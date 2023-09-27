@@ -4,12 +4,13 @@
 
 #import "ios/chrome/browser/ui/omnibox/keyboard_assist/omnibox_assistive_keyboard_delegate.h"
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/metrics/user_metrics.h"
 #import "base/metrics/user_metrics_action.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/shared/public/commands/lens_commands.h"
+#import "ios/chrome/browser/shared/public/commands/open_lens_input_selection_command.h"
 #import "ios/chrome/browser/shared/public/commands/qr_scanner_commands.h"
 #import "ios/chrome/browser/shared/ui/util/layout_guide_names.h"
 #import "ios/chrome/browser/shared/ui/util/util_swift.h"
@@ -18,16 +19,13 @@
 #import "ios/chrome/browser/ui/omnibox/omnibox_text_field_ios.h"
 #import "ios/public/provider/chrome/browser/voice_search/voice_search_api.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 @implementation OmniboxAssistiveKeyboardDelegateImpl
 
 @synthesize applicationCommandsHandler = _applicationCommandsHandler;
 @synthesize browserCoordinatorCommandsHandler =
     _browserCoordinatorCommandsHandler;
 @synthesize layoutGuideCenter = _layoutGuideCenter;
+@synthesize lensButton = _lensButton;
 @synthesize qrScannerCommandsHandler = _qrScannerCommandsHandler;
 @synthesize omniboxTextField = _omniboxTextField;
 
@@ -42,7 +40,7 @@
     // can be a regular view or a bar button item. Handle both cases.
     UIView* view;
     if ([sender isKindOfClass:[UIView class]]) {
-      view = base::mac::ObjCCastStrict<UIView>(sender);
+      view = base::apple::ObjCCastStrict<UIView>(sender);
     } else if ([sender isKindOfClass:[UIBarButtonItem class]]) {
       view = [sender valueForKey:@"view"];
     }
@@ -60,8 +58,12 @@
 
 - (void)keyboardAccessoryLensTapped {
   base::RecordAction(base::UserMetricsAction("MobileCustomRowLensSearch"));
-  [self.lensCommandsHandler
-      openInputSelectionForEntrypoint:LensEntrypoint::Keyboard];
+  OpenLensInputSelectionCommand* command = [[OpenLensInputSelectionCommand
+      alloc]
+          initWithEntryPoint:LensEntrypoint::Keyboard
+           presentationStyle:LensInputSelectionPresentationStyle::SlideFromRight
+      presentationCompletion:nil];
+  [self.lensCommandsHandler openLensInputSelection:command];
 }
 
 - (void)keyPressed:(NSString*)title {

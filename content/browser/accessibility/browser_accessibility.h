@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/strings/string_split.h"
 #include "build/build_config.h"
 #include "content/common/content_export.h"
@@ -239,8 +240,12 @@ class CONTENT_EXPORT BrowserAccessibility : public ui::AXPlatformNodeDelegate {
       const BrowserAccessibility* operator*();
 
      private:
-      const BrowserAccessibility* const parent_;
-      const BrowserAccessibility* const child_tree_root_;
+      // This field is not a raw_ptr<> because it was filtered by the rewriter
+      // for: #constexpr-ctor-field-initializer
+      RAW_PTR_EXCLUSION const BrowserAccessibility* const parent_;
+      // This field is not a raw_ptr<> because it was filtered by the rewriter
+      // for: #constexpr-ctor-field-initializer
+      RAW_PTR_EXCLUSION const BrowserAccessibility* const child_tree_root_;
       unsigned int index_;
     };
 
@@ -424,13 +429,9 @@ class CONTENT_EXPORT BrowserAccessibility : public ui::AXPlatformNodeDelegate {
   bool IsOffscreen() const override;
   bool IsWebContent() const override;
   bool HasVisibleCaretOrSelection() const override;
-  ui::AXPlatformNode* GetTargetNodeForRelation(
+  std::vector<ui::AXPlatformNode*> GetSourceNodesForReverseRelations(
       ax::mojom::IntAttribute attr) override;
-  std::vector<ui::AXPlatformNode*> GetTargetNodesForRelation(
-      ax::mojom::IntListAttribute attr) override;
-  std::set<ui::AXPlatformNode*> GetSourceNodesForReverseRelations(
-      ax::mojom::IntAttribute attr) override;
-  std::set<ui::AXPlatformNode*> GetSourceNodesForReverseRelations(
+  std::vector<ui::AXPlatformNode*> GetSourceNodesForReverseRelations(
       ax::mojom::IntListAttribute attr) override;
   absl::optional<int> GetPosInSet() const override;
   absl::optional<int> GetSetSize() const override;
@@ -513,11 +514,6 @@ class CONTENT_EXPORT BrowserAccessibility : public ui::AXPlatformNodeDelegate {
       const ui::AXCoordinateSystem coordinate_system,
       const ui::AXClippingBehavior clipping_behavior,
       ui::AXOffscreenResult* offscreen_result) const;
-
-  // Given a set of node ids, return the nodes in this delegate's tree to
-  // which they correspond.
-  std::set<ui::AXPlatformNode*> GetNodesForNodeIdSet(
-      const std::set<int32_t>& ids);
 
   // If the node has a child tree, get the root node.
   BrowserAccessibility* PlatformGetRootOfChildTree() const;

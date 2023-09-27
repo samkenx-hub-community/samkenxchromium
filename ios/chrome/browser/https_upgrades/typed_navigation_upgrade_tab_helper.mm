@@ -9,9 +9,9 @@
 #import "base/strings/string_number_conversions.h"
 #import "base/task/sequenced_task_runner.h"
 #import "components/security_interstitials/core/omnibox_https_upgrade_metrics.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/https_upgrades/https_upgrade_service_impl.h"
 #import "ios/chrome/browser/prerender/prerender_service.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/components/security_interstitials/https_only_mode/https_upgrade_service.h"
 #import "ios/web/public/navigation/https_upgrade_type.h"
 #import "ios/web/public/navigation/navigation_context.h"
@@ -19,10 +19,6 @@
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "net/base/mac/url_conversions.h"
 #import "ui/base/window_open_disposition.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using security_interstitials::omnibox_https_upgrades::Event;
 using security_interstitials::omnibox_https_upgrades::kEventHistogram;

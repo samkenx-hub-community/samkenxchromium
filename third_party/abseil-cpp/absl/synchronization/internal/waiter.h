@@ -20,6 +20,7 @@
 #include "absl/synchronization/internal/futex_waiter.h"
 #include "absl/synchronization/internal/pthread_waiter.h"
 #include "absl/synchronization/internal/sem_waiter.h"
+#include "absl/synchronization/internal/stdcpp_waiter.h"
 #include "absl/synchronization/internal/win32_waiter.h"
 
 // May be chosen at compile time via -DABSL_FORCE_WAITER_MODE=<index>
@@ -27,6 +28,7 @@
 #define ABSL_WAITER_MODE_SEM 1
 #define ABSL_WAITER_MODE_CONDVAR 2
 #define ABSL_WAITER_MODE_WIN32 3
+#define ABSL_WAITER_MODE_STDCPP 4
 
 #if defined(ABSL_FORCE_WAITER_MODE)
 #define ABSL_WAITER_MODE ABSL_FORCE_WAITER_MODE
@@ -38,6 +40,8 @@
 #define ABSL_WAITER_MODE ABSL_WAITER_MODE_SEM
 #elif defined(ABSL_INTERNAL_HAVE_PTHREAD_WAITER)
 #define ABSL_WAITER_MODE ABSL_WAITER_MODE_CONDVAR
+#elif defined(ABSL_INTERNAL_HAVE_STDCPP_WAITER)
+#define ABSL_WAITER_MODE ABSL_WAITER_MODE_STDCPP
 #else
 #error ABSL_WAITER_MODE is undefined
 #endif
@@ -54,6 +58,8 @@ using Waiter = SemWaiter;
 using Waiter = PthreadWaiter;
 #elif ABSL_WAITER_MODE == ABSL_WAITER_MODE_WIN32
 using Waiter = Win32Waiter;
+#elif ABSL_WAITER_MODE == ABSL_WAITER_MODE_STDCPP
+using Waiter = StdcppWaiter;
 #endif
 
 }  // namespace synchronization_internal

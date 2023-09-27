@@ -8,6 +8,8 @@
 #include <map>
 #include <memory>
 
+#include "base/memory/scoped_refptr.h"
+#include "content/browser/loader/keep_alive_url_loader.h"
 #include "content/common/content_export.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -17,23 +19,40 @@
 
 namespace content {
 
-// A service that stores bound SharedURLLoaderFactory mojo pipes. Every remote
-// of the pipes can be used to create a URLLoader that loads fetch keepalive
-// requests. The service is responsible for keeping the loaders in
-// `loader_receivers_`.
+class BrowserContext;
+class PolicyContainerHost;
+
+// A service that stores bound SharedURLLoaderFactory mojo pipes from renderers
+// of the same storage partition, and the intermediate URLLoader receivers, i.e.
+// KeepAliveURLLoader, they have created to load fetch keepalive requests.
 //
-// A renderer can ask this service to handle `fetch(..., {keepalive: true})` or
-// `navigator.sendBeacon()` requests by using a remote of URLLoaderFactory bound
-// to this service by `BindFactory()`,
+// A fetch keepalive request is originated from a JS call to
+// `fetch(..., {keepalive: true})` or `navigator.sendBeacon()`. A renderer can
+// ask this service to handle such request by using a remote of
+// mojom::URLLoaderFactory bound to this service by `BindFactory()`, which also
+// binds RenderFrameHostImpl-specific context with every receiver.
+//
+// Calling the remote `CreateLoaderAndStart()` of a factory will create a
+// `KeepAliveURLLoader` here in browser. The service is responsible for keeping
+// these loaders in `loader_receivers_` until the corresponding request
+// completes or fails.
 //
 // Handling keepalive requests in this service allows a request to continue even
-// if a renderer unloads before completion, i.e. the request is "keepalive".
+// if a renderer unloads before completion, i.e. the request is "keepalive",
+// without needing the renderer to stay extra longer than the necessary time.
+//
+// This service is created and stored in every `StoragePartitionImpl` instance.
+// Hence, its lifetime is the same as the owner StoragePartition for a partition
+// domain, which should be generally longer than any of the renderers spawned
+// from the partition domain.
 //
 // Design Doc:
-// https://docs.google.com/document/d/1ZzxMMBvpqn8VZBZKnb7Go8TWjnrGcXuLS_USwVVRUvY/edit#
+// https://docs.google.com/document/d/1ZzxMMBvpqn8VZBZKnb7Go8TWjnrGcXuLS_USwVVRUvY
 class CONTENT_EXPORT KeepAliveURLLoaderService {
  public:
-  explicit KeepAliveURLLoaderService();
+  // `browser_context` owns the StoragePartition creating the instance of this
+  // service. It must not be null and surpass the lifetime of this service.
+  explicit KeepAliveURLLoaderService(BrowserContext* browser_context);
   ~KeepAliveURLLoaderService();
 
   // Not Copyable.
@@ -41,17 +60,28 @@ class CONTENT_EXPORT KeepAliveURLLoaderService {
   KeepAliveURLLoaderService& operator=(const KeepAliveURLLoaderService&) =
       delete;
 
-  // Binds the pending `receiver` with this service, using `pending_factory`.
+  // Binds the pending `receiver` with this service, using
+  // `subresource_proxying_factory_bundle`.
   //
   // The remote of `receiver` can be passed to another process, i.e. renderer,
-  // to handle fetch keepalive requests.
+  // from which to create new fetch keepalive requests.
+  //
+  // `policy_container_host` is the policy host of the requester frame going to
+  // use the remote of `receiver` to load requests. It must not be null.
   void BindFactory(
       mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
-      std::unique_ptr<network::PendingSharedURLLoaderFactory> pending_factory);
+      scoped_refptr<network::SharedURLLoaderFactory>
+          subresource_proxying_factory_bundle,
+      scoped_refptr<PolicyContainerHost> policy_container_host);
 
   // For testing only:
   size_t NumLoadersForTesting() const;
   size_t NumDisconnectedLoadersForTesting() const;
+  void SetLoaderObserverForTesting(
+      scoped_refptr<KeepAliveURLLoader::TestObserver> observer);
+  void SetURLLoaderThrottlesGetterForTesting(
+      KeepAliveURLLoader::URLLoaderThrottlesGetter
+          url_loader_throttles_getter_for_testing);
 
  private:
   class KeepAliveURLLoaderFactory;
@@ -63,6 +93,9 @@ class CONTENT_EXPORT KeepAliveURLLoaderService {
   // `loader_receivers_` or `disconnected_loaders_`.
   void RemoveLoader(mojo::ReceiverId loader_receiver_id);
 
+  // The browsing session that owns this instance of the service.
+  const raw_ptr<BrowserContext> browser_context_;
+
   // Many-to-one mojo receiver of URLLoaderFactory.
   std::unique_ptr<KeepAliveURLLoaderFactory> factory_;
 
@@ -71,14 +104,21 @@ class CONTENT_EXPORT KeepAliveURLLoaderService {
   // Once a receiver is disconnected, its context should be moved to
   // `disconnected_loaders_`.
   mojo::ReceiverSet<network::mojom::URLLoader,
-                    std::unique_ptr<network::mojom::URLLoader>>
+                    std::unique_ptr<KeepAliveURLLoader>>
       loader_receivers_;
 
   // Holds all the KeepAliveURLLoader that has been disconnected from renderers.
   // They should be kept alive until the request completes or fails.
   // The key is the mojo::ReceiverId assigned by `loader_receivers_`.
-  std::map<mojo::ReceiverId, std::unique_ptr<network::mojom::URLLoader>>
+  std::map<mojo::ReceiverId, std::unique_ptr<KeepAliveURLLoader>>
       disconnected_loaders_;
+
+  // For testing only:
+  // Not owned.
+  scoped_refptr<KeepAliveURLLoader::TestObserver> loader_test_observer_ =
+      nullptr;
+  KeepAliveURLLoader::URLLoaderThrottlesGetter
+      url_loader_throttles_getter_for_testing_ = base::NullCallback();
 };
 
 }  // namespace content

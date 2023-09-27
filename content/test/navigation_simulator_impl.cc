@@ -18,9 +18,9 @@
 #include "content/browser/renderer_host/render_frame_host_impl.h"
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/common/content_navigation_policy.h"
+#include "content/common/features.h"
 #include "content/common/navigation_params_utils.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/common/content_features.h"
 #include "content/public/common/url_utils.h"
 #include "content/test/test_navigation_url_loader.h"
 #include "content/test/test_render_frame_host.h"
@@ -32,6 +32,7 @@
 #include "net/url_request/redirect_info.h"
 #include "services/metrics/public/cpp/ukm_recorder.h"
 #include "services/network/public/mojom/fetch_api.mojom.h"
+#include "services/network/public/mojom/url_response_head.mojom.h"
 #include "third_party/blink/public/common/chrome_debug_urls.h"
 #include "third_party/blink/public/common/navigation/navigation_params.h"
 #include "third_party/blink/public/mojom/loader/mixed_content.mojom.h"
@@ -406,7 +407,7 @@ void NavigationSimulatorImpl::InitializeFromStartedRequest(
 
   if (!browser_initiated_ && request_->GetInitiatorFrameToken().has_value()) {
     SetInitiatorFrame(RenderFrameHostImpl::FromFrameToken(
-        request_->GetInitiatorProcessID(),
+        request_->GetInitiatorProcessId(),
         request_->GetInitiatorFrameToken().value()));
   }
 
@@ -612,12 +613,18 @@ void NavigationSimulatorImpl::ReadyToCommit() {
       url_loader->SimulateEarlyHintsPreloadLinkHeaderReceived();
     }
 
+    auto response = network::mojom::URLResponseHead::New();
+    response->remote_endpoint = remote_endpoint_;
+    response->was_fetched_via_cache = was_fetched_via_cache_;
+    response->is_signed_exchange_inner_response =
+        is_signed_exchange_inner_response_;
+    response->connection_info = http_connection_info_;
+    response->ssl_info = ssl_info_;
+    response->headers = response_headers_;
+    response->dns_aliases = response_dns_aliases_;
     static_cast<TestRenderFrameHost*>(frame_tree_node_->current_frame_host())
         ->PrepareForCommitDeprecatedForNavigationSimulator(
-            remote_endpoint_, was_fetched_via_cache_,
-            is_signed_exchange_inner_response_, http_connection_info_,
-            ssl_info_, response_headers_, std::move(response_body_),
-            response_dns_aliases_);
+            std::move(response), std::move(response_body_));
   }
 
   // Synchronous failure can cause the navigation to finish here.
@@ -1155,6 +1162,13 @@ void NavigationSimulatorImpl::BrowserInitiatedStartAndWaitBeforeUnload() {
   state_ = WAITING_BEFORE_UNLOAD;
 }
 
+void NavigationSimulatorImpl::RenderFrameDeleted(
+    RenderFrameHost* render_frame_host) {
+  if (initiator_frame_host_ == render_frame_host) {
+    initiator_frame_host_ = nullptr;
+  }
+}
+
 void NavigationSimulatorImpl::DidStartNavigation(
     NavigationHandle* navigation_handle) {
   // Check if this navigation is the one we're simulating.
@@ -1329,13 +1343,13 @@ bool NavigationSimulatorImpl::SimulateRendererInitiatedStart() {
           nullptr /* trust_token_params */, impression_,
           base::TimeTicks() /* renderer_before_unload_start */,
           base::TimeTicks() /* renderer_before_unload_end */,
-          absl::nullopt /* web_bundle_token */,
           has_user_gesture_
               ? blink::mojom::NavigationInitiatorActivationAndAdStatus::
                     kStartedWithTransientActivationFromNonAd
               : blink::mojom::NavigationInitiatorActivationAndAdStatus::
                     kDidNotStartWithTransientActivation,
-          false /* is_container_initiated */);
+          false /* is_container_initiated */,
+          false /* is_fullscreen_requested */, false /* has_storage_access */);
   auto common_params = blink::CreateCommonNavigationParams();
   common_params->navigation_start = base::TimeTicks::Now();
   common_params->input_start = navigation_input_start_;
@@ -1553,6 +1567,9 @@ NavigationSimulatorImpl::BuildDidCommitProvisionalLoadParams(
   }
 
   // This mirrors the calculation in
+  // RenderFrameImpl::MakeDidCommitProvisionalLoadParams.
+  // TODO(wjmaclean): If params->url is about:blank or about:srcdoc then we
+  // should also populate params->initiator_base_url in a manner similar to
   // RenderFrameImpl::MakeDidCommitProvisionalLoadParams.
   if (same_document) {
     params->origin = current_rfh->GetLastCommittedOrigin();

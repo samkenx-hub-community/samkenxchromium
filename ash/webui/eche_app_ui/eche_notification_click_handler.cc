@@ -12,8 +12,7 @@
 #include "chromeos/ash/components/multidevice/logging/logging.h"
 #include "chromeos/ash/components/phonehub/phone_hub_manager.h"
 
-namespace ash {
-namespace eche_app {
+namespace ash::eche_app {
 
 EcheNotificationClickHandler::EcheNotificationClickHandler(
     phonehub::PhoneHubManager* phone_hub_manager,
@@ -47,17 +46,18 @@ void EcheNotificationClickHandler::HandleNotificationClick(
   const LaunchAppHelper::AppLaunchProhibitedReason prohibited_reason =
       launch_app_helper_->CheckAppLaunchProhibitedReason(
           feature_status_provider_->GetStatus());
+
   switch (prohibited_reason) {
     case LaunchAppHelper::AppLaunchProhibitedReason::kNotProhibited:
       base::UmaHistogramEnumeration(
           "Eche.AppStream.LaunchAttempt",
           mojom::AppStreamLaunchEntryPoint::NOTIFICATION);
-      apps_launch_info_provider_->SetEntryPoint(
+      apps_launch_info_provider_->SetAppLaunchInfo(
           mojom::AppStreamLaunchEntryPoint::NOTIFICATION);
       launch_app_helper_->LaunchEcheApp(
           notification_id, app_metadata.package_name,
           app_metadata.visible_app_name, app_metadata.user_id,
-          app_metadata.icon,
+          app_metadata.color_icon,
           phone_model_->phone_name().value_or(std::u16string()),
           apps_launch_info_provider_);
       break;
@@ -95,5 +95,4 @@ bool EcheNotificationClickHandler::IsClickable(FeatureStatus status) {
          status == FeatureStatus::kConnected;
 }
 
-}  // namespace eche_app
-}  // namespace ash
+}  // namespace ash::eche_app

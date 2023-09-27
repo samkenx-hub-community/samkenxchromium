@@ -44,7 +44,7 @@ public class SearchResumptionModuleView extends LinearLayout {
 
     void setExpandCollapseCallback(Callback<Boolean> callback) {
         mHeaderView.setOnClickListener(v -> {
-            boolean shouldExpand = mTileContainerView.isExpanded() ? false : true;
+            boolean shouldExpand = !mTileContainerView.isExpanded();
             configureExpandedCollapsed(shouldExpand, false /* isFirstSetup */);
             callback.onResult(shouldExpand);
         });
@@ -60,9 +60,9 @@ public class SearchResumptionModuleView extends LinearLayout {
     private void configureExpandedCollapsed(boolean shouldExpand, boolean isFirstSetup) {
         if (isFirstSetup || mTileContainerView.isExpanded() != shouldExpand) {
             if (shouldExpand) {
-                mOptionView.setImageResource(org.chromium.ui.R.drawable.ic_expand_less_black_24dp);
+                mOptionView.setImageResource(R.drawable.ic_expand_less_black_24dp);
             } else {
-                mOptionView.setImageResource(org.chromium.ui.R.drawable.ic_expand_more_black_24dp);
+                mOptionView.setImageResource(R.drawable.ic_expand_more_black_24dp);
             }
             String collapseOrExpandedText = getContext().getResources().getString(shouldExpand
                             ? R.string.accessibility_expanded

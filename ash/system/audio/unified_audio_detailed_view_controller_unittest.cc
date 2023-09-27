@@ -14,11 +14,15 @@
 #include "ash/system/audio/mic_gain_slider_view.h"
 #include "ash/system/audio/unified_volume_slider_controller.h"
 #include "ash/system/tray/hover_highlight_view.h"
+#include "ash/system/unified/unified_slider_view.h"
 #include "ash/system/unified/unified_system_tray_controller.h"
 #include "ash/system/unified/unified_system_tray_model.h"
 #include "ash/test/ash_test_base.h"
+#include "base/containers/contains.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "chromeos/ash/components/audio/audio_devices_pref_handler.h"
 #include "chromeos/ash/components/audio/audio_devices_pref_handler_stub.h"
@@ -33,6 +37,7 @@
 #include "ui/events/base_event_utils.h"
 #include "ui/views/controls/button/toggle_button.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/slider.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/widget/widget.h"
 
@@ -43,6 +48,7 @@ constexpr uint64_t kMicJackId = 10010;
 constexpr uint64_t kInternalMicId = 10003;
 constexpr uint64_t kFrontMicId = 10012;
 constexpr uint64_t kRearMicId = 10013;
+constexpr uint64_t kNbsMicId = 10020;
 const uint64_t kInternalSpeakerId = 10001;
 const uint64_t kHeadphoneId = 10002;
 constexpr uint64_t kDualInternalMicId = 0;
@@ -80,6 +86,9 @@ const uint32_t kOutputMaxSupportedChannels = 2;
 
 const int32_t kInputNumberOfVolumeSteps = 0;
 const int32_t kOutputNumberOfVolumeSteps = 25;
+
+const AudioNodeInfo kNbsMic[] = {
+    {true, kNbsMicId, "Fake Nbs Mic", "BLUETOOTH_NB_MIC", "Nbs Mic", 0}};
 
 const AudioNodeInfo kMicJack[] = {
     {true, kMicJackId, "Fake Mic Jack", "MIC", "Mic Jack", 0}};
@@ -140,6 +149,8 @@ class UnifiedAudioDetailedViewControllerTest
   void SetUp() override {
     if (IsQsRevampEnabled()) {
       scoped_feature_list_.InitAndEnableFeature(features::kQsRevamp);
+    } else {
+      scoped_feature_list_.InitAndDisableFeature(features::kQsRevamp);
     }
     AshTestBase::SetUp();
 
@@ -223,6 +234,48 @@ class UnifiedAudioDetailedViewControllerTest
     return audio_detailed_view_.get();
   }
 
+  void CheckSliderFocusBehavior(views::Widget* widget,
+                                bool is_input_slider,
+                                uint64_t device_id) {
+    SCOPED_TRACE(
+        base::StringPrintf("Test params: is_input_slider=%d", is_input_slider));
+
+    auto sliders_map =
+        is_input_slider ? input_sliders_map_ : output_sliders_map_;
+    EXPECT_TRUE(base::Contains(sliders_map, device_id));
+
+    auto* unified_slider_view =
+        static_cast<UnifiedSliderView*>(sliders_map.find(device_id)->second);
+    widget->SetContentsView(unified_slider_view);
+
+    views::Slider* slider = unified_slider_view->slider();
+    IconButton* slider_button = unified_slider_view->slider_button();
+    // `slider` is normally focusable, and `slider_button` is accessibility
+    // focusable.
+    EXPECT_TRUE(slider->IsFocusable());
+    EXPECT_FALSE(slider_button->IsFocusable());
+    EXPECT_TRUE(slider_button->IsAccessibilityFocusable());
+
+    slider->RequestFocus();
+    EXPECT_STREQ(slider->GetFocusManager()->GetFocusedView()->GetClassName(),
+                 "QuickSettingsSlider");
+
+    const bool is_muted =
+        is_input_slider
+            ? cras_audio_handler_->IsInputMutedForDevice(device_id)
+            : cras_audio_handler_->IsOutputMutedForDevice(device_id);
+
+    // Presses the enter key when focused on the slider will toggle mute state.
+    GetEventGenerator()->PressAndReleaseKey(ui::KeyboardCode::VKEY_RETURN);
+    if (is_input_slider) {
+      EXPECT_EQ(cras_audio_handler_->IsInputMutedForDevice(device_id),
+                !is_muted);
+    } else {
+      EXPECT_EQ(cras_audio_handler_->IsOutputMutedForDevice(device_id),
+                !is_muted);
+    }
+  }
+
   HoverHighlightView* live_caption_view() {
     return GetAudioDetailedView()->live_caption_view_;
   }
@@ -241,6 +294,11 @@ class UnifiedAudioDetailedViewControllerTest
     return Shell::Get()->accessibility_controller()->live_caption().enabled();
   }
 
+  views::View* nbs_warning_view() {
+    return GetAudioDetailedView()->GetViewByID(
+        AudioDetailedView::AudioDetailedViewID::kNbsWarningView);
+  }
+
   std::map<uint64_t, views::View*> input_sliders_map_;
   std::map<uint64_t, views::View*> output_sliders_map_;
   std::map<uint64_t, views::View*> toggles_map_;
@@ -250,7 +308,8 @@ class UnifiedAudioDetailedViewControllerTest
       map_output_device_sliders_callback_;
   AudioDetailedView::NoiseCancellationCallback
       noise_cancellation_toggle_callback_;
-  CrasAudioHandler* cras_audio_handler_ = nullptr;  // Not owned.
+  raw_ptr<CrasAudioHandler, DanglingUntriaged | ExperimentalAsh>
+      cras_audio_handler_ = nullptr;  // Not owned.
   scoped_refptr<AudioDevicesPrefHandlerStub> audio_pref_handler_;
   std::unique_ptr<UnifiedAudioDetailedViewController>
       audio_detailed_view_controller_;
@@ -258,11 +317,40 @@ class UnifiedAudioDetailedViewControllerTest
   std::unique_ptr<UnifiedSystemTrayController> tray_controller_;
   base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<AudioDetailedView> audio_detailed_view_;
+  base::HistogramTester histogram_tester_;
 };
 
 INSTANTIATE_TEST_SUITE_P(All,
                          UnifiedAudioDetailedViewControllerTest,
                          testing::Bool() /* IsQsRevampEnabled() */);
+
+TEST_P(UnifiedAudioDetailedViewControllerTest, ToggleNbsWarning) {
+  scoped_feature_list_.Reset();
+  if (!IsQsRevampEnabled()) {
+    scoped_feature_list_.InitWithFeatures({ash::features::kAudioHFPNbsWarning},
+                                          {});
+  } else {
+    scoped_feature_list_.InitWithFeatures(
+        {ash::features::kAudioHFPNbsWarning, features::kQsRevamp}, {});
+  }
+
+  fake_cras_audio_client()->SetAudioNodesAndNotifyObserversForTesting(
+      GenerateAudioNodeList({kMicJack, kNbsMic}));
+
+  auto jack_mic = AudioDevice(GenerateAudioNode(kMicJack));
+  cras_audio_handler_->SwitchToDevice(jack_mic, true,
+                                      CrasAudioHandler::ACTIVATE_BY_USER);
+  EXPECT_FALSE(nbs_warning_view());
+
+  auto nbs_mic = AudioDevice(GenerateAudioNode(kNbsMic));
+  cras_audio_handler_->SwitchToDevice(nbs_mic, true,
+                                      CrasAudioHandler::ACTIVATE_BY_USER);
+  EXPECT_TRUE(nbs_warning_view());
+
+  cras_audio_handler_->SwitchToDevice(jack_mic, true,
+                                      CrasAudioHandler::ACTIVATE_BY_USER);
+  EXPECT_FALSE(nbs_warning_view());
+}
 
 TEST_P(UnifiedAudioDetailedViewControllerTest, OneInputSlider) {
   std::unique_ptr<views::View> view =
@@ -536,12 +624,16 @@ TEST_P(UnifiedAudioDetailedViewControllerTest,
     EXPECT_TRUE(audio_pref_handler_->GetNoiseCancellationState());
 
     cras_audio_handler_->SetNoiseCancellationState(
-        /*noise_cancellation_on=*/false);
+        /*noise_cancellation_on=*/false,
+        CrasAudioHandler::AudioSettingsChangeSource::kSystemTray);
 
     EXPECT_EQ(1u, toggles_map_.size());
     // The toggle updates the pref correctly.
     EXPECT_FALSE(noise_cancellation_button()->GetIsOn());
     EXPECT_FALSE(audio_pref_handler_->GetNoiseCancellationState());
+    histogram_tester_.ExpectBucketCount(
+        CrasAudioHandler::kNoiseCancellationEnabledSourceHistogramName,
+        CrasAudioHandler::AudioSettingsChangeSource::kSystemTray, 1);
   } else {
     auto widget = CreateFramelessTestWidget();
     widget->SetContentsView(noise_cancellation_button());
@@ -551,11 +643,15 @@ TEST_P(UnifiedAudioDetailedViewControllerTest,
     EXPECT_TRUE(audio_pref_handler_->GetNoiseCancellationState());
 
     cras_audio_handler_->SetNoiseCancellationState(
-        /*noise_cancellation_on=*/false);
+        /*noise_cancellation_on=*/false,
+        CrasAudioHandler::AudioSettingsChangeSource::kSystemTray);
 
     // The noise cancellation button updates the pref correctly.
     EXPECT_FALSE(noise_cancellation_button()->GetIsOn());
     EXPECT_FALSE(audio_pref_handler_->GetNoiseCancellationState());
+    histogram_tester_.ExpectBucketCount(
+        CrasAudioHandler::kNoiseCancellationEnabledSourceHistogramName,
+        CrasAudioHandler::AudioSettingsChangeSource::kSystemTray, 1);
   }
 }
 
@@ -594,6 +690,65 @@ TEST_P(UnifiedAudioDetailedViewControllerTest, LiveCaptionNotAvailable) {
     EXPECT_TRUE(live_caption_view());
   }
   EXPECT_FALSE(live_caption_enabled());
+}
+
+TEST_P(UnifiedAudioDetailedViewControllerTest, SliderFocusToggleMute) {
+  // Pre-revamped slider has a different focus behavior
+  if (!IsQsRevampEnabled()) {
+    return;
+  }
+
+  std::unique_ptr<views::View> view =
+      audio_detailed_view_controller_->CreateView();
+  auto widget = CreateFramelessTestWidget();
+  fake_cras_audio_client()->SetAudioNodesAndNotifyObserversForTesting(
+      GenerateAudioNodeList({kInternalMic, kInternalSpeaker}));
+
+  // Sets the level to make sure the slider's volume is not 0. Otherwise the
+  // slider is still muted even if it's toggled on.
+  const int gain = 80;
+  cras_audio_handler_->SetVolumeGainPercentForDevice(kInternalMicId, gain);
+  cras_audio_handler_->SetVolumeGainPercentForDevice(kInternalSpeakerId, gain);
+
+  cras_audio_handler_->SwitchToDevice(
+      AudioDevice(GenerateAudioNode(kInternalMic)), true,
+      CrasAudioHandler::ACTIVATE_BY_USER);
+  CheckSliderFocusBehavior(widget.get(), /*is_input_slider=*/true,
+                           kInternalMicId);
+
+  cras_audio_handler_->SwitchToDevice(
+      AudioDevice(GenerateAudioNode(kInternalSpeaker)), true,
+      CrasAudioHandler::ACTIVATE_BY_USER);
+  CheckSliderFocusBehavior(widget.get(), /*is_input_slider=*/false,
+                           kInternalSpeakerId);
+}
+
+TEST_P(UnifiedAudioDetailedViewControllerTest,
+       BluetoothOutputDeviceVolumeChange) {
+  std::unique_ptr<views::View> view =
+      audio_detailed_view_controller_->CreateView();
+  fake_cras_audio_client()->SetAudioNodesAndNotifyObserversForTesting(
+      GenerateAudioNodeList({kHeadphone}));
+
+  cras_audio_handler_->SwitchToDevice(
+      AudioDevice(GenerateAudioNode(kHeadphone)), true,
+      CrasAudioHandler::ACTIVATE_BY_USER);
+  EXPECT_EQ(kHeadphoneId, cras_audio_handler_->GetPrimaryActiveOutputNode());
+
+  // Sets the device level to 0 to mute the device.
+  cras_audio_handler_->SetVolumeGainPercentForDevice(kHeadphoneId, /*value=*/0);
+
+  // For QsRevamp: level is 0 state should be equal to the muted state.
+  if (IsQsRevampEnabled()) {
+    EXPECT_TRUE(cras_audio_handler_->IsOutputMutedForDevice(kHeadphoneId));
+  } else {
+    EXPECT_FALSE(cras_audio_handler_->IsOutputMutedForDevice(kHeadphoneId));
+  }
+
+  // Unmute the device by setting a volume level greater than 0.
+  cras_audio_handler_->SetVolumeGainPercentForDevice(kHeadphoneId,
+                                                     /*value=*/10);
+  EXPECT_FALSE(cras_audio_handler_->IsOutputMutedForDevice(kHeadphoneId));
 }
 
 class UnifiedAudioDetailedViewControllerSodaTest

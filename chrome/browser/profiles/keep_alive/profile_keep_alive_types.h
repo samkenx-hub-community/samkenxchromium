@@ -86,6 +86,9 @@ enum class ProfileKeepAliveOrigin {
   kExtensionUpdater = 18,
 
   // This profile is being created (and is used to render GAIA sign-in flow).
+  // The profile creation flow either opens a browser window before
+  // kProfileCreationFlow keep alive is released or gets aborted without opening
+  // a browser window and in that case the profile should be removed.
   kProfileCreationFlow = 19,
 
   // The user just closed a notification. This might cause writing to the
@@ -135,7 +138,26 @@ enum class ProfileKeepAliveOrigin {
   // This keeps the profile alive while the connection is active.
   kDriveFsNativeMessageHostLacros = 31,
 
-  kMaxValue = kDriveFsNativeMessageHostLacros,
+  // Used during the deletion process for the respective profile. Avoids the
+  // profile from being randomly unloaded. Useful to keep an ephemeral profile
+  // alive until their deletion is completed, after releasing its last keep
+  // alive.
+  kProfileDeletionProcess = 32,
+
+  // Used when displaying the statistics for a profile in the Profile Picker,
+  // when deleting this profile.
+  kProfileStatistics = 33,
+
+  // Used during installation of an Isolated Web App.
+  kIsolatedWebAppInstall = 34,
+
+  // Used during update of an Isolated Web App.
+  kIsolatedWebAppUpdate = 35,
+
+  // A web app is being uninstalled.
+  kWebAppUninstall = 36,
+
+  kMaxValue = kWebAppUninstall,
 };
 
 std::ostream& operator<<(std::ostream& out,

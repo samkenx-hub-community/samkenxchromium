@@ -5,19 +5,18 @@
 #ifndef CHROME_BROWSER_WEB_APPLICATIONS_OS_INTEGRATION_FILE_HANDLING_SUB_MANAGER_H_
 #define CHROME_BROWSER_WEB_APPLICATIONS_OS_INTEGRATION_FILE_HANDLING_SUB_MANAGER_H_
 
+#include "base/files/file_path.h"
 #include "base/functional/callback_forward.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_sub_manager.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.pb.h"
 #include "chrome/browser/web_applications/web_app_id.h"
-
-class Profile;
+#include "components/webapps/common/web_app_id.h"
 
 namespace web_app {
 
-class WebAppRegistrar;
-class WebAppSyncBridge;
+class WebAppProvider;
 
 std::set<std::string> GetFileExtensionsFromFileHandlingProto(
     const proto::FileHandling& file_handling);
@@ -28,36 +27,33 @@ std::set<std::string> GetMimeTypesFromFileHandlingProto(
 // Used to track updates to the file handlers for a web app.
 class FileHandlingSubManager : public OsIntegrationSubManager {
  public:
-  FileHandlingSubManager(Profile& profile,
-                         WebAppRegistrar& registrar,
-                         WebAppSyncBridge& sync_bridge);
+  FileHandlingSubManager(const base::FilePath& profile_path,
+                         WebAppProvider& provider);
   ~FileHandlingSubManager() override;
-  void Start() override;
-  void Shutdown() override;
 
-  void Configure(const AppId& app_id,
+  void Configure(const webapps::AppId& app_id,
                  proto::WebAppOsIntegrationState& desired_state,
                  base::OnceClosure configure_done) override;
-  void Execute(const AppId& app_id,
+  void Execute(const webapps::AppId& app_id,
                const absl::optional<SynchronizeOsOptions>& synchronize_options,
                const proto::WebAppOsIntegrationState& desired_state,
                const proto::WebAppOsIntegrationState& current_state,
                base::OnceClosure callback) override;
+  void ForceUnregister(const webapps::AppId& app_id,
+                       base::OnceClosure callback) override;
 
  private:
-  void Unregister(const AppId& app_id,
+  void Unregister(const webapps::AppId& app_id,
                   const proto::WebAppOsIntegrationState& desired_state,
                   const proto::WebAppOsIntegrationState& current_state,
                   base::OnceClosure callback);
 
-  void Register(const AppId& app_id,
+  void Register(const webapps::AppId& app_id,
                 const proto::WebAppOsIntegrationState& desired_state,
                 base::OnceClosure callback);
 
-  const raw_ref<Profile> profile_;
-
-  const raw_ref<WebAppRegistrar> registrar_;
-  const raw_ref<WebAppSyncBridge> sync_bridge_;
+  const base::FilePath profile_path_;
+  const raw_ref<WebAppProvider> provider_;
 
   base::WeakPtrFactory<FileHandlingSubManager> weak_ptr_factory_{this};
 };

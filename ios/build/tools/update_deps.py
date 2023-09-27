@@ -64,12 +64,16 @@ GRIT_TARGET_MESSAGE_DETAILS = "Automatically replacing:\n  %s\nby:\n  %s\n"
 CANONICAL_PUBLIC_TARGETS = {
     "//ios/chrome/app/strings:ios_strings_grit":
     "//ios/chrome/app/strings:strings",
-    "//ios/chrome/app/strings:ios_google_chrome_strings_grit":
-    "//ios/chrome/app/strings:strings",
-    "//ios/chrome/app/strings:ios_chromium_strings_grit":
+    "//ios/chrome/app/strings:ios_branded_strings_grit":
     "//ios/chrome/app/strings:strings",
     "//components/strings:components_strings_grit":
     "//components/strings:strings",
+    "//components/sessions:shared":
+    "//components/sessions:sessions",
+    "//base/numerics:base_numerics":
+    "//base:base",
+    "//third_party/abseil-cpp/absl/types:optional":
+    "//base:base",
 }
 
 
@@ -177,6 +181,14 @@ def add_missing_deps(srcdir, target, deps):
     changed = False
     first_deps_variable_line_index = -1
     target_name = target_name.replace("+", "\\+")
+
+    # Handles the internal targets from ios_app_bundle and
+    # ios_framework_bundle templates.
+    for suffix in ('_executable', '_shared_library'):
+        if target_name.endswith(suffix):
+            target_name = target_name[:-len(suffix)]
+            break
+
     target_rule = re.compile("\s*[a-z_]*\(\"%s\"\) {" % target_name)
     with open(build_gn_file, "r") as build_gn:
         all_lines = build_gn.readlines()

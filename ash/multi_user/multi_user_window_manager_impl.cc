@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "ash/multi_user/multi_user_window_manager_impl.h"
+#include "base/memory/raw_ptr.h"
 
 #include <set>
 #include <vector>
@@ -16,6 +17,7 @@
 #include "ash/wm/desks/desks_util.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "base/auto_reset.h"
+#include "base/containers/contains.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window.h"
 #include "ui/base/ui_base_types.h"
@@ -81,7 +83,7 @@ class AnimationSetter {
 
  private:
   // The window which gets used.
-  aura::Window* window_;
+  raw_ptr<aura::Window, ExperimentalAsh> window_;
 
   // Previous animation type.
   const int previous_animation_type_;
@@ -481,8 +483,7 @@ void MultiUserWindowManagerImpl::AddTransientOwnerRecursive(
     return;
 
   // Remember the current visibility.
-  DCHECK(transient_window_to_visibility_.find(window) ==
-         transient_window_to_visibility_.end());
+  DCHECK(!base::Contains(transient_window_to_visibility_, window));
   transient_window_to_visibility_[window] = window->IsVisible();
 
   // Add observers to track state changes.

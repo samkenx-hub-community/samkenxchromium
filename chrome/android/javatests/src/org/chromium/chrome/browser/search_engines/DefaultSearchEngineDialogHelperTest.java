@@ -5,11 +5,11 @@
 package org.chromium.chrome.browser.search_engines;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.RadioButton;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Assert;
@@ -103,7 +103,7 @@ public class DefaultSearchEngineDialogHelperTest {
 
     @Before
     public void setUp() {
-        mContext = InstrumentationRegistry.getTargetContext();
+        mContext = ApplicationProvider.getApplicationContext();
 
         mTemplateUrls.clear();
         mTemplateUrls.add(new TestTemplateUrl("Google: Search by Google", "keyword 1"));

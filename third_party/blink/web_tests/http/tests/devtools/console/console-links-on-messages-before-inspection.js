@@ -2,11 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
   TestRunner.addResult(
       `Tests a handling of a click on the link in a message, which had been shown before its originating script was added.\n`);
 
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('console');
 
   await TestRunner.evaluateInPagePromise(`
@@ -20,12 +26,12 @@
   `);
 
 
-  var message = new SDK.ConsoleMessage(
+  var message = new SDK.ConsoleModel.ConsoleMessage(
       TestRunner.runtimeModel, Protocol.Log.LogEntrySource.JS,
       Protocol.Log.LogEntryLevel.Info, 'hello?',
       {url: 'http://127.0.0.1:8000/devtools/resources/source2.js'});
 
-  const consoleModel = SDK.targetManager.primaryPageTarget().model(SDK.ConsoleModel);
+  const consoleModel = SDK.TargetManager.TargetManager.instance().primaryPageTarget().model(SDK.ConsoleModel.ConsoleModel);
   consoleModel.addMessage(message);
   TestRunner.debuggerModel.addEventListener(SDK.DebuggerModel.Events.ParsedScriptSource, onScriptAdded);
   await ConsoleTestRunner.dumpConsoleMessages();
@@ -46,7 +52,7 @@
     TestRunner.completeTest();
   };
 
-  UI.inspectorView.tabbedPane.addEventListener(UI.TabbedPane.Events.TabSelected, panelChanged);
+  UI.inspectorView.tabbedPane.addEventListener(UIModule.TabbedPane.Events.TabSelected, panelChanged);
 
   function panelChanged() {
     TestRunner.addResult('Panel ' + UI.inspectorView.tabbedPane.currentTab.id + ' was opened');

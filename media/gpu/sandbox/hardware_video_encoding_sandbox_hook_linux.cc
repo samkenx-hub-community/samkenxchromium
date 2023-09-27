@@ -108,7 +108,7 @@ bool HardwareVideoEncodingPreSandboxHook(
   // of VA-API/V4L2. That means that bots like linux-chromeos-rel would end up
   // reaching this presandbox hook.
 #if BUILDFLAG(USE_VAAPI)
-  VaapiWrapper::PreSandboxInitialization();
+  VaapiWrapper::PreSandboxInitialization(/*allow_disabling_global_lock=*/true);
 
   if (options.use_amd_specific_policies) {
     const char* radeonsi_lib = "/usr/lib64/dri/radeonsi_dri.so";
@@ -121,20 +121,7 @@ bool HardwareVideoEncodingPreSandboxHook(
       return false;
     }
   }
-#elif BUILDFLAG(USE_V4L2_CODEC)
-  if (V4L2Device::UseLibV4L2()) {
-#if defined(__aarch64__)
-    dlopen("/usr/lib64/libv4l2.so", RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
-    dlopen("/usr/lib64/libv4l/plugins/libv4l-encplugin.so",
-           RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
-#else
-    dlopen("/usr/lib/libv4l2.so", RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
-    dlopen("/usr/lib/libv4l/plugins/libv4l-encplugin.so",
-           RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
-#endif  // defined(__aarch64__)
-  }
 #endif
-
   return true;
 }
 

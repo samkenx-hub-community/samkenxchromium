@@ -19,7 +19,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_dialogs.h"
 #include "chrome/browser/ui/chrome_pages.h"
-#include "chrome/browser/ui/profile_picker.h"
+#include "chrome/browser/ui/profiles/profile_picker.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/common/buildflags.h"
 #include "chrome/common/chrome_switches.h"
@@ -34,8 +34,8 @@
 #include "ui/base/resource/resource_bundle.h"
 
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
-#include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
+#include "components/supervised_user/core/browser/supervised_user_service.h"
 #endif
 
 using content::BrowserThread;
@@ -176,28 +176,6 @@ absl::optional<size_t> AvatarMenu::GetActiveProfileIndex() const {
   DCHECK(!index.has_value() ||
          index.value() < profile_list_->GetNumberOfItems());
   return index;
-}
-
-std::u16string AvatarMenu::GetSupervisedUserInformation() const {
-  // |browser_| can be NULL in unit_tests.
-  if (browser_ && browser_->profile()->IsChild()) {
-#if BUILDFLAG(ENABLE_SUPERVISED_USERS)
-    SupervisedUserService* service =
-        SupervisedUserServiceFactory::GetForProfile(browser_->profile());
-    std::u16string custodian =
-        base::UTF8ToUTF16(service->GetCustodianEmailAddress());
-    std::u16string second_custodian =
-        base::UTF8ToUTF16(service->GetSecondCustodianEmailAddress());
-    if (second_custodian.empty()) {
-      return l10n_util::GetStringFUTF16(IDS_CHILD_INFO_ONE_CUSTODIAN,
-                                        custodian);
-    } else {
-      return l10n_util::GetStringFUTF16(IDS_CHILD_INFO_TWO_CUSTODIANS,
-                                        custodian, second_custodian);
-    }
-#endif
-  }
-  return std::u16string();
 }
 
 void AvatarMenu::ActiveBrowserChanged(Browser* browser) {

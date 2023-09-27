@@ -11,6 +11,9 @@
 #include "ash/app_list/app_list_bubble_presenter.h"
 #include "ash/app_list/app_list_model_provider.h"
 #include "ash/app_list/app_list_presenter_impl.h"
+#include "ash/app_list/app_list_view_delegate.h"
+#include "ash/app_list/model/search/search_box_model.h"
+#include "ash/app_list/quick_app_access_model.h"
 #include "ash/app_list/views/app_list_item_view.h"
 #include "ash/app_list/views/app_list_main_view.h"
 #include "ash/app_list/views/app_list_toast_container_view.h"
@@ -18,7 +21,9 @@
 #include "ash/app_list/views/app_list_view.h"
 #include "ash/app_list/views/contents_view.h"
 #include "ash/app_list/views/search_box_view.h"
+#include "ash/app_list/views/search_notifier_controller.h"
 #include "ash/assistant/assistant_controller_impl.h"
+#include "ash/assistant/model/assistant_ui_model.h"
 #include "ash/assistant/ui/assistant_view_delegate.h"
 #include "ash/assistant/util/assistant_util.h"
 #include "ash/assistant/util/deep_link_util.h"
@@ -41,11 +46,15 @@
 #include "ash/scoped_animation_disabler.h"
 #include "ash/screen_util.h"
 #include "ash/session/session_controller_impl.h"
+#include "ash/shelf/home_button.h"
+#include "ash/shelf/shelf_navigation_widget.h"
 #include "ash/shell.h"
+#include "ash/user_education/welcome_tour/welcome_tour_metrics.h"
 #include "ash/wallpaper/wallpaper_controller_impl.h"
 #include "ash/wm/float/float_controller.h"
 #include "ash/wm/mru_window_tracker.h"
 #include "ash/wm/overview/overview_controller.h"
+#include "ash/wm/overview/overview_session.h"
 #include "ash/wm/splitview/split_view_controller.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/window_state.h"
@@ -54,10 +63,10 @@
 #include "base/callback_list.h"
 #include "base/containers/adapters.h"
 #include "base/containers/contains.h"
-#include "base/containers/cxx20_erase.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/metrics/user_metrics.h"
 #include "chromeos/ash/services/assistant/public/cpp/assistant_enums.h"
@@ -92,6 +101,9 @@ constexpr float kOverviewFadeAnimationScale = 0.92f;
 // fading transitions.
 constexpr base::TimeDelta kOverviewFadeAnimationDuration =
     base::Milliseconds(350);
+
+// The app id for the settings app used for testing quick app access.
+constexpr char kOsSettingsAppId[] = "odknhmnlageboeamepcngndbggdpaobj";
 
 // Update layer animation settings for launcher scale and opacity animation that
 // runs on overview mode change.
@@ -150,7 +162,8 @@ class WindowAnimationsCallback : public ui::LayerAnimationObserver {
   }
 
   base::OnceClosure callback_;
-  ui::LayerAnimator* animator_;  // Owned by the layer that is animating.
+  raw_ptr<ui::LayerAnimator, ExperimentalAsh>
+      animator_;  // Owned by the layer that is animating.
   base::CallbackListSubscription subscription_;
 };
 
@@ -244,6 +257,14 @@ bool IsKioskSession() {
   return Shell::Get()->session_controller()->IsRunningInAppMode();
 }
 
+void MaybeLogWelcomeTourInteraction(AppListShowSource show_source) {
+  if (features::IsWelcomeTourEnabled() &&
+      IsAppListShowSourceUserTriggered(show_source)) {
+    welcome_tour_metrics::RecordInteraction(
+        welcome_tour_metrics::Interaction::kLauncher);
+  }
+}
+
 }  // namespace
 
 AppListControllerImpl::AppListControllerImpl()
@@ -306,7 +327,11 @@ void AppListControllerImpl::RegisterProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterTimePref(prefs::kLauncherLastContinueRequestTime,
                              base::Time());
   registry->RegisterBooleanPref(prefs::kLauncherUseLongContinueDelay, false);
-  AppListNudgeController::RegisterProfilePrefs(registry);
+
+  // The prefs for launcher search controls.
+  // TODO(crbug.com/1352636): Consider merging this to
+  // `search_notifier_controller` and rename it.
+  registry->RegisterDictionaryPref(prefs::kLauncherSearchCategoryControlStatus);
 }
 
 void AppListControllerImpl::SetClient(AppListClient* client) {
@@ -324,18 +349,35 @@ AppListNotifier* AppListControllerImpl::GetNotifier() {
   return client_->GetNotifier();
 }
 
-void AppListControllerImpl::SetActiveModel(int profile_id,
-                                           AppListModel* model,
-                                           SearchModel* search_model) {
+std::unique_ptr<ScopedIphSession>
+AppListControllerImpl::CreateLauncherSearchIphSession() {
+  if (!client_) {
+    return nullptr;
+  }
+  return client_->CreateLauncherSearchIphSession();
+}
+
+void AppListControllerImpl::OpenSearchBoxIphUrl() {
+  if (!client_) {
+    return;
+  }
+  client_->OpenSearchBoxIphUrl();
+}
+
+void AppListControllerImpl::SetActiveModel(
+    int profile_id,
+    AppListModel* model,
+    SearchModel* search_model,
+    QuickAppAccessModel* quick_app_access_model) {
   profile_id_ = profile_id;
-  model_provider_->SetActiveModel(model, search_model);
-  UpdateAssistantVisibility();
+  model_provider_->SetActiveModel(model, search_model, quick_app_access_model);
+  UpdateSearchBoxUiVisibilities();
 }
 
 void AppListControllerImpl::ClearActiveModel() {
   profile_id_ = kAppListInvalidProfileID;
   model_provider_->ClearActiveModel();
-  UpdateAssistantVisibility();
+  UpdateSearchBoxUiVisibilities();
 }
 
 void AppListControllerImpl::DismissAppList() {
@@ -383,6 +425,12 @@ bool AppListControllerImpl::IsVisible() {
   return IsVisible(absl::nullopt);
 }
 
+bool AppListControllerImpl::IsImageSearchToggleable() {
+  // Hide the image search from the category filter menu if the privacy notice
+  // hasn't been accepted or timeout yet.
+  return !SearchNotifierController::ShouldShowPrivacyNotice();
+}
+
 void AppListControllerImpl::OnActiveUserPrefServiceChanged(
     PrefService* pref_service) {
   if (IsKioskSession())
@@ -414,6 +462,10 @@ void AppListControllerImpl::OnSessionStateChanged(
     return;
   }
 
+  if (base::FeatureList::IsEnabled(features::kQuickAppAccessTestUI)) {
+    SetHomeButtonQuickApp(kOsSettingsAppId);
+  }
+
   if (in_clamshell)
     return;
 
@@ -438,10 +490,11 @@ void AppListControllerImpl::OnUserSessionAdded(const AccountId& account_id) {
   ash::ReportPrefSortOrderOnSessionStart(client_->GetPermanentSortingOrder(),
                                          IsTabletMode());
 
+  auto* prefs =
+      Shell::Get()->session_controller()->GetUserPrefServiceForUser(account_id);
   if (features::IsLauncherNudgeSessionResetEnabled()) {
-    AppListNudgeController::ResetPrefsForNewUserSession(
-        Shell::Get()->session_controller()->GetUserPrefServiceForUser(
-            account_id));
+    AppListNudgeController::ResetPrefsForNewUserSession(prefs);
+    SearchNotifierController::ResetPrefsForNewUserSession(prefs);
   }
 }
 
@@ -466,6 +519,10 @@ void AppListControllerImpl::Show(int64_t display_id,
   if (should_record_metrics)
     LogAppListShowSource(show_source, !IsTabletMode());
 
+  // Checking `should_record_metrics` is redundant here, since this helper
+  // function never logs metrics when the app list was shown by tablet mode.
+  MaybeLogWelcomeTourInteraction(show_source);
+
   if (IsTabletMode()) {
     fullscreen_presenter_->Show(AppListViewState::kFullscreenAllApps,
                                 display_id, event_time_stamp, show_source);
@@ -479,6 +536,8 @@ void AppListControllerImpl::UpdateAppListWithNewTemporarySortOrder(
     const absl::optional<AppListSortOrder>& new_order,
     bool animate,
     base::OnceClosure update_position_closure) {
+  TRACE_EVENT0("ui",
+               "AppListControllerImpl::UpdateAppListWithNewTemporarySortOrder");
   if (new_order) {
     RecordAppListSortAction(*new_order, IsInTabletMode());
 
@@ -533,6 +592,9 @@ ShelfAction AppListControllerImpl::ToggleAppList(
     }
     LogAppListShowSource(show_source, /*app_list_bubble=*/false);
     last_open_source_ = show_source;
+
+    MaybeLogWelcomeTourInteraction(show_source);
+
     return SHELF_ACTION_APP_LIST_SHOWN;
   }
 
@@ -540,6 +602,8 @@ ShelfAction AppListControllerImpl::ToggleAppList(
   if (action == SHELF_ACTION_APP_LIST_SHOWN) {
     LogAppListShowSource(show_source, /*app_list_bubble=*/true);
     last_open_source_ = show_source;
+
+    MaybeLogWelcomeTourInteraction(show_source);
   }
   return action;
 }
@@ -848,16 +912,16 @@ void AppListControllerImpl::OnKeyboardVisibilityChanged(const bool is_visible) {
 
 void AppListControllerImpl::OnAssistantStatusChanged(
     assistant::AssistantStatus status) {
-  UpdateAssistantVisibility();
+  UpdateSearchBoxUiVisibilities();
 }
 
 void AppListControllerImpl::OnAssistantSettingsEnabled(bool enabled) {
-  UpdateAssistantVisibility();
+  UpdateSearchBoxUiVisibilities();
 }
 
 void AppListControllerImpl::OnAssistantFeatureAllowedChanged(
     assistant::AssistantAllowedState state) {
-  UpdateAssistantVisibility();
+  UpdateSearchBoxUiVisibilities();
 }
 
 void AppListControllerImpl::OnDisplayConfigurationChanged() {
@@ -883,7 +947,7 @@ void AppListControllerImpl::OnDisplayConfigurationChanged() {
 }
 
 void AppListControllerImpl::OnAssistantReady() {
-  UpdateAssistantVisibility();
+  UpdateSearchBoxUiVisibilities();
 }
 
 void AppListControllerImpl::OnUiVisibilityChanged(
@@ -1093,6 +1157,14 @@ void AppListControllerImpl::StartAssistant() {
       AssistantEntryPoint::kLauncherSearchBoxIcon);
 }
 
+std::vector<AppListSearchControlCategory>
+AppListControllerImpl::GetToggleableCategories() const {
+  if (client_) {
+    return client_->GetToggleableCategories();
+  }
+  return std::vector<AppListSearchControlCategory>();
+}
+
 void AppListControllerImpl::StartSearch(const std::u16string& raw_query) {
   if (client_) {
     std::u16string query;
@@ -1121,14 +1193,16 @@ void AppListControllerImpl::OpenSearchResult(const std::string& result_id,
   if (launch_type == AppListLaunchType::kAppSearchResult) {
     switch (launched_from) {
       case AppListLaunchedFrom::kLaunchedFromSearchBox:
-      case AppListLaunchedFrom::kLaunchedFromSuggestionChip:
       case AppListLaunchedFrom::kLaunchedFromRecentApps:
         RecordAppLaunched(launched_from);
         break;
       case AppListLaunchedFrom::kLaunchedFromGrid:
       case AppListLaunchedFrom::kLaunchedFromShelf:
       case AppListLaunchedFrom::kLaunchedFromContinueTask:
+      case AppListLaunchedFrom::kLaunchedFromQuickAppAccess:
         break;
+      case AppListLaunchedFrom::DEPRECATED_kLaunchedFromSuggestionChip:
+        NOTREACHED();
     }
   }
 
@@ -1149,10 +1223,6 @@ void AppListControllerImpl::OpenSearchResult(const std::string& result_id,
           break;
       }
       break;
-    case AppListLaunchedFrom::kLaunchedFromSuggestionChip:
-      RecordLauncherWorkflowMetrics(AppListUserAction::kOpenSuggestionChip,
-                                    is_tablet_mode, last_show_timestamp_);
-      break;
     case AppListLaunchedFrom::kLaunchedFromContinueTask:
       RecordLauncherWorkflowMetrics(AppListUserAction::kOpenContinueSectionTask,
                                     is_tablet_mode, last_show_timestamp_);
@@ -1160,15 +1230,13 @@ void AppListControllerImpl::OpenSearchResult(const std::string& result_id,
     case AppListLaunchedFrom::kLaunchedFromGrid:
     case AppListLaunchedFrom::kLaunchedFromRecentApps:
     case AppListLaunchedFrom::kLaunchedFromShelf:
+    case AppListLaunchedFrom::DEPRECATED_kLaunchedFromSuggestionChip:
+    case AppListLaunchedFrom::kLaunchedFromQuickAppAccess:
       NOTREACHED();
       break;
   }
 
-  // Suggestion chips are not represented to the user as search results, so do
-  // not record search result metrics for them.
-  if (launched_from != AppListLaunchedFrom::kLaunchedFromSuggestionChip) {
-    base::RecordAction(base::UserMetricsAction("AppList_OpenSearchResult"));
-  }
+  base::RecordAction(base::UserMetricsAction("AppList_OpenSearchResult"));
 
   if (client_) {
     client_->OpenSearchResult(profile_id_, result_id, event_flags,
@@ -1187,10 +1255,7 @@ void AppListControllerImpl::InvokeSearchResultAction(
 }
 
 void AppListControllerImpl::ViewShown(int64_t display_id) {
-  UpdateAssistantVisibility();
-
-  if (client_)
-    client_->ViewShown(display_id);
+  UpdateSearchBoxUiVisibilities();
 
   // Note that IsHomeScreenVisible() might still return false at this point, as
   // the home screen visibility takes into account whether the app list view is
@@ -1210,9 +1275,6 @@ bool AppListControllerImpl::AppListTargetVisibility() const {
 }
 
 void AppListControllerImpl::ViewClosing() {
-  if (client_)
-    client_->ViewClosing();
-
   split_view_observation_.Reset();
 }
 
@@ -1231,10 +1293,13 @@ void AppListControllerImpl::ActivateItem(const std::string& id,
       RecordLauncherWorkflowMetrics(AppListUserAction::kAppLaunchFromRecentApps,
                                     is_tablet_mode, last_show_timestamp_);
       break;
-    case AppListLaunchedFrom::kLaunchedFromSuggestionChip:
+    case AppListLaunchedFrom::kLaunchedFromQuickAppAccess:
+      // Metrics for quick app launch already recorded at RecordApplaunched().
+      break;
     case AppListLaunchedFrom::kLaunchedFromContinueTask:
     case AppListLaunchedFrom::kLaunchedFromSearchBox:
     case AppListLaunchedFrom::kLaunchedFromShelf:
+    case AppListLaunchedFrom::DEPRECATED_kLaunchedFromSuggestionChip:
       NOTREACHED();
       break;
   }
@@ -1375,9 +1440,23 @@ void AppListControllerImpl::SetHideContinueSection(bool hide) {
   bubble_presenter_->UpdateContinueSectionVisibility();
 }
 
-void AppListControllerImpl::CommitTemporarySortOrder() {
-  DCHECK(client_);
-  client_->CommitTemporarySortOrder();
+bool AppListControllerImpl::IsCategoryEnabled(
+    AppListSearchControlCategory category) {
+  PrefService* prefs =
+      Shell::Get()->session_controller()->GetLastActiveUserPrefService();
+  return prefs->GetDict(prefs::kLauncherSearchCategoryControlStatus)
+      .FindBool(GetAppListControlCategoryName(category))
+      .value_or(true);
+}
+
+void AppListControllerImpl::SetCategoryEnabled(
+    AppListSearchControlCategory category,
+    bool enabled) {
+  PrefService* prefs =
+      Shell::Get()->session_controller()->GetLastActiveUserPrefService();
+  ScopedDictPrefUpdate pref_update(prefs,
+                                   prefs::kLauncherSearchCategoryControlStatus);
+  pref_update->Set(GetAppListControlCategoryName(category), enabled);
 }
 
 void AppListControllerImpl::GetAppLaunchedMetricParams(
@@ -1429,7 +1508,7 @@ int AppListControllerImpl::GetShelfSize() {
 }
 
 int AppListControllerImpl::GetSystemShelfInsetsInTabletMode() {
-  return ShelfConfig::Get()->GetSystemShelfInsetsInTabletMode();
+  return ShelfConfig::Get()->GetTabletModeShelfInsetsAndRecordUMA();
 }
 
 bool AppListControllerImpl::IsInTabletMode() {
@@ -1455,6 +1534,10 @@ void AppListControllerImpl::OnVisibilityChanged(bool visible,
                                                 int64_t display_id) {
   // In the Kiosk session we should never show the app list.
   CHECK(!visible || !IsKioskSession());
+
+  if (client_) {
+    client_->RecalculateWouldTriggerLauncherSearchIph();
+  }
 
   DVLOG(1) << __PRETTY_FUNCTION__ << " visible " << visible << " display_id "
            << display_id;
@@ -1608,9 +1691,15 @@ SearchModel* AppListControllerImpl::GetSearchModel() {
   return model_provider_->search_model();
 }
 
-void AppListControllerImpl::UpdateAssistantVisibility() {
+void AppListControllerImpl::UpdateSearchBoxUiVisibilities() {
   GetSearchModel()->search_box()->SetShowAssistantButton(
       IsAssistantAllowedAndEnabled());
+
+  if (!client_) {
+    return;
+  }
+
+  client_->RecalculateWouldTriggerLauncherSearchIph();
 }
 
 int64_t AppListControllerImpl::GetDisplayIdToShowAppListOn() {
@@ -1880,6 +1969,13 @@ int AppListControllerImpl::GetPreferredBubbleWidth(
   DCHECK(bubble_presenter_);
 
   return bubble_presenter_->GetPreferredBubbleWidth(root_window);
+}
+
+bool AppListControllerImpl::SetHomeButtonQuickApp(const std::string& app_id) {
+  if (!features::IsHomeButtonQuickAppAccessEnabled()) {
+    return false;
+  }
+  return model_provider_->quick_app_access_model()->SetQuickApp(app_id);
 }
 
 }  // namespace ash

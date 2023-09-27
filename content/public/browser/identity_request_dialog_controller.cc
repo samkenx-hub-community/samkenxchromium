@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "content/public/browser/web_contents.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace content {
 
@@ -27,12 +28,14 @@ IdentityProviderData::IdentityProviderData(
     const std::vector<IdentityRequestAccount>& accounts,
     const IdentityProviderMetadata& idp_metadata,
     const ClientMetadata& client_metadata,
-    const blink::mojom::RpContext& rp_context)
+    const blink::mojom::RpContext& rp_context,
+    bool request_permission)
     : idp_for_display{idp_for_display},
       accounts{accounts},
       idp_metadata{idp_metadata},
       client_metadata{client_metadata},
-      rp_context(rp_context) {}
+      rp_context(rp_context),
+      request_permission(request_permission) {}
 
 IdentityProviderData::IdentityProviderData(const IdentityProviderData& other) =
     default;
@@ -51,9 +54,8 @@ void IdentityRequestDialogController::SetIsInterceptionEnabled(bool enabled) {
 }
 
 void IdentityRequestDialogController::ShowAccountsDialog(
-    WebContents* rp_web_contents,
     const std::string& top_frame_for_display,
-    const absl::optional<std::string>& iframe_url_for_display,
+    const absl::optional<std::string>& iframe_for_display,
     const std::vector<IdentityProviderData>& identity_provider_data,
     IdentityRequestAccount::SignInMode sign_in_mode,
     bool show_auto_reauthn_checkbox,
@@ -65,14 +67,38 @@ void IdentityRequestDialogController::ShowAccountsDialog(
 }
 
 void IdentityRequestDialogController::ShowFailureDialog(
-    WebContents* rp_web_contents,
     const std::string& top_frame_for_display,
+    const absl::optional<std::string>& iframe_for_display,
     const std::string& idp_for_display,
+    const blink::mojom::RpContext& rp_context,
     const IdentityProviderMetadata& idp_metadata,
+    DismissCallback dismiss_callback,
+    SigninToIdPCallback signin_callback) {
+  if (!is_interception_enabled_) {
+    std::move(dismiss_callback).Run(DismissReason::kOther);
+  }
+}
+
+void IdentityRequestDialogController::ShowErrorDialog(
+    const std::string& top_frame_for_display,
+    const absl::optional<std::string>& iframe_for_display,
+    const std::string& idp_for_display,
+    const blink::mojom::RpContext& rp_context,
+    const IdentityProviderMetadata& idp_metadata,
+    const absl::optional<IdentityCredentialTokenError>& error,
     DismissCallback dismiss_callback) {
   if (!is_interception_enabled_) {
     std::move(dismiss_callback).Run(DismissReason::kOther);
   }
+}
+
+std::string IdentityRequestDialogController::GetTitle() const {
+  return std::string();
+}
+
+absl::optional<std::string> IdentityRequestDialogController::GetSubtitle()
+    const {
+  return absl::nullopt;
 }
 
 void IdentityRequestDialogController::ShowIdpSigninFailureDialog(
@@ -81,5 +107,16 @@ void IdentityRequestDialogController::ShowIdpSigninFailureDialog(
     std::move(dismiss_callback).Run();
   }
 }
+
+WebContents* IdentityRequestDialogController::ShowModalDialog(
+    const GURL& url,
+    DismissCallback dismiss_callback) {
+  if (!is_interception_enabled_) {
+    std::move(dismiss_callback).Run(DismissReason::kOther);
+  }
+  return nullptr;
+}
+
+void IdentityRequestDialogController::CloseModalDialog() {}
 
 }  // namespace content

@@ -18,6 +18,7 @@
 #include "chrome/browser/ash/file_manager/filesystem_api_util.h"
 #include "chrome/browser/ash/fileapi/external_file_url_util.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_util.h"
 #include "chrome/common/chrome_content_client.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
@@ -27,9 +28,9 @@
 #include "components/drive/file_system_core_util.h"
 #include "content/public/browser/browser_thread.h"
 #include "net/base/filename_util.h"
-#include "net/base/url_util.h"
 #include "pdf/buildflags.h"
 #include "storage/browser/file_system/file_system_url.h"
+#include "url/gurl.h"
 
 using content::BrowserThread;
 
@@ -55,8 +56,9 @@ constexpr const base::FilePath::CharType* kFileExtensionsViewableInBrowser[] = {
 // Returns true if |file_path| is viewable in the browser (ex. HTML file).
 bool IsViewableInBrowser(const base::FilePath& file_path) {
   for (size_t i = 0; i < std::size(kFileExtensionsViewableInBrowser); i++) {
-    if (file_path.MatchesExtension(kFileExtensionsViewableInBrowser[i]))
+    if (file_path.MatchesExtension(kFileExtensionsViewableInBrowser[i])) {
       return true;
+    }
   }
   return false;
 }
@@ -78,8 +80,9 @@ bool OpenNewTab(const GURL& url) {
 // Note that an alternate url is a URL to open a hosted document.
 GURL ReadUrlFromGDocAsync(const base::FilePath& file_path) {
   GURL url = drive::util::ReadUrlFromGDocFile(file_path);
-  if (url.is_empty())
+  if (url.is_empty()) {
     url = net::FilePathToFileURL(file_path);
+  }
   return url;
 }
 
@@ -95,15 +98,32 @@ void OpenGDocUrlFromFile(const base::FilePath& file_path) {
 void OpenHostedDriveFsFile(const base::FilePath& file_path,
                            drive::FileError error,
                            drivefs::mojom::FileMetadataPtr metadata) {
-  if (error != drive::FILE_ERROR_OK)
+  if (error != drive::FILE_ERROR_OK) {
     return;
+  }
   if (drivefs::IsLocal(metadata->type)) {
     OpenGDocUrlFromFile(file_path);
     return;
   }
   GURL hosted_url(metadata->alternate_url);
-  if (!hosted_url.is_valid())
+  if (!hosted_url.is_valid()) {
     return;
+  }
+
+  OpenNewTab(hosted_url);
+}
+
+// Open an encrypted file by redirecting the user to Google Drive.
+void OpenEncryptedDriveFsFile(const base::FilePath& file_path,
+                              drive::FileError error,
+                              drivefs::mojom::FileMetadataPtr metadata) {
+  if (error != drive::FILE_ERROR_OK) {
+    return;
+  }
+  GURL hosted_url(metadata->alternate_url);
+  if (!hosted_url.is_valid()) {
+    return;
+  }
 
   OpenNewTab(hosted_url);
 }
@@ -118,13 +138,30 @@ bool OpenFileWithBrowser(Profile* profile,
 
   const base::FilePath file_path = file_system_url.path();
 
+  if (action_id == "open-encrypted") {
+    drive::DriveIntegrationService* integration_service =
+        drive::DriveIntegrationServiceFactory::FindForProfile(profile);
+    base::FilePath path;
+    if (integration_service && integration_service->IsMounted() &&
+        integration_service->GetDriveFsInterface() &&
+        integration_service->GetRelativeDrivePath(file_path, &path)) {
+      integration_service->GetDriveFsInterface()->GetMetadata(
+          path, base::BindOnce(&OpenEncryptedDriveFsFile, file_path));
+      return true;
+    }
+    LOG(WARNING) << "Failed to open file: " << file_path.value()
+                 << ": no connection to integration service";
+    return false;
+  }
+
   // For things supported natively by the browser, we should open it in a tab.
   if (IsViewableInBrowser(file_path) || action_id == "view-pdf" ||
       (action_id == "view-in-browser" && file_path.Extension() == "")) {
     // Use external file URL if it is provided for the file system.
     GURL page_url = ash::FileSystemURLToExternalFileURL(file_system_url);
-    if (page_url.is_empty())
+    if (page_url.is_empty()) {
       page_url = net::FilePathToFileURL(file_path);
+    }
 
     OpenNewTab(page_url);
     return true;
@@ -158,35 +195,6 @@ bool OpenFileWithBrowser(Profile* profile,
   // Failed to open the file of unknown type.
   LOG(WARNING) << "Unknown file type: " << file_path.value();
   return false;
-}
-
-bool OpenNewTabForHostedOfficeFile(const GURL& url) {
-  GURL url_with_query_param =
-      net::AppendOrReplaceQueryParameter(url, "cros_files", "true");
-
-  if (!url_with_query_param.is_valid()) {
-    UMA_HISTOGRAM_ENUMERATION(
-        file_tasks::kDriveErrorMetricName,
-        file_tasks::OfficeDriveErrors::INVALID_ALTERNATE_URL);
-    LOG(ERROR) << "Invalid URL";
-    return false;
-  }
-  if (url_with_query_param.host() == "drive.google.com") {
-    UMA_HISTOGRAM_ENUMERATION(
-        file_tasks::kDriveErrorMetricName,
-        file_tasks::OfficeDriveErrors::DRIVE_ALTERNATE_URL);
-    LOG(ERROR) << "URL was from drive.google.com";
-    return false;
-  }
-  if (url_with_query_param.host() != "docs.google.com") {
-    UMA_HISTOGRAM_ENUMERATION(
-        file_tasks::kDriveErrorMetricName,
-        file_tasks::OfficeDriveErrors::UNEXPECTED_ALTERNATE_URL);
-    LOG(ERROR) << "URL was not from docs.google.com";
-    return false;
-  }
-
-  return OpenNewTab(url_with_query_param);
 }
 
 }  // namespace util

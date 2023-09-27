@@ -12,9 +12,8 @@
 #include "ash/system/notification_center/notification_center_bubble.h"
 #include "ash/system/tray/tray_background_view.h"
 #include "ash/system/unified/notification_icons_controller.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/base/metadata/metadata_header_macros.h"
-#include "ui/message_center/message_center_observer.h"
-#include "ui/message_center/message_center_types.h"
 
 namespace views {
 class Widget;
@@ -23,6 +22,7 @@ class Widget;
 namespace ash {
 
 class NotificationListView;
+class NotificationMetricsRecorder;
 class PrivacyIndicatorsTrayItemView;
 class Shelf;
 class TrayBubbleView;
@@ -30,31 +30,53 @@ class TrayBubbleView;
 // A button in the tray which displays the number of currently available
 // notifications along with icons for pinned notifications. Clicking this button
 // opens a bubble with a scrollable list of all current notifications.
-class ASH_EXPORT NotificationCenterTray
-    : public TrayBackgroundView,
-      public message_center::MessageCenterObserver {
+class ASH_EXPORT NotificationCenterTray : public TrayBackgroundView,
+                                          public TrayItemView::Observer {
  public:
   METADATA_HEADER(NotificationCenterTray);
+
+  // Inherit from this class to be notified of events that happen for a specific
+  // `NotificationCenterTray`.
+  class Observer : public base::CheckedObserver {
+   public:
+    // Called when all `TrayItemView`s are done being added to this
+    // `NotificationCenterTray`.
+    virtual void OnAllTrayItemsAdded() = 0;
+  };
 
   explicit NotificationCenterTray(Shelf* shelf);
   NotificationCenterTray(const NotificationCenterTray&) = delete;
   NotificationCenterTray& operator=(const NotificationCenterTray&) = delete;
   ~NotificationCenterTray() override;
 
+  void AddNotificationCenterTrayObserver(Observer* observer);
+  void RemoveNotificationCenterTrayObserver(Observer* observer);
+
   // Called when UnifiedSystemTray's preferred visibility changes.
   void OnSystemTrayVisibilityChanged(bool system_tray_visible);
+
+  // Callback called when this TrayBackgroundView is pressed.
+  void OnTrayButtonPressed();
 
   NotificationListView* GetNotificationListView();
 
   // True if the bubble is shown.
   bool IsBubbleShown() const;
 
+  // Update the visibility of the tray button based on available notifications.
+  // If there are no notifications the tray button should be hidden and shown
+  // otherwise.
+  void UpdateVisibility();
+
   // TrayBackgroundView:
+  void Initialize() override;
   std::u16string GetAccessibleNameForBubble() override;
   std::u16string GetAccessibleNameForTray() override;
   void HandleLocaleChange() override;
   void HideBubbleWithView(const TrayBubbleView* bubble_view) override;
+  void HideBubble(const TrayBubbleView* bubble_view) override;
   void ClickedOutsideBubble() override;
+  void UpdateTrayItemColor(bool is_active) override;
   void CloseBubble() override;
   void ShowBubble() override;
   void UpdateAfterLoginStatusChange() override;
@@ -62,6 +84,10 @@ class ASH_EXPORT NotificationCenterTray
   views::Widget* GetBubbleWidget() const override;
   void OnAnyBubbleVisibilityChanged(views::Widget* bubble_widget,
                                     bool visible) override;
+  void UpdateLayout() override;
+
+  // ash::TrayItemView::Observer:
+  void OnTrayItemVisibilityAboutToChange(bool target_visibility) override;
 
   PrivacyIndicatorsTrayItemView* privacy_indicators_view() {
     return privacy_indicators_view_;
@@ -76,26 +102,17 @@ class ASH_EXPORT NotificationCenterTray
   friend class NotificationCounterViewTest;
   friend class NotificationIconsControllerTest;
 
-  // message_center::MessageCenterObserver:
-  void OnNotificationAdded(const std::string& notification_id) override;
-  void OnNotificationDisplayed(
-      const std::string& notification_id,
-      const message_center::DisplaySource source) override;
-  void OnNotificationRemoved(const std::string& notification_id,
-                             bool by_user) override;
-  void OnNotificationUpdated(const std::string& notification_id) override;
-
-  // Update the visibility of the tray button based on available notifications.
-  // If there are no notifications the tray button should be hidden and shown
-  // otherwise.
-  void UpdateVisibility();
+  // Manages notification metrics.
+  const std::unique_ptr<NotificationMetricsRecorder>
+      notification_metrics_recorder_;
 
   // Manages showing notification icons in the tray.
   const std::unique_ptr<NotificationIconsController>
       notification_icons_controller_;
 
   // Owned by the views hierarchy.
-  PrivacyIndicatorsTrayItemView* privacy_indicators_view_ = nullptr;
+  raw_ptr<PrivacyIndicatorsTrayItemView, ExperimentalAsh>
+      privacy_indicators_view_ = nullptr;
 
   std::unique_ptr<NotificationCenterBubble> bubble_;
 
@@ -103,6 +120,8 @@ class ASH_EXPORT NotificationCenterTray
   // date tray. This flag keeps track of the system tray's visibility being set
   // by the status area widget.
   bool system_tray_visible_ = true;
+
+  base::ObserverList<Observer> observers_;
 };
 
 }  // namespace ash

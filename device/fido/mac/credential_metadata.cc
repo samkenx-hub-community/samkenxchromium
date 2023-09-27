@@ -18,9 +18,7 @@
 #include "third_party/boringssl/src/include/openssl/hkdf.h"
 #include "third_party/boringssl/src/include/openssl/rand.h"
 
-namespace device {
-namespace fido {
-namespace mac {
+namespace device::fido::mac {
 
 static constexpr size_t kNonceLength = 12;
 
@@ -146,10 +144,7 @@ std::string Cryptor::DeriveKey(Algorithm alg) const {
 
 // static
 CredentialMetadata::Version CredentialMetadata::CurrentVersion() {
-  return base::FeatureList::IsEnabled(
-             kWebAuthnMacPlatformAuthenticatorOptionalUv)
-             ? CredentialMetadata::Version::kV4
-             : CredentialMetadata::Version::kV3;
+  return CredentialMetadata::Version::kV4;
 }
 
 // static
@@ -458,10 +453,9 @@ std::string EncodeRpId(const std::string& secret, const std::string& rp_id) {
       Cryptor(secret).Seal(Cryptor::Algorithm::kAes256GcmSiv, fixed_zero_nonce,
                            pt, /*authenticated_data=*/{});
 
-  // HexEncode to ensure that the result is valid UTF-8. Values of keychain
-  // field that stores the encrypted RP ID (kSecAttrLabel) are CFStringRef. The
-  // expected encoding is undocumented but must be UTF-8 (see `_ImportKey()` in
-  // https://opensource.apple.com/source/libsecurity_keychain/libsecurity_keychain-55050.2/lib/SecItem.cpp).
+  // HexEncode to ensure that the result is valid UTF-8. The result of this
+  // function will be converted to an NSString via SysUTF8ToNSString and
+  // therefore must be valid for that.
   return base::HexEncode(ct.data(), ct.size());
 }
 
@@ -525,6 +519,4 @@ std::vector<uint8_t> SealLegacyCredentialIdForTestingOnly(
   return result;
 }
 
-}  // namespace mac
-}  // namespace fido
-}  // namespace device
+}  // namespace device::fido::mac

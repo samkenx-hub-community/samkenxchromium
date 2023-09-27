@@ -12,6 +12,8 @@
 
 #include "ash/wm/window_resizer.h"
 #include "ash/wm/workspace/magnetism_matcher.h"
+#include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/timer/timer.h"
 #include "ui/aura/window_tracker.h"
@@ -20,6 +22,7 @@
 #include "ui/gfx/geometry/point_f.h"
 
 namespace ash {
+class WindowSplitter;
 class PhantomWindowController;
 class WindowSize;
 class WindowState;
@@ -214,7 +217,7 @@ class ASH_EXPORT WorkspaceWindowResizer : public WindowResizer {
   gfx::PointF last_location_in_parent_;
 
   // Window the drag has magnetically attached to.
-  aura::Window* magnetism_window_ = nullptr;
+  raw_ptr<aura::Window, ExperimentalAsh> magnetism_window_ = nullptr;
 
   // Used to verify |magnetism_window_| is still valid.
   aura::WindowTracker window_tracker_;
@@ -232,6 +235,9 @@ class ASH_EXPORT WorkspaceWindowResizer : public WindowResizer {
 
   // Presentation time recorder for tab dragging in clamshell mode.
   std::unique_ptr<ui::PresentationTimeRecorder> tab_dragging_recorder_;
+
+  // Optional window splitter for tiling groups.
+  std::unique_ptr<WindowSplitter> window_splitter_;
 
   // Used to determine if this has been deleted during a drag such as when a tab
   // gets dragged into another browser window.

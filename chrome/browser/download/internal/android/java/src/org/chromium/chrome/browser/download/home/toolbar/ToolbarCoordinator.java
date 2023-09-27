@@ -13,7 +13,6 @@ import android.view.ViewGroup;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.chrome.browser.download.home.list.ListItem;
-import org.chromium.chrome.browser.download.home.metrics.UmaUtils;
 import org.chromium.chrome.browser.download.internal.R;
 import org.chromium.components.browser_ui.widget.FadingShadow;
 import org.chromium.components.browser_ui.widget.FadingShadowView;
@@ -186,18 +185,14 @@ public class ToolbarCoordinator implements SelectionObserver<ListItem>, BackPres
     }
 
     private boolean onMenuItemClick(MenuItem item) {
-        UmaUtils.recordTopMenuAction(item.getItemId());
-
         if (item.getItemId() == R.id.close_menu_id) {
             mDelegate.close();
             return true;
         } else if (item.getItemId() == R.id.selection_mode_delete_menu_id) {
-            int itemsDeleted = mListActionDelegate.deleteSelectedItems();
-            UmaUtils.recordTopMenuDeleteCount(itemsDeleted);
+            mListActionDelegate.deleteSelectedItems();
             return true;
         } else if (item.getItemId() == R.id.selection_mode_share_menu_id) {
-            int itemsShared = mListActionDelegate.shareSelectedItems();
-            UmaUtils.recordTopMenuShareCount(itemsShared);
+            mListActionDelegate.shareSelectedItems();
             return true;
         } else if (item.getItemId() == R.id.search_menu_id) {
             mToolbar.showSearchView(true);

@@ -248,7 +248,7 @@ class UrlPatternIndexMatcher {
 
  private:
   // Must outlive this instance.
-  const flat::UrlPatternIndex* flat_index_;
+  raw_ptr<const flat::UrlPatternIndex> flat_index_;
 
   // The number of rules in this index. Mutable since this is lazily computed.
   mutable absl::optional<size_t> rules_count_;

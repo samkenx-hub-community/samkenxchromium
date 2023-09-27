@@ -18,7 +18,6 @@
 #include "base/compiler_specific.h"
 #include "base/containers/contains.h"
 #include "base/containers/flat_tree.h"
-#include "base/cxx17_backports.h"
 #include "base/dcheck_is_on.h"
 #include "base/functional/identity.h"
 #include "base/metrics/field_trial_params.h"
@@ -42,7 +41,7 @@
 namespace {
 
 int GetStudyGenerationFromFieldTrial() {
-  return base::clamp(features::kIdentifiabilityStudyGeneration.Get(), 0,
+  return std::clamp(features::kIdentifiabilityStudyGeneration.Get(), 0,
                      std::numeric_limits<int>::max());
 }
 
@@ -622,12 +621,6 @@ bool IdentifiabilityStudyState::ShouldReportEncounteredSurface(
 
   if (surface.GetType() ==
       blink::IdentifiableSurface::Type::kReservedInternal) {
-    return false;
-  }
-
-  // Don't report actively sampled surfaces as encountered surfaces.
-  if (ukm::SourceIdObj::FromInt64(source_id).GetType() ==
-      ukm::SourceIdType::NO_URL_ID) {
     return false;
   }
 

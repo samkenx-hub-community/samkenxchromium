@@ -6,8 +6,8 @@
 
 #include <memory>
 
+#include "content/public/browser/isolated_web_apps_policy.h"
 #include "content/public/browser/render_process_host.h"
-#include "content/public/browser/web_contents.h"
 
 namespace extensions {
 
@@ -21,7 +21,8 @@ BrowserProcessContextData::CloneProcessContextData() const {
 }
 
 bool BrowserProcessContextData::IsIsolatedApplication() const {
-  return process_ &&
+  return content::IsolatedWebAppsPolicy::AreIsolatedWebAppsEnabled(
+             process_->GetBrowserContext()) &&
          process_->GetWebExposedIsolationLevel() >=
              content::WebExposedIsolationLevel::kMaybeIsolatedApplication;
 }

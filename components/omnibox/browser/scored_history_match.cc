@@ -162,14 +162,15 @@ ScoredHistoryMatch::ScoredHistoryMatch(
   // has been constructed via the no-args constructor.
   ScoredHistoryMatch::Init();
 
-  if (OmniboxFieldTrial::IsLogUrlScoringSignalsEnabled()) {
+  if (OmniboxFieldTrial::IsPopulatingUrlScoringSignalsEnabled()) {
     // Populate the scoring signals available in the URL Row.
-    scoring_signals.set_typed_count(row.typed_count());
-    scoring_signals.set_visit_count(row.visit_count());
+    scoring_signals = absl::make_optional<ScoringSignals>();
+    scoring_signals->set_typed_count(row.typed_count());
+    scoring_signals->set_visit_count(row.visit_count());
     base::TimeDelta elapsed_time = now - row.last_visit();
-    scoring_signals.set_elapsed_time_last_visit_secs(elapsed_time.InSeconds());
-    scoring_signals.set_is_host_only(IsHostOnly());
-    scoring_signals.set_length_of_url(row.url().spec().length());
+    scoring_signals->set_elapsed_time_last_visit_secs(elapsed_time.InSeconds());
+    scoring_signals->set_is_host_only(IsHostOnly());
+    scoring_signals->set_length_of_url(row.url().spec().length());
   }
 
   // Figure out where each search term appears in the URL and/or page title
@@ -714,40 +715,40 @@ float ScoredHistoryMatch::GetTopicalityScore(
   IncrementTitleMatchTermScores(terms_to_word_starts_offsets,
                                 word_starts.title_word_starts_, &term_scores);
 
-  if (OmniboxFieldTrial::IsLogUrlScoringSignalsEnabled()) {
+  if (OmniboxFieldTrial::IsPopulatingUrlScoringSignalsEnabled()) {
     // Url matching signals.
     const auto url_matching_signals = ComputeUrlMatchingSignals(
         terms_to_word_starts_offsets, url, word_starts.url_word_starts_,
         adjustments, url_matches);
     if (url_matching_signals.first_url_match_position.has_value()) {
       // Not set if there is no URL match.
-      scoring_signals.set_first_url_match_position(
+      scoring_signals->set_first_url_match_position(
           *(url_matching_signals.first_url_match_position));
     }
     if (url_matching_signals.host_match_at_word_boundary.has_value()) {
       // Not set if there is no match in the host.
-      scoring_signals.set_host_match_at_word_boundary(
+      scoring_signals->set_host_match_at_word_boundary(
           *(url_matching_signals.host_match_at_word_boundary));
-      scoring_signals.set_has_non_scheme_www_match(
+      scoring_signals->set_has_non_scheme_www_match(
           *(url_matching_signals.has_non_scheme_www_match));
     }
-    scoring_signals.set_total_url_match_length(
+    scoring_signals->set_total_url_match_length(
         url_matching_signals.total_url_match_length);
-    scoring_signals.set_total_host_match_length(
+    scoring_signals->set_total_host_match_length(
         url_matching_signals.total_host_match_length);
-    scoring_signals.set_total_path_match_length(
+    scoring_signals->set_total_path_match_length(
         url_matching_signals.total_path_match_length);
-    scoring_signals.set_total_query_or_ref_match_length(
+    scoring_signals->set_total_query_or_ref_match_length(
         url_matching_signals.total_query_or_ref_match_length);
-    scoring_signals.set_num_input_terms_matched_by_url(
+    scoring_signals->set_num_input_terms_matched_by_url(
         url_matching_signals.num_input_terms_matched_by_url);
 
     // Title matching signals.
     size_t total_title_match_length = ComputeTotalMatchLength(
         terms_to_word_starts_offsets, title_matches,
         word_starts.title_word_starts_, num_title_words_to_allow_);
-    scoring_signals.set_total_title_match_length(total_title_match_length);
-    scoring_signals.set_num_input_terms_matched_by_title(
+    scoring_signals->set_total_title_match_length(total_title_match_length);
+    scoring_signals->set_num_input_terms_matched_by_title(
         CountUniqueMatchTerms(title_matches));
   }
 
@@ -800,10 +801,6 @@ void ScoredHistoryMatch::IncrementUrlMatchTermScores(
   base::OffsetAdjuster::AdjustOffset(adjustments, &query_pos);
   base::OffsetAdjuster::AdjustOffset(adjustments, &last_part_of_host_pos);
 
-  // Loop through all URL matches and score them appropriately.
-  url::Component query = parsed.query;
-  url::Component key, value;
-
   for (const auto& url_match : url_matches) {
     // Calculate the offset in the URL string where the meaningful (word) part
     // of the term starts.  This takes into account times when a term starts
@@ -820,23 +817,7 @@ void ScoredHistoryMatch::IncrementUrlMatchTermScores(
                                   (*next_word_starts == term_word_offset);
     if (term_word_offset >= query_pos) {
       // The match is in the query or ref component.
-      if (OmniboxFieldTrial::ShouldDisableCGIParamMatching()) {
-        // Only match cgi param values, NOT the param keys.
-        while (url::ExtractQueryKeyValue(url.spec().c_str(), &query, &key,
-                                         &value)) {
-          size_t value_begin = value.begin;
-          size_t value_end = value.end();
-          base::OffsetAdjuster::AdjustOffset(adjustments, &value_begin);
-          base::OffsetAdjuster::AdjustOffset(adjustments, &value_end);
-          if (term_word_offset >= value_begin &&
-              term_word_offset <= value_end) {
-            if (term_scores) {
-              (*term_scores)[url_match.term_num] += 5;
-            }
-            break;
-          }
-        }
-      } else if (term_scores) {
+      if (term_scores) {
         (*term_scores)[url_match.term_num] += 5;
       }
     } else if (term_word_offset >= path_pos) {

@@ -13,10 +13,10 @@
 #include "ash/components/arc/session/connection_observer.h"
 #include "base/containers/flat_set.h"
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ash/account_manager/account_apps_availability.h"
-#include "chrome/browser/ash/arc/auth/arc_active_directory_enrollment_token_fetcher.h"
 #include "chrome/browser/ash/arc/session/arc_session_manager_observer.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
@@ -136,16 +136,6 @@ class ArcAuthService : public KeyedService,
   // `mojom::AccountUpdateType::REMOVAL` for the provided email.
   void RemoveAccountFromArc(const std::string& email);
 
-  // Callback when Active Directory Enrollment Token is fetched.
-  // |callback| is completed with |ArcAuthCodeStatus| and |AccountInfo|
-  // depending on the success / failure of the operation.
-  void OnActiveDirectoryEnrollmentTokenFetched(
-      ArcActiveDirectoryEnrollmentTokenFetcher* fetcher,
-      RequestPrimaryAccountInfoCallback callback,
-      ArcActiveDirectoryEnrollmentTokenFetcher::Status status,
-      const std::string& enrollment_token,
-      const std::string& user_id);
-
   // Issues a request for fetching AccountInfo for the Device Account.
   // |initial_signin| denotes whether this is the initial ARC provisioning flow
   // or a subsequent sign-in.
@@ -223,10 +213,11 @@ class ArcAuthService : public KeyedService,
   void OnMainAccountResolutionStatus(mojom::MainAccountResolutionStatus status);
 
   // Non-owning pointers.
-  Profile* const profile_;
-  signin::IdentityManager* const identity_manager_;
-  ArcBridgeService* const arc_bridge_service_;
-  ash::AccountAppsAvailability* account_apps_availability_ = nullptr;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
+  const raw_ptr<signin::IdentityManager, ExperimentalAsh> identity_manager_;
+  const raw_ptr<ArcBridgeService, ExperimentalAsh> arc_bridge_service_;
+  raw_ptr<ash::AccountAppsAvailability, ExperimentalAsh>
+      account_apps_availability_ = nullptr;
 
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
   bool url_loader_factory_for_testing_set_ = false;

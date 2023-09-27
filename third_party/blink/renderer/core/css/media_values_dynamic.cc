@@ -6,12 +6,14 @@
 
 #include "third_party/blink/public/common/css/forced_colors.h"
 #include "third_party/blink/public/common/css/navigation_controls.h"
+#include "third_party/blink/public/common/css/scripting.h"
 #include "third_party/blink/renderer/core/css/css_primitive_value.h"
 #include "third_party/blink/renderer/core/css/css_resolution_units.h"
 #include "third_party/blink/renderer/core/css/css_to_length_conversion_data.h"
 #include "third_party/blink/renderer/core/css/media_values_cached.h"
 #include "third_party/blink/renderer/core/dom/document.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
+#include "ui/base/ui_base_types.h"
 
 namespace blink {
 
@@ -101,6 +103,17 @@ float MediaValuesDynamic::RootLineHeight(float zoom) const {
   return CalculateLineHeight(frame_);
 }
 
+float MediaValuesDynamic::CapFontSize(float zoom) const {
+  DCHECK_EQ(1.0f, zoom);
+  return CalculateCapSize(frame_);
+}
+
+float MediaValuesDynamic::RcapFontSize(float zoom) const {
+  DCHECK_EQ(1.0f, zoom);
+  // For media queries cap and rcap units are both based on the initial font.
+  return CalculateCapSize(frame_);
+}
+
 double MediaValuesDynamic::ViewportWidth() const {
   if (viewport_dimensions_overridden_) {
     return viewport_width_override_;
@@ -171,6 +184,10 @@ int MediaValuesDynamic::MonochromeBitsPerComponent() const {
   return CalculateMonochromeBitsPerComponent(frame_);
 }
 
+bool MediaValuesDynamic::InvertedColors() const {
+  return CalculateInvertedColors(frame_);
+}
+
 mojom::blink::PointerType MediaValuesDynamic::PrimaryPointerType() const {
   return CalculatePrimaryPointerType(frame_);
 }
@@ -204,6 +221,14 @@ blink::mojom::DisplayMode MediaValuesDynamic::DisplayMode() const {
   return CalculateDisplayMode(frame_);
 }
 
+ui::WindowShowState MediaValuesDynamic::WindowShowState() const {
+  return CalculateWindowShowState(frame_);
+}
+
+bool MediaValuesDynamic::Resizable() const {
+  return CalculateResizable(frame_);
+}
+
 bool MediaValuesDynamic::StrictMode() const {
   return CalculateStrictMode(frame_);
 }
@@ -230,6 +255,10 @@ bool MediaValuesDynamic::PrefersReducedData() const {
   return CalculatePrefersReducedData(frame_);
 }
 
+bool MediaValuesDynamic::PrefersReducedTransparency() const {
+  return CalculatePrefersReducedTransparency(frame_);
+}
+
 ForcedColors MediaValuesDynamic::GetForcedColors() const {
   return CalculateForcedColors(frame_);
 }
@@ -249,6 +278,10 @@ int MediaValuesDynamic::GetVerticalViewportSegments() const {
 device::mojom::blink::DevicePostureType MediaValuesDynamic::GetDevicePosture()
     const {
   return CalculateDevicePosture(frame_);
+}
+
+Scripting MediaValuesDynamic::GetScripting() const {
+  return CalculateScripting(frame_);
 }
 
 Document* MediaValuesDynamic::GetDocument() const {

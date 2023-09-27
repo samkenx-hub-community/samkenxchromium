@@ -18,7 +18,6 @@
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "ui/accessibility/ax_enums.mojom.h"
-#include "ui/accessibility/ax_node_data.h"
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/cursor/cursor.h"
@@ -33,11 +32,14 @@
 #include "ui/gfx/text_elider.h"
 #include "ui/gfx/text_utils.h"
 #include "ui/strings/grit/ui_strings.h"
+#include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/cascading_property.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/selection_controller.h"
+#include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 
 namespace {
 
@@ -77,7 +79,8 @@ Label::Label(const std::u16string& text,
     : text_context_(text_context),
       text_style_(text_style),
       context_menu_contents_(this) {
-  Init(text, style::GetFont(text_context, text_style), directionality_mode);
+  Init(text, TypographyProvider::Get().GetFont(text_context, text_style),
+       directionality_mode);
 }
 
 Label::Label(const std::u16string& text, const CustomFont& font)
@@ -91,7 +94,8 @@ Label::~Label() = default;
 
 // static
 const gfx::FontList& Label::GetDefaultFontList() {
-  return style::GetFont(style::CONTEXT_LABEL, style::STYLE_PRIMARY);
+  return TypographyProvider::Get().GetFont(style::CONTEXT_LABEL,
+                                           style::STYLE_PRIMARY);
 }
 
 void Label::SetFontList(const gfx::FontList& font_list) {
@@ -108,20 +112,24 @@ void Label::SetText(const std::u16string& new_text) {
   if (new_text == GetText())
     return;
 
-  if (GetAccessibleName().empty() || GetAccessibleName() == GetText()) {
+  std::u16string current_text = GetText();
+  full_text_->SetText(new_text);
+  ClearDisplayText();
+
+  if (GetAccessibleName().empty() || GetAccessibleName() == current_text) {
     SetAccessibleName(new_text);
   }
 
-  full_text_->SetText(new_text);
-  ClearDisplayText();
   OnPropertyChanged(&full_text_ + kLabelText,
                     kPropertyEffectsPreferredSizeChanged);
   stored_selection_range_ = gfx::Range::InvalidRange();
 }
 
-const std::u16string& Label::GetAccessibleName() const {
-  return View::GetAccessibleName().empty() ? full_text_->GetDisplayText()
-                                           : View::GetAccessibleName();
+void Label::AdjustAccessibleName(std::u16string& new_name,
+                                 ax::mojom::NameFrom& name_from) {
+  if (new_name.empty()) {
+    new_name = full_text_->GetDisplayText();
+  }
 }
 
 int Label::GetTextContext() const {
@@ -132,11 +140,17 @@ void Label::SetTextContext(int text_context) {
   if (text_context == text_context_)
     return;
   text_context_ = text_context;
-  full_text_->SetFontList(style::GetFont(text_context_, text_style_));
+  full_text_->SetFontList(
+      TypographyProvider::Get().GetFont(text_context_, text_style_));
   full_text_->SetMinLineHeight(GetLineHeight());
   ClearDisplayText();
   if (GetWidget())
     UpdateColorsFromTheme();
+
+  SetAccessibleRole(text_context_ == style::CONTEXT_DIALOG_TITLE
+                        ? ax::mojom::Role::kTitleBar
+                        : ax::mojom::Role::kStaticText);
+
   OnPropertyChanged(&text_context_, kPropertyEffectsPreferredSizeChanged);
 }
 
@@ -153,7 +167,8 @@ void Label::SetTextStyle(int style) {
 }
 
 void Label::ApplyBaselineTextStyle() {
-  full_text_->SetFontList(style::GetFont(text_context_, text_style_));
+  full_text_->SetFontList(
+      TypographyProvider::Get().GetFont(text_context_, text_style_));
   full_text_->SetMinLineHeight(GetLineHeight());
   ClearDisplayText();
   if (GetWidget())
@@ -167,13 +182,16 @@ void Label::SetTextStyleRange(int style, const gfx::Range& range) {
     return;
   }
 
-  const auto details = style::GetFontDetails(text_context_, style);
+  const auto& typography_provider = TypographyProvider::Get();
+  const auto details = typography_provider.GetFontDetails(text_context_, style);
   // This function is not prepared to handle style requests that vary by
   // anything other than weight.
-  DCHECK_EQ(details.typeface,
-            style::GetFontDetails(text_context_, text_style_).typeface);
+  DCHECK_EQ(
+      details.typeface,
+      typography_provider.GetFontDetails(text_context_, text_style_).typeface);
   DCHECK_EQ(details.size_delta,
-            style::GetFontDetails(text_context_, text_style_).size_delta);
+            typography_provider.GetFontDetails(text_context_, text_style_)
+                .size_delta);
   full_text_->ApplyWeight(details.weight, range);
   ClearDisplayText();
   PreferredSizeChanged();
@@ -349,9 +367,9 @@ void Label::SetVerticalAlignment(gfx::VerticalAlignment alignment) {
 int Label::GetLineHeight() const {
   // TODO(pkasting): If we can replace SetFontList() with context/style setter
   // calls, we can eliminate the reference to font_list().GetHeight() here.
-  return line_height_.value_or(
-      std::max(style::GetLineHeight(text_context_, text_style_),
-               font_list().GetHeight()));
+  return line_height_.value_or(std::max(
+      TypographyProvider::Get().GetLineHeight(text_context_, text_style_),
+      font_list().GetHeight()));
 }
 
 void Label::SetLineHeight(int line_height) {
@@ -465,6 +483,7 @@ void Label::SetTooltipText(const std::u16string& tooltip_text) {
   if (tooltip_text_ == tooltip_text)
     return;
   tooltip_text_ = tooltip_text;
+  TooltipTextChanged();
   OnPropertyChanged(&tooltip_text_, kPropertyEffectsNone);
 }
 
@@ -564,6 +583,13 @@ bool Label::SetSelectable(bool value) {
 bool Label::HasSelection() const {
   const gfx::RenderText* render_text = GetRenderTextForSelectionController();
   return render_text ? !render_text->selection().is_empty() : false;
+}
+
+bool Label::HasFullSelection() const {
+  const gfx::RenderText* render_text = GetRenderTextForSelectionController();
+  return render_text
+             ? render_text->selection().length() == render_text->text().length()
+             : false;
 }
 
 void Label::SelectAll() {
@@ -711,15 +737,6 @@ bool Label::GetCanProcessEventsWithinSubtree() const {
 
 WordLookupClient* Label::GetWordLookupClient() {
   return this;
-}
-
-void Label::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  if (text_context_ == style::CONTEXT_DIALOG_TITLE)
-    node_data->role = ax::mojom::Role::kTitleBar;
-  else
-    node_data->role = ax::mojom::Role::kStaticText;
-
-  node_data->SetName(GetAccessibleName());
 }
 
 std::u16string Label::GetTooltipText(const gfx::Point& p) const {
@@ -1143,12 +1160,18 @@ void Label::Init(const std::u16string& text,
   UpdateFullTextElideBehavior();
   full_text_->SetDirectionalityMode(directionality_mode);
 
+  SetAccessibilityProperties(text_context_ == style::CONTEXT_DIALOG_TITLE
+                                 ? ax::mojom::Role::kTitleBar
+                                 : ax::mojom::Role::kStaticText,
+                             text);
+
   SetText(text);
 
   // Only selectable labels will get requests to show the context menu, due to
   // GetCanProcessEventsWithinSubtree().
   BuildContextMenuContents();
   set_context_menu_controller(this);
+  GetViewAccessibility().set_needs_ax_tree_manager(true);
 
   // This allows the BrowserView to pass the copy command from the Chrome menu
   // to the Label.
@@ -1249,7 +1272,7 @@ void Label::UpdateColorsFromTheme() {
         GetCascadingProperty(this, kCascadingLabelEnabledColor);
     requested_enabled_color_ =
         cascading_color.value_or(GetColorProvider()->GetColor(
-            style::GetColorId(text_context_, text_style_)));
+            TypographyProvider::Get().GetColorId(text_context_, text_style_)));
   }
 
   if (background_color_id_.has_value()) {

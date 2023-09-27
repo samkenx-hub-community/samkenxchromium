@@ -29,6 +29,7 @@ StubAuthenticator::StubAuthenticator(AuthStatusConsumer* consumer,
       task_runner_(base::SingleThreadTaskRunner::GetCurrentDefault()) {}
 
 void StubAuthenticator::CompleteLogin(
+    bool ephemeral,
     std::unique_ptr<UserContext> user_context) {
   if (expected_user_context_ != *user_context)
     NOTREACHED();
@@ -36,6 +37,7 @@ void StubAuthenticator::CompleteLogin(
 }
 
 void StubAuthenticator::AuthenticateToLogin(
+    bool ephemeral,
     std::unique_ptr<UserContext> user_context) {
   // Don't compare the entire |expected_user_context_| to |user_context| because
   // during non-online re-auth |user_context| does not have a gaia id.
@@ -77,6 +79,7 @@ void StubAuthenticator::AuthenticateToLogin(
 }
 
 void StubAuthenticator::AuthenticateToUnlock(
+    bool ephemeral,
     std::unique_ptr<UserContext> user_context) {
   if (expected_user_context_.GetAccountId() == user_context->GetAccountId() &&
       (*expected_user_context_.GetKey() == *user_context->GetKey() ||
@@ -119,7 +122,8 @@ void StubAuthenticator::LoginAsPublicSession(const UserContext& user_context) {
 }
 
 void StubAuthenticator::LoginAsKioskAccount(
-    const AccountId& /* app_account_id */) {
+    const AccountId& /* app_account_id */,
+    bool /* ephemeral */) {
   UserContext user_context(user_manager::UserType::USER_TYPE_KIOSK_APP,
                            expected_user_context_.GetAccountId());
   user_context.SetIsUsingOAuth(false);
@@ -131,7 +135,8 @@ void StubAuthenticator::LoginAsKioskAccount(
 }
 
 void StubAuthenticator::LoginAsArcKioskAccount(
-    const AccountId& /* app_account_id */) {
+    const AccountId& /* app_account_id */,
+    bool /* ephemeral */) {
   UserContext user_context(user_manager::USER_TYPE_ARC_KIOSK_APP,
                            expected_user_context_.GetAccountId());
   user_context.SetIsUsingOAuth(false);
@@ -143,7 +148,8 @@ void StubAuthenticator::LoginAsArcKioskAccount(
 }
 
 void StubAuthenticator::LoginAsWebKioskAccount(
-    const AccountId& /* app_account_id */) {
+    const AccountId& /* app_account_id */,
+    bool /* ephemeral */) {
   UserContext user_context(user_manager::USER_TYPE_WEB_KIOSK_APP,
                            expected_user_context_.GetAccountId());
   user_context.SetIsUsingOAuth(false);
@@ -180,6 +186,7 @@ void StubAuthenticator::RecoverEncryptedData(
 }
 
 void StubAuthenticator::ResyncEncryptedData(
+    bool ephemeral,
     std::unique_ptr<UserContext> user_context) {
   task_runner_->PostTask(
       FROM_HERE, base::BindOnce(&StubAuthenticator::OnAuthSuccess, this));
@@ -212,7 +219,7 @@ UserContext StubAuthenticator::ExpectedUserContextWithTransformedKey() const {
   cryptohome::AuthFactor password(ref, cryptohome::AuthFactorCommonMetadata());
   user_context.SetAuthFactorsConfiguration(
       AuthFactorsConfiguration{{password}, factors});
-  user_context.SetAuthSessionId("someauthsessionid");
+  user_context.SetAuthSessionIds("someauthsessionid", "broadcast");
   return user_context;
 }
 

@@ -9,12 +9,13 @@
 #import <memory>
 #import <utility>
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/scoped_observation.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "base/test/scoped_feature_list.h"
+#import "base/test/test_timeouts.h"
 #import "ios/testing/ocmock_complex_type_helper.h"
 #import "ios/web/common/crw_content_view.h"
 #import "ios/web/common/crw_web_view_content_view.h"
@@ -26,7 +27,6 @@
 #import "ios/web/navigation/navigation_item_impl.h"
 #import "ios/web/navigation/navigation_manager_impl.h"
 #import "ios/web/navigation/wk_navigation_action_policy_util.h"
-#import "ios/web/public/deprecated/url_verification_constants.h"
 #import "ios/web/public/download/download_controller.h"
 #import "ios/web/public/download/download_task.h"
 #import "ios/web/public/navigation/referrer.h"
@@ -62,10 +62,6 @@
 #import "third_party/ocmock/gtest_support.h"
 #import "third_party/ocmock/ocmock_extensions.h"
 #import "url/scheme_host_port.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using base::test::ios::WaitUntilConditionOrTimeout;
 using base::test::ios::kWaitForPageLoadTimeout;
@@ -416,6 +412,25 @@ TEST_F(JavaScriptDialogPresenterTest, Prompt) {
   EXPECT_EQ(page_url(), dialog->origin_url);
   EXPECT_NSEQ(@"Yes?", dialog->message_text);
   EXPECT_NSEQ(@"No", dialog->default_prompt_text);
+}
+
+// Tests that window.prompt dialog is shown even when the given message and
+// default value are empty.
+TEST_F(JavaScriptDialogPresenterTest, PromptEmpty) {
+  ASSERT_FALSE(JSDialogPresenterHasDialogs());
+
+  js_dialog_presenter()->set_callback_user_input_argument(@"Maybe");
+
+  EXPECT_NSEQ(@"Maybe", ExecuteJavaScript(@"prompt('', '')"));
+
+  ASSERT_TRUE(requested_alert_dialogs().empty());
+  ASSERT_TRUE(requested_confirm_dialogs().empty());
+  ASSERT_EQ(1U, requested_prompt_dialogs().size());
+  auto& dialog = requested_prompt_dialogs().front();
+  EXPECT_EQ(web_state(), dialog->web_state);
+  EXPECT_EQ(page_url(), dialog->origin_url);
+  EXPECT_NSEQ(@"", dialog->message_text);
+  EXPECT_NSEQ(@"", dialog->default_prompt_text);
 }
 
 // Tests that window.alert, window.confirm and window.prompt dialogs are not
@@ -838,8 +853,8 @@ TEST_F(CRWWebControllerResponseTest, IFrameDownloadWithNSHTTPURLResponse) {
   EXPECT_EQ("", task->GetMimeType());
 }
 
-// Tests `currentURLWithTrustLevel:` method.
-TEST_F(CRWWebControllerTest, CurrentUrlWithTrustLevel) {
+// Tests `currentURL` method.
+TEST_F(CRWWebControllerTest, CurrentUrl) {
   GURL url("http://chromium.test");
   AddPendingItem(url, ui::PAGE_TRANSITION_TYPED);
 
@@ -857,9 +872,7 @@ TEST_F(CRWWebControllerTest, CurrentUrlWithTrustLevel) {
   [fake_wk_list_ setCurrentURL:@"http://chromium.test"];
   [navigation_delegate_ webView:mock_web_view_ didCommitNavigation:nil];
 
-  URLVerificationTrustLevel trust_level = kNone;
-  EXPECT_EQ(url, [web_controller() currentURLWithTrustLevel:&trust_level]);
-  EXPECT_EQ(kAbsolute, trust_level);
+  EXPECT_EQ(url, [web_controller() currentURL]);
 }
 
 // Test fixture to test decidePolicyForNavigationAction:decisionHandler:
@@ -1289,7 +1302,8 @@ TEST_F(ScriptExecutionTest, UserScriptOnAppSpecificPage) {
   nav_manager.AddPendingItem(
       GURL(kTestAppSpecificURL), Referrer(), ui::PAGE_TRANSITION_TYPED,
       NavigationInitiationType::BROWSER_INITIATED,
-      /*is_post_navigation=*/false, web::HttpsUpgradeType::kNone);
+      /*is_post_navigation=*/false, /*is_error_navigation=*/false,
+      web::HttpsUpgradeType::kNone);
   nav_manager.CommitPendingItem();
 
   NSError* error = nil;
@@ -1330,9 +1344,10 @@ TEST_F(CRWWebControllerWebProcessTest, Crash) {
   FakeWebStateObserver observer(web_state());
   FakeWebStateObserver* observer_ptr = &observer;
   SimulateWKWebViewCrash(web_view_);
-  base::test::ios::WaitUntilCondition(^bool() {
-    return observer_ptr->render_process_gone_info();
-  });
+  ASSERT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+      TestTimeouts::action_timeout(), ^bool() {
+        return observer_ptr->render_process_gone_info();
+      }));
   EXPECT_EQ(web_state(), observer.render_process_gone_info()->web_state);
   EXPECT_FALSE([web_controller() isViewAlive]);
   EXPECT_TRUE([web_controller() isWebProcessCrashed]);
@@ -1378,9 +1393,10 @@ TEST_F(CRWWebControllerWebViewTest, CheckNoKVOWhenWebStateDestroyed) {
   NSURL* URL = [NSURL URLWithString:@"about:blank"];
   NSURLRequest* request = [NSURLRequest requestWithURL:URL];
   [web_view_ loadRequest:request];
-  base::test::ios::WaitUntilCondition(^bool() {
-    return !web_view_.loading;
-  });
+  ASSERT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+      TestTimeouts::action_timeout(), ^bool() {
+        return !web_view_.loading;
+      }));
 
   // Destroying the WebState should call stop at a point where all observers are
   // supposed to be removed.

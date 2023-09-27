@@ -41,13 +41,41 @@ user_data_auth::AuthFactorType ConvertFactorTypeToProto(AuthFactorType type) {
   }
 }
 
+absl::optional<AuthFactorType> SafeConvertFactorTypeFromProto(
+    user_data_auth::AuthFactorType type) {
+  switch (type) {
+    case user_data_auth::AUTH_FACTOR_TYPE_UNSPECIFIED:
+      LOG(WARNING) << "Unknown factor type should be handled separately";
+      return absl::nullopt;
+    case user_data_auth::AUTH_FACTOR_TYPE_LEGACY_FINGERPRINT:
+      LOG(WARNING) << "Fingerprint factor type should never be returned";
+      return absl::nullopt;
+    case user_data_auth::AUTH_FACTOR_TYPE_PASSWORD:
+      return AuthFactorType::kPassword;
+    case user_data_auth::AUTH_FACTOR_TYPE_PIN:
+      return AuthFactorType::kPin;
+    case user_data_auth::AUTH_FACTOR_TYPE_CRYPTOHOME_RECOVERY:
+      return AuthFactorType::kRecovery;
+    case user_data_auth::AUTH_FACTOR_TYPE_KIOSK:
+      return AuthFactorType::kKiosk;
+    case user_data_auth::AUTH_FACTOR_TYPE_SMART_CARD:
+      return AuthFactorType::kSmartCard;
+    default:
+      LOG(WARNING)
+          << "Unknown auth factor type " << static_cast<int>(type)
+          << " Probably factor was added in cryptohome, but is not supported "
+             "in chrome yet.";
+      return absl::nullopt;
+  }
+}
+
 AuthFactorType ConvertFactorTypeFromProto(user_data_auth::AuthFactorType type) {
   switch (type) {
     case user_data_auth::AUTH_FACTOR_TYPE_UNSPECIFIED:
-      NOTREACHED() << "Unknown factor type should be handled separately";
+      LOG(FATAL) << "Unknown factor type should be handled separately";
       return AuthFactorType::kUnknownLegacy;
     case user_data_auth::AUTH_FACTOR_TYPE_LEGACY_FINGERPRINT:
-      NOTREACHED() << "Fingerprint factor type should never be returned";
+      LOG(FATAL) << "Fingerprint factor type should never be returned";
       return AuthFactorType::kUnknownLegacy;
     case user_data_auth::AUTH_FACTOR_TYPE_PASSWORD:
       return AuthFactorType::kPassword;
@@ -60,7 +88,8 @@ AuthFactorType ConvertFactorTypeFromProto(user_data_auth::AuthFactorType type) {
     case user_data_auth::AUTH_FACTOR_TYPE_SMART_CARD:
       return AuthFactorType::kSmartCard;
     default:
-      NOTREACHED() << "Unknown auth factor type " << static_cast<int>(type);
+      // Use `--ignore-unknown-auth-factors` to avoid this.
+      LOG(FATAL) << "Unknown auth factor type " << static_cast<int>(type);
       return AuthFactorType::kUnknownLegacy;
   }
 }
@@ -110,7 +139,8 @@ void SerializeAuthFactor(const AuthFactor& factor,
       out_proto->mutable_pin_metadata();
       break;
     case AuthFactorType::kRecovery:
-      out_proto->mutable_cryptohome_recovery_metadata();
+      out_proto->mutable_cryptohome_recovery_metadata()->set_mediator_pub_key(
+          factor.GetCryptohomeRecoveryMetadata().mediator_pub_key);
       break;
     case AuthFactorType::kKiosk:
       out_proto->mutable_kiosk_metadata();
@@ -229,8 +259,16 @@ AuthFactor DeserializeAuthFactor(const user_data_auth::AuthFactor& proto,
   switch (type) {
     case AuthFactorType::kPassword:
       return AuthFactor(std::move(ref), std::move(common_metadata));
-    case AuthFactorType::kRecovery:
-      return AuthFactor(std::move(ref), std::move(common_metadata));
+    case AuthFactorType::kRecovery: {
+      if (!proto.has_cryptohome_recovery_metadata()) {
+        return AuthFactor(std::move(ref), std::move(common_metadata));
+      }
+      CryptohomeRecoveryMetadata recovery_metadata;
+      recovery_metadata.mediator_pub_key =
+          proto.cryptohome_recovery_metadata().mediator_pub_key();
+      return AuthFactor(std::move(ref), std::move(common_metadata),
+                        std::move(recovery_metadata));
+    }
     case AuthFactorType::kKiosk:
       return AuthFactor(std::move(ref), std::move(common_metadata));
     case AuthFactorType::kPin: {

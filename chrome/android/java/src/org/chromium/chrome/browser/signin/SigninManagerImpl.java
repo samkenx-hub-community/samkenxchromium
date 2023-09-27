@@ -33,7 +33,6 @@ import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.SigninManager;
 import org.chromium.chrome.browser.signin.services.SigninPreferencesManager;
-import org.chromium.chrome.browser.sync.SyncService;
 import org.chromium.components.externalauth.ExternalAuthUtils;
 import org.chromium.components.signin.base.CoreAccountId;
 import org.chromium.components.signin.base.CoreAccountInfo;
@@ -47,6 +46,7 @@ import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.signin.metrics.SigninReason;
 import org.chromium.components.signin.metrics.SignoutDelete;
 import org.chromium.components.signin.metrics.SignoutReason;
+import org.chromium.components.sync.SyncService;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -76,6 +76,7 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
     private final AccountTrackerService mAccountTrackerService;
     private final IdentityManager mIdentityManager;
     private final IdentityMutator mIdentityMutator;
+    private final SyncService mSyncService;
     private final ObserverList<SignInStateObserver> mSignInStateObservers = new ObserverList<>();
     private final List<Runnable> mCallbacksWaitingForPendingOperation = new ArrayList<>();
     private boolean mSigninAllowedByPolicy;
@@ -104,13 +105,13 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
     @VisibleForTesting
     static SigninManager create(long nativeSigninManagerAndroid,
             AccountTrackerService accountTrackerService, IdentityManager identityManager,
-            IdentityMutator identityMutator) {
+            IdentityMutator identityMutator, SyncService syncService) {
         assert nativeSigninManagerAndroid != 0;
         assert accountTrackerService != null;
         assert identityManager != null;
         assert identityMutator != null;
         final SigninManagerImpl signinManager = new SigninManagerImpl(nativeSigninManagerAndroid,
-                accountTrackerService, identityManager, identityMutator);
+                accountTrackerService, identityManager, identityMutator, syncService);
 
         identityManager.addObserver(signinManager);
         AccountInfoServiceProvider.init(identityManager, accountTrackerService);
@@ -122,12 +123,13 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
 
     private SigninManagerImpl(long nativeSigninManagerAndroid,
             AccountTrackerService accountTrackerService, IdentityManager identityManager,
-            IdentityMutator identityMutator) {
+            IdentityMutator identityMutator, SyncService syncService) {
         ThreadUtils.assertOnUiThread();
         mNativeSigninManagerAndroid = nativeSigninManagerAndroid;
         mAccountTrackerService = accountTrackerService;
         mIdentityManager = identityManager;
         mIdentityMutator = identityMutator;
+        mSyncService = syncService;
 
         mSigninAllowedByPolicy =
                 SigninManagerImplJni.get().isSigninAllowedByPolicy(mNativeSigninManagerAndroid);
@@ -168,7 +170,7 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
     public boolean isSigninAllowed() {
         return mSignInState == null && mSigninAllowedByPolicy
                 && mIdentityManager.getPrimaryAccountInfo(ConsentLevel.SIGNIN) == null
-                && isSigninSupported();
+                && isSigninSupported(/*requireUpdatedPlayServices=*/false);
     }
 
     /**
@@ -178,7 +180,7 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
     public boolean isSyncOptInAllowed() {
         return mSignInState == null && mSigninAllowedByPolicy
                 && mIdentityManager.getPrimaryAccountInfo(ConsentLevel.SYNC) == null
-                && isSigninSupported();
+                && isSigninSupported(/*requireUpdatedPlayServices=*/false);
     }
 
     /** Returns true if sign out can be started now. */
@@ -198,12 +200,20 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
     }
 
     /**
-     * @return Whether true if the current user is not demo user and the user has a reasonable
-     *         Google Play Services installed.
+     * Returns whether the user can sign-in (maybe after an update to Google Play services).
+     * @param requireUpdatedPlayServices Indicates whether an updated version of play services is
+     *         required or not.
      */
     @Override
-    public boolean isSigninSupported() {
-        return !ApiCompatibilityUtils.isDemoUser() && isGooglePlayServicesPresent();
+    public boolean isSigninSupported(boolean requireUpdatedPlayServices) {
+        if (ApiCompatibilityUtils.isDemoUser()) {
+            return false;
+        }
+        if (requireUpdatedPlayServices) {
+            return ExternalAuthUtils.getInstance().canUseGooglePlayServices();
+        }
+        return !ExternalAuthUtils.getInstance().isGooglePlayServicesMissing(
+                ContextUtils.getApplicationContext());
     }
 
     /**
@@ -246,40 +256,14 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
         });
     }
 
-    /**
-     * Starts the sign-in flow, and executes the callback when finished.
-     *
-     * The sign-in flow goes through the following steps:
-     *
-     *   - Wait for AccountTrackerService to be seeded.
-     *   - Complete sign-in with the native IdentityManager.
-     *   - Call the callback if provided.
-     *
-     * @param account The account to sign in to.
-     * @param callback Optional callback for when the sign-in process is finished.
-     */
     @Override
-    public void signin(Account account, @Nullable SignInCallback callback) {
-        signinInternal(SignInState.createForSignin(account, callback));
+    public void signin(Account account, @SigninAccessPoint int accessPoint,
+            @Nullable SignInCallback callback) {
+        signinInternal(SignInState.createForSignin(accessPoint, account, callback));
     }
 
-    /**
-     * Starts the sign-in flow, and executes the callback when finished.
-     *
-     * The sign-in flow goes through the following steps:
-     *
-     *   - Wait for AccountTrackerService to be seeded.
-     *   - Wait for policy to be checked for the account.
-     *   - If managed, wait for the policy to be fetched.
-     *   - Complete sign-in with the native IdentityManager.
-     *   - Call the callback if provided.
-     *
-     * @param accessPoint {@link SigninAccessPoint} that initiated the sign-in flow.
-     * @param account The account to sign in to.
-     * @param callback Optional callback for when the sign-in process is finished.
-     */
     @Override
-    public void signinAndEnableSync(@SigninAccessPoint int accessPoint, Account account,
+    public void signinAndEnableSync(Account account, @SigninAccessPoint int accessPoint,
             @Nullable SignInCallback callback) {
         signinInternal(SignInState.createForSigninAndEnableSync(accessPoint, account, callback));
     }
@@ -339,7 +323,7 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
                 mSignInState.shouldTurnSyncOn() ? ConsentLevel.SYNC : ConsentLevel.SIGNIN;
         @PrimaryAccountError
         int primaryAccountError = mIdentityMutator.setPrimaryAccount(
-                mSignInState.mCoreAccountInfo.getId(), consentLevel);
+                mSignInState.mCoreAccountInfo.getId(), consentLevel, mSignInState.getAccessPoint());
         if (primaryAccountError != PrimaryAccountError.NO_ERROR) {
             Log.w(TAG, "SetPrimaryAccountError in IdentityManager: %d, aborting signin",
                     primaryAccountError);
@@ -353,7 +337,7 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
             SigninPreferencesManager.getInstance().setLegacySyncAccountEmail(
                     mSignInState.mCoreAccountInfo.getEmail());
 
-            SyncService.get().setSyncRequested(true);
+            mSyncService.setSyncRequested();
 
             RecordUserAction.record("Signin_Signin_Succeed");
             RecordHistogram.recordEnumeratedHistogram("Signin.SigninCompletedAccessPoint",
@@ -461,8 +445,6 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
             boolean forceWipeUserData) {
         // Only one signOut at a time!
         assert mSignOutState == null;
-        // User data should not be wiped if the user is not syncing.
-        assert mIdentityManager.hasPrimaryAccount(ConsentLevel.SYNC) || !forceWipeUserData;
 
         // Grab the management domain before nativeSignOut() potentially clears it.
         String managementDomain = getManagementDomain();
@@ -575,18 +557,32 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
      * Wipes the user's bookmarks and sync data.
      *
      * @param wipeDataCallback A callback which will be called once the data is wiped.
-     *
-     * TODO(crbug.com/1272911): this function and disableSyncAndWipeData() have very similar
-     * functionality, but with different implementations.  Consider merging them.
-     *
-     * TODO(crbug.com/1272911): add test coverage for this function (including its effect on
-     * notifyCallbacksWaitingForOperation()), after resolving the TODO above.
+     * @param dataWipeOption What kind of data to delete.
      */
     @Override
-    public void wipeSyncUserData(Runnable wipeDataCallback) {
+    public void wipeSyncUserData(Runnable wipeDataCallback, @DataWipeOption int dataWipeOption) {
         assert !mWipeUserDataInProgress;
         mWipeUserDataInProgress = true;
 
+        switch (dataWipeOption) {
+            case DataWipeOption.WIPE_SYNC_DATA:
+                wipeSyncUserDataOnly(wipeDataCallback);
+                break;
+            case DataWipeOption.WIPE_ALL_PROFILE_DATA:
+                SigninManagerImplJni.get().wipeProfileData(mNativeSigninManagerAndroid, () -> {
+                    mWipeUserDataInProgress = false;
+                    wipeDataCallback.run();
+                    notifyCallbacksWaitingForOperation();
+                });
+                break;
+        }
+    }
+
+    // TODO(crbug.com/1272911): this function and disableSyncAndWipeData() have very similar
+    // functionality, but with different implementations.  Consider merging them.
+    // TODO(crbug.com/1272911): add test coverage for this function (including its effect on
+    // notifyCallbacksWaitingForOperation()), after resolving the TODO above.
+    private void wipeSyncUserDataOnly(Runnable wipeDataCallback) {
         final BookmarkModel model =
                 BookmarkModel.getForProfile(Profile.getLastUsedRegularProfile());
         model.finishLoadingBookmarkModel(new Runnable() {
@@ -640,19 +636,12 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
                         mNativeSigninManagerAndroid, wipeDataCallback);
                 break;
             case SignOutState.DataWipeAction.WIPE_SYNC_DATA_ONLY:
-                wipeSyncUserData(wipeDataCallback);
+                wipeSyncUserData(wipeDataCallback, DataWipeOption.WIPE_SYNC_DATA);
                 break;
             case SignOutState.DataWipeAction.WIPE_ALL_PROFILE_DATA:
-                SigninManagerImplJni.get().wipeProfileData(
-                        mNativeSigninManagerAndroid, wipeDataCallback);
+                wipeSyncUserData(wipeDataCallback, DataWipeOption.WIPE_ALL_PROFILE_DATA);
                 break;
         }
-        ThreadUtils.postOnUiThread(mAccountTrackerService::onAccountsChanged);
-    }
-
-    @VisibleForTesting
-    IdentityMutator getIdentityMutatorForTesting() {
-        return mIdentityMutator;
     }
 
     /**
@@ -661,6 +650,7 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
      */
     private static class SignInState {
         private final @SigninAccessPoint Integer mAccessPoint;
+        private final boolean mShouldTurnSyncOn;
         final SignInCallback mCallback;
 
         /**
@@ -680,11 +670,13 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
         /**
          * State for the sign-in flow that doesn't enable sync.
          *
+         * @param accessPoint {@link SigninAccessPoint} that has initiated the sign-in.
          * @param account The account to sign in to.
          * @param callback Called when the sign-in process finishes or is cancelled. Can be null.
          */
-        static SignInState createForSignin(Account account, @Nullable SignInCallback callback) {
-            return new SignInState(null, account, callback);
+        static SignInState createForSignin(@SigninAccessPoint int accessPoint, Account account,
+                @Nullable SignInCallback callback) {
+            return new SignInState(accessPoint, account, callback, false);
         }
 
         /**
@@ -696,15 +688,16 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
          */
         static SignInState createForSigninAndEnableSync(@SigninAccessPoint int accessPoint,
                 Account account, @Nullable SignInCallback callback) {
-            return new SignInState(accessPoint, account, callback);
+            return new SignInState(accessPoint, account, callback, true);
         }
 
         private SignInState(@SigninAccessPoint Integer accessPoint, Account account,
-                @Nullable SignInCallback callback) {
+                @Nullable SignInCallback callback, boolean shouldTurnSyncOn) {
             assert account != null : "Account must be set and valid to progress.";
             mAccessPoint = accessPoint;
             mAccount = account;
             mCallback = callback;
+            mShouldTurnSyncOn = shouldTurnSyncOn;
         }
 
         /**
@@ -721,7 +714,7 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
          * Whether this sign-in flow should also turn on sync.
          */
         boolean shouldTurnSyncOn() {
-            return mAccessPoint != null;
+            return mShouldTurnSyncOn;
         }
     }
 

@@ -15,6 +15,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/observer_list.h"
+#include "base/task/cancelable_task_tracker.h"
 #include "content/browser/renderer_host/navigation_discard_reason.h"
 #include "content/browser/renderer_host/navigator.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
@@ -36,6 +37,17 @@
 #include "base/time/time.h"
 #include "url/gurl.h"
 #include "url/origin.h"
+
+namespace features {
+
+// Enable dumping when the a NavigationRequest with evicted RFH for BFCache
+// restore is moved to the FrameTreeNode.
+// This is a feature for debugging and should only be enabled on non-stable
+// channel.
+BASE_DECLARE_FEATURE(
+    kDumpWhenFrameTreeNodeTakesNavigationRequestWithEvictedBFCacheRFH);
+
+}  // namespace features
 
 namespace content {
 
@@ -280,6 +292,14 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
   // navigation requests on this frame should calculate and send the
   // `Sec-Browsing-Topics` header.
   bool browsing_topics() const { return attributes_->browsing_topics; }
+
+  // Tracks iframe's 'sharedstoragewritable' attribute, indicating what value
+  // the the corresponding `network::ResourceRequest::shared_storage_writable`
+  // should take for the navigation(s) on this frame. If true, the network
+  // service will send the `Shared-Storage-Write` request header.
+  bool shared_storage_writable() const {
+    return attributes_->shared_storage_writable;
+  }
   const absl::optional<std::string> html_id() const { return attributes_->id; }
   // This tracks iframe's 'name' attribute instead of window.name, which is
   // tracked in FrameReplicationState. See the comment for frame_name() for
@@ -308,6 +328,7 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
 
   // Returns true if this node is in a loading state.
   bool IsLoading() const;
+  LoadingState GetLoadingState() const;
 
   // Returns true if this node has a cross-document navigation in progress.
   bool HasPendingCrossDocumentNavigation() const;
@@ -439,9 +460,8 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
   }
 
   // Sets the associated FrameTree for this node. The node can change FrameTrees
-  // when blink::features::Prerender2 is enabled, which allows a page loaded in
-  // the prerendered FrameTree to be used for a navigation in the primary frame
-  // tree.
+  // as part of prerendering, which allows a page loaded in the prerendered
+  // FrameTree to be used for a navigation in the primary frame tree.
   void SetFrameTree(FrameTree& frame_tree);
 
   using TraceProto = perfetto::protos::pbzero::FrameTreeNodeInfo;
@@ -560,18 +580,39 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
     fenced_frame_properties_ = fenced_frame_properties;
   }
 
-  // Return the fenced frame properties for this fenced frame tree (if any).
-  // That is to say, this function returns the `fenced_frame_properties_`
-  // variable attached to the fenced frame root FrameTreeNode, which may be
-  // either this node or an ancestor of it.
-  const absl::optional<FencedFrameProperties>& GetFencedFrameProperties();
+  // This function returns the fenced frame properties associated with the given
+  // source.
+  // - If `source_node` is set to `kClosestAncestor`, the fenced frame
+  // properties are obtained by a bottom-up traversal from this node.
+  // - If `source_node` is set tp `kFrameTreeRoot`, the fenced frame properties
+  // from the fenced frame tree root are returned.
+  // For example, for an urn iframe that is nested inside a fenced frame.
+  // Calling this function from the nested urn iframe with `source_node` set to:
+  // - `kClosestAncestor`: returns the fenced frame properties from the urn
+  // iframe.
+  // - `kFrameTreeRoot`: returns the fenced frame properties from the fenced
+  // frame.
+  // Clients should decide which one to use depending on how the application of
+  // the fenced frame properties interact with urn iframes.
+  // TODO(crbug.com/1355857): Once navigation support for urn::uuid in iframes
+  // is deprecated, remove the parameter `node_source`.
+  const absl::optional<FencedFrameProperties>& GetFencedFrameProperties(
+      FencedFramePropertiesNodeSource node_source =
+          FencedFramePropertiesNodeSource::kClosestAncestor);
 
   // Called from the currently active document via the
   // `Fence.setReportEventDataForAutomaticBeacons` JS API.
   void SetFencedFrameAutomaticBeaconReportEventData(
       const std::string& event_data,
-      const std::vector<blink::FencedFrame::ReportingDestination>& destination)
-      override;
+      const std::vector<blink::FencedFrame::ReportingDestination>& destinations,
+      network::AttributionReportingRuntimeFeatures
+          attribution_reporting_runtime_features,
+      bool once) override;
+
+  // Helper function to clear out automatic beacon data after one automatic
+  // beacon if `once` was set to true when calling
+  // `setReportEventDataForAutomaticBeacons()`.
+  void MaybeResetFencedFrameAutomaticBeaconReportEventData();
 
   // Returns the number of fenced frame boundaries above this frame. The
   // outermost main frame's frame tree has fenced frame depth 0, a topmost
@@ -636,8 +677,7 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
   void ResetAllNavigationsForFrameDetach();
 
   // RenderFrameHostOwner implementation:
-  void DidStartLoading(bool should_show_loading_ui,
-                       bool was_previously_loading) override;
+  void DidStartLoading(LoadingState previous_frame_tree_loading_state) override;
   void DidStopLoading() override;
   void RestartNavigationAsCrossDocument(
       std::unique_ptr<NavigationRequest> navigation_request) override;
@@ -680,8 +720,6 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
       const std::vector<GURL>& redirects,
       const GURL& original_url,
       std::unique_ptr<CrossOriginEmbedderPolicyReporter> coep_reporter,
-      std::unique_ptr<SubresourceWebBundleNavigationInfo>
-          subresource_web_bundle_navigation_info,
       int http_response_code) override;
   void CancelNavigation() override;
   bool Credentialless() const override;
@@ -690,6 +728,24 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
       mojo::PendingReceiver<blink::test::mojom::VirtualAuthenticatorManager>
           receiver) override;
 #endif
+
+  // Restart the navigation restoring the page from the back-forward cache
+  // as a regular non-BFCached history navigation.
+  //
+  // The restart itself is asynchronous as it's dangerous to restart navigation
+  // with arbitrary state on the stack (another navigation might be starting),
+  // so this function only posts the actual task to do all the work (See
+  // `RestartBackForwardCachedNavigationImpl()`).
+  void RestartBackForwardCachedNavigationAsync(int nav_entry_id);
+
+  // Cancel the asynchronous task that would restart the BFCache navigation.
+  // This should be called whenever a FrameTreeNode's NavigationRequest would
+  // normally get cancelled, including when another NavigationRequest starts.
+  // This preserves the previous behavior where a restarting BFCache
+  // NavigationRequest is kept around until the task to create the new
+  // navigation is run, or until that NavigationRequest gets deleted (which
+  // cancels the task).
+  void CancelRestartingBackForwardCacheNavigation();
 
  private:
   friend class CSPEmbeddedEnforcementUnitTest;
@@ -727,7 +783,13 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
   // user activation state in the widget. Otherwise, this returns false.
   bool VerifyUserActivation();
 
-  absl::optional<FencedFrameProperties>& GetFencedFramePropertiesForEditing();
+  // See comments for `GetFencedFrameProperties()`.
+  absl::optional<FencedFrameProperties>& GetFencedFramePropertiesForEditing(
+      FencedFramePropertiesNodeSource node_source =
+          FencedFramePropertiesNodeSource::kClosestAncestor);
+
+  // See `RestartBackForwardCachedNavigationAsync()`.
+  void RestartBackForwardCachedNavigationImpl(int nav_entry_id);
 
   // The next available browser-global FrameTreeNode ID.
   static int next_frame_tree_node_id_;
@@ -849,6 +911,11 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
   // and urn iframes are gone.
   absl::optional<FencedFrameProperties> fenced_frame_properties_;
 
+  // The tracker of the task that restarts the BFCache navigation. It might be
+  // used to cancel the task.
+  // See `CancelRestartingBackForwardCacheNavigation()`.
+  base::CancelableTaskTracker restart_back_forward_cached_navigation_tracker_;
+
   // Manages creation and swapping of RenderFrameHosts for this frame.
   //
   // This field needs to be declared last, because destruction of
@@ -860,6 +927,8 @@ class CONTENT_EXPORT FrameTreeNode : public RenderFrameHostOwner {
   // before the RenderFrameHostManager's destructor runs.  See also
   // https://crbug.com/1157988.
   RenderFrameHostManager render_manager_;
+
+  base::WeakPtrFactory<FrameTreeNode> weak_factory_{this};
 };
 
 }  // namespace content

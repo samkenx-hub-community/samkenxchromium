@@ -8,7 +8,6 @@
 #include "third_party/blink/renderer/core/style/computed_grid_track_list.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
 #include "third_party/blink/renderer/core/style/grid_area.h"
-#include "third_party/blink/renderer/core/style/grid_positions_resolver.h"
 
 namespace blink {
 
@@ -56,7 +55,7 @@ NGGridNamedLineCollection::NGGridNamedLineCollection(
 
   insertion_point_ = computed_grid_track_list.auto_repeat_insertion_point;
   auto_repeat_track_list_length_ =
-      computed_grid_track_list.TrackList().AutoRepeatTrackCount();
+      computed_grid_track_list.track_list.AutoRepeatTrackCount();
 
   // For standalone grids, auto repeaters guarantee a minimum of one repeat,
   // but subgrids have a minimum of zero repeats. This can present issues, as

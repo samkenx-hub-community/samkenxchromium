@@ -344,10 +344,7 @@ void HistoryURLProviderTest::RunTest(
   matches_ = autocomplete_->matches();
   if (sort_matches_) {
     TemplateURLService* service = client_->GetTemplateURLService();
-    for (auto i = matches_.begin(); i != matches_.end(); ++i) {
-      i->ComputeStrippedDestinationURL(input, service);
-    }
-    AutocompleteResult::DeduplicateMatches(&matches_);
+    AutocompleteResult::DeduplicateMatches(&matches_, input, service);
     std::sort(matches_.begin(), matches_.end(),
               &AutocompleteMatch::MoreRelevant);
   }
@@ -1414,9 +1411,6 @@ TEST_F(HistoryURLProviderTest, DoTrimHttpsScheme) {
 // In this mode, suggestions should be provided for only the user input after
 // the keyword, i.e. "@history google" should only match "google".
 TEST_F(HistoryURLProviderTest, KeywordModeExtractUserInput) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(omnibox::kSiteSearchStarterPack);
-
   // Populate template URL with starter pack entries
   std::vector<std::unique_ptr<TemplateURLData>> turls =
       TemplateURLStarterPackData::GetStarterPackEngines();
@@ -1520,10 +1514,10 @@ TEST_F(HistoryURLProviderTest, HistoryMatchToACMatchWithScoringSignals) {
   AutocompleteMatch match =
       autocomplete_->HistoryMatchToACMatch(*params, 0, /*relevance=*/1,
                                            /*populate_scoring_signals=*/true);
-  EXPECT_EQ(match.scoring_signals.typed_count(), 3);
-  EXPECT_EQ(match.scoring_signals.visit_count(), 5);
-  EXPECT_TRUE(match.scoring_signals.allowed_to_be_default_match());
-  EXPECT_TRUE(match.scoring_signals.is_host_only());
-  EXPECT_EQ(match.scoring_signals.length_of_url(), 16);
-  EXPECT_TRUE(match.scoring_signals.has_non_scheme_www_match());
+  EXPECT_EQ(match.scoring_signals->typed_count(), 3);
+  EXPECT_EQ(match.scoring_signals->visit_count(), 5);
+  EXPECT_TRUE(match.scoring_signals->allowed_to_be_default_match());
+  EXPECT_TRUE(match.scoring_signals->is_host_only());
+  EXPECT_EQ(match.scoring_signals->length_of_url(), 16);
+  EXPECT_TRUE(match.scoring_signals->has_non_scheme_www_match());
 }

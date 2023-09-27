@@ -7,6 +7,7 @@ package org.chromium.chrome.browser.toolbar.top;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.ColorStateList;
@@ -14,6 +15,7 @@ import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LevelListDrawable;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
@@ -127,6 +129,10 @@ public class ToolbarTablet
                 getResources().getDimensionPixelOffset(R.dimen.toolbar_edge_padding);
     }
 
+    public boolean isToolbarButtonReorderingEnabled() {
+        return ChromeFeatureList.sTabletToolbarReordering.isEnabled();
+    }
+
     @Override
     public void onFinishInflate() {
         super.onFinishInflate();
@@ -135,8 +141,9 @@ public class ToolbarTablet
         mForwardButton = findViewById(R.id.forward_button);
         mReloadButton = findViewById(R.id.refresh_button);
 
-        // Reposition home button to align with desktop ordering when TSR enabled.
-        if (ChromeFeatureList.sTabStripRedesign.isEnabled()) {
+        // Reposition home button to align with desktop ordering when TSR enabled and toolbar
+        // reordering not disabled
+        if (isToolbarButtonReorderingEnabled()) {
             // Remove home button view added in XML and adding back with different ordering
             // programmatically.
             ((ViewGroup) mHomeButton.getParent()).removeView(mHomeButton);
@@ -169,6 +176,26 @@ public class ToolbarTablet
         mShouldAnimateButtonVisibilityChange = false;
         mToolbarButtonsVisible = true;
         mToolbarButtons = new ImageButton[] {mBackButton, mForwardButton, mReloadButton};
+
+        setTooltipTextForToolbarButtons();
+    }
+
+    // Set hover tooltip texts for tablets buttons.
+    @Override
+    public void setTooltipTextForToolbarButtons() {
+        // Set hover tooltip texts for toolbar buttons shared between phones and tablets.
+        super.setTooltipTextForToolbarButtons();
+
+        // Set hover tooltip texts for toolbar buttons that only on tablets.
+        super.setTooltipText(
+                mBackButton, getContext().getString(R.string.accessibility_toolbar_btn_back));
+        super.setTooltipText(
+                mForwardButton, getContext().getString(R.string.accessibility_menu_forward));
+        super.setTooltipText(
+                mReloadButton, getContext().getString(R.string.accessibility_btn_refresh));
+        super.setTooltipText(
+                mBookmarkButton, getContext().getString(R.string.accessibility_menu_bookmark));
+        super.setTooltipText(mSaveOfflineButton, getContext().getString(R.string.download_page));
     }
 
     @Override
@@ -190,7 +217,7 @@ public class ToolbarTablet
         mHomeButton.setOnKeyListener(new KeyboardNavigationListener() {
             @Override
             public View getNextFocusForward() {
-                if (ChromeFeatureList.sTabStripRedesign.isEnabled()) {
+                if (isToolbarButtonReorderingEnabled()) {
                     return findViewById(R.id.url_bar);
                 } else {
                     if (mBackButton.isFocusable()) {
@@ -205,7 +232,7 @@ public class ToolbarTablet
 
             @Override
             public View getNextFocusBackward() {
-                if (ChromeFeatureList.sTabStripRedesign.isEnabled()) {
+                if (isToolbarButtonReorderingEnabled()) {
                     return findViewById(R.id.refresh_button);
                 } else {
                     return findViewById(R.id.menu_button);
@@ -227,7 +254,7 @@ public class ToolbarTablet
 
             @Override
             public View getNextFocusBackward() {
-                if (ChromeFeatureList.sTabStripRedesign.isEnabled()) {
+                if (isToolbarButtonReorderingEnabled()) {
                     return findViewById(R.id.menu_button);
                 } else {
                     if (mHomeButton.getVisibility() == VISIBLE) {
@@ -251,7 +278,7 @@ public class ToolbarTablet
             public View getNextFocusBackward() {
                 if (mBackButton.isFocusable()) {
                     return mBackButton;
-                } else if (!ChromeFeatureList.sTabStripRedesign.isEnabled()
+                } else if (!isToolbarButtonReorderingEnabled()
                         && mHomeButton.getVisibility() == VISIBLE) {
                     return findViewById(R.id.home_button);
                 } else {
@@ -265,8 +292,7 @@ public class ToolbarTablet
         mReloadButton.setOnKeyListener(new KeyboardNavigationListener() {
             @Override
             public View getNextFocusForward() {
-                if (ChromeFeatureList.sTabStripRedesign.isEnabled()
-                        && mHomeButton.getVisibility() == VISIBLE) {
+                if (isToolbarButtonReorderingEnabled() && mHomeButton.getVisibility() == VISIBLE) {
                     return findViewById(R.id.home_button);
                 } else {
                     return findViewById(R.id.url_bar);
@@ -279,7 +305,7 @@ public class ToolbarTablet
                     return mForwardButton;
                 } else if (mBackButton.isFocusable()) {
                     return mBackButton;
-                } else if (!ChromeFeatureList.sTabStripRedesign.isEnabled()
+                } else if (!isToolbarButtonReorderingEnabled()
                         && mHomeButton.getVisibility() == VISIBLE) {
                     return findViewById(R.id.home_button);
                 } else {
@@ -557,8 +583,7 @@ public class ToolbarTablet
     }
 
     @Override
-    void setTabSwitcherMode(boolean inTabSwitcherMode, boolean showToolbar, boolean delayAnimation,
-            MenuButtonCoordinator menuButtonCoordinator) {
+    void setTabSwitcherMode(boolean inTabSwitcherMode) {
         mIsInTabSwitcherMode = inTabSwitcherMode;
         mSwitcherButton.setClickable(!inTabSwitcherMode);
         int importantForAccessibility = inTabSwitcherMode
@@ -649,6 +674,26 @@ public class ToolbarTablet
         }
 
         ButtonSpec buttonSpec = buttonData.getButtonSpec();
+
+        // Set hover highlight for profile, voice search, share and new tab button on tablets. Set
+        // box hover highlight for the rest of button variants.
+        if (buttonData.getButtonSpec().getShouldShowHoverHighlight()) {
+            mOptionalButton.setBackgroundResource(R.drawable.toolbar_button_ripple);
+        } else {
+            TypedValue themeRes = new TypedValue();
+            getContext().getTheme().resolveAttribute(
+                    R.attr.selectableItemBackground, themeRes, true);
+            mOptionalButton.setBackgroundResource(themeRes.resourceId);
+        }
+
+        // Set hover tooltip text for voice search, share and new tab button on tablets.
+        if (buttonSpec.getHoverTooltipTextId() != ButtonSpec.INVALID_TOOLTIP_TEXT_ID) {
+            super.setTooltipText(
+                    mOptionalButton, getContext().getString(buttonSpec.getHoverTooltipTextId()));
+        } else {
+            super.setTooltipText(mOptionalButton, null);
+        }
+
         mOptionalButtonUsesTint = buttonSpec.getSupportsTinting();
         if (mOptionalButtonUsesTint) {
             ImageViewCompat.setImageTintList(mOptionalButton, getTint());
@@ -682,7 +727,6 @@ public class ToolbarTablet
     }
 
     @Override
-    @VisibleForTesting
     public View getOptionalButtonViewForTesting() {
         return mOptionalButton;
     }
@@ -690,6 +734,11 @@ public class ToolbarTablet
     @Override
     public HomeButton getHomeButton() {
         return mHomeButton;
+    }
+
+    @Override
+    public ToggleTabStackButton getTabSwitcherButton() {
+        return mSwitcherButton;
     }
 
     private void setToolbarButtonsVisible(boolean visible) {
@@ -780,7 +829,11 @@ public class ToolbarTablet
 
         // Create animators for all of the toolbar buttons.
         for (ImageButton button : mToolbarButtons) {
-            animators.add(mLocationBar.createHideButtonAnimatorForTablet(button));
+            ObjectAnimator hideButtonAnimator =
+                    mLocationBar.createHideButtonAnimatorForTablet(button);
+            if (hideButtonAnimator != null) {
+                animators.add(hideButtonAnimator);
+            }
         }
 
         // Add animators for location bar.
@@ -817,12 +870,10 @@ public class ToolbarTablet
         return mToolbarButtons;
     }
 
-    @VisibleForTesting
     void enableButtonVisibilityChangeAnimationForTesting() {
         mShouldAnimateButtonVisibilityChange = true;
     }
 
-    @VisibleForTesting
     void setToolbarButtonsVisibleForTesting(boolean value) {
         mToolbarButtonsVisible = value;
     }

@@ -12,6 +12,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
+#include "base/trace_event/trace_event.h"
 #include "chrome/browser/ash/app_list/search/search_controller.h"
 #include "chrome/browser/ash/drive/drive_integration_service.h"
 #include "chrome/browser/ash/file_suggest/file_suggest_keyed_service.h"
@@ -66,12 +67,12 @@ ZeroStateDriveProvider::ZeroStateDriveProvider(
     } else {
       // Wait for DriveFS to be mounted, then fetch results. This happens in
       // OnFileSystemMounted.
-      drive_observation_.Observe(drive_service_);
+      drive_observation_.Observe(drive_service_.get());
     }
   }
 
   if (session_manager_)
-    session_observation_.Observe(session_manager_);
+    session_observation_.Observe(session_manager_.get());
 
   auto* power_manager = chromeos::PowerManagerClient::Get();
   if (power_manager)
@@ -82,6 +83,10 @@ ZeroStateDriveProvider::ZeroStateDriveProvider(
 
 ZeroStateDriveProvider::~ZeroStateDriveProvider() = default;
 
+void ZeroStateDriveProvider::OnDriveIntegrationServiceDestroyed() {
+  drive_observation_.Reset();
+}
+
 void ZeroStateDriveProvider::OnFileSystemMounted() {
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
       FROM_HERE,
@@ -91,6 +96,7 @@ void ZeroStateDriveProvider::OnFileSystemMounted() {
 }
 
 void ZeroStateDriveProvider::OnSessionStateChanged() {
+  TRACE_EVENT0("ui", "ZeroStateDriveProvider::OnSessionStateChanged");
   // Update cache if the user has logged in.
   if (session_manager_->session_state() ==
       session_manager::SessionState::ACTIVE) {

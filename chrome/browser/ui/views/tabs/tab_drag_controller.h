@@ -15,6 +15,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/timer/timer.h"
+#include "base/uuid.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "chrome/browser/ui/views/tabs/tab_drag_context.h"
@@ -30,6 +31,7 @@
 
 namespace ui {
 class ListSelectionModel;
+class PresentationTimeRecorder;
 }
 namespace views {
 class View;
@@ -661,6 +663,10 @@ class TabDragController : public views::WidgetObserver,
   // group header, indicating that the entire group is being dragged together.
   absl::optional<tab_groups::TabGroupId> group_;
 
+  // The GUID of the saved tab group whose tracking is paused between paired
+  // Detach() and Attach() calls, if dragging a saved tab group between windows.
+  absl::optional<base::Uuid> paused_saved_group_id_;
+
   // True until MoveAttached() is first invoked.
   bool initial_move_;
 
@@ -755,6 +761,8 @@ class TabDragController : public views::WidgetObserver,
   // the scrolling session that handles scrolling when the tabs are dragged
   // to the scrollable regions of the tab_strip.
   std::unique_ptr<TabStripScrollSession> tab_strip_scroll_session_ = nullptr;
+
+  std::unique_ptr<ui::PresentationTimeRecorder> presentation_time_recorder_;
 
   base::WeakPtrFactory<TabDragController> weak_factory_{this};
 };

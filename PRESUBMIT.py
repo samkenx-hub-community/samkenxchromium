@@ -15,9 +15,6 @@ from dataclasses import dataclass
 
 PRESUBMIT_VERSION = '2.0.0'
 
-# This line is 'magic' in that git-cl looks for it to decide whether to
-# use Python3 instead of Python2 when running the code in this file.
-USE_PYTHON3 = True
 
 _EXCLUDED_PATHS = (
     # Generated file
@@ -50,6 +47,8 @@ _EXCLUDED_PATHS = (
     r"tools/perf/page_sets/maps_perf_test.*",
     # Test pages for WebRTC telemetry tests.
     r"tools/perf/page_sets/webrtc_cases.*",
+    # Test file compared with generated output.
+    r"tools/polymer/tests/html_to_wrapper/.*.html.ts$",
 )
 
 _EXCLUDED_SET_NO_PARENT_PATHS = (
@@ -161,7 +160,7 @@ _BANNED_JAVA_IMPORTS : Sequence[BanRule] = (
       ),
     ),
     BanRule(
-      'import android.support.test.rule.UiThreadTestRule;',
+      'import androidx.test.rule.UiThreadTestRule;',
       (
        'Do not use UiThreadTestRule, just use '
        '@org.chromium.base.test.UiThreadTest on test methods that should run '
@@ -169,14 +168,14 @@ _BANNED_JAVA_IMPORTS : Sequence[BanRule] = (
       ),
     ),
     BanRule(
-      'import android.support.test.annotation.UiThreadTest;',
-      ('Do not use android.support.test.annotation.UiThreadTest, use '
+      'import androidx.test.annotation.UiThreadTest;',
+      ('Do not use androidx.test.annotation.UiThreadTest, use '
        'org.chromium.base.test.UiThreadTest instead. See '
        'https://crbug.com/1111893.',
       ),
     ),
     BanRule(
-      'import android.support.test.rule.ActivityTestRule;',
+      'import androidx.test.rule.ActivityTestRule;',
       (
        'Do not use ActivityTestRule, use '
        'org.chromium.base.test.BaseActivityTestRule instead.',
@@ -289,7 +288,8 @@ _BANNED_JAVA_FUNCTIONS : Sequence[BanRule] = (
       r'/RecordHistogram\.getHistogram(ValueCount|TotalCount|Samples)ForTesting\(',
       (
        'Raw histogram counts are easy to misuse; for example they don\'t reset '
-       'between batched tests. Use HistogramWatcher to check histogram records instead.',
+       'between batched tests. Use HistogramWatcher to check histogram records '
+       'instead.',
       ),
       False,
       excluded_paths=(
@@ -313,7 +313,7 @@ _BANNED_JAVASCRIPT_FUNCTIONS : Sequence [BanRule] = (
           # cleaned up.
           'ash/webui/common/resources/cr.m.js',
           'ash/webui/common/resources/multidevice_setup/multidevice_setup_browser_proxy.js',
-          'ash/webui/common/resources/quick_unlock/lock_screen_constants.js',
+          'ash/webui/common/resources/quick_unlock/lock_screen_constants.ts',
           'ash/webui/common/resources/smb_shares/smb_browser_proxy.js',
           'ash/webui/connectivity_diagnostics/resources/connectivity_diagnostics.js',
           'ash/webui/diagnostics_ui/resources/diagnostics_browser_proxy.ts',
@@ -321,7 +321,9 @@ _BANNED_JAVASCRIPT_FUNCTIONS : Sequence [BanRule] = (
           'ash/webui/multidevice_debug/resources/webui.js',
           'ash/webui/projector_app/resources/annotator/trusted/annotator_browser_proxy.js',
           'ash/webui/projector_app/resources/app/trusted/projector_browser_proxy.js',
-          'ash/webui/scanning/resources/scanning_browser_proxy.js',
+          # TODO(b/301634378): Remove violation exception once Scanning App
+          # migrated off usage of `chrome.send`.
+          'ash/webui/scanning/resources/scanning_browser_proxy.ts',
       ),
     ),
 )
@@ -407,6 +409,9 @@ _BANNED_OBJC_FUNCTIONS : Sequence[BanRule] = (
        'Please use |SysNSStringToUTF8| instead.',
       ),
       True,
+      excluded_paths = (
+        '^third_party/ocmock/OCMock/',
+      ),
     ),
     BanRule(
       r'__unsafe_unretained',
@@ -422,6 +427,14 @@ _BANNED_OBJC_FUNCTIONS : Sequence[BanRule] = (
       (
         'The use of "freeWhenDone:NO" with the NoCopy creation of ',
         'Foundation types is prohibited.',
+      ),
+      True,
+    ),
+    BanRule(
+      'This file requires ARC support.',
+      (
+        'ARC compilation is default in Chromium; do not add boilerplate to ',
+        'files that require ARC.',
       ),
       True,
     ),
@@ -456,7 +469,7 @@ _BANNED_IOS_OBJC_FUNCTIONS = (
       ),
       True,
       excluded_paths=(
-        'ios/chrome/browser/ui/icons/symbol_helpers.mm',
+        'ios/chrome/browser/shared/ui/symbols/symbol_helpers.mm',
         'ios/chrome/search_widget_extension/',
       ),
     ),
@@ -494,7 +507,10 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
        'base/gtest_prod_util.h and use FRIEND_TEST_ALL_PREFIXES() instead.',
       ),
       False,
-      (),
+      excluded_paths = (
+        "base/gtest_prod_util.h",
+        "base/allocator/partition_allocator/partition_alloc_base/gtest_prod_util.h",
+      ),
     ),
     BanRule(
       'setMatrixClip',
@@ -620,13 +636,17 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
         'deprecated (http://crbug.com/634507). Please avoid converting away',
         'from the Time types in Chromium code, especially if any math is',
         'being done on time values. For interfacing with platform/library',
-        'APIs, use FromMicroseconds() or InMicroseconds(), or one of the other',
-        'type converter methods instead. For faking TimeXXX values (for unit',
+        'APIs, use base::Time::(From,To)DeltaSinceWindowsEpoch() or',
+        'base::{TimeDelta::In}Microseconds(), or one of the other type',
+        'converter methods instead. For faking TimeXXX values (for unit',
         'testing only), use TimeXXX() + Microseconds(N). For',
         'other use cases, please contact base/time/OWNERS.',
       ),
       False,
-      (),
+      excluded_paths = (
+        "base/time/time.h",
+        "base/allocator/partition_allocator/partition_alloc_base/time/time.h",
+      ),
     ),
     BanRule(
       'CallJavascriptFunctionUnsafe',
@@ -694,8 +714,10 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
         're2::RE2 instead (crbug.com/755321)',
       ),
       True,
-      # Abseil's benchmarks never linked into chrome.
-      ['third_party/abseil-cpp/.*_benchmark.cc'],
+      [
+        # Abseil's benchmarks never linked into chrome.
+        'third_party/abseil-cpp/.*_benchmark.cc',
+      ],
     ),
     BanRule(
       r'/\bstd::sto(i|l|ul|ll|ull)\b',
@@ -730,6 +752,15 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       [_THIRD_PARTY_EXCEPT_BLINK],  # Don't warn in third_party folders.
     ),
     BanRule(
+      r'/#include <(cctype|ctype\.h|cwctype|wctype.h)>',
+      (
+        '<cctype>/<ctype.h>/<cwctype>/<wctype.h> are banned. Use',
+        '"third_party/abseil-cpp/absl/strings/ascii.h" instead.',
+      ),
+      True,
+      [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
+    ),
+    BanRule(
       r'/\bstd::shared_ptr\b',
       (
         'std::shared_ptr is banned. Use scoped_refptr instead.',
@@ -742,9 +773,11 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
        '^third_party/blink/renderer/bindings/core/v8/' +
          'v8_wasm_response_extensions.cc',
        '^gin/array_buffer\.(cc|h)',
+       '^gin/per_isolate_data\.(cc|h)',
        '^chrome/services/sharing/nearby/',
        # Needed for interop with third-party library libunwindstack.
        '^base/profiler/libunwindstack_unwinder_android\.(cc|h)',
+       '^base/profiler/native_unwinder_android_memory_regions_map_impl.(cc|h)',
        # Needed for interop with third-party boringssl cert verifier
        '^third_party/boringssl/',
        '^net/cert/',
@@ -760,8 +793,8 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
        # Fuchsia provides C++ libraries that use std::shared_ptr<>.
        '^base/fuchsia/.*\.(cc|h)',
        '.*fuchsia.*test\.(cc|h)',
-       # Needed for clang plugin tests
-       '^tools/clang/plugins/tests/',
+       # Clang plugins have different build config.
+       '^tools/clang/plugins/',
        _THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
     ),
     BanRule(
@@ -919,6 +952,7 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       [
         # Needed to use QUICHE API.
         r'services/network/web_transport\.cc',
+        r'chrome/browser/ip_protection/.*',
         # Not an error in third_party folders.
         _THIRD_PARTY_EXCEPT_BLINK
       ],
@@ -932,6 +966,9 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       [
         # Needed to use liburlpattern API.
         r'third_party/blink/renderer/core/url_pattern/.*',
+        r'third_party/blink/renderer/modules/manifest/manifest_parser\.cc',
+        # Needed to use QUICHE API.
+        r'chrome/browser/ip_protection/.*',
         # Not an error in third_party folders.
         _THIRD_PARTY_EXCEPT_BLINK
       ],
@@ -944,26 +981,6 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       ),
       True,
       [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
-    ),
-    BanRule(
-      r'/\b(absl|std)::(u16)?string_view\b',
-      (
-        'absl::string_view is banned and std::[u16]string_view are not allowed',
-        ' yet (https://crbug.com/691162). Use base::StringPiece[16] instead.',
-      ),
-      True,
-      [
-        # Needed to use liburlpattern API.
-        r'third_party/blink/renderer/core/url_pattern/.*',
-        # Needed to use QUICHE API.
-        r'net/quic/.*',
-        r'net/spdy/.*',
-        r'net/test/embedded_test_server/.*',
-        r'net/third_party/quiche/.*',
-        r'services/network/web_transport\.cc',
-        # Not an error in third_party folders.
-        _THIRD_PARTY_EXCEPT_BLINK
-      ],
     ),
     BanRule(
       r'/\babsl::(StrSplit|StrJoin|StrCat|StrAppend|Substitute|StrContains)\b',
@@ -988,7 +1005,12 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
         'Abseil\'s time library is banned. Use base/time instead.',
       ),
       True,
-      [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
+      [
+        # Needed to use QUICHE API.
+        r'chrome/browser/ip_protection/.*',
+        r'services/network/web_transport.*',
+        _THIRD_PARTY_EXCEPT_BLINK  # Not an error in third_party folders.
+      ],
     ),
     BanRule(
       r'/\bstd::optional\b',
@@ -997,7 +1019,12 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
         'absl::optional instead.',
       ),
       True,
-      [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
+      [
+          # Clang plugins have different build config.
+          '^tools/clang/plugins/',
+          # Not an error in third_party folders.
+          _THIRD_PARTY_EXCEPT_BLINK,
+      ],
     ),
     BanRule(
       r'/#include <chrono>',
@@ -1005,7 +1032,13 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
         '<chrono> is banned. Use base/time instead.',
       ),
       True,
-      [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
+      [
+          # Not an error in third_party folders:
+          _THIRD_PARTY_EXCEPT_BLINK,
+          # PartitionAlloc's starscan, doesn't depend on base/. It can't use
+          # base::ConditionalVariable::TimedWait(..).
+          "base/allocator/partition_allocator/starscan/pcscan_internal.cc",
+      ]
     ),
     BanRule(
       r'/#include <exception>',
@@ -1127,15 +1160,6 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       [_THIRD_PARTY_EXCEPT_BLINK],  # Don't warn in third_party folders.
     ),
     BanRule(
-      r'/\bstd::(u16)?string_view\b',
-      (
-        'std::[u16]string_view is not yet allowed (crbug.com/691162). Use ',
-        'base::StringPiece[16] instead.',
-      ),
-      True,
-      [_THIRD_PARTY_EXCEPT_BLINK],  # Don't warn in third_party folders.
-    ),
-    BanRule(
       r'/#include <(barrier|latch|semaphore|stop_token)>',
       (
         'The thread support library is banned. Use base/synchronization '
@@ -1159,7 +1183,12 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
         ' char and std::string instead?',
       ),
       True,
-      [_THIRD_PARTY_EXCEPT_BLINK],  # Don't warn in third_party folders.
+      [
+        # The demangler does not use this type but needs to know about it.
+        'base/third_party/symbolize/demangle\.cc',
+        # Don't warn in third_party folders.
+        _THIRD_PARTY_EXCEPT_BLINK
+      ],
     ),
     BanRule(
       r'/(\b(co_await|co_return|co_yield)\b|#include <coroutine>)',
@@ -1477,6 +1506,7 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       True,
       (
           r'^base/win/scoped_winrt_initializer\.cc$',
+          r'^third_party/abseil-cpp/absl/.*',
       ),
     ),
     BanRule(
@@ -1518,7 +1548,7 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
       ],
     ),
     BanRule(
-      r'\bchartorune\b',
+      r'/\bchartorune\b',
       (
         'chartorune is not memory-safe, unless you can guarantee the input ',
         'string is always null-terminated. Otherwise, please use charntorune ',
@@ -1530,16 +1560,155 @@ _BANNED_CPP_FUNCTIONS : Sequence[BanRule] = (
         # Exceptions to this rule should have a fuzzer.
       ],
     ),
-  BanRule(
-    r'/\b#include "base/atomicops\.h"\b',
-    (
-      'Do not use base::subtle atomics, but std::atomic, which are simpler to '
-      'use, have better understood, clearer and richer semantics, and are '
-      'harder to mis-use. See details in base/atomicops.h.'
+    BanRule(
+      r'/\b#include "base/atomicops\.h"\b',
+      (
+        'Do not use base::subtle atomics, but std::atomic, which are simpler '
+        'to use, have better understood, clearer and richer semantics, and are '
+        'harder to mis-use. See details in base/atomicops.h.',
+      ),
+      False,
+      [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
     ),
-    False,
-    [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
-  ),
+    BanRule(
+      r'CrossThreadPersistent<',
+      (
+        'Do not use blink::CrossThreadPersistent, but '
+        'blink::CrossThreadHandle. It is harder to mis-use.',
+        'More info: '
+        'https://docs.google.com/document/d/1GIT0ysdQ84sGhIo1r9EscF_fFt93lmNVM_q4vvHj2FQ/edit#heading=h.3e4d6y61tgs',
+        'Please contact platform-architecture-dev@ before adding new instances.'
+      ),
+      False,
+      []
+    ),
+    BanRule(
+      r'CrossThreadWeakPersistent<',
+      (
+        'Do not use blink::CrossThreadWeakPersistent, but '
+        'blink::CrossThreadWeakHandle. It is harder to mis-use.',
+        'More info: '
+        'https://docs.google.com/document/d/1GIT0ysdQ84sGhIo1r9EscF_fFt93lmNVM_q4vvHj2FQ/edit#heading=h.3e4d6y61tgs',
+        'Please contact platform-architecture-dev@ before adding new instances.'
+      ),
+      False,
+      []
+    ),
+    BanRule(
+      r'objc/objc.h',
+      (
+        'Do not include <objc/objc.h>. It defines away ARC lifetime '
+        'annotations, and is thus dangerous.',
+        'Please use the pimpl pattern; search for `ObjCStorage` for examples.',
+        'For further reading on how to safely mix C++ and Obj-C, see',
+        'https://chromium.googlesource.com/chromium/src/+/main/docs/mac/mixing_cpp_and_objc.md'
+      ),
+      True,
+      []
+    ),
+    BanRule(
+      r'/#include <filesystem>',
+      (
+        'libc++ <filesystem> is banned per the Google C++ styleguide.',
+      ),
+      True,
+      # This fuzzing framework is a standalone open source project and
+      # cannot rely on Chromium base.
+      (r'third_party/centipede'),
+    ),
+    BanRule(
+      r'TopDocument()',
+      (
+        'TopDocument() does not work correctly with out-of-process iframes. '
+        'Please do not introduce new uses.',
+      ),
+      True,
+      (
+        # TODO(crbug.com/617677): Remove all remaining uses.
+        r'^third_party/blink/renderer/core/dom/document\.cc',
+        r'^third_party/blink/renderer/core/dom/document\.h',
+        r'^third_party/blink/renderer/core/dom/element\.cc',
+        r'^third_party/blink/renderer/core/exported/web_disallow_transition_scope_test\.cc',
+        r'^third_party/blink/renderer/core/exported/web_document_test\.cc',
+        r'^third_party/blink/renderer/core/html/html_anchor_element\.cc',
+        r'^third_party/blink/renderer/core/html/html_dialog_element\.cc',
+        r'^third_party/blink/renderer/core/html/html_element\.cc',
+        r'^third_party/blink/renderer/core/html/html_frame_owner_element\.cc',
+        r'^third_party/blink/renderer/core/html/media/video_wake_lock\.cc',
+        r'^third_party/blink/renderer/core/loader/anchor_element_interaction_tracker\.cc',
+        r'^third_party/blink/renderer/core/page/scrolling/root_scroller_controller\.cc',
+        r'^third_party/blink/renderer/core/page/scrolling/top_document_root_scroller_controller\.cc',
+        r'^third_party/blink/renderer/core/page/scrolling/top_document_root_scroller_controller\.h',
+        r'^third_party/blink/renderer/core/script/classic_pending_script\.cc',
+        r'^third_party/blink/renderer/core/script/script_loader\.cc',
+      ),
+    ),
+    BanRule(
+      pattern = r'base::raw_ptr<',
+      explanation = (
+        'Do not use base::raw_ptr, use raw_ptr.',
+      ),
+      treat_as_error = True,
+      excluded_paths = (
+        '^base/',
+        '^tools/',
+      ),
+    ),
+    BanRule(
+      pattern = r'base:raw_ref<',
+      explanation = (
+        'Do not use base::raw_ref, use raw_ref.',
+      ),
+      treat_as_error = True,
+      excluded_paths = (
+        '^base/',
+        '^tools/',
+      ),
+    ),
+    BanRule(
+      pattern = r'/raw_ptr<[^;}]*\w{};',
+      explanation = (
+        'Do not use {} for raw_ptr initialization, use = nullptr instead.',
+      ),
+      treat_as_error = True,
+      excluded_paths = (
+        '^base/',
+        '^tools/',
+      ),
+    ),
+    BanRule(
+      pattern = r'/#include "base/allocator/.*/raw_'
+                r'(ptr|ptr_cast|ptr_exclusion|ref).h"',
+      explanation = (
+        'Please include the corresponding facade headers:',
+        '- #include "base/memory/raw_ptr.h"',
+        '- #include "base/memory/raw_ptr_cast.h"',
+        '- #include "base/memory/raw_ptr_exclusion.h"',
+        '- #include "base/memory/raw_ref.h"',
+      ),
+      treat_as_error = True,
+      excluded_paths = (
+        '^base/',
+        '^tools/',
+      ),
+    ),
+    BanRule(
+      pattern = r'ContentSettingsType::COOKIES',
+      explanation = (
+        'Do not use ContentSettingsType::COOKIES to check whether cookies are '
+        'supported in the provided context. Instead rely on the '
+        'content_settings::CookieSettings API. If you are using '
+        'ContentSettingsType::COOKIES to check the user preference setting '
+        'specifically, disregard this warning.',
+      ),
+      treat_as_error = False,
+      excluded_paths = (
+        '^chrome/browser/ui/content_settings/',
+        '^components/content_settings/',
+        '^services/network/cookie_settings/',
+        'test.cc',
+      ),
+    ),
 )
 
 _BANNED_MOJOM_PATTERNS : Sequence[BanRule] = (
@@ -1583,7 +1752,7 @@ _KNOWN_TEST_DATA_AND_INVALID_JSON_FILE_PATTERNS = [
     r'testing/buildbot/',
     r'^components/policy/resources/policy_templates\.json$',
     r'^third_party/protobuf/',
-    r'^third_party/blink/perf_tests/speedometer/resources/todomvc/learn.json',
+    r'^third_party/blink/perf_tests/speedometer.*/resources/todomvc/learn\.json',
     r'^third_party/blink/renderer/devtools/protocol\.json$',
     r'^third_party/blink/web_tests/external/wpt/',
     r'^tools/perf/',
@@ -1603,8 +1772,6 @@ _ANDROID_SPECIFIC_PYDEPS_FILES = [
 _GENERIC_PYDEPS_FILES = [
     'android_webview/test/components/run_webview_component_smoketest.pydeps',
     'android_webview/tools/run_cts.pydeps',
-    'base/android/jni_generator/jni_generator.pydeps',
-    'base/android/jni_generator/jni_registration_generator.pydeps',
     'build/android/apk_operations.pydeps',
     'build/android/devil_chromium.pydeps',
     'build/android/gyp/aar.pydeps',
@@ -1612,6 +1779,7 @@ _GENERIC_PYDEPS_FILES = [
     'build/android/gyp/allot_native_libraries.pydeps',
     'build/android/gyp/apkbuilder.pydeps',
     'build/android/gyp/assert_static_initializers.pydeps',
+    'build/android/gyp/binary_baseline_profile.pydeps',
     'build/android/gyp/bytecode_processor.pydeps',
     'build/android/gyp/bytecode_rewriter.pydeps',
     'build/android/gyp/check_flag_expectations.pydeps',
@@ -1683,6 +1851,7 @@ _GENERIC_PYDEPS_FILES = [
     'third_party/blink/renderer/bindings/scripts/check_generated_file_list.pydeps',
     'third_party/blink/renderer/bindings/scripts/collect_idl_files.pydeps',
     'third_party/blink/renderer/bindings/scripts/generate_bindings.pydeps',
+    'third_party/blink/renderer/bindings/scripts/generate_event_interface_names.pydeps',
     'third_party/blink/renderer/bindings/scripts/validate_web_idl.pydeps',
     'third_party/blink/tools/blinkpy/web_tests/merge_results.pydeps',
     'third_party/blink/tools/merge_web_test_results.pydeps',
@@ -1705,7 +1874,8 @@ _KNOWN_ROBOTS = set(
                     'lacros-version-skew-roller', 'skylab-test-cros-roller',
                     'infra-try-recipes-tester', 'lacros-tracking-roller',
                     'lacros-sdk-version-roller', 'chrome-automated-expectation',
-                    'chromium-automated-expectation', 'chrome-branch-day')
+                    'chromium-automated-expectation', 'chrome-branch-day',
+                    'chromium-autosharder')
   ) | set('%s@skia-public.iam.gserviceaccount.com' % s
           for s in ('chromium-autoroll', 'chromium-release-autoroll')
   ) | set('%s@skia-corp.google.com.iam.gserviceaccount.com' % s
@@ -1714,7 +1884,10 @@ _KNOWN_ROBOTS = set(
           for s in ('swarming-tasks',)
   ) | set('%s@fuchsia-infra.iam.gserviceaccount.com' % s
           for s in ('global-integration-try-builder',
-                    'global-integration-ci-builder'))
+                    'global-integration-ci-builder')
+  ) | set('%s@prod.google.com' % s
+          for s in ('chops-security-borg',
+                    'chops-security-cronjobs-cpesuggest'))
 
 _INVALID_GRD_FILE_LINE = [
         (r'<file lang=.* path=.*', 'Path should come before lang in GRD files.')
@@ -1862,6 +2035,7 @@ def CheckNoProductionCodeUsingTestOnlyFunctionsJava(input_api, output_api):
     inclusion_re = input_api.re.compile(r'(%s)\s*\(' % name_pattern)
     # Ignore definitions. (Comments are ignored separately.)
     exclusion_re = input_api.re.compile(r'(%s)[^;]+\{' % name_pattern)
+    allowlist_re = input_api.re.compile(r'// IN-TEST$')
 
     problems = []
     sources = lambda x: input_api.FilterSourceFile(
@@ -1882,6 +2056,7 @@ def CheckNoProductionCodeUsingTestOnlyFunctionsJava(input_api, output_api):
                 continue
             if (inclusion_re.search(line) and not comment_re.search(line)
                     and not annotation_re.search(line)
+                    and not allowlist_re.search(line)
                     and not exclusion_re.search(line)):
                 problems.append('%s:%d\n    %s' %
                                 (local_path, line_number, line.strip()))
@@ -1948,16 +2123,26 @@ def CheckNoStrCatRedefines(input_api, output_api):
     return []
 
 
+def _CheckNoUNIT_TESTInSourceFiles(input_api, f):
+    problems = []
+
+    unit_test_macro = input_api.re.compile(
+        '^\s*#.*(?:ifn?def\s+UNIT_TEST|defined\s*\(?\s*UNIT_TEST\s*\)?)(?:$|\s+)')
+    for line_num, line in f.ChangedContents():
+        if unit_test_macro.match(line):
+            problems.append('    %s:%d' % (f.LocalPath(), line_num))
+
+    return problems
+
+
 def CheckNoUNIT_TESTInSourceFiles(input_api, output_api):
     """Checks to make sure no source files use UNIT_TEST."""
     problems = []
     for f in input_api.AffectedFiles():
         if (not f.LocalPath().endswith(('.cc', '.mm'))):
             continue
-
-        for line_num, line in f.ChangedContents():
-            if 'UNIT_TEST ' in line or line.endswith('UNIT_TEST'):
-                problems.append('    %s:%d' % (f.LocalPath(), line_num))
+        problems.extend(
+            _CheckNoUNIT_TESTInSourceFiles(input_api, f))
 
     if not problems:
         return []
@@ -2980,6 +3165,7 @@ def CheckSpamLogging(input_api, output_api):
             r"^chrome/chrome_elf/dll_hash/dll_hash_main\.cc$",
             r"^chrome/installer/setup/.*",
             r"^chromecast/",
+            r"^components/cast",
             r"^components/media_control/renderer/media_playback_options\.cc$",
             r"^components/policy/core/common/policy_logger\.cc$",
             r"^components/viz/service/display/"
@@ -4180,8 +4366,8 @@ def _CheckAndroidTestAnnotationUsage(input_api, output_api):
         results.append(
             output_api.PresubmitError(
                 'Annotations in android.test.suitebuilder.annotation have been'
-                ' deprecated since API level 24. Please use android.support.test.filters'
-                ' from //third_party/android_support_test_runner:runner_java instead.'
+                ' deprecated since API level 24. Please use androidx.test.filters'
+                ' from //third_party/androidx:androidx_test_runner_java instead.'
                 ' Contact yolandyan@chromium.org if you have any questions.',
                 errors))
     return results
@@ -4301,10 +4487,10 @@ class _PydepsCheckerResult:
     def GetError(self):
         """Returns an error message, or None."""
         import difflib
+        new_contents = self._process.stdout.read().splitlines()[2:]
         if self._process.wait() != 0:
             # STDERR should already be printed.
             return 'Command failed: ' + self._cmd
-        new_contents = self._process.stdout.read().splitlines()[2:]
         if self._old_contents != new_contents:
             diff = '\n'.join(
                 difflib.context_diff(self._old_contents, new_contents))
@@ -4898,6 +5084,10 @@ def CheckCorrectProductNameInMessages(input_api, output_api):
         "correct_name": "Chrome",
         "incorrect_name": "Chromium",
     }, {
+        "filename_postfix": "google_chrome_strings.grd",
+        "correct_name": "Chrome",
+        "incorrect_name": "Chrome for Testing",
+    }, {
         "filename_postfix": "chromium_strings.grd",
         "correct_name": "Chromium",
         "incorrect_name": "Chrome",
@@ -4916,6 +5106,9 @@ def CheckCorrectProductNameInMessages(input_api, output_api):
                 if "<message" in line or "<!--" in line or "-->" in line:
                     continue
                 if test_case["incorrect_name"] in line:
+                    # Chrome for Testing is a special edge case: https://goo.gle/chrome-for-testing#bookmark=id.n1rat320av91
+                    if (test_case["correct_name"] == "Chromium" and line.count("Chrome") == line.count("Chrome for Testing")):
+                        continue
                     problems.append("Incorrect product name in %s:%d" %
                                     (f.LocalPath(), line_num))
 
@@ -4941,19 +5134,13 @@ def CheckForTooLargeFiles(input_api, output_api):
     # files seems to be 1-2 MB, with a handful around 5-8 MB, so
     # anything over 20 MB is exceptional.
     TOO_LARGE_FILE_SIZE_LIMIT = 20 * 1024 * 1024
-    # Special exemption for a file that is slightly over the limit.
-    SPECIAL_FILE_SIZE_LIMIT = 25 * 1024 * 1024
-    SPECIAL_FILE_NAME = 'transport_security_state_static.json'
 
     too_large_files = []
     for f in input_api.AffectedFiles():
         # Check both added and modified files (but not deleted files).
         if f.Action() in ('A', 'M'):
             size = input_api.os_path.getsize(f.AbsoluteLocalPath())
-            limit = (SPECIAL_FILE_SIZE_LIMIT if
-                f.AbsoluteLocalPath().endswith(SPECIAL_FILE_NAME) else
-                TOO_LARGE_FILE_SIZE_LIMIT)
-            if size > limit:
+            if size > TOO_LARGE_FILE_SIZE_LIMIT:
                 too_large_files.append("%s: %d bytes" % (f.LocalPath(), size))
 
     if too_large_files:
@@ -5138,10 +5325,16 @@ _ACCESSIBILITY_EVENTS_TEST_PATH = (
 )
 
 _ACCESSIBILITY_TREE_TEST_PATH = (
-    r"^content/test/data/accessibility/accname/.*\.html",
-    r"^content/test/data/accessibility/aria/.*\.html",
-    r"^content/test/data/accessibility/css/.*\.html",
-    r"^content/test/data/accessibility/html/.*\.html",
+    r"^content/test/data/accessibility/accname/"
+      ".*-expected-(mac|win|uia-win|auralinux).txt",
+    r"^content/test/data/accessibility/aria/"
+      ".*-expected-(mac|win|uia-win|auralinux).txt",
+    r"^content/test/data/accessibility/css/"
+      ".*-expected-(mac|win|uia-win|auralinux).txt",
+    r"^content/test/data/accessibility/event/"
+      ".*-expected-(mac|win|uia-win|auralinux).txt",
+    r"^content/test/data/accessibility/html/"
+      ".*-expected-(mac|win|uia-win|auralinux).txt",
 )
 
 _ACCESSIBILITY_ANDROID_EVENTS_TEST_PATH = (
@@ -5181,12 +5374,12 @@ def CheckAccessibilityEventsTestsAreIncludedForAndroid(input_api, output_api):
     message = []
     for f in input_api.AffectedFiles(include_deletes=True,
                                      file_filter=FilePathFilter):
-        if f.Action() == 'A' or f.Action() == 'D':
+        if f.Action() == 'A':
             message = (
-                "It appears that you are adding, renaming or deleting"
-                "\na dump_accessibility_events* test, but have not included"
+                "It appears that you are adding platform expectations for a"
+                "\ndump_accessibility_events* test, but have not included"
                 "\na corresponding change for Android."
-                "\nPlease include (or remove) the test from:"
+                "\nPlease include the test from:"
                 "\n    content/public/android/javatests/src/org/chromium/"
                 "content/browser/accessibility/"
                 "WebContentsAccessibilityEventsTest.java"
@@ -5229,10 +5422,10 @@ def CheckAccessibilityTreeTestsAreIncludedForAndroid(input_api, output_api):
     message = []
     for f in input_api.AffectedFiles(include_deletes=True,
                                      file_filter=FilePathFilter):
-        if f.Action() == 'A' or f.Action() == 'D':
+        if f.Action() == 'A':
             message = (
-                "It appears that you are adding, renaming or deleting"
-                "\na dump_accessibility_tree* test, but have not included"
+                "It appears that you are adding platform expectations for a"
+                "\ndump_accessibility_tree* test, but have not included"
                 "\na corresponding change for Android."
                 "\nPlease include (or remove) the test from:"
                 "\n    content/public/android/javatests/src/org/chromium/"
@@ -5348,21 +5541,12 @@ def ChecksCommon(input_api, output_api):
         if not input_api.os_path.exists(test_file):
             continue
 
-        use_python3 = False
-        with open(f.LocalPath(), encoding='utf-8') as fp:
-            use_python3 = any(
-                line.startswith('USE_PYTHON3 = True')
-                for line in fp.readlines())
-
         results.extend(
             input_api.canned_checks.RunUnitTestsInDirectory(
                 input_api,
                 output_api,
                 full_path,
-                files_to_check=[r'^PRESUBMIT_test\.py$'],
-                run_on_python2=not use_python3,
-                run_on_python3=use_python3,
-                skip_shebang_check=True))
+                files_to_check=[r'^PRESUBMIT_test\.py$']))
     return results
 
 
@@ -5986,6 +6170,7 @@ def CheckStrings(input_api, output_api):
     # - If the CL contains removed messages in grd files but the corresponding
     #   .sha1 files aren't removed, warn the developer to remove them.
     unnecessary_screenshots = []
+    invalid_sha1 = []
     missing_sha1 = []
     missing_sha1_modified = []
     unnecessary_sha1_files = []
@@ -5997,18 +6182,29 @@ def CheckStrings(input_api, output_api):
     # break message extraction for translation, hence would block Chromium
     # translations until they are fixed.
     icu_syntax_errors = []
+    sha1_pattern = input_api.re.compile(r'^[a-fA-F0-9]{40}$',
+                                        input_api.re.MULTILINE)
 
     def _CheckScreenshotAdded(screenshots_dir, message_id):
         sha1_path = input_api.os_path.join(screenshots_dir,
                                            message_id + '.png.sha1')
         if sha1_path not in new_or_added_paths:
             missing_sha1.append(sha1_path)
+        elif not _CheckValidSha1(sha1_path):
+            invalid_sha1.append(sha1_path)
 
     def _CheckScreenshotModified(screenshots_dir, message_id):
         sha1_path = input_api.os_path.join(screenshots_dir,
                                            message_id + '.png.sha1')
         if sha1_path not in new_or_added_paths:
             missing_sha1_modified.append(sha1_path)
+        elif not _CheckValidSha1(sha1_path):
+            invalid_sha1.append(sha1_path)
+
+    def _CheckValidSha1(sha1_path):
+        return sha1_pattern.search(
+            next("\n".join(f.NewContents()) for f in input_api.AffectedFiles()
+                 if f.LocalPath() == sha1_path))
 
     def _CheckScreenshotRemoved(screenshots_dir, message_id):
         sha1_path = input_api.os_path.join(screenshots_dir,
@@ -6206,14 +6402,8 @@ def CheckStrings(input_api, output_api):
                 modified_ids.add(key)
             elif old_id_to_msg_map[key].attrs['meaning'] != \
                 new_id_to_msg_map[key].attrs['meaning']:
-                # The message meaning changed. Ensure there is a screenshot for it.
-                sha1_path = input_api.os_path.join(screenshots_dir,
-                                                   key + '.png.sha1')
-                if sha1_path not in new_or_added_paths and not \
-                    input_api.os_path.exists(sha1_path):
-                    # There is neither a previous screenshot nor is a new one added now.
-                    # Require a screenshot.
-                    modified_ids.add(key)
+                # The message meaning changed. We later check for a screenshot.
+                modified_ids.add(key)
 
         if run_screenshot_check:
             # Check the screenshot directory for .png files. Warn if there is any.
@@ -6253,6 +6443,13 @@ def CheckStrings(input_api, output_api):
                     'To ensure the best translations, take screenshots of the relevant UI '
                     '(https://g.co/chrome/translation) and add these files to your '
                     'changelist:', sorted(missing_sha1)))
+
+        if invalid_sha1:
+            results.append(
+                output_api.PresubmitError(
+                    'The following files do not seem to contain valid sha1 hashes. '
+                    'Make sure they contain hashes created by '
+                    'tools/translate/upload_screenshots.py:', sorted(invalid_sha1)))
 
         if missing_sha1_modified:
             results.append(
@@ -6538,13 +6735,16 @@ def CheckAssertAshOnlyCode(input_api, output_api):
     return errors
 
 
-def _IsRendererOnlyCppFile(input_api, affected_file):
+def _IsMiraclePtrDisallowed(input_api, affected_file):
     path = affected_file.LocalPath()
     if not _IsCPlusPlusFile(input_api, path):
         return False
 
-    # Any code under a "renderer" subdirectory is assumed to be Renderer-only.
-    if "/renderer/" in path:
+    # Renderer code is generally allowed to use MiraclePtr.
+    # These directories, however, are specifically disallowed.
+    if ("third_party/blink/renderer/core/" in path
+            or "third_party/blink/renderer/platform/heap/" in path
+            or "third_party/blink/renderer/platform/wtf/" in path):
         return True
 
     # Blink's public/web API is only used/included by Renderer-only code.  Note
@@ -6565,18 +6765,39 @@ def CheckRawPtrUsage(input_api, output_api):
     # The regex below matches "raw_ptr<" following a word boundary, but not in a
     # C++ comment.
     raw_ptr_matcher = input_api.re.compile(r'^((?!//).)*\braw_ptr<')
-    file_filter = lambda f: _IsRendererOnlyCppFile(input_api, f)
+    file_filter = lambda f: _IsMiraclePtrDisallowed(input_api, f)
     for f, line_num, line in input_api.RightHandSideLines(file_filter):
         if raw_ptr_matcher.search(line):
             errors.append(
                 output_api.PresubmitError(
                     'Problem on {path}:{line} - '\
-                    'raw_ptr<T> should not be used in Renderer-only code '\
+                    'raw_ptr<T> should not be used in this renderer code '\
                     '(as documented in the "Pointers to unprotected memory" '\
                     'section in //base/memory/raw_ptr.md)'.format(
                         path=f.LocalPath(), line=line_num)))
     return errors
 
+def CheckAdvancedMemorySafetyChecksUsage(input_api, output_api):
+    """Checks that ADVANCED_MEMORY_SAFETY_CHECKS() macro is neither added nor
+    removed as it is managed by the memory safety team internally.
+    Do not add / remove it manually."""
+    paths = set([])
+    # The regex below matches "ADVANCED_MEMORY_SAFETY_CHECKS(" following a word
+    # boundary, but not in a C++ comment.
+    macro_matcher = input_api.re.compile(
+        r'^((?!//).)*\bADVANCED_MEMORY_SAFETY_CHECKS\(', input_api.re.MULTILINE)
+    for f in input_api.AffectedFiles():
+        if not _IsCPlusPlusFile(input_api, f.LocalPath()):
+            continue
+        if macro_matcher.search(f.GenerateScmDiff()):
+            paths.add(f.LocalPath())
+    if not paths:
+        return []
+    return [output_api.PresubmitPromptWarning(
+              'ADVANCED_MEMORY_SAFETY_CHECKS() macro is managed by ' \
+              'the memory safety team (chrome-memory-safety@). ' \
+              'Please contact us to add/delete the uses of the macro.',
+              paths)]
 
 def CheckPythonShebang(input_api, output_api):
     """Checks that python scripts use #!/usr/bin/env instead of hardcoding a
@@ -6613,6 +6834,7 @@ def CheckBatchAnnotation(input_api, output_api):
     robolectric_test = input_api.re.compile(r'[rR]obolectric')
     test_class_declaration = input_api.re.compile(r'^\s*public\sclass.*Test')
     uiautomator_test = input_api.re.compile(r'[uU]i[aA]utomator')
+    test_annotation_declaration = input_api.re.compile(r'^\s*public\s@interface\s.*{')
 
     missing_annotation_errors = []
     extra_annotation_errors = []
@@ -6627,6 +6849,7 @@ def CheckBatchAnnotation(input_api, output_api):
         batch_matched = None
         do_not_batch_matched = None
         is_instrumentation_test = True
+        test_annotation_declaration_matched = None
         for line in f.NewContents():
             if robolectric_test.search(line) or uiautomator_test.search(line):
                 # Skip Robolectric and UiAutomator tests.
@@ -6638,8 +6861,11 @@ def CheckBatchAnnotation(input_api, output_api):
                 do_not_batch_matched = do_not_batch_annotation.search(line)
             test_class_declaration_matched = test_class_declaration.search(
                 line)
-            if test_class_declaration_matched:
+            test_annotation_declaration_matched = test_annotation_declaration.search(line)
+            if test_class_declaration_matched or test_annotation_declaration_matched:
                 break
+        if test_annotation_declaration_matched:
+            continue
         if (is_instrumentation_test and
             not batch_matched and
             not do_not_batch_matched):
@@ -6655,10 +6881,11 @@ def CheckBatchAnnotation(input_api, output_api):
         results.append(
             output_api.PresubmitPromptWarning(
                 """
-Instrumentation tests should use either @Batch or @DoNotBatch. Use
-@Batch(Batch.PER_CLASS) in most cases. Use @Batch(Batch.UNIT_TESTS) when tests
-have no side-effects. If the tests are not safe to run in batch, please use
-@DoNotBatch with reasons.
+A change was made to an on-device test that has neither been annotated with
+@Batch nor @DoNotBatch. If this is a new test, please add the annotation. If
+this is an existing test, please consider adding it if you are sufficiently
+familiar with the test (but do so as a separate change).
+
 See https://source.chromium.org/chromium/chromium/src/+/main:docs/testing/batching_instrumentation_tests.md
 """, missing_annotation_errors))
     if extra_annotation_errors:
@@ -6788,7 +7015,8 @@ def CheckNoJsInIos(input_api, output_api):
         return input_api.FilterSourceFile(
             affected_file,
             files_to_skip=input_api.DEFAULT_FILES_TO_SKIP +
-                          (r'^ios/third_party/*', r'^third_party/*'),
+                (r'^ios/third_party/*', r'^ios/tools/*', r'^third_party/*',
+                r'^components/autofill/ios/form_util/resources/*'),
             files_to_check=[r'^ios/.*\.js$', r'.*/ios/.*\.js$'])
 
     deleted_files = []
@@ -6841,3 +7069,31 @@ def CheckNoJsInIos(input_api, output_api):
             'scripts on iOS.', error_paths))
 
     return results
+
+def CheckLibcxxRevisionsMatch(input_api, output_api):
+    """Check to make sure the libc++ version matches across deps files."""
+    # Disable check for changes to sub-repositories.
+    if input_api.PresubmitLocalPath() != input_api.change.RepositoryRoot():
+        return []
+
+    DEPS_FILES = [ 'DEPS', 'buildtools/deps_revisions.gni' ]
+
+    file_filter = lambda f: f.LocalPath().replace(
+            input_api.os_path.sep, '/') in DEPS_FILES
+    changed_deps_files = input_api.AffectedFiles(file_filter=file_filter)
+    if not changed_deps_files:
+        return []
+
+    def LibcxxRevision(file):
+        file = input_api.os_path.join(input_api.PresubmitLocalPath(),
+                                      *file.split('/'))
+        return input_api.re.search(
+                r'libcxx_revision.*[:=].*[\'"](\w+)[\'"]',
+                input_api.ReadFile(file)).group(1)
+
+    if len(set([LibcxxRevision(f) for f in DEPS_FILES])) == 1:
+        return []
+
+    return [output_api.PresubmitError(
+        'libcxx_revision not equal across %s' % ', '.join(DEPS_FILES),
+        changed_deps_files)]

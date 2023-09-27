@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/**
- * @fileoverview Base class for Text-to-Speech engines that actually transform
- * text to speech.
- */
-
 import {Msgs} from '../common/msgs.js';
 import {SettingsManager} from '../common/settings_manager.js';
 import * as ttsTypes from '../common/tts_types.js';
@@ -23,7 +18,8 @@ import {TtsInterface} from './tts_interface.js';
 let PropertyValues;
 
 /**
- * Creates a new instance.
+ * Base class for Text-to-Speech engines that actually transform
+ * text to speech (as opposed to logging or other behaviors).
  * @implements {TtsInterface}
  */
 export class AbstractTts {
@@ -134,12 +130,17 @@ export class AbstractTts {
 
   /** @override */
   increaseOrDecreaseProperty(propertyName, increase) {
-    const min = this.propertyMin[propertyName];
-    const max = this.propertyMax[propertyName];
     const step = this.propertyStep[propertyName];
     let current = this.ttsProperties[propertyName];
     current = increase ? current + step : current - step;
-    this.ttsProperties[propertyName] = Math.max(Math.min(current, max), min);
+    this.setProperty(propertyName, current);
+  }
+
+  /** @override */
+  setProperty(propertyName, value) {
+    const min = this.propertyMin[propertyName];
+    const max = this.propertyMax[propertyName];
+    this.ttsProperties[propertyName] = Math.max(Math.min(value, max), min);
   }
 
   /**
@@ -231,7 +232,7 @@ export class AbstractTts {
   preprocess(text, properties) {
     if (text.length === 1 && text.toLowerCase() !== text) {
       // Describe capital letters according to user's setting.
-      if (SettingsManager.get('capitalStrategy') === 'increasePitch') {
+      if (SettingsManager.getString('capitalStrategy') === 'increasePitch') {
         // Closure doesn't allow the use of for..in or [] with structs, so
         // convert to a pure JSON object.
         const CAPITAL = ttsTypes.Personality.CAPITAL.toJSON();
@@ -241,12 +242,12 @@ export class AbstractTts {
           }
         }
       } else if (
-          SettingsManager.get('capitalStrategy') === 'announceCapitals') {
+          SettingsManager.getString('capitalStrategy') === 'announceCapitals') {
         text = Msgs.getMsg('announce_capital_letter', [text]);
       }
     }
 
-    if (!SettingsManager.get('usePitchChanges')) {
+    if (!SettingsManager.getBoolean('usePitchChanges')) {
       delete properties.relativePitch;
     }
 

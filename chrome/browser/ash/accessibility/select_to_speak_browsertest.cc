@@ -15,16 +15,18 @@
 #include "ash/public/cpp/test/shell_test_api.h"
 #include "ash/root_window_controller.h"
 #include "ash/shell.h"
+#include "ash/system/accessibility/select_to_speak/select_to_speak_tray.h"
 #include "ash/system/status_area_widget.h"
 #include "ash/system/unified/unified_system_tray.h"
-#include "base/command_line.h"
+#include "ash/test/ash_test_util.h"
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
-#include "build/branding_buildflags.h"
-#include "build/build_config.h"
+#include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/ash/accessibility/accessibility_manager.h"
 #include "chrome/browser/ash/accessibility/accessibility_test_utils.h"
+#include "chrome/browser/ash/accessibility/html_test_utils.h"
 #include "chrome/browser/ash/accessibility/magnifier_animation_waiter.h"
+#include "chrome/browser/ash/accessibility/select_to_speak_test_utils.h"
 #include "chrome/browser/ash/accessibility/speech_monitor.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -32,26 +34,18 @@
 #include "chrome/common/extensions/extension_constants.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
-#include "content/public/browser/notification_details.h"
-#include "content/public/browser/notification_service.h"
 #include "content/public/test/accessibility_notification_waiter.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
-#include "content/public/test/test_utils.h"
 #include "extensions/browser/browsertest_util.h"
-#include "extensions/browser/extension_host.h"
-#include "extensions/browser/extension_host_test_helper.h"
-#include "extensions/browser/notification_types.h"
 #include "extensions/browser/process_manager.h"
-#include "mojo/public/cpp/bindings/remote.h"
 #include "third_party/skia/include/core/SkColor.h"
-#include "ui/accessibility/accessibility_features.h"
-#include "ui/accessibility/accessibility_switches.h"
 #include "ui/compositor/layer.h"
 #include "ui/display/manager/display_manager.h"
 #include "ui/display/screen.h"
 #include "ui/display/test/display_manager_test_api.h"
 #include "ui/events/test/event_generator.h"
+#include "ui/views/controls/menu/menu_item_view.h"
 #include "url/url_constants.h"
 
 namespace ash {
@@ -109,17 +103,6 @@ class SelectToSpeakTest : public InProcessBrowserTest {
   std::unique_ptr<SystemTrayTestApi> tray_test_api_;
   std::unique_ptr<ExtensionConsoleErrorObserver> console_observer_;
 
-  // Turns on Select to Speak and waits for the extension to signal it is ready.
-  // Virtual so that subclasses of this test can do other set-up on Select to
-  // Speak.
-  virtual void TurnOnSelectToSpeak() {
-    extensions::ExtensionHostTestHelper host_helper(
-        browser()->profile(), extension_misc::kSelectToSpeakExtensionId);
-    AccessibilityManager::Get()->SetSelectToSpeakEnabled(true);
-    host_helper.WaitForHostCompletedFirstLoad();
-    WaitForSTSReady();
-  }
-
   gfx::Rect GetWebContentsBounds() const {
     // TODO(katie): Find a way to get the exact bounds programmatically.
     gfx::Rect bounds = browser()->window()->GetBounds();
@@ -133,24 +116,51 @@ class SelectToSpeakTest : public InProcessBrowserTest {
     ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(url)));
     std::ignore = waiter.WaitForNotification();
 
-    if (!AccessibilityManager::Get()->IsSelectToSpeakEnabled())
-      TurnOnSelectToSpeak();
+    if (!AccessibilityManager::Get()->IsSelectToSpeakEnabled()) {
+      sts_test_utils::TurnOnSelectToSpeakForTest(browser());
+    }
   }
 
   virtual void ActivateSelectToSpeakInWindowBounds(std::string url) {
     // Load the URL before Select to Speak to avoid flakes.
     LoadURLAndSelectToSpeak(url);
 
-    gfx::Rect bounds = GetWebContentsBounds();
+    sts_test_utils::StartSelectToSpeakInBrowserWindow(browser(),
+                                                      generator_.get());
+  }
 
-    // Hold down Search and drag over the web contents to select everything.
-    generator_->PressKey(ui::VKEY_LWIN, 0 /* flags */);
-    generator_->MoveMouseTo(bounds.x(), bounds.y());
-    generator_->PressLeftButton();
-    generator_->MoveMouseTo(bounds.x() + bounds.width(),
-                            bounds.y() + bounds.height());
-    generator_->ReleaseLeftButton();
-    generator_->ReleaseKey(ui::VKEY_LWIN, 0 /* flags */);
+  // Set document selection to be the node with text `text` using Automation
+  // API.
+  void SelectNodeWithText(const std::string& text) {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    std::string script =
+        base::StringPrintf(R"JS(
+        (async function() {
+          chrome.automation.getDesktop(desktop => {
+            const textNode = desktop.find(
+                {role: 'staticText', attributes: {name: '%s'}});
+            chrome.automation.setDocumentSelection({
+              anchorObject: textNode,
+              anchorOffset: %d,
+              focusObject: textNode,
+              focusOffset: %d,
+            });
+            const callback = (() => {
+              desktop.removeEventListener('documentSelectionChanged',
+                  callback, /*capture=*/false);
+              chrome.test.sendScriptResult('ready');
+            });
+            desktop.addEventListener('documentSelectionChanged',
+                callback, /*capture=*/false);
+          });
+        })();
+      )JS",
+                           text.c_str(), 0, static_cast<int>(text.size()));
+    base::Value result =
+        extensions::browsertest_util::ExecuteScriptInBackgroundPage(
+            browser()->profile(), extension_misc::kSelectToSpeakExtensionId,
+            script);
+    ASSERT_EQ("ready", result);
   }
 
   void PrepareToWaitForHighlightAdded() {
@@ -196,13 +206,6 @@ class SelectToSpeakTest : public InProcessBrowserTest {
     return weak_ptr_factory_.GetWeakPtr();
   }
 
-  void RunJavaScriptInSelectToSpeakBackgroundPage(const std::string& script) {
-    extensions::browsertest_util::ExecuteScriptInBackgroundPage(
-        /*context=*/browser()->profile(),
-        /*extension_id=*/extension_misc::kSelectToSpeakExtensionId,
-        /*script=*/script);
-  }
-
   content::WebContents* GetWebContents() {
     return browser()->tab_strip_model()->GetActiveWebContents();
   }
@@ -212,27 +215,6 @@ class SelectToSpeakTest : public InProcessBrowserTest {
   }
 
  private:
-  void WaitForSTSReady() {
-    base::ScopedAllowBlockingForTesting allow_blocking;
-    std::string script = base::StringPrintf(R"JS(
-      (async function() {
-        let module = await import('./select_to_speak_main.js');
-        module.selectToSpeak.setOnLoadDesktopCallbackForTest(() => {
-            window.domAutomationController.send('ready');
-          });
-        // Set enhanced network voices dialog as shown, because the pref
-        // change takes some time to propagate.
-        module.selectToSpeak.prefsManager_.enhancedVoicesDialogShown_ = true;
-      })();
-    )JS");
-    std::string result =
-        extensions::browsertest_util::ExecuteScriptInBackgroundPage(
-            browser()->profile(), extension_misc::kSelectToSpeakExtensionId,
-            script);
-    ASSERT_EQ("ready", result);
-  }
-
-  base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<base::RunLoop> loop_runner_;
   std::unique_ptr<base::RunLoop> highlights_runner_;
   std::unique_ptr<base::RunLoop> tray_loop_runner_;
@@ -249,7 +231,7 @@ class SelectToSpeakTestWithVoiceSwitching : public SelectToSpeakTest {
 };
 
 IN_PROC_BROWSER_TEST_F(SelectToSpeakTest, SpeakStatusTray) {
-  TurnOnSelectToSpeak();
+  sts_test_utils::TurnOnSelectToSpeakForTest(browser());
   gfx::Rect tray_bounds = Shell::Get()
                               ->GetPrimaryRootWindowController()
                               ->GetStatusAreaWidget()
@@ -325,7 +307,7 @@ IN_PROC_BROWSER_TEST_F(SelectToSpeakTest,
 
   ShellTestApi shell_test_api;
   display::test::DisplayManagerTestApi(shell_test_api.display_manager())
-      .UpdateDisplay("1+0-800x800,801+1-800x800");
+      .UpdateDisplay("1+0-800x700,801+1-800x700");
   ASSERT_EQ(2u, shell_test_api.display_manager()->GetNumDisplays());
   display::test::DisplayManagerTestApi display_manager_test_api(
       shell_test_api.display_manager());
@@ -344,7 +326,7 @@ IN_PROC_BROWSER_TEST_F(SelectToSpeakTest,
       GURL("data:text/html;charset=utf-8,<p>This is some text</p>")));
   std::ignore = waiter.WaitForNotification();
 
-  TurnOnSelectToSpeak();
+  sts_test_utils::TurnOnSelectToSpeakForTest(browser());
   base::RepeatingCallback<void()> callback = base::BindRepeating(
       &SelectToSpeakTest::SetSelectToSpeakState, GetWeakPtr());
   AccessibilityManager::Get()->SetSelectToSpeakStateObserverForTest(callback);
@@ -366,7 +348,7 @@ IN_PROC_BROWSER_TEST_F(SelectToSpeakTest,
 }
 
 IN_PROC_BROWSER_TEST_F(SelectToSpeakTest, SelectToSpeakTrayNotSpoken) {
-  TurnOnSelectToSpeak();
+  sts_test_utils::TurnOnSelectToSpeakForTest(browser());
   base::RepeatingCallback<void()> callback = base::BindRepeating(
       &SelectToSpeakTest::SetSelectToSpeakState, GetWeakPtr());
   AccessibilityManager::Get()->SetSelectToSpeakStateObserverForTest(callback);
@@ -486,8 +468,12 @@ IN_PROC_BROWSER_TEST_F(SelectToSpeakTestWithVoiceSwitching,
       "<span lang='en-US'>The first paragraph</span>"
       "<span lang='fr-FR'>le deuxième paragraphe</span></div>");
 
-  sm_.ExpectSpeechPatternWithLocale("The first paragraph*", "en-US");
-  sm_.ExpectSpeechPatternWithLocale("le deuxième paragraphe*", "fr-FR");
+  sm_.ExpectSpeech(test::SpeechMonitor::Expectation("The first paragraph*")
+                       .AsPattern()
+                       .WithLocale("en-US"));
+  sm_.ExpectSpeech(test::SpeechMonitor::Expectation("le deuxième paragraphe*")
+                       .AsPattern()
+                       .WithLocale("fr-FR"));
   sm_.Replay();
 }
 
@@ -523,7 +509,7 @@ IN_PROC_BROWSER_TEST_F(SelectToSpeakTest, FocusRingMovesWithMouse) {
   AccessibilityManager::Get()->SetFocusRingObserverForTest(callback);
 
   std::string focus_ring_id = AccessibilityManager::Get()->GetFocusRingId(
-      extension_misc::kSelectToSpeakExtensionId, "");
+      ax::mojom::AssistiveTechnologyType::kSelectToSpeak, "");
 
   AccessibilityFocusRingControllerImpl* controller =
       Shell::Get()->accessibility_focus_ring_controller();
@@ -681,22 +667,77 @@ IN_PROC_BROWSER_TEST_F(SelectToSpeakTest, WorksWithStickyKeys) {
 
 IN_PROC_BROWSER_TEST_F(SelectToSpeakTest,
                        SelectToSpeakDoesNotDismissTrayBubble) {
-  TurnOnSelectToSpeak();
+  sts_test_utils::TurnOnSelectToSpeakForTest(browser());
 
   // Open tray bubble menu.
   tray_test_api_->ShowBubble();
 
-  // Search key + click the avatar button.
+  // Search key + click the settings button.
   generator_->PressKey(ui::VKEY_LWIN, 0 /* flags */);
-  tray_test_api_->ClickBubbleView(ViewID::VIEW_ID_QS_USER_AVATAR_BUTTON);
+  tray_test_api_->ClickBubbleView(ViewID::VIEW_ID_QS_SETTINGS_BUTTON);
   generator_->ReleaseKey(ui::VKEY_LWIN, 0 /* flags */);
 
   // Should read out text.
-  sm_.ExpectSpeechPattern("*stub-user@example.com*");
+  sm_.ExpectSpeechPattern("*Settings*");
   sm_.Replay();
 
   // Tray bubble menu should remain open.
   ASSERT_TRUE(tray_test_api_->IsTrayBubbleOpen());
+}
+
+IN_PROC_BROWSER_TEST_F(SelectToSpeakTest, ReadsSelectedTextWithSearchS) {
+  std::string text = "This is some selected text";
+  LoadURLAndSelectToSpeak(base::StringPrintf(
+      "data:text/html;charset=utf-8,<p>Not me!</p><p>%s</p><p>Nor me!</p>",
+      text.c_str()));
+  SelectNodeWithText(text);
+
+  generator_->PressKey(ui::VKEY_LWIN, /*flags=*/0);
+  generator_->PressKey(ui::VKEY_S, /*flags=*/0);
+  generator_->ReleaseKey(ui::VKEY_LWIN, /*flags=*/0);
+  generator_->ReleaseKey(ui::VKEY_S, /*flags=*/0);
+
+  sm_.ExpectSpeechPattern(text);
+  sm_.Replay();
+}
+
+IN_PROC_BROWSER_TEST_F(SelectToSpeakTest,
+                       ReadsSelectedTextFromContextMenuClick) {
+  std::string text = "This is some selected text";
+  LoadURLAndSelectToSpeak(
+      base::StringPrintf("data:text/html;charset=utf-8,<p>Not me!</p><p "
+                         "id='selected'>%s</p><p>Nor me!</p>",
+                         text.c_str()));
+
+  SelectNodeWithText(text);
+
+  const gfx::Rect text_bounds =
+      GetControlBoundsInRoot(GetWebContents(), "selected");
+  generator_->MoveMouseTo(text_bounds.CenterPoint());
+  generator_->PressRightButton();
+  const std::string name = "Listen to selected text";
+  views::MenuItemView* menu_item =
+      WaitForMenuItemWithLabel(base::UTF8ToUTF16(name));
+  ASSERT_TRUE(menu_item);
+  generator_->MoveMouseTo(menu_item->GetBoundsInScreen().CenterPoint());
+  generator_->ReleaseRightButton();
+
+  sm_.ExpectSpeechPattern(text);
+  sm_.Replay();
+}
+
+IN_PROC_BROWSER_TEST_F(SelectToSpeakTest,
+                       ReadsSelectedTextWithContextMenuNotification) {
+  std::string text = "Pick me! Read me!";
+  LoadURLAndSelectToSpeak(base::StringPrintf(
+      "data:text/html;charset=utf-8,<p>Not me!</p><p>%s</p><p>Nor me!</p>",
+      text.c_str()));
+  SelectNodeWithText(text);
+
+  AccessibilityManager::Get()->OnSelectToSpeakContextMenuClick();
+
+  sm_.ExpectSpeechPattern(text);
+  sm_.Replay();
 }
 
 }  // namespace ash

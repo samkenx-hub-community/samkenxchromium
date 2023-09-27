@@ -5,7 +5,7 @@
 #include "chrome/browser/ui/webui/ash/login/lacros_data_backward_migration_screen_handler.h"
 
 #include "chrome/browser/ash/login/screens/lacros_data_backward_migration_screen.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/login/localized_values_builder.h"
 
@@ -27,6 +27,10 @@ void LacrosDataBackwardMigrationScreenHandler::DeclareLocalizedValues(
                IDS_LACROS_DATA_MIGRATION_SCREEN_SUBTITLE);
   builder->Add("lacrosDataBackwardMigrationErrorTitle",
                IDS_LACROS_DATA_MIGRATION_SCREEN_ERROR_TITLE);
+  builder->Add("lacrosDataBackwardMigrationErrorSubtitle",
+               IDS_LACROS_DATA_BACKWARD_MIGRATION_SCREEN_ERROR_SUBTITLE);
+  builder->Add("lacrosDataBackwardMigrationErrorCancelButton",
+               IDS_LACROS_DATA_MIGRATION_SCREEN_ERROR_CANCEL_BUTTON);
 }
 
 void LacrosDataBackwardMigrationScreenHandler::Show() {

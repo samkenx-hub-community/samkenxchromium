@@ -22,6 +22,7 @@
 #import "components/policy/core/browser/webui/json_generation.h"
 #import "components/policy/core/browser/webui/machine_level_user_cloud_policy_status_provider.h"
 #import "components/policy/core/browser/webui/policy_webui_constants.h"
+#import "components/policy/core/browser/webui/statistics_collector.h"
 #import "components/policy/core/common/cloud/machine_level_user_cloud_policy_manager.h"
 #import "components/policy/core/common/policy_logger.h"
 #import "components/policy/core/common/policy_map.h"
@@ -32,20 +33,17 @@
 #import "components/prefs/pref_service.h"
 #import "components/strings/grit/components_strings.h"
 #import "components/version_info/version_info.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/policy/browser_policy_connector_ios.h"
 #import "ios/chrome/browser/policy/browser_state_policy_connector.h"
 #import "ios/chrome/browser/policy/policy_conversions_client_ios.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/ui/util/pasteboard_util.h"
 #import "ios/chrome/common/channel_info.h"
-#import "ios/chrome/grit/ios_chromium_strings.h"
+#import "ios/chrome/grit/ios_branded_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "ui/base/webui/web_ui_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 PolicyUIHandler::PolicyUIHandler() = default;
 
@@ -55,6 +53,9 @@ PolicyUIHandler::~PolicyUIHandler() {
                                          ->GetPolicyConnector()
                                          ->GetSchemaRegistry();
   registry->RemoveObserver(this);
+  policy::RecordPolicyUIButtonUsage(reload_policies_count_,
+                                    /*export_to_json_count=*/0,
+                                    copy_to_json_count_, upload_report_count_);
 }
 
 void PolicyUIHandler::AddCommonLocalizedStringsToSource(
@@ -151,11 +152,13 @@ void PolicyUIHandler::RegisterMessages() {
 }
 
 void PolicyUIHandler::HandleCopyPoliciesJson(const base::Value::List& args) {
+  copy_to_json_count_ += 1;
   NSString* jsonString = base::SysUTF8ToNSString(GetPoliciesAsJson());
-  [UIPasteboard generalPasteboard].string = jsonString;
+  StoreTextInPasteboard(jsonString);
 }
 
 void PolicyUIHandler::HandleUploadReport(const base::Value::List& args) {
+  upload_report_count_ += 1;
   DCHECK_EQ(1u, args.size());
   std::string callback_id = args[0].GetString();
   auto* report_scheduler = GetApplicationContext()
@@ -187,10 +190,10 @@ std::string PolicyUIHandler::GetPoliciesAsJson() {
       GetStatusValue(),
       policy::JsonGenerationParams()
           .with_application_name(l10n_util::GetStringUTF8(IDS_IOS_PRODUCT_NAME))
-          .with_channel_name(GetChannelString(GetChannel()))
+          .with_channel_name(std::string(GetChannelString(GetChannel())))
           .with_processor_variation(l10n_util::GetStringUTF8(
               sizeof(void*) == 8 ? IDS_VERSION_UI_64BIT : IDS_VERSION_UI_32BIT))
-          .with_os_name(version_info::GetOSType()));
+          .with_os_name(std::string(version_info::GetOSType())));
 }
 
 void PolicyUIHandler::OnSchemaRegistryUpdated(bool has_new_schemas) {
@@ -264,6 +267,7 @@ void PolicyUIHandler::HandleListenPoliciesUpdates(
 }
 
 void PolicyUIHandler::HandleReloadPolicies(const base::Value::List& args) {
+  reload_policies_count_ += 1;
   GetPolicyService()->RefreshPolicies(base::BindOnce(
       &PolicyUIHandler::OnRefreshPoliciesDone, weak_factory_.GetWeakPtr()));
 }

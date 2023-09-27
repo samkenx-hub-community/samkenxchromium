@@ -5,19 +5,15 @@
 #import "ios/chrome/browser/tabs/tab_helper_delegate_installer.h"
 
 #import "base/test/task_environment.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
-#import "ios/chrome/browser/main/test_browser.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/web_state_list/web_state_list_delegate.h"
-#import "ios/chrome/browser/web_state_list/web_state_opener.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list_delegate.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_opener.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
 #import "ios/web/public/web_state_user_data.h"
 #import "testing/gtest/include/gtest/gtest.h"
 #import "testing/platform_test.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 // A fake tab helper delegate.
@@ -87,7 +83,6 @@ class FakeTabHelperWebStateListDelegate : public WebStateListDelegate {
   void WillAddWebState(web::WebState* web_state) override {
     FakeTabHelper::CreateForWebState(web_state);
   }
-  void WebStateDetached(web::WebState* web_state) override {}
 };
 }  // namespace
 

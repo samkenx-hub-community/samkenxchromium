@@ -17,12 +17,11 @@
 #include "components/password_manager/core/browser/password_manager_client_helper.h"
 #include "components/password_manager/core/browser/password_manager_metrics_recorder.h"
 #include "components/password_manager/core/browser/password_manager_metrics_util.h"
-#include "components/password_manager/core/browser/password_reuse_detection_manager.h"
 #include "components/password_manager/core/browser/password_reuse_manager.h"
 #include "components/password_manager/core/browser/sync_credentials_filter.h"
 #include "components/password_manager/ios/password_manager_client_bridge.h"
 #include "components/prefs/pref_member.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
 #import "ios/chrome/browser/safe_browsing/input_event_observer.h"
 #import "ios/chrome/browser/safe_browsing/password_protection_java_script_feature.h"
 #import "ios/web/public/web_state.h"
@@ -45,10 +44,6 @@ namespace safe_browsing {
 enum class WarningAction;
 }
 
-namespace web {
-class NavigationContext;
-}
-
 @protocol IOSChromePasswordManagerClientBridge <PasswordManagerClientBridge>
 
 @property(readonly, nonatomic) ChromeBrowserState* browserState;
@@ -62,9 +57,7 @@ class NavigationContext;
 // An iOS implementation of password_manager::PasswordManagerClient.
 // TODO(crbug.com/958833): write unit tests for this class.
 class IOSChromePasswordManagerClient
-    : public password_manager::PasswordManagerClient,
-      public web::WebStateObserver,
-      public InputEventObserver {
+    : public password_manager::PasswordManagerClient {
  public:
   explicit IOSChromePasswordManagerClient(
       id<IOSChromePasswordManagerClientBridge> bridge);
@@ -101,7 +94,7 @@ class IOSChromePasswordManagerClient
       std::unique_ptr<password_manager::PasswordFormManagerForUI>
           saved_form_manager) override;
   void PromptUserToEnableAutosignin() override;
-  bool IsIncognito() const override;
+  bool IsOffTheRecord() const override;
   const password_manager::PasswordManager* GetPasswordManager() const override;
   const password_manager::PasswordFeatureManager* GetPasswordFeatureManager()
       const override;
@@ -146,46 +139,17 @@ class IOSChromePasswordManagerClient
   scoped_refptr<network::SharedURLLoaderFactory> GetURLLoaderFactory() override;
   password_manager::PasswordRequirementsService*
   GetPasswordRequirementsService() override;
+  void UpdateFormManagers() override;
   bool IsIsolationForPasswordSitesEnabled() const override;
   bool IsNewTabPage() const override;
-  password_manager::FieldInfoManager* GetFieldInfoManager() const override;
 
   safe_browsing::PasswordProtectionService* GetPasswordProtectionService()
       const override;
 
-  void CheckProtectedPasswordEntry(
-      password_manager::metrics_util::PasswordType reused_password_type,
-      const std::string& username,
-      const std::vector<password_manager::MatchingReusedCredential>&
-          matching_reused_credentials,
-      bool password_field_exists,
-      uint64_t reused_password_hash,
-      const std::string& domain) override;
-
-  void LogPasswordReuseDetectedEvent() override;
-
-  // Shows the password protection UI. `warning_text` is the displayed text.
-  // `callback` is invoked when the user dismisses the UI.
-  void NotifyUserPasswordProtectionWarning(
-      const std::u16string& warning_text,
-      base::OnceCallback<void(safe_browsing::WarningAction)> callback);
-
  private:
-  // web::WebStateObserver:
-  void DidFinishNavigation(web::WebState* web_state,
-                           web::NavigationContext* navigation_context) override;
-
-  // InputEventObserver:
-  void OnKeyPressed(std::string text) override;
-  void OnPaste(std::string text) override;
-  web::WebState* web_state() const override;
-
   __weak id<IOSChromePasswordManagerClientBridge> bridge_;
 
   password_manager::PasswordFeatureManagerImpl password_feature_manager_;
-
-  password_manager::PasswordReuseDetectionManager
-      password_reuse_detection_manager_;
 
   // The preference associated with
   // password_manager::prefs::kCredentialsEnableService.
@@ -205,11 +169,6 @@ class IOSChromePasswordManagerClient
   // ChromePasswordManagerClient and IOSChromePasswordManagerClient.
   password_manager::PasswordManagerClientHelper helper_;
 
-  base::ScopedObservation<web::WebState, web::WebStateObserver>
-      web_state_observation_{this};
-  base::ScopedObservation<PasswordProtectionJavaScriptFeature,
-                          InputEventObserver>
-      input_event_observation_{this};
   base::WeakPtrFactory<IOSChromePasswordManagerClient> weak_factory_{this};
 };
 

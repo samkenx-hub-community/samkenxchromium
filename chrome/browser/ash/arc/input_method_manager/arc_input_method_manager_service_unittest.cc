@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "ash/components/arc/session/arc_service_manager.h"
-#include "ash/components/arc/test/test_browser_context.h"
 #include "ash/constants/app_types.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/public/cpp/keyboard/arc/arc_input_method_bounds_tracker.h"
@@ -19,6 +18,8 @@
 #include "base/containers/contains.h"
 #include "base/containers/cxx20_erase.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/strings/stringprintf.h"
@@ -29,9 +30,11 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/crx_file/id_util.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/test/browser_task_environment.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/test/test_windows.h"
 #include "ui/base/ime/ash/extension_ime_util.h"
@@ -95,7 +98,7 @@ class FakeTabletMode : public ash::TabletMode {
   }
 
  private:
-  ash::TabletModeObserver* observer_ = nullptr;
+  raw_ptr<ash::TabletModeObserver, ExperimentalAsh> observer_ = nullptr;
   bool in_tablet_mode = false;
 };
 
@@ -144,7 +147,8 @@ class TestInputMethodManager : public im::MockInputMethodManager {
     im::InputMethodDescriptor GetCurrentInputMethod() const override {
       im::InputMethodDescriptor descriptor(
           current_ime_id_, "", "", "", std::vector<std::string>(),
-          false /* is_login_keyboard */, GURL(), GURL());
+          false /* is_login_keyboard */, GURL(), GURL(),
+          /*handwriting_language=*/absl::nullopt);
       return descriptor;
     }
 
@@ -183,8 +187,9 @@ class TestInputMethodManager : public im::MockInputMethodManager {
     void GetInputMethodExtensions(
         im::InputMethodDescriptors* descriptors) override {
       for (const auto& id : enabled_input_method_ids_) {
-        descriptors->push_back(im::InputMethodDescriptor(
-            id, "", "", {}, {}, false, GURL(), GURL()));
+        descriptors->push_back(
+            im::InputMethodDescriptor(id, "", "", {}, {}, false, GURL(), GURL(),
+                                      /*handwriting_language=*/absl::nullopt));
       }
     }
 
@@ -241,7 +246,7 @@ class TestIMEInputContextHandler : public ash::MockIMEInputContextHandler {
   ui::InputMethod* GetInputMethod() override { return input_method_; }
 
  private:
-  ui::InputMethod* const input_method_;
+  const raw_ptr<ui::InputMethod, ExperimentalAsh> input_method_;
 };
 
 class TestWindowDelegate : public ArcInputMethodManagerService::WindowDelegate {
@@ -261,8 +266,12 @@ class TestWindowDelegate : public ArcInputMethodManagerService::WindowDelegate {
   void SetActiveWindow(aura::Window* window) { active_ = window; }
 
  private:
-  aura::Window* focused_ = nullptr;
-  aura::Window* active_ = nullptr;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter
+  // for: #constexpr-ctor-field-initializer
+  RAW_PTR_EXCLUSION aura::Window* focused_ = nullptr;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter
+  // for: #constexpr-ctor-field-initializer
+  RAW_PTR_EXCLUSION aura::Window* active_ = nullptr;
 };
 
 class ArcInputMethodManagerServiceTest : public testing::Test {
@@ -326,9 +335,10 @@ class ArcInputMethodManagerServiceTest : public testing::Test {
         profile_.get());
     test_bridge_ = new TestInputMethodManagerBridge();
     service_->SetInputMethodManagerBridgeForTesting(
-        base::WrapUnique(test_bridge_));
+        base::WrapUnique(test_bridge_.get()));
     window_delegate_ = new TestWindowDelegate();
-    service_->SetWindowDelegateForTesting(base::WrapUnique(window_delegate_));
+    service_->SetWindowDelegateForTesting(
+        base::WrapUnique(window_delegate_.get()));
   }
 
   void TearDown() override {
@@ -351,10 +361,14 @@ class ArcInputMethodManagerServiceTest : public testing::Test {
   std::unique_ptr<FakeTabletMode> tablet_mode_controller_;
   std::unique_ptr<ash::ArcInputMethodBoundsTracker>
       input_method_bounds_tracker_;
-  TestInputMethodManager* input_method_manager_ = nullptr;
-  TestInputMethodManagerBridge* test_bridge_ = nullptr;  // Owned by |service_|
-  ArcInputMethodManagerService* service_ = nullptr;
-  TestWindowDelegate* window_delegate_ = nullptr;
+  raw_ptr<TestInputMethodManager, DanglingUntriaged | ExperimentalAsh>
+      input_method_manager_ = nullptr;
+  raw_ptr<TestInputMethodManagerBridge, ExperimentalAsh> test_bridge_ =
+      nullptr;  // Owned by |service_|
+  raw_ptr<ArcInputMethodManagerService, DanglingUntriaged | ExperimentalAsh>
+      service_ = nullptr;
+  raw_ptr<TestWindowDelegate, DanglingUntriaged | ExperimentalAsh>
+      window_delegate_ = nullptr;
 };
 
 }  // anonymous namespace

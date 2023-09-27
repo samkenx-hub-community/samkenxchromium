@@ -4,9 +4,8 @@
 
 package org.chromium.chrome.browser.permissions;
 
-import android.support.test.InstrumentationRegistry;
-
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Before;
 import org.junit.Rule;

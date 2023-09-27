@@ -4,6 +4,7 @@
 
 #include "ash/system/input_device_settings/pref_handlers/keyboard_pref_handler_impl.h"
 
+#include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/public/mojom/input_device_settings.mojom-shared.h"
 #include "ash/public/mojom/input_device_settings.mojom.h"
@@ -13,17 +14,31 @@
 #include "ash/system/input_device_settings/input_device_tracker.h"
 #include "ash/test/ash_test_base.h"
 #include "base/containers/contains.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
+#include "components/account_id/account_id.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/testing_pref_service.h"
-#include "ui/chromeos/events/mojom/modifier_key.mojom-shared.h"
-#include "ui/chromeos/events/mojom/modifier_key.mojom.h"
-#include "ui/chromeos/events/pref_names.h"
+#include "components/user_manager/known_user.h"
+#include "ui/base/ui_base_features.h"
+#include "ui/events/ash/mojom/extended_fkeys_modifier.mojom-shared.h"
+#include "ui/events/ash/mojom/extended_fkeys_modifier.mojom.h"
+#include "ui/events/ash/mojom/modifier_key.mojom-shared.h"
+#include "ui/events/ash/mojom/modifier_key.mojom.h"
+#include "ui/events/ash/mojom/six_pack_shortcut_modifier.mojom-shared.h"
+#include "ui/events/ash/mojom/six_pack_shortcut_modifier.mojom.h"
+#include "ui/events/ash/pref_names.h"
 
 namespace ash {
 
 namespace {
+constexpr char kUserEmail[] = "example@email.com";
+constexpr char kUserEmail2[] = "example2@email.com";
+const AccountId account_id_1 = AccountId::FromUserEmail(kUserEmail);
+const AccountId account_id_2 = AccountId::FromUserEmail(kUserEmail2);
+
 const std::string kDictFakeKey = "fake_key";
 const std::string kDictFakeValue = "fake_value";
 
@@ -36,17 +51,26 @@ const bool kGlobalSendFunctionKeys = false;
 const mojom::KeyboardSettings kKeyboardSettingsDefault(
     /*modifier_remappings=*/{},
     /*top_row_are_fkeys=*/kDefaultTopRowAreFKeys,
-    /*suppress_meta_fkey_rewrites=*/kDefaultSuppressMetaFKeyRewrites);
+    /*suppress_meta_fkey_rewrites=*/kDefaultSuppressMetaFKeyRewrites,
+    /*six_pack_key_remappings=*/{},
+    kDefaultFkey,
+    kDefaultFkey);
 
 const mojom::KeyboardSettings kKeyboardSettingsNotDefault(
     /*modifier_remappings=*/{},
     /*top_row_are_fkeys=*/!kDefaultTopRowAreFKeys,
-    /*suppress_meta_fkey_rewrites=*/!kDefaultSuppressMetaFKeyRewrites);
+    /*suppress_meta_fkey_rewrites=*/!kDefaultSuppressMetaFKeyRewrites,
+    /*six_pack_key_remappings=*/{},
+    kDefaultFkey,
+    kDefaultFkey);
 
 const mojom::KeyboardSettings kKeyboardSettings1(
     /*modifier_remappings=*/{},
     /*top_row_are_fkeys=*/false,
-    /*suppress_meta_fkey_rewrites=*/false);
+    /*suppress_meta_fkey_rewrites=*/false,
+    /*six_pack_key_remappings=*/{},
+    kDefaultFkey,
+    kDefaultFkey);
 
 const mojom::KeyboardSettings kKeyboardSettings2(
     /*modifier_remappings=*/{{ui::mojom::ModifierKey::kControl,
@@ -54,7 +78,10 @@ const mojom::KeyboardSettings kKeyboardSettings2(
                              {ui::mojom::ModifierKey::kAssistant,
                               ui::mojom::ModifierKey::kVoid}},
     /*top_row_are_fkeys=*/true,
-    /*suppress_meta_fkey_rewrites=*/true);
+    /*suppress_meta_fkey_rewrites=*/true,
+    /*six_pack_key_remappings=*/{},
+    kDefaultFkey,
+    kDefaultFkey);
 
 const mojom::KeyboardSettings kKeyboardSettings3(
     /*modifier_remappings=*/{{ui::mojom::ModifierKey::kAlt,
@@ -66,7 +93,10 @@ const mojom::KeyboardSettings kKeyboardSettings3(
                              {ui::mojom::ModifierKey::kControl,
                               ui::mojom::ModifierKey::kAssistant}},
     /*top_row_are_fkeys=*/true,
-    /*suppress_meta_fkey_rewrites=*/false);
+    /*suppress_meta_fkey_rewrites=*/false,
+    /*six_pack_key_remappings=*/{},
+    kDefaultFkey,
+    kDefaultFkey);
 }  // namespace
 
 class KeyboardPrefHandlerTest : public AshTestBase {
@@ -78,6 +108,14 @@ class KeyboardPrefHandlerTest : public AshTestBase {
 
   // testing::Test:
   void SetUp() override {
+    // scoped_feature_list_.InitAndEnableFeature(
+    //     features::kInputDeviceSettingsSplit);
+
+    scoped_feature_list_.InitWithFeatures(
+        /*enabled_features=*/{features::kInputDeviceSettingsSplit,
+                              ::features::kSupportF11AndF12KeyShortcuts},
+        /*disabled_features=*/{});
+
     AshTestBase::SetUp();
     InitializePrefService();
     pref_handler_ = std::make_unique<KeyboardPrefHandlerImpl>();
@@ -124,6 +162,17 @@ class KeyboardPrefHandlerTest : public AshTestBase {
     pref_service_->registry()->RegisterIntegerPref(
         ::prefs::kLanguageRemapExternalCommandKeyTo,
         static_cast<int>(ui::mojom::ModifierKey::kMeta));
+
+    pref_service_->registry()->RegisterIntegerPref(
+        prefs::kKeyEventRemappedToSixPackDelete, 0);
+    pref_service_->registry()->RegisterIntegerPref(
+        prefs::kKeyEventRemappedToSixPackEnd, 0);
+    pref_service_->registry()->RegisterIntegerPref(
+        prefs::kKeyEventRemappedToSixPackHome, 0);
+    pref_service_->registry()->RegisterIntegerPref(
+        prefs::kKeyEventRemappedToSixPackPageUp, 0);
+    pref_service_->registry()->RegisterIntegerPref(
+        prefs::kKeyEventRemappedToSixPackPageDown, 0);
   }
 
   void CheckKeyboardSettingsAndDictAreEqual(
@@ -159,13 +208,37 @@ class KeyboardPrefHandlerTest : public AshTestBase {
     }
   }
 
+  void CheckKeyboardSettingsAreSetToDefaultValues(
+      const mojom::KeyboardSettings& settings,
+      bool is_external) {
+    const bool default_top_row_are_fkeys =
+        is_external ? !kKeyboardSettingsDefault.top_row_are_fkeys
+                    : kKeyboardSettingsDefault.top_row_are_fkeys;
+    EXPECT_EQ(settings.suppress_meta_fkey_rewrites,
+              kKeyboardSettingsDefault.suppress_meta_fkey_rewrites);
+    EXPECT_EQ(settings.top_row_are_fkeys, default_top_row_are_fkeys);
+    EXPECT_EQ(0u, settings.modifier_remappings.size());
+  }
+
   void CallUpdateKeyboardSettings(const std::string& device_key,
                                   const mojom::KeyboardSettings& settings) {
     mojom::KeyboardPtr keyboard = mojom::Keyboard::New();
     keyboard->settings = settings.Clone();
     keyboard->device_key = device_key;
 
-    pref_handler_->UpdateKeyboardSettings(pref_service_.get(), *keyboard);
+    pref_handler_->UpdateKeyboardSettings(pref_service_.get(),
+                                          /*keyboard_policies=*/{}, *keyboard);
+  }
+
+  void CallUpdateLoginScreenKeyboardSettings(
+      const AccountId& account_id,
+      const std::string& device_key,
+      const mojom::KeyboardSettings& settings) {
+    mojom::KeyboardPtr keyboard = mojom::Keyboard::New();
+    keyboard->settings = settings.Clone();
+    pref_handler_->UpdateLoginScreenKeyboardSettings(local_state(), account_id,
+                                                     /*keyboard_policies=*/{},
+                                                     *keyboard);
   }
 
   mojom::KeyboardSettingsPtr CallInitializeKeyboardSettings(
@@ -173,16 +246,27 @@ class KeyboardPrefHandlerTest : public AshTestBase {
     mojom::KeyboardPtr keyboard = mojom::Keyboard::New();
     keyboard->device_key = device_key;
 
-    pref_handler_->InitializeKeyboardSettings(pref_service_.get(),
-                                              keyboard.get());
+    pref_handler_->InitializeKeyboardSettings(
+        pref_service_.get(), /*keyboard_policies=*/{}, keyboard.get());
     return std::move(keyboard->settings);
   }
 
   mojom::KeyboardSettingsPtr CallInitializeKeyboardSettings(
       const mojom::Keyboard& keyboard) {
     const auto keyboard_ptr = keyboard.Clone();
-    pref_handler_->InitializeKeyboardSettings(pref_service_.get(),
-                                              keyboard_ptr.get());
+    pref_handler_->InitializeKeyboardSettings(
+        pref_service_.get(), /*keyboard_policies=*/{}, keyboard_ptr.get());
+    return std::move(keyboard_ptr->settings);
+  }
+
+  mojom::KeyboardSettingsPtr CallInitializeLoginScreenKeyboardSettings(
+      const AccountId& account_id,
+      const mojom::Keyboard& keyboard) {
+    const auto keyboard_ptr = keyboard.Clone();
+
+    pref_handler_->InitializeLoginScreenKeyboardSettings(
+        local_state(), account_id, /*keyboard_policies=*/{},
+        keyboard_ptr.get());
     return std::move(keyboard_ptr->settings);
   }
 
@@ -197,7 +281,38 @@ class KeyboardPrefHandlerTest : public AshTestBase {
     return settings_dict;
   }
 
+  user_manager::KnownUser known_user() {
+    return user_manager::KnownUser(local_state());
+  }
+
+  bool HasInternalLoginScreenSettingsDict(AccountId account_id) {
+    const auto* dict = known_user().FindPath(
+        account_id, prefs::kKeyboardLoginScreenInternalSettingsPref);
+    return dict && dict->is_dict();
+  }
+
+  bool HasExternalLoginScreenSettingsDict(AccountId account_id) {
+    const auto* dict = known_user().FindPath(
+        account_id, prefs::kKeyboardLoginScreenExternalSettingsPref);
+    return dict && dict->is_dict();
+  }
+
+  base::Value::Dict GetInternalLoginScreenSettingsDict(AccountId account_id) {
+    return known_user()
+        .FindPath(account_id, prefs::kKeyboardLoginScreenInternalSettingsPref)
+        ->GetDict()
+        .Clone();
+  }
+
+  base::Value::Dict GetExternalLoginScreenSettingsDict(AccountId account_id) {
+    return known_user()
+        .FindPath(account_id, prefs::kKeyboardLoginScreenExternalSettingsPref)
+        ->GetDict()
+        .Clone();
+  }
+
  protected:
+  base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<KeyboardPrefHandlerImpl> pref_handler_;
   std::unique_ptr<TestingPrefServiceSimple> pref_service_;
 };
@@ -222,6 +337,61 @@ TEST_F(KeyboardPrefHandlerTest, MultipleDevices) {
   settings_dict = devices_dict.FindDict(kKeyboardKey3);
   ASSERT_NE(nullptr, settings_dict);
   CheckKeyboardSettingsAndDictAreEqual(kKeyboardSettings3, *settings_dict);
+}
+
+TEST_F(KeyboardPrefHandlerTest, InitializeLoginScreenKeyboardSettings) {
+  mojom::Keyboard keyboard;
+  keyboard.device_key = kKeyboardKey1;
+  keyboard.is_external = false;
+  mojom::KeyboardSettingsPtr settings =
+      CallInitializeLoginScreenKeyboardSettings(account_id_1, keyboard);
+
+  EXPECT_FALSE(HasInternalLoginScreenSettingsDict(account_id_1));
+  CheckKeyboardSettingsAreSetToDefaultValues(*settings, keyboard.is_external);
+
+  keyboard.is_external = true;
+  settings = CallInitializeLoginScreenKeyboardSettings(account_id_2, keyboard);
+  EXPECT_FALSE(HasExternalLoginScreenSettingsDict(account_id_2));
+
+  CheckKeyboardSettingsAreSetToDefaultValues(*settings, keyboard.is_external);
+}
+
+TEST_F(KeyboardPrefHandlerTest, UpdateLoginScreenKeyboardSettings) {
+  mojom::Keyboard keyboard;
+  keyboard.device_key = kKeyboardKey1;
+  keyboard.is_external = false;
+  mojom::KeyboardSettingsPtr settings =
+      CallInitializeLoginScreenKeyboardSettings(account_id_1, keyboard);
+
+  CheckKeyboardSettingsAreSetToDefaultValues(*settings, keyboard.is_external);
+  mojom::KeyboardSettingsPtr updated_settings = mojo::Clone(settings);
+  updated_settings->modifier_remappings = {
+      {ui::mojom::ModifierKey::kAlt, ui::mojom::ModifierKey::kControl}};
+  updated_settings->suppress_meta_fkey_rewrites =
+      !updated_settings->suppress_meta_fkey_rewrites;
+  updated_settings->top_row_are_fkeys = !updated_settings->top_row_are_fkeys;
+  CallUpdateLoginScreenKeyboardSettings(account_id_1, kKeyboardKey1,
+                                        *updated_settings);
+  const auto& updated_settings_dict =
+      GetInternalLoginScreenSettingsDict(account_id_1);
+  CheckKeyboardSettingsAndDictAreEqual(*updated_settings,
+                                       updated_settings_dict);
+}
+
+TEST_F(KeyboardPrefHandlerTest,
+       LoginScreenPrefsNotPersistedWhenFlagIsDisabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(features::kInputDeviceSettingsSplit);
+  mojom::Keyboard keyboard1;
+  keyboard1.device_key = kKeyboardKey1;
+  keyboard1.is_external = false;
+  mojom::Keyboard keyboard2;
+  keyboard2.device_key = kKeyboardKey2;
+  keyboard2.is_external = true;
+  CallInitializeLoginScreenKeyboardSettings(account_id_1, keyboard1);
+  CallInitializeLoginScreenKeyboardSettings(account_id_1, keyboard2);
+  EXPECT_FALSE(HasInternalLoginScreenSettingsDict(account_id_1));
+  EXPECT_FALSE(HasExternalLoginScreenSettingsDict(account_id_1));
 }
 
 TEST_F(KeyboardPrefHandlerTest, PreservesOldSettings) {
@@ -265,22 +435,22 @@ TEST_F(KeyboardPrefHandlerTest, UpdateSettings) {
   ASSERT_NE(nullptr, settings_dict);
   CheckKeyboardSettingsAndDictAreEqual(kKeyboardSettings2, *settings_dict);
 
-  mojom::KeyboardSettings updated_settings = kKeyboardSettings1;
-  updated_settings.modifier_remappings = {
+  mojom::KeyboardSettingsPtr updated_settings = kKeyboardSettings1.Clone();
+  updated_settings->modifier_remappings = {
       {ui::mojom::ModifierKey::kAlt, ui::mojom::ModifierKey::kControl}};
-  updated_settings.suppress_meta_fkey_rewrites =
-      !updated_settings.suppress_meta_fkey_rewrites;
-  updated_settings.top_row_are_fkeys = !updated_settings.top_row_are_fkeys;
+  updated_settings->suppress_meta_fkey_rewrites =
+      !updated_settings->suppress_meta_fkey_rewrites;
+  updated_settings->top_row_are_fkeys = !updated_settings->top_row_are_fkeys;
 
   // Update the settings again and verify the settings are updated in place.
-  CallUpdateKeyboardSettings(kKeyboardKey1, updated_settings);
+  CallUpdateKeyboardSettings(kKeyboardKey1, *updated_settings);
 
   const auto& updated_devices_dict =
       pref_service_->GetDict(prefs::kKeyboardDeviceSettingsDictPref);
   const auto* updated_settings_dict =
       updated_devices_dict.FindDict(kKeyboardKey1);
   ASSERT_NE(nullptr, updated_settings_dict);
-  CheckKeyboardSettingsAndDictAreEqual(updated_settings,
+  CheckKeyboardSettingsAndDictAreEqual(*updated_settings,
                                        *updated_settings_dict);
 
   // Verify other device remains unmodified.
@@ -292,10 +462,11 @@ TEST_F(KeyboardPrefHandlerTest, UpdateSettings) {
 }
 
 TEST_F(KeyboardPrefHandlerTest, NewSettingAddedRoundTrip) {
-  mojom::KeyboardSettings test_settings = kKeyboardSettings1;
-  test_settings.suppress_meta_fkey_rewrites = !kDefaultSuppressMetaFKeyRewrites;
+  mojom::KeyboardSettingsPtr test_settings = kKeyboardSettings1.Clone();
+  test_settings->suppress_meta_fkey_rewrites =
+      !kDefaultSuppressMetaFKeyRewrites;
 
-  CallUpdateKeyboardSettings(kKeyboardKey1, test_settings);
+  CallUpdateKeyboardSettings(kKeyboardKey1, *test_settings);
   auto devices_dict =
       pref_service_->GetDict(prefs::kKeyboardDeviceSettingsDictPref).Clone();
   auto* settings_dict = devices_dict.FindDict(kKeyboardKey1);
@@ -315,13 +486,14 @@ TEST_F(KeyboardPrefHandlerTest, NewSettingAddedRoundTrip) {
   // Reset "new settings" to the values that match `test_settings` and check
   // that the rest of the fields are equal.
   settings->suppress_meta_fkey_rewrites = !kDefaultSuppressMetaFKeyRewrites;
-  EXPECT_EQ(test_settings, *settings);
+  EXPECT_EQ(*test_settings, *settings);
 }
 
 TEST_F(KeyboardPrefHandlerTest, DefaultSettingsWhenPrefServiceNull) {
   mojom::Keyboard keyboard;
   keyboard.device_key = kKeyboardKey1;
-  pref_handler_->InitializeKeyboardSettings(nullptr, &keyboard);
+  pref_handler_->InitializeKeyboardSettings(nullptr, /*keyboard_policies=*/{},
+                                            &keyboard);
   EXPECT_EQ(kKeyboardSettingsDefault, *keyboard.settings);
 }
 
@@ -419,16 +591,6 @@ TEST_F(KeyboardPrefHandlerTest, InvalidModifierRemappings) {
                              ui::mojom::ModifierKey::kAlt));
   EXPECT_EQ(ui::mojom::ModifierKey::kControl,
             settings->modifier_remappings[ui::mojom::ModifierKey::kAlt]);
-
-  // Saved prefs should not be modified and should be left as they were in their
-  // invalid state.
-  devices_dict =
-      pref_service_->GetDict(prefs::kKeyboardDeviceSettingsDictPref).Clone();
-  settings_dict = devices_dict.FindDict(kKeyboardKey1);
-  auto* modifier_remappings_dict =
-      settings_dict->FindDict(prefs::kKeyboardSettingModifierRemappings);
-  ASSERT_NE(nullptr, modifier_remappings_dict);
-  EXPECT_EQ(invalid_modifier_remappings, *modifier_remappings_dict);
 }
 
 TEST_F(KeyboardPrefHandlerTest, KeyboardObserveredInTransitionPeriod) {
@@ -444,7 +606,35 @@ TEST_F(KeyboardPrefHandlerTest, KeyboardObserveredInTransitionPeriod) {
             kDefaultSuppressMetaFKeyRewrites);
 }
 
+TEST_F(KeyboardPrefHandlerTest,
+       KeyboardSendFunctionKeysTransitionPrefAlwaysConsistent) {
+  mojom::Keyboard keyboard;
+  keyboard.is_external = true;
+  keyboard.meta_key = mojom::MetaKey::kExternalMeta;
+  keyboard.device_key = kKeyboardKey1;
+  {
+    base::test::ScopedFeatureList disable_settings_split_feature_list;
+    disable_settings_split_feature_list.InitAndDisableFeature(
+        features::kInputDeviceSettingsSplit);
+    Shell::Get()->input_device_tracker()->OnKeyboardConnected(keyboard);
+  }
+
+  // Initialize keyboard settings for the device and check that the global
+  // prefs were used as defaults even though the `kSendFunctionKeys` pref was
+  // never changed and it goes against the default since the keyboard is
+  // external.
+  mojom::KeyboardSettingsPtr settings =
+      CallInitializeKeyboardSettings(keyboard);
+  ASSERT_EQ(settings->top_row_are_fkeys, kGlobalSendFunctionKeys);
+  ASSERT_EQ(settings->suppress_meta_fkey_rewrites,
+            kDefaultSuppressMetaFKeyRewrites);
+}
+
 TEST_F(KeyboardPrefHandlerTest, ModifierRemappingsFromGlobalPrefs) {
+  // Disable flag in this test since `InputDeviceTracker` only records
+  // connected devices when the settings split flag is disabled.
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(features::kInputDeviceSettingsSplit);
   mojom::Keyboard keyboard;
   keyboard.device_key = kKeyboardKey1;
   keyboard.modifier_keys = {
@@ -514,10 +704,228 @@ TEST_F(KeyboardPrefHandlerTest, DefaultNotPersistedUntilUpdated) {
                                        *settings_dict);
 }
 
+TEST_F(KeyboardPrefHandlerTest,
+       NewKeyboard_ManagedEnterprisePolicy_GetsDefaults) {
+  mojom::KeyboardPolicies policies;
+  policies.top_row_are_fkeys_policy = mojom::InputDeviceSettingsPolicy::New(
+      mojom::PolicyStatus::kManaged, !kDefaultTopRowAreFKeys);
+  policies.enable_meta_fkey_rewrites_policy =
+      mojom::InputDeviceSettingsPolicy::New(mojom::PolicyStatus::kManaged,
+                                            kDefaultSuppressMetaFKeyRewrites);
+
+  mojom::Keyboard keyboard;
+  keyboard.device_key = kKeyboardKey1;
+
+  pref_handler_->InitializeKeyboardSettings(pref_service_.get(), policies,
+                                            &keyboard);
+
+  EXPECT_EQ(!kDefaultTopRowAreFKeys, keyboard.settings->top_row_are_fkeys);
+  // For a non-external keyboard, the value of the EnabledMetaFkeyRewrites
+  // policy doesn't affect the value of the setting.
+  EXPECT_EQ(kDefaultSuppressMetaFKeyRewrites,
+            keyboard.settings->suppress_meta_fkey_rewrites);
+  keyboard.settings->top_row_are_fkeys = kDefaultTopRowAreFKeys;
+  EXPECT_EQ(kKeyboardSettingsDefault, *keyboard.settings);
+
+  const auto* settings_dict = GetSettingsDictForDeviceKey(kKeyboardKey1);
+  EXPECT_FALSE(settings_dict->contains(prefs::kKeyboardSettingTopRowAreFKeys));
+  EXPECT_FALSE(
+      settings_dict->contains(prefs::kKeyboardSettingSuppressMetaFKeyRewrites));
+}
+
+TEST_F(KeyboardPrefHandlerTest,
+       NewKeyboard_RecommendedEnterprisePolicy_GetsDefaults) {
+  mojom::KeyboardPolicies policies;
+  policies.top_row_are_fkeys_policy = mojom::InputDeviceSettingsPolicy::New(
+      mojom::PolicyStatus::kRecommended, !kDefaultTopRowAreFKeys);
+  policies.enable_meta_fkey_rewrites_policy =
+      mojom::InputDeviceSettingsPolicy::New(mojom::PolicyStatus::kRecommended,
+                                            !kDefaultSuppressMetaFKeyRewrites);
+
+  mojom::Keyboard keyboard;
+  keyboard.device_key = kKeyboardKey1;
+
+  pref_handler_->InitializeKeyboardSettings(pref_service_.get(), policies,
+                                            &keyboard);
+
+  EXPECT_EQ(!kDefaultTopRowAreFKeys, keyboard.settings->top_row_are_fkeys);
+  // For a non-external keyboard, the value of the EnabledMetaFkeyRewrites
+  // policy doesn't affect the value of the setting.
+  EXPECT_EQ(kDefaultSuppressMetaFKeyRewrites,
+            keyboard.settings->suppress_meta_fkey_rewrites);
+  keyboard.settings->top_row_are_fkeys = kDefaultTopRowAreFKeys;
+  keyboard.settings->suppress_meta_fkey_rewrites =
+      kDefaultSuppressMetaFKeyRewrites;
+  EXPECT_EQ(kKeyboardSettingsDefault, *keyboard.settings);
+
+  const auto* settings_dict = GetSettingsDictForDeviceKey(kKeyboardKey1);
+  EXPECT_FALSE(settings_dict->contains(prefs::kKeyboardSettingTopRowAreFKeys));
+}
+
+TEST_F(KeyboardPrefHandlerTest,
+       ExistingKeyboard_RecommendedEnterprisePolicy_GetsNewPolicy) {
+  mojom::KeyboardPolicies policies;
+  policies.top_row_are_fkeys_policy = mojom::InputDeviceSettingsPolicy::New(
+      mojom::PolicyStatus::kRecommended, !kDefaultTopRowAreFKeys);
+  policies.enable_meta_fkey_rewrites_policy =
+      mojom::InputDeviceSettingsPolicy::New(mojom::PolicyStatus::kRecommended,
+                                            kDefaultSuppressMetaFKeyRewrites);
+
+  mojom::Keyboard keyboard;
+  keyboard.device_key = kKeyboardKey1;
+
+  pref_handler_->InitializeKeyboardSettings(
+      pref_service_.get(), /*keyboard_policies=*/{}, &keyboard);
+  EXPECT_EQ(kKeyboardSettingsDefault, *keyboard.settings);
+
+  pref_handler_->InitializeKeyboardSettings(pref_service_.get(), policies,
+                                            &keyboard);
+  EXPECT_EQ(!kDefaultTopRowAreFKeys, keyboard.settings->top_row_are_fkeys);
+  EXPECT_EQ(!kDefaultSuppressMetaFKeyRewrites,
+            keyboard.settings->suppress_meta_fkey_rewrites);
+  keyboard.settings->top_row_are_fkeys = kDefaultTopRowAreFKeys;
+  keyboard.settings->suppress_meta_fkey_rewrites =
+      kDefaultSuppressMetaFKeyRewrites;
+  EXPECT_EQ(kKeyboardSettingsDefault, *keyboard.settings);
+
+  const auto* settings_dict = GetSettingsDictForDeviceKey(kKeyboardKey1);
+  EXPECT_FALSE(settings_dict->contains(prefs::kKeyboardSettingTopRowAreFKeys));
+}
+
+TEST_F(KeyboardPrefHandlerTest,
+       ExistingKeyboard_ManagedEnterprisePolicy_GetsNewPolicy) {
+  mojom::KeyboardPolicies policies;
+  policies.top_row_are_fkeys_policy = mojom::InputDeviceSettingsPolicy::New(
+      mojom::PolicyStatus::kManaged, !kDefaultTopRowAreFKeys);
+  policies.enable_meta_fkey_rewrites_policy =
+      mojom::InputDeviceSettingsPolicy::New(mojom::PolicyStatus::kManaged,
+                                            kDefaultSuppressMetaFKeyRewrites);
+
+  mojom::Keyboard keyboard;
+  keyboard.device_key = kKeyboardKey1;
+
+  pref_handler_->InitializeKeyboardSettings(
+      pref_service_.get(), /*keyboard_policies=*/{}, &keyboard);
+  EXPECT_EQ(kKeyboardSettingsDefault, *keyboard.settings);
+
+  keyboard.settings->top_row_are_fkeys = !kDefaultTopRowAreFKeys;
+  keyboard.settings->suppress_meta_fkey_rewrites =
+      !kDefaultSuppressMetaFKeyRewrites;
+  CallUpdateKeyboardSettings(kKeyboardKey1, *keyboard.settings);
+
+  pref_handler_->InitializeKeyboardSettings(pref_service_.get(), policies,
+                                            &keyboard);
+  EXPECT_EQ(!kDefaultTopRowAreFKeys, keyboard.settings->top_row_are_fkeys);
+  EXPECT_EQ(!kDefaultSuppressMetaFKeyRewrites,
+            keyboard.settings->suppress_meta_fkey_rewrites);
+  keyboard.settings->top_row_are_fkeys = kDefaultTopRowAreFKeys;
+  keyboard.settings->suppress_meta_fkey_rewrites =
+      kDefaultSuppressMetaFKeyRewrites;
+  EXPECT_EQ(kKeyboardSettingsDefault, *keyboard.settings);
+
+  const auto* settings_dict = GetSettingsDictForDeviceKey(kKeyboardKey1);
+  EXPECT_TRUE(settings_dict->contains(prefs::kKeyboardSettingTopRowAreFKeys));
+  EXPECT_EQ(
+      !kDefaultTopRowAreFKeys,
+      settings_dict->FindBool(prefs::kKeyboardSettingTopRowAreFKeys).value());
+}
+
+TEST_F(KeyboardPrefHandlerTest,
+       ExternalKeyboard_SuppressMetaFkeyRewritesPolicy) {
+  mojom::KeyboardPolicies policies;
+  policies.enable_meta_fkey_rewrites_policy =
+      mojom::InputDeviceSettingsPolicy::New(mojom::PolicyStatus::kManaged,
+                                            kDefaultSuppressMetaFKeyRewrites);
+
+  mojom::Keyboard keyboard;
+  keyboard.device_key = kKeyboardKey1;
+  keyboard.is_external = true;
+
+  pref_handler_->InitializeKeyboardSettings(pref_service_.get(), policies,
+                                            &keyboard);
+
+  EXPECT_EQ(!kDefaultSuppressMetaFKeyRewrites,
+            keyboard.settings->suppress_meta_fkey_rewrites);
+
+  const auto* settings_dict = GetSettingsDictForDeviceKey(kKeyboardKey1);
+  EXPECT_FALSE(
+      settings_dict->contains(prefs::kKeyboardSettingSuppressMetaFKeyRewrites));
+}
+
+TEST_F(KeyboardPrefHandlerTest, SixPackKeyRemappingsFlagDisabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
+      features::kAltClickAndSixPackCustomization);
+  CallInitializeKeyboardSettings(kKeyboardKey1);
+  const auto* settings_dict = GetSettingsDictForDeviceKey(kKeyboardKey1);
+  EXPECT_FALSE(
+      settings_dict->contains(prefs::kKeyboardSettingSixPackKeyRemappings));
+}
+
+TEST_F(KeyboardPrefHandlerTest, SixPackKeyRemappings_Default) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(features::kAltClickAndSixPackCustomization);
+
+  auto settings = CallInitializeKeyboardSettings(kKeyboardKey1);
+  EXPECT_EQ(ui::mojom::SixPackShortcutModifier::kSearch,
+            settings->six_pack_key_remappings->page_up);
+  EXPECT_EQ(ui::mojom::SixPackShortcutModifier::kSearch,
+            settings->six_pack_key_remappings->page_down);
+  EXPECT_EQ(ui::mojom::SixPackShortcutModifier::kSearch,
+            settings->six_pack_key_remappings->home);
+  EXPECT_EQ(ui::mojom::SixPackShortcutModifier::kSearch,
+            settings->six_pack_key_remappings->end);
+  EXPECT_EQ(ui::mojom::SixPackShortcutModifier::kSearch,
+            settings->six_pack_key_remappings->del);
+  EXPECT_EQ(ui::mojom::SixPackShortcutModifier::kSearch,
+            settings->six_pack_key_remappings->insert);
+}
+
+TEST_F(KeyboardPrefHandlerTest, SixPackKeyRemappings_Group) {
+  CallInitializeKeyboardSettings(kKeyboardKey1);
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(features::kAltClickAndSixPackCustomization);
+
+  pref_service_->SetUserPref(prefs::kKeyEventRemappedToSixPackPageUp,
+                             base::Value(15));
+  pref_service_->SetUserPref(prefs::kKeyEventRemappedToSixPackPageDown,
+                             base::Value(0));
+  // `kAlt` is the expected default since the `PageUp` pref has a positive
+  // value and the PageDown pref rewrite is either unused or usage is split
+  // equally between both the Search and Alt rewrites.
+  auto settings = CallInitializeKeyboardSettings(kKeyboardKey1);
+  EXPECT_EQ(ui::mojom::SixPackShortcutModifier::kAlt,
+            settings->six_pack_key_remappings->page_up);
+}
+
+TEST_F(KeyboardPrefHandlerTest, SixPackKeyRemappings_RetrieveSettings) {
+  CallInitializeKeyboardSettings(kKeyboardKey1);
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(features::kAltClickAndSixPackCustomization);
+
+  pref_service_->SetUserPref(prefs::kKeyEventRemappedToSixPackPageUp,
+                             base::Value(15));
+  auto settings = CallInitializeKeyboardSettings(kKeyboardKey1);
+  EXPECT_EQ(ui::mojom::SixPackShortcutModifier::kAlt,
+            settings->six_pack_key_remappings->page_up);
+  auto devices_dict =
+      pref_service_->GetDict(prefs::kKeyboardDeviceSettingsDictPref).Clone();
+  auto* settings_dict = devices_dict.FindDict(kKeyboardKey1);
+  EXPECT_TRUE(
+      settings_dict->contains(prefs::kKeyboardSettingSixPackKeyRemappings));
+  EXPECT_EQ(
+      *settings_dict->FindDict(prefs::kKeyboardSettingSixPackKeyRemappings)
+           ->FindInt(prefs::kSixPackKeyPageUp),
+      static_cast<int>(ui::mojom::SixPackShortcutModifier::kAlt));
+  settings = CallInitializeKeyboardSettings(kKeyboardKey1);
+  EXPECT_EQ(ui::mojom::SixPackShortcutModifier::kAlt,
+            settings->six_pack_key_remappings->page_up);
+}
+
 class KeyboardSettingsPrefConversionTest
     : public KeyboardPrefHandlerTest,
       public testing::WithParamInterface<
-          std::tuple<std::string, mojom::KeyboardSettings>> {
+          std::tuple<std::string, const mojom::KeyboardSettings*>> {
  public:
   KeyboardSettingsPrefConversionTest() = default;
   KeyboardSettingsPrefConversionTest(
@@ -534,7 +942,7 @@ class KeyboardSettingsPrefConversionTest
 
  protected:
   std::string device_key_;
-  mojom::KeyboardSettings settings_;
+  raw_ptr<const mojom::KeyboardSettings, ExperimentalAsh> settings_;
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -543,31 +951,31 @@ INSTANTIATE_TEST_SUITE_P(
     KeyboardSettingsPrefConversionTest,
     testing::Combine(
         testing::Values(kKeyboardKey1, kKeyboardKey2, kKeyboardKey3),
-        testing::Values(kKeyboardSettings1,
-                        kKeyboardSettings2,
-                        kKeyboardSettings3)));
+        testing::Values(&kKeyboardSettings1,
+                        &kKeyboardSettings2,
+                        &kKeyboardSettings3)));
 
 TEST_P(KeyboardSettingsPrefConversionTest, CheckConversion) {
-  CallUpdateKeyboardSettings(device_key_, settings_);
+  CallUpdateKeyboardSettings(device_key_, *settings_);
 
-  const auto* settings_dict = GetSettingsDictForDeviceKey(device_key_);
-  CheckKeyboardSettingsAndDictAreEqual(settings_, *settings_dict);
+  auto* settings_dict = GetSettingsDictForDeviceKey(device_key_);
+  CheckKeyboardSettingsAndDictAreEqual(*settings_, *settings_dict);
 }
 
 TEST_P(KeyboardSettingsPrefConversionTest, CheckRoundtripConversion) {
-  CallUpdateKeyboardSettings(device_key_, settings_);
+  CallUpdateKeyboardSettings(device_key_, *settings_);
 
-  const auto* settings_dict = GetSettingsDictForDeviceKey(device_key_);
-  CheckKeyboardSettingsAndDictAreEqual(settings_, *settings_dict);
+  auto* settings_dict = GetSettingsDictForDeviceKey(device_key_);
+  CheckKeyboardSettingsAndDictAreEqual(*settings_, *settings_dict);
 
   mojom::KeyboardSettingsPtr settings =
       CallInitializeKeyboardSettings(device_key_);
-  EXPECT_EQ(settings_, *settings);
+  EXPECT_EQ(*settings_, *settings);
 }
 
 TEST_P(KeyboardSettingsPrefConversionTest,
        CheckRoundtripConversionWithExtraKey) {
-  CallUpdateKeyboardSettings(device_key_, settings_);
+  CallUpdateKeyboardSettings(device_key_, *settings_);
 
   auto devices_dict =
       pref_service_->GetDict(prefs::kKeyboardDeviceSettingsDictPref).Clone();
@@ -575,17 +983,39 @@ TEST_P(KeyboardSettingsPrefConversionTest,
   auto* settings_dict = devices_dict.FindDict(device_key_);
   ASSERT_NE(nullptr, settings_dict);
 
-  // Set a fake key to simulate a setting being removed from 1 milestone to the
-  // next.
+  // Set a fake key to simulate a setting being removed from 1 milestone to
+  // the next.
   settings_dict->Set(kDictFakeKey, kDictFakeValue);
   pref_service_->SetDict(prefs::kKeyboardDeviceSettingsDictPref,
                          std::move(devices_dict));
 
-  CheckKeyboardSettingsAndDictAreEqual(settings_, *settings_dict);
+  CheckKeyboardSettingsAndDictAreEqual(*settings_, *settings_dict);
 
   mojom::KeyboardSettingsPtr settings =
       CallInitializeKeyboardSettings(device_key_);
-  EXPECT_EQ(settings_, *settings);
+  EXPECT_EQ(*settings_, *settings);
+}
+
+TEST_F(KeyboardPrefHandlerTest, ExtendedFkeysReceiveDefaultSettings) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(::features::kSupportF11AndF12KeyShortcuts);
+  mojom::Keyboard keyboard;
+  keyboard.is_external = false;
+  mojom::KeyboardSettingsPtr settings =
+      CallInitializeKeyboardSettings(keyboard);
+  EXPECT_EQ(kDefaultFkey, settings->f11);
+  EXPECT_EQ(kDefaultFkey, settings->f12);
+}
+
+TEST_F(KeyboardPrefHandlerTest, ExtendedFkeysOnlyAddedForChromeOSKeyboards) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(::features::kSupportF11AndF12KeyShortcuts);
+  mojom::Keyboard keyboard;
+  keyboard.meta_key = mojom::MetaKey::kCommand;
+  mojom::KeyboardSettingsPtr settings =
+      CallInitializeKeyboardSettings(keyboard);
+  EXPECT_FALSE(settings->f11.has_value());
+  EXPECT_FALSE(settings->f12.has_value());
 }
 
 }  // namespace ash

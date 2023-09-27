@@ -233,7 +233,9 @@ void TranslateAgent::PageCaptured(const std::u16string& contents) {
   if (base::FeatureList::IsEnabled(
           translate::kSkipLanguageDetectionOnEmptyContent) &&
       page_contents_length_ == 0) {
-    language = translate::kUnknownLanguageCode;
+    // Use the page-provided language if available.
+    language = translate::DeterminePageLanguage(
+        content_language, html_lang, translate::kUnknownLanguageCode, false);
   } else if (translate::IsTFLiteLanguageDetectionEnabled()) {
     translate::LanguageDetectionModel& language_detection_model =
         GetLanguageDetectionModel();
@@ -261,8 +263,6 @@ void TranslateAgent::PageCaptured(const std::u16string& contents) {
 
   if (language.empty())
     return;
-
-  language_determined_time_ = base::TimeTicks::Now();
 
   details.time = base::Time::Now();
   details.url = web_detection_details.url;
@@ -433,11 +433,6 @@ int64_t TranslateAgent::ExecuteScriptAndGetIntegerResult(
 }
 
 // mojom::TranslateAgent implementations.
-void TranslateAgent::GetWebLanguageDetectionDetails(
-    GetWebLanguageDetectionDetailsCallback callback) {
-  NOTREACHED() << "This interface supported by PerFrameTranslateAgent";
-}
-
 void TranslateAgent::TranslateFrame(const std::string& translate_script,
                                     const std::string& source_lang,
                                     const std::string& target_lang,
@@ -469,11 +464,6 @@ void TranslateAgent::TranslateFrame(const std::string& translate_script,
   source_lang_ = (source_lang != kUnknownLanguageCode) ? source_lang
                                                        : kAutoDetectionLanguage;
   target_lang_ = target_lang;
-
-  ReportUserActionDuration(language_determined_time_, base::TimeTicks::Now());
-
-  GURL url(main_frame->GetDocument().Url());
-  ReportPageScheme(url.scheme());
 
   // Set up v8 isolated world.
   EnsureIsolatedWorldInitialized(world_id_);

@@ -9,10 +9,13 @@
 #include <memory>
 #include <string>
 
+#include "ash/components/arc/arc_browser_context_keyed_service_factory_base.h"
 #include "ash/components/arc/mojom/anr.mojom.h"
 #include "ash/components/arc/mojom/power.mojom.h"
 #include "ash/components/arc/session/arc_service_manager.h"
 #include "ash/components/arc/session/connection_observer.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/singleton.h"
 #include "base/observer_list.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -32,6 +35,24 @@ class BrowserContext;
 namespace arc {
 
 class ArcBridgeService;
+class ArcPowerBridge;  // So we can declare the factory first.
+
+// Singleton factory for ArcPowerBridge.
+class ArcPowerBridgeFactory
+    : public internal::ArcBrowserContextKeyedServiceFactoryBase<
+          ArcPowerBridge,
+          ArcPowerBridgeFactory> {
+ public:
+  // Factory name used by ArcBrowserContextKeyedServiceFactoryBase.
+  static constexpr const char* kName = "ArcPowerBridgeFactory";
+
+  static ArcPowerBridgeFactory* GetInstance();
+
+ private:
+  friend base::DefaultSingletonTraits<ArcPowerBridgeFactory>;
+  ArcPowerBridgeFactory() = default;
+  ~ArcPowerBridgeFactory() override = default;
+};
 
 // ARC Power Client sets power management policy based on requests from
 // ARC instances.
@@ -46,6 +67,13 @@ class ArcPowerBridge : public KeyedService,
     // Notifies that wakefulness mode is changed.
     virtual void OnWakefulnessChanged(mojom::WakefulnessMode mode) {}
     virtual void OnPreAnr(mojom::AnrType type) {}
+
+    // Notifies about resume state of the underlying VM (ARCVM-exclusive).
+    // ARC Container does not communicate with CrosVM, and it doesn't
+    // instantiate services that care about this event.
+    virtual void OnVmResumed() {}
+
+    virtual void OnWillDestroyArcPowerBridge() {}
   };
 
   // Returns singleton instance for the given BrowserContext,
@@ -91,6 +119,8 @@ class ArcPowerBridge : public KeyedService,
   void ScreenBrightnessChanged(
       const power_manager::BacklightBrightnessChange& change) override;
   void PowerChanged(const power_manager::PowerSupplyProperties& proto) override;
+  void BatterySaverModeStateChanged(
+      const power_manager::BatterySaverModeState& state) override;
 
   // DisplayConfigurator::Observer overrides.
   void OnPowerStateChanged(chromeos::DisplayPowerState power_state) override;
@@ -103,6 +133,8 @@ class ArcPowerBridge : public KeyedService,
   void OnWakefulnessChanged(mojom::WakefulnessMode mode) override;
   void OnPreAnr(mojom::AnrType type) override;
   void OnAnrRecoveryFailed(::arc::mojom::AnrType type) override;
+  void GetBatterySaverModeState(
+      GetBatterySaverModeStateCallback callback) override;
 
   void SetWakeLockProviderForTesting(
       mojo::Remote<device::mojom::WakeLockProvider> provider) {
@@ -110,6 +142,12 @@ class ArcPowerBridge : public KeyedService,
   }
 
   static void EnsureFactoryBuilt();
+
+  // Notify ARC and patchpanel about change in power state, notification to
+  // patchpanel is used to decide whether to start/stop forwarding multicast
+  // traffic to ARC.
+  static void NotifyAndroidInteractiveState(ArcBridgeService* bridge,
+                                            bool enabled);
 
  private:
   class WakeLockRequestor;
@@ -134,13 +172,19 @@ class ArcPowerBridge : public KeyedService,
   void OnConciergeResumeVmResponse(
       absl::optional<vm_tools::concierge::ResumeVmResponse> reply);
 
+  // Called on PowerManagerClient::GetBatterySaverModeState() completion.
+  void OnBatterySaverModeStateReceived(
+      GetBatterySaverModeStateCallback callback,
+      absl::optional<power_manager::BatterySaverModeState> state);
+
   // Sends a PowerInstance::UpdateScreenBrightnessSettings mojo call to Android.
   void UpdateAndroidScreenBrightness(double percent);
 
   // Sends a PowerInstance::Resume mojo call to Android.
   void DispatchAndroidResume();
 
-  ArcBridgeService* const arc_bridge_service_;  // Owned by ArcServiceManager.
+  const raw_ptr<ArcBridgeService, ExperimentalAsh>
+      arc_bridge_service_;  // Owned by ArcServiceManager.
 
   std::string user_id_hash_;
 

@@ -16,6 +16,7 @@
 #include "ash/public/cpp/app_types_util.h"
 #include "ash/public/cpp/external_arc/message_center/arc_notification_content_view.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/singleton.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/string_util.h"
@@ -143,7 +144,7 @@ class ArcWindowDelegateImpl : public ArcImeService::ArcWindowDelegate {
   }
 
  private:
-  ArcImeService* const ime_service_;
+  const raw_ptr<ArcImeService, ExperimentalAsh> ime_service_;
 };
 
 // Singleton factory for ArcImeService.
@@ -472,7 +473,7 @@ void ArcImeService::InsertChar(const ui::KeyEvent& event) {
 
   if (IsCharacterKeyEvent(&event)) {
     has_composition_text_ = false;
-    ime_bridge_->SendInsertText(std::u16string(1, event.GetText()),
+    ime_bridge_->SendInsertText(std::u16string(1, event.GetCharacter()),
                                 /*new_cursor_position=*/1);
   }
 }

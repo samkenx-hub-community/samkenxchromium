@@ -245,14 +245,8 @@ bool SevenZipDelegateImpl::EntryDone(seven_zip::Result result,
 
   if (!entry.last_modified_time.is_null()) {
     FILETIME filetime = entry.last_modified_time.ToFileTime();
-    if (!SetFileTime(current_file.GetPlatformFile(), nullptr, nullptr,
-                     &filetime)) {
-      PLOG(ERROR) << "Error returned by SetFileTime";
-      // TODO(crbug/1368654): This should not be a fatal error.
-      error_code_ = ::GetLastError();
-      unpack_error_ = UNPACK_SET_FILE_TIME_ERROR;
-      return false;
-    }
+    // Make a best-effort attempt to set the file time.
+    SetFileTime(current_file.GetPlatformFile(), nullptr, nullptr, &filetime);
   }
 
   return true;
@@ -313,7 +307,11 @@ UnPackStatus LzmaUtilImpl::UnPack(const base::FilePath& location,
   DCHECK(archive_file_.IsValid());
 
   SevenZipDelegateImpl delegate(location, output_file);
-  seven_zip::Extract(archive_file_.Duplicate(), delegate);
+  std::unique_ptr<seven_zip::SevenZipReader> reader =
+      seven_zip::SevenZipReader::Create(archive_file_.Duplicate(), delegate);
+  if (reader) {
+    reader->Extract();
+  }
   error_code_ = delegate.error_code();
   return delegate.unpack_error();
 }

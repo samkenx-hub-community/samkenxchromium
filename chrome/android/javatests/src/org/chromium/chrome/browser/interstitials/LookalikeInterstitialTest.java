@@ -4,11 +4,9 @@
 
 package org.chromium.chrome.browser.interstitials;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -53,12 +51,8 @@ public class LookalikeInterstitialTest {
     @Before
     public void setUp() {
         mActivityTestRule.startMainActivityFromLauncher();
-        mServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-    }
-
-    @After
-    public void tearDown() {
-        mServer.stopAndDestroyServer();
+        mServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
     }
 
     @Test

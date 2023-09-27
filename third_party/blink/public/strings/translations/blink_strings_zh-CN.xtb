@@ -24,9 +24,9 @@
 <translation id="1993104285338243655">已切换到镜像</translation>
 <translation id="2031987842108996681">红色通道</translation>
 <translation id="2060505056492490888">“<ph name="INVALIDDOMAIN" />”中“<ph name="DOT" />”的位置不正确。</translation>
+<translation id="2068711044993563745">最小值 (<ph name="MINIMUM" />) 必须小于最大值 (<ph name="MAXIMUM" />)。</translation>
 <translation id="2148716181193084225">今天</translation>
 <translation id="2226276347425096477">请将该文本减少为 <ph name="MAX_CHARACTERS" /> 个字符或更少（您当前使用了 <ph name="CURRENT_LENGTH" /> 个字符）。</translation>
-<translation id="2246498165605549352">本地文件</translation>
 <translation id="2247351761944213033"><ph name="YEAR" /> 年第 <ph name="WEEKNUMBER" /> 周</translation>
 <translation id="2277199496770840904">字幕轨 <ph name="NUMBER" /></translation>
 <translation id="2393030564806080191">十六进制颜色值</translation>
@@ -45,6 +45,7 @@
 <translation id="2761667185364618470">如果要继续，请选中此框。</translation>
 <translation id="2908441821576996758">请输入用逗号分隔的电子邮件地址的列表。</translation>
 <translation id="3049748772180311791"><ph name="QUANTITY" /> MB</translation>
+<translation id="3053226512517284904">显示语音描述菜单</translation>
 <translation id="3075154866155599887">请输入一个有效值。该字段不完整或存在无效日期。</translation>
 <translation id="310520048233152454">请输入网址。</translation>
 <translation id="3220661731597678625">当前步骤</translation>
@@ -89,6 +90,7 @@
 <translation id="5425179576310518467">当前日期</translation>
 <translation id="5466621249238537318">请选择一个或多个文件。</translation>
 <translation id="5468998798572797635">退出全屏模式</translation>
+<translation id="5514612371225420585">您设备上的文件</translation>
 <translation id="5516235301412634559">0.75</translation>
 <translation id="5537725057119320332">投放</translation>
 <translation id="5546461542133609677">取消静音</translation>
@@ -100,7 +102,7 @@
 <translation id="5860033963881614850">关闭</translation>
 <translation id="588258955323874662">全屏</translation>
 <translation id="5888666972993069672">现正投放至“<ph name="DEVICE_FRIENDLY_NAME" />”</translation>
-<translation id="5916664084637901428">启用</translation>
+<translation id="5916664084637901428">已启用</translation>
 <translation id="5939518447894949180">重置</translation>
 <translation id="5966707198760109579">周</translation>
 <translation id="5985507339671257014">0.5</translation>
@@ -113,6 +115,7 @@
 <translation id="6398862346408813489">显示月份选择面板</translation>
 <translation id="6404546809543547843">音频时间进度条</translation>
 <translation id="6443871981718447451">显示字幕菜单</translation>
+<translation id="6484738902856791350">美观输出</translation>
 <translation id="6550675742724504774">选项</translation>
 <translation id="6572309429103589720">语法无效</translation>
 <translation id="658823671542763450">进入全屏模式</translation>

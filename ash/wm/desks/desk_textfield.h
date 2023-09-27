@@ -6,22 +6,21 @@
 #define ASH_WM_DESKS_DESK_TEXTFIELD_H_
 
 #include "ash/ash_export.h"
-#include "ash/wm/overview/overview_highlightable_view.h"
+#include "ash/style/system_textfield.h"
+#include "ash/wm/overview/overview_focusable_view.h"
 #include "ui/base/metadata/metadata_header_macros.h"
-#include "ui/views/controls/textfield/textfield.h"
 
 namespace ash {
 
 // Defines a textfield styled so when it's not focused, it looks like a normal
-// label. It can be highlighted and activated by the
-// `OverviewHighlightController`.
-// TODO(minch): Unify this to ash/style.
-class ASH_EXPORT DeskTextfield : public views::Textfield,
-                                 public OverviewHighlightableView {
+// label. It can be focused and activated by the `OverviewFocusCycler`.
+class ASH_EXPORT DeskTextfield : public SystemTextfield,
+                                 public OverviewFocusableView {
  public:
   METADATA_HEADER(DeskTextfield);
 
   DeskTextfield();
+  explicit DeskTextfield(Type type);
   DeskTextfield(const DeskTextfield&) = delete;
   DeskTextfield& operator=(const DeskTextfield&) = delete;
   ~DeskTextfield() override;
@@ -34,40 +33,31 @@ class ASH_EXPORT DeskTextfield : public views::Textfield,
   // widget or the desk bar widget.
   static void CommitChanges(views::Widget* widget);
 
+  void set_use_default_focus_manager(bool use_default_focus_manager) {
+    use_default_focus_manager_ = use_default_focus_manager;
+  }
+
   // views::View:
   gfx::Size CalculatePreferredSize() const override;
-  void SetBorder(std::unique_ptr<views::Border> b) override;
   bool SkipDefaultKeyEventProcessing(const ui::KeyEvent& event) override;
   std::u16string GetTooltipText(const gfx::Point& p) const override;
   void GetAccessibleNodeData(ui::AXNodeData* node_data) override;
-  void OnMouseEntered(const ui::MouseEvent& event) override;
-  void OnMouseExited(const ui::MouseEvent& event) override;
-  void OnThemeChanged() override;
   ui::Cursor GetCursor(const ui::MouseEvent& event) override;
   void OnFocus() override;
   void OnBlur() override;
   void OnDragEntered(const ui::DropTargetEvent& event) override;
   void OnDragExited() override;
 
-  // OverviewHighlightableView:
+  // OverviewFocusableView:
   views::View* GetView() override;
-  void MaybeActivateHighlightedView() override;
-  void MaybeCloseHighlightedView(bool primary_action) override;
-  void MaybeSwapHighlightedView(bool right) override;
-  void OnViewHighlighted() override;
-  void OnViewUnhighlighted() override;
+  void MaybeActivateFocusedView() override;
+  void MaybeCloseFocusedView(bool primary_action) override;
+  void MaybeSwapFocusedView(bool right) override;
+  void OnFocusableViewFocused() override;
+  void OnFocusableViewBlurred() override;
 
  private:
-  void UpdateFocusRingState();
-
-  // If this view has focus, make the view's border visible and change
-  // background to its active color. If it doesn't have focus, hide the view's
-  // border and change background to its default color.
-  void UpdateViewAppearance();
-
-  // Returns the background color for this view based on whether it has focus
-  // and if the mouse is entering/exiting the view.
-  SkColor GetBackgroundColor() const;
+  bool use_default_focus_manager_ = false;
 };
 
 BEGIN_VIEW_BUILDER(/* no export */, DeskTextfield, views::Textfield)

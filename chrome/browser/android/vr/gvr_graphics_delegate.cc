@@ -15,15 +15,9 @@
 #include "base/trace_event/traced_value.h"
 #include "chrome/browser/android/vr/gl_browser_interface.h"
 #include "chrome/browser/android/vr/gvr_util.h"
-#include "chrome/browser/vr/gl_texture_location.h"
 #include "chrome/browser/vr/vr_geometry_util.h"
 #include "device/vr/android/web_xr_presentation_state.h"
 #include "device/vr/vr_gl_util.h"
-#include "third_party/skia/include/core/SkBitmap.h"
-#include "third_party/skia/include/core/SkEncodedImageFormat.h"
-#include "third_party/skia/include/core/SkImageEncoder.h"
-#include "third_party/skia/include/core/SkPixmap.h"
-#include "third_party/skia/include/core/SkStream.h"
 #include "ui/gfx/geometry/angle_conversions.h"
 #include "ui/gl/android/scoped_java_surface.h"
 #include "ui/gl/android/surface_texture.h"
@@ -378,9 +372,9 @@ void GvrGraphicsDelegate::UpdateEyeInfos(const gfx::Transform& head_pose,
     const gfx::RectF& rect = GfxRectFromUV(vp.GetSourceUv());
     eye_info.viewport = vr::CalculatePixelSpaceRect(render_size, rect);
 
-    eye_info.proj_matrix =
-        PerspectiveMatrixFromView(vp.GetSourceFov(), kZNear, kZFar);
-    eye_info.view_proj_matrix = eye_info.proj_matrix * eye_info.view_matrix;
+    eye_info.view_proj_matrix =
+        PerspectiveMatrixFromView(vp.GetSourceFov(), kZNear, kZFar) *
+        eye_info.view_matrix;
   }
 }
 

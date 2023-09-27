@@ -97,7 +97,10 @@ class DevToolsManagerDelegate final : public content::DevToolsManagerDelegate {
     std::vector<content::BrowserContext*> contexts = GetBrowserContexts();
     return contexts.empty() ? nullptr : contexts.front();
   }
-  content::DevToolsAgentHost::List RemoteDebuggingTargets() override {
+  content::DevToolsAgentHost::List RemoteDebuggingTargets(
+      DevToolsManagerDelegate::TargetType target_type) override {
+    LOG_IF(WARNING, target_type != DevToolsManagerDelegate::kFrame)
+        << "Ignoring unsupported remote target type: " << target_type;
     return main_parts_->devtools_controller()->RemoteDebuggingTargets();
   }
 
@@ -118,7 +121,6 @@ static constexpr char const* kRendererSwitchesToCopy[] = {
     switches::kEnableCastStreamingReceiver,
     switches::kEnableProtectedVideoBuffers,
     switches::kForceProtectedVideoOutputBuffers,
-    switches::kUseOverlaysForVideo,
     switches::kMinVideoDecoderOutputBufferSize,
 
 // TODO(crbug/1013412): Delete these two switches when fixed.
@@ -170,7 +172,7 @@ WebEngineContentBrowserClient::CreateDevToolsManagerDelegate() {
 }
 
 std::string WebEngineContentBrowserClient::GetProduct() {
-  return version_info::GetProductNameAndVersionForUserAgent();
+  return std::string(version_info::GetProductNameAndVersionForUserAgent());
 }
 
 std::string WebEngineContentBrowserClient::GetUserAgent() {
@@ -261,16 +263,14 @@ void WebEngineContentBrowserClient::AppendExtraCommandLineSwitches(
       *base::CommandLine::ForCurrentProcess();
 
   command_line->CopySwitchesFrom(browser_command_line,
-                                 kAllProcessSwitchesToCopy,
-                                 std::size(kAllProcessSwitchesToCopy));
+                                 kAllProcessSwitchesToCopy);
 
   std::string process_type =
       command_line->GetSwitchValueASCII(switches::kProcessType);
 
   if (process_type == switches::kRendererProcess) {
     command_line->CopySwitchesFrom(browser_command_line,
-                                   kRendererSwitchesToCopy,
-                                   std::size(kRendererSwitchesToCopy));
+                                   kRendererSwitchesToCopy);
   } else if (process_type == switches::kUtilityProcess) {
     // Although only the Network process needs
     // kUnsafelyTreatInsecureOriginAsSecureSwitchToCopy, differentiating utility
@@ -278,8 +278,7 @@ void WebEngineContentBrowserClient::AppendExtraCommandLineSwitches(
     // switch to all Utility processes so do the same here.
     // Do not add other switches here.
     command_line->CopySwitchesFrom(
-        browser_command_line, kUnsafelyTreatInsecureOriginAsSecureSwitchToCopy,
-        std::size(kUnsafelyTreatInsecureOriginAsSecureSwitchToCopy));
+        browser_command_line, kUnsafelyTreatInsecureOriginAsSecureSwitchToCopy);
   }
 }
 
@@ -297,6 +296,7 @@ std::string WebEngineContentBrowserClient::GetAcceptLangs(
 }
 
 base::OnceClosure WebEngineContentBrowserClient::SelectClientCertificate(
+    content::BrowserContext* browser_context,
     content::WebContents* web_contents,
     net::SSLCertRequestInfo* cert_request_info,
     net::ClientCertIdentityList client_certs,
@@ -349,7 +349,7 @@ WebEngineContentBrowserClient::CreateURLLoaderThrottles(
   std::vector<std::unique_ptr<blink::URLLoaderThrottle>> throttles;
   auto* frame_impl = FrameImpl::FromWebContents(wc_getter.Run());
   DCHECK(frame_impl);
-  const auto& rules =
+  auto rules =
       frame_impl->url_request_rewrite_rules_manager()->GetCachedRules();
   if (rules) {
     throttles.emplace_back(std::make_unique<url_rewrite::URLLoaderThrottle>(

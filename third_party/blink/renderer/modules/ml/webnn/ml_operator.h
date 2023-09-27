@@ -17,29 +17,42 @@ namespace blink {
 class MLGraphBuilder;
 class MLOperand;
 
-class MODULES_EXPORT MLOperator final : public GarbageCollected<MLOperator> {
+class MODULES_EXPORT MLOperator : public GarbageCollected<MLOperator> {
  public:
   enum class OperatorKind {
     // Keep the order as the same as build methods of MLGraphBuilder.
     kClamp,
     kConcat,
     kConv2d,
+    kConvTranspose2d,
     kAdd,
     kSub,
     kMul,
     kDiv,
+    kAbs,
+    kCeil,
+    kFloor,
+    kNeg,
     kLeakyRelu,
     kMax,
     kMin,
+    kElu,
     kGemm,
     kHardSwish,
     kAveragePool2d,
     kMaxPool2d,
+    kPad,
+    kPRelu,
+    kReduceMean,
+    kReduceSum,
     kRelu,
     kReshape,
     kResample2d,
-    kSoftmax,
     kSigmoid,
+    kSlice,
+    kSoftmax,
+    kSplit,
+    kTanh,
     kTranspose
   };
 
@@ -97,6 +110,83 @@ class MODULES_EXPORT MLOperator final : public GarbageCollected<MLOperator> {
   HeapVector<Member<const MLOperand>> outputs_;
 };
 
+class MODULES_EXPORT MLConcatOperator : public MLOperator {
+ public:
+  MLConcatOperator(MLGraphBuilder* builder, const uint32_t axis);
+
+  MLConcatOperator(const MLConcatOperator&) = delete;
+  MLConcatOperator& operator=(const MLConcatOperator&) = delete;
+
+  ~MLConcatOperator();
+
+  uint32_t Axis() const;
+
+ private:
+  uint32_t axis_;
+};
+
+class MODULES_EXPORT MLPadOperator : public MLOperator {
+ public:
+  MLPadOperator(MLGraphBuilder* builder,
+                const Vector<uint32_t>& beginning_padding,
+                const Vector<uint32_t>& ending_padding,
+                const bindings::DictionaryBase* options = nullptr);
+
+  MLPadOperator(const MLPadOperator&) = delete;
+  MLPadOperator& operator=(const MLPadOperator&) = delete;
+
+  ~MLPadOperator();
+
+  const Vector<uint32_t>& BeginningPadding() const;
+  const Vector<uint32_t>& EndingPadding() const;
+
+ private:
+  Vector<uint32_t> beginning_padding_;
+  Vector<uint32_t> ending_padding_;
+};
+
+class MODULES_EXPORT MLSliceOperator : public MLOperator {
+ public:
+  MLSliceOperator(MLGraphBuilder* builder,
+                  const Vector<uint32_t>& beginning_padding,
+                  const Vector<uint32_t>& ending_padding);
+
+  MLSliceOperator(const MLSliceOperator&) = delete;
+  MLSliceOperator& operator=(const MLSliceOperator&) = delete;
+
+  ~MLSliceOperator();
+
+  const Vector<uint32_t>& Starts() const;
+  const Vector<uint32_t>& Sizes() const;
+
+ private:
+  Vector<uint32_t> starts_;
+  Vector<uint32_t> sizes_;
+};
+
+class MODULES_EXPORT MLSplitOperator : public MLOperator {
+ public:
+  MLSplitOperator(MLGraphBuilder* builder,
+                  const uint32_t splits,
+                  const bindings::DictionaryBase* options = nullptr);
+  MLSplitOperator(MLGraphBuilder* builder,
+                  const Vector<uint32_t>& splits,
+                  const bindings::DictionaryBase* options = nullptr);
+
+  MLSplitOperator(const MLSplitOperator&) = delete;
+  MLSplitOperator& operator=(const MLSplitOperator&) = delete;
+
+  ~MLSplitOperator();
+
+  bool IsEvenSplit() const;
+  uint32_t SplitNumber() const;
+  const Vector<uint32_t>& SplitSizes() const;
+
+ private:
+  bool is_even_split_;
+  uint32_t split_number_;
+  Vector<uint32_t> split_sizes_;
+};
 }  // namespace blink
 
 #endif  // THIRD_PARTY_BLINK_RENDERER_MODULES_ML_WEBNN_ML_OPERATOR_H_

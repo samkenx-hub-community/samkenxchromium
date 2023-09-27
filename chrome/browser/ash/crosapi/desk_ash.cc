@@ -12,8 +12,9 @@
 #include "ash/public/cpp/desk_template.h"
 #include "ash/shell.h"
 #include "ash/wm/desks/desk.h"
-#include "base/guid.h"
+#include "ash/wm/desks/desks_controller.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/uuid.h"
 #include "base/value_iterators.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/ash/desks/desks_client.h"
@@ -103,10 +104,16 @@ void DeskAsh::LaunchEmptyDesk(const std::string& desk_name,
       crosapi::mojom::LaunchEmptyDeskResult::NewDeskId(result.value()));
 }
 
-void DeskAsh::RemoveDesk(const base::GUID& desk_uuid,
-                         bool close_all,
+void DeskAsh::RemoveDesk(const base::Uuid& desk_uuid,
+                         bool combine_desk,
+                         absl::optional<bool> allow_undo,
                          RemoveDeskCallback callback) {
-  auto error = DesksClient::Get()->RemoveDesk(desk_uuid, close_all);
+  bool undo_value = allow_undo.value_or(false);
+  ash::DeskCloseType close_type =
+      combine_desk ? ash::DeskCloseType::kCombineDesks
+                   : (undo_value ? ash::DeskCloseType::kCloseAllWindowsAndWait
+                                 : ash::DeskCloseType::kCloseAllWindows);
+  auto error = DesksClient::Get()->RemoveDesk(desk_uuid, close_type);
   if (error) {
     std::move(callback).Run(crosapi::mojom::RemoveDeskResult::NewError(
         ToCrosApiError(error.value())));
@@ -116,7 +123,7 @@ void DeskAsh::RemoveDesk(const base::GUID& desk_uuid,
   std::move(callback).Run(std::move(result));
 }
 
-void DeskAsh::GetTemplateJson(const base::GUID& uuid,
+void DeskAsh::GetTemplateJson(const base::Uuid& uuid,
                               GetTemplateJsonCallback callback) {
   DesksClient::Get()->GetTemplateJson(
       uuid, ProfileManager::GetActiveUserProfile(),
@@ -179,7 +186,7 @@ void DeskAsh::SaveActiveDesk(SaveActiveDeskCallback callback) {
       ash::DeskTemplateType::kSaveAndRecall);
 }
 
-void DeskAsh::DeleteSavedDesk(const base::GUID& uuid,
+void DeskAsh::DeleteSavedDesk(const base::Uuid& uuid,
                               DeleteSavedDeskCallback callback) {
   DesksClient::Get()->DeleteDeskTemplate(
       uuid, base::BindOnce(
@@ -198,14 +205,14 @@ void DeskAsh::DeleteSavedDesk(const base::GUID& uuid,
                 std::move(callback)));
 }
 
-void DeskAsh::RecallSavedDesk(const base::GUID& uuid,
+void DeskAsh::RecallSavedDesk(const base::Uuid& uuid,
                               RecallSavedDeskCallback callback) {
   DesksClient::Get()->LaunchDeskTemplate(
       uuid,
       base::BindOnce(
           [](RecallSavedDeskCallback callback,
              absl::optional<DesksClient::DeskActionError> error,
-             const base::GUID& desk_uuid) {
+             const base::Uuid& desk_uuid) {
             if (error) {
               std::move(callback).Run(
                   crosapi::mojom::RecallSavedDeskResult::NewError(
@@ -272,7 +279,7 @@ void DeskAsh::GetActiveDesk(GetActiveDeskCallback callback) {
       crosapi::mojom::GetActiveDeskResult::NewDeskId(desk_id));
 }
 
-void DeskAsh::SwitchDesk(const base::GUID& desk_id,
+void DeskAsh::SwitchDesk(const base::Uuid& desk_id,
                          SwitchDeskCallback callback) {
   auto error = DesksClient::Get()->SwitchDesk(desk_id);
   if (error) {
@@ -283,7 +290,7 @@ void DeskAsh::SwitchDesk(const base::GUID& desk_id,
   std::move(callback).Run(crosapi::mojom::SwitchDeskResult::NewSucceeded(true));
 }
 
-void DeskAsh::GetDeskByID(const base::GUID& uuid,
+void DeskAsh::GetDeskByID(const base::Uuid& uuid,
                           GetDeskByIDCallback callback) {
   auto result = DesksClient::Get()->GetDeskByID(uuid);
   if (!result.has_value()) {
@@ -293,6 +300,33 @@ void DeskAsh::GetDeskByID(const base::GUID& uuid,
   }
   std::move(callback).Run(
       crosapi::mojom::GetDeskByIDResult::NewDesk(ToDeskModel(result.value())));
+}
+
+void DeskAsh::AddDeskEventObserver(
+    mojo::PendingRemote<crosapi::mojom::DeskEventObserver> observer) {
+  mojo::Remote<mojom::DeskEventObserver> remote(std::move(observer));
+  remote_desk_event_observers_.Add(std::move(remote));
+}
+
+void DeskAsh::NotifyDeskAdded(const base::Uuid& uuid, bool from_undo) {
+  // If there is listener in lacros-chrome, dispatch events.
+  for (auto& client : remote_desk_event_observers_) {
+    client->OnDeskAdded(uuid, from_undo);
+  }
+}
+
+void DeskAsh::NotifyDeskRemoved(const base::Uuid& uuid) {
+  // If there is listener in lacros-chrome, dispatch events.
+  for (auto& client : remote_desk_event_observers_) {
+    client->OnDeskRemoved(uuid);
+  }
+}
+
+void DeskAsh::NotifyDeskSwitched(const base::Uuid& current_id,
+                                 const base::Uuid& previous_id) {
+  for (auto& client : remote_desk_event_observers_) {
+    client->OnDeskSwitched(current_id, previous_id);
+  }
 }
 
 // Performs a depth-first search for a window with given App Restore Window

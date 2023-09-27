@@ -4,8 +4,6 @@
 
 #include "chrome/browser/ash/arc/input_overlay/ui/edit_finish_view.h"
 
-#include <memory>
-
 #include "ash/app_list/app_list_util.h"
 #include "ash/style/style_util.h"
 #include "base/functional/bind.h"
@@ -21,11 +19,12 @@
 #include "ui/color/color_id.h"
 #include "ui/events/event.h"
 #include "ui/gfx/geometry/size.h"
-#include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/flood_fill_ink_drop_ripple.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_highlight.h"
 #include "ui/views/background.h"
+#include "ui/views/controls/button/button.h"
+#include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/layout/box_layout.h"
@@ -42,9 +41,6 @@ constexpr int kViewBackgroundColor = SkColorSetA(SK_ColorBLACK, 0xCC /*80%*/);
 constexpr int kParentPadding = 16;
 // Space between children.
 constexpr int kSpaceRow = 4;
-// Alpha view features.
-constexpr int kSpaceRowAlpha = 8;
-constexpr int kViewHeightAlpha = 184;
 
 // About button.
 constexpr int kButtonHeight = 40;
@@ -55,17 +51,6 @@ constexpr SkColor kSaveButtonBackgroundColor = gfx::kGoogleBlue300;
 constexpr SkColor kSaveButtonTextColor = gfx::kGoogleGrey900;
 constexpr char kFontStyle[] = "Google Sans";
 constexpr int kFontSize = 13;
-// Alpha button features.
-constexpr int kButtonCornerRadiusAlpha = 16;
-constexpr int kFontSizeAlpha = 16;
-constexpr int kButtonSideInsetAlpha = 20;
-constexpr int kButtonHeightAlpha = 56;
-// This color is same as the background color of input_mapping_view in kEdit
-// mode and is used for buttons to decide what ink drop color should be. If the
-// dark background color is set, then it will show the light ink drop color.
-// Since we only need the dark mode for the kEdit mode, so dark background is
-// passed for setting up the ink drop.
-constexpr SkColor kEditBackgroundColor = SkColorSetA(SK_ColorBLACK, 0x99);
 constexpr SkColor kInkDropBaseColor = SK_ColorWHITE;
 constexpr float kInkDropOpacity = 0.08f;
 
@@ -120,52 +105,34 @@ class EditFinishView::ChildButton : public views::LabelButton {
         on_mouse_pressed_callback_(on_mouse_pressed_callback),
         on_mouse_dragged_callback_(on_mouse_dragged_callback),
         on_mouse_released_callback_(on_mouse_released_callback) {
-    label()->SetFontList(
-        gfx::FontList({kFontStyle}, gfx::Font::NORMAL,
-                      AllowReposition() ? kFontSize : kFontSizeAlpha,
-                      gfx::Font::Weight::MEDIUM));
+    label()->SetFontList(gfx::FontList({kFontStyle}, gfx::Font::NORMAL,
+                                       kFontSize, gfx::Font::Weight::MEDIUM));
     SetEnabledTextColors(text_color);
     SetAccessibleName(l10n_util::GetStringUTF16(text_source_id));
-    SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(
-        0, AllowReposition() ? kButtonSideInset : kButtonSideInsetAlpha)));
+    SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, kButtonSideInset)));
     SetHorizontalAlignment(gfx::ALIGN_CENTER);
     SetMinSize(gfx::Size(
-        /*width=*/0, AllowReposition() ? kButtonHeight : kButtonHeightAlpha));
-    SetBackground(views::CreateRoundedRectBackground(
-        background_color,
-        AllowReposition() ? kButtonCornerRadius : kButtonCornerRadiusAlpha));
+        /*width=*/0, kButtonHeight));
+    SetBackground(views::CreateRoundedRectBackground(background_color,
+                                                     kButtonCornerRadius));
 
     // Set states.
-    views::InstallRoundRectHighlightPathGenerator(
-        this, gfx::Insets(),
-        AllowReposition() ? kButtonCornerRadius : kButtonCornerRadiusAlpha);
+    views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
+                                                  kButtonCornerRadius);
     auto* focus_ring = views::FocusRing::Get(this);
     focus_ring->SetHaloInset(kHaloInset);
     focus_ring->SetHaloThickness(kHaloThickness);
     focus_ring->SetColorId(ui::kColorAshInputOverlayFocusRing);
-    if (AllowReposition()) {
-      SetUpInkDropForButton();
-    } else {
-      ash::StyleUtil::SetUpInkDropForButton(this, gfx::Insets(),
-                                            /*highlight_on_hover=*/true,
-                                            /*highlight_on_focus=*/true,
-                                            kEditBackgroundColor);
-    }
+    SetUpInkDropForButton();
   }
   ~ChildButton() override = default;
 
   bool OnMousePressed(const ui::MouseEvent& event) override {
-    if (AllowReposition()) {
-      on_mouse_pressed_callback_.Run(event);
-    }
+    on_mouse_pressed_callback_.Run(event);
     return LabelButton::OnMousePressed(event);
   }
 
   bool OnMouseDragged(const ui::MouseEvent& event) override {
-    if (!AllowReposition()) {
-      return LabelButton::OnMouseDragged(event);
-    }
-
     is_dragging_ = true;
     on_mouse_dragged_callback_.Run(event);
     views::InkDrop::Get(this)->GetInkDrop()->SetHovered(false);
@@ -175,7 +142,7 @@ class EditFinishView::ChildButton : public views::LabelButton {
   }
 
   void OnMouseReleased(const ui::MouseEvent& event) override {
-    if (!AllowReposition() || !is_dragging_) {
+    if (!is_dragging_) {
       LabelButton::OnMouseReleased(event);
       return;
     }
@@ -218,26 +185,24 @@ EditFinishView* EditFinishView::BuildView(
 
 EditFinishView::EditFinishView(
     DisplayOverlayController* display_overlay_controller)
-    : display_overlay_controller_(display_overlay_controller) {}
+    : display_overlay_controller_(display_overlay_controller) {
+  SetAccessibilityProperties(
+      ax::mojom::Role::kGroup,
+      l10n_util::GetStringUTF16(IDS_INPUT_OVERLAY_LAYOUT_ACCTIONS_MENU),
+      l10n_util::GetStringUTF16(IDS_INPUT_OVERLAY_EDIT_MENU_FOCUS));
+}
 
-EditFinishView::~EditFinishView() {}
+EditFinishView::~EditFinishView() = default;
 
 void EditFinishView::Init(const gfx::Size& parent_size) {
   DCHECK(display_overlay_controller_);
   SetLayoutManager(std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kVertical,
-      AllowReposition() ? gfx::Insets().TLBR(kViewMargin, kViewMargin,
-                                             kViewMargin, kViewMargin)
-                        : gfx::Insets(),
-      AllowReposition() ? kSpaceRow : kSpaceRowAlpha));
-  SetBackground(AllowReposition()
-                    ? views::CreateRoundedRectBackground(kViewBackgroundColor,
-                                                         kViewCornerRadius)
-                    : views::CreateSolidBackground(SK_ColorTRANSPARENT));
-
-  if (AllowReposition()) {
-    SetFocusRing();
-  }
+      gfx::Insets().TLBR(kViewMargin, kViewMargin, kViewMargin, kViewMargin),
+      kSpaceRow));
+  SetBackground(views::CreateRoundedRectBackground(kViewBackgroundColor,
+                                                   kViewCornerRadius));
+  SetFocusRing();
 
   auto on_mouse_pressed_callback = base::BindRepeating(
       &EditFinishView::OnMousePressed, base::Unretained(this));
@@ -268,20 +233,14 @@ void EditFinishView::Init(const gfx::Size& parent_size) {
       on_mouse_released_callback));
 
   const int width = CalculateWidth();
-  const int height = AllowReposition() ? kViewHeight : kViewHeightAlpha;
-  SetSize(
-      gfx::Size(AllowReposition() ? width + 2 * kViewMargin : width, height));
-  SetPosition(gfx::Point(std::max(0, parent_size.width() - width - kSideMargin),
-                         std::max(0, parent_size.height() / 3 - height / 2)));
+  SetSize(gfx::Size(width + 2 * kViewMargin, kViewHeight));
+  SetPosition(
+      gfx::Point(std::max(0, parent_size.width() - width - kSideMargin),
+                 std::max(0, parent_size.height() / 3 - kViewHeight / 2)));
 }
 
 void EditFinishView::SetFocusRing() {
   SetFocusBehavior(FocusBehavior::ALWAYS);
-  GetViewAccessibility().OverrideRole(ax::mojom::Role::kGroup);
-  GetViewAccessibility().OverrideName(
-      l10n_util::GetStringUTF16(IDS_INPUT_OVERLAY_LAYOUT_ACCTIONS_MENU));
-  GetViewAccessibility().OverrideDescription(
-      l10n_util::GetStringUTF16(IDS_INPUT_OVERLAY_EDIT_MENU_FOCUS));
   views::FocusRing::Install(this);
   views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
                                                 kButtonCornerRadius);
@@ -298,112 +257,67 @@ int EditFinishView::CalculateWidth() {
   return width;
 }
 
-bool EditFinishView::OnMousePressed(const ui::MouseEvent& event) {
-  if (AllowReposition()) {
-    OnDragStart(event);
-  }
-  return true;
-}
-
-bool EditFinishView::OnMouseDragged(const ui::MouseEvent& event) {
-  if (AllowReposition()) {
-    SetCursor(ui::mojom::CursorType::kGrabbing);
-    OnDragUpdate(event);
-  }
-  return true;
-}
-
-void EditFinishView::OnMouseReleased(const ui::MouseEvent& event) {
-  if (!AllowReposition() || !is_dragging_) {
-    views::View::OnMouseReleased(event);
-    return;
-  }
-  SetCursor(ui::mojom::CursorType::kGrab);
-  OnDragEnd();
+void EditFinishView::OnMouseDragEndCallback() {
   RecordInputOverlayButtonGroupReposition(
       display_overlay_controller_->GetPackageName(),
       RepositionType::kMouseDragRepostion,
       display_overlay_controller_->GetWindowStateType());
 }
 
-ui::Cursor EditFinishView::GetCursor(const ui::MouseEvent& event) {
-  if (AllowReposition()) {
-    return ui::mojom::CursorType::kHand;
-  }
-  return views::View::GetCursor(event);
+void EditFinishView::OnGestureDragEndCallback() {
+  RecordInputOverlayButtonGroupReposition(
+      display_overlay_controller_->GetPackageName(),
+      RepositionType::kTouchscreenDragRepostion,
+      display_overlay_controller_->GetWindowStateType());
 }
 
-void EditFinishView::OnGestureEvent(ui::GestureEvent* event) {
-  if (!AllowReposition()) {
-    views::View::OnGestureEvent(event);
-    return;
-  }
-
-  switch (event->type()) {
-    case ui::ET_GESTURE_SCROLL_BEGIN:
-      OnDragStart(*event);
-      event->SetHandled();
-      break;
-    case ui::ET_GESTURE_SCROLL_UPDATE:
-      OnDragUpdate(*event);
-      event->SetHandled();
-      break;
-    case ui::ET_GESTURE_SCROLL_END:
-    case ui::ET_SCROLL_FLING_START:
-      OnDragEnd();
-      event->SetHandled();
-      RecordInputOverlayButtonGroupReposition(
-          display_overlay_controller_->GetPackageName(),
-          RepositionType::kTouchscreenDragRepostion,
-          display_overlay_controller_->GetWindowStateType());
-      break;
-    default:
-      views::View::OnGestureEvent(event);
-      break;
-  }
-}
-
-bool EditFinishView::OnKeyPressed(const ui::KeyEvent& event) {
-  auto target_position = origin();
-  if (!AllowReposition() ||
-      !UpdatePositionByArrowKey(event.key_code(), target_position) ||
-      !HasFocus()) {
-    return views::View::OnKeyPressed(event);
-  }
-
-  ClampPosition(target_position, size(), parent()->size(), kParentPadding);
-  SetPosition(target_position);
-  return true;
-}
-
-bool EditFinishView::OnKeyReleased(const ui::KeyEvent& event) {
-  if (!AllowReposition() || !ash::IsArrowKeyEvent(event) || !HasFocus()) {
-    return views::View::OnKeyReleased(event);
-  }
-
+void EditFinishView::OnKeyReleasedCallback() {
   RecordInputOverlayButtonGroupReposition(
       display_overlay_controller_->GetPackageName(),
       RepositionType::kKeyboardArrowKeyReposition,
       display_overlay_controller_->GetWindowStateType());
+}
+
+void EditFinishView::AddedToWidget() {
+  SetRepositionController();
+}
+
+bool EditFinishView::OnMousePressed(const ui::MouseEvent& event) {
+  reposition_controller_->OnMousePressed(event);
   return true;
 }
 
-void EditFinishView::OnDragStart(const ui::LocatedEvent& event) {
-  start_drag_event_pos_ = event.location();
-  start_drag_view_pos_ = origin();
+bool EditFinishView::OnMouseDragged(const ui::MouseEvent& event) {
+  SetCursor(ui::mojom::CursorType::kGrabbing);
+  reposition_controller_->OnMouseDragged(event);
+  return true;
 }
 
-void EditFinishView::OnDragUpdate(const ui::LocatedEvent& event) {
-  is_dragging_ = true;
-
-  auto new_location = event.location();
-  auto target_position = origin() + (new_location - start_drag_event_pos_);
-  ClampPosition(target_position, size(), parent()->size(), kParentPadding);
-  SetPosition(target_position);
+void EditFinishView::OnMouseReleased(const ui::MouseEvent& event) {
+  SetCursor(ui::mojom::CursorType::kGrab);
+  reposition_controller_->OnMouseReleased(event);
 }
 
-void EditFinishView::OnDragEnd() {
-  is_dragging_ = false;
+void EditFinishView::OnGestureEvent(ui::GestureEvent* event) {
+  reposition_controller_->OnGestureEvent(event);
+}
+
+bool EditFinishView::OnKeyPressed(const ui::KeyEvent& event) {
+  if (!reposition_controller_->OnKeyPressed(event)) {
+    return views::View::OnKeyPressed(event);
+  }
+  return true;
+}
+
+bool EditFinishView::OnKeyReleased(const ui::KeyEvent& event) {
+  if (!reposition_controller_->OnKeyReleased(event)) {
+    return views::View::OnKeyReleased(event);
+  }
+  return true;
+}
+
+ui::Cursor EditFinishView::GetCursor(const ui::MouseEvent& event) {
+  return ui::mojom::CursorType::kHand;
 }
 
 void EditFinishView::SetCursor(ui::mojom::CursorType cursor_type) {
@@ -440,6 +354,20 @@ void EditFinishView::OnCancelButtonPressed() {
     return;
   }
   display_overlay_controller_->OnCustomizeCancel();
+}
+
+void EditFinishView::SetRepositionController() {
+  if (reposition_controller_) {
+    return;
+  }
+  reposition_controller_ =
+      std::make_unique<RepositionController>(this, kParentPadding);
+  reposition_controller_->set_mouse_drag_end_callback(base::BindRepeating(
+      &EditFinishView::OnMouseDragEndCallback, base::Unretained(this)));
+  reposition_controller_->set_gesture_drag_end_callback(base::BindRepeating(
+      &EditFinishView::OnGestureDragEndCallback, base::Unretained(this)));
+  reposition_controller_->set_key_released_callback(base::BindRepeating(
+      &EditFinishView::OnKeyReleasedCallback, base::Unretained(this)));
 }
 
 }  // namespace arc::input_overlay

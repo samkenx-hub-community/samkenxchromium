@@ -4,13 +4,9 @@
 
 #import "ios/chrome/browser/tabs/tab_helper_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 #import "base/feature_list.h"
 #import "components/autofill/ios/form_util/unique_id_data_tab_helper.h"
-#import "components/breadcrumbs/core/features.h"
+#import "components/breadcrumbs/core/breadcrumbs_status.h"
 #import "components/commerce/ios/browser/commerce_tab_helper.h"
 #import "components/favicon/core/favicon_service.h"
 #import "components/favicon/ios/web_favicon_driver.h"
@@ -23,17 +19,17 @@
 #import "components/safe_browsing/ios/browser/safe_browsing_url_allow_list.h"
 #import "components/supervised_user/core/common/features.h"
 #import "components/ukm/ios/ukm_url_recorder.h"
-#import "ios/chrome/browser/app_launcher/app_launcher_abuse_detector.h"
-#import "ios/chrome/browser/app_launcher/app_launcher_tab_helper.h"
+#import "ios/chrome/browser/app_launcher/model/app_launcher_abuse_detector.h"
+#import "ios/chrome/browser/app_launcher/model/app_launcher_tab_helper.h"
 #import "ios/chrome/browser/autofill/autofill_tab_helper.h"
+#import "ios/chrome/browser/autofill/bottom_sheet/autofill_bottom_sheet_tab_helper.h"
 #import "ios/chrome/browser/autofill/form_suggestion_tab_helper.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/commerce/price_alert_util.h"
-#import "ios/chrome/browser/commerce/price_notifications/price_notifications_tab_helper.h"
-#import "ios/chrome/browser/commerce/push_notification/push_notification_feature.h"
-#import "ios/chrome/browser/commerce/shopping_persisted_data_tab_helper.h"
-#import "ios/chrome/browser/commerce/shopping_service_factory.h"
-#import "ios/chrome/browser/complex_tasks/ios_task_tab_helper.h"
+#import "ios/chrome/browser/commerce/model/price_alert_util.h"
+#import "ios/chrome/browser/commerce/model/price_notifications/price_notifications_tab_helper.h"
+#import "ios/chrome/browser/commerce/model/push_notification/push_notification_feature.h"
+#import "ios/chrome/browser/commerce/model/shopping_persisted_data_tab_helper.h"
+#import "ios/chrome/browser/commerce/model/shopping_service_factory.h"
+#import "ios/chrome/browser/complex_tasks/model/ios_task_tab_helper.h"
 #import "ios/chrome/browser/crash_report/breadcrumbs/breadcrumb_manager_tab_helper.h"
 #import "ios/chrome/browser/download/ar_quick_look_tab_helper.h"
 #import "ios/chrome/browser/download/download_manager_tab_helper.h"
@@ -43,6 +39,7 @@
 #import "ios/chrome/browser/favicon/favicon_service_factory.h"
 #import "ios/chrome/browser/find_in_page/find_tab_helper.h"
 #import "ios/chrome/browser/find_in_page/java_script_find_tab_helper.h"
+#import "ios/chrome/browser/find_in_page/util.h"
 #import "ios/chrome/browser/follow/follow_tab_helper.h"
 #import "ios/chrome/browser/history/history_service_factory.h"
 #import "ios/chrome/browser/history/history_tab_helper.h"
@@ -61,10 +58,10 @@
 #import "ios/chrome/browser/metrics/pageload_foreground_duration_tab_helper.h"
 #import "ios/chrome/browser/ntp/features.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper.h"
-#import "ios/chrome/browser/open_in/open_in_tab_helper.h"
 #import "ios/chrome/browser/optimization_guide/optimization_guide_tab_helper.h"
 #import "ios/chrome/browser/optimization_guide/optimization_guide_validation_tab_helper.h"
 #import "ios/chrome/browser/overscroll_actions/overscroll_actions_tab_helper.h"
+#import "ios/chrome/browser/passwords/password_controller.h"
 #import "ios/chrome/browser/passwords/password_tab_helper.h"
 #import "ios/chrome/browser/passwords/well_known_change_password_tab_helper.h"
 #import "ios/chrome/browser/permissions/permissions_tab_helper.h"
@@ -78,15 +75,19 @@
 #import "ios/chrome/browser/safe_browsing/tailored_security/tailored_security_tab_helper.h"
 #import "ios/chrome/browser/search_engines/search_engine_tab_helper.h"
 #import "ios/chrome/browser/sessions/ios_chrome_session_tab_helper.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/sharing/share_file_download_tab_helper.h"
 #import "ios/chrome/browser/snapshots/snapshot_tab_helper.h"
 #import "ios/chrome/browser/ssl/captive_portal_tab_helper.h"
+#import "ios/chrome/browser/supervised_user/supervised_user_error_container.h"
 #import "ios/chrome/browser/supervised_user/supervised_user_url_filter_tab_helper.h"
 #import "ios/chrome/browser/sync/ios_chrome_synced_tab_delegate.h"
 #import "ios/chrome/browser/translate/chrome_ios_translate_client.h"
 #import "ios/chrome/browser/voice/voice_search_navigations_tab_helper.h"
 #import "ios/chrome/browser/web/annotations/annotations_tab_helper.h"
 #import "ios/chrome/browser/web/blocked_popup_tab_helper.h"
+#import "ios/chrome/browser/web/features.h"
 #import "ios/chrome/browser/web/font_size/font_size_tab_helper.h"
 #import "ios/chrome/browser/web/image_fetch/image_fetch_tab_helper.h"
 #import "ios/chrome/browser/web/invalid_url_tab_helper.h"
@@ -97,8 +98,8 @@
 #import "ios/chrome/browser/web/sad_tab_tab_helper.h"
 #import "ios/chrome/browser/web/session_state/web_session_state_tab_helper.h"
 #import "ios/chrome/browser/web/web_performance_metrics/web_performance_metrics_tab_helper.h"
-#import "ios/chrome/browser/web_selection/web_selection_tab_helper.h"
-#import "ios/chrome/browser/webui/net_export_tab_helper.h"
+#import "ios/chrome/browser/web_selection/model/web_selection_tab_helper.h"
+#import "ios/chrome/browser/webui/model/net_export_tab_helper.h"
 #import "ios/components/security_interstitials/https_only_mode/feature.h"
 #import "ios/components/security_interstitials/https_only_mode/https_only_mode_container.h"
 #import "ios/components/security_interstitials/ios_blocking_page_tab_helper.h"
@@ -109,7 +110,6 @@
 #import "ios/components/security_interstitials/safe_browsing/safe_browsing_query_manager.h"
 #import "ios/components/security_interstitials/safe_browsing/safe_browsing_tab_helper.h"
 #import "ios/components/security_interstitials/safe_browsing/safe_browsing_unsafe_resource_container.h"
-#import "ios/public/provider/chrome/browser/find_in_page/find_in_page_api.h"
 #import "ios/public/provider/chrome/browser/text_zoom/text_zoom_api.h"
 #import "ios/web/common/annotations_utils.h"
 #import "ios/web/common/features.h"
@@ -128,7 +128,7 @@ void AttachTabHelpers(web::WebState* web_state, bool for_prerender) {
   IOSChromeSyncedTabDelegate::CreateForWebState(web_state);
   InfoBarManagerImpl::CreateForWebState(web_state);
   BlockedPopupTabHelper::CreateForWebState(web_state);
-  if (ios::provider::IsNativeFindInPageEnabled()) {
+  if (IsNativeFindInPageAvailable()) {
     FindTabHelper::CreateForWebState(web_state);
   } else {
     JavaScriptFindTabHelper::CreateForWebState(web_state);
@@ -161,13 +161,11 @@ void AttachTabHelpers(web::WebState* web_state, bool for_prerender) {
     FontSizeTabHelper::CreateForWebState(web_state);
   }
 
-  if (base::FeatureList::IsEnabled(breadcrumbs::kLogBreadcrumbs)) {
+  if (breadcrumbs::IsEnabled()) {
     BreadcrumbManagerTabHelper::CreateForWebState(web_state);
   }
 
-  if (web::WebPageAnnotationsEnabled()) {
-    AnnotationsTabHelper::CreateForWebState(web_state);
-  }
+  AnnotationsTabHelper::CreateForWebState(web_state);
 
   SafeBrowsingClient* client =
       SafeBrowsingClientFactory::GetForBrowserState(browser_state);
@@ -185,15 +183,19 @@ void AttachTabHelpers(web::WebState* web_state, bool for_prerender) {
 
   PolicyUrlBlockingTabHelper::CreateForWebState(web_state);
 
+  // Supervised user services are not supported for off-the-record browser
+  // state.
   if (base::FeatureList::IsEnabled(
-          supervised_user::kFilterWebsitesForSupervisedUsersOnDesktopAndIOS)) {
+          supervised_user::kFilterWebsitesForSupervisedUsersOnDesktopAndIOS) &&
+      !is_off_the_record) {
     SupervisedUserURLFilterTabHelper::CreateForWebState(web_state);
+    SupervisedUserErrorContainer::CreateForWebState(web_state);
   }
 
   ImageFetchTabHelper::CreateForWebState(web_state);
 
   NewTabPageTabHelper::CreateForWebState(web_state);
-  OpenInTabHelper::CreateForWebState(web_state);
+  ShareFileDownloadTabHelper::CreateForWebState(web_state);
   OptimizationGuideTabHelper::CreateForWebState(web_state);
   OptimizationGuideValidationTabHelper::CreateForWebState(web_state);
   ChromeBrowserState* original_browser_state =
@@ -240,9 +242,13 @@ void AttachTabHelpers(web::WebState* web_state, bool for_prerender) {
     ChromeIOSTranslateClient::CreateForWebState(web_state);
 
     PasswordTabHelper::CreateForWebState(web_state);
-    AutofillTabHelper::CreateForWebState(
-        web_state,
-        PasswordTabHelper::FromWebState(web_state)->GetPasswordManager());
+    // TODO(crbug.com/1434606): PasswordTabHelper and
+    // AutofillBottomSheetTabHelper must share a password controller until the
+    // Butter notice is removed.
+    AutofillBottomSheetTabHelper::CreateForWebState(
+        web_state, PasswordTabHelper::FromWebState(web_state)
+                       ->GetPasswordsAccountStorageNoticeHandler());
+    AutofillTabHelper::CreateForWebState(web_state);
 
     FormSuggestionTabHelper::CreateForWebState(web_state, @[
       PasswordTabHelper::FromWebState(web_state)->GetSuggestionProvider(),
@@ -256,11 +262,14 @@ void AttachTabHelpers(web::WebState* web_state, bool for_prerender) {
     LinkToTextTabHelper::CreateForWebState(web_state);
   }
 
-  if (base::FeatureList::IsEnabled(kIOSEditMenuPartialTranslate)) {
+  if (IsPartialTranslateEnabled() || IsSearchWithEnabled()) {
     WebSelectionTabHelper::CreateForWebState(web_state);
   }
 
-  WebSessionStateTabHelper::CreateForWebState(web_state);
+  if (web::UseNativeSessionRestorationCache()) {
+    WebSessionStateTabHelper::CreateForWebState(web_state);
+  }
+
   WebPerformanceMetricsTabHelper::CreateForWebState(web_state);
 
   OfflinePageTabHelper::CreateForWebState(
@@ -271,7 +280,9 @@ void AttachTabHelpers(web::WebState* web_state, bool for_prerender) {
   NetExportTabHelper::CreateForWebState(web_state);
 
   if (base::FeatureList::IsEnabled(
-          security_interstitials::features::kHttpsOnlyMode)) {
+          security_interstitials::features::kHttpsOnlyMode) ||
+      base::FeatureList::IsEnabled(
+          security_interstitials::features::kHttpsUpgrades)) {
     HttpsOnlyModeUpgradeTabHelper::CreateForWebState(
         web_state, browser_state->GetPrefs(),
         PrerenderServiceFactory::GetForBrowserState(browser_state),
@@ -285,13 +296,13 @@ void AttachTabHelpers(web::WebState* web_state, bool for_prerender) {
         HttpsUpgradeServiceFactory::GetForBrowserState(browser_state));
   }
 
-  if (IsWebChannelsEnabled() && !is_off_the_record) {
+  if (!is_off_the_record) {
     FollowTabHelper::CreateForWebState(web_state);
   }
 
   CaptivePortalTabHelper::CreateForWebState(web_state);
 
-  if (IsPriceTrackingEnabled(browser_state)) {
+  if (!is_off_the_record) {
     PriceNotificationsTabHelper::CreateForWebState(web_state);
   }
 }

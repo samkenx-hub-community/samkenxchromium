@@ -10,17 +10,13 @@
 #import "base/ios/ios_util.h"
 #import "base/notreached.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/elements/gray_highlight_button.h"
+#import "ios/chrome/browser/shared/ui/elements/text_field_configuration.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/alert_view/alert_action.h"
-#import "ios/chrome/browser/ui/elements/gray_highlight_button.h"
-#import "ios/chrome/browser/ui/elements/text_field_configuration.h"
 #import "ios/chrome/common/button_configuration_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -70,6 +66,13 @@ constexpr NSUInteger kUIViewAnimationCurveToOptionsShift = 16;
 // Returns the width and height of a single pixel in point.
 CGFloat GetPixelLength() {
   return 1.0 / [UIScreen mainScreen].scale;
+}
+
+// Returns the width of the alert.
+CGFloat GetAlertWidth() {
+  BOOL is_a11y_content_size = UIContentSizeCategoryIsAccessibilityCategory(
+      [UIApplication sharedApplication].preferredContentSizeCategory);
+  return is_a11y_content_size ? kAlertWidthAccessibility : kAlertWidth;
 }
 
 // Positions the content view on the screen.
@@ -126,28 +129,6 @@ void AddSeparatorToStackView(UIStackView* stackView) {
 
 // Returns a GrayHighlightButton to be added to the alert for `action`.
 GrayHighlightButton* GetButtonForAction(AlertAction* action) {
-  // TODO(crbug.com/1418068): Simplify after minimum version required is >=
-  // iOS 15.
-  GrayHighlightButton* button = nil;
-  if (base::ios::IsRunningOnIOS15OrLater() &&
-      IsUIButtonConfigurationEnabled()) {
-    if (@available(iOS 15, *)) {
-      UIButtonConfiguration* buttonConfiguration =
-          [UIButtonConfiguration plainButtonConfiguration];
-      buttonConfiguration.contentInsets =
-          NSDirectionalEdgeInsetsMake(kButtonInsetTop, kButtonInsetLeading,
-                                      kButtonInsetBottom, kButtonInsetTrailing);
-      button = [GrayHighlightButton buttonWithConfiguration:buttonConfiguration
-                                              primaryAction:nil];
-    }
-  } else {
-    button = [[GrayHighlightButton alloc] init];
-    UIEdgeInsets contentEdgeInsets =
-        UIEdgeInsetsMake(kButtonInsetTop, kButtonInsetLeading,
-                         kButtonInsetBottom, kButtonInsetTrailing);
-    SetContentEdgeInsets(button, contentEdgeInsets);
-  }
-
   UIFont* font = nil;
   UIColor* textColor = nil;
   if (action.style == UIAlertActionStyleDefault) {
@@ -160,11 +141,33 @@ GrayHighlightButton* GetButtonForAction(AlertAction* action) {
     font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
     textColor = [UIColor colorNamed:kRedColor];
   }
-  button.titleLabel.font = font;
-  button.titleLabel.adjustsFontForContentSizeCategory = YES;
 
-  [button setTitleColor:textColor forState:UIControlStateNormal];
-  [button setTitle:action.title forState:UIControlStateNormal];
+  GrayHighlightButton* button = nil;
+  if (IsUIButtonConfigurationEnabled()) {
+    UIButtonConfiguration* buttonConfiguration =
+        [UIButtonConfiguration plainButtonConfiguration];
+    buttonConfiguration.contentInsets =
+        NSDirectionalEdgeInsetsMake(kButtonInsetTop, kButtonInsetLeading,
+                                    kButtonInsetBottom, kButtonInsetTrailing);
+    NSDictionary* attributes = @{NSFontAttributeName : font};
+    NSAttributedString* title =
+        [[NSAttributedString alloc] initWithString:action.title
+                                        attributes:attributes];
+    buttonConfiguration.attributedTitle = title;
+    buttonConfiguration.baseForegroundColor = textColor;
+    button = [GrayHighlightButton buttonWithConfiguration:buttonConfiguration
+                                            primaryAction:nil];
+  } else {
+    button = [[GrayHighlightButton alloc] init];
+    UIEdgeInsets contentEdgeInsets =
+        UIEdgeInsetsMake(kButtonInsetTop, kButtonInsetLeading,
+                         kButtonInsetBottom, kButtonInsetTrailing);
+    SetContentEdgeInsets(button, contentEdgeInsets);
+    button.titleLabel.font = font;
+    button.titleLabel.adjustsFontForContentSizeCategory = YES;
+    [button setTitleColor:textColor forState:UIControlStateNormal];
+    [button setTitle:action.title forState:UIControlStateNormal];
+  }
 
   button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
   button.translatesAutoresizingMaskIntoConstraints = NO;
@@ -266,13 +269,6 @@ GrayHighlightButton* GetButtonForAction(AlertAction* action) {
   self.swipeRecognizer.enabled = NO;
   [self.contentView addGestureRecognizer:self.swipeRecognizer];
 
-  auto GetAlertWidth = ^CGFloat(void) {
-    BOOL isAccessibilityContentSize =
-        UIContentSizeCategoryIsAccessibilityCategory(
-            [UIApplication sharedApplication].preferredContentSizeCategory);
-    return isAccessibilityContentSize ? kAlertWidthAccessibility : kAlertWidth;
-  };
-
   NSLayoutConstraint* widthConstraint =
       [self.contentView.widthAnchor constraintEqualToConstant:GetAlertWidth()];
   widthConstraint.priority = UILayoutPriorityRequired - 1;
@@ -362,9 +358,6 @@ GrayHighlightButton* GetButtonForAction(AlertAction* action) {
       CGFloat spaceBefore = [stackView customSpacingAfterView:previousView];
       [stackView setCustomSpacing:kTextfieldStackInsetTop + spaceBefore
                         afterView:previousView];
-    } else {
-      // There should always be a title or message.
-      NOTREACHED() << "Presenting alert without a title or message.";
     }
     [stackView addArrangedSubview:self.textFieldStackHolder];
     NSDirectionalEdgeInsets stackHolderContentInsets =
@@ -590,30 +583,47 @@ GrayHighlightButton* GetButtonForAction(AlertAction* action) {
   for (NSArray<AlertAction*>* rowOfActions in self.actions) {
     DCHECK_GT([rowOfActions count], 0U);
     AddSeparatorToStackView(buttons);
-    UIStackView* rowOfButtons = [[UIStackView alloc] init];
-    rowOfButtons.axis = UILayoutConstraintAxisHorizontal;
-    rowOfButtons.alignment = UIStackViewAlignmentCenter;
-    UIView* firstButton;
+    // Calculate the axis for the sub-stackview.
+    CGFloat maxWidth = 0;
+    NSMutableArray<GrayHighlightButton*>* rowOfButtons =
+        [[NSMutableArray alloc] init];
     for (AlertAction* action in rowOfActions) {
-      if (action != [rowOfActions firstObject]) {
-        AddSeparatorToStackView(rowOfButtons);
-      }
       GrayHighlightButton* button = GetButtonForAction(action);
       [button addTarget:self
                     action:@selector(didSelectActionForButton:)
           forControlEvents:UIControlEventTouchUpInside];
-      [rowOfButtons addArrangedSubview:button];
-      if (firstButton) {
+      [rowOfButtons addObject:button];
+      maxWidth = MAX(maxWidth, button.intrinsicContentSize.width);
+    }
+    UILayoutConstraintAxis axis =
+        maxWidth > GetAlertWidth() / rowOfActions.count
+            ? UILayoutConstraintAxisVertical
+            : UILayoutConstraintAxisHorizontal;
+    // Actually creates and adds the stack view to the view, and position the
+    // buttons.
+    UIStackView* rowOfButtonStackView = [[UIStackView alloc] init];
+    rowOfButtonStackView.axis = axis;
+    rowOfButtonStackView.alignment = UIStackViewAlignmentCenter;
+    GrayHighlightButton* firstButton = [rowOfButtons firstObject];
+    GrayHighlightButton* lastButton = [rowOfButtons lastObject];
+    for (GrayHighlightButton* button in rowOfButtons) {
+      [rowOfButtonStackView addArrangedSubview:button];
+      if (button != lastButton) {
+        AddSeparatorToStackView(rowOfButtonStackView);
+      }
+      if (axis == UILayoutConstraintAxisHorizontal) {
         [button.widthAnchor constraintEqualToAnchor:firstButton.widthAnchor]
             .active = YES;
+        AddSameConstraintsToSides(button, rowOfButtonStackView,
+                                  (LayoutSides::kTop | LayoutSides::kBottom));
       } else {
-        firstButton = button;
+        AddSameConstraintsToSides(
+            button, rowOfButtonStackView,
+            (LayoutSides::kTrailing | LayoutSides::kLeading));
       }
-      AddSameConstraintsToSides(button, rowOfButtons,
-                                (LayoutSides::kTop | LayoutSides::kBottom));
     }
-    [buttons addArrangedSubview:rowOfButtons];
-    AddSameConstraintsToSides(rowOfButtons, buttons,
+    [buttons addArrangedSubview:rowOfButtonStackView];
+    AddSameConstraintsToSides(rowOfButtonStackView, buttons,
                               (LayoutSides::kTrailing | LayoutSides::kLeading));
   }
   return buttons;

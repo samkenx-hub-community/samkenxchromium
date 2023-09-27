@@ -9,6 +9,7 @@
 
 #include "ash/public/cpp/ash_public_export.h"
 #include "ash/public/cpp/saved_desk_delegate.h"
+#include "base/memory/raw_ptr.h"
 
 namespace aura {
 class Window;
@@ -16,6 +17,7 @@ class Window;
 
 namespace desks_storage {
 class DeskModel;
+class AdminTemplateService;
 }
 
 namespace ui {
@@ -37,6 +39,11 @@ class ASH_PUBLIC_EXPORT TestSavedDeskDelegate : public SavedDeskDelegate {
     desk_model_ = desk_model;
   }
 
+  void set_admin_template_service(
+      desks_storage::AdminTemplateService* admin_template_service) {
+    admin_template_service_ = admin_template_service;
+  }
+
   void set_unavailable_apps(
       const std::vector<std::string>& unavailable_app_ids) {
     unavailable_app_ids_ = unavailable_app_ids;
@@ -47,7 +54,8 @@ class ASH_PUBLIC_EXPORT TestSavedDeskDelegate : public SavedDeskDelegate {
       aura::Window* window,
       GetAppLaunchDataCallback callback) const override;
   desks_storage::DeskModel* GetDeskModel() override;
-  bool IsIncognitoWindow(aura::Window* window) const override;
+  desks_storage::AdminTemplateService* GetAdminTemplateService() override;
+  bool IsWindowPersistable(aura::Window* window) const override;
   absl::optional<gfx::ImageSkia> MaybeRetrieveIconForSpecialIdentifier(
       const std::string& identifier,
       const ui::ColorProvider* color_provider) const override;
@@ -66,7 +74,10 @@ class ASH_PUBLIC_EXPORT TestSavedDeskDelegate : public SavedDeskDelegate {
   bool IsAppAvailable(const std::string& app_id) const override;
 
  private:
-  desks_storage::DeskModel* desk_model_ = nullptr;
+  raw_ptr<desks_storage::DeskModel, ExperimentalAsh> desk_model_ = nullptr;
+  raw_ptr<desks_storage::AdminTemplateService,
+          DanglingUntriaged | ExperimentalAsh>
+      admin_template_service_ = nullptr;
   std::vector<std::string> unavailable_app_ids_;
 };
 

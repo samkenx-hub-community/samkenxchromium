@@ -8,8 +8,8 @@
 #import <set>
 #import <utility>
 
-#import "base/mac/bundle_locations.h"
-#import "base/mac/foundation_util.h"
+#import "base/apple/bundle_locations.h"
+#import "base/apple/foundation_util.h"
 #import "base/scoped_observation.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/time/time.h"
@@ -21,9 +21,9 @@
 #import "ios/chrome/browser/infobars/infobar_utils.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/upgrade/upgrade_constants.h"
-#import "ios/chrome/grit/ios_chromium_strings.h"
+#import "ios/chrome/grit/ios_branded_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/web/common/url_scheme_util.h"
 #import "net/base/mac/url_conversions.h"
@@ -31,10 +31,6 @@
 #import "ui/base/models/image_model.h"
 #import "ui/gfx/image/image.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface UpgradeCenter ()
 // Creates infobars on all tabs.
@@ -94,10 +90,8 @@ class UpgradeInfoBarDelegate : public ConfirmInfoBarDelegate {
 
   ui::ImageModel GetIcon() const override {
     if (icon_.IsEmpty()) {
-      icon_ = gfx::Image(UseSymbols()
-                             ? DefaultSymbolWithPointSize(
-                                   kInfoCircleSymbol, kInfobarSymbolPointSize)
-                             : [UIImage imageNamed:@"infobar_update"]);
+      icon_ = gfx::Image(DefaultSymbolWithPointSize(kInfoCircleSymbol,
+                                                    kInfobarSymbolPointSize));
     }
     return ui::ImageModel::FromImage(icon_);
   }
@@ -270,7 +264,7 @@ class UpgradeInfoBarDismissObserver
 
 - (BOOL)infoBarShownRecently {
   NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-  NSDate* lastDisplayDate = base::mac::ObjCCast<NSDate>(
+  NSDate* lastDisplayDate = base::apple::ObjCCast<NSDate>(
       [defaults objectForKey:kLastInfobarDisplayTimeKey]);
   if (!lastDisplayDate) {
     return NO;

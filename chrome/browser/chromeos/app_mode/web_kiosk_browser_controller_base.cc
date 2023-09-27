@@ -12,15 +12,16 @@
 #include "chrome/browser/ui/web_applications/web_app_ui_manager_impl.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_tab_helper.h"
+#include "components/webapps/common/web_app_id.h"
 #include "content/public/browser/web_contents.h"
 #include "url/gurl.h"
 
-namespace ash {
+namespace chromeos {
 
 WebKioskBrowserControllerBase::WebKioskBrowserControllerBase(
     web_app::WebAppProvider& provider,
     Browser* browser,
-    web_app::AppId app_id)
+    webapps::AppId app_id)
     : AppBrowserController(browser, std::move(app_id), false),
       provider_(provider) {}
 
@@ -57,15 +58,15 @@ ui::ImageModel WebKioskBrowserControllerBase::GetWindowIcon() const {
 }
 
 GURL WebKioskBrowserControllerBase::GetAppStartUrl() const {
-  return registrar()->GetAppStartUrl(app_id());
+  return registrar().GetAppStartUrl(app_id());
 }
 
 bool WebKioskBrowserControllerBase::IsUrlInAppScope(const GURL& url) const {
-  return registrar()->IsUrlInAppScope(url, app_id());
+  return registrar().IsUrlInAppScope(url, app_id());
 }
 
 std::u16string WebKioskBrowserControllerBase::GetAppShortName() const {
-  return base::UTF8ToUTF16(registrar()->GetAppShortName(app_id()));
+  return base::UTF8ToUTF16(registrar().GetAppShortName(app_id()));
 }
 
 std::u16string WebKioskBrowserControllerBase::GetFormattedUrlOrigin() const {
@@ -77,7 +78,7 @@ bool WebKioskBrowserControllerBase::CanUserUninstall() const {
 }
 
 bool WebKioskBrowserControllerBase::IsInstalled() const {
-  return registrar()->IsInstalled(app_id());
+  return registrar().IsInstalled(app_id());
 }
 
 void WebKioskBrowserControllerBase::OnTabInserted(
@@ -98,9 +99,8 @@ void WebKioskBrowserControllerBase::OnTabRemoved(
   web_app::ClearAppPrefsForWebContents(contents);
 }
 
-const raw_ref<web_app::WebAppRegistrar>
-WebKioskBrowserControllerBase::registrar() const {
-  return raw_ref(provider_->registrar_unsafe());
+web_app::WebAppRegistrar& WebKioskBrowserControllerBase::registrar() const {
+  return provider_->registrar_unsafe();
 }
 
-}  // namespace ash
+}  // namespace chromeos

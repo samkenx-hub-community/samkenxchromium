@@ -12,7 +12,7 @@
 #include "third_party/blink/renderer/modules/webgpu/dawn_object.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_map.h"
-#include "third_party/blink/renderer/platform/heap/collection_support/heap_vector.h"
+#include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_set.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/wtf/ref_counted.h"
 
@@ -49,8 +49,7 @@ class ExternalTextureCache : public GarbageCollected<ExternalTextureCache> {
   ExternalTextureCache& operator=(const ExternalTextureCache&) = delete;
 
   // Implement importExternalTexture() auto expiry mechanism.
-  GPUExternalTexture* Import(ExecutionContext* execution_context,
-                             const GPUExternalTextureDescriptor* descriptor,
+  GPUExternalTexture* Import(const GPUExternalTextureDescriptor* descriptor,
                              ExceptionState& exception_state);
 
   // Destroy all cached GPUExternalTexture and clear all lists.
@@ -77,7 +76,7 @@ class ExternalTextureCache : public GarbageCollected<ExternalTextureCache> {
       from_video_frame_;
 
   bool expire_task_scheduled_ = false;
-  HeapVector<Member<GPUExternalTexture>> expire_list_;
+  HeapHashSet<Member<GPUExternalTexture>> expire_set_;
 
   Member<GPUDevice> device_;
 };
@@ -116,16 +115,15 @@ class GPUExternalTexture : public DawnObject<WGPUExternalTexture> {
   void Expire();
   void Refresh();
 
-  void ListenToHTMLVideoElement(HTMLVideoElement* video);
-  void ListenToVideoFrame(VideoFrame* frame);
+  void SetVideo(HTMLVideoElement* video);
 
-  // Check whether current VideoFrame is outdated informs
-  // ScriptAnimationController.
-  // Return true if current VideoFrame is latest and still need to trigger next
-  // check.
-  // Return false if current VideoFrame is outdated and the no need to trigger
-  // future checks.
-  bool ContinueCheckingCurrentVideoFrame();
+  // Returns true iff the video frame is still available
+  bool ListenToVideoFrame(VideoFrame* frame);
+
+  // Check whether current VideoFrame is outdated from HTMLVideoElement. Pure
+  // video playback might not trigger any script animation work. Check video
+  // frame states in import to ensure cache refresh.
+  bool NeedsToUpdate();
 
   // GPUExternalTexture from VideoFrame expires when VideoFrame is closed. Note
   // that all back resources destroyed needs to happen on the thread that
@@ -161,6 +159,8 @@ class GPUExternalTexture : public DawnObject<WGPUExternalTexture> {
     GetProcs().externalTextureSetLabel(GetHandle(), utf8_label.c_str());
   }
 
+  bool IsCurrentFrameFromHTMLVideoElementValid();
+
   // This is the function to push a task to destroy the external texture when
   // the imported video frame in GPUDevice cache is outdated. The function is
   // used as callback function and be registered to the imported
@@ -177,6 +177,7 @@ class GPUExternalTexture : public DawnObject<WGPUExternalTexture> {
 
   scoped_refptr<WebGPUMailboxTexture> mailbox_texture_;
   bool is_zero_copy_ = false;
+  bool remove_from_cache_task_scheduled_ = false;
 
   absl::optional<media::VideoFrame::ID> media_video_frame_unique_id_;
   WeakMember<HTMLVideoElement> video_;

@@ -33,15 +33,22 @@ bool BlobCacheExtensionAvailable(gl::GLDisplayEGL* gl_display) {
 // forced to have this be global.
 PassthroughProgramCache* g_program_cache = nullptr;
 
+// Blob cache function pointers can only be set once per EGLDisplay. Using a
+// single bool is not technically correct, but it's acceptable since we only
+// have one EGLDisplay in practice.
+bool g_blob_cache_funcs_set = false;
+
 }  // namespace
 
 PassthroughProgramCache::PassthroughProgramCache(
     size_t max_cache_size_bytes,
-    bool disable_gpu_shader_disk_cache)
+    bool disable_gpu_shader_disk_cache,
+    ValueAddedHook* value_added_hook)
     : ProgramCache(max_cache_size_bytes),
       disable_gpu_shader_disk_cache_(disable_gpu_shader_disk_cache),
       curr_size_bytes_(0),
-      store_(ProgramLRUCache::NO_AUTO_EVICT) {
+      store_(ProgramLRUCache::NO_AUTO_EVICT),
+      value_added_hook_(value_added_hook) {
 #if defined(USE_EGL)
   gl::GLDisplayEGL* gl_display = gl::GLSurfaceEGL::GetGLDisplayEGL();
   EGLDisplay egl_display = gl_display->GetDisplay();
@@ -50,10 +57,11 @@ PassthroughProgramCache::PassthroughProgramCache(
   g_program_cache = this;
 
   // display is EGL_NO_DISPLAY during unittests.
-  if (egl_display != EGL_NO_DISPLAY &&
+  if (egl_display != EGL_NO_DISPLAY && !g_blob_cache_funcs_set &&
       BlobCacheExtensionAvailable(gl_display)) {
     // Register the blob cache callbacks.
     eglSetBlobCacheFuncsANDROID(egl_display, BlobCacheSet, BlobCacheGet);
+    g_blob_cache_funcs_set = true;
   }
 #endif  // defined(USE_EGL)
 }
@@ -151,7 +159,7 @@ void PassthroughProgramCache::Set(Key&& key, Value&& value) {
   {
     base::AutoLock auto_lock(lock_);
     // If callback is set, notify that there was a new/updated blob entry so it
-    // can be soted in disk.  Note that this is done before the Put() call as
+    // can be stored in disk.  Note that this is done before the Put() call as
     // that consumes `value`.
     if (cache_program_callback_) {
       // Convert the key and binary to string form.
@@ -166,15 +174,52 @@ void PassthroughProgramCache::Set(Key&& key, Value&& value) {
       cache_program_callback_.Run(key_string_64, value_string_64);
     }
 
+    if (value_added_hook_) {
+      value_added_hook_->OnValueAddedToCache(key, value);
+    }
+
     store_.Put(key, ProgramCacheValue(std::move(value), this));
   }
 }
 
 const PassthroughProgramCache::ProgramCacheValue* PassthroughProgramCache::Get(
     const Key& key) {
-  base::AutoLock auto_lock(lock_);
+  lock_.AssertAcquired();
   ProgramLRUCache::iterator found = store_.Get(key);
   return found == store_.end() ? nullptr : &found->second;
+}
+
+EGLsizeiANDROID PassthroughProgramCache::BlobCacheGetImpl(
+    const void* key,
+    EGLsizeiANDROID key_size,
+    void* value,
+    EGLsizeiANDROID value_size) {
+  if (key_size < 0) {
+    return 0;
+  }
+
+  const uint8_t* key_begin = reinterpret_cast<const uint8_t*>(key);
+  PassthroughProgramCache::Key entry_key(key_begin, key_begin + key_size);
+
+  // Note that the |lock_| should be held during whole time ProgramCacheValue is
+  // being accessed below.
+  base::AutoLock auto_lock(lock_);
+  const PassthroughProgramCache::ProgramCacheValue* cache_value =
+      g_program_cache->Get(std::move(entry_key));
+
+  if (!cache_value) {
+    return 0;
+  }
+
+  const PassthroughProgramCache::Value& entry_value = cache_value->data();
+
+  if (value_size > 0) {
+    if (static_cast<size_t>(value_size) >= entry_value.size()) {
+      memcpy(value, entry_value.data(), entry_value.size());
+    }
+  }
+
+  return entry_value.size();
 }
 
 void PassthroughProgramCache::BlobCacheSet(const void* key,
@@ -205,26 +250,7 @@ EGLsizeiANDROID PassthroughProgramCache::BlobCacheGet(
   if (!g_program_cache)
     return 0;
 
-  if (key_size < 0)
-    return 0;
-
-  const uint8_t* key_begin = reinterpret_cast<const uint8_t*>(key);
-  PassthroughProgramCache::Key entry_key(key_begin, key_begin + key_size);
-
-  const PassthroughProgramCache::ProgramCacheValue* cacheValue =
-      g_program_cache->Get(std::move(entry_key));
-
-  if (!cacheValue)
-    return 0;
-
-  const PassthroughProgramCache::Value& entry_value = cacheValue->data();
-
-  if (value_size > 0) {
-    if (static_cast<size_t>(value_size) >= entry_value.size())
-      memcpy(value, entry_value.data(), entry_value.size());
-  }
-
-  return entry_value.size();
+  return g_program_cache->BlobCacheGetImpl(key, key_size, value, value_size);
 }
 
 PassthroughProgramCache::ProgramCacheValue::ProgramCacheValue(

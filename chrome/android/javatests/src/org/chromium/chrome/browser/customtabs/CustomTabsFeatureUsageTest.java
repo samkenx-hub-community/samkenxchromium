@@ -8,11 +8,12 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.lifecycle.Stage;
 
 import androidx.browser.customtabs.CustomTabsSessionToken;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.runner.lifecycle.Stage;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -29,7 +30,7 @@ import org.chromium.chrome.browser.customtabs.CustomTabsFeatureUsage.CustomTabsF
 import org.chromium.chrome.browser.firstrun.FirstRunStatus;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.ui.test.util.BlankUiTestActivity;
@@ -68,14 +69,10 @@ public class CustomTabsFeatureUsageTest {
     @After
     public void tearDown() {
         TestThreadUtils.runOnUiThreadBlocking(() -> FirstRunStatus.setFirstRunFlowComplete(false));
-        if (mTestServer != null) {
-            mTestServer.stopAndDestroyServer();
-            mTestServer = null;
-        }
     }
 
     private Activity startBlankUiTestActivity() {
-        Context context = InstrumentationRegistry.getContext();
+        Context context = ApplicationProvider.getApplicationContext();
         Intent emptyIntent = new Intent(context, BlankUiTestActivity.class);
         emptyIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         return InstrumentationRegistry.getInstrumentation().startActivitySync(emptyIntent);
@@ -92,11 +89,11 @@ public class CustomTabsFeatureUsageTest {
 
     @Test
     @SmallTest
-    @Features.EnableFeatures({ChromeFeatureList.CCT_FEATURE_USAGE})
+    @EnableFeatures({ChromeFeatureList.CCT_FEATURE_USAGE})
     public void testNormalFeatureUsage() throws Exception {
         Activity emptyActivity = startBlankUiTestActivity();
         Intent intent = CustomTabsIntentTestUtils.createCustomTabIntent(
-                InstrumentationRegistry.getContext(), mTestPage, false, builder -> {});
+                ApplicationProvider.getApplicationContext(), mTestPage, false, builder -> {});
         CustomTabsConnection connection = CustomTabsTestUtils.warmUpAndWait();
         CustomTabsSessionToken token = CustomTabsSessionToken.getSessionTokenFromIntent(intent);
         connection.newSession(token);
@@ -114,11 +111,11 @@ public class CustomTabsFeatureUsageTest {
 
     @Test
     @SmallTest
-    @Features.EnableFeatures({ChromeFeatureList.CCT_FEATURE_USAGE})
+    @EnableFeatures({ChromeFeatureList.CCT_FEATURE_USAGE})
     public void testNormalFeatureUsageIncognito() throws Exception {
         startBlankUiTestActivity();
         Intent intent = CustomTabsIntentTestUtils.createMinimalIncognitoCustomTabIntent(
-                InstrumentationRegistry.getContext(), mTestPage);
+                ApplicationProvider.getApplicationContext(), mTestPage);
         mIncognitoCustomTabActivityTestRule.startCustomTabActivityWithIntent(intent);
         CustomTabsConnection connection = CustomTabsTestUtils.warmUpAndWait();
         CustomTabsSessionToken token = CustomTabsSessionToken.getSessionTokenFromIntent(intent);

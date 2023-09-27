@@ -7,10 +7,7 @@
 #include <utility>
 
 #include "mojo/public/cpp/bindings/pending_remote.h"
-#include "mojo/public/cpp/bindings/remote.h"
-#include "third_party/blink/public/common/browser_interface_broker_proxy.h"
 #include "third_party/blink/public/mojom/file_system_access/file_system_access_error.mojom-blink.h"
-#include "third_party/blink/public/mojom/file_system_access/file_system_access_manager.mojom-blink.h"
 #include "third_party/blink/public/platform/web_content_settings_client.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_throw_dom_exception.h"
@@ -18,6 +15,7 @@
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/workers/worker_global_scope.h"
 #include "third_party/blink/renderer/modules/file_system_access/file_system_access_error.h"
+#include "third_party/blink/renderer/modules/file_system_access/file_system_access_manager.h"
 #include "third_party/blink/renderer/modules/file_system_access/file_system_directory_handle.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
@@ -30,25 +28,6 @@ namespace blink {
 namespace {
 // The name to use for the root directory of a sandboxed file system.
 constexpr const char kSandboxRootDirectoryName[] = "";
-
-// Gets the OPFS for the default bucket.
-void GetSandboxedFileSystemForDefaultBucket(ScriptPromiseResolver* resolver) {
-  mojo::Remote<mojom::blink::FileSystemAccessManager> manager;
-  resolver->GetExecutionContext()->GetBrowserInterfaceBroker().GetInterface(
-      manager.BindNewPipeAndPassReceiver());
-
-  auto* raw_manager = manager.get();
-  raw_manager->GetSandboxedFileSystem(WTF::BindOnce(
-      [](ScriptPromiseResolver* resolver,
-         mojo::Remote<mojom::blink::FileSystemAccessManager>,
-         mojom::blink::FileSystemAccessErrorPtr result,
-         mojo::PendingRemote<mojom::blink::FileSystemAccessDirectoryHandle>
-             handle) {
-        StorageManagerFileSystemAccess::DidGetSandboxedFileSystem(
-            resolver, std::move(result), std::move(handle));
-      },
-      WrapPersistent(resolver), std::move(manager)));
-}
 
 // Called with the result of browser-side permissions checks.
 void OnGotAccessAllowed(
@@ -79,9 +58,14 @@ ScriptPromise StorageManagerFileSystemAccess::getDirectory(
     ScriptState* script_state,
     const StorageManager& storage,
     ExceptionState& exception_state) {
-  auto run_if_allowed = WTF::BindOnce(&GetSandboxedFileSystemForDefaultBucket);
-  return CheckGetDirectoryIsAllowed(script_state, exception_state,
-                                    std::move(run_if_allowed));
+  return CheckGetDirectoryIsAllowed(
+      script_state, exception_state,
+      WTF::BindOnce([](ScriptPromiseResolver* resolver) {
+        FileSystemAccessManager::From(resolver->GetExecutionContext())
+            ->GetSandboxedFileSystem(WTF::BindOnce(
+                &StorageManagerFileSystemAccess::DidGetSandboxedFileSystem,
+                WrapPersistent(resolver)));
+      }));
 }
 
 // static

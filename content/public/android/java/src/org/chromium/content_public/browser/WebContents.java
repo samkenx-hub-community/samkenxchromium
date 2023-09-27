@@ -10,7 +10,6 @@ import android.os.Parcelable;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.blink_public.input.SelectionGranularity;
 import org.chromium.ui.OverscrollRefreshHandler;
@@ -169,6 +168,12 @@ public interface WebContents extends Parcelable {
     RenderFrameHost getFocusedFrame();
 
     /**
+     * @return Whether the focused frame element in this WebContents is editable. Will be false if
+     *         the WebContents does not have focus.
+     */
+    boolean isFocusedElementEditable();
+
+    /**
      * @return The frame associated with the id. Will be null if the ID does not correspond to a
      *         live RenderFrameHost.
      */
@@ -192,6 +197,12 @@ public interface WebContents extends Parcelable {
      */
     @Visibility
     int getVisibility();
+
+    /**
+     * Updates WebContents Visibility and notifies all the observers about Visibility change event.
+     * See native WebContents::UpdateWebContentsVisibility.
+     */
+    void updateWebContentsVisibility(@Visibility int visibility);
 
     /**
      * @return The title for the current visible page.
@@ -363,7 +374,6 @@ public interface WebContents extends Parcelable {
      *                 will be made on the main thread.
      *                 If no result is required, pass null.
      */
-    @VisibleForTesting
     void evaluateJavaScriptForTests(String script, @Nullable JavaScriptCallback callback);
 
     /**

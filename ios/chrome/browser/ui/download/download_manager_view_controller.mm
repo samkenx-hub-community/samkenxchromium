@@ -9,21 +9,17 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/download/download_manager_metric_names.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/layout_guide_names.h"
 #import "ios/chrome/browser/shared/ui/util/util_swift.h"
 #import "ios/chrome/browser/ui/download/download_manager_animation_constants.h"
 #import "ios/chrome/browser/ui/download/download_manager_state_view.h"
 #import "ios/chrome/browser/ui/download/radial_progress_view.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/public/provider/chrome/browser/branded_images/branded_images_api.h"
 #import "ui/base/l10n/l10n_util_mac.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -328,7 +324,7 @@ NSString* GetSizeString(long long size_in_bytes) {
 #pragma mark - Public
 
 - (void)setFileName:(NSString*)fileName {
-  if (![_fileName isEqual:fileName]) {
+  if (![_fileName isEqualToString:fileName]) {
     _fileName = [fileName copy];
     [self updateStatusLabel];
   }

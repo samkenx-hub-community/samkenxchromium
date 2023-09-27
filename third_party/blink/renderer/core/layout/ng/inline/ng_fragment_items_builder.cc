@@ -9,7 +9,7 @@
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_cursor.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_box_fragment_builder.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_physical_box_fragment.h"
-#include "third_party/blink/renderer/core/layout/ng/svg/ng_svg_text_layout_algorithm.h"
+#include "third_party/blink/renderer/core/layout/svg/svg_text_layout_algorithm.h"
 
 namespace blink {
 
@@ -19,7 +19,8 @@ NGFragmentItemsBuilder::NGFragmentItemsBuilder(
 
 NGFragmentItemsBuilder::NGFragmentItemsBuilder(
     const NGInlineNode& node,
-    WritingDirectionMode writing_direction)
+    WritingDirectionMode writing_direction,
+    bool is_block_fragmented)
     : node_(node), writing_direction_(writing_direction) {
   const NGInlineItemsData& items_data = node.ItemsData(false);
   text_content_ = items_data.text_content;
@@ -32,9 +33,17 @@ NGFragmentItemsBuilder::NGFragmentItemsBuilder(
   // line, and each line contains 3 items; a line box, an inline box, and a
   // text. If it will require more than one reallocations, make an initial
   // reservation here.
-  const wtf_size_t estimated_item_count = text_content_.length() / 40 * 3;
-  if (UNLIKELY(estimated_item_count > items_.capacity() * 2))
-    items_.ReserveInitialCapacity(estimated_item_count);
+  //
+  // Skip this if we constrained by a fragmentainer's block-size. The estimate
+  // will be way too high in such cases, and we're going to make this
+  // reservation for every fragmentainer, potentially running out of memory if
+  // oilpan doesn't get around to collecting it.
+  if (!is_block_fragmented) {
+    const wtf_size_t estimated_item_count = text_content_.length() / 40 * 3;
+    if (UNLIKELY(estimated_item_count > items_.capacity() * 2)) {
+      items_.ReserveInitialCapacity(estimated_item_count);
+    }
+  }
 }
 
 NGFragmentItemsBuilder::~NGFragmentItemsBuilder() {
@@ -273,8 +282,8 @@ NGFragmentItemsBuilder::AddPreviousItems(
           current_items_data = items_data;
         else
           current_items_data = items_data = &node_.ItemsData(false);
-        if (UNLIKELY(!current_items_data->IsValidOffset(
-                break_token->ItemIndex(), break_token->TextOffset()))) {
+        if (UNLIKELY(
+                !current_items_data->IsValidOffset(break_token->Start()))) {
           NOTREACHED();
           break;
         }
@@ -420,7 +429,7 @@ absl::optional<PhysicalSize> NGFragmentItemsBuilder::ToFragmentItems(
   ConvertToPhysical(outer_size);
   absl::optional<PhysicalSize> new_size;
   if (node_.IsSvgText()) {
-    new_size = NGSvgTextLayoutAlgorithm(node_, GetWritingMode())
+    new_size = SvgTextLayoutAlgorithm(node_, GetWritingMode())
                    .Layout(TextContent(false), items_);
   }
   new (data) NGFragmentItems(this);

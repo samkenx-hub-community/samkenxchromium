@@ -10,10 +10,6 @@
 #import "ios/chrome/browser/ui/authentication/signin/consistency_promo_signin/consistency_account_chooser/consistency_account_chooser_consumer.h"
 #import "ios/chrome/browser/ui/authentication/signin/consistency_promo_signin/consistency_account_chooser/identity_item_configurator.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 @interface ConsistencyAccountChooserMediator () <
     ChromeAccountManagerServiceObserver> {
   ChromeAccountManagerService* _accountManagerService;
@@ -115,7 +111,7 @@
   IdentityItemConfigurator* configurator = nil;
   for (IdentityItemConfigurator* cursor in self
            .sortedIdentityItemConfigurators) {
-    if ([cursor.gaiaID isEqual:identity.gaiaID]) {
+    if ([cursor.gaiaID isEqualToString:identity.gaiaID]) {
       configurator = cursor;
     }
   }

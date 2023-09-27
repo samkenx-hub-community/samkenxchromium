@@ -32,14 +32,6 @@
 namespace updater {
 namespace {
 
-// This task joins a process, hence .WithBaseSyncPrimitives().
-// TODO(crbug.com/1376713) - implement a way to express priority for
-// foreground/background installs.
-static constexpr base::TaskTraits kTaskTraitsBlockWithSyncPrimitives = {
-    base::MayBlock(), base::WithBaseSyncPrimitives(),
-    base::TaskPriority::USER_VISIBLE,
-    base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN};
-
 // Returns the full path to the installation directory for the application
 // identified by the |app_id|.
 absl::optional<base::FilePath> GetAppInstallDir(UpdaterScope scope,
@@ -48,7 +40,6 @@ absl::optional<base::FilePath> GetAppInstallDir(UpdaterScope scope,
   if (!app_install_dir) {
     return absl::nullopt;
   }
-
   return app_install_dir->AppendASCII(kAppsDir).AppendASCII(app_id);
 }
 
@@ -57,10 +48,15 @@ absl::optional<base::FilePath> GetAppInstallDir(UpdaterScope scope,
 AppInfo::AppInfo(const UpdaterScope scope,
                  const std::string& app_id,
                  const std::string& ap,
+                 const std::string& brand,
                  const base::Version& app_version,
                  const base::FilePath& ecp)
-    : scope(scope), app_id(app_id), ap(ap), version(app_version), ecp(ecp) {}
-
+    : scope(scope),
+      app_id(app_id),
+      ap(ap),
+      brand(brand),
+      version(app_version),
+      ecp(ecp) {}
 AppInfo::AppInfo(const AppInfo&) = default;
 AppInfo& AppInfo::operator=(const AppInfo&) = default;
 AppInfo::~AppInfo() = default;
@@ -89,9 +85,7 @@ Installer::Installer(
       crx_verifier_format_(crx_verifier_format),
       usage_stats_enabled_(persisted_data->GetUsageStatsEnabled()) {}
 
-Installer::~Installer() {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-}
+Installer::~Installer() = default;
 
 update_client::CrxComponent Installer::MakeCrxComponent() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -106,6 +100,7 @@ update_client::CrxComponent Installer::MakeCrxComponent() {
     checker_path_ = persisted_data_->GetExistenceCheckerPath(app_id_);
     fingerprint_ = persisted_data_->GetFingerprint(app_id_);
     ap_ = persisted_data_->GetAP(app_id_);
+    brand_ = persisted_data_->GetBrandCode(app_id_);
   } else {
     pv_ = base::Version(kNullVersion);
   }
@@ -148,18 +143,17 @@ void Installer::DeleteOlderInstallPaths() {
     return;
   }
 
-  base::FileEnumerator file_enumerator(*app_install_dir, false,
-                                       base::FileEnumerator::DIRECTORIES);
-  for (auto path = file_enumerator.Next(); !path.value().empty();
-       path = file_enumerator.Next()) {
-    const base::Version version_dir(path.BaseName().MaybeAsASCII());
+  base::FileEnumerator(*app_install_dir, false,
+                       base::FileEnumerator::DIRECTORIES)
+      .ForEach([this](const base::FilePath& path) {
+        const base::Version version_dir(path.BaseName().MaybeAsASCII());
 
-    // Mark for deletion any valid versioned directory except the directory
-    // for the currently registered app.
-    if (version_dir.IsValid() && version_dir.CompareTo(pv_)) {
-      base::DeletePathRecursively(path);
-    }
-  }
+        // Mark for deletion any valid versioned directory except the directory
+        // for the currently registered app.
+        if (version_dir.IsValid() && version_dir.CompareTo(pv_)) {
+          base::DeletePathRecursively(path);
+        }
+      });
 }
 
 Installer::Result Installer::InstallHelper(
@@ -189,7 +183,7 @@ Installer::Result Installer::InstallHelper(
   // The task sequencing guarantees that the prefs will be updated by the
   // time another CrxDataCallback is invoked, which needs updated values.
   return RunApplicationInstaller(
-      AppInfo(updater_scope_, app_id_, ap_, pv_, checker_path_),
+      AppInfo(updater_scope_, app_id_, ap_, brand_, pv_, checker_path_),
       application_installer, install_params->arguments,
       WriteInstallerDataToTempFile(unpack_path,
                                    client_install_data_.empty()
@@ -222,7 +216,10 @@ void Installer::Install(const base::FilePath& unpack_path,
                         ProgressCallback progress_callback,
                         Callback callback) {
   base::ThreadPool::PostTask(
-      FROM_HERE, kTaskTraitsBlockWithSyncPrimitives,
+      FROM_HERE,
+      {base::MayBlock(), base::WithBaseSyncPrimitives(),
+       base::TaskPriority::USER_BLOCKING,
+       base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN},
       base::BindOnce(&Installer::InstallWithSyncPrimitives, this, unpack_path,
                      std::move(install_params), std::move(progress_callback),
                      std::move(callback)));

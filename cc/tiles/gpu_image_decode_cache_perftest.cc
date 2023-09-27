@@ -23,6 +23,7 @@
 #include "third_party/skia/include/core/SkSurface.h"
 #include "third_party/skia/include/gpu/GpuTypes.h"
 #include "third_party/skia/include/gpu/GrDirectContext.h"
+#include "third_party/skia/include/gpu/ganesh/SkSurfaceGanesh.h"
 
 namespace cc {
 namespace {
@@ -35,7 +36,7 @@ static const int kCacheSize = 128 * 1024 * 1024;
 sk_sp<SkImage> CreateImage(int width, int height) {
   SkBitmap bitmap;
   bitmap.allocPixels(SkImageInfo::MakeS32(width, height, kPremul_SkAlphaType));
-  return SkImage::MakeFromBitmap(bitmap);
+  return SkImages::RasterFromBitmap(bitmap);
 }
 
 SkM44 CreateMatrix(const SkSize& scale) {
@@ -141,7 +142,7 @@ INSTANTIATE_TEST_SUITE_P(P,
 
 TEST_P(GpuImageDecodeCachePerfTestNoSw, DecodeWithMips) {
   // Surface to render into.
-  auto surface = SkSurface::MakeRenderTarget(
+  auto surface = SkSurfaces::RenderTarget(
       context_provider_->GrContext(), skgpu::Budgeted::kNo,
       SkImageInfo::MakeN32Premul(2048, 2048));
 

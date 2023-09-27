@@ -15,7 +15,7 @@
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "base/metrics/histogram_macros.h"
+#include "base/metrics/histogram_functions.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "ui/accessibility/ax_enums.mojom.h"
@@ -25,9 +25,11 @@
 #include "ui/base/default_style.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/resource/resource_bundle.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
-#include "ui/color/color_provider_manager.h"
+#include "ui/color/color_provider_key.h"
+#include "ui/compositor/compositor.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animation_element.h"
 #include "ui/compositor/layer_animator.h"
@@ -97,7 +99,7 @@ class BubbleWidget : public Widget {
     return anchor ? anchor->GetThemeProvider() : Widget::GetThemeProvider();
   }
 
-  ui::ColorProviderManager::ThemeInitializerSupplier* GetCustomTheme()
+  ui::ColorProviderKey::ThemeInitializerSupplier* GetCustomTheme()
       const override {
     const Widget* const anchor = GetAnchorWidget();
     return anchor ? anchor->GetCustomTheme() : Widget::GetCustomTheme();
@@ -108,10 +110,18 @@ class BubbleWidget : public Widget {
     return anchor ? anchor->GetNativeTheme() : Widget::GetNativeTheme();
   }
 
+  using Widget::GetPrimaryWindowWidget;
+
   Widget* GetPrimaryWindowWidget() override {
     Widget* const anchor = GetAnchorWidget();
     return anchor ? anchor->GetPrimaryWindowWidget()
                   : Widget::GetPrimaryWindowWidget();
+  }
+
+  const ui::ColorProvider* GetColorProvider() const override {
+    const Widget* const primary = GetPrimaryWindowWidget();
+    return (primary && primary != this) ? primary->GetColorProvider()
+                                        : Widget::GetColorProvider();
   }
 
  private:
@@ -160,9 +170,9 @@ Widget* CreateBubbleWidget(BubbleDialogDelegate* bubble) {
     bubble_params.shadow_type = Widget::InitParams::ShadowType::kNone;
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   bubble_params.background_elevation =
-      ui::ColorProviderManager::ElevationMode::kHigh;
+      ui::ColorProviderKey::ElevationMode::kHigh;
 #endif
-  gfx::NativeView parent = nullptr;
+  gfx::NativeView parent = gfx::NativeView();
   if (bubble->has_parent()) {
     if (bubble->parent_window()) {
       parent = bubble->parent_window();
@@ -308,6 +318,13 @@ class BubbleDialogDelegate::AnchorWidgetObserver : public WidgetObserver,
       owner_->OnAnchorBoundsChanged();
     }
   }
+
+  // If the native window is closed by the OS, OnWidgetDestroying() won't
+  // fire. Instead, OnWindowDestroying() will fire before aura::Window
+  // destruction. See //docs/ui/views/widget_destruction.md.
+  void OnWindowDestroying(aura::Window* window) override {
+    window_observation_.Reset();
+  }
 #endif
 
  private:
@@ -421,8 +438,8 @@ BubbleDialogDelegate::BubbleDialogDelegate(View* anchor_view,
                                            BubbleBorder::Shadow shadow)
     : arrow_(arrow),
       shadow_(shadow),
-      close_on_deactivate_pins_(
-          std::make_unique<CloseOnDeactivatePin::Pins>()) {
+      close_on_deactivate_pins_(std::make_unique<CloseOnDeactivatePin::Pins>()),
+      bubble_created_time_(base::TimeTicks::Now()) {
   SetOwnedByWidget(true);
   SetAnchorView(anchor_view);
   SetArrow(arrow);
@@ -432,6 +449,8 @@ BubbleDialogDelegate::BubbleDialogDelegate(View* anchor_view,
   set_margins(layout_provider->GetDialogInsetsForContentType(
       DialogContentType::kText, DialogContentType::kText));
   set_title_margins(layout_provider->GetInsetsMetric(INSETS_DIALOG_TITLE));
+  set_footnote_margins(
+      layout_provider->GetInsetsMetric(INSETS_DIALOG_SUBSECTION));
 
   RegisterWidgetInitializedCallback(base::BindOnce(
       [](BubbleDialogDelegate* bubble_delegate) {
@@ -442,6 +461,25 @@ BubbleDialogDelegate::BubbleDialogDelegate(View* anchor_view,
         bubble_delegate->UpdateColorsFromTheme();
       },
       this));
+
+  // Bind a callback to the compositor for logging time from bubble creation to
+  // successful presentation of the next frame.
+  if (base::FeatureList::IsEnabled(::features::kBubbleMetricsApi)) {
+    RegisterWidgetInitializedCallback(base::BindOnce(
+        [](WidgetDelegate* delegate, base::TimeTicks bubble_created_time) {
+          delegate->GetWidget()
+              ->GetCompositor()
+              ->RequestSuccessfulPresentationTimeForNextFrame(base::BindOnce(
+                  [](base::TimeTicks bubble_created_time,
+                     base::TimeTicks presentation_timestamp) {
+                    base::UmaHistogramMediumTimes(
+                        "Bubble.All.CreateToPresentationTime",
+                        presentation_timestamp - bubble_created_time);
+                  },
+                  bubble_created_time));
+        },
+        base::Unretained(this), *bubble_created_time_));
+  }
 }
 
 BubbleDialogDelegate::~BubbleDialogDelegate() {
@@ -478,11 +516,6 @@ Widget* BubbleDialogDelegate::CreateBubble(
   return bubble_widget;
 }
 
-Widget* BubbleDialogDelegateView::CreateBubble(
-    std::unique_ptr<BubbleDialogDelegateView> delegate) {
-  return BubbleDialogDelegate::CreateBubble(std::move(delegate));
-}
-
 Widget* BubbleDialogDelegateView::CreateBubble(BubbleDialogDelegateView* view) {
   return CreateBubble(base::WrapUnique(view));
 }
@@ -517,10 +550,8 @@ BubbleDialogDelegate* BubbleDialogDelegate::AsBubbleDialogDelegate() {
 std::unique_ptr<NonClientFrameView>
 BubbleDialogDelegate::CreateNonClientFrameView(Widget* widget) {
   auto frame = std::make_unique<BubbleDialogFrameView>(title_margins_);
-  LayoutProvider* provider = LayoutProvider::Get();
 
-  frame->SetFootnoteMargins(
-      provider->GetInsetsMetric(INSETS_DIALOG_SUBSECTION));
+  frame->SetFootnoteMargins(footnote_margins_);
   frame->SetFootnoteView(DisownFootnoteView());
 
   std::unique_ptr<BubbleBorder> border =
@@ -573,8 +604,20 @@ void BubbleDialogDelegate::OnBubbleWidgetClosing() {
   // focus traversal path. Don't reset kAnchoredDialogKey or we risk detaching
   // a widget from the traversal path.
   if (GetAnchorView() &&
-      GetAnchorView()->GetProperty(kAnchoredDialogKey) == this)
+      GetAnchorView()->GetProperty(kAnchoredDialogKey) == this) {
     GetAnchorView()->ClearProperty(kAnchoredDialogKey);
+  }
+
+  if (base::FeatureList::IsEnabled(::features::kBubbleMetricsApi)) {
+    if (bubble_shown_time_.has_value()) {
+      bubble_shown_duration_ += base::TimeTicks::Now() - *bubble_shown_time_;
+      bubble_shown_time_.reset();
+    }
+    UmaHistogramLongTimes("Bubble.All.TimeVisible", bubble_shown_duration_);
+  }
+
+  base::UmaHistogramEnumeration("Bubble.All.CloseReason",
+                                GetWidget()->closed_reason());
 }
 
 void BubbleDialogDelegate::OnAnchorWidgetDestroying() {
@@ -937,6 +980,32 @@ void BubbleDialogDelegate::UpdateColorsFromTheme() {
 }
 
 void BubbleDialogDelegate::OnBubbleWidgetVisibilityChanged(bool visible) {
+  // Log time from bubble dialog delegate creation to bubble becoming
+  // visible.
+  if (base::FeatureList::IsEnabled(::features::kBubbleMetricsApi)) {
+    if (visible) {
+      if (bubble_created_time_.has_value()) {
+        GetWidget()
+            ->GetCompositor()
+            ->RequestSuccessfulPresentationTimeForNextFrame(base::BindOnce(
+                [](base::TimeTicks bubble_created_time,
+                   base::TimeTicks presentation_timestamp) {
+                  base::UmaHistogramMediumTimes(
+                      "Bubble.All.CreateToVisibleTime",
+                      presentation_timestamp - bubble_created_time);
+                },
+                *bubble_created_time_));
+        bubble_created_time_.reset();
+      }
+      bubble_shown_time_ = base::TimeTicks::Now();
+    } else {
+      if (bubble_shown_time_.has_value()) {
+        bubble_shown_duration_ += base::TimeTicks::Now() - *bubble_shown_time_;
+        bubble_shown_time_.reset();
+      }
+    }
+  }
+
   UpdateHighlightedButton(visible);
 
   // Fire ax::mojom::Event::kAlert for bubbles marked as
@@ -979,8 +1048,13 @@ void BubbleDialogDelegate::SetAnchoredDialogKey() {
 void BubbleDialogDelegate::UpdateHighlightedButton(bool highlighted) {
   Button* button = Button::AsButton(highlighted_button_tracker_.view());
   button = button ? button : Button::AsButton(GetAnchorView());
-  if (button && highlight_button_when_shown_)
-    button->SetHighlighted(highlighted);
+  if (button && highlight_button_when_shown_) {
+    if (highlighted) {
+      button_anchor_higlight_ = button->AddAnchorHighlight();
+    } else {
+      button_anchor_higlight_.reset();
+    }
+  }
 }
 
 BEGIN_METADATA(BubbleDialogDelegateView, View)

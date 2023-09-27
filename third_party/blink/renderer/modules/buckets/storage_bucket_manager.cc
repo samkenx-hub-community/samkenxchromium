@@ -132,7 +132,7 @@ ScriptPromise StorageBucketManager::open(ScriptState* script_state,
       ->OpenBucket(
           name, std::move(bucket_policies),
           WTF::BindOnce(&StorageBucketManager::DidOpen, WrapPersistent(this),
-                        WrapPersistent(resolver)));
+                        WrapPersistent(resolver), name));
   return promise;
 }
 
@@ -198,6 +198,7 @@ mojom::blink::BucketManagerHost* StorageBucketManager::GetBucketManager(
 
 void StorageBucketManager::DidOpen(
     ScriptPromiseResolver* resolver,
+    const String& name,
     mojo::PendingRemote<mojom::blink::BucketHost> bucket_remote,
     mojom::blink::BucketError error) {
   ScriptState* script_state = resolver->GetScriptState();
@@ -226,7 +227,7 @@ void StorageBucketManager::DidOpen(
   }
 
   resolver->Resolve(MakeGarbageCollected<StorageBucket>(
-      navigator_base_, std::move(bucket_remote)));
+      navigator_base_, name, std::move(bucket_remote)));
 }
 
 void StorageBucketManager::DidGetKeys(ScriptPromiseResolver* resolver,
@@ -262,6 +263,24 @@ void StorageBucketManager::DidDelete(ScriptPromiseResolver* resolver,
     return;
   }
   resolver->Resolve();
+}
+
+StorageBucket* StorageBucketManager::GetBucketForDevtools(
+    ScriptState* script_state,
+    const String& name) {
+  ExecutionContext* context = ExecutionContext::From(script_state);
+  if (!context->GetSecurityOrigin()->CanAccessStorageBuckets()) {
+    return nullptr;
+  }
+
+  mojo::PendingRemote<mojom::blink::BucketHost> bucket_remote;
+
+  GetBucketManager(script_state)
+      ->GetBucketForDevtools(name,
+                             bucket_remote.InitWithNewPipeAndPassReceiver());
+
+  return MakeGarbageCollected<StorageBucket>(navigator_base_, name,
+                                             std::move(bucket_remote));
 }
 
 void StorageBucketManager::Trace(Visitor* visitor) const {

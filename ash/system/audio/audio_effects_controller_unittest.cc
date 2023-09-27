@@ -4,14 +4,22 @@
 
 #include "ash/system/audio/audio_effects_controller.h"
 
+#include <vector>
+
 #include "ash/accessibility/accessibility_controller_impl.h"
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
 #include "ash/shell.h"
+#include "ash/system/status_area_widget.h"
+#include "ash/system/status_area_widget_test_helper.h"
 #include "ash/system/video_conference/effects/video_conference_tray_effects_manager_types.h"
 #include "ash/system/video_conference/fake_video_conference_tray_controller.h"
+#include "ash/system/video_conference/video_conference_common.h"
+#include "ash/system/video_conference/video_conference_tray.h"
 #include "ash/test/ash_test_base.h"
 #include "base/command_line.h"
+#include "base/memory/raw_ptr.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "chromeos/ash/components/audio/cras_audio_handler.h"
 #include "chromeos/ash/components/dbus/audio/cras_audio_client.h"
@@ -19,6 +27,72 @@
 #include "media/base/media_switches.h"
 
 namespace ash {
+
+namespace {
+
+struct AudioNodeInfo {
+  bool is_input;
+  uint64_t id;
+  const char* const device_name;
+  const char* const type;
+  const char* const name;
+  uint32_t audio_effect;
+};
+
+constexpr uint32_t kNoiseCancellationAudioEffect = 1;
+
+constexpr AudioNodeInfo kInternalMicWithNC[] = {
+    {.is_input = true,
+     .id = 10001,
+     .device_name = "Internal Mic",
+     .type = "INTERNAL_MIC",
+     .name = "Internal Mic",
+     .audio_effect = kNoiseCancellationAudioEffect}};
+
+constexpr AudioNodeInfo kInternalMicWithoutNC[] = {
+    {.is_input = true,
+     .id = 10002,
+     .device_name = "Internal Mic",
+     .type = "INTERNAL_MIC",
+     .name = "Internal Mic",
+     .audio_effect = 0u}};
+
+constexpr AudioNodeInfo kInternalSpeakerWithNC[] = {
+    {.is_input = false,
+     .id = 20001,
+     .device_name = "Internal Speaker",
+     .type = "INTERNAL_SPEAKER",
+     .name = "Internal Speaker",
+     .audio_effect = kNoiseCancellationAudioEffect}};
+
+constexpr AudioNodeInfo kInternalSpeakerWithoutNC[] = {
+    {.is_input = false,
+     .id = 20002,
+     .device_name = "Internal Speaker",
+     .type = "INTERNAL_SPEAKER",
+     .name = "Internal Speaker",
+     .audio_effect = 0u}};
+
+AudioNode GenerateAudioNode(const AudioNodeInfo* node_info) {
+  return AudioNode(node_info->is_input, node_info->id,
+                   /*has_v2_stable_device_id=*/false, node_info->id,
+                   /*stable_device_id_v2=*/0, node_info->device_name,
+                   node_info->type, node_info->name, /*active=*/false,
+                   /* plugged_time=*/0,
+                   /*max_supported_channels=*/1, node_info->audio_effect,
+                   /*number_of_volume_steps=*/0);
+}
+
+AudioNodeList GenerateAudioNodeList(
+    const std::vector<const AudioNodeInfo*>& nodes) {
+  AudioNodeList node_list;
+  for (auto* node_info : nodes) {
+    node_list.emplace_back(GenerateAudioNode(node_info));
+  }
+  return node_list;
+}
+
+}  // namespace
 
 class AudioEffectsControllerTest : public NoSessionAshTestBase {
  public:
@@ -32,9 +106,10 @@ class AudioEffectsControllerTest : public NoSessionAshTestBase {
 
   // NoSessionAshTestBase:
   void SetUp() override {
-    scoped_feature_list_.InitWithFeatures({features::kVideoConference}, {});
-    base::CommandLine::ForCurrentProcess()->AppendSwitch(
-        switches::kCameraEffectsSupportedByHardware);
+    scoped_feature_list_.InitWithFeatures(
+        {features::kVideoConference,
+         features::kCameraEffectsSupportedByHardware},
+        {});
 
     // Here we have to create the global instance of `CrasAudioHandler` before
     // `FakeVideoConferenceTrayController`, so we do it here and not in
@@ -73,8 +148,54 @@ class AudioEffectsControllerTest : public NoSessionAshTestBase {
     return audio_effects_controller_;
   }
 
+  void ChangeAudioInput(bool noise_cancellation_supported) {
+    const std::vector<const AudioNodeInfo*> audio_info_nodes = {
+        (noise_cancellation_supported) ? kInternalMicWithNC
+                                       : kInternalMicWithoutNC};
+    fake_cras_audio_client()->SetAudioNodesAndNotifyObserversForTesting(
+        GenerateAudioNodeList(audio_info_nodes));
+    cras_audio_handler()->RequestNoiseCancellationSupported(base::DoNothing());
+  }
+
+  void ChangeAudioOutput(bool noise_cancellation_supported) {
+    // Noise cancellation support state for output device is set in the platform
+    // level (not in chrome level), then it will propagate that state through
+    // `RequestNoiseCancellationSupported()`. Since we can't access platform
+    // level, we will mimic that process like below for testing purpose.
+    fake_cras_audio_client()->SetNoiseCancellationSupported(
+        noise_cancellation_supported);
+    cras_audio_handler()->RequestNoiseCancellationSupported(base::DoNothing());
+
+    cras_audio_handler()->SwitchToDevice(
+        AudioDevice(GenerateAudioNode(noise_cancellation_supported
+                                          ? kInternalSpeakerWithNC
+                                          : kInternalSpeakerWithoutNC)),
+        /*notify=*/true, CrasAudioHandler::ACTIVATE_BY_USER);
+  }
+
+  VideoConferenceTray* GetVideoConfereneTray() {
+    return StatusAreaWidgetTestHelper::GetStatusAreaWidget()
+        ->video_conference_tray();
+  }
+
+  void OpenVideoConferenceBubble() {
+    // Update media status to make the video conference tray visible.
+    VideoConferenceMediaState state;
+    state.has_media_app = true;
+    state.has_camera_permission = true;
+    state.has_microphone_permission = true;
+    state.is_capturing_screen = true;
+    tray_controller_->UpdateWithMediaState(state);
+
+    // Open the bubble by clicking the toggle button.
+    LeftClickOn(GetVideoConfereneTray()->toggle_bubble_button());
+  }
+
+  base::HistogramTester histogram_tester_;
+
  private:
-  AudioEffectsController* audio_effects_controller_ = nullptr;
+  raw_ptr<AudioEffectsController, DanglingUntriaged | ExperimentalAsh>
+      audio_effects_controller_ = nullptr;
   std::unique_ptr<FakeVideoConferenceTrayController> tray_controller_;
   base::test::ScopedFeatureList scoped_feature_list_;
 };
@@ -90,6 +211,8 @@ TEST_F(AudioEffectsControllerTest, NoiseCancellationNotSupported) {
   // `AudioEffectsController` reports noise that cancellation is not-supported.
   EXPECT_FALSE(audio_effects_controller()->IsEffectSupported(
       VcEffectId::kNoiseCancellation));
+  EXPECT_FALSE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
 }
 
 TEST_F(AudioEffectsControllerTest, NoiseCancellationSupported) {
@@ -102,12 +225,19 @@ TEST_F(AudioEffectsControllerTest, NoiseCancellationSupported) {
   // `AudioEffectsController` reports that noise cancellation is supported.
   EXPECT_TRUE(audio_effects_controller()->IsEffectSupported(
       VcEffectId::kNoiseCancellation));
+  EXPECT_TRUE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
 
   // Makes sure the dependency flag is set when the effect is supported.
-  auto* effect = audio_effects_controller()->GetEffect(0);
-  ASSERT_EQ(VcEffectId::kNoiseCancellation, effect->id());
+  auto* effect =
+      audio_effects_controller()->GetEffectById(VcEffectId::kNoiseCancellation);
   EXPECT_EQ(VcHostedEffect::ResourceDependency::kMicrophone,
             effect->dependency_flags());
+
+  // Delegate should be registered.
+  EXPECT_TRUE(VideoConferenceTrayController::Get()
+                  ->effects_manager()
+                  .IsDelegateRegistered(audio_effects_controller()));
 }
 
 TEST_F(AudioEffectsControllerTest, NoiseCancellationNotEnabled) {
@@ -118,7 +248,11 @@ TEST_F(AudioEffectsControllerTest, NoiseCancellationNotEnabled) {
   SimulateUserLogin("testuser1@gmail.com");
 
   // Explicitly disable noise cancellation.
-  cras_audio_handler()->SetNoiseCancellationState(false);
+  cras_audio_handler()->SetNoiseCancellationState(
+      false, CrasAudioHandler::AudioSettingsChangeSource::kVideoConferenceTray);
+  histogram_tester_.ExpectBucketCount(
+      CrasAudioHandler::kNoiseCancellationEnabledSourceHistogramName,
+      CrasAudioHandler::AudioSettingsChangeSource::kVideoConferenceTray, 1);
 
   // Noise cancellation effect state is disabled.
   absl::optional<int> effect_state = audio_effects_controller()->GetEffectState(
@@ -126,11 +260,15 @@ TEST_F(AudioEffectsControllerTest, NoiseCancellationNotEnabled) {
   EXPECT_TRUE(effect_state.has_value());
   EXPECT_EQ(effect_state, 0);
 
-  cras_audio_handler()->SetNoiseCancellationState(true);
+  cras_audio_handler()->SetNoiseCancellationState(
+      true, CrasAudioHandler::AudioSettingsChangeSource::kVideoConferenceTray);
   effect_state = audio_effects_controller()->GetEffectState(
       VcEffectId::kNoiseCancellation);
   EXPECT_TRUE(effect_state.has_value());
   EXPECT_EQ(effect_state, 1);
+  histogram_tester_.ExpectBucketCount(
+      CrasAudioHandler::kNoiseCancellationEnabledSourceHistogramName,
+      CrasAudioHandler::AudioSettingsChangeSource::kVideoConferenceTray, 2);
 }
 
 TEST_F(AudioEffectsControllerTest, NoiseCancellationEnabled) {
@@ -141,7 +279,11 @@ TEST_F(AudioEffectsControllerTest, NoiseCancellationEnabled) {
   SimulateUserLogin("testuser1@gmail.com");
 
   // Explicitly enable noise cancellation.
-  cras_audio_handler()->SetNoiseCancellationState(true);
+  cras_audio_handler()->SetNoiseCancellationState(
+      true, CrasAudioHandler::AudioSettingsChangeSource::kVideoConferenceTray);
+  histogram_tester_.ExpectBucketCount(
+      CrasAudioHandler::kNoiseCancellationEnabledSourceHistogramName,
+      CrasAudioHandler::AudioSettingsChangeSource::kVideoConferenceTray, 1);
 
   // Noise cancellation effect state is disabled.
   absl::optional<int> effect_state = audio_effects_controller()->GetEffectState(
@@ -158,7 +300,8 @@ TEST_F(AudioEffectsControllerTest, NoiseCancellationSetNotEnabled) {
   SimulateUserLogin("testuser1@gmail.com");
 
   // Explicitly enable noise cancellation.
-  cras_audio_handler()->SetNoiseCancellationState(true);
+  cras_audio_handler()->SetNoiseCancellationState(
+      true, CrasAudioHandler::AudioSettingsChangeSource::kVideoConferenceTray);
 
   // Check that noise cancellation is enabled.
   EXPECT_TRUE(cras_audio_handler()->GetNoiseCancellationState());
@@ -179,7 +322,8 @@ TEST_F(AudioEffectsControllerTest, NoiseCancellationSetEnabled) {
   SimulateUserLogin("testuser1@gmail.com");
 
   // Explicitly disable noise cancellation.
-  cras_audio_handler()->SetNoiseCancellationState(false);
+  cras_audio_handler()->SetNoiseCancellationState(
+      false, CrasAudioHandler::AudioSettingsChangeSource::kVideoConferenceTray);
 
   // Check that noise cancellation is disabled.
   EXPECT_FALSE(cras_audio_handler()->GetNoiseCancellationState());
@@ -190,6 +334,128 @@ TEST_F(AudioEffectsControllerTest, NoiseCancellationSetEnabled) {
 
   // State should now be enabled.
   EXPECT_TRUE(cras_audio_handler()->GetNoiseCancellationState());
+}
+
+TEST_F(AudioEffectsControllerTest, NoiseCancellationAudioInputDevice) {
+  // Prepare `CrasAudioHandler` to report that noise cancellation is supported.
+  // However, the input audio does not support noise cancellation.
+  fake_cras_audio_client()->SetNoiseCancellationSupported(true);
+  cras_audio_handler()->RequestNoiseCancellationSupported(base::DoNothing());
+  ChangeAudioInput(/*noise_cancellation_supported=*/false);
+
+  SimulateUserLogin("testuser1@gmail.com");
+
+  // `AudioEffectsController` reports noise that cancellation is not-supported.
+  EXPECT_FALSE(audio_effects_controller()->IsEffectSupported(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_FALSE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
+
+  // Change to an input that does support. The state should reflect that.
+  ChangeAudioInput(/*noise_cancellation_supported=*/true);
+  EXPECT_TRUE(audio_effects_controller()->IsEffectSupported(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_TRUE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
+}
+
+TEST_F(AudioEffectsControllerTest, NoiseCancellationSwitchInputDevice) {
+  fake_cras_audio_client()->SetAudioNodesAndNotifyObserversForTesting(
+      GenerateAudioNodeList({kInternalMicWithNC, kInternalMicWithoutNC}));
+
+  // Prepare `CrasAudioHandler` to report that noise cancellation is supported.
+  fake_cras_audio_client()->SetNoiseCancellationSupported(true);
+  cras_audio_handler()->RequestNoiseCancellationSupported(base::DoNothing());
+
+  SimulateUserLogin("testuser1@gmail.com");
+
+  // Switch to use `kInternalMicWithoutNC`, `AudioEffectsController` reports
+  // noise that cancellation is not-supported.
+  cras_audio_handler()->SwitchToDevice(
+      AudioDevice(GenerateAudioNode(kInternalMicWithoutNC)), /*notify=*/true,
+      CrasAudioHandler::ACTIVATE_BY_USER);
+
+  EXPECT_FALSE(audio_effects_controller()->IsEffectSupported(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_FALSE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
+
+  // Switch to use `kInternalMicWithNC`, `AudioEffectsController` reports noise
+  // that cancellation is supported.
+  cras_audio_handler()->SwitchToDevice(
+      AudioDevice(GenerateAudioNode(kInternalMicWithNC)), /*notify=*/true,
+      CrasAudioHandler::ACTIVATE_BY_USER);
+
+  EXPECT_TRUE(audio_effects_controller()->IsEffectSupported(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_TRUE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
+
+  // Switch back to use `kInternalMicWithoutNC`, `AudioEffectsController`
+  // reports noise that cancellation is not-supported.
+  cras_audio_handler()->SwitchToDevice(
+      AudioDevice(GenerateAudioNode(kInternalMicWithoutNC)), /*notify=*/true,
+      CrasAudioHandler::ACTIVATE_BY_USER);
+
+  EXPECT_FALSE(audio_effects_controller()->IsEffectSupported(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_FALSE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
+}
+
+TEST_F(AudioEffectsControllerTest, NoiseCancellationSwitchOutputDevice) {
+  fake_cras_audio_client()->SetAudioNodesAndNotifyObserversForTesting(
+      GenerateAudioNodeList({kInternalMicWithNC, kInternalSpeakerWithNC,
+                             kInternalSpeakerWithoutNC}));
+
+  // Prepare `CrasAudioHandler` to report that noise cancellation is supported.
+  fake_cras_audio_client()->SetNoiseCancellationSupported(true);
+  cras_audio_handler()->RequestNoiseCancellationSupported(base::DoNothing());
+
+  SimulateUserLogin("testuser1@gmail.com");
+
+  // Switch output device to not support NC, `AudioEffectsController` reports
+  // noise that cancellation is not-supported.
+  ChangeAudioOutput(/*noise_cancellation_supported=*/false);
+
+  EXPECT_FALSE(audio_effects_controller()->IsEffectSupported(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_FALSE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
+
+  // Switch output device to support NC, `AudioEffectsController` reports noise
+  // that cancellation is supported.
+  ChangeAudioOutput(/*noise_cancellation_supported=*/true);
+
+  EXPECT_TRUE(audio_effects_controller()->IsEffectSupported(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_TRUE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
+
+  // Switch back output device to not support NC, `AudioEffectsController`
+  // reports noise that cancellation is not-supported.
+  ChangeAudioOutput(/*noise_cancellation_supported=*/false);
+
+  EXPECT_FALSE(audio_effects_controller()->IsEffectSupported(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_FALSE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
+}
+
+TEST_F(AudioEffectsControllerTest, CloseBubble) {
+  fake_cras_audio_client()->SetNoiseCancellationSupported(true);
+  cras_audio_handler()->RequestNoiseCancellationSupported(base::DoNothing());
+  ChangeAudioInput(/*noise_cancellation_supported=*/true);
+
+  SimulateUserLogin("testuser1@gmail.com");
+
+  OpenVideoConferenceBubble();
+  ASSERT_TRUE(GetVideoConfereneTray()->GetBubbleView());
+
+  // Change to an input device that does not support noise cancellation. The
+  // bubble should close automatically to update effect state.
+  ChangeAudioInput(/*noise_cancellation_supported=*/false);
+  EXPECT_FALSE(GetVideoConfereneTray()->GetBubbleView());
 }
 
 TEST_F(AudioEffectsControllerTest, LiveCaptionNotSupported) {
@@ -205,7 +471,8 @@ TEST_F(AudioEffectsControllerTest, LiveCaptionSupported) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitWithFeatures(
       {media::kLiveCaption, media::kLiveCaptionSystemWideOnChromeOS,
-       ash::features::kOnDeviceSpeechRecognition},
+       features::kOnDeviceSpeechRecognition,
+       features::kShowLiveCaptionInVideoConferenceTray},
       {});
 
   SimulateUserLogin("testuser1@gmail.com");
@@ -214,6 +481,30 @@ TEST_F(AudioEffectsControllerTest, LiveCaptionSupported) {
   // that live caption is supported.
   EXPECT_TRUE(
       audio_effects_controller()->IsEffectSupported(VcEffectId::kLiveCaption));
+  EXPECT_TRUE(
+      audio_effects_controller()->GetEffectById(VcEffectId::kLiveCaption));
+
+  // Delegate should be registered.
+  EXPECT_TRUE(VideoConferenceTrayController::Get()
+                  ->effects_manager()
+                  .IsDelegateRegistered(audio_effects_controller()));
+}
+
+// Tests that with `features::kShowLiveCaptionInVideoConferenceTray`
+// disabled, the live caption button does not show up in the vc tray.
+TEST_F(AudioEffectsControllerTest, DoNotShowLiveCaptionInVcTray) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitWithFeatures(
+      {media::kLiveCaption, media::kLiveCaptionSystemWideOnChromeOS,
+       features::kOnDeviceSpeechRecognition},
+      {features::kShowLiveCaptionInVideoConferenceTray});
+
+  SimulateUserLogin("testuser1@gmail.com");
+
+  EXPECT_FALSE(
+      audio_effects_controller()->IsEffectSupported(VcEffectId::kLiveCaption));
+  EXPECT_FALSE(
+      audio_effects_controller()->GetEffectById(VcEffectId::kLiveCaption));
 }
 
 TEST_F(AudioEffectsControllerTest, LiveCaptionNotEnabled) {
@@ -221,7 +512,7 @@ TEST_F(AudioEffectsControllerTest, LiveCaptionNotEnabled) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitWithFeatures(
       {media::kLiveCaption, media::kLiveCaptionSystemWideOnChromeOS,
-       ash::features::kOnDeviceSpeechRecognition},
+       features::kOnDeviceSpeechRecognition},
       {});
 
   SimulateUserLogin("testuser1@gmail.com");
@@ -244,7 +535,7 @@ TEST_F(AudioEffectsControllerTest, LiveCaptionEnabled) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitWithFeatures(
       {media::kLiveCaption, media::kLiveCaptionSystemWideOnChromeOS,
-       ash::features::kOnDeviceSpeechRecognition},
+       features::kOnDeviceSpeechRecognition},
       {});
 
   SimulateUserLogin("testuser1@gmail.com");
@@ -267,7 +558,7 @@ TEST_F(AudioEffectsControllerTest, LiveCaptionSetNotEnabled) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitWithFeatures(
       {media::kLiveCaption, media::kLiveCaptionSystemWideOnChromeOS,
-       ash::features::kOnDeviceSpeechRecognition},
+       features::kOnDeviceSpeechRecognition},
       {});
 
   SimulateUserLogin("testuser1@gmail.com");
@@ -291,7 +582,7 @@ TEST_F(AudioEffectsControllerTest, LiveCaptionSetEnabled) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitWithFeatures(
       {media::kLiveCaption, media::kLiveCaptionSystemWideOnChromeOS,
-       ash::features::kOnDeviceSpeechRecognition},
+       features::kOnDeviceSpeechRecognition},
       {});
 
   SimulateUserLogin("testuser1@gmail.com");
@@ -308,6 +599,57 @@ TEST_F(AudioEffectsControllerTest, LiveCaptionSetEnabled) {
 
   // Live caption is now enabled.
   EXPECT_TRUE(controller->live_caption().enabled());
+}
+
+TEST_F(AudioEffectsControllerTest, LiveCaptionAndNoiseCancellationAdded) {
+  // Prepare noise cancellation support.
+  fake_cras_audio_client()->SetNoiseCancellationSupported(true);
+  cras_audio_handler()->RequestNoiseCancellationSupported(base::DoNothing());
+
+  // Ensure that live caption is supported.
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitWithFeatures(
+      {media::kLiveCaption, media::kLiveCaptionSystemWideOnChromeOS,
+       features::kOnDeviceSpeechRecognition,
+       features::kShowLiveCaptionInVideoConferenceTray},
+      {});
+
+  SimulateUserLogin("testuser1@gmail.com");
+
+  // Both effects should be supported and added.
+  EXPECT_TRUE(audio_effects_controller()->IsEffectSupported(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_TRUE(
+      audio_effects_controller()->IsEffectSupported(VcEffectId::kLiveCaption));
+
+  EXPECT_TRUE(audio_effects_controller()->GetEffectById(
+      VcEffectId::kNoiseCancellation));
+  EXPECT_TRUE(
+      audio_effects_controller()->GetEffectById(VcEffectId::kLiveCaption));
+
+  // Delegate should be registered.
+  EXPECT_TRUE(VideoConferenceTrayController::Get()
+                  ->effects_manager()
+                  .IsDelegateRegistered(audio_effects_controller()));
+}
+
+TEST_F(AudioEffectsControllerTest, DelegateRegistered) {
+  VideoConferenceTrayEffectsManager& effects_manager =
+      VideoConferenceTrayController::Get()->effects_manager();
+
+  // No effects supported. Delegate should not be registered.
+  SimulateUserLogin("testuser1@gmail.com");
+
+  EXPECT_FALSE(
+      effects_manager.IsDelegateRegistered(audio_effects_controller()));
+
+  // Change audio input to support noise cancellation. Delegate should be
+  // registered now.
+  fake_cras_audio_client()->SetNoiseCancellationSupported(true);
+  cras_audio_handler()->RequestNoiseCancellationSupported(base::DoNothing());
+  ChangeAudioInput(/*noise_cancellation_supported=*/true);
+
+  EXPECT_TRUE(effects_manager.IsDelegateRegistered(audio_effects_controller()));
 }
 
 }  // namespace ash

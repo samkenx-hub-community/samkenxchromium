@@ -7,6 +7,7 @@
 
 #include "ash/components/arc/mojom/intent_helper.mojom.h"
 #include "ash/components/arc/session/connection_holder.h"
+#include "base/memory/raw_ptr.h"
 
 namespace arc {
 
@@ -35,7 +36,6 @@ class FakeIntentHelperHost : public mojom::IntentHelperHost {
   void OpenWallpaperPicker() override;
   void OpenVolumeControl() override;
   void OnOpenWebApp(const std::string& url) override;
-  void RecordShareFilesMetricsDeprecated(mojom::ShareFiles flag) override;
   void LaunchCameraApp(uint32_t intent_id,
                        arc::mojom::CameraIntentMode mode,
                        bool should_handle_result,
@@ -64,8 +64,9 @@ class FakeIntentHelperHost : public mojom::IntentHelperHost {
 
  private:
   // The connection holder must outlive |this| object.
-  ConnectionHolder<arc::mojom::IntentHelperInstance,
-                   arc::mojom::IntentHelperHost>* const
+  const raw_ptr<ConnectionHolder<arc::mojom::IntentHelperInstance,
+                                 arc::mojom::IntentHelperHost>,
+                ExperimentalAsh>
       intent_helper_connection_holder_;
 };
 

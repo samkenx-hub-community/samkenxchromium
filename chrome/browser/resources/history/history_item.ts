@@ -103,6 +103,11 @@ export class HistoryItemElement extends HistoryItemElementBase {
         type: String,
         computed: 'getAriaDescribedByForHeading_(isCardStart, isCardEnd)',
       },
+
+      ariaDescribedByForActions_: {
+        type: String,
+        computed: 'getAriaDescribedByForActions_(isCardStart, isCardEnd)',
+      },
     };
   }
 
@@ -233,6 +238,16 @@ export class HistoryItemElement extends HistoryItemElementBase {
     return this.isCardStart || this.isCardEnd ? 'date-accessed' : '';
   }
 
+  /**
+   * Actions menu is described by the title and domain of the row and may
+   * include the date to make sure users know if they have jumped between dates.
+   */
+  private getAriaDescribedByForActions_(): string {
+    return this.isCardStart || this.isCardEnd ?
+        'title-and-domain date-accessed' :
+        'title-and-domain';
+  }
+
   private getAriaChecked_(selected: boolean): string {
     return selected ? 'true' : 'false';
   }
@@ -240,7 +255,7 @@ export class HistoryItemElement extends HistoryItemElementBase {
   /**
    * Remove bookmark of current item when bookmark-star is clicked.
    */
-  private onRemoveBookmarkTap_() {
+  private onRemoveBookmarkClick_() {
     if (!this.item.starred) {
       return;
     }
@@ -261,7 +276,7 @@ export class HistoryItemElement extends HistoryItemElementBase {
    * Fires a custom event when the menu button is clicked. Sends the details
    * of the history item and where the menu should appear.
    */
-  private onMenuButtonTap_(e: Event) {
+  private onMenuButtonClick_(e: Event) {
     this.fire_('open-menu', {
       target: e.target,
       index: this.index,

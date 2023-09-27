@@ -9,6 +9,7 @@
 
 #include "ash/wm/splitview/split_view_controller.h"
 #include "ash/wm/window_state.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/gfx/geometry/rect.h"
 
 namespace ash {
@@ -85,6 +86,14 @@ class TabletModeWindowState : public WindowState::State {
       WindowState* window_state,
       chromeos::WindowStateType target_state);
 
+  // If `target_state` is PRIMARY/SECONDARY_SNAPPED or TRUSTED_PINNED/PINNED,
+  // returns `target_state`. Otherwise depending on the capabilities of the
+  // window either returns `WindowStateType::kMaximized` or
+  // `WindowStateType::kNormal`.
+  chromeos::WindowStateType AdjustStateForTabletMode(
+      WindowState* window_state,
+      chromeos::WindowStateType target_state);
+
   // Updates the bounds to the maximum possible bounds according to the current
   // window state. If `animate` is set we animate the change.
   void UpdateBounds(WindowState* window_state,
@@ -101,7 +110,8 @@ class TabletModeWindowState : public WindowState::State {
   // it cannot be snapped.
   void DoTabletSnap(WindowState* window_state,
                     WMEventType snap_event_type,
-                    float snap_ratio);
+                    float snap_ratio,
+                    WindowSnapActionSource snap_action_source);
 
   // Called by `WM_EVENT_RESTORE`, or a `WM_EVENT_NORMAL` that is restoring.
   // Restores to the state in `window_states`'s restore history.
@@ -112,10 +122,10 @@ class TabletModeWindowState : public WindowState::State {
   std::unique_ptr<WindowState::State> old_state_;
 
   // The window whose WindowState owns this instance.
-  aura::Window* window_;
+  raw_ptr<aura::Window, ExperimentalAsh> window_;
 
   // The creator which needs to be informed when this state goes away.
-  TabletModeWindowManager* creator_;
+  raw_ptr<TabletModeWindowManager, ExperimentalAsh> creator_;
 
   // The state type to be established in AttachState(), unless
   // previous_state->GetType() is MAXIMIZED, MINIMIZED, FULLSCREEN, PINNED, or

@@ -4,7 +4,12 @@
 
 #include "ash/glanceables/tasks/glanceables_tasks_types.h"
 
+#include "third_party/abseil-cpp/absl/types/optional.h"
+
 namespace ash {
+
+// ----------------------------------------------------------------------------
+// GlanceablesTaskList:
 
 GlanceablesTaskList::GlanceablesTaskList(const std::string& id,
                                          const std::string& title,
@@ -19,10 +24,17 @@ GlanceablesTaskList::~GlanceablesTaskList() = default;
 GlanceablesTask::GlanceablesTask(const std::string& id,
                                  const std::string& title,
                                  bool completed,
-                                 const std::vector<GlanceablesTask>& subtasks)
-    : id(id), title(title), completed(completed), subtasks(subtasks) {}
-
-GlanceablesTask::GlanceablesTask(const GlanceablesTask&) = default;
+                                 const absl::optional<base::Time>& due,
+                                 bool has_subtasks,
+                                 bool has_email_link,
+                                 bool has_notes)
+    : id(id),
+      title(title),
+      completed(completed),
+      due(due),
+      has_subtasks(has_subtasks),
+      has_email_link(has_email_link),
+      has_notes(has_notes) {}
 
 GlanceablesTask::~GlanceablesTask() = default;
 

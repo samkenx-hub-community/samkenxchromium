@@ -30,6 +30,7 @@
 
 #include <memory>
 
+#include "base/gtest_prod_util.h"
 #include "third_party/blink/public/common/privacy_budget/identifiable_surface.h"
 #include "third_party/blink/public/common/privacy_budget/identifiable_token.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_value.h"
@@ -74,14 +75,13 @@ class
 typedef CanvasRenderingContext2DOrWebGLRenderingContextOrWebGL2RenderingContextOrImageBitmapRenderingContextOrGPUCanvasContext
     RenderingContext;
 
+CORE_EXPORT BASE_DECLARE_FEATURE(kStartCanvasWithAccelerationDisabled);
+
 // This contains the information of HTML Canvas Element,
 // There are four different types of rendering context this HTML Canvas can own.
 // It can be a 3D Context (WebGL or WebGL2), 2D Context,
 // BitmapRenderingContext or it can have no context (Offscreen placeholder).
 // To check the no context case is good to check if there is a placeholder.
-//
-// TODO (juanmihd): Study if a refactor of context could help in simplifying
-// this class and without overcomplicating context.
 class CORE_EXPORT HTMLCanvasElement final
     : public HTMLElement,
       public ExecutionContextLifecycleObserver,
@@ -103,12 +103,10 @@ class CORE_EXPORT HTMLCanvasElement final
   unsigned width() const { return Size().width(); }
   unsigned height() const { return Size().height(); }
 
-  const gfx::Size& Size() const override { return size_; }
-
   void setWidth(unsigned, ExceptionState&);
   void setHeight(unsigned, ExceptionState&);
 
-  void SetSize(const gfx::Size& new_size);
+  void SetSize(gfx::Size new_size) final;
 
   // Called by Document::getCSSCanvasContext as well as above getContext().
   CanvasRenderingContext* GetCanvasRenderingContext(
@@ -182,7 +180,7 @@ class CORE_EXPORT HTMLCanvasElement final
   void DoDeferredPaintInvalidation();
 
   void PreFinalizeFrame() override;
-  void PostFinalizeFrame(CanvasResourceProvider::FlushReason) override;
+  void PostFinalizeFrame(FlushReason) override;
 
   CanvasResourceDispatcher* GetOrCreateResourceDispatcher() override;
 
@@ -197,7 +195,7 @@ class CORE_EXPORT HTMLCanvasElement final
 
   // CanvasImageSource implementation
   scoped_refptr<Image> GetSourceImageForCanvas(
-      CanvasResourceProvider::FlushReason,
+      FlushReason,
       SourceImageStatus*,
       const gfx::SizeF&,
       const AlphaDisposition alpha_disposition = kPremultiplyAlpha) override;
@@ -214,6 +212,7 @@ class CORE_EXPORT HTMLCanvasElement final
   void UnregisterContentsLayer(cc::Layer*) override;
 
   // CanvasResourceHost implementation
+  bool IsPageVisible() override;
   void NotifyGpuContextLost() override;
   void SetNeedsCompositingUpdate() override;
   void UpdateMemoryUsage() override;
@@ -224,6 +223,8 @@ class CORE_EXPORT HTMLCanvasElement final
       RasterModeHint hint) override;
   bool IsPrinting() const override;
   void SetFilterQuality(cc::PaintFlags::FilterQuality filter_quality) override;
+  bool IsHibernating() const override;
+  void FlushRecording(FlushReason reason) override;
 
   // CanvasRenderingContextHost implementation.
   UkmParameters GetUkmParameters() override;
@@ -273,7 +274,7 @@ class CORE_EXPORT HTMLCanvasElement final
   }
 
   const KURL& GetExecutionContextUrl() const override {
-    return GetDocument().TopDocument().Url();
+    return GetDocument().Url();
   }
 
   DispatchEventResult HostDispatchEvent(Event* event) override {
@@ -297,7 +298,7 @@ class CORE_EXPORT HTMLCanvasElement final
     needs_unbuffered_input_ = value;
   }
 
-  scoped_refptr<StaticBitmapImage> Snapshot(CanvasResourceProvider::FlushReason,
+  scoped_refptr<StaticBitmapImage> Snapshot(FlushReason,
                                             SourceDrawingBuffer) const;
 
   // Returns the cc layer containing the contents. It's the cc layer of
@@ -313,6 +314,8 @@ class CORE_EXPORT HTMLCanvasElement final
   bool IsCanvasClear() { return canvas_is_clear_; }
 
   bool IsPlaceholder() const override { return IsOffscreenCanvasRegistered(); }
+
+  bool ShouldDisableAccelerationBecauseOfReadback() const;
 
  protected:
   void DidMoveToNewDocument(Document& old_document) override;
@@ -342,18 +345,16 @@ class CORE_EXPORT HTMLCanvasElement final
   static CanvasRenderingContextFactory* GetRenderingContextFactory(int);
 
   bool ShouldAccelerate() const;
-
   void ParseAttribute(const AttributeModificationParams&) override;
-  LayoutObject* CreateLayoutObject(const ComputedStyle&, LegacyLayout) override;
+  LayoutObject* CreateLayoutObject(const ComputedStyle&) override;
   bool AreAuthorShadowsAllowed() const override { return false; }
 
   void Reset();
 
-  std::unique_ptr<Canvas2DLayerBridge> Create2DLayerBridge(
-      RasterMode raster_mode);
+  std::unique_ptr<Canvas2DLayerBridge> Create2DLayerBridge();
   void SetCanvas2DLayerBridgeInternal(std::unique_ptr<Canvas2DLayerBridge>);
 
-  void SetSurfaceSize(const gfx::Size&);
+  void SetSurfaceSize(gfx::Size);
 
   bool PaintsIntoCanvasBuffer() const;
 
@@ -373,7 +374,7 @@ class CORE_EXPORT HTMLCanvasElement final
       const CanvasContextCreationAttributesCore&);
 
   scoped_refptr<StaticBitmapImage> GetSourceImageForCanvasInternal(
-      CanvasResourceProvider::FlushReason,
+      FlushReason,
       SourceImageStatus*,
       const AlphaDisposition alpha_disposition = kPremultiplyAlpha);
 
@@ -383,8 +384,6 @@ class CORE_EXPORT HTMLCanvasElement final
   FRIEND_TEST_ALL_PREFIXES(HTMLCanvasElementTest, BrokenCanvasHighRes);
 
   HeapHashSet<WeakMember<CanvasDrawListener>> listeners_;
-
-  gfx::Size size_;
 
   Member<CanvasRenderingContext> context_;
   // Used only for WebGL currently.

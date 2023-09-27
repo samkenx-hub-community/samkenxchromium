@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+
+import * as Common from 'devtools/core/common/common.js';
+
 (async function() {
   TestRunner.addResult(`Tests workspace mappings\n`);
 
@@ -18,7 +22,7 @@
       workspace.addProject(project);
       projects[projectId] = project;
     }
-    var uiSourceCode = project.createUISourceCode(projectId + '/' + relativePath, Common.resourceTypes.Script);
+    var uiSourceCode = project.createUISourceCode(projectId + '/' + relativePath, Common.ResourceType.resourceTypes.Script);
     project.addUISourceCode(uiSourceCode);
   }
 

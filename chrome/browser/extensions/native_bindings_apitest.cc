@@ -171,8 +171,10 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, FileSystemApiGetDisplayPath) {
   FileSystemChooseEntryFunction::RegisterTempExternalFileSystemForTest(
       "test_root", test_dir);
   base::FilePath test_file = test_dir.AppendASCII("text.txt");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_file);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_file};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("native_bindings/instance_of",
                                {.launch_as_platform_app = true}))
       << message_;
@@ -236,8 +238,8 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, ContextMenusTest) {
   content::WebContents* web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   std::unique_ptr<TestRenderViewContextMenu> menu(
-      TestRenderViewContextMenu::Create(
-          web_contents, GURL("https://www.example.com"), GURL(), GURL()));
+      TestRenderViewContextMenu::Create(web_contents,
+                                        GURL("https://www.example.com")));
 
   ExtensionTestMessageListener listener("clicked");
   int command_id = ContextMenuMatcher::ConvertToExtensionsCustomCommandId(0);
@@ -295,13 +297,9 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, WebUIBindings) {
   content::WebContents* web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   auto api_exists = [web_contents](const std::string& api_name) {
-    bool exists = false;
-    EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-        web_contents,
-        base::StringPrintf("window.domAutomationController.send(!!%s);",
-                           api_name.c_str()),
-        &exists));
-    return exists;
+    return content::EvalJs(web_contents,
+                           base::StringPrintf("!!%s;", api_name.c_str()))
+        .ExtractBool();
   };
 
   EXPECT_TRUE(api_exists("chrome.developerPrivate"));

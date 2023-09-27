@@ -9,6 +9,23 @@
 #include "components/policy/policy_export.h"
 
 namespace policy {
+
+// Possible values for Incognito mode availability. Please, do not change
+// the order of entries since numeric values are exposed to users.
+enum class IncognitoModeAvailability {
+  // Incognito mode enabled. Users may open pages in both Incognito mode and
+  // normal mode (usually the default behaviour).
+  kEnabled = 0,
+  // Incognito mode disabled. Users may not open pages in Incognito mode.
+  // Only normal mode is available for browsing.
+  kDisabled,
+  // Incognito mode forced. Users may open pages *ONLY* in Incognito mode.
+  // Normal mode is not available for browsing.
+  kForced,
+
+  kNumTypes
+};
+
 namespace policy_prefs {
 
 #if BUILDFLAG(IS_WIN)
@@ -35,6 +52,7 @@ extern const char kIntensiveWakeUpThrottlingEnabled[];
 extern const char kUserAgentClientHintsGREASEUpdateEnabled[];
 #if BUILDFLAG(IS_ANDROID)
 extern const char kBackForwardCacheEnabled[];
+extern const char kReadAloudEnabled[];
 #endif  // BUILDFLAG(IS_ANDROID)
 extern const char kIsolatedAppsDeveloperModeAllowed[];
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
@@ -43,16 +61,18 @@ extern const char kLastPolicyCheckTime[];
 #if BUILDFLAG(IS_IOS)
 extern const char kUserPolicyNotificationWasShown[];
 #endif
-extern const char kEventPathEnabled[];
 extern const char kOffsetParentNewSpecBehaviorEnabled[];
 extern const char kSendMouseEventsDisabledFormControlsEnabled[];
-extern const char kUseMojoVideoDecoderForPepperAllowed[];
-extern const char kPPAPISharedImagesSwapChainAllowed[];
-extern const char kForceEnablePepperVideoDecoderDevAPI[];
 extern const char kForceGoogleSafeSearch[];
 extern const char kForceYouTubeRestrict[];
 extern const char kHideWebStoreIcon[];
 extern const char kIncognitoModeAvailability[];
+extern const char kBeforeunloadEventCancelByPreventDefaultEnabled[];
+extern const char kPolicyTestPageEnabled[];
+extern const char kAllowBackForwardCacheForCacheControlNoStorePageEnabled[];
+extern const char kLocalTestPoliciesForNextStartup[];
+extern const char kForcePermissionPolicyUnloadDefaultEnabled[];
+extern const char kPPAPISharedImagesForVideoDecoderAllowed[];
 
 }  // namespace policy_prefs
 }  // namespace policy

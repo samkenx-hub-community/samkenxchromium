@@ -56,22 +56,25 @@ void ConversationStateListenerImpl::OnRecognitionStateChanged(
 
   switch (state) {
     case RecognitionState::STARTED:
-      for (auto& observer : speech_recognition_observers_)
+      for (auto& observer : *speech_recognition_observers_) {
         observer->OnSpeechRecognitionStart();
+      }
       break;
     case RecognitionState::INTERMEDIATE_RESULT:
-      for (auto& observer : speech_recognition_observers_) {
+      for (auto& observer : *speech_recognition_observers_) {
         observer->OnIntermediateResult(recognition_result.high_confidence_text,
                                        recognition_result.low_confidence_text);
       }
       break;
     case RecognitionState::END_OF_UTTERANCE:
-      for (auto& observer : speech_recognition_observers_)
+      for (auto& observer : *speech_recognition_observers_) {
         observer->OnSpeechRecognitionEnd();
+      }
       break;
     case RecognitionState::FINAL_RESULT:
-      for (auto& observer : speech_recognition_observers_)
+      for (auto& observer : *speech_recognition_observers_) {
         observer->OnFinalResult(recognition_result.recognized_speech);
+      }
       break;
   }
 }
@@ -118,6 +121,7 @@ void ConversationStateListenerImpl::OnConversationTurnFinished(
       return;
     // This is only applicable in longform barge-in mode, which we do not use.
     case Resolution::LONGFORM_KEEP_MIC_OPEN:
+    case Resolution::BLUE_STEEL_ON_DEVICE_REJECTION:
       NOTREACHED();
       return;
   }
@@ -128,16 +132,18 @@ void ConversationStateListenerImpl::OnRespondingStarted(
   ENSURE_MOJOM_THREAD(&ConversationStateListenerImpl::OnRespondingStarted,
                       is_error_response);
 
-  for (auto& observer : conversation_observers_)
+  for (auto& observer : *conversation_observers_) {
     observer->OnTtsStarted(is_error_response);
+  }
 }
 
 void ConversationStateListenerImpl::NotifyInteractionFinished(
     assistant::AssistantInteractionResolution resolution) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  for (auto& observer : conversation_observers_)
+  for (auto& observer : *conversation_observers_) {
     observer->OnInteractionFinished(resolution);
+  }
 }
 
 }  // namespace ash::libassistant

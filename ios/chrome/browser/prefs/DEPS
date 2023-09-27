@@ -1,7 +1,3 @@
-specific_include_rules = {
-  # TODO(crbug.com/1294160): Remove this dependency.
-  "^browser_prefs.mm": [
-    "+ios/chrome/browser/ui",
-  ],
-}
-
+include_rules = [
+  "+ios/chrome/browser/sync/prefs",
+]

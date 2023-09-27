@@ -74,7 +74,7 @@ class MEDIA_MOJO_EXPORT MojoVideoEncodeAcceleratorService
       mojo::PendingRemote<mojom::MediaLog> media_log,
       InitializeCallback callback) override;
   void Encode(const scoped_refptr<VideoFrame>& frame,
-              bool force_keyframe,
+              const media::VideoEncoder::EncodeOptions& options,
               EncodeCallback callback) override;
   void UseOutputBitstreamBuffer(int32_t bitstream_buffer_id,
                                 base::UnsafeSharedMemoryRegion region) override;
@@ -98,7 +98,7 @@ class MEDIA_MOJO_EXPORT MojoVideoEncodeAcceleratorService
   void BitstreamBufferReady(
       int32_t bitstream_buffer_id,
       const media::BitstreamBufferMetadata& metadata) override;
-  void NotifyError(::media::VideoEncodeAccelerator::Error error) override;
+  void NotifyErrorStatus(const EncoderStatus& status) override;
   void NotifyEncoderInfoChange(const ::media::VideoEncoderInfo& info) override;
 
   CreateAndInitializeVideoEncodeAcceleratorCallback create_vea_callback_;

@@ -11,7 +11,11 @@
 
 #include "base/compiler_specific.h"
 #include "base/component_export.h"
+#include "base/containers/flat_map.h"
+#include "base/containers/flat_set.h"
+#include "base/files/file_path.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 #include "base/time/time.h"
 #include "chromeos/ash/components/dbus/arc/arc.pb.h"
@@ -100,9 +104,7 @@ class COMPONENT_EXPORT(SESSION_MANAGER) FakeSessionManagerClient
       const cryptohome::AccountIdentifier& cryptohome_id) override;
   void StartDeviceWipe() override;
   void StartRemoteDeviceWipe(
-      const enterprise_management::SignedData& signed_command,
-      enterprise_management::PolicyFetchRequest::SignatureType signature_type)
-      override;
+      const enterprise_management::SignedData& signed_command) override;
   void ClearForcedReEnrollmentVpd(
       chromeos::VoidDBusMethodCallback callback) override;
   void UnblockDevModeForEnrollment(
@@ -450,7 +452,7 @@ class COMPONENT_EXPORT(SESSION_MANAGER) FakeSessionManagerClient
   // Contains last request passed to StartArcInstance
   arc::UpgradeArcContainerRequest last_upgrade_arc_request_;
 
-  StubDelegate* delegate_ = nullptr;
+  raw_ptr<StubDelegate, ExperimentalAsh> delegate_ = nullptr;
 
   bool session_stopped_ = false;
 
@@ -468,19 +470,21 @@ class COMPONENT_EXPORT(SESSION_MANAGER) FakeSessionManagerClient
 
   absl::optional<std::string> primary_user_id_;
 
+  base::flat_map<std::string, std::string> login_screen_storage_;
+
+  base::flat_set<base::FilePath> files_to_clean_up_;
+
   base::WeakPtrFactory<FakeSessionManagerClient> weak_ptr_factory_{this};
 };
 
+// Helper class to create FakeSessionManagerClient. Note that the existing
+// SessionManagerClient instance will be released.
 class COMPONENT_EXPORT(SESSION_MANAGER) ScopedFakeSessionManagerClient {
  public:
   ScopedFakeSessionManagerClient();
+  explicit ScopedFakeSessionManagerClient(
+      FakeSessionManagerClient::PolicyStorageType policy_storage);
   ~ScopedFakeSessionManagerClient();
-};
-
-class COMPONENT_EXPORT(SESSION_MANAGER) ScopedFakeInMemorySessionManagerClient {
- public:
-  ScopedFakeInMemorySessionManagerClient();
-  ~ScopedFakeInMemorySessionManagerClient();
 };
 
 }  // namespace ash

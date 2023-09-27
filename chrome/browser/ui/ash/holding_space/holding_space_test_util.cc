@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ui/ash/holding_space/holding_space_test_util.h"
 
+#include "ash/public/cpp/holding_space/holding_space_file.h"
 #include "ash/public/cpp/holding_space/holding_space_model.h"
 #include "ash/public/cpp/holding_space/mock_holding_space_model_observer.h"
 #include "base/run_loop.h"
@@ -16,8 +17,9 @@ GetSuggestionsInModel(const HoldingSpaceModel& model) {
   std::vector<std::pair<HoldingSpaceItem::Type, base::FilePath>>
       model_suggestions;
   for (const auto& item : model.items()) {
-    if (HoldingSpaceItem::IsSuggestion(item->type()))
-      model_suggestions.emplace_back(item->type(), item->file_path());
+    if (HoldingSpaceItem::IsSuggestionType(item->type())) {
+      model_suggestions.emplace_back(item->type(), item->file().file_path);
+    }
   }
   return model_suggestions;
 }

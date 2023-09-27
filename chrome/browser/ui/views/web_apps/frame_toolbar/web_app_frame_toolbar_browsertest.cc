@@ -5,6 +5,7 @@
 #include <cmath>
 #include <tuple>
 
+#include "base/memory/raw_ptr.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/test/bind.h"
@@ -12,10 +13,13 @@
 #include "base/test/test_future.h"
 #include "base/test/test_timeouts.h"
 #include "build/build_config.h"
+#include "chrome/browser/download/bubble/download_bubble_ui_controller.h"
+#include "chrome/browser/download/bubble/download_display_controller.h"
 #include "chrome/browser/extensions/chrome_test_extension_loader.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
+#include "chrome/browser/ui/download/download_display.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/extensions/extensions_menu_view.h"
@@ -54,9 +58,10 @@
 #include "components/infobars/content/content_infobar_manager.h"
 #include "components/permissions/permission_request_manager.h"
 #include "components/safe_browsing/core/common/features.h"
+#include "content/public/browser/notification_service.h"
+#include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
-#include "content/public/common/content_features.h"
 #include "content/public/common/page_zoom.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -74,6 +79,7 @@
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/view.h"
+#include "ui/views/widget/any_widget_observer.h"
 #include "url/gurl.h"
 #include "url/origin.h"
 
@@ -96,8 +102,9 @@ template <typename T>
 T* GetLastVisible(const std::vector<T*>& views) {
   T* visible = nullptr;
   for (auto* view : views) {
-    if (view->GetVisible())
+    if (view->GetVisible()) {
       visible = view;
+    }
   }
   return visible;
 }
@@ -182,8 +189,9 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest, SpaceConstrained) {
           ->web_app_frame_toolbar()
           ->GetPageActionIconControllerForTesting()
           ->GetPageActionIconViewsForTesting();
-  for (const PageActionIconView* action : page_actions)
+  for (const PageActionIconView* action : page_actions) {
     EXPECT_EQ(action->parent(), toolbar_right_container);
+  }
 
   views::View* const menu_button =
       helper()->browser_view()->toolbar_button_provider()->GetAppMenuButton();
@@ -357,6 +365,20 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest, TitleHover) {
 #endif
 }
 
+IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest,
+                       MenuButtonAccessibleName) {
+  const GURL app_url("https://test.org");
+  helper()->InstallAndLaunchWebApp(browser(), app_url);
+
+  views::View* const menu_button =
+      helper()->browser_view()->toolbar_button_provider()->GetAppMenuButton();
+
+  EXPECT_EQ(menu_button->GetAccessibleName(),
+            u"Customize and control A minimal-ui app");
+  EXPECT_EQ(menu_button->GetTooltipText(gfx::Point()),
+            u"Customize and control A minimal-ui app");
+}
+
 class WebAppFrameToolbarBrowserTest_ElidedExtensionsMenu
     : public WebAppFrameToolbarBrowserTest {
  public:
@@ -439,10 +461,8 @@ class BorderlessIsolatedWebAppBrowserTest
     : public web_app::IsolatedWebAppBrowserTestHarness {
  public:
   BorderlessIsolatedWebAppBrowserTest() {
-    scoped_feature_list_.InitWithFeatures(
-        {features::kIsolatedWebApps, features::kIsolatedWebAppDevMode,
-         blink::features::kWebAppBorderless},
-        {});
+    scoped_feature_list_.InitAndEnableFeature(
+        blink::features::kWebAppBorderless);
   }
 
   void InstallAndLaunchIsolatedWebApp(bool uses_borderless) {
@@ -473,7 +493,7 @@ class BorderlessIsolatedWebAppBrowserTest
     auto* web_contents = browser_view()->GetActiveWebContents();
     std::string permission_auto_approve_script = R"(
       const draggable = document.getElementById('draggable');
-      draggable.setAttribute('allow', 'window-placement');
+      draggable.setAttribute('allow', 'window-management');
     )";
     EXPECT_TRUE(ExecJs(web_contents, permission_auto_approve_script,
                        content::EXECUTE_SCRIPT_NO_USER_GESTURE));
@@ -486,7 +506,7 @@ class BorderlessIsolatedWebAppBrowserTest
 
     std::string permission_query_script = R"(
       navigator.permissions.query({
-        name: 'window-placement'
+        name: 'window-management'
       }).then(res => res.state)
     )";
     EXPECT_EQ("granted", EvalJs(web_contents, permission_query_script));
@@ -580,9 +600,9 @@ class BorderlessIsolatedWebAppBrowserTest
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<net::EmbeddedTestServer> isolated_web_app_dev_server_;
-  Browser* browser_;
-  BrowserView* browser_view_;
-  BrowserNonClientFrameView* frame_view_;
+  raw_ptr<Browser, AcrossTasksDanglingUntriaged> browser_;
+  raw_ptr<BrowserView, AcrossTasksDanglingUntriaged> browser_view_;
+  raw_ptr<BrowserNonClientFrameView, AcrossTasksDanglingUntriaged> frame_view_;
 };
 
 IN_PROC_BROWSER_TEST_F(BorderlessIsolatedWebAppBrowserTest,
@@ -593,7 +613,6 @@ IN_PROC_BROWSER_TEST_F(BorderlessIsolatedWebAppBrowserTest,
   ASSERT_TRUE(
       browser_view()->window_management_permission_granted_for_testing());
   ASSERT_TRUE(browser_view()->IsBorderlessModeEnabled());
-  ASSERT_FALSE(web_app_frame_toolbar()->GetAppMenuButton()->GetVisible());
 }
 
 IN_PROC_BROWSER_TEST_F(BorderlessIsolatedWebAppBrowserTest,
@@ -643,7 +662,6 @@ IN_PROC_BROWSER_TEST_F(BorderlessIsolatedWebAppBrowserTest,
   ASSERT_FALSE(
       browser_view()->window_management_permission_granted_for_testing());
   ASSERT_FALSE(browser_view()->IsBorderlessModeEnabled());
-  ASSERT_TRUE(web_app_frame_toolbar()->GetAppMenuButton()->GetVisible());
 }
 
 IN_PROC_BROWSER_TEST_F(BorderlessIsolatedWebAppBrowserTest,
@@ -826,18 +844,14 @@ class WebAppFrameToolbarBrowserTest_WindowControlsOverlay
     WebAppFrameToolbarBrowserTest::SetUp();
   }
 
-  web_app::AppId InstallAndLaunchWebApp() {
-    EXPECT_TRUE(https_server()->Start());
-    GURL start_url =
-        helper()->LoadWindowControlsOverlayTestPageWithDataAndGetURL(
-            embedded_test_server(), &temp_dir_);
-
+  webapps::AppId InstallAndLaunchWCOWebApp(GURL start_url,
+                                           std::u16string app_title) {
     std::vector<blink::mojom::DisplayMode> display_overrides;
     display_overrides.push_back(web_app::DisplayMode::kWindowControlsOverlay);
-    auto web_app_info = std::make_unique<WebAppInstallInfo>();
+    auto web_app_info = std::make_unique<web_app::WebAppInstallInfo>();
     web_app_info->start_url = start_url;
     web_app_info->scope = start_url.GetWithoutFilename();
-    web_app_info->title = u"A window-controls-overlay app";
+    web_app_info->title = std::move(app_title);
     web_app_info->display_mode = web_app::DisplayMode::kStandalone;
     web_app_info->user_display_mode =
         web_app::mojom::UserDisplayMode::kStandalone;
@@ -845,6 +859,22 @@ class WebAppFrameToolbarBrowserTest_WindowControlsOverlay
 
     return helper()->InstallAndLaunchCustomWebApp(
         browser(), std::move(web_app_info), start_url);
+  }
+
+  webapps::AppId InstallAndLaunchWebApp() {
+    EXPECT_TRUE(https_server()->Start());
+    return InstallAndLaunchWCOWebApp(
+        helper()->LoadWindowControlsOverlayTestPageWithDataAndGetURL(
+            embedded_test_server(), &temp_dir_),
+        u"A window-controls-overlay app");
+  }
+
+  webapps::AppId InstallAndLaunchFullyDraggableWebApp() {
+    EXPECT_TRUE(https_server()->Start());
+    return InstallAndLaunchWCOWebApp(
+        helper()->LoadWholeAppIsDraggableTestPageWithDataAndGetURL(
+            embedded_test_server(), &temp_dir_),
+        u"Full page draggable window-controls-overlay app");
   }
 
   void ToggleWindowControlsOverlayAndWaitHelper(
@@ -1146,8 +1176,7 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
 
   std::string kCSSTitlebarRect = GetCSSTitlebarRect();
   auto* web_contents = helper()->browser_view()->GetActiveWebContents();
-  EXPECT_TRUE(
-      ExecuteScript(web_contents->GetPrimaryMainFrame(), kCSSTitlebarRect));
+  EXPECT_TRUE(ExecJs(web_contents->GetPrimaryMainFrame(), kCSSTitlebarRect));
 
   const std::string kRectListString =
       "var rect = [titlebarAreaXInt, titlebarAreaYInt, "
@@ -1179,8 +1208,7 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
   new_bounds.set_height(new_bounds.height() + 20);
   ResizeWindowBoundsAndWait(new_bounds);
 
-  EXPECT_TRUE(
-      ExecuteScript(web_contents->GetPrimaryMainFrame(), kCSSTitlebarRect));
+  EXPECT_TRUE(ExecJs(web_contents->GetPrimaryMainFrame(), kCSSTitlebarRect));
 
   base::Value::List updated_rect_list = helper()->GetXYWidthHeightListValue(
       helper()->browser_view()->GetActiveWebContents(), kRectListString,
@@ -1203,8 +1231,7 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
 
   std::string kCSSTitlebarRect = GetCSSTitlebarRect();
   auto* web_contents = helper()->browser_view()->GetActiveWebContents();
-  EXPECT_TRUE(
-      ExecuteScript(web_contents->GetPrimaryMainFrame(), kCSSTitlebarRect));
+  EXPECT_TRUE(ExecJs(web_contents->GetPrimaryMainFrame(), kCSSTitlebarRect));
 
   const std::string kRectListString =
       "var rect = [titlebarAreaXInt, titlebarAreaYInt, "
@@ -1231,8 +1258,7 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
   new_bounds.set_height(new_bounds.height() + 15);
   ResizeWindowBoundsAndWait(new_bounds);
 
-  EXPECT_TRUE(
-      ExecuteScript(web_contents->GetPrimaryMainFrame(), kCSSTitlebarRect));
+  EXPECT_TRUE(ExecJs(web_contents->GetPrimaryMainFrame(), kCSSTitlebarRect));
 
   base::Value::List updated_rect_list = helper()->GetXYWidthHeightListValue(
       helper()->browser_view()->GetActiveWebContents(), kRectListString,
@@ -1253,6 +1279,68 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
   InstallAndLaunchWebApp();
   ToggleWindowControlsOverlayAndWait();
   helper()->TestDraggableRegions();
+}
+
+// Regression test for https://crbug.com/1448878.
+IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
+                       DraggableRegionsIgnoredForOwnedWidgets) {
+  auto app_id = InstallAndLaunchFullyDraggableWebApp();
+  ToggleWindowControlsOverlayAndWait();
+
+  BrowserView* browser_view = helper()->browser_view();
+  views::NonClientFrameView* frame_view =
+      browser_view->GetWidget()->non_client_view()->frame_view();
+
+  // A widget owned by BrowserView is triggered to ensure that a click inside
+  // the widget overlaying a draggable region correctly returns `HTCLIENT` and
+  // not `HTCAPTION`. The widget ownership varies between platforms so using
+  // different widgets based on platform.
+
+#if BUILDFLAG(IS_WIN)
+  views::NamedWidgetShownWaiter widget_waiter(
+      views::test::AnyWidgetTestPasskey{}, "DropdownBarHost");
+  // Press Ctrl+F to open find bar.
+  content::NativeWebKeyboardEvent event(
+      blink::WebKeyboardEvent::Type::kRawKeyDown,
+      blink::WebInputEvent::kControlKey,
+      blink::WebInputEvent::GetStaticTimeStampForTests());
+  event.windows_key_code = ui::VKEY_F;
+  event.skip_if_unhandled = false;
+  browser_view->GetActiveWebContents()
+      ->GetPrimaryMainFrame()
+      ->GetRenderViewHost()
+      ->GetWidget()
+      ->ForwardKeyboardEvent(event);
+#else
+  views::NamedWidgetShownWaiter widget_waiter(
+      views::test::AnyWidgetTestPasskey{}, "PermissionPromptBubbleBaseView");
+  content::ExecuteScriptAsyncWithoutUserGesture(
+      browser_view->GetActiveWebContents(),
+      "navigator.geolocation.getCurrentPosition(() => {});");
+#endif  // BUILDFLAG(IS_WIN)
+
+  views::Widget* widget = widget_waiter.WaitIfNeededAndGet();
+
+  // A point inside the widget is not draggable and returns `HTCLIENT` and not
+  // e.g. `HTCAPTION`.
+  auto widget_in_screen_bounds = widget->GetWindowBoundsInScreen();
+  gfx::Point point_in_widget = widget_in_screen_bounds.CenterPoint();
+  views::View::ConvertPointToTarget(
+      browser_view, browser_view->contents_web_view(), &point_in_widget);
+  EXPECT_TRUE(browser_view->ShouldDescendIntoChildForEventHandling(
+      browser_view->GetWidget()->GetNativeView(), point_in_widget));
+  EXPECT_EQ(frame_view->NonClientHitTest(point_in_widget), HTCLIENT);
+
+  // A point inside a draggable region (but outside the widget) is draggable
+  // and returns `HTCAPTION` as expected. This is to make sure having the widget
+  // open doesn't interfere with the way the draggable regions work beyond the
+  // area of the widget.
+  gfx::Point point_below_widget =
+      gfx::Point(widget_in_screen_bounds.bottom_center().x(),
+                 widget_in_screen_bounds.bottom_center().y() + 5);
+  EXPECT_FALSE(browser_view->ShouldDescendIntoChildForEventHandling(
+      browser_view->GetWidget()->GetNativeView(), point_below_widget));
+  EXPECT_EQ(frame_view->NonClientHitTest(point_below_widget), HTCAPTION);
 }
 
 IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
@@ -1360,7 +1448,7 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
 // Regression test for https://crbug.com/1239443.
 IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
                        OpenWithOverlayEnabled) {
-  web_app::AppId app_id = InstallAndLaunchWebApp();
+  webapps::AppId app_id = InstallAndLaunchWebApp();
   base::test::TestFuture<void> future;
   helper()
       ->browser_view()
@@ -1443,7 +1531,7 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
 // Regression test for https://crbug.com/1351566.
 IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
                        ExtensionsIconVisibility) {
-  web_app::AppId app_id = InstallAndLaunchWebApp();
+  webapps::AppId app_id = InstallAndLaunchWebApp();
   ToggleWindowControlsOverlayAndWait();
 
   // There should be no visible Extensions icon.
@@ -1475,22 +1563,79 @@ IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
 #endif  // !BUILDFLAG(IS_CHROMEOS)
 
 #if !BUILDFLAG(IS_CHROMEOS_ASH)
+// Test that a download by a web app browser only shows the download UI in that
+// app's window.
 IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
-                       DownloadIconVisibility) {
-  web_app::AppId app_id = InstallAndLaunchWebApp();
+                       DownloadIconVisibilityForAppDownload) {
+  webapps::AppId app_id = InstallAndLaunchWebApp();
   ToggleWindowControlsOverlayAndWait();
 
-  // There should be no visible Downloads icon.
+  Browser* non_app_browser = CreateBrowser(profile());
+
+  // There should be no visible Downloads icon prior to the download, in either
+  // the app browser or the non-app browser.
   WebAppToolbarButtonContainer* toolbar_button_container =
       helper()->web_app_frame_toolbar()->get_right_container_for_testing();
   EXPECT_FALSE(toolbar_button_container->download_button()->GetVisible());
+  EXPECT_FALSE(non_app_browser->window()
+                   ->GetDownloadBubbleUIController()
+                   ->GetDownloadDisplayController()
+                   ->download_display_for_testing()
+                   ->IsShowing());
 
+  // Download a file in the app browser.
   ui_test_utils::DownloadURL(
-      browser(), ui_test_utils::GetTestUrl(
-                     base::FilePath().AppendASCII("downloads"),
-                     base::FilePath().AppendASCII("a_zip_file.zip")));
+      helper()->app_browser(),
+      ui_test_utils::GetTestUrl(
+          base::FilePath().AppendASCII("downloads"),
+          base::FilePath().AppendASCII("a_zip_file.zip")));
 
+  // The download button is visible in the app browser.
   EXPECT_TRUE(toolbar_button_container->download_button()->GetVisible());
+
+  // The download button is not visible in the non-app browser.
+  EXPECT_FALSE(non_app_browser->window()
+                   ->GetDownloadBubbleUIController()
+                   ->GetDownloadDisplayController()
+                   ->download_display_for_testing()
+                   ->IsShowing());
+}
+
+// Test that a download by a regular browser does not show the download UI in an
+// app's window.
+IN_PROC_BROWSER_TEST_F(WebAppFrameToolbarBrowserTest_WindowControlsOverlay,
+                       DownloadIconVisibilityForRegularDownload) {
+  webapps::AppId app_id = InstallAndLaunchWebApp();
+  ToggleWindowControlsOverlayAndWait();
+
+  Browser* non_app_browser = CreateBrowser(profile());
+
+  // There should be no visible Downloads icon prior to the download, in either
+  // the app browser or the non-app browser.
+  WebAppToolbarButtonContainer* toolbar_button_container =
+      helper()->web_app_frame_toolbar()->get_right_container_for_testing();
+  EXPECT_FALSE(toolbar_button_container->download_button()->GetVisible());
+  EXPECT_FALSE(non_app_browser->window()
+                   ->GetDownloadBubbleUIController()
+                   ->GetDownloadDisplayController()
+                   ->download_display_for_testing()
+                   ->IsShowing());
+
+  // Download a file in the regular browser.
+  ui_test_utils::DownloadURL(
+      non_app_browser, ui_test_utils::GetTestUrl(
+                           base::FilePath().AppendASCII("downloads"),
+                           base::FilePath().AppendASCII("a_zip_file.zip")));
+
+  // The download button is not visible in the app browser.
+  EXPECT_FALSE(toolbar_button_container->download_button()->GetVisible());
+
+  // The download button is visible in the non-app browser.
+  EXPECT_TRUE(non_app_browser->window()
+                  ->GetDownloadBubbleUIController()
+                  ->GetDownloadDisplayController()
+                  ->download_display_for_testing()
+                  ->IsShowing());
 }
 #endif  // !BUILDFLAG(IS_CHROMEOS_ASH)
 

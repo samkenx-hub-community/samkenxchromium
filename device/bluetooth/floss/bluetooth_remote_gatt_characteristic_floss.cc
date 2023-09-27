@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 #include "device/bluetooth/floss/bluetooth_remote_gatt_characteristic_floss.h"
@@ -44,6 +44,19 @@ BluetoothRemoteGattCharacteristicFloss::BluetoothRemoteGattCharacteristicFloss(
 
 BluetoothRemoteGattCharacteristicFloss::
     ~BluetoothRemoteGattCharacteristicFloss() {
+  // Reply to pending callbacks
+  if (std::get<1>(pending_write_callbacks_)) {
+    auto [callback, error_callback, data] = std::move(pending_write_callbacks_);
+    if (error_callback) {
+      std::move(error_callback)
+          .Run(BluetoothGattServiceFloss::GattErrorCode::kUnknown);
+    }
+  }
+  if (pending_read_callback_) {
+    std::move(pending_read_callback_)
+        .Run(BluetoothGattServiceFloss::GattErrorCode::kUnknown, {});
+  }
+
   descriptors_.clear();
   service_->RemoveObserverForHandle(characteristic_->instance_id);
 }
@@ -167,6 +180,10 @@ void BluetoothRemoteGattCharacteristicFloss::GattCharacteristicRead(
     return;
   }
 
+  if (num_of_reads_in_progress_ == 0 || !pending_read_callback_) {
+    return;
+  }
+
   --num_of_reads_in_progress_;
   DCHECK_GE(num_of_reads_in_progress_, 0);
 
@@ -191,6 +208,10 @@ void BluetoothRemoteGattCharacteristicFloss::GattCharacteristicWrite(
   }
 
   auto [callback, error_callback, data] = std::move(pending_write_callbacks_);
+
+  if (!callback || !error_callback) {
+    return;
+  }
 
   if (status == GattStatus::kSuccess) {
     cached_data_ = data;

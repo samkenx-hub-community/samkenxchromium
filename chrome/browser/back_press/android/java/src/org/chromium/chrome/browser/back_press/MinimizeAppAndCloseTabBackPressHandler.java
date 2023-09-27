@@ -11,11 +11,14 @@ import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 
 import org.chromium.base.Callback;
+import org.chromium.base.ResettersForTesting;
+import org.chromium.base.TimeUtils;
 import org.chromium.base.lifetime.Destroyable;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.Supplier;
+import org.chromium.chrome.browser.flags.BooleanCachedFieldTrialParameter;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.layouts.LayoutStateProvider;
 import org.chromium.chrome.browser.layouts.LayoutType;
@@ -32,6 +35,10 @@ import java.util.function.Predicate;
  * to manually minimize app and close tab if necessary.
  */
 public class MinimizeAppAndCloseTabBackPressHandler implements BackPressHandler, Destroyable {
+    public static final BooleanCachedFieldTrialParameter SYSTEM_BACK =
+            new BooleanCachedFieldTrialParameter(
+                    ChromeFeatureList.BACK_GESTURE_REFACTOR, "system_back", false);
+
     static final String HISTOGRAM = "Android.BackPress.MinimizeAppAndCloseTab";
 
     // An always-enabled supplier since this handler is the final step of back press handling.
@@ -42,6 +49,8 @@ public class MinimizeAppAndCloseTabBackPressHandler implements BackPressHandler,
     private final Callback<Tab> mOnTabChanged = this::onTabChanged;
     private final ObservableSupplier<Tab> mActivityTabSupplier;
     private final Runnable mCallbackOnBackPress;
+    private final boolean mUseSystemBack;
+    private final Supplier<Long> mLastBackPressSupplier;
 
     private static Integer sVersionForTesting;
 
@@ -105,13 +114,15 @@ public class MinimizeAppAndCloseTabBackPressHandler implements BackPressHandler,
      */
     public MinimizeAppAndCloseTabBackPressHandler(ObservableSupplier<Tab> activityTabSupplier,
             Predicate<Tab> backShouldCloseTab, Callback<Tab> sendToBackground,
-            Runnable callbackOnBackPress) {
+            Runnable callbackOnBackPress, Supplier<Long> lastBackPressMsSupplier) {
         mBackShouldCloseTab = backShouldCloseTab;
         mSendToBackground = sendToBackground;
         mActivityTabSupplier = activityTabSupplier;
-        mBackPressSupplier.set(!shouldUseSystemBack());
+        mUseSystemBack = shouldUseSystemBack();
+        mBackPressSupplier.set(!mUseSystemBack);
         mCallbackOnBackPress = callbackOnBackPress;
-        if (shouldUseSystemBack()) {
+        mLastBackPressSupplier = lastBackPressMsSupplier;
+        if (mUseSystemBack) {
             mActivityTabSupplier.addObserver(mOnTabChanged);
         }
     }
@@ -123,11 +134,23 @@ public class MinimizeAppAndCloseTabBackPressHandler implements BackPressHandler,
         Tab currentTab = mActivityTabSupplier.get();
 
         if (currentTab == null) {
-            assert !shouldUseSystemBack()
+            assert !mUseSystemBack
                 : "Should be disabled when there is no valid tab and back press will be consumed.";
             minimizeApp = true;
             shouldCloseTab = false;
         } else {
+            // TAB history handler has a higher priority and should navigate page back before
+            // minimizing app and closing tab.
+            if (currentTab.canGoBack()) {
+                long interval = mLastBackPressSupplier.get() == -1
+                        ? -1
+                        : TimeUtils.elapsedRealtimeMillis() - mLastBackPressSupplier.get();
+                var msg = "Tab should be navigated back before closing or exiting app; interval %s";
+                assert false : String.format(msg, interval);
+                if (BackPressManager.correctTabNavigationOnFallback()) {
+                    return BackPressResult.FAILURE;
+                }
+            }
             // At this point we know either the tab will close or the app will minimize.
             NativePage nativePage = currentTab.getNativePage();
             if (nativePage != null) {
@@ -150,7 +173,7 @@ public class MinimizeAppAndCloseTabBackPressHandler implements BackPressHandler,
                                   : MinimizeAppAndCloseTabType.MINIMIZE_APP);
             // If system back is enabled, we should let system handle the back press when
             // no tab is about to be closed.
-            assert shouldCloseTab || !shouldUseSystemBack();
+            assert shouldCloseTab || !mUseSystemBack;
             mSendToBackground.onResult(shouldCloseTab ? currentTab : null);
         } else { // shouldCloseTab is always true if minimizeApp is false.
             record(MinimizeAppAndCloseTabType.CLOSE_TAB);
@@ -171,23 +194,22 @@ public class MinimizeAppAndCloseTabBackPressHandler implements BackPressHandler,
     }
 
     private void onTabChanged(Tab tab) {
-        assert shouldUseSystemBack() : "Should not observe changes when system back is disabled";
+        assert mUseSystemBack : "Should not observe changes when system back is disabled";
         mBackPressSupplier.set(tab != null && mBackShouldCloseTab.test(tab));
     }
 
-    private static boolean shouldUseSystemBack() {
+    static boolean shouldUseSystemBack() {
         // https://developer.android.com/about/versions/12/behavior-changes-all#back-press
         // Starting from 12, root launcher activities are no longer finished on Back press.
         // Limiting to T, since some OEMs seem to still finish activity on 12.
         boolean isAtLeastT = (sVersionForTesting == null ? VERSION.SDK_INT : sVersionForTesting)
                 >= VERSION_CODES.TIRAMISU;
-        return isAtLeastT
-                && ChromeFeatureList.getFieldTrialParamByFeatureAsBoolean(
-                        ChromeFeatureList.BACK_GESTURE_REFACTOR, "system_back", false);
+        return isAtLeastT && SYSTEM_BACK.getValue();
     }
 
     static void setVersionForTesting(Integer version) {
         sVersionForTesting = version;
+        ResettersForTesting.register(() -> sVersionForTesting = null);
     }
 
     public static String getHistogramNameForTesting() {

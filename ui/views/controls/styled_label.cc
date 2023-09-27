@@ -16,7 +16,6 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
 #include "ui/accessibility/ax_enums.mojom.h"
-#include "ui/accessibility/ax_node_data.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
@@ -27,6 +26,8 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/link.h"
 #include "ui/views/controls/link_fragment.h"
+#include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 #include "ui/views/view_class_properties.h"
 
 namespace views {
@@ -79,7 +80,11 @@ struct StyledLabel::LayoutViews {
   std::vector<std::unique_ptr<View>> owned_views;
 };
 
-StyledLabel::StyledLabel() = default;
+StyledLabel::StyledLabel() {
+  SetAccessibilityProperties(text_context_ == style::CONTEXT_DIALOG_TITLE
+                                 ? ax::mojom::Role::kTitleBar
+                                 : ax::mojom::Role::kStaticText);
+}
 
 StyledLabel::~StyledLabel() = default;
 
@@ -96,13 +101,14 @@ void StyledLabel::SetText(std::u16string text) {
     return;
 
   text_ = text;
+  SetAccessibleName(text_);
   style_ranges_.clear();
   RemoveOrDeleteAllChildViews();
   OnPropertyChanged(&text_, kPropertyEffectsPreferredSizeChanged);
 }
 
 gfx::FontList StyledLabel::GetFontList(const RangeStyleInfo& style_info) const {
-  return style_info.custom_font.value_or(style::GetFont(
+  return style_info.custom_font.value_or(TypographyProvider::Get().GetFont(
       text_context_, style_info.text_style.value_or(default_text_style_)));
 }
 
@@ -135,6 +141,9 @@ void StyledLabel::SetTextContext(int text_context) {
     return;
 
   text_context_ = text_context;
+  SetAccessibleRole(text_context_ == style::CONTEXT_DIALOG_TITLE
+                        ? ax::mojom::Role::kTitleBar
+                        : ax::mojom::Role::kStaticText);
   OnPropertyChanged(&text_context_, kPropertyEffectsPreferredSizeChanged);
 }
 
@@ -150,9 +159,23 @@ void StyledLabel::SetDefaultTextStyle(int text_style) {
   OnPropertyChanged(&default_text_style_, kPropertyEffectsPreferredSizeChanged);
 }
 
+absl::optional<ui::ColorId> StyledLabel::GetDefaultEnabledColorId() const {
+  return default_enabled_color_id_;
+}
+
+void StyledLabel::SetDefaultEnabledColorId(
+    absl::optional<ui::ColorId> enabled_color_id) {
+  if (default_enabled_color_id_ == enabled_color_id) {
+    return;
+  }
+
+  default_enabled_color_id_ = enabled_color_id;
+  OnPropertyChanged(&default_enabled_color_id_, kPropertyEffectsPaint);
+}
+
 int StyledLabel::GetLineHeight() const {
-  return line_height_.value_or(
-      style::GetLineHeight(text_context_, default_text_style_));
+  return line_height_.value_or(TypographyProvider::Get().GetLineHeight(
+      text_context_, default_text_style_));
 }
 
 void StyledLabel::SetLineHeight(int line_height) {
@@ -217,13 +240,6 @@ void StyledLabel::SizeToFit(int fixed_width) {
   gfx::Size size = layout_size_info_.total_size;
   size.set_width(std::max(size.width(), fixed_width));
   SetSize(size);
-}
-
-void StyledLabel::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  node_data->role = (text_context_ == style::CONTEXT_DIALOG_TITLE)
-                        ? ax::mojom::Role::kTitleBar
-                        : ax::mojom::Role::kStaticText;
-  node_data->SetName(GetText());
 }
 
 gfx::Size StyledLabel::CalculatePreferredSize() const {
@@ -573,8 +589,13 @@ std::unique_ptr<Label> StyledLabel::CreateLabel(
         style_info.text_style.value_or(default_text_style_));
   }
 
-  if (style_info.override_color)
+  if (style_info.override_color_id) {
+    result->SetEnabledColorId(style_info.override_color_id.value());
+  } else if (style_info.override_color) {
     result->SetEnabledColor(style_info.override_color.value());
+  } else if (default_enabled_color_id_) {
+    result->SetEnabledColorId(default_enabled_color_id_);
+  }
   if (!style_info.tooltip.empty())
     result->SetTooltipText(style_info.tooltip);
   if (!style_info.accessible_name.empty())
@@ -627,6 +648,7 @@ ADD_PROPERTY_METADATA(int, DefaultTextStyle)
 ADD_PROPERTY_METADATA(int, LineHeight)
 ADD_PROPERTY_METADATA(bool, AutoColorReadabilityEnabled)
 ADD_PROPERTY_METADATA(StyledLabel::ColorVariant, DisplayedOnBackgroundColor)
+ADD_PROPERTY_METADATA(absl::optional<ui::ColorId>, DefaultEnabledColorId)
 END_METADATA
 
 }  // namespace views

@@ -17,6 +17,7 @@
 #include "cc/test/resource_provider_test_utils.h"
 #include "components/viz/client/client_resource_provider.h"
 #include "components/viz/common/display/renderer_settings.h"
+#include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/quads/aggregated_render_pass.h"
 #include "components/viz/common/quads/aggregated_render_pass_draw_quad.h"
 #include "components/viz/common/quads/solid_color_draw_quad.h"
@@ -70,12 +71,13 @@ class MockDCLayerOutputSurface : public FakeSkiaOutputSurface {
 
 class DCTestOverlayProcessor : public OverlayProcessorWin {
  public:
-  explicit DCTestOverlayProcessor(OutputSurface* output_surface)
+  DCTestOverlayProcessor(OutputSurface* output_surface,
+                         int allowed_yuv_overlay_count)
       : OverlayProcessorWin(output_surface,
                             &debug_settings_,
                             std::make_unique<DCLayerOverlayProcessor>(
-                                /*allowed_yuv_overlay_count=*/1,
-                                true)) {}
+                                allowed_yuv_overlay_count,
+                                /*skip_initialization_for_testing=*/true)) {}
   DebugRendererSettings debug_settings_;
 };
 
@@ -96,8 +98,8 @@ static ResourceId CreateResourceInLayerTree(
     const gfx::Size& size,
     bool is_overlay_candidate) {
   auto resource = TransferableResource::MakeGpu(
-      gpu::Mailbox::GenerateForSharedImage(), GL_LINEAR, GL_TEXTURE_2D,
-      gpu::SyncToken(), size, RGBA_8888, is_overlay_candidate);
+      gpu::Mailbox::GenerateForSharedImage(), GL_TEXTURE_2D, gpu::SyncToken(),
+      size, SinglePlaneFormat::kRGBA_8888, is_overlay_candidate);
 
   ResourceId resource_id =
       child_resource_provider->ImportResource(resource, base::DoNothing());
@@ -226,6 +228,16 @@ class DCLayerOverlayTest : public testing::Test,
     feature_list_.InitWithFeatures(enabled_features, disabled_features);
   }
 
+  void InitializeOverlayProcessor(int allowed_yuv_overlay_count = 1) {
+    overlay_processor_ = std::make_unique<DCTestOverlayProcessor>(
+        output_surface_.get(), allowed_yuv_overlay_count);
+    overlay_processor_->set_using_dc_layers_for_testing(true);
+    overlay_processor_->SetViewportSize(gfx::Size(256, 256));
+    overlay_processor_
+        ->set_frames_since_last_qualified_multi_overlays_for_testing(5);
+    EXPECT_TRUE(overlay_processor_->IsOverlaySupported());
+  }
+
   void SetUp() override {
     output_surface_ = MockDCLayerOutputSurface::Create();
     output_surface_->BindToClient(&output_surface_client_);
@@ -237,14 +249,6 @@ class DCLayerOverlayTest : public testing::Test,
     child_provider_ = TestContextProvider::Create();
     child_provider_->BindToCurrentSequence();
     child_resource_provider_ = std::make_unique<ClientResourceProvider>();
-
-    overlay_processor_ =
-        std::make_unique<DCTestOverlayProcessor>(output_surface_.get());
-    overlay_processor_->set_using_dc_layers_for_testing(true);
-    overlay_processor_->SetViewportSize(gfx::Size(256, 256));
-    overlay_processor_
-        ->set_frames_since_last_qualified_multi_overlays_for_testing(5);
-    EXPECT_TRUE(overlay_processor_->IsOverlaySupported());
 
     if (IsUsingDCompPresenter()) {
       output_surface_plane_ =
@@ -291,6 +295,7 @@ class DCLayerOverlayTest : public testing::Test,
 };
 
 TEST_P(DCLayerOverlayTest, DisableVideoOverlayIfMovingFeature) {
+  InitializeOverlayProcessor();
   auto ProcessForOverlaysSingleVideoRectWithOffset =
       [&](gfx::Vector2d video_rect_offset) {
         auto pass = CreateRenderPass();
@@ -346,7 +351,76 @@ TEST_P(DCLayerOverlayTest, DisableVideoOverlayIfMovingFeature) {
   }
 }
 
+// Check that we don't accidentally end up in a case where we try to read back a
+// DComp surface, which can happen if one issues a copy request while we're in
+// the hysteresis when switching from a DComp surface back to a swap chain.
+TEST_P(DCLayerOverlayTest, ForceSwapChainForCapture) {
+  InitializeOverlayProcessor();
+
+  // Start in the DComp surface mode, e.g. from a previous frame that had a
+  // video overlay.
+  overlay_processor_->set_using_dc_layers_for_testing(true);
+
+  // Frame with no overlays, but we expect to still be in DComp surface mode,
+  // due to one-sided hysteresis intended to prevent allocation churn.
+  {
+    AggregatedRenderPassList pass_list;
+    pass_list.push_back(CreateRenderPass());
+
+    damage_rect_ = pass_list.back()->output_rect;
+
+    if (!IsUsingDCompPresenter()) {
+      // We expect no change, so no call.
+      EXPECT_CALL(*output_surface_.get(), SetEnableDCLayers(_)).Times(0);
+    }
+
+    OverlayCandidateList dc_layer_list;
+    OverlayProcessorInterface::FilterOperationsMap render_pass_filters;
+    OverlayProcessorInterface::FilterOperationsMap render_pass_backdrop_filters;
+    overlay_processor_->ProcessForOverlays(
+        resource_provider_.get(), &pass_list, GetIdentityColorMatrix(),
+        render_pass_filters, render_pass_backdrop_filters,
+        SurfaceDamageRectList(), GetOutputSurfacePlane(), &dc_layer_list,
+        &damage_rect_, &content_bounds_);
+
+    if (IsUsingDCompPresenter()) {
+      EXPECT_TRUE(pass_list.back()->needs_synchronous_dcomp_commit);
+    }
+  }
+
+  // Frame with a copy request. Even though we're still in the hysteresis, we
+  // expect to forcibly switch to swap chain mode so that the copy request
+  // succeeds.
+  {
+    AggregatedRenderPassList pass_list;
+    pass_list.push_back(CreateRenderPass());
+
+    pass_list.back()->copy_requests.push_back(
+        CopyOutputRequest::CreateStubForTesting());
+
+    damage_rect_ = pass_list.back()->output_rect;
+
+    if (!IsUsingDCompPresenter()) {
+      EXPECT_CALL(*output_surface_.get(), SetEnableDCLayers(false)).Times(1);
+    }
+
+    OverlayCandidateList dc_layer_list;
+    OverlayProcessorInterface::FilterOperationsMap render_pass_filters;
+    OverlayProcessorInterface::FilterOperationsMap render_pass_backdrop_filters;
+    overlay_processor_->ProcessForOverlays(
+        resource_provider_.get(), &pass_list, GetIdentityColorMatrix(),
+        render_pass_filters, render_pass_backdrop_filters,
+        SurfaceDamageRectList(), GetOutputSurfacePlane(), &dc_layer_list,
+        &damage_rect_, &content_bounds_);
+
+    if (IsUsingDCompPresenter()) {
+      EXPECT_FALSE(pass_list.back()->needs_synchronous_dcomp_commit);
+    }
+  }
+}
+
 TEST_P(DCLayerOverlayTest, Occluded) {
+  InitializeOverlayProcessor();
   {
     auto pass = CreateRenderPass();
     SharedQuadState* first_shared_state = pass->shared_quad_state_list.back();
@@ -454,6 +528,7 @@ TEST_P(DCLayerOverlayTest, Occluded) {
 }
 
 TEST_P(DCLayerOverlayTest, DamageRectWithoutVideoDamage) {
+  InitializeOverlayProcessor();
   {
     auto pass = CreateRenderPass();
     SharedQuadState* shared_quad_state = pass->shared_quad_state_list.back();
@@ -543,6 +618,7 @@ TEST_P(DCLayerOverlayTest, DamageRectWithoutVideoDamage) {
 }
 
 TEST_P(DCLayerOverlayTest, DamageRect) {
+  InitializeOverlayProcessor();
   for (int i = 0; i < 2; i++) {
     auto pass = CreateRenderPass();
     SharedQuadState* shared_quad_state = pass->shared_quad_state_list.back();
@@ -577,6 +653,7 @@ TEST_P(DCLayerOverlayTest, DamageRect) {
 }
 
 TEST_P(DCLayerOverlayTest, ClipRect) {
+  InitializeOverlayProcessor();
   // Process twice. The second time through the overlay list shouldn't change,
   // which will allow the damage rect to reflect just the changes in that
   // frame.
@@ -625,6 +702,7 @@ TEST_P(DCLayerOverlayTest, ClipRect) {
 }
 
 TEST_P(DCLayerOverlayTest, TransparentOnTop) {
+  InitializeOverlayProcessor();
   // Process twice. The second time through the overlay list shouldn't change,
   // which will allow the damage rect to reflect just the changes in that
   // frame.
@@ -657,6 +735,7 @@ TEST_P(DCLayerOverlayTest, TransparentOnTop) {
 }
 
 TEST_P(DCLayerOverlayTest, UnderlayDamageRectWithQuadOnTopUnchanged) {
+  InitializeOverlayProcessor();
   for (int i = 0; i < 3; i++) {
     auto pass = CreateRenderPass();
     // Add a solid color quad on top
@@ -705,6 +784,7 @@ TEST_P(DCLayerOverlayTest, UnderlayDamageRectWithQuadOnTopUnchanged) {
 
 // Test whether quads with rounded corners are supported.
 TEST_P(DCLayerOverlayTest, RoundedCorners) {
+  InitializeOverlayProcessor();
   // Frame #0
   {
     auto pass = CreateRenderPass();
@@ -879,6 +959,7 @@ TEST_P(DCLayerOverlayTest, RoundedCorners) {
 // If there are multiple yuv overlay quad candidates, no overlay will be
 // promoted to save power.
 TEST_P(DCLayerOverlayTest, MultipleYUVOverlays) {
+  InitializeOverlayProcessor();
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeature(
       features::kNoUndamagedOverlayPromotion);
@@ -934,6 +1015,7 @@ TEST_P(DCLayerOverlayTest, MultipleYUVOverlays) {
 }
 
 TEST_P(DCLayerOverlayTest, SetEnableDCLayers) {
+  InitializeOverlayProcessor();
   // Start without DC layers.
   overlay_processor_->set_using_dc_layers_for_testing(false);
 
@@ -1047,6 +1129,7 @@ TEST_P(DCLayerOverlayTest, SetEnableDCLayers) {
 // Test that the video is forced to underlay if the expanded quad of pixel
 // moving foreground filter is on top.
 TEST_P(DCLayerOverlayTest, PixelMovingForegroundFilter) {
+  InitializeOverlayProcessor();
   AggregatedRenderPassList pass_list;
 
   // Create a non-root render pass with a pixel-moving foreground filter.
@@ -1073,8 +1156,8 @@ TEST_P(DCLayerOverlayTest, PixelMovingForegroundFilter) {
   SharedQuadState* shared_quad_state_rpdq = pass->shared_quad_state_list.back();
   // The pixel-moving render pass draw quad itself (rpdq->rect) doesn't
   // intersect with kOverlayRect(0, 0, 256, 256), but the expanded draw quad
-  // (rpdq->rect(260, 260, 100, 100) + MaximumPixelMovement (2 * 10.f) = (240,
-  // 240, 140, 140)) does.
+  // (rpdq->rect(260, 260, 100, 100) + blur filter pixel movement (2 * 10.f) =
+  // (240, 240, 140, 140)) does.
 
   CreateRenderPassDrawQuadAt(pass.get(), shared_quad_state_rpdq, filter_rect,
                              filter_render_pass_id);
@@ -1110,13 +1193,14 @@ TEST_P(DCLayerOverlayTest, PixelMovingForegroundFilter) {
 
   EXPECT_EQ(1U, dc_layer_list.size());
   // Make sure the video is in an underlay mode if the overlay quad intersects
-  // with (rpdq->rect + MaximumPixelMovement()).
+  // with expanded rpdq->rect.
   EXPECT_EQ(-1, dc_layer_list.back().plane_z_order);
   EXPECT_EQ(gfx::Rect(0, 0, 360, 360), damage_rect_);
 }
 
 // Test that the video is not promoted if a quad on top has backdrop filters.
 TEST_P(DCLayerOverlayTest, BackdropFilter) {
+  InitializeOverlayProcessor();
   AggregatedRenderPassList pass_list;
 
   // Create a non-root render pass with a backdrop filter.
@@ -1188,6 +1272,7 @@ TEST_P(DCLayerOverlayTest, BackdropFilter) {
 
 // Test if overlay is not used when video capture is on.
 TEST_P(DCLayerOverlayTest, VideoCapture) {
+  InitializeOverlayProcessor();
   // Frame #0
   {
     auto pass = CreateRenderPass();
@@ -1273,10 +1358,12 @@ TEST_P(DCLayerOverlayTest, VideoCapture) {
 }
 
 TEST_P(DCLayerOverlayTest, RenderPassRootTransformOverlay) {
+  InitializeOverlayProcessor();
   TestRenderPassRootTransform(/*is_overlay*/ true);
 }
 
 TEST_P(DCLayerOverlayTest, RenderPassRootTransformUnderlay) {
+  InitializeOverlayProcessor();
   TestRenderPassRootTransform(/*is_overlay*/ false);
 }
 
@@ -1352,6 +1439,71 @@ void DCLayerOverlayTest::TestRenderPassRootTransform(bool is_overlay) {
       // damage rect is (25,20 10x10) union (30,25 50x15).
       EXPECT_EQ(damage_rect_, gfx::Rect(25, 20, 55, 25));
     }
+  }
+}
+
+// When there are multiple videos intersected with each other, only the topmost
+// of them should be considered as "overlay".
+TEST_P(DCLayerOverlayTest, MultipleYUVOverlaysIntersected) {
+  InitializeOverlayProcessor(/*allowed_yuv_overlay_count=*/2);
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      features::kNoUndamagedOverlayPromotion);
+  {
+    auto pass = CreateRenderPass();
+
+    // Video 1: Topmost video.
+    auto* video_quad = CreateFullscreenCandidateYUVVideoQuad(
+        resource_provider_.get(), child_resource_provider_.get(),
+        child_provider_.get(), pass->shared_quad_state_list.back(), pass.get());
+    gfx::Rect rect(150, 150, 50, 50);
+    video_quad->rect = rect;
+    video_quad->visible_rect = rect;
+    pass->shared_quad_state_list.back()->overlay_damage_index = 1;
+
+    // Video 2: Intersected with and under the 1st video.
+    auto* second_video_quad = CreateFullscreenCandidateYUVVideoQuad(
+        resource_provider_.get(), child_resource_provider_.get(),
+        child_provider_.get(), pass->shared_quad_state_list.back(), pass.get());
+    gfx::Rect second_rect(100, 100, 120, 120);
+    second_video_quad->rect = second_rect;
+    second_video_quad->visible_rect = second_rect;
+    pass->shared_quad_state_list.back()->overlay_damage_index = 2;
+
+    // Background.
+    CreateOpaqueQuadAt(resource_provider_.get(),
+                       pass->shared_quad_state_list.back(), pass.get(),
+                       gfx::Rect(0, 0, 256, 256), SkColors::kWhite);
+
+    OverlayCandidateList dc_layer_list;
+    OverlayProcessorInterface::FilterOperationsMap render_pass_filters;
+    OverlayProcessorInterface::FilterOperationsMap render_pass_backdrop_filters;
+    damage_rect_ = gfx::Rect(0, 0, 220, 220);
+    AggregatedRenderPassList pass_list;
+    pass_list.push_back(std::move(pass));
+    SurfaceDamageRectList surface_damage_rect_list;
+
+    surface_damage_rect_list.push_back(video_quad->rect);
+    surface_damage_rect_list.push_back(second_video_quad->rect);
+    surface_damage_rect_list.push_back(gfx::Rect(0, 0, 256, 256));
+
+    overlay_processor_->ProcessForOverlays(
+        resource_provider_.get(), &pass_list, GetIdentityColorMatrix(),
+        render_pass_filters, render_pass_backdrop_filters,
+        std::move(surface_damage_rect_list), GetOutputSurfacePlane(),
+        &dc_layer_list, &damage_rect_, &content_bounds_);
+
+    int overlay_cnt = 0;
+    for (auto& dc : dc_layer_list) {
+      if (dc.plane_z_order > 0) {
+        // The overlay video should be the topmost one.
+        EXPECT_EQ(gfx::Rect(150, 150, 50, 50),
+                  gfx::ToEnclosingRect(dc.display_rect));
+        overlay_cnt++;
+      }
+    }
+
+    EXPECT_EQ(1, overlay_cnt);
   }
 }
 

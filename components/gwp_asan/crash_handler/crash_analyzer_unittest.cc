@@ -14,11 +14,13 @@
 #include "base/debug/stack_trace.h"
 #include "base/functional/callback_helpers.h"
 #include "base/test/gtest_util.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "build/build_config.h"
 #include "components/gwp_asan/client/guarded_page_allocator.h"
+#include "components/gwp_asan/client/lightweight_detector.h"
 #include "components/gwp_asan/common/allocator_state.h"
 #include "components/gwp_asan/common/crash_key_name.h"
-#include "components/gwp_asan/common/lightweight_detector.h"
+#include "components/gwp_asan/common/lightweight_detector_state.h"
 #include "components/gwp_asan/crash_handler/crash.pb.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -83,33 +85,43 @@ void SetNonCanonicalAccessAddress(
 #endif
 }
 
+constexpr const char* kMallocHistogramName =
+    "Security.GwpAsan.CrashAnalysisResult.Malloc";
+constexpr const char* kPartitionAllocHistogramName =
+    "Security.GwpAsan.CrashAnalysisResult.PartitionAlloc";
 }  // namespace
 
 class BaseCrashAnalyzerTest : public testing::Test {
  protected:
-  using testing::Test::SetUp;
-
-  void SetUp(bool is_partition_alloc,
-             LightweightDetector::State lightweight_detector_state,
-             size_t num_lightweight_detector_metadata) {
+  BaseCrashAnalyzerTest(bool is_partition_alloc,
+                        LightweightDetectorMode lightweight_detector_mode) {
     is_partition_alloc_ = is_partition_alloc;
-    gpa_.Init(1, 1, 1, base::DoNothing(), is_partition_alloc,
-              lightweight_detector_state, num_lightweight_detector_metadata);
+    gpa_.Init(1, 1, 1, base::DoNothing(), is_partition_alloc);
+
+    if (lightweight_detector_mode != LightweightDetectorMode::kOff) {
+      lightweight_detector_ =
+          std::make_unique<LightweightDetector>(lightweight_detector_mode, 1);
+    }
   }
 
   // Initializes the ProcessSnapshot so that it appears the given allocator was
   // used for backing either malloc or PartitionAlloc, depending on
   // `is_partition_alloc_`.
   void InitializeSnapshot(crashpad::VMAddress exception_address) {
-    std::string crash_key_value = gpa_.GetCrashKey();
-    std::vector<uint8_t> crash_key_vector(crash_key_value.begin(),
-                                          crash_key_value.end());
-
     std::vector<crashpad::AnnotationSnapshot> annotations;
-    annotations.emplace_back(
+    auto append_annotation = [&](const char* key, const std::string& value) {
+      std::vector<uint8_t> buffer(value.begin(), value.end());
+      annotations.emplace_back(
+          key, static_cast<uint16_t>(crashpad::Annotation::Type::kString),
+          buffer);
+    };
+    append_annotation(
         is_partition_alloc_ ? kPartitionAllocCrashKey : kMallocCrashKey,
-        static_cast<uint16_t>(crashpad::Annotation::Type::kString),
-        crash_key_vector);
+        gpa_.GetCrashKey());
+    if (lightweight_detector_) {
+      append_annotation(kLightweightDetectorCrashKey,
+                        lightweight_detector_->GetCrashKey());
+    }
 
     auto module = std::make_unique<crashpad::test::TestModuleSnapshot>();
     module->SetAnnotationObjects(annotations);
@@ -146,12 +158,15 @@ class BaseCrashAnalyzerTest : public testing::Test {
 #endif
 
   bool is_partition_alloc_ = false;
+
+  std::unique_ptr<LightweightDetector> lightweight_detector_;
 };
 
 class CrashAnalyzerTest : public BaseCrashAnalyzerTest {
-  void SetUp() final {
-    BaseCrashAnalyzerTest::SetUp(/* is_partition_alloc = */ false,
-                                 LightweightDetector::State::kDisabled, 0);
+ protected:
+  CrashAnalyzerTest()
+      : BaseCrashAnalyzerTest(/* is_partition_alloc = */ false,
+                              LightweightDetectorMode::kOff) {
     InitializeSnapshot(0);
   }
 };
@@ -168,10 +183,16 @@ TEST_F(CrashAnalyzerTest, StackTraceCollection) {
   // Lets pretend a double free() occurred on the allocation we saw previously.
   gpa_.state_.double_free_address = reinterpret_cast<uintptr_t>(ptr);
 
+  base::HistogramTester histogram_tester;
   gwp_asan::Crash proto;
   bool proto_present =
       CrashAnalyzer::GetExceptionInfo(process_snapshot_, &proto);
   ASSERT_TRUE(proto_present);
+
+  int result = static_cast<int>(GwpAsanCrashAnalysisResult::kGwpAsanCrash);
+  EXPECT_THAT(histogram_tester.GetAllSamples(kMallocHistogramName),
+              testing::ElementsAre(base::Bucket(result, 1)));
+  histogram_tester.ExpectTotalCount(kPartitionAllocHistogramName, 0);
 
   ASSERT_TRUE(proto.has_allocation());
   ASSERT_TRUE(proto.has_deallocation());
@@ -216,10 +237,17 @@ TEST_F(CrashAnalyzerTest, InternalError) {
   // single entry slot/metadata entry.
   gpa_.slot_to_metadata_idx_[0] = 5;
 
+  base::HistogramTester histogram_tester;
   gwp_asan::Crash proto;
   bool proto_present =
       CrashAnalyzer::GetExceptionInfo(process_snapshot_, &proto);
   ASSERT_TRUE(proto_present);
+
+  int result =
+      static_cast<int>(GwpAsanCrashAnalysisResult::kErrorBadMetadataIndex);
+  EXPECT_THAT(histogram_tester.GetAllSamples(kMallocHistogramName),
+              testing::ElementsAre(base::Bucket(result, 1)));
+  histogram_tester.ExpectTotalCount(kPartitionAllocHistogramName, 0);
 
   EXPECT_TRUE(proto.has_internal_error());
   ASSERT_TRUE(proto.has_missing_metadata());
@@ -230,21 +258,29 @@ TEST_F(CrashAnalyzerTest, InternalError) {
 // enough to safely store metadata IDs.
 #if defined(ARCH_CPU_64_BITS)
 class LightweightDetectorAnalyzerTest : public BaseCrashAnalyzerTest {
-  void SetUp() final {
-    BaseCrashAnalyzerTest::SetUp(/* is_partition_alloc = */ true,
-                                 LightweightDetector::State::kEnabled, 1);
-  }
+ protected:
+  LightweightDetectorAnalyzerTest()
+      : BaseCrashAnalyzerTest(/* is_partition_alloc = */ true,
+                              LightweightDetectorMode::kBrpQuarantine) {}
 };
 
 TEST_F(LightweightDetectorAnalyzerTest, UseAfterFree) {
   uint64_t alloc;
-  gpa_.RecordLightweightDeallocation(&alloc, sizeof(alloc));
+  ASSERT_TRUE(lightweight_detector_);
+  lightweight_detector_->RecordLightweightDeallocation(&alloc, sizeof(alloc));
   InitializeSnapshot(alloc);
 
+  base::HistogramTester histogram_tester;
   gwp_asan::Crash proto;
   bool proto_present =
       CrashAnalyzer::GetExceptionInfo(process_snapshot_, &proto);
   ASSERT_TRUE(proto_present);
+
+  int result =
+      static_cast<int>(GwpAsanCrashAnalysisResult::kLightweightDetectorCrash);
+  EXPECT_THAT(histogram_tester.GetAllSamples(kPartitionAllocHistogramName),
+              testing::ElementsAre(base::Bucket(result, 1)));
+  histogram_tester.ExpectTotalCount(kMallocHistogramName, 0);
 
   ASSERT_FALSE(proto.has_allocation());
   ASSERT_TRUE(proto.has_deallocation());
@@ -255,16 +291,25 @@ TEST_F(LightweightDetectorAnalyzerTest, UseAfterFree) {
 
 TEST_F(LightweightDetectorAnalyzerTest, InternalError) {
   uint64_t alloc;
-  gpa_.RecordLightweightDeallocation(&alloc, sizeof(alloc));
+  ASSERT_TRUE(lightweight_detector_);
+  lightweight_detector_->RecordLightweightDeallocation(&alloc, sizeof(alloc));
   InitializeSnapshot(alloc);
 
   // Corrupt the metadata ID.
-  ++gpa_.lightweight_detector_metadata_[0].lightweight_id;
+  ++lightweight_detector_->metadata_[0].id;
 
+  base::HistogramTester histogram_tester;
   gwp_asan::Crash proto;
   bool proto_present =
       CrashAnalyzer::GetExceptionInfo(process_snapshot_, &proto);
   ASSERT_TRUE(proto_present);
+
+  int result =
+      static_cast<int>(GwpAsanCrashAnalysisResult::
+                           kErrorInvalidOrOutdatedLightweightMetadataIndex);
+  EXPECT_THAT(histogram_tester.GetAllSamples(kPartitionAllocHistogramName),
+              testing::ElementsAre(base::Bucket(result, 1)));
+  histogram_tester.ExpectTotalCount(kMallocHistogramName, 0);
 
   ASSERT_FALSE(proto.has_allocation());
   ASSERT_FALSE(proto.has_deallocation());

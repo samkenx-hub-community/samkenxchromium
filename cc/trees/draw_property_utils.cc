@@ -266,7 +266,7 @@ ConditionalClip ComputeAccumulatedClip(PropertyTrees* property_trees,
   while (target_node->clip_id < clip_node->id) {
     if (parent_chain.size() > 0) {
       // Search the cache.
-      for (size_t i = 0; i < clip_node->cached_clip_rects->size(); ++i) {
+      for (size_t i = 0; i < clip_node->cached_clip_rects.size(); ++i) {
         auto& data = clip_node->cached_clip_rects[i];
         if (data.target_id == target_id) {
           cache_hit = true;
@@ -365,6 +365,8 @@ int LowestCommonAncestor(int clip_id_1,
 void SetHasContributingLayerThatEscapesClip(int lca_clip_id,
                                             int target_effect_id,
                                             EffectTree* effect_tree) {
+  DCHECK(!base::FeatureList::IsEnabled(
+      features::kRenderSurfaceCommonAncestorClip));
   const EffectNode* effect_node = effect_tree->Node(target_effect_id);
   // Find all ancestor targets starting from effect_node who are clipped by
   // a descendant of lowest ancestor clip and set their
@@ -375,6 +377,44 @@ void SetHasContributingLayerThatEscapesClip(int lca_clip_id,
     DCHECK(render_surface);
     render_surface->set_has_contributing_layer_that_escapes_clip(true);
     effect_node = effect_tree->Node(effect_node->target_id);
+  }
+}
+
+void UpdateRenderSurfaceCommonAncestorClip(LayerImpl* layer,
+                                           const ClipTree* clip_tree,
+                                           EffectTree* effect_tree) {
+  DCHECK(
+      base::FeatureList::IsEnabled(features::kRenderSurfaceCommonAncestorClip));
+  RenderSurfaceImpl* render_surface = layer->render_target();
+  CHECK(render_surface);
+  int clip_id = layer->clip_tree_index();
+  // Find each ancestor targets whose clip is escaped by the layer's clip, and
+  // set its common_ancestor_clip_id to be the lowest common ancestor of both
+  // clips.
+  while (clip_id < render_surface->common_ancestor_clip_id()) {
+    clip_id = LowestCommonAncestor(
+        clip_id, render_surface->common_ancestor_clip_id(), clip_tree);
+    render_surface->set_common_ancestor_clip_id(clip_id);
+    RenderSurfaceImpl* parent_render_surface = render_surface->render_target();
+    if (parent_render_surface == render_surface) {
+      break;
+    }
+    render_surface = parent_render_surface;
+  }
+}
+
+void ClearRenderSurfaceCommonAncestorClip(LayerImpl* layer) {
+  DCHECK(
+      base::FeatureList::IsEnabled(features::kRenderSurfaceCommonAncestorClip));
+  RenderSurfaceImpl* render_surface = layer->render_target();
+  CHECK(render_surface);
+  while (render_surface->has_contributing_layer_that_escapes_clip()) {
+    render_surface->set_common_ancestor_clip_id(kInvalidPropertyNodeId);
+    RenderSurfaceImpl* parent_render_surface = render_surface->render_target();
+    if (parent_render_surface == render_surface) {
+      break;
+    }
+    render_surface = parent_render_surface;
   }
 }
 
@@ -541,11 +581,26 @@ gfx::Rect LayerDrawableContentRect(
 
 void SetSurfaceIsClipped(const ClipTree& clip_tree,
                          RenderSurfaceImpl* render_surface) {
-  bool is_clipped;
+  bool is_clipped = false;
   if (render_surface->EffectTreeIndex() == kContentsRootPropertyNodeId) {
     // Root render surface is always clipped.
     is_clipped = true;
+  } else if (base::FeatureList::IsEnabled(
+                 features::kRenderSurfaceCommonAncestorClip)) {
+    int parent_target_clip_id =
+        render_surface->render_target()->common_ancestor_clip_id();
+    for (const ClipNode* clip_node =
+             clip_tree.Node(render_surface->common_ancestor_clip_id());
+         clip_node && clip_node->id != parent_target_clip_id;
+         clip_node = clip_tree.parent(clip_node)) {
+      if (clip_node->AppliesLocalClip()) {
+        is_clipped = true;
+        break;
+      }
+    }
   } else if (render_surface->has_contributing_layer_that_escapes_clip()) {
+    CHECK_EQ(render_surface->common_ancestor_clip_id(),
+             render_surface->ClipTreeIndex());
     // We cannot clip a surface that has a contribuitng layer which escapes the
     // clip.
     is_clipped = false;
@@ -623,9 +678,12 @@ void SetSurfaceClipRect(const ClipNode* parent_clip_node,
     render_surface->SetClipRect(
         ToEnclosingClipRect(clip_tree.Node(effect_node->clip_id)->clip));
   } else {
-    ConditionalClip accumulated_clip_rect =
-        ComputeAccumulatedClip(property_trees, include_expanding_clips,
-                               effect_node->clip_id, target_node->id);
+    DCHECK(base::FeatureList::IsEnabled(
+               features::kRenderSurfaceCommonAncestorClip) ||
+           render_surface->common_ancestor_clip_id() == effect_node->clip_id);
+    ConditionalClip accumulated_clip_rect = ComputeAccumulatedClip(
+        property_trees, include_expanding_clips,
+        render_surface->common_ancestor_clip_id(), target_node->id);
     render_surface->SetClipRect(
         ToEnclosingClipRect(accumulated_clip_rect.clip_rect));
   }
@@ -832,7 +890,7 @@ void ComputeClips(PropertyTrees* property_trees) {
        ++i) {
     ClipNode* clip_node = clip_tree->Node(i);
     // Clear the clip rect cache
-    clip_node->cached_clip_rects->clear();
+    clip_node->cached_clip_rects.clear();
     if (clip_node->id == kViewportPropertyNodeId) {
       clip_node->cached_accumulated_rect_in_screen_space = clip_node->clip;
       continue;
@@ -856,10 +914,12 @@ void ComputeSurfaceDrawProperties(PropertyTrees* property_trees,
   SetSurfaceDrawOpacity(property_trees->effect_tree(), render_surface);
   SetSurfaceDrawTransform(property_trees, render_surface);
 
-  render_surface->SetMaskFilterInfo(
+  auto mask_filter_info_pair =
       GetMaskFilterInfoPair(property_trees, render_surface->EffectTreeIndex(),
-                            /*for_render_surface=*/true)
-          .first);
+                            /*for_render_surface=*/true);
+  render_surface->SetMaskFilterInfo(
+      /*mask_filter_info=*/mask_filter_info_pair.first,
+      /*is_fast_rounded_corner=*/mask_filter_info_pair.second);
   render_surface->SetScreenSpaceTransform(
       property_trees->ToScreenSpaceTransformWithoutSurfaceContentsScale(
           render_surface->TransformTreeIndex(),
@@ -1167,14 +1227,8 @@ void UpdateElasticOverscroll(
   // from the overscrolled edge by applying a stretch transform
   overscroll_elasticity_transform_node->local.MakeIdentity();
   overscroll_elasticity_transform_node->origin.SetPoint(0.f, 0.f, 0.f);
-  if (base::FeatureList::IsEnabled(
-          features::kAvoidRasterDuringElasticOverscroll)) {
-    overscroll_elasticity_transform_node->has_potential_animation =
-        !elastic_overscroll.IsZero();
-  } else {
-    overscroll_elasticity_transform_node->to_screen_is_potentially_animated =
-        !elastic_overscroll.IsZero();
-  }
+  overscroll_elasticity_transform_node->has_potential_animation =
+      !elastic_overscroll.IsZero();
 
   if (!elastic_overscroll.IsZero() && inner_viewport) {
     // The inner viewport container size takes into account the size change as a
@@ -1219,7 +1273,10 @@ void UpdateElasticOverscroll(
 
 void ComputeDrawPropertiesOfVisibleLayers(const LayerImplList* layer_list,
                                           PropertyTrees* property_trees) {
-  // Compute transforms
+  const bool common_ancestor_clip_enabled =
+      base::FeatureList::IsEnabled(features::kRenderSurfaceCommonAncestorClip);
+
+  // Compute transforms and clear common ancestor clips of render surfaces.
   for (LayerImpl* layer : *layer_list) {
     const TransformNode* transform_node =
         property_trees->transform_tree().Node(layer->transform_tree_index());
@@ -1235,22 +1292,30 @@ void ComputeDrawPropertiesOfVisibleLayers(const LayerImplList* layer_list,
     layer->draw_properties().mask_filter_info = mask_filter_info_pair.first;
     layer->draw_properties().is_fast_rounded_corner =
         mask_filter_info_pair.second;
+
+    if (common_ancestor_clip_enabled) {
+      ClearRenderSurfaceCommonAncestorClip(layer);
+    }
   }
 
-  // Compute effects and determine if render surfaces have contributing layers
-  // that escape clip.
+  // Compute effects and common ancestor clips of render surfaces.
   for (LayerImpl* layer : *layer_list) {
     layer->draw_properties().opacity =
         LayerDrawOpacity(layer, property_trees->effect_tree());
-
-    RenderSurfaceImpl* render_target = layer->render_target();
-    int lca_clip_id = LowestCommonAncestor(layer->clip_tree_index(),
-                                           render_target->ClipTreeIndex(),
-                                           &property_trees->clip_tree());
-    if (lca_clip_id != render_target->ClipTreeIndex()) {
-      SetHasContributingLayerThatEscapesClip(
-          lca_clip_id, render_target->EffectTreeIndex(),
+    if (common_ancestor_clip_enabled) {
+      UpdateRenderSurfaceCommonAncestorClip(
+          layer, &property_trees->clip_tree(),
           &property_trees->effect_tree_mutable());
+    } else {
+      RenderSurfaceImpl* render_target = layer->render_target();
+      int lca_clip_id = LowestCommonAncestor(layer->clip_tree_index(),
+                                             render_target->ClipTreeIndex(),
+                                             &property_trees->clip_tree());
+      if (lca_clip_id != render_target->ClipTreeIndex()) {
+        SetHasContributingLayerThatEscapesClip(
+            lca_clip_id, render_target->EffectTreeIndex(),
+            &property_trees->effect_tree_mutable());
+      }
     }
   }
 

@@ -247,6 +247,13 @@ TEST_F(URLUtilTest, DecodeURLEscapeSequences) {
       {"%70%71%72%73%74%75%76%77%78%79%7a%7B%7C%7D%7e%7f/",
        "pqrstuvwxyz{|}~\x7f/"},
       {"%e4%bd%a0%e5%a5%bd", "\xe4\xbd\xa0\xe5\xa5\xbd"},
+      // U+FFFF (Noncharacter) should not be replaced with U+FFFD (Replacement
+      // Character) (http://crbug.com/1416021)
+      {"%ef%bf%bf", "\xef\xbf\xbf"},
+      // U+FDD0 (Noncharacter)
+      {"%ef%b7%90", "\xef\xb7\x90"},
+      // U+FFFD (Replacement Character)
+      {"%ef%bf%bd", "\xef\xbf\xbd"},
   };
 
   for (size_t i = 0; i < std::size(decode_cases); i++) {
@@ -394,6 +401,7 @@ TEST_F(URLUtilTest, TestResolveRelativeWithNonStandardBase) {
       {"about:blank", "#id42", true, "about:blank#id42"},
       {"about:blank", " #id42", true, "about:blank#id42"},
       {"about:blank#oldfrag", "#newfrag", true, "about:blank#newfrag"},
+      {"about:blank", " #id:42", true, "about:blank#id:42"},
       // A surprising side effect of allowing fragments to resolve against
       // any URL scheme is we might break javascript: URLs by doing so...
       {"javascript:alert('foo#bar')", "#badfrag", true,
@@ -624,6 +632,89 @@ TEST_F(URLUtilTest, TestCanonicalizeIdempotencyWithLeadingControlCharacters) {
       ASSERT_TRUE(canonicalized);
       EXPECT_EQ(canonicalized, CanonicalizeSpec(*canonicalized, trim_path_end));
     }
+  }
+}
+
+TEST_F(URLUtilTest, TestHasInvalidURLEscapeSequences) {
+  struct TestCase {
+    const char* input;
+    bool is_invalid;
+  } cases[] = {
+      // Edge cases.
+      {"", false},
+      {"%", true},
+
+      // Single regular chars with no escaping are valid.
+      {"a", false},
+      {"g", false},
+      {"A", false},
+      {"G", false},
+      {":", false},
+      {"]", false},
+      {"\x00", false},      // ASCII 'NUL' char
+      {"\x01", false},      // ASCII 'SOH' char
+      {"\xC2\xA3", false},  // UTF-8 encoded '£'.
+
+      // Longer strings without escaping are valid.
+      {"Hello world", false},
+      {"Here: [%25] <-- a percent-encoded percent character.", false},
+
+      // Valid %-escaped sequences ('%' followed by two hex digits).
+      {"%00", false},
+      {"%20", false},
+      {"%02", false},
+      {"%ff", false},
+      {"%FF", false},
+      {"%0a", false},
+      {"%0A", false},
+      {"abc%FF", false},
+      {"%FFabc", false},
+      {"abc%FFabc", false},
+      {"hello %FF world", false},
+      {"%20hello%20world", false},
+      {"%25", false},
+      {"%25%25", false},
+      {"%250", false},
+      {"%259", false},
+      {"%25A", false},
+      {"%25F", false},
+      {"%0a:", false},
+
+      // '%' followed by a single character is never a valid sequence.
+      {"%%", true},
+      {"%2", true},
+      {"%a", true},
+      {"%A", true},
+      {"%g", true},
+      {"%G", true},
+      {"%:", true},
+      {"%[", true},
+      {"%F", true},
+      {"%\xC2\xA3", true},  //% followed by UTF-8 encoded '£'.
+
+      // String ends on a potential escape sequence but without two hex-digits
+      // is invalid.
+      {"abc%", true},
+      {"abc%%", true},
+      {"abc%%%", true},
+      {"abc%a", true},
+
+      // One hex and one non-hex digit is invalid.
+      {"%a:", true},
+      {"%:a", true},
+      {"%::", true},
+      {"%ag", true},
+      {"%ga", true},
+      {"%-1", true},
+      {"%1-", true},
+      {"%0\xC2\xA3", true},  // %0£.
+  };
+
+  for (TestCase test_case : cases) {
+    const char* input = test_case.input;
+    bool result = HasInvalidURLEscapeSequences(input);
+    EXPECT_EQ(test_case.is_invalid, result)
+        << "Invalid result for '" << input << "'";
   }
 }
 

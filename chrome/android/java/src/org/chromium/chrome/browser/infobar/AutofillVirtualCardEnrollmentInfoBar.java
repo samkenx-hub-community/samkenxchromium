@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.infobar;
 
+import static org.chromium.chrome.browser.autofill.AutofillUiUtils.getSpannableStringForLegalMessageLines;
+
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.text.SpannableString;
@@ -17,8 +19,8 @@ import org.chromium.base.annotations.NativeMethods;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeStringConstants;
 import org.chromium.chrome.browser.autofill.AutofillUiUtils;
-import org.chromium.chrome.browser.autofill.LegalMessageLine;
 import org.chromium.components.autofill.VirtualCardEnrollmentLinkType;
+import org.chromium.components.autofill.payments.LegalMessageLine;
 import org.chromium.components.infobars.ConfirmInfoBar;
 import org.chromium.components.infobars.InfoBarControlLayout;
 import org.chromium.components.infobars.InfoBarLayout;
@@ -159,7 +161,7 @@ public class AutofillVirtualCardEnrollmentInfoBar extends ConfirmInfoBar {
             LinkedList<LegalMessageLine> legalMessageLines,
             @VirtualCardEnrollmentLinkType int virtualCardEnrollmentLinkType) {
         SpannableStringBuilder legalMessageLinesText =
-                AutofillUiUtils.getSpannableStringForLegalMessageLines(context, legalMessageLines,
+                getSpannableStringForLegalMessageLines(context, legalMessageLines,
                         /* underlineLinks= */ true,
                         url
                         -> AutofillVirtualCardEnrollmentInfoBarJni.get().onInfobarLinkClicked(
@@ -199,28 +201,22 @@ public class AutofillVirtualCardEnrollmentInfoBar extends ConfirmInfoBar {
             control.addDescription(text);
         }
 
-        // The card container contains two lines. The first line contains the "Virtual Card" title
-        // and the second line contains the card identifier. The second line has a different text
-        // appearance than the first line and thus requires us to set the span.
-        String cardContainerTitle = layout.getContext().getString(
-                R.string.autofill_virtual_card_enrollment_dialog_card_container_title);
-        SpannableString cardContainerText =
-                new SpannableString(String.format("%s\n%s %s", cardContainerTitle,
-                        layout.getContext().getString(
-                                R.string.autofill_virtual_card_enrollment_infobar_card_prefix),
-                        mCardLabel));
-        int spanOffsetStart = cardContainerTitle.length() + 1;
+        // The card container contains two lines. The first line contains the card name and number,
+        // and the second line contains the "Virtual card" label. The second line has a different
+        // text appearance than the first line and thus requires us to set the span.
+        SpannableString cardContainerText = new SpannableString(String.format("%s\n%s", mCardLabel,
+                layout.getContext().getString(
+                        R.string.autofill_virtual_card_enrollment_dialog_card_container_title)));
+        int spanOffsetStart = mCardLabel.length() + 1;
         cardContainerText.setSpan(new TextAppearanceSpan(layout.getContext(),
                                           R.style.TextAppearance_TextSmall_Secondary_Baseline),
                 spanOffsetStart, cardContainerText.length(), Spanned.SPAN_INCLUSIVE_EXCLUSIVE);
 
         // Get and resize the issuer icon.
-        Bitmap scaledIssuerIcon = Bitmap.createScaledBitmap(mIssuerIcon,
-                layout.getResources().getDimensionPixelSize(
-                        R.dimen.virtual_card_enrollment_dialog_card_art_width),
-                layout.getResources().getDimensionPixelSize(
-                        R.dimen.virtual_card_enrollment_dialog_card_art_height),
-                true);
+        AutofillUiUtils.CardIconSpecs cardIconSpecs = AutofillUiUtils.CardIconSpecs.create(
+                layout.getContext(), AutofillUiUtils.CardIconSize.LARGE);
+        Bitmap scaledIssuerIcon = Bitmap.createScaledBitmap(
+                mIssuerIcon, cardIconSpecs.getWidth(), cardIconSpecs.getHeight(), true);
 
         // Add the issuer icon and the card container text.
         control.addIcon(scaledIssuerIcon, 0, cardContainerText, null,

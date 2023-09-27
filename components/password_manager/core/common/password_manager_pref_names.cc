@@ -24,6 +24,8 @@ const char kOfferToSavePasswordsEnabledGMS[] =
 const char kSavePasswordsSuspendedByError[] =
     "profile.save_passwords_suspended_by_error";
 const char kSettingsMigratedToUPM[] = "profile.settings_migrated_to_upm";
+const char kSettingsMigratedToUPMLocal[] =
+    "profile.settings_migrated_to_upm_local";
 
 const char kCurrentMigrationVersionToGoogleMobileServices[] =
     "current_migration_version_to_google_mobile_services";
@@ -32,9 +34,6 @@ const char kTimeOfLastMigrationAttempt[] = "time_of_last_migration_attempt";
 
 const char kRequiresMigrationAfterSyncStatusChange[] =
     "requires_migration_after_sync_status_change";
-
-const char kPasswordsPrefWithNewLabelUsed[] =
-    "passwords_pref_with_new_label_used";
 
 const char kUnenrolledFromGoogleMobileServicesDueToErrors[] =
     "unenrolled_from_google_mobile_services_due_to_errors";
@@ -50,7 +49,15 @@ const char kTimesReenrolledToGoogleMobileServices[] =
 
 const char kTimesAttemptedToReenrollToGoogleMobileServices[] =
     "times_attempted_to_reenroll_to_google_mobile_services";
-const char kTimesUPMAuthErrorShown[] = "times_upm_auth_error_shown";
+
+const char kUserAcknowledgedLocalPasswordsMigrationWarning[] =
+    "user_acknowledged_local_passwords_migration_warning";
+const char kLocalPasswordsMigrationWarningShownTimestamp[] =
+    "local_passwords_migration_warning_shown_timestamp";
+const char kLocalPasswordMigrationWarningShownAtStartup[] =
+    "local_passwords_migration_warning_shown_at_startup";
+const char kLocalPasswordMigrationWarningPrefsVersion[] =
+    "local_passwords_migration_warning_reset_count";
 #endif
 
 #if BUILDFLAG(IS_WIN)
@@ -100,6 +107,9 @@ const char kPasswordLeakDetectionEnabled[] =
 const char kPasswordDismissCompromisedAlertEnabled[] =
     "profile.password_dismiss_compromised_alert";
 
+const char kPasswordsPrefWithNewLabelUsed[] =
+    "passwords_pref_with_new_label_used";
+
 const char kProfileStoreDateLastUsedForFilling[] =
     "password_manager.profile_store_date_last_used_for_filling";
 const char kAccountStoreDateLastUsedForFilling[] =
@@ -120,9 +130,6 @@ const char kBiometricAuthenticationBeforeFilling[] =
 const char kHadBiometricsAvailable[] =
     "password_manager.had_biometrics_available";
 #endif
-
-const char kPasswordsGroupingInfoRequested[] =
-    "password_manager.passwords_grouping_info_requested";
 
 #if BUILDFLAG(IS_IOS)
 const char kAccountStorageNoticeShown[] =

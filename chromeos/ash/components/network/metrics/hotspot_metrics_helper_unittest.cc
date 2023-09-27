@@ -13,10 +13,13 @@
 #include "chromeos/ash/components/dbus/shill/shill_clients.h"
 #include "chromeos/ash/components/dbus/shill/shill_manager_client.h"
 #include "chromeos/ash/components/login/login_state/login_state.h"
+#include "chromeos/ash/components/network/enterprise_managed_metadata_store.h"
 #include "chromeos/ash/components/network/hotspot_capabilities_provider.h"
 #include "chromeos/ash/components/network/hotspot_configuration_handler.h"
 #include "chromeos/ash/components/network/hotspot_controller.h"
+#include "chromeos/ash/components/network/hotspot_enabled_state_notifier.h"
 #include "chromeos/ash/components/network/hotspot_state_handler.h"
+#include "chromeos/ash/components/network/metrics/hotspot_feature_usage_metrics.h"
 #include "chromeos/ash/components/network/network_state_handler.h"
 #include "chromeos/ash/components/network/network_state_test_helper.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -41,10 +44,17 @@ class HotspotMetricsHelperTest : public testing::Test {
   void SetUp() override {
     LoginState::Initialize();
 
+    enterprise_managed_metadata_store_ =
+        std::make_unique<EnterpriseManagedMetadataStore>();
     hotspot_capabilities_provider_ =
         std::make_unique<HotspotCapabilitiesProvider>();
     hotspot_capabilities_provider_->Init(
         network_state_test_helper_.network_state_handler());
+    hotspot_feature_usage_metrics_ =
+        std::make_unique<HotspotFeatureUsageMetrics>();
+    hotspot_feature_usage_metrics_->Init(
+        enterprise_managed_metadata_store_.get(),
+        hotspot_capabilities_provider_.get());
     technology_state_controller_ =
         std::make_unique<TechnologyStateController>();
     technology_state_controller_->Init(
@@ -53,15 +63,22 @@ class HotspotMetricsHelperTest : public testing::Test {
     hotspot_state_handler_->Init();
     hotspot_controller_ = std::make_unique<HotspotController>();
     hotspot_controller_->Init(hotspot_capabilities_provider_.get(),
+                              hotspot_feature_usage_metrics_.get(),
                               hotspot_state_handler_.get(),
                               technology_state_controller_.get());
     hotspot_configuration_handler_ =
         std::make_unique<HotspotConfigurationHandler>();
     hotspot_configuration_handler_->Init(hotspot_controller_.get());
+    hotspot_enabled_state_notifier_ =
+        std::make_unique<HotspotEnabledStateNotifier>();
+    hotspot_enabled_state_notifier_->Init(hotspot_state_handler_.get(),
+                                          hotspot_controller_.get());
     hotspot_metrics_helper_ = std::make_unique<HotspotMetricsHelper>();
     hotspot_metrics_helper_->Init(
+        enterprise_managed_metadata_store_.get(),
         hotspot_capabilities_provider_.get(), hotspot_state_handler_.get(),
         hotspot_controller_.get(), hotspot_configuration_handler_.get(),
+        hotspot_enabled_state_notifier_.get(),
         network_state_test_helper_.network_state_handler());
 
     base::RunLoop().RunUntilIdle();
@@ -85,8 +102,8 @@ class HotspotMetricsHelperTest : public testing::Test {
   }
 
   void SetHotspotStateInShill(const std::string& hotspot_state) {
-    base::Value::Dict status_dict;
-    status_dict.Set(shill::kTetheringStatusStateProperty, hotspot_state);
+    auto status_dict = base::Value::Dict().Set(
+        shill::kTetheringStatusStateProperty, hotspot_state);
     network_state_test_helper_.manager_test()->SetManagerProperty(
         shill::kTetheringStatusProperty, base::Value(std::move(status_dict)));
     base::RunLoop().RunUntilIdle();
@@ -95,12 +112,15 @@ class HotspotMetricsHelperTest : public testing::Test {
   void TearDown() override {
     network_state_test_helper_.ClearDevices();
     network_state_test_helper_.ClearServices();
+    hotspot_enabled_state_notifier_.reset();
     hotspot_metrics_helper_.reset();
     hotspot_configuration_handler_.reset();
     hotspot_controller_.reset();
+    hotspot_feature_usage_metrics_.reset();
     hotspot_capabilities_provider_.reset();
     hotspot_state_handler_.reset();
     technology_state_controller_.reset();
+    enterprise_managed_metadata_store_.reset();
     LoginState::Shutdown();
   }
 
@@ -110,11 +130,15 @@ class HotspotMetricsHelperTest : public testing::Test {
   base::HistogramTester histogram_tester_;
   NetworkStateTestHelper network_state_test_helper_{
       /*use_default_devices_and_services=*/false};
+  std::unique_ptr<EnterpriseManagedMetadataStore>
+      enterprise_managed_metadata_store_;
   std::unique_ptr<HotspotCapabilitiesProvider> hotspot_capabilities_provider_;
   std::unique_ptr<HotspotStateHandler> hotspot_state_handler_;
+  std::unique_ptr<HotspotFeatureUsageMetrics> hotspot_feature_usage_metrics_;
   std::unique_ptr<TechnologyStateController> technology_state_controller_;
   std::unique_ptr<HotspotController> hotspot_controller_;
   std::unique_ptr<HotspotConfigurationHandler> hotspot_configuration_handler_;
+  std::unique_ptr<HotspotEnabledStateNotifier> hotspot_enabled_state_notifier_;
   std::unique_ptr<HotspotMetricsHelper> hotspot_metrics_helper_;
 };
 
@@ -198,24 +222,25 @@ TEST_F(HotspotMetricsHelperTest, HotspotUsageDurationHistogram) {
   SetHotspotStateInShill(shill::kTetheringStateActive);
   hotspot_controller_->DisableHotspot(
       base::DoNothing(), hotspot_config::mojom::DisableReason::kUserInitiated);
+  SetHotspotStateInShill(shill::kTetheringStateIdle);
   base::RunLoop().RunUntilIdle();
   histogram_tester_.ExpectTimeBucketCount(
       HotspotMetricsHelper::kHotspotUsageDuration, kHotspotUsageTime, 1);
 
-  SetHotspotStateInShill(shill::kTetheringStateIdle);
   // Verifies that the usage duration is logged if hotspot is torn down by
   // internal error.
   hotspot_controller_->EnableHotspot(base::DoNothing());
+  SetHotspotStateInShill(shill::kTetheringStateActive);
   base::RunLoop().RunUntilIdle();
   task_environment_.FastForwardBy(kHotspotUsageTime);
 
-  base::Value::Dict status_dict;
-  status_dict.Set(shill::kTetheringStatusStateProperty,
-                  shill::kTetheringStateIdle);
-  status_dict.Set(shill::kTetheringStatusIdleReasonProperty,
-                  shill::kTetheringIdleReasonError);
+  auto status_dict =
+      base::Value::Dict()
+          .Set(shill::kTetheringStatusStateProperty, shill::kTetheringStateIdle)
+          .Set(shill::kTetheringStatusIdleReasonProperty,
+               shill::kTetheringIdleReasonError);
   network_state_test_helper_.manager_test()->SetManagerProperty(
-      shill::kTetheringStatusProperty, base::Value(status_dict.Clone()));
+      shill::kTetheringStatusProperty, base::Value(std::move(status_dict)));
   base::RunLoop().RunUntilIdle();
   histogram_tester_.ExpectTimeBucketCount(
       HotspotMetricsHelper::kHotspotUsageDuration, kHotspotUsageTime, 2);
@@ -231,11 +256,11 @@ TEST_F(HotspotMetricsHelperTest, HotspotMaxClientCountHistogram) {
                   shill::kTetheringStateActive);
   // Update tethering status with one active client.
   base::Value::List active_clients_list;
-  base::Value::Dict client;
-  client.Set(shill::kTetheringStatusClientIPv4Property, "IPV4:001");
-  client.Set(shill::kTetheringStatusClientHostnameProperty, "hostname1");
-  client.Set(shill::kTetheringStatusClientMACProperty, "persist");
-  active_clients_list.Append(std::move(client));
+  active_clients_list.Append(
+      base::Value::Dict()
+          .Set(shill::kTetheringStatusClientIPv4Property, "IPV4:001")
+          .Set(shill::kTetheringStatusClientHostnameProperty, "hostname1")
+          .Set(shill::kTetheringStatusClientMACProperty, "persist"));
   status_dict.Set(shill::kTetheringStatusClientsProperty,
                   active_clients_list.Clone());
   network_state_test_helper_.manager_test()->SetManagerProperty(
@@ -257,10 +282,10 @@ TEST_F(HotspotMetricsHelperTest, HotspotMaxClientCountHistogram) {
   base::RunLoop().RunUntilIdle();
 
   // Add one more connected client.
-  base::Value::Dict client2;
-  client2.Set(shill::kTetheringStatusClientIPv4Property, "IPV4:002");
-  client2.Set(shill::kTetheringStatusClientHostnameProperty, "hostname2");
-  active_clients_list.Append(std::move(client2));
+  active_clients_list.Append(
+      base::Value::Dict()
+          .Set(shill::kTetheringStatusClientIPv4Property, "IPV4:002")
+          .Set(shill::kTetheringStatusClientHostnameProperty, "hostname2"));
   status_dict.Set(shill::kTetheringStatusClientsProperty,
                   std::move(active_clients_list));
   network_state_test_helper_.manager_test()->SetManagerProperty(
@@ -291,7 +316,7 @@ TEST_F(HotspotMetricsHelperTest, HotspotIsDeviceManagedHistogram) {
       base::DoNothing(), hotspot_config::mojom::DisableReason::kUserInitiated);
   base::RunLoop().RunUntilIdle();
 
-  hotspot_metrics_helper_->set_is_enterprise_managed(
+  enterprise_managed_metadata_store_->set_is_enterprise_managed(
       /*is_enterprise_managed=*/true);
   hotspot_controller_->EnableHotspot(base::DoNothing());
   base::RunLoop().RunUntilIdle();
@@ -343,14 +368,14 @@ TEST_F(HotspotMetricsHelperTest, HotspotDisableReasonHistogram) {
       HotspotMetricsHelper::kHotspotDisableReasonHistogram,
       HotspotMetricsHelper::HotspotMetricsDisableReason::kUserInitiated, 1);
 
-  SetHotspotStateInShill(shill::kTetheringStateIdle);
+  SetHotspotStateInShill(shill::kTetheringStateActive);
   // Verifies that the disabel reason is logged if hotspot is torn down by
   // internal error.
-  base::Value::Dict status_dict;
-  status_dict.Set(shill::kTetheringStatusStateProperty,
-                  shill::kTetheringStateIdle);
-  status_dict.Set(shill::kTetheringStatusIdleReasonProperty,
-                  shill::kTetheringIdleReasonError);
+  auto status_dict =
+      base::Value::Dict()
+          .Set(shill::kTetheringStatusStateProperty, shill::kTetheringStateIdle)
+          .Set(shill::kTetheringStatusIdleReasonProperty,
+               shill::kTetheringIdleReasonError);
   network_state_test_helper_.manager_test()->SetManagerProperty(
       shill::kTetheringStatusProperty, base::Value(status_dict.Clone()));
   base::RunLoop().RunUntilIdle();

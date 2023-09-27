@@ -9,9 +9,9 @@ import static org.chromium.android_webview.test.AwActivityTestRule.WAIT_TIMEOUT_
 
 import android.annotation.SuppressLint;
 import android.os.Build;
-import android.support.test.InstrumentationRegistry;
 import android.util.Pair;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 
 import org.hamcrest.Matchers;
@@ -641,27 +641,6 @@ public class AwContentsClientShouldOverrideUrlLoadingTest {
         Assert.assertFalse(mShouldOverrideUrlLoadingHelper.isRedirect());
         Assert.assertFalse(mShouldOverrideUrlLoadingHelper.hasUserGesture());
         Assert.assertFalse(mShouldOverrideUrlLoadingHelper.isOutermostMainFrame());
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"AndroidWebView", "Navigation"})
-    public void testNotCalledForIframeUuidInPackageSchemeNavigations() throws Throwable {
-        standardSetup();
-
-        final String uuidInPackageSchemeUrl =
-                "uuid-in-package:f81d4fae-7dec-11d0-a765-00a0c91e6bf6";
-        final String pageWithIframeUrl = addPageToTestServer("/iframe_intercept.html",
-                makeHtmlPageFrom("", "<iframe src=\"" + uuidInPackageSchemeUrl + "\" />"));
-
-        final int shouldOverrideUrlLoadingCallCount =
-                mShouldOverrideUrlLoadingHelper.getCallCount();
-
-        mActivityTestRule.loadUrlSync(
-                mAwContents, mContentsClient.getOnPageFinishedHelper(), pageWithIframeUrl);
-
-        Assert.assertEquals(
-                shouldOverrideUrlLoadingCallCount, mShouldOverrideUrlLoadingHelper.getCallCount());
     }
 
     /**

@@ -4,12 +4,15 @@
 
 package org.chromium.chrome.browser.customtabs;
 
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
+
 import android.app.Activity;
-import android.support.test.InstrumentationRegistry;
+import android.util.SparseBooleanArray;
 
 import androidx.annotation.Nullable;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.After;
@@ -102,7 +105,7 @@ public class CustomTabTabPersistencePolicyTest {
     public void testDeletableMetadataSelection_NoFiles() {
         List<File> deletableFiles = CustomTabTabPersistencePolicy.getMetadataFilesForDeletion(
                 System.currentTimeMillis(), new ArrayList<File>());
-        Assert.assertThat(deletableFiles, Matchers.emptyIterableOf(File.class));
+        assertThat(deletableFiles, Matchers.emptyIterableOf(File.class));
     }
 
     @Test
@@ -116,7 +119,7 @@ public class CustomTabTabPersistencePolicyTest {
         filesToTest.addAll(generateMaximumStateFiles(currentTime));
         List<File> deletableFiles = CustomTabTabPersistencePolicy.getMetadataFilesForDeletion(
                 currentTime, filesToTest);
-        Assert.assertThat(deletableFiles, Matchers.emptyIterableOf(File.class));
+        assertThat(deletableFiles, Matchers.emptyIterableOf(File.class));
     }
 
     @Test
@@ -134,7 +137,7 @@ public class CustomTabTabPersistencePolicyTest {
         filesToTest.add(filesToTest.size() / 2, slightlyOlderFile);
         List<File> deletableFiles = CustomTabTabPersistencePolicy.getMetadataFilesForDeletion(
                 currentTime, filesToTest);
-        Assert.assertThat(deletableFiles, Matchers.containsInAnyOrder(slightlyOlderFile));
+        assertThat(deletableFiles, Matchers.containsInAnyOrder(slightlyOlderFile));
     }
 
     @Test
@@ -151,7 +154,7 @@ public class CustomTabTabPersistencePolicyTest {
         filesToTest.add(expiredFile);
         List<File> deletableFiles = CustomTabTabPersistencePolicy.getMetadataFilesForDeletion(
                 currentTime, filesToTest);
-        Assert.assertThat(deletableFiles, Matchers.containsInAnyOrder(expiredFile));
+        assertThat(deletableFiles, Matchers.containsInAnyOrder(expiredFile));
     }
 
     /**
@@ -189,8 +192,8 @@ public class CustomTabTabPersistencePolicyTest {
         Set<Integer> tabIds = new HashSet<>();
         Set<Integer> taskIds = new HashSet<>();
         CustomTabTabPersistencePolicy.getAllLiveTabAndTaskIds(tabIds, taskIds);
-        Assert.assertThat(tabIds, Matchers.emptyIterable());
-        Assert.assertThat(taskIds, Matchers.emptyIterable());
+        assertThat(tabIds, Matchers.emptyIterable());
+        assertThat(taskIds, Matchers.emptyIterable());
 
         tabIds.clear();
         taskIds.clear();
@@ -219,8 +222,8 @@ public class CustomTabTabPersistencePolicyTest {
         ApplicationStatus.onStateChangeForTesting(tabbedActivity, ActivityState.CREATED);
 
         CustomTabTabPersistencePolicy.getAllLiveTabAndTaskIds(tabIds, taskIds);
-        Assert.assertThat(tabIds, Matchers.containsInAnyOrder(4, 8, 9, 458, 9878));
-        Assert.assertThat(taskIds, Matchers.containsInAnyOrder(1, 5));
+        assertThat(tabIds, Matchers.containsInAnyOrder(4, 8, 9, 458, 9878));
+        assertThat(taskIds, Matchers.containsInAnyOrder(1, 5));
     }
 
     /**
@@ -250,14 +253,14 @@ public class CustomTabTabPersistencePolicyTest {
         // Test when no files have been created.
         policy.cleanupUnusedFiles(filesToDeleteCallback);
         callbackSignal.waitForCallback(0);
-        Assert.assertThat(filesToDelete.get(), Matchers.emptyIterable());
+        assertThat(filesToDelete.get(), Matchers.emptyIterable());
 
         // Create an unreferenced tab state file and ensure it is marked for deletion.
         File tab999File = TabStateFileManager.getTabStateFile(stateDirectory, 999, false);
         Assert.assertTrue(tab999File.createNewFile());
         policy.cleanupUnusedFiles(filesToDeleteCallback);
         callbackSignal.waitForCallback(1);
-        Assert.assertThat(filesToDelete.get(), Matchers.containsInAnyOrder(tab999File.getName()));
+        assertThat(filesToDelete.get(), Matchers.containsInAnyOrder(tab999File.getName()));
 
         // Reference the tab state file and ensure it is no longer marked for deletion.
         TestThreadUtils.runOnUiThreadBlocking(() -> {
@@ -266,7 +269,7 @@ public class CustomTabTabPersistencePolicyTest {
         });
         policy.cleanupUnusedFiles(filesToDeleteCallback);
         callbackSignal.waitForCallback(2);
-        Assert.assertThat(filesToDelete.get(), Matchers.emptyIterable());
+        assertThat(filesToDelete.get(), Matchers.emptyIterable());
 
         // Create a tab model and associated tabs. Ensure it is not marked for deletion as it is
         // new enough.
@@ -275,7 +278,8 @@ public class CustomTabTabPersistencePolicyTest {
             public byte[] call() throws Exception {
                 TabModelSelectorImpl selectorImpl =
                         buildTestTabModelSelector(new int[] {111, 222, 333}, null);
-                return TabPersistentStore.serializeTabModelSelector(selectorImpl, null).listData;
+                return TabPersistentStore.serializeTabModelSelector(selectorImpl, null, false)
+                        .listData;
             }
         });
         FileOutputStream fos = null;
@@ -295,14 +299,14 @@ public class CustomTabTabPersistencePolicyTest {
         Assert.assertTrue(tab333File.createNewFile());
         policy.cleanupUnusedFiles(filesToDeleteCallback);
         callbackSignal.waitForCallback(3);
-        Assert.assertThat(filesToDelete.get(), Matchers.emptyIterable());
+        assertThat(filesToDelete.get(), Matchers.emptyIterable());
 
         // Set the age of the metadata file to be past the expiration threshold and ensure it along
         // with the associated tab files are marked for deletion.
         Assert.assertTrue(metadataFile.setLastModified(1234));
         policy.cleanupUnusedFiles(filesToDeleteCallback);
         callbackSignal.waitForCallback(4);
-        Assert.assertThat(filesToDelete.get(),
+        assertThat(filesToDelete.get(),
                 Matchers.containsInAnyOrder(tab111File.getName(), tab222File.getName(),
                         tab333File.getName(), metadataFile.getName()));
     }
@@ -428,6 +432,10 @@ public class CustomTabTabPersistencePolicyTest {
             @Override
             public void cancelCleanupInProgress() {
             }
+
+            @Override
+            public void getAllTabIds(Callback<SparseBooleanArray> tabIdsCallback) {}
+
         };
     }
 

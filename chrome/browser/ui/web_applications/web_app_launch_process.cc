@@ -5,14 +5,13 @@
 #include "chrome/browser/ui/web_applications/web_app_launch_process.h"
 
 #include "base/files/file_path.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/values_equivalent.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/apps/app_service/app_launch_params.h"
 #include "chrome/browser/apps/app_service/launch_utils.h"
-#include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
@@ -71,6 +70,20 @@ content::WebContents* WebAppLaunchProcess::CreateAndRun(
       .Run();
 }
 
+// static
+void WebAppLaunchProcess::SetOpenApplicationCallbackForTesting(
+    OpenApplicationCallback callback) {
+  GetOpenApplicationCallbackForTesting() = std::move(callback);  // IN-TEST
+}
+
+// static
+WebAppLaunchProcess::OpenApplicationCallback&
+WebAppLaunchProcess::GetOpenApplicationCallbackForTesting() {
+  static base::NoDestructor<WebAppLaunchProcess::OpenApplicationCallback>
+      callback;
+  return *callback;
+}
+
 WebAppLaunchProcess::WebAppLaunchProcess(
     Profile& profile,
     WebAppRegistrar& registrar,
@@ -98,13 +111,8 @@ content::WebContents* WebAppLaunchProcess::Run() {
   const apps::ShareTarget* share_target = MaybeGetShareTarget();
   auto [launch_url, is_file_handling] = GetLaunchUrl(share_target);
 
-  // TODO(crbug.com/1265381): URL Handlers allows web apps to be opened with
-  // associated origin URLs. There's no utility function to test whether a URL
-  // is in a web app's extended scope at the moment.
-  // Because URL Handlers is not implemented for Chrome OS we can perform this
-  // DCHECK on the basic scope.
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-  bool is_url_in_system_web_app_sccope =
+  bool is_url_in_system_web_app_scope =
       ash::GetSystemWebAppTypeForAppId(&*profile_, params_->app_id) &&
       ash::SystemWebAppManager::Get(&*profile_)
           ->GetSystemApp(
@@ -113,12 +121,19 @@ content::WebContents* WebAppLaunchProcess::Run() {
           ->GetSystemApp(
               *ash::GetSystemWebAppTypeForAppId(&*profile_, params_->app_id))
           ->IsUrlInSystemAppScope(launch_url);
-  DCHECK(registrar_->IsUrlInAppScope(launch_url, params_->app_id) ||
-         is_url_in_system_web_app_sccope)
-      << "Url " << launch_url.spec() << " not in scope for app "
-      << params_->app_id;
+
+  // TODO(crbug.com/1477991): Figure out why this is getting hit.
+  if (!registrar_->IsUrlInAppExtendedScope(launch_url, params_->app_id) &&
+      !is_url_in_system_web_app_scope) {
+    SCOPED_CRASH_KEY_STRING256("crbug1477991", "launch_url", launch_url.spec());
+    SCOPED_CRASH_KEY_STRING256("crbug1477991", "app_scope",
+                               web_app_->scope().spec());
+    base::debug::DumpWithoutCrashing();
+    DCHECK(false) << "Url " << launch_url.spec() << " not in scope for app "
+                  << params_->app_id;
+  }
 #else
-  DCHECK(registrar_->IsUrlInAppScope(launch_url, params_->app_id));
+  CHECK(registrar_->IsUrlInAppExtendedScope(launch_url, params_->app_id));
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -151,7 +166,6 @@ content::WebContents* WebAppLaunchProcess::Run() {
   RecordLaunchMetrics(params_->app_id, params_->container,
                       params_->launch_source, launch_url, web_contents);
 
-  MaybeShowProfileSwitchIPH(browser);
   return web_contents;
 }
 
@@ -202,6 +216,11 @@ std::tuple<GURL, bool /*is_file_handling*/> WebAppLaunchProcess::GetLaunchUrl(
 
 WindowOpenDisposition WebAppLaunchProcess::GetNavigationDisposition(
     bool is_new_browser) const {
+  // For prevent-close, we always want to focus the existing window
+  if (registrar_->IsPreventCloseEnabled(params_->app_id)) {
+    return WindowOpenDisposition::CURRENT_TAB;
+  }
+
   if (registrar_->IsTabbedWindowModeEnabled(params_->app_id)) {
     return WindowOpenDisposition::NEW_FOREGROUND_TAB;
   }
@@ -277,8 +296,11 @@ Browser* WebAppLaunchProcess::MaybeFindBrowserForLaunch() const {
         &profile_.get(), /*match_original_profiles=*/false, display_id);
   }
 
+  // In the case of prevent-close, we do not want to create a new browser, but
+  // instead continue to find the existing browser window.
   if (!registrar_->IsTabbedWindowModeEnabled(params_->app_id) &&
-      GetLaunchClientMode() == LaunchHandler::ClientMode::kNavigateNew) {
+      GetLaunchClientMode() == LaunchHandler::ClientMode::kNavigateNew &&
+      !registrar_->IsPreventCloseEnabled(params_->app_id)) {
     return nullptr;
   }
 
@@ -325,7 +347,10 @@ WebAppLaunchProcess::NavigateResult WebAppLaunchProcess::MaybeNavigateBrowser(
 
   content::WebContents* existing_tab = tab_strip->GetActiveWebContents();
   DCHECK(existing_tab);
-  if (GetLaunchHandler().NeverNavigateExistingClients()) {
+  // In the case of prevent-close, we do not navigate but instead focus the
+  // existing window
+  if (GetLaunchHandler().NeverNavigateExistingClients() ||
+      registrar_->IsPreventCloseEnabled(params_->app_id)) {
     if (base::ValuesEquivalent(WebAppTabHelper::FromWebContents(existing_tab)
                                    ->EnsureLaunchQueue()
                                    .GetPendingLaunchAppId(),
@@ -337,8 +362,8 @@ WebAppLaunchProcess::NavigateResult WebAppLaunchProcess::MaybeNavigateBrowser(
       return {.web_contents = existing_tab, .did_navigate = false};
     }
 
-    if (registrar_->IsUrlInAppScope(existing_tab->GetLastCommittedURL(),
-                                    params_->app_id)) {
+    if (registrar_->IsUrlInAppExtendedScope(existing_tab->GetLastCommittedURL(),
+                                            params_->app_id)) {
       // If the web contents is currently navigating then interrupt it. The
       // current page is now being used for this app launch.
       existing_tab->Stop();
@@ -383,17 +408,6 @@ void WebAppLaunchProcess::MaybeEnqueueWebLaunchParams(
         ->EnsureLaunchQueue()
         .Enqueue(std::move(launch_params));
   }
-}
-
-void WebAppLaunchProcess::MaybeShowProfileSwitchIPH(Browser* browser) {
-#if !BUILDFLAG(IS_CHROMEOS)
-  ProfileManager* profile_manager = g_browser_process->profile_manager();
-  if (browser && browser->app_controller() &&
-      browser->app_controller()->HasProfileMenuButton() && profile_manager &&
-      profile_manager->GetNumberOfProfiles() > 1) {
-    browser->window()->MaybeShowProfileSwitchIPH();
-  }
-#endif
 }
 
 }  // namespace web_app

@@ -4,7 +4,10 @@
 
 #include "chrome/browser/ash/system/timezone_resolver_manager.h"
 
+#include "ash/constants/ash_pref_names.h"
 #include "ash/constants/ash_switches.h"
+#include "ash/shell.h"
+#include "ash/system/privacy_hub/privacy_hub_controller.h"
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/functional/bind.h"
@@ -15,7 +18,9 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_process_platform_part.h"
 #include "chrome/common/pref_names.h"
+#include "chromeos/ash/components/install_attributes/install_attributes.h"
 #include "components/policy/proto/chrome_device_policy.pb.h"
+#include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
 
 namespace ash {
@@ -37,12 +42,12 @@ enum ServiceConfiguration {
 ServiceConfiguration GetServiceConfigurationFromAutomaticDetectionPolicy() {
   PrefService* local_state = g_browser_process->local_state();
   const bool is_managed = local_state->IsManagedPreference(
-      prefs::kSystemTimezoneAutomaticDetectionPolicy);
+      ::prefs::kSystemTimezoneAutomaticDetectionPolicy);
   if (!is_managed)
     return UNSPECIFIED;
 
   int policy_value =
-      local_state->GetInteger(prefs::kSystemTimezoneAutomaticDetectionPolicy);
+      local_state->GetInteger(::prefs::kSystemTimezoneAutomaticDetectionPolicy);
 
   switch (policy_value) {
     case enterprise_management::SystemTimezoneProto::USERS_DECIDE:
@@ -88,7 +93,7 @@ ServiceConfiguration GetServiceConfigurationFromUserPrefs(
     const PrefService* user_prefs) {
   return TimeZoneResolverManager::TimeZoneResolveMethodFromInt(
              user_prefs->GetInteger(
-                 prefs::kResolveTimezoneByGeolocationMethod)) ==
+                 ::prefs::kResolveTimezoneByGeolocationMethod)) ==
                  TimeZoneResolverManager::TimeZoneResolveMethod::DISABLED
              ? SHOULD_STOP
              : SHOULD_START;
@@ -96,9 +101,18 @@ ServiceConfiguration GetServiceConfigurationFromUserPrefs(
 
 // Returns service configuration for the signin screen.
 ServiceConfiguration GetServiceConfigurationForSigninScreen() {
+  using AccessLevel = PrivacyHubController::AccessLevel;
+
+  const AccessLevel device_geolocation_permission =
+      static_cast<AccessLevel>(g_browser_process->local_state()->GetInteger(
+          prefs::kDeviceGeolocationAllowed));
+  if (device_geolocation_permission == AccessLevel::kDisallowed) {
+    return SHOULD_STOP;
+  }
+
   const PrefService::Preference* device_pref =
       g_browser_process->local_state()->FindPreference(
-          prefs::kResolveDeviceTimezoneByGeolocationMethod);
+          ::prefs::kResolveDeviceTimezoneByGeolocationMethod);
   if (!device_pref || device_pref->IsDefaultValue()) {
     // CfM devices default to static timezone.
     bool keyboard_driven_oobe =
@@ -131,7 +145,7 @@ TimeZoneResolverManager::TimeZoneResolverManager() {
 
   local_state_pref_change_registrar_.Init(g_browser_process->local_state());
   local_state_pref_change_registrar_.Add(
-      prefs::kSystemTimezoneAutomaticDetectionPolicy,
+      ::prefs::kSystemTimezoneAutomaticDetectionPolicy,
       base::BindRepeating(&TimeZoneResolverManager::UpdateTimezoneResolver,
                           base::Unretained(this)));
 }
@@ -142,7 +156,7 @@ void TimeZoneResolverManager::SetPrimaryUserPrefs(PrefService* pref_service) {
   primary_user_prefs_ = pref_service;
 }
 
-bool TimeZoneResolverManager::ShouldSendWiFiGeolocationData() {
+bool TimeZoneResolverManager::ShouldSendWiFiGeolocationData() const {
   // Managed user case, check cloud policies for automatic time zone.
   if (IsTimeZoneResolutionPolicyControlled()) {
     switch (GetEffectiveAutomaticTimezoneManagementSetting()) {
@@ -159,26 +173,32 @@ bool TimeZoneResolverManager::ShouldSendWiFiGeolocationData() {
   }
 
   // Regular user case (also USERS_DECIDE case for managed).
-  // Automatic time zone setting is an user configurable option, applying
-  // the primary user's choice to the entire session.
   // primary_user_prefs_ indicates if the user has signed in or not.
-  if (primary_user_prefs_) {
-    switch (GetEffectiveUserTimeZoneResolveMethod(primary_user_prefs_,
-                                                  /*check_policy=*/false)) {
-      case TimeZoneResolveMethod::SEND_WIFI_ACCESS_POINTS:
-        return true;
-      case TimeZoneResolveMethod::SEND_ALL_LOCATION_INFO:
-        return true;
-      default:
-        return false;
-    }
+  // Precise location is disabled on log-in screen.
+  if (!primary_user_prefs_) {
+    return false;
   }
 
-  // Precise location is disabled on log-in screen.
-  return false;
+  // User is logged in at this point.
+  // Check that System-wide location permission is granted by the primary user.
+  if (!primary_user_prefs_->GetBoolean(ash::prefs::kUserGeolocationAllowed)) {
+    return false;
+  }
+
+  // Automatic time zone setting is a user configurable option, applying
+  // the primary user's choice to the entire session.
+  switch (GetEffectiveUserTimeZoneResolveMethod(primary_user_prefs_,
+                                                /*check_policy=*/false)) {
+    case TimeZoneResolveMethod::SEND_WIFI_ACCESS_POINTS:
+      return true;
+    case TimeZoneResolveMethod::SEND_ALL_LOCATION_INFO:
+      return true;
+    default:
+      return false;
+  }
 }
 
-bool TimeZoneResolverManager::ShouldSendCellularGeolocationData() {
+bool TimeZoneResolverManager::ShouldSendCellularGeolocationData() const {
   // Managed user case, check cloud policies for automatic time zone.
   if (IsTimeZoneResolutionPolicyControlled()) {
     switch (GetEffectiveAutomaticTimezoneManagementSetting()) {
@@ -193,17 +213,35 @@ bool TimeZoneResolverManager::ShouldSendCellularGeolocationData() {
   }
 
   // Regular user case (also USERS_DECIDE case for managed).
-  // Automatic time zone setting is an user configurable option, applying
-  // the primary user's choice to the entire session.
-  // primary_user_prefs_ indicates if the has user signed in or not.
-  if (primary_user_prefs_) {
-    return GetEffectiveUserTimeZoneResolveMethod(primary_user_prefs_,
-                                                 /*check_policy=*/false) ==
-           TimeZoneResolveMethod::SEND_ALL_LOCATION_INFO;
+  // primary_user_prefs_ indicates if the user has signed in or not.
+  // Precise location is disabled on log-in screen.
+  if (!primary_user_prefs_) {
+    return false;
   }
 
-  // Precise location is disabled on log-in screen.
-  return false;
+  // User is logged in at this point.
+  // Check that System-wide location permission is granted by the primary user.
+  if (!primary_user_prefs_->GetBoolean(ash::prefs::kUserGeolocationAllowed)) {
+    return false;
+  }
+
+  // Automatic time zone setting is a user configurable option, applying
+  // the primary user's choice to the entire session.
+  return GetEffectiveUserTimeZoneResolveMethod(primary_user_prefs_,
+                                               /*check_policy=*/false) ==
+         TimeZoneResolveMethod::SEND_ALL_LOCATION_INFO;
+}
+
+bool TimeZoneResolverManager::IsSystemGeolocationAllowed() const {
+  // Follow device preference on log-in screen.
+  if (!primary_user_prefs_) {
+    return g_browser_process->local_state()->GetInteger(
+               ash::prefs::kDeviceGeolocationAllowed) ==
+           static_cast<int>(PrivacyHubController::AccessLevel::kAllowed);
+  }
+
+  // Inside user session check geolocation user preference.
+  return primary_user_prefs_->GetBoolean(ash::prefs::kUserGeolocationAllowed);
 }
 
 // static
@@ -219,7 +257,7 @@ int TimeZoneResolverManager::GetEffectiveAutomaticTimezoneManagementSetting() {
   }
 
   int policy_value = g_browser_process->local_state()->GetInteger(
-      prefs::kSystemTimezoneAutomaticDetectionPolicy);
+      ::prefs::kSystemTimezoneAutomaticDetectionPolicy);
   DCHECK(policy_value <= enterprise_management::SystemTimezoneProto::
                              AutomaticTimezoneDetectionType_MAX);
 
@@ -247,6 +285,11 @@ void TimeZoneResolverManager::UpdateTimezoneResolver() {
     observer.OnTimeZoneResolverUpdated();
 }
 
+void TimeZoneResolverManager::OnSystemGeolocationPermissionChanged(
+    bool enabled) {
+  UpdateTimezoneResolver();
+}
+
 void TimeZoneResolverManager::AddObserver(Observer* observer) {
   observers_.AddObserver(observer);
 }
@@ -260,6 +303,12 @@ bool TimeZoneResolverManager::ShouldApplyResolvedTimezone() {
 }
 
 bool TimeZoneResolverManager::TimeZoneResolverShouldBeRunning() {
+  // System geolocation permission is required for automatic timezone
+  // resolution.
+  if (!IsSystemGeolocationAllowed()) {
+    return false;
+  }
+
   ServiceConfiguration result = GetServiceConfigurationFromPolicy();
 
   if (result == UNSPECIFIED) {
@@ -324,9 +373,9 @@ TimeZoneResolverManager::GetEffectiveUserTimeZoneResolveMethod(
     }
   }
   if (user_prefs->GetBoolean(
-          prefs::kResolveTimezoneByGeolocationMigratedToMethod)) {
+          ::prefs::kResolveTimezoneByGeolocationMigratedToMethod)) {
     return TimeZoneResolveMethodFromInt(
-        user_prefs->GetInteger(prefs::kResolveTimezoneByGeolocationMethod));
+        user_prefs->GetInteger(::prefs::kResolveTimezoneByGeolocationMethod));
   }
   return TimeZoneResolveMethod::IP_ONLY;
 }

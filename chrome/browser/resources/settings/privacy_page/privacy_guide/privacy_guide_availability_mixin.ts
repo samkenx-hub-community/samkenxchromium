@@ -7,11 +7,11 @@
  * Contains utilities that track whether the Privacy Guide is available.
  */
 
+import {SyncStatus} from '/shared/settings/people_page/sync_browser_proxy.js';
 import {WebUiListenerMixin, WebUiListenerMixinInterface} from 'chrome://resources/cr_elements/web_ui_listener_mixin.js';
 import {dedupingMixin, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {loadTimeData} from '../../i18n_setup.js';
-import {SyncStatus} from '../../people_page/sync_browser_proxy.js';
 
 type Constructor<T> = new (...args: any[]) => T;
 
@@ -49,7 +49,7 @@ export const PrivacyGuideAvailabilityMixin = dedupingMixin(
               'sync-status-changed',
               (syncStatus: SyncStatus) =>
                   this.onPrivacyGuideAvailabilityChanged_(
-                      !syncStatus.childUser));
+                      !syncStatus.supervisedUser));
         }
 
         private onPrivacyGuideAvailabilityChanged_(isAvailable: boolean) {

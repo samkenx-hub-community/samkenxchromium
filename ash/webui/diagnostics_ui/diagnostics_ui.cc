@@ -12,6 +12,7 @@
 #include "ash/constants/ash_features.h"
 #include "ash/webui/common/backend/plural_string_handler.h"
 #include "ash/webui/common/keyboard_diagram_strings.h"
+#include "ash/webui/common/trusted_types_util.h"
 #include "ash/webui/diagnostics_ui/backend/common/histogram_util.h"
 #include "ash/webui/diagnostics_ui/backend/connectivity/network_health_provider.h"
 #include "ash/webui/diagnostics_ui/backend/diagnostics_manager.h"
@@ -35,6 +36,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "chromeos/ash/components/login/login_state/login_state.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
@@ -44,6 +46,7 @@
 #include "ui/base/webui/web_ui_util.h"
 #include "ui/chromeos/strings/network/network_element_localized_strings_provider.h"
 #include "ui/resources/grit/webui_resources.h"
+#include "ui/webui/color_change_listener/color_change_handler.h"
 
 namespace ash {
 
@@ -297,6 +300,8 @@ void AddDiagnosticsStrings(content::WebUIDataSource* html_source) {
       {"noIpAddressText", IDS_NETWORK_DIAGNOSTICS_NO_IP_ADDRESS_TEXT},
       {"notEnoughAvailableMemoryMessage",
        IDS_DIAGNOSTICS_NOT_ENOUGH_AVAILABLE_MEMORY},
+      {"notEnoughAvailableMemoryCpuMessage",
+       IDS_DIAGNOSTICS_NOT_ENOUGH_AVAILABLE_MEMORY_CPU},
       {"percentageLabel", IDS_DIAGNOSTICS_PERCENTAGE_LABEL},
       {"reconnectLinkText", IDS_DIAGNOSTICS_RECONNECT_LINK_TEXT},
       {"remainingCharge", IDS_DIAGNOSTICS_REMAINING_CHARGE_LABEL},
@@ -376,12 +381,12 @@ void SetUpWebUIDataSource(content::WebUIDataSource* source,
   source->AddResourcePath("test_loader_util.js",
                           IDR_WEBUI_JS_TEST_LOADER_UTIL_JS);
   source->AddBoolean("isLoggedIn", LoginState::Get()->IsUserLoggedIn());
-  source->AddBoolean("isInputEnabled",
-                     features::IsInputInDiagnosticsAppEnabled());
   source->AddBoolean("isTouchpadEnabled",
                      features::IsTouchpadInDiagnosticsAppEnabled());
   source->AddBoolean("isTouchscreenEnabled",
                      features::IsTouchscreenInDiagnosticsAppEnabled());
+  source->AddBoolean("isJellyEnabledForDiagnosticsApp",
+                     ash::features::IsJellyEnabledForDiagnosticsApp());
 }
 
 void SetUpPluralStringHandler(content::WebUI* web_ui) {
@@ -407,7 +412,7 @@ DiagnosticsDialogUI::DiagnosticsDialogUI(
       network::mojom::CSPDirectiveName::ScriptSrc,
       "script-src chrome://resources chrome://test chrome://webui-test "
       "'self';");
-  html_source->DisableTrustedTypesCSP();
+  ash::EnableTrustedTypesCSP(html_source);
 
   const auto resources = base::make_span(kAshDiagnosticsAppResources,
                                          kAshDiagnosticsAppResourcesSize);
@@ -486,6 +491,12 @@ void DiagnosticsDialogUI::BindInterface(
   if (input_data_provider) {
     input_data_provider->BindInterface(std::move(receiver));
   }
+}
+
+void DiagnosticsDialogUI::BindInterface(
+    mojo::PendingReceiver<color_change_listener::mojom::PageHandler> receiver) {
+  color_provider_handler_ = std::make_unique<ui::ColorChangeHandler>(
+      web_ui()->GetWebContents(), std::move(receiver));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(DiagnosticsDialogUI)

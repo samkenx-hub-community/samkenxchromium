@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/browser/ui/tabs/tab_style.h"
 #include "chrome/browser/ui/views/frame/browser_non_client_frame_view.h"
 #include "chrome/browser/ui/views/tabs/tab_group_header.h"
 #include "chrome/browser/ui/views/tabs/tab_group_highlight.h"
@@ -134,19 +133,6 @@ gfx::Rect TabGroupViews::GetBounds() const {
 SkColor TabGroupViews::GetGroupColor() const {
   return tab_slot_controller_->GetPaintedGroupColor(
       tab_slot_controller_->GetGroupColorId(group_));
-}
-
-SkColor TabGroupViews::GetTabBackgroundColor() const {
-  return tab_slot_controller_->GetTabBackgroundColor(
-      TabActive::kInactive, BrowserFrameActiveState::kUseCurrent);
-}
-
-SkColor TabGroupViews::GetGroupBackgroundColor() const {
-  const SkColor active_color = tab_slot_controller_->GetTabBackgroundColor(
-      TabActive::kActive, BrowserFrameActiveState::kUseCurrent);
-  return SkColorSetA(active_color, gfx::Tween::IntValueBetween(
-                                       TabStyle::kSelectedTabOpacity,
-                                       SK_AlphaTRANSPARENT, SK_AlphaOPAQUE));
 }
 
 bool TabGroupViews::InTearDown() const {

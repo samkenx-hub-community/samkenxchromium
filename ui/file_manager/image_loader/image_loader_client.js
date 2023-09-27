@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {LRUCache} from 'chrome://file-manager/common/js/lru_cache.js';
+import {LruCache} from 'chrome://file-manager/common/js/lru_cache.js';
 
 import {LoadImageRequest, LoadImageResponse, LoadImageResponseStatus} from './load_image_request.js';
 
@@ -25,7 +25,7 @@ export function ImageLoaderClient() {
 
   /**
    * LRU cache for images.
-   * @type {!LRUCache.<{
+   * @type {!LruCache.<{
    *   timestamp: ?number,
    *   width: number,
    *   height: number,
@@ -34,7 +34,7 @@ export function ImageLoaderClient() {
    * }>}
    * @private
    */
-  this.cache_ = new LRUCache(ImageLoaderClient.CACHE_MEMORY_LIMIT);
+  this.cache_ = new LruCache(ImageLoaderClient.CACHE_MEMORY_LIMIT);
 }
 
 /**
@@ -167,6 +167,13 @@ ImageLoaderClient.prototype.load = function(request, callback) {
   request.taskId = this.lastTaskId_;
 
   ImageLoaderClient.sendMessage_(request, function(result_data) {
+    if (chrome.runtime.lastError) {
+      console.warn(chrome.runtime.lastError.message);
+      callback(new LoadImageResponse(
+          LoadImageResponseStatus.ERROR,
+          /** @type {number} */ (request.taskId)));
+      return;
+    }
     // TODO(tapted): Move to a prototype for better type checking.
     const result = /** @type {!LoadImageResponse} */ (result_data);
     // Save to cache.
@@ -213,7 +220,7 @@ ImageLoaderClient.CACHE_MEMORY_LIMIT = 20 * 1024 * 1024;  // 20 MB.
  */
 ImageLoaderClient.loadToImage = function(request, image, onSuccess, onError) {
   const callback = function(result) {
-    if (result.status == LoadImageResponseStatus.ERROR) {
+    if (!result || result.status == LoadImageResponseStatus.ERROR) {
       onError();
       return;
     }

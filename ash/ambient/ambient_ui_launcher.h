@@ -7,8 +7,8 @@
 
 #include <memory>
 
+#include "ash/ambient/ambient_photo_controller.h"
 #include "ash/ambient/model/ambient_backend_model.h"
-#include "ash/constants/ambient_theme.h"
 #include "base/functional/callback_forward.h"
 #include "ui/views/view.h"
 
@@ -22,15 +22,25 @@ namespace ash {
 // for the first time and ends when the `Finalize` method is called.
 class AmbientUiLauncher {
  public:
+  using InitializationCallback = base::OnceCallback<void(bool success)>;
+
+  class Observer : public base::CheckedObserver {
+   public:
+    virtual void OnReadyStateChanged(bool is_ready) {}
+  };
+
   virtual ~AmbientUiLauncher() = default;
 
   // Do any asynchronous initialization before launching the UI. This method is
   // only expected to be run once per ambient UI session.
-  virtual void Initialize(base::OnceClosure on_done) = 0;
+  virtual void Initialize(InitializationCallback on_done) = 0;
 
   // After Initialize() is complete, we call this method to create the view,
   // this can be called multiple times during an ambient UI session in case
   // there are multiple screens.
+  //
+  // Must only be called between a successful `Initialize()` and `Finalize()`
+  // call.
   virtual std::unique_ptr<views::View> CreateView() = 0;
 
   // Stop any processing and ends the current ambient session. This method is
@@ -41,8 +51,32 @@ class AmbientUiLauncher {
   // from the ambient controller and PhotoView.
   virtual AmbientBackendModel* GetAmbientBackendModel() = 0;
 
+  // TODO(pzliu): Remove when we get rid of the ambient photo controller
+  // dependency from the ambient controller.
+  virtual AmbientPhotoController* GetAmbientPhotoController() = 0;
+
   // Returns whether an ambient UI session is active.
   virtual bool IsActive() = 0;
+
+  // Returns whether an ambient UI session is ready to be started and the
+  // `Intiailize` method can be called. Note: This can potentially disable
+  // ambient mode until the next lock/unlock event if this is false on the lock
+  // screen.
+  bool IsReady();
+
+  void SetObserver(Observer* observer);
+
+ protected:
+  // Sets the ready state and notifies the observer whenvever the reader state
+  // changes.
+  void SetReadyState(bool is_ready);
+
+ private:
+  raw_ptr<Observer> observer_ = nullptr;
+
+  // The ready state of the launcher, indicates whether the launcher is ready to
+  // be shown or not.
+  bool is_ready_ = true;
 };
 
 }  // namespace ash

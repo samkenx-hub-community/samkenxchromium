@@ -20,7 +20,9 @@
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
+#include "chrome/browser/ui/views/permissions/permission_prompt_bubble_view_factory.h"
 #include "chrome/browser/ui/views/permissions/permission_prompt_chip_model.h"
+#include "chrome/browser/ui/views/permissions/permission_prompt_style.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/permissions/features.h"
@@ -29,22 +31,29 @@
 #include "components/permissions/permission_util.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
+#include "content/public/browser/visibility.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/button_controller.h"
 #include "ui/views/widget/widget.h"
 
-constexpr auto kExpandDuration = base::Milliseconds(350);
-constexpr auto kAnimateToFitDuration = base::Milliseconds(200);
-constexpr auto kPromptCollapseDuration = base::Milliseconds(250);
-constexpr auto kConfirmationCollapseDuration = base::Milliseconds(75);
-constexpr auto kConfirmationDisplayDuration = base::Seconds(4);
-constexpr auto kDelayBeforeCollapsingChip = base::Seconds(12);
+namespace {
 
+constexpr auto kConfirmationDisplayDuration = base::Seconds(4);
+constexpr auto kCollapseDelay = base::Seconds(12);
+constexpr auto kDismissDelay = base::Seconds(6);
 // Abusive origins do not support expand animation, hence the dismiss timer
 // should be longer.
-constexpr auto kDelayBeforeCollapsingChipForAbusiveOrigins = base::Seconds(18);
+constexpr auto kDismissDelayForAbusiveOrigins = kDismissDelay * 3;
+
+base::TimeDelta GetAnimationDuration(base::TimeDelta duration) {
+  return gfx::Animation::ShouldRenderRichAnimation() ? duration
+                                                     : base::TimeDelta();
+}
+
+}  // namespace
 
 class BubbleButtonController : public views::ButtonController {
  public:
@@ -81,6 +90,7 @@ ChipController::~ChipController() {
   if (active_chip_permission_request_manager_.has_value()) {
     active_chip_permission_request_manager_.value()->RemoveObserver(this);
   }
+  observation_.Reset();
 }
 
 void ChipController::OnPermissionRequestManagerDestructed() {
@@ -88,17 +98,6 @@ void ChipController::OnPermissionRequestManagerDestructed() {
   if (active_chip_permission_request_manager_.has_value()) {
     active_chip_permission_request_manager_.value()->RemoveObserver(this);
     active_chip_permission_request_manager_.reset();
-  }
-}
-
-void ChipController::OnWebContentsChanged() {
-  if (active_chip_permission_request_manager_.has_value() &&
-      active_chip_permission_request_manager_.value()->IsRequestInProgress()) {
-    chip_->AnimateExpand(kExpandDuration);
-  } else {
-    // Because the web contents changed, we should no longer display any chip
-    // that was displayed for the previous web contents.
-    ResetChip();
   }
 }
 
@@ -115,31 +114,29 @@ void ChipController::OnNavigation(
   ResetPermissionPromptChip();
 }
 
-void ChipController::OnPromptRemoved() {
-  bool is_tab_hidden = active_chip_permission_request_manager_.value()
-                           ->GetWebContents()
-                           .GetVisibility() == content::Visibility::HIDDEN;
-  if (is_tab_hidden || !is_confirmation_showing_) {
+void ChipController::OnTabVisibilityChanged(content::Visibility visibility) {
+  if (visibility == content::Visibility::HIDDEN) {
+    ResetPermissionPromptChip();
+  }
+}
+
+void ChipController::OnRequestsFinalized() {
+  if (!is_confirmation_showing_) {
     ResetPermissionPromptChip();
   }
 }
 
 void ChipController::OnRequestDecided(
     permissions::PermissionAction permission_action) {
-  DCHECK(permission_prompt_model_);
   RemoveBubbleObserverAndResetTimersAndChipCallbacks();
-  permission_prompt_model_->UpdateWithUserDecision(permission_action);
-
   if (!GetLocationBarView()->IsDrawn() ||
-      GetLocationBarView()->GetWidget()->IsFullscreen()) {
+      GetLocationBarView()->GetWidget()->GetTopLevelWidget()->IsFullscreen() ||
+      !base::FeatureList::IsEnabled(permissions::features::kConfirmationChip)) {
     // If the location bar isn't drawn or during fullscreen, the chip can't be
     // shown anywhere.
-    ResetChip();
-  } else if (base::FeatureList::IsEnabled(
-                 permissions::features::kConfirmationChip)) {
-    HandleConfirmation(permission_action);
+    ResetPermissionPromptChip();
   } else {
-    HideChip();
+    HandleConfirmation(permission_action);
   }
 }
 
@@ -170,16 +167,19 @@ void ChipController::RestartTimersOnMouseHover() {
 void ChipController::OnWidgetDestroying(views::Widget* widget) {
   DCHECK_EQ(GetBubbleWidget(), widget);
   ResetTimers();
-  if (widget->closed_reason() == views::Widget::ClosedReason::kEscKeyPressed ||
-      widget->closed_reason() ==
-          views::Widget::ClosedReason::kCloseButtonClicked) {
-    OnPromptBubbleDismissed();
-  }
 
   disallowed_custom_cursors_scope_.RunAndReset();
   widget->RemoveObserver(this);
 
-  CollapsePrompt(/*allow_restart=*/false);
+  observation_.Reset();
+
+  if (widget->closed_reason() == views::Widget::ClosedReason::kEscKeyPressed ||
+      widget->closed_reason() ==
+          views::Widget::ClosedReason::kCloseButtonClicked) {
+    OnPromptBubbleDismissed();
+  } else {
+    CollapsePrompt(/*allow_restart=*/false);
+  }
 }
 
 void ChipController::OnWidgetActivationChanged(views::Widget* widget,
@@ -190,7 +190,8 @@ void ChipController::OnWidgetActivationChanged(views::Widget* widget,
     // If the widget is active and the primary window wasn't active the last
     // time activation changed, we know that the window just came to the
     // foreground and trigger input protection.
-    GetPromptBubbleView()->AsDialogDelegate()->TriggerInputProtection();
+    GetPromptBubbleView()->AsDialogDelegate()->TriggerInputProtection(
+        /*force_early*/ true);
   }
   parent_was_visible_when_activation_changed_ =
       prompt_bubble_widget->GetPrimaryWindowWidget()->IsVisible();
@@ -201,24 +202,22 @@ bool ChipController::ShouldWaitForConfirmationToComplete() {
 }
 
 void ChipController::InitializePermissionPrompt(
-    content::WebContents* web_contents,
     base::WeakPtr<permissions::PermissionPrompt::Delegate> delegate,
     base::OnceCallback<void()> callback) {
-  DCHECK(delegate);
   if (ShouldWaitForConfirmationToComplete()) {
     delay_prompt_timer_.Start(
         FROM_HERE, collapse_timer_.GetCurrentDelay(),
         base::BindOnce(&ChipController::InitializePermissionPrompt,
-                       weak_factory_.GetWeakPtr(), web_contents, delegate,
+                       weak_factory_.GetWeakPtr(), delegate,
                        std::move(callback)));
     return;
   }
 
-  if (delegate.WasInvalidated()) {
+  ResetPermissionPromptChip();
+
+  if (!delegate) {
     return;
   }
-
-  ResetChip();
 
   // Here we just initialize the controller with the current request. We might
   // not yet want to display the chip, for example when a prompt bubble without
@@ -226,35 +225,35 @@ void ChipController::InitializePermissionPrompt(
   // the chip should become visible.
   chip_->SetVisible(false);
   permission_prompt_model_ =
-      std::make_unique<PermissionPromptChipModel>(delegate.get());
+      std::make_unique<PermissionPromptChipModel>(delegate);
 
   if (active_chip_permission_request_manager_.has_value()) {
     active_chip_permission_request_manager_.value()->RemoveObserver(this);
   }
 
   active_chip_permission_request_manager_ =
-      permissions::PermissionRequestManager::FromWebContents(web_contents);
+      permissions::PermissionRequestManager::FromWebContents(
+          delegate->GetAssociatedWebContents());
   active_chip_permission_request_manager_.value()->AddObserver(this);
+  observation_.Observe(chip_);
   std::move(callback).Run();
 }
 
 void ChipController::ShowPermissionPrompt(
-    content::WebContents* web_contents,
     base::WeakPtr<permissions::PermissionPrompt::Delegate> delegate) {
-  DCHECK(delegate);
   if (ShouldWaitForConfirmationToComplete()) {
     delay_prompt_timer_.Start(
         FROM_HERE, collapse_timer_.GetCurrentDelay(),
         base::BindOnce(&ChipController::ShowPermissionPrompt,
-                       weak_factory_.GetWeakPtr(), web_contents, delegate));
+                       weak_factory_.GetWeakPtr(), delegate));
     return;
   }
 
-  if (delegate.WasInvalidated()) {
+  if (!delegate) {
     return;
   }
 
-  InitializePermissionPrompt(web_contents, delegate, base::DoNothing());
+  InitializePermissionPrompt(delegate);
 
   // HaTS surveys may be triggered while a quiet chip is displayed. If that
   // happens, the quiet chip should not collapse anymore, because otherwise a
@@ -283,27 +282,10 @@ void ChipController::ShowPermissionPrompt(
   ObservePromptBubble();
 
   if (permission_prompt_model_->IsExpandAnimationAllowed()) {
-    AnimateExpand(base::BindRepeating(&ChipController::OnExpandAnimationEnded,
-                                      weak_factory_.GetWeakPtr()));
+    AnimateExpand();
   } else {
     StartDismissTimer();
   }
-}
-
-void ChipController::ResetChip() {
-  // This is a placeholder method, additional chip functionality will be added
-  // and will be reset here.
-  ResetPermissionPromptChip();
-}
-
-void ChipController::ResetChipCallbacks() {
-  chip_->SetCallback(base::RepeatingCallback<void()>(base::DoNothing()));
-  chip_->SetCollapseEndedCallback(
-      base::RepeatingCallback<void()>(base::DoNothing()));
-  chip_->SetExpandAnimationEndedCallback(
-      base::RepeatingCallback<void()>(base::DoNothing()));
-  chip_->SetVisibilityChangedCallback(
-      base::RepeatingCallback<void()>(base::DoNothing()));
 }
 
 void ChipController::RemoveBubbleObserverAndResetTimersAndChipCallbacks() {
@@ -314,12 +296,15 @@ void ChipController::RemoveBubbleObserverAndResetTimersAndChipCallbacks() {
     bubble_widget->Close();
   }
 
+  // Reset button click callback
+  chip_->SetCallback(base::RepeatingCallback<void()>(base::DoNothing()));
+
   ResetTimers();
-  ResetChipCallbacks();
 }
 
 void ChipController::ResetPermissionPromptChip() {
   RemoveBubbleObserverAndResetTimersAndChipCallbacks();
+  observation_.Reset();
   if (permission_prompt_model_) {
     // permission_request_manager_ is empty if the PermissionRequestManager
     // instance has destructed, which triggers the observer method
@@ -386,10 +371,9 @@ void ChipController::OnPageInfoBubbleClosed(
 }
 
 void ChipController::CollapseConfirmation() {
-  chip_->SetCollapseEndedCallback(base::BindRepeating(
-      &ChipController::HideChip, weak_factory_.GetWeakPtr()));
-  chip_->AnimateCollapse(kConfirmationCollapseDuration);
+  chip_->AnimateCollapse(GetAnimationDuration(base::Milliseconds(75)));
   is_confirmation_showing_ = false;
+  is_waiting_for_confirmation_collapse = true;
   GetLocationBarView()->ResetConfirmationChipShownTime();
 }
 
@@ -398,17 +382,16 @@ bool ChipController::should_expand_for_testing() {
   return permission_prompt_model_->ShouldExpand();
 }
 
-void ChipController::AnimateExpand(
-    base::RepeatingCallback<void()> expand_anmiation_ended_callback) {
-  chip_->SetExpandAnimationEndedCallback(
-      std::move(expand_anmiation_ended_callback));
+void ChipController::AnimateExpand() {
   chip_->ResetAnimation();
-  chip_->AnimateExpand(kExpandDuration);
+  chip_->AnimateExpand(GetAnimationDuration(base::Milliseconds(350)));
   chip_->SetVisible(true);
 }
 
 void ChipController::HandleConfirmation(
     permissions::PermissionAction user_decision) {
+  DCHECK(permission_prompt_model_);
+  permission_prompt_model_->UpdateWithUserDecision(user_decision);
   SyncChipWithModel();
   if (user_decision != permissions::PermissionAction::IGNORED &&
       user_decision != permissions::PermissionAction::DISMISSED &&
@@ -419,13 +402,11 @@ void ChipController::HandleConfirmation(
     is_confirmation_showing_ = true;
 
     if (chip_->GetVisible()) {
-      chip_->AnimateToFit(kAnimateToFitDuration);
+      chip_->AnimateToFit(GetAnimationDuration(base::Milliseconds(200)));
     } else {
       // No request chip was shown, always expand independently of what contents
-      // are stored in the previous chip (which is not visible before the
-      // SetVisible call).
-      chip_->SetVisible(true);
-      chip_->AnimateExpand(kExpandDuration);
+      // were stored in the previous chip.
+      AnimateExpand();
     }
 
     chip_->SetCallback(base::BindRepeating(&ChipController::ShowPageInfoDialog,
@@ -435,7 +416,7 @@ void ChipController::HandleConfirmation(
     collapse_timer_.Start(FROM_HERE, kConfirmationDisplayDuration, this,
                           &ChipController::CollapseConfirmation);
   } else {
-    ResetChip();
+    ResetPermissionPromptChip();
   }
 }
 
@@ -457,10 +438,31 @@ void ChipController::CollapsePrompt(bool allow_restart) {
     permission_prompt_model_->UpdateAutoCollapsePromptChipState(true);
     SyncChipWithModel();
 
-    if (!chip_->is_fully_collapsed())
-      chip_->AnimateCollapse(kPromptCollapseDuration);
+    if (!chip_->is_fully_collapsed()) {
+      chip_->AnimateCollapse(GetAnimationDuration(base::Milliseconds(250)));
+    }
 
     StartDismissTimer();
+  }
+}
+
+void ChipController::OnExpandAnimationEnded() {
+  if (is_confirmation_showing_ || IsBubbleShowing() ||
+      !IsPermissionPromptChipVisible() || !permission_prompt_model_) {
+    return;
+  }
+
+  if (permission_prompt_model_->ShouldBubbleStartOpen()) {
+    OpenPermissionPromptBubble();
+  } else {
+    StartCollapseTimer();
+  }
+}
+
+void ChipController::OnCollapseAnimationEnded() {
+  if (is_waiting_for_confirmation_collapse) {
+    HideChip();
+    is_waiting_for_confirmation_collapse = false;
   }
 }
 
@@ -477,12 +479,12 @@ void ChipController::HideChip() {
 void ChipController::OpenPermissionPromptBubble() {
   DCHECK(!IsBubbleShowing());
   if (!permission_prompt_model_ ||
-      !permission_prompt_model_->GetDelegate().has_value()) {
+      !permission_prompt_model_->GetDelegate().get() ||
+      permission_prompt_model_->GetDelegate().WasInvalidated()) {
     return;
   }
 
   disallowed_custom_cursors_scope_ = permission_prompt_model_->GetDelegate()
-                                         .value()
                                          ->GetAssociatedWebContents()
                                          ->CreateDisallowCustomCursorScope();
 
@@ -492,10 +494,9 @@ void ChipController::OpenPermissionPromptBubble() {
   if (permission_prompt_model_->GetPromptStyle() ==
       PermissionPromptStyle::kChip) {
     // Loud prompt bubble
-    raw_ptr<PermissionPromptBubbleView> prompt_bubble =
-        new PermissionPromptBubbleView(
-            browser_,
-            permission_prompt_model_->GetDelegate().value()->GetWeakPtr(),
+    raw_ptr<PermissionPromptBubbleBaseView> prompt_bubble =
+        CreatePermissionPromptBubbleView(
+            browser_, permission_prompt_model_->GetDelegate(),
             request_chip_shown_time_, PermissionPromptStyle::kChip);
     bubble_tracker_.SetView(prompt_bubble);
     prompt_bubble->Show();
@@ -522,14 +523,12 @@ void ChipController::OpenPermissionPromptBubble() {
       bubble_widget->Show();
     }
   }
-  chip_->SetVisibilityChangedCallback(base::BindRepeating(
-      &ChipController::OnChipVisibilityChanged, weak_factory_.GetWeakPtr()));
 
   // It is possible that a Chip got reset while the permission prompt bubble was
   // displayed.
   if (permission_prompt_model_ && IsBubbleShowing()) {
     ObservePromptBubble();
-    permission_prompt_model_->GetDelegate().value()->SetPromptShown();
+    permission_prompt_model_->GetDelegate()->SetPromptShown();
   }
 }
 
@@ -558,27 +557,31 @@ void ChipController::OnPromptBubbleDismissed() {
   if (!permission_prompt_model_)
     return;
 
-  permission_prompt_model_->SetShouldDismiss(true);
-  if (permission_prompt_model_->GetDelegate().has_value()) {
-    permission_prompt_model_->GetDelegate().value()->SetDismissOnTabClose();
+  if (permission_prompt_model_->GetDelegate().get()) {
+    permission_prompt_model_->GetDelegate()->SetDismissOnTabClose();
     // If the permission prompt bubble is closed, we count it as "Dismissed",
-    // hence it should record the time when the bubble is closed and not when
-    // the permission request is finalized.
-    permission_prompt_model_->GetDelegate().value()->SetDecisionTime();
+    // hence it should record the time when the bubble is closed.
+    permission_prompt_model_->GetDelegate()->SetDecisionTime();
+    // If a permission popup bubble is closed/dismissed, a permission request
+    // should be dismissed as well.
+    permission_prompt_model_->GetDelegate()->Dismiss();
   }
 }
 
 void ChipController::OnPromptExpired() {
   AnnouncePermissionRequestForAccessibility(l10n_util::GetStringUTF16(
       IDS_PERMISSIONS_EXPIRED_SCREENREADER_ANNOUNCEMENT));
-  if (permission_prompt_model_ &&
-      permission_prompt_model_->GetDelegate().has_value()) {
-    if (permission_prompt_model_->ShouldDismiss()) {
-      permission_prompt_model_->GetDelegate().value()->Dismiss();
-    } else {
-      permission_prompt_model_->GetDelegate().value()->Ignore();
-    }
+  if (active_chip_permission_request_manager_.has_value()) {
+    active_chip_permission_request_manager_.value()->RemoveObserver(this);
+    active_chip_permission_request_manager_.reset();
   }
+
+  if (permission_prompt_model_ &&
+      permission_prompt_model_->GetDelegate().get()) {
+    permission_prompt_model_->GetDelegate()->Ignore();
+  }
+
+  ResetPermissionPromptChip();
 }
 
 void ChipController::OnRequestChipButtonPressed() {
@@ -605,19 +608,7 @@ void ChipController::OnRequestChipButtonPressed() {
   }
 }
 
-void ChipController::OnExpandAnimationEnded() {
-  if (IsBubbleShowing() || !IsPermissionPromptChipVisible() ||
-      !permission_prompt_model_)
-    return;
-
-  if (permission_prompt_model_->ShouldBubbleStartOpen()) {
-    OpenPermissionPromptBubble();
-  } else {
-    StartCollapseTimer();
-  }
-}
-
-void ChipController::OnChipVisibilityChanged() {
+void ChipController::OnChipVisibilityChanged(bool is_visible) {
   auto* prompt_bubble = GetBubbleWidget();
   if (!chip_->GetVisible() && prompt_bubble) {
     // In case if the prompt bubble isn't closed on focus loss, manually close
@@ -627,34 +618,31 @@ void ChipController::OnChipVisibilityChanged() {
 }
 
 void ChipController::SyncChipWithModel() {
-  chip_->SetChipIcon(permission_prompt_model_->GetIcon());
-  chip_->SetText(permission_prompt_model_->GetChipText());
-  chip_->SetTheme(permission_prompt_model_->GetChipTheme());
+  PermissionPromptChipModel* const model = permission_prompt_model_.get();
+  chip_->SetChipIcon(model->GetIcon());
+  chip_->SetTheme(model->GetChipTheme());
+  chip_->SetMessage(model->GetChipText());
+  chip_->SetUserDecision(model->GetUserDecision());
+  chip_->SetPermissionPromptStyle(model->GetPromptStyle());
+  chip_->SetBlockedIconShowing(model->ShouldDisplayBlockedIcon());
 }
 
 void ChipController::StartCollapseTimer() {
-  collapse_timer_.Start(
-      FROM_HERE, kDelayBeforeCollapsingChip,
-      base::BindOnce(&ChipController::CollapsePrompt, base::Unretained(this),
-                     /*allow_restart=*/true));
+  collapse_timer_.Start(FROM_HERE, kCollapseDelay,
+                        base::BindOnce(&ChipController::CollapsePrompt,
+                                       weak_factory_.GetWeakPtr(),
+                                       /*allow_restart=*/true));
 }
 
 void ChipController::StartDismissTimer() {
   if (!permission_prompt_model_)
     return;
 
-  if (permission_prompt_model_->ShouldExpand()) {
-    if (base::FeatureList::IsEnabled(
-            permissions::features::kPermissionChipAutoDismiss)) {
-      auto delay = base::Milliseconds(
-          permissions::features::kPermissionChipAutoDismissDelay.Get());
-      dismiss_timer_.Start(FROM_HERE, delay, this,
-                           &ChipController::OnPromptExpired);
-    }
-  } else {
-    dismiss_timer_.Start(FROM_HERE, kDelayBeforeCollapsingChipForAbusiveOrigins,
-                         this, &ChipController::OnPromptExpired);
-  }
+  dismiss_timer_.Start(FROM_HERE,
+                       permission_prompt_model_->ShouldExpand()
+                           ? kDismissDelay
+                           : kDismissDelayForAbusiveOrigins,
+                       this, &ChipController::OnPromptExpired);
 }
 
 void ChipController::ResetTimers() {
@@ -670,15 +658,15 @@ LocationBarView* ChipController::GetLocationBarView() {
 
 views::Widget* ChipController::GetBubbleWidget() {
   // We can't call GetPromptBubbleView() here, because the bubble_tracker may
-  // hold objects that aren't of typ `PermissionPromptBubbleView`.
+  // hold objects that aren't of typ `PermissionPromptBubbleBaseView`.
   return bubble_tracker_.view() ? bubble_tracker_.view()->GetWidget() : nullptr;
 }
 
-PermissionPromptBubbleView* ChipController::GetPromptBubbleView() {
-  // The tracked bubble view is a `PermissionPromptBubbleView` only when `kChip`
-  // is used.
+PermissionPromptBubbleBaseView* ChipController::GetPromptBubbleView() {
+  // The tracked bubble view is a `PermissionPromptBubbleBaseView` only when
+  // `kChip` is used.
   CHECK_EQ(permission_prompt_model_->GetPromptStyle(),
            PermissionPromptStyle::kChip);
   auto* view = bubble_tracker_.view();
-  return view ? static_cast<PermissionPromptBubbleView*>(view) : nullptr;
+  return view ? static_cast<PermissionPromptBubbleBaseView*>(view) : nullptr;
 }

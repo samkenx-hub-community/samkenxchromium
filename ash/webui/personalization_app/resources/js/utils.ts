@@ -6,7 +6,7 @@
  * @fileoverview Utility functions to be used throughout personalization app.
  */
 
-import {loadTimeData} from '//resources/ash/common/load_time_data.m.js';
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {String16} from 'chrome://resources/mojo/mojo/public/mojom/base/string16.mojom-webui.js';
 import {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
 
@@ -18,7 +18,7 @@ export interface ColorInfo {
   enumVal: BacklightColor;
 }
 
-export const WALLPAPER: string = 'wallpaper';
+export const WALLPAPER: string = 'wallpaperColor';
 export const WHITE: string = 'whiteColor';
 export const RED: string = 'redColor';
 export const YELLOW: string = 'yellowColor';
@@ -26,7 +26,7 @@ export const GREEN: string = 'greenColor';
 export const BLUE: string = 'blueColor';
 export const INDIGO: string = 'indigoColor';
 export const PURPLE: string = 'purpleColor';
-export const RAINBOW: string = 'rainbow';
+export const RAINBOW: string = 'rainbowColor';
 
 export const staticColorIds =
     [WALLPAPER, WHITE, RED, YELLOW, GREEN, BLUE, INDIGO, PURPLE];
@@ -163,4 +163,11 @@ export function isRecentHighlightsAlbum(album: AmbientModeAlbum|
 export function getCheckmarkIcon(): string {
   return isPersonalizationJellyEnabled() ? 'personalization:circle_checkmark' :
                                            'personalization:checkmark';
+}
+
+/**
+ * Returns a x-length dummy array of zeros (0s)
+ */
+export function getZerosArray(x: number): number[] {
+  return new Array(x).fill(0);
 }

@@ -12,10 +12,6 @@
 #import "content/public/browser/web_contents.h"
 #import "net/http/http_request_headers.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace web {
 
 const char kNavigationItemDataKey[] = "navigation_item";
@@ -130,15 +126,6 @@ const std::u16string& ContentNavigationItem::GetTitle() const {
   return entry_->GetTitle();
 }
 
-void ContentNavigationItem::SetPageDisplayState(
-    const PageDisplayState& page_state) {
-  page_display_state_ = page_state;
-}
-
-const PageDisplayState& ContentNavigationItem::GetPageDisplayState() const {
-  return page_display_state_;
-}
-
 const std::u16string& ContentNavigationItem::GetTitleForDisplay() const {
   return entry_->GetTitleForDisplay();
 }
@@ -206,11 +193,12 @@ bool ContentNavigationItem::HasPostData() const {
 }
 
 void ContentNavigationItem::AddHttpRequestHeaders(
-    NSDictionary* additional_headers) {
+    HttpRequestHeaders* additional_headers) {
   NOTREACHED();
 }
 
-NSDictionary* ContentNavigationItem::GetHttpRequestHeaders() const {
+NavigationItem::HttpRequestHeaders*
+ContentNavigationItem::GetHttpRequestHeaders() const {
   auto headers_string = entry_->GetExtraHeaders();
   if (!headers_string.empty()) {
     net::HttpRequestHeaders headers;

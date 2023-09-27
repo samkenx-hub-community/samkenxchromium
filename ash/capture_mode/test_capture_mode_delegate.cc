@@ -79,6 +79,11 @@ bool TestCaptureModeDelegate::IsDoingAudioRecording() const {
   return recording_service_ && recording_service_->IsDoingAudioRecording();
 }
 
+int TestCaptureModeDelegate::GetNumberOfAudioCapturers() const {
+  return recording_service_ ? recording_service_->GetNumberOfAudioCapturers()
+                            : 0;
+}
+
 base::FilePath TestCaptureModeDelegate::GetUserDefaultDownloadsFolder() const {
   DCHECK(Shell::Get()->session_controller()->IsActiveUserSessionStarted());
 
@@ -189,5 +194,18 @@ bool TestCaptureModeDelegate::IsCameraDisabledByPolicy() const {
 bool TestCaptureModeDelegate::IsAudioCaptureDisabledByPolicy() const {
   return is_audio_capture_disabled_by_policy_;
 }
+
+void TestCaptureModeDelegate::RegisterVideoConferenceManagerClient(
+    crosapi::mojom::VideoConferenceManagerClient* client,
+    const base::UnguessableToken& client_id) {}
+
+void TestCaptureModeDelegate::UnregisterVideoConferenceManagerClient(
+    const base::UnguessableToken& client_id) {}
+
+void TestCaptureModeDelegate::UpdateVideoConferenceManager(
+    crosapi::mojom::VideoConferenceMediaUsageStatusPtr status) {}
+
+void TestCaptureModeDelegate::NotifyDeviceUsedWhileDisabled(
+    crosapi::mojom::VideoConferenceMediaDevice device) {}
 
 }  // namespace ash

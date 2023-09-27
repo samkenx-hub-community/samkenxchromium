@@ -65,9 +65,11 @@ const char kWidevineCdmArch[] =
 
 namespace component_updater {
 
+// Allows this component to be disabled via `ComponentUpdatesEnabled` policy.
+// See https://chromeenterprise.google/policies/?policy=ComponentUpdatesEnabled
 bool MediaFoundationWidevineCdmComponentInstallerPolicy::
     SupportsGroupPolicyEnabledComponentUpdates() const {
-  return false;
+  return true;
 }
 
 bool MediaFoundationWidevineCdmComponentInstallerPolicy::
@@ -111,11 +113,11 @@ void MediaFoundationWidevineCdmComponentInstallerPolicy::ComponentReady(
       version, GetCdmPath(install_dir));
 
   // Ensures MediaFoundationService process is monitored.
-  // TODO(crbug.com/1296219): This is tricky. Move the init to a better place.
   MediaFoundationServiceMonitor::GetInstance();
 
   // Check whether hardware secure decryption CDM should be disabled.
   if (base::FeatureList::IsEnabled(media::kHardwareSecureDecryptionFallback) &&
+      !media::kHardwareSecureDecryptionFallbackPerSite.Get() &&
       MediaFoundationServiceMonitor::
           IsHardwareSecureDecryptionDisabledByPref()) {
     VLOG(1) << "Media Foundation Widevine CDM disabled due to previous errors";
@@ -132,7 +134,6 @@ void MediaFoundationWidevineCdmComponentInstallerPolicy::ComponentReady(
 bool MediaFoundationWidevineCdmComponentInstallerPolicy::VerifyInstallation(
     const base::Value::Dict& manifest,
     const base::FilePath& install_dir) const {
-  // TODO(crbug.com/1225681): Compare manifest version and DLL's version.
   return base::PathExists(GetCdmPath(install_dir));
 }
 

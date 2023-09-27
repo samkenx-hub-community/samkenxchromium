@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/callback_list.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/sequence_checker.h"
@@ -35,10 +36,10 @@ namespace app_list {
 class SearchController;
 
 class ZeroStateDriveProvider : public SearchProvider,
-                               public drive::DriveIntegrationServiceObserver,
-                               public session_manager::SessionManagerObserver,
-                               public chromeos::PowerManagerClient::Observer,
-                               public ash::FileSuggestKeyedService::Observer {
+                               drive::DriveIntegrationService::Observer,
+                               session_manager::SessionManagerObserver,
+                               chromeos::PowerManagerClient::Observer,
+                               ash::FileSuggestKeyedService::Observer {
  public:
   ZeroStateDriveProvider(Profile* profile,
                          SearchController* search_controller,
@@ -49,7 +50,8 @@ class ZeroStateDriveProvider : public SearchProvider,
   ZeroStateDriveProvider(const ZeroStateDriveProvider&) = delete;
   ZeroStateDriveProvider& operator=(const ZeroStateDriveProvider&) = delete;
 
-  // drive::DriveIntegrationServiceObserver:
+  // DriveIntegrationService::Observer implementation.
+  void OnDriveIntegrationServiceDestroyed() override;
   void OnFileSystemMounted() override;
 
   // session_manager::SessionManagerObserver:
@@ -89,11 +91,12 @@ class ZeroStateDriveProvider : public SearchProvider,
   // FileSuggestKeyedService::Observer:
   void OnFileSuggestionUpdated(ash::FileSuggestionType type) override;
 
-  Profile* const profile_;
-  drive::DriveIntegrationService* const drive_service_;
-  session_manager::SessionManager* const session_manager_;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
+  const raw_ptr<drive::DriveIntegrationService, ExperimentalAsh> drive_service_;
+  const raw_ptr<session_manager::SessionManager, ExperimentalAsh>
+      session_manager_;
 
-  const base::raw_ptr<ash::FileSuggestKeyedService> file_suggest_service_;
+  const raw_ptr<ash::FileSuggestKeyedService> file_suggest_service_;
 
   const base::Time construction_time_;
   base::TimeTicks query_start_time_;
@@ -102,7 +105,7 @@ class ZeroStateDriveProvider : public SearchProvider,
   bool screen_off_ = true;
 
   base::ScopedObservation<drive::DriveIntegrationService,
-                          drive::DriveIntegrationServiceObserver>
+                          drive::DriveIntegrationService::Observer>
       drive_observation_{this};
   base::ScopedObservation<session_manager::SessionManager,
                           session_manager::SessionManagerObserver>

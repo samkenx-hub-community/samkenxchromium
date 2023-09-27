@@ -12,12 +12,12 @@
 #include <string>
 #include <vector>
 
+#include "base/containers/flat_map.h"
 #include "base/containers/span.h"
-#include "base/guid.h"
 #include "base/strings/string_piece.h"
 #include "base/time/time.h"
+#include "base/uuid.h"
 #include "base/values.h"
-#include "components/aggregation_service/aggregation_service.mojom.h"
 #include "content/browser/aggregation_service/public_key.h"
 #include "content/common/content_export.h"
 #include "third_party/abseil-cpp/absl/numeric/int128.h"
@@ -40,13 +40,14 @@ struct CONTENT_EXPORT AggregationServicePayloadContents {
     kHistogram,
   };
 
+  // The default aggregation coordinator origin will be used if
+  // `aggregation_coordinator_origin` is `absl::nullopt`.
   AggregationServicePayloadContents(
       Operation operation,
       std::vector<blink::mojom::AggregatableReportHistogramContribution>
           contributions,
       blink::mojom::AggregationServiceMode aggregation_mode,
-      ::aggregation_service::mojom::AggregationCoordinator
-          aggregation_coordinator);
+      absl::optional<url::Origin> aggregation_coordinator_origin);
 
   AggregationServicePayloadContents(
       const AggregationServicePayloadContents& other);
@@ -61,9 +62,7 @@ struct CONTENT_EXPORT AggregationServicePayloadContents {
   std::vector<blink::mojom::AggregatableReportHistogramContribution>
       contributions;
   blink::mojom::AggregationServiceMode aggregation_mode;
-
-  // Does not affect the unencrypted payload, but is used for encryption.
-  ::aggregation_service::mojom::AggregationCoordinator aggregation_coordinator;
+  absl::optional<url::Origin> aggregation_coordinator_origin;
 };
 
 // Represents the information that will be provided to both the reporting
@@ -76,7 +75,7 @@ struct CONTENT_EXPORT AggregatableReportSharedInfo {
   };
 
   AggregatableReportSharedInfo(base::Time scheduled_report_time,
-                               base::GUID report_id,
+                               base::Uuid report_id,
                                url::Origin reporting_origin,
                                DebugMode debug_mode,
                                base::Value::Dict additional_fields,
@@ -98,7 +97,7 @@ struct CONTENT_EXPORT AggregatableReportSharedInfo {
   std::string SerializeAsJson() const;
 
   base::Time scheduled_report_time;
-  base::GUID report_id;  // Used to prevent double counting.
+  base::Uuid report_id;  // Used to prevent double counting.
   url::Origin reporting_origin;
   DebugMode debug_mode;
   base::Value::Dict additional_fields;
@@ -187,9 +186,12 @@ class CONTENT_EXPORT AggregatableReport {
   static constexpr base::StringPiece kDomainSeparationPrefix =
       "aggregation_service";
 
-  AggregatableReport(std::vector<AggregationServicePayload> payloads,
-                     std::string shared_info,
-                     absl::optional<uint64_t> debug_key);
+  AggregatableReport(
+      std::vector<AggregationServicePayload> payloads,
+      std::string shared_info,
+      absl::optional<uint64_t> debug_key,
+      base::flat_map<std::string, std::string> additional_fields,
+      absl::optional<url::Origin> aggregation_coordinator_origin);
   AggregatableReport(const AggregatableReport& other);
   AggregatableReport& operator=(const AggregatableReport& other);
   AggregatableReport(AggregatableReport&& other);
@@ -201,6 +203,12 @@ class CONTENT_EXPORT AggregatableReport {
   }
   const std::string& shared_info() const { return shared_info_; }
   absl::optional<uint64_t> debug_key() const { return debug_key_; }
+  const base::flat_map<std::string, std::string>& additional_fields() const {
+    return additional_fields_;
+  }
+  const absl::optional<url::Origin>& aggregation_coordinator_origin() const {
+    return aggregation_coordinator_origin_;
+  }
 
   // Returns the JSON representation of this report of the form
   // {
@@ -232,7 +240,8 @@ class CONTENT_EXPORT AggregatableReport {
   // field: `"debug_cleartext_payload": "<base64 encoded payload cleartext>"`.
   // Note that APIs may wish to add additional key-value pairs to this returned
   // value. Additionally, if requested, the outer JSON will have an extra field:
-  // `"debug_key": "<unsigned 64-bit integer>"`.
+  // `"debug_key": "<unsigned 64-bit integer>"` along with any other extra
+  // fields specified in `additional_fields_`.
   base::Value::Dict GetAsJson() const;
 
   // TODO(crbug.com/1247409): Expose static method to validate that a
@@ -261,6 +270,10 @@ class CONTENT_EXPORT AggregatableReport {
   // Should only be set if the debug mode is enabled (but can still be empty).
   // Used as part of the temporary debugging mechanism.
   absl::optional<uint64_t> debug_key_;
+
+  base::flat_map<std::string, std::string> additional_fields_;
+
+  absl::optional<url::Origin> aggregation_coordinator_origin_;
 };
 
 // Represents a request for an AggregatableReport. Contains all the data
@@ -281,6 +294,7 @@ class CONTENT_EXPORT AggregatableReportRequest {
       AggregatableReportSharedInfo shared_info,
       std::string reporting_path = std::string(),
       absl::optional<uint64_t> debug_key = absl::nullopt,
+      base::flat_map<std::string, std::string> additional_fields = {},
       int failed_send_attempts = 0);
 
   // Returns `absl::nullopt` if `payload_contents.contributions.size()` or
@@ -298,6 +312,7 @@ class CONTENT_EXPORT AggregatableReportRequest {
       AggregatableReportSharedInfo shared_info,
       std::string reporting_path = std::string(),
       absl::optional<uint64_t> debug_key = absl::nullopt,
+      base::flat_map<std::string, std::string> additional_fields = {},
       int failed_send_attempts = 0);
 
   // Deserializes a bytestring generated by `Serialize()`. Returns
@@ -319,6 +334,10 @@ class CONTENT_EXPORT AggregatableReportRequest {
   }
   const std::string& reporting_path() const { return reporting_path_; }
   absl::optional<uint64_t> debug_key() const { return debug_key_; }
+  const base::flat_map<std::string, std::string>& additional_fields() const {
+    return additional_fields_;
+  }
+  int failed_send_attempts() const { return failed_send_attempts_; }
 
   // Returns the URL this report should be sent to. The return value is invalid
   // if the reporting_path is empty.
@@ -328,8 +347,6 @@ class CONTENT_EXPORT AggregatableReportRequest {
   // empty vector in case of an error.
   std::vector<uint8_t> Serialize();
 
-  int failed_send_attempts() const { return failed_send_attempts_; }
-
  private:
   static absl::optional<AggregatableReportRequest> CreateInternal(
       std::vector<GURL> processing_urls,
@@ -337,14 +354,17 @@ class CONTENT_EXPORT AggregatableReportRequest {
       AggregatableReportSharedInfo shared_info,
       std::string reporting_path,
       absl::optional<uint64_t> debug_key,
+      base::flat_map<std::string, std::string> additional_fields,
       int failed_send_attempts);
 
-  AggregatableReportRequest(std::vector<GURL> processing_urls,
-                            AggregationServicePayloadContents payload_contents,
-                            AggregatableReportSharedInfo shared_info,
-                            std::string reporting_path,
-                            absl::optional<uint64_t> debug_key,
-                            int failed_send_attempts);
+  AggregatableReportRequest(
+      std::vector<GURL> processing_urls,
+      AggregationServicePayloadContents payload_contents,
+      AggregatableReportSharedInfo shared_info,
+      std::string reporting_path,
+      absl::optional<uint64_t> debug_key,
+      base::flat_map<std::string, std::string> additional_fields,
+      int failed_send_attempts);
 
   std::vector<GURL> processing_urls_;
   AggregationServicePayloadContents payload_contents_;
@@ -358,6 +378,8 @@ class CONTENT_EXPORT AggregatableReportRequest {
   // Can only be set if `shared_info_.debug_mode` is `kEnabled` (but can still
   // be empty). Used as part of the temporary debugging mechanism.
   absl::optional<uint64_t> debug_key_;
+
+  base::flat_map<std::string, std::string> additional_fields_;
 
   // Number of times the browser has tried and failed to send this report before
   // this attempt. The value in this class is not incremented if this attempt

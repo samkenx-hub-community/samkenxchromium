@@ -5,12 +5,16 @@
 import 'chrome://shortcut-customization/js/accelerator_edit_view.js';
 import 'chrome://webui-test/mojo_webui_test_support.js';
 
+import {strictQuery} from 'chrome://resources/ash/common/typescript_utils/strict_query.js';
 import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 import {AcceleratorEditViewElement} from 'chrome://shortcut-customization/js/accelerator_edit_view.js';
 import {AcceleratorLookupManager} from 'chrome://shortcut-customization/js/accelerator_lookup_manager.js';
 import {fakeAcceleratorConfig, fakeLayoutInfo} from 'chrome://shortcut-customization/js/fake_data.js';
-import {AcceleratorSource, Modifier} from 'chrome://shortcut-customization/js/shortcut_types.js';
-import {assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {FakeShortcutProvider} from 'chrome://shortcut-customization/js/fake_shortcut_provider.js';
+import {setShortcutProviderForTesting} from 'chrome://shortcut-customization/js/mojo_interface_provider.js';
+import {AcceleratorConfigResult, AcceleratorSource, Modifier} from 'chrome://shortcut-customization/js/shortcut_types.js';
+import {AcceleratorResultData} from 'chrome://shortcut-customization/mojom-webui/ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom-webui.js';
+import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 import {isVisible} from 'chrome://webui-test/test_util.js';
 
@@ -19,8 +23,12 @@ import {createStandardAcceleratorInfo, createUserAcceleratorInfo} from './shortc
 suite('acceleratorEditViewTest', function() {
   let editViewElement: AcceleratorEditViewElement|null = null;
   let manager: AcceleratorLookupManager|null = null;
+  let provider: FakeShortcutProvider;
 
   setup(() => {
+    provider = new FakeShortcutProvider();
+    setShortcutProviderForTesting(provider);
+
     manager = AcceleratorLookupManager.getInstance();
     manager.setAcceleratorLookup(fakeAcceleratorConfig);
     manager.setAcceleratorLayoutLookup(fakeLayoutInfo);
@@ -68,11 +76,20 @@ suite('acceleratorEditViewTest', function() {
 
     // Click on the Cancel button and expect the edit buttons to be available.
     getElementById('cancelButton')!.click();
+
+    await flushTasks();
     assertTrue(isVisible(getElementById('editButtonsContainer')));
     assertFalse(isVisible(getElementById('cancelButtonContainer')));
   });
 
   test('DetectShortcutConflict', async () => {
+    const fakeResult: AcceleratorResultData = {
+      result: AcceleratorConfigResult.kConflict,
+      shortcutName: {data: [1]},
+    };
+
+    provider.setFakeReplaceAcceleratorResult(fakeResult);
+
     const acceleratorInfo = createStandardAcceleratorInfo(
         Modifier.ALT,
         /*key=*/ 221,
@@ -93,7 +110,7 @@ suite('acceleratorEditViewTest', function() {
     // Click on the edit button.
     getElementById('editButton')!.click();
 
-    // Press 'Snap Window left' key, expect an error due since it is a
+    // Press 'Snap Window left' key, expect an error since it is a
     // pre-existing shortcut.
     const viewElement = getElementById('acceleratorItem');
     viewElement!.dispatchEvent(new KeyboardEvent('keydown', {
@@ -109,6 +126,12 @@ suite('acceleratorEditViewTest', function() {
     await flushTasks();
     assertTrue(editViewElement!.hasError);
 
+    const fakeResult2: AcceleratorResultData = {
+      result: AcceleratorConfigResult.kSuccess,
+      shortcutName: undefined,
+    };
+
+    provider.setFakeReplaceAcceleratorResult(fakeResult2);
     // Press another shortcut, expect no error.
     viewElement!.dispatchEvent(new KeyboardEvent('keydown', {
       key: 'e',
@@ -122,5 +145,83 @@ suite('acceleratorEditViewTest', function() {
 
     await flushTasks();
     assertFalse(editViewElement!.hasError);
+  });
+
+  test('PressKeyToResetError', async () => {
+    const fakeResult: AcceleratorResultData = {
+      result: AcceleratorConfigResult.kConflict,
+      shortcutName: {data: [1]},
+    };
+
+    provider.setFakeReplaceAcceleratorResult(fakeResult);
+
+    const acceleratorInfo = createStandardAcceleratorInfo(
+        Modifier.ALT,
+        /*key=*/ 221,
+        /*keyDisplay=*/ ']');
+
+    editViewElement!.acceleratorInfo = acceleratorInfo;
+    editViewElement!.source = AcceleratorSource.kAsh;
+    editViewElement!.action = 1;
+    await flushTasks();
+
+    // Click on the edit button.
+    getElementById('editButton')!.click();
+
+    // Press 'Snap Window left' key, expect an error since it is a
+    // pre-existing shortcut.
+    const viewElement = getElementById('acceleratorItem');
+    viewElement!.dispatchEvent(new KeyboardEvent('keydown', {
+      key: '[',
+      keyCode: 219,
+      code: 'Key[',
+      ctrlKey: false,
+      altKey: true,
+      shiftKey: false,
+      metaKey: false,
+    }));
+
+    await flushTasks();
+    assertTrue(editViewElement!.hasError);
+
+    // Press a single key, expect error to be reset.
+    viewElement!.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'a',
+      keyCode: 220,
+      code: 'KeyA',
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+    }));
+
+    await flushTasks();
+    assertFalse(editViewElement!.hasError);
+  });
+
+  test('ClickEditAndShowInputHint', async () => {
+    const acceleratorInfo = createStandardAcceleratorInfo(
+        Modifier.ALT,
+        /*key=*/ 221,
+        /*keyDisplay=*/ ']');
+
+    editViewElement!.acceleratorInfo = acceleratorInfo;
+    editViewElement!.source = AcceleratorSource.kAsh;
+    editViewElement!.action = 1;
+    await flushTasks();
+
+    // Check that the edit button is visible.
+    assertTrue(isVisible(getElementById('editButtonsContainer')));
+
+    // Click on the edit button.
+    getElementById('editButton')!.click();
+
+    // Input hint message should be shown.
+    const expectedHintMessage =
+        'Press 1-4 modifiers and 1 other key on your keyboard. To exit ' +
+        'editing mode, press alt + esc.';
+    const statusMessageElement = strictQuery(
+        '#acceleratorInfoText', editViewElement!.shadowRoot, HTMLDivElement);
+    assertEquals(expectedHintMessage, statusMessageElement.textContent!.trim());
   });
 });

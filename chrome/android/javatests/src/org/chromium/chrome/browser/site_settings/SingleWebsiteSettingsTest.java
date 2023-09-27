@@ -4,6 +4,18 @@
 
 package org.chromium.chrome.browser.site_settings;
 
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+
+import static com.google.common.truth.Truth.assertThat;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.assertEquals;
+
 import android.os.Build;
 
 import androidx.test.filters.SmallTest;
@@ -15,7 +27,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.FeatureList;
 import org.chromium.base.test.params.ParameterAnnotations.UseMethodParameter;
 import org.chromium.base.test.params.ParameterAnnotations.UseRunnerDelegate;
 import org.chromium.base.test.params.ParameterProvider;
@@ -25,25 +36,27 @@ import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.DisableIf;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
+import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.SettingsActivity;
 import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
 import org.chromium.components.browser_ui.site_settings.ContentSettingException;
 import org.chromium.components.browser_ui.site_settings.SingleWebsiteSettings;
-import org.chromium.components.browser_ui.site_settings.SiteSettingsFeatureList;
 import org.chromium.components.browser_ui.site_settings.SiteSettingsUtil;
 import org.chromium.components.browser_ui.site_settings.Website;
 import org.chromium.components.browser_ui.site_settings.WebsiteAddress;
+import org.chromium.components.browser_ui.site_settings.WebsitePreferenceBridge;
 import org.chromium.components.content_settings.ContentSettingValues;
 import org.chromium.components.content_settings.ContentSettingsType;
-import org.chromium.content_public.browser.ContentFeatureList;
+import org.chromium.components.permissions.PermissionsAndroidFeatureList;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
+import org.chromium.url.GURL;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 /**
  * Tests that exercise functionality when showing details for a single site.
@@ -124,38 +137,67 @@ public class SingleWebsiteSettingsTest {
 
     @Test
     @SmallTest
-    public void testDesktopSiteException_DowngradePath() {
-        // Enable RDS exceptions and launch single website settings.
-        Map<String, Boolean> featureMap = new HashMap<>();
-        featureMap.put(ContentFeatureList.REQUEST_DESKTOP_SITE_EXCEPTIONS, true);
-        FeatureList.setTestFeatures(featureMap);
-
-        SettingsActivity settingsActivity1 = SiteSettingsTestUtils.startSingleWebsitePreferences(
+    public void testDesktopSiteException() {
+        SettingsActivity settingsActivity = SiteSettingsTestUtils.startSingleWebsitePreferences(
                 createWebsiteWithContentSettingException(
                         ContentSettingsType.REQUEST_DESKTOP_SITE, ContentSettingValues.ALLOW));
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            var websitePreferences = (SingleWebsiteSettings) settingsActivity1.getMainFragment();
+            var websitePreferences = (SingleWebsiteSettings) settingsActivity.getMainFragment();
             Assert.assertNotNull("Desktop site preference should be present.",
                     websitePreferences.findPreference(SingleWebsiteSettings.getPreferenceKey(
                             ContentSettingsType.REQUEST_DESKTOP_SITE)));
         });
-        settingsActivity1.finish();
+        settingsActivity.finish();
+    }
 
-        // Disable RDS exceptions for a downgrade and launch single website settings.
-        featureMap.put(ContentFeatureList.REQUEST_DESKTOP_SITE_EXCEPTIONS, false);
-        featureMap.put(SiteSettingsFeatureList.REQUEST_DESKTOP_SITE_EXCEPTIONS_DOWNGRADE, true);
-        FeatureList.setTestFeatures(featureMap);
+    @Test
+    @SmallTest
+    @EnableFeatures(PermissionsAndroidFeatureList.PERMISSION_STORAGE_ACCESS)
+    public void testStorageAccessPermission() {
+        int type = ContentSettingsType.STORAGE_ACCESS;
+        GURL example = new GURL("https://example.com");
+        GURL embedded2 = new GURL("https://embedded2.com");
 
-        SettingsActivity settingsActivity2 = SiteSettingsTestUtils.startSingleWebsitePreferences(
-                createWebsiteWithContentSettingException(
-                        ContentSettingsType.REQUEST_DESKTOP_SITE, ContentSettingValues.ALLOW));
+        Website website = createWebsiteWithStorageAccessPermission(
+                "https://[*.]embedded.com", "https://[*.]example.com", ContentSettingValues.ALLOW);
+        Website website2 = createWebsiteWithStorageAccessPermission(
+                "https://[*.]embedded2.com", "https://[*.]example.com", ContentSettingValues.BLOCK);
+        Website other = createWebsiteWithStorageAccessPermission(
+                "https://[*.]embedded.com", "https://[*.]foo.com", ContentSettingValues.BLOCK);
+        Website merged = SingleWebsiteSettings.mergePermissionAndStorageInfoForTopLevelOrigin(
+                WebsiteAddress.create(EXAMPLE_ADDRESS), List.of(website, website2, other));
+
+        var exceptions = merged.getEmbeddedPermissions().get(type);
+        assertThat(exceptions.size()).isEqualTo(2);
+        assertThat(exceptions.get(0).getContentSetting()).isEqualTo(ContentSettingValues.ALLOW);
+        assertThat(exceptions.get(1).getContentSetting()).isEqualTo(ContentSettingValues.BLOCK);
+        assertEquals(ContentSettingValues.BLOCK, getStorageAccessSetting(type, embedded2, example));
+
+        // Open site settings.
+        SettingsActivity activity = SiteSettingsTestUtils.startSingleWebsitePreferences(merged);
+        onView(withText("embedded.com")).check(matches(isDisplayed()));
+
+        // Toggle the second permission.
+        onView(withText("embedded2.com")).check(matches(isDisplayed())).perform(click());
+        assertEquals(ContentSettingValues.ALLOW, getStorageAccessSetting(type, embedded2, example));
+
+        // Reset permission.
+        onView(withText(containsString("reset permissions"))).perform(click());
+        onView(withText("Delete & reset")).perform(click());
+        onView(withText("Embedded content")).check(doesNotExist());
+        assertEquals(ContentSettingValues.ASK, getStorageAccessSetting(type, embedded2, example));
+        activity.finish();
+    }
+
+    private static int getStorageAccessSetting(
+            @ContentSettingsType int contentSettingType, GURL primaryUrl, GURL secondaryUrl) {
+        int[] result = {0};
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            var websitePreferences = (SingleWebsiteSettings) settingsActivity2.getMainFragment();
-            Assert.assertNull("Desktop site preference should not be present.",
-                    websitePreferences.findPreference(SingleWebsiteSettings.getPreferenceKey(
-                            ContentSettingsType.REQUEST_DESKTOP_SITE)));
+            result[0] =
+                    WebsitePreferenceBridge.getContentSetting(Profile.getLastUsedRegularProfile(),
+                            contentSettingType, primaryUrl, secondaryUrl);
         });
-        settingsActivity2.finish();
+        return result[0];
     }
 
     /**
@@ -207,7 +249,7 @@ public class SingleWebsiteSettingsTest {
             String prefKey = SingleWebsiteSettings.getPreferenceKey(mContentSettingsType);
             ChromeSwitchPreference switchPref = websitePreferences.findPreference(prefKey);
             Assert.assertNotNull("Preference cannot be found on screen.", switchPref);
-            Assert.assertEquals("Switch check state is different than test setting.",
+            assertEquals("Switch check state is different than test setting.",
                     mContentSettingValue == ContentSettingValues.ALLOW, switchPref.isChecked());
         }
     }
@@ -220,6 +262,20 @@ public class SingleWebsiteSettingsTest {
                 new ContentSettingException(type, website.getAddress().getOrigin(), value,
                         "preference", /*isEmbargoed=*/false));
 
+        return website;
+    }
+
+    private static Website createWebsiteWithStorageAccessPermission(
+            String origin, String embedder, @ContentSettingValues int setting) {
+        Website website =
+                new Website(WebsiteAddress.create(origin), WebsiteAddress.create(embedder));
+        ContentSettingException info = new ContentSettingException(
+                ContentSettingsType.STORAGE_ACCESS, origin, embedder, ContentSettingValues.ASK,
+                /*source=*/"", /*expiration=*/0, /*isEmbargoed=*/false);
+        // Set setting explicitly to write it to prefs.
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { info.setContentSetting(Profile.getLastUsedRegularProfile(), setting); });
+        website.addEmbeddedPermission(info);
         return website;
     }
 }

@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.toolbar;
 
+import androidx.annotation.VisibleForTesting;
+
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.MutableFlagWithSafeDefault;
 
@@ -20,8 +22,13 @@ public final class ToolbarFeatures {
 
     private static final MutableFlagWithSafeDefault sSuppressionFlag =
             new MutableFlagWithSafeDefault(ChromeFeatureList.SUPPRESS_TOOLBAR_CAPTURES, false);
+    @VisibleForTesting
+    public static final String BLOCK_FOR_FULLSCREEN = "block_for_fullscreen";
+
     private static final MutableFlagWithSafeDefault sRecordSuppressionMetrics =
             new MutableFlagWithSafeDefault(ChromeFeatureList.RECORD_SUPPRESSION_METRICS, true);
+    private static final MutableFlagWithSafeDefault sDelayTransitionsForAnimation =
+            new MutableFlagWithSafeDefault(ChromeFeatureList.DELAY_TRANSITIONS_FOR_ANIMATION, true);
 
     /** Private constructor to avoid instantiation. */
     private ToolbarFeatures() {}
@@ -40,6 +47,23 @@ public final class ToolbarFeatures {
 
     public static boolean shouldSuppressCaptures() {
         return sSuppressionFlag.isEnabled();
+    }
+
+    /** Returns if the suppression logic should avoid capturing during fullscreen, such as video. */
+    public static boolean shouldBlockCapturesForFullscreen() {
+        return ChromeFeatureList.getFieldTrialParamByFeatureAsBoolean(
+                ChromeFeatureList.SUPPRESS_TOOLBAR_CAPTURES, BLOCK_FOR_FULLSCREEN, false);
+    }
+
+    /**
+     * Returns whether the layout system will delay transitions between start/done hiding/showing
+     * for Android view animations or not. When this is delayed, the toolbar code will try to
+     * always draw itself from Android views during these transitions, to avoid letting the captured
+     * bitmap leak through during transitions. With suppression enabled, the captured bitmap is less
+     * reliable during these transitions.
+     */
+    public static boolean shouldDelayTransitionsForAnimation() {
+        return sDelayTransitionsForAnimation.isEnabled();
     }
 
     /**

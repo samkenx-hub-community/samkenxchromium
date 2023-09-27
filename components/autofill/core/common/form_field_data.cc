@@ -178,67 +178,13 @@ bool DeserializeSection11(base::PickleIterator* iter,
   return iter->ReadString16(&field_data->name_attribute);
 }
 
-// LabelInfo is used to implement that "a.label == b.label" can be weakened to
-// "a.label == b.label OR a certain feature is enabled and {a,b}.label_source !=
-// kLabelTag and a.label_source == b.label_source".
-// Beware of the StringPiece member and resulting lifetime issues. Deleted copy
-// and move ctors/operators to reduce risk potential.
-struct LabelInfo {
-  explicit LabelInfo(const FormFieldData& f)
-      : label(f.label), source(f.label_source) {}
-  LabelInfo(const LabelInfo&) = delete;
-  LabelInfo& operator=(const LabelInfo&) = delete;
-  LabelInfo(LabelInfo&&) = default;
-  LabelInfo& operator=(LabelInfo&&) = default;
-
-  bool operator==(const LabelInfo& that) const {
-    if (label == that.label)
-      return true;
-
-    // Feature |kAutofillSkipComparingInferredLabels| weakens equivalence of
-    // labels: two labels are equivalent if they were inferred from the same
-    // type of tag other than a LABEL tag.
-    // TODO(crbug.com/1211834): The experiment seems dead; remove?
-    return base::FeatureList::IsEnabled(
-               features::kAutofillSkipComparingInferredLabels) &&
-           source != FormFieldData::LabelSource::kLabelTag &&
-           source == that.source;
-  }
-
-  bool operator<(const LabelInfo& that) const { return label < that.label; }
-
-  base::StringPiece16 label;
-  FormFieldData::LabelSource source = FormFieldData::LabelSource::kLabelTag;
-};
-
-// CommonTuple(), SimilarityTuple(), DynamicIdentityTuple(), IdentityTuple()
-// return values should be used as temporaries only because they include a
-// StringPiece.
-
-auto CommonTuple(const FormFieldData& f) {
-  return std::tuple_cat(
-      std::make_tuple(LabelInfo(f)),
-      std::tie(f.name, f.name_attribute, f.id_attribute, f.form_control_type));
-}
-
-auto SimilarityTuple(const FormFieldData& f) {
-  return std::tuple_cat(CommonTuple(f),
-                        std::make_tuple(IsCheckable(f.check_status)));
-}
-
-auto DynamicIdentityTuple(const FormFieldData& f) {
-  return std::tuple_cat(CommonTuple(f), std::make_tuple(f.IsFocusable()));
-}
-
 auto IdentityTuple(const FormFieldData& f) {
-  // |unique_renderer_id| uniquely identifies the field, if and only if it is
-  // set; the other members compared below (excluding label_source) together
-  // uniquely identify the field as well.
   return std::tuple_cat(
-      SimilarityTuple(f),
-      std::tie(f.autocomplete_attribute, f.placeholder, f.max_length,
-               f.css_classes, f.is_focusable, f.should_autocomplete, f.role,
-               f.text_direction, f.options));
+      std::tie(f.label, f.name, f.name_attribute, f.id_attribute,
+               f.form_control_type, f.autocomplete_attribute, f.placeholder,
+               f.max_length, f.css_classes, f.is_focusable,
+               f.should_autocomplete, f.role, f.text_direction, f.options),
+      std::make_tuple(IsCheckable(f.check_status)));
 }
 
 }  // namespace
@@ -395,14 +341,6 @@ bool FormFieldData::SameFieldAs(const FormFieldData& field) const {
   return IdentityTuple(*this) == IdentityTuple(field);
 }
 
-bool FormFieldData::SimilarFieldAs(const FormFieldData& field) const {
-  return SimilarityTuple(*this) == SimilarityTuple(field);
-}
-
-bool FormFieldData::DynamicallySameFieldAs(const FormFieldData& field) const {
-  return DynamicIdentityTuple(*this) == DynamicIdentityTuple(field);
-}
-
 bool FormFieldData::IsTextInputElement() const {
   return form_control_type == "text" || form_control_type == "password" ||
          form_control_type == "search" || form_control_type == "tel" ||
@@ -412,6 +350,18 @@ bool FormFieldData::IsTextInputElement() const {
 
 bool FormFieldData::IsPasswordInputElement() const {
   return form_control_type == "password";
+}
+
+bool FormFieldData::IsSelectElement() const {
+  return form_control_type == "select-one";
+}
+
+bool FormFieldData::IsSelectListElement() const {
+  return form_control_type == "selectlist";
+}
+
+bool FormFieldData::IsSelectOrSelectListElement() const {
+  return IsSelectElement() || IsSelectListElement();
 }
 
 bool FormFieldData::DidUserType() const {
@@ -424,6 +374,16 @@ bool FormFieldData::HadFocus() const {
 
 bool FormFieldData::WasPasswordAutofilled() const {
   return properties_mask & kAutofilled;
+}
+
+std::u16string FormFieldData::GetSelection() const {
+  return std::u16string(GetSelectionAsStringView());
+}
+
+std::u16string_view FormFieldData::GetSelectionAsStringView() const {
+  size_t offset = std::min(static_cast<size_t>(selection_start), value.size());
+  size_t length = selection_end - selection_start;
+  return std::u16string_view(value).substr(offset, length);
 }
 
 // static

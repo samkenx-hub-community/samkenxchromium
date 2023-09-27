@@ -19,6 +19,7 @@
 #include "base/values.h"
 #include "build/build_config.h"
 #include "components/devtools/simple_devtools_protocol_client/simple_devtools_protocol_client.h"
+#include "components/headless/select_file_dialog/headless_select_file_dialog.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/permission_controller_delegate.h"
@@ -28,9 +29,9 @@
 #include "content/public/common/url_constants.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/no_renderer_crashes_assertion.h"
+#include "content/public/test/test_navigation_observer.h"
 #include "headless/lib/browser/headless_browser_context_impl.h"
 #include "headless/lib/browser/headless_browser_impl.h"
-#include "headless/lib/browser/headless_select_file_dialog_factory.h"
 #include "headless/lib/browser/headless_web_contents_impl.h"
 #include "headless/public/headless_browser.h"
 #include "headless/public/headless_web_contents.h"
@@ -50,6 +51,7 @@
 #include "third_party/blink/public/resources/grit/blink_resources.h"
 #include "third_party/blink/public/strings/grit/blink_strings.h"
 #include "ui/base/clipboard/clipboard.h"
+#include "ui/base/clipboard/clipboard_non_backed.h"
 #include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/geometry/size.h"
@@ -288,17 +290,35 @@ IN_PROC_BROWSER_TEST_F(HeadlessBrowserTest, WebGLSupported) {
 
 IN_PROC_BROWSER_TEST_F(HeadlessBrowserTest, ClipboardCopyPasteText) {
   // Tests copy-pasting text with the clipboard in headless mode.
-  ui::Clipboard* clipboard = ui::Clipboard::GetForCurrentThread();
+  ui::Clipboard* clipboard = ui::ClipboardNonBacked::GetForCurrentThread();
   ASSERT_TRUE(clipboard);
-  std::u16string paste_text = u"Clippy!";
-  for (ui::ClipboardBuffer buffer :
-       {ui::ClipboardBuffer::kCopyPaste, ui::ClipboardBuffer::kSelection,
-        ui::ClipboardBuffer::kDrag}) {
+
+  static const struct ClipboardBufferInfo {
+    ui::ClipboardBuffer buffer;
+    std::u16string paste_text;
+  } clipboard_buffers[] = {
+      {ui::ClipboardBuffer::kCopyPaste, u"kCopyPaste"},
+      {ui::ClipboardBuffer::kSelection, u"kSelection"},
+      {ui::ClipboardBuffer::kDrag, u"kDrag"},
+  };
+
+  // Check basic write/read ops into each buffer type.
+  for (const auto& [buffer, paste_text] : clipboard_buffers) {
     if (!ui::Clipboard::IsSupportedClipboardBuffer(buffer))
       continue;
     {
       ui::ScopedClipboardWriter writer(buffer);
       writer.WriteText(paste_text);
+    }
+    std::u16string copy_text;
+    clipboard->ReadText(buffer, /* data_dst = */ nullptr, &copy_text);
+    EXPECT_EQ(paste_text, copy_text);
+  }
+
+  // Verify that different clipboard buffer data is independent.
+  for (const auto& [buffer, paste_text] : clipboard_buffers) {
+    if (!ui::Clipboard::IsSupportedClipboardBuffer(buffer)) {
+      continue;
     }
     std::u16string copy_text;
     clipboard->ReadText(buffer, /* data_dst = */ nullptr, &copy_text);
@@ -430,8 +450,10 @@ class CrashReporterTest : public HeadlessBrowserTest,
   void OnTargetCrashed(const base::Value::Dict&) { FinishAsynchronousTest(); }
 
  protected:
-  raw_ptr<HeadlessBrowserContext, DanglingUntriaged> browser_context_ = nullptr;
-  raw_ptr<HeadlessWebContents, DanglingUntriaged> web_contents_ = nullptr;
+  raw_ptr<HeadlessBrowserContext, AcrossTasksDanglingUntriaged>
+      browser_context_ = nullptr;
+  raw_ptr<HeadlessWebContents, AcrossTasksDanglingUntriaged> web_contents_ =
+      nullptr;
   SimpleDevToolsProtocolClient devtools_client_;
   base::FilePath crash_dumps_dir_;
 };
@@ -454,9 +476,6 @@ IN_PROC_BROWSER_TEST_F(CrashReporterTest, GenerateMinidump) {
 
   web_contents_->AddObserver(this);
   RunAsynchronousTest();
-
-  // The target has crashed and should no longer be there.
-  EXPECT_FALSE(web_contents_->GetDevToolsTarget());
 
   // Check that one minidump got created.
   {
@@ -822,6 +841,37 @@ IN_PROC_BROWSER_TEST_P(SelectFileDialogHeadlessBrowserTest, SelectFileDialog) {
   WaitForSelectFileDialogCallback();
 
   EXPECT_EQ(select_file_dialog_type_, expected_type());
+}
+
+IN_PROC_BROWSER_TEST_F(HeadlessBrowserTest, NetworkServiceCrash) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+
+  HeadlessBrowserContext* browser_context =
+      browser()->CreateBrowserContextBuilder().Build();
+
+  HeadlessWebContents* headless_web_contents =
+      browser_context->CreateWebContentsBuilder()
+          .SetInitialURL(embedded_test_server()->GetURL("/hello.html"))
+          .Build();
+  ASSERT_TRUE(WaitForLoad(headless_web_contents));
+
+  SimulateNetworkServiceCrash();
+
+  content::WebContents* wc =
+      HeadlessWebContentsImpl::From(headless_web_contents)->web_contents();
+  const GURL new_url = embedded_test_server()->GetURL("/blue_page.html");
+  // Wait for navigaitons including those non-committed and re-try as needed,
+  // as a navigation may be aborted during network service restart.
+  do {
+    wc->GetController().LoadURLWithParams(
+        content::NavigationController::LoadURLParams(new_url));
+
+    content::TestNavigationObserver nav_observer(
+        wc, /* expected_number_of_navigations */ 1,
+        content::MessageLoopRunner::QuitMode::IMMEDIATE,
+        /* ignore_uncommitted_navigations */ false);
+    nav_observer.Wait();
+  } while (wc->GetController().GetLastCommittedEntry()->GetURL() != new_url);
 }
 
 }  // namespace headless

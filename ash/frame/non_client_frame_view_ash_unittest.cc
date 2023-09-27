@@ -26,8 +26,7 @@
 #include "ash/wm/wm_event.h"
 #include "base/command_line.h"
 #include "base/containers/flat_set.h"
-#include "base/test/scoped_feature_list.h"
-#include "chromeos/constants/chromeos_features.h"
+#include "base/memory/raw_ptr.h"
 #include "chromeos/ui/base/window_properties.h"
 #include "chromeos/ui/frame/caption_buttons/frame_caption_button_container_view.h"
 #include "chromeos/ui/frame/default_frame_header.h"
@@ -40,9 +39,9 @@
 #include "ui/aura/window_targeter.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/accelerators/test_accelerator_target.h"
-#include "ui/base/ui_base_features.h"
 #include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/compositor/layer.h"
+#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/compositor/test/draw_waiter_for_test.h"
 #include "ui/events/test/event_generator.h"
 #include "ui/gfx/geometry/rect.h"
@@ -98,12 +97,13 @@ class NonClientFrameViewAshTestWidgetDelegate
   }
 
   chromeos::HeaderView* header_view() const {
-    return non_client_frame_view_->header_view_;
+    return non_client_frame_view_->GetHeaderView();
   }
 
  private:
   // Not owned.
-  NonClientFrameViewAsh* non_client_frame_view_ = nullptr;
+  raw_ptr<NonClientFrameViewAsh, ExperimentalAsh> non_client_frame_view_ =
+      nullptr;
 };
 
 class TestWidgetConstraintsDelegate
@@ -414,18 +414,30 @@ TEST_F(NonClientFrameViewAshTest, MinimizedWindowsInTabletMode) {
 TEST_F(NonClientFrameViewAshTest, HeaderVisibilityInFullscreen) {
   auto* delegate = new NonClientFrameViewAshTestWidgetDelegate();
   std::unique_ptr<views::Widget> widget = CreateTestWidget(delegate);
+
+  auto* controller = ImmersiveFullscreenController::Get(widget.get());
+  ImmersiveFullscreenControllerTestApi test_api(controller);
+  ui::ScopedAnimationDurationScaleMode test_duration_mode(
+      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+
   NonClientFrameViewAsh* non_client_frame_view =
       delegate->non_client_frame_view();
   chromeos::HeaderView* header_view = non_client_frame_view->GetHeaderView();
   EXPECT_FALSE(header_view->in_immersive_mode());
   EXPECT_TRUE(header_view->GetVisible());
+
   widget->SetFullscreen(true);
   widget->LayoutRootViewIfNecessary();
   EXPECT_TRUE(header_view->in_immersive_mode());
   EXPECT_TRUE(header_view->GetVisible());
+  test_api.EndAnimation();
+  EXPECT_FALSE(header_view->GetVisible());
+
   widget->SetFullscreen(false);
   widget->LayoutRootViewIfNecessary();
   EXPECT_FALSE(header_view->in_immersive_mode());
+  EXPECT_TRUE(header_view->GetVisible());
+  test_api.EndAnimation();
   EXPECT_TRUE(header_view->GetVisible());
 
   // Turn immersive off, and make sure that header view is invisible
@@ -961,12 +973,9 @@ TEST_P(NonClientFrameViewAshFrameColorTest, WideFrameInitialColor) {
 // Tests to make sure that the NonClientFrameViewAsh tracks default frame colors
 // for both light and dark mode.
 TEST_P(NonClientFrameViewAshFrameColorTest, DefaultFrameColorsDarkAndLight) {
-  base::test::ScopedFeatureList scoped_feature_list(
-      chromeos::features::kDarkLightMode);
   auto* dark_light_mode_controller = DarkLightModeControllerImpl::Get();
   dark_light_mode_controller->OnActiveUserPrefServiceChanged(
       Shell::Get()->session_controller()->GetActivePrefService());
-  ASSERT_TRUE(chromeos::features::IsDarkLightModeEnabled());
   const bool initial_dark_mode_status =
       dark_light_mode_controller->IsDarkModeEnabled();
 
@@ -1010,12 +1019,9 @@ TEST_P(NonClientFrameViewAshFrameColorTest, DefaultFrameColorsDarkAndLight) {
 // colors when the kTrackDefaultFrameColors property is set to false.
 TEST_P(NonClientFrameViewAshFrameColorTest,
        CanSetPersistentFrameColorsDarkAndLight) {
-  base::test::ScopedFeatureList scoped_feature_list(
-      chromeos::features::kDarkLightMode);
   auto* dark_light_mode_controller = DarkLightModeControllerImpl::Get();
   dark_light_mode_controller->OnActiveUserPrefServiceChanged(
       Shell::Get()->session_controller()->GetActivePrefService());
-  ASSERT_TRUE(chromeos::features::IsDarkLightModeEnabled());
   const bool initial_dark_mode_status =
       dark_light_mode_controller->IsDarkModeEnabled();
 

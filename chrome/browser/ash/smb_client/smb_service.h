@@ -14,6 +14,7 @@
 #include "base/files/file.h"
 #include "base/functional/callback.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "chrome/browser/ash/file_system_provider/provided_file_system_info.h"
@@ -116,6 +117,9 @@ class SmbService : public KeyedService,
   // created.
   void SetSmbFsMounterCreationCallbackForTesting(
       SmbFsShare::MounterCreationCallback callback);
+
+  // Returns true if any SMB shares have been configured or saved before.
+  bool IsAnySmbShareConfigured();
 
  private:
   FRIEND_TEST_ALL_PREFIXES(SmbServiceWithSmbfsTest, MountInvalidSaved);
@@ -240,7 +244,7 @@ class SmbService : public KeyedService,
   static bool disable_share_discovery_for_testing_;
 
   const file_system_provider::ProviderId provider_id_;
-  Profile* profile_;
+  raw_ptr<Profile, ExperimentalAsh> profile_;
   std::unique_ptr<SmbShareFinder> share_finder_;
   // |smbfs_mount_id| -> SmbFsShare
   // Note, mount ID for smbfs is a randomly generated string. For smbprovider

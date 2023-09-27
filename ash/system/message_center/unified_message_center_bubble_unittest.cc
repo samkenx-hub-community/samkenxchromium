@@ -6,9 +6,10 @@
 
 #include <memory>
 
-#include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
+#include "ash/root_window_controller.h"
 #include "ash/session/session_controller_impl.h"
+#include "ash/shelf/shelf.h"
 #include "ash/shell.h"
 #include "ash/system/notification_center/notification_center_view.h"
 #include "ash/system/tray/tray_constants.h"
@@ -27,15 +28,14 @@
 using message_center::MessageCenter;
 using message_center::Notification;
 
-#include <iostream>
-
 namespace ash {
 
-class UnifiedMessageCenterBubbleTest
-    : public AshTestBase,
-      public testing::WithParamInterface<bool> {
+class UnifiedMessageCenterBubbleTest : public AshTestBase {
  public:
-  UnifiedMessageCenterBubbleTest() = default;
+  UnifiedMessageCenterBubbleTest() {
+    // `UnifiedMessageCenterBubble` is only used when the QS revamp is disabled.
+    scoped_feature_list_.InitAndDisableFeature(features::kQsRevamp);
+  }
 
   UnifiedMessageCenterBubbleTest(const UnifiedMessageCenterBubbleTest&) =
       delete;
@@ -44,24 +44,14 @@ class UnifiedMessageCenterBubbleTest
 
   ~UnifiedMessageCenterBubbleTest() override = default;
 
-  // AshTestBase:
-  void SetUp() override {
-    scoped_feature_list_ = std::make_unique<base::test::ScopedFeatureList>();
-    scoped_feature_list_->InitWithFeatureState(features::kNotificationsRefresh,
-                                               IsNotificationsRefreshEnabled());
-
-    AshTestBase::SetUp();
-  }
-
-  bool IsNotificationsRefreshEnabled() const { return GetParam(); }
-
  protected:
   std::string AddWebNotification() {
     std::string id = base::NumberToString(id_++);
     MessageCenter::Get()->AddNotification(std::make_unique<Notification>(
         message_center::NOTIFICATION_TYPE_SIMPLE, id, u"title", u"message",
         ui::ImageModel(), std::u16string(), GURL(),
-        message_center::NotifierId(GURL(u"example.com"), u"webpagetitle"),
+        message_center::NotifierId(GURL(u"example.com"), u"webpagetitle",
+                                   /*web_app_id=*/absl::nullopt),
         message_center::RichNotificationData(), /*delegate=*/nullptr));
     return id;
   }
@@ -85,12 +75,28 @@ class UnifiedMessageCenterBubbleTest
         ->ResetBounds();
   }
 
+  UnifiedSystemTray* GetSecondaryUnifiedSystemTray() {
+    return Shell::Get()
+        ->GetRootWindowControllerWithDisplayId(GetSecondaryDisplay().id())
+        ->shelf()
+        ->status_area_widget()
+        ->unified_system_tray();
+  }
+
   UnifiedMessageCenterBubble* GetMessageCenterBubble() {
     return GetPrimaryUnifiedSystemTray()->message_center_bubble();
   }
 
+  UnifiedMessageCenterBubble* GetSecondaryMessageCenterBubble() {
+    return GetSecondaryUnifiedSystemTray()->message_center_bubble();
+  }
+
   UnifiedSystemTrayBubble* GetSystemTrayBubble() {
     return GetPrimaryUnifiedSystemTray()->bubble();
+  }
+
+  UnifiedSystemTrayBubble* GetSecondarySystemTrayBubble() {
+    return GetSecondaryUnifiedSystemTray()->bubble();
   }
 
   int MessageCenterSeparationHeight() {
@@ -166,14 +172,10 @@ class UnifiedMessageCenterBubbleTest
 
  private:
   int id_ = 0;
-  std::unique_ptr<base::test::ScopedFeatureList> scoped_feature_list_;
+  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
-INSTANTIATE_TEST_SUITE_P(All,
-                         UnifiedMessageCenterBubbleTest,
-                         testing::Bool() /* IsNotificationsRefreshEnabled() */);
-
-TEST_P(UnifiedMessageCenterBubbleTest, PositionedAboveSystemTray) {
+TEST_F(UnifiedMessageCenterBubbleTest, PositionedAboveSystemTray) {
   const int total_notifications = 5;
   GetPrimaryUnifiedSystemTray()->ShowBubble();
   AddNotification();
@@ -202,7 +204,7 @@ TEST_P(UnifiedMessageCenterBubbleTest, PositionedAboveSystemTray) {
   }
 }
 
-TEST_P(UnifiedMessageCenterBubbleTest, FocusCycle) {
+TEST_F(UnifiedMessageCenterBubbleTest, FocusCycle) {
   GetPrimaryUnifiedSystemTray()->ShowBubble();
   AddNotification();
   AddNotification();
@@ -250,7 +252,7 @@ TEST_P(UnifiedMessageCenterBubbleTest, FocusCycle) {
             GetFirstQuickSettingsFocusable());
 }
 
-TEST_P(UnifiedMessageCenterBubbleTest, CollapseState) {
+TEST_F(UnifiedMessageCenterBubbleTest, CollapseState) {
   AddNotification();
   AddNotification();
 
@@ -301,7 +303,7 @@ TEST_P(UnifiedMessageCenterBubbleTest, CollapseState) {
   EXPECT_FALSE(IsMessageCenterCollapsed());
 }
 
-TEST_P(UnifiedMessageCenterBubbleTest, FocusCycleWithNoNotifications) {
+TEST_F(UnifiedMessageCenterBubbleTest, FocusCycleWithNoNotifications) {
   GetPrimaryUnifiedSystemTray()->ShowBubble();
 
   views::Widget* quick_settings_widget =
@@ -332,7 +334,7 @@ TEST_P(UnifiedMessageCenterBubbleTest, FocusCycleWithNoNotifications) {
             GetFirstQuickSettingsFocusable());
 }
 
-TEST_P(UnifiedMessageCenterBubbleTest, BubbleBounds) {
+TEST_F(UnifiedMessageCenterBubbleTest, BubbleBounds) {
   std::vector<std::string> displays = {"0+0-1200x800", "0+0-1280x1080",
                                        "0+0-1600x1440"};
 
@@ -381,7 +383,7 @@ TEST_P(UnifiedMessageCenterBubbleTest, BubbleBounds) {
   }
 }
 
-TEST_P(UnifiedMessageCenterBubbleTest, HandleAccelerators) {
+TEST_F(UnifiedMessageCenterBubbleTest, HandleAccelerators) {
   auto id = AddWebNotification();
   WaitForAnimation();
 
@@ -417,6 +419,75 @@ TEST_P(UnifiedMessageCenterBubbleTest, HandleAccelerators) {
   WaitForAnimation();
   EXPECT_EQ(nullptr,
             GetPrimaryUnifiedSystemTray()->GetFocusManager()->GetFocusedView());
+}
+
+class UnifiedMessageCenterBubbleMultiDisplayTest
+    : public UnifiedMessageCenterBubbleTest,
+      public testing::WithParamInterface<
+          std::tuple</* Primary display height */ int,
+                     /* Secondary display height */ int>> {
+ public:
+  UnifiedMessageCenterBubbleMultiDisplayTest() = default;
+  UnifiedMessageCenterBubbleMultiDisplayTest(
+      const UnifiedMessageCenterBubbleMultiDisplayTest&) = delete;
+  UnifiedMessageCenterBubbleMultiDisplayTest& operator=(
+      const UnifiedMessageCenterBubbleMultiDisplayTest&) = delete;
+  ~UnifiedMessageCenterBubbleMultiDisplayTest() override = default;
+
+ protected:
+  int GetPrimaryDisplayHeight() { return std::get<0>(GetParam()); }
+  int GetSecondaryDisplayHeight() { return std::get<1>(GetParam()); }
+};
+
+INSTANTIATE_TEST_SUITE_P(DisplayHeight,
+                         UnifiedMessageCenterBubbleMultiDisplayTest,
+                         testing::Values(
+                             // Short primary display, tall secondary display
+                             std::make_tuple(600, 1600),
+                             // Tall primary display, short secondary display
+                             std::make_tuple(1600, 600),
+                             // Same primary and secondary display heights
+                             std::make_tuple(600, 600)));
+
+// Tests that the bounds of `UnifiedMessageCenterBubble` are constrained
+// according to the dimensions of the display it is being shown on.
+TEST_P(UnifiedMessageCenterBubbleMultiDisplayTest, BubbleBounds) {
+  UpdateDisplay("800x" + base::NumberToString(GetPrimaryDisplayHeight()) +
+                ",800x" + base::NumberToString(GetSecondaryDisplayHeight()));
+
+  // Add a large number of notifications to overflow the scroll view in the
+  // `UnifiedMessageCenterBubble`.
+  for (int i = 0; i < 100; i++) {
+    AddNotification();
+  }
+
+  // Show the primary display's `UnifiedMessageCenterBubble`.
+  GetPrimaryUnifiedSystemTray()->ShowBubble();
+
+  // The height of the primary display's `UnifiedMessageCenterBubble` should
+  // not exceed the primary display's height.
+  const int bubble1_height =
+      GetMessageCenterBubble()->GetBoundsInScreen().height();
+  EXPECT_LT(bubble1_height, GetPrimaryDisplayHeight());
+
+  // The primary display's `UnifiedMessageCenterBubble` should be positioned
+  // above the primary display's system tray bubble.
+  EXPECT_LT(GetMessageCenterBubble()->GetBoundsInScreen().bottom(),
+            GetSystemTrayBubble()->GetBoundsInScreen().y());
+
+  // Show the secondary display's `UnifiedMessageCenterBubble`.
+  GetSecondaryUnifiedSystemTray()->ShowBubble();
+
+  // The height of the secondary display's `UnifiedMessageCenterBubble` should
+  // not exceed the secondary display's height.
+  const int bubble2_height =
+      GetSecondaryMessageCenterBubble()->GetBoundsInScreen().height();
+  EXPECT_LT(bubble2_height, GetSecondaryDisplayHeight());
+
+  // The secondary display's `UnifiedMessageCenterBubble` should be positioned
+  // above the secondary display's system tray bubble.
+  EXPECT_LT(GetSecondaryMessageCenterBubble()->GetBoundsInScreen().bottom(),
+            GetSecondarySystemTrayBubble()->GetBoundsInScreen().y());
 }
 
 }  // namespace ash

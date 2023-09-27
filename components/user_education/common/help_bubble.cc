@@ -9,8 +9,6 @@
 
 namespace user_education {
 
-DEFINE_CUSTOM_ELEMENT_EVENT_TYPE(kHelpBubbleAnchorBoundsChangedEvent);
-
 HelpBubble::HelpBubble()
     : on_close_callbacks_(std::make_unique<CallbackList>()) {}
 

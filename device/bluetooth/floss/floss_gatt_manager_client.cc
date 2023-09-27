@@ -24,10 +24,16 @@ constexpr char kWriteType[] = "write_type";
 namespace {
 // Randomly generated UUID for use in this client.
 constexpr char kDefaultGattManagerClientUuid[] =
+// Ash and LaCrOS should use the different APP UUID, otherwise the latter one
+// (usually LaCrOS) fails on registering.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
     "e060b902508c485f8b0e27639c7f2d41";
+#else
+    "58523f357dbc4390ab78ed075b15a634";
+#endif
 
-// Default to requesting eatt support with gatt client.
-constexpr bool kDefaultEattSupport = true;
+// Default to not requesting eatt support with gatt client.
+constexpr bool kDefaultEattSupport = false;
 
 void HandleResponse(const char* method, DBusResult<Void> result) {
   if (!result.has_value()) {
@@ -273,7 +279,8 @@ void FlossGattManagerClient::AddObserver(FlossGattClientObserver* observer) {
   gatt_client_observers_.AddObserver(observer);
 }
 
-void FlossGattManagerClient::AddObserver(FlossGattServerObserver* observer) {
+void FlossGattManagerClient::AddServerObserver(
+    FlossGattServerObserver* observer) {
   gatt_server_observers_.AddObserver(observer);
 }
 
@@ -281,16 +288,15 @@ void FlossGattManagerClient::RemoveObserver(FlossGattClientObserver* observer) {
   gatt_client_observers_.RemoveObserver(observer);
 }
 
-void FlossGattManagerClient::RemoveObserver(FlossGattServerObserver* observer) {
+void FlossGattManagerClient::RemoveServerObserver(
+    FlossGattServerObserver* observer) {
   gatt_server_observers_.RemoveObserver(observer);
 }
 
 void FlossGattManagerClient::Connect(ResponseCallback<Void> callback,
                                      const std::string& remote_device,
-                                     const BluetoothTransport& transport) {
-  // Gatt client connections occur immediately instead of when next seen.
-  constexpr bool is_direct = true;
-
+                                     const BluetoothTransport& transport,
+                                     bool is_direct) {
   // Opportunistic connections should be false because we want connections to
   // immediately fail with timeout if it doesn't work out.
   const bool opportunistic = false;
@@ -588,6 +594,9 @@ void FlossGattManagerClient::Init(dbus::Bus* bus,
       gatt::kOnServerServiceAdded,
       &FlossGattServerObserver::GattServerServiceAdded);
   gatt_server_exported_callback_manager_.AddMethod(
+      gatt::kOnServerServiceRemoved,
+      &FlossGattServerObserver::GattServerServiceRemoved);
+  gatt_server_exported_callback_manager_.AddMethod(
       gatt::kOnServerCharacteristicReadRequest,
       &FlossGattServerObserver::GattServerCharacteristicReadRequest);
   gatt_server_exported_callback_manager_.AddMethod(
@@ -859,6 +868,13 @@ void FlossGattManagerClient::GattServerServiceAdded(GattStatus status,
                                                     GattService service) {
   for (auto& observer : gatt_server_observers_) {
     observer.GattServerServiceAdded(status, service);
+  }
+}
+
+void FlossGattManagerClient::GattServerServiceRemoved(GattStatus status,
+                                                      int32_t handle) {
+  for (auto& observer : gatt_server_observers_) {
+    observer.GattServerServiceRemoved(status, handle);
   }
 }
 

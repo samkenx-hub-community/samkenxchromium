@@ -44,9 +44,13 @@
     }
   },
   "$build/reclient": {
+    "bootstrap_env": {
+      "RBE_experimental_exit_on_stuck_actions": "true"
+    },
     "instance": "rbe-chromium-trusted",
     "jobs": 250,
-    "metrics_project": "chromium-reclient-metrics"
+    "metrics_project": "chromium-reclient-metrics",
+    "scandeps_server": true
   },
   "$recipe_engine/resultdb/test_presentation": {
     "column_keys": [],

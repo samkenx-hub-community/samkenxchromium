@@ -149,6 +149,7 @@ SkiaOutputDeviceBufferQueue::SkiaOutputDeviceBufferQueue(
     gpu::MemoryTracker* memory_tracker,
     const DidSwapBufferCompleteCallback& did_swap_buffer_complete_callback)
     : SkiaOutputDevice(deps->GetSharedContextState()->gr_context(),
+                       deps->GetSharedContextState()->graphite_context(),
                        memory_tracker,
                        did_swap_buffer_complete_callback),
       presenter_(std::move(presenter)),
@@ -163,6 +164,12 @@ SkiaOutputDeviceBufferQueue::SkiaOutputDeviceBufferQueue(
       ui::OzonePlatform::GetInstance()
           ->GetPlatformRuntimeProperties()
           .supports_non_backed_solid_color_buffers;
+
+  capabilities_.supports_single_pixel_buffer =
+      ui::OzonePlatform::GetInstance()
+          ->GetPlatformRuntimeProperties()
+          .supports_single_pixel_buffer;
+
 #elif BUILDFLAG(IS_APPLE)
   capabilities_.supports_non_backed_solid_color_overlays = true;
 #endif  // BUILDFLAG(IS_OZONE)
@@ -171,7 +178,6 @@ SkiaOutputDeviceBufferQueue::SkiaOutputDeviceBufferQueue(
   capabilities_.preserve_buffer_content = true;
   capabilities_.only_invalidates_damage_rect = false;
   capabilities_.number_of_buffers = 3;
-  capabilities_.supports_gpu_vsync = presenter_->SupportsGpuVSync();
 
   capabilities_.renderer_allocates_images =
       ::features::ShouldRendererAllocateImages();
@@ -403,7 +409,8 @@ void SkiaOutputDeviceBufferQueue::ScheduleOverlays(
 #if BUILDFLAG(IS_OZONE)
     if (overlay.is_solid_color) {
       DCHECK(overlay.color.has_value());
-      DCHECK(capabilities_.supports_non_backed_solid_color_overlays);
+      DCHECK(capabilities_.supports_non_backed_solid_color_overlays ||
+        capabilities_.supports_single_pixel_buffer);
       presenter_->ScheduleOverlayPlane(overlay, nullptr, nullptr);
       continue;
     }
@@ -599,14 +606,14 @@ gfx::Size SkiaOutputDeviceBufferQueue::GetSwapBuffersSize() {
   }
 }
 
-bool SkiaOutputDeviceBufferQueue::Reshape(
-    const SkSurfaceCharacterization& characterization,
-    const gfx::ColorSpace& color_space,
-    float device_scale_factor,
-    gfx::OverlayTransform transform) {
+bool SkiaOutputDeviceBufferQueue::Reshape(const SkImageInfo& image_info,
+                                          const gfx::ColorSpace& color_space,
+                                          int sample_count,
+                                          float device_scale_factor,
+                                          gfx::OverlayTransform transform) {
   DCHECK(pending_overlay_mailboxes_.empty());
-  if (!presenter_->Reshape(characterization, color_space, device_scale_factor,
-                           transform)) {
+  if (!presenter_->Reshape(image_info, color_space, sample_count,
+                           device_scale_factor, transform)) {
     LOG(ERROR) << "Failed to resize.";
     CheckForLoopFailuresBufferQueue();
     // To prevent tail call, so we can see the stack.
@@ -615,12 +622,12 @@ bool SkiaOutputDeviceBufferQueue::Reshape(
   }
 
   overlay_transform_ = transform;
-  gfx::Size size = gfx::SkISizeToSize(characterization.dimensions());
+  gfx::Size size = gfx::SkISizeToSize(image_info.dimensions());
   if (color_space_ == color_space && image_size_ == size)
     return true;
   color_space_ = color_space;
   image_size_ = size;
-  sample_count_ = characterization.sampleCount();
+  sample_count_ = sample_count;
 
   bool success = RecreateImages();
   if (!success) {
@@ -708,10 +715,6 @@ bool SkiaOutputDeviceBufferQueue::OverlayDataComparator::operator()(
     const gpu::Mailbox& lhs,
     const OverlayData& rhs) const {
   return lhs < rhs.mailbox();
-}
-
-void SkiaOutputDeviceBufferQueue::SetGpuVSyncEnabled(bool enabled) {
-  presenter_->SetGpuVSyncEnabled(enabled);
 }
 
 void SkiaOutputDeviceBufferQueue::SetVSyncDisplayID(int64_t display_id) {

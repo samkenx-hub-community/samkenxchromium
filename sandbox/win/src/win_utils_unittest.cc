@@ -15,11 +15,13 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/format_macros.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/path_service.h"
 #include "base/rand_util.h"
 #include "base/strings/string_util_win.h"
 #include "base/strings/stringprintf.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/win/scoped_handle.h"
 #include "base/win/scoped_process_information.h"
 #include "sandbox/win/src/nt_internals.h"
@@ -52,6 +54,11 @@ bool GetModuleList(HANDLE process, std::vector<HMODULE>* result) {
     return true;
   }
   modules.resize(size_needed / sizeof(HMODULE));
+  // Avoid the undefined-behavior of calling modules[0] on an empty list. This
+  // can happen if the process has not yet started or has already exited.
+  if (modules.size() == 0) {
+    return false;
+  }
   if (EnumProcessModules(
           process, &modules[0],
           base::checked_cast<DWORD>(modules.size() * sizeof(HMODULE)),
@@ -64,8 +71,9 @@ bool GetModuleList(HANDLE process, std::vector<HMODULE>* result) {
 }
 
 std::wstring GetRandomName() {
-  return base::StringPrintf(L"chrome_%08X%08X", base::RandUint64(),
-                            base::RandUint64());
+  return base::ASCIIToWide(
+      base::StringPrintf("chrome_%016" PRIX64 "%016" PRIX64, base::RandUint64(),
+                         base::RandUint64()));
 }
 
 void CompareHandlePath(const base::win::ScopedHandle& handle,
@@ -228,7 +236,11 @@ TEST(WinUtils, GetProcessBaseAddress) {
   using sandbox::GetProcessBaseAddress;
   STARTUPINFO start_info = {};
   PROCESS_INFORMATION proc_info = {};
-  WCHAR command_line[] = L"notepad";
+  // The child process for this test must be a GUI app so that WaitForInputIdle
+  // can be used to guarantee that the child process has started but has not
+  // exited. notepad was used but will fail on Windows 11 if the store version
+  // of notepad is not installed.
+  WCHAR command_line[] = L"calc";
   start_info.cb = sizeof(start_info);
   start_info.dwFlags = STARTF_USESHOWWINDOW;
   start_info.wShowWindow = SW_HIDE;

@@ -13,10 +13,10 @@ import android.view.ViewGroup.LayoutParams;
 import org.chromium.base.Callback;
 import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.components.browser_ui.util.GlobalDiscardableReferencePool;
-import org.chromium.components.browser_ui.widget.R;
 import org.chromium.components.browser_ui.widget.image_tiles.ImageTile;
 import org.chromium.components.browser_ui.widget.image_tiles.ImageTileCoordinator;
 import org.chromium.components.browser_ui.widget.image_tiles.ImageTileCoordinatorFactory;
@@ -122,7 +122,6 @@ public class QueryTileSection {
         QueryTile queryTile = (QueryTile) tile;
         mTileUmaLogger.recordTileClicked(queryTile);
         mTileProvider.onTileClicked(queryTile.id);
-        QueryTileUtils.onQueryTileClicked();
 
         // TODO(qinmin): make isLastLevelTile a member variable of ImageTile.
         boolean isLastLevelTile = queryTile.children.isEmpty();

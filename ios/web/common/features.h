@@ -41,38 +41,31 @@ BASE_DECLARE_FEATURE(kSetRequestAttribution);
 // Feature flag that enable Shared Highlighting color change in iOS.
 BASE_DECLARE_FEATURE(kIOSSharedHighlightingColorChange);
 
-// Feature flag that enables native session restoration with a synthesized
-// interaction state.
-BASE_DECLARE_FEATURE(kSynthesizedRestoreSession);
-
-// Enables user control for camera and/or microphone access for a specific site
-// through site settings during its lifespan. When enabled, each web state will
-// keep track of whether camera and/or microphone access is granted by the user
-// for its current site.
-BASE_DECLARE_FEATURE(kMediaPermissionsControl);
-
-// Enables the Fullscreen API in WebKit (supported on iOS 16.0+). This API
-// allows web sites to enter fullscreen mode, with all browser UI hidden.
-BASE_DECLARE_FEATURE(kEnableFullscreenAPI);
-
 // Feature flag enabling use of new iOS 15
 // loadSimulatedRequest:responseHTMLString: API to display error pages in
 // CRWWKNavigationHandler. The helper method IsLoadSimulatedRequestAPIEnabled()
 // should be used instead of directly checking this feature.
 BASE_DECLARE_FEATURE(kUseLoadSimulatedRequestForOfflinePage);
 
-// Feature flag that enables getting more of the surrounding text when the user
-// long presses at a certain location.
-BASE_DECLARE_FEATURE(kLongPressSurroundingText);
-
-// Feature flag to enable Emails detection.
-BASE_DECLARE_FEATURE(kEnableEmails);
-
 // Feature flag to enable Phone Numbers detection.
 BASE_DECLARE_FEATURE(kEnablePhoneNumbers);
 
+// Feature flag to enable Measurements detection.
+BASE_DECLARE_FEATURE(kEnableMeasurements);
+
+// Feature param under kOneTapForMaps to select consent behavior.
+extern const char kOneTapForMapsConsentModeParamTitle[];
+extern const char kOneTapForMapsConsentModeDefaultParam[];
+extern const char kOneTapForMapsConsentModeForcedParam[];
+extern const char kOneTapForMapsConsentModeDisabledParam[];
+extern const char kOneTapForMapsConsentModeIPHParam[];
+extern const char kOneTapForMapsConsentModeIPHForcedParam[];
 // Feature flag to enable One tap experience for Maps.
 BASE_DECLARE_FEATURE(kOneTapForMaps);
+
+// Feature flag that enables using web::AnnotationsTextManager for fetching web
+// page text for language detection.
+BASE_DECLARE_FEATURE(kUseAnnotationsForLanguageDetection);
 
 // When enabled, CRWWebViewScrollViewProxy's `scrollEnabled` state is not
 // restored if the new instance already has the same `scrollEnabled` state as
@@ -89,19 +82,18 @@ BASE_DECLARE_FEATURE(kEnableWebInspector);
 // viewport adjustment experiment is selected via command line switches.
 BASE_DECLARE_FEATURE(kSmoothScrollingDefault);
 
-// When true, user control for camera and/or microphone access should be
-// enabled.
-bool IsMediaPermissionsControlEnabled();
+// Feature flag to enable the session serialization optimizations.
+BASE_DECLARE_FEATURE(kEnableSessionSerializationOptimizations);
 
 // When true, the new loadSimulatedRequest API should be used when displaying
 // error pages.
 bool IsLoadSimulatedRequestAPIEnabled();
 
-// When true, the fullscreen API should be used to enable fullscreen mode.
-bool IsFullscreenAPIEnabled();
+// When true, an option to enable Web Inspector should be present in Settings.
+bool IsWebInspectorSupportEnabled();
 
-// Return true when the smooth scrolling feature is enabled.
-bool IsFullscreenSmoothScrollingEnabled();
+// When true, session serialization optimizations should be enabled.
+bool UseSessionSerializationOptimizations();
 
 }  // namespace features
 }  // namespace web

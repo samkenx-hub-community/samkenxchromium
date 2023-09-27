@@ -157,6 +157,8 @@ class MockVideoCaptureObserver final
     buffers_.erase(iter);
     OnBufferDestroyedCall(buffer_id);
   }
+  MOCK_METHOD1(OnFrameDroppedEarly,
+               void(media::VideoCaptureFrameDropReason reason));
 
   MOCK_METHOD1(OnNewCropVersion, void(uint32_t crop_version));
 
@@ -249,6 +251,8 @@ class SingleClientVideoCaptureHostTest : public ::testing::Test {
                 OnStateChangedCall(media::mojom::VideoCaptureState::ENDED))
         .WillOnce(InvokeWithoutArgs(&run_loop, &base::RunLoop::Quit));
     consumer_->Stop();
+
+    launched_device_ = nullptr;
     run_loop.Run();
   }
 

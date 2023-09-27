@@ -31,6 +31,7 @@
 
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/timer/elapsed_timer.h"
 #include "services/network/public/cpp/resource_request.h"
@@ -45,7 +46,6 @@
 #include "third_party/blink/renderer/core/dom/cdata_section.h"
 #include "third_party/blink/renderer/core/dom/child_list_mutation_scope.h"
 #include "third_party/blink/renderer/core/dom/comment.h"
-#include "third_party/blink/renderer/core/dom/context_features.h"
 #include "third_party/blink/renderer/core/dom/document_fragment.h"
 #include "third_party/blink/renderer/core/dom/document_init.h"
 #include "third_party/blink/renderer/core/dom/element_traversal.h"
@@ -59,6 +59,7 @@
 #include "third_party/blink/renderer/core/editing/serializers/styled_markup_serializer.h"
 #include "third_party/blink/renderer/core/editing/visible_selection.h"
 #include "third_party/blink/renderer/core/editing/visible_units.h"
+#include "third_party/blink/renderer/core/execution_context/agent.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/frame/settings.h"
 #include "third_party/blink/renderer/core/html/html_anchor_element.h"
@@ -80,7 +81,6 @@
 #include "third_party/blink/renderer/core/svg/svg_use_element.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/bindings/runtime_call_stats.h"
-#include "third_party/blink/renderer/platform/bindings/v8_per_isolate_data.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/loader/fetch/url_loader/url_loader_client.h"
 #include "third_party/blink/renderer/platform/weborigin/kurl.h"
@@ -98,7 +98,7 @@ class AttributeChange {
   DISALLOW_NEW();
 
  public:
-  AttributeChange() : name_(g_null_atom, g_null_atom, g_null_atom) {}
+  AttributeChange() : name_(QualifiedName::Null()) {}
 
   AttributeChange(Element* element,
                   const QualifiedName& name,
@@ -148,11 +148,7 @@ class EmptyLocalFrameClientWithFailingLoaderFactory final
 #if defined(USE_INNER_HTML_PARSER_FAST_PATH)
 void LogFastPathParserTotalTime(base::TimeDelta parse_time) {
   // The time needed to parse is typically < 1ms (even at the 99%).
-  if (!base::TimeTicks::IsHighResolution()) {
-    return;
-  }
-
-  base::UmaHistogramCustomMicrosecondsTimes(
+  UMA_HISTOGRAM_CUSTOM_MICROSECONDS_TIMES(
       "Blink.HTMLFastPathParser.TotalParseTime2", parse_time,
       base::Microseconds(1), base::Milliseconds(10), 100);
 }
@@ -468,7 +464,6 @@ DocumentFragment* CreateFragmentFromMarkupWithContext(
       DocumentInit::Create()
           .WithExecutionContext(document.GetExecutionContext())
           .WithAgent(document.GetAgent()));
-  tagged_document->SetContextFeatures(document.GetContextFeatures());
 
   auto* root =
       MakeGarbageCollected<Element>(QualifiedName::Null(), tagged_document);
@@ -580,12 +575,12 @@ bool IsPlainTextMarkup(Node* node) {
 static bool ShouldPreserveNewline(const EphemeralRange& range) {
   if (Node* node = range.StartPosition().NodeAsRangeFirstNode()) {
     if (LayoutObject* layout_object = node->GetLayoutObject())
-      return layout_object->Style()->PreserveNewline();
+      return layout_object->Style()->ShouldPreserveBreaks();
   }
 
   if (Node* node = range.StartPosition().AnchorNode()) {
     if (LayoutObject* layout_object = node->GetLayoutObject())
-      return layout_object->Style()->PreserveNewline();
+      return layout_object->Style()->ShouldPreserveBreaks();
   }
 
   return false;
@@ -611,7 +606,8 @@ DocumentFragment* CreateFragmentFromText(const EphemeralRange& context,
     fragment->AppendChild(document.createTextNode(string));
     if (string.EndsWith('\n')) {
       auto* element = MakeGarbageCollected<HTMLBRElement>(document);
-      element->setAttribute(html_names::kClassAttr, AppleInterchangeNewline);
+      element->setAttribute(html_names::kClassAttr,
+                            AtomicString(AppleInterchangeNewline));
       fragment->AppendChild(element);
     }
     return fragment;
@@ -641,7 +637,8 @@ DocumentFragment* CreateFragmentFromText(const EphemeralRange& context,
     if (s.empty() && i + 1 == num_lines) {
       // For last line, use the "magic BR" rather than a P.
       element = MakeGarbageCollected<HTMLBRElement>(document);
-      element->setAttribute(html_names::kClassAttr, AppleInterchangeNewline);
+      element->setAttribute(html_names::kClassAttr,
+                            AtomicString(AppleInterchangeNewline));
     } else {
       if (use_clones_of_enclosing_block)
         element = &block->CloneWithoutChildren();
@@ -809,10 +806,10 @@ DocumentFragment* CreateContextualFragment(
 void ReplaceChildrenWithFragment(ContainerNode* container,
                                  DocumentFragment* fragment,
                                  ExceptionState& exception_state) {
-  RUNTIME_CALL_TIMER_SCOPE(
-      V8PerIsolateData::MainThreadIsolate(),
-      RuntimeCallStats::CounterId::kReplaceChildrenWithFragment);
   DCHECK(container);
+  RUNTIME_CALL_TIMER_SCOPE(
+      container->GetDocument().GetAgent().isolate(),
+      RuntimeCallStats::CounterId::kReplaceChildrenWithFragment);
   ContainerNode* container_node(container);
 
   ChildListMutationScope mutation(*container_node);
@@ -897,7 +894,8 @@ static Document* CreateStagingDocumentForMarkupSanitization(
   frame->SetView(frame_view);
   // TODO(https://crbug.com/1355751) Initialize `storage_key`.
   frame->Init(/*opener=*/nullptr, DocumentToken(), /*policy_container=*/nullptr,
-              StorageKey(), /*document_ukm_source_id=*/ukm::kInvalidSourceId);
+              StorageKey(), /*document_ukm_source_id=*/ukm::kInvalidSourceId,
+              /*creator_base_url=*/KURL());
 
   Document* document = frame->GetDocument();
   DCHECK(document);
@@ -919,9 +917,8 @@ static bool ContainsStyleElements(const DocumentFragment& fragment) {
 
 // Returns true if any svg <use> element is removed.
 static bool StripSVGUseDataURLs(Node& node) {
-  if (IsA<SVGUseElement>(node)) {
-    SVGUseElement& use = To<SVGUseElement>(node);
-    SVGURLReferenceResolver resolver(use.HrefString(), use.GetDocument());
+  if (auto* use = DynamicTo<SVGUseElement>(node)) {
+    SVGURLReferenceResolver resolver(use->HrefString(), use->GetDocument());
     if (resolver.AbsoluteUrl().ProtocolIsData())
       node.remove();
     return true;

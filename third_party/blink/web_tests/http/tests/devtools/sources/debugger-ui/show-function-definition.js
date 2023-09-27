@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
   TestRunner.addResult(`Tests that "Show Function Definition" jumps to the correct location.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('sources');
   await TestRunner.evaluateInPagePromise(`
       function jumpToMe()
@@ -19,7 +24,7 @@
   TestRunner.runTestSuite([
     function testRevealFunctionDefinition(next) {
       TestRunner.addSniffer(panel, 'showUISourceCode', showUISourceCodeHook);
-      UI.context.flavor(SDK.ExecutionContext).evaluate({expression: 'jumpToMe', silent: true}).then(didGetFunction);
+      UIModule.Context.Context.instance().flavor(SDK.ExecutionContext).evaluate({expression: 'jumpToMe', silent: true}).then(didGetFunction);
 
       function didGetFunction(result) {
         var error = !result.object || !!result.exceptionDetails;
@@ -27,7 +32,7 @@
         panel.showFunctionDefinition(result.object);
       }
 
-      function showUISourceCodeHook(uiSourceCode, lineNumber, columnNumber, forceShowInPanel) {
+      function showUISourceCodeHook(uiSourceCode, {lineNumber, columnNumber}, forceShowInPanel) {
         // lineNumber and columnNumber are 0-based
         ++lineNumber;
         ++columnNumber;

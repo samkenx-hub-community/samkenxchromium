@@ -69,7 +69,7 @@ class CORE_EXPORT NGInlineItem {
                scoped_refptr<const ShapeResult>);
 
   NGInlineItemType Type() const { return type_; }
-  const char* NGInlineItemTypeToString(int val) const;
+  const char* NGInlineItemTypeToString(NGInlineItemType val) const;
 
   NGTextType TextType() const { return static_cast<NGTextType>(text_type_); }
   bool IsForcedLineBreak() const {
@@ -146,11 +146,11 @@ class CORE_EXPORT NGInlineItem {
   bool IsImage() const {
     return GetLayoutObject() && GetLayoutObject()->IsLayoutImage();
   }
-  bool IsRubyRun() const {
-    return GetLayoutObject() && GetLayoutObject()->IsRubyRun();
+  bool IsRubyColumn() const {
+    return GetLayoutObject() && GetLayoutObject()->IsRubyColumn();
   }
   bool IsTextCombine() const {
-    return GetLayoutObject() && GetLayoutObject()->IsLayoutNGTextCombine();
+    return GetLayoutObject() && GetLayoutObject()->IsLayoutTextCombine();
   }
 
   void SetOffset(unsigned start, unsigned end) {
@@ -165,18 +165,6 @@ class CORE_EXPORT NGInlineItem {
     end_offset_ = end_offset;
     // Any modification to the offset will invalidate the shape result.
     shape_result_ = nullptr;
-  }
-
-  bool HasStartEdge() const {
-    DCHECK(Type() == kOpenTag || Type() == kCloseTag);
-    // TODO(kojii): Should use break token when NG has its own tree building.
-    return !GetLayoutObject()->IsInlineElementContinuation();
-  }
-  bool HasEndEdge() const {
-    DCHECK(Type() == kOpenTag || Type() == kCloseTag);
-    // TODO(kojii): Should use break token when NG has its own tree building.
-    return !GetLayoutObject()->IsLayoutInline() ||
-           !To<LayoutInline>(GetLayoutObject())->Continuation();
   }
 
   void SetStyleVariant(NGStyleVariant style_variant) {
@@ -240,6 +228,8 @@ class CORE_EXPORT NGInlineItem {
                              HeapVector<NGInlineItem>* items);
 
   RunSegmenter::RunSegmenterRange CreateRunSegmenterRange() const {
+    // Only `kText` has the `segment_data_`, see `NGInlineItem::SetSegmentData`.
+    DCHECK_EQ(Type(), kText);
     return NGInlineItemSegment::UnpackSegmentData(start_offset_, end_offset_,
                                                   segment_data_);
   }

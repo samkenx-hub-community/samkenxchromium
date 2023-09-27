@@ -46,13 +46,7 @@ class MemoryReclaimerTest : public ::testing::Test {
 
     allocator_ =
         std::make_unique<PartitionAllocatorForTesting>(PartitionOptions{
-            PartitionOptions::AlignedAlloc::kDisallowed,
-            PartitionOptions::ThreadCache::kDisabled,
-            PartitionOptions::Quarantine::kAllowed,
-            PartitionOptions::Cookie::kAllowed,
-            PartitionOptions::BackupRefPtr::kDisabled,
-            PartitionOptions::BackupRefPtrZapping::kDisabled,
-            PartitionOptions::UseConfigurablePool::kNo,
+            .star_scan_quarantine = PartitionOptions::kAllowed,
         });
     allocator_->root()->UncapEmptySlotSpanMemoryForTesting();
     PartitionAllocGlobalInit(HandleOOM);
@@ -69,7 +63,7 @@ class MemoryReclaimerTest : public ::testing::Test {
   void Reclaim() { MemoryReclaimer::Instance()->ReclaimNormal(); }
 
   void AllocateAndFree() {
-    void* data = allocator_->root()->Alloc(1, "");
+    void* data = allocator_->root()->Alloc(1);
     allocator_->root()->Free(data);
   }
 
@@ -77,7 +71,7 @@ class MemoryReclaimerTest : public ::testing::Test {
 };
 
 TEST_F(MemoryReclaimerTest, FreesMemory) {
-  PartitionRoot<internal::ThreadSafe>* root = allocator_->root();
+  PartitionRoot* root = allocator_->root();
 
   size_t committed_initially = root->get_total_size_of_committed_pages();
   AllocateAndFree();
@@ -92,7 +86,7 @@ TEST_F(MemoryReclaimerTest, FreesMemory) {
 }
 
 TEST_F(MemoryReclaimerTest, Reclaim) {
-  PartitionRoot<internal::ThreadSafe>* root = allocator_->root();
+  PartitionRoot* root = allocator_->root();
   size_t committed_initially = root->get_total_size_of_committed_pages();
 
   {

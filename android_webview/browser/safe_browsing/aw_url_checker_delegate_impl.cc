@@ -17,6 +17,7 @@
 #include "android_webview/browser/safe_browsing/aw_safe_browsing_allowlist_manager.h"
 #include "android_webview/browser/safe_browsing/aw_safe_browsing_ui_manager.h"
 #include "android_webview/browser_jni_headers/AwSafeBrowsingConfigHelper_jni.h"
+#include "android_webview/browser_jni_headers/AwSafeBrowsingSafeModeAction_jni.h"
 #include "base/android/jni_android.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
@@ -114,12 +115,21 @@ bool AwUrlCheckerDelegateImpl::ShouldSkipRequestCheck(
     int render_process_id,
     int render_frame_id,
     bool originated_from_service_worker) {
+  JNIEnv* env = base::android::AttachCurrentThread();
+  if (Java_AwSafeBrowsingSafeModeAction_isSafeBrowsingDisabled(env)) {
+    return true;
+  }
+
   const content::GlobalRenderFrameHostId rfh_id(render_process_id,
                                                 render_frame_id);
 
   std::unique_ptr<AwContentsIoThreadClient> client;
   if (originated_from_service_worker) {
-    client = AwContentsIoThreadClient::GetServiceWorkerIoThreadClient();
+    if (!Java_AwSafeBrowsingConfigHelper_getSafeBrowsingEnabledByManifest(
+            env)) {
+      // Skip the check if safe browsing is disabled in the app's manifest.
+      return true;
+    }
   } else if (!rfh_id) {
     client = AwContentsIoThreadClient::FromID(frame_tree_node_id);
   } else {
@@ -145,8 +155,16 @@ bool AwUrlCheckerDelegateImpl::ShouldSkipRequestCheck(
   if (is_hardcoded_url)
     return false;
 
+  // Proceed with the request iff GMS is present, enabled, accessible to
+  // WebView and has minimum version to support safe browsing
+  if (base::FeatureList::IsEnabled(safe_browsing::kHashPrefixRealTimeLookups)) {
+    bool can_use_gms = Java_AwSafeBrowsingConfigHelper_canUseGms(env);
+    if (!can_use_gms) {
+      return true;
+    }
+  }
+
   // For other requests, follow user consent.
-  JNIEnv* env = base::android::AttachCurrentThread();
   bool safe_browsing_user_consent =
       Java_AwSafeBrowsingConfigHelper_getSafeBrowsingUserOptIn(env);
   return !safe_browsing_user_consent;

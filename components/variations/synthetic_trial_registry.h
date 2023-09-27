@@ -15,6 +15,7 @@
 #include "components/variations/synthetic_trials.h"
 
 namespace metrics {
+class MetricsService;
 class MetricsServiceAccessor;
 }  // namespace metrics
 
@@ -43,10 +44,10 @@ class COMPONENT_EXPORT(VARIATIONS) SyntheticTrialRegistry {
   ~SyntheticTrialRegistry();
 
   // Adds an observer to be notified when the synthetic trials list changes.
-  void AddSyntheticTrialObserver(SyntheticTrialObserver* observer);
+  void AddObserver(SyntheticTrialObserver* observer);
 
   // Removes an existing observer of synthetic trials list changes.
-  void RemoveSyntheticTrialObserver(SyntheticTrialObserver* observer);
+  void RemoveObserver(SyntheticTrialObserver* observer);
 
   // Specifies the mode of RegisterExternalExperiments() operation.
   enum OverrideMode {
@@ -78,6 +79,7 @@ class COMPONENT_EXPORT(VARIATIONS) SyntheticTrialRegistry {
                                    OverrideMode mode);
 
  private:
+  friend metrics::MetricsService;
   friend metrics::MetricsServiceAccessor;
   friend FieldTrialsProvider;
   friend FieldTrialsProviderTest;
@@ -88,6 +90,7 @@ class COMPONENT_EXPORT(VARIATIONS) SyntheticTrialRegistry {
   FRIEND_TEST_ALL_PREFIXES(SyntheticTrialRegistryTest,
                            GetSyntheticFieldTrialActiveGroups);
   FRIEND_TEST_ALL_PREFIXES(VariationsCrashKeysTest, BasicFunctionality);
+  FRIEND_TEST_ALL_PREFIXES(SyntheticTrialRegistryTest, NotifyObserver);
 
   // Registers a field trial name and group to be used to annotate UMA and UKM
   // reports with a particular Chrome configuration state.
@@ -127,7 +130,9 @@ class COMPONENT_EXPORT(VARIATIONS) SyntheticTrialRegistry {
       base::StringPiece suffix = "") const;
 
   // Notifies observers on a synthetic trial list change.
-  void NotifySyntheticTrialObservers();
+  void NotifySyntheticTrialObservers(
+      const std::vector<SyntheticTrialGroup>& trials_updated,
+      const std::vector<SyntheticTrialGroup>& trials_removed);
 
   // Whether the allowlist is enabled. Some configurations, like WebLayer
   // do not use the allowlist.

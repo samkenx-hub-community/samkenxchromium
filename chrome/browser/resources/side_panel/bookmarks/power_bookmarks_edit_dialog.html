@@ -9,7 +9,6 @@
   .body {
     display: flex;
     flex-direction: column;
-    gap: 8px;
   }
 
   .button-row {
@@ -29,15 +28,60 @@
     background-color: var(--cr-hover-background-color);
   }
 
+  :host-context([chrome-refresh-2023]) .folder-row:focus-visible {
+    outline-color: var(--cr-focus-outline-color);
+  }
+
   .folder-row[selected] {
-    background-color: var(--cr-active-background-color);
+    background-color: var(--google-blue-50);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .folder-row[selected] {
+      background-color: var(--google-blue-300);
+    }
+
+    .folder-row[selected] > .cr-icon {
+      background-color: var(--google-grey-900);
+    }
+
+    .folder-row[selected] > .folder-title {
+      color: var(--google-grey-900);
+    }
+
+    .folder-row[selected] > .subpage-arrow {
+      --cr-icon-button-fill-color: var(--google-grey-900);
+    }
+  }
+
+  :host-context([chrome-refresh-2023]) .folder-row[selected] {
+    background-color: var(
+        --color-side-panel-bookmarks-selected-folder-background);
+  }
+
+  :host-context([chrome-refresh-2023]) .folder-row[selected] > .cr-icon {
+    background-color: var(--color-side-panel-bookmarks-selected-folder-icon);
+  }
+
+  :host-context([chrome-refresh-2023]) .folder-row[selected] > .folder-title {
+    color: var(--color-side-panel-bookmarks-selected-folder-foreground);
+  }
+
+  :host-context([chrome-refresh-2023]) .folder-row[selected] > .subpage-arrow {
+    --cr-icon-button-fill-color: var(
+        --color-side-panel-bookmarks-selected-folder-icon);
   }
 
   .folder-selector {
     border: 1px solid var(--scrollable-border-color);
     border-radius: 2px;
     height: 160px;
+    margin-top: 8px;
     overflow: auto;
+  }
+
+  :host-context([chrome-refresh-2023]) .folder-selector {
+    border-color: var(--color-side-panel-dialog-divider);
   }
 
   .folder-title {
@@ -53,8 +97,15 @@
     white-space: nowrap;
   }
 
+  :host-context([chrome-refresh-2023]) .input-label {
+    font-size: 13px;
+    color: var(--cr-primary-text-color);
+  }
+
   .input-row {
+    align-items: baseline;
     display: grid;
+    gap: 4px;
     grid-template-columns: 52px auto;
   }
 
@@ -64,8 +115,16 @@
     gap: 8px;
   }
 
+  :host-context([chrome-refresh-2023]) .input-section {
+    margin-bottom: 16px;
+  }
+
   .name-input {
     --cr-input-error-display: none;
+  }
+
+  :host-context([chrome-refresh-2023]) .cr-icon {
+    --cr-icon-color: var(--cr-secondary-text-color);
   }
 </style>
 
@@ -84,11 +143,12 @@
         <cr-input class="sp-labelless-input" id="urlInput" type="url"
             value="[[getBookmarkUrl_(selectedBookmarks_.*)]]"
             error-message="$i18n{editInvalidUrl}"
-            aria-label="$i18n{editUrl}"></cr-input>
+            aria-label="$i18n{editUrl}" required></cr-input>
       </div>
     </div>
     <sp-heading hide-back-button="[[!activeFolderPath_.length]]"
-        back-button-label="[[getBackButtonLabel_(activeFolderPath_.*)]]"
+        back-button-title="$i18n{tooltipBack}"
+        back-button-aria-label="[[getBackButtonLabel_(activeFolderPath_.*)]]"
         on-back-button-click="onBack_">
       <h2 slot="heading">[[getActiveFolderTitle_(activeFolderPath_.*)]]</h2>
     </sp-heading>
@@ -98,6 +158,7 @@
                    newFolders_.*)]]">
         <template>
           <div class="folder-row"
+              title="[[item.title]]"
               selected$="[[isSelected_(item, selectedFolder_)]]"
               on-click="onFolderSelected_"
               tabindex="0">
@@ -105,9 +166,10 @@
             <div class="folder-title">
               [[item.title]]
             </div>
-            <template is="dom-if"
-                if="[[hasChildFolders_(item, newFolders_.*)]]" restamp>
+            <template is="dom-if" restamp
+                if="[[hasAvailableChildFolders_(item, newFolders_.*)]]">
               <cr-icon-button class="subpage-arrow"
+                  title="[[getForwardButtonTooltip_(item)]]"
                   aria-label="[[getForwardButtonLabel_(item)]]"
                   on-click="onForward_">
               </cr-icon-button>

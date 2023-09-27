@@ -13,8 +13,11 @@ import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
 
 import {EntryLocation} from '../../externs/entry_location.js';
 import {FakeEntry, FilesAppEntry} from '../../externs/files_app_entry_interfaces.js';
+import {State} from '../../externs/ts/state.js';
 import {VolumeInfo} from '../../externs/volume_info.js';
 import {VolumeManager} from '../../externs/volume_manager.js';
+import {constants} from '../../foreground/js/constants.js';
+import {getStore} from '../../state/store.js';
 
 import {promisify} from './api.js';
 import {createDOMError} from './dom_utils.js';
@@ -404,13 +407,21 @@ util.isComputersEntry = entry => {
 };
 
 /**
+ * Returns true if the given root type is Trash.
+ * @param {VolumeManagerCommon.RootType|null} rootType
+ * @returns {boolean}
+ */
+util.isTrashRootType = rootType => {
+  return rootType == VolumeManagerCommon.RootType.TRASH;
+};
+
+/**
  * Returns true if the given entry is the root folder of Trash.
  * @param {!Entry|!FilesAppEntry} entry Entry or a fake entry.
  * @returns {boolean}
  */
 util.isTrashRoot = entry => {
-  return entry.fullPath === '/' &&
-      entry.rootType == VolumeManagerCommon.RootType.TRASH;
+  return entry.fullPath === '/' && util.isTrashRootType(entry.rootType);
 };
 
 /**
@@ -419,8 +430,7 @@ util.isTrashRoot = entry => {
  * @returns {boolean}
  */
 util.isTrashEntry = entry => {
-  return entry.fullPath !== '/' &&
-      entry.rootType == VolumeManagerCommon.RootType.TRASH;
+  return entry.fullPath !== '/' && util.isTrashRootType(entry.rootType);
 };
 
 
@@ -1131,6 +1141,14 @@ util.isJellyEnabled = () => {
 };
 
 /**
+ * Returns true if the cros-components flag is enabled.
+ * @return {boolean}
+ */
+util.isCrosComponentsEnabled = () => {
+  return loadTimeData.getBoolean('CROS_COMPONENTS');
+};
+
+/**
  * Returns true if DriveFsMirroring flag is enabled.
  * @return {boolean}
  */
@@ -1138,14 +1156,6 @@ util.isMirrorSyncEnabled = () => {
   return loadTimeData.isInitialized() &&
       loadTimeData.valueExists('DRIVEFS_MIRRORING') &&
       loadTimeData.getBoolean('DRIVEFS_MIRRORING');
-};
-
-/**
- * Returns true if search v2 feature flag is enabled.
- * @return {boolean}
- */
-util.isSearchV2Enabled = () => {
-  return loadTimeData.getBoolean('FILES_SEARCH_V2');
 };
 
 util.isGoogleOneOfferFilesBannerEligibleAndEnabled = () => {
@@ -1159,15 +1169,6 @@ util.isGoogleOneOfferFilesBannerEligibleAndEnabled = () => {
  */
 util.isSinglePartitionFormatEnabled = () => {
   return loadTimeData.getBoolean('FILES_SINGLE_PARTITION_FORMAT_ENABLED');
-};
-
-/**
- * Returns true if FilesTrash feature flag is enabled.
- * @returns {boolean}
- */
-util.isTrashEnabled = () => {
-  return loadTimeData.valueExists('FILES_TRASH_ENABLED') &&
-      loadTimeData.getBoolean('FILES_TRASH_ENABLED');
 };
 
 /**
@@ -1529,14 +1530,122 @@ class UserCanceledError extends Error {}
 util.isNullOrUndefined = (value) => value === null || value === undefined;
 
 /**
+ * @param {string|undefined} providerId
+ * @return {boolean}
+ */
+util.isOneDriveId = (providerId) => providerId === constants.ODFS_EXTENSION_ID;
+
+/**
  * @param {?VolumeInfo} volumeInfo
  * @return {boolean}
  */
 util.isOneDrive = (volumeInfo) => {
-  if (volumeInfo?.providerId === 'ajdgmkbkgifbokednjgbmieaemeighkg') {
+  return util.isOneDriveId(volumeInfo?.providerId);
+};
+
+/**
+ * Returns the ODFS root as an Entry. Request the actions of this
+ * Entry to get ODFS metadata.
+ * @param {VolumeInfo} odfsVolumeInfo
+ * @return {Entry|FilesAppEntry}
+ */
+util.getODFSMetadataQueryEntry = (odfsVolumeInfo) => {
+  return util.unwrapEntry(odfsVolumeInfo.displayRoot);
+};
+
+/**
+ * Return true if the volume with |volumeInfo| is an
+ * interactive volume.
+ * @param {VolumeInfo} volumeInfo
+ * @return {boolean}
+ */
+util.isInteractiveVolume = (volumeInfo) => {
+  const state = /** @type {State} */ (getStore().getState());
+  const volumes = state.volumes;
+  if (!volumes) {
+    console.error('Expected volumes to exist in the store.');
     return true;
   }
+  const volume = volumes[volumeInfo.volumeId];
+  if (!volume) {
+    console.error('Expected volume to be in the store.');
+    return true;
+  }
+  return volume.isInteractive;
+};
+
+/**
+ * Bulk pinning should only show visible UI elements when in progress or
+ * continuing to sync.
+ * @param {chrome.fileManagerPrivate.BulkPinStage|undefined} stage
+ * @param {boolean|undefined} pref
+ * @returns {boolean}
+ */
+util.canBulkPinningCloudPanelShow = (stage, pref) => {
+  if (!util.isDriveFsBulkPinningEnabled()) {
+    return false;
+  }
+
+  const BulkPinStage = chrome.fileManagerPrivate.BulkPinStage;
+  // If the stage is in progress and the bulk pinning preference is enabled,
+  // then the cloud panel should not be visible.
+  if (pref &&
+      (stage === BulkPinStage.GETTING_FREE_SPACE ||
+       stage === BulkPinStage.LISTING_FILES ||
+       stage === BulkPinStage.SYNCING)) {
+    return true;
+  }
+
+  // For the PAUSED... states the preference should still be enabled, however,
+  // for the latter the preference will have been disabled.
+  if ((stage === BulkPinStage.PAUSED_OFFLINE && pref) ||
+      (stage === BulkPinStage.PAUSED_BATTERY_SAVER && pref) ||
+      stage === BulkPinStage.NOT_ENOUGH_SPACE) {
+    return true;
+  }
+
   return false;
+};
+
+/**
+ * Converts seconds into a time remaining string.
+ * @param {number} seconds
+ * @returns {string}
+ */
+util.secondsToRemainingTimeString = (seconds) => {
+  const locale = util.getCurrentLocaleOrDefault();
+  let minutes = Math.ceil(seconds / 60);
+  if (minutes <= 1) {
+    // Less than one minute. Display remaining time in seconds.
+    const formatter = new Intl.NumberFormat(
+        locale, {style: 'unit', unit: 'second', unitDisplay: 'long'});
+    return strf(
+        'TIME_REMAINING_ESTIMATE', formatter.format(Math.ceil(seconds)));
+  }
+
+  const minuteFormatter = new Intl.NumberFormat(
+      locale, {style: 'unit', unit: 'minute', unitDisplay: 'long'});
+
+  const hours = Math.floor(minutes / 60);
+  if (hours == 0) {
+    // Less than one hour. Display remaining time in minutes.
+    return strf('TIME_REMAINING_ESTIMATE', minuteFormatter.format(minutes));
+  }
+
+  minutes -= hours * 60;
+
+  const hourFormatter = new Intl.NumberFormat(
+      locale, {style: 'unit', unit: 'hour', unitDisplay: 'long'});
+
+  if (minutes == 0) {
+    // Hours but no minutes.
+    return strf('TIME_REMAINING_ESTIMATE', hourFormatter.format(hours));
+  }
+
+  // Hours and minutes.
+  return strf(
+      'TIME_REMAINING_ESTIMATE_2', hourFormatter.format(hours),
+      minuteFormatter.format(minutes));
 };
 
 export {util, UserCanceledError};

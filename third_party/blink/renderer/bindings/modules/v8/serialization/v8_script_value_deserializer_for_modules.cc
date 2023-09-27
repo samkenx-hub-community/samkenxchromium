@@ -643,7 +643,7 @@ CropTarget* V8ScriptValueDeserializerForModules::ReadCropTarget() {
   }
 
   String crop_id;
-  if (!ReadUTF8String(&crop_id)) {
+  if (!ReadUTF8String(&crop_id) || crop_id.empty()) {
     return nullptr;
   }
 
@@ -652,13 +652,6 @@ CropTarget* V8ScriptValueDeserializerForModules::ReadCropTarget() {
 
 MediaSourceHandleImpl*
 V8ScriptValueDeserializerForModules::ReadMediaSourceHandle() {
-  if (!RuntimeEnabledFeatures::MediaSourceInWorkersEnabled(
-          ExecutionContext::From(GetScriptState())) ||
-      !RuntimeEnabledFeatures::MediaSourceInWorkersUsingHandleEnabled(
-          ExecutionContext::From(GetScriptState()))) {
-    return nullptr;
-  }
-
   uint32_t index;
   if (!ReadUint32(&index))
     return nullptr;

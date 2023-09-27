@@ -4,11 +4,15 @@
 
 #include "chrome/browser/dips/dips_utils.h"
 
-#include "base/cxx17_backports.h"
+#include <algorithm>
+
 #include "base/strings/string_piece.h"
 #include "base/time/time.h"
 #include "chrome/browser/profiles/profile_selections.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/navigation_entry.h"
+#include "content/public/browser/web_contents.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "url/gurl.h"
 
@@ -63,50 +67,37 @@ std::ostream& operator<<(std::ostream& os, TimestampRange range) {
   return os << "[" << range->first << ", " << range->second << "]";
 }
 
-// CookieAccessType:
-base::StringPiece CookieAccessTypeToString(CookieAccessType type) {
+// SiteDataAccessType:
+
+base::StringPiece SiteDataAccessTypeToString(SiteDataAccessType type) {
   switch (type) {
-    case CookieAccessType::kUnknown:
+    case SiteDataAccessType::kUnknown:
       return "Unknown";
-    case CookieAccessType::kNone:
+    case SiteDataAccessType::kNone:
       return "None";
-    case CookieAccessType::kRead:
+    case SiteDataAccessType::kRead:
       return "Read";
-    case CookieAccessType::kWrite:
+    case SiteDataAccessType::kWrite:
       return "Write";
-    case CookieAccessType::kReadWrite:
+    case SiteDataAccessType::kReadWrite:
       return "ReadWrite";
   }
 }
 
-std::ostream& operator<<(std::ostream& os, CookieAccessType access_type) {
-  return os << CookieAccessTypeToString(access_type);
+std::ostream& operator<<(std::ostream& os, SiteDataAccessType access_type) {
+  return os << SiteDataAccessTypeToString(access_type);
 }
 
 // DIPSCookieMode:
-DIPSCookieMode GetDIPSCookieMode(bool is_otr, bool block_third_party_cookies) {
-  if (is_otr) {
-    if (block_third_party_cookies) {
-      return DIPSCookieMode::kOffTheRecord_Block3PC;
-    }
-    return DIPSCookieMode::kOffTheRecord;
-  }
-
-  if (block_third_party_cookies) {
-    return DIPSCookieMode::kBlock3PC;
-  }
-
-  return DIPSCookieMode::kStandard;
+DIPSCookieMode GetDIPSCookieMode(bool is_otr) {
+  return is_otr ? DIPSCookieMode::kOffTheRecord_Block3PC
+                : DIPSCookieMode::kBlock3PC;
 }
 
 base::StringPiece GetHistogramSuffix(DIPSCookieMode mode) {
   // Any changes here need to be reflected in DIPSCookieMode in
   // tools/metrics/histograms/metadata/others/histograms.xml
   switch (mode) {
-    case DIPSCookieMode::kStandard:
-      return ".Standard";
-    case DIPSCookieMode::kOffTheRecord:
-      return ".OffTheRecord";
     case DIPSCookieMode::kBlock3PC:
       return ".Block3PC";
     case DIPSCookieMode::kOffTheRecord_Block3PC:
@@ -118,10 +109,6 @@ base::StringPiece GetHistogramSuffix(DIPSCookieMode mode) {
 
 const char* DIPSCookieModeToString(DIPSCookieMode mode) {
   switch (mode) {
-    case DIPSCookieMode::kStandard:
-      return "Standard";
-    case DIPSCookieMode::kOffTheRecord:
-      return "OffTheRecord";
     case DIPSCookieMode::kBlock3PC:
       return "Block3PC";
     case DIPSCookieMode::kOffTheRecord_Block3PC:
@@ -161,11 +148,66 @@ std::ostream& operator<<(std::ostream& os, DIPSRedirectType type) {
 }
 
 int64_t BucketizeBounceDelay(base::TimeDelta delta) {
-  return base::clamp(delta.InSeconds(), INT64_C(0), INT64_C(10));
+  return std::clamp(delta.InSeconds(), INT64_C(0), INT64_C(10));
 }
 
 std::string GetSiteForDIPS(const GURL& url) {
   const auto domain = net::registry_controlled_domains::GetDomainAndRegistry(
       url, net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
   return domain.empty() ? url.host() : domain;
+}
+
+bool HasSameSiteIframe(content::WebContents* web_contents, const GURL& url) {
+  const auto popup_site = net::SiteForCookies::FromUrl(url);
+  bool found = false;
+
+  web_contents->GetPrimaryMainFrame()->ForEachRenderFrameHostWithAction(
+      [&](content::RenderFrameHost* frame) {
+        if (frame->IsInPrimaryMainFrame()) {
+          // Continue to look at children of the main frame.
+          return content::RenderFrameHost::FrameIterationAction::kContinue;
+        }
+
+        // Note: For future first-party checks, consider using schemeful site
+        // comparisons. More specs are moving to schemeful, although this is
+        // different from how cookie access is currently classified.
+        if (popup_site.IsFirstPartyWithSchemefulMode(
+                frame->GetLastCommittedURL(), /*compute_schemefully=*/false)) {
+          // We found a same-site iframe -- break out of the ForEach loop.
+          found = true;
+          return content::RenderFrameHost::FrameIterationAction::kStop;
+        }
+
+        // Not same-site, so skip children and go to the next sibling iframe.
+        return content::RenderFrameHost::FrameIterationAction::kSkipChildren;
+      });
+
+  return found;
+}
+
+bool DoesFirstPartyPrecedeThirdParty(content::WebContents* web_contents,
+                                     const GURL& first_party_url,
+                                     const GURL& third_party_url) {
+  if (web_contents == nullptr) {
+    return false;
+  }
+  content::NavigationController& nav_controller = web_contents->GetController();
+  const std::string first_party_site = GetSiteForDIPS(first_party_url);
+  const std::string third_party_site = GetSiteForDIPS(third_party_url);
+
+  bool third_party_started = false;
+  for (int ind = nav_controller.GetCurrentEntryIndex(); ind >= 0; ind--) {
+    std::string cur_site =
+        GetSiteForDIPS(nav_controller.GetEntryAtIndex(ind)->GetURL());
+
+    if (third_party_started && cur_site != third_party_site) {
+      return (cur_site == first_party_site);
+    }
+
+    if (cur_site == third_party_site) {
+      third_party_started = true;
+    }
+  }
+
+  return false;
 }

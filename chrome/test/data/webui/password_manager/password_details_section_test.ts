@@ -4,7 +4,7 @@
 
 import 'chrome://password-manager/password_manager.js';
 
-import {Page, PasswordDetailsCardElement, PasswordDetailsSectionElement, PasswordManagerImpl, Router} from 'chrome://password-manager/password_manager.js';
+import {Page, PasskeyDetailsCardElement, PasswordDetailsCardElement, PasswordDetailsSectionElement, PasswordManagerImpl, PasswordViewPageInteractions, Router, UrlParam} from 'chrome://password-manager/password_manager.js';
 import {assertArrayEquals, assertDeepEquals, assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 
@@ -59,6 +59,9 @@ suite('PasswordDetailsSectionTest', function() {
         document.createElement('password-details-section');
     document.body.appendChild(section);
     await passwordManager.whenCalled('getCredentialGroups');
+    assertEquals(
+        PasswordViewPageInteractions.CREDENTIAL_REQUESTED_BY_URL,
+        await passwordManager.whenCalled('recordPasswordViewInteraction'));
     assertArrayEquals(
         [0, 1], await passwordManager.whenCalled('requestCredentialsDetails'));
     await flushTasks();
@@ -125,12 +128,13 @@ suite('PasswordDetailsSectionTest', function() {
     assertEquals(Page.PASSWORDS, Router.getInstance().currentRoute.page);
   });
 
-  test('All password entries are displayed', async function() {
+  test('All credential entries are displayed', async function() {
     const group = createCredentialGroup({
       name: 'test.com',
       credentials: [
         createPasswordEntry({id: 0, username: 'test1'}),
         createPasswordEntry({id: 1, username: 'test2'}),
+        createPasswordEntry({isPasskey: true, id: 2, username: 'test3'}),
       ],
     });
     Router.getInstance().navigateTo(Page.PASSWORD_DETAILS, group);
@@ -139,14 +143,20 @@ suite('PasswordDetailsSectionTest', function() {
     document.body.appendChild(section);
     await flushTasks();
 
-    const entries =
+    const passwordEntries =
         section.shadowRoot!.querySelectorAll<PasswordDetailsCardElement>(
             'password-details-card');
-    assertTrue(!!entries.length);
-    assertEquals(entries.length, group.entries.length);
-    for (let index = 0; index < entries.length; ++index) {
-      assertDeepEquals(entries[index]!.password, group.entries[index]);
+    assertTrue(!!passwordEntries.length);
+    assertEquals(passwordEntries.length, 2);
+    for (let index = 0; index < passwordEntries.length; ++index) {
+      assertDeepEquals(passwordEntries[index]!.password, group.entries[index]);
     }
+
+    const passkeyEntries =
+        section.shadowRoot!.querySelectorAll<PasskeyDetailsCardElement>(
+            'passkey-details-card');
+    assertEquals(passkeyEntries.length, 1);
+    assertEquals(passkeyEntries[0]!.passkey, group.entries[2]);
   });
 
   test('Details section closes when password deleted', async function() {
@@ -318,6 +328,9 @@ suite('PasswordDetailsSectionTest', function() {
     assertTrue(!!passwordManager.listeners.passwordManagerAuthTimeoutListener);
 
     passwordManager.listeners.passwordManagerAuthTimeoutListener();
+    assertEquals(
+        PasswordViewPageInteractions.TIMED_OUT_IN_VIEW_PAGE,
+        await passwordManager.whenCalled('recordPasswordViewInteraction'));
     await flushTasks();
 
     // Assert that now Passwords page is shown.
@@ -362,4 +375,24 @@ suite('PasswordDetailsSectionTest', function() {
             'password-details-card');
     assertEquals(2, entries.length);
   });
+
+  test(
+      'Clicking back navigates to passwords section and keeps old query',
+      async function() {
+        const group = createCredentialGroup({name: 'test.com'});
+        const query = new URLSearchParams();
+        query.set(UrlParam.SEARCH_TERM, 'bar');
+        Router.getInstance().navigateTo(Page.PASSWORD_DETAILS, group, query);
+
+        const section: PasswordDetailsSectionElement =
+            document.createElement('password-details-section');
+        document.body.appendChild(section);
+        await flushTasks();
+
+        assertEquals(
+            Page.PASSWORD_DETAILS, Router.getInstance().currentRoute.page);
+        section.$.backButton.click();
+        assertEquals(Page.PASSWORDS, Router.getInstance().currentRoute.page);
+        assertEquals(query, Router.getInstance().currentRoute.queryParameters);
+      });
 });

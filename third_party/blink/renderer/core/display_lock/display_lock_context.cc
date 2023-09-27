@@ -145,7 +145,7 @@ void DisplayLockContext::SetRequestedState(EContentVisibility state,
       element_.Get());
 }
 
-scoped_refptr<const ComputedStyle> DisplayLockContext::AdjustElementStyle(
+const ComputedStyle* DisplayLockContext::AdjustElementStyle(
     const ComputedStyle* style) const {
   if (IsAlwaysVisible())
     return style;
@@ -352,7 +352,9 @@ bool DisplayLockContext::ShouldStyleChildren() const {
          forced_info_.is_forced(ForcedPhase::kStyleAndLayoutTree) ||
          (document_->GetDisplayLockDocumentState()
               .ActivatableDisplayLocksForced() &&
-          IsActivatable(DisplayLockActivationReason::kAny));
+          IsActivatable(DisplayLockActivationReason::kAny)) ||
+         (document_->ExistingAXObjectCache() &&
+          IsActivatable(DisplayLockActivationReason::kAccessibility));
 }
 
 void DisplayLockContext::DidStyleSelf() {
@@ -387,7 +389,11 @@ bool DisplayLockContext::ShouldLayoutChildren() const {
   return !is_locked_ || forced_info_.is_forced(ForcedPhase::kLayout) ||
          (document_->GetDisplayLockDocumentState()
               .ActivatableDisplayLocksForced() &&
-          IsActivatable(DisplayLockActivationReason::kAny));
+          IsActivatable(DisplayLockActivationReason::kAny)) ||
+         (document_->ExistingAXObjectCache() &&
+          document_->GetStyleEngine()
+              .StyleMaybeAffectedByLayoutForAccessibility() &&
+          IsActivatable(DisplayLockActivationReason::kAccessibility));
 }
 
 void DisplayLockContext::DidLayoutChildren() {
@@ -643,8 +649,8 @@ void DisplayLockContext::Unlock() {
     // can mark the dirty bits from the descendant top layer node up to this
     // display lock on the ancestor chain while we're in the middle of style
     // recalc. It seems plausible, but we have to be careful.
-    blocked_child_recalc_change_ = blocked_child_recalc_change_.EnsureAtLeast(
-        StyleRecalcChange::kRecalcDescendants);
+    blocked_child_recalc_change_ =
+        blocked_child_recalc_change_.ForceRecalcDescendants();
   }
 
   // We also need to notify the AX cache (if it exists) to update the childrens
@@ -725,6 +731,10 @@ bool DisplayLockContext::MarkForLayoutIfNeeded() {
     } scoped_force(this);
 
     auto* layout_object = element_->GetLayoutObject();
+
+    // Ensure any layout-type specific caches are dirty.
+    layout_object->SetGridPlacementDirty(true);
+
     if (child_layout_was_blocked_ || HasStashedScrollOffset()) {
       // We've previously blocked a child traversal when doing self-layout for
       // the locked element, so we're marking it with child-needs-layout so that
@@ -793,9 +803,7 @@ bool DisplayLockContext::MarkNeedsRepaintAndPaintArtifactCompositorUpdate() {
   DCHECK(ConnectedToView());
   if (auto* layout_object = element_->GetLayoutObject()) {
     layout_object->PaintingLayer()->SetNeedsRepaint();
-    document_->View()->SetPaintArtifactCompositorNeedsUpdate(
-        PaintArtifactCompositorUpdateReason::
-            kDisplayLockContextNeedsPaintArtifactCompositorUpdate);
+    document_->View()->SetPaintArtifactCompositorNeedsUpdate();
     return true;
   }
   return false;
@@ -1096,36 +1104,12 @@ bool DisplayLockContext::ForceUnlockIfNeeded() {
   if (ShouldForceUnlock()) {
     if (IsLocked()) {
       Unlock();
-      // If we forced unlocked, then there is a chance that layout containment
-      // doesn't actually apply to our element. This means that we may have
-      // continuations, for which the dirty bits also need to be propagated.
-      // This should be a rare case, so we just ensure that each of the
-      // continuations needs a layout. Note that it is insufficient to set that
-      // child needs layout, since that bit may have already been present and
-      // not have been propagated up the (continuation's) ancestor chain.
-      if (auto* object = element_->GetLayoutObject()) {
-        // Only LayoutInlines should have continuations.
-        DCHECK(!object->VirtualContinuation() || object->IsLayoutInline());
-        for (auto* continuation = object->VirtualContinuation(); continuation;
-             continuation = continuation->VirtualContinuation()) {
-          continuation->SetNeedsLayout(
-              layout_invalidation_reason::kDisplayLock);
-        }
-      }
       // If we forced unlock, then we need to prevent subsequent calls to
       // Lock() until the next frame.
       SetRequestedState(EContentVisibility::kVisible, g_null_atom);
     }
     return true;
   }
-  // Check that if we have containment and we don't need to force unlock above,
-  // then we don't have continuations. Note that if we need to rebuild a layout
-  // tree here, then the check may fail due to the fact that we currently have a
-  // continuation which will be removed. So we only run the test if we don't
-  // need to rebuild the layout tree.
-  DCHECK(element_->NeedsRebuildLayoutTree(WhitespaceAttacher()) ||
-         !element_->GetLayoutObject() ||
-         !element_->GetLayoutObject()->VirtualContinuation());
   return false;
 }
 

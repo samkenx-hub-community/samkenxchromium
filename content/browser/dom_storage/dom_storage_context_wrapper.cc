@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
@@ -299,12 +300,12 @@ bool DOMStorageContextWrapper::IsRequestValid(
     }
     switch (type) {
       case StorageType::kLocalStorage: {
-        host_storage_key_did_not_match = host->storage_key() != storage_key;
+        host_storage_key_did_not_match = host->GetStorageKey() != storage_key;
         break;
       }
       case StorageType::kSessionStorage: {
         host_storage_key_did_not_match =
-            host->frame_tree()->GetSessionStorageKey(host->storage_key()) !=
+            host->frame_tree()->GetSessionStorageKey(host->GetStorageKey()) !=
             storage_key;
         break;
       }
@@ -371,14 +372,14 @@ void DOMStorageContextWrapper::AddNamespace(
     const std::string& namespace_id,
     SessionStorageNamespaceImpl* session_namespace) {
   base::AutoLock lock(alive_namespaces_lock_);
-  DCHECK(alive_namespaces_.find(namespace_id) == alive_namespaces_.end());
+  DCHECK(!base::Contains(alive_namespaces_, namespace_id));
   alive_namespaces_[namespace_id] = session_namespace;
 }
 
 void DOMStorageContextWrapper::RemoveNamespace(
     const std::string& namespace_id) {
   base::AutoLock lock(alive_namespaces_lock_);
-  DCHECK(alive_namespaces_.find(namespace_id) != alive_namespaces_.end());
+  DCHECK(base::Contains(alive_namespaces_, namespace_id));
   alive_namespaces_.erase(namespace_id);
 }
 

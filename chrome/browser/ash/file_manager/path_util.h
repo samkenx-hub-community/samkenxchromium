@@ -17,6 +17,15 @@
 class GURL;
 class Profile;
 
+namespace base {
+class Pickle;
+}  // namespace base
+
+namespace ui {
+class DataTransferEndpoint;
+struct FileInfo;
+}  // namespace ui
+
 namespace file_manager {
 namespace util {
 
@@ -139,12 +148,6 @@ base::FilePath GetCrostiniMountDirectory(Profile* profile);
 // The actual directory the Guest OS with `mountPointName` is mounted in.
 base::FilePath GetGuestOsMountDirectory(std::string mountPointName);
 
-// The sshfs mount options for crostini "Linux files" mount.
-std::vector<std::string> GetCrostiniMountOptions(
-    const std::string& hostname,
-    const std::string& host_private_key,
-    const std::string& container_public_key);
-
 // Convert a cracked |file_system_url| to a path inside a VM mounted at
 // |vm_mount| (e.g. /mnt/chromeos). If |map_crostini_home| is set, paths under
 // GetCrostiniMountDirectory() are translated to be under the user's home
@@ -242,6 +245,12 @@ absl::optional<base::FilePath> GetDisplayablePath(Profile* profile,
 absl::optional<base::FilePath> GetDisplayablePath(
     Profile* profile,
     storage::FileSystemURL file_url);
+
+// Reads pickle for FilesApp fs/sources with newline-separated filesystem
+// URLs. Validates that |source| is FilesApp.
+std::vector<ui::FileInfo> ParseFileSystemSources(
+    const ui::DataTransferEndpoint* source,
+    const base::Pickle& pickle);
 
 }  // namespace util
 }  // namespace file_manager

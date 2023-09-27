@@ -35,10 +35,6 @@ class TestFCMSyncNetworkChannel : public FCMSyncNetworkChannel {
   void StartListening() override {}
   void StopListening() override {}
 
-  void RequestDetailedStatus(
-      const base::RepeatingCallback<void(base::Value::Dict)>& callback)
-      override {}
-
   using FCMSyncNetworkChannel::DeliverIncomingMessage;
   using FCMSyncNetworkChannel::DeliverToken;
   using FCMSyncNetworkChannel::NotifyChannelStateChange;
@@ -124,8 +120,7 @@ class MockSubscriptionManager : public PerUserTopicSubscriptionManager {
       : PerUserTopicSubscriptionManager(nullptr /* identity_provider */,
                                         nullptr /* pref_service */,
                                         nullptr /* loader_factory */,
-                                        "fake_sender_id",
-                                        false) {
+                                        "fake_sender_id") {
     ON_CALL(*this, LookupSubscribedPublicTopicByPrivateTopic)
         .WillByDefault(testing::ReturnArg<0>());
   }
@@ -211,8 +206,9 @@ class FCMInvalidationListenerTest : public testing::Test {
  private:
   base::test::SingleThreadTaskEnvironment task_environment_;
   data_decoder::test::InProcessDataDecoder in_process_data_decoder_;
-  raw_ptr<TestFCMSyncNetworkChannel> fcm_sync_network_channel_;
-  raw_ptr<MockSubscriptionManager> subscription_manager_;
+  raw_ptr<TestFCMSyncNetworkChannel, DanglingUntriaged>
+      fcm_sync_network_channel_;
+  raw_ptr<MockSubscriptionManager, DanglingUntriaged> subscription_manager_;
 
  protected:
   // Tests need to access these directly.

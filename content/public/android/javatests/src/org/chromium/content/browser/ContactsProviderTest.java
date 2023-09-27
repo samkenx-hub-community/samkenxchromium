@@ -4,8 +4,7 @@
 
 package org.chromium.content.browser;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 
 import org.hamcrest.Matchers;
@@ -16,7 +15,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.test.BaseJUnit4ClassRunner;
+import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
@@ -25,6 +24,7 @@ import org.chromium.base.test.util.CriteriaNotSatisfiedException;
 import org.chromium.content_public.browser.ContactsPicker;
 import org.chromium.content_public.browser.ContactsPickerListener;
 import org.chromium.content_public.browser.RenderFrameHost;
+import org.chromium.content_public.browser.test.ContentJUnit4ClassRunner;
 import org.chromium.content_public.browser.test.RenderFrameHostTestExt;
 import org.chromium.content_public.browser.test.util.FencedFrameUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
@@ -41,9 +41,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Tests contacts Web API functionality.
+ * Tests Contacts Web API functionality.
  */
-@RunWith(BaseJUnit4ClassRunner.class)
+@RunWith(ContentJUnit4ClassRunner.class)
+@Batch(Batch.PER_CLASS)
 public class ContactsProviderTest {
     private static final String TEST_URL = "/content/test/data/android/title1.html";
     private static final String FENCED_FRAME_URL =
@@ -138,7 +139,8 @@ public class ContactsProviderTest {
                         listener.onContactsPickerUserAction(
                                 ContactsPickerListener.ContactsPickerAction.CONTACTS_SELECTED,
                                 contacts,
-                                /*percentageShared=*/0, /*propertiesRequested=*/0);
+                                /*percentageShared=*/0, /*propertiesSiteRequested=*/0,
+                                /*propertiesUserRejected=*/0);
                         return true;
                     });
         });
@@ -170,7 +172,8 @@ public class ContactsProviderTest {
      */
     @Test
     @SmallTest
-    @CommandLineFlags.Add({"enable-features=FencedFrames<Study,PrivacySandboxAdsAPIsOverride",
+    @CommandLineFlags.
+    Add({"enable-features=FencedFrames<Study,PrivacySandboxAdsAPIsOverride,FencedFramesAPIChanges,FencedFramesDefaultMode",
             "force-fieldtrials=Study/Group",
             "force-fieldtrial-params=Study.Group:implementation_type/mparch"})
     public void

@@ -18,13 +18,13 @@
 #include "base/values.h"
 #include "chrome/browser/ash/app_mode/kiosk_app_manager.h"
 #include "chrome/browser/ash/login/ui/login_display_host_webui.h"
-#include "chrome/browser/ash/login/ui/login_display_webui.h"
 #include "chrome/browser/ash/login/ui/web_contents_forced_title.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/lifetime/termination_notification.h"
 #include "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h"
 #include "chrome/browser/password_manager/chrome_password_manager_client.h"
 #include "chrome/browser/renderer_preferences_util.h"
+#include "chrome/browser/safe_browsing/chrome_password_reuse_detection_manager_client.h"
 #include "chrome/browser/sessions/session_tab_helper_factory.h"
 #include "chrome/browser/ui/ash/login_screen_client_impl.h"
 #include "chrome/browser/ui/ash/system_tray_client_impl.h"
@@ -155,9 +155,11 @@ void WebUILoginView::InitializeWebView(views::WebView* web_view,
   CreateSessionServiceTabHelper(web_contents);
 
   // Create the password manager that is needed for the proxy.
-  ChromePasswordManagerClient::CreateForWebContentsWithAutofillClient(
-      web_contents,
-      autofill::ContentAutofillClient::FromWebContents(web_contents));
+  autofill::ChromeAutofillClient::CreateForWebContents(web_contents);
+  ChromePasswordManagerClient::CreateForWebContents(web_contents);
+
+  // Create the password reuse detection manager.
+  ChromePasswordReuseDetectionManagerClient::CreateForWebContents(web_contents);
 
   // LoginHandlerViews uses a constrained window for the password manager view.
   WebContentsModalDialogManager::CreateForWebContents(web_contents);
@@ -262,7 +264,7 @@ void WebUILoginView::SetStatusAreaVisible(bool visible) {
   SystemTrayClientImpl::Get()->SetPrimaryTrayVisible(visible);
 }
 
-void WebUILoginView::SetUIEnabled(bool enabled) {
+void WebUILoginView::SetKeyboardEventsAndSystemTrayEnabled(bool enabled) {
   forward_keyboard_event_ = enabled;
 
   SystemTrayClientImpl::Get()->SetPrimaryTrayEnabled(enabled);
@@ -298,11 +300,6 @@ void WebUILoginView::OnAppTerminating() {
     LoginScreenClientImpl::Get()->RemoveSystemTrayObserver(this);
     observing_system_tray_focus_ = false;
   }
-}
-
-void WebUILoginView::OnNetworkErrorScreenShown() {
-  OnLoginPromptVisible();
-  session_observation_.Reset();
 }
 
 void WebUILoginView::OnLoginOrLockScreenVisible() {

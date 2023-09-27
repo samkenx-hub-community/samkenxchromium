@@ -128,6 +128,11 @@ export class SiteDetailsElement extends SiteDetailsElementBase {
             loadTimeData.getBoolean('enableWebBluetoothNewPermissionsBackend'),
       },
 
+      autoPictureInPictureEnabled_: {
+        type: Boolean,
+        value: () => loadTimeData.getBoolean('autoPictureInPictureEnabled'),
+      },
+
       isPrivacySandboxSettings4_: {
         type: Boolean,
         value() {
@@ -156,6 +161,7 @@ export class SiteDetailsElement extends SiteDetailsElementBase {
   private fpsEnterprisePref_: chrome.settingsPrivate.PrefObject;
   private enableExperimentalWebPlatformFeatures_: boolean;
   private enableWebBluetoothNewPermissionsBackend_: boolean;
+  private autoPictureInPictureEnabled_: boolean;
   private websiteUsageProxy_: WebsiteUsageBrowserProxy =
       WebsiteUsageBrowserProxyImpl.getInstance();
 
@@ -282,17 +288,7 @@ export class SiteDetailsElement extends SiteDetailsElementBase {
           // The displayName won't change, so just use the first
           // exception.
           assert(exceptionList.length > 0);
-          this.pageTitle = exceptionList[0].isolatedWebAppName ??
-              this.originRepresentation(exceptionList[0].displayName);
-
-          // If the origin is an extension origin, use the extension name if
-          // available.
-          if (exceptionList[0].extensionNameWithId !== undefined) {
-            const url = this.toUrl(exceptionList[0].origin);
-            if (url !== null && url.protocol === 'chrome-extension:') {
-              this.pageTitle = exceptionList[0].extensionNameWithId;
-            }
-          }
+          this.pageTitle = exceptionList[0].displayName;
         });
   }
 

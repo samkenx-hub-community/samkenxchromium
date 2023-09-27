@@ -7,13 +7,13 @@ import("//build/config/ios/asset_catalog.gni")
 import("//build/config/ios/ios_sdk.gni")
 
 source_set("confirmation_alert") {
-  configs += [ "//build/config/compiler:enable_arc" ]
   sources = [
     "confirmation_alert_action_handler.h",
     "confirmation_alert_view_controller.h",
     "confirmation_alert_view_controller.mm",
   ]
   deps = [
+    ":constants",
     "//base",
     "//ios/chrome/common:button_config",
     "//ios/chrome/common/ui/colors",
@@ -23,4 +23,12 @@ source_set("confirmation_alert") {
     "//ios/chrome/common/ui/util:dynamic_type_util",
   ]
   frameworks = [ "UIKit.framework" ]
+}
+
+source_set("constants") {
+  sources = [
+    "constants.h",
+    "constants.mm",
+  ]
+  frameworks = [ "Foundation.framework" ]
 }

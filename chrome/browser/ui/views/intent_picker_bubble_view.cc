@@ -61,6 +61,7 @@
 #include "ui/views/layout/table_layout.h"
 #include "ui/views/layout/table_layout_view.h"
 #include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 #include "ui/views/view_class_properties.h"
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -347,8 +348,9 @@ class IntentPickerLabelButton : public views::LabelButton {
         provider->GetDistanceMetric(DISTANCE_CONTENT_LIST_VERTICAL_MULTI),
         provider->GetInsetsMetric(views::INSETS_DIALOG).left())));
     views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
-    views::InkDrop::Get(this)->SetBaseColorId(views::style::GetColorId(
-        views::style::CONTEXT_BUTTON, views::style::STYLE_SECONDARY));
+    views::InkDrop::Get(this)->SetBaseColorId(
+        views::TypographyProvider::Get().GetColorId(
+            views::style::CONTEXT_BUTTON, views::style::STYLE_SECONDARY));
   }
   IntentPickerLabelButton(const IntentPickerLabelButton&) = delete;
   IntentPickerLabelButton& operator=(const IntentPickerLabelButton&) = delete;
@@ -395,10 +397,7 @@ class IntentPickerAppListView
     DCHECK(!contents()->children().empty());
     const int row_height =
         contents()->children().front()->GetPreferredSize().height();
-    // TODO(djacobo): Replace this limit to correctly reflect the UI mocks,
-    // which now instead of limiting the results to 3.5 will allow whatever fits
-    // in 256pt. Using |kMaxAppResults| as a measure of how many apps we want to
-    // show.
+    // Use |kMaxAppResults| as a measure of how many apps we want to show.
     ClipHeightTo(row_height, (apps::kMaxAppResults + 0.5) * row_height);
   }
 

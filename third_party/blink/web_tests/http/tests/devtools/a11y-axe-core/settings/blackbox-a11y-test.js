@@ -1,11 +1,13 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
+// Copyright 2019 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+import {TestRunner} from 'test_runner';
+import {AxeCoreTestRunner} from 'axe_core_test_runner';
 
 (async function() {
   TestRunner.addResult('Tests accessibility in IgnoreList view using the axe-core linter.');
 
-  await TestRunner.loadTestModule('axe_core_test_runner');
   await UI.viewManager.showView('blackbox');
   const ignoreListWidget = await UI.viewManager.view('blackbox').widget();
 
@@ -29,8 +31,8 @@
   async function testPatternError() {
     const ignoreListEditor = ignoreListWidget.list.editor;
     const patternInput = ignoreListEditor.controls[0];
-    // Blur patternInput to run validator
-    patternInput.blur();
+    // Send input event to patternInput to run validator
+    patternInput.dispatchEvent(new Event('input'));
 
     const errorMessage = ignoreListEditor.errorMessageContainer.textContent;
     TestRunner.addResult(`Error message: ${errorMessage}`);

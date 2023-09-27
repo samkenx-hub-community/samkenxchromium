@@ -7,9 +7,11 @@
  * extension under test at runtime to populate testing functionality.
  */
 
+import './test_util.js';
+
 import {assert} from 'chrome://resources/ash/common/assert.js';
 
-import {metrics} from '../../common/js/metrics.js';
+import {recordEnum} from '../../common/js/metrics.js';
 import {util} from '../../common/js/util.js';
 import {VolumeManagerCommon} from '../../common/js/volume_manager_types.js';
 import {FileManagerBaseInterface} from '../../externs/background/file_manager_base.js';
@@ -81,6 +83,7 @@ function extractElementInfo(element, contentWindow, opt_styleNames) {
   const result = {
     attributes: attributes,
     text: element.textContent,
+    innerText: element.innerText,
     value: element.value,
     // The hidden attribute is not in the element.attributes even if
     // element.hasAttribute('hidden') is true.
@@ -285,6 +288,35 @@ test.util.sync.deepGetActiveElement = (contentWindow, opt_styleNames) => {
   }
 
   return extractElementInfo(activeElement, contentWindow, opt_styleNames);
+};
+
+/**
+ * Gets an array of every activeElement, walking down the shadowRoot of every
+ * active element it finds.
+ *
+ * @param {Window} contentWindow Window to be tested.
+ * @param {Array<string>=} opt_styleNames List of CSS property name to be
+ *     obtained.
+ * @return {Array<ElementObject>} Element information that contains contentText,
+ *     attribute names and values, hidden attribute, and style names and values.
+ *     If there is no active element, returns an empty array.
+ */
+test.util.sync.deepGetActivePath = (contentWindow, opt_styleNames) => {
+  if (!contentWindow.document || !contentWindow.document.activeElement) {
+    return [];
+  }
+
+  const path = [contentWindow.document.activeElement];
+  while (true) {
+    const shadow = path[path.length - 1].shadowRoot;
+    if (shadow && shadow.activeElement) {
+      path.push(shadow.activeElement);
+    } else {
+      break;
+    }
+  }
+
+  return path.map(el => extractElementInfo(el, contentWindow, opt_styleNames));
 };
 
 /**
@@ -1029,7 +1061,7 @@ test.util.executeTestMessage = (request, sendResponse) => {
   }
   // Prepare arguments.
   if (!('args' in request)) {
-    throw new Error('Invalid request.');
+    throw new Error('Invalid request: no args provided.');
   }
 
   const args = request.args.slice();  // shallow copy
@@ -1160,7 +1192,7 @@ test.util.sync.setPreferences = preferences => {
  *
  */
 test.util.sync.recordEnumMetric = (name, value, validValues) => {
-  metrics.recordEnum(name, value, validValues);
+  recordEnum(name, value, validValues);
   return true;
 };
 

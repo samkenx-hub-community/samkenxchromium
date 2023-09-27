@@ -7,6 +7,7 @@
 
 #include <memory>
 
+#include "base/gtest_prod_util.h"
 #include "base/memory/weak_ptr.h"
 #include "base/thread_annotations.h"
 #include "base/threading/sequence_bound.h"
@@ -28,11 +29,14 @@ class CpuProbeMac : public CpuProbe {
   CpuProbeMac(const CpuProbeMac&) = delete;
   CpuProbeMac& operator=(const CpuProbeMac&) = delete;
 
- private:
-  class BlockingTaskRunnerHelper;
-
+ protected:
   CpuProbeMac(base::TimeDelta,
               base::RepeatingCallback<void(mojom::PressureState)>);
+
+ private:
+  FRIEND_TEST_ALL_PREFIXES(CpuProbeMacTest, ProductionDataNoCrash);
+
+  class BlockingTaskRunnerHelper;
 
   // CpuProbe implementation.
   void Update() override;

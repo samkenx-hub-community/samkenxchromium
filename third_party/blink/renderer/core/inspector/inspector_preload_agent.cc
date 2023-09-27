@@ -13,8 +13,6 @@
 
 namespace blink {
 
-using protocol::Response;
-
 namespace {
 
 absl::optional<protocol::Preload::RuleSetErrorType> GetProtocolRuleSetErrorType(
@@ -37,23 +35,6 @@ String GetProtocolRuleSetErrorMessage(const SpeculationRuleSet& rule_set) {
     case SpeculationRuleSetErrorType::kInvalidRulesSkipped:
       return rule_set.error_message();
   }
-}
-
-std::unique_ptr<protocol::Preload::RuleSet> BuildProtocolRuleSet(
-    const SpeculationRuleSet& rule_set,
-    const String& loader_id) {
-  auto builder = protocol::Preload::RuleSet::create()
-                     .setId(rule_set.InspectorId())
-                     .setLoaderId(loader_id)
-                     .setSourceText(rule_set.source()->GetSourceText())
-                     .build();
-
-  if (auto error_type = GetProtocolRuleSetErrorType(rule_set.error_type())) {
-    builder->setErrorType(error_type.value());
-    builder->setErrorMessage(GetProtocolRuleSetErrorMessage(rule_set));
-  }
-
-  return builder;
 }
 
 // Struct to represent a unique preloading attempt (corresponds to
@@ -161,7 +142,7 @@ BuildProtocolPreloadingAttemptSource(
     }
     if (HTMLAnchorElement* anchor = candidate->anchor();
         anchor && unique_anchors.insert(anchor).is_new_entry) {
-      node_ids->push_back(DOMNodeIds::IdForNode(anchor));
+      node_ids->push_back(anchor->GetDomNodeId());
     }
   }
   return protocol::Preload::PreloadingAttemptSource::create()
@@ -172,6 +153,45 @@ BuildProtocolPreloadingAttemptSource(
 }
 
 }  // namespace
+
+namespace internal {
+
+std::unique_ptr<protocol::Preload::RuleSet> BuildProtocolRuleSet(
+    const SpeculationRuleSet& rule_set,
+    const String& loader_id) {
+  auto builder = protocol::Preload::RuleSet::create()
+                     .setId(rule_set.InspectorId())
+                     .setLoaderId(loader_id)
+                     .setSourceText(rule_set.source()->GetSourceText())
+                     .build();
+
+  auto* source = rule_set.source();
+  auto node_id = source->GetNodeId();
+  auto url = source->GetSourceURL();
+  auto request_id = source->GetRequestId();
+  // Ensured by SpeculationRuleSet's ctor.
+  CHECK_NE(node_id.has_value(), url.has_value() && request_id.has_value());
+  if (node_id.has_value()) {
+    builder->setBackendNodeId(node_id.value());
+  } else {
+    builder->setUrl(url.value());
+
+    String request_id_string =
+        IdentifiersFactory::SubresourceRequestId(request_id.value());
+    if (!request_id_string.IsNull()) {
+      builder->setRequestId(request_id_string);
+    }
+  }
+
+  if (auto error_type = GetProtocolRuleSetErrorType(rule_set.error_type())) {
+    builder->setErrorType(error_type.value());
+    builder->setErrorMessage(GetProtocolRuleSetErrorMessage(rule_set));
+  }
+
+  return builder;
+}
+
+}  // namespace internal
 
 InspectorPreloadAgent::InspectorPreloadAgent()
     : enabled_(&agent_state_, /*default_value=*/false) {}
@@ -192,7 +212,8 @@ void InspectorPreloadAgent::DidAddSpeculationRuleSet(
   }
 
   String loader_id = IdentifiersFactory::LoaderId(document.Loader());
-  GetFrontend()->ruleSetUpdated(BuildProtocolRuleSet(rule_set, loader_id));
+  GetFrontend()->ruleSetUpdated(
+      internal::BuildProtocolRuleSet(rule_set, loader_id));
 }
 
 void InspectorPreloadAgent::DidRemoveSpeculationRuleSet(
@@ -246,13 +267,13 @@ void InspectorPreloadAgent::SpeculationCandidatesUpdated(
 
 protocol::Response InspectorPreloadAgent::enable() {
   EnableInternal();
-  return Response::Success();
+  return protocol::Response::Success();
 }
 
 protocol::Response InspectorPreloadAgent::disable() {
   enabled_.Clear();
   instrumenting_agents_->RemoveInspectorPreloadAgent(this);
-  return Response::Success();
+  return protocol::Response::Success();
 }
 
 void InspectorPreloadAgent::EnableInternal() {

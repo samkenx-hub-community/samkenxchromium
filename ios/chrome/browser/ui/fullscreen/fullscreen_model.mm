@@ -9,10 +9,7 @@
 #import "base/check_op.h"
 #import "ios/chrome/browser/ui/fullscreen/fullscreen_model_observer.h"
 #import "ios/chrome/common/ui/util/ui_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "ios/web/common/features.h"
 
 namespace {
 // Object that increments `counter` by 1 for its lifetime.
@@ -30,6 +27,14 @@ class ScopedIncrementer {
 
 FullscreenModel::FullscreenModel() = default;
 FullscreenModel::~FullscreenModel() = default;
+
+void FullscreenModel::AddObserver(FullscreenModelObserver* observer) {
+  observers_.AddObserver(observer);
+}
+
+void FullscreenModel::RemoveObserver(FullscreenModelObserver* observer) {
+  observers_.RemoveObserver(observer);
+}
 
 void FullscreenModel::IncrementDisabledCounter() {
   if (++disabled_counter_ == 1U) {
@@ -52,6 +57,10 @@ void FullscreenModel::DecrementDisabledCounter() {
       observer.FullscreenModelEnabledStateChanged(this);
     }
   }
+}
+
+void FullscreenModel::ForceEnterFullscreen() {
+  SetProgress(0.0);
 }
 
 void FullscreenModel::ResetForNavigation() {
@@ -78,11 +87,12 @@ void FullscreenModel::AnimationEndedWithProgress(CGFloat progress) {
   progress_ = progress;
 }
 
-void FullscreenModel::SetCollapsedToolbarHeight(CGFloat height) {
-  if (AreCGFloatsEqual(GetCollapsedToolbarHeight(), height))
+void FullscreenModel::SetCollapsedTopToolbarHeight(CGFloat height) {
+  if (AreCGFloatsEqual(GetCollapsedTopToolbarHeight(), height)) {
     return;
+  }
   DCHECK_GE(height, 0.0);
-  collapsed_toolbar_height_ = height;
+  collapsed_top_toolbar_height_ = height;
   base_offset_ = NAN;
   ScopedIncrementer toolbar_height_incrementer(&observer_callback_count_);
   for (auto& observer : observers_) {
@@ -90,15 +100,16 @@ void FullscreenModel::SetCollapsedToolbarHeight(CGFloat height) {
   }
 }
 
-CGFloat FullscreenModel::GetCollapsedToolbarHeight() const {
-  return GetFreezeToolbarHeight() ? 0 : collapsed_toolbar_height_;
+CGFloat FullscreenModel::GetCollapsedTopToolbarHeight() const {
+  return GetFreezeToolbarHeight() ? 0 : collapsed_top_toolbar_height_;
 }
 
-void FullscreenModel::SetExpandedToolbarHeight(CGFloat height) {
-  if (AreCGFloatsEqual(GetExpandedToolbarHeight(), height))
+void FullscreenModel::SetExpandedTopToolbarHeight(CGFloat height) {
+  if (AreCGFloatsEqual(GetExpandedTopToolbarHeight(), height)) {
     return;
+  }
   DCHECK_GE(height, 0.0);
-  expanded_toolbar_height_ = height;
+  expanded_top_toolbar_height_ = height;
   base_offset_ = NAN;
   ScopedIncrementer toolbar_height_incrementer(&observer_callback_count_);
   for (auto& observer : observers_) {
@@ -106,15 +117,16 @@ void FullscreenModel::SetExpandedToolbarHeight(CGFloat height) {
   }
 }
 
-CGFloat FullscreenModel::GetExpandedToolbarHeight() const {
-  return GetFreezeToolbarHeight() ? 0 : expanded_toolbar_height_;
+CGFloat FullscreenModel::GetExpandedTopToolbarHeight() const {
+  return GetFreezeToolbarHeight() ? 0 : expanded_top_toolbar_height_;
 }
 
-void FullscreenModel::SetBottomToolbarHeight(CGFloat height) {
-  if (AreCGFloatsEqual(bottom_toolbar_height_, height))
+void FullscreenModel::SetExpandedBottomToolbarHeight(CGFloat height) {
+  if (AreCGFloatsEqual(expanded_bottom_toolbar_height_, height)) {
     return;
+  }
   DCHECK_GE(height, 0.0);
-  bottom_toolbar_height_ = height;
+  expanded_bottom_toolbar_height_ = height;
   base_offset_ = NAN;
   ScopedIncrementer toolbar_height_incrementer(&observer_callback_count_);
   for (auto& observer : observers_) {
@@ -122,8 +134,25 @@ void FullscreenModel::SetBottomToolbarHeight(CGFloat height) {
   }
 }
 
-CGFloat FullscreenModel::GetBottomToolbarHeight() const {
-  return bottom_toolbar_height_;
+CGFloat FullscreenModel::GetExpandedBottomToolbarHeight() const {
+  return expanded_bottom_toolbar_height_;
+}
+
+void FullscreenModel::SetCollapsedBottomToolbarHeight(CGFloat height) {
+  if (AreCGFloatsEqual(collapsed_bottom_toolbar_height_, height)) {
+    return;
+  }
+  DCHECK_GE(height, 0.0);
+  collapsed_bottom_toolbar_height_ = height;
+  base_offset_ = NAN;
+  ScopedIncrementer toolbar_height_incrementer(&observer_callback_count_);
+  for (auto& observer : observers_) {
+    observer.FullscreenModelToolbarHeightsUpdated(this);
+  }
+}
+
+CGFloat FullscreenModel::GetCollapsedBottomToolbarHeight() const {
+  return collapsed_bottom_toolbar_height_;
 }
 
 void FullscreenModel::SetScrollViewHeight(CGFloat scroll_view_height) {
@@ -325,7 +354,8 @@ void FullscreenModel::UpdateDisabledCounterForContentHeight() {
     // When Smooth Scrolling is disabled, the scroll view can sometimes be
     // resized to account for the viewport insets after the page has been
     // rendered, so account for the maximum toolbar insets in the threshold.
-    disabling_threshold += GetExpandedToolbarHeight() + bottom_toolbar_height_;
+    disabling_threshold +=
+        GetExpandedTopToolbarHeight() + GetExpandedBottomToolbarHeight();
   } else {
     // After reloads, pages whose viewports fit the screen are sometimes resized
     // to account for the safe area insets.  Adding these to the threshold helps
@@ -364,6 +394,7 @@ void FullscreenModel::SetProgress(CGFloat progress) {
 }
 
 void FullscreenModel::OnScrollViewSizeBroadcasted(CGSize scroll_view_size) {
+  CHECK(base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault));
   SetScrollViewHeight(scroll_view_size.height);
 }
 
@@ -373,33 +404,43 @@ void FullscreenModel::OnScrollViewContentSizeBroadcasted(CGSize content_size) {
 
 void FullscreenModel::OnScrollViewContentInsetBroadcasted(
     UIEdgeInsets content_inset) {
+  CHECK(base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault));
   SetTopContentInset(content_inset.top);
 }
 
 void FullscreenModel::OnContentScrollOffsetBroadcasted(CGFloat offset) {
+  CHECK(base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault));
   SetYContentOffset(offset);
 }
 
 void FullscreenModel::OnScrollViewIsScrollingBroadcasted(bool scrolling) {
+  CHECK(base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault));
   SetScrollViewIsScrolling(scrolling);
 }
 
 void FullscreenModel::OnScrollViewIsZoomingBroadcasted(bool zooming) {
+  CHECK(base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault));
   SetScrollViewIsZooming(zooming);
 }
 
 void FullscreenModel::OnScrollViewIsDraggingBroadcasted(bool dragging) {
+  CHECK(base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault));
   SetScrollViewIsDragging(dragging);
 }
 
-void FullscreenModel::OnCollapsedToolbarHeightBroadcasted(CGFloat height) {
-  SetCollapsedToolbarHeight(height);
+void FullscreenModel::OnCollapsedTopToolbarHeightBroadcasted(CGFloat height) {
+  SetCollapsedTopToolbarHeight(height);
 }
 
-void FullscreenModel::OnExpandedToolbarHeightBroadcasted(CGFloat height) {
-  SetExpandedToolbarHeight(height);
+void FullscreenModel::OnExpandedTopToolbarHeightBroadcasted(CGFloat height) {
+  SetExpandedTopToolbarHeight(height);
 }
 
-void FullscreenModel::OnBottomToolbarHeightBroadcasted(CGFloat height) {
-  SetBottomToolbarHeight(height);
+void FullscreenModel::OnCollapsedBottomToolbarHeightBroadcasted(
+    CGFloat height) {
+  SetCollapsedBottomToolbarHeight(height);
+}
+
+void FullscreenModel::OnExpandedBottomToolbarHeightBroadcasted(CGFloat height) {
+  SetExpandedBottomToolbarHeight(height);
 }

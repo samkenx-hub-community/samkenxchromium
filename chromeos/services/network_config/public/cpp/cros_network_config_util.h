@@ -61,9 +61,9 @@ int GetWirelessSignalStrength(const mojom::NetworkStateProperties* network);
 bool IsInhibited(const mojom::DeviceStateProperties* device);
 
 // Returns an ONC dictionary for network with guid |network_guid| containing a
-// configuration of the network's user APN list.
-base::Value::Dict UserApnListToOnc(const std::string& network_guid,
-                                   const base::Value::List* user_apn_list);
+// configuration of the network's custom APN list.
+base::Value::Dict CustomApnListToOnc(const std::string& network_guid,
+                                     const base::Value::List* custom_apn_list);
 
 // Converts a list of APN types in the ONC representation to the Mojo enum
 // representation.
@@ -73,6 +73,10 @@ std::vector<mojom::ApnType> OncApnTypesToMojo(
 // Creates a Mojo APN from a ONC dictionary.
 mojom::ApnPropertiesPtr GetApnProperties(const base::Value::Dict& onc_apn,
                                          bool is_apn_revamp_enabled);
+
+// Creates a Mojo APN list from a ONC dictionary.
+mojom::ManagedApnListPtr GetManagedApnList(const base::Value* value,
+                                           bool is_apn_revamp_enabled);
 
 }  // namespace chromeos::network_config
 

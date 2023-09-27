@@ -8,20 +8,18 @@
 #include "ash/wm/desks/desks_controller.h"
 #include "base/run_loop.h"
 
-namespace ui {
-namespace test {
+namespace ui::test {
 class EventGenerator;
-}  // namespace test
-}  // namespace ui
+}  // namespace ui::test
 
 namespace ash {
 
 class CloseButton;
 class DeskActivationAnimation;
 class DeskMiniView;
-class DesksBarView;
+class LegacyDeskBarView;
 
-constexpr int kNumFingersForHighlight = 3;
+constexpr int kNumFingersForFocus = 3;
 constexpr int kNumFingersForDesksSwitch = 4;
 
 // Used for waiting for the desk switch animations on all root windows to
@@ -72,7 +70,7 @@ void ScrollToSwitchDesks(bool scroll_left,
 void WaitUntilEndingScreenshotTaken(DeskActivationAnimation* animation);
 
 // Returns the desk bar view for the primary display.
-const DesksBarView* GetPrimaryRootDesksBarView();
+const LegacyDeskBarView* GetPrimaryRootDesksBarView();
 
 // Returns the combine desks button if it is available, and otherwise the
 // close-all button.

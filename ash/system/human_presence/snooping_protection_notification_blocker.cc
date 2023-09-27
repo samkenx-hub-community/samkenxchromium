@@ -23,6 +23,7 @@
 #include "ash/system/status_area_widget.h"
 #include "ash/system/unified/unified_system_tray.h"
 #include "base/check_op.h"
+#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
@@ -100,7 +101,7 @@ SnoopingProtectionNotificationBlocker::SnoopingProtectionNotificationBlocker(
     : NotificationBlocker(message_center),
       message_center_(message_center),
       controller_(controller) {
-  controller_observation_.Observe(controller_);
+  controller_observation_.Observe(controller_.get());
 
   // Session controller is instantiated before us in the shell.
   SessionControllerImpl* session_controller =
@@ -108,7 +109,7 @@ SnoopingProtectionNotificationBlocker::SnoopingProtectionNotificationBlocker(
   DCHECK(session_controller);
   session_observation_.Observe(session_controller);
 
-  message_center_observation_.Observe(message_center_);
+  message_center_observation_.Observe(message_center_.get());
 
   UpdateInfoNotificationIfNecessary();
 }
@@ -284,16 +285,18 @@ SnoopingProtectionNotificationBlocker::CreateInfoNotification() const {
   for (const message_center::Notification* notification :
        message_center_->GetPopupNotificationsWithoutBlocker(*this)) {
     const std::string& id = notification->id();
-    if (blocked_popups_.find(id) == blocked_popups_.end())
+    if (!base::Contains(blocked_popups_, id)) {
       continue;
+    }
 
     // Use a human readable-title (e.g. "Web" vs "https://somesite.com:443").
     const std::u16string& title =
         hps_internal::GetNotifierTitle<apps::AppRegistryCacheWrapper>(
             notification->notifier_id(),
             Shell::Get()->session_controller()->GetActiveAccountId());
-    if (seen_titles.find(title) != seen_titles.end())
+    if (base::Contains(seen_titles, title)) {
       continue;
+    }
 
     titles.push_back(title);
     seen_titles.insert(title);

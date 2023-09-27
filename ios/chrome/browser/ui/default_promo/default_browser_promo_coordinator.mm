@@ -10,18 +10,13 @@
 #import "base/metrics/user_metrics_action.h"
 #import "components/feature_engagement/public/event_constants.h"
 #import "components/feature_engagement/public/tracker.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/feature_engagement/tracker_factory.h"
-#import "ios/chrome/browser/main/browser.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/ui/default_promo/default_browser_promo_view_controller.h"
 #import "ios/chrome/browser/ui/default_promo/default_browser_string_util.h"
-#import "ios/chrome/browser/ui/default_promo/default_browser_utils.h"
 #import "ios/chrome/common/ui/confirmation_alert/confirmation_alert_action_handler.h"
 #import "ios/chrome/common/ui/elements/popover_label_view_controller.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface DefaultBrowserPromoCoordinator () <
     ConfirmationAlertActionHandler,
@@ -43,8 +38,7 @@
 
 - (void)start {
   [super start];
-  base::RecordAction(
-      base::UserMetricsAction("IOS.DefaultBrowserFullscreenPromo.Impression"));
+  [self recordDefaultBrowserPromoShown];
   self.defaultBrowerPromoViewController =
       [[DefaultBrowserPromoViewController alloc] init];
   self.defaultBrowerPromoViewController.actionHandler = self;
@@ -65,6 +59,7 @@
       dismissViewControllerAnimated:YES
                          completion:nil];
   self.defaultBrowerPromoViewController = nil;
+  self.promoStats = nil;
   [super stop];
 }
 
@@ -72,84 +67,57 @@
 
 - (void)presentationControllerDidDismiss:
     (UIPresentationController*)presentationController {
+  LogDefaultBrowserPromoHistogramForAction(
+      DefaultPromoTypeGeneral, IOSDefaultBrowserPromoAction::kDismiss);
   base::RecordAction(
       base::UserMetricsAction("IOS.DefaultBrowserFullscreenPromo.Dismissed"));
   // This ensures that a modal swipe dismiss will also be logged.
   LogUserInteractionWithFullscreenPromo();
-  [self recordDefaultBrowserPromoShown];
+
+  if (IsDefaultBrowserTriggerCriteraExperimentEnabled()) {
+    RecordPromoStatsToUMAForAction(self.promoStats,
+                                   IOSDefaultBrowserPromoAction::kDismiss);
+  }
+  [self.handler hidePromo];
 }
 
 #pragma mark - ConfirmationAlertActionHandler
 
 - (void)confirmationAlertPrimaryAction {
-  if (IsInRemindMeLaterGroup()) {
-    if (self.defaultBrowerPromoViewController.tertiaryActionString) {
-      [self logDefaultBrowserFullscreenPromoRemindMeHistogramForAction:
-                IOSDefaultBrowserFullscreenPromoAction::kActionButton];
-    } else {
-      [self logDefaultBrowserFullscreenRemindMeSecondPromoHistogramForAction:
-                IOSDefaultBrowserFullscreenPromoAction::kActionButton];
-    }
-  } else {
-    [self logDefaultBrowserFullscreenPromoHistogramForAction:
-              IOSDefaultBrowserFullscreenPromoAction::kActionButton];
-  }
+  LogDefaultBrowserPromoHistogramForAction(
+      DefaultPromoTypeGeneral, IOSDefaultBrowserPromoAction::kActionButton);
   base::RecordAction(base::UserMetricsAction(
       "IOS.DefaultBrowserFullscreenPromo.PrimaryActionTapped"));
   LogUserInteractionWithFullscreenPromo();
-  [self recordDefaultBrowserPromoShown];
   [[UIApplication sharedApplication]
                 openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]
                 options:{}
       completionHandler:nil];
-
-  [self.handler hidePromo];
-}
-
-- (void)confirmationAlertSecondaryAction {
-  LogUserInteractionWithFullscreenPromo();
-  if (IsInRemindMeLaterGroup()) {
-    if (self.defaultBrowerPromoViewController.tertiaryActionString) {
-      // When the "Remind Me Later" button is visible, it is the secondary
-      // button, while the "No Thanks" button is the tertiary button.
-      [self logDefaultBrowserFullscreenPromoRemindMeHistogramForAction:
-                IOSDefaultBrowserFullscreenPromoAction::kRemindMeLater];
-      base::RecordAction(base::UserMetricsAction(
-          "IOS.DefaultBrowserFullscreenPromo.RemindMeTapped"));
-      LogRemindMeLaterPromoActionInteraction();
-      [self NotifyFETRemindMeLater];
-    } else {
-      [self logDefaultBrowserFullscreenRemindMeSecondPromoHistogramForAction:
-                IOSDefaultBrowserFullscreenPromoAction::kCancel];
-      base::RecordAction(base::UserMetricsAction(
-          "IOS.DefaultBrowserFullscreenPromo.Dismissed"));
-      [self recordDefaultBrowserPromoShown];
-    }
-  } else {
-    [self logDefaultBrowserFullscreenPromoHistogramForAction:
-              IOSDefaultBrowserFullscreenPromoAction::kCancel];
-    base::RecordAction(
-        base::UserMetricsAction("IOS.DefaultBrowserFullscreenPromo.Dismissed"));
-    [self recordDefaultBrowserPromoShown];
+  if (IsDefaultBrowserTriggerCriteraExperimentEnabled()) {
+    RecordPromoStatsToUMAForAction(self.promoStats,
+                                   IOSDefaultBrowserPromoAction::kActionButton);
   }
   [self.handler hidePromo];
 }
 
-- (void)confirmationAlertTertiaryAction {
-  DCHECK(IsInRemindMeLaterGroup());
-  [self logDefaultBrowserFullscreenPromoRemindMeHistogramForAction:
-            IOSDefaultBrowserFullscreenPromoAction::kCancel];
+- (void)confirmationAlertSecondaryAction {
+  LogDefaultBrowserPromoHistogramForAction(
+      DefaultPromoTypeGeneral, IOSDefaultBrowserPromoAction::kCancel);
   base::RecordAction(
-      base::UserMetricsAction("IOS.DefaultBrowserFullscreenPromo.Dismissed"));
+      base::UserMetricsAction("IOS.DefaultBrowserFullscreenPromo.Cancel"));
   LogUserInteractionWithFullscreenPromo();
-  [self recordDefaultBrowserPromoShown];
+
+  if (IsDefaultBrowserTriggerCriteraExperimentEnabled()) {
+    RecordPromoStatsToUMAForAction(self.promoStats,
+                                   IOSDefaultBrowserPromoAction::kCancel);
+  }
+
   [self.handler hidePromo];
 }
 
 - (void)confirmationAlertLearnMoreAction {
   base::RecordAction(base::UserMetricsAction(
-      "IOS.DefaultBrowserFullscreen.PromoMoreInfoTapped"));
-  [self recordDefaultBrowserPromoShown];
+      "IOS.DefaultBrowserFullscreenPromo.MoreInfoTapped"));
   NSString* message = GetDefaultBrowserLearnMoreText();
   self.learnMoreViewController =
       [[PopoverLabelViewController alloc] initWithMessage:message];
@@ -165,44 +133,25 @@
                  completion:nil];
 }
 
-- (void)logDefaultBrowserFullscreenPromoHistogramForAction:
-    (IOSDefaultBrowserFullscreenPromoAction)action {
-  base::UmaHistogramEnumeration("IOS.DefaultBrowserFullscreenPromo", action);
-}
-
-- (void)logDefaultBrowserFullscreenPromoRemindMeHistogramForAction:
-    (IOSDefaultBrowserFullscreenPromoAction)action {
-  base::UmaHistogramEnumeration("IOS.DefaultBrowserFullscreenPromoRemindMe",
-                                action);
-}
-
-- (void)logDefaultBrowserFullscreenRemindMeSecondPromoHistogramForAction:
-    (IOSDefaultBrowserFullscreenPromoAction)action {
-  base::UmaHistogramEnumeration(
-      "IOS.DefaultBrowserFullscreenPromoRemindMeSecondPromo", action);
-}
-
 #pragma mark - Private
 
-// Notifies the FET that the user has clicked "remind me later" on the default
-// browser promo, which is an eligibility criterion for the default browser blue
-// dot promo.
-- (void)NotifyFETRemindMeLater {
-  ChromeBrowserState* browserState = self.browser->GetBrowserState();
-  if (!browserState || browserState->IsOffTheRecord()) {
-    return;
+// Records that a default browser promo has been shown.
+- (void)recordDefaultBrowserPromoShown {
+  base::RecordAction(
+      base::UserMetricsAction("IOS.DefaultBrowserFullscreenPromo.Impression"));
+  base::UmaHistogramEnumeration("IOS.DefaultBrowserPromo.Shown",
+                                DefaultPromoTypeForUMA::kGeneral);
+
+  if (IsDefaultBrowserTriggerCriteraExperimentEnabled()) {
+    // `CalculatePromoStatistics` should be called before
+    // `LogFullscreenDefaultBrowserPromoDisplayed` which will modify storage
+    // data.
+    self.promoStats = CalculatePromoStatistics();
+    RecordPromoStatsToUMAForAppear(self.promoStats);
   }
 
-  feature_engagement::TrackerFactory::GetForBrowserState(browserState)
-      ->NotifyEvent(feature_engagement::events::kBlueDotPromoCriterionMet);
-}
+  LogFullscreenDefaultBrowserPromoDisplayed();
 
-// Records that a default browser promo has been shown. This needs to be called
-// for any action the user takes other than "remind me later", since this event
-// is used by the FET to block the blue dot default browser promo, and clicking
-// "remind me later" should not block that promo. This is why this method isn't
-// simply called in something more generic like `start`.
-- (void)recordDefaultBrowserPromoShown {
   ChromeBrowserState* browserState = self.browser->GetBrowserState();
   LogToFETDefaultBrowserPromoShown(
       feature_engagement::TrackerFactory::GetForBrowserState(browserState));

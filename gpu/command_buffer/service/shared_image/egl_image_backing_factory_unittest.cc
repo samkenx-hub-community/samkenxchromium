@@ -9,6 +9,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/stringprintf.h"
+#include "build/build_config.h"
 #include "components/viz/common/resources/resource_sizes.h"
 #include "gpu/command_buffer/common/gpu_memory_buffer_support.h"
 #include "gpu/command_buffer/common/mailbox.h"
@@ -18,7 +19,7 @@
 #include "gpu/command_buffer/service/shared_context_state.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_backing.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_factory.h"
-#include "gpu/command_buffer/service/shared_image/shared_image_format_utils.h"
+#include "gpu/command_buffer/service/shared_image/shared_image_format_service_utils.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_manager.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_representation.h"
 #include "gpu/command_buffer/service/shared_image/test_utils.h"
@@ -29,12 +30,13 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-#include "third_party/skia/include/core/SkPromiseImageTexture.h"
+#include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/gpu/GrBackendSemaphore.h"
 #include "third_party/skia/include/gpu/GrBackendSurface.h"
+#include "third_party/skia/include/gpu/ganesh/SkImageGanesh.h"
+#include "third_party/skia/include/private/chromium/GrPromiseImageTexture.h"
 #include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/color_space.h"
-#include "ui/gl/buffer_format_utils.h"
 #include "ui/gl/gl_bindings.h"
 #include "ui/gl/gl_context.h"
 #include "ui/gl/gl_surface.h"
@@ -95,8 +97,9 @@ void CreateSharedContext(const GpuDriverBugWorkarounds& workarounds,
       base::MakeRefCounted<gles2::FeatureInfo>(workarounds, GpuFeatureInfo());
   context_state = base::MakeRefCounted<SharedContextState>(
       std::move(share_group), surface, context,
-      /*use_virtualized_gl_contexts=*/false, base::DoNothing());
-  context_state->InitializeGrContext(GpuPreferences(), workarounds, nullptr);
+      /*use_virtualized_gl_contexts=*/false, base::DoNothing(),
+      GrContextType::kGL);
+  context_state->InitializeSkia(GpuPreferences(), workarounds);
   context_state->InitializeGL(GpuPreferences(), feature_info);
 }
 
@@ -121,6 +124,14 @@ class EGLImageBackingFactoryThreadSafeTest
   void SetUp() override {
     if (!IsEglImageSupported())
       return;
+
+#if BUILDFLAG(IS_ANDROID)
+    auto* command_line = base::CommandLine::ForCurrentProcess();
+    if (gles2::UsePassthroughCommandDecoder(command_line)) {
+      // TODO(crbug.com/1472516): fix this tests to work with passthrough.
+      GTEST_SKIP();
+    }
+#endif
 
     GpuDriverBugWorkarounds workarounds;
 
@@ -175,7 +186,7 @@ class EGLImageBackingFactoryThreadSafeTest
     EXPECT_EQ(size.height(), backend_texture.height());
 
     // Create an Sk Image from GrBackendTexture.
-    auto sk_image = SkImage::MakeFromTexture(
+    auto sk_image = SkImages::BorrowTextureFrom(
         context_state_->gr_context(), backend_texture, kTopLeft_GrSurfaceOrigin,
         kRGBA_8888_SkColorType, kOpaque_SkAlphaType, nullptr);
 
@@ -355,7 +366,7 @@ TEST_F(EGLImageBackingFactoryThreadSafeTest, Dawn_SkiaGL) {
 
   // Create a Dawm OpenGLES device.
   dawn::native::Instance instance;
-  instance.DiscoverDefaultAdapters();
+  instance.DiscoverDefaultPhysicalDevices();
 
   std::vector<dawn::native::Adapter> adapters = instance.GetAdapters();
 
@@ -368,10 +379,16 @@ TEST_F(EGLImageBackingFactoryThreadSafeTest, Dawn_SkiaGL) {
                                        });
   ASSERT_NE(adapter_it, adapters.end());
 
-  dawn::native::DawnDeviceDescriptor device_descriptor;
   // We need to request internal usage to be able to do operations with
   // internal methods that would need specific usages.
-  device_descriptor.requiredFeatures.push_back("dawn-internal-usages");
+  wgpu::FeatureName dawn_internal_usage = wgpu::FeatureName::DawnInternalUsages;
+  wgpu::DeviceDescriptor device_descriptor;
+#ifdef WGPU_BREAKING_CHANGE_COUNT_RENAME
+  device_descriptor.requiredFeatureCount = 1;
+#else
+  device_descriptor.requiredFeaturesCount = 1;
+#endif
+  device_descriptor.requiredFeatures = &dawn_internal_usage;
 
   wgpu::Device device =
       wgpu::Device::Acquire(adapter_it->CreateDevice(&device_descriptor));
@@ -391,7 +408,7 @@ TEST_F(EGLImageBackingFactoryThreadSafeTest, Dawn_SkiaGL) {
   // requested to be.
   auto backing = backing_factory_->CreateSharedImage(
       mailbox, format, surface_handle, size, color_space,
-      kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, usage,
+      kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, usage, "TestLabel",
       /* is_thread_safe=*/true);
   ASSERT_NE(backing, nullptr);
 
@@ -404,11 +421,11 @@ TEST_F(EGLImageBackingFactoryThreadSafeTest, Dawn_SkiaGL) {
     // Create a DawnImageRepresentation using WGPUBackendType_OpenGLES backend.
     auto dawn_representation =
         shared_image_representation_factory_->ProduceDawn(
-            mailbox, device.Get(), WGPUBackendType_OpenGLES, {});
+            mailbox, device, wgpu::BackendType::OpenGLES, {});
     ASSERT_TRUE(dawn_representation);
 
     auto scoped_access = dawn_representation->BeginScopedAccess(
-        WGPUTextureUsage_RenderAttachment,
+        wgpu::TextureUsage::RenderAttachment,
         SharedImageRepresentation::AllowUnclearedAccess::kYes);
     ASSERT_TRUE(scoped_access);
 
@@ -428,7 +445,7 @@ TEST_F(EGLImageBackingFactoryThreadSafeTest, Dawn_SkiaGL) {
 
     wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
     wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderPassDesc);
-    pass.EndPass();
+    pass.End();
     wgpu::CommandBuffer commands = encoder.Finish();
 
     wgpu::Queue queue = device.GetQueue();
@@ -477,11 +494,11 @@ CreateAndValidateSharedImageRepresentations::
         viz::ResourceSizes::CheckedSizeInBytes<unsigned int>(size_, format));
     backing_ = backing_factory->CreateSharedImage(
         mailbox_, format, size_, color_space, surface_origin, alpha_type, usage,
-        initial_data);
+        "TestLabel", initial_data);
   } else {
     backing_ = backing_factory->CreateSharedImage(
         mailbox_, format, surface_handle, size_, color_space, surface_origin,
-        alpha_type, usage, is_thread_safe);
+        alpha_type, usage, "TestLabel", is_thread_safe);
   }
 
   // As long as either |chromium_image_ar30| or |chromium_image_ab30| is

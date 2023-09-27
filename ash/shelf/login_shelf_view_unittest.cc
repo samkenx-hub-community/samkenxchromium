@@ -39,6 +39,7 @@
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -198,7 +199,8 @@ class LoginShelfViewTest : public LoginTestBase {
 
   TestTrayActionClient tray_action_client_;
 
-  LoginShelfView* login_shelf_view_ = nullptr;  // Unowned.
+  raw_ptr<LoginShelfView, DanglingUntriaged | ExperimentalAsh>
+      login_shelf_view_ = nullptr;  // Unowned.
 
   TestLockScreenActionBackgroundController* action_background_controller() {
     return action_background_controller_;
@@ -218,13 +220,13 @@ class LoginShelfViewTest : public LoginTestBase {
 
   // LockScreenActionBackgroundController created by
   // |CreateActionBackgroundController|.
-  TestLockScreenActionBackgroundController* action_background_controller_ =
-      nullptr;
+  raw_ptr<TestLockScreenActionBackgroundController, ExperimentalAsh>
+      action_background_controller_ = nullptr;
 };
 
 // Checks the login shelf updates UI after session state changes.
 TEST_F(LoginShelfViewTest, ShouldUpdateUiAfterSessionStateChange) {
-  EXPECT_TRUE(ShowsShelfButtons({LoginShelfView::kShutdown}));
+  EXPECT_TRUE(ShowsShelfButtons({}));
 
   login_shelf_view_->SetAllowLoginAsGuest(true /*allow_guest*/);
   NotifySessionStateChanged(SessionState::LOGIN_PRIMARY);
@@ -252,7 +254,7 @@ TEST_F(LoginShelfViewTest, ShouldUpdateUiAfterSessionStateChange) {
 
 // Checks that the login shelf is not displayed in Shimless RMA.
 TEST_F(LoginShelfViewTest, ShouldHideUiInShimlessRma) {
-  EXPECT_TRUE(ShowsShelfButtons({LoginShelfView::kShutdown}));
+  EXPECT_TRUE(ShowsShelfButtons({}));
   NotifySessionStateChanged(SessionState::RMA);
   EXPECT_TRUE(ShowsShelfButtons({}));
 }
@@ -261,7 +263,7 @@ TEST_F(LoginShelfViewTest, ShouldHideUiInShimlessRma) {
 // screen is locked.
 TEST_F(LoginShelfViewTest,
        ShouldUpdateUiAfterShutdownPolicyChangeAtLockScreen) {
-  EXPECT_TRUE(ShowsShelfButtons({LoginShelfView::kShutdown}));
+  EXPECT_TRUE(ShowsShelfButtons({}));
 
   CreateUserSessions(1);
   NotifySessionStateChanged(SessionState::LOCKED);
@@ -285,7 +287,7 @@ TEST_F(LoginShelfViewTest,
 // will be reflected when the screen becomes locked.
 TEST_F(LoginShelfViewTest, ShouldUpdateUiBasedOnShutdownPolicyInActiveSession) {
   // The initial state of |reboot_on_shutdown| is false.
-  EXPECT_TRUE(ShowsShelfButtons({LoginShelfView::kShutdown}));
+  EXPECT_TRUE(ShowsShelfButtons({}));
 
   CreateUserSessions(1);
   NotifyShutdownPolicyChanged(true /*reboot_on_shutdown*/);
@@ -336,7 +338,7 @@ TEST_F(LoginShelfViewTest, ShouldShowShutdownOrRestartButtonsBeforeApps) {
 
 // Checks the login shelf updates UI after lock screen note state changes.
 TEST_F(LoginShelfViewTest, ShouldUpdateUiAfterLockScreenNoteState) {
-  EXPECT_TRUE(ShowsShelfButtons({LoginShelfView::kShutdown}));
+  EXPECT_TRUE(ShowsShelfButtons({}));
 
   CreateUserSessions(1);
   NotifySessionStateChanged(SessionState::LOCKED);
@@ -540,7 +542,16 @@ TEST_F(LoginShelfViewTest, ShouldShowGuestButtonWhenNoUserPods) {
       {LoginShelfView::kShutdown, LoginShelfView::kBrowseAsGuest}));
 }
 
+TEST_F(LoginShelfViewTest, ClickShutdownButtonOnLoginScreen) {
+  NotifySessionStateChanged(SessionState::LOGIN_PRIMARY);
+  ShutdownAndConfirm();
+  EXPECT_TRUE(Shell::Get()->lock_state_controller()->ShutdownRequested());
+}
+
 TEST_F(LoginShelfViewTest, ClickShutdownButton) {
+  NotifySessionStateChanged(session_manager::SessionState::OOBE);
+  login_shelf_view_->SetLoginDialogState(OobeDialogState::GAIA_SIGNIN);
+  login_shelf_view_->SetIsFirstSigninStep(/*is_first=*/true);
   ShutdownAndConfirm();
   EXPECT_TRUE(Shell::Get()->lock_state_controller()->ShutdownRequested());
 }
@@ -627,11 +638,7 @@ TEST_F(LoginShelfViewTest, ClickCancelButton) {
 TEST_F(LoginShelfViewTest, ClickBrowseAsGuestButton) {
   auto client = std::make_unique<MockLoginScreenClient>();
 
-  if (features::IsOobeConsolidatedConsentEnabled())
-    EXPECT_CALL(*client, ShowGuestTosScreen());
-  else
-    EXPECT_CALL(*client, LoginAsGuest());
-
+  EXPECT_CALL(*client, ShowGuestTosScreen());
   login_shelf_view_->SetAllowLoginAsGuest(true /*allow_guest*/);
   NotifySessionStateChanged(SessionState::LOGIN_PRIMARY);
   Click(LoginShelfView::kBrowseAsGuest);
@@ -743,6 +750,7 @@ TEST_F(LoginShelfViewTest, ShelfWidgetStackedAtBottomInActiveSession) {
 
   // Focus on the login shelf button (which could happen if user tabs to move
   // the focus).
+  NotifySessionStateChanged(SessionState::LOGIN_PRIMARY);
   FocusOnLoginShelfButton();
 
   // Verify that shelf widget is no longer focused, and is stacked at the bottom
@@ -867,6 +875,9 @@ TEST_F(LoginShelfViewTest, TapShutdownInTabletLoginPrimary) {
 
 TEST_F(LoginShelfViewTest, TapShutdownInTabletOobe) {
   TabletModeControllerTestApi().EnterTabletMode();
+  NotifySessionStateChanged(session_manager::SessionState::OOBE);
+  login_shelf_view_->SetLoginDialogState(OobeDialogState::GAIA_SIGNIN);
+  login_shelf_view_->SetIsFirstSigninStep(/*is_first=*/true);
   ShutdownAndConfirm();
   EXPECT_TRUE(Shell::Get()->lock_state_controller()->ShutdownRequested());
 }
@@ -926,6 +937,8 @@ TEST_F(LoginShelfViewTest, DisplayOn) {
       ash::Shell::Get()->display_configurator();
   ASSERT_TRUE(configurator->IsDisplayOn());
 
+  // Set a State where LoginShelfView::kShutdown is visible
+  NotifySessionStateChanged(SessionState::LOGIN_PRIMARY);
   ShutdownAndConfirm();
   EXPECT_TRUE(Shell::Get()->lock_state_controller()->ShutdownRequested());
 }
@@ -950,6 +963,11 @@ TEST_F(LoginShelfViewTest, DisplayOff) {
 
   run_loop.Run();
   ASSERT_FALSE(configurator->IsDisplayOn());
+
+  // Set a State where LoginShelfView::kShutdown is visible
+  NotifySessionStateChanged(session_manager::SessionState::OOBE);
+  login_shelf_view_->SetLoginDialogState(OobeDialogState::GAIA_SIGNIN);
+  login_shelf_view_->SetIsFirstSigninStep(/*is_first=*/true);
 
   // The first calls are blocked.
   constexpr int kMaxDropped =
@@ -1036,15 +1054,6 @@ namespace {
 
 const char kShelfShutdownConfirmationActionHistogramName[] =
     "Ash.Shelf.ShutdownConfirmationBubble.Action";
-
-const char kCancelActionDurationHistogramName[] =
-    "Ash.Shelf.ShutdownConfirmationBubble.ActionDuration.Cancel";
-
-const char kConfirmActionDurationHistogramName[] =
-    "Ash.Shelf.ShutdownConfirmationBubble.ActionDuration.Confirm";
-
-const char kDismissActionDurationHistogramName[] =
-    "Ash.Shelf.ShutdownConfirmationBubble.ActionDuration.Dismiss";
 
 }  // namespace
 
@@ -1138,9 +1147,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest,
       ShelfShutdownConfirmationBubble::BubbleAction::kOpened, 1);
   histograms().ExpectTotalCount(kShelfShutdownConfirmationActionHistogramName,
                                 1);
-  histograms().ExpectTotalCount(kCancelActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kDismissActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kConfirmActionDurationHistogramName, 0);
 }
 
 // Checks that shutdown confirmation bubble appears after pressing the
@@ -1163,9 +1169,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest,
       ShelfShutdownConfirmationBubble::BubbleAction::kOpened, 1);
   histograms().ExpectTotalCount(kShelfShutdownConfirmationActionHistogramName,
                                 1);
-  histograms().ExpectTotalCount(kCancelActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kDismissActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kConfirmActionDurationHistogramName, 0);
 }
 
 // Checks that shutdown confirmation bubble disappears after pressing the
@@ -1196,9 +1199,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest,
       ShelfShutdownConfirmationBubble::BubbleAction::kCancelled, 1);
   histograms().ExpectTotalCount(kShelfShutdownConfirmationActionHistogramName,
                                 2);
-  histograms().ExpectTotalCount(kCancelActionDurationHistogramName, 1);
-  histograms().ExpectTotalCount(kDismissActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kConfirmActionDurationHistogramName, 0);
 
   // Shutdown confirmation could be shown again.
   Click(LoginShelfView::kShutdown);
@@ -1209,9 +1209,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest,
       ShelfShutdownConfirmationBubble::BubbleAction::kOpened, 2);
   histograms().ExpectTotalCount(kShelfShutdownConfirmationActionHistogramName,
                                 3);
-  histograms().ExpectTotalCount(kCancelActionDurationHistogramName, 1);
-  histograms().ExpectTotalCount(kDismissActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kConfirmActionDurationHistogramName, 0);
 }
 
 // Checks that shutdown confirmation bubble disappears after pressing the
@@ -1243,9 +1240,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest,
       ShelfShutdownConfirmationBubble::BubbleAction::kConfirmed, 1);
   histograms().ExpectTotalCount(kShelfShutdownConfirmationActionHistogramName,
                                 2);
-  histograms().ExpectTotalCount(kCancelActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kDismissActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kConfirmActionDurationHistogramName, 1);
 }
 
 // Checks that shutdown confirmation bubble disappears after inactive.
@@ -1275,9 +1269,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest, ShouldCloseAfterInactive) {
       ShelfShutdownConfirmationBubble::BubbleAction::kDismissed, 1);
   histograms().ExpectTotalCount(kShelfShutdownConfirmationActionHistogramName,
                                 2);
-  histograms().ExpectTotalCount(kCancelActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kDismissActionDurationHistogramName, 1);
-  histograms().ExpectTotalCount(kConfirmActionDurationHistogramName, 0);
 }
 
 // Checks that shutdown confirmation was first cancelled, then confirmed
@@ -1307,9 +1298,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest,
       ShelfShutdownConfirmationBubble::BubbleAction::kCancelled, 1);
   histograms().ExpectTotalCount(kShelfShutdownConfirmationActionHistogramName,
                                 2);
-  histograms().ExpectTotalCount(kCancelActionDurationHistogramName, 1);
-  histograms().ExpectTotalCount(kDismissActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kConfirmActionDurationHistogramName, 0);
 
   // Shutdown confirmation could be shown again.
   Click(LoginShelfView::kShutdown);
@@ -1320,9 +1308,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest,
       ShelfShutdownConfirmationBubble::BubbleAction::kOpened, 2);
   histograms().ExpectTotalCount(kShelfShutdownConfirmationActionHistogramName,
                                 3);
-  histograms().ExpectTotalCount(kCancelActionDurationHistogramName, 1);
-  histograms().ExpectTotalCount(kDismissActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kConfirmActionDurationHistogramName, 0);
 
   // Shutdown confirmation is confirmed and disappeared.
   ConfirmShutdown();
@@ -1333,9 +1318,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest,
       ShelfShutdownConfirmationBubble::BubbleAction::kConfirmed, 1);
   histograms().ExpectTotalCount(kShelfShutdownConfirmationActionHistogramName,
                                 4);
-  histograms().ExpectTotalCount(kCancelActionDurationHistogramName, 1);
-  histograms().ExpectTotalCount(kDismissActionDurationHistogramName, 0);
-  histograms().ExpectTotalCount(kConfirmActionDurationHistogramName, 1);
 }
 
 // When display is on Shutdown button clicks should not be blocked.
@@ -1344,6 +1326,9 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest, DisplayOn) {
       ash::Shell::Get()->display_configurator();
   ASSERT_TRUE(configurator->IsDisplayOn());
 
+  NotifySessionStateChanged(session_manager::SessionState::OOBE);
+  login_shelf_view_->SetLoginDialogState(OobeDialogState::GAIA_SIGNIN);
+  login_shelf_view_->SetIsFirstSigninStep(/*is_first=*/true);
   Click(LoginShelfView::kShutdown);
   EXPECT_TRUE(IsShutdownConfirmationVisible());
   EXPECT_FALSE(Shell::Get()->lock_state_controller()->ShutdownRequested());
@@ -1370,6 +1355,11 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest, DisplayOff) {
   run_loop.Run();
   ASSERT_FALSE(configurator->IsDisplayOn());
 
+  // Set a State where LoginShelfView::kShutdown is visible
+  NotifySessionStateChanged(session_manager::SessionState::OOBE);
+  login_shelf_view_->SetLoginDialogState(OobeDialogState::GAIA_SIGNIN);
+  login_shelf_view_->SetIsFirstSigninStep(/*is_first=*/true);
+
   // The first calls are blocked.
   constexpr int kMaxDropped =
       3;  // correspond to `kMaxDroppedCallsWhenDisplaysOff`
@@ -1379,7 +1369,6 @@ TEST_F(LoginShelfViewWithShutdownConfirmationTest, DisplayOff) {
     EXPECT_FALSE(Shell::Get()->lock_state_controller()->ShutdownRequested());
   }
 
-  // This should go through.
   Click(LoginShelfView::kShutdown);
   EXPECT_TRUE(IsShutdownConfirmationVisible());
   ConfirmShutdown();

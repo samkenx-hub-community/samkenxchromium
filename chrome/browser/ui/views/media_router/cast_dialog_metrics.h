@@ -9,6 +9,7 @@
 #include "chrome/browser/ui/media_router/media_cast_mode.h"
 #include "chrome/browser/ui/media_router/ui_media_sink.h"
 #include "chrome/browser/ui/views/media_router/cast_dialog_sink_button.h"
+#include "chrome/browser/ui/views/media_router/cast_dialog_sink_view.h"
 #include "components/media_router/browser/media_router_metrics.h"
 #include "components/media_router/common/media_sink.h"
 
@@ -52,8 +53,6 @@ class CastDialogMetrics {
 
   void OnStopCasting(bool is_local_route);
 
-  void OnCastModeSelected();
-
   // Records the time it took to close the dialog, if no other action was taken
   // prior to that after opening the dialog.
   void OnCloseDialog(const base::Time& close_time);
@@ -61,11 +60,11 @@ class CastDialogMetrics {
   // Records the number of sinks, which may be 0.
   void OnRecordSinkCount(
       const std::vector<CastDialogSinkButton*>& sink_buttons);
+  void OnRecordSinkCount(
+      const std::vector<raw_ptr<CastDialogSinkView, DanglingUntriaged>>&
+          sink_views);
 
  private:
-  // Records the first user action if it hasn't already been recorded.
-  void MaybeRecordFirstAction(MediaRouterUserAction action);
-
   void MaybeRecordActivationLocationAndCastMode(MediaCastMode cast_mode);
 
   // The time when the dialog UI started initializing.

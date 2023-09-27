@@ -12,13 +12,9 @@
 #import "ios/chrome/browser/web/image_fetch/image_fetch_tab_helper.h"
 #import "ios/web/public/js_messaging/java_script_feature_util.h"
 #import "ios/web/public/js_messaging/script_message.h"
-#import "ios/web/public/js_messaging/web_frame_util.h"
+#import "ios/web/public/js_messaging/web_frames_manager.h"
 #import "ios/web/public/web_state.h"
 #import "third_party/abseil-cpp/absl/types/optional.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 const char kScriptName[] = "image_fetch";
@@ -55,14 +51,14 @@ ImageFetchJavaScriptFeature* ImageFetchJavaScriptFeature::GetInstance() {
 void ImageFetchJavaScriptFeature::GetImageData(web::WebState* web_state,
                                                int call_id,
                                                const GURL& url) {
-  web::WebFrame* main_frame = GetMainFrame(web_state);
+  web::WebFrame* main_frame = GetWebFramesManager(web_state)->GetMainWebFrame();
   if (!main_frame) {
     return;
   }
 
-  std::vector<base::Value> parameters;
-  parameters.push_back(base::Value(call_id));
-  parameters.push_back(base::Value(url.spec()));
+  base::Value::List parameters;
+  parameters.Append(call_id);
+  parameters.Append(url.spec());
   CallJavaScriptFunction(main_frame, "imageFetch.getImageData", parameters);
 }
 

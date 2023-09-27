@@ -10,20 +10,19 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/ash/arc/session/arc_session_manager.h"
 #include "chrome/browser/ash/arc/test/test_arc_session_manager.h"
 #include "chrome/browser/ash/crostini/crostini_manager.h"
 #include "chrome/browser/ash/crostini/crostini_util.h"
-#include "chrome/browser/ash/file_manager/fake_disk_mount_manager.h"
 #include "chrome/browser/ash/file_manager/path_util.h"
 #include "chrome/browser/ash/file_manager/volume_manager.h"
 #include "chrome/browser/ash/file_manager/volume_manager_factory.h"
 #include "chrome/browser/ash/guest_os/guest_os_pref_names.h"
 #include "chrome/browser/ash/guest_os/guest_os_session_tracker.h"
 #include "chrome/browser/ash/guest_os/public/guest_os_service.h"
-#include "chrome/browser/ash/guest_os/public/guest_os_wayland_server.h"
 #include "chrome/browser/ash/guest_os/public/types.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
 #include "chrome/browser/ash/plugin_vm/plugin_vm_util.h"
@@ -44,6 +43,7 @@
 #include "chromeos/ash/components/dbus/seneschal/seneschal_service.pb.h"
 #include "chromeos/ash/components/dbus/vm_plugin_dispatcher/vm_plugin_dispatcher_client.h"
 #include "chromeos/ash/components/disks/disk_mount_manager.h"
+#include "chromeos/ash/components/disks/fake_disk_mount_manager.h"
 #include "components/account_id/account_id.h"
 #include "components/drive/drive_pref_names.h"
 #include "components/prefs/pref_service.h"
@@ -269,11 +269,6 @@ class GuestOsSharePathTest : public testing::Test {
     drivefs_ =
         base::FilePath("/media/fuse/drivefs-84675c855b63e12f384d45f033826980");
 
-    // Setup for a fake wayland server (needed when CrostiniManager makes a VM).
-    guest_os::GuestOsService::GetForProfile(profile())
-        ->WaylandServer()
-        ->OverrideServerForTesting(vm_tools::launch::TERMINA, nullptr, {});
-
     guest_os::GuestOsSessionTracker::GetForProfile(profile())
         ->AddGuestForTesting(guest_os::GuestId{guest_os::VmType::UNKNOWN,
                                                "vm-running", "unused"});
@@ -285,7 +280,7 @@ class GuestOsSharePathTest : public testing::Test {
     g_browser_process->platform_part()
         ->InitializeSchedulerConfigurationManager();
     ash::disks::DiskMountManager::InitializeForTesting(
-        new file_manager::FakeDiskMountManager);
+        new ash::disks::FakeDiskMountManager);
     file_manager::VolumeManagerFactory::GetInstance()->SetTestingFactory(
         profile(), base::BindRepeating(&BuildVolumeManager));
     root_ = file_manager::util::GetMyFilesFolderForProfile(profile());
@@ -328,13 +323,16 @@ class GuestOsSharePathTest : public testing::Test {
   base::FilePath drivefs_;
   std::unique_ptr<file_manager::Volume> volume_downloads_;
 
-  ash::FakeSeneschalClient* fake_seneschal_client_;
-  ash::FakeConciergeClient* fake_concierge_client_;
+  raw_ptr<ash::FakeSeneschalClient, DanglingUntriaged | ExperimentalAsh>
+      fake_seneschal_client_;
+  raw_ptr<ash::FakeConciergeClient, DanglingUntriaged | ExperimentalAsh>
+      fake_concierge_client_;
 
   content::BrowserTaskEnvironment task_environment_;
   std::unique_ptr<base::RunLoop> run_loop_;
   std::unique_ptr<TestingProfile> profile_;
-  GuestOsSharePath* guest_os_share_path_;
+  raw_ptr<GuestOsSharePath, DanglingUntriaged | ExperimentalAsh>
+      guest_os_share_path_;
   base::test::ScopedFeatureList features_;
   std::unique_ptr<user_manager::ScopedUserManager> scoped_user_manager_;
   AccountId account_id_;

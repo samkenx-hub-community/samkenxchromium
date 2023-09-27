@@ -118,12 +118,12 @@ Animation* Animatable::animate(
 
   // ViewTimeline options.
   if (options_dict->hasRangeStart() &&
-      RuntimeEnabledFeatures::CSSScrollTimelineEnabled()) {
+      RuntimeEnabledFeatures::ScrollTimelineEnabled()) {
     animation->SetRangeStartInternal(TimelineOffset::Create(
         element, options_dict->rangeStart(), 0, exception_state));
   }
   if (options_dict->hasRangeEnd() &&
-      RuntimeEnabledFeatures::CSSScrollTimelineEnabled()) {
+      RuntimeEnabledFeatures::ScrollTimelineEnabled()) {
     animation->SetRangeEndInternal(TimelineOffset::Create(
         element, options_dict->rangeEnd(), 100, exception_state));
   }
@@ -165,10 +165,13 @@ HeapVector<Member<Animation>> Animatable::getAnimations(
 HeapVector<Member<Animation>> Animatable::GetAnimationsInternal(
     GetAnimationsOptionsResolved options) {
   Element* element = GetAnimationTarget();
-  if (options.use_subtree)
-    element->GetDocument().UpdateStyleAndLayoutTreeForSubtree(element);
-  else
-    element->GetDocument().UpdateStyleAndLayoutTreeForNode(element);
+  if (options.use_subtree) {
+    element->GetDocument().UpdateStyleAndLayoutTreeForSubtree(
+        element, DocumentUpdateReason::kWebAnimation);
+  } else {
+    element->GetDocument().UpdateStyleAndLayoutTreeForNode(
+        element, DocumentUpdateReason::kWebAnimation);
+  }
 
   HeapVector<Member<Animation>> animations;
   if (!options.use_subtree && !element->HasAnimations())

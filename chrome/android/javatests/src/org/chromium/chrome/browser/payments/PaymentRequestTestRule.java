@@ -31,6 +31,7 @@ import org.chromium.base.test.util.UrlUtils;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.autofill.CardUnmaskPrompt;
 import org.chromium.chrome.browser.autofill.CardUnmaskPrompt.CardUnmaskObserverForTest;
+import org.chromium.chrome.browser.autofill.editors.EditorObserverForTest;
 import org.chromium.chrome.browser.payments.ChromePaymentRequestFactory.ChromePaymentRequestDelegateImpl;
 import org.chromium.chrome.browser.payments.ChromePaymentRequestFactory.ChromePaymentRequestDelegateImplObserverForTest;
 import org.chromium.chrome.browser.payments.ui.PaymentRequestSection.OptionSection;
@@ -38,14 +39,12 @@ import org.chromium.chrome.browser.payments.ui.PaymentRequestSection.OptionSecti
 import org.chromium.chrome.browser.payments.ui.PaymentRequestUI;
 import org.chromium.chrome.browser.payments.ui.PaymentRequestUI.PaymentRequestObserverForTest;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
-import org.chromium.components.autofill.prefeditor.EditorObserverForTest;
 import org.chromium.components.payments.AbortReason;
 import org.chromium.components.payments.PayerData;
 import org.chromium.components.payments.PaymentApp;
 import org.chromium.components.payments.PaymentAppFactoryDelegate;
 import org.chromium.components.payments.PaymentAppFactoryInterface;
 import org.chromium.components.payments.PaymentAppService;
-import org.chromium.components.payments.PaymentFeatureList;
 import org.chromium.components.payments.PaymentRequestService;
 import org.chromium.components.payments.PaymentRequestService.PaymentRequestServiceObserverForTest;
 import org.chromium.content_public.browser.WebContents;
@@ -118,10 +117,6 @@ import java.util.concurrent.atomic.AtomicReference;
      * "Select" hint.
      */
     /* package */ static final int FIRST_BILLING_ADDRESS = 1;
-
-    /** Command line flag to enable payment details modifiers in tests. */
-    /* package */ static final String ENABLE_WEB_PAYMENTS_MODIFIERS =
-            "enable-features=" + PaymentFeatureList.WEB_PAYMENTS_MODIFIERS;
 
     /** Command line flag to enable experimental web platform features in tests. */
     /* package */ static final String ENABLE_EXPERIMENTAL_WEB_PLATFORM_FEATURES =
@@ -1186,6 +1181,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
         @Override
         public void dismissInstrument() {}
+    }
+
+    public void startMainActivity() {
+        assert mDelayStartActivity;
+        startMainActivityWithURL(mTestFilePath);
     }
 
     @Override

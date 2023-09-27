@@ -8,8 +8,9 @@
 #include <memory>
 
 #include "ash/public/cpp/projector/projector_annotator_controller.h"
-#include "ash/webui/projector_app/annotator_page_handler_impl.h"
 #include "ash/webui/projector_app/projector_app_client.h"
+#include "ash/webui/projector_app/untrusted_annotator_page_handler_impl.h"
+#include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 #include "chrome/browser/ui/ash/projector/pending_screencast_manager.h"
 #include "chrome/browser/ui/ash/projector/screencast_manager.h"
@@ -41,7 +42,8 @@ class ProjectorAppClientImpl : public ash::ProjectorAppClient {
   network::mojom::URLLoaderFactory* GetUrlLoaderFactory() override;
   void OnNewScreencastPreconditionChanged(
       const ash::NewScreencastPrecondition& precondition) override;
-  const ash::PendingScreencastSet& GetPendingScreencasts() const override;
+  const ash::PendingScreencastContainerSet& GetPendingScreencasts()
+      const override;
   bool ShouldDownloadSoda() const override;
   void InstallSoda() override;
   void OnSodaInstallProgress(int combined_progress) override;
@@ -50,19 +52,21 @@ class ProjectorAppClientImpl : public ash::ProjectorAppClient {
   void OpenFeedbackDialog() const override;
   void GetVideo(
       const std::string& video_file_id,
-      const std::string& resource_key,
+      const absl::optional<std::string>& resource_key,
       ash::ProjectorAppClient::OnGetVideoCallback callback) const override;
-  void SetAnnotatorPageHandler(ash::AnnotatorPageHandlerImpl* handler) override;
+  void SetAnnotatorPageHandler(
+      ash::UntrustedAnnotatorPageHandlerImpl* handler) override;
   void ResetAnnotatorPageHandler(
-      ash::AnnotatorPageHandlerImpl* handler) override;
+      ash::UntrustedAnnotatorPageHandlerImpl* handler) override;
   void SetTool(const ash::AnnotatorTool& tool) override;
   void Clear() override;
   void NotifyAppUIActive(bool active) override;
   void ToggleFileSyncingNotificationForPaths(
       const std::vector<base::FilePath>& screencast_paths,
       bool suppress) override;
+  void HandleAccountReauth(const std::string& email) override;
 
-  ash::AnnotatorPageHandlerImpl* get_annotator_handler_for_test() {
+  ash::UntrustedAnnotatorPageHandlerImpl* get_annotator_handler_for_test() {
     return annotator_handler_;
   }
   PendingScreencastManager* get_pending_screencast_manager_for_test() {
@@ -71,7 +75,7 @@ class ProjectorAppClientImpl : public ash::ProjectorAppClient {
 
  private:
   void NotifyScreencastsPendingStatusChanged(
-      const ash::PendingScreencastSet& pending_screencast);
+      const ash::PendingScreencastContainerSet& pending_screencast_containers);
 
   base::ObserverList<Observer> observers_;
 
@@ -80,7 +84,8 @@ class ProjectorAppClientImpl : public ash::ProjectorAppClient {
 
   ash::ScreencastManager screencast_manager_;
 
-  ash::AnnotatorPageHandlerImpl* annotator_handler_ = nullptr;
+  raw_ptr<ash::UntrustedAnnotatorPageHandlerImpl, ExperimentalAsh>
+      annotator_handler_ = nullptr;
 };
 
 #endif  // CHROME_BROWSER_UI_ASH_PROJECTOR_PROJECTOR_APP_CLIENT_IMPL_H_

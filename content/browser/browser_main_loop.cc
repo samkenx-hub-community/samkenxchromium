@@ -102,10 +102,12 @@
 #include "content/browser/webui/content_web_ui_configs.h"
 #include "content/browser/webui/url_data_manager.h"
 #include "content/common/content_switches_internal.h"
+#include "content/common/features.h"
 #include "content/common/pseudonymization_salt.h"
 #include "content/common/skia_utils.h"
 #include "content/common/thread_pool_util.h"
 #include "content/public/browser/audio_service.h"
+#include "content/public/browser/background_tracing_manager.h"
 #include "content/public/browser/browser_main_parts.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
@@ -179,7 +181,7 @@
 #endif
 
 #if BUILDFLAG(IS_MAC)
-#include "base/mac/scoped_nsautorelease_pool.h"
+#include "base/apple/scoped_nsautorelease_pool.h"
 #include "content/browser/renderer_host/browser_compositor_view_mac.h"
 #include "content/browser/theme_helper_mac.h"
 #include "ui/accelerated_widget_mac/window_resize_helper_mac.h"
@@ -238,7 +240,7 @@
 #endif
 
 #if defined(ENABLE_IPC_FUZZER) && BUILDFLAG(IS_MAC)
-#include "base/mac/foundation_util.h"
+#include "base/apple/foundation_util.h"
 #endif
 
 #if BUILDFLAG(MOJO_RANDOM_DELAYS_ENABLED)
@@ -330,7 +332,7 @@ bool GetBuildDirectory(base::FilePath* result) {
     return false;
 
 #if BUILDFLAG(IS_MAC)
-  if (base::mac::AmIBundled()) {
+  if (base::apple::AmIBundled()) {
     // The bundled app executables (Chromium, TestShell, etc) live three
     // levels down from the build directory, eg:
     // Chromium.app/Contents/MacOS/Chromium
@@ -574,10 +576,10 @@ int BrowserMainLoop::EarlyInitialization() {
   DCHECK(base::CurrentUIThread::IsSet());
   base::PlatformThread::SetCurrentThreadType(base::ThreadType::kCompositing);
 
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || \
+#if BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || \
     BUILDFLAG(IS_ANDROID)
   // We use quite a few file descriptors for our IPC as well as disk the disk
-  // cache,and the default limit on the Mac is low (256), so bump it up.
+  // cache, and the default limit on Apple is low (256), so bump it up.
 
   // Same for Linux. The default various per distro, but it is 1024 on Fedora.
   // Low soft limits combined with liberal use of file descriptors means power
@@ -738,11 +740,6 @@ void BrowserMainLoop::PostCreateMainMessageLoop() {
     InitSkiaEventTracer();
     base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
         skia::SkiaMemoryDumpProvider::GetInstance(), "Skia", nullptr);
-
-    // For in-browser tests, we still need to call this to respect the
-    // force-skia-analytic-aa switch
-    // https://crbug.com/1421297
-    InitializeSkiaAnalyticAntialiasing();
   }
 
   base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
@@ -758,7 +755,8 @@ void BrowserMainLoop::PostCreateMainMessageLoop() {
   {
     TRACE_EVENT0("startup",
                  "BrowserMainLoop::Subsystem:BrowserAccessibilityStateImpl");
-    BrowserAccessibilityStateImpl::GetInstance()->InitBackgroundTasks();
+    browser_accessibility_state_ = BrowserAccessibilityStateImpl::Create();
+    browser_accessibility_state_->InitBackgroundTasks();
   }
 }
 
@@ -768,6 +766,12 @@ void BrowserMainLoop::CreateMessageLoopForEarlyShutdown() {
 
 int BrowserMainLoop::PreCreateThreads() {
   TRACE_EVENT0("startup", "BrowserMainLoop::PreCreateThreads");
+
+  // This must occur before metrics recording initialization in
+  // ChromeBrowserMainParts::PreCreateThreads() because it's used in
+  // BackgroundTracingMetricsProvider.
+  background_tracing_manager_ =
+      content::BackgroundTracingManagerImpl::CreateInstance();
 
   // Make sure no accidental call to initialize GpuDataManager earlier.
   DCHECK(!GpuDataManagerImpl::Initialized());
@@ -791,7 +795,7 @@ int BrowserMainLoop::PreCreateThreads() {
   }
 #endif
 
-#if BUILDFLAG(ENABLE_LIBRARY_CDMS) || BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(ENABLE_LIBRARY_CDMS)
   // Prior to any processing happening on the IO thread, we create the
   // CDM service as it is predominantly used from the IO thread. This must
   // be called on the main thread since it involves file path checks.
@@ -818,9 +822,10 @@ int BrowserMainLoop::PreCreateThreads() {
   // while avoiding doing so in unit tests by making it explicitly enabled here.
   GpuDataManagerImpl::GetInstance()->StartUmaTimer();
 
-#if !BUILDFLAG(GOOGLE_CHROME_BRANDING) || BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(GOOGLE_CHROME_BRANDING) || BUILDFLAG(IS_ANDROID) || \
+    BUILDFLAG(IS_IOS)
   // Single-process is an unsupported and not fully tested mode, so
-  // don't enable it for official Chrome builds (except on Android).
+  // don't enable it for official Chrome builds (except on Android and iOS).
   if (parsed_command_line_->HasSwitch(switches::kSingleProcess))
     RenderProcessHost::SetRunRendererInProcess(true);
 #endif
@@ -873,11 +878,11 @@ void BrowserMainLoop::CreateStartupTasks() {
       &BrowserMainLoop::PreMainMessageLoopRun, base::Unretained(this));
   startup_task_runner_->AddTask(std::move(pre_main_message_loop_run));
 
-// On Android, the native message loop is already running when the app is
-// entered and startup tasks are run asynchrously from it.
+// On Android and iOS, the native message loop is already running when the app
+// is entered and startup tasks are run asynchrously from it.
 // InterceptMainMessageLoopRun() thus needs to be forced instead of happening
 // from MainMessageLoopRun().
-#if BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
   StartupTask intercept_main_message_loop_run = base::BindOnce(
       [](BrowserMainLoop* self) {
         // Lambda to ignore the return value and always keep a clean exit code
@@ -1201,6 +1206,13 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
     ResetThread_IO(std::move(io_thread_));
   }
 
+  // Must be done before ThreadPool shutdown since the trace report database
+  // lives on the ThreadPool.
+  {
+    TRACE_EVENT0("shutdown", "BrowserMainLoop::Subsystem::TracingManager");
+    background_tracing_manager_.reset();
+  }
+
   {
     TRACE_EVENT0("shutdown", "BrowserMainLoop::Subsystem:ThreadPool");
     base::ThreadPoolInstance::Get()->Shutdown();
@@ -1421,9 +1433,7 @@ void BrowserMainLoop::PostCreateThreadsImpl() {
     GpuProcessHost::Get(GPU_PROCESS_KIND_SANDBOXED, true /* force_create */);
   }
 
-#if BUILDFLAG(IS_WIN)
   GpuDataManagerImpl::GetInstance()->PostCreateThreads();
-#endif
 
   if (MediaKeysListenerManager::IsMediaKeysListenerManagerEnabled()) {
     media_keys_listener_manager_ =
@@ -1436,6 +1446,11 @@ void BrowserMainLoop::PostCreateThreadsImpl() {
 
 #if BUILDFLAG(IS_ANDROID)
   media::SetMediaDrmBridgeClient(GetContentClient()->GetMediaDrmBridgeClient());
+
+  // On Android this must be done after SetMediaDrmBridgeClient(). For Android
+  // all CDMs are part of the OS, so no file checks are involved.
+  CdmRegistry::GetInstance()->Init();
+
   if (base::FeatureList::IsEnabled(features::kFontSrcLocalMatching)) {
     FontUniqueNameLookup::GetInstance();
   }

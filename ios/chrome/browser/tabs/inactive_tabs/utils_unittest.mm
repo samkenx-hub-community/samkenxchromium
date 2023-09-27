@@ -6,20 +6,20 @@
 
 #import "base/test/scoped_feature_list.h"
 #import "base/test/task_environment.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
-#import "ios/chrome/browser/main/test_browser.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper_delegate.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
+#import "ios/chrome/browser/shared/model/web_state_list/test/fake_web_state_list_delegate.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_opener.h"
 #import "ios/chrome/browser/snapshots/snapshot_browser_agent.h"
 #import "ios/chrome/browser/snapshots/snapshot_tab_helper.h"
-#import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/tabs/inactive_tabs/features.h"
 #import "ios/chrome/browser/tabs/inactive_tabs/utils.h"
-#import "ios/chrome/browser/url/chrome_url_constants.h"
 #import "ios/chrome/browser/web/web_navigation_util.h"
-#import "ios/chrome/browser/web_state_list/fake_web_state_list_delegate.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/web_state_list/web_state_opener.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/web/public/test/fakes/fake_navigation_manager.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
@@ -27,10 +27,6 @@
 #import "testing/platform_test.h"
 #import "third_party/ocmock/OCMock/OCMock.h"
 #import "ui/base/device_form_factor.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 // Fake WebStateList delegate that attaches the required tab helper.
 class InactiveTabsFakeWebStateListDelegate : public FakeWebStateListDelegate {
@@ -258,11 +254,8 @@ TEST_F(InactiveTabsUtilsTest, ComplicatedMove) {
   parameters[kTabInactivityThresholdParameterName] =
       kTabInactivityThresholdOneWeekParam;
   feature_list.InitWithFeaturesAndParameters(
-      {
-          /* Enabled features */
-          {kTabInactivityThreshold, {parameters}},
-          {kEnablePinnedTabs, {}},
-      },
+      {/* Enabled features */
+       {kTabInactivityThreshold, {parameters}}},
       {/* Disabled features */});
 
   WebStateList* active_web_state_list = browser_active_->GetWebStateList();
@@ -351,9 +344,7 @@ TEST_F(InactiveTabsUtilsTest, ComplicatedMove) {
 // tabs, un-ordered, pinned tabs).
 TEST_F(InactiveTabsUtilsTest, ComplicatedRestore) {
   base::test::ScopedFeatureList feature_list;
-  feature_list.InitWithFeatures(
-      {/* Enabled features */ kEnablePinnedTabs},
-      {/* Disabled features */ kTabInactivityThreshold});
+  feature_list.InitAndDisableFeature(kTabInactivityThreshold);
 
   WebStateList* active_web_state_list = browser_active_->GetWebStateList();
   WebStateList* inactive_web_state_list = browser_inactive_->GetWebStateList();
@@ -453,4 +444,165 @@ TEST_F(InactiveTabsUtilsTest, DoNotMoveNTPInInactive) {
 
   EXPECT_EQ(active_web_state_list->count(), 1);
   EXPECT_EQ(inactive_web_state_list->count(), 0);
+}
+
+TEST_F(InactiveTabsUtilsTest, EnsurePreferencePriority) {
+  // No inactive tabs on iPad.
+  if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
+    return;
+  }
+  base::test::ScopedFeatureList feature_list;
+  std::map<std::string, std::string> parameters;
+  parameters[kTabInactivityThresholdParameterName] =
+      kTabInactivityThresholdOneWeekParam;
+  feature_list.InitAndEnableFeatureWithParameters(kTabInactivityThreshold,
+                                                  parameters);
+
+  // Test that flags are taken into account instead of pref as we set the
+  // preference default value.
+  local_state_.Get()->SetInteger(prefs::kInactiveTabsTimeThreshold, 0);
+
+  WebStateList* active_web_state_list = browser_active_->GetWebStateList();
+  WebStateList* inactive_web_state_list = browser_inactive_->GetWebStateList();
+
+  EXPECT_EQ(active_web_state_list->count(), 0);
+  EXPECT_EQ(inactive_web_state_list->count(), 0);
+
+  // Add tabs in the active browser.
+  active_web_state_list->InsertWebState(
+      0, CreateInactiveTab(3), WebStateList::INSERT_ACTIVATE, WebStateOpener());
+  active_web_state_list->InsertWebState(0, CreateInactiveTab(10),
+                                        WebStateList::INSERT_ACTIVATE,
+                                        WebStateOpener());
+  active_web_state_list->InsertWebState(0, CreateInactiveTab(30),
+                                        WebStateList::INSERT_ACTIVATE,
+                                        WebStateOpener());
+
+  EXPECT_EQ(active_web_state_list->count(), 3);
+  EXPECT_EQ(inactive_web_state_list->count(), 0);
+
+  MoveTabsFromActiveToInactive(browser_active_.get(), browser_inactive_.get());
+
+  EXPECT_EQ(active_web_state_list->count(), 1);
+  EXPECT_EQ(inactive_web_state_list->count(), 2);
+
+  std::vector<int> expected_inactive_order = {10, 30};
+  CheckOrder(inactive_web_state_list, expected_inactive_order);
+
+  // Set the preference to 14.
+  local_state_.Get()->SetInteger(prefs::kInactiveTabsTimeThreshold, 14);
+  MoveTabsFromInactiveToActive(browser_inactive_.get(), browser_active_.get());
+
+  EXPECT_EQ(active_web_state_list->count(), 2);
+  EXPECT_EQ(inactive_web_state_list->count(), 1);
+
+  std::vector<int> expected_active_order = {10, 3};
+  CheckOrder(active_web_state_list, expected_active_order);
+}
+
+// Ensure that inactive tabs are moved from the active tab list to the inactive
+// tab list.
+TEST_F(InactiveTabsUtilsTest, LimitsTabsMoves) {
+  // No inactive tabs on iPad.
+  if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
+    return;
+  }
+  base::test::ScopedFeatureList feature_list;
+  std::map<std::string, std::string> parameters;
+  parameters[kTabInactivityThresholdParameterName] =
+      kTabInactivityThresholdOneWeekParam;
+  feature_list.InitWithFeaturesAndParameters(
+      {
+          /* Enabled features */
+          {kTabInactivityThreshold, {parameters}},
+          {kInactiveTabsMoveLimit, {}},
+      },
+      {/* Disabled features */});
+
+  WebStateList* active_web_state_list = browser_active_->GetWebStateList();
+  WebStateList* inactive_web_state_list = browser_inactive_->GetWebStateList();
+
+  EXPECT_EQ(active_web_state_list->count(), 0);
+  EXPECT_EQ(inactive_web_state_list->count(), 0);
+
+  // Add 505 inactive tabs (10 days with no activity) in the active browser.
+  for (int insert = 0; insert < 505; insert++) {
+    active_web_state_list->InsertWebState(0, CreateInactiveTab(10),
+                                          WebStateList::INSERT_ACTIVATE,
+                                          WebStateOpener());
+  }
+
+  EXPECT_EQ(active_web_state_list->count(), 505);
+  EXPECT_EQ(inactive_web_state_list->count(), 0);
+
+  // Ensures that moves are limited to 500.
+  MoveTabsFromActiveToInactive(browser_active_.get(), browser_inactive_.get());
+  EXPECT_EQ(active_web_state_list->count(), 5);
+  EXPECT_EQ(inactive_web_state_list->count(), 500);
+
+  // Add 505 active tabs in inactive browser.
+  for (int insert = 0; insert < 505; insert++) {
+    inactive_web_state_list->InsertWebState(
+        0, CreateActiveTab(), WebStateList::INSERT_ACTIVATE, WebStateOpener());
+  }
+  EXPECT_EQ(active_web_state_list->count(), 5);
+  EXPECT_EQ(inactive_web_state_list->count(), 1005);
+
+  // Ensures that moves are limited to 500.
+  MoveTabsFromInactiveToActive(browser_inactive_.get(), browser_active_.get());
+  EXPECT_EQ(active_web_state_list->count(), 505);
+  EXPECT_EQ(inactive_web_state_list->count(), 505);
+}
+
+// Ensure that inactive tabs move are not limited.
+TEST_F(InactiveTabsUtilsTest, NoLimitsTabsMoves) {
+  // No inactive tabs on iPad.
+  if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
+    return;
+  }
+  base::test::ScopedFeatureList feature_list;
+  std::map<std::string, std::string> parameters;
+  parameters[kTabInactivityThresholdParameterName] =
+      kTabInactivityThresholdOneWeekParam;
+  feature_list.InitWithFeaturesAndParameters(
+      {
+          /* Enabled features */
+          {kTabInactivityThreshold, {parameters}},
+      },
+      {/* Disabled features */
+       kInactiveTabsMoveLimit});
+
+  WebStateList* active_web_state_list = browser_active_->GetWebStateList();
+  WebStateList* inactive_web_state_list = browser_inactive_->GetWebStateList();
+
+  EXPECT_EQ(active_web_state_list->count(), 0);
+  EXPECT_EQ(inactive_web_state_list->count(), 0);
+
+  // Add 505 inactive tabs (10 days with no activity) in the active browser.
+  for (int insert = 0; insert < 505; insert++) {
+    active_web_state_list->InsertWebState(0, CreateInactiveTab(10),
+                                          WebStateList::INSERT_ACTIVATE,
+                                          WebStateOpener());
+  }
+
+  EXPECT_EQ(active_web_state_list->count(), 505);
+  EXPECT_EQ(inactive_web_state_list->count(), 0);
+
+  // Ensures that moves are limited to 500.
+  MoveTabsFromActiveToInactive(browser_active_.get(), browser_inactive_.get());
+  EXPECT_EQ(active_web_state_list->count(), 0);
+  EXPECT_EQ(inactive_web_state_list->count(), 505);
+
+  // Add 505 active tabs in inactive browser.
+  for (int insert = 0; insert < 505; insert++) {
+    inactive_web_state_list->InsertWebState(
+        0, CreateActiveTab(), WebStateList::INSERT_ACTIVATE, WebStateOpener());
+  }
+  EXPECT_EQ(active_web_state_list->count(), 0);
+  EXPECT_EQ(inactive_web_state_list->count(), 1010);
+
+  // Ensures that moves are limited to 500.
+  MoveTabsFromInactiveToActive(browser_inactive_.get(), browser_active_.get());
+  EXPECT_EQ(active_web_state_list->count(), 505);
+  EXPECT_EQ(inactive_web_state_list->count(), 505);
 }

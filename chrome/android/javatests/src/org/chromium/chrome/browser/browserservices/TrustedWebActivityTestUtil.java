@@ -5,11 +5,11 @@
 package org.chromium.chrome.browser.browserservices;
 
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.browser.customtabs.CustomTabsService;
 import androidx.browser.customtabs.CustomTabsSessionToken;
 import androidx.browser.customtabs.TrustedWebUtils;
+import androidx.test.core.app.ApplicationProvider;
 
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.cc.input.BrowserControlsState;
@@ -57,7 +57,7 @@ public class TrustedWebActivityTestUtil {
     /** Creates an Intent that will launch a Custom Tab to the given |url|. */
     public static Intent createTrustedWebActivityIntent(String url) {
         Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
-                InstrumentationRegistry.getTargetContext(), url);
+                ApplicationProvider.getApplicationContext(), url);
         intent.putExtra(TrustedWebUtils.EXTRA_LAUNCH_AS_TRUSTED_WEB_ACTIVITY, true);
         return intent;
     }

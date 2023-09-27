@@ -7,9 +7,10 @@
       "backgroundColor": "#FFFFFF"
     },
     {
-      "name": "LayoutNGTextControlSingleLine INPUT id='root'",
+      "name": "LayoutTextControlSingleLine INPUT id='root'",
       "position": [-1, -1],
       "bounds": [74, 24],
+      "contentsOpaqueForText": true,
       "backgroundColor": "#FFFFFF",
       "invalidations": [
         [0, 0, 74, 24]
@@ -17,31 +18,14 @@
       "transform": 1
     },
     {
-      "name": "LayoutNGTextControlInnerEditor DIV",
-      "bounds": [64, 16],
-      "drawsContent": false,
-      "transform": 2
-    },
-    {
-      "name": "LayoutNGTextControlInnerEditor DIV",
-      "bounds": [74, 16],
-      "invalidations": [
-        [0, 0, 74, 16]
-      ],
-      "transform": 3
-    },
-    {
       "name": "Caret",
       "position": [63, 0],
       "bounds": [1, 16],
       "contentsOpaque": true,
-      "invalidations": [
-        [0, 0, 1, 16]
-      ],
       "transform": 2
     },
     {
-      "name": "LayoutNGTextControlSingleLine INPUT id='root'",
+      "name": "LayoutTextControlSingleLine INPUT id='root'",
       "position": [-1, -1],
       "bounds": [74, 24],
       "invalidations": [
@@ -68,16 +52,6 @@
         [0, 1, 0, 0],
         [0, 0, 1, 0],
         [4, 3, 0, 1]
-      ]
-    },
-    {
-      "id": 3,
-      "parent": 2,
-      "transform": [
-        [1, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 0, 1, 0],
-        [-10, 0, 0, 1]
       ]
     }
   ]

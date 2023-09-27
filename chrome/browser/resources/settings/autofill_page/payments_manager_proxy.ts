@@ -69,11 +69,6 @@ export interface PaymentsManagerProxy {
   setCreditCardFidoAuthEnabledState(enabled: boolean): void;
 
   /**
-   * Requests the list of UPI IDs from personal data.
-   */
-  getUpiIdList(): Promise<string[]>;
-
-  /**
    * Enrolls the card into virtual cards.
    */
   addVirtualCard(cardId: string): void;
@@ -87,6 +82,26 @@ export interface PaymentsManagerProxy {
    * A null response means that there is no platform authenticator.
    */
   isUserVerifyingPlatformAuthenticatorAvailable(): Promise<boolean|null>;
+
+  /**
+   * Authenticate the user via device authentication and flip the mandatory auth
+   * toggle is successful.
+   */
+  authenticateUserAndFlipMandatoryAuthToggle(): void;
+
+  /**
+   * Authenticate the user via device authentication and display the edit dialog
+   * for local card if the auth is successful.
+   */
+  authenticateUserToEditLocalCard(): Promise<boolean>;
+
+  // <if expr="is_win or is_macosx">
+  /**
+   * Returns true if there is authentication available on this device (biometric
+   * or screen lock), false otherwise.
+   */
+  checkIfDeviceAuthAvailable(): Promise<boolean>;
+  // </if>
 }
 
 /**
@@ -145,10 +160,6 @@ export class PaymentsManagerImpl implements PaymentsManagerProxy {
     chrome.autofillPrivate.setCreditCardFIDOAuthEnabledState(enabled);
   }
 
-  getUpiIdList() {
-    return chrome.autofillPrivate.getUpiIdList();
-  }
-
   addVirtualCard(cardId: string) {
     chrome.autofillPrivate.addVirtualCard(cardId);
   }
@@ -165,6 +176,20 @@ export class PaymentsManagerImpl implements PaymentsManagerProxy {
     return window.PublicKeyCredential
         .isUserVerifyingPlatformAuthenticatorAvailable();
   }
+
+  authenticateUserAndFlipMandatoryAuthToggle() {
+    chrome.autofillPrivate.authenticateUserAndFlipMandatoryAuthToggle();
+  }
+
+  authenticateUserToEditLocalCard() {
+    return chrome.autofillPrivate.authenticateUserToEditLocalCard();
+  }
+
+  // <if expr="is_win or is_macosx">
+  checkIfDeviceAuthAvailable() {
+    return chrome.autofillPrivate.checkIfDeviceAuthAvailable();
+  }
+  // </if>
 
   static getInstance(): PaymentsManagerProxy {
     return instance || (instance = new PaymentsManagerImpl());

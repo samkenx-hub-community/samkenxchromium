@@ -100,12 +100,6 @@ WebAuthenticationRequestProxy* WebAuthenticationDelegate::MaybeGetRequestProxy(
 }
 #endif  // !IS_ANDROID
 
-#if BUILDFLAG(IS_WIN)
-void WebAuthenticationDelegate::OperationSucceeded(
-    BrowserContext* browser_context,
-    bool used_win_api) {}
-#endif
-
 #if BUILDFLAG(IS_MAC)
 absl::optional<WebAuthenticationDelegate::TouchIdAuthenticatorConfig>
 WebAuthenticationDelegate::GetTouchIdAuthenticatorConfig(
@@ -127,10 +121,6 @@ base::android::ScopedJavaLocalRef<jobject>
 WebAuthenticationDelegate::GetIntentSender(WebContents* web_contents) {
   return nullptr;
 }
-
-int WebAuthenticationDelegate::GetSupportLevel(WebContents* web_contents) {
-  return 2 /* browser-like support */;
-}
 #endif
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -149,6 +139,11 @@ bool AuthenticatorRequestClientDelegate::DoesBlockRequestOnFailure(
   return false;
 }
 
+void AuthenticatorRequestClientDelegate::OnTransactionSuccessful(
+    RequestSource request_source,
+    device::FidoRequestType request_type,
+    device::AuthenticatorType authenticator_type) {}
+
 void AuthenticatorRequestClientDelegate::RegisterActionCallbacks(
     base::OnceClosure cancel_callback,
     base::RepeatingClosure start_over_callback,
@@ -164,9 +159,11 @@ void AuthenticatorRequestClientDelegate::ShouldReturnAttestation(
   std::move(callback).Run(!is_enterprise_attestation);
 }
 
-void AuthenticatorRequestClientDelegate::ConfigureCable(
+void AuthenticatorRequestClientDelegate::ConfigureDiscoveries(
     const url::Origin& origin,
-    device::CableRequestType request_type,
+    const std::string& rp_id,
+    RequestSource request_source,
+    device::FidoRequestType request_type,
     absl::optional<device::ResidentKeyRequirement> resident_key_requirement,
     base::span<const device::CableDiscoveryData> pairings_from_extension,
     device::FidoDiscoveryFactory* fido_discovery_factory) {}

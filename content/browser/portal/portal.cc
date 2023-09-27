@@ -20,6 +20,7 @@
 #include "content/browser/renderer_host/render_frame_host_manager.h"
 #include "content/browser/renderer_host/render_frame_proxy_host.h"
 #include "content/browser/web_contents/web_contents_impl.h"
+#include "content/browser/web_contents/web_contents_view.h"
 #include "content/public/browser/render_widget_host_iterator.h"
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/common/page_type.h"
@@ -275,11 +276,17 @@ void Portal::Navigate(const GURL& url,
   // this call.
   const blink::LocalFrameToken frame_token =
       owner_render_frame_host_->GetFrameToken();
+  absl::optional<GURL> initiator_base_url;
+  if (!owner_render_frame_host_->GetInheritedBaseUrl().is_empty() &&
+      (out_validated_url.IsAboutBlank() || out_validated_url.IsAboutSrcdoc())) {
+    // Note: GetInheritedBaseUrl() will only be non-empty when
+    // blink::features::IsNewBaseUrlInheritanceBehaviour is true.
+    initiator_base_url = owner_render_frame_host_->GetInheritedBaseUrl();
+  }
   portal_root->navigator().NavigateFromFrameProxy(
       portal_frame, out_validated_url, &frame_token,
       owner_render_frame_host_->GetProcess()->GetID(),
-      owner_render_frame_host_->GetLastCommittedOrigin(),
-      owner_render_frame_host_->GetInheritedBaseUrl(),
+      owner_render_frame_host_->GetLastCommittedOrigin(), initiator_base_url,
       owner_render_frame_host_->GetSiteInstance(),
       mojo::ConvertTo<Referrer>(referrer), ui::PAGE_TRANSITION_LINK,
       should_replace_entry, download_policy, "GET", nullptr, "", nullptr,
@@ -519,7 +526,7 @@ std::pair<bool, blink::mojom::PortalActivateResult> Portal::CanActivate() {
 
   // If no navigation has yet committed in the portal, it cannot be activated as
   // this would lead to an empty tab contents (without even an about:blank).
-  if (portal_controller.GetLastCommittedEntry()->IsInitialEntry()) {
+  if (portal_contents_->GetPrimaryMainFrame()->is_initial_empty_document()) {
     return std::make_pair(
         false,
         blink::mojom::PortalActivateResult::kRejectedDueToPortalNotReady);
@@ -638,6 +645,7 @@ void Portal::ActivateImpl(blink::TransferableMessage data,
         outer_contents_main_frame_view);
     touch_events =
         outer_contents_main_frame_view->ExtractAndCancelActiveTouches();
+    outer_contents->GetView()->CancelDragDropForPortalActivation();
     FlushTouchEventQueues(outer_contents_main_frame_view->host());
   }
 
@@ -726,6 +734,9 @@ void Portal::WebContentsHolder::SetOwned(
     std::unique_ptr<WebContents> web_contents) {
   SetUnowned(static_cast<WebContentsImpl*>(web_contents.get()));
   owned_contents_ = std::move(web_contents);
+  if (owned_contents_) {
+    owned_contents_->SetOwnerLocationForDebug(FROM_HERE);
+  }
 }
 
 void Portal::WebContentsHolder::Clear() {

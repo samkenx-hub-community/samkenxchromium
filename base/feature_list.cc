@@ -87,16 +87,8 @@ class EarlyFeatureAccessTracker {
     SCOPED_CRASH_KEY_STRING256("FeatureList", "feature-accessed-too-early",
                                feature->name);
 #endif  // !BUILDFLAG(IS_NACL)
-    // Fail if DCHECKs are enabled.
-    DCHECK(!feature) << "Accessed feature " << feature->name
-                     << " before FeatureList registration.";
-    // TODO(crbug.com/1383852): When we believe that all early accesses have
-    // been fixed, remove this base::debug::DumpWithoutCrashing() and change the
-    // above DCHECK to a CHECK.
-
-    // The following line is commented to reduce the crash volume while a fix
-    // for crbug.com/1392145 is prepared.
-    // base::debug::DumpWithoutCrashing();
+    CHECK(!feature) << "Accessed feature " << feature->name
+                    << " before FeatureList registration.";
 #endif  // !BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_ANDROID) &&
         // !BUILDFLAG(IS_CHROMEOS)
   }

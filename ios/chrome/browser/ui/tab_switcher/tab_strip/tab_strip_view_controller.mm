@@ -5,21 +5,19 @@
 #import "ios/chrome/browser/ui/tab_switcher/tab_strip/tab_strip_view_controller.h"
 
 #import "base/allocator/partition_allocator/partition_alloc.h"
+#import "base/apple/foundation_util.h"
 #import "base/ios/ios_util.h"
-#import "base/mac/foundation_util.h"
 #import "base/numerics/safe_conversions.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_strip/tab_strip_cell.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_strip/tab_strip_mediator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_strip/tab_strip_view_layout.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_switcher_item.h"
+#import "ios/chrome/browser/ui/tab_switcher/tab_utils.h"
 #import "ios/chrome/common/button_configuration_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "ios/web/public/web_state_id.h"
 
 namespace {
 
@@ -45,7 +43,7 @@ const CGFloat kSymbolSize = 18;
 @property(nonatomic, strong) NSMutableArray<TabSwitcherItem*>* items;
 // Identifier of the selected item. This value is disregarded if `self.items` is
 // empty.
-@property(nonatomic, copy) NSString* selectedItemID;
+@property(nonatomic, assign) web::WebStateID selectedItemID;
 // Index of the selected item in `items`.
 @property(nonatomic, readonly) NSUInteger selectedIndex;
 // Constraints that are used when the button needs to be kept next to the last
@@ -75,24 +73,41 @@ const CGFloat kSymbolSize = 18;
 
   self.buttonNewTab = [[UIButton alloc] init];
   self.buttonNewTab.translatesAutoresizingMaskIntoConstraints = NO;
-  self.buttonNewTab.imageView.contentMode = UIViewContentModeCenter;
   UIImage* buttonNewTabImage =
       DefaultSymbolWithPointSize(kPlusSymbol, kSymbolSize);
-  [self.buttonNewTab setImage:buttonNewTabImage forState:UIControlStateNormal];
-  [self.buttonNewTab.imageView setTintColor:[UIColor colorNamed:kGrey500Color]];
 
-  // TODO(crbug.com/1418068): Simplify after minimum version required is >=
-  // iOS 15.
-  if (base::ios::IsRunningOnIOS15OrLater() &&
-      IsUIButtonConfigurationEnabled()) {
-    if (@available(iOS 15, *)) {
-      UIButtonConfiguration* buttonConfiguration =
-          [UIButtonConfiguration plainButtonConfiguration];
-      buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
-          0, kNewTabButtonLeadingImageInset, kNewTabButtonBottomImageInset, 0);
-      self.buttonNewTab.configuration = buttonConfiguration;
-    }
+  if (IsUIButtonConfigurationEnabled()) {
+    UIButtonConfiguration* buttonConfiguration =
+        [UIButtonConfiguration plainButtonConfiguration];
+    buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
+        0, kNewTabButtonLeadingImageInset, kNewTabButtonBottomImageInset, 0);
+    buttonConfiguration.image = buttonNewTabImage;
+    buttonConfiguration.baseForegroundColor =
+        [UIColor colorNamed:kGrey500Color];
+    self.buttonNewTab.configuration = buttonConfiguration;
+    self.buttonNewTab.configurationUpdateHandler = ^(UIButton* incomingButton) {
+      UIButtonConfiguration* updatedConfig = incomingButton.configuration;
+      switch (incomingButton.state) {
+        case UIControlStateHighlighted: {
+          updatedConfig.baseForegroundColor =
+              [UIColor colorNamed:kGrey900Color];
+          break;
+        }
+        case UIControlStateNormal:
+          updatedConfig.baseForegroundColor =
+              [UIColor colorNamed:kGrey500Color];
+          break;
+        default:
+          break;
+      }
+      incomingButton.configuration = updatedConfig;
+    };
   } else {
+    self.buttonNewTab.imageView.contentMode = UIViewContentModeCenter;
+    [self.buttonNewTab setImage:buttonNewTabImage
+                       forState:UIControlStateNormal];
+    [self.buttonNewTab.imageView
+        setTintColor:[UIColor colorNamed:kGrey500Color]];
     UIEdgeInsets imageInsets = UIEdgeInsetsMake(
         0, kNewTabButtonLeadingImageInset, kNewTabButtonBottomImageInset, 0);
     SetImageEdgeInsets(self.buttonNewTab, imageInsets);
@@ -136,12 +151,12 @@ const CGFloat kSymbolSize = 18;
     itemIndex = self.items.count - 1;
 
   TabSwitcherItem* item = self.items[itemIndex];
-  TabStripCell* cell = base::mac::ObjCCastStrict<TabStripCell>([collectionView
+  TabStripCell* cell = base::apple::ObjCCastStrict<TabStripCell>([collectionView
       dequeueReusableCellWithReuseIdentifier:kReuseIdentifier
                                 forIndexPath:indexPath]);
 
   [self configureCell:cell withItem:item];
-  cell.selected = [cell hasIdentifier:self.selectedItemID];
+  cell.selected = cell.itemIdentifier == self.selectedItemID;
   return cell;
 }
 
@@ -171,15 +186,9 @@ const CGFloat kSymbolSize = 18;
 #pragma mark - TabStripConsumer
 
 - (void)populateItems:(NSArray<TabSwitcherItem*>*)items
-       selectedItemID:(NSString*)selectedItemID {
-#ifndef NDEBUG
-  // Consistency check: ensure no IDs are duplicated.
-  NSMutableSet<NSString*>* identifiers = [[NSMutableSet alloc] init];
-  for (TabSwitcherItem* item in items) {
-    [identifiers addObject:item.identifier];
-  }
-  CHECK_EQ(identifiers.count, items.count);
-#endif
+       selectedItemID:(web::WebStateID)selectedItemID {
+  // Note: Keep as a DCHECK, as this can be costly.
+  DCHECK(!HasDuplicateIdentifiers(items));
 
   self.items = [items mutableCopy];
   self.selectedItemID = selectedItemID;
@@ -190,11 +199,12 @@ const CGFloat kSymbolSize = 18;
              scrollPosition:UICollectionViewScrollPositionNone];
 }
 
-- (void)replaceItemID:(NSString*)itemID withItem:(TabSwitcherItem*)item {
-  if ([self indexOfItemWithID:itemID] == NSNotFound)
+- (void)replaceItemID:(web::WebStateID)itemID withItem:(TabSwitcherItem*)item {
+  if ([self indexOfItemWithID:itemID] == NSNotFound) {
     return;
+  }
   // Consistency check: `item`'s ID is either `itemID` or not in `items`.
-  DCHECK([item.identifier isEqualToString:itemID] ||
+  DCHECK(item.identifier == itemID ||
          [self indexOfItemWithID:item.identifier] == NSNotFound);
   NSUInteger index = [self indexOfItemWithID:itemID];
   self.items[index] = item;
@@ -205,9 +215,10 @@ const CGFloat kSymbolSize = 18;
     [self configureCell:cell withItem:item];
 }
 
-- (void)selectItemWithID:(NSString*)selectedItemID {
-  if ([self.selectedItemID isEqualToString:selectedItemID])
+- (void)selectItemWithID:(web::WebStateID)selectedItemID {
+  if (self.selectedItemID == selectedItemID) {
     return;
+  }
 
   [self.collectionView
       deselectItemAtIndexPath:CreateIndexPath(self.selectedIndex)
@@ -238,25 +249,23 @@ const CGFloat kSymbolSize = 18;
     cell.delegate = self;
     cell.itemIdentifier = item.identifier;
     cell.titleLabel.text = item.title;
-    NSString* itemIdentifier = item.identifier;
-    [self.faviconDataSource
-        faviconForIdentifier:itemIdentifier
-                  completion:^(UIImage* icon) {
-                    // Only update the icon if the cell is not
-                    // already reused for another item.
-                    if ([cell hasIdentifier:itemIdentifier])
-                      cell.faviconView.image = icon;
-                  }];
-    cell.selected = [cell hasIdentifier:self.selectedItemID];
+    [item fetchFavicon:^(TabSwitcherItem* innerItem, UIImage* icon) {
+      // Only update the icon if the cell is not
+      // already reused for another item.
+      if (cell.itemIdentifier == innerItem.identifier) {
+        cell.faviconView.image = icon;
+      }
+    }];
+    cell.selected = cell.itemIdentifier == self.selectedItemID;
   }
 }
 
 // Returns the index in `self.items` of the first item whose identifier is
 // `identifier`.
-- (NSUInteger)indexOfItemWithID:(NSString*)identifier {
+- (NSUInteger)indexOfItemWithID:(web::WebStateID)identifier {
   auto selectedTest =
       ^BOOL(TabSwitcherItem* item, NSUInteger index, BOOL* stop) {
-        return [item.identifier isEqualToString:identifier];
+        return item.identifier == identifier;
       };
   return [self.items indexOfObjectPassingTest:selectedTest];
 }

@@ -11,16 +11,32 @@
 
 class GURL;
 
+enum class ImageCopyResult {
+  kImage,
+  kURL,
+};
+
 // Stores `url` in the pasteboard. `url` must be valid.
 void StoreURLInPasteboard(const GURL& url);
 
-// Stores `urls` in the pasteboard. `urls` must not be empty and each url
-// within `urls` must be valid. (Use `ClearPasteboard()` explicitly to clear
-// existing items.)
+// Stores `urls` in the pasteboard.
+// (Use `ClearPasteboard()` explicitly to clear existing items.)
 void StoreURLsInPasteboard(const std::vector<const GURL>& urls);
 
 // Stores `text` and `url` into the pasteboard.
 void StoreInPasteboard(NSString* text, const GURL& url);
+
+// Stores `text` into the pasteboard.
+void StoreTextInPasteboard(NSString* text);
+
+// Stores the image represented by `data` into the pasteboard. If the image came
+// from a url, `url` can be provided. Otherwise, it should be `nil`. The end
+// result could be an image or a url copied to the pasteboard. The return value
+// indicates which.
+ImageCopyResult StoreImageInPasteboard(NSData* data, NSURL* url);
+
+// Stores `item` into the pasteboard.
+void StoreItemInPasteboard(NSDictionary* item);
 
 // Effectively clears any items in the pasteboard.
 void ClearPasteboard();

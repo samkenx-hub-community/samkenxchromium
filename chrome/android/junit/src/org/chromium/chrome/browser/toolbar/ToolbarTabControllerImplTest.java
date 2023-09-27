@@ -13,8 +13,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import android.text.TextUtils;
-
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -30,7 +28,9 @@ import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.Supplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.JniMocker;
+import org.chromium.chrome.browser.common.ChromeUrlConstants;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.homepage.HomepageManager;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.profiles.ProfileJni;
@@ -38,11 +38,13 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.toolbar.bottom.BottomControlsCoordinator;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.chrome.test.util.browser.Features;
-import org.chromium.components.embedder_support.util.UrlConstants;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.feature_engagement.EventConstants;
 import org.chromium.components.feature_engagement.Tracker;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.ui.base.PageTransition;
+import org.chromium.url.GURL;
 
 /** Unit tests for ToolbarTabControllerImpl. */
 @RunWith(BaseRobolectricTestRunner.class)
@@ -67,6 +69,8 @@ public class ToolbarTabControllerImplTest {
     @Mock
     private Tab mTab;
     @Mock
+    private Tab mTab2;
+    @Mock
     private Supplier<Boolean> mOverrideHomePageSupplier;
     @Mock
     private ObservableSupplier<BottomControlsCoordinator> mBottomControlsCoordinatorSupplier;
@@ -84,6 +88,8 @@ public class ToolbarTabControllerImplTest {
     public Profile.Natives mMockProfileNatives;
     @Mock
     private NativePage mNativePage;
+    @Mock
+    private Supplier<Tab> mActivityTabProvider;
 
     @Rule
     public TestRule mProcessor = new Features.JUnitProcessor();
@@ -94,6 +100,7 @@ public class ToolbarTabControllerImplTest {
     public void setUp() {
         MockitoAnnotations.initMocks(this);
         doReturn(mTab).when(mTabSupplier).get();
+        doReturn(mTab).when(mActivityTabProvider).get();
         doReturn(false).when(mOverrideHomePageSupplier).get();
         mocker.mock(ProfileJni.TEST_HOOKS, mMockProfileNatives);
         doReturn(mProfile).when(mMockProfileNatives).fromWebContents(any());
@@ -183,17 +190,69 @@ public class ToolbarTabControllerImplTest {
     @Test
     public void openHomepage_loadsHomePage() {
         mToolbarTabController.openHomepage();
-        String homePageUrl = HomepageManager.getHomepageUri();
-        if (TextUtils.isEmpty(homePageUrl)) {
-            homePageUrl = UrlConstants.NTP_URL;
+        GURL homePageGurl = HomepageManager.getHomepageGurl();
+        if (homePageGurl.isEmpty()) {
+            homePageGurl = ChromeUrlConstants.nativeNtpGurl();
         }
         verify(mTab).loadUrl(argThat(new LoadUrlParamsMatcher(
-                new LoadUrlParams(homePageUrl, PageTransition.HOME_PAGE))));
+                new LoadUrlParams(homePageGurl, PageTransition.HOME_PAGE))));
+    }
+
+    @Test
+    @DisableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR,
+            ChromeFeatureList.BACK_GESTURE_ACTIVITY_TAB_PROVIDER})
+    public void
+    testUsingCorrectTabSupplier_refactorOff_controlWithActivityTabProviderOff_usesRegularTabSupplier() {
+        // Should only use regular tab supplier when back press refactor is disabled and
+        // control with activity tab provider is also disabled.
+        setUpUsingCorrectTabSupplier();
+
+        Assert.assertTrue(mToolbarTabController.back());
+        Assert.assertTrue(mToolbarTabController.canGoBack());
+    }
+
+    @Test
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
+    @DisableFeatures(ChromeFeatureList.BACK_GESTURE_ACTIVITY_TAB_PROVIDER)
+    public void
+    testUsingCorrectTabSupplier_refactorOn_controlWithActivityTabProviderOff_doesNotUseRegularTabSupplier() {
+        setUpUsingCorrectTabSupplier();
+
+        Assert.assertFalse(mToolbarTabController.back());
+        Assert.assertFalse(mToolbarTabController.canGoBack());
+    }
+
+    @Test
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_ACTIVITY_TAB_PROVIDER)
+    @DisableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
+    public void
+    testUsingCorrectTabSupplier_refactorOff_controlWithActivityTabProviderOn_doesNotUseRegularTabSupplier() {
+        setUpUsingCorrectTabSupplier();
+
+        Assert.assertFalse(mToolbarTabController.back());
+        Assert.assertFalse(mToolbarTabController.canGoBack());
+    }
+
+    @Test
+    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_ACTIVITY_TAB_PROVIDER,
+            ChromeFeatureList.BACK_GESTURE_ACTIVITY_TAB_PROVIDER})
+    public void
+    testUsingCorrectTabSupplier_refactorOn_controlWithActivityTabProviderOn_doesNotUseRegularTabSupplier() {
+        setUpUsingCorrectTabSupplier();
+
+        Assert.assertFalse(mToolbarTabController.back());
+        Assert.assertFalse(mToolbarTabController.canGoBack());
     }
 
     private void initToolbarTabController() {
         mToolbarTabController = new ToolbarTabControllerImpl(mTabSupplier,
                 mOverrideHomePageSupplier, mTrackerSupplier, mBottomControlsCoordinatorSupplier,
-                ToolbarManager::homepageUrl, mRunnable, mTabSupplier);
+                ToolbarManager::homepageUrl, mRunnable, mActivityTabProvider);
+    }
+
+    private void setUpUsingCorrectTabSupplier() {
+        doReturn(mTab2).when(mActivityTabProvider).get();
+        doReturn(false).when(mTab2).canGoBack();
+        doReturn(true).when(mTab).canGoBack();
     }
 }

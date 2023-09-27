@@ -10,6 +10,19 @@ import {gCrWeb} from '//ios/web/public/js_messaging/resources/gcrweb.js';
 import {NON_TEXT_NODE_NAMES}
     from '//ios/web/annotations/resources/annotations_constants.js';
 
+// Simpleton tags with no closing tags (only those used in tests).
+const NO_END_TAGS_NODE_NAMES = new Set([
+  'br'
+]);
+
+/**
+ * Returns count of <chrome_annotation>s.
+ */
+function countAnnotations(): number {
+  let nodes = document.querySelectorAll("chrome_annotation");
+  return nodes.length;
+}
+
 /**
  * Simulate clicking annotation at given `index`.
  */
@@ -51,8 +64,10 @@ function clickAnnotation(index: number): boolean {
           traverse(child);
         }
       }
-      parts.push('</' + tagName + '>');
-      length += tagName.length + 2;
+      if (!NO_END_TAGS_NODE_NAMES.has(tagName)) {
+        parts.push('</' + tagName + '>');
+        length += tagName.length + 2;
+      }
     } else if (node.nodeType === Node.TEXT_NODE && node.textContent) {
       parts.push(node.textContent);
       length += node.textContent.length;
@@ -66,5 +81,6 @@ function clickAnnotation(index: number): boolean {
 
 gCrWeb.annotationsTest = {
   getPageTaggedText,
+  countAnnotations,
   clickAnnotation,
 };

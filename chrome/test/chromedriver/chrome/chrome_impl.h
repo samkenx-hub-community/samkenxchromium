@@ -7,24 +7,22 @@
 
 #include <list>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
 #include "base/values.h"
+#include "chrome/test/chromedriver/chrome/browser_info.h"
 #include "chrome/test/chromedriver/chrome/chrome.h"
-#include "chrome/test/chromedriver/net/sync_websocket_factory.h"
+#include "chrome/test/chromedriver/chrome/devtools_http_client.h"
+#include "chrome/test/chromedriver/chrome/mobile_device.h"
 
 class DevToolsClient;
-class DevToolsClientImpl;
 class DevToolsEventListener;
-class DevToolsHttpClient;
 class PageTracker;
 class Status;
 class WebView;
 class WebViewImpl;
-class WebViewsInfo;
-struct BrowserInfo;
-struct DeviceMetrics;
 
 class ChromeImpl : public Chrome {
  public:
@@ -60,20 +58,18 @@ class ChromeImpl : public Chrome {
   DevToolsClient* Client() const;
 
  protected:
-  ChromeImpl(std::unique_ptr<DevToolsHttpClient> http_client,
+  ChromeImpl(BrowserInfo browser_info,
+             std::set<WebViewInfo::Type> window_types,
              std::unique_ptr<DevToolsClient> websocket_client,
              std::vector<std::unique_ptr<DevToolsEventListener>>
                  devtools_event_listeners,
-             std::unique_ptr<DeviceMetrics> device_metrics,
-             SyncWebSocketFactory socket_factory,
+             absl::optional<MobileDevice> mobile_device,
              std::string page_load_strategy);
 
   virtual Status QuitImpl() = 0;
-
-  Status CreateClient(const std::string& id,
-                      std::unique_ptr<DevToolsClientImpl>* client);
-  Status CloseFrontends(const std::string& for_client_id);
   Status CloseTarget(const std::string& id);
+
+  bool IsBrowserWindow(const WebViewInfo& view) const;
 
   struct Window {
     int id;
@@ -84,18 +80,17 @@ class ChromeImpl : public Chrome {
     int height;
   };
   virtual Status GetWindow(const std::string& target_id, Window* window);
-  Status ParseWindow(const base::Value& params, Window* window);
-  Status ParseWindowBounds(const base::Value& params, Window* window);
+  Status ParseWindow(const base::Value::Dict& params, Window* window);
+  Status ParseWindowBounds(const base::Value::Dict& params, Window* window);
   Status GetWindowBounds(int window_id, Window* window);
   Status SetWindowBounds(Window* window,
                          const std::string& target_id,
                          std::unique_ptr<base::Value::Dict> bounds);
-  Status GetWebViewsInfo(WebViewsInfo* views_info);
 
   bool quit_ = false;
-  std::unique_ptr<DeviceMetrics> device_metrics_;
-  SyncWebSocketFactory socket_factory_;
-  std::unique_ptr<DevToolsHttpClient> devtools_http_client_;
+  absl::optional<MobileDevice> mobile_device_;
+  BrowserInfo browser_info_;
+  std::set<WebViewInfo::Type> window_types_;
   std::unique_ptr<DevToolsClient> devtools_websocket_client_;
 
  private:

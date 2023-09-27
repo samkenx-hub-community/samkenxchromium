@@ -4,6 +4,7 @@
 
 #include "ash/system/audio/unified_volume_slider_controller.h"
 
+#include "ash/constants/ash_features.h"
 #include "ash/constants/quick_settings_catalogs.h"
 #include "ash/system/audio/unified_volume_view.h"
 #include "base/metrics/histogram_functions.h"
@@ -30,7 +31,7 @@ UnifiedVolumeSliderController::UnifiedVolumeSliderController(
           CrasAudioHandler::kMetricsDelayTimerInterval,
           /*receiver=*/this,
           &UnifiedVolumeSliderController::RecordVolumeSourceMetric) {
-  DCHECK(delegate);
+  CHECK(delegate);
 }
 
 UnifiedVolumeSliderController::UnifiedVolumeSliderController()
@@ -61,8 +62,9 @@ void UnifiedVolumeSliderController::SetMapDeviceSliderCallbackForTest(
   g_map_slider_device_callback = map_slider_device_callback;
 }
 
-views::View* UnifiedVolumeSliderController::CreateView() {
-  return new UnifiedVolumeView(this, delegate_, /*is_active_output_node=*/true);
+std::unique_ptr<UnifiedSliderView> UnifiedVolumeSliderController::CreateView() {
+  return std::make_unique<UnifiedVolumeView>(this, delegate_,
+                                             /*is_active_output_node=*/true);
 }
 
 QsSliderCatalogName UnifiedVolumeSliderController::GetCatalogName() {
@@ -74,22 +76,32 @@ void UnifiedVolumeSliderController::SliderValueChanged(
     float value,
     float old_value,
     views::SliderChangeReason reason) {
-  if (reason != views::SliderChangeReason::kByUser)
+  if (reason != views::SliderChangeReason::kByUser) {
     return;
-
-  const int level = value * 100;
-
-  if (level != CrasAudioHandler::Get()->GetOutputVolumePercent()) {
-    TrackValueChangeUMA(/*going_up=*/level >
-                        CrasAudioHandler::Get()->GetOutputVolumePercent());
   }
 
-  CrasAudioHandler::Get()->SetOutputVolumePercent(level);
+  const int level = value * 100;
+  auto* const audio_handler = CrasAudioHandler::Get();
+
+  // If the `level` doesn't change, don't do anything.
+  if (level == audio_handler->GetOutputVolumePercent()) {
+    return;
+  }
+
+  TrackValueChangeUMA(/*going_up=*/level >
+                      audio_handler->GetOutputVolumePercent());
+  audio_handler->SetOutputVolumePercent(level);
+
+  // For QsRevamp: Manually sets the mute state since we don't distinguish muted
+  // and level is 0 state in QsRevamp.
+  if (features::IsQsRevampEnabled() && level == 0) {
+    audio_handler->SetOutputMute(/*mute_on=*/true);
+  }
 
   // If the volume is above certain level and it's muted, it should be unmuted.
-  if (CrasAudioHandler::Get()->IsOutputMuted() &&
-      level > CrasAudioHandler::Get()->GetOutputDefaultVolumeMuteThreshold()) {
-    CrasAudioHandler::Get()->SetOutputMute(false);
+  if (audio_handler->IsOutputMuted() &&
+      level > audio_handler->GetOutputDefaultVolumeMuteThreshold()) {
+    audio_handler->SetOutputMute(/*mute_on=*/false);
   }
 
   output_volume_metric_delay_timer_.Reset();
@@ -99,9 +111,16 @@ void UnifiedVolumeSliderController::SliderButtonPressed() {
   auto* const audio_handler = CrasAudioHandler::Get();
   const bool mute = !audio_handler->IsOutputMuted();
 
+  // If the level is 0, the slider is still muted, and nothing needs to be done.
+  if (features::IsQsRevampEnabled() &&
+      audio_handler->GetOutputVolumePercent() == 0) {
+    return;
+  }
+
   TrackToggleUMA(/*target_toggle_state=*/mute);
 
-  audio_handler->SetOutputMute(mute);
+  audio_handler->SetOutputMute(
+      mute, CrasAudioHandler::AudioSettingsChangeSource::kSystemTray);
 }
 
 void UnifiedVolumeSliderController::RecordVolumeSourceMetric() {

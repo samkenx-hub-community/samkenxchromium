@@ -7,12 +7,15 @@
 #include <windows.h>
 #include <stdint.h>
 
+#include <shellapi.h>
+
 #include <string>
 
 #include "base/command_line.h"
 #include "base/logging.h"
 #include "base/process/launch.h"
 #include "base/process/process.h"
+#include "base/strings/strcat_win.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
@@ -21,6 +24,7 @@
 #include "base/win/scoped_handle.h"
 #include "build/branding_buildflags.h"
 #include "crypto/random.h"
+#include "extensions/common/extension_features.h"
 
 namespace extensions {
 
@@ -112,16 +116,14 @@ base::Process LaunchNativeExeDirectly(const std::wstring& command,
 
   options.stdin_handle = stdin_file.Get();
   options.stdout_handle = stdout_file.Get();
-  options.handles_to_inherit.push_back(stdin_file.Get());
-  options.handles_to_inherit.push_back(stdout_file.Get());
+  options.stderr_handle = ::GetStdHandle(STD_ERROR_HANDLE);
+  options.handles_to_inherit.push_back(options.stdin_handle);
+  options.handles_to_inherit.push_back(options.stdout_handle);
 
-  // If Chrome was launched with |stderr| attached, inherit it into
-  // the Native Host.
-  options.stderr_handle = GetStdHandle(STD_ERROR_HANDLE);
-  if (options.stderr_handle) {
+  // Inherit Chrome's STD_ERROR_HANDLE, if set, into the Native Host. If Chrome
+  // was not started with standard error redirected, this value will be null.
+  if (options.stderr_handle != NULL) {
     options.handles_to_inherit.push_back(options.stderr_handle);
-  } else {
-    options.stderr_handle = INVALID_HANDLE_VALUE;
   }
 
   return base::LaunchProcess(command, options);
@@ -143,11 +145,10 @@ base::Process LaunchNativeHostViaCmd(const std::wstring& command,
   ::GetEnvironmentVariable(
       L"COMSPEC", base::WriteInto(&comspec, comspec_length), comspec_length);
 
-  std::wstring wrapped_command = base::StringPrintf(
-      L"%ls /d /c %ls < %ls > %ls", comspec.c_str(), command.c_str(),
-      in_pipe_name.c_str(), out_pipe_name.c_str());
-
-  return base::LaunchProcess(wrapped_command, options);
+  return base::LaunchProcess(
+      base::StrCat({comspec, L" /d /s /c \"", command, L"\" < ", in_pipe_name,
+                    L" > ", out_pipe_name}),
+      options);
 }
 
 }  // namespace
@@ -203,10 +204,12 @@ bool NativeProcessLauncher::LaunchNativeProcess(
 
   uint64_t pipe_name_token;
   crypto::RandBytes(&pipe_name_token, sizeof(pipe_name_token));
-  std::wstring out_pipe_name = base::StringPrintf(
-      L"\\\\.\\pipe\\chrome.nativeMessaging.out.%llx", pipe_name_token);
-  std::wstring in_pipe_name = base::StringPrintf(
-      L"\\\\.\\pipe\\chrome.nativeMessaging.in.%llx", pipe_name_token);
+  const std::wstring pipe_name_token_str =
+      base::ASCIIToWide(base::StringPrintf("%llx", pipe_name_token));
+  const std::wstring out_pipe_name =
+      L"\\\\.\\pipe\\chrome.nativeMessaging.out." + pipe_name_token_str;
+  const std::wstring in_pipe_name =
+      L"\\\\.\\pipe\\chrome.nativeMessaging.in." + pipe_name_token_str;
 
   // Create the pipes to read and write from.
   base::win::ScopedHandle stdout_pipe(::CreateNamedPipeW(
@@ -234,8 +237,23 @@ bool NativeProcessLauncher::LaunchNativeProcess(
   options.current_directory = command_line.GetProgram().DirName();
   options.start_hidden = true;
 
+  bool use_direct_launch =
+      base::FeatureList::IsEnabled(
+          extensions_features::kLaunchWindowsNativeHostsDirectly) &&
+      command_line.GetProgram().MatchesFinalExtension(L".exe");
+
   base::Process launched_process;
-  if (command_line.GetProgram().MatchesFinalExtension(L".exe")) {
+  if (use_direct_launch) {
+    // Compat: If the target is SUBSYSTEM_WINDOWS, then don't set |start_hidden|
+    // in order to mimic legacy behavior: https://crbug.com/1442359.
+    // A Windows executable will have LOWORD of 0x4550. A GUI executable will
+    // have a non-Zero HIWORD while a console executable will have a 0 HIWORD.
+    uintptr_t exe_type = ::SHGetFileInfoW(
+        command_line.GetProgram().value().c_str(), 0, NULL, 0, SHGFI_EXETYPE);
+    if ((LOWORD(exe_type) == 0x4550) && (HIWORD(exe_type) != 0)) {
+      options.start_hidden = false;
+    }
+
     launched_process =
         LaunchNativeExeDirectly(command, options, in_pipe_name, out_pipe_name);
   } else {

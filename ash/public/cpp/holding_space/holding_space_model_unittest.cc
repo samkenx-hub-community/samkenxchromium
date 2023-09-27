@@ -9,6 +9,7 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/public/cpp/holding_space/holding_space_constants.h"
+#include "ash/public/cpp/holding_space/holding_space_file.h"
 #include "ash/public/cpp/holding_space/holding_space_image.h"
 #include "ash/public/cpp/holding_space/holding_space_item.h"
 #include "ash/public/cpp/holding_space/holding_space_model_observer.h"
@@ -16,6 +17,7 @@
 #include "ash/public/cpp/holding_space/holding_space_section.h"
 #include "ash/public/cpp/holding_space/holding_space_util.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/test/scoped_feature_list.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -54,8 +56,10 @@ std::unique_ptr<HoldingSpaceImage> CreateFakeHoldingSpaceImage(
 
 std::unique_ptr<HoldingSpaceItem> CreateItem(HoldingSpaceItem::Type type) {
   return HoldingSpaceItem::CreateFileBackedItem(
-      /*type=*/type, base::FilePath("file_path"),
-      GURL("filesystem::file_system_url"),
+      type,
+      HoldingSpaceFile(base::FilePath("file_path"),
+                       HoldingSpaceFile::FileSystemType::kTest,
+                       GURL("filesystem::file_system_url")),
       /*image_resolver=*/base::BindOnce(&CreateFakeHoldingSpaceImage));
 }
 
@@ -123,7 +127,7 @@ class ScopedModelObservation : public HoldingSpaceModelObserver {
   // The last `HoldingSpaceItem` for which `OnHoldingSpaceItemUpdated()` was
   // called. May be `nullptr` prior to an update event or following a call to
   // `TakeLastUpdatedItem()`.
-  const HoldingSpaceItem* last_updated_item_ = nullptr;
+  raw_ptr<const HoldingSpaceItem, ExperimentalAsh> last_updated_item_ = nullptr;
 
   // The last updated fields for which `OnHoldingSpaceItemUpdated()` was called.
   // May be zero prior to an update event or following a call to
@@ -195,8 +199,10 @@ TEST_P(HoldingSpaceModelTest, UpdateItem_AccessibleName) {
 
   // Create a holding space `item`.
   auto item = HoldingSpaceItem::CreateFileBackedItem(
-      /*type=*/GetHoldingSpaceItemType(), base::FilePath("file_path"),
-      GURL("filesystem::file_system_url"),
+      /*type=*/GetHoldingSpaceItemType(),
+      HoldingSpaceFile(base::FilePath("file_path"),
+                       HoldingSpaceFile::FileSystemType::kTest,
+                       GURL("filesystem::file_system_url")),
       HoldingSpaceProgress(/*current_bytes=*/0, /*total_bytes=*/100),
       /*image_resolver=*/base::BindOnce(&CreateFakeHoldingSpaceImage));
   auto* item_ptr = item.get();
@@ -272,8 +278,10 @@ TEST_P(HoldingSpaceModelTest, UpdateItem_Atomic) {
 
   // Create a holding space `item`.
   auto item = HoldingSpaceItem::CreateFileBackedItem(
-      /*type=*/GetHoldingSpaceItemType(), base::FilePath("file_path"),
-      GURL("filesystem::file_system_url"),
+      /*type=*/GetHoldingSpaceItemType(),
+      HoldingSpaceFile(base::FilePath("file_path"),
+                       HoldingSpaceFile::FileSystemType::kTest,
+                       GURL("filesystem::file_system_url")),
       HoldingSpaceProgress(/*current_bytes=*/0, /*total_bytes=*/100),
       /*image_resolver=*/base::BindOnce(&CreateFakeHoldingSpaceImage));
   auto* item_ptr = item.get();
@@ -293,14 +301,18 @@ TEST_P(HoldingSpaceModelTest, UpdateItem_Atomic) {
   // Update backing file.
   base::FilePath updated_file_path("updated_file_path");
   GURL updated_file_system_url("filesystem::updated_file_system_url");
+  HoldingSpaceFile::FileSystemType updated_file_system_type(
+      HoldingSpaceFile::FileSystemType::kTest);
   model()
       .UpdateItem(item_ptr->id())
-      ->SetBackingFile(updated_file_path, updated_file_system_url);
+      ->SetBackingFile(HoldingSpaceFile(updated_file_path,
+                                        updated_file_system_type,
+                                        updated_file_system_url));
   EXPECT_EQ(observation.TakeLastUpdatedItem(), item_ptr);
   EXPECT_EQ(observation.TakeLastUpdatedFields(), UpdatedField::kBackingFile);
   EXPECT_EQ(observation.TakeUpdatedItemCount(), 1);
-  EXPECT_EQ(item_ptr->file_path(), updated_file_path);
-  EXPECT_EQ(item_ptr->file_system_url(), updated_file_system_url);
+  EXPECT_EQ(item_ptr->file().file_path, updated_file_path);
+  EXPECT_EQ(item_ptr->file().file_system_url, updated_file_system_url);
 
   // Update in-progress commands.
   std::vector<HoldingSpaceItem::InProgressCommand> in_progress_commands;
@@ -354,10 +366,12 @@ TEST_P(HoldingSpaceModelTest, UpdateItem_Atomic) {
       CreateInProgressCommand(HoldingSpaceCommandId::kPauseItem));
   updated_file_path = base::FilePath("again_updated_file_path");
   updated_file_system_url = GURL("filesystem::again_updated_file_system_url");
+  updated_file_system_type = HoldingSpaceFile::FileSystemType::kLocal;
   model()
       .UpdateItem(item_ptr->id())
       ->SetAccessibleName(u"updated_accessible_name")
-      .SetBackingFile(updated_file_path, updated_file_system_url)
+      .SetBackingFile(HoldingSpaceFile(
+          updated_file_path, updated_file_system_type, updated_file_system_url))
       .SetInProgressCommands(in_progress_commands)
       .SetText(u"updated_text")
       .SetSecondaryText(u"updated_secondary_text")
@@ -372,8 +386,8 @@ TEST_P(HoldingSpaceModelTest, UpdateItem_Atomic) {
                 UpdatedField::kSecondaryTextColor | UpdatedField::kText);
   EXPECT_EQ(observation.TakeUpdatedItemCount(), 1);
   EXPECT_EQ(item_ptr->GetAccessibleName(), u"updated_accessible_name");
-  EXPECT_EQ(item_ptr->file_path(), updated_file_path);
-  EXPECT_EQ(item_ptr->file_system_url(), updated_file_system_url);
+  EXPECT_EQ(item_ptr->file().file_path, updated_file_path);
+  EXPECT_EQ(item_ptr->file().file_system_url, updated_file_system_url);
   EXPECT_EQ(item_ptr->in_progress_commands(), in_progress_commands);
   EXPECT_EQ(item_ptr->progress().GetValue(), 0.75f);
   EXPECT_EQ(item_ptr->GetText(), u"updated_text");
@@ -391,8 +405,11 @@ TEST_P(HoldingSpaceModelTest, UpdateItem_Noop) {
 
   // Create a holding space `item`.
   auto item = HoldingSpaceItem::CreateFileBackedItem(
-      /*type=*/GetHoldingSpaceItemType(), base::FilePath("file_path"),
-      GURL("filesystem::file_system_url"), HoldingSpaceProgress(),
+      /*type=*/GetHoldingSpaceItemType(),
+      HoldingSpaceFile(base::FilePath("file_path"),
+                       HoldingSpaceFile::FileSystemType::kTest,
+                       GURL("filesystem::file_system_url")),
+      HoldingSpaceProgress(),
       /*image_resolver=*/base::BindOnce(&CreateFakeHoldingSpaceImage));
   auto* item_ptr = item.get();
 
@@ -409,7 +426,7 @@ TEST_P(HoldingSpaceModelTest, UpdateItem_Noop) {
   model()
       .UpdateItem(item_ptr->id())
       ->SetAccessibleName(absl::nullopt)
-      .SetBackingFile(item_ptr->file_path(), item_ptr->file_system_url())
+      .SetBackingFile(item_ptr->file())
       .SetInProgressCommands({})
       .SetText(absl::nullopt)
       .SetSecondaryText(absl::nullopt)
@@ -427,8 +444,10 @@ TEST_P(HoldingSpaceModelTest, UpdateItem_InProgressCommands) {
 
   // Create an in-progress holding space `item`.
   auto item = HoldingSpaceItem::CreateFileBackedItem(
-      /*type=*/GetHoldingSpaceItemType(), base::FilePath("file_path"),
-      GURL("filesystem::file_system_url"),
+      /*type=*/GetHoldingSpaceItemType(),
+      HoldingSpaceFile(base::FilePath("file_path"),
+                       HoldingSpaceFile::FileSystemType::kTest,
+                       GURL("filesystem::file_system_url")),
       HoldingSpaceProgress(/*current_bytes=*/0, /*total_bytes=*/100),
       /*image_resolver=*/base::BindOnce(&CreateFakeHoldingSpaceImage));
   auto* item_ptr = item.get();
@@ -503,8 +522,10 @@ TEST_P(HoldingSpaceModelTest, UpdateItem_Progress) {
 
   // Create a holding space `item`.
   auto item = HoldingSpaceItem::CreateFileBackedItem(
-      /*type=*/GetHoldingSpaceItemType(), base::FilePath("file_path"),
-      GURL("filesystem::file_system_url"),
+      /*type=*/GetHoldingSpaceItemType(),
+      HoldingSpaceFile(base::FilePath("file_path"),
+                       HoldingSpaceFile::FileSystemType::kTest,
+                       GURL("filesystem::file_system_url")),
       HoldingSpaceProgress(/*current_bytes=*/absl::nullopt,
                            /*total_bytes=*/100),
       /*image_resolver=*/base::BindOnce(&CreateFakeHoldingSpaceImage));
@@ -574,16 +595,7 @@ TEST_P(HoldingSpaceModelTest, EnforcesMaxItemCountsPerSection) {
   // Cache the section to which the parameterized type belongs.
   const HoldingSpaceItem::Type type = GetHoldingSpaceItemType();
   const HoldingSpaceSection* section = GetHoldingSpaceSection(type);
-
-  if (!section) {
-    // TODO(http://b/274484210): Update views for camera app types.
-    EXPECT_TRUE(type == HoldingSpaceItem::Type::kCameraAppPhoto ||
-                type == HoldingSpaceItem::Type::kCameraAppScanJpg ||
-                type == HoldingSpaceItem::Type::kCameraAppScanPdf ||
-                type == HoldingSpaceItem::Type::kCameraAppVideoGif ||
-                type == HoldingSpaceItem::Type::kCameraAppVideoMp4);
-    return;
-  }
+  ASSERT_TRUE(section);
 
   // Add the maximum count of items allowed for the section or some high number
   // if the section does not specify a maximum item count restriction.

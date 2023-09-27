@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/memory/raw_ptr.h"
 #include "base/time/time.h"
 #include "chrome/browser/ash/policy/dlp/dlp_content_manager_ash.h"
 
@@ -18,19 +19,19 @@
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/mock_callback.h"
 #include "base/test/test_future.h"
+#include "chrome/browser/chromeos/policy/dlp/dialogs/dlp_warn_dialog.h"
+#include "chrome/browser/chromeos/policy/dlp/dialogs/dlp_warn_notifier.h"
+#include "chrome/browser/chromeos/policy/dlp/dialogs/mock_dlp_warn_notifier.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_confidential_contents.h"
-#include "chrome/browser/chromeos/policy/dlp/dlp_content_manager_test_helper.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_content_restriction_set.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_histogram_helper.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_policy_event.pb.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_reporting_manager.h"
-#include "chrome/browser/chromeos/policy/dlp/dlp_reporting_manager_test_helper.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager_factory.h"
-#include "chrome/browser/chromeos/policy/dlp/dlp_warn_dialog.h"
-#include "chrome/browser/chromeos/policy/dlp/dlp_warn_notifier.h"
-#include "chrome/browser/chromeos/policy/dlp/mock_dlp_rules_manager.h"
-#include "chrome/browser/chromeos/policy/dlp/mock_dlp_warn_notifier.h"
+#include "chrome/browser/chromeos/policy/dlp/test/dlp_content_manager_test_helper.h"
+#include "chrome/browser/chromeos/policy/dlp/test/dlp_reporting_manager_test_helper.h"
+#include "chrome/browser/chromeos/policy/dlp/test/mock_dlp_rules_manager.h"
 #include "chrome/browser/extensions/api/tab_capture/tab_capture_registry.h"
 #include "chrome/browser/media/media_access_handler.h"
 #include "chrome/browser/media/webrtc/desktop_capture_access_handler.h"
@@ -226,7 +227,8 @@ class DlpContentManagerAshBrowserTest : public InProcessBrowserTest {
  protected:
   std::unique_ptr<DlpContentManagerTestHelper> helper_;
   base::HistogramTester histogram_tester_;
-  MockDlpRulesManager* mock_rules_manager_;
+  raw_ptr<MockDlpRulesManager, DanglingUntriaged | ExperimentalAsh>
+      mock_rules_manager_;
   std::vector<DlpPolicyEvent> events_;
 };
 
@@ -898,7 +900,6 @@ class DlpContentManagerAshScreenShareBrowserTest
             web_contents->GetPrimaryMainFrame()->GetProcess()->GetID(),
             web_contents->GetPrimaryMainFrame()->GetRoutingID(),
             url::Origin::Create(GURL(kExampleUrl)), media_id,
-            /*extension_name=*/"",
             content::DesktopStreamRegistryType::kRegistryStreamTypeDesktop);
 
     MaybeStartScreenShare(
@@ -920,16 +921,16 @@ class DlpContentManagerAshScreenShareBrowserTest
       content::WebContents* web_contents,
       bool expect_allowed = true,
       bool expect_warning = false) {
+    int process_id = web_contents->GetPrimaryMainFrame()->GetProcess()->GetID();
+    int frame_id = web_contents->GetPrimaryMainFrame()->GetRoutingID();
     const content::DesktopMediaID media_id(
         content::DesktopMediaID::TYPE_WEB_CONTENTS,
         content::DesktopMediaID::kNullId,
-        content::WebContentsMediaCaptureId(
-            web_contents->GetPrimaryMainFrame()->GetProcess()->GetID(),
-            web_contents->GetPrimaryMainFrame()->GetRoutingID()));
+        content::WebContentsMediaCaptureId(process_id, frame_id));
+
     extensions::TabCaptureRegistry::Get(browser()->profile())
         ->AddRequest(web_contents, /*extension_id=*/"", /*is_anonymous=*/false,
-                     GURL(kExampleUrl), media_id, /*extension_name=*/"",
-                     web_contents);
+                     GURL(kExampleUrl), media_id, process_id, frame_id);
 
     MaybeStartScreenShare(
         std::make_unique<TabCaptureAccessHandler>(), web_contents,

@@ -7,10 +7,10 @@ package org.chromium.components.external_intents;
 import android.util.Pair;
 
 import androidx.annotation.IntDef;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Callback;
 import org.chromium.base.ContextUtils;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.annotations.JNINamespace;
 import org.chromium.base.annotations.NativeMethods;
 import org.chromium.base.metrics.RecordHistogram;
@@ -150,16 +150,13 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
 
     @Override
     public boolean shouldIgnoreNavigation(NavigationHandle navigationHandle, GURL escapedUrl,
-            boolean crossFrame, boolean isSandboxedFrame) {
+            boolean hiddenCrossFrame, boolean isSandboxedFrame) {
         // We should never get here for non-main-frame navigations.
         if (!navigationHandle.isInPrimaryMainFrame()) throw new RuntimeException();
 
         mClient.onNavigationStarted(navigationHandle);
 
         RedirectHandler redirectHandler = mClient.getOrCreateRedirectHandler();
-        if (crossFrame && ExternalIntentsFeatures.BLOCK_FRAME_RENAVIGATIONS.isEnabled()) {
-            redirectHandler.clearUserGesture();
-        }
 
         OverrideUrlLoadingResult result = shouldOverrideUrlLoading(redirectHandler, escapedUrl,
                 navigationHandle.pageTransition(), navigationHandle.isRedirect(),
@@ -167,7 +164,7 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
                 navigationHandle.getReferrerUrl(), navigationHandle.isInPrimaryMainFrame(),
                 navigationHandle.getInitiatorOrigin(), navigationHandle.isExternalProtocol(),
                 mClient.areIntentLaunchesAllowedInHiddenTabsForNavigation(navigationHandle),
-                this::onDidAsyncActionInMainFrame, crossFrame, isSandboxedFrame);
+                this::onDidAsyncActionInMainFrame, hiddenCrossFrame, isSandboxedFrame);
 
         mClient.onDecisionReachedForNavigation(navigationHandle, result);
 
@@ -210,19 +207,15 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
                 GURL.emptyGURL() /* referrerUrl */, false /* isInPrimaryMainFrame */,
                 initiatorOrigin, true /* isExternalProtocol */,
                 false /* areIntentLaunchesAllowedInHiddenTabsForNavigation */,
-                this::onDidAsyncActionInSubFrame, false /* crossframe */,
+                this::onDidAsyncActionInSubFrame, false /* hiddenCrossFrame */,
                 false /* isSandboxedMainFrame */);
 
         switch (result.getResultType()) {
             case OverrideUrlLoadingResultType.OVERRIDE_WITH_EXTERNAL_INTENT:
                 return null;
             case OverrideUrlLoadingResultType.OVERRIDE_WITH_NAVIGATE_TAB:
-                if (ExternalIntentsFeatures.EXTERNAL_NAVIGATION_SUBFRAME_REDIRECTS.isEnabled()) {
-                    assert result.getTargetUrl() != null;
-                    return result.getTargetUrl();
-                } else {
-                    return null;
-                }
+                assert result.getTargetUrl() != null;
+                return result.getTargetUrl();
             case OverrideUrlLoadingResultType.OVERRIDE_WITH_ASYNC_ACTION:
                 // Empty GURL indicates a pending async action.
                 return GURL.emptyGURL();
@@ -238,7 +231,7 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
             boolean hasUserGesture, boolean isRendererInitiated, GURL referrerUrl,
             boolean isInPrimaryMainFrame, Origin initiatorOrigin, boolean isExternalProtocol,
             boolean areIntentLaunchesAllowedInHiddenTabsForNavigation,
-            Callback<AsyncActionTakenParams> asyncActionTakenCallback, boolean crossFrame,
+            Callback<AsyncActionTakenParams> asyncActionTakenCallback, boolean hiddenCrossFrame,
             boolean isSandboxedMainFrame) {
         boolean initialNavigation = isInitialNavigation();
         redirectHandler.updateNewUrlLoading(pageTransition, isRedirect, hasUserGesture,
@@ -267,7 +260,7 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
                         .setInitiatorOrigin(initiatorOrigin)
                         .setAsyncActionTakenCallback(asyncActionTakenCallback)
                         .setIsInitialNavigationInFrame(initialNavigation)
-                        .setIsCrossFrameNavigation(crossFrame)
+                        .setIsHiddenCrossFrameNavigation(hiddenCrossFrame)
                         .setIsSandboxedMainFrame(isSandboxedMainFrame)
                         .build();
 
@@ -490,10 +483,10 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
                 ContextUtils.getApplicationContext().getString(resId, url.getSpec()));
     }
 
-    @VisibleForTesting
     public void setResultCallbackForTesting(
             Callback<Pair<GURL, OverrideUrlLoadingResult>> callback) {
         mResultCallbackForTesting = callback;
+        ResettersForTesting.register(() -> mResultCallbackForTesting = null);
     }
 
     @NativeMethods

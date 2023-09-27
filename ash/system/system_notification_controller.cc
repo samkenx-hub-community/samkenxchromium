@@ -4,19 +4,21 @@
 
 #include "ash/system/system_notification_controller.h"
 
+#include <memory>
+
 #include "ash/constants/ash_features.h"
 #include "ash/system/caps_lock_notification_controller.h"
 #include "ash/system/cast/cast_notification_controller.h"
 #include "ash/system/do_not_disturb_notification_controller.h"
-#include "ash/system/gesture_education/gesture_education_notification_controller.h"
+#include "ash/system/hotspot/hotspot_notifier.h"
 #include "ash/system/lock_screen_notification_controller.h"
 #include "ash/system/network/auto_connect_notifier.h"
 #include "ash/system/network/cellular_setup_notifier.h"
-#include "ash/system/network/hotspot_notifier.h"
 #include "ash/system/network/managed_sim_lock_notifier.h"
 #include "ash/system/network/wifi_toggle_notification_controller.h"
 #include "ash/system/power/power_notification_controller.h"
 #include "ash/system/power/power_sounds_controller.h"
+#include "ash/system/privacy/privacy_indicators_controller.h"
 #include "ash/system/privacy/screen_security_controller.h"
 #include "ash/system/privacy_hub/privacy_hub_notification_controller.h"
 #include "ash/system/session/session_limit_notification_controller.h"
@@ -45,8 +47,6 @@ SystemNotificationController::SystemNotificationController()
           features::IsQsRevampEnabled()
               ? std::make_unique<DoNotDisturbNotificationController>()
               : nullptr),
-      gesture_education_(
-          std::make_unique<GestureEducationNotificationController>()),
       lock_screen_(features::IsQsRevampEnabled()
                        ? std::make_unique<LockScreenNotificationController>()
                        : nullptr),
@@ -62,6 +62,10 @@ SystemNotificationController::SystemNotificationController()
   managed_sim_lock_notifier_ = std::make_unique<ash::ManagedSimLockNotifier>();
   if (features::IsHotspotEnabled()) {
     hotspot_notifier_ = std::make_unique<ash::HotspotNotifier>();
+  }
+  if (features::IsPrivacyIndicatorsEnabled()) {
+    privacy_indicators_controller_ =
+        std::make_unique<PrivacyIndicatorsController>();
   }
 }
 

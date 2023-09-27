@@ -3275,6 +3275,28 @@ TEST_F(GLES2ImplementationTest, PixelLocalStorageBarrierANGLE) {
   EXPECT_EQ(0, memcmp(&expected, commands_, sizeof(expected)));
 }
 
+TEST_F(GLES2ImplementationTest, FramebufferPixelLocalStorageInterruptANGLE) {
+  struct Cmds {
+    cmds::FramebufferPixelLocalStorageInterruptANGLE cmd;
+  };
+  Cmds expected;
+  expected.cmd.Init();
+
+  gl_->FramebufferPixelLocalStorageInterruptANGLE();
+  EXPECT_EQ(0, memcmp(&expected, commands_, sizeof(expected)));
+}
+
+TEST_F(GLES2ImplementationTest, FramebufferPixelLocalStorageRestoreANGLE) {
+  struct Cmds {
+    cmds::FramebufferPixelLocalStorageRestoreANGLE cmd;
+  };
+  Cmds expected;
+  expected.cmd.Init();
+
+  gl_->FramebufferPixelLocalStorageRestoreANGLE();
+  EXPECT_EQ(0, memcmp(&expected, commands_, sizeof(expected)));
+}
+
 TEST_F(GLES2ImplementationTest,
        GetFramebufferPixelLocalStorageParameterfvANGLE) {
   struct Cmds {
@@ -3313,5 +3335,38 @@ TEST_F(GLES2ImplementationTest,
   gl_->GetFramebufferPixelLocalStorageParameterivANGLE(123, 2, &result);
   EXPECT_EQ(0, memcmp(&expected, commands_, sizeof(expected)));
   EXPECT_EQ(static_cast<ResultType>(1), result);
+}
+
+TEST_F(GLES2ImplementationTest, ClipControlEXT) {
+  struct Cmds {
+    cmds::ClipControlEXT cmd;
+  };
+  Cmds expected;
+  expected.cmd.Init(1, 2);
+
+  gl_->ClipControlEXT(1, 2);
+  EXPECT_EQ(0, memcmp(&expected, commands_, sizeof(expected)));
+}
+
+TEST_F(GLES2ImplementationTest, PolygonModeANGLE) {
+  struct Cmds {
+    cmds::PolygonModeANGLE cmd;
+  };
+  Cmds expected;
+  expected.cmd.Init(1, 2);
+
+  gl_->PolygonModeANGLE(1, 2);
+  EXPECT_EQ(0, memcmp(&expected, commands_, sizeof(expected)));
+}
+
+TEST_F(GLES2ImplementationTest, PolygonOffsetClampEXT) {
+  struct Cmds {
+    cmds::PolygonOffsetClampEXT cmd;
+  };
+  Cmds expected;
+  expected.cmd.Init(1, 2, 3);
+
+  gl_->PolygonOffsetClampEXT(1, 2, 3);
+  EXPECT_EQ(0, memcmp(&expected, commands_, sizeof(expected)));
 }
 #endif  // GPU_COMMAND_BUFFER_CLIENT_GLES2_IMPLEMENTATION_UNITTEST_AUTOGEN_H_

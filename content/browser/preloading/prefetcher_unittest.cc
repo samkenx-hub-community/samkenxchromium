@@ -59,7 +59,7 @@ class TestPrefetchService : public PrefetchService {
     request->trusted_params->devtools_observer =
         devtools_observer->MakeSelfOwnedNetworkServiceDevToolsObserver();
     devtools_observer->OnStartSinglePrefetch(prefetch_container->RequestId(),
-                                             *request);
+                                             *request, absl::nullopt);
 
     network::mojom::URLResponseHead response_head;
     devtools_observer->OnPrefetchResponseReceived(
@@ -99,7 +99,7 @@ class MockContentBrowserClient : public TestContentBrowserClient {
 
  private:
   raw_ptr<ContentBrowserClient> old_browser_client_;
-  raw_ptr<MockSpeculationHostDelegate> delegate_;
+  raw_ptr<MockSpeculationHostDelegate, DanglingUntriaged> delegate_;
 };
 
 class PrefetcherTest : public RenderViewHostTestHarness {
@@ -166,8 +166,7 @@ TEST_F(PrefetcherTest, ProcessCandidatesForPrefetch) {
   candidate1->referrer = blink::mojom::Referrer::New();
   candidates.push_back(std::move(candidate1));
 
-  prefetcher.ProcessCandidatesForPrefetch(base::UnguessableToken::Create(),
-                                          candidates);
+  prefetcher.ProcessCandidatesForPrefetch(candidates);
   EXPECT_TRUE(delegate->Candidates().empty());
   EXPECT_EQ(1u, GetPrefetchService()->prefetches_.size());
 
@@ -184,8 +183,13 @@ class MockPrefetcher : public Prefetcher {
   explicit MockPrefetcher(RenderFrameHost& render_frame_host)
       : Prefetcher(render_frame_host) {}
 
-  void OnStartSinglePrefetch(const std::string& request_id,
-                             const network::ResourceRequest& request) override {
+  void OnStartSinglePrefetch(
+      const std::string& request_id,
+      const network::ResourceRequest& request,
+      absl::optional<
+          std::pair<const GURL&,
+                    const network::mojom::URLResponseHeadDevToolsInfo&>>
+          redirect_info) override {
     on_start_signle_prefetch_was_called_ = true;
     dev_tools_observer_is_valid_ =
         request.trusted_params->devtools_observer.is_valid();
@@ -235,8 +239,7 @@ TEST_F(PrefetcherTest, MockPrefetcher) {
   candidate1->referrer = blink::mojom::Referrer::New();
   candidates.push_back(std::move(candidate1));
 
-  prefetcher.ProcessCandidatesForPrefetch(base::UnguessableToken::Create(),
-                                          candidates);
+  prefetcher.ProcessCandidatesForPrefetch(candidates);
   EXPECT_TRUE(delegate->Candidates().empty());
   EXPECT_EQ(1u, GetPrefetchService()->prefetches_.size());
 

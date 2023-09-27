@@ -8,7 +8,11 @@ import android.text.TextUtils;
 
 import androidx.annotation.VisibleForTesting;
 
+import org.chromium.base.FeatureList;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
+import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.signin.services.UnifiedConsentServiceBridge;
 
 /**
  * A utility class for handling feature flags used by {@link AdaptiveToolbarButtonController}.
@@ -51,6 +55,11 @@ public class AdaptiveToolbarFeatures {
      */
     public static final int DEFAULT_CONTEXTUAL_PAGE_ACTION_CHIP_DELAY_MS = 3000;
 
+    /**
+     * Default action chip delay for price tracking.
+     */
+    public static final int DEFAULT_PRICE_TRACKING_ACTION_CHIP_DELAY_MS = 6000;
+
     @AdaptiveToolbarButtonVariant
     private static Integer sButtonVariant;
 
@@ -59,6 +68,7 @@ public class AdaptiveToolbarFeatures {
     private static Boolean sIgnoreSegmentationResultsForTesting;
     private static Boolean sDisableUiForTesting;
     private static Boolean sShowUiOnlyAfterReadyForTesting;
+    private static Profile sProfileForTesting;
 
     /** @return Whether the button variant is a dynamic action. */
     public static boolean isDynamicAction(@AdaptiveToolbarButtonVariant int variant) {
@@ -109,6 +119,11 @@ public class AdaptiveToolbarFeatures {
     /** @return Whether the contextual page actions should show the action chip version. */
     public static boolean shouldShowActionChip(@AdaptiveToolbarButtonVariant int buttonVariant) {
         if (!isDynamicAction(buttonVariant)) return false;
+        if (buttonVariant == AdaptiveToolbarButtonVariant.PRICE_TRACKING) {
+            // Price tracking launched with the action chip variant.
+            return true;
+        }
+
         return ChromeFeatureList.getFieldTrialParamByFeatureAsBoolean(
                 getFeatureNameForButtonVariant(buttonVariant), "action_chip", false);
     }
@@ -119,6 +134,11 @@ public class AdaptiveToolbarFeatures {
      */
     public static int getContextualPageActionDelayMs(
             @AdaptiveToolbarButtonVariant int buttonVariant) {
+        if (buttonVariant == AdaptiveToolbarButtonVariant.PRICE_TRACKING) {
+            // Price tracking launched with an action chip delay of 6 seconds.
+            return DEFAULT_PRICE_TRACKING_ACTION_CHIP_DELAY_MS;
+        }
+
         return ChromeFeatureList.getFieldTrialParamByFeatureAsInt(
                 getFeatureNameForButtonVariant(buttonVariant), "action_chip_time_ms",
                 DEFAULT_CONTEXTUAL_PAGE_ACTION_CHIP_DELAY_MS);
@@ -129,6 +149,11 @@ public class AdaptiveToolbarFeatures {
      */
     public static boolean shouldUseAlternativeActionChipColor(
             @AdaptiveToolbarButtonVariant int buttonVariant) {
+        if (buttonVariant == AdaptiveToolbarButtonVariant.PRICE_TRACKING) {
+            // Price tracking launched without using alternative color.
+            return false;
+        }
+
         return ChromeFeatureList.getFieldTrialParamByFeatureAsBoolean(
                 getFeatureNameForButtonVariant(buttonVariant), "action_chip_with_different_color",
                 false);
@@ -176,6 +201,16 @@ public class AdaptiveToolbarFeatures {
                 "reader_mode_session_rate_limiting", true);
     }
 
+    // TODO: This should use a passed in reference to a Profile rather than
+    // getLastUsedRegularProfile, but for starters we use it, just like in
+    // AdaptiveStatePredictor#readFromSegmentationPlatform.
+    public static boolean isAdaptiveToolbarReadAloudEnabled() {
+        return ChromeFeatureList.isEnabled(ChromeFeatureList.READALOUD)
+                && UnifiedConsentServiceBridge.isUrlKeyedAnonymizedDataCollectionEnabled(
+                        sProfileForTesting != null ? sProfileForTesting
+                                                   : Profile.getLastUsedRegularProfile());
+    }
+
     /**
      * @return Whether contextual page actions UI is enabled.
      */
@@ -189,8 +224,7 @@ public class AdaptiveToolbarFeatures {
      * Returns the default variant to be shown in segmentation experiment when the backend results
      * are unavailable or not configured.
      */
-    @AdaptiveToolbarButtonVariant
-    static int getSegmentationDefault() {
+    static @AdaptiveToolbarButtonVariant int getSegmentationDefault() {
         assert isCustomizationEnabled();
         if (sButtonVariant != null) return sButtonVariant;
         String defaultSegment = getDefaultSegment();
@@ -257,27 +291,32 @@ public class AdaptiveToolbarFeatures {
                 VARIATION_PARAM_SHOW_UI_ONLY_AFTER_READY, true);
     }
 
-    @VisibleForTesting
     static void setDefaultSegmentForTesting(String defaultSegment) {
         sDefaultSegmentForTesting = defaultSegment;
+        ResettersForTesting.register(() -> sDefaultSegmentForTesting = null);
     }
 
-    @VisibleForTesting
     static void setIgnoreSegmentationResultsForTesting(boolean ignoreSegmentationResults) {
         sIgnoreSegmentationResultsForTesting = ignoreSegmentationResults;
+        ResettersForTesting.register(() -> sIgnoreSegmentationResultsForTesting = null);
     }
 
-    @VisibleForTesting
     static void setDisableUiForTesting(boolean disableUi) {
         sDisableUiForTesting = disableUi;
+        ResettersForTesting.register(() -> sDisableUiForTesting = null);
     }
 
-    @VisibleForTesting
     static void setShowUiOnlyAfterReadyForTesting(boolean showUiOnlyAfterReady) {
         sShowUiOnlyAfterReadyForTesting = showUiOnlyAfterReady;
+        ResettersForTesting.register(() -> sShowUiOnlyAfterReadyForTesting = null);
     }
 
-    @VisibleForTesting
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
+    public static void setProfile(Profile profile) {
+        sProfileForTesting = profile;
+        ResettersForTesting.register(() -> sProfileForTesting = null);
+    }
+
     public static void clearParsedParamsForTesting() {
         sButtonVariant = null;
         sDefaultSegmentForTesting = null;

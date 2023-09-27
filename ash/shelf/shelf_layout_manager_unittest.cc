@@ -76,11 +76,13 @@
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/i18n/rtl.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/icu_test_util.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/metrics/user_action_tester.h"
 #include "base/test/scoped_feature_list.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/ui/base/window_properties.h"
 #include "components/prefs/pref_service.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -251,7 +253,11 @@ class AutoHideStateDetector : public ShelfLayoutManagerObserver {
 
 class ShelfLayoutManagerTest : public ShelfLayoutManagerTestBase {
  public:
-  ShelfLayoutManagerTest() = default;
+  ShelfLayoutManagerTest() {
+    // TODO(b/293400777): Test currently crashes when Jelly is enabled because
+    // of a crash in ShellTestApi. Remove when that is fixed.
+    scoped_features_.InitAndDisableFeature(chromeos::features::kJelly);
+  }
 
   void SetUpKioskSession() {
     SessionInfo info;
@@ -259,6 +265,9 @@ class ShelfLayoutManagerTest : public ShelfLayoutManagerTestBase {
     info.state = session_manager::SessionState::ACTIVE;
     Shell::Get()->session_controller()->SetSessionInfo(info);
   }
+
+ private:
+  base::test::ScopedFeatureList scoped_features_;
 };
 
 // Makes sure SetVisible updates work area and widget appropriately.
@@ -617,8 +626,8 @@ TEST_F(ShelfLayoutManagerTest, VisibleWhenLockScreenShowing) {
             GetShelfWidget()->GetBackgroundType());
 }
 
-// Verifies that the hidden shelf shows after triggering the FOCUS_SHELF
-// accelerator (https://crbug.com/1111426).
+// Verifies that the hidden shelf shows after triggering the
+// AcceleratorAction::kFocusShelf accelerator (https://crbug.com/1111426).
 TEST_F(ShelfLayoutManagerTest, ShowHiddenShelfByFocusShelfAccelerator) {
   // Open a window so that the shelf will auto-hide.
   std::unique_ptr<aura::Window> window(CreateTestWindow());
@@ -629,8 +638,8 @@ TEST_F(ShelfLayoutManagerTest, ShowHiddenShelfByFocusShelfAccelerator) {
   EXPECT_EQ(SHELF_AUTO_HIDE_HIDDEN, shelf->GetAutoHideState());
 
   // Focus on the shelf by accelerator.
-  Shell::Get()->accelerator_controller()->PerformActionIfEnabled(FOCUS_SHELF,
-                                                                 {});
+  Shell::Get()->accelerator_controller()->PerformActionIfEnabled(
+      AcceleratorAction::kFocusShelf, {});
 
   // Shelf should be visible.
   EXPECT_EQ(SHELF_AUTO_HIDE, shelf->GetVisibilityState());
@@ -664,6 +673,7 @@ TEST_F(ShelfLayoutManagerTest, VisibleInOverview) {
       ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   std::unique_ptr<aura::Window> window(CreateTestWindow());
+  window->SetBounds({0, 0, 120, 320});
   window->Show();
   Shelf* shelf = GetPrimaryShelf();
   shelf->SetAutoHideBehavior(ShelfAutoHideBehavior::kAlways);
@@ -1021,7 +1031,7 @@ TEST_F(ShelfLayoutManagerTest, OpenAppListWithShelfAutoHideState) {
   GetAppListTestHelper()->ShowAndRunLoop(GetPrimaryDisplayId());
   // The shelf's auto hide state won't be changed until the timer fires, so
   // force it to update now.
-  GetShelfLayoutManager()->UpdateVisibilityState();
+  GetShelfLayoutManager()->UpdateVisibilityState(/*force_layout=*/false);
   GetAppListTestHelper()->CheckVisibility(true);
   EXPECT_EQ(SHELF_AUTO_HIDE, shelf->GetVisibilityState());
   EXPECT_EQ(SHELF_AUTO_HIDE_SHOWN, shelf->GetAutoHideState());
@@ -1709,7 +1719,7 @@ TEST_F(ShelfLayoutManagerTest, WindowVisibilityDisablesAutoHide) {
   views::Widget* dummy = CreateTestWidget();
 
   // Window visible => auto hide behaves normally.
-  layout_manager->UpdateVisibilityState();
+  layout_manager->UpdateVisibilityState(/*force_layout=*/false);
   EXPECT_EQ(SHELF_AUTO_HIDE_HIDDEN, shelf->GetAutoHideState());
 
   // Window minimized => auto hide disabled.
@@ -1978,7 +1988,7 @@ TEST_F(ShelfLayoutManagerTest, ShelfFlickerOnTrayActivation) {
 
   // Show the status menu. That should make the shelf visible again.
   Shell::Get()->accelerator_controller()->PerformActionIfEnabled(
-      TOGGLE_SYSTEM_TRAY_BUBBLE, {});
+      AcceleratorAction::kToggleSystemTrayBubble, {});
   GetAppListTestHelper()->WaitUntilIdle();
   EXPECT_EQ(SHELF_AUTO_HIDE, shelf->GetVisibilityState());
   EXPECT_EQ(SHELF_AUTO_HIDE_SHOWN, shelf->GetAutoHideState());
@@ -2939,7 +2949,8 @@ class ShelfLayoutManagerDragDropTest
   }
 
  private:
-  ui::test::EventGenerator* generator_;
+  raw_ptr<ui::test::EventGenerator, DanglingUntriaged | ExperimentalAsh>
+      generator_;
 };
 
 INSTANTIATE_TEST_SUITE_P(All,
@@ -3116,7 +3127,7 @@ TEST_F(ShelfLayoutManagerWindowDraggingTest, DraggedMRUWindow) {
   const struct TestCase {
     // The shelf widget whose bounds are used as the base for gesture start and
     // end locations.
-    const views::Widget* widget;
+    raw_ptr<const views::Widget, ExperimentalAsh> widget;
     // Whether the widget bounds are completely in the left part of the split
     // view.
     const bool left_in_split_view;
@@ -4187,7 +4198,7 @@ TEST_F(ShelfLayoutManagerTest, VerifyAutoHideBehaviorOnMultipleDisplays) {
 
   // Show the system tray on the secondary display.
   Shell::Get()->accelerator_controller()->PerformActionIfEnabled(
-      TOGGLE_SYSTEM_TRAY_BUBBLE, {});
+      AcceleratorAction::kToggleSystemTrayBubble, {});
   Shelf* secondary_shelf =
       RootWindowController::ForWindow(secondary_root_window)->shelf();
   ASSERT_TRUE(secondary_shelf->status_area_widget()->IsMessageBubbleShown());
@@ -4271,15 +4282,8 @@ class QuickActionShowBubbleTest : public ShelfLayoutManagerTestBase,
  public:
   QuickActionShowBubbleTest() : scoped_locale_(GetParam() ? "ar" : "") {}
   ~QuickActionShowBubbleTest() override = default;
-  // ShelfLayoutManagerTestBase:
-  void SetUp() override {
-    ShelfLayoutManagerTestBase::SetUp();
-    scoped_features_.InitAndEnableFeature(
-        app_list_features::kQuickActionShowBubbleLauncher);
-  }
 
  private:
-  base::test::ScopedFeatureList scoped_features_;
   base::test::ScopedRestoreICUDefaultLocale scoped_locale_;
 };
 
@@ -4588,7 +4592,8 @@ TEST_F(NoSessionShelfLayoutManagerTest, UpdateShelfVisibilityAfterLogin) {
 
   // Setup autohide shelf pref.
   auto pref_service = std::make_unique<TestingPrefServiceSimple>();
-  RegisterUserProfilePrefs(pref_service->registry(), /*for_test=*/true);
+  RegisterUserProfilePrefs(pref_service->registry(), /*country=*/"",
+                           /*for_test=*/true);
   SetShelfAutoHideBehaviorPref(pref_service.get(),
                                WindowTreeHostManager::GetPrimaryDisplayId(),
                                ShelfAutoHideBehavior::kAlways);
@@ -5057,7 +5062,7 @@ TEST_F(ShelfLayoutManagerWithEcheTest, AutoHideShelfWithEcheHidden) {
   // Set the shelf to auto-hide.
   Shelf* shelf = GetPrimaryShelf();
   shelf->SetAutoHideBehavior(ShelfAutoHideBehavior::kAlways);
-  GetShelfLayoutManager()->UpdateVisibilityState();
+  GetShelfLayoutManager()->UpdateVisibilityState(/*force_layout=*/false);
 
   EXPECT_EQ(SHELF_AUTO_HIDE, shelf->GetVisibilityState());
   EXPECT_EQ(SHELF_AUTO_HIDE_HIDDEN, shelf->GetAutoHideState());
@@ -5073,7 +5078,7 @@ TEST_F(ShelfLayoutManagerWithEcheTest, AutoHideShelfWithEcheHidden) {
       GURL("http://google.com"), gfx::Image(image_skia), u"app 1",
       u"your phone",
       eche_app::mojom::ConnectionStatus::kConnectionStatusDisconnected,
-      eche_app::mojom::AppStreamLaunchEntryPoint::UNKNOWN);
+      eche_app::mojom::AppStreamLaunchEntryPoint::RECENT_APPS);
   status_area->eche_tray()->ShowBubble();
   UpdateAutoHideStateNow();
 

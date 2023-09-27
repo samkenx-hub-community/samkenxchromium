@@ -11,11 +11,11 @@ import android.graphics.Point;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.SystemClock;
-import android.support.test.InstrumentationRegistry;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
@@ -27,7 +27,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.chromium.android_webview.AwContents;
-import org.chromium.android_webview.AwFeatureList;
+import org.chromium.android_webview.AwFeatureMap;
 import org.chromium.android_webview.AwSettings;
 import org.chromium.android_webview.AwSettings.LayoutAlgorithm;
 import org.chromium.android_webview.ManifestMetadataUtil;
@@ -46,6 +46,7 @@ import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
+import org.chromium.base.test.util.RequiresRestart;
 import org.chromium.base.test.util.TestFileUtil;
 import org.chromium.base.test.util.UrlUtils;
 import org.chromium.components.embedder_support.util.WebResourceResponseInfo;
@@ -58,6 +59,7 @@ import org.chromium.content_public.common.ContentUrlConstants;
 import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.net.test.ServerCertificate;
 import org.chromium.net.test.util.TestWebServer;
+import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.display.DisplayAndroid;
 import org.chromium.ui.display.DisplayUtil;
 
@@ -84,10 +86,10 @@ public class AwSettingsTest {
             new AwActivityTestRule() {
                 @Override
                 public TestDependencyFactory createTestDependencyFactory() {
-                    if (mOverridenFactory == null) {
+                    if (mOverriddenFactory == null) {
                         return new TestDependencyFactory();
                     } else {
-                        return mOverridenFactory;
+                        return mOverriddenFactory;
                     }
                 }
             };
@@ -1164,10 +1166,17 @@ public class AwSettingsTest {
             final boolean expectPopupEnabled = value;
             AwActivityTestRule.pollInstrumentationThread(() -> {
                 String title = getTitleOnUiThread();
-                return expectPopupEnabled ? POPUP_ENABLED.equals(title) :
-                        POPUP_BLOCKED.equals(title);
+                // When popup is enabled, expect the title to be either POPUP_ENABLED or
+                // "about:blank". The latter is possible if the document.write() that sets the
+                // title finishes before the "about:blank" navigation commits. After that
+                // navigation commits, the title will be set to "about:blank".
+                return expectPopupEnabled
+                        ? (POPUP_ENABLED.equals(title) || "about:blank".equals(title))
+                        : POPUP_BLOCKED.equals(title);
             });
-            Assert.assertEquals(value ? POPUP_ENABLED : POPUP_BLOCKED, getTitleOnUiThread());
+            String title = getTitleOnUiThread();
+            Assert.assertTrue(value ? (POPUP_ENABLED.equals(title) || "about:blank".equals(title))
+                                    : POPUP_BLOCKED.equals(title));
         }
 
         private String getData() {
@@ -1333,7 +1342,10 @@ public class AwSettingsTest {
 
         @Override
         protected void setCurrentValue(Boolean value) {
-            mExpectScaleChange = mAwSettings.getLoadWithOverviewMode() != value;
+            // On tablets, viewport width will default to device width without viewport tag; so the
+            // page will not have any overflowing content to zoom out.
+            mExpectScaleChange = mAwSettings.getLoadWithOverviewMode() != value
+                    && (!isTablet() || mWithViewPortTag);
             if (mExpectScaleChange) {
                 mOnScaleChangedCallCount =
                         mContentViewClient.getOnScaleChangedHelper().getCallCount();
@@ -1350,7 +1362,9 @@ public class AwSettingsTest {
                 mExpectScaleChange = false;
             }
             float currentScale = mActivityTestRule.getScaleOnUiThread(mAwContents);
-            if (value) {
+            // On tablets, viewport width will default to device width without viewport tag; so the
+            // page will not have any overflowing content to zoom out.
+            if (value && (!isTablet() || mWithViewPortTag)) {
                 Assert.assertTrue("Expected: " + currentScale + " < " + DEFAULT_PAGE_SCALE,
                         currentScale < DEFAULT_PAGE_SCALE);
             } else {
@@ -1941,17 +1955,13 @@ public class AwSettingsTest {
 
         AwActivityTestRule.enableJavaScriptOnUiThread(awContents);
 
-        try {
-            // Create url with echoheader echoing the User-Agent header in the the html body.
-            String url = testServer.getURL("/echoheader?User-Agent");
-            settings.setUserAgentString(customUserAgentString);
-            mActivityTestRule.loadUrlSync(awContents, contentClient.getOnPageFinishedHelper(), url);
-            String userAgent =
-                    mActivityTestRule.getJavaScriptResultBodyTextContent(awContents, contentClient);
-            Assert.assertEquals(customUserAgentString, userAgent);
-        } finally {
-            testServer.stopAndDestroyServer();
-        }
+        // Create url with echoheader echoing the User-Agent header in the the html body.
+        String url = testServer.getURL("/echoheader?User-Agent");
+        settings.setUserAgentString(customUserAgentString);
+        mActivityTestRule.loadUrlSync(awContents, contentClient.getOnPageFinishedHelper(), url);
+        String userAgent =
+                mActivityTestRule.getJavaScriptResultBodyTextContent(awContents, contentClient);
+        Assert.assertEquals(customUserAgentString, userAgent);
     }
 
     @Test
@@ -1973,18 +1983,58 @@ public class AwSettingsTest {
 
         AwActivityTestRule.enableJavaScriptOnUiThread(awContents);
 
-        try {
-            String targetUrl = testServer.getURL("/android_webview/test/data/fetch-echo.html")
-                    + "?url="
-                    + URLEncoder.encode("/echoheader?Sec-CH-UA&Sec-CH-UA-Mobile&User-Agent");
-            mActivityTestRule.loadUrlSync(
-                    awContents, contentClient.getOnPageFinishedHelper(), targetUrl);
-            AwActivityTestRule.pollInstrumentationThread(
-                    () -> !"running".equals(mActivityTestRule.getTitleOnUiThread(awContents)));
-            Assert.assertEquals("?0 " + customUserAgentString,
+        String targetUrl = testServer.getURL("/android_webview/test/data/fetch-echo.html") + "?url="
+                + URLEncoder.encode("/echoheader?Sec-CH-UA&Sec-CH-UA-Platform&User-Agent");
+        mActivityTestRule.loadUrlSync(
+                awContents, contentClient.getOnPageFinishedHelper(), targetUrl);
+        AwActivityTestRule.pollInstrumentationThread(
+                () -> !"running".equals(mActivityTestRule.getTitleOnUiThread(awContents)));
+
+        String actualTitleContent = mActivityTestRule.getTitleOnUiThread(awContents);
+        // Here we can't directly validate the exact value for the client hints: Sec-CH-UA and
+        // Sec-CH-UA-Platform since they change over release version. Try best to validate the value
+        // ends with platform string and user-agent string.
+        Assert.assertTrue(actualTitleContent.endsWith(
+                /*sec-ch-ua-platform=*/"\"Android\" " + /*user-agent=*/customUserAgentString));
+        // Sec-ch-ua value has brand AndroidWebview.
+        Assert.assertTrue(actualTitleContent.indexOf("\"Android WebView\";v=\"") != -1);
+    }
+
+    @Test
+    @SmallTest
+    @Feature({"AndroidWebView", "Preferences"})
+    @CommandLineFlags.Add({"enable-features=UserAgentClientHint"})
+    public void testUserAgentOverrideWithDefaultUserAgentClientHints() throws Throwable {
+        final TestAwContentsClient contentClient = new TestAwContentsClient();
+        final AwTestContainerView testContainerView =
+                mActivityTestRule.createAwTestContainerViewOnMainSync(contentClient);
+        AwContents awContents = testContainerView.getAwContents();
+        AwSettings settings = mActivityTestRule.getAwSettingsOnUiThread(awContents);
+        final String customUserAgentString =
+                settings.getUserAgentString() + "UserAgentOverrideSuffix";
+        settings.setUserAgentString(customUserAgentString);
+
+        EmbeddedTestServer testServer = EmbeddedTestServer.createAndStartHTTPSServer(
+                InstrumentationRegistry.getInstrumentation().getContext(),
+                ServerCertificate.CERT_OK);
+
+        AwActivityTestRule.enableJavaScriptOnUiThread(awContents);
+
+        String targetUrl = testServer.getURL("/android_webview/test/data/fetch-echo.html") + "?url="
+                + URLEncoder.encode("/echoheader?Sec-CH-UA-Mobile&Sec-CH-UA-Platform&User-Agent");
+        mActivityTestRule.loadUrlSync(
+                awContents, contentClient.getOnPageFinishedHelper(), targetUrl);
+        AwActivityTestRule.pollInstrumentationThread(
+                () -> !"running".equals(mActivityTestRule.getTitleOnUiThread(awContents)));
+        // Make sure the Sec-CH-UA-Mobile, Sec-CH-UA-Platform client hint returns the correct
+        // value. If use the mobile user agent, Sec-CH-UA-Mobile should return true, otherwise
+        // false.
+        if (customUserAgentString.indexOf(" Mobile") != -1) {
+            Assert.assertEquals("?1 \"Android\" " + customUserAgentString,
                     mActivityTestRule.getTitleOnUiThread(awContents));
-        } finally {
-            testServer.stopAndDestroyServer();
+        } else {
+            Assert.assertEquals("?0 \"Android\" " + customUserAgentString,
+                    mActivityTestRule.getTitleOnUiThread(awContents));
         }
     }
 
@@ -2000,12 +2050,11 @@ public class AwSettingsTest {
                         views.getContainer1(), views.getClient1()));
     }
 
-    // Ideally, these three tests below should be combined into one, or tested using
-    // runPerViewSettingsTest. However, it seems the database setting cannot be toggled
-    // once set. Filed b/8186497.
     @Test
     @SmallTest
     @Feature({"AndroidWebView", "Preferences"})
+    @RequiresRestart("setDatabaseEnabled is ignored after the first use of WebView in the process")
+    @CommandLineFlags.Add({"enable-features=kWebSQLAccess"})
     public void testDatabaseInitialValue() throws Throwable {
         TestAwContentsClient client = new TestAwContentsClient();
         final AwTestContainerView testContainerView =
@@ -2018,6 +2067,8 @@ public class AwSettingsTest {
     @Test
     @SmallTest
     @Feature({"AndroidWebView", "Preferences"})
+    @RequiresRestart("setDatabaseEnabled is ignored after the first use of WebView in the process")
+    @CommandLineFlags.Add({"enable-features=kWebSQLAccess"})
     public void testDatabaseEnabled() throws Throwable {
         TestAwContentsClient client = new TestAwContentsClient();
         final AwTestContainerView testContainerView =
@@ -2031,6 +2082,8 @@ public class AwSettingsTest {
     @Test
     @SmallTest
     @Feature({"AndroidWebView", "Preferences"})
+    @RequiresRestart("setDatabaseEnabled is ignored after the first use of WebView in the process")
+    @CommandLineFlags.Add({"enable-features=kWebSQLAccess"})
     public void testDatabaseDisabled() throws Throwable {
         TestAwContentsClient client = new TestAwContentsClient();
         final AwTestContainerView testContainerView =
@@ -2987,7 +3040,13 @@ public class AwSettingsTest {
         mActivityTestRule.loadDataSync(
                 awContents, onPageFinishedHelper, pageNoViewport, "text/html", false);
         actualWidth = Integer.parseInt(mActivityTestRule.getTitleOnUiThread(awContents));
-        Assert.assertTrue("Expected: >= 980 , Actual: " + actualWidth, actualWidth >= 980);
+        if (isTablet()) {
+            // On tablets, viewport width will default to device width without viewport tag.
+            Assert.assertTrue("Expected: " + displayWidth + ", Actual: " + actualWidth,
+                    Math.abs(displayWidth - actualWidth) <= 1);
+        } else {
+            Assert.assertTrue("Expected: >= 980 , Actual: " + actualWidth, actualWidth >= 980);
+        }
         mActivityTestRule.loadDataSync(
                 awContents, onPageFinishedHelper, pageViewportDeviceWidth, "text/html", false);
         actualWidth = Integer.parseInt(mActivityTestRule.getTitleOnUiThread(awContents));
@@ -3002,7 +3061,6 @@ public class AwSettingsTest {
     @Test
     @SmallTest
     @Feature({"AndroidWebView", "Preferences"})
-    @DisabledTest(message = "https://crbug.com/1133535")
     public void testUseWideViewportLayoutWidth() throws Throwable {
         TestAwContentsClient contentClient = new TestAwContentsClient();
         AwTestContainerView testContainerView =
@@ -3013,7 +3071,6 @@ public class AwSettingsTest {
     @Test
     @SmallTest
     @Feature({"AndroidWebView", "Preferences"})
-    @DisabledTest(message = "https://crbug.com/1133535")
     public void testUseWideViewportLayoutWidthNoQuirks() throws Throwable {
         TestAwContentsClient contentClient = new TestAwContentsClient();
         AwTestContainerView testContainerView =
@@ -3175,7 +3232,7 @@ public class AwSettingsTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @LargeTest
     @Feature({"AndroidWebView", "Preferences"})
     public void testMediaPlaybackWithoutUserGesture() throws Throwable {
@@ -3184,7 +3241,7 @@ public class AwSettingsTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @SmallTest
     @Feature({"AndroidWebView", "Preferences"})
     public void testMediaPlaybackWithUserGesture() throws Throwable {
@@ -3315,7 +3372,7 @@ public class AwSettingsTest {
             Assert.assertEquals(1, httpServer.getRequestCount(imageUrl));
 
             awSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
-            if (AwFeatureList.isEnabled(AwFeatures.WEBVIEW_MIXED_CONTENT_AUTOUPGRADES)) {
+            if (AwFeatureMap.isEnabled(AwFeatures.WEBVIEW_MIXED_CONTENT_AUTOUPGRADES)) {
                 // COMPATIBILITY_MODE enables autoupgrades for passive mixed content (including
                 // images), so we set the image url to the HTTP version of the HTTPS server, and
                 // check it was autoupgraded by expecting the HTTPS server to be hit.
@@ -3384,17 +3441,17 @@ public class AwSettingsTest {
         }
     }
 
-    private TestDependencyFactory mOverridenFactory;
+    private TestDependencyFactory mOverriddenFactory;
 
     @After
     public void tearDown() {
-        mOverridenFactory = null;
+        mOverriddenFactory = null;
     }
 
-    private static class EmptyDocumentPeristenceTestDependencyFactory
+    private static class EmptyDocumentPersistenceTestDependencyFactory
             extends TestDependencyFactory {
         private boolean mAllow;
-        public EmptyDocumentPeristenceTestDependencyFactory(boolean allow) {
+        public EmptyDocumentPersistenceTestDependencyFactory(boolean allow) {
             mAllow = allow;
         }
 
@@ -3407,7 +3464,7 @@ public class AwSettingsTest {
     }
 
     private void doAllowEmptyDocumentPersistenceTest(boolean allow) throws Throwable {
-        mOverridenFactory = new EmptyDocumentPeristenceTestDependencyFactory(allow);
+        mOverriddenFactory = new EmptyDocumentPersistenceTestDependencyFactory(allow);
 
         final TestAwContentsClient client = new TestAwContentsClient();
         final AwTestContainerView mContainerView =
@@ -3480,7 +3537,7 @@ public class AwSettingsTest {
     }
 
     private void selectionUpdateOnMutatingSelectionRangeTest(boolean doNotUpdate) throws Throwable {
-        mOverridenFactory = new SelectionRangeTestDependencyFactory(doNotUpdate);
+        mOverriddenFactory = new SelectionRangeTestDependencyFactory(doNotUpdate);
 
         final TestAwContentsClient client = new TestAwContentsClient();
         final AwTestContainerView mContainerView =
@@ -3741,5 +3798,9 @@ public class AwSettingsTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(
                 () -> awContents.getWebContents().getEventForwarder().doubleTapForTest(
                                 SystemClock.uptimeMillis(), x, y));
+    }
+
+    private boolean isTablet() {
+        return DeviceFormFactor.isNonMultiDisplayContextOnTablet(mActivityTestRule.getActivity());
     }
 }

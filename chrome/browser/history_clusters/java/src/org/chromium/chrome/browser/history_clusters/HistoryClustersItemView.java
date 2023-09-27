@@ -49,6 +49,18 @@ class HistoryClustersItemView extends SelectableItemView<ClusterVisit> {
     @Override
     protected void onClick() {}
 
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        Drawable iconViewBackground = getIconView().getBackground();
+        int level = iconViewBackground.getLevel();
+        // Work around a race condition that puts the icon view background gets into a bad state.
+        // Changing the level and changing it back guarantees a call to
+        // initializeDrawableForDisplay(), which resets it into a good state.
+        iconViewBackground.setLevel(level + 1);
+        iconViewBackground.setLevel(level);
+    }
+
     void setTitleText(CharSequence text) {
         mTitleView.setText(text);
         SelectableListUtils.setContentDescriptionContext(getContext(), mEndButtonView,
@@ -57,10 +69,6 @@ class HistoryClustersItemView extends SelectableItemView<ClusterVisit> {
 
     void setHostText(CharSequence text) {
         mDescriptionView.setText(text);
-    }
-
-    void setIconDrawable(Drawable drawable) {
-        super.setStartIconDrawable(drawable);
     }
 
     void setEndButtonClickHandler(OnClickListener onClickListener) {

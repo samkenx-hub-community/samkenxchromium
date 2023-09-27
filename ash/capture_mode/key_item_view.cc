@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "ash/capture_mode/capture_mode_util.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/chromeos/styles/cros_tokens_color_mappings.h"
@@ -21,6 +22,7 @@
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/highlight_border.h"
+#include "ui/views/widget/widget.h"
 
 namespace ash {
 
@@ -42,21 +44,46 @@ SkColor GetColor() {
 
 }  // namespace
 
-KeyItemView::KeyItemView(ui::KeyboardCode key_code) : key_code_(key_code) {
+KeyItemView::KeyItemView(ui::KeyboardCode key_code)
+    : key_code_(key_code),
+      shadow_(SystemShadow::CreateShadowOnTextureLayer(
+          SystemShadow::Type::kElevation4)) {
   SetPaintToLayer();
   SetBackground(
       views::CreateRoundedRectBackground(GetColor(), kKeyItemHeight / 2));
   layer()->SetFillsBoundsOpaquely(false);
+
+  capture_mode_util::SetHighlightBorder(
+      this, kKeyItemHeight / 2,
+      views::HighlightBorder::Type::kHighlightBorderOnShadow);
+
+  shadow_->SetRoundedCornerRadius(kKeyItemHeight / 2);
 }
 
 KeyItemView::~KeyItemView() = default;
 
+void KeyItemView::AddedToWidget() {
+  // Since the layer of the shadow has to be added as a sibling to this view's
+  // layer, we need to wait until the view is added to the widget.
+  auto* parent = layer()->parent();
+  parent->Add(shadow_->GetLayer());
+  parent->StackAtBottom(shadow_->GetLayer());
+
+  // Make the shadow observe the color provider source change to update the
+  // colors.
+  shadow_->ObserveColorProviderSource(GetWidget());
+}
+
+void KeyItemView::OnBoundsChanged(const gfx::Rect& previous_bounds) {
+  // The shadow layer is a sibling of this view's layer, and should have the
+  // same bounds. Need to update the location of the shadow when the key items
+  // in the combo change position and/or size.
+  shadow_->SetContentBounds(layer()->bounds());
+}
+
 void KeyItemView::OnThemeChanged() {
   views::View::OnThemeChanged();
   GetBackground()->SetNativeControlColor(GetColor());
-  SetBorder(std::make_unique<views::HighlightBorder>(
-      kKeyItemHeight / 2, views::HighlightBorder::Type::kHighlightBorder1,
-      /*use_light_colors=*/false));
   SchedulePaint();
 }
 

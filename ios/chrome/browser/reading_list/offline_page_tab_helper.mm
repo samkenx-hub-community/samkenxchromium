@@ -17,11 +17,11 @@
 #import "components/reading_list/core/offline_url_utils.h"
 #import "components/reading_list/core/reading_list_entry.h"
 #import "components/reading_list/core/reading_list_model.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/reading_list/offline_url_utils.h"
 #import "ios/chrome/browser/reading_list/reading_list_download_service.h"
 #import "ios/chrome/browser/reading_list/reading_list_download_service_factory.h"
-#import "ios/chrome/browser/url/chrome_url_constants.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
 #import "ios/web/common/features.h"
 #import "ios/web/public/navigation/navigation_context.h"
 #import "ios/web/public/navigation/navigation_item.h"
@@ -30,10 +30,6 @@
 #import "ios/web/public/thread/web_thread.h"
 #import "net/base/mac/url_conversions.h"
 #import "ui/base/page_transition_types.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 // Gets the offline data at `offline_path`. The result is a single std::string
@@ -190,9 +186,9 @@ void OfflinePageTabHelper::DidStartNavigation(web::WebState* web_state,
         context->GetPageTransition(), ui::PAGE_TRANSITION_RELOAD);
     is_offline_navigation_ =
         reading_list::IsOfflineEntryURL(initial_navigation_url_);
+    navigation_transition_type_ = context->GetPageTransition();
     is_new_navigation_ =
         ui::PageTransitionIsNewNavigation(navigation_transition_type_);
-    navigation_transition_type_ = context->GetPageTransition();
     navigation_is_renderer_initiated_ = context->IsRendererInitiated();
   }
 
@@ -217,7 +213,7 @@ void OfflinePageTabHelper::DidFinishNavigation(
   if (reading_list::IsOfflineReloadURL(navigation_context->GetUrl())) {
     if (dont_reload_online_on_next_navigation_) {
       dont_reload_online_on_next_navigation_ = false;
-    } else {
+    } else if (reloading_from_offline_) {
       ReplaceLocationUrlAndReload(
           reading_list::ReloadURLForOfflineURL(navigation_context->GetUrl()));
       return;

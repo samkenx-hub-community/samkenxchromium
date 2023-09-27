@@ -4,8 +4,7 @@
 
 package org.chromium.chrome.browser.tab;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
 import org.junit.After;
@@ -38,12 +37,11 @@ public class WebContentsStateBridgeTest {
     public void setUp() {
         NativeLibraryTestUtils.loadNativeLibraryNoBrowserProcess();
         mTestTabModelDirectory = new TestTabModelDirectory(
-                InstrumentationRegistry.getTargetContext(), "WebContentsStateBridgeTest", null);
+                ApplicationProvider.getApplicationContext(), "WebContentsStateBridgeTest", null);
     }
 
     @After
     public void tearDown() {
-        TabStateFileManager.setChannelNameOverrideForTest(null);
         mTestTabModelDirectory.tearDown();
     }
 
@@ -66,8 +64,6 @@ public class WebContentsStateBridgeTest {
     @Test
     @SmallTest
     public void testLoadCorruptedTabState() throws Exception {
-        TabStateFileManager.setChannelNameOverrideForTest(null);
-
         writeFile(mTestTabModelDirectory.getBaseDirectory(), "tab0",
                 new byte[] {0, 0, 0, 0, 0, 0, 0, 0, // encryption key
                         0, 0, 0, 0, 0, 0, 0, 0, // timestamp

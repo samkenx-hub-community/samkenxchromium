@@ -17,8 +17,6 @@
 #include "ash/wm/tablet_mode/tablet_mode_window_state.h"
 #include "base/metrics/user_metrics.h"
 #include "base/time/time.h"
-#include "ui/aura/null_window_targeter.h"
-#include "ui/aura/scoped_window_targeter.h"
 #include "ui/aura/window_targeter.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -111,15 +109,17 @@ class TuckHandleView : public views::Button,
         DarkLightModeControllerImpl::Get()->IsDarkModeEnabled();
 
     // Paint the container bottom layer with default 80% opacity.
-    const SkColor bottom_color = ColorUtil::GetSecondToneColor(
-        dark_mode ? gfx::kGoogleGrey500 : gfx::kGoogleGrey600);
+    SkColor color = dark_mode ? gfx::kGoogleGrey500 : gfx::kGoogleGrey600;
+    const SkColor bottom_color =
+        SkColorSetA(color, std::round(SkColorGetA(color) * 0.8f));
+
     const gfx::ImageSkia& tuck_container_bottom = gfx::CreateVectorIcon(
         kTuckHandleContainerBottomIcon, kTuckHandleWidth, bottom_color);
     canvas->DrawImageInt(tuck_container_bottom, 0, 0);
 
     // Paint the container top layer. This is mostly transparent, with 12%
     // opacity.
-    const SkColor color = dark_mode ? gfx::kGoogleGrey200 : gfx::kGoogleGrey600;
+    color = dark_mode ? gfx::kGoogleGrey200 : gfx::kGoogleGrey600;
     const SkColor top_color =
         SkColorSetA(color, std::round(SkColorGetA(color) * 0.12f));
     const gfx::ImageSkia& tuck_container_top = gfx::CreateVectorIcon(
@@ -172,7 +172,7 @@ END_METADATA
 // -----------------------------------------------------------------------------
 
 ScopedWindowTucker::ScopedWindowTucker(aura::Window* window, bool left)
-    : window_(window), left_(left) {
+    : window_(window), left_(left), event_blocker_(window) {
   DCHECK(window_);
 
   views::Widget::InitParams params(views::Widget::InitParams::TYPE_POPUP);
@@ -211,15 +211,16 @@ ScopedWindowTucker::ScopedWindowTucker(aura::Window* window, bool left)
   DCHECK(window_to_activate);
   wm::ActivateWindow(window_to_activate);
 
-  targeter_ = std::make_unique<aura::ScopedWindowTargeter>(
-      window_, std::make_unique<aura::NullWindowTargeter>());
-
   Shell::Get()->activation_client()->AddObserver(this);
   overview_observer_.Observe(Shell::Get()->overview_controller());
 }
 
 ScopedWindowTucker::~ScopedWindowTucker() {
   Shell::Get()->activation_client()->RemoveObserver(this);
+  if (!window_->IsVisible()) {
+    window_->Show();
+    return;
+  }
   wm::ActivateWindow(window_);
 }
 
@@ -227,9 +228,9 @@ void ScopedWindowTucker::AnimateTuck() {
   const gfx::Rect initial_bounds(window_->bounds());
 
   // Sets the destination tucked bounds after the animation.
-  // `TabletModeWindowState::UpdatePosition` calls
-  // `GetPreferredFloatWindowTabletBounds` which checks if a window is tucked
-  // and returns the tucked bounds accordingly.
+  // `TabletModeWindowState::UpdatePosition` calls `GetFloatWindowTabletBounds`
+  // which checks if a window is tucked and returns the tucked bounds
+  // accordingly.
   TabletModeWindowState::UpdateWindowPosition(
       WindowState::Get(window_), WindowState::BoundsChangeAnimationType::kNone);
   const gfx::Rect final_bounds(window_->bounds());
@@ -247,8 +248,6 @@ void ScopedWindowTucker::AnimateTuck() {
       left_ ? -kTuckOffscreenPaddingDp : kTuckOffscreenPaddingDp, 0);
 
   views::AnimationBuilder()
-      .OnAborted(base::BindOnce(&ScopedWindowTucker::OnAnimateTuckEnded,
-                                weak_factory_.GetWeakPtr()))
       .OnEnded(base::BindOnce(&ScopedWindowTucker::OnAnimateTuckEnded,
                               weak_factory_.GetWeakPtr()))
       .SetPreemptionStrategy(
@@ -287,6 +286,8 @@ void ScopedWindowTucker::AnimateUntuck(base::OnceClosure callback) {
   tuck_handle->SetBounds(GetTuckHandleBounds(left_, final_bounds));
 
   views::AnimationBuilder()
+      // TODO(sammiequon|sophiewen): Should we handle the case where the
+      // animation gets aborted?
       .OnEnded(std::move(callback))
       .SetPreemptionStrategy(
           ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET)

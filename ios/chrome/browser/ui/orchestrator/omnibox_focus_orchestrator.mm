@@ -10,10 +10,6 @@
 #import "ios/chrome/browser/ui/orchestrator/toolbar_animatee.h"
 #import "ios/chrome/common/material_timing.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 @interface OmniboxFocusOrchestrator ()
 
 @property(nonatomic, assign) BOOL isAnimating;
@@ -78,7 +74,7 @@
     // call to `animationFinished` after the toolbar animations finished was
     // interrupted and cleanup still needs to occur.
     if (self.inProgressAnimationCount == 0 && self.isAnimating) {
-      [self animationFinished];
+      [self cleanupAfterAnimations];
     }
   });
 }
@@ -331,6 +327,10 @@
 
 - (void)animationFinished {
   self.inProgressAnimationCount -= 1;
+  [self cleanupAfterAnimations];
+}
+
+- (void)cleanupAfterAnimations {
   // Make sure all the animations have been queued and finished.
   if (!self.areOmniboxChangesQueued || self.inProgressAnimationCount > 0) {
     return;

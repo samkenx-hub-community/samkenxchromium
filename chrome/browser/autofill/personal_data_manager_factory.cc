@@ -4,13 +4,14 @@
 
 #include "chrome/browser/autofill/personal_data_manager_factory.h"
 
-#include "base/memory/singleton.h"
+#include "base/no_destructor.h"
 #include "chrome/browser/autofill/autofill_image_fetcher_factory.h"
 #include "chrome/browser/autofill/strike_database_factory.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
+#include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/browser/web_data_service_factory.h"
 #include "components/autofill/core/browser/personal_data_manager.h"
 #include "components/autofill/core/browser/strike_databases/strike_database.h"
@@ -51,18 +52,25 @@ PersonalDataManager* PersonalDataManagerFactory::GetForBrowserContext(
 
 // static
 PersonalDataManagerFactory* PersonalDataManagerFactory::GetInstance() {
-  return base::Singleton<PersonalDataManagerFactory>::get();
+  static base::NoDestructor<PersonalDataManagerFactory> instance;
+  return instance.get();
 }
 
 PersonalDataManagerFactory::PersonalDataManagerFactory()
     : ProfileKeyedServiceFactory(
           "PersonalDataManager",
-          ProfileSelections::BuildForRegularAndIncognito()) {
+          ProfileSelections::Builder()
+              .WithRegular(ProfileSelection::kRedirectedToOriginal)
+              // TODO(crbug.com/1418376): Check if this service is needed in
+              // Guest mode.
+              .WithGuest(ProfileSelection::kRedirectedToOriginal)
+              .Build()) {
   DependsOn(IdentityManagerFactory::GetInstance());
   DependsOn(HistoryServiceFactory::GetInstance());
   DependsOn(WebDataServiceFactory::GetInstance());
   DependsOn(StrikeDatabaseFactory::GetInstance());
   DependsOn(AutofillImageFetcherFactory::GetInstance());
+  DependsOn(SyncServiceFactory::GetInstance());
 }
 
 PersonalDataManagerFactory::~PersonalDataManagerFactory() = default;
@@ -84,22 +92,18 @@ KeyedService* PersonalDataManagerFactory::BuildPersonalDataManager(
   auto* history_service = HistoryServiceFactory::GetForProfile(
       profile, ServiceAccessType::EXPLICIT_ACCESS);
 
-  // This is null for OTR profiles.
   auto* strike_database = StrikeDatabaseFactory::GetForProfile(profile);
 
   // The AutofillImageFetcherFactory redirects to the original profile.
   auto* image_fetcher = AutofillImageFetcherFactory::GetForProfile(profile);
 
-  // This is null for OTR profiles.
   auto* identity_manager = IdentityManagerFactory::GetForProfile(profile);
+
+  auto* sync_service = SyncServiceFactory::GetForProfile(profile);
 
   service->Init(local_storage, account_storage, profile->GetPrefs(),
                 g_browser_process->local_state(), identity_manager,
-                history_service, strike_database, image_fetcher,
-                profile->IsOffTheRecord());
-
-  if (!syncer::IsSyncAllowedByFlag())
-    service->OnSyncServiceInitialized(nullptr);
+                history_service, sync_service, strike_database, image_fetcher);
 
   return service;
 }

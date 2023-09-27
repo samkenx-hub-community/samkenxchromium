@@ -7,7 +7,8 @@
 #include <unistd.h>
 
 #include "ash/components/arc/session/arc_service_manager.h"
-#include "ash/components/arc/test/test_browser_context.h"
+#include "base/memory/raw_ptr.h"
+#include "components/user_prefs/test/test_browser_context_with_prefs.h"
 #include "content/public/test/browser_task_environment.h"
 #include "mojo/public/cpp/system/platform_handle.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -30,8 +31,8 @@ class ArcCrashCollectorBridgeTest : public testing::Test {
  private:
   content::BrowserTaskEnvironment task_environment_;
   ArcServiceManager arc_service_manager_;
-  TestBrowserContext context_;
-  ArcCrashCollectorBridge* const bridge_;
+  user_prefs::TestBrowserContextWithPrefs context_;
+  const raw_ptr<ArcCrashCollectorBridge, ExperimentalAsh> bridge_;
 };
 
 TEST_F(ArcCrashCollectorBridgeTest, ConstructDestruct) {}

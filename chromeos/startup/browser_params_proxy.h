@@ -16,6 +16,12 @@ class COMPONENT_EXPORT(CHROMEOS_STARTUP) BrowserParamsProxy {
  public:
   static BrowserParamsProxy* Get();
 
+  // Wait for the user to login and post-login parameters to be available.
+  // NOTE: This needs to be called before post-login parameters are accessed.
+  // Please note that this method is not thread-safe and should be called
+  // before any threads are created in the browser process.
+  static void WaitForLogin();
+
   // Init and post-login parameters' accessors are listed starting from here.
   bool DisableCrosapiForTesting() const;
 
@@ -33,8 +39,6 @@ class COMPONENT_EXPORT(CHROMEOS_STARTUP) BrowserParamsProxy {
   InterfaceVersions() const;
 
   const crosapi::mojom::DefaultPathsPtr& DefaultPaths() const;
-
-  const absl::optional<std::string>& DeviceAccountGaiaId() const;
 
   crosapi::mojom::MetricsReportingManaged AshMetricsManaged() const;
 
@@ -67,8 +71,6 @@ class COMPONENT_EXPORT(CHROMEOS_STARTUP) BrowserParamsProxy {
 
   crosapi::mojom::OpenUrlFrom StartupUrlsFrom() const;
 
-  const absl::optional<std::vector<GURL>>& StartupUrls() const;
-
   const crosapi::mojom::DeviceSettingsPtr& DeviceSettings() const;
 
   const absl::optional<std::string>& MetricsServiceClientId() const;
@@ -89,10 +91,6 @@ class COMPONENT_EXPORT(CHROMEOS_STARTUP) BrowserParamsProxy {
 
   const absl::optional<std::vector<GURL>>& AcceptedInternalAshUrls() const;
 
-  bool IsHoldingSpaceIncognitoProfileIntegrationEnabled() const;
-
-  bool IsHoldingSpaceInProgressDownloadsNotificationSuppressionEnabled() const;
-
   bool IsDeviceEnterprisedManaged() const;
 
   crosapi::mojom::BrowserInitParams::DeviceType DeviceType() const;
@@ -108,9 +106,13 @@ class COMPONENT_EXPORT(CHROMEOS_STARTUP) BrowserParamsProxy {
 
   bool UseFlossBluetooth() const;
 
+  bool IsFlossAvailable() const;
+
+  bool IsFlossAvailabilityCheckNeeded() const;
+
   bool IsCurrentUserDeviceOwner() const;
 
-  bool DoNotMuxExtensionAppIds() const;
+  bool IsCurrentUserEphemeral() const;
 
   bool EnableLacrosTtsSupport() const;
 
@@ -129,6 +131,24 @@ class COMPONENT_EXPORT(CHROMEOS_STARTUP) BrowserParamsProxy {
 
   const crosapi::mojom::StandaloneBrowserAppServiceBlockList*
   StandaloneBrowserAppServiceBlockList() const;
+
+  bool EnableCpuMappableNativeGpuMemoryBuffers() const;
+
+  bool OopVideoDecodingEnabled() const;
+
+  bool IsUploadOfficeToCloudEnabled() const;
+
+  bool EnableClipboardHistoryRefresh() const;
+
+  bool IsVariableRefreshRateEnabled() const;
+
+  bool IsPdfOcrEnabled() const;
+
+  bool IsDriveFsBulkPinningAvailable() const;
+
+  bool IsSysUiDownloadsIntegrationV2Enabled() const;
+
+  bool IsCrosBatterySaverAvailable() const;
 
  private:
   friend base::NoDestructor<BrowserParamsProxy>;

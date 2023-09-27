@@ -92,15 +92,6 @@ const char kPeakWindowdPercentHistogramId[] =
 const char kHeavyAdInterventionTypeHistogramId[] =
     "PageLoad.Clients.Ads.HeavyAds.InterventionType2";
 
-const char kMaxAdDensityByAreaHistogramId[] =
-    "PageLoad.Clients.Ads.AdDensity.MaxPercentByArea";
-
-const char kMaxAdDensityByHeightHistogramId[] =
-    "PageLoad.Clients.Ads.AdDensity.MaxPercentByHeight";
-
-const char kMaxAdDensityRecordedHistogramId[] =
-    "PageLoad.Clients.Ads.AdDensity.Recorded";
-
 const char kMemoryMainFrameMaxHistogramId[] =
     "PageLoad.Clients.Ads.Memory.MainFrame.Max";
 
@@ -137,6 +128,12 @@ class AdsPageLoadMetricsObserverBrowserTest
 
     scoped_feature_list_.InitWithFeatures(enabled, disabled);
     subresource_filter::SubresourceFilterBrowserTest::SetUp();
+  }
+
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    subresource_filter::SubresourceFilterBrowserTest::SetUpCommandLine(
+        command_line);
+    command_line->AppendSwitchASCII(switches::kForceDeviceScaleFactor, "1");
   }
 
   void SetUpOnMainThread() override {
@@ -460,12 +457,6 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
   ASSERT_TRUE(
       ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL)));
 
-  histogram_tester.ExpectUniqueSample(kMaxAdDensityByAreaHistogramId,
-                                      expected_page_density_area, 1);
-  histogram_tester.ExpectUniqueSample(kMaxAdDensityByHeightHistogramId,
-                                      expected_page_density_height, 1);
-  histogram_tester.ExpectUniqueSample(kMaxAdDensityRecordedHistogramId, true,
-                                      1);
   auto entries =
       ukm_recorder.GetEntriesByName(ukm::builders::AdPageLoad::kEntryName);
   EXPECT_EQ(1u, entries.size());
@@ -567,12 +558,6 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
   int expected_page_density_height =
       ad_height_within_page * 100 / document_height;
 
-  histogram_tester.ExpectUniqueSample(kMaxAdDensityByAreaHistogramId,
-                                      expected_page_density_area, 1);
-  histogram_tester.ExpectUniqueSample(kMaxAdDensityByHeightHistogramId,
-                                      expected_page_density_height, 1);
-  histogram_tester.ExpectUniqueSample(kMaxAdDensityRecordedHistogramId, true,
-                                      1);
   auto entries =
       ukm_recorder.GetEntriesByName(ukm::builders::AdPageLoad::kEntryName);
   EXPECT_EQ(1u, entries.size());
@@ -638,10 +623,6 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
   ASSERT_TRUE(
       ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL)));
 
-  histogram_tester.ExpectUniqueSample(kMaxAdDensityByAreaHistogramId, 0, 1);
-  histogram_tester.ExpectUniqueSample(kMaxAdDensityByHeightHistogramId, 0, 1);
-  histogram_tester.ExpectUniqueSample(kMaxAdDensityRecordedHistogramId, true,
-                                      1);
   auto entries =
       ukm_recorder.GetEntriesByName(ukm::builders::AdPageLoad::kEntryName);
   EXPECT_EQ(1u, entries.size());
@@ -939,10 +920,12 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
       browser()->tab_strip_model()->GetActiveWebContents();
 
   // Create a second frame that will not receive activation.
-  EXPECT_TRUE(content::ExecuteScriptWithoutUserGesture(
-      web_contents, "createAdFrame('/ad_tagging/ad.html', '');"));
-  EXPECT_TRUE(content::ExecuteScriptWithoutUserGesture(
-      web_contents, "createAdFrame('/ad_tagging/ad.html', '');"));
+  EXPECT_TRUE(content::ExecJs(web_contents,
+                              "createAdFrame('/ad_tagging/ad.html', '');",
+                              content::EXECUTE_SCRIPT_NO_USER_GESTURE));
+  EXPECT_TRUE(content::ExecJs(web_contents,
+                              "createAdFrame('/ad_tagging/ad.html', '');",
+                              content::EXECUTE_SCRIPT_NO_USER_GESTURE));
 
   // Wait for the frames resources to be loaded as we only log histograms for
   // frames that have non-zero bytes. Four resources in the main frame and one
@@ -954,7 +937,7 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
   content::RenderFrameHost* ad_frame =
       ChildFrameAt(web_contents->GetPrimaryMainFrame(), 0);
   const std::string no_op_script = "// No-op script";
-  EXPECT_TRUE(ExecuteScript(ad_frame, no_op_script));
+  EXPECT_TRUE(ExecJs(ad_frame, no_op_script));
 
   ASSERT_TRUE(
       ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL)));
@@ -990,10 +973,12 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
       browser()->tab_strip_model()->GetActiveWebContents();
 
   // Create two same-origin ad frames.
-  EXPECT_TRUE(content::ExecuteScriptWithoutUserGesture(
-      web_contents, "createAdFrame('/ad_tagging/ad.html', '');"));
-  EXPECT_TRUE(content::ExecuteScriptWithoutUserGesture(
-      web_contents, "createAdFrame('/ad_tagging/ad.html', '');"));
+  EXPECT_TRUE(content::ExecJs(web_contents,
+                              "createAdFrame('/ad_tagging/ad.html', '');",
+                              content::EXECUTE_SCRIPT_NO_USER_GESTURE));
+  EXPECT_TRUE(content::ExecJs(web_contents,
+                              "createAdFrame('/ad_tagging/ad.html', '');",
+                              content::EXECUTE_SCRIPT_NO_USER_GESTURE));
 
   // Wait for the frames resources to be loaded as we only log histograms for
   // frames that have non-zero bytes. Four resources in the main frame and one
@@ -1007,12 +992,12 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
   content::RenderFrameHost* ad_frame =
       ChildFrameAt(web_contents->GetPrimaryMainFrame(), 0);
   const std::string no_op_script = "// No-op script";
-  EXPECT_TRUE(ExecuteScript(ad_frame, no_op_script));
+  EXPECT_TRUE(ExecJs(ad_frame, no_op_script));
 
   // Activate the other frame directly by executing a dummy script.
   content::RenderFrameHost* ad_frame_2 =
       ChildFrameAt(web_contents->GetPrimaryMainFrame(), 1);
-  EXPECT_TRUE(ExecuteScript(ad_frame_2, no_op_script));
+  EXPECT_TRUE(ExecJs(ad_frame_2, no_op_script));
 
   // Ensure both frames are marked active.
   ASSERT_TRUE(
@@ -1375,9 +1360,9 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
       browser()->tab_strip_model()->GetActiveWebContents();
 
   // Create a second frame that will not receive activation.
-  EXPECT_TRUE(content::ExecuteScriptWithoutUserGesture(
-      web_contents,
-      "createAdFrame('/ad_tagging/multiple_mimes.html', 'test');"));
+  EXPECT_TRUE(content::ExecJs(
+      web_contents, "createAdFrame('/ad_tagging/multiple_mimes.html', 'test');",
+      content::EXECUTE_SCRIPT_NO_USER_GESTURE));
 
   waiter->AddMinimumCompleteResourcesExpectation(8);
   waiter->Wait();
@@ -1387,11 +1372,11 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
       ChildFrameAt(web_contents->GetPrimaryMainFrame(), 0);
   const std::string play_script =
       "var video = document.getElementsByTagName('video')[0];"
-      "video.onplaying = () => { "
-      "window.domAutomationController.send('true'); };"
-      "video.play();";
-  EXPECT_EQ("true", content::EvalJs(ad_frame, play_script,
-                                    content::EXECUTE_SCRIPT_USE_MANUAL_REPLY));
+      "new Promise(resolve => {"
+      "  video.onplaying = () => { resolve('true'); };"
+      "  video.play();"
+      "});";
+  EXPECT_EQ("true", content::EvalJs(ad_frame, play_script));
 
   ASSERT_TRUE(
       ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL)));
@@ -1432,8 +1417,6 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
   // There should be no observed ads because the ad iframe was same domain.
   histogram_tester.ExpectUniqueSample(
       "PageLoad.Clients.Ads.FrameCounts.AdFrames.Total", 0, 1);
-  histogram_tester.ExpectUniqueSample(
-      "PageLoad.Clients.Ads.FrameCounts.IgnoredByRestrictedAdTagging", 1, 1);
 
   waiter = CreatePageLoadMetricsTestWaiter();
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
@@ -1456,8 +1439,6 @@ IN_PROC_BROWSER_TEST_F(AdsPageLoadMetricsObserverBrowserTest,
       ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL)));
   histogram_tester.ExpectBucketCount(
       "PageLoad.Clients.Ads.FrameCounts.AdFrames.Total", 1, 1);
-  histogram_tester.ExpectBucketCount(
-      "PageLoad.Clients.Ads.FrameCounts.IgnoredByRestrictedAdTagging", 0, 1);
 }
 
 IN_PROC_BROWSER_TEST_F(
@@ -1495,8 +1476,6 @@ IN_PROC_BROWSER_TEST_F(
   // allowlist rule.
   histogram_tester.ExpectUniqueSample(
       "PageLoad.Clients.Ads.FrameCounts.AdFrames.Total", 0, 1);
-  histogram_tester.ExpectUniqueSample(
-      "PageLoad.Clients.Ads.FrameCounts.IgnoredByRestrictedAdTagging", 1, 1);
 }
 
 // This test harness does not start the test server and allows

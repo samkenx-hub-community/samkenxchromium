@@ -1,5 +1,5 @@
 {
-  "Dawn Android arm DEPS Release (Pixel 4)": {
+  "Dawn Android arm Builder": {
     "gn_args": {
       "dcheck_always_on": true,
       "debuggable_apks": false,
@@ -9,11 +9,10 @@
       "proprietary_codecs": true,
       "symbol_level": 1,
       "target_os": "android",
-      "use_dawn": true,
       "use_remoteexec": true
     }
   },
-  "Dawn Android arm Release (Pixel 4)": {
+  "Dawn Android arm DEPS Builder": {
     "gn_args": {
       "dcheck_always_on": true,
       "debuggable_apks": false,
@@ -23,31 +22,87 @@
       "proprietary_codecs": true,
       "symbol_level": 1,
       "target_os": "android",
-      "use_dawn": true,
+      "use_remoteexec": true
+    }
+  },
+  "Dawn Android arm64 DEPS Release (Pixel 6)": {
+    "gn_args": {
+      "dcheck_always_on": true,
+      "debuggable_apks": false,
+      "ffmpeg_branding": "Chrome",
+      "is_component_build": false,
+      "is_debug": false,
+      "proprietary_codecs": true,
+      "symbol_level": 1,
+      "target_cpu": "arm64",
+      "target_os": "android",
+      "use_remoteexec": true
+    }
+  },
+  "Dawn Android arm64 Release (Pixel 6)": {
+    "gn_args": {
+      "dcheck_always_on": true,
+      "debuggable_apks": false,
+      "ffmpeg_branding": "Chrome",
+      "is_component_build": false,
+      "is_debug": false,
+      "proprietary_codecs": true,
+      "symbol_level": 1,
+      "target_cpu": "arm64",
+      "target_os": "android",
+      "use_remoteexec": true
+    }
+  },
+  "Dawn Linux TSAN Release": {
+    "gn_args": {
+      "dawn_enable_opengles": true,
+      "dcheck_always_on": true,
+      "is_component_build": false,
+      "is_debug": false,
+      "is_tsan": true,
+      "symbol_level": 1,
       "use_remoteexec": true
     }
   },
   "Dawn Linux x64 Builder": {
     "gn_args": {
-      "dawn_enable_desktop_gl": true,
       "dawn_enable_opengles": true,
       "dcheck_always_on": true,
       "is_component_build": false,
       "is_debug": false,
       "symbol_level": 1,
-      "use_dawn": true,
       "use_remoteexec": true
     }
   },
   "Dawn Linux x64 DEPS Builder": {
     "gn_args": {
-      "dawn_enable_desktop_gl": true,
       "dawn_enable_opengles": true,
       "dcheck_always_on": true,
       "is_component_build": false,
       "is_debug": false,
       "symbol_level": 1,
-      "use_dawn": true,
+      "use_remoteexec": true
+    }
+  },
+  "Dawn Mac arm64 DEPS Release (Apple M2)": {
+    "gn_args": {
+      "dawn_enable_opengles": true,
+      "dcheck_always_on": true,
+      "is_component_build": false,
+      "is_debug": false,
+      "symbol_level": 1,
+      "target_cpu": "arm64",
+      "use_remoteexec": true
+    }
+  },
+  "Dawn Mac arm64 Release (Apple M2)": {
+    "gn_args": {
+      "dawn_enable_opengles": true,
+      "dcheck_always_on": true,
+      "is_component_build": false,
+      "is_debug": false,
+      "symbol_level": 1,
+      "target_cpu": "arm64",
       "use_remoteexec": true
     }
   },
@@ -58,7 +113,6 @@
       "is_component_build": false,
       "is_debug": false,
       "symbol_level": 1,
-      "use_dawn": true,
       "use_remoteexec": true
     }
   },
@@ -69,41 +123,40 @@
       "is_component_build": false,
       "is_debug": false,
       "symbol_level": 1,
-      "use_dawn": true,
       "use_remoteexec": true
     }
   },
-  "Dawn Win10 x64 ASAN Release": {
+  "Dawn Win10 x64 ASAN Builder": {
     "gn_args": {
       "dawn_enable_opengles": true,
+      "dawn_use_built_dxc": true,
       "dcheck_always_on": true,
       "is_asan": true,
       "is_component_build": false,
       "is_debug": false,
       "symbol_level": 1,
-      "use_dawn": true,
       "use_remoteexec": true
     }
   },
   "Dawn Win10 x64 Builder": {
     "gn_args": {
       "dawn_enable_opengles": true,
+      "dawn_use_built_dxc": true,
       "dcheck_always_on": true,
       "is_component_build": false,
       "is_debug": false,
       "symbol_level": 1,
-      "use_dawn": true,
       "use_remoteexec": true
     }
   },
   "Dawn Win10 x64 DEPS Builder": {
     "gn_args": {
       "dawn_enable_opengles": true,
+      "dawn_use_built_dxc": true,
       "dcheck_always_on": true,
       "is_component_build": false,
       "is_debug": false,
       "symbol_level": 1,
-      "use_dawn": true,
       "use_remoteexec": true
     }
   },
@@ -115,7 +168,6 @@
       "is_debug": false,
       "symbol_level": 1,
       "target_cpu": "x86",
-      "use_dawn": true,
       "use_remoteexec": true
     }
   },
@@ -127,7 +179,6 @@
       "is_debug": false,
       "symbol_level": 1,
       "target_cpu": "x86",
-      "use_dawn": true,
       "use_remoteexec": true
     }
   }

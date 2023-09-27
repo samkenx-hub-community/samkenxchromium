@@ -118,7 +118,8 @@ gfx::ColorSpace DisplayColorSpaces::GetCompositingColorSpace(
 
 bool DisplayColorSpaces::SupportsHDR() const {
   return GetOutputColorSpace(ContentColorUsage::kHDR, false).IsHDR() ||
-         GetOutputColorSpace(ContentColorUsage::kHDR, true).IsHDR();
+         GetOutputColorSpace(ContentColorUsage::kHDR, true).IsHDR() ||
+         hdr_max_luminance_relative_ > 1.f;
 }
 
 ColorSpace DisplayColorSpaces::GetScreenInfoColorSpace() const {
@@ -203,6 +204,16 @@ bool DisplayColorSpaces::operator==(const DisplayColorSpaces& other) const {
 
 bool DisplayColorSpaces::operator!=(const DisplayColorSpaces& other) const {
   return !(*this == other);
+}
+
+// static
+bool DisplayColorSpaces::EqualExceptForHdrParameters(
+    const DisplayColorSpaces& a,
+    const DisplayColorSpaces& b) {
+  DisplayColorSpaces b_with_a_params = b;
+  b_with_a_params.sdr_max_luminance_nits_ = a.sdr_max_luminance_nits_;
+  b_with_a_params.hdr_max_luminance_relative_ = a.hdr_max_luminance_relative_;
+  return a == b_with_a_params;
 }
 
 }  // namespace gfx

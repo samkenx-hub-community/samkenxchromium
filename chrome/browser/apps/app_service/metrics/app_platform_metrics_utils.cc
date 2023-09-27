@@ -11,6 +11,7 @@
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
 #include "chrome/browser/ash/guest_os/guest_os_shelf_utils.h"
+#include "chrome/browser/ash/login/demo_mode/demo_session.h"
 #include "chrome/browser/ash/policy/core/browser_policy_connector_ash.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/browser_process.h"
@@ -26,13 +27,14 @@
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
+#include "chromeos/components/kiosk/kiosk_utils.h"
 #include "components/app_constants/constants.h"
 #include "components/services/app_service/public/cpp/app_launch_util.h"
 #include "components/services/app_service/public/cpp/instance_registry.h"
 #include "components/services/app_service/public/cpp/instance_update.h"
 #include "components/sync/base/model_type.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_service_utils.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_service_utils.h"
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
 #include "extensions/browser/extension_prefs.h"
@@ -369,6 +371,16 @@ AppTypeName GetAppTypeNameFromString(const std::string& app_type_name) {
 }
 
 bool ShouldRecordUkm(Profile* profile) {
+  // Bypass AppKM App Sync check for Demo Mode devices to collect app metrics.
+  if (ash::DemoSession::IsDeviceInDemoMode()) {
+    return true;
+  }
+
+  // Bypass AppKM App Sync check for Kiosk devices to collect app metrics.
+  if (chromeos::IsKioskSession()) {
+    return true;
+  }
+
   switch (syncer::GetUploadToGoogleState(
       SyncServiceFactory::GetForProfile(profile), syncer::ModelType::APPS)) {
     case syncer::UploadState::NOT_ACTIVE:
@@ -482,6 +494,20 @@ AppType GetAppType(Profile* profile, const std::string& app_id) {
     return AppType::kCrostini;
   }
   return AppType::kUnknown;
+}
+
+bool IsSystemWebApp(Profile* profile, const std::string& app_id) {
+  AppType app_type = GetAppType(profile, app_id);
+
+  InstallReason install_reason;
+  apps::AppServiceProxyFactory::GetForProfile(profile)
+      ->AppRegistryCache()
+      .ForOneApp(app_id, [&install_reason](const apps::AppUpdate& update) {
+        install_reason = update.InstallReason();
+      });
+
+  return app_type == AppType::kSystemWeb ||
+         install_reason == apps::InstallReason::kSystem;
 }
 
 }  // namespace apps

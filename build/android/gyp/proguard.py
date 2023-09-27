@@ -16,6 +16,48 @@ import zipfile
 import dex
 from util import build_utils
 from util import diff_utils
+import action_helpers  # build_utils adds //build to sys.path.
+import zip_helpers
+
+_IGNORE_WARNINGS = (
+    # E.g. Triggers for weblayer_instrumentation_test_apk since both it and its
+    # apk_under_test have no shared_libraries.
+    # https://crbug.com/1364192 << To fix this in a better way.
+    r'Missing class org.chromium.build.NativeLibraries',
+    # Caused by internal protobuf package: https://crbug.com/1183971
+    r'referenced from: com\.google\.protobuf\.GeneratedMessageLite\$GeneratedExtension',  # pylint: disable=line-too-long
+    # Caused by protobuf runtime using -identifiernamestring in a way that
+    # doesn't work with R8. Looks like:
+    # Rule matches the static final field `...`, which may have been inlined...
+    # com.google.protobuf.*GeneratedExtensionRegistryLite {
+    #   static java.lang.String CONTAINING_TYPE_*;
+    # }
+    r'GeneratedExtensionRegistryLite\.CONTAINING_TYPE_',
+    # Relevant for R8 when optimizing an app that doesn't use protobuf.
+    r'Ignoring -shrinkunusedprotofields since the protobuf-lite runtime is',
+    # Ignore Unused Rule Warnings in third_party libraries.
+    r'/third_party/.*Proguard configuration rule does not match anything',
+    # Ignore cronet's test rules (low priority to fix).
+    r'cronet/android/test/proguard.cfg.*Proguard configuration rule does not',
+    r'Proguard configuration rule does not match anything:.*(?:' + '|'.join([
+        # aapt2 generates keeps for these.
+        r'class android\.',
+        # Used internally.
+        r'com.no.real.class.needed.receiver',
+        # Ignore Unused Rule Warnings for annotations.
+        r'@',
+        # Ignore rules that opt out of this check.
+        r'!cr_allowunused',
+        # https://crbug.com/1441225
+        r'EditorDialogToolbar',
+        # https://crbug.com/1441226
+        r'PaymentRequest[BH]',
+    ]) + ')',
+    # TODO(agrieve): Remove once we update to U SDK.
+    r'OnBackAnimationCallback',
+    # We enforce that this class is removed via -checkdiscard.
+    r'FastServiceLoader\.class:.*Could not inline ServiceLoader\.load',
+)
 
 _BLOCKLISTED_EXPECTATION_PATHS = [
     # A separate expectation file is created for these files.
@@ -28,7 +70,7 @@ _DUMP_DIR_NAME = 'r8inputs_dir'
 def _ParseOptions():
   args = build_utils.ExpandFileArgs(sys.argv[1:])
   parser = argparse.ArgumentParser()
-  build_utils.AddDepfileOption(parser)
+  action_helpers.add_depfile_arg(parser)
   parser.add_argument('--r8-path',
                       required=True,
                       help='Path to the R8.jar to use.')
@@ -65,8 +107,9 @@ def _ParseOptions():
                       help='Minify symbol names')
   parser.add_argument(
       '--verbose', '-v', action='store_true', help='Print all ProGuard output')
-  parser.add_argument(
-      '--repackage-classes', help='Package all optimized classes are put in.')
+  parser.add_argument('--repackage-classes',
+                      default='',
+                      help='Value for -repackageclasses.')
   parser.add_argument(
     '--disable-checks',
     action='store_true',
@@ -99,6 +142,14 @@ def _ParseOptions():
       action='append',
       help='List of name pairs separated by : mapping a feature module to a '
       'dependent feature module.')
+  parser.add_argument('--input-art-profile',
+                      help='Path to the input unobfuscated ART profile.')
+  parser.add_argument('--output-art-profile',
+                      help='Path to the output obfuscated ART profile.')
+  parser.add_argument(
+      '--apply-startup-profile',
+      action='store_true',
+      help='Whether to pass --input-art-profile as a startup profile to R8.')
   parser.add_argument(
       '--keep-rules-targets-regex',
       metavar='KEEP_RULES_REGEX',
@@ -144,14 +195,20 @@ def _ParseOptions():
     parser.error('You must path both --keep-rules-targets-regex and '
                  '--keep-rules-output-path')
 
+  if options.output_art_profile and not options.input_art_profile:
+    parser.error('--output-art-profile requires --input-art-profile')
+  if options.apply_startup_profile and not options.input_art_profile:
+    parser.error('--apply-startup-profile requires --input-art-profile')
+
   if options.force_enable_assertions and options.assertion_handler:
     parser.error('Cannot use both --force-enable-assertions and '
                  '--assertion-handler')
 
-  options.classpath = build_utils.ParseGnList(options.classpath)
-  options.proguard_configs = build_utils.ParseGnList(options.proguard_configs)
-  options.input_paths = build_utils.ParseGnList(options.input_paths)
-  options.extra_mapping_output_paths = build_utils.ParseGnList(
+  options.classpath = action_helpers.parse_gn_list(options.classpath)
+  options.proguard_configs = action_helpers.parse_gn_list(
+      options.proguard_configs)
+  options.input_paths = action_helpers.parse_gn_list(options.input_paths)
+  options.extra_mapping_output_paths = action_helpers.parse_gn_list(
       options.extra_mapping_output_paths)
 
   if options.feature_names:
@@ -162,7 +219,7 @@ def _ParseOptions():
       parser.error('Invalid feature argument lengths.')
 
     options.feature_jars = [
-        build_utils.ParseGnList(x) for x in options.feature_jars
+        action_helpers.parse_gn_list(x) for x in options.feature_jars
     ]
 
   split_map = {}
@@ -202,15 +259,13 @@ class _SplitContext:
     # Add to .jar using Python rather than having R8 output to a .zip directly
     # in order to disable compression of the .jar, saving ~500ms.
     tmp_jar_output = self.staging_dir + '.jar'
-    build_utils.DoZip(found_files, tmp_jar_output, base_dir=self.staging_dir)
+    zip_helpers.add_files_to_zip(found_files,
+                                 tmp_jar_output,
+                                 base_dir=self.staging_dir)
     shutil.move(tmp_jar_output, self.final_output_path)
 
 
-def _OptimizeWithR8(options,
-                    config_paths,
-                    libraries,
-                    dynamic_config_data,
-                    print_stdout=False):
+def _OptimizeWithR8(options, config_paths, libraries, dynamic_config_data):
   with build_utils.TempDir() as tmp_dir:
     if dynamic_config_data:
       dynamic_config_path = os.path.join(tmp_dir, 'dynamic_config.flags')
@@ -300,6 +355,18 @@ def _OptimizeWithR8(options,
       for main_dex_rule in options.main_dex_rules_path:
         cmd += ['--main-dex-rules', main_dex_rule]
 
+    if options.output_art_profile:
+      cmd += [
+          '--art-profile',
+          options.input_art_profile,
+          options.output_art_profile,
+      ]
+    if options.apply_startup_profile:
+      cmd += [
+          '--startup-profile',
+          options.input_art_profile,
+      ]
+
     # Add any extra inputs to the base context (e.g. desugar runtime).
     extra_jars = set(options.input_paths)
     for split_context in split_contexts_by_name.values():
@@ -314,12 +381,19 @@ def _OptimizeWithR8(options,
 
     cmd += sorted(base_context.input_jars)
 
+    if options.verbose or os.environ.get('R8_VERBOSE') == '1':
+      stderr_filter = None
+    else:
+      filters = list(dex.DEFAULT_IGNORE_WARNINGS)
+      filters += _IGNORE_WARNINGS
+      if options.show_desugar_default_interface_warnings:
+        filters += dex.INTERFACE_DESUGARING_WARNINGS
+      stderr_filter = dex.CreateStderrFilter(filters)
+
     try:
-      stderr_filter = dex.CreateStderrFilter(
-          options.show_desugar_default_interface_warnings)
       logging.debug('Running R8')
       build_utils.CheckOutput(cmd,
-                              print_stdout=print_stdout,
+                              print_stdout=True,
                               stderr_filter=stderr_filter,
                               fail_on_output=options.warnings_as_errors)
     except build_utils.CalledProcessError as e:
@@ -391,6 +465,8 @@ def _CheckForMissingSymbols(r8_path, dex_files, classpath, warnings_as_errors,
 
         # Found in: com/facebook/fbui/textlayoutbuilder/StaticLayoutHelper
         'android.text.StaticLayout.<init>',
+        # TODO(crbug/1426964): Remove once chrome builds with Android U SDK.
+        ' android.',
 
         # Explicictly guarded by try (NoClassDefFoundError) in Flogger's
         # PlatformProvider.
@@ -506,7 +582,7 @@ def _CombineConfigs(configs,
 def _CreateDynamicConfig(options):
   ret = []
   if options.enable_obfuscation:
-    ret.append("-repackageclasses ''")
+    ret.append(f"-repackageclasses '{options.repackage_classes}'")
   else:
     ret.append("-dontobfuscate")
 
@@ -539,18 +615,13 @@ def _ExtractEmbeddedConfigs(jar_path, embedded_configs):
       embedded_configs[config_path] = z.read(filename).decode('utf-8').rstrip()
 
 
-def _ContainsDebuggingConfig(config_str):
-  debugging_configs = ('-whyareyoukeeping', '-whyareyounotinlining')
-  return any(config in config_str for config in debugging_configs)
-
-
 def _MaybeWriteStampAndDepFile(options, inputs):
   output = options.output_path
   if options.stamp:
     build_utils.Touch(options.stamp)
     output = options.stamp
   if options.depfile:
-    build_utils.WriteDepfile(options.depfile, output, inputs=inputs)
+    action_helpers.write_depfile(options.depfile, output, inputs=inputs)
 
 
 def _IterParentContexts(context_name, split_contexts_by_name):
@@ -606,15 +677,8 @@ def _Run(options):
   dynamic_config_data = _CreateDynamicConfig(options)
 
   logging.debug('Looking for embedded configs')
-  libraries = []
-  for p in options.classpath:
-    # TODO(bjoyce): Remove filter once old android support libraries are gone.
-    # Fix for having Library class extend program class dependency problem.
-    if 'com_android_support' in p or 'android_support_test' in p:
-      continue
-    # If a jar is part of input no need to include it as library jar.
-    if p not in libraries and p not in options.input_paths:
-      libraries.append(p)
+  # If a jar is part of input no need to include it as library jar.
+  libraries = [p for p in options.classpath if p not in options.input_paths]
 
   embedded_configs = {}
   for jar_path in options.input_paths + libraries:
@@ -625,15 +689,14 @@ def _Run(options):
                                    dynamic_config_data,
                                    embedded_configs,
                                    exclude_generated=True)
-  print_stdout = _ContainsDebuggingConfig(merged_configs) or options.verbose
 
   depfile_inputs = options.proguard_configs + options.input_paths + libraries
   if options.expected_file:
     diff_utils.CheckExpectations(merged_configs, options)
     if options.only_verify_expectations:
-      build_utils.WriteDepfile(options.depfile,
-                               options.actual_file,
-                               inputs=depfile_inputs)
+      action_helpers.write_depfile(options.depfile,
+                                   options.actual_file,
+                                   inputs=depfile_inputs)
       return
 
   if options.keep_rules_output_path:
@@ -642,18 +705,8 @@ def _Run(options):
                      options.keep_rules_output_path)
     return
 
-  # TODO(agrieve): Stop appending to dynamic_config_data once R8 natively
-  #     supports finding configs the "tools" directory.
-  #     https://issuetracker.google.com/227983179
-  tools_configs = {
-      k: v
-      for k, v in embedded_configs.items() if 'com.android.tools' in k
-  }
-  dynamic_config_data += '\n' + _CombineConfigs([], None, tools_configs)
-
   split_contexts_by_name = _OptimizeWithR8(options, options.proguard_configs,
-                                           libraries, dynamic_config_data,
-                                           print_stdout)
+                                           libraries, dynamic_config_data)
 
   if not options.disable_checks:
     logging.debug('Running tracereferences')
@@ -689,7 +742,7 @@ def main():
     _Run(options)
   finally:
     if options.dump_inputs:
-      build_utils.ZipDir('r8inputs.zip', _DUMP_DIR_NAME)
+      zip_helpers.zip_directory('r8inputs.zip', _DUMP_DIR_NAME)
 
 
 if __name__ == '__main__':

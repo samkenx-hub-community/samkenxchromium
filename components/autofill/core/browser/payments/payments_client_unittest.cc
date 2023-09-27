@@ -41,6 +41,7 @@
 #include "services/network/test/test_utils.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 using ::testing::HasSubstr;
 
@@ -199,7 +200,6 @@ class PaymentsClientTest : public testing::Test {
         switches::kWalletServiceUseSandbox, "0");
 
     result_ = AutofillClient::PaymentsRpcResult::kNone;
-    unmask_response_details_ = nullptr;
     legal_message_.reset();
     has_variations_header_ = false;
 
@@ -237,13 +237,13 @@ class PaymentsClientTest : public testing::Test {
       AutofillClient::PaymentsRpcResult result,
       payments::PaymentsClient::UnmaskDetails& unmask_details) {
     result_ = result;
-    unmask_details_ = &unmask_details;
+    unmask_details_ = unmask_details;
   }
 
   void OnDidGetRealPan(AutofillClient::PaymentsRpcResult result,
                        PaymentsClient::UnmaskResponseDetails& response) {
     result_ = result;
-    unmask_response_details_ = &response;
+    unmask_response_details_ = response;
   }
 
   void OnDidGetOptChangeResult(
@@ -312,7 +312,7 @@ class PaymentsClientTest : public testing::Test {
   void StartGettingUnmaskDetails() {
     client_->GetUnmaskDetails(
         base::BindOnce(&PaymentsClientTest::OnDidGetUnmaskDetails,
-                       weak_ptr_factory_.GetWeakPtr()),
+                       GetWeakPtr()),
         "language-LOCALE");
   }
 
@@ -335,7 +335,8 @@ class PaymentsClientTest : public testing::Test {
     if (options.use_cvc)
       request_details.user_response.cvc = base::ASCIIToUTF16(options.cvc);
     if (options.virtual_card) {
-      request_details.card.set_record_type(CreditCard::VIRTUAL_CARD);
+      request_details.card.set_record_type(
+          CreditCard::RecordType::kVirtualCard);
       request_details.last_committed_primary_main_frame_origin =
           GURL("https://www.example.com");
       if (options.use_cvc) {
@@ -348,9 +349,9 @@ class PaymentsClientTest : public testing::Test {
       request_details.context_token = "fake context token";
     if (options.use_otp)
       request_details.otp = base::ASCIIToUTF16(options.otp);
-    client_->UnmaskCard(request_details,
-                        base::BindOnce(&PaymentsClientTest::OnDidGetRealPan,
-                                       weak_ptr_factory_.GetWeakPtr()));
+    client_->UnmaskCard(
+        request_details,
+        base::BindOnce(&PaymentsClientTest::OnDidGetRealPan, GetWeakPtr()));
   }
 
   // If |opt_in| is set to true, then opts the user in to use FIDO
@@ -362,7 +363,7 @@ class PaymentsClientTest : public testing::Test {
     client_->OptChange(
         request_details,
         base::BindOnce(&PaymentsClientTest::OnDidGetOptChangeResult,
-                       weak_ptr_factory_.GetWeakPtr()));
+                       GetWeakPtr()));
   }
 
   // Issue a GetUploadDetails request. This may require an OAuth token before
@@ -373,7 +374,7 @@ class PaymentsClientTest : public testing::Test {
         BuildTestProfiles(), kAllDetectableValues,
         get_upload_details_options.client_behavior_signals, "language-LOCALE",
         base::BindOnce(&PaymentsClientTest::OnDidGetUploadDetails,
-                       weak_ptr_factory_.GetWeakPtr()),
+                       GetWeakPtr()),
         /*billable_service_number=*/12345,
         get_upload_details_options.billing_customer_number,
         get_upload_details_options.upload_card_source);
@@ -400,9 +401,9 @@ class PaymentsClientTest : public testing::Test {
     request_details.risk_data = "some risk data";
     request_details.app_locale = "language-LOCALE";
     request_details.profiles = BuildTestProfiles();
-    client_->UploadCard(request_details,
-                        base::BindOnce(&PaymentsClientTest::OnDidUploadCard,
-                                       weak_ptr_factory_.GetWeakPtr()));
+    client_->UploadCard(
+        request_details,
+        base::BindOnce(&PaymentsClientTest::OnDidUploadCard, GetWeakPtr()));
   }
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
@@ -427,7 +428,7 @@ class PaymentsClientTest : public testing::Test {
     client_->MigrateCards(
         request_details, migratable_credit_cards_,
         base::BindOnce(&PaymentsClientTest::OnDidMigrateLocalCards,
-                       weak_ptr_factory_.GetWeakPtr()));
+                       GetWeakPtr()));
   }
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
@@ -449,7 +450,7 @@ class PaymentsClientTest : public testing::Test {
     client_->SelectChallengeOption(
         request_details,
         base::BindOnce(&PaymentsClientTest::OnDidSelectChallengeOption,
-                       weak_ptr_factory_.GetWeakPtr()));
+                       GetWeakPtr()));
   }
 
   network::TestURLLoaderFactory* factory() { return &test_url_loader_factory_; }
@@ -535,9 +536,21 @@ class PaymentsClientTest : public testing::Test {
     EXPECT_TRUE(GetUploadData().find(field_name_or_value) == std::string::npos);
   }
 
+  const PaymentsClient::UnmaskDetails* unmask_details() const {
+    return unmask_details_ ? &unmask_details_.value() : nullptr;
+  }
+  const PaymentsClient::UnmaskResponseDetails* unmask_response_details() const {
+    return unmask_response_details_ ? &unmask_response_details_.value()
+                                    : nullptr;
+  }
+  void ResetUnmaskResponseDetails() { unmask_response_details_.reset(); }
+
+  base::WeakPtr<PaymentsClientTest> GetWeakPtr() {
+    return weak_ptr_factory_.GetWeakPtr();
+  }
+
   AutofillClient::PaymentsRpcResult result_ =
       AutofillClient::PaymentsRpcResult::kNone;
-  raw_ptr<payments::PaymentsClient::UnmaskDetails> unmask_details_;
 
   // Server ID of a saved card via credit card upload save.
   PaymentsClient::UploadCardResponseDetails upload_card_response_details_;
@@ -546,9 +559,6 @@ class PaymentsClientTest : public testing::Test {
   // The response details retrieved from an GetDetailsForEnrollmentRequest.
   PaymentsClient::GetDetailsForEnrollmentResponseDetails
       get_details_for_enrollment_response_fields_;
-  // The UnmaskResponseDetails retrieved from an UnmaskRequest.  Includes PAN.
-  raw_ptr<PaymentsClient::UnmaskResponseDetails> unmask_response_details_ =
-      nullptr;
   // The legal message returned from a GetDetails upload save preflight call.
   std::unique_ptr<base::Value::Dict> legal_message_;
   // A list of card BIN ranges supported by Google Payments, returned from a
@@ -581,8 +591,6 @@ class PaymentsClientTest : public testing::Test {
   net::HttpRequestHeaders intercepted_headers_;
   bool has_variations_header_;
   std::string intercepted_body_;
-  base::WeakPtrFactory<PaymentsClientTest> weak_ptr_factory_{this};
-
  private:
   std::vector<AutofillProfile> BuildTestProfiles() {
     std::vector<AutofillProfile> profiles;
@@ -614,6 +622,12 @@ class PaymentsClientTest : public testing::Test {
     profile.FinalizeAfterImport();
     return profile;
   }
+
+  absl::optional<PaymentsClient::UnmaskDetails> unmask_details_;
+  // The UnmaskResponseDetails retrieved from an UnmaskRequest.  Includes PAN.
+  absl::optional<PaymentsClient::UnmaskResponseDetails>
+      unmask_response_details_;
+  base::WeakPtrFactory<PaymentsClientTest> weak_ptr_factory_{this};
 };
 
 TEST_F(PaymentsClientTest, GetUnmaskDetailsSuccess) {
@@ -623,16 +637,12 @@ TEST_F(PaymentsClientTest, GetUnmaskDetailsSuccess) {
                  "{ \"offer_fido_opt_in\": \"false\", "
                  "\"authentication_method\": \"CVC\" }");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ(false, unmask_details_->offer_fido_opt_in);
+  EXPECT_EQ(false, unmask_details()->offer_fido_opt_in);
   EXPECT_EQ(AutofillClient::UnmaskAuthMethod::kCvc,
-            unmask_details_->unmask_auth_method);
+            unmask_details()->unmask_auth_method);
 }
 
 TEST_F(PaymentsClientTest, GetUnmaskDetailsIncludesChromeUserContext) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(
-      features::kAutofillEnableAccountWalletStorage);
-
   StartGettingUnmaskDetails();
   IssueOAuthToken();
   ReturnResponse(net::HTTP_OK, "{}");
@@ -647,7 +657,7 @@ TEST_F(PaymentsClientTest, OAuthError) {
   identity_test_env_.WaitForAccessTokenRequestIfNecessaryAndRespondWithError(
       GoogleServiceAuthError(GoogleServiceAuthError::SERVICE_UNAVAILABLE));
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kPermanentFailure, result_);
-  EXPECT_TRUE(unmask_response_details_->real_pan.empty());
+  EXPECT_TRUE(unmask_response_details()->real_pan.empty());
 }
 
 TEST_F(PaymentsClientTest,
@@ -668,7 +678,7 @@ TEST_F(PaymentsClientTest, UnmaskSuccessViaCVC) {
 
   assertCvcIncludedInRequest("111");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("1234", unmask_response_details_->real_pan);
+  EXPECT_EQ("1234", unmask_response_details()->real_pan);
 }
 
 TEST_F(PaymentsClientTest, UnmaskSuccessViaFIDO) {
@@ -678,7 +688,7 @@ TEST_F(PaymentsClientTest, UnmaskSuccessViaFIDO) {
 
   assertCvcNotIncludedInRequest();
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("1234", unmask_response_details_->real_pan);
+  EXPECT_EQ("1234", unmask_response_details()->real_pan);
 }
 
 TEST_F(PaymentsClientTest, UnmaskSuccessViaCVCWithCreationOptions) {
@@ -686,8 +696,8 @@ TEST_F(PaymentsClientTest, UnmaskSuccessViaCVCWithCreationOptions) {
   IssueOAuthToken();
   ReturnResponse(net::HTTP_OK, "{ \"pan\": \"1234\", \"dcvv\": \"321\"}");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("1234", unmask_response_details_->real_pan);
-  EXPECT_EQ("321", unmask_response_details_->dcvv);
+  EXPECT_EQ("1234", unmask_response_details()->real_pan);
+  EXPECT_EQ("321", unmask_response_details()->dcvv);
 }
 
 TEST_F(PaymentsClientTest, UnmaskSuccessAccountFromSyncTest) {
@@ -695,7 +705,7 @@ TEST_F(PaymentsClientTest, UnmaskSuccessAccountFromSyncTest) {
   IssueOAuthToken();
   ReturnResponse(net::HTTP_OK, "{ \"pan\": \"1234\" }");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("1234", unmask_response_details_->real_pan);
+  EXPECT_EQ("1234", unmask_response_details()->real_pan);
 }
 
 TEST_F(PaymentsClientTest, UnmaskSuccessWithVirtualCardCvcAuth) {
@@ -711,10 +721,10 @@ TEST_F(PaymentsClientTest, UnmaskSuccessWithVirtualCardCvcAuth) {
   assertIncludedInRequest("cvc_length");
   assertIncludedInRequest("cvc_position");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("4111111111111111", unmask_response_details_->real_pan);
-  EXPECT_EQ("999", unmask_response_details_->dcvv);
-  EXPECT_EQ("12", unmask_response_details_->expiration_month);
-  EXPECT_EQ("2099", unmask_response_details_->expiration_year);
+  EXPECT_EQ("4111111111111111", unmask_response_details()->real_pan);
+  EXPECT_EQ("999", unmask_response_details()->dcvv);
+  EXPECT_EQ("12", unmask_response_details()->expiration_month);
+  EXPECT_EQ("2099", unmask_response_details()->expiration_year);
 }
 
 TEST_F(PaymentsClientTest, UnmaskSuccessWithVirtualCardFidoAuth) {
@@ -727,10 +737,10 @@ TEST_F(PaymentsClientTest, UnmaskSuccessWithVirtualCardFidoAuth) {
   assertCvcNotIncludedInRequest();
   assertNotIncludedInRequest("cvc_challenge_option");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("4111111111111111", unmask_response_details_->real_pan);
-  EXPECT_EQ("999", unmask_response_details_->dcvv);
-  EXPECT_EQ("12", unmask_response_details_->expiration_month);
-  EXPECT_EQ("2099", unmask_response_details_->expiration_year);
+  EXPECT_EQ("4111111111111111", unmask_response_details()->real_pan);
+  EXPECT_EQ("999", unmask_response_details()->dcvv);
+  EXPECT_EQ("12", unmask_response_details()->expiration_month);
+  EXPECT_EQ("2099", unmask_response_details()->expiration_year);
 }
 
 TEST_F(PaymentsClientTest, VirtualCardRiskBasedGreenPathResponse) {
@@ -749,11 +759,11 @@ TEST_F(PaymentsClientTest, VirtualCardRiskBasedGreenPathResponse) {
   EXPECT_TRUE(GetUploadData().find("merchant_domain") != std::string::npos);
 
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("4111111111111111", unmask_response_details_->real_pan);
-  EXPECT_EQ("999", unmask_response_details_->dcvv);
-  EXPECT_EQ("12", unmask_response_details_->expiration_month);
-  EXPECT_EQ("2099", unmask_response_details_->expiration_year);
-  EXPECT_TRUE(unmask_response_details_->card_unmask_challenge_options.empty());
+  EXPECT_EQ("4111111111111111", unmask_response_details()->real_pan);
+  EXPECT_EQ("999", unmask_response_details()->dcvv);
+  EXPECT_EQ("12", unmask_response_details()->expiration_month);
+  EXPECT_EQ("2099", unmask_response_details()->expiration_year);
+  EXPECT_TRUE(unmask_response_details()->card_unmask_challenge_options.empty());
 }
 
 TEST_F(PaymentsClientTest, VirtualCardRiskBasedRedPathResponse_Error) {
@@ -774,10 +784,7 @@ TEST_F(PaymentsClientTest,
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kPermanentFailure, result_);
 }
 
-TEST_F(PaymentsClientTest, VirtualCardRiskBasedYellowPathResponse_CvcFlagOff) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndDisableFeature(
-      features::kAutofillEnableCvcForVcnYellowPath);
+TEST_F(PaymentsClientTest, VirtualCardRiskBasedYellowPathResponse) {
   StartUnmasking(CardUnmaskOptions().with_virtual_card_risk_based());
   IssueOAuthToken();
   ReturnResponse(
@@ -794,66 +801,27 @@ TEST_F(PaymentsClientTest, VirtualCardRiskBasedYellowPathResponse_CvcFlagOff) {
 
   // Ensure that it's not treated as failure when no pan is returned.
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("fake_context_token", unmask_response_details_->context_token);
+  EXPECT_EQ("fake_context_token", unmask_response_details()->context_token);
   // Verify the FIDO request challenge is correctly parsed.
-  EXPECT_EQ(
-      "fake_fido_challenge",
-      *unmask_response_details_->fido_request_options->FindString("challenge"));
-  // Verify the two idv challenge options are both sms challenge and fields can
-  // be correctly parsed.
-  ASSERT_EQ(2u, unmask_response_details_->card_unmask_challenge_options.size());
-  const CardUnmaskChallengeOption& challenge_option_1 =
-      unmask_response_details_->card_unmask_challenge_options[0];
-  EXPECT_EQ(CardUnmaskChallengeOptionType::kSmsOtp, challenge_option_1.type);
-  EXPECT_EQ("fake_challenge_id_1", challenge_option_1.id.value());
-  EXPECT_EQ(u"(***)-***-1234", challenge_option_1.challenge_info);
-  const CardUnmaskChallengeOption& challenge_option_2 =
-      unmask_response_details_->card_unmask_challenge_options[1];
-  EXPECT_EQ(CardUnmaskChallengeOptionType::kSmsOtp, challenge_option_2.type);
-  EXPECT_EQ("fake_challenge_id_2", challenge_option_2.id.value());
-  EXPECT_EQ(u"(***)-***-5678", challenge_option_2.challenge_info);
-}
-
-TEST_F(PaymentsClientTest, VirtualCardRiskBasedYellowPathResponse_CvcFlagOn) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(
-      features::kAutofillEnableCvcForVcnYellowPath);
-  StartUnmasking(CardUnmaskOptions().with_virtual_card_risk_based());
-  IssueOAuthToken();
-  ReturnResponse(
-      net::HTTP_OK,
-      "{ \"fido_request_options\": { \"challenge\": \"fake_fido_challenge\" }, "
-      "\"context_token\": \"fake_context_token\", \"idv_challenge_options\": "
-      "[{ \"sms_otp_challenge_option\": { \"challenge_id\": "
-      "\"fake_challenge_id_1\", \"masked_phone_number\": \"(***)-***-1234\" } "
-      "}, { \"sms_otp_challenge_option\": { \"challenge_id\": "
-      "\"fake_challenge_id_2\", \"masked_phone_number\": \"(***)-***-5678\" } "
-      "}, { \"cvc_challenge_option\": { \"challenge_id\": "
-      "\"fake_challenge_id_3\", \"cvc_length\": 3, \"cvc_position\": "
-      "\"CVC_POSITION_BACK\"}}]}");
-
-  // Ensure that it's not treated as failure when no pan is returned.
-  EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("fake_context_token", unmask_response_details_->context_token);
-  // Verify the FIDO request challenge is correctly parsed.
-  EXPECT_EQ(
-      "fake_fido_challenge",
-      *unmask_response_details_->fido_request_options->FindString("challenge"));
+  EXPECT_EQ("fake_fido_challenge",
+            *unmask_response_details()->fido_request_options->FindString(
+                "challenge"));
   // Verify the three challenge options are two sms challenge options and one
   // cvc challenge option, and fields can be correctly parsed.
-  ASSERT_EQ(3u, unmask_response_details_->card_unmask_challenge_options.size());
+  ASSERT_EQ(3u,
+            unmask_response_details()->card_unmask_challenge_options.size());
   const CardUnmaskChallengeOption& challenge_option_1 =
-      unmask_response_details_->card_unmask_challenge_options[0];
+      unmask_response_details()->card_unmask_challenge_options[0];
   EXPECT_EQ(CardUnmaskChallengeOptionType::kSmsOtp, challenge_option_1.type);
   EXPECT_EQ("fake_challenge_id_1", challenge_option_1.id.value());
   EXPECT_EQ(u"(***)-***-1234", challenge_option_1.challenge_info);
   const CardUnmaskChallengeOption& challenge_option_2 =
-      unmask_response_details_->card_unmask_challenge_options[1];
+      unmask_response_details()->card_unmask_challenge_options[1];
   EXPECT_EQ(CardUnmaskChallengeOptionType::kSmsOtp, challenge_option_2.type);
   EXPECT_EQ("fake_challenge_id_2", challenge_option_2.id.value());
   EXPECT_EQ(u"(***)-***-5678", challenge_option_2.challenge_info);
   const CardUnmaskChallengeOption& challenge_option_3 =
-      unmask_response_details_->card_unmask_challenge_options[2];
+      unmask_response_details()->card_unmask_challenge_options[2];
   EXPECT_EQ(CardUnmaskChallengeOptionType::kCvc, challenge_option_3.type);
   EXPECT_EQ("fake_challenge_id_3", challenge_option_3.id.value());
   EXPECT_EQ(challenge_option_3.challenge_info,
@@ -890,17 +858,18 @@ TEST_F(PaymentsClientTest,
 
   // Ensure that it's not treated as failure when no pan is returned.
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("fake_context_token", unmask_response_details_->context_token);
+  EXPECT_EQ("fake_context_token", unmask_response_details()->context_token);
   // Verify the FIDO request challenge is correctly parsed.
-  EXPECT_EQ(
-      "fake_fido_challenge",
-      *unmask_response_details_->fido_request_options->FindString("challenge"));
+  EXPECT_EQ("fake_fido_challenge",
+            *unmask_response_details()->fido_request_options->FindString(
+                "challenge"));
   // Verify that the unknow new challenge option type won't break the parsing.
   // We ignore the unknown new type, and only return the supported challenge
   // option.
-  EXPECT_EQ(1u, unmask_response_details_->card_unmask_challenge_options.size());
+  EXPECT_EQ(1u,
+            unmask_response_details()->card_unmask_challenge_options.size());
   const CardUnmaskChallengeOption& sms_challenge_option =
-      unmask_response_details_->card_unmask_challenge_options[0];
+      unmask_response_details()->card_unmask_challenge_options[0];
   EXPECT_EQ(CardUnmaskChallengeOptionType::kSmsOtp, sms_challenge_option.type);
   EXPECT_EQ("fake_challenge_id_1", sms_challenge_option.id.value());
   EXPECT_EQ(u"(***)-***-1234", sms_challenge_option.challenge_info);
@@ -923,10 +892,10 @@ TEST_F(PaymentsClientTest, VirtualCardRiskBasedThenFido) {
   EXPECT_TRUE(GetUploadData().find("merchant_domain") != std::string::npos);
 
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("4111111111111111", unmask_response_details_->real_pan);
-  EXPECT_EQ("999", unmask_response_details_->dcvv);
-  EXPECT_EQ("12", unmask_response_details_->expiration_month);
-  EXPECT_EQ("2099", unmask_response_details_->expiration_year);
+  EXPECT_EQ("4111111111111111", unmask_response_details()->real_pan);
+  EXPECT_EQ("999", unmask_response_details()->dcvv);
+  EXPECT_EQ("12", unmask_response_details()->expiration_month);
+  EXPECT_EQ("2099", unmask_response_details()->expiration_year);
 }
 
 TEST_F(PaymentsClientTest, VirtualCardRiskBasedThenOtpSuccess) {
@@ -948,10 +917,10 @@ TEST_F(PaymentsClientTest, VirtualCardRiskBasedThenOtpSuccess) {
   EXPECT_TRUE(GetUploadData().find("merchant_domain") != std::string::npos);
 
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("4111111111111111", unmask_response_details_->real_pan);
-  EXPECT_EQ("999", unmask_response_details_->dcvv);
-  EXPECT_EQ("12", unmask_response_details_->expiration_month);
-  EXPECT_EQ("2099", unmask_response_details_->expiration_year);
+  EXPECT_EQ("4111111111111111", unmask_response_details()->real_pan);
+  EXPECT_EQ("999", unmask_response_details()->dcvv);
+  EXPECT_EQ("12", unmask_response_details()->expiration_month);
+  EXPECT_EQ("2099", unmask_response_details()->expiration_year);
 }
 
 TEST_F(PaymentsClientTest, ExpiredOtp) {
@@ -971,7 +940,7 @@ TEST_F(PaymentsClientTest, ExpiredOtp) {
   EXPECT_TRUE(GetUploadData().find("merchant_domain") != std::string::npos);
 
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("FLOW_STATUS_EXPIRED_OTP", unmask_response_details_->flow_status);
+  EXPECT_EQ("FLOW_STATUS_EXPIRED_OTP", unmask_response_details()->flow_status);
 }
 
 TEST_F(PaymentsClientTest, IncorrectOtp) {
@@ -991,21 +960,8 @@ TEST_F(PaymentsClientTest, IncorrectOtp) {
   EXPECT_TRUE(GetUploadData().find("merchant_domain") != std::string::npos);
 
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-  EXPECT_EQ("FLOW_STATUS_INCORRECT_OTP", unmask_response_details_->flow_status);
-}
-
-TEST_F(PaymentsClientTest, UnmaskIncludesChromeUserContext) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(
-      features::kAutofillEnableAccountWalletStorage);
-
-  StartUnmasking(CardUnmaskOptions());
-  IssueOAuthToken();
-  ReturnResponse(net::HTTP_OK, "{}");
-
-  // ChromeUserContext was set.
-  EXPECT_TRUE(GetUploadData().find("chrome_user_context") != std::string::npos);
-  EXPECT_TRUE(GetUploadData().find("full_sync_enabled") != std::string::npos);
+  EXPECT_EQ("FLOW_STATUS_INCORRECT_OTP",
+            unmask_response_details()->flow_status);
 }
 
 TEST_F(PaymentsClientTest, UnmaskIncludesLegacyAndNonLegacyId) {
@@ -1042,12 +998,7 @@ TEST_F(PaymentsClientTest, UnmaskIncludesOnlyNonLegacyId) {
   EXPECT_TRUE(GetUploadData().find("credit_card_id") == std::string::npos);
 }
 
-TEST_F(PaymentsClientTest,
-       UnmaskIncludesChromeUserContextIfWalletStorageFlagEnabled) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(
-      features::kAutofillEnableAccountWalletStorage);
-
+TEST_F(PaymentsClientTest, UnmaskIncludesChromeUserContext) {
   StartUnmasking(CardUnmaskOptions());
   IssueOAuthToken();
   ReturnResponse(net::HTTP_OK, "{}");
@@ -1079,9 +1030,9 @@ TEST_F(PaymentsClientTest, UnmaskResponseIncludesDeclineDetails) {
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kVcnRetrievalTryAgainFailure,
             result_);
   EXPECT_TRUE(
-      unmask_response_details_->autofill_error_dialog_context.has_value());
+      unmask_response_details()->autofill_error_dialog_context.has_value());
   AutofillErrorDialogContext autofill_error_dialog_context =
-      *unmask_response_details_->autofill_error_dialog_context;
+      *unmask_response_details()->autofill_error_dialog_context;
   EXPECT_EQ(*autofill_error_dialog_context.server_returned_title,
             "test_user_message_title");
   EXPECT_EQ(*autofill_error_dialog_context.server_returned_description,
@@ -1101,7 +1052,7 @@ TEST_F(PaymentsClientTest, UnmaskResponseIncludesEmptyDeclineDetails) {
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kVcnRetrievalTryAgainFailure,
             result_);
   EXPECT_FALSE(
-      unmask_response_details_->autofill_error_dialog_context.has_value());
+      unmask_response_details()->autofill_error_dialog_context.has_value());
 }
 
 TEST_F(PaymentsClientTest, OptInSuccess) {
@@ -1223,19 +1174,6 @@ TEST_P(PaymentsClientUploadDetailsTest,
               std::string::npos);
 }
 
-TEST_P(PaymentsClientUploadDetailsTest, GetDetailsIncludesChromeUserContext) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(
-      features::kAutofillEnableAccountWalletStorage);
-
-  StartGettingUploadDetails(GetUploadDetailsOptions());
-  IssueOAuthTokenIfNecessaryForPreflightCall();
-
-  // ChromeUserContext was set.
-  EXPECT_TRUE(GetUploadData().find("chrome_user_context") != std::string::npos);
-  EXPECT_TRUE(GetUploadData().find("full_sync_enabled") != std::string::npos);
-}
-
 TEST_P(PaymentsClientUploadDetailsTest,
        GetDetailsIncludesIncludesClientBehaviorSignalsInChromeUserContext) {
   base::test::ScopedFeatureList feature_list;
@@ -1258,12 +1196,7 @@ TEST_P(PaymentsClientUploadDetailsTest,
   EXPECT_THAT(GetUploadData(), HasSubstr("\"client_behavior_signals\":[1]"));
 }
 
-TEST_P(PaymentsClientUploadDetailsTest,
-       GetDetailsIncludesChromeUserContextIfWalletStorageFlagEnabled) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(
-      features::kAutofillEnableAccountWalletStorage);
-
+TEST_P(PaymentsClientUploadDetailsTest, GetDetailsIncludesChromeUserContext) {
   StartGettingUploadDetails(GetUploadDetailsOptions());
   IssueOAuthTokenIfNecessaryForPreflightCall();
 
@@ -1494,7 +1427,7 @@ TEST_F(PaymentsClientTest, UploadSuccessEmptyResponse) {
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
   EXPECT_FALSE(upload_card_response_details_.instrument_id.has_value());
   EXPECT_TRUE(upload_card_response_details_.virtual_card_enrollment_state ==
-              CreditCard::VirtualCardEnrollmentState::UNSPECIFIED);
+              CreditCard::VirtualCardEnrollmentState::kUnspecified);
   EXPECT_TRUE(upload_card_response_details_.card_art_url.is_empty());
 }
 
@@ -1513,9 +1446,9 @@ TEST_F(PaymentsClientTest, UploadSuccessInstrumentIdPresent) {
 TEST_F(PaymentsClientTest, UploadSuccessVirtualCardEnrollmentStatePresent) {
   bool oauth_token_issued = false;
   for (CreditCard::VirtualCardEnrollmentState virtual_card_enrollment_state :
-       {CreditCard::VirtualCardEnrollmentState::UNENROLLED_AND_NOT_ELIGIBLE,
-        CreditCard::VirtualCardEnrollmentState::UNENROLLED_AND_ELIGIBLE,
-        CreditCard::VirtualCardEnrollmentState::ENROLLED}) {
+       {CreditCard::VirtualCardEnrollmentState::kUnenrolledAndNotEligible,
+        CreditCard::VirtualCardEnrollmentState::kUnenrolledAndEligible,
+        CreditCard::VirtualCardEnrollmentState::kEnrolled}) {
     StartUploading(UploadCardOptions());
     // An OAuthToken needs to be issued to initiate the first UploadCard call
     // from PaymentsClientTest::StartUploading(), but only for the first call.
@@ -1526,23 +1459,23 @@ TEST_F(PaymentsClientTest, UploadSuccessVirtualCardEnrollmentStatePresent) {
       oauth_token_issued = true;
     }
     switch (virtual_card_enrollment_state) {
-      case CreditCard::VirtualCardEnrollmentState::UNENROLLED_AND_NOT_ELIGIBLE:
+      case CreditCard::VirtualCardEnrollmentState::kUnenrolledAndNotEligible:
         ReturnResponse(net::HTTP_OK,
                        "{ \"virtual_card_metadata\": { \"status\": "
                        "\"ENROLLMENT_STATUS_UNSPECIFIED\" } }");
         break;
-      case CreditCard::VirtualCardEnrollmentState::UNENROLLED_AND_ELIGIBLE:
+      case CreditCard::VirtualCardEnrollmentState::kUnenrolledAndEligible:
         ReturnResponse(net::HTTP_OK,
                        "{ \"virtual_card_metadata\": { \"status\": "
                        "\"ENROLLMENT_ELIGIBLE\" } }");
         break;
-      case CreditCard::VirtualCardEnrollmentState::ENROLLED:
+      case CreditCard::VirtualCardEnrollmentState::kEnrolled:
         ReturnResponse(
             net::HTTP_OK,
             "{ \"virtual_card_metadata\": { \"status\": \"ENROLLED\" } }");
         break;
-      case CreditCard::VirtualCardEnrollmentState::UNENROLLED:
-      case CreditCard::VirtualCardEnrollmentState::UNSPECIFIED:
+      case CreditCard::VirtualCardEnrollmentState::kUnenrolled:
+      case CreditCard::VirtualCardEnrollmentState::kUnspecified:
         break;
     }
     EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
@@ -1565,7 +1498,7 @@ TEST_F(PaymentsClientTest,
                  "\"context_token\": \"some_token\"} } }");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
   EXPECT_EQ(upload_card_response_details_.virtual_card_enrollment_state,
-            CreditCard::VirtualCardEnrollmentState::UNENROLLED_AND_ELIGIBLE);
+            CreditCard::VirtualCardEnrollmentState::kUnenrolledAndEligible);
   EXPECT_EQ(
       upload_card_response_details_.get_details_for_enrollment_response_details
           .value()
@@ -1647,9 +1580,12 @@ TEST_F(PaymentsClientTest, UploadRequestIncludesEncryptedPan) {
   StartUploading(UploadCardOptions());
   IssueOAuthToken();
 
-  // Verify that the encrypted_pan and s7e_1_pan parameters were included
-  // in the request.
-  EXPECT_TRUE(GetUploadData().find("encrypted_pan") != std::string::npos);
+  // Verify that the `encrypted_pan` and s7e_1_pan parameters were included in
+  // the request, and `pan` was not.
+  // Because "pan" is a subset of "encrypted_pan", temporarily include their
+  // enclosing quotation marks (as %22) in the searches.
+  EXPECT_TRUE(GetUploadData().find("%22encrypted_pan%22") != std::string::npos);
+  EXPECT_TRUE(GetUploadData().find("%22pan%22") == std::string::npos);
   EXPECT_TRUE(GetUploadData().find("__param:s7e_1_pan") != std::string::npos);
   EXPECT_TRUE(GetUploadData().find("&s7e_1_pan=4111111111111111") !=
               std::string::npos);
@@ -1676,8 +1612,7 @@ TEST_F(PaymentsClientTest, UploadRequestIncludesClientBehaviorSignals) {
               HasSubstr("%22client_behavior_signals%22:%5B1%5D"));
 }
 
-TEST_F(PaymentsClientTest,
-       UploadRequestIncludesEncryptedPanUsingAlternateType) {
+TEST_F(PaymentsClientTest, UploadRequestIncludesPan) {
   base::test::ScopedFeatureList feature_list;
   feature_list.InitAndEnableFeature(
       features::kAutofillUpstreamUseAlternateSecureDataType);
@@ -1685,11 +1620,12 @@ TEST_F(PaymentsClientTest,
   StartUploading(UploadCardOptions());
   IssueOAuthToken();
 
-  // Verify that the encrypted_pan and s7e_38_pan parameters were included
-  // in the request.
-  EXPECT_TRUE(GetUploadData().find("encrypted_pan") != std::string::npos);
-  EXPECT_TRUE(GetUploadData().find("__param:s7e_38_pan") != std::string::npos);
-  EXPECT_TRUE(GetUploadData().find("&s7e_38_pan=4111111111111111") !=
+  // Verify that the `pan` and s7e_21_pan parameters were included in the
+  // request, and `encrypted_pan` was not.
+  EXPECT_TRUE(GetUploadData().find("encrypted_pan") == std::string::npos);
+  EXPECT_TRUE(GetUploadData().find("pan") != std::string::npos);
+  EXPECT_TRUE(GetUploadData().find("__param:s7e_21_pan") != std::string::npos);
+  EXPECT_TRUE(GetUploadData().find("&s7e_21_pan=4111111111111111") !=
               std::string::npos);
 }
 
@@ -1717,24 +1653,6 @@ TEST_F(PaymentsClientTest, UploadDoesNotIncludeCvcInRequestIfNotProvided) {
 }
 
 TEST_F(PaymentsClientTest, UploadIncludesChromeUserContext) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(
-      features::kAutofillEnableAccountWalletStorage);
-
-  StartUploading(UploadCardOptions());
-  IssueOAuthToken();
-
-  // ChromeUserContext was set.
-  EXPECT_TRUE(GetUploadData().find("chrome_user_context") != std::string::npos);
-  EXPECT_TRUE(GetUploadData().find("full_sync_enabled") != std::string::npos);
-}
-
-TEST_F(PaymentsClientTest,
-       UploadIncludesChromeUserContextIfWalletStorageFlagEnabled) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(
-      features::kAutofillEnableAccountWalletStorage);
-
   StartUploading(UploadCardOptions());
   IssueOAuthToken();
 
@@ -1772,7 +1690,7 @@ TEST_F(PaymentsClientTest, UnmaskRetryFailure) {
   IssueOAuthToken();
   ReturnResponse(net::HTTP_OK, "{ \"error\": { \"code\": \"INTERNAL\" } }");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kTryAgainFailure, result_);
-  EXPECT_EQ("", unmask_response_details_->real_pan);
+  EXPECT_EQ("", unmask_response_details()->real_pan);
 }
 
 TEST_F(PaymentsClientTest, UnmaskPermanentFailure) {
@@ -1781,7 +1699,7 @@ TEST_F(PaymentsClientTest, UnmaskPermanentFailure) {
   ReturnResponse(net::HTTP_OK,
                  "{ \"error\": { \"code\": \"ANYTHING_ELSE\" } }");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kPermanentFailure, result_);
-  EXPECT_EQ("", unmask_response_details_->real_pan);
+  EXPECT_EQ("", unmask_response_details()->real_pan);
 }
 
 TEST_F(PaymentsClientTest, UnmaskMalformedResponse) {
@@ -1789,7 +1707,7 @@ TEST_F(PaymentsClientTest, UnmaskMalformedResponse) {
   IssueOAuthToken();
   ReturnResponse(net::HTTP_OK, "{ \"error_code\": \"WRONG_JSON_FORMAT\" }");
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kPermanentFailure, result_);
-  EXPECT_EQ("", unmask_response_details_->real_pan);
+  EXPECT_EQ("", unmask_response_details()->real_pan);
 }
 
 TEST_F(PaymentsClientTest, ReauthNeeded) {
@@ -1799,17 +1717,17 @@ TEST_F(PaymentsClientTest, ReauthNeeded) {
     ReturnResponse(net::HTTP_UNAUTHORIZED, "");
     // No response yet.
     EXPECT_EQ(AutofillClient::PaymentsRpcResult::kNone, result_);
-    EXPECT_EQ(nullptr, unmask_response_details_.get());
+    EXPECT_EQ(nullptr, unmask_response_details());
 
     // Second HTTP_UNAUTHORIZED causes permanent failure.
     IssueOAuthToken();
     ReturnResponse(net::HTTP_UNAUTHORIZED, "");
     EXPECT_EQ(AutofillClient::PaymentsRpcResult::kPermanentFailure, result_);
-    EXPECT_EQ("", unmask_response_details_->real_pan);
+    EXPECT_EQ("", unmask_response_details()->real_pan);
   }
 
   result_ = AutofillClient::PaymentsRpcResult::kNone;
-  unmask_response_details_ = nullptr;
+  ResetUnmaskResponseDetails();
 
   {
     StartUnmasking(CardUnmaskOptions());
@@ -1820,13 +1738,13 @@ TEST_F(PaymentsClientTest, ReauthNeeded) {
     ReturnResponse(net::HTTP_UNAUTHORIZED, "");
     // No response yet.
     EXPECT_EQ(AutofillClient::PaymentsRpcResult::kNone, result_);
-    EXPECT_EQ(nullptr, unmask_response_details_.get());
+    EXPECT_EQ(nullptr, unmask_response_details());
 
     // HTTP_OK after first HTTP_UNAUTHORIZED results in success.
     IssueOAuthToken();
     ReturnResponse(net::HTTP_OK, "{ \"pan\": \"1234\" }");
     EXPECT_EQ(AutofillClient::PaymentsRpcResult::kSuccess, result_);
-    EXPECT_EQ("1234", unmask_response_details_->real_pan);
+    EXPECT_EQ("1234", unmask_response_details()->real_pan);
   }
 }
 
@@ -1835,7 +1753,7 @@ TEST_F(PaymentsClientTest, NetworkError) {
   IssueOAuthToken();
   ReturnResponse(net::HTTP_REQUEST_TIMEOUT, std::string());
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kNetworkError, result_);
-  EXPECT_EQ("", unmask_response_details_->real_pan);
+  EXPECT_EQ("", unmask_response_details()->real_pan);
 }
 
 TEST_F(PaymentsClientTest, OtherError) {
@@ -1843,7 +1761,7 @@ TEST_F(PaymentsClientTest, OtherError) {
   IssueOAuthToken();
   ReturnResponse(net::HTTP_FORBIDDEN, std::string());
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kPermanentFailure, result_);
-  EXPECT_EQ("", unmask_response_details_->real_pan);
+  EXPECT_EQ("", unmask_response_details()->real_pan);
 }
 
 TEST_F(PaymentsClientTest, VcnRetrievalTryAgainFailure) {
@@ -1872,7 +1790,7 @@ TEST_F(PaymentsClientTest, UnmaskPermanentFailureWhenVcnMissingExpiration) {
   ReturnResponse(net::HTTP_OK,
                  "{ \"pan\": \"4111111111111111\", \"dcvv\": \"999\" }");
 
-  EXPECT_EQ("4111111111111111", unmask_response_details_->real_pan);
+  EXPECT_EQ("4111111111111111", unmask_response_details()->real_pan);
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kPermanentFailure, result_);
 }
 
@@ -1883,7 +1801,7 @@ TEST_F(PaymentsClientTest, UnmaskPermanentFailureWhenVcnMissingCvv) {
                  "{ \"pan\": \"4111111111111111\", \"expiration\": { "
                  "\"month\":12, \"year\":2099 } }");
 
-  EXPECT_EQ("4111111111111111", unmask_response_details_->real_pan);
+  EXPECT_EQ("4111111111111111", unmask_response_details()->real_pan);
   EXPECT_EQ(AutofillClient::PaymentsRpcResult::kPermanentFailure, result_);
 }
 
@@ -1976,24 +1894,6 @@ TEST_F(PaymentsClientTest,
 }
 
 TEST_F(PaymentsClientTest, MigrationRequestIncludesChromeUserContext) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(
-      features::kAutofillEnableAccountWalletStorage);
-
-  StartMigrating(/*has_cardholder_name=*/true);
-  IssueOAuthToken();
-
-  // ChromeUserContext was set.
-  EXPECT_TRUE(GetUploadData().find("chrome_user_context") != std::string::npos);
-  EXPECT_TRUE(GetUploadData().find("full_sync_enabled") != std::string::npos);
-}
-
-TEST_F(PaymentsClientTest,
-       MigrationRequestIncludesChromeUserContextIfWalletStorageFlagEnabled) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(
-      features::kAutofillEnableAccountWalletStorage);
-
   StartMigrating(/*has_cardholder_name=*/true);
   IssueOAuthToken();
 
@@ -2202,7 +2102,7 @@ class UpdateVirtualCardEnrollmentTest
         request_details,
         base::BindOnce(
             &PaymentsClientTest::OnDidGetUpdateVirtualCardEnrollmentResponse,
-            weak_ptr_factory_.GetWeakPtr()));
+            GetWeakPtr()));
   }
 };
 
@@ -2279,7 +2179,7 @@ TEST_P(GetVirtualCardEnrollmentDetailsTest,
   client_->GetVirtualCardEnrollmentDetails(
       request_details,
       base::BindOnce(&PaymentsClientTest::OnDidGetVirtualCardEnrollmentDetails,
-                     weak_ptr_factory_.GetWeakPtr()));
+                     GetWeakPtr()));
   IssueOAuthToken();
 
   // Ensures the PaymentsRpcResult is set correctly.

@@ -104,8 +104,7 @@ public class FREMobileIdentityConsistencyFieldTrial {
     }
 
     @AnyThread
-    @VariationsGroup
-    private static int getFirstRunTrialGroup() {
+    private static @VariationsGroup int getFirstRunTrialGroup() {
         synchronized (LOCK) {
             return SharedPreferencesManager.getInstance().readInt(
                     ChromePreferenceKeys.FIRST_RUN_VARIATIONS_FIELD_TRIAL_GROUP,
@@ -175,8 +174,7 @@ public class FREMobileIdentityConsistencyFieldTrial {
     @CalledByNative
     @AnyThread
     public static String getFirstRunVariationsTrialGroupName() {
-        @VariationsGroup
-        final int group = getFirstRunTrialGroup();
+        final @VariationsGroup int group = getFirstRunTrialGroup();
         switch (group) {
             case VariationsGroup.WELCOME_TO_CHROME:
                 return "Control";
@@ -203,8 +201,7 @@ public class FREMobileIdentityConsistencyFieldTrial {
      */
     @MainThread
     public static Pair<Integer, Integer> getVariationTitleAndSubtitle() {
-        @VariationsGroup
-        final int group = getFirstRunTrialGroup();
+        final @VariationsGroup int group = getFirstRunTrialGroup();
         switch (group) {
             case VariationsGroup.WELCOME_TO_CHROME:
                 return new Pair(R.string.fre_welcome, 0);
@@ -224,18 +221,19 @@ public class FREMobileIdentityConsistencyFieldTrial {
         }
     }
 
-    @VariationsGroup
-    private static int generateFirstRunStringVariationsGroup(
+    private static @VariationsGroup int generateFirstRunStringVariationsGroup(
             int lowEntropyValue, int lowEntropySize) {
-        int variationsPercentage = 0;
+        double variationsPercentage = 0;
         switch (VersionConstants.CHANNEL) {
             case Channel.DEFAULT:
             case Channel.CANARY:
             case Channel.DEV:
+            case Channel.BETA:
                 variationsPercentage = 10;
                 break;
-            case Channel.BETA:
             case Channel.STABLE:
+                variationsPercentage = 0.5;
+                break;
         }
         // For A/B testing all experiment groups should have the same percentages.
         assert variationsPercentage * VariationsGroup.MAX_VALUE <= 100;
@@ -258,8 +256,7 @@ public class FREMobileIdentityConsistencyFieldTrial {
      */
     @MainThread
     public static boolean shouldHideTitleUntilPoliciesAreLoaded() {
-        @VariationsGroup
-        final int group = getFirstRunTrialGroup();
+        final @VariationsGroup int group = getFirstRunTrialGroup();
         return group != VariationsGroup.DEFAULT && group != VariationsGroup.WELCOME_TO_CHROME;
     }
 
@@ -272,20 +269,24 @@ public class FREMobileIdentityConsistencyFieldTrial {
      */
     @MainThread
     public static void createFirstRunVariationsTrial() {
+        // TODO(https://crbug.com/1430512): Add a test to verify that the group assignment stays
+        // consistent when the user closes and reopens Chrome during the FRE.
+        synchronized (LOCK) {
+            // Don't create a new group if the user was already assigned a group. Can
+            // happen when the user dismisses FRE without finishing the flow and starts chrome
+            // again.
+            if (SharedPreferencesManager.getInstance().readInt(
+                        ChromePreferenceKeys.FIRST_RUN_VARIATIONS_FIELD_TRIAL_GROUP, -2)
+                    != -2) {
+                return;
+            }
+        }
         int group = generateFirstRunStringVariationsGroup(
                 LowEntropySource.generateLowEntropySourceForFirstRunTrial(),
                 LowEntropySource.MAX_LOW_ENTROPY_SIZE);
         synchronized (LOCK) {
             SharedPreferencesManager.getInstance().writeInt(
                     ChromePreferenceKeys.FIRST_RUN_VARIATIONS_FIELD_TRIAL_GROUP, group);
-        }
-    }
-
-    @AnyThread
-    public static void setFirstRunTrialGroupForTesting(String group) {
-        synchronized (LOCK) {
-            SharedPreferencesManager.getInstance().writeString(
-                    ChromePreferenceKeys.FIRST_RUN_FIELD_TRIAL_GROUP, group);
         }
     }
 

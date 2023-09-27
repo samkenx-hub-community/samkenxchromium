@@ -27,6 +27,7 @@ class WaylandPositioner {
   enum Direction { kNegative = -1, kNeutral = 0, kPositive = 1 };
 
   WaylandPositioner() = default;
+
   WaylandPositioner(const WaylandPositioner&) = delete;
   WaylandPositioner& operator=(const WaylandPositioner&) = delete;
 

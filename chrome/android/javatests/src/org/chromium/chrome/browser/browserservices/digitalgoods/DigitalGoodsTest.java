@@ -12,12 +12,13 @@ import static org.chromium.chrome.browser.browserservices.TestTrustedWebActivity
 
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.browser.trusted.TrustedWebActivityCallback;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -82,7 +83,7 @@ public class DigitalGoodsTest {
 
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(
                 CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
-                        InstrumentationRegistry.getTargetContext(), mTestPage));
+                        ApplicationProvider.getApplicationContext(), mTestPage));
     }
 
     /**

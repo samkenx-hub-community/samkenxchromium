@@ -8,8 +8,8 @@
 #import <string>
 #import <vector>
 
+#import "base/apple/foundation_util.h"
 #import "base/functional/callback.h"
-#import "base/mac/foundation_util.h"
 #import "base/notreached.h"
 #import "base/ranges/algorithm.h"
 #import "base/strings/sys_string_conversions.h"
@@ -28,12 +28,9 @@
 #import "components/autofill/ios/form_util/unique_id_data_tab_helper.h"
 #import "components/keyed_service/core/service_access_type.h"
 #import "components/password_manager/core/browser/leak_detection_dialog_utils.h"
-#import "components/password_manager/ios/ios_password_manager_driver.h"
-#import "components/password_manager/ios/ios_password_manager_driver_factory.h"
 #import "components/password_manager/ios/shared_password_controller.h"
-#import "components/sync/driver/sync_service.h"
+#import "components/sync/service/sync_service.h"
 #import "ios/web/public/js_messaging/web_frame.h"
-#import "ios/web/public/js_messaging/web_frame_util.h"
 #import "ios/web/public/js_messaging/web_frames_manager.h"
 #import "ios/web/public/web_state.h"
 #import "ios/web_view/internal/app/application_context.h"
@@ -54,12 +51,9 @@
 #import "ios/web_view/public/cwv_autofill_controller_delegate.h"
 #import "net/base/mac/url_conversions.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
-using autofill::FormRendererId;
 using autofill::FieldRendererId;
+using autofill::FormData;
+using autofill::FormRendererId;
 using UserDecision =
     autofill::AutofillClient::SaveAddressProfileOfferUserDecision;
 
@@ -158,16 +152,18 @@ using UserDecision =
           fieldIdentifier:(NSString*)fieldIdentifier
                   frameID:(NSString*)frameID
         completionHandler:(nullable void (^)(void))completionHandler {
+  autofill::AutofillJavaScriptFeature* feature =
+      autofill::AutofillJavaScriptFeature::GetInstance();
   web::WebFrame* frame =
-      web::GetWebFrameWithId(_webState, base::SysNSStringToUTF8(frameID));
-  autofill::AutofillJavaScriptFeature::GetInstance()
-      ->ClearAutofilledFieldsForForm(frame, _lastFormActivityUniqueFormID,
-                                     _lastFormActivityUniqueFieldID,
-                                     base::BindOnce(^(NSString*) {
-                                       if (completionHandler) {
-                                         completionHandler();
-                                       }
-                                     }));
+      feature->GetWebFramesManager(_webState)->GetFrameWithId(
+          base::SysNSStringToUTF8(frameID));
+  feature->ClearAutofilledFieldsForForm(frame, _lastFormActivityUniqueFormID,
+                                        _lastFormActivityUniqueFieldID,
+                                        base::BindOnce(^(NSString*) {
+                                          if (completionHandler) {
+                                            completionHandler();
+                                          }
+                                        }));
 }
 
 - (void)fetchSuggestionsForFormWithName:(NSString*)formName
@@ -320,13 +316,14 @@ using UserDecision =
             popupDelegate:
                 (const base::WeakPtr<autofill::AutofillPopupDelegate>&)
                     delegate {
-  // frontend_id is > 0 for Autofill suggestions, == 0 for Autocomplete
-  // suggestions, and < 0 for special suggestions such as clear form.
   // We only want Autofill suggestions.
   std::vector<autofill::Suggestion> filtered_suggestions;
   base::ranges::copy_if(suggestions, std::back_inserter(filtered_suggestions),
                         [](const autofill::Suggestion& suggestion) {
-                          return suggestion.frontend_id > 0;
+                          return suggestion.popup_item_id ==
+                                     autofill::PopupItemId::kAddressEntry ||
+                                 suggestion.popup_item_id ==
+                                     autofill::PopupItemId::kCreditCardEntry;
                         });
   [_autofillAgent showAutofillPopup:filtered_suggestions
                       popupDelegate:delegate];
@@ -399,18 +396,6 @@ using UserDecision =
   } else if (_saver) {
     [_saver loadRiskData:std::move(callback)];
   }
-}
-
-- (void)propagateAutofillPredictionsForForms:
-            (const std::vector<autofill::FormStructure*>&)forms
-                                     inFrame:(web::WebFrame*)frame {
-  IOSPasswordManagerDriver* driver =
-      IOSPasswordManagerDriverFactory::FromWebStateAndWebFrame(_webState,
-                                                               frame);
-  if (!driver) {
-    return;
-  }
-  _passwordManager->ProcessAutofillPredictions(driver, forms);
 }
 
 - (void)
@@ -493,18 +478,20 @@ using UserDecision =
                     inFrame:(web::WebFrame*)frame {
   DCHECK_EQ(_webState, webState);
 
+  std::string frame_id = frame ? frame->GetFrameId() : "";
+
   NSString* nsFormName = base::SysUTF8ToNSString(params.form_name);
   _lastFormActivityUniqueFormID = params.unique_form_id;
   NSString* nsFieldIdentifier =
       base::SysUTF8ToNSString(params.field_identifier);
   _lastFormActivityUniqueFieldID = params.unique_field_id;
   NSString* nsFieldType = base::SysUTF8ToNSString(params.field_type);
-  NSString* nsFrameID = base::SysUTF8ToNSString(GetWebFrameId(frame));
+  NSString* nsFrameID = base::SysUTF8ToNSString(frame_id);
   NSString* nsValue = base::SysUTF8ToNSString(params.value);
   NSString* nsType = base::SysUTF8ToNSString(params.type);
   BOOL userInitiated = params.has_user_gesture;
 
-  _lastFormActivityWebFrameID = GetWebFrameId(frame);
+  _lastFormActivityWebFrameID = frame_id;
   _lastFormActivityTypedValue = nsValue;
   _lastFormActivityType = nsType;
   if (params.type == "focus") {
@@ -721,6 +708,16 @@ using UserDecision =
     // If not implemented, just reject.
     decisionHandler(/*accept=*/NO);
   }
+}
+
+- (void)attachListenersForBottomSheet:
+            (const std::vector<autofill::FieldRendererId>&)rendererIds
+                           forFrameId:(const std::string&)frameId {
+  // No op.
+}
+
+- (void)detachListenersForBottomSheet:(const std::string&)frameId {
+  // No op.
 }
 
 - (void)sharedPasswordController:(SharedPasswordController*)controller

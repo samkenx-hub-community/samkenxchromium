@@ -13,7 +13,6 @@
 #include "ash/public/cpp/metrics_util.h"
 #include "ash/public/cpp/shelf_config.h"
 #include "ash/public/cpp/shell_window_ids.h"
-#include "ash/public/cpp/tablet_mode.h"
 #include "ash/public/cpp/tablet_mode_observer.h"
 #include "ash/root_window_controller.h"
 #include "ash/shelf/shelf.h"
@@ -29,7 +28,6 @@
 #include "ash/wm/window_util.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
-#include "base/cxx17_backports.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/location.h"
@@ -40,7 +38,6 @@
 #include "base/system/sys_info.h"
 #include "base/time/default_tick_clock.h"
 #include "base/time/tick_clock.h"
-#include "chromeos/dbus/power/power_manager_client.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window_observer.h"
 #include "ui/base/accelerators/accelerator.h"
@@ -57,7 +54,6 @@
 #include "ui/events/devices/input_device.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
-#include "ui/gfx/geometry/vector3d_f.h"
 #include "ui/views/widget/widget.h"
 #include "ui/wm/core/cursor_manager.h"
 #include "ui/wm/core/window_util.h"
@@ -164,12 +160,14 @@ bool ShouldObserveSequence(ui::LayerAnimationSequence* sequence) {
 
 // Check if there is any external and internal pointing device in
 // |input_devices|.
+template <typename PointingDeviceType>
 void CheckHasPointingDevices(
-    const std::vector<ui::InputDevice>& input_devices,
+    const std::vector<PointingDeviceType>& input_devices,
     BluetoothDevicesObserver* bluetooth_device_observer,
     bool* out_has_external_pointing_device,
     bool* out_has_internal_pointing_device) {
-  for (const ui::InputDevice& input_device : input_devices) {
+  static_assert(std::is_base_of<ui::InputDevice, PointingDeviceType>::value);
+  for (const PointingDeviceType& input_device : input_devices) {
     if (input_device.type == ui::INPUT_DEVICE_INTERNAL) {
       *out_has_internal_pointing_device = true;
     } else if (input_device.type == ui::INPUT_DEVICE_USB ||
@@ -330,7 +328,7 @@ class TabletModeController::DestroyObserver : public aura::WindowObserver {
   aura::Window* window() { return window_; }
 
  private:
-  aura::Window* window_;
+  raw_ptr<aura::Window, ExperimentalAsh> window_;
   base::OnceCallback<void(void)> callback_;
 };
 
@@ -373,7 +371,7 @@ class TabletModeController::ScopedContainerHider {
   }
 
  private:
-  aura::Window* const root_window_;
+  const raw_ptr<aura::Window, ExperimentalAsh> root_window_;
 
   // The layer that holds the clone of shelf and float layers while the
   // originals are hidden.
@@ -421,8 +419,6 @@ TabletModeController::TabletModeController()
   chromeos::PowerManagerClient* power_manager_client =
       chromeos::PowerManagerClient::Get();
   power_manager_client->AddObserver(this);
-  power_manager_client->GetSwitchStates(base::BindOnce(
-      &TabletModeController::OnGetSwitchStates, weak_factory_.GetWeakPtr()));
 }
 
 TabletModeController::~TabletModeController() {
@@ -688,6 +684,14 @@ void TabletModeController::OnAccelerometerUpdated(
   StartTrackingTabletUsageMetricsIfApplicable();
 }
 
+void TabletModeController::PowerManagerBecameAvailable(bool available) {
+  if (!available) {
+    return;
+  }
+  chromeos::PowerManagerClient::Get()->GetSwitchStates(base::BindOnce(
+      &TabletModeController::OnGetSwitchStates, weak_factory_.GetWeakPtr()));
+}
+
 void TabletModeController::LidEventReceived(
     chromeos::PowerManagerClient::LidState state,
     base::TimeTicks time) {
@@ -950,7 +954,7 @@ void TabletModeController::HandleHingeRotation(
   // accuracy.
   float largest_hinge_acceleration =
       std::max(std::abs(base_reading.x()), std::abs(lid_reading.x()));
-  float smoothing_ratio = base::clamp(
+  float smoothing_ratio = std::clamp(
       (largest_hinge_acceleration - kHingeVerticalSmoothingStart) /
           (kHingeVerticalSmoothingMaximum - kHingeVerticalSmoothingStart),
       0.0f, 1.0f);
@@ -1336,11 +1340,22 @@ bool TabletModeController::ShouldUiBeInTabletMode() const {
   if (!tablet_mode_behavior_.observe_pointer_device_events)
     return is_in_tablet_physical_state_;
 
-  if (has_external_pointing_device_)
+  // If this is a tablet capable device, and `OnDeviceListsComplete()` has
+  // not been received yet, then skip further checking and don't enter tablet
+  // mode, since `has_external_pointing_device_` and
+  // `has_internal_pointing_device_` are not accurate yet.
+  if (IsBoardTypeMarkedAsTabletCapable() &&
+      !initial_input_device_set_up_finished_) {
     return false;
+  }
 
-  if (is_in_tablet_physical_state_)
+  if (has_external_pointing_device_) {
+    return false;
+  }
+
+  if (is_in_tablet_physical_state_) {
     return true;
+  }
 
   return !has_internal_pointing_device_ && CanEnterTabletMode() &&
          HasActiveInternalDisplay() && base::SysInfo::IsRunningOnChromeOS();

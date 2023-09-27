@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'chrome://webui-test/mojo_webui_test_support.js';
 import 'chrome://new-tab-page/new_tab_page.js';
 
 import {$$, BrowserProxyImpl, decodeString16, MetricsReporterImpl, mojoString16, RealboxBrowserProxy, RealboxElement, RealboxIconElement, RealboxMatchElement} from 'chrome://new-tab-page/new_tab_page.js';
@@ -31,6 +30,7 @@ function createClipboardEvent(name: string): ClipboardEvent {
 function createAutocompleteMatch(): AutocompleteMatch {
   return {
     a11yLabel: mojoString16(''),
+    actions: [],
     allowedToBeDefaultMatch: false,
     isSearchType: false,
     swapContentsAndDescription: false,
@@ -129,7 +129,6 @@ suite('NewTabPageRealboxTest', () => {
   suiteSetup(() => {
     loadTimeData.overrideValues({
       realboxSeparator: ' - ',
-      showSecondarySide: true,
     });
   });
 
@@ -184,6 +183,7 @@ suite('NewTabPageRealboxTest', () => {
   }
 
   test('when created is not focused and matches are not showing', async () => {
+    assertEquals(0, testProxy.handler.getCallCount('onFocusChanged'));
     assertFalse(realbox.hidden);
     assertNotEquals(realbox, getDeepActiveElement());
     assertFalse(areMatchesShowing());
@@ -282,6 +282,7 @@ suite('NewTabPageRealboxTest', () => {
     // Left click does not query autocomplete when matches are showing.
     realbox.$.input.dispatchEvent(new MouseEvent('mousedown', {button: 0}));
     assertEquals(0, testProxy.handler.getCallCount('queryAutocomplete'));
+    assertEquals(1, testProxy.handler.getCallCount('onFocusChanged'));
 
     // Hide the matches by focusing out.
     matchEls[0]!.dispatchEvent(new FocusEvent('focusout', {
@@ -294,6 +295,7 @@ suite('NewTabPageRealboxTest', () => {
     // Right click does not query autocomplete.
     realbox.$.input.dispatchEvent(new MouseEvent('mousedown', {button: 1}));
     assertEquals(0, testProxy.handler.getCallCount('queryAutocomplete'));
+    assertEquals(2, testProxy.handler.getCallCount('onFocusChanged'));
 
     // Left click does not query autocomplete when input is non-empty.
     realbox.$.input.value = '   ';
@@ -302,10 +304,12 @@ suite('NewTabPageRealboxTest', () => {
   });
 
   test('focusing the input does not query autocomplete', async () => {
+    assertEquals(0, testProxy.handler.getCallCount('onFocusChanged'));
     realbox.$.input.value = '';
     realbox.$.input.focus();
     assertEquals(realbox.$.input, getDeepActiveElement());
     assertEquals(0, testProxy.handler.getCallCount('queryAutocomplete'));
+    assertEquals(1, testProxy.handler.getCallCount('onFocusChanged'));
   });
 
   test('tabbing into empty input queries autocomplete', async () => {
@@ -949,7 +953,6 @@ suite('NewTabPageRealboxTest', () => {
       assertEquals(matches[0]!.destinationUrl.url, args.url.url);
       assertTrue(args.areMatchesShowing);
       assertTrue(args.shiftKey);
-      assertTrue(args.timeElapsedSinceLastFocus.microseconds > 0);
     });
     assertEquals(1, testProxy.handler.getCallCount('openAutocompleteMatch'));
   });
@@ -1029,7 +1032,6 @@ suite('NewTabPageRealboxTest', () => {
               assertEquals(matches[0]!.destinationUrl.url, args.url.url);
               assertFalse(args.areMatchesShowing);
               assertTrue(args.shiftKey);
-              assertTrue(args.timeElapsedSinceLastFocus.microseconds > 0);
             });
         assertEquals(
             1, testProxy.handler.getCallCount('openAutocompleteMatch'));
@@ -1205,7 +1207,6 @@ suite('NewTabPageRealboxTest', () => {
       assertEquals(matches[0]!.destinationUrl.url, args.url.url);
       assertTrue(args.areMatchesShowing);
       assertTrue(args.shiftKey);
-      assertTrue(args.timeElapsedSinceLastFocus.microseconds > 0);
     });
     assertEquals(1, testProxy.handler.getCallCount('openAutocompleteMatch'));
   });
@@ -1254,79 +1255,6 @@ suite('NewTabPageRealboxTest', () => {
       assertEquals(matches[0]!.destinationUrl.url, args.url.url);
       assertTrue(args.areMatchesShowing);
       assertTrue(args.shiftKey);
-      assertTrue(args.timeElapsedSinceLastFocus.microseconds > 0);
-    });
-    assertEquals(1, testProxy.handler.getCallCount('openAutocompleteMatch'));
-  });
-
-  test('Clicking a match navigates to it', async () => {
-    // Input is expected to have been focused before any navigation.
-    realbox.$.input.dispatchEvent(new Event('focus'));
-
-    realbox.$.input.value = 'hello';
-    realbox.$.input.dispatchEvent(new InputEvent('input'));
-
-    const matches = [createSearchMatch(), createUrlMatch()];
-    testProxy.callbackRouterRemote.autocompleteResultChanged({
-      input: mojoString16(realbox.$.input.value.trimStart()),
-      matches,
-      suggestionGroupsMap: {},
-    });
-    await testProxy.callbackRouterRemote.$.flushForTesting();
-    assertTrue(areMatchesShowing());
-
-    const matchEls =
-        realbox.$.matches.shadowRoot!.querySelectorAll('cr-realbox-match');
-    assertEquals(2, matchEls.length);
-
-    // Right clicks are ignored.
-    const rightClick = new MouseEvent('click', {
-      bubbles: true,
-      button: 2,
-      cancelable: true,
-      composed: true,  // So it propagates across shadow DOM boundary.
-    });
-    matchEls[0]!.dispatchEvent(rightClick);
-    assertFalse(rightClick.defaultPrevented);
-    assertEquals(0, testProxy.handler.getCallCount('openAutocompleteMatch'));
-
-    // Middle clicks are accepted.
-    const middleClick = new MouseEvent('click', {
-      bubbles: true,
-      button: 1,
-      cancelable: true,
-      composed: true,  // So it propagates across shadow DOM boundary.
-    });
-    matchEls[0]!.dispatchEvent(middleClick);
-    assertTrue(middleClick.defaultPrevented);
-
-    await testProxy.handler.whenCalled('openAutocompleteMatch').then((args) => {
-      assertEquals(0, args.line);
-      assertEquals(matches[0]!.destinationUrl.url, args.url.url);
-      assertTrue(args.areMatchesShowing);
-      assertEquals(1, args.mouseButton);
-      assertTrue(args.timeElapsedSinceLastFocus.microseconds > 0);
-    });
-    assertEquals(1, testProxy.handler.getCallCount('openAutocompleteMatch'));
-
-    testProxy.handler.reset();
-
-    // Left clicks are accepted.
-    const leftClick = new MouseEvent('click', {
-      bubbles: true,
-      button: 0,
-      cancelable: true,
-      composed: true,  // So it propagates across shadow DOM boundary.
-    });
-    matchEls[0]!.dispatchEvent(leftClick);
-    assertTrue(leftClick.defaultPrevented);
-
-    await testProxy.handler.whenCalled('openAutocompleteMatch').then((args) => {
-      assertEquals(0, args.line);
-      assertEquals(matches[0]!.destinationUrl.url, args.url.url);
-      assertTrue(args.areMatchesShowing);
-      assertEquals(0, args.mouseButton);
-      assertTrue(args.timeElapsedSinceLastFocus.microseconds > 0);
     });
     assertEquals(1, testProxy.handler.getCallCount('openAutocompleteMatch'));
   });
@@ -1357,65 +1285,6 @@ suite('NewTabPageRealboxTest', () => {
         window.getComputedStyle(matchEls[0]!.$.remove).display, 'none');
     assertNotEquals(
         window.getComputedStyle(matchEls[1]!.$.remove).display, 'none');
-  });
-
-  test('Can remove match using the remove button', async () => {
-    realbox.$.input.value = 'hello';
-    realbox.$.input.dispatchEvent(new InputEvent('input'));
-
-    const matches =
-        [createSearchMatch(), createUrlMatch({supportsDeletion: true})];
-    testProxy.callbackRouterRemote.autocompleteResultChanged({
-      input: mojoString16(realbox.$.input.value.trimStart()),
-      matches,
-      suggestionGroupsMap: {},
-    });
-    await testProxy.callbackRouterRemote.$.flushForTesting();
-    assertTrue(areMatchesShowing());
-
-    const matchEls =
-        realbox.$.matches.shadowRoot!.querySelectorAll('cr-realbox-match');
-    assertEquals(2, matchEls.length);
-
-    // Select the second match.
-    const arrowUpEvent = new KeyboardEvent('keydown', {
-      bubbles: true,
-      cancelable: true,
-      composed: true,  // So it propagates across shadow DOM boundary.
-      key: 'ArrowUp',
-    });
-    realbox.$.input.dispatchEvent(arrowUpEvent);
-    assertTrue(arrowUpEvent.defaultPrevented);
-    assertTrue(matchEls[1]!.hasAttribute(Attributes.SELECTED));
-
-    // By pressing 'Enter' on the button.
-    const enter = new KeyboardEvent('keydown', {
-      bubbles: true,
-      cancelable: true,
-      composed: true,  // So it propagates across shadow DOM boundary.
-      key: 'Enter',
-    });
-    matchEls[1]!.$.remove.dispatchEvent(enter);
-    assertTrue(enter.defaultPrevented);
-    await testProxy.handler.whenCalled('deleteAutocompleteMatch')
-        .then((args) => {
-          assertEquals(1, args.line);
-        });
-    assertEquals(1, testProxy.handler.getCallCount('deleteAutocompleteMatch'));
-    // Pressing 'Enter' on the button doesn't accidentally trigger navigation.
-    assertEquals(0, testProxy.handler.getCallCount('openAutocompleteMatch'));
-
-    testProxy.handler.reset();
-
-    // By clicking the button.
-    matchEls[1]!.$.remove.click();
-    await testProxy.handler.whenCalled('deleteAutocompleteMatch')
-        .then((args) => {
-          assertEquals(1, args.line);
-        });
-    assertEquals(1, testProxy.handler.getCallCount('deleteAutocompleteMatch'));
-    // Clicking the button doesn't accidentally trigger navigation.
-    assertEquals(0, testProxy.handler.getCallCount('openAutocompleteMatch'));
   });
 
   test('Can remove selected match using keyboard shortcut', async () => {
@@ -1479,50 +1348,6 @@ suite('NewTabPageRealboxTest', () => {
     });
     realbox.$.input.dispatchEvent(shiftDeleteEvent);
     assertTrue(shiftDeleteEvent.defaultPrevented);
-    await testProxy.handler.whenCalled('deleteAutocompleteMatch')
-        .then((args) => {
-          assertEquals(1, args.line);
-        });
-    assertEquals(1, testProxy.handler.getCallCount('deleteAutocompleteMatch'));
-  });
-
-  test('Can remove match using the remove button', async () => {
-    realbox.$.input.value = 'hello';
-    realbox.$.input.dispatchEvent(new InputEvent('input'));
-
-    const matches =
-        [createSearchMatch(), createUrlMatch({supportsDeletion: true})];
-    testProxy.callbackRouterRemote.autocompleteResultChanged({
-      input: mojoString16(realbox.$.input.value.trimStart()),
-      matches,
-      suggestionGroupsMap: {},
-    });
-    await testProxy.callbackRouterRemote.$.flushForTesting();
-    assertTrue(areMatchesShowing());
-
-    const matchEls =
-        realbox.$.matches.shadowRoot!.querySelectorAll('cr-realbox-match');
-    assertEquals(2, matchEls.length);
-
-    // By pressing 'Enter' on the button.
-    const enter = new KeyboardEvent('keydown', {
-      bubbles: true,
-      cancelable: true,
-      composed: true,  // So it propagates across shadow DOM boundary.
-      key: 'Enter',
-    });
-    matchEls[1]!.$.remove.dispatchEvent(enter);
-    assertTrue(enter.defaultPrevented);
-    await testProxy.handler.whenCalled('deleteAutocompleteMatch')
-        .then((args) => {
-          assertEquals(1, args.line);
-        });
-    assertEquals(1, testProxy.handler.getCallCount('deleteAutocompleteMatch'));
-
-    testProxy.handler.reset();
-
-    // By clicking the button.
-    matchEls[1]!.$.remove.click();
     await testProxy.handler.whenCalled('deleteAutocompleteMatch')
         .then((args) => {
           assertEquals(1, args.line);
@@ -1729,6 +1554,7 @@ suite('NewTabPageRealboxTest', () => {
     realbox.$.input.focus();
     realbox.$.input.value = 'hello';
     realbox.$.input.dispatchEvent(new InputEvent('input'));
+    assertEquals(1, testProxy.handler.getCallCount('onFocusChanged'));
 
     const matches = [createSearchMatch(), createUrlMatch()];
     testProxy.callbackRouterRemote.autocompleteResultChanged({
@@ -1816,6 +1642,10 @@ suite('NewTabPageRealboxTest', () => {
     assertTrue(matchEls[0]!.hasAttribute(Attributes.SELECTED));
     assertEquals('hello world', realbox.$.input.value);
     assertEquals(matchEls[0], realbox.$.matches.shadowRoot!.activeElement);
+
+    // Changing match selection doesn't result in another onFocusChanged call
+    // because focus is for the whole realbox (including input container).
+    assertEquals(1, testProxy.handler.getCallCount('onFocusChanged'));
   });
 
   test('focus indicator', async () => {
@@ -1824,12 +1654,12 @@ suite('NewTabPageRealboxTest', () => {
     realbox.$.input.dispatchEvent(new InputEvent('input'));
 
     const matches = [createSearchMatch({
-      action: {
+      actions: [{
         a11yLabel: mojoString16(''),
         hint: mojoString16('Clear Browsing History'),
         suggestionContents: mojoString16(''),
         iconUrl: 'chrome://theme/current-channel-logo',
-      },
+      }],
       fillIntoEdit: mojoString16('clear browsing history'),
       supportsDeletion: true,
     })];
@@ -1881,93 +1711,7 @@ suite('NewTabPageRealboxTest', () => {
   // Test Responsiveness Metrics
   //============================================================================
 
-  test('responsiveness metric is being recorded', async () => {
-    realbox.$.input.value = 'he';
-    realbox.$.input.dispatchEvent(new InputEvent('input'));
-
-    // The responsiveness metric is not recorded until the results are painted.
-    assertEquals(
-        0, testProxy.handler.getCallCount('logCharTypedToRepaintLatency'));
-
-    let matches = [createSearchMatch()];
-    testProxy.callbackRouterRemote.autocompleteResultChanged({
-      input: mojoString16(realbox.$.input.value.trimStart()),
-      matches,
-      suggestionGroupsMap: {},
-    });
-    await testProxy.callbackRouterRemote.$.flushForTesting();
-    assertTrue(areMatchesShowing());
-
-    // The responsiveness metric is recorded once the results are painted.
-    await testProxy.handler.whenCalled('logCharTypedToRepaintLatency')
-        .then((args) => {
-          assertTrue(args.timeDelta.microseconds > 0);
-        });
-    assertEquals(
-        1, testProxy.handler.getCallCount('logCharTypedToRepaintLatency'));
-
-    testProxy.handler.reset();
-
-    // Delete the last character.
-    realbox.$.input.value = 'h';
-    realbox.$.input.dispatchEvent(new InputEvent('input'));
-
-    matches = [createSearchMatch({
-      allowedToBeDefaultMatch: true,
-      inlineAutocompletion: mojoString16('ello'),
-    })];
-    testProxy.callbackRouterRemote.autocompleteResultChanged({
-      input: mojoString16(realbox.$.input.value.trimStart()),
-      matches,
-      suggestionGroupsMap: {},
-    });
-    await testProxy.callbackRouterRemote.$.flushForTesting();
-    assertTrue(areMatchesShowing());
-
-    // The responsiveness metric is not recorded when characters are deleted.
-    assertEquals(
-        0, testProxy.handler.getCallCount('logCharTypedToRepaintLatency'));
-
-    testProxy.handler.reset();
-
-    assertEquals('hello', realbox.$.input.value);
-    const start = realbox.$.input.selectionStart!;
-    const end = realbox.$.input.selectionEnd!;
-    assertEquals('ello', realbox.$.input.value.substring(start, end));
-
-    // Type the next character of the inline autocompletion.
-    const keyEvent = new KeyboardEvent('keydown', {
-      bubbles: true,
-      cancelable: true,
-      composed: true,  // So it propagates across shadow DOM boundary.
-      key: 'e',
-    });
-    realbox.$.input.dispatchEvent(keyEvent);
-    assertTrue(keyEvent.defaultPrevented);
-
-    matches = [createSearchMatch({
-      allowedToBeDefaultMatch: true,
-      inlineAutocompletion: mojoString16('llo'),
-    })];
-    testProxy.callbackRouterRemote.autocompleteResultChanged({
-      input: mojoString16('he'),
-      matches,
-      suggestionGroupsMap: {},
-    });
-    await testProxy.callbackRouterRemote.$.flushForTesting();
-    assertTrue(areMatchesShowing());
-
-    // The responsiveness metric is recorded when the default match has
-    // inline autocompletion.
-    await testProxy.handler.whenCalled('logCharTypedToRepaintLatency')
-        .then((args) => {
-          assertTrue(args.timeDelta.microseconds > 0);
-        });
-    assertEquals(
-        1, testProxy.handler.getCallCount('logCharTypedToRepaintLatency'));
-  });
-
-  test('new responsiveness metrics are being recorded', async () => {
+  test('responsiveness metrics are being recorded', async () => {
     realbox.$.input.value = 'he';
     realbox.$.input.dispatchEvent(new InputEvent('input'));
 
@@ -2289,8 +2033,7 @@ suite('NewTabPageRealboxTest', () => {
     assertTrue(areMatchesShowing());
 
     // The first match is showing. The second match is initially hidden.
-    let matchEls =
-        realbox.$.matches.shadowRoot!.querySelectorAll('cr-realbox-match');
+    let matchEls = realbox.$.matches.selectableMatchElements;
     assertEquals(1, matchEls.length);
 
     // The suggestion group header and the toggle button are visible.
@@ -2327,8 +2070,7 @@ suite('NewTabPageRealboxTest', () => {
     testProxy.handler.reset();
 
     // Second match is visible.
-    matchEls =
-        realbox.$.matches.shadowRoot!.querySelectorAll('cr-realbox-match');
+    matchEls = realbox.$.matches.selectableMatchElements;
     assertEquals(2, matchEls.length);
 
     // Hide the second match by clicking the toggle button.
@@ -2342,8 +2084,7 @@ suite('NewTabPageRealboxTest', () => {
         1, testProxy.handler.getCallCount('toggleSuggestionGroupIdVisibility'));
 
     // Second match is hidden.
-    matchEls =
-        realbox.$.matches.shadowRoot!.querySelectorAll('cr-realbox-match');
+    matchEls = realbox.$.matches.selectableMatchElements;
     assertEquals(1, matchEls.length);
 
     testProxy.handler.reset();
@@ -2357,9 +2098,42 @@ suite('NewTabPageRealboxTest', () => {
     assertEquals(
         1, testProxy.handler.getCallCount('toggleSuggestionGroupIdVisibility'));
     // Second match is visible again.
-    matchEls =
-        realbox.$.matches.shadowRoot!.querySelectorAll('cr-realbox-match');
+    matchEls = realbox.$.matches.selectableMatchElements;
     assertEquals(2, matchEls.length);
+  });
+
+  test('HidesDropdownIfNoPrimaryMatches', async () => {
+    realbox.$.input.value = '';
+    realbox.$.input.dispatchEvent(new MouseEvent('mousedown', {button: 0}));
+
+    const matches = [createUrlMatch({suggestionGroupId: 100})];
+    const suggestionGroupsMap = {
+      100: {
+        header: mojoString16('People also search for'),
+        hideGroupA11yLabel: mojoString16(''),
+        showGroupA11yLabel: mojoString16(''),
+        hidden: false,
+        sideType: SideType.kSecondary,
+      },
+    };
+    testProxy.callbackRouterRemote.autocompleteResultChanged({
+      input: mojoString16(''),
+      matches,
+      suggestionGroupsMap,
+    });
+    await testProxy.callbackRouterRemote.$.flushForTesting();
+    assertFalse(areMatchesShowing());
+
+    // Verify updating the suggestion group to be a primary group makes the
+    // realbox dropdown show.
+    suggestionGroupsMap[100].sideType = SideType.kDefaultPrimary;
+    testProxy.callbackRouterRemote.autocompleteResultChanged({
+      input: mojoString16(''),
+      matches,
+      suggestionGroupsMap,
+    });
+    await testProxy.callbackRouterRemote.$.flushForTesting();
+    assertTrue(areMatchesShowing());
   });
 
   test(
@@ -2516,12 +2290,12 @@ suite('NewTabPageRealboxTest', () => {
     realbox.$.input.value = 'Clear Browsing History';
     realbox.$.input.dispatchEvent(new InputEvent('input'));
     const matches = [createSearchMatch({
-      action: {
+      actions: [{
         a11yLabel: mojoString16(''),
         hint: mojoString16('Clear Browsing History'),
         suggestionContents: mojoString16(''),
         iconUrl: 'chrome://theme/current-channel-logo',
-      },
+      }],
     })];
     testProxy.callbackRouterRemote.autocompleteResultChanged({
       input: mojoString16(realbox.$.input.value.trimStart()),
@@ -2566,12 +2340,20 @@ suite('NewTabPageRealboxTest', () => {
     const matches = [
       createSearchMatch({contents: mojoString16('Clear Bro')}),
       createSearchMatch({
-        action: {
-          a11yLabel: mojoString16(''),
-          hint: mojoString16('Clear Browsing History'),
-          suggestionContents: mojoString16(''),
-          iconUrl: 'chrome://theme/current-channel-logo',
-        },
+        actions: [
+          {
+            a11yLabel: mojoString16(''),
+            hint: mojoString16('Clear Browsing History'),
+            suggestionContents: mojoString16(''),
+            iconUrl: 'chrome://theme/current-channel-logo',
+          },
+          {
+            a11yLabel: mojoString16(''),
+            hint: mojoString16('Tab Switch'),
+            suggestionContents: mojoString16(''),
+            iconUrl: 'chrome://theme/current-channel-logo',
+          },
+        ],
       }),
     ];
     testProxy.callbackRouterRemote.autocompleteResultChanged({
@@ -2587,10 +2369,11 @@ suite('NewTabPageRealboxTest', () => {
     verifyMatch(matches[0]!, matchEls[0]!);
     verifyMatch(matches[1]!, matchEls[1]!);
 
-    const pedalEl = $$($$(matchEls[1]!, 'cr-realbox-action')!, '.contents')!;
+    const pedalElClear =
+        $$($$(matchEls[1]!, 'cr-realbox-action')!, '.contents')!;
 
     assertEquals(
-        pedalEl.querySelector<HTMLImageElement>('#action-icon')!.src,
+        pedalElClear.querySelector<HTMLImageElement>('#action-icon')!.src,
         'chrome://theme/current-channel-logo');  // Default Pedal Icon
 
     const leftClick = new MouseEvent('click', {
@@ -2600,7 +2383,7 @@ suite('NewTabPageRealboxTest', () => {
       composed: true,  // So it propagates across shadow DOM boundary.
     });
 
-    pedalEl.dispatchEvent(leftClick);
+    pedalElClear.dispatchEvent(leftClick);
     assertTrue(leftClick.defaultPrevented);
 
     await testProxy.handler.whenCalled('executeAction').then((args) => {
@@ -2609,6 +2392,20 @@ suite('NewTabPageRealboxTest', () => {
       assertTrue(args.matchSelectionTimestamp['internalValue'] > 0);
     });
     assertEquals(1, testProxy.handler.getCallCount('executeAction'));
+
+    const pedalElTab =
+        $$(matchEls[1]!.shadowRoot!.querySelectorAll('cr-realbox-action')![1]!,
+           '.contents')!;
+
+    pedalElTab.dispatchEvent(leftClick);
+    assertTrue(leftClick.defaultPrevented);
+
+    await testProxy.handler.whenCalled('executeAction').then((args) => {
+      assertEquals(1, args.line);
+      assertEquals(args.mouseButton, 0);
+      assertTrue(args.matchSelectionTimestamp['internalValue'] > 0);
+    });
+    assertEquals(2, testProxy.handler.getCallCount('executeAction'));
   });
 
   //============================================================================
@@ -2640,36 +2437,6 @@ suite('NewTabPageRealboxTest', () => {
       assertEquals(0, args.line);
       assertEquals(
           NavigationPredictor.kUpOrDownArrowButton, args.navigationPredictor);
-    });
-  });
-
-  test('mouse down events are sent to handler', async () => {
-    realbox.$.input.value = 'he';
-    realbox.$.input.dispatchEvent(new InputEvent('input'));
-
-    const matches = [createSearchMatch()];
-    testProxy.callbackRouterRemote.autocompleteResultChanged({
-      input: mojoString16(realbox.$.input.value.trimStart()),
-      matches,
-      suggestionGroupsMap: {},
-    });
-    await testProxy.callbackRouterRemote.$.flushForTesting();
-    assertTrue(areMatchesShowing());
-
-    const matchEls =
-        realbox.$.matches.shadowRoot!.querySelectorAll('cr-realbox-match');
-
-    const mouseDown = new MouseEvent('mousedown', {
-      bubbles: true,
-      button: 0,
-      cancelable: true,
-      composed: true,  // So it propagates across shadow DOM boundary.
-    });
-    matchEls[0]!.$.contents.dispatchEvent(mouseDown);
-
-    await testProxy.handler.whenCalled('onNavigationLikely').then((args) => {
-      assertEquals(0, args.line);
-      assertEquals(NavigationPredictor.kMouseDown, args.navigationPredictor);
     });
   });
 });

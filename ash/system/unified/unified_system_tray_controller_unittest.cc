@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 #include "ash/system/unified/unified_system_tray_controller.h"
+#include <memory>
 
+#include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/constants/quick_settings_catalogs.h"
 #include "ash/session/session_controller_impl.h"
@@ -18,8 +20,10 @@
 #include "ash/system/unified/unified_system_tray_model.h"
 #include "ash/system/unified/unified_system_tray_view.h"
 #include "ash/test/ash_test_base.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "base/test/scoped_feature_list.h"
 #include "chromeos/ash/components/audio/cras_audio_handler.h"
 #include "chromeos/ash/components/dbus/shill/shill_clients.h"
 #include "chromeos/ash/services/network_config/public/cpp/cros_network_config_test_helper.h"
@@ -53,8 +57,10 @@ class UnifiedSystemTrayControllerTest : public AshTestBase,
 
   ~UnifiedSystemTrayControllerTest() override = default;
 
-  // testing::Test:
+  // AshTestBase:
   void SetUp() override {
+    scoped_feature_list_ = std::make_unique<base::test::ScopedFeatureList>();
+    scoped_feature_list_->InitAndDisableFeature(features::kQsRevamp);
     network_config_helper_ =
         std::make_unique<network_config::CrosNetworkConfigTestHelper>();
     AshTestBase::SetUp();
@@ -140,7 +146,73 @@ class UnifiedSystemTrayControllerTest : public AshTestBase,
   std::unique_ptr<UnifiedSystemTrayView> view_;
 
   int preferred_size_changed_count_ = 0;
+
+  std::unique_ptr<base::test::ScopedFeatureList> scoped_feature_list_;
 };
+
+class QsRevampUnifiedSystemTrayControllerTest : public AshTestBase {
+ public:
+  QsRevampUnifiedSystemTrayControllerTest()
+      : scoped_feature_list_(features::kQsRevamp) {}
+  QsRevampUnifiedSystemTrayControllerTest(
+      const QsRevampUnifiedSystemTrayControllerTest&) = delete;
+  QsRevampUnifiedSystemTrayControllerTest& operator=(
+      const QsRevampUnifiedSystemTrayControllerTest&) = delete;
+  ~QsRevampUnifiedSystemTrayControllerTest() override = default;
+
+  // AshTestBase:
+  void SetUp() override {
+    network_config_helper_ =
+        std::make_unique<network_config::CrosNetworkConfigTestHelper>();
+    AshTestBase::SetUp();
+    // Networking stubs may have asynchronous initialization.
+    base::RunLoop().RunUntilIdle();
+
+    model_ = base::MakeRefCounted<UnifiedSystemTrayModel>(nullptr);
+    controller_ = std::make_unique<UnifiedSystemTrayController>(model_.get());
+  }
+
+  void TearDown() override {
+    DCHECK(quick_settings_view_);
+    widget_.reset();
+    quick_settings_view_ = nullptr;
+    controller_.reset();
+    model_.reset();
+
+    AshTestBase::TearDown();
+  }
+
+  void InitializeQuickSettingsView() {
+    widget_ = CreateFramelessTestWidget();
+    widget_->SetFullscreen(true);
+    quick_settings_view_ =
+        widget_->SetContentsView(controller_->CreateQuickSettingsView(600));
+  }
+
+  std::unique_ptr<network_config::CrosNetworkConfigTestHelper>
+      network_config_helper_;
+  scoped_refptr<UnifiedSystemTrayModel> model_;
+  std::unique_ptr<UnifiedSystemTrayController> controller_;
+  std::unique_ptr<views::Widget> widget_;
+
+  // Owned by `widget_`.
+  raw_ptr<QuickSettingsView, DanglingUntriaged | ExperimentalAsh>
+      quick_settings_view_;
+
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+// Tests that setting the `UnifiedSystemTrayModel::StateOnOpen` pref to
+// collapsed is a no-op with the QSRevamp enabled.
+TEST_F(QsRevampUnifiedSystemTrayControllerTest, ExpandedPrefIsNoOp) {
+  // Set the pref to collapsed, there should be no effect.
+  model_->set_expanded_on_open(UnifiedSystemTrayModel::StateOnOpen::COLLAPSED);
+
+  InitializeQuickSettingsView();
+
+  EXPECT_TRUE(model_->IsExpandedOnOpen());
+  EXPECT_TRUE(controller_->IsExpanded());
+}
 
 TEST_F(UnifiedSystemTrayControllerTest, ToggleExpanded) {
   InitializeView();
@@ -190,16 +262,16 @@ TEST_F(UnifiedSystemTrayControllerTest, UMATracking) {
 
 TEST_F(UnifiedSystemTrayControllerTest, EnsureExpanded_UserChooserShown) {
   InitializeView();
-  EXPECT_FALSE(view()->detailed_view_for_testing()->GetVisible());
+  EXPECT_FALSE(view()->detailed_view_container()->GetVisible());
 
   // Show the user chooser view.
   controller()->ShowUserChooserView();
-  EXPECT_TRUE(view()->detailed_view_for_testing()->GetVisible());
+  EXPECT_TRUE(view()->detailed_view_container()->GetVisible());
 
   // Calling EnsureExpanded() should hide the detailed view (e.g. this can
   // happen when changing the brightness or volume).
   controller()->EnsureExpanded();
-  EXPECT_FALSE(view()->detailed_view_for_testing()->GetVisible());
+  EXPECT_FALSE(view()->detailed_view_container()->GetVisible());
 }
 
 TEST_F(UnifiedSystemTrayControllerTest, PreferredSizeChanged) {

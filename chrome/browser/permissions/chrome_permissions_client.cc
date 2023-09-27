@@ -26,7 +26,7 @@
 #include "chrome/browser/permissions/permission_decision_auto_blocker_factory.h"
 #include "chrome/browser/permissions/permission_revocation_request.h"
 #include "chrome/browser/permissions/prediction_based_permission_ui_selector.h"
-#include "chrome/browser/permissions/pref_notification_permission_ui_selector.h"
+#include "chrome/browser/permissions/pref_based_quiet_permission_ui_selector.h"
 #include "chrome/browser/permissions/quiet_notification_permission_ui_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profiles_state.h"
@@ -51,6 +51,7 @@
 #include "components/site_engagement/content/site_engagement_service.h"
 #include "components/subresource_filter/content/browser/subresource_filter_content_settings_manager.h"
 #include "components/subresource_filter/content/browser/subresource_filter_profile_context.h"
+#include "components/unified_consent/pref_names.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/buildflags/buildflags.h"
@@ -262,33 +263,49 @@ void ChromePermissionsClient::TriggerPromptHatsSurveyIfEnabled(
     permissions::PermissionRequestGestureType gesture_type,
     absl::optional<base::TimeDelta> prompt_display_duration,
     bool is_post_prompt,
+    const GURL& gurl,
     base::OnceCallback<void()> hats_shown_callback) {
+  Profile* profile = Profile::FromBrowserContext(context);
+  absl::optional<GURL> recorded_gurl =
+      profile->GetPrefs()->GetBoolean(
+          unified_consent::prefs::kUrlKeyedAnonymizedDataCollectionEnabled)
+          ? absl::make_optional(gurl)
+          : absl::nullopt;
+
   auto prompt_parameters =
       permissions::PermissionHatsTriggerHelper::PromptParametersForHaTS(
           request_type, action, prompt_disposition, prompt_disposition_reason,
-          gesture_type, version_info::GetChannelString(chrome::GetChannel()),
+          gesture_type,
+          std::string(version_info::GetChannelString(chrome::GetChannel())),
           is_post_prompt ? permissions::kOnPromptResolved
                          : permissions::kOnPromptAppearing,
-          prompt_display_duration);
+          prompt_display_duration,
+          permissions::PermissionHatsTriggerHelper::
+              GetOneTimePromptsDecidedBucket(profile->GetPrefs()),
+          recorded_gurl);
 
   if (!permissions::PermissionHatsTriggerHelper::
-          ArePromptTriggerCriteriaSatisfied(prompt_parameters)) {
+          ArePromptTriggerCriteriaSatisfied(
+              prompt_parameters, kHatsSurveyTriggerPermissionsPrompt)) {
     return;
   }
 
-  Profile* profile = Profile::FromBrowserContext(context);
+  auto trigger_and_probability = permissions::PermissionHatsTriggerHelper::
+      GetPermissionPromptTriggerNameAndProbabilityForRequestType(
+          kHatsSurveyTriggerPermissionsPrompt,
+          permissions::PermissionUmaUtil::GetRequestTypeString(request_type));
 
   auto* hats_service =
       HatsServiceFactory::GetForProfile(profile,
                                         /*create_if_necessary=*/true);
-  if (!hats_service) {
+  if (!hats_service || !trigger_and_probability.has_value()) {
     return;
   }
 
   auto survey_data = permissions::PermissionHatsTriggerHelper::
       SurveyProductSpecificData::PopulateFrom(prompt_parameters);
 
-  hats_service->LaunchSurvey(kHatsSurveyTriggerPermissionsPrompt,
+  hats_service->LaunchSurvey(trigger_and_probability->first,
                              std::move(hats_shown_callback), base::DoNothing(),
                              survey_data.survey_bits_data,
                              survey_data.survey_string_data);
@@ -319,7 +336,7 @@ ChromePermissionsClient::CreatePermissionUiSelectors(
   std::vector<std::unique_ptr<permissions::PermissionUiSelector>> selectors;
   selectors.emplace_back(
       std::make_unique<ContextualNotificationPermissionUiSelector>());
-  selectors.emplace_back(std::make_unique<PrefNotificationPermissionUiSelector>(
+  selectors.emplace_back(std::make_unique<PrefBasedQuietPermissionUiSelector>(
       Profile::FromBrowserContext(browser_context)));
   selectors.emplace_back(std::make_unique<PredictionBasedPermissionUiSelector>(
       Profile::FromBrowserContext(browser_context)));
@@ -344,7 +361,6 @@ void ChromePermissionsClient::OnPromptResolved(
   if (request_type == permissions::RequestType::kNotifications) {
     AdaptiveQuietNotificationPermissionUiEnabler::GetForProfile(profile)
         ->PermissionPromptResolved();
-
     if (action == permissions::PermissionAction::GRANTED &&
         quiet_ui_reason.has_value() &&
         (quiet_ui_reason.value() ==
@@ -359,11 +375,19 @@ void ChromePermissionsClient::OnPromptResolved(
   }
 
 #if !BUILDFLAG(IS_ANDROID)
+  auto content_setting_type = RequestTypeToContentSettingsType(request_type);
+  if (content_setting_type.has_value()) {
+    permissions::PermissionHatsTriggerHelper::
+        IncrementOneTimePermissionPromptsDecidedIfApplicable(
+            content_setting_type.value(), profile->GetPrefs());
+  }
+
   TriggerPromptHatsSurveyIfEnabled(
       web_contents->GetBrowserContext(), request_type,
       absl::make_optional(action), prompt_disposition,
       prompt_disposition_reason, gesture_type,
-      absl::make_optional(prompt_display_duration), true, base::DoNothing());
+      absl::make_optional(prompt_display_duration), true,
+      web_contents->GetLastCommittedURL(), base::DoNothing());
 #endif  // !BUILDFLAG(IS_ANDROID)
 }
 

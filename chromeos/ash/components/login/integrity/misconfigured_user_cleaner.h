@@ -5,9 +5,9 @@
 #ifndef CHROMEOS_ASH_COMPONENTS_LOGIN_INTEGRITY_MISCONFIGURED_USER_CLEANER_H_
 #define CHROMEOS_ASH_COMPONENTS_LOGIN_INTEGRITY_MISCONFIGURED_USER_CLEANER_H_
 
-#include "base/allocator/partition_allocator/pointers/raw_ptr.h"
 #include "base/component_export.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chromeos/ash/components/dbus/cryptohome/UserDataAuth.pb.h"
 #include "chromeos/ash/components/dbus/cryptohome/rpc.pb.h"
@@ -54,13 +54,13 @@ class COMPONENT_EXPORT(ASH_LOGIN_INTEGRITY) MisconfiguredUserCleaner {
   void DoCleanup(user_manager::UserDirectoryIntegrityManager&,
                  const AccountId&);
 
-  PrefService* const local_state_;
+  const raw_ptr<PrefService, DanglingUntriaged | ExperimentalAsh> local_state_;
 
   // We expect `SessionController` to always outlive this class as it is owned
   // by `ash::Shell` and destroyed in
   // `ChromeBrowserMainPartsAsh::PostMainMessageLoopRun`, before
   // `ChromeBrowserMainPartsAsh`, the owner of this class.
-  const base::raw_ptr<SessionController, DanglingUntriaged> session_controller_;
+  const raw_ptr<SessionController, DanglingUntriaged> session_controller_;
 
   std::unique_ptr<MountPerformer> mount_performer_;
 

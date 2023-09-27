@@ -6,6 +6,7 @@
 
 #include "base/check_op.h"
 #include "base/notreached.h"
+#include "content/browser/preloading/preloading_attempt_impl.h"
 #include "content/browser/preloading/prerender/prerender_host.h"
 #include "content/browser/preloading/prerender/prerender_host_registry.h"
 #include "content/browser/web_contents/web_contents_impl.h"
@@ -14,31 +15,12 @@
 
 namespace content {
 
-// This is used as the delegate of WebContents created for a new tab where
-// prerendering runs.
-class PrerenderNewTabHandle::WebContentsDelegateImpl
-    : public WebContentsDelegate {
- public:
-  WebContentsDelegateImpl() = default;
-  ~WebContentsDelegateImpl() override = default;
-
-  PreloadingEligibility IsPrerender2Supported(
-      WebContents& web_contents) override {
-    // This should be checked in the initiator's WebContents.
-    NOTREACHED();
-    return PreloadingEligibility::kPreloadingDisabled;
-  }
-
-  // TODO(crbug.com/1350676): Investigate if we have to override other
-  // functions on WebContentsDelegateImpl.
-};
-
 PrerenderNewTabHandle::PrerenderNewTabHandle(
     const PrerenderAttributes& attributes,
     BrowserContext& browser_context)
     : attributes_(attributes), web_contents_create_params_(&browser_context) {
-  DCHECK(base::FeatureList::IsEnabled(blink::features::kPrerender2InNewTab));
-  DCHECK(!attributes.IsBrowserInitiated());
+  CHECK(base::FeatureList::IsEnabled(blink::features::kPrerender2InNewTab));
+  CHECK(!attributes.IsBrowserInitiated());
 
   auto* initiator_render_frame_host = RenderFrameHostImpl::FromFrameToken(
       attributes_.initiator_process_id,
@@ -63,10 +45,11 @@ PrerenderNewTabHandle::PrerenderNewTabHandle(
       WebContents::Create(web_contents_create_params_).release()));
 
   // The delegate is swapped with a proper one on activation.
-  web_contents_delegate_ = std::make_unique<WebContentsDelegateImpl>();
+  web_contents_delegate_ =
+      GetContentClient()->browser()->CreatePrerenderWebContentsDelegate();
   web_contents_->SetDelegate(web_contents_delegate_.get());
 
-  DCHECK_EQ(web_contents_->GetVisibility(), Visibility::HIDDEN);
+  CHECK_EQ(web_contents_->GetVisibility(), Visibility::HIDDEN);
 }
 
 PrerenderNewTabHandle::~PrerenderNewTabHandle() {
@@ -74,10 +57,29 @@ PrerenderNewTabHandle::~PrerenderNewTabHandle() {
     web_contents_->SetDelegate(nullptr);
 }
 
-int PrerenderNewTabHandle::StartPrerendering() {
-  // TODO(crbug.com/1350676): Pass a valid PreloadingAttempt.
+int PrerenderNewTabHandle::StartPrerendering(
+    PreloadingPredictor preloading_predictor) {
+  CHECK(web_contents_);
+  CHECK(attributes_.initiator_web_contents);
+
+  // Create new PreloadingAttempt and pass all the values corresponding to
+  // this prerendering attempt.
+  auto* preloading_data =
+      PreloadingData::GetOrCreateForWebContents(web_contents_.get());
+  PreloadingURLMatchCallback same_url_matcher =
+      PreloadingData::GetSameURLMatcher(attributes_.prerendering_url);
+  ukm::SourceId triggered_primary_page_source_id =
+      attributes_.initiator_web_contents->GetPrimaryMainFrame()
+          ->GetPageUkmSourceId();
+  auto* preloading_attempt =
+      static_cast<PreloadingAttemptImpl*>(preloading_data->AddPreloadingAttempt(
+          preloading_predictor, PreloadingType::kPrerender,
+          std::move(same_url_matcher), triggered_primary_page_source_id));
+  CHECK(attributes_.eagerness.has_value());
+  preloading_attempt->SetSpeculationEagerness(attributes_.eagerness.value());
+
   prerender_host_id_ = GetPrerenderHostRegistry().CreateAndStartHost(
-      attributes_, /*preloading_attempt=*/nullptr);
+      attributes_, preloading_attempt);
   return prerender_host_id_;
 }
 
@@ -116,7 +118,7 @@ PrerenderNewTabHandle::TakeWebContentsIfAvailable(
 
   // TODO(crbug.com/1350676): Consider supporting activation for non-empty
   // `main_frame_name`.
-  DCHECK(web_contents_create_params_.main_frame_name.empty());
+  CHECK(web_contents_create_params_.main_frame_name.empty());
   if (web_contents_create_params_.main_frame_name !=
       web_contents_create_params.main_frame_name) {
     return nullptr;
@@ -127,7 +129,7 @@ PrerenderNewTabHandle::TakeWebContentsIfAvailable(
   // that parameters newly added to WebContents::CreateParams are accordingly
   // handled here with an approach similar to SameSizeAsDocumentLoader.
 
-  DCHECK(web_contents_);
+  CHECK(web_contents_);
   web_contents_->SetDelegate(nullptr);
   return std::move(web_contents_);
 }
@@ -141,7 +143,7 @@ PrerenderHost* PrerenderNewTabHandle::GetPrerenderHostForTesting() {
 }
 
 PrerenderHostRegistry& PrerenderNewTabHandle::GetPrerenderHostRegistry() {
-  DCHECK(web_contents_);
+  CHECK(web_contents_);
   return *web_contents_->GetPrerenderHostRegistry();
 }
 

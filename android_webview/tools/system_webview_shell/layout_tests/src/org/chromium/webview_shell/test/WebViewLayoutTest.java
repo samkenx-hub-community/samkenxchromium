@@ -5,8 +5,8 @@
 package org.chromium.webview_shell.test;
 
 import android.os.Bundle;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.MediumTest;
 
 import junit.framework.ComparisonFailure;
@@ -23,6 +23,7 @@ import org.chromium.base.test.BaseActivityTestRule;
 import org.chromium.base.test.BaseJUnit4ClassRunner;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.DisabledTest;
+import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.UrlUtils;
 import org.chromium.webview_shell.WebViewLayoutTestActivity;
 
@@ -44,6 +45,7 @@ import java.util.concurrent.TimeoutException;
  * Tests running end-to-end layout tests.
  */
 @RunWith(BaseJUnit4ClassRunner.class)
+@DoNotBatch(reason = "https://crbug.com/1465624")
 public class WebViewLayoutTest {
     private static final String TAG = "WebViewLayoutTest";
 
@@ -119,7 +121,7 @@ public class WebViewLayoutTest {
                            "webexposed/global-interface-listing-expected.txt", true);
     }
 
-    // This is a non-failing test to avoid 'blind' rebaselines by the sheriff
+    // This is a non-failing test to avoid rebaselines by the sheriff
     // (see crbug.com/564765).
     @Test
     @MediumTest
@@ -248,7 +250,6 @@ public class WebViewLayoutTest {
                 buildHashMap(blinkStableExpected);
         HashMap<String, HashSet<String>> webviewExcludedInterfacesMap =
                 buildHashMap(webviewExcluded);
-        StringBuilder missing = new StringBuilder();
 
         // Wait for web test to finish running. Note we should wait for the web test to
         // finish running after processing all expectations files. All the expectations
@@ -353,7 +354,7 @@ public class WebViewLayoutTest {
     @Test
     @MediumTest
     @CommandLineFlags.Add("use-fake-device-for-media-stream")
-    @DisabledTest(message = "https://crbug.com/1368439")
+    @DisabledTest(message = "crbug.com/1477889")
     public void testMediaStreamApiDenyPermission() throws Exception {
         runWebViewLayoutTest("blink-apis/webrtc/mediastream-permission-denied-callbacks.html",
                 "blink-apis/webrtc/mediastream-permission-denied-callbacks-expected.txt");
@@ -362,7 +363,7 @@ public class WebViewLayoutTest {
     @Test
     @MediumTest
     @CommandLineFlags.Add("use-fake-device-for-media-stream")
-    @DisabledTest(message = "https://crbug.com/1368439")
+    @DisabledTest(message = "crbug.com/1477889")
     public void testMediaStreamApi() throws Exception {
         mTestActivity.setGrantPermission(true);
         runWebViewLayoutTest("blink-apis/webrtc/mediastream-callbacks.html",
@@ -544,5 +545,4 @@ public class WebViewLayoutTest {
         return s.startsWith("getter") || s.startsWith("setter")
                 || s.startsWith("method") || s.startsWith("attribute");
     }
-
 }

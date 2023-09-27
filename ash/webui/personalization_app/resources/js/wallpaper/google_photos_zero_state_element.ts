@@ -6,6 +6,7 @@
  * @fileoverview Polymer element that displays the Google Photos zero state.
  */
 
+import 'chrome://resources/cr_components/localized_link/localized_link.js';
 import '../../css/wallpaper.css.js';
 import '../../css/common.css.js';
 
@@ -18,7 +19,7 @@ import {getTemplate} from './google_photos_zero_state_element.html.js';
 
 const Base = I18nMixin(PolymerElement);
 
-export class GooglePhotosZeroState extends Base {
+export class GooglePhotosZeroStateElement extends Base {
   static get is() {
     return 'google-photos-zero-state';
   }
@@ -59,7 +60,8 @@ export class GooglePhotosZeroState extends Base {
     const label = this.getMessageLabel_(tab);
     return this.i18nAdvanced(label, {
       substitutions: [
-        '<a target="_blank" href="https://photos.google.com">photos.google.com</a>',
+        `<a target="_blank" href="${
+            this.i18n('googlePhotosURL')}">photos.google.com</a>`,
       ],
     });
   }
@@ -71,4 +73,5 @@ export class GooglePhotosZeroState extends Base {
   }
 }
 
-customElements.define(GooglePhotosZeroState.is, GooglePhotosZeroState);
+customElements.define(
+    GooglePhotosZeroStateElement.is, GooglePhotosZeroStateElement);

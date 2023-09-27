@@ -19,7 +19,7 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.toolbar.ToolbarFeatures;
 import org.chromium.components.omnibox.SecurityButtonAnimationDelegate;
 import org.chromium.ui.base.ViewUtils;
-import org.chromium.ui.interpolators.BakedBezierInterpolator;
+import org.chromium.ui.interpolators.Interpolators;
 
 /**
  * A delegate class to handle the title animation and security icon animation in
@@ -93,8 +93,6 @@ class CustomTabToolbarAnimationDelegate {
 
         float oldSizePx = mUrlBar.getTextSize();
         mUrlBar.setTextSize(TypedValue.COMPLEX_UNIT_PX, newSizeSp);
-        float newSizePx = mUrlBar.getTextSize();
-        final float scale = oldSizePx / newSizePx;
 
         // View#getY() cannot be used because the boundary of the parent will change after relayout.
         final int[] oldLoc = new int[2];
@@ -111,6 +109,11 @@ class CustomTabToolbarAnimationDelegate {
                 int[] newLoc = new int[2];
                 mUrlBar.getLocationInWindow(newLoc);
 
+                // The size may change during the measuring pass, so we should calculate the new
+                // size here, after the layout is done.
+                float newSizePx = mUrlBar.getTextSize();
+                final float scale = oldSizePx / newSizePx;
+
                 mUrlBar.setScaleX(scale);
                 mUrlBar.setScaleY(scale);
                 mUrlBar.setTranslationX(oldLoc[0] - newLoc[0]);
@@ -123,13 +126,14 @@ class CustomTabToolbarAnimationDelegate {
                         .translationX(0)
                         .translationY(0)
                         .setDuration(SecurityButtonAnimationDelegate.SLIDE_DURATION_MS)
-                        .setInterpolator(BakedBezierInterpolator.TRANSFORM_CURVE)
+                        .setInterpolator(Interpolators.FAST_OUT_SLOW_IN_INTERPOLATOR)
                         .setListener(new AnimatorListenerAdapter() {
                             @Override
                             public void onAnimationEnd(Animator animation) {
                                 mTitleBar.animate()
                                         .alpha(1f)
-                                        .setInterpolator(BakedBezierInterpolator.FADE_IN_CURVE)
+                                        .setInterpolator(
+                                                Interpolators.LINEAR_OUT_SLOW_IN_INTERPOLATOR)
                                         .setDuration(
                                                 SecurityButtonAnimationDelegate.FADE_DURATION_MS)
                                         .setListener(new AnimatorListenerAdapter() {

@@ -21,6 +21,7 @@ import org.robolectric.annotation.Config;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.UmaRecorderHolder;
 import org.chromium.base.test.BaseRobolectricTestRunner;
+import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.components.search_engines.TemplateUrl;
 import org.chromium.components.search_engines.TemplateUrlService;
 
@@ -42,6 +43,8 @@ public final class SearchEngineChoiceMetricsTest {
     private TemplateUrl mInitialSearchEngine;
     @Mock
     private TemplateUrl mAlternativeSearchEngine;
+    @Mock
+    private Profile mProfile;
 
     @Before
     public void setUp() {
@@ -49,6 +52,7 @@ public final class SearchEngineChoiceMetricsTest {
         UmaRecorderHolder.resetForTesting();
 
         // Sets up appropriate responses from Template URL service.
+        Profile.setLastUsedProfileForTesting(mProfile);
         TemplateUrlServiceFactory.setInstanceForTesting(mTemplateUrlService);
         doReturn(TEST_ALTERNATIVE_ENGINE).when(mAlternativeSearchEngine).getKeyword();
         doReturn(SearchEngineType.SEARCH_ENGINE_DUCKDUCKGO)

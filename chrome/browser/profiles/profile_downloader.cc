@@ -188,14 +188,25 @@ void ProfileDownloader::FetchImageData() {
           trigger: "User signs into a Profile."
           data: "Filename of the png to download and Google OAuth bearer token."
           destination: GOOGLE_OWNED_SERVICE
+          internal {
+            contacts {
+              owners: "//chrome/browser/profiles/OWNERS"
+            }
+          }
+          user_data {
+            type: ACCESS_TOKEN
+            type: FILE_DATA
+          }
+          last_reviewed: "2023-07-31"
         }
         policy {
           cookies_allowed: NO
           setting: "This feature cannot be disabled by settings."
-          policy_exception_justification:
-            "Not implemented, considered not useful as no content is being "
-            "uploaded or saved; this request merely downloads the user's "
-            "Google account image."
+          chrome_policy {
+            UserAvatarCustomizationSelectorsEnabled {
+              UserAvatarCustomizationSelectorsEnabled: false
+            }
+          }
         })");
 
   VLOG(1) << "Loading profile image from " << image_url_to_fetch;

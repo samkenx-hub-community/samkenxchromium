@@ -62,6 +62,7 @@ class PLATFORM_EXPORT DisplayItem {
     kDrawingPaintPhaseFirst = kDrawingFirst,
     kDrawingPaintPhaseLast = kDrawingFirst + kPaintPhaseMax,
     kBoxDecorationBackground,
+    kFixedAttachmentBackground,
     kCapsLockIndicator,
     kCaret,
     kColumnRules,
@@ -88,7 +89,6 @@ class PLATFORM_EXPORT DisplayItem {
     kScrollbarTickmarks,
     kSelectionTint,
     kTableCollapsedBorders,
-    kWebFont,
     kWebPlugin,
     kDrawingLast = kWebPlugin,
 
@@ -125,6 +125,9 @@ class PLATFORM_EXPORT DisplayItem {
     // include content that does not paint. Hit test data ensure a layer exists
     // and is sized properly even if no content would otherwise be painted.
     kHitTest,
+    // Web plugin needs a separate id to avoid conflict with the hit test data
+    // for LayoutReplaced.
+    kWebPluginHitTest,
 
     // Used for paint chunks that contain region capture data.
     kRegionCapture,

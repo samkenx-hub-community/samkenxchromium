@@ -6,12 +6,10 @@ package org.chromium.chrome.browser.media.ui;
 
 import android.content.Intent;
 import android.media.AudioManager;
-import android.support.test.InstrumentationRegistry;
 
-import androidx.test.filters.MediumTest;
-import androidx.test.filters.SmallTest;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.filters.LargeTest;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -20,13 +18,12 @@ import org.junit.runner.RunWith;
 
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.ntp.NewTabPage;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.NewTabPageTestUtils;
 import org.chromium.chrome.test.util.browser.TabLoadObserver;
 import org.chromium.components.browser_ui.media.MediaNotificationController;
@@ -54,11 +51,13 @@ public class MediaSessionTest {
     private static final String TEST_PATH = "/content/test/data/media/session/media-session.html";
     private static final String VIDEO_ID = "long-video";
 
+    private static final long LONG_TIMEOUT = 5000L;
+    private static final long DEFAULT_POLL_INTERVAL = 50L;
+
     private EmbeddedTestServer mTestServer;
 
     @Test
-    @SmallTest
-    @DisabledTest(message = "https://crbug.com/1315419")
+    @LargeTest
     public void testPauseOnHeadsetUnplug() throws IllegalArgumentException, TimeoutException {
         mActivityTestRule.startMainActivityWithURL(mTestServer.getURL(TEST_PATH));
         Tab tab = mActivityTestRule.getActivity().getActivityTab();
@@ -79,7 +78,7 @@ public class MediaSessionTest {
      * with media.
      */
     @Test
-    @MediumTest
+    @LargeTest
     public void mediaSessionUrlUpdatedAfterNativePageNavigation() throws Exception {
         mActivityTestRule.startMainActivityWithURL("about:blank");
 
@@ -107,25 +106,22 @@ public class MediaSessionTest {
 
     @Before
     public void setUp() {
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-    }
-
-    @After
-    public void tearDown() {
-        mTestServer.stopAndDestroyServer();
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
     }
 
     private void waitForNotificationReady() {
+        // Extended timeout to avoid flakiness https://crbug.com/1315419
         CriteriaHelper.pollInstrumentationThread(() -> {
             return MediaNotificationManager.getController(R.id.media_playback_notification) != null;
-        });
+        }, LONG_TIMEOUT, DEFAULT_POLL_INTERVAL);
     }
 
     private void simulateHeadsetUnplug() {
-        Intent i = new Intent(InstrumentationRegistry.getTargetContext(),
+        Intent i = new Intent(ApplicationProvider.getApplicationContext(),
                 ChromeMediaNotificationControllerServices.PlaybackListenerService.class);
         i.setAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
 
-        InstrumentationRegistry.getContext().startService(i);
+        ApplicationProvider.getApplicationContext().startService(i);
     }
 }

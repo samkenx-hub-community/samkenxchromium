@@ -7,10 +7,6 @@
 #import "ios/web/public/init/web_main_parts.h"
 #import "ios/web/public/web_client.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace web {
 
 IOSBrowserMainParts::IOSBrowserMainParts() {
@@ -32,10 +28,16 @@ void IOSBrowserMainParts::PreCreateMainMessageLoop() {
 void IOSBrowserMainParts::PostCreateMainMessageLoop() {
   parts_->PostCreateMainMessageLoop();
 }
+
 int IOSBrowserMainParts::PreCreateThreads() {
   parts_->PreCreateThreads();
   return 0;
 }
+
+void IOSBrowserMainParts::PostCreateThreads() {
+  parts_->PostCreateThreads();
+}
+
 int IOSBrowserMainParts::PreMainMessageLoopRun() {
   parts_->PreMainMessageLoopRun();
   return 0;

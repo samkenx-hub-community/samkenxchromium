@@ -50,11 +50,17 @@ const char kLogNetLog[] = "log-net-log";
 // description of their meanings.
 const char kNetLogCaptureMode[] = "net-log-capture-mode";
 
+// Sets the maximum size, in megabytes. The log file can grow to before older
+// data is overwritten. Do not use this flag if you want an unlimited file size.
+const char kNetLogMaxSizeMb[] = "net-log-max-size-mb";
+
 // Causes SSL key material to be logged to the specified file for debugging
 // purposes. See
 // https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/Key_Log_Format
 // for the format.
 const char kSSLKeyLogFile[] = "ssl-key-log-file";
+
+const char kTestThirdPartyCookiePhaseout[] = "test-third-party-cookie-phaseout";
 
 // Treat given (insecure) origins as secure origins. Multiple origins can be
 // supplied as a comma-separated list. For the definition of secure contexts,
@@ -111,5 +117,8 @@ const char kUseFirstPartySet[] = "use-first-party-set";
 // And the Web Platform Test RFC #72 behind it:
 // https://github.com/web-platform-tests/rfcs/blob/master/rfcs/address_space_overrides.md
 const char kIpAddressSpaceOverrides[] = "ip-address-space-overrides";
+
+// Enables register the empty network service in utility process.
+const char kRegisterEmptyNetworkService[] = "register-empty-network-service";
 
 }  // namespace network::switches

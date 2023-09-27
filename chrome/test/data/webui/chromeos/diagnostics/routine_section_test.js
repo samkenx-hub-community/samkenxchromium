@@ -35,7 +35,7 @@ suite('routineSectionTestSuite', function() {
   const originalTime = performance.now;
 
   setup(function() {
-    document.body.innerHTML = '';
+    document.body.innerHTML = window.trustedTypes.emptyHTML;
 
     // Setup a fake routine controller so that nothing resolves unless
     // done explicitly.
@@ -523,6 +523,45 @@ suite('routineSectionTestSuite', function() {
           assertFalse(getStatusTextElement().hidden);
           dx_utils.assertElementContainsText(
               getStatusTextElement(), 'Test succeeded');
+          dx_utils.assertElementContainsText(
+              getStatusTextElement(), 'Learn more');
+        });
+  });
+
+  test('PowerTestResultListStatusSuccess', () => {
+    /** @type {!Array<!RoutineType>} */
+    const routines = [
+      RoutineType.kBatteryCharge,
+    ];
+
+    routineController.setFakeStandardRoutineResult(
+        RoutineType.kBatteryCharge, StandardRoutineResult.kTestPassed);
+
+    return initializeRoutineSection(routines)
+        .then(() => {
+          // Hidden by default.
+          assertFalse(isVisible(getStatusBadge()));
+          assertFalse(isVisible(getStatusTextElement()));
+          return clickRunTestsButton();
+        })
+        .then(() => {
+          // Text is visible describing which test is being run.
+          assertFalse(getStatusTextElement().hidden);
+          dx_utils.assertElementContainsText(
+              getStatusTextElement(),
+              loadTimeData.getString('batteryChargeRoutineText').toLowerCase());
+
+          // Resolve the running test.
+          return routineController.resolveRoutineForTesting();
+        })
+        .then(() => {
+          return flushTasks();
+        })
+        .then(() => {
+          // Text is visible saying test progress.
+          assertFalse(getStatusTextElement().hidden);
+          dx_utils.assertElementContainsText(
+              getStatusTextElement(), 'Charged 0.00% in 0 seconds.');
           dx_utils.assertElementContainsText(
               getStatusTextElement(), 'Learn more');
         });

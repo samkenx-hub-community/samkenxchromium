@@ -62,6 +62,11 @@ void SecureDnsManager::SetDoHTemplatesUriResolverForTesting(
 }
 
 void SecureDnsManager::LoadProviders() {
+  // Note: Check whether each provider is enabled *after* filtering based on
+  // country code so that if we are doing experimentation via Finch for a
+  // regional provider, the experiment groups will be less likely to include
+  // users from other regions unnecessarily (since a client will be included in
+  // the experiment if the provider feature flag is checked).
   const net::DohProviderEntry::List local_providers =
       chrome_browser_net::secure_dns::SelectEnabledProviders(
           chrome_browser_net::secure_dns::ProvidersForCountry(
@@ -123,7 +128,7 @@ void SecureDnsManager::OnPrefChanged() {
 
   NetworkHandler::Get()
       ->network_metadata_store()
-      ->set_secure_dns_templates_with_identifiers_active(
+      ->SetSecureDnsTemplatesWithIdentifiersActive(
           doh_templates_uri_resolver_->GetDohWithIdentifiersActive());
 }
 

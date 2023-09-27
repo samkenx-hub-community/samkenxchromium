@@ -8,19 +8,15 @@
 #import "components/feature_engagement/public/tracker.h"
 #import "ios/chrome/browser/feature_engagement/tracker_factory.h"
 #import "ios/chrome/browser/lens/lens_browser_agent.h"
-#import "ios/chrome/browser/main/browser.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/lens_commands.h"
 #import "ios/chrome/browser/web/web_navigation_ntp_delegate.h"
 #import "ios/chrome/browser/web/web_navigation_util.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
 #import "ios/web/common/user_agent.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/web_state.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 BROWSER_USER_DATA_KEY_IMPL(WebNavigationBrowserAgent)
 
@@ -149,11 +145,11 @@ web::UserAgentType WebNavigationBrowserAgent::UserAgentType(
   if (!web_state) {
     return web::UserAgentType::NONE;
   }
-  web::NavigationItem* visibleItem =
+  web::NavigationItem* visible_item =
       web_state->GetNavigationManager()->GetVisibleItem();
-  if (!visibleItem) {
+  if (!visible_item) {
     return web::UserAgentType::NONE;
   }
 
-  return visibleItem->GetUserAgentType();
+  return visible_item->GetUserAgentType();
 }

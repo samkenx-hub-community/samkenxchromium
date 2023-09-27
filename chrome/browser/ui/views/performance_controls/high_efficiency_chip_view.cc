@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 #include "chrome/browser/ui/views/performance_controls/high_efficiency_chip_view.h"
+#include <string>
 
+#include "base/notreached.h"
 #include "base/time/time.h"
 #include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/browser_process.h"
@@ -11,7 +13,9 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_window.h"
-#include "chrome/browser/ui/performance_controls/tab_discard_tab_helper.h"
+#include "chrome/browser/ui/performance_controls/high_efficiency_chip_tab_helper.h"
+#include "chrome/browser/ui/performance_controls/high_efficiency_utils.h"
+#include "chrome/browser/ui/performance_controls/performance_controls_metrics.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -23,23 +27,19 @@
 #include "chrome/grit/generated_resources.h"
 #include "components/feature_engagement/public/event_constants.h"
 #include "components/feature_engagement/public/feature_constants.h"
+#include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/performance_manager/public/features.h"
 #include "components/performance_manager/public/user_tuning/prefs.h"
 #include "components/prefs/pref_service.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/text/bytes_formatting.h"
 #include "ui/views/view_class_properties.h"
 
 namespace {
 
 // The duration that the chip should be expanded for.
 constexpr base::TimeDelta kChipAnimationDuration = base::Seconds(12);
-// The delay before the IPH should be potentially shown. This should be less
-// than kChipAnimationDuration but longer than kIconLabelAnimationDurationMs.
-constexpr base::TimeDelta kIPHDelayDuration = base::Seconds(1);
-
-// We want this to show up before the chip finishes animating.
-static_assert(kIPHDelayDuration < kChipAnimationDuration);
 
 }  // namespace
 
@@ -53,7 +53,9 @@ HighEfficiencyChipView::HighEfficiencyChipView(
                          icon_label_bubble_delegate,
                          page_action_icon_delegate,
                          "HighEfficiency"),
-      browser_(browser) {
+      browser_(browser),
+      chip_accessible_label_(
+          l10n_util::GetStringUTF16(IDS_HIGH_EFFICIENCY_CHIP_ACCNAME)) {
   DCHECK(browser_);
 
   auto* manager = performance_manager::user_tuning::
@@ -64,12 +66,9 @@ HighEfficiencyChipView::HighEfficiencyChipView(
   SetUpForInOutAnimation(kChipAnimationDuration);
   SetPaintLabelOverSolidBackground(true);
   SetProperty(views::kElementIdentifierKey, kHighEfficiencyChipElementId);
-  browser_->tab_strip_model()->AddObserver(this);
 }
 
-HighEfficiencyChipView::~HighEfficiencyChipView() {
-  browser_->tab_strip_model()->RemoveObserver(this);
-}
+HighEfficiencyChipView::~HighEfficiencyChipView() = default;
 
 void HighEfficiencyChipView::OnBubbleShown() {
   PauseAnimation();
@@ -80,54 +79,62 @@ void HighEfficiencyChipView::OnBubbleHidden() {
   bubble_ = nullptr;
 }
 
-void HighEfficiencyChipView::OnTabStripModelChanged(
-    TabStripModel* tab_strip_model,
-    const TabStripModelChange& change,
-    const TabStripSelectionChange& selection) {
-  content::WebContents* const web_contents = selection.old_contents;
-  if (!web_contents) {
-    return;
-  }
-
-  if (selection.active_tab_changed()) {
-    TabDiscardTabHelper* const tab_helper =
-        TabDiscardTabHelper::FromWebContents(web_contents);
-    tab_helper->SetChipHasBeenHidden();
-  }
-}
-
 void HighEfficiencyChipView::UpdateImpl() {
   content::WebContents* const web_contents = GetWebContents();
   if (!web_contents) {
     return;
   }
-  TabDiscardTabHelper* const tab_helper =
-      TabDiscardTabHelper::FromWebContents(web_contents);
-  if (tab_helper->ShouldChipBeVisible() && is_high_efficiency_mode_enabled_) {
-    SetVisible(true);
-    if (tab_helper->ShouldIconAnimate()) {
-      // Only animate the chip to the expanded view the first 3 times it is
-      // viewed.
-      PrefService* const pref_service = browser_->profile()->GetPrefs();
-      int times_rendered =
-          pref_service->GetInteger(prefs::kHighEfficiencyChipExpandedCount);
-      if (times_rendered < kChipAnimationCount) {
-        AnimateIn(IDS_HIGH_EFFICIENCY_CHIP_LABEL);
-        tab_helper->SetWasAnimated();
-        pref_service->SetInteger(prefs::kHighEfficiencyChipExpandedCount,
-                                 times_rendered + 1);
-      }
-    } else if (tab_helper->HasChipBeenHidden()) {
-      UnpauseAnimation();
-      AnimateOut();
-      ResetSlideAnimation(false);
+
+  HighEfficiencyChipTabHelper* const tab_helper =
+      HighEfficiencyChipTabHelper::FromWebContents(web_contents);
+  auto chip_state = tab_helper->chip_state();
+
+  if (chip_state != high_efficiency::ChipState::HIDDEN &&
+      is_high_efficiency_mode_enabled_) {
+    if (!tab_helper->ShouldChipAnimate()) {
+      return;
     }
 
-    if (performance_manager::features::kHighEfficiencyModeDefaultState.Get()) {
-      // Delay the IPH to ensure the chip is not animating when it appears.
-      timer_.Start(FROM_HERE, kIPHDelayDuration,
-                   base::BindOnce(&HighEfficiencyChipView::MaybeShowIPH,
-                                  weak_ptr_factory_.GetWeakPtr()));
+    switch (chip_state) {
+      case high_efficiency::ChipState::EXPANDED_EDUCATION: {
+        SetVisible(true);
+        AnimateIn(IDS_HIGH_EFFICIENCY_CHIP_LABEL);
+        RecordHighEfficiencyChipState(
+            HighEfficiencyChipState::kExpandedEducation);
+        break;
+      }
+      case high_efficiency::ChipState::EXPANDED_WITH_SAVINGS: {
+        SetVisible(true);
+        int const memory_savings =
+            high_efficiency::GetDiscardedMemorySavingsInBytes(web_contents);
+        std::u16string memory_savings_string = ui::FormatBytes(memory_savings);
+        SetLabel(
+            l10n_util::GetStringFUTF16(IDS_HIGH_EFFICIENCY_CHIP_SAVINGS_LABEL,
+                                       {memory_savings_string}),
+            l10n_util::GetStringFUTF16(
+                IDS_HIGH_EFFICIENCY_CHIP_WITH_SAVINGS_ACCNAME,
+                {memory_savings_string}));
+        AnimateIn(absl::nullopt);
+        RecordHighEfficiencyChipState(
+            HighEfficiencyChipState::kExpandedWithSavings);
+        break;
+      }
+      case high_efficiency::ChipState::COLLAPSED_FROM_EXPANDED: {
+        SetVisible(true);
+        UnpauseAnimation();
+        AnimateOut();
+        ResetSlideAnimation(false);
+        break;
+      }
+      case high_efficiency::ChipState::COLLAPSED: {
+        SetVisible(true);
+        SetAccessibleName(chip_accessible_label_);
+        RecordHighEfficiencyChipState(HighEfficiencyChipState::kCollapsed);
+        break;
+      }
+      default: {
+        NOTREACHED();
+      }
     }
   } else {
     AnimateOut();
@@ -146,10 +153,6 @@ void HighEfficiencyChipView::OnExecuting(
 
   BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser_);
 
-  // If the IPH is currently open, close it before opening the dialog.
-  browser_view->CloseFeaturePromo(
-      feature_engagement::kIPHHighEfficiencyInfoModeFeature);
-
   // Open the dialog bubble.
   View* anchor_view = browser_view->toolbar_button_provider()->GetAnchorView(
       PageActionIconType::kHighEfficiency);
@@ -161,36 +164,13 @@ void HighEfficiencyChipView::OnExecuting(
 }
 
 const gfx::VectorIcon& HighEfficiencyChipView::GetVectorIcon() const {
-  return kHighEfficiencyIcon;
+  return OmniboxFieldTrial::IsChromeRefreshIconsEnabled()
+             ? kHighEfficiencyChromeRefreshIcon
+             : kHighEfficiencyIcon;
 }
 
 views::BubbleDialogDelegate* HighEfficiencyChipView::GetBubble() const {
   return bubble_;
-}
-
-std::u16string HighEfficiencyChipView::GetTextForTooltipAndAccessibleName()
-    const {
-  return l10n_util::GetStringUTF16(IDS_HIGH_EFFICIENCY_CHIP_ACCNAME);
-}
-
-void HighEfficiencyChipView::MaybeShowIPH() {
-  if (browser_->window() != nullptr) {
-    bool const promo_shown = browser_->window()->MaybeShowFeaturePromo(
-        feature_engagement::kIPHHighEfficiencyInfoModeFeature, {},
-        base::BindOnce(&HighEfficiencyChipView::OnIPHClosed,
-                       weak_ptr_factory_.GetWeakPtr()));
-    // While the IPH is showing, pause the animation of the chip so it doesn't
-    // animate closed.
-    if (promo_shown) {
-      PauseAnimation();
-      SetHighlighted(true);
-    }
-  }
-}
-
-void HighEfficiencyChipView::OnIPHClosed() {
-  SetHighlighted(false);
-  UnpauseAnimation();
 }
 
 void HighEfficiencyChipView::OnHighEfficiencyModeChanged() {

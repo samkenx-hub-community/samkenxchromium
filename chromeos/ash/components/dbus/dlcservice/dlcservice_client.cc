@@ -10,18 +10,20 @@
 #include <deque>
 #include <map>
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/containers/fixed_flat_set.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/location.h"
 #include "base/logging.h"
-#include "base/no_destructor.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_piece.h"
 #include "base/strings/string_util.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chromeos/ash/components/dbus/dlcservice/fake_dlcservice_client.h"
@@ -68,7 +70,7 @@ class DlcserviceErrorResponseHandler {
  private:
   void VerifyAndSetError(dbus::ErrorResponse* err_response) {
     const std::string& err = err_response->GetErrorName();
-    static const base::NoDestructor<std::unordered_set<std::string>> err_set({
+    static constexpr auto kErrSet = base::MakeFixedFlatSet<base::StringPiece>({
         dlcservice::kErrorNone,
         dlcservice::kErrorInternal,
         dlcservice::kErrorBusy,
@@ -77,8 +79,8 @@ class DlcserviceErrorResponseHandler {
         dlcservice::kErrorNoImageFound,
     });
     // Lookup the dlcservice error code and provide default on invalid.
-    auto itr = err_set->find(err);
-    if (itr == err_set->end()) {
+    auto* itr = kErrSet.find(err);
+    if (itr == kErrSet.end()) {
       LOG(ERROR) << "Failed to set error based on ErrorResponse "
                     "defaulted to kErrorInternal, was:" << err;
       err_ = dlcservice::kErrorInternal;
@@ -283,6 +285,23 @@ class DlcserviceClientImpl : public DlcserviceClient {
   }
 
   void CheckAndRunPendingTask() {
+    // If there are no pending tasks, we can call TaskEnded() now to allow new
+    // requests to run immediately.
+    if (pending_tasks_.empty()) {
+      TaskEnded();
+      return;
+    }
+
+    // Delay pending tasks and let new tasks get queued to ensure we don't spin
+    // the CPU with repeated calls when the DLC installer is busy.
+    base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(&DlcserviceClientImpl::DelayedPendingTask,
+                       weak_ptr_factory_.GetWeakPtr()),
+        base::Seconds(3));
+  }
+
+  void DelayedPendingTask() {
     TaskEnded();
     if (!pending_tasks_.empty()) {
       std::move(pending_tasks_.front()).Run();
@@ -450,7 +469,7 @@ class DlcserviceClientImpl : public DlcserviceClient {
   // DLC ID to `InstallationHolder` mapping.
   std::map<std::string, std::vector<InstallationHolder>> installation_holder_;
 
-  dbus::ObjectProxy* dlcservice_proxy_;
+  raw_ptr<dbus::ObjectProxy, ExperimentalAsh> dlcservice_proxy_;
 
   // TODO(crbug.com/928805): Once platform dlcservice batches, can be removed.
   // Specifically when platform dlcservice doesn't return a busy status.

@@ -7,6 +7,7 @@
 
 #include <memory>
 
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/task/sequence_manager/task_queue.h"
 #include "base/time/time.h"
 #include "content/browser/scheduler/browser_task_queues.h"
@@ -40,7 +41,9 @@ class CONTENT_EXPORT BrowserUIThreadScheduler {
     void MoveFrom(UserInputActiveHandle* other);
     // Only this constructor actually creates a UserInputActiveHandle that will
     // inform scheduling decisions.
-    BrowserUIThreadScheduler* scheduler_ = nullptr;
+    // This field is not a raw_ptr<> because it was filtered by the rewriter
+    // for: #union
+    RAW_PTR_EXCLUSION BrowserUIThreadScheduler* scheduler_ = nullptr;
   };
 
   enum ScrollState { kGestureScrollActive, kFlingActive, kNone };
@@ -68,6 +71,9 @@ class CONTENT_EXPORT BrowserUIThreadScheduler {
  private:
   friend class BrowserTaskExecutor;
   friend class BrowserUIThreadSchedulerTest;
+
+  using QueueEnabledVoter =
+      base::sequence_manager::TaskQueue::QueueEnabledVoter;
 
   explicit BrowserUIThreadScheduler(
       base::sequence_manager::SequenceManager* sequence_manager);
@@ -99,9 +105,8 @@ class CONTENT_EXPORT BrowserUIThreadScheduler {
   // Can be expanded to modify queue priorities as well.
   void UpdateTaskQueueStates();
 
-  base::sequence_manager::TaskQueue::QueueEnabledVoter&
-  GetBrowserTaskRunnerVoter(QueueType queue_type) {
-    return *queue_data_[static_cast<size_t>(queue_type)].voter_.get();
+  QueueEnabledVoter& GetBrowserTaskRunnerVoter(QueueType queue_type) {
+    return *queue_enabled_voters_[static_cast<size_t>(queue_type)].get();
   }
 
   // Policy controls the scheduling policy for UI main thread, like which
@@ -142,8 +147,9 @@ class CONTENT_EXPORT BrowserUIThreadScheduler {
       owned_sequence_manager_;
 
   BrowserTaskQueues task_queues_;
-  std::array<BrowserTaskQueues::QueueData, BrowserTaskQueues::kNumQueueTypes>
-      queue_data_;
+  std::array<std::unique_ptr<QueueEnabledVoter>,
+             BrowserTaskQueues::kNumQueueTypes>
+      queue_enabled_voters_;
 
   scoped_refptr<Handle> handle_;
 

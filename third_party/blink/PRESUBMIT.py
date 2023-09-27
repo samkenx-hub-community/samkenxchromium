@@ -12,7 +12,6 @@ import inspect
 import os
 import re
 
-USE_PYTHON3 = True
 
 try:
     # pylint: disable=C0103
@@ -79,18 +78,11 @@ def _CheckForWrongMojomIncludes(input_api, output_api):
         'third_party/blink/public/mojom/loader/resource_load_info',
         'third_party/blink/public/mojom/loader/resource_load_info_notifier',
         'third_party/blink/public/mojom/worker/subresource_loader_updater',
+        'third_party/blink/public/mojom/worker/worklet_global_scope_creation_params',
         'third_party/blink/public/mojom/loader/transferrable_url_loader',
         'third_party/blink/public/mojom/loader/code_cache',
-        # The `shared_storage_worklet_service` and `private_aggregation_host`
-        # are tentatively included here when shared storage is migrating to
-        # the blink-style worklet infrastructure.
-        # TODO(crbug.com/1414951): Remove once the migration completes.
-        'third_party/blink/public/mojom/shared_storage/shared_storage_worklet_service',
-        'third_party/blink/public/mojom/private_aggregation/private_aggregation_host',
-        'media/mojo/mojom/interface_factory',
-        'media/mojo/mojom/audio_decoder',
-        'media/mojo/mojom/audio_encoder',
-        'media/mojo/mojom/video_decoder',
+        'media/mojo/mojom/interface_factory', 'media/mojo/mojom/audio_decoder',
+        'media/mojo/mojom/audio_encoder', 'media/mojo/mojom/video_decoder',
         'media/mojo/mojom/media_metrics_provider')
 
     for f in input_api.AffectedFiles(file_filter=source_file_filter):
@@ -218,16 +210,17 @@ def _CheckStyle(input_api, output_api):
         input_api.os_path.relpath(file_path, input_api.PresubmitLocalPath())
         for file_path in files if input_api.fnmatch.fnmatch(file_path, '*.py')
     ]
-    pylintrc = input_api.os_path.join('tools', 'blinkpy', 'pylintrc')
-    results.extend(
-        input_api.RunTests(
-            input_api.canned_checks.GetPylint(
-                input_api,
-                output_api,
-                files_to_check=[
-                    re.escape(path) for path in affected_python_files
-                ],
-                pylintrc=pylintrc)))
+    if affected_python_files:
+        pylintrc = input_api.os_path.join('tools', 'blinkpy', 'pylintrc')
+        results.extend(
+            input_api.RunTests(
+                input_api.canned_checks.GetPylint(
+                    input_api,
+                    output_api,
+                    files_to_check=[
+                        re.escape(path) for path in affected_python_files
+                    ],
+                    pylintrc=pylintrc)))
     return results
 
 

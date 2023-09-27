@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/bind.h"
 #include "base/test/task_environment.h"
@@ -112,14 +113,17 @@ class BluetoothClassicMediumTest : public testing::Test {
     run_loop.Run();
   }
 
-  bluetooth::FakeAdapter* fake_adapter_;
+  raw_ptr<bluetooth::FakeAdapter, ExperimentalAsh> fake_adapter_;
   mojo::SharedRemote<bluetooth::mojom::Adapter> remote_adapter_;
   std::unique_ptr<BluetoothClassicMedium> bluetooth_classic_medium_;
   BluetoothClassicMedium::DiscoveryCallback discovery_callback_;
 
-  api::BluetoothDevice* last_device_discovered_ = nullptr;
-  api::BluetoothDevice* last_device_name_changed_ = nullptr;
-  api::BluetoothDevice* expected_last_device_lost_ = nullptr;
+  raw_ptr<api::BluetoothDevice, DanglingUntriaged | ExperimentalAsh>
+      last_device_discovered_ = nullptr;
+  raw_ptr<api::BluetoothDevice, DanglingUntriaged | ExperimentalAsh>
+      last_device_name_changed_ = nullptr;
+  raw_ptr<api::BluetoothDevice, DanglingUntriaged | ExperimentalAsh>
+      expected_last_device_lost_ = nullptr;
 
   base::OnceClosure on_device_discovered_callback_;
   base::OnceClosure on_device_name_changed_callback_;
@@ -165,7 +169,7 @@ TEST_F(BluetoothClassicMediumTest,
             bluetooth_classic_medium_->GetRemoteDevice(kDeviceAddress1));
   EXPECT_EQ(kDeviceName1, last_device_discovered_->GetName());
 
-  auto* first_device_discovered = last_device_discovered_;
+  auto* first_device_discovered = last_device_discovered_.get();
 
   NotifyDeviceAdded(kDeviceAddress2, kDeviceName2);
   EXPECT_TRUE(bluetooth_classic_medium_->GetRemoteDevice(kDeviceAddress2));
@@ -250,7 +254,7 @@ TEST_F(BluetoothClassicMediumTest, TestDiscovery_DeviceNameChanged) {
   fake_adapter_->NotifyDeviceChanged(
       CreateDeviceInfo(kDeviceAddress1, kDeviceName2));
   run_loop.RunUntilIdle();
-  EXPECT_EQ(nullptr, last_device_name_changed_);
+  EXPECT_EQ(nullptr, last_device_name_changed_.get());
 
   StopDiscovery();
 }
@@ -275,11 +279,30 @@ TEST_F(BluetoothClassicMediumTest, TestConnectToService_Success) {
   fake_adapter_->AllowConnectionForAddressAndUuidPair(
       kDeviceAddress1, kNearbySharingServiceUuid);
 
+  auto cancellation_flag = std::make_unique<CancellationFlag>();
   auto bluetooth_socket = bluetooth_classic_medium_->ConnectToService(
-      *last_device_discovered_, kNearbySharingServiceUuid.value(), nullptr);
+      *last_device_discovered_, kNearbySharingServiceUuid.value(),
+      cancellation_flag.get());
   EXPECT_EQ(last_device_discovered_, bluetooth_socket->GetRemoteDevice());
 
   EXPECT_TRUE(bluetooth_socket->Close().Ok());
+}
+
+TEST_F(BluetoothClassicMediumTest,
+       TestConnectToService_CancelledByCancellationFlag) {
+  StartDiscovery();
+  NotifyDeviceAdded(kDeviceAddress1, kDeviceName1);
+  StopDiscovery();
+
+  fake_adapter_->AllowConnectionForAddressAndUuidPair(
+      kDeviceAddress1, kNearbySharingServiceUuid);
+
+  auto cancellation_flag = std::make_unique<CancellationFlag>();
+  cancellation_flag->Cancel();
+
+  EXPECT_FALSE(bluetooth_classic_medium_->ConnectToService(
+      *last_device_discovered_, kNearbySharingServiceUuid.value(),
+      cancellation_flag.get()));
 }
 
 TEST_F(BluetoothClassicMediumTest, TestConnectToService_Failure) {

@@ -65,19 +65,15 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ref {
   // hooks that provide BRP-ASan instrumentation for raw_ref.
   using Inner = raw_ptr<T, Traits | RawPtrTraits::kDisableHooks>;
 
+  // Some underlying implementations do not clear on move, which produces an
+  // inconsistent behaviour. We want consistent behaviour such that using a
+  // raw_ref after move is caught and aborts, so do it when the underlying
+  // implementation doesn't. Failure to clear would be indicated by the related
+  // death tests not CHECKing appropriately.
+  static constexpr bool kNeedClearAfterMove = !Inner::kZeroOnMove;
+
  public:
   using Impl = typename Inner::Impl;
-
-  // These impls do not clear on move, which produces an inconsistent behaviour.
-  // We want consistent behaviour such that using a raw_ref after move is caught
-  // and aborts. Failure to clear would be indicated by the related death tests
-  // not CHECKing appropriately.
-  static constexpr bool need_clear_after_move =
-#if BUILDFLAG(USE_ASAN_UNOWNED_PTR)
-      std::is_same_v<Impl, internal::RawPtrAsanUnownedImpl<true>> ||
-      std::is_same_v<Impl, internal::RawPtrAsanUnownedImpl<false>> ||
-#endif  // BUILDFLAG(USE_ASAN_UNOWNED_PTR)
-      std::is_same_v<Impl, internal::RawPtrNoOpImpl>;
 
   // Construct a raw_ref from a pointer, which must not be null.
   //
@@ -111,7 +107,7 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ref {
   PA_ALWAYS_INLINE constexpr raw_ref(raw_ref&& p) noexcept
       : inner_(std::move(p.inner_)) {
     PA_RAW_PTR_CHECK(inner_);  // Catch use-after-move.
-    if constexpr (need_clear_after_move) {
+    if constexpr (kNeedClearAfterMove) {
       p.inner_ = nullptr;
     }
   }
@@ -125,7 +121,7 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ref {
   PA_ALWAYS_INLINE constexpr raw_ref& operator=(raw_ref&& p) noexcept {
     PA_RAW_PTR_CHECK(p.inner_);  // Catch use-after-move.
     inner_.operator=(std::move(p.inner_));
-    if constexpr (need_clear_after_move) {
+    if constexpr (kNeedClearAfterMove) {
       p.inner_ = nullptr;
     }
     return *this;
@@ -152,7 +148,7 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ref {
   PA_ALWAYS_INLINE constexpr raw_ref(raw_ref<U, PassedTraits>&& p) noexcept
       : inner_(std::move(p.inner_)) {
     PA_RAW_PTR_CHECK(inner_);  // Catch use-after-move.
-    if constexpr (need_clear_after_move) {
+    if constexpr (kNeedClearAfterMove) {
       p.inner_ = nullptr;
     }
   }
@@ -178,7 +174,7 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ref {
       raw_ref<U, PassedTraits>&& p) noexcept {
     PA_RAW_PTR_CHECK(p.inner_);  // Catch use-after-move.
     inner_.operator=(std::move(p.inner_));
-    if constexpr (need_clear_after_move) {
+    if constexpr (kNeedClearAfterMove) {
       p.inner_ = nullptr;
     }
     return *this;
@@ -383,6 +379,11 @@ using RemoveRawRefT = typename RemoveRawRef<T>::type;
 
 using base::raw_ref;
 
+template <base::RawPtrTraits Traits = base::RawPtrTraits::kEmpty, typename T>
+auto ToRawRef(T& ref) {
+  return raw_ref<T, Traits>(ref);
+}
+
 namespace std {
 
 // Override so set/map lookups do not create extra raw_ref. This also
@@ -409,7 +410,6 @@ struct less<raw_ref<T, Traits>> {
   }
 };
 
-#if defined(_LIBCPP_VERSION)
 // Specialize std::pointer_traits. The latter is required to obtain the
 // underlying raw pointer in the std::to_address(pointer) overload.
 // Implementing the pointer_traits is the standard blessed way to customize
@@ -438,7 +438,6 @@ struct pointer_traits<::raw_ref<T, Traits>> {
     return &(p.get());
   }
 };
-#endif  // defined(_LIBCPP_VERSION)
 
 }  // namespace std
 

@@ -10,6 +10,7 @@
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_fragment_items_builder.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_box_state.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_logical_line_item.h"
+#include "third_party/blink/renderer/core/layout/ng/inline/ng_score_line_break_context.h"
 
 namespace blink {
 
@@ -21,15 +22,22 @@ class NGInlineItem;
 //
 // Because this context is in initial state for when fragmentation occurs and
 // some other cases, do not add things that are too expensive to rebuild.
+//
+// This class has no public constructors. Instantiate one of subclasses below
+// depending on the line breaker type for the context.
 class CORE_EXPORT NGInlineChildLayoutContext {
   STACK_ALLOCATED();
 
  public:
-  NGInlineChildLayoutContext(const NGInlineNode& node,
-                             NGBoxFragmentBuilder* container_builder);
   ~NGInlineChildLayoutContext();
 
   NGFragmentItemsBuilder* ItemsBuilder() { return &items_builder_; }
+
+  NGScoreLineBreakContext* ScoreLineBreakContext() const {
+    return score_line_break_context_;
+  }
+  NGLineInfo& GetLineInfo(const NGInlineBreakToken* break_token,
+                          bool& is_cached_out);
 
   // Acquire/release temporary |NGLogicalLineItems|, used for a short period of
   // time, but needed multiple times in a context.
@@ -55,12 +63,12 @@ class CORE_EXPORT NGInlineChildLayoutContext {
     item_index_ = item_index;
   }
 
-  const HeapVector<Member<const NGBlockBreakToken>>& PropagatedBreakTokens()
+  const HeapVector<Member<const NGBreakToken>>& ParallelFlowBreakTokens()
       const {
-    return propagated_float_break_tokens_;
+    return parallel_flow_break_tokens_;
   }
-  void ClearPropagatedBreakTokens();
-  void PropagateBreakToken(const NGBlockBreakToken*);
+  void ClearParallelFlowBreakTokens();
+  void PropagateParallelFlowBreakToken(const NGBreakToken*);
 
   const absl::optional<LayoutUnit>& BalancedAvailableWidth() const {
     return balanced_available_width_;
@@ -69,9 +77,20 @@ class CORE_EXPORT NGInlineChildLayoutContext {
     balanced_available_width_ = value;
   }
 
+ protected:
+  NGInlineChildLayoutContext(const NGInlineNode& node,
+                             NGBoxFragmentBuilder* container_builder,
+                             NGLineInfo* line_info);
+  NGInlineChildLayoutContext(const NGInlineNode& node,
+                             NGBoxFragmentBuilder* container_builder,
+                             NGScoreLineBreakContext* score_line_break_context);
+
  private:
   NGBoxFragmentBuilder* container_builder_ = nullptr;
   NGFragmentItemsBuilder items_builder_;
+
+  NGLineInfo* line_info_ = nullptr;
+  NGScoreLineBreakContext* score_line_break_context_ = nullptr;
 
   NGLogicalLineItems* temp_logical_line_items_ = nullptr;
 
@@ -81,11 +100,54 @@ class CORE_EXPORT NGInlineChildLayoutContext {
   const HeapVector<NGInlineItem>* items_ = nullptr;
   unsigned item_index_ = 0;
 
-  HeapVector<Member<const NGBlockBreakToken>> propagated_float_break_tokens_;
+  HeapVector<Member<const NGBreakToken>> parallel_flow_break_tokens_;
 
   // Used by `NGParagraphLineBreaker`.
   absl::optional<LayoutUnit> balanced_available_width_;
 };
+
+// A subclass of `NGInlineChildLayoutContext` for when the algorithm requires
+// only one `NGLineInfo`.
+class CORE_EXPORT NGSimpleInlineChildLayoutContext
+    : public NGInlineChildLayoutContext {
+ public:
+  NGSimpleInlineChildLayoutContext(const NGInlineNode& node,
+                                   NGBoxFragmentBuilder* container_builder)
+      : NGInlineChildLayoutContext(node,
+                                   container_builder,
+                                   &line_info_storage_) {}
+
+ private:
+  NGLineInfo line_info_storage_;
+};
+
+// A subclass of `NGInlineChildLayoutContext` for when the algorithm requires
+// `NGScoreLineBreakContext`.
+template <wtf_size_t max_lines>
+class CORE_EXPORT NGOptimalInlineChildLayoutContext
+    : public NGInlineChildLayoutContext {
+ public:
+  NGOptimalInlineChildLayoutContext(const NGInlineNode& node,
+                                    NGBoxFragmentBuilder* container_builder)
+      : NGInlineChildLayoutContext(node,
+                                   container_builder,
+                                   &score_line_break_context_instance_) {}
+
+ private:
+  NGScoreLineBreakContextOf<max_lines> score_line_break_context_instance_;
+};
+
+inline NGLineInfo& NGInlineChildLayoutContext::GetLineInfo(
+    const NGInlineBreakToken* break_token,
+    bool& is_cached_out) {
+  DCHECK(!is_cached_out);
+  if (line_info_) {
+    return *line_info_;
+  }
+  DCHECK(score_line_break_context_);
+  return score_line_break_context_->LineInfoList().Get(break_token,
+                                                       is_cached_out);
+}
 
 inline NGLogicalLineItems&
 NGInlineChildLayoutContext::AcquireTempLogicalLineItems() {

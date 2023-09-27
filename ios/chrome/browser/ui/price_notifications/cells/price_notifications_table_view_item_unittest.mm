@@ -14,10 +14,6 @@
 #import "testing/platform_test.h"
 #import "url/gurl.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 using PriceNotificationsTableViewItemTest = PlatformTest;
 // Ensures that the PriceNotificationTableViewCell's track button is visible
 // while the menu button is hidden if the cell contains a trackable product.
@@ -92,9 +88,9 @@ TEST_F(PriceNotificationsTableViewItemTest,
             initWithStyle:UITableViewCellStyleDefault
           reuseIdentifier:nil];
   CGPoint valid_points[] = {CGPointMake(0, 0),    CGPointMake(10, 5),
-                            CGPointMake(20, -10), CGPointMake(22, 0),
-                            CGPointMake(-22, 0),  CGPointMake(0, 22),
-                            CGPointMake(0, -22),  CGPoint(22, -22)};
+                            CGPointMake(20, -10), CGPointMake(23, 0),
+                            CGPointMake(-23, 0),  CGPointMake(0, 23),
+                            CGPointMake(0, -23),  CGPointMake(23, -23)};
 
   for (CGPoint point : valid_points) {
     EXPECT_TRUE([cell.menuButton pointInside:point withEvent:nil]);
@@ -110,9 +106,9 @@ TEST_F(PriceNotificationsTableViewItemTest,
       [[PriceNotificationsTableViewCell alloc]
             initWithStyle:UITableViewCellStyleDefault
           reuseIdentifier:nil];
-  CGPoint valid_points[] = {CGPointMake(23, 0),   CGPointMake(-24, 0),
-                            CGPointMake(0, 23),   CGPointMake(0, -24),
-                            CGPointMake(23, -23), CGPointMake(100, 0)};
+  CGPoint valid_points[] = {CGPointMake(24, 0),   CGPointMake(-25, 0),
+                            CGPointMake(0, 24),   CGPointMake(0, -25),
+                            CGPointMake(24, -24), CGPointMake(100, 0)};
 
   for (CGPoint point : valid_points) {
     EXPECT_FALSE([cell.menuButton pointInside:point withEvent:nil]);

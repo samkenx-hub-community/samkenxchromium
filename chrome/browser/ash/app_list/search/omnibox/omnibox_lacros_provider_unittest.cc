@@ -8,6 +8,9 @@
 #include <string>
 #include <vector>
 
+#include "ash/constants/ash_features.h"
+#include "ash/constants/ash_pref_names.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "chrome/browser/ash/app_list/search/test/test_search_controller.h"
 #include "chrome/browser/ash/app_list/test/test_app_list_controller_delegate.h"
@@ -22,6 +25,7 @@
 #include "chrome/test/base/testing_profile_manager.h"
 #include "chromeos/ash/components/login/login_state/login_state.h"
 #include "chromeos/crosapi/mojom/launcher_search.mojom.h"
+#include "components/prefs/scoped_user_pref_update.h"
 #include "content/public/test/browser_task_environment.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -121,6 +125,9 @@ class TestSearchResultProducer : public cam::SearchController {
   // cam::SearchController overrides:
   void Search(const std::u16string& query, SearchCallback callback) override {
     last_query_ = query;
+
+    // Reset the remote and send a new pending receiver to ash.
+    publisher_.reset();
     std::move(callback).Run(publisher_.BindNewEndpointAndPassReceiver());
   }
 
@@ -205,6 +212,14 @@ class OmniboxLacrosProviderTest : public testing::Test {
     base::RunLoop().RunUntilIdle();
   }
 
+  void DisableWebSearch() {
+    ScopedDictPrefUpdate pref_update(
+        profile_->GetPrefs(), ash::prefs::kLauncherSearchCategoryControlStatus);
+
+    pref_update->Set(ash::GetAppListControlCategoryName(ControlCategory::kWeb),
+                     false);
+  }
+
  protected:
   std::unique_ptr<TestSearchResultProducer> search_producer_;
   std::unique_ptr<TestSearchController> search_controller_;
@@ -214,7 +229,7 @@ class OmniboxLacrosProviderTest : public testing::Test {
   TestAppListControllerDelegate list_controller_;
 
   std::unique_ptr<TestingProfileManager> profile_manager_;
-  TestingProfile* profile_;
+  raw_ptr<TestingProfile, ExperimentalAsh> profile_;
 
   std::unique_ptr<crosapi::CrosapiManager> crosapi_manager_;
 
@@ -251,6 +266,8 @@ TEST_F(OmniboxLacrosProviderTest, NewResults) {
   std::vector<cam::SearchResultPtr> to_produce;
   to_produce.emplace_back(NewOpenTabResult("https://example.com/open_tab_1"));
   ProduceResults(std::move(to_produce));
+
+  StartSearch(u"query2");
 
   // Then produce another.
   to_produce.clear();
@@ -330,6 +347,30 @@ TEST_F(OmniboxLacrosProviderTest, UnhandledUrls) {
             search_controller_->last_results()[1]->id());
 }
 
+// Test that all non-answer results are filtered if web search is disabled in
+// search control.
+TEST_F(OmniboxLacrosProviderTest, WebSearchControl) {
+  base::test::ScopedFeatureList scoped_feature_list_;
+  scoped_feature_list_.InitAndEnableFeature(
+      ash::features::kLauncherSearchControl);
+  DisableWebSearch();
+
+  StartSearch(u"query");
+  EXPECT_EQ(u"query", search_producer_->last_query());
+
+  std::vector<cam::SearchResultPtr> to_produce;
+  to_produce.emplace_back(NewOmniboxResult("https://example.com/result"));
+  to_produce.emplace_back(NewAnswerResult(
+      "https://example.com/answer", cam::SearchResult::AnswerType::kWeather));
+  to_produce.emplace_back(NewOpenTabResult("https://example.com/open_tab"));
+  ProduceResults(std::move(to_produce));
+
+  // Results always appear after answer and open tab entries.
+  ASSERT_EQ(1u, search_controller_->last_results().size());
+  EXPECT_EQ("omnibox_answer://https://example.com/answer",
+            search_controller_->last_results()[0]->id());
+}
+
 // A secondary test fixture which does not have any search producer connected to
 // the crosapi manager.
 class OmniboxLacrosProviderNoCrosAPITest : public testing::Test {
@@ -396,7 +437,7 @@ class OmniboxLacrosProviderNoCrosAPITest : public testing::Test {
   TestAppListControllerDelegate list_controller_;
   std::unique_ptr<crosapi::CrosapiManager> crosapi_manager_;
   std::unique_ptr<TestingProfileManager> profile_manager_;
-  TestingProfile* profile_;
+  raw_ptr<TestingProfile, ExperimentalAsh> profile_;
   std::unique_ptr<OmniboxLacrosProvider> omnibox_provider_;
 };
 

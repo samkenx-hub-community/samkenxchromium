@@ -1,5 +1,5 @@
 This is a testharness.js-based test.
-Found 1017 tests; 1010 PASS, 7 FAIL, 0 TIMEOUT, 0 NOTRUN.
+Found 1027 tests; 1019 PASS, 8 FAIL, 0 TIMEOUT, 0 NOTRUN.
 PASS idl_test setup
 PASS idl_test validation
 PASS Partial interface Document: original interface defined
@@ -91,6 +91,8 @@ PASS HTMLStyleElement includes LinkStyle: member names are unique
 PASS HTMLBodyElement includes WindowEventHandlers: member names are unique
 PASS HTMLAnchorElement includes HTMLHyperlinkElementUtils: member names are unique
 PASS HTMLAreaElement includes HTMLHyperlinkElementUtils: member names are unique
+PASS HTMLInputElement includes PopoverInvokerElement: member names are unique
+PASS HTMLButtonElement includes PopoverInvokerElement: member names are unique
 PASS CanvasRenderingContext2D includes CanvasState: member names are unique
 PASS CanvasRenderingContext2D includes CanvasTransform: member names are unique
 PASS CanvasRenderingContext2D includes CanvasCompositing: member names are unique
@@ -183,6 +185,7 @@ PASS Window interface: existence and properties of interface prototype object's 
 PASS Window interface: attribute self
 PASS Window interface: attribute name
 PASS Window interface: attribute history
+FAIL Window interface: attribute navigation assert_equals: setter must be undefined for readonly attributes expected (undefined) undefined but got (function) function "function set navigation() { [native code] }"
 PASS Window interface: attribute customElements
 PASS Window interface: attribute locationbar
 PASS Window interface: attribute menubar
@@ -219,6 +222,7 @@ PASS Window interface: attribute onabort
 PASS Window interface: attribute onauxclick
 PASS Window interface: attribute onbeforeinput
 PASS Window interface: attribute onbeforematch
+PASS Window interface: attribute onbeforetoggle
 PASS Window interface: attribute onblur
 PASS Window interface: attribute oncancel
 PASS Window interface: attribute oncanplay
@@ -337,6 +341,7 @@ PASS Window interface: window must have own property "document"
 PASS Window interface: window must inherit property "name" with the proper type
 PASS Window interface: window must have own property "location"
 PASS Window interface: window must inherit property "history" with the proper type
+PASS Window interface: window must inherit property "navigation" with the proper type
 PASS Window interface: window must inherit property "customElements" with the proper type
 PASS Window interface: window must inherit property "locationbar" with the proper type
 PASS Window interface: window must inherit property "menubar" with the proper type
@@ -380,6 +385,7 @@ PASS Window interface: window must inherit property "onabort" with the proper ty
 PASS Window interface: window must inherit property "onauxclick" with the proper type
 PASS Window interface: window must inherit property "onbeforeinput" with the proper type
 PASS Window interface: window must inherit property "onbeforematch" with the proper type
+PASS Window interface: window must inherit property "onbeforetoggle" with the proper type
 PASS Window interface: window must inherit property "onblur" with the proper type
 PASS Window interface: window must inherit property "oncancel" with the proper type
 PASS Window interface: window must inherit property "oncanplay" with the proper type
@@ -547,6 +553,7 @@ PASS Document interface: attribute onabort
 PASS Document interface: attribute onauxclick
 PASS Document interface: attribute onbeforeinput
 PASS Document interface: attribute onbeforematch
+PASS Document interface: attribute onbeforetoggle
 PASS Document interface: attribute onblur
 PASS Document interface: attribute oncancel
 PASS Document interface: attribute oncanplay
@@ -680,6 +687,7 @@ PASS Document interface: iframe.contentDocument must inherit property "onabort" 
 PASS Document interface: iframe.contentDocument must inherit property "onauxclick" with the proper type
 PASS Document interface: iframe.contentDocument must inherit property "onbeforeinput" with the proper type
 PASS Document interface: iframe.contentDocument must inherit property "onbeforematch" with the proper type
+PASS Document interface: iframe.contentDocument must inherit property "onbeforetoggle" with the proper type
 PASS Document interface: iframe.contentDocument must inherit property "onblur" with the proper type
 PASS Document interface: iframe.contentDocument must inherit property "oncancel" with the proper type
 PASS Document interface: iframe.contentDocument must inherit property "oncanplay" with the proper type
@@ -813,6 +821,7 @@ PASS Document interface: new Document() must inherit property "onabort" with the
 PASS Document interface: new Document() must inherit property "onauxclick" with the proper type
 PASS Document interface: new Document() must inherit property "onbeforeinput" with the proper type
 PASS Document interface: new Document() must inherit property "onbeforematch" with the proper type
+PASS Document interface: new Document() must inherit property "onbeforetoggle" with the proper type
 PASS Document interface: new Document() must inherit property "onblur" with the proper type
 PASS Document interface: new Document() must inherit property "oncancel" with the proper type
 PASS Document interface: new Document() must inherit property "oncanplay" with the proper type
@@ -946,6 +955,7 @@ PASS Document interface: documentWithHandlers must inherit property "onabort" wi
 PASS Document interface: documentWithHandlers must inherit property "onauxclick" with the proper type
 PASS Document interface: documentWithHandlers must inherit property "onbeforeinput" with the proper type
 PASS Document interface: documentWithHandlers must inherit property "onbeforematch" with the proper type
+PASS Document interface: documentWithHandlers must inherit property "onbeforetoggle" with the proper type
 PASS Document interface: documentWithHandlers must inherit property "onblur" with the proper type
 PASS Document interface: documentWithHandlers must inherit property "oncancel" with the proper type
 PASS Document interface: documentWithHandlers must inherit property "oncanplay" with the proper type

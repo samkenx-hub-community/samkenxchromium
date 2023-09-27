@@ -6,7 +6,6 @@
 
 #import <UIKit/UIKit.h>
 
-#import "base/compiler_specific.h"
 #import "base/test/scoped_feature_list.h"
 #import "ios/web/common/features.h"
 #import "ios/web/web_state/ui/crw_web_view_scroll_view_delegate_proxy.h"
@@ -14,10 +13,6 @@
 #import "testing/platform_test.h"
 #import "third_party/ocmock/OCMock/OCMock.h"
 #import "third_party/ocmock/gtest_support.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 // TODO(crbug.com/1030168): Rewrite tests Delegate, MultipleScrollView,
 // DelegateClearingUp not to depend on this, and delete this.

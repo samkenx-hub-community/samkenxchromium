@@ -27,9 +27,7 @@
 <translation id="199526504800285197">Se ha parado la grabación</translation>
 <translation id="1995951722691075581">La grabación se ha parado porque hay poco espacio de almacenamiento en el dispositivo. Para grabar más vídeos, debes liberar espacio en tu dispositivo.</translation>
 <translation id="2036868001356139588">Duración del temporizador</translation>
-<translation id="2050339315714019657">Vertical</translation>
 <translation id="2064538373111010176"><ph name="CAMERA" /> activa</translation>
-<translation id="2128052519899549250">Grabar un vídeo de secuencia acelerada</translation>
 <translation id="2134029355740465625">Ajustes de vídeo</translation>
 <translation id="2144806332417375165">Parámetros de vídeo personalizados</translation>
 <translation id="2175927920773552910">Código QR</translation>
@@ -59,6 +57,7 @@
 <translation id="3566302376254083266">Moviendo hacia arriba a la izquierda</translation>
 <translation id="3573890771273113519">Cambiar al modo escáner</translation>
 <translation id="3583444040776960729">Esquina inferior izquierda del documento</translation>
+<translation id="3642192109456033823">Procesando vídeo...</translation>
 <translation id="3789724198583203151">Girar 90 grados en el sentido contrario a las agujas del reloj</translation>
 <translation id="3810838688059735925">Vídeo</translation>
 <translation id="3892148308691398805">Copiar texto</translation>
@@ -67,9 +66,10 @@
 <translation id="4118525110028899586">Pausar grabación</translation>
 <translation id="4121305183798804752">Documento detectado</translation>
 <translation id="414641094616694804">Esta cámara no puede cambiar de resolución</translation>
-<translation id="4269820728363426813">Copiar la dirección del enlace</translation>
-<translation id="4281620174117014503">Resolución media</translation>
+<translation id="4176463684765177261">Inhabilitado</translation>
+<translation id="4269820728363426813">Copiar dirección del enlace</translation>
 <translation id="428234092390943511">Miniatura de la página</translation>
+<translation id="4349714250734879769">Escalar marcos con Chrome</translation>
 <translation id="4383571725254449280">Imprimir registros de rendimiento</translation>
 <translation id="4445542136948522167">Detener foto</translation>
 <translation id="4570032796877367747">Cámara frontal</translation>
@@ -82,24 +82,26 @@
 <translation id="4864143361253542638">Lista de páginas escaneadas</translation>
 <translation id="4890010094662541459">3x3</translation>
 <translation id="491895758387112773">Grabación de vídeo con varias emisiones</translation>
+<translation id="495170559598752135">Acciones</translation>
 <translation id="4984613436295737187">Quad HD (1440p)</translation>
 <translation id="5034763830503483128">Relación de aspecto de la foto</translation>
 <translation id="5057360777601936059">Tu cámara no está disponible en este momento.
         Comprueba si está conectada correctamente.</translation>
 <translation id="5163387177077603948">Moviendo hacia la derecha</translation>
+<translation id="5219374179772385066">El modo Secuencia acelerada ya está disponible.</translation>
 <translation id="5235304959032763950">16 a 9</translation>
 <translation id="5266635337630551423">Esquina superior izquierda del documento</translation>
 <translation id="5317780077021120954">Guardar</translation>
 <translation id="5320594929574852403">Moviendo hacia la izquierda</translation>
 <translation id="5374917190292010970">4K (2160p)</translation>
-<translation id="5577251651370645658">Secuencia acelerada</translation>
 <translation id="5662366948659129155">Escaneando página <ph name="COUNT" /></translation>
 <translation id="5671277269877808209">Cuadrado</translation>
+<translation id="574392208103952083">Media</translation>
 <translation id="5746169159649715125">Guardar como PDF</translation>
 <translation id="5753488212459587150">Habilitar modo Experto</translation>
 <translation id="5759254179196327752">Escanear documento</translation>
 <translation id="5775960006311140197">Modo Experto</translation>
-<translation id="5860033963881614850">Desactivado</translation>
+<translation id="5860033963881614850">Desactivada</translation>
 <translation id="5869546221129391014">Cuadrícula</translation>
 <translation id="5916664084637901428">Activado</translation>
 <translation id="5975083100439434680">Reducir</translation>
@@ -122,6 +124,7 @@ Si tu comentario está relacionado con la calidad de imagen o de vídeo, adjunta
 <translation id="6888362557094394345">Moviendo hacia abajo</translation>
 <translation id="695140971690006676">Restablecer todo</translation>
 <translation id="6965382102122355670">Aceptar</translation>
+<translation id="6965830616442491568">Retrato</translation>
 <translation id="698156982839284926">3 segundos</translation>
 <translation id="7134221860976209830">Temporizador de 10 segundos</translation>
 <translation id="7191890674911603392">Tipo de grabación</translation>
@@ -137,6 +140,7 @@ Si tu comentario está relacionado con la calidad de imagen o de vídeo, adjunta
 <translation id="7658239707568436148">Cancelar</translation>
 <translation id="7670511624014457267">60 FPS</translation>
 <translation id="7671804233658741790">Esquina inferior derecha del documento</translation>
+<translation id="7684446460490665873">Grabar vídeo de secuencia acelerada</translation>
 <translation id="7692090236657809299">Habilitar panorámica, inclinación y zoom</translation>
 <translation id="7726641833034062494">Grabar vídeo normal</translation>
 <translation id="7748344063862150053">Esquina superior derecha del documento</translation>
@@ -148,6 +152,7 @@ Si tu comentario está relacionado con la calidad de imagen o de vídeo, adjunta
 <translation id="8145038249676204903">Cambiar al modo de cámara de fotos</translation>
 <translation id="8167081290930651932">Guardar como foto</translation>
 <translation id="8239780215768881278">Hacer una captura de vídeo</translation>
+<translation id="8346544573713510785">Escalar marcos con cámara HAL</translation>
 <translation id="8425673304802773841">Inclinar hacia abajo</translation>
 <translation id="8428213095426709021">Configuración</translation>
 <translation id="8629662593426079630">360p</translation>
@@ -162,6 +167,7 @@ Si tu comentario está relacionado con la calidad de imagen o de vídeo, adjunta
 <translation id="9045010116236796332">Coloca todos los bordes del documento dentro del marco</translation>
 <translation id="9045155556724273246">10 segundos</translation>
 <translation id="906331135292332864">Procesando imagen...</translation>
+<translation id="9161584225258678723">Secuencia acelerada</translation>
 <translation id="922762992951083513">Efecto espejo activado</translation>
 <translation id="945522503751344254">Enviar comentarios</translation>
 </translationbundle>

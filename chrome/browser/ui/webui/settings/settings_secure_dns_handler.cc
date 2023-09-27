@@ -85,12 +85,6 @@ void SecureDnsHandler::RegisterMessages() {
   web_ui()->RegisterMessageCallback(
       "probeConfig", base::BindRepeating(&SecureDnsHandler::HandleProbeConfig,
                                          base::Unretained(this)));
-
-  web_ui()->RegisterMessageCallback(
-      "recordUserDropdownInteraction",
-      base::BindRepeating(
-          &SecureDnsHandler::HandleRecordUserDropdownInteraction,
-          base::Unretained(this)));
 }
 
 void SecureDnsHandler::OnJavascriptAllowed() {
@@ -224,15 +218,6 @@ void SecureDnsHandler::HandleProbeConfig(const base::Value::List& args) {
                                    base::Unretained(this)));
 }
 
-void SecureDnsHandler::HandleRecordUserDropdownInteraction(
-    const base::Value::List& args) {
-  CHECK_EQ(2U, args.size());
-  const std::string& old_provider = args[0].GetString();
-  const std::string& new_provider = args[1].GetString();
-
-  secure_dns::UpdateDropdownHistograms(providers_, old_provider, new_provider);
-}
-
 void SecureDnsHandler::OnProbeComplete() {
   bool success =
       runner_->result() == chrome_browser_net::DnsProbeRunner::CORRECT;
@@ -249,9 +234,13 @@ void SecureDnsHandler::SendSecureDnsSettingUpdatesToJavascript() {
 
 // static
 net::DohProviderEntry::List SecureDnsHandler::GetFilteredProviders() {
-  return secure_dns::ProvidersForCountry(
-      secure_dns::SelectEnabledProviders(net::DohProviderEntry::GetList()),
-      country_codes::GetCurrentCountryID());
+  // Note: Check whether each provider is enabled *after* filtering based on
+  // country code so that if we are doing experimentation via Finch for a
+  // regional provider, the experiment groups will be less likely to include
+  // users from other regions unnecessarily (since a client will be included in
+  // the experiment if the provider feature flag is checked).
+  return secure_dns::SelectEnabledProviders(secure_dns::ProvidersForCountry(
+      net::DohProviderEntry::GetList(), country_codes::GetCurrentCountryID()));
 }
 
 }  // namespace settings

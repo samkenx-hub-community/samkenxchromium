@@ -146,6 +146,7 @@ GLenum glClientWaitSyncFn(GLsync sync,
 GLenum glClientWaitSyncAPPLEFn(GLsync sync,
                                GLbitfield flags,
                                GLuint64 timeout) override;
+void glClipControlEXTFn(GLenum origin, GLenum depth) override;
 void glColorMaskFn(GLboolean red,
                    GLboolean green,
                    GLboolean blue,
@@ -432,6 +433,8 @@ void glFramebufferPixelLocalClearValueivANGLEFn(GLint plane,
                                                 const GLint* value) override;
 void glFramebufferPixelLocalClearValueuivANGLEFn(GLint plane,
                                                  const GLuint* value) override;
+void glFramebufferPixelLocalStorageInterruptANGLEFn() override;
+void glFramebufferPixelLocalStorageRestoreANGLEFn() override;
 void glFramebufferRenderbufferEXTFn(GLenum target,
                                     GLenum attachment,
                                     GLenum renderbuffertarget,
@@ -1054,7 +1057,11 @@ void glPixelLocalStorageBarrierANGLEFn() override;
 void glPixelStoreiFn(GLenum pname, GLint param) override;
 void glPointParameteriFn(GLenum pname, GLint param) override;
 void glPolygonModeFn(GLenum face, GLenum mode) override;
+void glPolygonModeANGLEFn(GLenum face, GLenum mode) override;
 void glPolygonOffsetFn(GLfloat factor, GLfloat units) override;
+void glPolygonOffsetClampEXTFn(GLfloat factor,
+                               GLfloat units,
+                               GLfloat clamp) override;
 void glPopDebugGroupFn() override;
 void glPopGroupMarkerEXTFn(void) override;
 void glPrimitiveRestartIndexFn(GLuint index) override;

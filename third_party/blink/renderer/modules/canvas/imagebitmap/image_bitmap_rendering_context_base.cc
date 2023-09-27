@@ -52,7 +52,7 @@ void ImageBitmapRenderingContextBase::ResetInternalBitmapToBlackTransparent(
   SkBitmap black_bitmap;
   if (black_bitmap.tryAllocN32Pixels(width, height)) {
     black_bitmap.eraseARGB(0, 0, 0, 0);
-    auto image = SkImage::MakeFromBitmap(black_bitmap);
+    auto image = SkImages::RasterFromBitmap(black_bitmap);
     if (image) {
       image_layer_bridge_->SetImage(
           UnacceleratedStaticBitmapImage::Create(image));
@@ -77,7 +77,7 @@ void ImageBitmapRenderingContextBase::SetImage(ImageBitmap* image_bitmap) {
 }
 
 scoped_refptr<StaticBitmapImage> ImageBitmapRenderingContextBase::GetImage(
-    CanvasResourceProvider::FlushReason) {
+    FlushReason) {
   return image_layer_bridge_->GetImage();
 }
 
@@ -111,10 +111,6 @@ void ImageBitmapRenderingContextBase::Trace(Visitor* visitor) const {
   CanvasRenderingContext::Trace(visitor);
 }
 
-bool ImageBitmapRenderingContextBase::IsAccelerated() const {
-  return image_layer_bridge_->IsAccelerated();
-}
-
 bool ImageBitmapRenderingContextBase::CanCreateCanvas2dResourceProvider()
     const {
   DCHECK(Host());
@@ -139,7 +135,7 @@ bool ImageBitmapRenderingContextBase::PushFrame() {
       &paint_flags);
   scoped_refptr<CanvasResource> resource =
       Host()->ResourceProvider()->ProduceCanvasResource(
-          CanvasResourceProvider::FlushReason::kNon2DCanvas);
+          FlushReason::kNon2DCanvas);
   Host()->PushFrame(
       std::move(resource),
       SkIRect::MakeWH(image_layer_bridge_->GetImage()->Size().width(),
@@ -150,7 +146,7 @@ bool ImageBitmapRenderingContextBase::PushFrame() {
 bool ImageBitmapRenderingContextBase::IsOriginTopLeft() const {
   if (Host()->IsOffscreenCanvas())
     return false;
-  return IsAccelerated();
+  return Host()->IsAccelerated();
 }
 
 }  // namespace blink

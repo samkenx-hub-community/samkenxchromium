@@ -6,6 +6,7 @@
 
 #include "base/check_op.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 #include "base/process/process_metrics.h"
 #include "base/task/sequenced_task_runner.h"
@@ -51,6 +52,14 @@ class ResourcedClientImpl : public ResourcedClient {
                             weak_factory_.GetWeakPtr()),
         base::BindOnce(&ResourcedClientImpl::MemoryPressureConnected,
                        weak_factory_.GetWeakPtr()));
+    proxy_->ConnectToSignal(
+        resource_manager::kResourceManagerInterface,
+        resource_manager::kMemoryPressureArcContainer,
+        base::BindRepeating(
+            &ResourcedClientImpl::MemoryPressureArcContainerReceived,
+            weak_factory_.GetWeakPtr()),
+        base::BindOnce(&ResourcedClientImpl::MemoryPressureConnected,
+                       weak_factory_.GetWeakPtr()));
   }
 
   // ResourcedClient interface.
@@ -71,6 +80,10 @@ class ResourcedClientImpl : public ResourcedClient {
 
   void RemoveArcVmObserver(ArcVmObserver* observer) override;
 
+  void AddArcContainerObserver(ArcContainerObserver* observer) override;
+
+  void RemoveArcContainerObserver(ArcContainerObserver* observer) override;
+
  private:
   // D-Bus response handlers.
   void HandleSetGameModeWithTimeoutResponse(
@@ -90,9 +103,11 @@ class ResourcedClientImpl : public ResourcedClient {
 
   void MemoryPressureArcVmReceived(dbus::Signal* signal);
 
+  void MemoryPressureArcContainerReceived(dbus::Signal* signal);
+
   // Member variables.
 
-  dbus::ObjectProxy* proxy_ = nullptr;
+  raw_ptr<dbus::ObjectProxy, ExperimentalAsh> proxy_ = nullptr;
 
   // Caches the total memory for reclaim_target_kb sanity check. The default
   // value is 32 GiB in case reading total memory failed.
@@ -103,6 +118,9 @@ class ResourcedClientImpl : public ResourcedClient {
 
   // A list of observers listening for ARCVM memory pressure signals.
   base::ObserverList<ArcVmObserver> arcvm_observers_;
+
+  // A list of observers listening for ARC container memory pressure signals.
+  base::ObserverList<ArcContainerObserver> arc_container_observers_;
 
   base::WeakPtrFactory<ResourcedClientImpl> weak_factory_{this};
 };
@@ -193,6 +211,52 @@ void ResourcedClientImpl::MemoryPressureArcVmReceived(dbus::Signal* signal) {
   }
 
   for (auto& observer : arcvm_observers_) {
+    observer.OnMemoryPressure(pressure_level, reclaim_target_kb);
+  }
+}
+
+void ResourcedClientImpl::MemoryPressureArcContainerReceived(
+    dbus::Signal* signal) {
+  dbus::MessageReader signal_reader(signal);
+
+  uint8_t pressure_level_byte;
+  PressureLevelArcContainer pressure_level;
+  uint64_t reclaim_target_kb;
+
+  if (!signal_reader.PopByte(&pressure_level_byte) ||
+      !signal_reader.PopUint64(&reclaim_target_kb)) {
+    LOG(ERROR) << "Error reading signal from resourced: " << signal->ToString();
+    return;
+  }
+  switch (static_cast<resource_manager::PressureLevelArcContainer>(
+      pressure_level_byte)) {
+    case resource_manager::PressureLevelArcContainer::NONE:
+      pressure_level = PressureLevelArcContainer::kNone;
+      break;
+
+    case resource_manager::PressureLevelArcContainer::CACHED:
+      pressure_level = PressureLevelArcContainer::kCached;
+      break;
+
+    case resource_manager::PressureLevelArcContainer::PERCEPTIBLE:
+      pressure_level = PressureLevelArcContainer::kPerceptible;
+      break;
+
+    case resource_manager::PressureLevelArcContainer::FOREGROUND:
+      pressure_level = PressureLevelArcContainer::kForeground;
+      break;
+
+    default:
+      LOG(ERROR) << "Unknown memory pressure level: " << pressure_level_byte;
+      return;
+  }
+
+  if (reclaim_target_kb > total_memory_kb_) {
+    LOG(ERROR) << "reclaim_target_kb is too large: " << reclaim_target_kb;
+    return;
+  }
+
+  for (auto& observer : arc_container_observers_) {
     observer.OnMemoryPressure(pressure_level, reclaim_target_kb);
   }
 }
@@ -302,6 +366,16 @@ void ResourcedClientImpl::RemoveArcVmObserver(ArcVmObserver* observer) {
   arcvm_observers_.RemoveObserver(observer);
 }
 
+void ResourcedClientImpl::AddArcContainerObserver(
+    ArcContainerObserver* observer) {
+  arc_container_observers_.AddObserver(observer);
+}
+
+void ResourcedClientImpl::RemoveArcContainerObserver(
+    ArcContainerObserver* observer) {
+  arc_container_observers_.RemoveObserver(observer);
+}
+
 }  // namespace
 
 ResourcedClient::ResourcedClient() {
@@ -321,8 +395,8 @@ void ResourcedClient::Initialize(dbus::Bus* bus) {
 }
 
 // static
-void ResourcedClient::InitializeFake() {
-  new FakeResourcedClient();
+FakeResourcedClient* ResourcedClient::InitializeFake() {
+  return new FakeResourcedClient();
 }
 
 // static

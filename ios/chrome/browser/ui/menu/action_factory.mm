@@ -9,15 +9,11 @@
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/pasteboard_util.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface ActionFactory ()
 
@@ -163,9 +159,12 @@
 }
 
 - (UIAction*)actionToMoveFolderWithBlock:(ProceduralBlock)block {
+  // Use multi color to make sure the arrow is visible.
+  UIImage* image = MakeSymbolMulticolor(
+      CustomSymbolWithPointSize(kMoveFolderSymbol, kSymbolActionPointSize));
   return [self
       actionWithTitle:l10n_util::GetNSString(IDS_IOS_BOOKMARK_CONTEXT_MENU_MOVE)
-                image:[UIImage imageNamed:@"move_folder"]
+                image:image
                  type:MenuActionType::Move
                 block:block];
 }
@@ -234,16 +233,15 @@
                 block:block];
 }
 
-- (UIAction*)actionToCloseTabWithBlock:(ProceduralBlock)block {
-  UIImage* image =
-      DefaultSymbolWithPointSize(kXMarkSymbol, kSymbolActionPointSize);
-  UIAction* action = [self
-      actionWithTitle:l10n_util::GetNSString(IDS_IOS_CONTENT_CONTEXT_CLOSETAB)
-                image:image
-                 type:MenuActionType::CloseTab
-                block:block];
-  action.attributes = UIMenuElementAttributesDestructive;
-  return action;
+- (UIAction*)actionToCloseRegularTabWithBlock:(ProceduralBlock)block {
+  NSString* title = l10n_util::GetNSString(IDS_IOS_CONTENT_CONTEXT_CLOSETAB);
+  return [self actionToCloseTabWithTitle:title block:block];
+}
+
+- (UIAction*)actionToClosePinnedTabWithBlock:(ProceduralBlock)block {
+  NSString* title =
+      l10n_util::GetNSString(IDS_IOS_CONTENT_CONTEXT_CLOSEPINNEDTAB);
+  return [self actionToCloseTabWithTitle:title block:block];
 }
 
 - (UIAction*)actionSaveImageWithBlock:(ProceduralBlock)block {
@@ -326,6 +324,21 @@
       block();
     }
   };
+}
+
+#pragma mark - Private
+
+// Creates a UIAction instance for closing a tab with a provided `title`.
+- (UIAction*)actionToCloseTabWithTitle:(NSString*)title
+                                 block:(ProceduralBlock)block {
+  UIImage* image =
+      DefaultSymbolWithPointSize(kXMarkSymbol, kSymbolActionPointSize);
+  UIAction* action = [self actionWithTitle:title
+                                     image:image
+                                      type:MenuActionType::CloseTab
+                                     block:block];
+  action.attributes = UIMenuElementAttributesDestructive;
+  return action;
 }
 
 @end

@@ -19,7 +19,6 @@
 #include "base/test/test_simple_task_runner.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
-#include "chrome/browser/extensions/extension_function_test_utils.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/test_extension_system.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
@@ -293,7 +292,7 @@ class BackgroundModeManagerWithExtensionsTest : public testing::Test {
 
   std::unique_ptr<TestingProfileManager> profile_manager_;
   // Test profile used by all tests - this is owned by profile_manager_.
-  raw_ptr<TestingProfile> profile_;
+  raw_ptr<TestingProfile, DanglingUntriaged> profile_;
 
  private:
   // Required for extension service.

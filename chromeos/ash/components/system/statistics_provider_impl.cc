@@ -13,6 +13,7 @@
 #include "ash/constants/ash_switches.h"
 #include "base/check.h"
 #include "base/command_line.h"
+#include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/json/json_file_value_serializer.h"
 #include "base/logging.h"
@@ -59,6 +60,9 @@ const char kHardwareClassCrosSystemKey[] = "hwid";
 const char kHardwareClassValueUnknown[] = "unknown";
 
 const char kIsVmCrosSystemKey[] = "inside_vm";
+
+// ChromeOS should allow debug features.
+const char kIsCrosDebugCrosSystemKey[] = "cros_debug";
 
 // Items in region dictionary.
 const char kKeyboardsPath[] = "keyboards";
@@ -361,6 +365,13 @@ bool StatisticsProviderImpl::IsRunningOnVm() {
   return GetMachineStatistic(kIsVmKey) == kIsVmValueTrue;
 }
 
+bool StatisticsProviderImpl::IsCrosDebugMode() {
+  if (!base::SysInfo::IsRunningOnChromeOS()) {
+    return false;
+  }
+  return GetMachineStatistic(kIsCrosDebugKey) == kIsCrosDebugValueTrue;
+}
+
 StatisticsProvider::VpdStatus StatisticsProviderImpl::GetVpdStatus() const {
   return vpd_status_;
 }
@@ -449,11 +460,19 @@ void StatisticsProviderImpl::LoadMachineStatistics(bool load_oem_manifest) {
       machine_info_[kIsVmKey] = kIsVmValueTrue;
     }
 
+    // By default, assume that this is *not* in debug mode. If crossystem is not
+    // present, report that we are not in debug mode.
+    machine_info_[kIsCrosDebugKey] = kIsCrosDebugValueFalse;
+    const auto is_debug_iter = machine_info_.find(kIsCrosDebugCrosSystemKey);
+    if (is_debug_iter != machine_info_.end() &&
+        is_debug_iter->second == kIsCrosDebugValueTrue) {
+      machine_info_[kIsCrosDebugKey] = kIsCrosDebugValueTrue;
+    }
+
     // Use the write-protect value from crossystem only if it hasn't been loaded
     // from any other source, since the result of crossystem is less reliable
     // for this key.
-    if (machine_info_.find(kFirmwareWriteProtectCurrentKey) ==
-            machine_info_.end() &&
+    if (!base::Contains(machine_info_, kFirmwareWriteProtectCurrentKey) &&
         !crossystem_wpsw.empty()) {
       LOG(WARNING) << "wpsw_cur missing from machine_info, using value: "
                    << crossystem_wpsw;
@@ -481,10 +500,10 @@ void StatisticsProviderImpl::LoadMachineStatistics(bool load_oem_manifest) {
     VLOG(1) << "CrOS region set to '" << region << "'";
   }
 
+  const auto it = machine_info_.find(kRegionKey);
+
   LoadRegionsFile(sources_.cros_regions_filepath,
-                  machine_info_.find(kRegionKey) != machine_info_.end()
-                      ? machine_info_[kRegionKey]
-                      : "");
+                  it != machine_info_.end() ? it->second : "");
 
   SignalStatisticsLoaded();
 }
@@ -633,11 +652,13 @@ void StatisticsProviderImpl::LoadRegionsFile(const base::FilePath& filename,
 
 absl::optional<base::StringPiece>
 StatisticsProviderImpl::GetRegionalInformation(base::StringPiece name) const {
-  if (machine_info_.find(kRegionKey) == machine_info_.end())
+  if (!base::Contains(machine_info_, kRegionKey)) {
     return absl::nullopt;
+  }
 
-  if (const auto iter = region_info_.find(name); iter != region_info_.end())
+  if (const auto iter = region_info_.find(name); iter != region_info_.end()) {
     return base::StringPiece(iter->second);
+  }
 
   return absl::nullopt;
 }

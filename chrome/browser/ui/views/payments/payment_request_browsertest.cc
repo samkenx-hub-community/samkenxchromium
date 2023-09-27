@@ -73,21 +73,21 @@ IN_PROC_BROWSER_TEST_F(PaymentRequestNoShippingTest, OpenAndNavigateTo404) {
   OpenPaymentRequestDialog();
   ResetEventWaiter(DialogEvent::DIALOG_CLOSED);
   NavigateTo("/non-existent.html");
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 }
 
 IN_PROC_BROWSER_TEST_F(PaymentRequestNoShippingTest, OpenAndNavigateToSame) {
   OpenPaymentRequestDialog();
   ResetEventWaiter(DialogEvent::DIALOG_CLOSED);
   NavigateTo("/payment_request_no_shipping_test.html");
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 }
 
 IN_PROC_BROWSER_TEST_F(PaymentRequestNoShippingTest, OpenAndReload) {
   OpenPaymentRequestDialog();
   ResetEventWaiter(DialogEvent::DIALOG_CLOSED);
   chrome::Reload(browser(), WindowOpenDisposition::CURRENT_TAB);
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 }
 
 IN_PROC_BROWSER_TEST_F(PaymentRequestNoShippingTest, OpenAndClickCancel) {
@@ -106,7 +106,14 @@ IN_PROC_BROWSER_TEST_F(PaymentRequestNoShippingTest,
                            /*wait_for_animation=*/false);
 }
 
-IN_PROC_BROWSER_TEST_F(PaymentRequestNoShippingTest, InactiveBrowserWindow) {
+// TODO(crbug.com/1468503): Re-enable this test on Mac, Linux and Lacros
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
+#define MAYBE_InactiveBrowserWindow DISABLED_InactiveBrowserWindow
+#else
+#define MAYBE_InactiveBrowserWindow InactiveBrowserWindow
+#endif
+IN_PROC_BROWSER_TEST_F(PaymentRequestNoShippingTest,
+                       MAYBE_InactiveBrowserWindow) {
   std::string a_method_name;
   InstallPaymentApp("a.com", "/payment_request_success_responder.js",
                     &a_method_name);
@@ -169,9 +176,9 @@ IN_PROC_BROWSER_TEST_F(PaymentRequestAbortTest, OpenThenAbort) {
   content::WebContents* web_contents = GetActiveWebContents();
   const std::string click_buy_button_js =
       "(function() { document.getElementById('abort').click(); })();";
-  ASSERT_TRUE(content::ExecuteScript(web_contents, click_buy_button_js));
+  ASSERT_TRUE(content::ExecJs(web_contents, click_buy_button_js));
 
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 
   ExpectBodyContains({"Aborted"});
 

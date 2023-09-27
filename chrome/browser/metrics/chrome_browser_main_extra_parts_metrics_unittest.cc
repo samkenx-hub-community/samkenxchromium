@@ -26,6 +26,10 @@
 #include "chromeos/dbus/u2f/u2f_client.h"  // nogncheck
 #endif
 
+#if BUILDFLAG(IS_WIN)
+#include "base/test/test_reg_util_win.h"
+#endif  // BUILDFLAG(IS_WIN)
+
 namespace {
 
 const char kTouchEventFeatureDetectionEnabledHistogramName[] =
@@ -72,6 +76,9 @@ class ChromeBrowserMainExtraPartsMetricsTest : public testing::Test {
     // which would ordinarily have been set up by browser DBus initialization.
     chromeos::U2FClient::InitializeFake();
 #endif
+#if BUILDFLAG(IS_WIN)
+    registry_override_.OverrideRegistry(HKEY_CURRENT_USER);
+#endif  // BUILDFLAG(IS_WIN)
   }
 
   void TearDown() override {
@@ -86,6 +93,12 @@ class ChromeBrowserMainExtraPartsMetricsTest : public testing::Test {
 #endif
 
  private:
+#if BUILDFLAG(IS_WIN)
+  // This is used to ensure that any registry changes by this test don't affect
+  // the registry on the machine running the test, and are cleaned up.
+  registry_util::RegistryOverrideManager registry_override_;
+#endif  // BUILDFLAG(IS_WIN)
+
   // Provides a message loop and allows the use of the task scheduler
   content::BrowserTaskEnvironment task_environment_;
 
@@ -295,3 +308,29 @@ TEST_F(ChromeBrowserMainExtraPartsMetricsTest,
   EXPECT_FALSE(pref_service.HasPrefPath(kEnableBenchmarkingPrefId));
   EXPECT_EQ(0u, storage.GetFlags().size());
 }
+
+#if BUILDFLAG(IS_ANDROID)
+TEST_F(ChromeBrowserMainExtraPartsMetricsTest,
+       IsBundleForMixedDeviceAccordingToVersionCode) {
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505130"));
+  EXPECT_TRUE(IsBundleForMixedDeviceAccordingToVersionCode("584505131"));
+  EXPECT_TRUE(IsBundleForMixedDeviceAccordingToVersionCode("584505132"));
+  EXPECT_TRUE(IsBundleForMixedDeviceAccordingToVersionCode("584505133"));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505134"));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505135"));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505136"));
+  EXPECT_TRUE(IsBundleForMixedDeviceAccordingToVersionCode("584505137"));
+  EXPECT_TRUE(IsBundleForMixedDeviceAccordingToVersionCode("584505138"));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505139"));
+
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505121"));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505122"));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505123"));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505101"));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("584505141"));
+
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode(""));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("0"));
+  EXPECT_FALSE(IsBundleForMixedDeviceAccordingToVersionCode("5845-051-3-1"));
+}
+#endif  // BUILDFLAG(IS_ANDROID)

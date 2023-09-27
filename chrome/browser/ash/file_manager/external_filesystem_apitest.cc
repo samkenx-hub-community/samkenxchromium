@@ -9,6 +9,7 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/path_service.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
@@ -54,9 +55,6 @@
 // The tests cover following external file system types:
 // - local (kFileSystemTypeLocalNative): a local file system on which files are
 //   accessed using native local path.
-// - restricted (kFileSystemTypeRestrictedLocalNative): a *read-only* local file
-//   system which can only be accessed by extensions that have full access to
-//   external file systems (i.e. extensions with fileManagerPrivate permission).
 //
 // The tests cover following scenarios:
 // - Performing file system operations on external file systems from an
@@ -80,7 +78,6 @@ namespace {
 // but the test will have to make sure the mount point is added before
 // starting a test extension using WaitUntilDriveMountPointIsAdded().
 constexpr char kLocalMountPointName[] = "local";
-constexpr char kRestrictedMountPointName[] = "restricted";
 
 // Default file content for the test files.
 constexpr char kTestFileContent[] = "This is some test content.";
@@ -124,7 +121,7 @@ class JSTestStarter : public content::TestNavigationObserver {
           self.testNameToRun = '$1';
         }
     )";
-    ASSERT_TRUE(content::ExecuteScript(
+    ASSERT_TRUE(content::ExecJs(
         navigation_handle->GetRenderFrameHost(),
         base::ReplaceStringPlaceholders(kScript, {test_name_}, nullptr)));
 
@@ -139,9 +136,10 @@ bool TouchFile(const base::FilePath& path,
                base::StringPiece mtime_string,
                base::StringPiece atime_string) {
   base::Time mtime, atime;
-  auto result = base::Time::FromString(mtime_string.data(), &mtime) &&
-                base::Time::FromString(atime_string.data(), &atime) &&
-                base::TouchFile(path, atime, mtime);
+  auto result =
+      base::Time::FromString(std::string(mtime_string).c_str(), &mtime) &&
+      base::Time::FromString(std::string(atime_string).c_str(), &atime) &&
+      base::TouchFile(path, atime, mtime);
   return result;
 }
 
@@ -172,43 +170,50 @@ constexpr const TestDirConfig kDefaultDirConfig[] = {
      ""},
 };
 
-// Sets up the initial file system state for native local and restricted native
-// local file systems. The hierarchy is the same as for the drive file system.
+// Sets up the initial file system state for native local file systems. The
+// hierarchy is the same as for the drive file system.
 // The directory is created at unique_temp_dir/|mount_point_name| path.
 bool InitializeLocalFileSystem(std::string mount_point_name,
                                base::ScopedTempDir* tmp_dir,
                                base::FilePath* mount_point_dir,
                                const std::vector<TestDirConfig>& dir_contents) {
-  if (!tmp_dir->CreateUniqueTempDir())
+  if (!tmp_dir->CreateUniqueTempDir()) {
     return false;
+  }
 
   *mount_point_dir = tmp_dir->GetPath().AppendASCII(mount_point_name);
   // Create the mount point.
-  if (!base::CreateDirectory(*mount_point_dir))
+  if (!base::CreateDirectory(*mount_point_dir)) {
     return false;
+  }
 
   constexpr TestDirConfig kTestDir = {"2012-01-02T00:00:00.000Z",
                                       "2012-01-02T00:00:01.000Z", "test_dir",
                                       nullptr};
 
   const base::FilePath test_dir = mount_point_dir->AppendASCII(kTestDir.name);
-  if (!base::CreateDirectory(test_dir))
+  if (!base::CreateDirectory(test_dir)) {
     return false;
+  }
 
   for (const auto& file : dir_contents) {
     const base::FilePath test_path = test_dir.AppendASCII(file.name);
     if (file.contents) {
-      if (!google_apis::test_util::WriteStringToFile(test_path, file.contents))
+      if (!google_apis::test_util::WriteStringToFile(test_path,
+                                                     file.contents)) {
         return false;
+      }
     } else {
-      if (!base::CreateDirectory(test_path))
+      if (!base::CreateDirectory(test_path)) {
         return false;
+      }
     }
   }
 
   for (const auto& file : dir_contents) {
-    if (!TouchFile(test_dir.Append(file.name), file.mtime, file.atime))
+    if (!TouchFile(test_dir.Append(file.name), file.mtime, file.atime)) {
       return false;
+    }
   }
 
   // Touch the directory holding all the contents last.
@@ -379,36 +384,6 @@ class LocalFileSystemExtensionApiTest : public FileSystemExtensionApiTestBase {
   base::FilePath mount_point_dir_;
 };
 
-// Tests for restricted native local file systems.
-class RestrictedFileSystemExtensionApiTest
-    : public FileSystemExtensionApiTestBase {
- public:
-  RestrictedFileSystemExtensionApiTest() = default;
-  ~RestrictedFileSystemExtensionApiTest() override = default;
-
-  // FileSystemExtensionApiTestBase override.
-  void InitTestFileSystem() override {
-    ASSERT_TRUE(InitializeLocalFileSystem(kRestrictedMountPointName, &tmp_dir_,
-                                          &mount_point_dir_,
-                                          GetTestDirContents()))
-        << "Failed to initialize file system.";
-  }
-
-  // FileSystemExtensionApiTestBase override.
-  void AddTestMountPoint() override {
-    EXPECT_TRUE(profile()->GetMountPoints()->RegisterFileSystem(
-        kRestrictedMountPointName, storage::kFileSystemTypeRestrictedLocal,
-        storage::FileSystemMountOption(), mount_point_dir_));
-    VolumeManager::Get(profile())->AddVolumeForTesting(
-        mount_point_dir_, VOLUME_TYPE_TESTING, ash::DeviceType::kUnknown,
-        true /* read_only */);
-  }
-
- private:
-  base::ScopedTempDir tmp_dir_;
-  base::FilePath mount_point_dir_;
-};
-
 // Tests for a drive file system.
 class DriveFileSystemExtensionApiTest : public FileSystemExtensionApiTestBase {
  public:
@@ -566,7 +541,8 @@ class MultiProfileDriveFileSystemExtensionApiTest
       create_drive_integration_service_;
   std::unique_ptr<DriveIntegrationServiceFactory::ScopedFactoryForTest>
       service_factory_for_test_;
-  Profile* second_profile_ = nullptr;
+  raw_ptr<Profile, DanglingUntriaged | ExperimentalAsh> second_profile_ =
+      nullptr;
   std::unordered_map<Profile*, std::unique_ptr<drive::FakeDriveFsHelper>>
       fake_drivefs_helpers_;
 };
@@ -741,17 +717,6 @@ IN_PROC_BROWSER_TEST_F(LocalFileSystemExtensionApiTest, DefaultFileHandler) {
 }
 
 //
-// RestrictedFileSystemExtensionApiTests.
-//
-IN_PROC_BROWSER_TEST_F(RestrictedFileSystemExtensionApiTest,
-                       FileSystemOperations) {
-  EXPECT_TRUE(RunFileSystemExtensionApiTest(
-      "file_browser/filesystem_operations_test",
-      FILE_PATH_LITERAL("manifest.json"), "", FLAGS_NONE))
-      << message_;
-}
-
-//
 // DriveFileSystemExtensionApiTests.
 //
 // This test is flaky. See https://crbug.com/1008880.
@@ -794,8 +759,10 @@ IN_PROC_BROWSER_TEST_F(DriveFileSystemExtensionApiTest, AppFileHandler) {
 }
 
 IN_PROC_BROWSER_TEST_F(DriveFileSystemExtensionApiTest, RetainEntry) {
-  ui::SelectFileDialog::SetFactory(new content::FakeSelectFileDialogFactory(
-      {drivefs_root_.GetPath().Append("drive-user/root/test_dir")}));
+  ui::SelectFileDialog::SetFactory(
+      std::make_unique<content::FakeSelectFileDialogFactory>(
+          std::vector<base::FilePath>{
+              drivefs_root_.GetPath().Append("drive-user/root/test_dir")}));
   EXPECT_TRUE(RunFileSystemExtensionApiTest("file_browser/retain_entry",
                                             FILE_PATH_LITERAL("manifest.json"),
                                             "", FLAGS_NONE))

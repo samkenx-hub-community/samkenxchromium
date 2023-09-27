@@ -7,6 +7,8 @@
 #include <memory>
 #include <utility>
 
+#include "ash/constants/ash_features.h"
+#include "ash/webui/common/trusted_types_util.h"
 #include "ash/webui/grit/ash_os_feedback_resources.h"
 #include "ash/webui/grit/ash_os_feedback_resources_map.h"
 #include "ash/webui/os_feedback_ui/backend/feedback_service_provider.h"
@@ -21,6 +23,8 @@
 #include "content/public/common/url_constants.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "ui/resources/grit/webui_resources.h"
+#include "ui/web_dialogs/web_dialog_ui.h"
+#include "ui/webui/color_change_listener/color_change_handler.h"
 #include "ui/webui/mojo_web_ui_controller.h"
 #include "ui/webui/webui_allowlist.h"
 
@@ -37,6 +41,8 @@ void SetUpWebUIDataSource(content::WebUIDataSource* source,
   source->AddResourcePath("test_loader.js", IDR_WEBUI_JS_TEST_LOADER_JS);
   source->AddResourcePath("test_loader_util.js",
                           IDR_WEBUI_JS_TEST_LOADER_UTIL_JS);
+  source->AddBoolean("isJellyEnabledForOsFeedback",
+                     ash::features::IsJellyEnabledForOsFeedback());
 }
 
 void AddLocalizedStrings(content::WebUIDataSource* source) {
@@ -51,6 +57,7 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
       {"feedbackHelpLinkLabel", IDS_FEEDBACK_TOOL_FEEDBACK_HELP_LINK_LABEL},
       {"pageTitle", IDS_FEEDBACK_TOOL_PAGE_TITLE},
       {"privacyNote", IDS_FEEDBACK_TOOL_PRIVACY_NOTE},
+      {"mayBeShareWithPartnerNote", IDS_FEEDBACK_TOOL_MAY_BE_SHARED_NOTE},
       {"sendButtonLabel", IDS_FEEDBACK_TOOL_SEND_BUTTON_LABEL},
       // The help content strings are needed for browser tests.
       {"suggestedHelpContent", IDS_FEEDBACK_TOOL_SUGGESTED_HELP_CONTENT},
@@ -109,6 +116,10 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
       {"fileTooBigErrorMessage", IDS_FEEDBACK_TOOL_FILE_TOO_BIG_ERROR_MESSAGE},
       {"bluetoothLogsInfo", IDS_FEEDBACK_TOOL_BLUETOOTH_LOGS_CHECKBOX},
       {"bluetoothLogsMessage", IDS_FEEDBACK_TOOL_BLUETOOTH_LOGS_MESSAGE},
+      {"linkCrossDeviceDogfoodFeedbackInfo",
+       IDS_FEEDBACK_TOOL_LINK_CROSS_DEVICE_DOGFOOD_FEEDBACK_INFO},
+      {"linkCrossDeviceDogfoodFeedbackMessage",
+       IDS_FEEDBACK_TOOL_LINK_CROSS_DEVICE_DOGFOOD_FEEDBACK_MESSAGE},
       {"includeAssistantLogsCheckboxLabel",
        IDS_FEEDBACK_TOOL_ASSISTANT_LOGS_CHECKBOX},
       {"assistantLogsMessage", IDS_FEEDBACK_TOOL_ASSISTANT_LOGS_MESSAGE},
@@ -118,6 +129,9 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
 
   source->AddLocalizedStrings(kLocalizedStrings);
   source->UseStringsJs();
+
+  source->AddBoolean("enableLinkCrossDeviceDogfoodFeedbackFlag",
+                     features::IsLinkCrossDeviceDogfoodFeedbackEnabled());
 }
 
 }  // namespace
@@ -125,7 +139,7 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
 OSFeedbackUI::OSFeedbackUI(
     content::WebUI* web_ui,
     std::unique_ptr<OsFeedbackDelegate> feedback_delegate)
-    : MojoWebUIController(web_ui) {
+    : ui::MojoWebDialogUI(web_ui) {
   auto* browser_context = web_ui->GetWebContents()->GetBrowserContext();
   content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
       browser_context, kChromeUIOSFeedbackHost);
@@ -142,7 +156,7 @@ OSFeedbackUI::OSFeedbackUI(
       network::mojom::CSPDirectiveName::ScriptSrc,
       "script-src chrome://resources chrome://test chrome://webui-test "
       "'self';");
-  source->DisableTrustedTypesCSP();
+  ash::EnableTrustedTypesCSP(source);
 
   const auto resources =
       base::make_span(kAshOsFeedbackResources, kAshOsFeedbackResourcesSize);
@@ -177,6 +191,13 @@ void OSFeedbackUI::BindInterface(
     mojo::PendingReceiver<os_feedback_ui::mojom::HelpContentProvider>
         receiver) {
   help_content_provider_->BindInterface(std::move(receiver));
+}
+
+void OSFeedbackUI::BindInterface(
+    mojo::PendingReceiver<color_change_listener::mojom::PageHandler> receiver) {
+  CHECK(ash::features::IsJellyEnabledForOsFeedback());
+  color_provider_handler_ = std::make_unique<ui::ColorChangeHandler>(
+      web_ui()->GetWebContents(), std::move(receiver));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(OSFeedbackUI)

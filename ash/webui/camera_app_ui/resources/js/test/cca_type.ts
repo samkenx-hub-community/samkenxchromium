@@ -25,7 +25,7 @@ export const SELECTOR_MAP = {
   documentBackButton: '#back-to-review-document',
   documentCancelButton:
       '.document-preview-mode button[i18n-text=cancel_review_button]',
-  documentCornerOverlay: '#preview-document-corner-overlay',
+  documentCorner: '#preview-document-corner-overlay .corner',
   documentDoneFixButton: `.document-fix-mode ` +
       `button[i18n-text=label_crop_done]`,
   documentFixButton:
@@ -34,28 +34,32 @@ export const SELECTOR_MAP = {
   documentFixModeImage: '.document-fix-mode .image',
   documentPreviewModeImage: '.document-preview-mode .image',
   documentReview: '#view-document-review',
-  documentSaveAsPhotoButton:
-      '.document-preview-mode button[i18n-text=label_save_photo_document]',
   documentSaveAsPdfButton:
       '.document-preview-mode button[i18n-text=label_save_pdf_document]',
+  documentSaveAsPhotoButton:
+      '.document-preview-mode button[i18n-text=label_save_photo_document]',
   expertCustomVideoParametersOption: '#custom-video-parameters',
   expertModeButton: '#settings-expert',
   expertModeOption: '#expert-enable-expert-mode',
   expertMultiStreamRecordingOption: '#expert-enable-multistream-recording',
+  expertMultiStreamRecordingChromeOption:
+      '#expert-enable-multistream-recording-chrome',
   expertSaveMetadataOption: '#expert-save-metadata',
   expertShowMetadataOption: '#expert-show-metadata',
   feedbackButton: '#settings-feedback',
+  fps60Buttons: `.fps-60:not(.invisible)`,
   frontAspectRatioOptions:
       '#view-photo-aspect-ratio-settings .menu-item>input[data-facing="user"]',
   frontPhotoResolutionOptions:
       '#view-photo-resolution-settings .menu-item>input[data-facing="user"]',
   frontVideoResolutionOptions:
       '#view-video-resolution-settings .menu-item>input[data-facing="user"]',
+  galleryButton: '#gallery-enter',
   galleryButtonCover: '#gallery-enter>img',
-  galleryEnter: '#gallery-enter',
   gifRecordingOption: 'input[type=radio][data-state=record-type-gif]',
   gifReviewRetakeButton: '#review-retake',
   gifReviewSaveButton: '#view-review button[i18n-text=label_save]',
+  gridOptionGoldenRatio: 'span[i18n-aria=label_grid_golden]',
   helpButton: '#settings-help',
   lowStorageDialog: '#view-low-storage-dialog',
   lowStorageDialogManageButton:
@@ -63,28 +67,38 @@ export const SELECTOR_MAP = {
   lowStorageDialogOKButton:
       '#view-low-storage-dialog button.dialog-positive-button',
   lowStorageWarning: '#nudge',
+  mirrorOptionOff: 'span[i18n-aria=aria_mirror_off]',
+  mirrorOptionOn: 'span[i18n-aria=aria_mirror_on]',
   modeSelector: '#modes-group',
   openGridPanelButton: '#open-grid-panel',
   openMirrorPanelButton: '#open-mirror-panel',
   openPTZPanelButton: '#open-ptz-panel',
   openTimerPanelButton: '#open-timer-panel',
-  optionsContainer: '#options-container',
   panLeftButton: '#pan-left',
   panRightButton: '#pan-right',
   photoAspectRatioSettingButton: '#settings-photo-aspect-ratio',
   photoResolutionSettingButton: '#settings-photo-resolution',
+  // TODO(kamchonlathorn): Remove this once its usage in Tast is removed.
+  previewExposureTime: '#preview-exposure-time',
+  previewResolution: '#preview-resolution',
   previewVideo: '#preview-video',
   previewViewport: '#preview-viewport',
   ptzResetAllButton: '#ptz-reset-all',
   reviewView: '#view-review',
   scanBarcodeOption: '#scan-barcode',
   scanDocumentModeOption: '#scan-document',
-  scanModeButton: '.mode-item>input[data-mode="scan"]',
   settingsButton: '#open-settings',
+  settingsButtonContainer: 'div:has(> #open-settings)',
+  settingsHeader: '#settings-header',
   shutter: '.shutter',
   switchDeviceButton: '#switch-device',
   tiltDownButton: '#tilt-down',
   tiltUpButton: '#tilt-up',
+  timeLapseRecordingOption:
+      'input[type=radio][data-state=record-type-time-lapse]',
+  timerOption10Seconds: 'span[i18n-aria=aria_timer_10s]',
+  timerOption3Seconds: 'span[i18n-aria=aria_timer_3s]',
+  timerOptionOff: 'span[i18n-aria=aria_timer_off]',
   videoPauseResumeButton: '#pause-recordvideo',
   videoProfileSelect: '#video-profile',
   videoResolutionSettingButton: '#settings-video-resolution',
@@ -106,6 +120,10 @@ export const SETTING_OPTION_MAP = {
   multiStreamRecordingOption: {
     component: 'expertMultiStreamRecordingOption',
     state: ExpertOption.ENABLE_MULTISTREAM_RECORDING,
+  },
+  multiStreamRecordingChromeOption: {
+    component: 'expertMultiStreamRecordingChromeOption',
+    state: ExpertOption.ENABLE_MULTISTREAM_RECORDING_CHROME,
   },
   saveMetadataOption: {
     component: 'expertSaveMetadataOption',

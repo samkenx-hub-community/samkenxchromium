@@ -104,8 +104,18 @@ public interface BottomSheetContent {
     };
 
     /**
-     * @return Whether this content owns its lifecycle. If false, the content will be hidden
-     *         when the user navigates away from the page or switches tab.
+     * @return Whether this content owns its lifecycle. If false, the content will be dismissed
+     *         when the user navigates away from the page, switches tabs, or a layout change
+     *         occurs.
+     *
+     * If a BottomSheetContent ever needs to suppress across a layout state change rather than
+     * being dismissed this can be addressed by:
+     * * Registering a LayoutStateObserver to re-request to be shown when the correct LayoutType
+     *   finishes showing.
+     * * For LayoutType.BROWSING also registering a TabModelSelectorObserver to dismiss if
+     *   a tab switch occurs.
+     * * The client is responsible for restoring any previous state of the BottomSheetContent
+     *   and the View's it hosts.
      */
     default boolean hasCustomLifecycle() {
         return false;
@@ -154,7 +164,7 @@ public interface BottomSheetContent {
     }
 
     /**
-     * @return Whether the sheet should be hidden when it is in the PEEK state and the user
+     * @return Whether the sheet should be hidden when it is in the PEEK/HALF state and the user
      *         scrolls down the page.
      */
     default boolean hideOnScroll() {

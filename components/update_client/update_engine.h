@@ -16,7 +16,6 @@
 #include "base/memory/ref_counted.h"
 #include "base/sequence_checker.h"
 #include "base/time/time.h"
-#include "components/update_client/buildflags.h"
 #include "components/update_client/component.h"
 #include "components/update_client/crx_cache.h"
 #include "components/update_client/crx_downloader.h"
@@ -25,10 +24,6 @@
 #include "components/update_client/update_checker.h"
 #include "components/update_client/update_client.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-
-namespace base {
-class TimeTicks;
-}  // namespace base
 
 namespace update_client {
 
@@ -80,9 +75,12 @@ class UpdateEngine : public base::RefCountedThreadSafe<UpdateEngine> {
       UpdateClient::CrxStateChangeCallback crx_state_change_callback,
       Callback update_callback);
 
-  void SendUninstallPing(const CrxComponent& crx_component,
-                         int reason,
-                         Callback update_callback);
+  void SendPing(const CrxComponent& crx_component,
+                int type,
+                int result_code,
+                int error_code,
+                int extra_code1,
+                Callback update_callback);
 
  private:
   friend class base::RefCountedThreadSafe<UpdateEngine>;
@@ -91,7 +89,7 @@ class UpdateEngine : public base::RefCountedThreadSafe<UpdateEngine> {
   // Maps a session id to an update context.
   using UpdateContexts = std::map<std::string, scoped_refptr<UpdateContext>>;
 
-  absl::optional<base::RepeatingClosure> InvokeOperation(
+  base::RepeatingClosure InvokeOperation(
       bool is_foreground,
       bool is_update_check_only,
       bool is_install,
@@ -126,27 +124,14 @@ class UpdateEngine : public base::RefCountedThreadSafe<UpdateEngine> {
   // Called when CRX state changes occur.
   const NotifyObserversCallback notify_observers_callback_;
 
-#if BUILDFLAG(ENABLE_PUFFIN_PATCHES)
-  // TODO(crbug.com/1349060) once Puffin patches are fully implemented,
-  // we should remove this #if.
   absl::optional<scoped_refptr<CrxCache>> crx_cache_;
-#endif
 
   // Contains the contexts associated with each update in progress.
   UpdateContexts update_contexts_;
-
-  // Implements a rate limiting mechanism for background update checks. Has the
-  // effect of rejecting the update call if the update call occurs before
-  // a certain time, which is negotiated with the server as part of the
-  // update protocol. See the comments for X-Retry-After header.
-  base::TimeTicks throttle_updates_until_;
 };
 
 // Describes a group of components which are installed or updated together.
 struct UpdateContext : public base::RefCountedThreadSafe<UpdateContext> {
-#if BUILDFLAG(ENABLE_PUFFIN_PATCHES)
-  // TODO(crbug.com/1349060) once Puffin patches are fully implemented,
-  // we should remove this #if.
   UpdateContext(
       scoped_refptr<Configurator> config,
       absl::optional<scoped_refptr<CrxCache>> crx_cache,
@@ -158,28 +143,12 @@ struct UpdateContext : public base::RefCountedThreadSafe<UpdateContext> {
       UpdateEngine::Callback callback,
       PersistedData* persisted_data,
       bool is_update_check_only);
-#else
-  UpdateContext(
-      scoped_refptr<Configurator> config,
-      bool is_foreground,
-      bool is_install,
-      const std::vector<std::string>& ids,
-      UpdateClient::CrxStateChangeCallback crx_state_change_callback,
-      const UpdateEngine::NotifyObserversCallback& notify_observers_callback,
-      UpdateEngine::Callback callback,
-      PersistedData* persisted_data,
-      bool is_update_check_only);
-#endif
   UpdateContext(const UpdateContext&) = delete;
   UpdateContext& operator=(const UpdateContext&) = delete;
 
   scoped_refptr<Configurator> config;
 
-#if BUILDFLAG(ENABLE_PUFFIN_PATCHES)
-  // TODO(crbug.com/1349060) once Puffin patches are fully implemented,
-  // we should remove this #if.
   absl::optional<scoped_refptr<CrxCache>> crx_cache_;
-#endif
 
   // True if the component is updated as a result of user interaction.
   bool is_foreground = false;

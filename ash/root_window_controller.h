@@ -14,6 +14,7 @@
 #include "ash/style/ash_color_provider_source.h"
 #include "ash/wm/workspace/workspace_types.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_tree_host.h"
 
@@ -50,7 +51,7 @@ class RootWindowLayoutManager;
 class Shelf;
 class ShelfLayoutManager;
 class SplitViewController;
-class StackingController;
+class SplitViewOverviewSession;
 class StatusAreaWidget;
 class SystemModalContainerLayoutManager;
 class SystemWallpaperController;
@@ -58,6 +59,7 @@ class TouchExplorationManager;
 class TouchHudDebug;
 class TouchHudProjection;
 class WallpaperWidgetController;
+class WindowParentingController;
 class WorkAreaInsets;
 
 namespace curtain {
@@ -111,8 +113,11 @@ class ASH_EXPORT RootWindowController {
   aura::Window* GetRootWindow();
   const aura::Window* GetRootWindow() const;
 
-  SplitViewController* split_view_controller() const {
+  SplitViewController* split_view_controller() {
     return split_view_controller_.get();
+  }
+  SplitViewOverviewSession* split_view_overview_session() {
+    return split_view_overview_session_.get();
   }
 
   Shelf* shelf() const { return shelf_.get(); }
@@ -252,6 +257,12 @@ class ASH_EXPORT RootWindowController {
   curtain::SecurityCurtainWidgetController*
   security_curtain_widget_controller();
 
+  // Starts a split view overview session for this root window with `window`
+  // snapped on one side and overview on the other side. Overview and split view
+  // should already be active before calling this function.
+  void StartSplitViewOverviewSession(aura::Window* window);
+  void EndSplitViewOverviewSession();
+
  private:
   FRIEND_TEST_ALL_PREFIXES(RootWindowControllerTest,
                            ContextMenuDisappearsInTabletMode);
@@ -289,10 +300,12 @@ class ASH_EXPORT RootWindowController {
 
   std::unique_ptr<AshWindowTreeHost> ash_host_;
   // |ash_host_| as a WindowTreeHost.
-  aura::WindowTreeHost* window_tree_host_;
+  raw_ptr<aura::WindowTreeHost, DanglingUntriaged | ExperimentalAsh>
+      window_tree_host_;
 
   // LayoutManagers are owned by the window they are installed on.
-  RootWindowLayoutManager* root_window_layout_manager_ = nullptr;
+  raw_ptr<RootWindowLayoutManager, DanglingUntriaged | ExperimentalAsh>
+      root_window_layout_manager_ = nullptr;
 
   std::unique_ptr<WallpaperWidgetController> wallpaper_widget_controller_;
 
@@ -302,9 +315,10 @@ class ASH_EXPORT RootWindowController {
   std::unique_ptr<AppMenuModelAdapter> root_window_menu_model_adapter_;
   std::unique_ptr<ui::SimpleMenuModel> sort_apps_submenu_;
 
-  std::unique_ptr<StackingController> stacking_controller_;
+  std::unique_ptr<WindowParentingController> window_parenting_controller_;
 
   std::unique_ptr<SplitViewController> split_view_controller_;
+  std::unique_ptr<SplitViewOverviewSession> split_view_overview_session_;
 
   // The shelf controller for this root window. Exists for the entire lifetime
   // of the RootWindowController so that it is safe for observers to be added
@@ -319,8 +333,10 @@ class ASH_EXPORT RootWindowController {
 
   // Heads-up displays for touch events. These HUDs are not owned by the root
   // window controller and manage their own lifetimes.
-  TouchHudDebug* touch_hud_debug_ = nullptr;
-  TouchHudProjection* touch_hud_projection_ = nullptr;
+  raw_ptr<TouchHudDebug, DanglingUntriaged | ExperimentalAsh> touch_hud_debug_ =
+      nullptr;
+  raw_ptr<TouchHudProjection, DanglingUntriaged | ExperimentalAsh>
+      touch_hud_projection_ = nullptr;
 
   std::unique_ptr<::wm::ScopedCaptureClient> capture_client_;
 

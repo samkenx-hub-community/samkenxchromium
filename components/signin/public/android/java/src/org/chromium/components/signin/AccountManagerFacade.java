@@ -8,6 +8,7 @@ import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.app.Activity;
 import android.content.Intent;
+import android.os.Bundle;
 
 import androidx.annotation.AnyThread;
 import androidx.annotation.MainThread;
@@ -64,8 +65,12 @@ public interface AccountManagerFacade {
      * Since a different {@link Promise} will be returned every time the accounts get updated,
      * this makes the {@link Promise} a bad candidate for end users to cache locally unless
      * the end users are awaiting the current list of accounts only.
+     *
+     * @deprecated
+     * TODO(crbug.com/1463878): Use {@link #getCoreAccountInfos()} instead.
      */
     @MainThread
+    @Deprecated
     Promise<List<Account>> getAccounts();
 
     /**
@@ -90,12 +95,13 @@ public interface AccountManagerFacade {
     /**
      * Synchronously gets an OAuth2 access token. May return a cached version, use
      * {@link #invalidateAccessToken} to invalidate a token in the cache.
-     * @param account The {@link Account} for which the token is requested.
+     * @param coreAccountInfo The {@link CoreAccountInfo} for which the token is requested.
      * @param scope OAuth2 scope for which the requested token should be valid.
      * @return The OAuth2 access token as an AccessTokenData with a string and an expiration time.
      */
     @WorkerThread
-    AccessTokenData getAccessToken(Account account, String scope) throws AuthException;
+    AccessTokenData getAccessToken(CoreAccountInfo coreAccountInfo, String scope)
+            throws AuthException;
 
     /**
      * Removes an OAuth2 access token from the cache with retries asynchronously.
@@ -107,6 +113,7 @@ public interface AccountManagerFacade {
 
     /**
      * Checks the child account status of the given account.
+     * TODO(crbug.com/1462264): Replace Account with CoreAccountId.
      *
      * @param account The account to check the child account status.
      * @param listener The listener is called when the status of the account
@@ -152,4 +159,16 @@ public interface AccountManagerFacade {
     @WorkerThread
     @Nullable
     String getAccountGaiaId(String accountEmail);
+
+    /**
+     * Asks the user to confirm their knowledge of the password to the given account.
+     *
+     * @param account The {@link Account} to confirm the credentials for.
+     * @param activity The {@link Activity} context to use for launching a new authenticator-defined
+     *                 sub-Activity to prompt the user to confirm the account's password.
+     * @param callback The callback to indicate whether the user successfully confirmed their
+     *                 knowledge of the account's credentials.
+     */
+    @AnyThread
+    void confirmCredentials(Account account, Activity activity, Callback<Bundle> callback);
 }

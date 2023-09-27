@@ -8,40 +8,26 @@
  * shared between all *two* screens here.
  */
 
+import '//resources/js/cr.js';
+
 import {assert} from '//resources/ash/common/assert.js';
-import {sendWithPromise} from '//resources/ash/common/cr.m.js';
-import {addSingletonGetter} from '//resources/ash/common/cr_deprecated.js';
 import {$} from '//resources/ash/common/util.js';
 
-import {DISPLAY_TYPE} from './components/display_manager_types.js';
 import {OobeTypes} from './components/oobe_types.js';
 import {DisplayManager} from './display_manager.js';
 import {loadTimeData} from './i18n_setup.js';
 
+/** @type {?Oobe} */
+let instance = null;
 
 /**
  * Out of box controller. It manages initialization of screens,
  * transitions, error messages display.
  */
 export class Oobe extends DisplayManager {
-  /**
-   * OOBE initialization coordination. Used by tests to wait for OOBE
-   * to fully load when using the HTLImports polyfill.
-   * TODO(crbug.com/1111387) - Remove once migrated to JS modules.
-   * Remove spammy logging when closer to M89 branch point.
-   */
-  static waitForOobeToLoad() {
-    return new Promise((resolve, reject) => {
-      if (this.initializationComplete) {
-        // TODO(crbug.com/1111387) - Remove excessive logging.
-        console.warn('OOBE is already initialized. Continuing...');
-        resolve();
-      } else {
-        // TODO(crbug.com/1111387) - Remove excessive logging.
-        console.warn('OOBE not loaded yet. Waiting...');
-        this.initCallbacks.push(resolve);
-      }
-    });
+  /** @return {!Oobe} */
+  static getInstance() {
+    return instance || (instance = new Oobe());
   }
 
   /**
@@ -65,6 +51,16 @@ export class Oobe extends DisplayManager {
    */
   static toggleSystemInfo() {
     Oobe.getInstance().toggleSystemInfo();
+  }
+
+  /**
+   * Does the initial transition to the OOBE flow after booting animation.
+   */
+  static triggerDown() {
+    // Notify that we are going to play initial animation in the WebUI.
+    document.dispatchEvent(new CustomEvent('about-to-shrink'));
+    // Delay this call to reduce the load during animation.
+    setTimeout(() => Oobe.getInstance().triggerDown(), 0);
   }
 
   /**
@@ -252,6 +248,7 @@ export class Oobe extends DisplayManager {
       lang: 'language',
       dir: 'textdirection',
       highlight: 'highlightStrength',
+      tablet: 'isInTabletMode',
     };
     for (const [attribute, stringName] of Object.entries(attrToStrMap)) {
       const localizedString = loadTimeData.getValue(stringName);
@@ -263,7 +260,7 @@ export class Oobe extends DisplayManager {
 
   /**
    * Updates "device in tablet mode" state when tablet mode is changed.
-   * @param {Boolean} isInTabletMode True when in tablet mode.
+   * @param {boolean} isInTabletMode True when in tablet mode.
    */
   static setTabletModeState(isInTabletMode) {
     Oobe.getInstance().setTabletModeState_(isInTabletMode);
@@ -279,8 +276,6 @@ export class Oobe extends DisplayManager {
 
 }  // class Oobe
 
-Oobe.initializationComplete = false;
-Oobe.initCallbacks = [];
 /**
  * Some ForTesting APIs directly access to DOM. Because this script is loaded
  * in header, DOM tree may not be available at beginning.
@@ -290,5 +285,3 @@ Oobe.initCallbacks = [];
  * @type {boolean}
  */
 Oobe.readyForTesting = false;
-
-addSingletonGetter(Oobe);

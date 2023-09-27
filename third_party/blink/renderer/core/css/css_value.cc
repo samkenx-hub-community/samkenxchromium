@@ -65,6 +65,7 @@
 #include "third_party/blink/renderer/core/css/css_math_function_value.h"
 #include "third_party/blink/renderer/core/css/css_numeric_literal_value.h"
 #include "third_party/blink/renderer/core/css/css_paint_value.h"
+#include "third_party/blink/renderer/core/css/css_palette_mix_value.h"
 #include "third_party/blink/renderer/core/css/css_path_value.h"
 #include "third_party/blink/renderer/core/css/css_pending_substitution_value.h"
 #include "third_party/blink/renderer/core/css/css_pending_system_font_value.h"
@@ -109,6 +110,7 @@ CSSValue* CSSValue::Create(const Length& value, float zoom) {
     case Length::kPercent:
     case Length::kFixed:
     case Length::kCalculated:
+    case Length::kFlex:
       return CSSPrimitiveValue::CreateFromLength(value, zoom);
     case Length::kDeviceWidth:
     case Length::kDeviceHeight:
@@ -323,6 +325,8 @@ bool CSSValue::operator==(const CSSValue& other) const {
         return CompareCSSValues<cssvalue::CSSViewValue>(*this, other);
       case kRatioClass:
         return CompareCSSValues<cssvalue::CSSRatioValue>(*this, other);
+      case kPaletteMixClass:
+        return CompareCSSValues<cssvalue::CSSPaletteMixValue>(*this, other);
     }
     NOTREACHED();
     return false;
@@ -469,6 +473,8 @@ String CSSValue::CssText() const {
       return To<cssvalue::CSSViewValue>(this)->CustomCSSText();
     case kRatioClass:
       return To<cssvalue::CSSRatioValue>(this)->CustomCSSText();
+    case kPaletteMixClass:
+      return To<cssvalue::CSSPaletteMixValue>(this)->CustomCSSText();
   }
   NOTREACHED();
   return String();
@@ -707,6 +713,9 @@ void CSSValue::Trace(Visitor* visitor) const {
       return;
     case kRatioClass:
       To<cssvalue::CSSRatioValue>(this)->TraceAfterDispatch(visitor);
+      return;
+    case kPaletteMixClass:
+      To<cssvalue::CSSPaletteMixValue>(this)->TraceAfterDispatch(visitor);
       return;
   }
   NOTREACHED();

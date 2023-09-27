@@ -16,12 +16,13 @@ import androidx.annotation.IntDef;
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.BaseSwitches;
+import org.chromium.base.Callback;
 import org.chromium.base.CommandLine;
 import org.chromium.base.ContextUtils;
-import org.chromium.base.JNIUtils;
 import org.chromium.base.Log;
 import org.chromium.base.NativeLibraryLoadedStatus;
 import org.chromium.base.NativeLibraryLoadedStatus.NativeLibraryLoadedStatusProvider;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.StrictModeContext;
 import org.chromium.base.TimeUtils.CurrentThreadTimeMillisTimer;
 import org.chromium.base.TimeUtils.UptimeMillisTimer;
@@ -123,10 +124,6 @@ public class LibraryLoader {
     // Avoids locking: should be initialized very early.
     private @LibraryProcessType int mLibraryProcessType;
 
-    // Makes sure non-Main Dex initialization happens only once. Does not use any class members
-    // except the volatile |mLoadState|.
-    private final Object mNonMainDexLock = new Object();
-
     // Mediates all communication between Linker instances in different processes.
     private final MultiProcessMediator mMediator = new MultiProcessMediator();
 
@@ -164,6 +161,14 @@ public class LibraryLoader {
         int ZYGOTE = 1;
         int CHILD_WITHOUT_ZYGOTE = 2;
     }
+
+    // Used by tests to ensure that sLoadFailedCallback is called, also referenced by
+    // SplitCompatApplication.
+    @VisibleForTesting
+    public static boolean sOverrideNativeLibraryCannotBeLoadedForTesting;
+
+    // Allow embedders to register a callback to handle native library load failures.
+    public static Callback<UnsatisfiedLinkError> sLoadFailedCallback;
 
     // Returns true when sharing RELRO between the browser process and the app zygote should *not*
     // be attempted.
@@ -368,16 +373,6 @@ public class LibraryLoader {
             }
         }
 
-        private void recordLinkerHistogramsAfterLibraryLoad() {
-            if (!useChromiumLinker()) return;
-            // When recording a sample in the App Zygote it gets copied to each forked process and
-            // hence gets duplicated in the uploads. Avoiding such duplication would require
-            // serializing the samples, sending them to the browser process and disambiguating by,
-            // for example, Zygote PID in ChildProcessConnection.java. A few rough performance
-            // estimations do not require this complexity.
-            getLinker().recordHistograms(creationAsString());
-        }
-
         private String creationAsString() {
             switch (mCreatedIn) {
                 case CreatedIn.MAIN:
@@ -422,13 +417,8 @@ public class LibraryLoader {
         if (BuildConfig.ENABLE_ASSERTS) {
             NativeLibraryLoadedStatus.setProvider(new NativeLibraryLoadedStatusProvider() {
                 @Override
-                public boolean areMainDexNativeMethodsReady() {
-                    return isMainDexLoaded();
-                }
-
-                @Override
                 public boolean areNativeMethodsReady() {
-                    return isLoaded();
+                    return isMainDexLoaded();
                 }
             });
         }
@@ -742,7 +732,6 @@ public class LibraryLoader {
         String sourceDir = appInfo.sourceDir;
         Log.i(TAG, "Loading %s from within %s", library, sourceDir);
         linker.loadLibrary(library); // May throw UnsatisfiedLinkError.
-        getMediator().recordLinkerHistogramsAfterLibraryLoad();
     }
 
     @GuardedBy("mLock")
@@ -773,6 +762,10 @@ public class LibraryLoader {
             UptimeMillisTimer uptimeTimer = new UptimeMillisTimer();
             CurrentThreadTimeMillisTimer threadTimeTimer = new CurrentThreadTimeMillisTimer();
 
+            if (sOverrideNativeLibraryCannotBeLoadedForTesting) {
+                throw new UnsatisfiedLinkError();
+            }
+
             if (useChromiumLinker() && !mFallbackToSystemLinker) {
                 if (DEBUG) Log.i(TAG, "Loading with the Chromium linker.");
                 // See base/android/linker/config.gni, the chromium linker is only enabled when
@@ -796,31 +789,22 @@ public class LibraryLoader {
             getMediator().recordLoadTimeHistogram(loadTimeMs);
             getMediator().recordLoadThreadTimeHistogram(threadTimeTimer.getElapsedMillis());
         } catch (UnsatisfiedLinkError e) {
-            throw new ProcessInitException(LoaderErrors.NATIVE_LIBRARY_LOAD_FAILED, e);
+            if (sLoadFailedCallback != null) {
+                sLoadFailedCallback.onResult(e);
+            } else {
+                throw new ProcessInitException(LoaderErrors.NATIVE_LIBRARY_LOAD_FAILED, e);
+            }
         }
     }
 
+    // This used to actually do stuff, but now we have removed the concept of MainDex/non-MainDex
+    // JNI. However, entirely removing the "middle state" (LoadState.MAIN_DEX) causes issues with
+    // robolectric tests using GURL. See https://crbug.com/1371542#c13.
     @VisibleForTesting
     protected void loadNonMainDex() {
-        if (mLoadState == LoadState.LOADED) {
-            if (sEnableStateForTesting) {
-                mLoadStateForTesting = LoadState.LOADED;
-            }
-            return;
-        }
-        synchronized (mNonMainDexLock) {
-            assert mLoadState != LoadState.NOT_LOADED;
-            if (mLoadState == LoadState.LOADED) return;
-            try (TraceEvent te = TraceEvent.scoped("LibraryLoader.loadNonMainDex")) {
-                if (!JNIUtils.isSelectiveJniRegistrationEnabled()) {
-                    // On M+ the native symbols are exported, and registering natives seems fast.
-                    LibraryLoaderJni.get().registerNonMainDexJni();
-                }
-                mLoadState = LoadState.LOADED;
-                if (sEnableStateForTesting) {
-                    mLoadStateForTesting = LoadState.LOADED;
-                }
-            }
+        mLoadState = LoadState.LOADED;
+        if (sEnableStateForTesting) {
+            mLoadStateForTesting = LoadState.LOADED;
         }
     }
 
@@ -855,7 +839,6 @@ public class LibraryLoader {
         assert libraryProcessType == mLibraryProcessType;
     }
 
-    // Invoke base::android::LibraryLoaded in library_loader_hooks.cc
     @GuardedBy("mLock")
     private void initializeAlreadyLocked() {
         if (mInitialized) {
@@ -887,6 +870,8 @@ public class LibraryLoader {
 
         ensureCommandLineSwitchedAlreadyLocked();
 
+        // Invoke content::LibraryLoaded() in //content/app/android/library_loader_hooks.cc
+        // via a hook stored in //base/android/library_loader/library_loader_hooks.cc.
         if (!LibraryLoaderJni.get().libraryLoaded(mLibraryProcessType)) {
             Log.e(TAG, "error calling LibraryLoaderJni.get().libraryLoaded");
             throw new ProcessInitException(LoaderErrors.FAILED_TO_REGISTER_JNI);
@@ -920,9 +905,10 @@ public class LibraryLoader {
      * @param loader the mock library loader.
      */
     @Deprecated
-    @VisibleForTesting
     public static void setLibraryLoaderForTesting(LibraryLoader loader) {
+        var oldValue = sInstance;
         sInstance = loader;
+        ResettersForTesting.register(() -> sInstance = oldValue);
     }
 
     /**
@@ -965,6 +951,16 @@ public class LibraryLoader {
         }
     }
 
+    public static void setOverrideNativeLibraryCannotBeLoadedForTesting() {
+        sOverrideNativeLibraryCannotBeLoadedForTesting = true;
+        ResettersForTesting.register(() -> sOverrideNativeLibraryCannotBeLoadedForTesting = false);
+    }
+
+    public static void setLoadFailedCallbackForTesting(Callback<UnsatisfiedLinkError> callback) {
+        sLoadFailedCallback = callback;
+        ResettersForTesting.register(() -> sLoadFailedCallback = null);
+    }
+
     public static void setBrowserProcessStartupBlockedForTesting() {
         sBrowserStartupBlockedForTesting = true;
     }
@@ -979,9 +975,5 @@ public class LibraryLoader {
         // Performs auxiliary initialization useful right after the native library load. Returns
         // true on success and false on failure.
         boolean libraryLoaded(@LibraryProcessType int processType);
-
-        // Registers JNI for non-main processes. For details see android_native_libraries.md,
-        // android_dynamic_feature_modules.md and jni_generator/README.md
-        void registerNonMainDexJni();
     }
 }

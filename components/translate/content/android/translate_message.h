@@ -29,6 +29,7 @@ class TranslateUIDelegate;
 class TranslateUILanguagesManager;
 
 BASE_DECLARE_FEATURE(kTranslateMessageUI);
+extern const char kTranslateMessageUISnackbarParam[];
 
 class TranslateMessage {
  public:
@@ -162,7 +163,7 @@ class TranslateMessage {
 
   // Constructed the first time ShowTranslateStep is called.
   std::unique_ptr<TranslateUIDelegate> ui_delegate_;
-  TranslateUILanguagesManager* ui_languages_manager_;
+  raw_ptr<TranslateUILanguagesManager> ui_languages_manager_;
   State state_ = State::kDismissed;
 
   // Keeps track of whether or not this TranslateMessage has ever been

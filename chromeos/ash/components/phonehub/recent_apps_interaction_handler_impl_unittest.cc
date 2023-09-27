@@ -93,7 +93,8 @@ class RecentAppsInteractionHandlerTest : public testing::Test {
     const char package_name1[] = "com.fakeapp";
     const int64_t expected_user_id1 = 1;
     auto app_metadata1 = Notification::AppMetadata(
-        app_visible_name1, package_name1, gfx::Image(),
+        app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+        /*monochrome_icon_mask=*/absl::nullopt,
         /*icon_color=*/kIconColor, /*icon_is_monochrome=*/true,
         expected_user_id1, proto::AppStreamabilityStatus::STREAMABLE);
 
@@ -101,7 +102,8 @@ class RecentAppsInteractionHandlerTest : public testing::Test {
     const char package_name2[] = "com.fakeapp2";
     const int64_t expected_user_id2 = 2;
     auto app_metadata2 = Notification::AppMetadata(
-        app_visible_name2, package_name2, gfx::Image(),
+        app_visible_name2, package_name2, /*color_icon=*/gfx::Image(),
+        /*monochrome_icon_mask=*/gfx::Image(),
         /*icon_color=*/absl::nullopt, /*icon_is_monochrome=*/false,
         expected_user_id2, proto::AppStreamabilityStatus::STREAMABLE);
 
@@ -119,7 +121,8 @@ class RecentAppsInteractionHandlerTest : public testing::Test {
     const int64_t expected_user_id1 = 1;
     base::Value::Dict app_metadata_value =
         Notification::AppMetadata(
-            app_visible_name1, package_name1, gfx::Image(),
+            app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+            /*monochrome_icon_mask=*/absl::nullopt,
             /*icon_color=*/kIconColor, /*icon_is_monochrome=*/false,
             expected_user_id1, proto::AppStreamabilityStatus::STREAMABLE)
             .ToValue();
@@ -209,14 +212,16 @@ class RecentAppsInteractionHandlerTest : public testing::Test {
     const char package_name1[] = "com.fakeapp1";
     const int64_t expected_user_id1 = 1;
     auto app_metadata1 = Notification::AppMetadata(
-        app_visible_name1, package_name1, gfx::Image(),
+        app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+        /*monochrome_icon_mask=*/absl::nullopt,
         /*icon_color=*/absl::nullopt, /*icon_is_monochrome=*/true,
         expected_user_id1, proto::AppStreamabilityStatus::STREAMABLE);
     const char16_t app_visible_name2[] = u"Fake App2";
     const char package_name2[] = "com.fakeapp2";
     const int64_t expected_user_id2 = 2;
     auto app_metadata2 = Notification::AppMetadata(
-        app_visible_name2, package_name2, gfx::Image(),
+        app_visible_name2, package_name2, /*color_icon=*/gfx::Image(),
+        /*monochrome_icon_mask=*/gfx::Image(),
         /*icon_color=*/absl::nullopt, /*icon_is_monochrome=*/true,
         expected_user_id2, proto::AppStreamabilityStatus::STREAMABLE);
     handler().NotifyRecentAppAddedOrUpdated(app_metadata1, now);
@@ -229,13 +234,15 @@ class RecentAppsInteractionHandlerTest : public testing::Test {
     const char package_name1[] = "com.fakeapp1";
     const int64_t expected_user_id = 1;
     auto app_metadata1 = Notification::AppMetadata(
-        app_visible_name1, package_name1, gfx::Image(),
+        app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+        /*monochrome_icon_mask=*/absl::nullopt,
         /*icon_color=*/absl::nullopt, /*icon_is_monochrome=*/true,
         expected_user_id, proto::AppStreamabilityStatus::STREAMABLE);
     const char16_t app_visible_name2[] = u"Fake App2";
     const char package_name2[] = "com.fakeapp2";
     auto app_metadata2 = Notification::AppMetadata(
-        app_visible_name2, package_name2, gfx::Image(),
+        app_visible_name2, package_name2, /*color_icon=*/gfx::Image(),
+        /*monochrome_icon_mask=*/gfx::Image(),
         /*icon_color=*/absl::nullopt, /*icon_is_monochrome=*/true,
         expected_user_id, proto::AppStreamabilityStatus::STREAMABLE);
     handler().NotifyRecentAppAddedOrUpdated(app_metadata1, now);
@@ -274,7 +281,27 @@ TEST_F(RecentAppsInteractionHandlerTest, RecentAppsClicked) {
   const char expected_package_name[] = "com.fakeapp";
   const int64_t expected_user_id = 1;
   auto expected_app_metadata = Notification::AppMetadata(
-      expected_app_visible_name, expected_package_name, gfx::Image(),
+      expected_app_visible_name, expected_package_name,
+      /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt, /*icon_is_monochrome=*/true,
+      expected_user_id, proto::AppStreamabilityStatus::STREAMABLE);
+
+  handler().NotifyRecentAppClicked(
+      expected_app_metadata,
+      eche_app::mojom::AppStreamLaunchEntryPoint::RECENT_APPS);
+
+  EXPECT_EQ(expected_package_name, GetPackageName());
+}
+
+TEST_F(RecentAppsInteractionHandlerTest, RecentAppsClickedHasOriginalIcon) {
+  const char16_t expected_app_visible_name[] = u"Fake App";
+  const char expected_package_name[] = "com.fakeapp";
+  const int64_t expected_user_id = 1;
+  auto expected_app_metadata = Notification::AppMetadata(
+      expected_app_visible_name, expected_package_name,
+      /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/gfx::Image(),
       /*icon_color=*/absl::nullopt, /*icon_is_monochrome=*/true,
       expected_user_id, proto::AppStreamabilityStatus::STREAMABLE);
 
@@ -289,20 +316,22 @@ TEST_F(RecentAppsInteractionHandlerTest, RecentAppsUpdated) {
   const char16_t app_visible_name1[] = u"Fake App";
   const char package_name1[] = "com.fakeapp";
   const int64_t expected_user_id1 = 1;
-  auto app_metadata1 =
-      Notification::AppMetadata(app_visible_name1, package_name1, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id1,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata1 = Notification::AppMetadata(
+      app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id1,
+      proto::AppStreamabilityStatus::STREAMABLE);
 
   const char16_t app_visible_name2[] = u"Fake App2";
   const char package_name2[] = "com.fakeapp2";
   const int64_t expected_user_id2 = 2;
-  auto app_metadata2 =
-      Notification::AppMetadata(app_visible_name2, package_name2, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id2,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata2 = Notification::AppMetadata(
+      app_visible_name2, package_name2, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/gfx::Image(),
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id2,
+      proto::AppStreamabilityStatus::STREAMABLE);
   const base::Time now = base::Time::Now();
 
   handler().NotifyRecentAppAddedOrUpdated(app_metadata1, now);
@@ -324,16 +353,18 @@ TEST_F(RecentAppsInteractionHandlerTest, RecentAppsUpdated) {
 
 TEST_F(RecentAppsInteractionHandlerTest, SetStreamableApps) {
   std::vector<Notification::AppMetadata> streamable_apps;
-  streamable_apps.emplace_back(
-      Notification::AppMetadata(u"App1", "com.fakeapp1", gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, 1,
-                                proto::AppStreamabilityStatus::STREAMABLE));
-  streamable_apps.emplace_back(
-      Notification::AppMetadata(u"App2", "com.fakeapp2", gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, 1,
-                                proto::AppStreamabilityStatus::STREAMABLE));
+  streamable_apps.emplace_back(u"App1", "com.fakeapp1",
+                               /*color_icon=*/gfx::Image(),
+                               /*monochrome_icon_mask=*/absl::nullopt,
+                               /*icon_color=*/absl::nullopt,
+                               /*icon_is_monochrome=*/true, 1,
+                               proto::AppStreamabilityStatus::STREAMABLE);
+  streamable_apps.emplace_back(u"App2", "com.fakeapp2",
+                               /*color_icon=*/gfx::Image(),
+                               /*monochrome_icon_mask=*/gfx::Image(),
+                               /*icon_color=*/absl::nullopt,
+                               /*icon_is_monochrome=*/true, 1,
+                               proto::AppStreamabilityStatus::STREAMABLE);
 
   handler().SetStreamableApps(streamable_apps);
 
@@ -351,16 +382,18 @@ TEST_F(RecentAppsInteractionHandlerTest, SetStreamableApps) {
 TEST_F(RecentAppsInteractionHandlerTest,
        SetStreamableApps_ClearsPreviousState) {
   std::vector<Notification::AppMetadata> streamable_apps;
-  streamable_apps.emplace_back(
-      Notification::AppMetadata(u"App1", "com.fakeapp1", gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, 1,
-                                proto::AppStreamabilityStatus::STREAMABLE));
-  streamable_apps.emplace_back(
-      Notification::AppMetadata(u"App2", "com.fakeapp2", gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, 1,
-                                proto::AppStreamabilityStatus::STREAMABLE));
+  streamable_apps.emplace_back(u"App1", "com.fakeapp1",
+                               /*color_icon=*/gfx::Image(),
+                               /*monochrome_icon_mask=*/absl::nullopt,
+                               /*icon_color=*/absl::nullopt,
+                               /*icon_is_monochrome=*/true, 1,
+                               proto::AppStreamabilityStatus::STREAMABLE);
+  streamable_apps.emplace_back(u"App2", "com.fakeapp2",
+                               /*color_icon=*/gfx::Image(),
+                               /*monochrome_icon_mask=*/gfx::Image(),
+                               /*icon_color=*/absl::nullopt,
+                               /*icon_is_monochrome=*/true, 1,
+                               proto::AppStreamabilityStatus::STREAMABLE);
 
   handler().SetStreamableApps(streamable_apps);
 
@@ -375,11 +408,12 @@ TEST_F(RecentAppsInteractionHandlerTest,
                                 .first.package_name);
 
   std::vector<Notification::AppMetadata> streamable_apps2;
-  streamable_apps2.emplace_back(
-      Notification::AppMetadata(u"App3", "com.fakeapp3", gfx::Image(),
+  streamable_apps2.emplace_back(u"App3", "com.fakeapp3",
+                                /*color_icon=*/gfx::Image(),
+                                /*monochrome_icon_mask=*/absl::nullopt,
                                 /*icon_color=*/absl::nullopt,
                                 /*icon_is_monochrome=*/true, 1,
-                                proto::AppStreamabilityStatus::STREAMABLE));
+                                proto::AppStreamabilityStatus::STREAMABLE);
 
   handler().SetStreamableApps(streamable_apps2);
 
@@ -400,16 +434,18 @@ TEST_F(RecentAppsInteractionHandlerTest, SetStreamableApps_EmptyList) {
 
 TEST_F(RecentAppsInteractionHandlerTest, RemoveStreamableApp) {
   std::vector<Notification::AppMetadata> streamable_apps;
-  streamable_apps.emplace_back(
-      Notification::AppMetadata(u"App1", "com.fakeapp1", gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, 1,
-                                proto::AppStreamabilityStatus::STREAMABLE));
-  streamable_apps.emplace_back(
-      Notification::AppMetadata(u"App2", "com.fakeapp2", gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, 1,
-                                proto::AppStreamabilityStatus::STREAMABLE));
+  streamable_apps.emplace_back(u"App1", "com.fakeapp1",
+                               /*color_icon=*/gfx::Image(),
+                               /*monochrome_icon_mask=*/absl::nullopt,
+                               /*icon_color=*/absl::nullopt,
+                               /*icon_is_monochrome=*/true, 1,
+                               proto::AppStreamabilityStatus::STREAMABLE);
+  streamable_apps.emplace_back(u"App2", "com.fakeapp2",
+                               /*color_icon=*/gfx::Image(),
+                               /*monochrome_icon_mask=*/gfx::Image(),
+                               /*icon_color=*/absl::nullopt,
+                               /*icon_is_monochrome=*/true, 1,
+                               proto::AppStreamabilityStatus::STREAMABLE);
 
   handler().SetStreamableApps(streamable_apps);
 
@@ -430,29 +466,32 @@ TEST_F(RecentAppsInteractionHandlerTest, FetchRecentAppMetadataList) {
   const char16_t app_visible_name1[] = u"Fake App";
   const char package_name1[] = "com.fakeapp";
   const int64_t expected_user_id1 = 1;
-  auto app_metadata1 =
-      Notification::AppMetadata(app_visible_name1, package_name1, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id1,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata1 = Notification::AppMetadata(
+      app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id1,
+      proto::AppStreamabilityStatus::STREAMABLE);
 
   const char16_t app_visible_name2[] = u"Fake App2";
   const char package_name2[] = "com.fakeapp2";
   const int64_t expected_user_id2 = 1;
-  auto app_metadata2 =
-      Notification::AppMetadata(app_visible_name2, package_name2, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id2,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata2 = Notification::AppMetadata(
+      app_visible_name2, package_name2, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/gfx::Image(),
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id2,
+      proto::AppStreamabilityStatus::STREAMABLE);
 
   const char16_t app_visible_name3[] = u"Fake App3";
   const char package_name3[] = "com.fakeapp3";
   const int64_t expected_user_id3 = 1;
-  auto app_metadata3 =
-      Notification::AppMetadata(app_visible_name3, package_name3, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id3,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata3 = Notification::AppMetadata(
+      app_visible_name3, package_name3, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id3,
+      proto::AppStreamabilityStatus::STREAMABLE);
 
   const base::Time now = base::Time::Now();
   const base::Time next_minute = base::Time::Now() + base::Minutes(1);
@@ -477,20 +516,22 @@ TEST_F(RecentAppsInteractionHandlerTest, FetchRecentAppMetadataList) {
   const char16_t app_visible_name4[] = u"Fake App4";
   const char package_name4[] = "com.fakeapp4";
   const int64_t expected_user_id4 = 1;
-  auto app_metadata4 =
-      Notification::AppMetadata(app_visible_name4, package_name4, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id4,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata4 = Notification::AppMetadata(
+      app_visible_name4, package_name4, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id4,
+      proto::AppStreamabilityStatus::STREAMABLE);
 
   const char16_t app_visible_name5[] = u"Fake App5";
   const char package_name5[] = "com.fakeapp5";
   const int64_t expected_user_id5 = 1;
-  auto app_metadata5 =
-      Notification::AppMetadata(app_visible_name5, package_name5, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id5,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata5 = Notification::AppMetadata(
+      app_visible_name5, package_name5, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id5,
+      proto::AppStreamabilityStatus::STREAMABLE);
 
   const base::Time next_two_hour = base::Time::Now() + base::Hours(2);
   const base::Time next_three_hour = base::Time::Now() + base::Hours(3);
@@ -568,11 +609,12 @@ TEST_F(RecentAppsInteractionHandlerTest,
   const char16_t app_visible_name1[] = u"Fake App";
   const char package_name1[] = "com.fakeapp";
   const int64_t expected_user_id1 = 1;
-  auto app_metadata1 =
-      Notification::AppMetadata(app_visible_name1, package_name1, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id1,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata1 = Notification::AppMetadata(
+      app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id1,
+      proto::AppStreamabilityStatus::STREAMABLE);
 
   handler().NotifyRecentAppAddedOrUpdated(app_metadata1, now);
   SetEcheFeatureState(FeatureState::kDisabledByUser);
@@ -588,7 +630,7 @@ TEST_F(RecentAppsInteractionHandlerTest,
   SetAppsAccessStatus(true);
   SetNotificationAccess(true);
 
-  EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::PLACEHOLDER_VIEW,
+  EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::LOADING,
             handler().ui_state());
 }
 
@@ -599,34 +641,34 @@ TEST_F(RecentAppsInteractionHandlerTest,
   SetAppsAccessStatus(true);
   SetNotificationAccess(true);
 
-  EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::PLACEHOLDER_VIEW,
+  EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::LOADING,
             handler().ui_state());
 
-  // Disable notification access permission on the host device.
-  SetNotificationAccess(false);
+  // Disable apps access permission on the host device.
+  SetAppsAccessStatus(false);
 
   EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::HIDDEN,
             handler().ui_state());
 
-  // Disable notification access permission on the local device.
-  SetNotificationAccess(true);
-  SetPhoneHubNotificationsFeatureState(FeatureState::kDisabledByUser);
+  // Disable apps access permission on the local device.
+  SetAppsAccessStatus(true);
+  SetEcheFeatureState(FeatureState::kDisabledByUser);
 
   EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::HIDDEN,
             handler().ui_state());
 
-  // Disable notification access permission on both devices.
-  SetNotificationAccess(false);
-  SetPhoneHubNotificationsFeatureState(FeatureState::kDisabledByUser);
+  // Disable apps access permission on both devices.
+  SetAppsAccessStatus(false);
+  SetEcheFeatureState(FeatureState::kDisabledByUser);
 
   EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::HIDDEN,
             handler().ui_state());
 
-  // Enable notification access permission back on both devices.
-  SetNotificationAccess(true);
-  SetPhoneHubNotificationsFeatureState(FeatureState::kEnabledByUser);
+  // Enable apps access permission back on both devices.
+  SetAppsAccessStatus(true);
+  SetEcheFeatureState(FeatureState::kEnabledByUser);
 
-  EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::PLACEHOLDER_VIEW,
+  EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::LOADING,
             handler().ui_state());
 }
 
@@ -636,11 +678,12 @@ TEST_F(RecentAppsInteractionHandlerTest,
   const char16_t app_visible_name1[] = u"Fake App";
   const char package_name1[] = "com.fakeapp";
   const int64_t expected_user_id1 = 1;
-  auto app_metadata1 =
-      Notification::AppMetadata(app_visible_name1, package_name1, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id1,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata1 = Notification::AppMetadata(
+      app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id1,
+      proto::AppStreamabilityStatus::STREAMABLE);
   SetConnectionStatus(ConnectionStatus::kConnectionStatusConnected);
   SetAppsAccessStatus(true);
   handler().NotifyRecentAppAddedOrUpdated(app_metadata1, now);
@@ -656,11 +699,12 @@ TEST_F(RecentAppsInteractionHandlerTest,
   const char16_t app_visible_name1[] = u"Fake App";
   const char package_name1[] = "com.fakeapp";
   const int64_t expected_user_id1 = 1;
-  auto app_metadata1 =
-      Notification::AppMetadata(app_visible_name1, package_name1, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id1,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata1 = Notification::AppMetadata(
+      app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id1,
+      proto::AppStreamabilityStatus::STREAMABLE);
 
   SetConnectionStatus(ConnectionStatus::kConnectionStatusConnected);
   SetAppsAccessStatus(true);
@@ -693,6 +737,11 @@ TEST_F(RecentAppsInteractionHandlerTest,
 
 TEST_F(RecentAppsInteractionHandlerTest,
        UiStateChangedToVisibleWhenRecentAppBeAdded) {
+  feature_list_.Reset();
+  feature_list_.InitWithFeatures(
+      /*enabled_features=*/{features::kEcheSWA},
+      /*disabled_features=*/{features::kEcheNetworkConnectionState});
+
   SetEcheFeatureState(FeatureState::kEnabledByUser);
   SetPhoneHubNotificationsFeatureState(FeatureState::kEnabledByUser);
   SetConnectionStatus(ConnectionStatus::kConnectionStatusConnected);
@@ -706,11 +755,12 @@ TEST_F(RecentAppsInteractionHandlerTest,
   const char16_t app_visible_name1[] = u"Fake App";
   const char package_name1[] = "com.fakeapp";
   const int64_t expected_user_id1 = 1;
-  auto app_metadata1 =
-      Notification::AppMetadata(app_visible_name1, package_name1, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id1,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata1 = Notification::AppMetadata(
+      app_visible_name1, package_name1, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id1,
+      proto::AppStreamabilityStatus::STREAMABLE);
   handler().NotifyRecentAppAddedOrUpdated(app_metadata1, now);
 
   EXPECT_EQ(RecentAppsInteractionHandler::RecentAppsUiState::ITEMS_VISIBLE,
@@ -774,11 +824,12 @@ TEST_F(
   const char16_t app_visible_name[] = u"Fake App";
   const char package_name[] = "com.fakeapp";
   const int64_t expected_user_id = 1;
-  auto app_metadata =
-      Notification::AppMetadata(app_visible_name, package_name, gfx::Image(),
-                                /*icon_color=*/absl::nullopt,
-                                /*icon_is_monochrome=*/true, expected_user_id,
-                                proto::AppStreamabilityStatus::STREAMABLE);
+  auto app_metadata = Notification::AppMetadata(
+      app_visible_name, package_name, /*color_icon=*/gfx::Image(),
+      /*monochrome_icon_mask=*/absl::nullopt,
+      /*icon_color=*/absl::nullopt,
+      /*icon_is_monochrome=*/true, expected_user_id,
+      proto::AppStreamabilityStatus::STREAMABLE);
   handler().NotifyRecentAppAddedOrUpdated(app_metadata, now);
   SetHostStatus(HostStatus::kHostSetButNotYetVerified);
 
@@ -860,18 +911,20 @@ TEST_F(RecentAppsInteractionHandlerTest, OnConnectionStatusChanged) {
   EXPECT_EQ(handler().connection_status_for_testing(),
             ConnectionStatus::kConnectionStatusDisconnected);
 
+  // Any transition to "connected" should update ConnUX to connected.
   NotifyConnectionStatusChanged(ConnectionStatus::kConnectionStatusConnected);
   EXPECT_EQ(handler().connection_status_for_testing(),
             ConnectionStatus::kConnectionStatusConnected);
 
+  // Only background failures update the ConnUX state, app stream failures
+  // should not.
   NotifyConnectionStatusChanged(ConnectionStatus::kConnectionStatusFailed);
   EXPECT_EQ(handler().connection_status_for_testing(),
-            ConnectionStatus::kConnectionStatusFailed);
-
+            ConnectionStatus::kConnectionStatusConnected);
   NotifyConnectionStatusChanged(
       ConnectionStatus::kConnectionStatusDisconnected);
   EXPECT_EQ(handler().connection_status_for_testing(),
-            ConnectionStatus::kConnectionStatusFailed);
+            ConnectionStatus::kConnectionStatusConnected);
 }
 
 TEST_F(RecentAppsInteractionHandlerTest,

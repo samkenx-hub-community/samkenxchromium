@@ -6,7 +6,7 @@
 #define ASH_CURTAIN_REMOTE_MAINTENANCE_CURTAIN_VIEW_H_
 
 #include "ash/ash_export.h"
-#include "base/allocator/partition_allocator/pointers/raw_ptr.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/views/view.h"
 
 namespace ash {
@@ -20,6 +20,11 @@ class Size;
 }  // namespace gfx
 
 namespace ash::curtain {
+
+// ID given to the `AshWebView` that renders the WebUI part of the curtain.
+// Used by pixel tests to wait for the WebUI to render.
+// (the value is randomly chosen).
+constexpr int kRemoteMaintenanceCurtainAshWebViewId = 14569;
 
 // The root view shown as the security curtain overlay when the security curtain
 // is created by an enterprise admin through the 'start crd session' remote

@@ -16,6 +16,7 @@
 #include "google_apis/common/api_error_codes.h"
 #include "google_apis/common/base_requests.h"
 #include "google_apis/common/request_sender.h"
+#include "google_apis/tasks/tasks_api_request_types.h"
 #include "google_apis/tasks/tasks_api_response_types.h"
 #include "google_apis/tasks/tasks_api_url_generator_utils.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
@@ -24,6 +25,7 @@
 namespace google_apis::tasks {
 namespace {
 
+constexpr char kContentTypeJson[] = "application/json; charset=utf-8";
 constexpr int kMaxAllowedMaxResults = 100;
 
 }
@@ -36,7 +38,7 @@ ListTaskListsRequest::ListTaskListsRequest(RequestSender* sender,
     : UrlFetchRequestBase(sender, ProgressCallback(), ProgressCallback()),
       callback_(std::move(callback)),
       page_token_(page_token) {
-  DCHECK(!callback_.is_null());
+  CHECK(!callback_.is_null());
 }
 
 ListTaskListsRequest::~ListTaskListsRequest() = default;
@@ -103,8 +105,8 @@ ListTasksRequest::ListTasksRequest(RequestSender* sender,
       callback_(std::move(callback)),
       task_list_id_(task_list_id),
       page_token_(page_token) {
-  DCHECK(!callback_.is_null());
-  DCHECK(!task_list_id_.empty());
+  CHECK(!callback_.is_null());
+  CHECK(!task_list_id_.empty());
 }
 
 ListTasksRequest::~ListTasksRequest() = default;
@@ -157,6 +159,143 @@ void ListTasksRequest::OnDataParsed(std::unique_ptr<Tasks> tasks) {
     std::move(callback_).Run(base::unexpected(PARSE_ERROR));
   } else {
     std::move(callback_).Run(std::move(tasks));
+  }
+  OnProcessURLFetchResultsComplete();
+}
+
+// ----- PatchTaskRequest -----
+
+PatchTaskRequest::PatchTaskRequest(RequestSender* sender,
+                                   Callback callback,
+                                   const std::string& task_list_id,
+                                   const std::string& task_id,
+                                   const TaskRequestPayload& payload)
+    : UrlFetchRequestBase(sender, ProgressCallback(), ProgressCallback()),
+      callback_(std::move(callback)),
+      task_list_id_(task_list_id),
+      task_id_(task_id),
+      payload_(payload) {
+  CHECK(!callback_.is_null());
+  CHECK(!task_list_id_.empty());
+  CHECK(!task_id_.empty());
+}
+
+PatchTaskRequest::~PatchTaskRequest() = default;
+
+GURL PatchTaskRequest::GetURL() const {
+  return GetPatchTaskUrl(task_list_id_, task_id_);
+}
+
+ApiErrorCode PatchTaskRequest::MapReasonToError(ApiErrorCode code,
+                                                const std::string& reason) {
+  return code;
+}
+
+bool PatchTaskRequest::IsSuccessfulErrorCode(ApiErrorCode error) {
+  return error == HTTP_SUCCESS;
+}
+
+HttpRequestMethod PatchTaskRequest::GetRequestType() const {
+  return HttpRequestMethod::kPatch;
+}
+
+bool PatchTaskRequest::GetContentData(std::string* upload_content_type,
+                                      std::string* upload_content) {
+  *upload_content_type = kContentTypeJson;
+  *upload_content = payload_.ToJson();
+  return true;
+}
+
+void PatchTaskRequest::ProcessURLFetchResults(
+    const network::mojom::URLResponseHead* response_head,
+    base::FilePath response_file,
+    std::string response_body) {
+  std::move(callback_).Run(GetErrorCode());
+  OnProcessURLFetchResultsComplete();
+}
+
+void PatchTaskRequest::RunCallbackOnPrematureFailure(ApiErrorCode error) {
+  std::move(callback_).Run(error);
+}
+
+// ----- InsertTaskRequest -----
+
+InsertTaskRequest::InsertTaskRequest(RequestSender* sender,
+                                     const std::string& task_list_id,
+                                     const std::string& previous_task_id,
+                                     const TaskRequestPayload& payload,
+                                     Callback callback)
+    : UrlFetchRequestBase(sender, ProgressCallback(), ProgressCallback()),
+      task_list_id_(task_list_id),
+      previous_task_id_(previous_task_id),
+      payload_(payload),
+      callback_(std::move(callback)) {
+  CHECK(!task_list_id_.empty());
+  CHECK(callback_);
+}
+
+InsertTaskRequest::~InsertTaskRequest() = default;
+
+GURL InsertTaskRequest::GetURL() const {
+  return GetInsertTaskUrl(task_list_id_, previous_task_id_);
+}
+
+ApiErrorCode InsertTaskRequest::MapReasonToError(ApiErrorCode code,
+                                                 const std::string& reason) {
+  return code;
+}
+
+bool InsertTaskRequest::IsSuccessfulErrorCode(ApiErrorCode error) {
+  return error == HTTP_SUCCESS || error == HTTP_CREATED;
+}
+
+HttpRequestMethod InsertTaskRequest::GetRequestType() const {
+  return HttpRequestMethod::kPost;
+}
+
+bool InsertTaskRequest::GetContentData(std::string* upload_content_type,
+                                       std::string* upload_content) {
+  *upload_content_type = kContentTypeJson;
+  *upload_content = payload_.ToJson();
+  return true;
+}
+
+void InsertTaskRequest::ProcessURLFetchResults(
+    const network::mojom::URLResponseHead* response_head,
+    base::FilePath response_file,
+    std::string response_body) {
+  ApiErrorCode error = GetErrorCode();
+  switch (error) {
+    case HTTP_SUCCESS:
+    case HTTP_CREATED:
+      blocking_task_runner()->PostTaskAndReplyWithResult(
+          FROM_HERE,
+          base::BindOnce(&InsertTaskRequest::Parse, std::move(response_body)),
+          base::BindOnce(&InsertTaskRequest::OnDataParsed,
+                         weak_ptr_factory_.GetWeakPtr()));
+      break;
+    default:
+      RunCallbackOnPrematureFailure(error);
+      OnProcessURLFetchResultsComplete();
+      break;
+  }
+}
+
+void InsertTaskRequest::RunCallbackOnPrematureFailure(ApiErrorCode error) {
+  std::move(callback_).Run(base::unexpected(error));
+}
+
+// static
+std::unique_ptr<Task> InsertTaskRequest::Parse(std::string json) {
+  std::unique_ptr<base::Value> value = ParseJson(json);
+  return value ? Task::CreateFrom(*value) : nullptr;
+}
+
+void InsertTaskRequest::OnDataParsed(std::unique_ptr<Task> task) {
+  if (!task) {
+    std::move(callback_).Run(base::unexpected(PARSE_ERROR));
+  } else {
+    std::move(callback_).Run(std::move(task));
   }
   OnProcessURLFetchResultsComplete();
 }

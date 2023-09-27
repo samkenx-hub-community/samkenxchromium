@@ -8,16 +8,12 @@
 #import <memory>
 
 #import "base/check_op.h"
-#import "ios/chrome/browser/main/browser.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/ui/overlays/overlay_container_view_controller.h"
 #import "ios/chrome/browser/ui/overlays/overlay_presentation_context_coordinator.h"
 #import "ios/chrome/browser/ui/overlays/overlay_presentation_context_impl.h"
 #import "ios/chrome/browser/ui/overlays/overlay_presentation_context_impl_delegate.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface OverlayContainerCoordinator () <
     OverlayContainerViewControllerDelegate,

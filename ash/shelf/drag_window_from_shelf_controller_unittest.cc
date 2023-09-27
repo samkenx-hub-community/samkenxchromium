@@ -20,10 +20,9 @@
 #include "ash/shelf/window_scale_animation.h"
 #include "ash/shell.h"
 #include "ash/test/ash_test_base.h"
-#include "ash/test/ash_test_util.h"
+#include "ash/wallpaper/views/wallpaper_view.h"
+#include "ash/wallpaper/views/wallpaper_widget_controller.h"
 #include "ash/wallpaper/wallpaper_constants.h"
-#include "ash/wallpaper/wallpaper_view.h"
-#include "ash/wallpaper/wallpaper_widget_controller.h"
 #include "ash/wm/mru_window_tracker.h"
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/overview/overview_grid.h"
@@ -35,9 +34,11 @@
 #include "ash/wm/window_properties.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_util.h"
+#include "ash/wm/work_area_insets.h"
 #include "base/ranges/algorithm.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/ui/wm/features.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/client/window_parenting_client.h"
@@ -147,8 +148,9 @@ class DragWindowFromShelfControllerTest : public AshTestBase {
     child->Init(ui::LAYER_NOT_DRAWN);
     child->SetBounds(bounds);
     wm::AddTransientChild(transient_parent, child.get());
-    aura::client::ParentWindowWithContext(
-        child.get(), transient_parent->GetRootWindow(), bounds);
+    aura::client::ParentWindowWithContext(child.get(),
+                                          transient_parent->GetRootWindow(),
+                                          bounds, display::kInvalidDisplayId);
     child->Show();
 
     child->SetProperty(aura::client::kModalKey, ui::MODAL_TYPE_WINDOW);
@@ -489,9 +491,18 @@ TEST_F(DragWindowFromShelfControllerTest, FlingInOverview) {
   EXPECT_TRUE(WindowState::Get(window.get())->IsMinimized());
 }
 
+// TODO(crbug.com/1473400): Re-enable the test once the bug is fixed.
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+#define MAYBE_VerifyHomeLauncherAnimationMetrics \
+  DISABLED_VerifyHomeLauncherAnimationMetrics
+#else
+#define MAYBE_VerifyHomeLauncherAnimationMetrics \
+  VerifyHomeLauncherAnimationMetrics
+#endif
 // Verify that metrics of home launcher animation are recorded correctly when
 // swiping up from shelf with sufficient velocity.
-TEST_F(DragWindowFromShelfControllerTest, VerifyHomeLauncherAnimationMetrics) {
+TEST_F(DragWindowFromShelfControllerTest,
+       MAYBE_VerifyHomeLauncherAnimationMetrics) {
   // Set non-zero animation duration to report animation metrics.
   ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
       ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
@@ -603,7 +614,10 @@ TEST_F(DragWindowFromShelfControllerTest, WallpaperBlurDuringDragging) {
       RootWindowController::ForWindow(window->GetRootWindow())
           ->wallpaper_widget_controller()
           ->wallpaper_view();
-  EXPECT_EQ(wallpaper_view->blur_sigma(), wallpaper_constants::kOverviewBlur);
+  EXPECT_EQ(wallpaper_view->blur_sigma(),
+            chromeos::features::IsJellyrollEnabled()
+                ? wallpaper_constants::kClear
+                : wallpaper_constants::kOverviewBlur);
 
   EndDrag(shelf_bounds.CenterPoint(), /*velocity_y=*/absl::nullopt);
   EXPECT_EQ(wallpaper_view->blur_sigma(), wallpaper_constants::kClear);
@@ -627,7 +641,7 @@ TEST_F(DragWindowFromShelfControllerTest, HideOverviewDuringDragging) {
   OverviewGrid* current_grid =
       overview_controller->overview_session()->GetGridWithRootWindow(
           window1->GetRootWindow());
-  OverviewItem* drop_target_item = current_grid->GetDropTarget();
+  auto* drop_target_item = current_grid->GetDropTarget();
   EXPECT_TRUE(drop_target_item);
   EXPECT_EQ(drop_target_item->GetWindow()->layer()->GetTargetOpacity(), 1.f);
 
@@ -1171,12 +1185,12 @@ TEST_F(DragWindowFromShelfControllerTest, DropsIntoOverviewAtCorrectPosition) {
   aura::Window* parent = window1->parent();
   ASSERT_EQ(parent, window2->parent());
   ASSERT_EQ(parent, window3->parent());
-  EXPECT_TRUE(IsStackedBelow(
+  EXPECT_TRUE(window_util::IsStackedBelow(
       GetOverviewItemForWindow(window1.get())->item_widget()->GetNativeWindow(),
       GetOverviewItemForWindow(window2.get())
           ->item_widget()
           ->GetNativeWindow()));
-  EXPECT_TRUE(IsStackedBelow(
+  EXPECT_TRUE(window_util::IsStackedBelow(
       GetOverviewItemForWindow(window3.get())->item_widget()->GetNativeWindow(),
       GetOverviewItemForWindow(window1.get())
           ->item_widget()
@@ -1200,7 +1214,7 @@ TEST_F(DragWindowFromShelfControllerTest, NoAnimationWhenReturnToMaximize) {
   // Get the bounds and transform of the item associated with |item2|.
   OverviewController* overview_controller = Shell::Get()->overview_controller();
   ASSERT_TRUE(overview_controller->InOverviewSession());
-  OverviewItem* item = GetOverviewItemForWindow(window2.get());
+  auto* item = GetOverviewItemForWindow(window2.get());
   ASSERT_TRUE(item);
   aura::Window* item_window = item->item_widget()->GetNativeWindow();
   const gfx::Rect pre_exit_bounds = item_window->bounds();
@@ -1315,15 +1329,14 @@ TEST_F(DragWindowFromShelfControllerTest,
   EXPECT_TRUE(overview_grid);
   ASSERT_EQ(1u, overview_grid->window_list().size());
 
-  OverviewItem* overview_item = overview_grid->window_list()[0].get();
+  auto* overview_item = overview_grid->window_list()[0].get();
 
-  // Click on |overview_item| to exit overview mode and show windows.
-  const gfx::Point view_center =
-      overview_item->GetBoundsOfSelectedItem().CenterPoint();
-
+  // Press on `overview_item` to exit overview mode and show windows.
   auto* event_generator = GetEventGenerator();
-  event_generator->MoveMouseTo(view_center);
-  event_generator->ClickLeftButton();
+  event_generator->set_current_screen_location(
+      gfx::ToRoundedPoint(overview_item->GetTransformedBounds().CenterPoint()));
+  event_generator->PressTouch();
+  event_generator->ReleaseTouch();
   ASSERT_FALSE(overview_controller->InOverviewSession());
 
   // Both transient child and parent windows should become visible.
@@ -1488,12 +1501,13 @@ TEST_F(FloatDragWindowFromShelfControllerTest, DragMaximizedWindow) {
   ui::Layer* other_window_copy_layer = GetOtherWindowCopyLayer();
   ASSERT_TRUE(other_window_copy_layer);
 
-  // To check if the copy is of the floated window, we check the parent and
-  // bounds.
-  EXPECT_EQ(floated_window->layer()->parent(),
-            other_window_copy_layer->parent());
+  // To check if the copy is of the floated window, we check the bounds. The
+  // float container gets stacked under the desk containers during overview, so
+  // the copy should be on a different parent.
   EXPECT_EQ(floated_window->layer()->bounds(),
             other_window_copy_layer->bounds());
+  EXPECT_NE(floated_window->layer()->parent(),
+            other_window_copy_layer->parent());
 
   Drag(gfx::Point(0, 200), 1.f, 1.f);
   EndDrag(shelf_bounds.CenterPoint(), /*velocity_y=*/absl::nullopt);
@@ -1575,6 +1589,7 @@ TEST_F(FloatDragWindowFromShelfControllerTest, DraggingFloatedWindow) {
   // does nothing.
   GetEventGenerator()->PressTouch(drag_point_under_float);
   GetEventGenerator()->MoveTouchBy(0, -200);
+  GetEventGenerator()->ReleaseTouch();
   EXPECT_FALSE(GetDragWindowFromShelfController()->drag_started());
 }
 
@@ -1634,15 +1649,19 @@ TEST_F(FloatDragWindowFromShelfControllerTest,
       right_window.get(), SplitViewController::SnapPosition::kSecondary);
 
   // Ensure we are in a both snapped state with a floated window.
+  wm::ActivateWindow(floated_window.get());
   ASSERT_TRUE(WindowState::Get(left_window.get())->IsSnapped());
   ASSERT_TRUE(WindowState::Get(right_window.get())->IsSnapped());
   ASSERT_TRUE(WindowState::Get(floated_window.get())->IsFloated());
-  wm::ActivateWindow(floated_window.get());
 
   // Verify that the floated window by default is magnetized to the bottom right
   // corner.
-  ASSERT_TRUE(right_window->GetBoundsInScreen().Contains(
-      floated_window->GetBoundsInScreen()));
+  const gfx::Rect work_area =
+      WorkAreaInsets::ForWindow(floated_window.get())->user_work_area_bounds();
+  ASSERT_EQ(
+      gfx::Point(work_area.right() - chromeos::wm::kFloatedWindowPaddingDp,
+                 work_area.bottom() - chromeos::wm::kFloatedWindowPaddingDp),
+      floated_window->GetBoundsInScreen().bottom_right());
 
   // Drag under the floated window. It should be the dragged window.
   const gfx::Rect shelf_bounds = GetShelfBounds();
@@ -1654,10 +1673,12 @@ TEST_F(FloatDragWindowFromShelfControllerTest,
   auto* drag_controller = GetDragWindowFromShelfController();
   ASSERT_TRUE(drag_controller);
   EXPECT_EQ(floated_window.get(), drag_controller->dragged_window());
+  EXPECT_TRUE(WindowState::Get(floated_window.get())->IsFloated());
 
   // Move back towards the shelf to ensure we do not enter overview.
   GetEventGenerator()->MoveTouchBy(0, 200);
   GetEventGenerator()->ReleaseTouch();
+  EXPECT_TRUE(WindowState::Get(floated_window.get())->IsFloated());
 
   // Drag under the right snapped window. It should be the dragged window.
   const gfx::Point drag_point_under_right(
@@ -1668,6 +1689,11 @@ TEST_F(FloatDragWindowFromShelfControllerTest,
   drag_controller = GetDragWindowFromShelfController();
   ASSERT_TRUE(drag_controller);
   EXPECT_EQ(right_window.get(), drag_controller->dragged_window());
+
+  // Verify that all the window states remain the same.
+  EXPECT_TRUE(WindowState::Get(left_window.get())->IsSnapped());
+  EXPECT_TRUE(WindowState::Get(right_window.get())->IsSnapped());
+  EXPECT_TRUE(WindowState::Get(floated_window.get())->IsFloated());
 }
 
 }  // namespace ash

@@ -7,12 +7,14 @@
 #include <string>
 #include <utility>
 
+#include "ash/system/diagnostics/diagnostics_log_controller.h"
 #include "ash/system/diagnostics/networking_log.h"
 #include "ash/webui/diagnostics_ui/backend/common/histogram_util.h"
 #include "base/containers/contains.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/functional/bind.h"
 #include "base/strings/string_util.h"
+#include "base/uuid.h"
 #include "chromeos/ash/services/network_config/in_process_instance.h"
 #include "chromeos/services/network_config/public/cpp/cros_network_config_util.h"
 #include "mojo/public/cpp/bindings/enum_traits.h"
@@ -394,6 +396,10 @@ int GetScoreForNetwork(const mojom::NetworkPtr& network) {
   return kNetworkTypePriorityMap.at(network->type) + state_priority;
 }
 
+bool IsLoggingEnabled() {
+  return diagnostics::DiagnosticsLogController::IsInitialized();
+}
+
 }  // namespace
 
 NetworkObserverInfo::NetworkObserverInfo() = default;
@@ -402,11 +408,7 @@ NetworkObserverInfo& NetworkObserverInfo::operator=(NetworkObserverInfo&&) =
     default;
 NetworkObserverInfo::~NetworkObserverInfo() = default;
 
-NetworkHealthProvider::NetworkHealthProvider()
-    : NetworkHealthProvider(/*networking_log_ptr_=*/nullptr) {}
-
-NetworkHealthProvider::NetworkHealthProvider(NetworkingLog* networking_log_ptr)
-    : networking_log_ptr_(networking_log_ptr) {
+NetworkHealthProvider::NetworkHealthProvider() {
   network_config::BindToInProcessInstance(
       remote_cros_network_config_.BindNewPipeAndPassReceiver());
   remote_cros_network_config_->AddObserver(
@@ -543,7 +545,8 @@ void NetworkHealthProvider::OnDeviceStateListReceived(
 
 std::string NetworkHealthProvider::AddNewNetwork(
     const network_mojom::DeviceStatePropertiesPtr& device) {
-  std::string observer_guid = base::GenerateGUID();
+  std::string observer_guid =
+      base::Uuid::GenerateRandomV4().AsLowercaseString();
   auto network = mojom::Network::New();
   network->observer_guid = observer_guid;
 
@@ -643,8 +646,9 @@ void NetworkHealthProvider::NotifyNetworkListObservers() {
     observer->OnNetworkListChanged(mojo::Clone(observer_guids), active_guid_);
   }
 
-  if (IsLoggingEnabled()) {
-    networking_log_ptr_->UpdateNetworkList(observer_guids, active_guid_);
+  if (IsLoggingEnabled() && !active_guid_.empty()) {
+    DiagnosticsLogController::Get()->GetNetworkingLog().UpdateNetworkList(
+        observer_guids, active_guid_);
   }
 }
 
@@ -658,7 +662,8 @@ void NetworkHealthProvider::NotifyNetworkStateObserver(
       mojo::Clone(network_info.network));
 
   if (IsLoggingEnabled()) {
-    networking_log_ptr_->UpdateNetworkState(network_info.network.Clone());
+    DiagnosticsLogController::Get()->GetNetworkingLog().UpdateNetworkState(
+        network_info.network.Clone());
   }
 }
 
@@ -675,15 +680,6 @@ void NetworkHealthProvider::GetDeviceState() {
   remote_cros_network_config_->GetDeviceStateList(
       base::BindOnce(&NetworkHealthProvider::OnDeviceStateListReceived,
                      base::Unretained(this)));
-}
-
-void NetworkHealthProvider::SetNetworkingLogForTesting(
-    NetworkingLog* networking_log_ptr) {
-  networking_log_ptr_ = networking_log_ptr;
-}
-
-bool NetworkHealthProvider::IsLoggingEnabled() const {
-  return networking_log_ptr_ != nullptr;
 }
 
 mojom::NetworkState NetworkHealthProvider::GetNetworkStateForGuid(

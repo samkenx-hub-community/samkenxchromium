@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "ash/webui/system_apps/public/system_web_app_type.h"
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "chrome/browser/ash/drive/file_system_util.h"
@@ -22,6 +23,8 @@
 #include "chrome/browser/ash/fileapi/file_system_backend.h"
 #include "chrome/browser/extensions/chrome_extension_function_details.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/ash/system_web_apps/system_web_app_ui_utils.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/common/extensions/api/file_manager_private.h"
 #include "chrome/common/extensions/api/file_manager_private_internal.h"
 #include "extensions/browser/api/file_handlers/directory_util.h"
@@ -37,8 +40,6 @@ namespace {
 // Error messages.
 constexpr char kInvalidTaskType[] = "Invalid task type: ";
 constexpr char kInvalidFileUrl[] = "Invalid file URL";
-constexpr char kInvalidAssignmentPolicyConflict[] =
-    "Invalid assignment (conflicts with policy): ";
 
 // Make a set of unique filename suffixes out of the list of file URLs.
 std::set<std::string> GetUniqueSuffixes(
@@ -133,8 +134,11 @@ FileManagerPrivateInternalExecuteTaskFunction::Run() {
     urls.push_back(url);
   }
 
+  // Get Files App window, if it exists.
+  Browser* browser =
+      FindSystemWebAppBrowser(profile, ash::SystemWebAppType::FILE_MANAGER);
   gfx::NativeWindow modal_parent =
-      ChromeExtensionFunctionDetails(this).GetNativeWindowForUI();
+      browser ? browser->window()->GetNativeWindow() : nullptr;
 
   const bool result = file_manager::file_tasks::ExecuteFileTask(
       profile, task, urls, modal_parent,
@@ -298,14 +302,6 @@ FileManagerPrivateInternalSetDefaultTaskFunction::Run() {
     return RespondNow(WithArguments(true));
   }
 
-  // Check that there are no conflicts with policy-assigned defaults.
-  for (const auto& suffix : suffixes) {
-    if (file_manager::file_tasks::GetPolicyDefaultHandlerForFileExtension(
-            profile, suffix)) {
-      return RespondNow(Error(kInvalidAssignmentPolicyConflict + suffix));
-    }
-  }
-
   file_manager::file_tasks::TaskType task_type =
       file_manager::file_tasks::StringToTaskType(params->descriptor.task_type);
   if (task_type == file_manager::file_tasks::TASK_TYPE_UNKNOWN) {
@@ -316,7 +312,7 @@ FileManagerPrivateInternalSetDefaultTaskFunction::Run() {
 
   file_manager::file_tasks::UpdateDefaultTask(profile, descriptor, suffixes,
                                               mime_types);
-  return RespondNow(WithArguments());
+  return RespondNow(NoArguments());
 }
 
 }  // namespace extensions

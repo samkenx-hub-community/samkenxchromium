@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ash/arc/input_method_manager/input_connection_impl.h"
 
+#include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/task_environment.h"
 #include "chrome/browser/ash/arc/input_method_manager/test_input_method_manager_bridge.h"
@@ -100,12 +101,12 @@ class TestIMEInputContextHandler : public ash::MockIMEInputContextHandler {
     ++send_key_event_call_count_;
   }
 
-  bool SetCompositionRange(
+  bool SetComposingRange(
       uint32_t before,
       uint32_t after,
       const std::vector<ui::ImeTextSpan>& text_spans) override {
-    ash::MockIMEInputContextHandler::SetCompositionRange(before, after,
-                                                         text_spans);
+    ash::MockIMEInputContextHandler::SetComposingRange(before, after,
+                                                       text_spans);
     composition_range_history_.push_back(std::make_tuple(before, after));
     return true;
   }
@@ -122,7 +123,7 @@ class TestIMEInputContextHandler : public ash::MockIMEInputContextHandler {
   }
 
  private:
-  ui::InputMethod* const input_method_;
+  const raw_ptr<ui::InputMethod, ExperimentalAsh> input_method_;
 
   int send_key_event_call_count_ = 0;
   std::vector<std::tuple<int, int>> composition_range_history_;
@@ -399,7 +400,7 @@ TEST_F(InputConnectionImplTest, SetCompositionRange) {
   // a[b|cd]e
   connection->SetCompositionRange(gfx::Range(1, 4));
   EXPECT_EQ(1u, context_handler()->composition_range_history().size());
-  EXPECT_EQ(std::make_tuple(1, 2),
+  EXPECT_EQ(std::make_tuple(1, 4),
             context_handler()->composition_range_history().back());
 
   engine()->Blur();

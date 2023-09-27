@@ -9,11 +9,9 @@
 #include <string>
 #include <vector>
 
-#include "base/allocator/partition_allocator/pointers/raw_ptr.h"
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/containers/flat_set.h"
-#include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/metrics/field_trial_params.h"
@@ -33,7 +31,6 @@
 #include "chrome/browser/apps/intent_helper/preferred_apps_test_util.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/web_applications/app_registrar_observer.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom-shared.h"
 #include "chrome/browser/web_applications/preinstalled_web_app_manager.h"
 #include "chrome/browser/web_applications/preinstalled_web_app_window_experiment_utils.h"
@@ -41,10 +38,10 @@
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_database_factory.h"
-#include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/browser/web_applications/web_app_id_constants.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
+#include "chrome/browser/web_applications/web_app_registrar_observer.h"
 #include "chrome/browser/web_applications/web_app_sync_bridge.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_switches.h"
@@ -54,12 +51,20 @@
 #include "components/services/app_service/public/cpp/preferred_apps_list_handle.h"
 #include "components/sync/model/entity_change.h"
 #include "components/sync/test/mock_model_type_change_processor.h"
+#include "components/user_manager/user_names.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
+#include "components/webapps/common/web_app_id.h"
 #include "content/public/test/browser_test.h"
+#include "testing/gmock/include/gmock/gmock-matchers.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "ash/constants/ash_switches.h"
+#include "chrome/browser/ash/profiles/profile_helper.h"
+#endif
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
 #include "chrome/browser/web_applications/app_service/test/loopback_crosapi_app_service_proxy.h"
@@ -69,6 +74,7 @@ namespace web_app {
 using base::Bucket;
 using mojom::UserDisplayMode;
 using testing::ElementsAre;
+using testing::IsEmpty;
 using UserGroup = features::PreinstalledWebAppWindowExperimentUserGroup;
 
 static const auto& kUserGroupParam =
@@ -77,7 +83,7 @@ static const auto& kUserGroupParam =
 // ChromeOS only.
 class PreinstalledWebAppWindowExperimentBrowserTest
     : public InProcessBrowserTest,
-      public AppRegistrarObserver,
+      public WebAppRegistrarObserver,
       public apps::PreferredAppsListHandle::Observer {
  public:
   PreinstalledWebAppWindowExperimentBrowserTest()
@@ -119,14 +125,14 @@ class PreinstalledWebAppWindowExperimentBrowserTest
 #endif
   }
 
-  // AppRegistrarObserver:
+  // WebAppRegistrarObserver:
   void OnWebAppUserDisplayModeChanged(
-      const AppId& app_id,
+      const webapps::AppId& app_id,
       UserDisplayMode user_display_mode) override {
     recorded_display_mode_changes_[app_id] = user_display_mode;
   }
 
-  // AppRegistrarObserver:
+  // WebAppRegistrarObserver:
   void OnAppRegistrarDestroyed() override { registrar_observation_.Reset(); }
 
   // apps::PreferredAppsListHandle::Observer:
@@ -154,8 +160,8 @@ class PreinstalledWebAppWindowExperimentBrowserTest
         .WillByDefault(testing::Return(true));
 
     WebAppSyncBridge& sync_bridge = provider().sync_bridge_unsafe();
-    sync_bridge.MergeSyncData(sync_bridge.CreateMetadataChangeList(),
-                              syncer::EntityChangeList());
+    sync_bridge.MergeFullSyncData(sync_bridge.CreateMetadataChangeList(),
+                                  syncer::EntityChangeList());
   }
 
   PreinstalledWebAppWindowExperiment& experiment() {
@@ -196,17 +202,31 @@ class PreinstalledWebAppWindowExperimentBrowserTest
   }
 #endif
 
-  std::map<AppId, UserDisplayMode> recorded_display_mode_changes_;
-  std::map<AppId, bool> recorded_link_capturing_changes_;
+  // Abstraction of `apps_util::RemoveSupportedLinksPreferenceAndWait`.
+  // CrosAPI doesn't have this method so it doesn't exist on Lacros.
+  void RemoveSupportedLinksPreferenceAndWait(const std::string& app_id) {
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+    loopback_crosapi().RemoveSupportedLinksPreference(app_id);
+    apps_util::PreferredAppUpdateWaiter(proxy().PreferredAppsList(), app_id,
+                                        /*is_preferred_app=*/false)
+        .Wait();
+#else
+    apps_util::RemoveSupportedLinksPreferenceAndWait(browser()->profile(),
+                                                     app_id);
+#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
+  }
+
+  std::map<webapps::AppId, UserDisplayMode> recorded_display_mode_changes_;
+  std::map<webapps::AppId, bool> recorded_link_capturing_changes_;
 
  private:
   std::unique_ptr<KeyedService> CreateFakeWebAppProvider(Profile* profile) {
     auto provider = std::make_unique<FakeWebAppProvider>(profile);
 
     // Use default fakes for fake working sync system.
-    provider->SetDefaultFakeSubsystems();
+    provider->CreateFakeSubsystems();
 
-    // Added by `SetDefaultFakeSubsystems`. Re-enable default apps as
+    // Added by `CreateFakeSubsystems`. Re-enable default apps as
     // we wish to test effects on them.
     base::CommandLine::ForCurrentProcess()->RemoveSwitch(
         switches::kDisableDefaultApps);
@@ -226,7 +246,7 @@ class PreinstalledWebAppWindowExperimentBrowserTest
     return provider;
   }
 
-  base::ScopedObservation<WebAppRegistrar, AppRegistrarObserver>
+  base::ScopedObservation<WebAppRegistrar, WebAppRegistrarObserver>
       registrar_observation_{this};
 
   base::ScopedObservation<apps::PreferredAppsListHandle,
@@ -294,15 +314,51 @@ class PreinstalledWebAppWindowExperimentBrowserTestWindow
   base::test::ScopedFeatureList features_;
 };
 
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+// WebAppProvider exists in Guest sessions on Ash only, so it is sufficient to
+// test Guest sessions on Ash only.
+class PreinstalledWebAppWindowExperimentBrowserTestWindowGuest
+    : public PreinstalledWebAppWindowExperimentBrowserTestWindow {
+ public:
+  PreinstalledWebAppWindowExperimentBrowserTestWindowGuest() = default;
+
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    PreinstalledWebAppWindowExperimentBrowserTestWindow::SetUpCommandLine(
+        command_line);
+
+    command_line->AppendSwitch(::switches::kIncognito);
+    command_line->AppendSwitch(ash::switches::kGuestSession);
+    command_line->AppendSwitchASCII(ash::switches::kLoginProfile, "user");
+    command_line->AppendSwitchASCII(ash::switches::kLoginUser,
+                                    user_manager::kGuestUserName);
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindowGuest,
+                       IneligibleDueToGuestProfile) {
+  Profile& guest_profile = *browser()->profile();
+  EXPECT_TRUE(guest_profile.IsGuestSession());
+
+  // Allow eligibility check to happen.
+  SimulateSyncReady();
+  AwaitExperimentSetup();
+
+  // User is ineligible.
+  EXPECT_EQ(preinstalled_web_app_window_experiment_utils::GetUserGroupPref(
+                browser()->profile()->GetPrefs()),
+            UserGroup::kUnknown);
+}
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
 IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
                        IneligibleDueToNonRecentApp) {
   // Install an app and set install time as if installed a long time ago.
-  AppId app_id = test::InstallDummyWebApp(
+  webapps::AppId app_id = test::InstallDummyWebApp(
       browser()->profile(), "non-recent app", GURL("https://example.com"));
   auto& fake_provider = static_cast<FakeWebAppProvider&>(provider());
   WebApp* app = fake_provider.GetRegistrarMutable().GetAppByIdMutable(app_id);
   DCHECK(app);
-  app->SetInstallTime(base::Time::UnixEpoch());
+  app->SetFirstInstallTime(base::Time::UnixEpoch());
 
   // Allow eligibility check to happen.
   SimulateSyncReady();
@@ -317,9 +373,9 @@ IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
 IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
                        IneligibleDueToSyncInstalledApp) {
   // Install an app as if it came from sync.
-  AppId app_id = test::InstallDummyWebApp(browser()->profile(), "app from sync",
-                                          GURL("https://example.com"),
-                                          webapps::WebappInstallSource::SYNC);
+  webapps::AppId app_id = test::InstallDummyWebApp(
+      browser()->profile(), "app from sync", GURL("https://example.com"),
+      webapps::WebappInstallSource::SYNC);
 
   // Allow eligibility check to happen.
   SimulateSyncReady();
@@ -334,7 +390,7 @@ IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
 IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
                        IneligibleDueToPendingSyncInstalledApp) {
   // Install an app and set as if just received from sync.
-  AppId app_id = test::InstallDummyWebApp(
+  webapps::AppId app_id = test::InstallDummyWebApp(
       browser()->profile(), "non-recent app", GURL("https://example.com"));
   auto& fake_provider = static_cast<FakeWebAppProvider&>(provider());
   WebApp* app = fake_provider.GetRegistrarMutable().GetAppByIdMutable(app_id);
@@ -353,17 +409,17 @@ IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
 
 IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
                        PreinstalledAppLaunchedBeforeExperiment) {
-  // Set preinstalled apps before the test app so it isn't removed.
+  // Set preinstalled apps before the test apps so they aren't removed.
   AwaitPreinstalledAppsInstalled();
 
   // Install an app and set launch time as if recently launched.
-  AppId launched_app_id = test::InstallDummyWebApp(
+  webapps::AppId launched_app_id = test::InstallDummyWebApp(
       browser()->profile(), "launched app", GURL("https://example1.com"),
       webapps::WebappInstallSource::INTERNAL_DEFAULT);
   provider().sync_bridge_unsafe().SetAppLastLaunchTime(launched_app_id,
                                                        base::Time::Now());
 
-  AppId unlaunched_app_id = test::InstallDummyWebApp(
+  webapps::AppId unlaunched_app_id = test::InstallDummyWebApp(
       browser()->profile(), "unlaunched app", GURL("https://example2.com"),
       webapps::WebappInstallSource::INTERNAL_DEFAULT);
 
@@ -382,6 +438,106 @@ IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
   EXPECT_FALSE(preinstalled_web_app_window_experiment_utils::
                    HasLaunchedAppBeforeExperiment(
                        kGoogleDriveAppId, browser()->profile()->GetPrefs()));
+}
+
+IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
+                       IgnoreOnPreferredAppChangedCallFromSetup) {
+  base::HistogramTester histogram_tester;
+
+  // Set preinstalled apps before the test app so it isn't removed.
+  AwaitPreinstalledAppsInstalled();
+
+  // Use a real preinstalled app if available, otherwise install a fake one.
+  // webapps::AppId must match a known preinstalled app for metrics to be
+  // recorded.
+  if (!provider().registrar_unsafe().IsInstalled(kGoogleDriveAppId)) {
+    // Install an app and set supported links preference so experiment setting
+    // it won't cause any observations.
+    webapps::AppId app_id = test::InstallDummyWebApp(
+        browser()->profile(), "launched app",
+        GURL("https://drive.google.com/?lfhs=2"),
+        webapps::WebappInstallSource::INTERNAL_DEFAULT);
+    ASSERT_EQ(app_id, kGoogleDriveAppId);
+  }
+
+  ASSERT_FALSE(proxy().PreferredAppsList().IsPreferredAppForSupportedLinks(
+      kGoogleDriveAppId));
+
+  // Allow eligibility check to happen.
+  SimulateSyncReady();
+  AwaitExperimentSetup();
+
+  // Wait for (possibly asynchronous) preferred apps change from experiment
+  // setup.
+  apps_util::PreferredAppUpdateWaiter(proxy().PreferredAppsList(),
+                                      kGoogleDriveAppId,
+                                      /*is_preferred_app=*/true)
+      .Wait();
+
+  // No Link Capturing metrics should have been recorded.
+  histogram_tester.ExpectTotalCount(
+      "WebApp.Preinstalled.WindowExperiment.Window.LinkCapturingEnabled", 0);
+  histogram_tester.ExpectTotalCount(
+      "WebApp.Preinstalled.WindowExperiment.Window.LinkCapturingDisabled", 0);
+
+  // Simulate subsequent preferred app change from user.
+  RemoveSupportedLinksPreferenceAndWait(kGoogleDriveAppId);
+
+  // Now the remove should be recorded.
+  histogram_tester.ExpectTotalCount(
+      "WebApp.Preinstalled.WindowExperiment.Window.LinkCapturingEnabled", 0);
+  histogram_tester.ExpectTotalCount(
+      "WebApp.Preinstalled.WindowExperiment.Window.LinkCapturingDisabled", 1);
+}
+
+IN_PROC_BROWSER_TEST_F(PreinstalledWebAppWindowExperimentBrowserTestWindow,
+                       NoIgnoreOnPreferredAppChangedCallFromUser) {
+  base::HistogramTester histogram_tester;
+
+  // Set preinstalled apps before the test app so it isn't removed.
+  AwaitPreinstalledAppsInstalled();
+
+  // Use a real preinstalled app if available, otherwise install a fake one.
+  // webapps::AppId must match a known preinstalled app for metrics to be
+  // recorded.
+  if (!provider().registrar_unsafe().IsInstalled(kGoogleDriveAppId)) {
+    // Install an app and set supported links preference so experiment setting
+    // it won't cause any observations.
+    webapps::AppId app_id = test::InstallDummyWebApp(
+        browser()->profile(), "launched app",
+        GURL("https://drive.google.com/?lfhs=2"),
+        webapps::WebappInstallSource::INTERNAL_DEFAULT);
+    ASSERT_EQ(app_id, kGoogleDriveAppId);
+  }
+
+  apps_util::SetSupportedLinksPreferenceAndWait(browser()->profile(),
+                                                kGoogleDriveAppId);
+  ASSERT_TRUE(proxy().PreferredAppsList().IsPreferredAppForSupportedLinks(
+      kGoogleDriveAppId));
+
+  // Allow eligibility check to happen.
+  SimulateSyncReady();
+  AwaitExperimentSetup();
+
+  // Simulate preferred app change from user, without first seeing one from
+  // experiment setup.
+  RemoveSupportedLinksPreferenceAndWait(kGoogleDriveAppId);
+
+  // The disable should be recorded.
+  histogram_tester.ExpectTotalCount(
+      "WebApp.Preinstalled.WindowExperiment.Window.LinkCapturingEnabled", 0);
+  histogram_tester.ExpectTotalCount(
+      "WebApp.Preinstalled.WindowExperiment.Window.LinkCapturingDisabled", 1);
+
+  // Simulate the user re-enabling link capturing.
+  apps_util::SetSupportedLinksPreferenceAndWait(browser()->profile(),
+                                                kGoogleDriveAppId);
+
+  // The enable should be recorded.
+  histogram_tester.ExpectTotalCount(
+      "WebApp.Preinstalled.WindowExperiment.Window.LinkCapturingEnabled", 1);
+  histogram_tester.ExpectTotalCount(
+      "WebApp.Preinstalled.WindowExperiment.Window.LinkCapturingDisabled", 1);
 }
 
 class PreinstalledWebAppWindowExperimentBrowserTestAll
@@ -421,14 +577,14 @@ IN_PROC_BROWSER_TEST_P(PreinstalledWebAppWindowExperimentBrowserTestAll,
 #endif
 
   if (!has_preinstalled_apps) {
-    EXPECT_TRUE(recorded_display_mode_changes_.empty());
-    EXPECT_TRUE(recorded_link_capturing_changes_.empty());
+    EXPECT_THAT(recorded_display_mode_changes_, IsEmpty());
+    EXPECT_THAT(recorded_link_capturing_changes_, IsEmpty());
     // No apps expected to be installed/installing.
-    std::vector<AppId> app_ids;
+    std::vector<webapps::AppId> app_ids;
     for (const WebApp& app : registrar.GetAppsIncludingStubs()) {
       app_ids.emplace_back(app.app_id());
     }
-    EXPECT_TRUE(app_ids.empty());
+    EXPECT_THAT(app_ids, IsEmpty());
 
     // Remaining tests rely on apps being preinstalled.
     return;
@@ -444,7 +600,7 @@ IN_PROC_BROWSER_TEST_P(PreinstalledWebAppWindowExperimentBrowserTestAll,
         recorded_link_capturing_changes_.contains(kGoogleCalendarAppId));
     EXPECT_TRUE(recorded_link_capturing_changes_[kGoogleCalendarAppId]);
   } else {
-    EXPECT_TRUE(recorded_link_capturing_changes_.empty());
+    EXPECT_THAT(recorded_link_capturing_changes_, IsEmpty());
   }
 
   absl::optional<UserDisplayMode> expected =
@@ -517,14 +673,14 @@ IN_PROC_BROWSER_TEST_P(PreinstalledWebAppWindowExperimentBrowserTestAll,
 
   // User-overridden apps should be recorded.
   PrefService* pref_service = browser()->profile()->GetPrefs();
-  base::flat_set<AppId> overridden_apps =
+  base::flat_set<webapps::AppId> overridden_apps =
       preinstalled_web_app_window_experiment_utils::
           GetAppIdsWithUserOverridenDisplayModePref(pref_service);
   if (GetUserGroupTestParam() == UserGroup::kUnknown) {
-    EXPECT_TRUE(overridden_apps.empty());
+    EXPECT_THAT(overridden_apps, IsEmpty());
   } else {
     EXPECT_EQ(overridden_apps,
-              base::flat_set<AppId>(
+              base::flat_set<webapps::AppId>(
                   {kGoogleDriveAppId, kYoutubeAppId, kGoogleCalendarAppId}));
   }
 
@@ -584,17 +740,7 @@ IN_PROC_BROWSER_TEST_P(PreinstalledWebAppWindowExperimentBrowserTestAll,
   Profile* profile = browser()->profile();
   apps_util::SetSupportedLinksPreferenceAndWait(profile, kGoogleDriveAppId);
   apps_util::SetSupportedLinksPreferenceAndWait(profile, kYoutubeAppId);
-
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-  auto waiter = apps_util::PreferredAppUpdateWaiter(proxy().PreferredAppsList(),
-                                                    kGoogleCalendarAppId,
-                                                    /*is_preferred_app=*/false);
-  loopback_crosapi().RemoveSupportedLinksPreference(kGoogleCalendarAppId);
-  waiter.Wait();
-#else
-  apps_util::RemoveSupportedLinksPreferenceAndWait(profile,
-                                                   kGoogleCalendarAppId);
-#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
+  RemoveSupportedLinksPreferenceAndWait(kGoogleCalendarAppId);
 
   // Metrics should be emitted iff experiment is active and link capturing
   // state actually changed.

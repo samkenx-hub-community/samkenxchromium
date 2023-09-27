@@ -2,8 +2,8 @@
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.chromium.chrome.stable"
-    platformBuildVersionCode="33"
-    platformBuildVersionName="13"
+    platformBuildVersionCode="34"
+    platformBuildVersionName="14"
     android:isolatedSplits="true"
     android:versionCode="OFFSET=30"
     android:versionName="#.#.#.#">
@@ -12,7 +12,6 @@
   <permission android:name="$PACKAGE.permission.CHILD_SERVICE" android:protectionLevel="signature"/>
   <permission android:name="$PACKAGE.permission.DEBUG" android:label="Debug web pages" android:protectionLevel="signature"/>
   <permission android:name="$PACKAGE.permission.READ_WRITE_BOOKMARK_FOLDERS" android:protectionLevel="signatureOrSystem"/>
-  <permission android:name="$PACKAGE.permission.TRANSLATE" android:protectionLevel="signature"/>
   <queries>  # DIFF-ANCHOR: 9588fea7
     <package android:name="com.google.ar.core"/>
   </queries>  # DIFF-ANCHOR: 9588fea7
@@ -35,8 +34,12 @@
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
   <uses-permission android:name="android.permission.CAMERA"/>
+  <uses-permission android:name="android.permission.CREDENTIAL_MANAGER_QUERY_CANDIDATE_CREDENTIALS"/>
+  <uses-permission android:name="android.permission.CREDENTIAL_MANAGER_SET_ALLOWED_PROVIDERS"/>
+  <uses-permission android:name="android.permission.CREDENTIAL_MANAGER_SET_ORIGIN"/>
   <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
   <uses-permission android:name="android.permission.GET_ACCOUNTS"/>
   <uses-permission android:name="android.permission.INTERNET"/>
@@ -48,6 +51,7 @@
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+  <uses-permission android:name="android.permission.RUN_USER_INITIATED_JOBS"/>
   <uses-permission android:name="android.permission.USE_CREDENTIALS"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
@@ -56,6 +60,7 @@
   <uses-permission android:name="com.chrome.permission.DEVICE_EXTRAS"/>
   <uses-permission android:name="com.google.android.apps.now.CURRENT_ACCOUNT_ACCESS"/>
   <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE"/>
+  <uses-permission-sdk-23 android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"/>
   <uses-permission-sdk-23 android:name="android.permission.ACCESS_WIFI_STATE"/>
   <uses-permission-sdk-23 android:name="android.permission.BLUETOOTH"/>
   <uses-permission-sdk-23 android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
@@ -70,7 +75,7 @@
   <uses-permission-sdk-23 android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
   <uses-permission-sdk-23 android:name="android.permission.USE_BIOMETRIC"/>
   <uses-permission-sdk-23 android:name="android.permission.USE_FINGERPRINT"/>
-  <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="33"/>
+  <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34"/>
   <application
       android:name="org.chromium.chrome.browser.base.SplitChromeApplication"
       android:allowAudioPlaybackCapture="false"
@@ -82,11 +87,11 @@
       android:label="@string/app_name"
       android:largeHeap="false"
       android:manageSpaceActivity="@string/manage_space_activity"
+      android:memtagMode="async"
       android:multiArch="true"
       android:networkSecurityConfig="@xml/network_security_config"
       android:roundIcon="@drawable/ic_launcher_round"
       android:supportsRtl="true"
-      android:use32bitAbi="true"
       android:zygotePreloadName="org.chromium.chrome.app.TrichromeZygotePreload">
     <activity  # DIFF-ANCHOR: ea1a94af
         android:name="com.google.android.gms.common.api.GoogleApiActivity"
@@ -99,14 +104,6 @@
         android:stateNotNeeded="true"
         android:theme="@style/Theme.PlayCore.Transparent">
     </activity>  # DIFF-ANCHOR: a2bae37c
-    <activity  # DIFF-ANCHOR: 28dc9019
-        android:name="com.google.ar.core.InstallActivity"
-        android:configChanges="keyboardHidden|orientation|screenSize"
-        android:excludeFromRecents="true"
-        android:exported="false"
-        android:launchMode="singleTop"
-        android:theme="@android:style/Theme.Material.Light.Dialog.Alert">
-    </activity>  # DIFF-ANCHOR: 28dc9019
     <meta-data android:name="android.allow_multiple_resumed_activities" android:value="true"/>
     <meta-data android:name="android.content.APP_RESTRICTIONS" android:resource="@xml/app_restrictions"/>
     <meta-data android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME" android:value="org.chromium.components.media_router.caf.CastOptionsProvider"/>

@@ -4,7 +4,7 @@
 
 #import "ios/chrome/browser/ui/autofill/card_unmask_prompt_view_controller.h"
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/autofill/core/browser/ui/payments/card_unmask_prompt_controller.h"
 #import "components/strings/grit/components_strings.h"
@@ -23,10 +23,6 @@
 #import "ui/base/l10n/l10n_util.h"
 #import "url/gurl.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 NSString* const kCardUnmaskPromptTableViewAccessibilityID =
     @"CardUnmaskPromptTableViewAccessibilityID";
 
@@ -42,6 +38,13 @@ typedef NS_ENUM(NSInteger, ItemType) {
   ItemTypeCVCInput,
   ItemTypeFooter,
   ItemTypeExpirationDateInput,
+};
+
+// Represents the next first responder after a UI transition.
+enum class ItemToFocus {
+  kNone,
+  kCVC,
+  kExpirationDate,
 };
 
 // Empty space on top of the input section. This value added up to the gPay
@@ -66,7 +69,8 @@ const char kFooterDummyLinkTarget[] = "about:blank";
   // Button displayed on the right side of the navigation bar.
   // Tapping it sends the data in the prompt for verification.
   UIBarButtonItem* _confirmButton;
-  // Owns `self`.
+  // Owns `self`. A value of nullptr means the view controller is dismissed or
+  // about to be dismissed.
   autofill::CardUnmaskPromptViewBridge* _bridge;  // weak
   // Model of the CVC input cell.
   TableViewTextEditItem* _CVCInputItem;
@@ -76,12 +80,9 @@ const char kFooterDummyLinkTarget[] = "about:blank";
   CVCHeaderItem* _headerItem;
   // Model of the expiration date input cell.
   ExpirationDateEditItem* _expirationDateInputItem;
-  // Flag indicating that we should set the focus in either the CVC or
-  // expiration date fields once the tableView is reloaded. After the view shows
-  // the CVC form or the expiration form, we want to focus the CVC and
-  // expiration date fields respectively. When transitioning from one form to
-  // the other, we activate this flag so the focus is updated.
-  BOOL _shouldUpdateFocus;
+  // Whether we should set the focus on the CVC or
+  // expiration date fields once the tableView is reloaded.
+  ItemToFocus _itemToFocus;
 }
 
 @end
@@ -94,7 +95,7 @@ const char kFooterDummyLinkTarget[] = "about:blank";
   if (self) {
     _bridge = bridge;
     // Focus CVC field after initial load.
-    _shouldUpdateFocus = YES;
+    _itemToFocus = ItemToFocus::kCVC;
   }
 
   return self;
@@ -102,6 +103,10 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 
 - (void)viewDidLoad {
   [super viewDidLoad];
+
+  if (_bridge == nullptr) {
+    return;
+  }
 
   // Default inset inherited from `super` is for cells that display icons.
   // Using smaller inset.
@@ -143,6 +148,10 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 - (void)loadModel {
   [super loadModel];
 
+  if (_bridge == nullptr) {
+    return;
+  }
+
   TableViewModel* model = self.tableViewModel;
   [model addSectionWithIdentifier:SectionIdentifierHeader];
 
@@ -156,6 +165,10 @@ const char kFooterDummyLinkTarget[] = "about:blank";
   _CVCInputItem = [self createCVCInputItem];
   [self.tableViewModel addItem:_CVCInputItem
        toSectionWithIdentifier:SectionIdentifierInputs];
+
+  if (_bridge->GetController()->ShouldRequestExpirationDate()) {
+    [self addExpirationDateInputItem];
+  }
 }
 
 #pragma mark - Public
@@ -197,22 +210,42 @@ const char kFooterDummyLinkTarget[] = "about:blank";
   [self presentViewController:errorAlert animated:YES completion:nil];
 }
 
+- (void)disconnectFromBridge {
+  _bridge = nullptr;
+}
+
 #pragma mark - UIAdaptivePresentationControllerDelegate
 
 - (void)presentationControllerDidDismiss:
     (UIPresentationController*)presentationController {
+  if (_bridge == nullptr) {
+    return;
+  }
   // Notify bridge that UI was dismissed.
   _bridge->NavigationControllerDismissed();
-  _bridge = nullptr;
 }
 
 #pragma mark - Actions
 
 - (void)onCancelTapped {
-  _bridge->PerformClose();
+  if (_bridge) {
+    _bridge->PerformClose();
+  }
 }
 
 - (void)onVerifyTapped {
+  if (_bridge == nullptr) {
+    return;
+  }
+
+  // Guard against the rare case where the user was able to tap on verify after
+  // setting an invalid date and before the button is disabled. The UIPickerView
+  // notifies its delegate about picker changes but with a sligh delay, which
+  // leads to this case.
+  if (![self isExpirationInputValid]) {
+    return;
+  }
+
   autofill::CardUnmaskPromptController* controller = _bridge->GetController();
 
   NSString* CVC = _CVCInputItem.textFieldValue;
@@ -254,7 +287,7 @@ const char kFooterDummyLinkTarget[] = "about:blank";
   [self removeFooterItem];
 
   // Change focus to expiration date field once the cells are loaded.
-  _shouldUpdateFocus = YES;
+  _itemToFocus = ItemToFocus::kExpirationDate;
 
   [self reloadAllSections];
 
@@ -284,7 +317,7 @@ const char kFooterDummyLinkTarget[] = "about:blank";
         forSectionWithIdentifier:SectionIdentifierInputs];
 
   // Restore focus to CVC input field after the section is reloaded.
-  _shouldUpdateFocus = YES;
+  _itemToFocus = ItemToFocus::kCVC;
 
   // Reload inputs section to display footer.
   NSIndexSet* indexSet = [[NSIndexSet alloc]
@@ -313,6 +346,10 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 
 // Returns a new confirm button for the navigation bar.
 - (UIBarButtonItem*)createConfirmButton {
+  if (_bridge == nullptr) {
+    return nil;
+  }
+
   NSString* confirmButtonText =
       base::SysUTF16ToNSString(_bridge->GetController()->GetOkButtonLabel());
   UIBarButtonItem* confirmButton =
@@ -334,6 +371,10 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 
 // Returns the model for the CVC input cell.
 - (TableViewTextEditItem*)createCVCInputItem {
+  if (_bridge == nullptr) {
+    return nil;
+  }
+
   autofill::CardUnmaskPromptController* controller = _bridge->GetController();
 
   TableViewTextEditItem* CVCInputItem =
@@ -408,6 +449,10 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 // The actual correctness of the CVC is verified by the server when the form is
 // submitted.
 - (BOOL)isCVCInputValid {
+  if (_bridge == nullptr) {
+    return NO;
+  }
+
   return _bridge->GetController()->InputCvcIsValid(
       base::SysNSStringToUTF16(_CVCInputItem.textFieldValue));
 }
@@ -416,6 +461,10 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 // the expiration date input is not being displayed. The actual correctness of
 // the expiration date is verified by the server when the form is submitted.
 - (BOOL)isExpirationInputValid {
+  if (_bridge == nullptr) {
+    return NO;
+  }
+
   if (!_expirationDateInputItem) {
     return YES;
   }
@@ -435,6 +484,10 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 // Updates `self` after the error alert was dismissed.
 // When `closeOnDismiss` is YES, `self` is dismissed.
 - (void)onErrorAlertDismissedAndShouldCloseOnDismiss:(BOOL)closeOnDismiss {
+  if (_bridge == nullptr) {
+    return;
+  }
+
   if (closeOnDismiss) {
     _bridge->PerformClose();
     return;
@@ -453,6 +506,9 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 
 // Helper method that fetches the instructions from the Controller.
 - (NSString*)instructions {
+  if (_bridge == nullptr) {
+    return nil;
+  }
   autofill::CardUnmaskPromptController* controller = _bridge->GetController();
   return base::SysUTF16ToNSString(controller->GetInstructionsMessage());
 }
@@ -506,24 +562,24 @@ const char kFooterDummyLinkTarget[] = "about:blank";
   // needed.
   // Don't update focus when Voice Over is running. Instead, the instructions
   // will be read, providing more context for users with Voice Over enabled.
-  if (UIAccessibilityIsVoiceOverRunning() || !_shouldUpdateFocus ||
+  if (UIAccessibilityIsVoiceOverRunning() ||
+      _itemToFocus == ItemToFocus::kNone ||
       ![cell isKindOfClass:TableViewTextEditCell.class]) {
     return;
   }
   // When we're about to display the CVC form or expiration date form for
   // the first time focus the textField on the right cell.
   TableViewTextEditCell* rowCell =
-      base::mac::ObjCCastStrict<TableViewTextEditCell>(cell);
+      base::apple::ObjCCastStrict<TableViewTextEditCell>(cell);
 
   ItemType rowItemType = static_cast<ItemType>(
       [self.tableViewModel itemTypeForIndexPath:indexPath]);
-  // If the expiration date cell is displayed then we're transitioning to the
-  // expiration date form. Only focus the CVC cell when we're not transitioning
-  // to the expiration date form.
-  if (rowItemType == ItemTypeExpirationDateInput ||
-      (rowItemType == ItemTypeCVCInput && !_expirationDateInputItem)) {
+
+  if ((rowItemType == ItemTypeExpirationDateInput &&
+       _itemToFocus == ItemToFocus::kExpirationDate) ||
+      (rowItemType == ItemTypeCVCInput && _itemToFocus == ItemToFocus::kCVC)) {
     [rowCell.textField becomeFirstResponder];
-    _shouldUpdateFocus = NO;
+    _itemToFocus = ItemToFocus::kNone;
   }
 }
 
@@ -539,7 +595,7 @@ const char kFooterDummyLinkTarget[] = "about:blank";
   // Update Card link.
   if (sectionIdentifier == SectionIdentifierInputs) {
     TableViewLinkHeaderFooterView* footerView =
-        base::mac::ObjCCast<TableViewLinkHeaderFooterView>(view);
+        base::apple::ObjCCast<TableViewLinkHeaderFooterView>(view);
     footerView.delegate = self;
   }
 
@@ -556,7 +612,7 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 
   if (rowItemType == ItemTypeCVCInput) {
     TableViewTextEditCell* rowCell =
-        base::mac::ObjCCastStrict<TableViewTextEditCell>(cell);
+        base::apple::ObjCCastStrict<TableViewTextEditCell>(cell);
     rowCell.textField.delegate = self;
     // Hide the icon from Voice Over.
     rowCell.identifyingIconButton.isAccessibilityElement = NO;
@@ -568,6 +624,9 @@ const char kFooterDummyLinkTarget[] = "about:blank";
 #pragma mark - TableViewLinkHeaderFooterDelegate
 
 - (void)view:(TableViewLinkHeaderFooterView*)view didTapLinkURL:(CrURL*)URL {
+  if (_bridge == nullptr) {
+    return;
+  }
   // Notify Controller about the Expiration Date Form being shown so it updates
   // its state accordingly.
   _bridge->GetController()->NewCardLinkClicked();

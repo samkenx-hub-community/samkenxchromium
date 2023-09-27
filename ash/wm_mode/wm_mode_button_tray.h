@@ -7,6 +7,7 @@
 
 #include "ash/public/cpp/session/session_observer.h"
 #include "ash/system/tray/tray_background_view.h"
+#include "base/memory/raw_ptr.h"
 
 namespace views {
 class ImageView;
@@ -36,6 +37,9 @@ class WmModeButtonTray : public TrayBackgroundView, public SessionObserver {
   void HandleLocaleChange() override {}
   void HideBubbleWithView(const TrayBubbleView* bubble_view) override {}
   void ClickedOutsideBubble() override {}
+  // No need to override since the icon and activation state of this tray will
+  // change and get updated simultaneously in `UpdateButtonVisuals()`.
+  void UpdateTrayItemColor(bool is_active) override {}
 
   // SessionObserver:
   void OnSessionStateChanged(session_manager::SessionState state) override;
@@ -48,7 +52,7 @@ class WmModeButtonTray : public TrayBackgroundView, public SessionObserver {
   void UpdateButtonVisibility();
 
   // The view that hosts the button icon.
-  views::ImageView* const image_view_;
+  const raw_ptr<views::ImageView, ExperimentalAsh> image_view_;
 };
 
 }  // namespace ash

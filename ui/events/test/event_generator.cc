@@ -10,6 +10,7 @@
 #include <memory>
 #include <utility>
 
+#include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/task/single_thread_task_runner.h"
@@ -28,6 +29,10 @@
 #include "ui/events/keycodes/keyboard_code_conversion.h"
 #endif
 
+#if BUILDFLAG(IS_OZONE)
+#include "ui/events/ozone/events_ozone.h"
+#endif
+
 namespace ui {
 namespace test {
 
@@ -39,11 +44,18 @@ class TestTickClock : public base::TickClock {
   TestTickClock(const TestTickClock&) = delete;
   TestTickClock& operator=(const TestTickClock&) = delete;
 
-  // Unconditionally returns a tick count that is 1ms later than the previous
-  // call, starting at 1ms.
+  // Returns a tick count that is 1ms later than the previous call to
+  // `NowTicks`, plus possible additional time from calls to `Advance`. Starts
+  // at 1ms.
   base::TimeTicks NowTicks() const override {
     static constexpr base::TimeDelta kOneMillisecond = base::Milliseconds(1);
     return ticks_ += kOneMillisecond;
+  }
+
+  // Advances the clock by `delta`. `delta` should be non-negative.
+  void Advance(const base::TimeDelta& delta) {
+    DCHECK(delta >= base::TimeDelta());
+    ticks_ += delta;
   }
 
  private:
@@ -72,6 +84,8 @@ const int kAllButtonMask = ui::EF_LEFT_MOUSE_BUTTON | ui::EF_RIGHT_MOUSE_BUTTON;
 
 EventGeneratorDelegate::FactoryFunction g_event_generator_delegate_factory;
 
+bool g_event_generator_allowed = true;
+
 }  // namespace
 
 // static
@@ -79,19 +93,24 @@ void EventGeneratorDelegate::SetFactoryFunction(FactoryFunction factory) {
   g_event_generator_delegate_factory = std::move(factory);
 }
 
+// static
+void EventGenerator::BanEventGenerator() {
+  g_event_generator_allowed = false;
+}
+
 EventGenerator::EventGenerator(std::unique_ptr<EventGeneratorDelegate> delegate)
     : delegate_(std::move(delegate)) {
-  Init(nullptr, nullptr);
+  Init(gfx::NativeWindow(), gfx::NativeWindow());
 }
 
 EventGenerator::EventGenerator(gfx::NativeWindow root_window) {
-  Init(root_window, nullptr);
+  Init(root_window, gfx::NativeWindow());
 }
 
 EventGenerator::EventGenerator(gfx::NativeWindow root_window,
                                const gfx::Point& point)
     : current_screen_location_(point) {
-  Init(root_window, nullptr);
+  Init(root_window, gfx::NativeWindow());
 }
 
 EventGenerator::EventGenerator(gfx::NativeWindow root_window,
@@ -539,7 +558,8 @@ void EventGenerator::ScrollSequence(const gfx::Point& start,
                                     float x_offset,
                                     float y_offset,
                                     int steps,
-                                    int num_fingers) {
+                                    int num_fingers,
+                                    ScrollSequenceType end_state) {
   UpdateCurrentDispatcher(start);
 
   base::TimeTicks timestamp = ui::EventTimeForNow();
@@ -564,6 +584,12 @@ void EventGenerator::ScrollSequence(const gfx::Point& start,
                          dx, dy,
                          num_fingers);
     Dispatch(&move);
+  }
+
+  // End the scroll sequence early if we want to end with the fingers rested on
+  // the trackpad.
+  if (end_state == ScrollSequenceType::ScrollOnly) {
+    return;
   }
 
   ui::ScrollEvent fling_start(ui::ET_SCROLL_FLING_START,
@@ -627,8 +653,16 @@ void EventGenerator::Dispatch(ui::Event* event) {
   }
 }
 
+void EventGenerator::AdvanceClock(const base::TimeDelta& delta) {
+  tick_clock_->Advance(delta);
+}
+
 void EventGenerator::Init(gfx::NativeWindow root_window,
                           gfx::NativeWindow target_window) {
+  CHECK(g_event_generator_allowed)
+      << "EventGenerator is not allowed in this test suite. Please use "
+         "functions from ui_controls.h instead.";
+
   tick_clock_ = std::make_unique<TestTickClock>();
   ui::SetEventTickClockForTesting(tick_clock_.get());
   if (!delegate_) {
@@ -677,15 +711,14 @@ void EventGenerator::DispatchKeyEvent(bool is_press,
 #else
   ui::EventType type = is_press ? ui::ET_KEY_PRESSED : ui::ET_KEY_RELEASED;
   ui::KeyEvent keyev(type, key_code, flags);
+#if BUILDFLAG(IS_OZONE)
   if (is_press) {
     // Set a property as if this is a key event not consumed by IME.
     // Ozone/X11+GTK IME works so already. Ozone/wayland IME relies on this
     // flag to work properly.
-    keyev.SetProperties({{
-        kPropertyKeyboardImeFlag,
-        std::vector<uint8_t>{kPropertyKeyboardImeIgnoredFlag},
-    }});
+    SetKeyboardImeFlags(&keyev, kPropertyKeyboardImeIgnoredFlag);
   }
+#endif  // BUILDFLAG(IS_OZONE)
 #endif  // BUILDFLAG(IS_WIN)
   keyev.set_source_device_id(source_device_id);
   Dispatch(&keyev);

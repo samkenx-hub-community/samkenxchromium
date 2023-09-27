@@ -22,12 +22,12 @@
 #import "components/translate/core/browser/translate_metrics_logger_impl.h"
 #import "components/translate/core/browser/translate_step.h"
 #import "components/translate/core/common/language_detection_details.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/infobars/infobar_ios.h"
 #import "ios/chrome/browser/infobars/infobar_manager_impl.h"
 #import "ios/chrome/browser/language/accept_languages_service_factory.h"
 #import "ios/chrome/browser/language/language_model_manager_factory.h"
 #import "ios/chrome/browser/language/url_language_histogram_factory.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/translate/language_detection_model_service_factory.h"
 #import "ios/chrome/browser/translate/translate_model_service_factory.h"
 #import "ios/chrome/browser/translate/translate_ranker_factory.h"
@@ -38,10 +38,6 @@
 #import "ios/web/public/web_state.h"
 #import "third_party/metrics_proto/translate_event.pb.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 ChromeIOSTranslateClient::ChromeIOSTranslateClient(web::WebState* web_state)
     : web_state_(web_state),
@@ -87,8 +83,8 @@ std::unique_ptr<infobars::InfoBar> ChromeIOSTranslateClient::CreateInfoBar(
     std::unique_ptr<translate::TranslateInfoBarDelegate> delegate) const {
   bool skip_banner = delegate->translate_step() ==
                      translate::TranslateStep::TRANSLATE_STEP_TRANSLATING;
-    return std::make_unique<InfoBarIOS>(InfobarType::kInfobarTypeTranslate,
-                                        std::move(delegate), skip_banner);
+  return std::make_unique<InfoBarIOS>(InfobarType::kInfobarTypeTranslate,
+                                      std::move(delegate), skip_banner);
 }
 
 bool ChromeIOSTranslateClient::ShowTranslateUI(
@@ -103,7 +99,7 @@ bool ChromeIOSTranslateClient::ShowTranslateUI(
 
   // Infobar UI.
   translate::TranslateInfoBarDelegate::Create(
-      step != translate::TRANSLATE_STEP_BEFORE_TRANSLATE,
+      step != translate::TRANSLATE_STEP_BEFORE_TRANSLATE || triggered_from_menu,
       translate_manager_->GetWeakPtr(),
       InfoBarManagerImpl::FromWebState(web_state_), step, source_language,
       target_language, error_type, triggered_from_menu);

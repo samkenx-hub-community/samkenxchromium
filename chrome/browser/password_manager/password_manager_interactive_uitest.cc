@@ -23,6 +23,7 @@
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "components/autofill/core/common/autofill_features.h"
+#include "components/autofill/core/common/form_data.h"
 #include "components/password_manager/content/browser/content_password_manager_driver.h"
 #include "components/password_manager/core/browser/password_form_manager.h"
 #include "components/password_manager/core/browser/password_manager.h"
@@ -51,6 +52,8 @@ void WaitForCondition(base::RepeatingCallback<bool()> condition) {
   }
 }
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
+
+constexpr autofill::FieldRendererId kElementId(1000);
 
 }  // namespace
 
@@ -108,7 +111,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest, UsernameChanged) {
   BubbleObserver prompt_observer(WebContents());
   std::string submit =
       "document.getElementById('input_submit_button').click();";
-  ASSERT_TRUE(content::ExecuteScript(WebContents(), submit));
+  ASSERT_TRUE(content::ExecJs(WebContents(), submit));
   ASSERT_TRUE(navigation_observer.Wait());
   EXPECT_TRUE(prompt_observer.IsSavePromptShownAutomatically());
   prompt_observer.AcceptSavePrompt();
@@ -218,7 +221,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
   FillElementWithValue("username_field", "user");
   FillElementWithValue("password_field", "1234");
   PasswordsNavigationObserver observer(WebContents());
-  ASSERT_TRUE(content::ExecuteScript(WebContents(), "send_xhr()"));
+  ASSERT_TRUE(content::ExecJs(WebContents(), "send_xhr()"));
   ASSERT_TRUE(observer.Wait());
   EXPECT_TRUE(BubbleObserver(WebContents()).IsSavePromptShownAutomatically());
 }
@@ -235,7 +238,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
   FillElementWithValue("signup_password_field", "1234");
   FillElementWithValue("confirmation_password_field", "1234");
   PasswordsNavigationObserver observer(WebContents());
-  ASSERT_TRUE(content::ExecuteScript(WebContents(), "send_xhr()"));
+  ASSERT_TRUE(content::ExecJs(WebContents(), "send_xhr()"));
   ASSERT_TRUE(observer.Wait());
   EXPECT_TRUE(BubbleObserver(WebContents()).IsSavePromptShownAutomatically());
 }
@@ -250,7 +253,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
   FillElementWithValue("password_field", "1234");
 
   PasswordsNavigationObserver observer(WebContents());
-  ASSERT_TRUE(content::ExecuteScript(WebContents(), "send_fetch()"));
+  ASSERT_TRUE(content::ExecJs(WebContents(), "send_fetch()"));
   ASSERT_TRUE(observer.Wait());
   EXPECT_TRUE(BubbleObserver(WebContents()).IsSavePromptShownAutomatically());
 }
@@ -275,7 +278,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
   FillElementWithValue("signup_password_field", "1234");
   FillElementWithValue("confirmation_password_field", "1234");
   PasswordsNavigationObserver observer(WebContents());
-  ASSERT_TRUE(content::ExecuteScript(WebContents(), "send_fetch()"));
+  ASSERT_TRUE(content::ExecJs(WebContents(), "send_fetch()"));
   ASSERT_TRUE(observer.Wait());
   EXPECT_TRUE(BubbleObserver(WebContents()).IsSavePromptShownAutomatically());
 }
@@ -358,7 +361,9 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
                             content_area_bounds.height() * 0.1);
 
   // Instruct Chrome to show the password dropdown.
-  driver->ShowPasswordSuggestions(base::i18n::LEFT_TO_RIGHT, std::u16string(),
+  autofill::FormData form;
+  driver->ShowPasswordSuggestions(kElementId, form, 0, 0,
+                                  base::i18n::LEFT_TO_RIGHT, std::u16string(),
                                   0, element_bounds);
   autofill::ChromeAutofillClient* autofill_client =
       autofill::ChromeAutofillClient::FromWebContentsForTesting(WebContents());
@@ -370,7 +375,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
   EXPECT_EQ(4, controller->GetLineCount());
 
   // Trigger user gesture so that autofill happens.
-  ASSERT_TRUE(content::ExecuteScript(
+  ASSERT_TRUE(content::ExecJs(
       WebContents(), "document.getElementById('username_field').click();"));
   WaitForElementValue("username_field", "admin");
 
@@ -382,7 +387,8 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
   EXPECT_FALSE(autofill_client->popup_controller_for_testing());
   WaitForPasswordStore();
   // Reshow the dropdown.
-  driver->ShowPasswordSuggestions(base::i18n::LEFT_TO_RIGHT, std::u16string(),
+  driver->ShowPasswordSuggestions(kElementId, form, 0, 0,
+                                  base::i18n::LEFT_TO_RIGHT, std::u16string(),
                                   0, element_bounds);
   controller = autofill_client->popup_controller_for_testing().get();
   ASSERT_TRUE(controller);
@@ -401,7 +407,8 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
   EXPECT_FALSE(autofill_client->popup_controller_for_testing());
   WaitForPasswordStore();
   // Reshow the dropdown won't work because there is nothing to suggest.
-  driver->ShowPasswordSuggestions(base::i18n::LEFT_TO_RIGHT, std::u16string(),
+  driver->ShowPasswordSuggestions(kElementId, form, 0, 0,
+                                  base::i18n::LEFT_TO_RIGHT, std::u16string(),
                                   0, element_bounds);
   EXPECT_FALSE(autofill_client->popup_controller_for_testing());
 
@@ -433,7 +440,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest, ChangePwdFormCleared) {
   FillElementWithValue("chg_new_password_2", "new_pw", "new_pw");
 
   std::string submit = "document.getElementById('chg_clear_button').click();";
-  ASSERT_TRUE(content::ExecuteScript(WebContents(), submit));
+  ASSERT_TRUE(content::ExecJs(WebContents(), submit));
 
   EXPECT_TRUE(prompt_observer->IsUpdatePromptShownAutomatically());
 
@@ -484,7 +491,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
             ? "document.getElementById('chg_clear_all_fields_button').click();"
             : "document.getElementById('chg_clear_some_fields_button').click()"
               ";";
-    ASSERT_TRUE(content::ExecuteScript(WebContents(), submit));
+    ASSERT_TRUE(content::ExecJs(WebContents(), submit));
 
     if (all_fields_cleared)
       EXPECT_TRUE(prompt_observer->IsUpdatePromptShownAutomatically());
@@ -542,7 +549,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerInteractiveTest,
                              : "document.getElementById('chg_clear_some_"
                                "formless_fields_button').click();";
 
-    ASSERT_TRUE(content::ExecuteScript(WebContents(), submit));
+    ASSERT_TRUE(content::ExecJs(WebContents(), submit));
 
     if (relevant_fields_cleared) {
       prompt_observer->WaitForAutomaticUpdatePrompt();

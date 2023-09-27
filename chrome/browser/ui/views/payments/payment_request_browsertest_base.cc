@@ -53,6 +53,7 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/styled_label.h"
 #include "ui/views/input_event_activation_protector.h"
+#include "ui/views/views_switches.h"
 
 namespace payments {
 
@@ -89,6 +90,11 @@ void PaymentRequestBrowserTestBase::SetUpCommandLine(
   // load pages from "a.com" without an interstitial.
   command_line->AppendSwitch(switches::kIgnoreCertificateErrors);
   command_line->AppendSwitch(switches::kEnableExperimentalWebPlatformFeatures);
+
+  // Clicks from tests should always be allowed, even on dialogs that have
+  // protection against accidental double-clicking/etc.
+  command_line->AppendSwitch(
+      views::switches::kDisableInputEventActivationProtectionForTesting);
 }
 
 void PaymentRequestBrowserTestBase::SetUpOnMainThread() {
@@ -110,14 +116,10 @@ void PaymentRequestBrowserTestBase::SetUpOnMainThread() {
       base::Unretained(this)));
 
   // Set a test sync service so that all types of cards work.
-  GetDataManager()->OnSyncServiceInitialized(&sync_service_);
+  GetDataManager()->SetSyncServiceForTest(&sync_service_);
 
   // Register all prefs with our pref testing service.
   payments::RegisterProfilePrefs(prefs_.registry());
-
-  // Clicks from tests should always be allowed, even on dialogs that have
-  // protection against accidental double-clicking/etc.
-  views::InputEventActivationProtector::DisableForTesting();
 }
 
 void PaymentRequestBrowserTestBase::NavigateTo(const std::string& file_path) {
@@ -306,9 +308,10 @@ void PaymentRequestBrowserTestBase::InvokePaymentRequestUIWithJs(
   ResetEventWaiterForDialogOpened();
 
   content::WebContents* web_contents = GetActiveWebContents();
-  ASSERT_TRUE(content::ExecuteScript(web_contents, click_buy_button_js));
+  ASSERT_TRUE(content::ExecJs(web_contents, click_buy_button_js,
+                              content::EXECUTE_SCRIPT_NO_RESOLVE_PROMISES));
 
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 
   // The web-modal dialog should be open.
   web_modal::WebContentsModalDialogManager* web_contents_modal_dialog_manager =
@@ -319,13 +322,9 @@ void PaymentRequestBrowserTestBase::InvokePaymentRequestUIWithJs(
 void PaymentRequestBrowserTestBase::ExpectBodyContains(
     const std::vector<std::string>& expected_strings) {
   content::WebContents* web_contents = GetActiveWebContents();
-  const std::string extract_contents_js =
-      "(function() { "
-      "window.domAutomationController.send(window.document.body.textContent); "
-      "})()";
-  std::string contents;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractString(
-      web_contents, extract_contents_js, &contents));
+  const std::string extract_contents_js = "window.document.body.textContent;";
+  std::string contents =
+      content::EvalJs(web_contents, extract_contents_js).ExtractString();
   for (const std::string& expected_string : expected_strings) {
     EXPECT_NE(std::string::npos, contents.find(expected_string))
         << "String \"" << expected_string
@@ -494,7 +493,7 @@ void PaymentRequestBrowserTestBase::AddAutofillProfile(
 void PaymentRequestBrowserTestBase::AddCreditCard(
     const autofill::CreditCard& card) {
   autofill::PersonalDataManager* personal_data_manager = GetDataManager();
-  if (card.record_type() != autofill::CreditCard::LOCAL_CARD) {
+  if (card.record_type() != autofill::CreditCard::RecordType::kLocalCard) {
     personal_data_manager->AddServerCreditCardForTest(
         std::make_unique<autofill::CreditCard>(card));
     return;
@@ -578,7 +577,7 @@ void PaymentRequestBrowserTestBase::ClickOnDialogViewAndWait(
   if (wait_for_animation) {
     WaitForAnimation(dialog_view);
   }
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 }
 
 void PaymentRequestBrowserTestBase::ClickOnDialogView(views::View* view) {
@@ -678,10 +677,10 @@ void PaymentRequestBrowserTestBase::RetryPaymentRequest(
                                DialogEvent::PROCESSING_SPINNER_HIDDEN,
                                DialogEvent::BACK_TO_PAYMENT_SHEET_NAVIGATION});
 
-  ASSERT_TRUE(content::ExecuteScript(GetActiveWebContents(),
-                                     "retry(" + validation_errors + ");"));
+  ASSERT_TRUE(content::ExecJs(GetActiveWebContents(),
+                              "retry(" + validation_errors + ");"));
 
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 }
 
 void PaymentRequestBrowserTestBase::RetryPaymentRequest(
@@ -694,10 +693,10 @@ void PaymentRequestBrowserTestBase::RetryPaymentRequest(
        DialogEvent::PROCESSING_SPINNER_HIDDEN,
        DialogEvent::BACK_TO_PAYMENT_SHEET_NAVIGATION, dialog_event});
 
-  ASSERT_TRUE(content::ExecuteScript(GetActiveWebContents(),
-                                     "retry(" + validation_errors + ");"));
+  ASSERT_TRUE(content::ExecJs(GetActiveWebContents(),
+                              "retry(" + validation_errors + ");"));
 
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 }
 
 bool PaymentRequestBrowserTestBase::IsViewVisible(DialogViewID view_id) const {
@@ -883,8 +882,8 @@ void PaymentRequestBrowserTestBase::ResetEventWaiterForDialogOpened() {
                                DialogEvent::DIALOG_OPENED});
 }
 
-void PaymentRequestBrowserTestBase::WaitForObservedEvent() {
-  event_waiter_->Wait();
+testing::AssertionResult PaymentRequestBrowserTestBase::WaitForObservedEvent() {
+  return event_waiter_->Wait();
 }
 
 base::WeakPtr<CSPChecker>

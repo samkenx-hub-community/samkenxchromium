@@ -4,7 +4,7 @@
 
 package org.chromium.chrome.browser.feedback;
 
-import android.support.test.InstrumentationRegistry;
+import androidx.test.core.app.ApplicationProvider;
 
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
@@ -34,11 +34,7 @@ public class ConnectivityCheckerTestRule extends ChromeBrowserTestRule {
             @Override
             public void evaluate() throws Throwable {
                 setUp();
-                try {
-                    base.evaluate();
-                } finally {
-                    tearDown();
-                }
+                base.evaluate();
             }
         }, description);
     }
@@ -60,15 +56,12 @@ public class ConnectivityCheckerTestRule extends ChromeBrowserTestRule {
     }
 
     private void setUp() {
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         mGenerated200Url = mTestServer.getURL("/echo?status=200");
         mGenerated204Url = mTestServer.getURL("/echo?status=204");
         mGenerated302Url = mTestServer.getURL("/echo?status=302");
         mGenerated404Url = mTestServer.getURL("/echo?status=404");
         mGeneratedSlowUrl = mTestServer.getURL("/slow?5");
-    }
-
-    private void tearDown() {
-        mTestServer.stopAndDestroyServer();
     }
 }

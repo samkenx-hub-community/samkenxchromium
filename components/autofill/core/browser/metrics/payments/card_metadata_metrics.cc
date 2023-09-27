@@ -27,72 +27,138 @@ std::string GetMetadataAvailabilitySuffix(
 }
 
 std::string GetCardIssuerIdSuffix(const std::string& card_issuer_id) {
-  if (!card_issuer_id.empty()) {
-    if (card_issuer_id == kAmexCardIssuerId) {
-      return kAmericanExpress;
-    }
-    if (card_issuer_id == kCapitalOneCardIssuerId) {
-      return kCapitalOne;
-    }
-    if (card_issuer_id == kChaseCardIssuerId) {
-      return kChase;
-    }
-    if (card_issuer_id == kMarqetaCardIssuerId) {
-      return kMarqeta;
-    }
-
-    // Found an unknown issuer id.
-    DLOG(WARNING) << "It seems a new issuer was added, but the suggestion "
-                     "acceptance latency logging logic was not updated. Please "
-                     "update this logging if this issuer should be included in "
-                     "this logging. Ignore if you have already updated it and "
-                     "this is from older versions or you don't care about the "
-                     "newly added issuer.";
+  if (card_issuer_id == kAmexCardIssuerId) {
+    return kAmericanExpress;
+  } else if (card_issuer_id == kCapitalOneCardIssuerId) {
+    return kCapitalOne;
+  } else if (card_issuer_id == kDiscoverCardIssuerId) {
+    return kDiscover;
+  } else if (card_issuer_id == kMarqetaCardIssuerId) {
+    return kMarqeta;
+  } else {
+    return std::string();
   }
+}
 
-  return std::string();
+// Returns true when the card has rich card art, excluding any static card art
+// image.
+bool HasRichCardArtImageFromMetadata(const CreditCard& card) {
+  return card.card_art_url().is_valid() &&
+         card.card_art_url().spec() != kCapitalOneLargeCardArtUrl &&
+         card.card_art_url().spec() != kCapitalOneCardArtUrl;
 }
 
 }  // namespace
 
+CardMetadataLoggingContext::CardMetadataLoggingContext() = default;
+CardMetadataLoggingContext::CardMetadataLoggingContext(
+    const CardMetadataLoggingContext&) = default;
+CardMetadataLoggingContext& CardMetadataLoggingContext::operator=(
+    const CardMetadataLoggingContext&) = default;
+CardMetadataLoggingContext::~CardMetadataLoggingContext() = default;
+
 CardMetadataLoggingContext GetMetadataLoggingContext(
     const std::vector<CreditCard>& cards) {
-  bool card_product_description_available = false;
-  bool card_art_image_available = false;
-  bool virtual_card_with_card_art_image = false;
+  CardMetadataLoggingContext metadata_logging_context;
 
   for (const CreditCard& card : cards) {
+    // If there is a product description, denote in the
+    // `metadata_logging_context` that we have shown at least one product
+    // description so we can log it later.
     if (!card.product_description().empty()) {
-      card_product_description_available = true;
+      metadata_logging_context.card_product_description_shown =
+          base::FeatureList::IsEnabled(
+              features::kAutofillEnableCardProductName);
     }
 
-    if (card.card_art_url().is_valid()) {
-      card_art_image_available = true;
-      if (card.virtual_card_enrollment_state() ==
-          CreditCard::VirtualCardEnrollmentState::ENROLLED) {
-        virtual_card_with_card_art_image = true;
-      }
+    // If there is rich card art we received from the metadata for this card,
+    // denote in the `metadata_logging_context` that we have shown an enriched
+    // card art so we can log it later.
+    if (HasRichCardArtImageFromMetadata(card)) {
+      metadata_logging_context.card_art_image_shown =
+          base::FeatureList::IsEnabled(features::kAutofillEnableCardArtImage);
+    }
+
+    bool card_has_metadata = !card.product_description().empty() ||
+                             HasRichCardArtImageFromMetadata(card);
+
+    if (!card.issuer_id().empty()) {
+      metadata_logging_context
+          .issuer_to_metadata_availability[card.issuer_id()] |=
+          card_has_metadata;
+    }
+
+    // If there is at least one card having product description or rich card
+    // art, denote in the `metadata_logging_context`.
+    if (card_has_metadata) {
+      metadata_logging_context.card_metadata_available = true;
     }
   }
 
-  CardMetadataLoggingContext metadata_logging_context;
-  metadata_logging_context.card_metadata_available =
-      card_product_description_available || card_art_image_available;
-
-  metadata_logging_context.card_product_description_shown =
-      card_product_description_available &&
-      base::FeatureList::IsEnabled(features::kAutofillEnableCardProductName);
-
-  // `card_art_image_shown` is set to true if art image is available and
-  // 1. the experiment is enabled or
-  // 2. the card with art image has a linked virtual card (for virtual cards,
-  // the card art image is always shown if available).
-  metadata_logging_context.card_art_image_shown =
-      card_art_image_available &&
-      (base::FeatureList::IsEnabled(features::kAutofillEnableCardArtImage) ||
-       virtual_card_with_card_art_image);
-
   return metadata_logging_context;
+}
+
+void LogCardWithMetadataFormEventMetric(
+    CardMetadataLoggingEvent event,
+    const CardMetadataLoggingContext& context,
+    HasBeenLogged has_been_logged) {
+  for (const auto& [issuer, has_metadata] :
+       context.issuer_to_metadata_availability) {
+    if (GetCardIssuerIdSuffix(issuer) == std::string()) {
+      continue;
+    }
+
+    switch (event) {
+      case CardMetadataLoggingEvent::kShown:
+        base::UmaHistogramBoolean("Autofill.CreditCard." +
+                                      GetCardIssuerIdSuffix(issuer) +
+                                      ".ShownWithMetadata",
+                                  has_metadata);
+        if (!has_been_logged.value()) {
+          base::UmaHistogramBoolean("Autofill.CreditCard." +
+                                        GetCardIssuerIdSuffix(issuer) +
+                                        ".ShownWithMetadataOnce",
+                                    has_metadata);
+        }
+        break;
+      case CardMetadataLoggingEvent::kSelected:
+        base::UmaHistogramBoolean("Autofill.CreditCard." +
+                                      GetCardIssuerIdSuffix(issuer) +
+                                      ".SelectedWithMetadata",
+                                  has_metadata);
+        if (!has_been_logged.value()) {
+          base::UmaHistogramBoolean("Autofill.CreditCard." +
+                                        GetCardIssuerIdSuffix(issuer) +
+                                        ".SelectedWithMetadataOnce",
+                                    has_metadata);
+        }
+        break;
+      case CardMetadataLoggingEvent::kFilled:
+        base::UmaHistogramBoolean("Autofill.CreditCard." +
+                                      GetCardIssuerIdSuffix(issuer) +
+                                      ".FilledWithMetadata",
+                                  has_metadata);
+        if (!has_been_logged.value()) {
+          base::UmaHistogramBoolean("Autofill.CreditCard." +
+                                        GetCardIssuerIdSuffix(issuer) +
+                                        ".FilledWithMetadataOnce",
+                                    has_metadata);
+        }
+        break;
+      case CardMetadataLoggingEvent::kWillSubmit:
+        base::UmaHistogramBoolean("Autofill.CreditCard." +
+                                      GetCardIssuerIdSuffix(issuer) +
+                                      ".WillSubmitWithMetadataOnce",
+                                  has_metadata);
+        break;
+      case CardMetadataLoggingEvent::kSubmitted:
+        base::UmaHistogramBoolean("Autofill.CreditCard." +
+                                      GetCardIssuerIdSuffix(issuer) +
+                                      ".SubmittedWithMetadataOnce",
+                                  has_metadata);
+        break;
+    }
+  }
 }
 
 void LogAcceptanceLatency(base::TimeDelta latency,

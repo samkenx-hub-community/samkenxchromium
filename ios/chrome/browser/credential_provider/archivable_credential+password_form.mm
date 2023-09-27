@@ -10,13 +10,8 @@
 #import "components/password_manager/core/browser/password_form.h"
 #import "components/password_manager/core/browser/password_manager_util.h"
 #import "components/password_manager/core/browser/password_ui_utils.h"
-#import "components/sync/base/features.h"
 #import "ios/chrome/browser/credential_provider/credential_provider_util.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -37,11 +32,9 @@ password_manager::PasswordForm PasswordFormFromCredential(
   form.url = password_manager_util::StripAuthAndParams(url);
   form.signon_realm = form.url.DeprecatedGetOriginAsURL().spec();
   form.username_value = SysNSStringToUTF16(credential.user);
-  form.encrypted_password = SysNSStringToUTF8(credential.keychainIdentifier);
+  form.keychain_identifier = SysNSStringToUTF8(credential.keychainIdentifier);
   form.times_used_in_html_form = credential.rank;
-  if (base::FeatureList::IsEnabled(syncer::kPasswordNotesWithBackup)) {
-    form.SetNoteWithEmptyUniqueDisplayName(SysNSStringToUTF16(credential.note));
-  }
+  form.SetNoteWithEmptyUniqueDisplayName(SysNSStringToUTF16(credential.note));
 
   return form;
 }
@@ -50,23 +43,19 @@ password_manager::PasswordForm PasswordFormFromCredential(
 
 - (instancetype)initWithPasswordForm:
                     (const password_manager::PasswordForm&)passwordForm
-                             favicon:(NSString*)favicon
-                validationIdentifier:(NSString*)validationIdentifier {
+                             favicon:(NSString*)favicon {
   if (passwordForm.blocked_by_user) {
     return nil;
   }
   std::string site_name =
       password_manager::GetShownOrigin(url::Origin::Create(passwordForm.url));
   NSString* keychainIdentifier =
-      SysUTF8ToNSString(passwordForm.encrypted_password);
+      SysUTF8ToNSString(passwordForm.keychain_identifier);
 
   NSString* serviceIdentifier = SysUTF8ToNSString(passwordForm.url.spec());
   NSString* serviceName = SysUTF8ToNSString(site_name);
-
-  NSString* note = @"";
-  if (base::FeatureList::IsEnabled(syncer::kPasswordNotesWithBackup)) {
-    note = SysUTF16ToNSString(passwordForm.GetNoteWithEmptyUniqueDisplayName());
-  }
+  NSString* note =
+      SysUTF16ToNSString(passwordForm.GetNoteWithEmptyUniqueDisplayName());
 
   if (password_manager::IsValidAndroidFacetURI(passwordForm.signon_realm)) {
     NSString* webRealm = SysUTF8ToNSString(passwordForm.affiliated_web_realm);
@@ -104,7 +93,6 @@ password_manager::PasswordForm PasswordFormFromCredential(
              serviceIdentifier:serviceIdentifier
                    serviceName:serviceName
                           user:SysUTF16ToNSString(passwordForm.username_value)
-          validationIdentifier:validationIdentifier
                           note:note];
 }
 

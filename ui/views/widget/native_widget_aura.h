@@ -139,7 +139,8 @@ class VIEWS_EXPORT NativeWidgetAura : public internal::NativeWidgetPrivate,
   void SetCanAppearInExistingFullscreenSpaces(
       bool can_appear_in_existing_fullscreen_spaces) override;
   void SetOpacity(float opacity) override;
-  void SetAspectRatio(const gfx::SizeF& aspect_ratio) override;
+  void SetAspectRatio(const gfx::SizeF& aspect_ratio,
+                      const gfx::Size& excluded_margin) override;
   void FlashFrame(bool flash_frame) override;
   void RunShellDrag(View* view,
                     std::unique_ptr<ui::OSExchangeData> data,
@@ -239,6 +240,13 @@ class VIEWS_EXPORT NativeWidgetAura : public internal::NativeWidgetPrivate,
 
  private:
   void SetInitialFocus(ui::WindowShowState show_state);
+
+  // Set the bounds with target 'display_id'. This will place the widget in that
+  // 'display' even if the more than half of bounds are outside of the display.
+  // If the 'display_id' is nullopt or the display does not exist, it will use
+  // the display that matches 'bounds'.
+  void SetBoundsInternal(const gfx::Rect& bounds,
+                         absl::optional<int64_t> display_id);
 
   base::WeakPtr<internal::NativeWidgetDelegate> delegate_;
   std::unique_ptr<internal::NativeWidgetDelegate> owned_delegate_;

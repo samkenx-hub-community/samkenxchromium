@@ -67,7 +67,6 @@
 #include "third_party/blink/renderer/core/page/focus_changed_observer.h"
 #include "third_party/blink/renderer/core/page/frame_tree.h"
 #include "third_party/blink/renderer/core/page/page.h"
-#include "third_party/blink/renderer/core/page/slot_scoped_traversal.h"
 #include "third_party/blink/renderer/core/page/spatial_navigation.h"
 
 namespace blink {
@@ -184,7 +183,7 @@ class FocusNavigation : public GarbageCollected<FocusNavigation> {
     Element* owner = nullptr;
     Element* owner_slot = nullptr;
     if (Element* element = DynamicTo<Element>(node))
-      owner_slot = SlotScopedTraversal::FindScopeOwnerSlot(*element);
+      owner_slot = FocusController::FindScopeOwnerSlot(*element);
 
     if (owner_slot)
       owner = owner_slot;
@@ -323,8 +322,9 @@ Element* ScopedFocusNavigation::Owner() const {
 ScopedFocusNavigation ScopedFocusNavigation::CreateFor(
     const Element& current,
     FocusController::OwnerMap& owner_map) {
-  if (HTMLSlotElement* slot = SlotScopedTraversal::FindScopeOwnerSlot(current))
+  if (HTMLSlotElement* slot = FocusController::FindScopeOwnerSlot(current)) {
     return ScopedFocusNavigation(*slot, &current, owner_map);
+  }
   if (HTMLSlotElement* slot =
           ScopedFocusNavigation::FindFallbackScopeOwnerSlot(current)) {
     return ScopedFocusNavigation(*slot, &current, owner_map);
@@ -1136,7 +1136,8 @@ bool FocusController::AdvanceFocusInDocumentOrder(
 
     // We didn't find an element to focus, so we should try to pass focus to
     // Chrome.
-    if (!initial_focus && page_->GetChromeClient().CanTakeFocus(type)) {
+    if ((!initial_focus || document->GetFrame()->IsFencedFrameRoot()) &&
+        page_->GetChromeClient().CanTakeFocus(type)) {
       document->ClearFocusedElement();
       document->SetSequentialFocusNavigationStartingPoint(nullptr);
       SetFocusedFrame(nullptr);
@@ -1227,8 +1228,9 @@ bool FocusController::AdvanceFocusInDocumentOrder(
 
   SetFocusedFrame(new_document.GetFrame());
 
-  element->Focus(
-      FocusParams(SelectionBehaviorOnFocus::kReset, type, source_capabilities));
+  element->Focus(FocusParams(SelectionBehaviorOnFocus::kReset, type,
+                             source_capabilities, FocusOptions::Create(),
+                             FocusTrigger::kUserGesture));
   return true;
 }
 
@@ -1316,13 +1318,12 @@ Element* FocusController::NextFocusableElementForImeAndAutofill(
       return next_element;
     }
     LayoutObject* layout = next_element->GetLayoutObject();
-    if (layout && layout->IsTextControlIncludingNG()) {
+    if (layout && layout->IsTextControl()) {
       // TODO(crbug.com/1320441): Extend it for radio buttons and checkboxes.
       return next_element;
     }
 
-    if (auto* select_element =
-            DynamicTo<HTMLSelectElement>(next_form_control_element)) {
+    if (IsA<HTMLSelectElement>(next_form_control_element)) {
       return next_element;
     }
   }
@@ -1333,7 +1334,6 @@ Element* FocusController::NextFocusableElementForImeAndAutofill(
 // https://html.spec.whatwg.org/C/#get-the-focusable-area
 Element* FocusController::FindFocusableElementInShadowHost(
     const Element& shadow_host) {
-  DCHECK(shadow_host.AuthorShadowRoot());
   // We have no behavior difference by focus trigger. Skip step 2.1.
 
   // 2.2. Otherwise, let possible focus delegates be the list of all
@@ -1347,6 +1347,18 @@ Element* FocusController::FindFocusableElementInShadowHost(
     if (auto* current_element = DynamicTo<Element>(current)) {
       if (current_element->IsFocusable())
         return current_element;
+    }
+  }
+  return nullptr;
+}
+
+// static
+HTMLSlotElement* FocusController::FindScopeOwnerSlot(const Element& current) {
+  Element* element = const_cast<Element*>(&current);
+  for (; element; element = element->parentElement()) {
+    HTMLSlotElement* slot_element = element->AssignedSlot();
+    if (slot_element) {
+      return slot_element;
     }
   }
   return nullptr;
@@ -1491,12 +1503,8 @@ int FocusController::AdjustedTabIndex(const Element& element) {
     // missing values.
     return element.GetIntegralAttribute(html_names::kTabindexAttr, 0);
   }
-  bool default_focusable =
-      element.SupportsFocus() ||
-      (RuntimeEnabledFeatures::KeyboardFocusableScrollersEnabled() &&
-       IsScrollableNode(&element));
   return element.GetIntegralAttribute(html_names::kTabindexAttr,
-                                      default_focusable ? 0 : -1);
+                                      element.IsFocusable() ? 0 : -1);
 }
 
 void FocusController::Trace(Visitor* visitor) const {

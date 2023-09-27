@@ -22,18 +22,21 @@ typedef NS_ENUM(NSInteger, SigninPromoViewStyle) {
   // logo, text body, rounded corners colored button and an optional secondary
   // plain button, all stacked vertically.
   SigninPromoViewStyleStandard = 0,
-  // Compact style that does not support personalization. Horizontal layout with
-  // generic icon and title.
-  SigninPromoViewStyleCompactTitled = 1,
-  // Compact style with horizontal layout and avatar/logo.
-  SigninPromoViewStyleCompactHorizontal = 2,
   // Compact style with vertical layout and avatar/logo.
-  SigninPromoViewStyleCompactVertical = 3,
+  SigninPromoViewStyleCompactHorizontal = 1,
+  SigninPromoViewStyleCompactVertical = 2,
+  // Style containing a single rounded corners colored button.
+  // TODO(crbug.com/1467810): This is a weird construct used only by recent
+  // tabs, where SigninPromoView shows the button and other views show the
+  // text/illustration. We should consider adopting SigninPromoViewStyleStandard
+  // in that UI, or bringing the text/illustration here.
+  SigninPromoViewStyleOnlyButton = 3,
 };
 
 extern NSString* const kSigninPromoViewId;
 extern NSString* const kSigninPromoPrimaryButtonId;
 extern NSString* const kSigninPromoSecondaryButtonId;
 extern NSString* const kSigninPromoCloseButtonId;
+extern NSString* const kSigninPromoActivityIndicatorId;
 
 #endif  // IOS_CHROME_BROWSER_UI_AUTHENTICATION_CELLS_SIGNIN_PROMO_VIEW_CONSTANTS_H_

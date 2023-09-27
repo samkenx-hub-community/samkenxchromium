@@ -27,7 +27,19 @@ crosapi::mojom::LacrosFeedbackSource ToMojoLacrosFeedbackSource(
     case kFeedbackSourceQuickAnswers:
       return crosapi::mojom::LacrosFeedbackSource::kLacrosQuickAnswers;
     case kFeedbackSourceWindowLayoutMenu:
-      return crosapi::mojom::LacrosFeedbackSource::kLacrosWindowLayoutMenu;
+      return crosapi::mojom::LacrosFeedbackSource::
+          kDeprecatedLacrosWindowLayoutMenu;
+    case kFeedbackSourceCookieControls:
+      return crosapi::mojom::LacrosFeedbackSource::
+          kFeedbackSourceCookieControls;
+    case kFeedbackSourceSettingsPerformancePage:
+      return crosapi::mojom::LacrosFeedbackSource::
+          kFeedbackSourceSettingsPerformancePage;
+    case kFeedbackSourceProfileErrorDialog:
+      return crosapi::mojom::LacrosFeedbackSource::
+          kFeedbackSourceProfileErrorDialog;
+    case kFeedbackSourceQuickOffice:
+      return crosapi::mojom::LacrosFeedbackSource::kFeedbackSourceQuickOffice;
     default:
       LOG(ERROR) << "ShowFeedbackPage is called by unknown Lacros source: "
                  << static_cast<int>(source);

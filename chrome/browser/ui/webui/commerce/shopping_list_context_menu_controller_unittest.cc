@@ -4,6 +4,7 @@
 
 #include <memory>
 
+#include "base/memory/raw_ptr.h"
 #include "base/test/metrics/user_action_tester.h"
 #include "base/test/task_environment.h"
 #include "chrome/app/chrome_command_ids.h"
@@ -37,10 +38,11 @@ class MockShoppingListHandler : public ShoppingListHandler {
             shopping_service,
             nullptr,
             nullptr,
-            "") {}
+            "",
+            nullptr) {}
 
-  MOCK_METHOD1(TrackPriceForBookmark, void(int64_t bookmark_id));
-  MOCK_METHOD1(UntrackPriceForBookmark, void(int64_t bookmark_id));
+  MOCK_METHOD(void, TrackPriceForBookmark, (int64_t bookmark_id));
+  MOCK_METHOD(void, UntrackPriceForBookmark, (int64_t bookmark_id));
 };
 
 class ShoppingListContextMenuControllerTest : public testing::Test {
@@ -83,7 +85,7 @@ class ShoppingListContextMenuControllerTest : public testing::Test {
  protected:
   content::BrowserTaskEnvironment task_environment_;
   base::UserActionTester user_action_tester_;
-  const bookmarks::BookmarkNode* bookmark_;
+  raw_ptr<const bookmarks::BookmarkNode, DanglingUntriaged> bookmark_;
 
  private:
   std::unique_ptr<bookmarks::BookmarkModel> bookmark_model_;

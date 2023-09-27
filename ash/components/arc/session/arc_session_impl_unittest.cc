@@ -22,6 +22,7 @@
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/scoped_feature_list.h"
@@ -245,8 +246,9 @@ class TestArcSessionObserver : public ArcSession::Observer {
   }
 
  private:
-  ArcSession* const arc_session_;            // Not owned.
-  base::RunLoop* const run_loop_ = nullptr;  // Not owned.
+  const raw_ptr<ArcSession, ExperimentalAsh> arc_session_;  // Not owned.
+  const raw_ptr<base::RunLoop, ExperimentalAsh> run_loop_ =
+      nullptr;  // Not owned.
   absl::optional<OnSessionStoppedArgs> on_session_stopped_args_;
 };
 
@@ -906,8 +908,8 @@ TEST_F(ArcSessionImplTest, DisableUreadahead) {
       GetClient(arc_session.get())->last_start_params().disable_ureadahead);
 }
 
-// Test that validates ureadahead generation flag is not set by default.
-TEST_F(ArcSessionImplTest, HostUreadaheadGenerationDefault) {
+// Test that validates host ureadahead generation flag is not set by default.
+TEST_F(ArcSessionImplTest, NoHostUreadaheadGenerationDefault) {
   auto arc_session = CreateArcSession();
   arc_session->StartMiniInstance();
   base::RunLoop().RunUntilIdle();
@@ -915,6 +917,7 @@ TEST_F(ArcSessionImplTest, HostUreadaheadGenerationDefault) {
                    ->last_start_params()
                    .host_ureadahead_generation);
 }
+
 // Test that validates host ureadahead generation flag is set.
 TEST_F(ArcSessionImplTest, HostUreadaheadGenerationSet) {
   base::CommandLine* const command_line =
@@ -929,6 +932,26 @@ TEST_F(ArcSessionImplTest, HostUreadaheadGenerationSet) {
   // Host ureadahead generation implies disabling ureadahead.
   EXPECT_TRUE(
       GetClient(arc_session.get())->last_start_params().disable_ureadahead);
+}
+
+// Test that validates use dev caches flag is not set by default.
+TEST_F(ArcSessionImplTest, DoNotUseDevCachesByDefault) {
+  auto arc_session = CreateArcSession();
+  arc_session->StartMiniInstance();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(
+      GetClient(arc_session.get())->last_start_params().use_dev_caches);
+}
+
+// Test that validates use dev caches flag is set.
+TEST_F(ArcSessionImplTest, UseDevCachesSet) {
+  base::CommandLine* const command_line =
+      base::CommandLine::ForCurrentProcess();
+  command_line->AppendSwitch(ash::switches::kArcUseDevCaches);
+  auto arc_session = CreateArcSession();
+  arc_session->StartMiniInstance();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(GetClient(arc_session.get())->last_start_params().use_dev_caches);
 }
 
 // Test that validates TTS caching is enabled by default.

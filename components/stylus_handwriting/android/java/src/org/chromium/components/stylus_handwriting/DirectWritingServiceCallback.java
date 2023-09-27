@@ -23,7 +23,7 @@ import org.chromium.base.MathUtils;
 import org.chromium.blink.mojom.StylusWritingGestureAction;
 import org.chromium.blink.mojom.StylusWritingGestureData;
 import org.chromium.blink.mojom.StylusWritingGestureGranularity;
-import org.chromium.content.browser.input.StylusGestureHandler;
+import org.chromium.content.browser.input.StylusGestureConverter;
 import org.chromium.content_public.browser.StylusWritingImeCallback;
 import org.chromium.mojo_base.mojom.String16;
 
@@ -59,6 +59,21 @@ class DirectWritingServiceCallback
     static final String GESTURE_TYPE_ARCH_TYPE_REMOVE_SPACE = "arch_type_remove_space";
     static final String GESTURE_I_TYPE_FUNCTIONAL = "i_type_functional";
 
+    /**
+     * Callback interface for DirectWritingTrigger class.
+     */
+    public interface TriggerCallback {
+        /**
+         * Update editable bounds to Direct Writing service.
+         */
+        void updateEditableBoundsToService();
+
+        /**
+         * @return true if stylus handwriting icon is showing, false otherwise.
+         */
+        boolean isHandwritingIconShowing();
+    }
+
     private EditorInfo mEditorInfo;
     private int mLastSelectionStart;
     private int mLastSelectionEnd;
@@ -67,6 +82,11 @@ class DirectWritingServiceCallback
     private Point mCursorPosition;
 
     private StylusWritingImeCallback mStylusWritingImeCallback;
+    private TriggerCallback mTriggerCallback;
+
+    void setTriggerCallback(TriggerCallback callback) {
+        mTriggerCallback = callback;
+    }
 
     private final Handler mHandler = new Handler((android.os.Looper.getMainLooper())) {
         @Override
@@ -75,7 +95,7 @@ class DirectWritingServiceCallback
             switch (msg.what) {
                 case DirectWritingConstants.MSG_SEND_SET_TEXT_SELECTION:
                     mStylusWritingImeCallback.finishComposingText();
-                    mStylusWritingImeCallback.setEditableSelectionOffsets(0, mLastText.length());
+                    mStylusWritingImeCallback.setEditableSelectionOffsets(0, getText().length());
                     mStylusWritingImeCallback.sendCompositionToNative(
                             ((CharSequence) msg.obj), msg.arg1, true);
                     mStylusWritingImeCallback.setEditableSelectionOffsets(msg.arg1, msg.arg1);
@@ -95,6 +115,9 @@ class DirectWritingServiceCallback
                     break;
                 case DirectWritingConstants.MSG_FORCE_HIDE_KEYBOARD:
                     mStylusWritingImeCallback.hideKeyboard();
+                    break;
+                case DirectWritingConstants.MSG_UPDATE_EDIT_BOUNDS:
+                    mTriggerCallback.updateEditableBoundsToService();
                     break;
                 default:
                     break;
@@ -153,20 +176,20 @@ class DirectWritingServiceCallback
 
         switch (gestureData.action) {
             case StylusWritingGestureAction.DELETE_TEXT:
-                StylusGestureHandler.logGestureType(
-                        StylusGestureHandler.UmaGestureType.DW_DELETE_TEXT);
+                StylusGestureConverter.logGestureType(
+                        StylusGestureConverter.UmaGestureType.DW_DELETE_TEXT);
                 break;
             case StylusWritingGestureAction.ADD_SPACE_OR_TEXT:
-                StylusGestureHandler.logGestureType(
-                        StylusGestureHandler.UmaGestureType.DW_ADD_SPACE_OR_TEXT);
+                StylusGestureConverter.logGestureType(
+                        StylusGestureConverter.UmaGestureType.DW_ADD_SPACE_OR_TEXT);
                 break;
             case StylusWritingGestureAction.REMOVE_SPACES:
-                StylusGestureHandler.logGestureType(
-                        StylusGestureHandler.UmaGestureType.DW_REMOVE_SPACES);
+                StylusGestureConverter.logGestureType(
+                        StylusGestureConverter.UmaGestureType.DW_REMOVE_SPACES);
                 break;
             case StylusWritingGestureAction.SPLIT_OR_MERGE:
-                StylusGestureHandler.logGestureType(
-                        StylusGestureHandler.UmaGestureType.DW_SPLIT_OR_MERGE);
+                StylusGestureConverter.logGestureType(
+                        StylusGestureConverter.UmaGestureType.DW_SPLIT_OR_MERGE);
                 break;
             default:
                 assert false : "Gesture type unset";
@@ -369,6 +392,19 @@ class DirectWritingServiceCallback
         msg.obj = action;
         msg.setData(bundle);
         mHandler.sendMessage(msg);
+    }
+
+    @BinderThread
+    @Override
+    public void updateBoundedEditTextRect() {
+        Message msg = mHandler.obtainMessage(DirectWritingConstants.MSG_UPDATE_EDIT_BOUNDS);
+        mHandler.sendMessage(msg);
+    }
+
+    @BinderThread
+    @Override
+    public boolean isHoverIconShowing() {
+        return mTriggerCallback.isHandwritingIconShowing();
     }
 
     // All of the below IDirectWritingServiceCallback interface implementations are default or no-op

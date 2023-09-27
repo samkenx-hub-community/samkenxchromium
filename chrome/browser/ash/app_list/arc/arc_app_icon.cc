@@ -14,6 +14,7 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/lazy_instance.h"
+#include "base/memory/raw_ref.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/no_destructor.h"
 #include "base/ranges/algorithm.h"
@@ -28,6 +29,7 @@
 #include "extensions/grit/extensions_browser_resources.h"
 #include "services/data_decoder/public/cpp/data_decoder.h"
 #include "ui/base/resource/resource_bundle.h"
+#include "ui/base/resource/resource_scale_factor.h"
 #include "ui/gfx/codec/png_codec.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/image/image_skia_operations.h"
@@ -162,12 +164,13 @@ class ArcAppIcon::DecodeRequest : public ImageDecoder::ImageRequest {
   void OnDecodeImageFailed() override;
 
  private:
-  ArcAppIcon& host_;
+  const raw_ref<ArcAppIcon, ExperimentalAsh> host_;
   const ArcAppIconDescriptor descriptor_;
   const bool resize_allowed_;
   const bool retain_padding_;
-  gfx::ImageSkia& image_skia_;
-  std::map<ui::ResourceScaleFactor, base::Time>& incomplete_scale_factors_;
+  const raw_ref<gfx::ImageSkia, ExperimentalAsh> image_skia_;
+  const raw_ref<std::map<ui::ResourceScaleFactor, base::Time>, ExperimentalAsh>
+      incomplete_scale_factors_;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -205,26 +208,26 @@ void ArcAppIcon::DecodeRequest::OnImageDecoded(const SkBitmap& bitmap) {
     if (!resize_allowed_) {
       VLOG(2) << "Decoded ARC icon has unexpected dimension " << bitmap.width()
               << "x" << bitmap.height() << ". Expected " << expected_dim << ".";
-      host_.MaybeRequestIcon(descriptor_.scale_factor);
+      host_->MaybeRequestIcon(descriptor_.scale_factor);
     } else {
-      host_.UpdateImageSkia(descriptor_.scale_factor,
-                            skia::ImageOperations::Resize(
-                                bitmap, skia::ImageOperations::RESIZE_BEST,
-                                expected_dim, expected_dim),
-                            image_skia_, incomplete_scale_factors_);
+      host_->UpdateImageSkia(descriptor_.scale_factor,
+                             skia::ImageOperations::Resize(
+                                 bitmap, skia::ImageOperations::RESIZE_BEST,
+                                 expected_dim, expected_dim),
+                             *image_skia_, *incomplete_scale_factors_);
     }
   } else {
-    host_.UpdateImageSkia(descriptor_.scale_factor, bitmap, image_skia_,
-                          incomplete_scale_factors_);
+    host_->UpdateImageSkia(descriptor_.scale_factor, bitmap, *image_skia_,
+                           *incomplete_scale_factors_);
   }
 
-  host_.DiscardDecodeRequest(this, true /* bool is_decode_success */);
+  host_->DiscardDecodeRequest(this, true /* bool is_decode_success */);
 }
 
 void ArcAppIcon::DecodeRequest::OnDecodeImageFailed() {
   VLOG(2) << "Failed to decode ARC icon.";
-  host_.MaybeRequestIcon(descriptor_.scale_factor);
-  host_.DiscardDecodeRequest(this, false /* bool is_decode_success*/);
+  host_->MaybeRequestIcon(descriptor_.scale_factor);
+  host_->DiscardDecodeRequest(this, false /* bool is_decode_success*/);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -271,7 +274,7 @@ ArcAppIcon::ArcAppIcon(content::BrowserContext* context,
       background_image_skia_ = gfx::ImageSkia(
           std::make_unique<Source>(nullptr, resource_size_in_dip),
           resource_size);
-      for (const auto& scale_factor : scale_factors) {
+      for (const auto scale_factor : scale_factors) {
         foreground_incomplete_scale_factors_.insert(
             {scale_factor, base::Time::Now()});
         background_incomplete_scale_factors_.insert(
@@ -290,7 +293,7 @@ ArcAppIcon::ArcAppIcon(content::BrowserContext* context,
       // |incomplete_scale_factors_|.
       [[fallthrough]];
     case IconType::kCompressed:
-      for (const auto& scale_factor : scale_factors) {
+      for (const auto scale_factor : scale_factors) {
         incomplete_scale_factors_.insert({scale_factor, base::Time::Now()});
         if (icon_type != IconType::kAdaptive)
           is_adaptive_icons_.insert({scale_factor, false});
@@ -739,11 +742,10 @@ void ArcAppIcon::UpdateImageSkia(
     gfx::ImageSkia& image_skia,
     std::map<ui::ResourceScaleFactor, base::Time>& incomplete_scale_factors) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  CHECK(ui::IsScaleFactorSupported(scale_factor));
 
   gfx::ImageSkiaRep image_rep(bitmap,
                               ui::GetScaleForResourceScaleFactor(scale_factor));
-  DCHECK(ui::IsSupportedScale(image_rep.scale()));
-
   image_skia.RemoveRepresentation(image_rep.scale());
   image_skia.AddRepresentation(image_rep);
   image_skia.RemoveUnsupportedRepresentationsForScale(image_rep.scale());

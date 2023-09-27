@@ -2,11 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
+  await TestRunner.loadLegacyModule('sources');
   TestRunner.addResult("Test frontend's timeout support.\n");
 
-  const executionContext = UI.context.flavor(SDK.ExecutionContext);
+  const executionContext = UIModule.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
   const regularExpression = '1 + 1';
   const infiniteExpression = 'while (1){}';
 

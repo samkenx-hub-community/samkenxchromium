@@ -110,12 +110,10 @@ public class AccountManagerFacadeImplTest {
     @Test
     public void testAccountsChangerObservationInitialization() {
         mFacadeWithSystemDelegate.addObserver(mObserverMock);
-        verify(mObserverMock, never()).onAccountsChanged();
         verify(mObserverMock, never()).onCoreAccountInfosChanged();
 
         mContext.sendBroadcast(new Intent(AccountManager.LOGIN_ACCOUNTS_CHANGED_ACTION));
 
-        verify(mObserverMock).onAccountsChanged();
         verify(mObserverMock).onCoreAccountInfosChanged();
     }
 
@@ -125,7 +123,7 @@ public class AccountManagerFacadeImplTest {
                 HistogramWatcher.newSingleRecordWatcher("Signin.AndroidNumberOfDeviceAccounts", 1);
         addTestAccount("test@gmail.com");
 
-        AccountManagerFacade facade = new AccountManagerFacadeImpl(mDelegate);
+        new AccountManagerFacadeImpl(mDelegate);
 
         numberOfAccountsHistogram.assertExpected();
     }
@@ -323,15 +321,18 @@ public class AccountManagerFacadeImplTest {
 
     @Test
     public void testGetAndInvalidateAccessToken() throws AuthException {
-        final Account account = addTestAccount("test@gmail.com");
-        final AccessTokenData originalToken = mFacade.getAccessToken(account, TEST_TOKEN_SCOPE);
+        final CoreAccountInfo coreAccountInfo =
+                CoreAccountInfo.createFromEmailAndGaiaId("test@gmail.com", "gaiaIdNotUsed");
+        addTestAccount(coreAccountInfo.getEmail());
+        final AccessTokenData originalToken =
+                mFacade.getAccessToken(coreAccountInfo, TEST_TOKEN_SCOPE);
         Assert.assertEquals("The same token should be returned before invalidating the token.",
-                mFacade.getAccessToken(account, TEST_TOKEN_SCOPE).getToken(),
+                mFacade.getAccessToken(coreAccountInfo, TEST_TOKEN_SCOPE).getToken(),
                 originalToken.getToken());
 
         mFacade.invalidateAccessToken(originalToken.getToken());
 
-        final AccessTokenData newToken = mFacade.getAccessToken(account, TEST_TOKEN_SCOPE);
+        final AccessTokenData newToken = mFacade.getAccessToken(coreAccountInfo, TEST_TOKEN_SCOPE);
         Assert.assertNotEquals(
                 "A different token should be returned since the original token is invalidated.",
                 newToken.getToken(), originalToken.getToken());
@@ -357,6 +358,9 @@ public class AccountManagerFacadeImplTest {
         Assert.assertEquals(capabilities.canOfferExtendedSyncPromos(), Tribool.TRUE);
         Assert.assertEquals(capabilities.isSubjectToParentalControls(), Tribool.TRUE);
         Assert.assertEquals(capabilities.canRunChromePrivacySandboxTrials(), Tribool.TRUE);
+        Assert.assertEquals(
+                capabilities.isSubjectToChromePrivacySandboxRestrictedMeasurementNotice(),
+                Tribool.TRUE);
     }
 
     @Test
@@ -374,6 +378,9 @@ public class AccountManagerFacadeImplTest {
         Assert.assertEquals(capabilities.canOfferExtendedSyncPromos(), Tribool.FALSE);
         Assert.assertEquals(capabilities.isSubjectToParentalControls(), Tribool.FALSE);
         Assert.assertEquals(capabilities.canRunChromePrivacySandboxTrials(), Tribool.FALSE);
+        Assert.assertEquals(
+                capabilities.isSubjectToChromePrivacySandboxRestrictedMeasurementNotice(),
+                Tribool.FALSE);
     }
 
     @Test
@@ -391,6 +398,9 @@ public class AccountManagerFacadeImplTest {
         Assert.assertEquals(capabilities.canOfferExtendedSyncPromos(), Tribool.UNKNOWN);
         Assert.assertEquals(capabilities.isSubjectToParentalControls(), Tribool.UNKNOWN);
         Assert.assertEquals(capabilities.canRunChromePrivacySandboxTrials(), Tribool.UNKNOWN);
+        Assert.assertEquals(
+                capabilities.isSubjectToChromePrivacySandboxRestrictedMeasurementNotice(),
+                Tribool.UNKNOWN);
     }
 
     private Account setFeaturesForAccount(String email, String... features) {

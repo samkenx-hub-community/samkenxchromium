@@ -10,7 +10,6 @@ import android.provider.Settings;
 import android.text.TextUtils;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.ApplicationState;
 import org.chromium.base.ApplicationStatus;
@@ -36,9 +35,9 @@ import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.profiles.ProfileManagerUtils;
-import org.chromium.chrome.browser.read_later.ReadingListBridge;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.translate.TranslateBridge;
+import org.chromium.components.browser_ui.accessibility.DeviceAccessibilitySettingsHandler;
 import org.chromium.components.browser_ui.accessibility.FontSizePrefs;
 import org.chromium.components.browser_ui.share.ShareImageFileUtils;
 import org.chromium.components.feature_engagement.EventConstants;
@@ -56,7 +55,8 @@ public class ChromeActivitySessionTracker {
     @SuppressLint("StaticFieldLeak")
     private static ChromeActivitySessionTracker sInstance;
 
-    private final PowerBroadcastReceiver mPowerBroadcastReceiver = new PowerBroadcastReceiver();
+    private final OmahaServiceStartDelayer mOmahaServiceStartDelayer =
+            new OmahaServiceStartDelayer();
     private final Map<Activity, Supplier<TabModelSelector>> mTabModelSelectorSuppliers =
             new HashMap<>();
 
@@ -114,8 +114,7 @@ public class ChromeActivitySessionTracker {
     /**
      * @return The latest country according to the current variations state. Null if not available.
      */
-    @Nullable
-    public String getVariationsLatestCountry() {
+    public @Nullable String getVariationsLatestCountry() {
         return mVariationsSession.getLatestCountry();
     }
 
@@ -164,12 +163,13 @@ public class ChromeActivitySessionTracker {
             updatePasswordEchoState();
             FontSizePrefs.getInstance(Profile.getLastUsedRegularProfile())
                     .onSystemFontScaleChanged();
+            DeviceAccessibilitySettingsHandler.getInstance(Profile.getLastUsedRegularProfile())
+                    .updateFontWeightAdjustment();
             ChromeLocalizationUtils.recordUiLanguageStatus();
             updateAcceptLanguages();
             mVariationsSession.start();
-            mPowerBroadcastReceiver.onForegroundSessionStart();
+            mOmahaServiceStartDelayer.onForegroundSessionStart();
             AppHooks.get().getChimeDelegate().startSession();
-            ReadingListBridge.onStartChromeForeground();
             PasswordManagerLifecycleHelper.getInstance().onStartForegroundSession();
 
             // Track the ratio of Chrome startups that are caused by notification clicks.
@@ -190,7 +190,7 @@ public class ChromeActivitySessionTracker {
         UmaUtils.recordBackgroundTimeWithNative();
         ProfileManagerUtils.flushPersistentDataForAllProfiles();
         mIsStarted = false;
-        mPowerBroadcastReceiver.onForegroundSessionEnd();
+        mOmahaServiceStartDelayer.onForegroundSessionEnd();
 
         IntentHandler.clearPendingReferrer();
         IntentHandler.clearPendingIncognitoUrl();
@@ -272,10 +272,9 @@ public class ChromeActivitySessionTracker {
     }
 
     /**
-     * @return The PowerBroadcastReceiver for the browser process.
+     * @return The {@link OmahaServiceStartDelayer} for the browser process.
      */
-    @VisibleForTesting
-    public PowerBroadcastReceiver getPowerBroadcastReceiverForTesting() {
-        return mPowerBroadcastReceiver;
+    public OmahaServiceStartDelayer getOmahaServiceStartDelayerForTesting() {
+        return mOmahaServiceStartDelayer;
     }
 }

@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "ash/constants/ash_features.h"
+#include "ash/webui/eche_app_ui/system_info_provider.h"
 #include "chromeos/ash/components/phonehub/app_stream_launcher_data_model.h"
 #include "chromeos/ash/components/phonehub/app_stream_manager.h"
 #include "chromeos/ash/components/phonehub/browser_tabs_metadata_fetcher.h"
@@ -32,6 +33,7 @@
 #include "chromeos/ash/components/phonehub/notification_processor.h"
 #include "chromeos/ash/components/phonehub/onboarding_ui_tracker_impl.h"
 #include "chromeos/ash/components/phonehub/phone_hub_metrics_recorder.h"
+#include "chromeos/ash/components/phonehub/phone_hub_ui_readiness_recorder.h"
 #include "chromeos/ash/components/phonehub/phone_model.h"
 #include "chromeos/ash/components/phonehub/phone_status_processor.h"
 #include "chromeos/ash/components/phonehub/ping_manager_impl.h"
@@ -81,10 +83,15 @@ PhoneHubManagerImpl::PhoneHubManagerImpl(
           chromeos::PowerManagerClient::Get())),
       user_action_recorder_(std::make_unique<UserActionRecorderImpl>(
           feature_status_provider_.get())),
+      phone_hub_ui_readiness_recorder_(
+          std::make_unique<PhoneHubUiReadinessRecorder>(
+              feature_status_provider_.get(),
+              connection_manager_.get())),
       message_receiver_(
           std::make_unique<MessageReceiverImpl>(connection_manager_.get())),
-      message_sender_(
-          std::make_unique<MessageSenderImpl>(connection_manager_.get())),
+      message_sender_(std::make_unique<MessageSenderImpl>(
+          connection_manager_.get(),
+          phone_hub_ui_readiness_recorder_.get())),
       phone_model_(std::make_unique<MutablePhoneModel>()),
       cros_state_sender_(std::make_unique<CrosStateSender>(
           message_sender_.get(),
@@ -151,7 +158,8 @@ PhoneHubManagerImpl::PhoneHubManagerImpl(
           pref_service,
           app_stream_manager_.get(),
           app_stream_launcher_data_model_.get(),
-          icon_decoder_.get())),
+          icon_decoder_.get(),
+          phone_hub_ui_readiness_recorder_.get())),
       tether_controller_(
           std::make_unique<TetherControllerImpl>(phone_model_.get(),
                                                  user_action_recorder_.get(),
@@ -185,12 +193,13 @@ PhoneHubManagerImpl::PhoneHubManagerImpl(
                     message_receiver_.get(),
                     multidevice_feature_access_manager_.get())
               : nullptr),
-      ping_manager_(
-          features::IsPhoneHubPingOnBubbleOpenEnabled()
-              ? std::make_unique<PingManagerImpl>(connection_manager_.get(),
-                                                  message_receiver_.get(),
-                                                  message_sender_.get())
-              : nullptr) {}
+      ping_manager_(features::IsPhoneHubPingOnBubbleOpenEnabled()
+                        ? std::make_unique<PingManagerImpl>(
+                              connection_manager_.get(),
+                              feature_status_provider_.get(),
+                              message_receiver_.get(),
+                              message_sender_.get())
+                        : nullptr) {}
 
 PhoneHubManagerImpl::~PhoneHubManagerImpl() = default;
 
@@ -274,6 +283,11 @@ AppStreamManager* PhoneHubManagerImpl::GetAppStreamManager() {
   return app_stream_manager_.get();
 }
 
+PhoneHubUiReadinessRecorder*
+PhoneHubManagerImpl::GetPhoneHubUiReadinessRecorder() {
+  return phone_hub_ui_readiness_recorder_.get();
+}
+
 void PhoneHubManagerImpl::GetHostLastSeenTimestamp(
     base::OnceCallback<void(absl::optional<base::Time>)> callback) {
   connection_manager_->GetHostLastSeenTimestamp(std::move(callback));
@@ -289,6 +303,15 @@ void PhoneHubManagerImpl::SetEcheConnectionStatusHandler(
   eche_connection_status_handler_ = eche_connection_status_handler;
   recent_apps_interaction_handler_->SetConnectionStatusHandler(
       eche_connection_status_handler_);
+}
+
+void PhoneHubManagerImpl::SetSystemInfoProvider(
+    eche_app::SystemInfoProvider* system_info_provider) {
+  system_info_provider_ = system_info_provider;
+}
+
+eche_app::SystemInfoProvider* PhoneHubManagerImpl::GetSystemInfoProvider() {
+  return system_info_provider_;
 }
 
 // NOTE: These should be destroyed in the opposite order of how these objects
@@ -317,6 +340,7 @@ void PhoneHubManagerImpl::Shutdown() {
   phone_model_.reset();
   message_sender_.reset();
   message_receiver_.reset();
+  phone_hub_ui_readiness_recorder_.reset();
   user_action_recorder_.reset();
   feature_status_provider_.reset();
   connection_manager_.reset();

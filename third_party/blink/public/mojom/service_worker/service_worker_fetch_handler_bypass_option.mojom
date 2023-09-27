@@ -13,4 +13,7 @@ module blink.mojom;
 enum ServiceWorkerFetchHandlerBypassOption {
   kDefault,
   kBypassOnlyIfServiceWorkerNotStarted,
+  kRaceNetworkRequest,
+  kRaceNetworkRequestHoldback,
+  kAutoPreload,
 };

@@ -26,8 +26,8 @@ class ComputedStyle;
 class Font;
 class NGDecoratingBox;
 class NGInlinePaintContext;
+class NGTextDecorationOffset;
 class SimpleFontData;
-class TextDecorationOffsetBase;
 
 enum class ResolvedUnderlinePosition {
   kNearAlphabeticBaselineAuto,
@@ -54,10 +54,7 @@ class CORE_EXPORT TextDecorationInfo {
       const AppliedTextDecoration* decoration_override = nullptr,
       const Font* font_override = nullptr,
       MinimumThickness1 minimum_thickness1 = MinimumThickness1(true),
-      float scaling_factor = 1.0f,
-      // Following arguments are used only in legacy. They're deprecated.
-      absl::optional<FontBaseline> baseline_type_override = absl::nullopt,
-      const ComputedStyle* decorating_box_style = nullptr);
+      float scaling_factor = 1.0f);
 
   wtf_size_t AppliedDecorationCount() const;
   const AppliedTextDecoration& AppliedDecoration(wtf_size_t) const;
@@ -103,10 +100,10 @@ class CORE_EXPORT TextDecorationInfo {
   // through. Must be called before trying to paint or compute bounds
   // for a line.
   void SetLineData(TextDecorationLine line, float line_offset);
-  void SetUnderlineLineData(const TextDecorationOffsetBase& decoration_offset);
-  void SetOverlineLineData(const TextDecorationOffsetBase& decoration_offset);
+  void SetUnderlineLineData(const NGTextDecorationOffset& decoration_offset);
+  void SetOverlineLineData(const NGTextDecorationOffset& decoration_offset);
   void SetLineThroughLineData();
-  void SetSpellingOrGrammarErrorLineData(const TextDecorationOffsetBase&);
+  void SetSpellingOrGrammarErrorLineData(const NGTextDecorationOffset&);
 
   // These methods do not depend on |SetDecorationIndex|.
   LayoutUnit Width() const { return width_; }
@@ -193,8 +190,6 @@ class CORE_EXPORT TextDecorationInfo {
   // [decorating box] is not supported.
   const AppliedTextDecoration* const decoration_override_ = nullptr;
   const Font* const font_override_ = nullptr;
-  const ComputedStyle* const decorating_box_style_override_ = nullptr;
-  const absl::optional<FontBaseline> baseline_type_override_;
 
   // Geometry of the target text/box.
   const PhysicalOffset local_origin_;

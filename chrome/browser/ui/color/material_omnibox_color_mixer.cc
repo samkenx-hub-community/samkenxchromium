@@ -13,7 +13,7 @@
 #include "ui/color/color_transform.h"
 
 void AddMaterialOmniboxColorMixer(ui::ColorProvider* provider,
-                                  const ui::ColorProviderManager::Key& key) {
+                                  const ui::ColorProviderKey& key) {
   if (!ShouldApplyChromeMaterialOverrides(key)) {
     return;
   }
@@ -32,5 +32,4 @@ void AddMaterialOmniboxColorMixer(ui::ColorProvider* provider,
   mixer[kColorToolbarBackgroundSubtleEmphasisHovered] =
       ui::GetResultingPaintColor(ui::kColorSysStateHoverBrightBlendProtection,
                                  kColorToolbarBackgroundSubtleEmphasis);
-  mixer[kColorOmniboxText] = {ui::kColorSysOnSurface};
 }

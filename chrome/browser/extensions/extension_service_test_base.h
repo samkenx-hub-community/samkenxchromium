@@ -16,6 +16,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
+#include "chrome/common/chrome_constants.h"
 #include "chrome/test/base/scoped_testing_local_state.h"
 #include "components/policy/core/common/mock_configuration_policy_provider.h"
 #include "components/policy/core/common/policy_service.h"
@@ -62,9 +63,16 @@ class ExtensionService;
 class ExtensionServiceTestBase : public testing::Test {
  public:
   struct ExtensionServiceInitParams {
-    base::FilePath profile_path;
-    base::FilePath pref_file;
-    base::FilePath extensions_install_dir;
+    // If set, even if it is empty string, creates a pref file in the profile
+    // directory with the given content, and initializes user prefs store
+    // referring the file.
+    // If not, sync_preferences::TestingPrefServiceSyncable is used.
+    absl::optional<std::string> prefs_content;
+
+    // If not empty, copies both directories to the profile directory.
+    base::FilePath extensions_dir;
+    base::FilePath unpacked_extensions_dir;
+
     bool autoupdate_enabled = false;
     bool extensions_enabled = true;
     bool is_first_run = true;
@@ -73,12 +81,21 @@ class ExtensionServiceTestBase : public testing::Test {
     bool enable_bookmark_model = false;
     bool enable_install_limiter = false;
 
-    raw_ptr<policy::PolicyService> policy_service = nullptr;
-
-    // Though you could use this constructor, you probably want to use
-    // CreateDefaultInitParams(), and then make a change or two.
     ExtensionServiceInitParams();
     ExtensionServiceInitParams(const ExtensionServiceInitParams& other);
+    ~ExtensionServiceInitParams();
+
+    // Sets the prefs_content to the content in the given file.
+    [[nodiscard]] bool SetPrefsContentFromFile(const base::FilePath& filepath);
+
+    // Configures prefs_content and extensions_dir from the test data directory
+    // specified by the `filepath`.
+    // There must be a file named "Preferences" in the test data directory
+    // containing the prefs content.
+    // Also, there must be a directory named "Extensions" containing extensions
+    // data for testing.
+    [[nodiscard]] bool ConfigureByTestDataDirectory(
+        const base::FilePath& filepath);
   };
 
   ExtensionServiceTestBase(const ExtensionServiceTestBase&) = delete;
@@ -100,23 +117,13 @@ class ExtensionServiceTestBase : public testing::Test {
   void SetUp() override;
   void TearDown() override;
 
-  // Create a set of InitParams to install an ExtensionService into |temp_dir_|.
-  ExtensionServiceInitParams CreateDefaultInitParams();
-
   // Initialize an ExtensionService according to the given |params|.
   virtual void InitializeExtensionService(
       const ExtensionServiceInitParams& params);
 
-  // Initialize an empty ExtensionService using the default init params.
+  // Initialize an empty ExtensionService using a production, on-disk pref file.
+  // See documentation for |prefs_content|.
   void InitializeEmptyExtensionService();
-
-  // Initialize an ExtensionService with the associated |prefs_file| and
-  // |source_install_dir|.
-  void InitializeInstalledExtensionService(
-      const base::FilePath& prefs_file,
-      const base::FilePath& source_install_dir,
-      const ExtensionServiceInitParams& additional_params =
-          ExtensionServiceInitParams{});
 
   // Initialize an ExtensionService with a few already-installed extensions.
   void InitializeGoodInstalledExtensionService();
@@ -153,6 +160,9 @@ class ExtensionServiceTestBase : public testing::Test {
   ExtensionRegistry* registry() { return registry_; }
   const base::FilePath& extensions_install_dir() const {
     return extensions_install_dir_;
+  }
+  const base::FilePath& unpacked_install_dir() const {
+    return unpacked_install_dir_;
   }
   const base::FilePath& data_dir() const { return data_dir_; }
   const base::ScopedTempDir& temp_dir() const { return temp_dir_; }
@@ -207,7 +217,7 @@ class ExtensionServiceTestBase : public testing::Test {
 
   // The ExtensionService, whose lifetime is managed by |profile|'s
   // ExtensionSystem.
-  raw_ptr<ExtensionService> service_;
+  raw_ptr<ExtensionService, DanglingUntriaged> service_;
   ScopedTestingLocalState testing_local_state_;
 
  private:
@@ -215,6 +225,8 @@ class ExtensionServiceTestBase : public testing::Test {
 
   // The directory into which extensions are installed.
   base::FilePath extensions_install_dir_;
+  // The directory into which unpacked extensions are installed.
+  base::FilePath unpacked_install_dir_;
 
   // chrome/test/data/extensions/
   base::FilePath data_dir_;
@@ -222,7 +234,7 @@ class ExtensionServiceTestBase : public testing::Test {
   content::InProcessUtilityThreadHelper in_process_utility_thread_helper_;
 
   // The associated ExtensionRegistry, for convenience.
-  raw_ptr<extensions::ExtensionRegistry> registry_;
+  raw_ptr<extensions::ExtensionRegistry, DanglingUntriaged> registry_;
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   ash::ScopedCrosSettingsTestHelper cros_settings_test_helper_;

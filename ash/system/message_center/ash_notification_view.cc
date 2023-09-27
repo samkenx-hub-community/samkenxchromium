@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "ash/constants/ash_features.h"
+#include "ash/drag_drop/drag_drop_util.h"
 #include "ash/public/cpp/metrics_util.h"
 #include "ash/public/cpp/rounded_image_view.h"
 #include "ash/public/cpp/style/color_provider.h"
@@ -16,10 +17,12 @@
 #include "ash/shelf/shelf.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
+#include "ash/style/ash_color_id.h"
 #include "ash/style/ash_color_provider.h"
 #include "ash/style/dark_light_mode_controller_impl.h"
 #include "ash/style/icon_button.h"
 #include "ash/style/pill_button.h"
+#include "ash/style/typography.h"
 #include "ash/system/message_center/ash_notification_control_button_factory.h"
 #include "ash/system/message_center/ash_notification_drag_controller.h"
 #include "ash/system/message_center/ash_notification_expand_button.h"
@@ -28,6 +31,7 @@
 #include "ash/system/message_center/message_center_controller.h"
 #include "ash/system/message_center/message_center_style.h"
 #include "ash/system/message_center/message_center_utils.h"
+#include "ash/system/message_center/message_view_factory.h"
 #include "ash/system/message_center/metrics_utils.h"
 #include "ash/system/message_center/notification_grouping_controller.h"
 #include "ash/wm/work_area_insets.h"
@@ -38,13 +42,14 @@
 #include "base/ranges/algorithm.h"
 #include "base/strings/strcat.h"
 #include "base/time/time.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/compositor/animation_throughput_reporter.h"
-#include "ui/compositor/canvas_painter.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
@@ -61,6 +66,7 @@
 #include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/image/image_skia_operations.h"
 #include "ui/gfx/paint_vector_icon.h"
+#include "ui/gfx/shadow_util.h"
 #include "ui/gfx/text_constants.h"
 #include "ui/gfx/text_elider.h"
 #include "ui/message_center/message_center.h"
@@ -74,6 +80,7 @@
 #include "ui/message_center/views/notification_control_buttons_view.h"
 #include "ui/message_center/views/notification_header_view.h"
 #include "ui/message_center/views/notification_view_base.h"
+#include "ui/message_center/views/notification_view_util.h"
 #include "ui/message_center/views/proportional_image_view.h"
 #include "ui/message_center/views/relative_time_formatter.h"
 #include "ui/strings/grit/ui_strings.h"
@@ -85,6 +92,7 @@
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/drag_utils.h"
+#include "ui/views/highlight_border.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/box_layout_view.h"
 #include "ui/views/layout/flex_layout.h"
@@ -118,14 +126,19 @@ constexpr auto kImageContainerPadding = gfx::Insets::TLBR(12, 14, 12, 12);
 constexpr auto kActionButtonsRowPadding = gfx::Insets::TLBR(4, 38, 12, 4);
 constexpr int kActionsRowHorizontalSpacing = 8;
 
-constexpr auto kContentRowPadding = gfx::Insets::TLBR(16, 0, 0, 0);
+constexpr auto kContentRowPadding = gfx::Insets::TLBR(14, 0, 0, 0);
 
 constexpr int kLeftContentVerticalSpacing = 4;
 constexpr int kTitleRowMinimumWidthWithIcon = 186;
 constexpr int kTitleRowMinimumWidth = 266;
 constexpr int kTitleRowSpacing = 6;
 
-constexpr auto kHeaderRowExpandedPadding = gfx::Insets::TLBR(4, 0, 8, 0);
+// This padding is applied in collapsed mode when there is no message in order
+// to vertically center the title.
+constexpr auto kTitleRowNoMessageCollapsedPadding =
+    gfx::Insets::TLBR(12, 0, 0, 0);
+
+constexpr auto kHeaderRowExpandedPadding = gfx::Insets::TLBR(6, 0, 8, 0);
 constexpr auto kHeaderRowCollapsedPadding = gfx::Insets::TLBR(0, 0, 8, 0);
 constexpr auto kRightContentCollapsedPadding = gfx::Insets::TLBR(12, 0, 0, 16);
 constexpr auto kRightContentExpandedPadding = gfx::Insets::TLBR(20, 0, 0, 16);
@@ -354,6 +367,7 @@ AshNotificationView::NotificationTitleRow::NotificationTitleRow(
   timestamp_in_collapsed_view_->SetProperty(views::kMarginsKey,
                                             kTimeStampInCollapsedStatePadding);
   timestamp_in_collapsed_view_->SetElideBehavior(gfx::ElideBehavior::NO_ELIDE);
+
   title_view_->SetProperty(
       views::kFlexBehaviorKey,
       views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToMinimum,
@@ -371,6 +385,17 @@ AshNotificationView::NotificationTitleRow::NotificationTitleRow(
   message_center_utils::InitLayerForAnimations(timestamp_in_collapsed_view_);
   ConfigureLabelStyle(title_view_, kTitleLabelSize,
                       /*is_color_primary=*/true, gfx::Font::Weight::MEDIUM);
+
+  if (chromeos::features::IsJellyEnabled()) {
+    ash::TypographyProvider::Get()->StyleLabel(
+        ash::TypographyToken::kCrosButton2, *title_view_);
+    title_view_->SetEnabledColorId(cros_tokens::kCrosSysOnSurface);
+
+    timestamp_in_collapsed_view_->SetEnabledColorId(
+        cros_tokens::kCrosSysOnSurfaceVariant);
+    ash::TypographyProvider::Get()->StyleLabel(
+        ash::TypographyToken::kCrosAnnotation1, *timestamp_in_collapsed_view_);
+  }
 }
 
 AshNotificationView::NotificationTitleRow::~NotificationTitleRow() {
@@ -448,6 +473,12 @@ void AshNotificationView::NotificationTitleRow::OnThemeChanged() {
       AshColorProvider::ContentLayerType::kTextColorSecondary);
   title_row_divider_->SetEnabledColor(secondary_text_color);
   timestamp_in_collapsed_view_->SetEnabledColor(secondary_text_color);
+
+  if (chromeos::features::IsJellyEnabled()) {
+    title_view_->SetEnabledColorId(cros_tokens::kCrosSysOnSurface);
+    timestamp_in_collapsed_view_->SetEnabledColorId(
+        cros_tokens::kCrosSysOnSurfaceVariant);
+  }
 }
 
 // static
@@ -562,11 +593,20 @@ AshNotificationView::AshNotificationView(
                   // consider making changes to this code when the bug is fixed.
                   .SetMaximumWidth(GetExpandedMessageLabelWidth()))
           .AddChild(CreateInlineSettingsBuilder())
+          .AddChild(CreateSnoozeSettingsBuilder())
           .AddChild(CreateImageContainerBuilder().SetProperty(
               views::kMarginsKey, kImageContainerPadding));
 
   ConfigureLabelStyle(message_label_in_expanded_state_, kMessageLabelSize,
-                      false);
+                      /*is_color_primary=*/false);
+
+  if (chromeos::features::IsJellyEnabled()) {
+    message_label_in_expanded_state_->SetEnabledColorId(
+        cros_tokens::kCrosSysOnSurfaceVariant);
+    ash::TypographyProvider::Get()->StyleLabel(
+        ash::TypographyToken::kCrosAnnotation1,
+        *message_label_in_expanded_state_);
+  }
 
   AddChildView(
       views::Builder<views::FlexLayoutView>()
@@ -636,6 +676,9 @@ AshNotificationView::AshNotificationView(
                     gfx::Font::Weight::NORMAL),
       gfx::Insets(), true);
 
+  // This view should not be focusable since it does not act as a button.
+  header_row()->SetFocusBehavior(views::View::FocusBehavior::NEVER);
+
   // Corner radius for popups is handled below. We do not set corner radius if
   // the view is  in the message center here. Rounded corners for message_views
   // in the message center view are handled in `UnifiedMessageListView`.
@@ -647,6 +690,11 @@ AshNotificationView::AshNotificationView(
     layer()->SetRoundedCornerRadius(
         gfx::RoundedCornersF{kMessagePopupCornerRadius});
     layer()->SetIsFastRoundedCorner(true);
+    SetBorder(std::make_unique<views::HighlightBorder>(
+        kMessagePopupCornerRadius,
+        chromeos::features::IsJellyrollEnabled()
+            ? views::HighlightBorder::Type::kHighlightBorderOnShadow
+            : views::HighlightBorder::Type::kHighlightBorder1));
   }
 
   views::FocusRing::Get(this)->SetColorId(ui::kColorAshFocusRing);
@@ -866,9 +914,24 @@ absl::optional<gfx::ImageSkia> AshNotificationView::GetDragImage() {
 
   // Assume that an Ash notification has at most one large image view. Fetch the
   // image shown in the large image view.
-  return static_cast<message_center::LargeImageView*>(
-             GetViewByID(message_center::NotificationViewBase::kLargeImageView))
-      ->drawn_image();
+  const gfx::ImageSkia& original_image =
+      static_cast<message_center::LargeImageView*>(
+          GetViewByID(message_center::NotificationViewBase::kLargeImageView))
+          ->drawn_image();
+
+  // Add the background color.
+  const absl::optional<size_t> radius =
+      message_center::notification_view_util::GetLargeImageCornerRadius();
+  const gfx::ImageSkia drag_image_with_background =
+      gfx::ImageSkiaOperations::CreateImageWithRoundRectBackground(
+          gfx::SizeF{original_image.size()}, radius.value_or(0),
+          GetColorProvider()->GetColor(drag_drop::kDragImageBackgroundColor),
+          original_image);
+
+  // Add the drop shadow.
+  return gfx::ImageSkiaOperations::CreateImageWithDropShadow(
+      drag_image_with_background,
+      drag_drop::GetDragImageShadowDetails(radius).values);
 }
 
 void AshNotificationView::AttachDropData(ui::OSExchangeData* data) {
@@ -936,7 +999,7 @@ void AshNotificationView::AddGroupNotification(
   notification_view->SetGroupedChildExpanded(IsExpanded());
   notification_view->set_parent_message_view(this);
   notification_view->set_scroller(
-      scroller() ? scroller() : grouped_notifications_scroll_view_);
+      scroller() ? scroller() : grouped_notifications_scroll_view_.get());
 
   header_row()->SetTimestamp(notification.timestamp());
 
@@ -960,8 +1023,14 @@ void AshNotificationView::PopulateGroupNotifications(
 
   for (auto* notification : notifications) {
     auto notification_view =
-        std::make_unique<AshNotificationView>(*notification,
-                                              /*shown_in_popup=*/false);
+            MessageViewFactory::Create(*notification, /*shown_in_popup=*/false);
+    // The child can either be an AshNotificationView or a custom notification
+    // view.
+    if (notification->type() != message_center::NOTIFICATION_TYPE_CUSTOM) {
+      auto* ash_notification_view =
+              static_cast<AshNotificationView*>(notification_view.get());
+      ash_notification_view->SetGroupedChildExpanded(IsExpanded());
+    }
 
     if (!total_grouped_notifications_) {
       header_row()->SetTimestamp(notification->timestamp());
@@ -971,10 +1040,10 @@ void AshNotificationView::PopulateGroupNotifications(
         total_grouped_notifications_ <
             message_center_style::kMaxGroupedNotificationsInCollapsedState ||
         IsExpanded());
-    notification_view->SetGroupedChildExpanded(IsExpanded());
+
     notification_view->set_parent_message_view(this);
     notification_view->set_scroller(
-        scroller() ? scroller() : grouped_notifications_scroll_view_);
+        scroller() ? scroller() : grouped_notifications_scroll_view_.get());
 
     grouped_notifications_container_->AddChildView(
         std::move(notification_view));
@@ -1080,6 +1149,12 @@ void AshNotificationView::UpdateViewForExpandedState(bool expanded) {
     title_row_->UpdateVisibility(IsExpandable() && !expanded);
     title_row_->title_view()->SetMaxLines(
         expanded ? kTitleLabelExpandedMaxLines : kTitleLabelCollapsedMaxLines);
+    // Add extra padding to center the title in collapsed mode when there is no
+    // message.
+    title_row_->SetProperty(views::kMarginsKey,
+                            !message_label() && !use_expanded_padding
+                                ? kTitleRowNoMessageCollapsedPadding
+                                : gfx::Insets());
   }
 
   if (message_label()) {
@@ -1184,13 +1259,21 @@ void AshNotificationView::UpdateWithNotification(
   // Configure views style.
   UpdateIconAndButtonsColor(&notification);
   if (message_label()) {
-    ConfigureLabelStyle(message_label(), kMessageLabelSize, false);
+    ConfigureLabelStyle(message_label(), kMessageLabelSize,
+                        /*is_color_primary=*/false);
+    if (chromeos::features::IsJellyEnabled()) {
+      message_label()->SetEnabledColorId(cros_tokens::kCrosSysOnSurfaceVariant);
+      ash::TypographyProvider::Get()->StyleLabel(
+          ash::TypographyToken::kCrosAnnotation1, *message_label());
+    }
   }
   if (inline_reply()) {
-    SkColor text_color = ash::AshColorProvider::Get()->GetContentLayerColor(
-        ash::AshColorProvider::ContentLayerType::kTextColorSecondary);
-    inline_reply()->textfield()->SetTextColor(text_color);
-    inline_reply()->textfield()->set_placeholder_text_color(text_color);
+    if (!chromeos::features::IsJellyEnabled()) {
+      SkColor text_color = ash::AshColorProvider::Get()->GetContentLayerColor(
+          ash::AshColorProvider::ContentLayerType::kTextColorSecondary);
+      inline_reply()->textfield()->SetTextColor(text_color);
+      inline_reply()->textfield()->set_placeholder_text_color(text_color);
+    }
   }
 }
 
@@ -1218,7 +1301,7 @@ void AshNotificationView::CreateOrUpdateTitleView(
   if (notification.title().empty()) {
     if (title_row_) {
       DCHECK(left_content()->Contains(title_row_));
-      left_content()->RemoveChildViewT(title_row_);
+      left_content()->RemoveChildViewT(title_row_.get());
       title_row_ = nullptr;
     }
     return;
@@ -1293,6 +1376,58 @@ void AshNotificationView::CreateOrUpdateInlineSettingsViews(
       std::move(inline_settings_cancel_button));
 }
 
+void AshNotificationView::CreateOrUpdateSnoozeSettingsViews(
+    const message_center::Notification& notification) {
+  // TODO(b/298216201): Enable snooze settings after adding mojo callbacks in
+  // the snooze settings layout.
+
+  if (!snooze_settings_enabled()) {
+    return;
+  }
+
+  snooze_settings_row()->SetLayoutManager(std::make_unique<views::BoxLayout>(
+      views::BoxLayout::Orientation::kHorizontal));
+  auto snooze_notification_1_hour_button = GenerateNotificationLabelButton(
+      base::BindRepeating(&AshNotificationView::DisableNotification,
+                          base::Unretained(this)),
+      l10n_util::GetStringUTF16(
+          IDS_ASH_NOTIFICATION_SNOOZE_SETTINGS_SNOOZE_1_HOUR_TEXT));
+  snooze_settings_row()->AddChildView(
+      std::move(snooze_notification_1_hour_button));
+
+  auto snooze_notification_15_minutes_button = GenerateNotificationLabelButton(
+      base::BindRepeating(&AshNotificationView::DisableNotification,
+                          base::Unretained(this)),
+      l10n_util::GetStringUTF16(
+          IDS_ASH_NOTIFICATION_SNOOZE_SETTINGS_SNOOZE_15_MINUTES_TEXT));
+  snooze_settings_row()->AddChildView(
+      std::move(snooze_notification_15_minutes_button));
+
+  auto snooze_notification_30_minutes_button = GenerateNotificationLabelButton(
+      base::BindRepeating(&AshNotificationView::DisableNotification,
+                          base::Unretained(this)),
+      l10n_util::GetStringUTF16(
+          IDS_ASH_NOTIFICATION_SNOOZE_SETTINGS_SNOOZE_30_MINUTES_TEXT));
+  snooze_settings_row()->AddChildView(
+      std::move(snooze_notification_30_minutes_button));
+
+  auto snooze_notification_2_hours_button = GenerateNotificationLabelButton(
+      base::BindRepeating(&AshNotificationView::DisableNotification,
+                          base::Unretained(this)),
+      l10n_util::GetStringUTF16(
+          IDS_ASH_NOTIFICATION_SNOOZE_SETTINGS_SNOOZE_2_HOURS_TEXT));
+  snooze_settings_row()->AddChildView(
+      std::move(snooze_notification_2_hours_button));
+
+  auto undo_snooze_notification_button = GenerateNotificationLabelButton(
+      base::BindRepeating(&AshNotificationView::ToggleSnoozeSettings,
+                          base::Unretained(this)),
+      l10n_util::GetStringUTF16(
+          IDS_ASH_NOTIFICATION_SNOOZE_SETTINGS_UNDO_SNOOZE_TEXT));
+  snooze_settings_row()->AddChildView(
+      std::move(undo_snooze_notification_button));
+}
+
 void AshNotificationView::CreateOrUpdateCompactTitleMessageView(
     const message_center::Notification& notification) {
   // No CompactTitleMessageView required. It is only used for progress
@@ -1306,10 +1441,20 @@ void AshNotificationView::CreateOrUpdateProgressViews(
   // bar. This is the opposite of what is required of the chrome notification.
   CreateOrUpdateProgressStatusView(notification);
   CreateOrUpdateProgressBarView(notification);
+  if (progress_bar_view() && chromeos::features::IsJellyEnabled()) {
+    progress_bar_view()->SetForegroundColorId(cros_tokens::kCrosSysPrimary);
+    progress_bar_view()->SetBackgroundColorId(
+        cros_tokens::kCrosSysHighlightShape);
+  }
 
   if (status_view()) {
     status_view()->SetMultiLine(true);
     status_view()->SetMaxLines(message_center::kMaxLinesForStatusView);
+    if (chromeos::features::IsJellyEnabled()) {
+      status_view()->SetEnabledColorId(cros_tokens::kCrosSysOnSurfaceVariant);
+      TypographyProvider::Get()->StyleLabel(TypographyToken::kCrosAnnotation1,
+                                            *status_view());
+    }
   }
 }
 
@@ -1330,8 +1475,8 @@ bool AshNotificationView::IsIconViewShown() const {
   return NotificationViewBase::IsIconViewShown() && !is_grouped_child_view_;
 }
 
-void AshNotificationView::SetExpandButtonEnabled(bool enabled) {
-  expand_button_->SetVisible(enabled);
+void AshNotificationView::SetExpandButtonVisibility(bool visible) {
+  expand_button_->SetVisible(visible);
 }
 
 bool AshNotificationView::IsExpandable() const {
@@ -1364,6 +1509,9 @@ void AshNotificationView::OnThemeChanged() {
 
   if (message_label()) {
     message_label()->SetEnabledColor(secondary_text_color);
+    if (chromeos::features::IsJellyEnabled()) {
+      message_label()->SetEnabledColorId(cros_tokens::kCrosSysOnSurfaceVariant);
+    }
   }
 
   if (control_buttons_view_) {
@@ -1374,6 +1522,10 @@ void AshNotificationView::OnThemeChanged() {
 
   if (message_label_in_expanded_state_) {
     message_label_in_expanded_state_->SetEnabledColor(secondary_text_color);
+    if (chromeos::features::IsJellyEnabled()) {
+      message_label_in_expanded_state_->SetEnabledColorId(
+          cros_tokens::kCrosSysOnSurfaceVariant);
+    }
   }
 
   UpdateIconAndButtonsColor(
@@ -1381,10 +1533,18 @@ void AshNotificationView::OnThemeChanged() {
           notification_id()));
 
   if (inline_reply()) {
-    SkColor text_color = ash::AshColorProvider::Get()->GetContentLayerColor(
-        ash::AshColorProvider::ContentLayerType::kTextColorSecondary);
-    inline_reply()->textfield()->SetTextColor(text_color);
-    inline_reply()->textfield()->set_placeholder_text_color(text_color);
+    // For unittests, `GetColorProvider()` could be nullptr.
+    if (chromeos::features::IsJellyEnabled() && GetColorProvider()) {
+      inline_reply()->textfield()->SetTextColor(
+          GetColorProvider()->GetColor(cros_tokens::kCrosSysOnSurface));
+      inline_reply()->textfield()->set_placeholder_text_color(
+          GetColorProvider()->GetColor(cros_tokens::kCrosSysOnSurfaceVariant));
+    } else {
+      SkColor text_color = ash::AshColorProvider::Get()->GetContentLayerColor(
+          ash::AshColorProvider::ContentLayerType::kTextColorSecondary);
+      inline_reply()->textfield()->SetTextColor(text_color);
+      inline_reply()->textfield()->set_placeholder_text_color(text_color);
+    }
   }
 
   if (icon_view() &&
@@ -1411,10 +1571,12 @@ AshNotificationView::GenerateNotificationLabelButton(
     views::Button::PressedCallback callback,
     const std::u16string& label) {
   std::unique_ptr<views::LabelButton> actions_button =
-      std::make_unique<PillButton>(std::move(callback), label,
-                                   PillButton::Type::kAccentFloatingWithoutIcon,
-                                   /*icon=*/nullptr,
-                                   kNotificationPillButtonHorizontalSpacing);
+      std::make_unique<PillButton>(
+          std::move(callback), label,
+          chromeos::features::IsJellyEnabled()
+              ? PillButton::Type::kFloatingWithoutIcon
+              : PillButton::Type::kAccentFloatingWithoutIcon,
+          /*icon=*/nullptr, kNotificationPillButtonHorizontalSpacing);
   return actions_button;
 }
 
@@ -1453,6 +1615,21 @@ void AshNotificationView::ToggleInlineSettings(const ui::Event& event) {
     right_content()->SetVisible(!should_show_inline_settings);
   }
   expand_button_->SetVisible(!should_show_inline_settings);
+
+  PreferredSizeChanged();
+}
+
+void AshNotificationView::ToggleSnoozeSettings(const ui::Event& event) {
+  if (!snooze_settings_enabled()) {
+    return;
+  }
+
+  bool should_show_snooze_settings = !snooze_settings_row()->GetVisible();
+
+  NotificationViewBase::ToggleSnoozeSettings(event);
+
+  left_content()->SetVisible(!should_show_snooze_settings);
+  right_content()->SetVisible(!should_show_snooze_settings);
 
   PreferredSizeChanged();
 }
@@ -1533,7 +1710,7 @@ void AshNotificationView::CreateOrUpdateSnoozeButton(
     const message_center::Notification& notification) {
   if (!notification.should_show_snooze_button()) {
     if (action_buttons_row()->Contains(snooze_button_)) {
-      action_buttons_row()->RemoveChildViewT(snooze_button_);
+      action_buttons_row()->RemoveChildViewT(snooze_button_.get());
       snooze_button_ = nullptr;
       DCHECK(action_buttons_row()->Contains(snooze_button_spacer_));
       action_buttons_row()->RemoveChildViewT(snooze_button_spacer_);
@@ -1601,13 +1778,20 @@ void AshNotificationView::UpdateMessageLabelInExpandedState(
 }
 
 void AshNotificationView::UpdateBackground(int top_radius, int bottom_radius) {
-  SkColor background_color;
+  SkColor background_color = gfx::kPlaceholderColor;
+  // `color_provider` might be nullptr in tests.
+  const auto* color_provider = GetColorProvider();
   if (shown_in_popup_) {
-    background_color = AshColorProvider::Get()->GetBaseLayerColor(
-        AshColorProvider::BaseLayerType::kTransparent80);
+    if (color_provider) {
+      background_color = color_provider->GetColor(kColorAshShieldAndBase80);
+    }
   } else {
-    background_color = AshColorProvider::Get()->GetControlsLayerColor(
-        AshColorProvider::ControlsLayerType::kControlBackgroundColorInactive);
+    background_color =
+        chromeos::features::IsJellyEnabled() && color_provider
+            ? color_provider->GetColor(cros_tokens::kCrosSysSystemOnBase)
+            : AshColorProvider::Get()->GetControlsLayerColor(
+                  AshColorProvider::ControlsLayerType::
+                      kControlBackgroundColorInactive);
   }
 
   if (background_color == background_color_ && top_radius_ == top_radius &&
@@ -1650,6 +1834,9 @@ void AshNotificationView::UpdateAppIconView(
 
   SkColor icon_color = AshColorProvider::Get()->GetContentLayerColor(
       AshColorProvider::ContentLayerType::kInvertedButtonLabelColor);
+  if (chromeos::features::IsJellyEnabled() && GetWidget()) {
+    icon_color = GetColorProvider()->GetColor(cros_tokens::kCrosSysOnPrimary);
+  }
   SkColor icon_background_color = CalculateIconAndButtonsColor(notification);
 
   // TODO(crbug.com/768748): figure out if this has a performance impact and
@@ -1700,8 +1887,11 @@ SkColor AshNotificationView::CalculateIconAndButtonsColor(
           : color_utils::kMinimumReadableContrastRatio;
 
   // Actual color is kTransparent80, but BlendForMinContrast requires opaque.
-  SkColor bg_color = AshColorProvider::Get()->GetBaseLayerColor(
-      AshColorProvider::BaseLayerType::kOpaque);
+  // GetColorProvider might be nullptr in tests.
+  const auto* color_provider = GetColorProvider();
+  const SkColor bg_color =
+      color_provider ? color_provider->GetColor(kColorAshShieldAndBaseOpaque)
+                     : gfx::kPlaceholderColor;
   return color_utils::BlendForMinContrast(
              fg_color, bg_color,
              /*high_contrast_foreground=*/absl::nullopt, minContrastRatio)
@@ -2041,8 +2231,8 @@ void AshNotificationView::PerformToggleInlineSettingsAnimation(
 }
 
 void AshNotificationView::AnimateSingleToGroupFadeIn() {
-  auto* fade_in_view = shown_in_popup_ ? grouped_notifications_scroll_view_
-                                       : grouped_notifications_container_;
+  auto fade_in_view = shown_in_popup_ ? grouped_notifications_scroll_view_
+                                      : grouped_notifications_container_;
   message_center_utils::InitLayerForAnimations(fade_in_view);
   message_center_utils::FadeInView(
       fade_in_view, /*delay_in_ms=*/0,

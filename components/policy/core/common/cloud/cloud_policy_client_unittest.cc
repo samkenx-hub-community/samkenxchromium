@@ -22,7 +22,6 @@
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/bind.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
 #include "base/values.h"
@@ -36,7 +35,6 @@
 #include "components/policy/core/common/cloud/mock_signing_service.h"
 #include "components/policy/core/common/cloud/realtime_reporting_job_configuration.h"
 #include "components/policy/core/common/cloud/reporting_job_configuration_base.h"
-#include "components/policy/core/common/features.h"
 #include "components/policy/proto/device_management_backend.pb.h"
 #include "components/version_info/version_info.h"
 #include "google_apis/gaia/gaia_urls.h"
@@ -120,6 +118,9 @@ constexpr int64_t kTimestamp = 987654321;
 
 constexpr em::PolicyFetchRequest::SignatureType kSignatureType =
     em::PolicyFetchRequest::SHA256_RSA;
+
+constexpr PolicyFetchReason kReason = PolicyFetchReason::kTest;
+constexpr auto kProtoReason = enterprise_management::DevicePolicyRequest::TEST;
 
 MATCHER_P(MatchProto, expected, "matches protobuf") {
   return arg.SerializePartialAsString() == expected.SerializePartialAsString();
@@ -233,6 +234,7 @@ em::DeviceManagementRequest GetPolicyRequest() {
   policy_fetch_request->set_signature_type(em::PolicyFetchRequest::SHA1_RSA);
   policy_fetch_request->set_verification_key_hash(kPolicyVerificationKeyHash);
   policy_fetch_request->set_device_dm_token(kDeviceDMToken);
+  policy_request.mutable_policy_request()->set_reason(kProtoReason);
 
   return policy_request;
 }
@@ -304,7 +306,8 @@ em::DeviceManagementRequest GetReregistrationRequest() {
 em::DeviceManagementRequest GetCertBasedRegistrationRequest(
     FakeSigningService* fake_signing_service,
     absl::optional<PsmExecutionResult> psm_execution_result,
-    absl::optional<int64_t> psm_determination_timestamp) {
+    absl::optional<int64_t> psm_determination_timestamp,
+    const absl::optional<em::DemoModeDimensions>& demo_mode_dimensions) {
   em::CertificateBasedDeviceRegistrationData data;
   data.set_certificate_type(em::CertificateBasedDeviceRegistrationData::
                                 ENTERPRISE_ENROLLMENT_CERTIFICATE);
@@ -331,6 +334,10 @@ em::DeviceManagementRequest GetCertBasedRegistrationRequest(
   }
   if (psm_execution_result.has_value())
     register_request->set_psm_execution_result(psm_execution_result.value());
+  if (demo_mode_dimensions.has_value()) {
+    *register_request->mutable_demo_mode_dimensions() =
+        demo_mode_dimensions.value();
+  }
 
   em::DeviceManagementRequest request;
 
@@ -407,6 +414,8 @@ em::DeviceManagementRequest GetRemoteCommandRequest(
       signature_type);
   remote_command_request.mutable_remote_command_request()
       ->set_send_secure_commands(true);
+  remote_command_request.mutable_remote_command_request()->set_type(
+      dm_protocol::kChromeUserRemoteCommandType);
 
   return remote_command_request;
 }
@@ -436,6 +445,16 @@ em::DeviceManagementResponse GetRobotAuthCodeFetchResponse() {
 
 em::DeviceManagementResponse GetEmptyResponse() {
   return em::DeviceManagementResponse();
+}
+
+em::DemoModeDimensions GetDemoModeDimensions() {
+  em::DemoModeDimensions demo_mode_dimensions;
+  demo_mode_dimensions.set_country("GB");
+  demo_mode_dimensions.set_retailer_name("retailer");
+  demo_mode_dimensions.set_store_number("1234");
+  demo_mode_dimensions.add_customization_facets(
+      em::DemoModeDimensions::FEATURE_AWARE_DEVICE);
+  return demo_mode_dimensions;
 }
 
 }  // namespace
@@ -612,7 +631,7 @@ TEST_F(CloudPolicyClientTest, SetupRegistrationAndPolicyFetch) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -622,6 +641,83 @@ TEST_F(CloudPolicyClientTest, SetupRegistrationAndPolicyFetch) {
   EXPECT_EQ(DM_STATUS_SUCCESS, client_->last_dm_status());
   CheckPolicyResponse(policy_response);
 }
+
+class CloudPolicyClientWithFetchReasonTest
+    : public CloudPolicyClientTest,
+      public testing::WithParamInterface<
+          std::tuple<PolicyFetchReason,
+                     enterprise_management::DevicePolicyRequest_Reason>> {
+ public:
+  PolicyFetchReason GetReason() const { return get<0>(GetParam()); }
+  auto GetProtoReason() const { return get<1>(GetParam()); }
+};
+
+TEST_P(CloudPolicyClientWithFetchReasonTest, FetchReason) {
+  RegisterClient();
+  ExpectAndCaptureJob(GetPolicyResponse());
+
+  EXPECT_CALL(observer_, OnPolicyFetched);
+  client_->FetchPolicy(GetReason());
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(job_request_.policy_request().reason(), GetProtoReason());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    CloudPolicyClientWithReasonParams,
+    CloudPolicyClientWithFetchReasonTest,
+    ::testing::Values(
+        std::tuple(PolicyFetchReason::kUnspecified,
+                   enterprise_management::DevicePolicyRequest::UNSPECIFIED),
+        std::tuple(PolicyFetchReason::kBrowserStart,
+                   enterprise_management::DevicePolicyRequest::BROWSER_START),
+        std::tuple(
+            PolicyFetchReason::kDeviceEnrollment,
+            enterprise_management::DevicePolicyRequest::DEVICE_ENROLLMENT),
+        std::tuple(PolicyFetchReason::kInvalidation,
+                   enterprise_management::DevicePolicyRequest::INVALIDATION),
+        std::tuple(
+            PolicyFetchReason::kRegistrationChanged,
+            enterprise_management::DevicePolicyRequest::REGISTRATION_CHANGED),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusServiceActivationPending,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_SERVICE_ACTIVATION_PENDING),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusServicePolicyNotFound,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_SERVICE_POLICY_NOT_FOUND),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusServiceTooManyRequests,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_SERVICE_TOO_MANY_REQUESTS),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusRequestFailed,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_REQUEST_FAILED),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusTemporaryUnavailable,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_TEMPORARY_UNAVAILABLE),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusCannotSignRequest,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_CANNOT_SIGN_REQUEST),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusRequestInvalid,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_REQUEST_INVALID),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusHttpStatusError,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_HTTP_STATUS_ERROR),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusResponseDecodingError,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_RESPONSE_DECODING_ERROR),
+        std::tuple(
+            PolicyFetchReason::kRetryAfterStatusServiceManagementNotSupported,
+            enterprise_management::DevicePolicyRequest::
+                RETRY_AFTER_STATUS_SERVICE_MANAGEMENT_NOT_SUPPORTED),
+        std::tuple(PolicyFetchReason::kRetryAfterStatusRequestTooLarge,
+                   enterprise_management::DevicePolicyRequest::
+                       RETRY_AFTER_STATUS_REQUEST_TOO_LARGE),
+        std::tuple(PolicyFetchReason::kScheduled,
+                   enterprise_management::DevicePolicyRequest::SCHEDULED),
+        std::tuple(PolicyFetchReason::kSignin,
+                   enterprise_management::DevicePolicyRequest::SIGNIN),
+        std::tuple(PolicyFetchReason::kTest,
+                   enterprise_management::DevicePolicyRequest::TEST)));
 
 TEST_F(CloudPolicyClientTest, SetupRegistrationAndPolicyFetchWithOAuthToken) {
   const em::DeviceManagementResponse policy_response = GetPolicyResponse();
@@ -638,7 +734,7 @@ TEST_F(CloudPolicyClientTest, SetupRegistrationAndPolicyFetchWithOAuthToken) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -676,7 +772,7 @@ TEST_F(CloudPolicyClientTest, RegistrationWithTokenAndPolicyFetch) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -730,7 +826,7 @@ TEST_F(CloudPolicyClientTest, RegistrationAndPolicyFetch) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -769,7 +865,7 @@ TEST_F(CloudPolicyClientTest, RegistrationAndPolicyFetchWithOAuthToken) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -795,7 +891,8 @@ TEST_F(CloudPolicyClientTest, RegistrationWithCertificateAndPolicyFetch) {
       GetCertBasedRegistrationRequest(
           fake_signing_service.get(),
           /*psm_execution_result=*/absl::nullopt,
-          /*psm_determination_timestamp=*/absl::nullopt)
+          /*psm_determination_timestamp=*/absl::nullopt,
+          /*demo_mode_dimensions=*/absl::nullopt)
           .SerializePartialAsString();
   EXPECT_CALL(observer_, OnRegistrationStateChanged);
   CloudPolicyClient::RegistrationParameters device_attestation(
@@ -816,7 +913,7 @@ TEST_F(CloudPolicyClientTest, RegistrationWithCertificateAndPolicyFetch) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -825,6 +922,41 @@ TEST_F(CloudPolicyClientTest, RegistrationWithCertificateAndPolicyFetch) {
             GetPolicyRequest().SerializePartialAsString());
   EXPECT_EQ(DM_STATUS_SUCCESS, client_->last_dm_status());
   CheckPolicyResponse(policy_response);
+}
+
+TEST_F(CloudPolicyClientTest, DemoModeRegistration) {
+  EXPECT_CALL(device_dmtoken_callback_observer_,
+              OnDeviceDMTokenRequested(
+                  /*user_affiliation_ids=*/std::vector<std::string>()))
+      .WillOnce(Return(kDeviceDMToken));
+  ExpectAndCaptureJob(GetRegistrationResponse());
+  auto fake_signing_service = std::make_unique<FakeSigningService>();
+  fake_signing_service->set_success(true);
+  const std::string expected_job_request_string =
+      GetCertBasedRegistrationRequest(
+          fake_signing_service.get(),
+          /*psm_execution_result=*/absl::nullopt,
+          /*psm_determination_timestamp=*/absl::nullopt,
+          GetDemoModeDimensions())
+          .SerializePartialAsString();
+  EXPECT_CALL(observer_, OnRegistrationStateChanged);
+  CloudPolicyClient::RegistrationParameters demo_enrollment_parameters(
+      em::DeviceRegisterRequest::DEVICE,
+      em::DeviceRegisterRequest::FLAVOR_ENROLLMENT_ATTESTATION);
+  demo_enrollment_parameters.demo_mode_dimensions = GetDemoModeDimensions();
+  client_->RegisterWithCertificate(
+      demo_enrollment_parameters, std::string() /* client_id */,
+      kEnrollmentCertificate, std::string() /* sub_organization */,
+      std::move(fake_signing_service));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(
+      DeviceManagementService::JobConfiguration::TYPE_CERT_BASED_REGISTRATION,
+      job_type_);
+  EXPECT_EQ(job_request_.SerializePartialAsString(),
+            expected_job_request_string);
+  EXPECT_TRUE(client_->is_registered());
+  EXPECT_FALSE(client_->GetPolicyFor(policy_type_, std::string()));
+  EXPECT_EQ(DM_STATUS_SUCCESS, client_->last_dm_status());
 }
 
 TEST_F(CloudPolicyClientTest, RegistrationWithCertificateFailToSignRequest) {
@@ -968,7 +1100,7 @@ TEST_F(CloudPolicyClientTest, PolicyUpdate) {
 
     ExpectAndCaptureJob(policy_response);
     EXPECT_CALL(observer_, OnPolicyFetched);
-    client_->FetchPolicy();
+    client_->FetchPolicy(kReason);
     base::RunLoop().RunUntilIdle();
     EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
               job_type_);
@@ -985,7 +1117,7 @@ TEST_F(CloudPolicyClientTest, PolicyUpdate) {
 
     ExpectAndCaptureJob(policy_response);
     EXPECT_CALL(observer_, OnPolicyFetched);
-    client_->FetchPolicy();
+    client_->FetchPolicy(kReason);
     base::RunLoop().RunUntilIdle();
     EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
               job_type_);
@@ -1016,7 +1148,7 @@ TEST_F(CloudPolicyClientTest, PolicyFetchWithMetaData) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -1046,7 +1178,7 @@ TEST_F(CloudPolicyClientTest, PolicyFetchWithInvalidation) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -1068,7 +1200,7 @@ TEST_F(CloudPolicyClientTest, PolicyFetchWithInvalidationNoPayload) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -1090,7 +1222,7 @@ TEST_F(CloudPolicyClientTest, PolicyFetchWithBrowserDeviceIdentifier) {
   // Make a policy fetch.
   ExpectAndCaptureJob(GetPolicyResponse());
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
@@ -1149,7 +1281,7 @@ TEST_F(CloudPolicyClientTest, PolicyFetchClearOAuthToken) {
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
   client_->SetOAuthTokenAsAdditionalAuth(kOAuthToken);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -1162,7 +1294,7 @@ TEST_F(CloudPolicyClientTest, PolicyFetchClearOAuthToken) {
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
   client_->SetOAuthTokenAsAdditionalAuth("");
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -1180,7 +1312,7 @@ TEST_F(CloudPolicyClientTest, BadPolicyResponse) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnClientError);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -1196,7 +1328,7 @@ TEST_F(CloudPolicyClientTest, BadPolicyResponse) {
       CreatePolicyData("excess-fake-policy-data"));
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -1217,7 +1349,7 @@ TEST_F(CloudPolicyClientTest, PolicyRequestFailure) {
           service_.SendJobResponseAsync(
               net::ERR_FAILED, DeviceManagementService::kInvalidArgument)));
   EXPECT_CALL(observer_, OnClientError);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type);
@@ -1268,7 +1400,7 @@ TEST_F(CloudPolicyClientTest, PolicyFetchWithExtensionPolicy) {
   EXPECT_CALL(observer_, OnPolicyFetched);
   client_->AddPolicyTypeToFetch(dm_protocol::kChromeExtensionPolicyType,
                                 std::string());
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type);
@@ -1549,7 +1681,7 @@ TEST_F(CloudPolicyClientTest, UploadStatusWhilePolicyFetchActive) {
 
   ExpectAndCaptureJob(policy_response);
   EXPECT_CALL(observer_, OnPolicyFetched);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH,
             job_type_);
@@ -1748,7 +1880,8 @@ TEST_P(CloudPolicyClientRegisterWithPsmParamsTest,
   const std::string expected_job_request_string =
       GetCertBasedRegistrationRequest(fake_signing_service.get(),
                                       psm_execution_result,
-                                      kExpectedPsmDeterminationTimestamp)
+                                      kExpectedPsmDeterminationTimestamp,
+                                      /*demo_mode_dimensions=*/absl::nullopt)
           .SerializePartialAsString();
   EXPECT_CALL(observer_, OnRegistrationStateChanged);
   CloudPolicyClient::RegistrationParameters device_attestation(
@@ -1831,58 +1964,59 @@ TEST_P(CloudPolicyClientUploadSecurityEventTest, Test) {
 
   absl::optional<base::Value> payload = base::JSONReader::Read(job_payload_);
   ASSERT_TRUE(payload);
+  const base::Value::Dict& payload_dict = payload->GetDict();
 
   ASSERT_FALSE(policy::GetDeviceName().empty());
   EXPECT_EQ(version_info::GetVersionNumber(),
-            *payload->FindStringPath(
+            *payload_dict.FindStringByDottedPath(
                 ReportingJobConfigurationBase::BrowserDictionaryBuilder::
                     GetChromeVersionPath()));
 
   if (include_device_info()) {
-    EXPECT_EQ(kDMToken, *payload->FindStringPath(
+    EXPECT_EQ(kDMToken, *payload_dict.FindStringByDottedPath(
                             ReportingJobConfigurationBase::
                                 DeviceDictionaryBuilder::GetDMTokenPath()));
-    EXPECT_EQ(client_id_, *payload->FindStringPath(
+    EXPECT_EQ(client_id_, *payload_dict.FindStringByDottedPath(
                               ReportingJobConfigurationBase::
                                   DeviceDictionaryBuilder::GetClientIdPath()));
     EXPECT_EQ(policy::GetOSUsername(),
-              *payload->FindStringPath(
+              *payload_dict.FindStringByDottedPath(
                   ReportingJobConfigurationBase::BrowserDictionaryBuilder::
                       GetMachineUserPath()));
     EXPECT_EQ(GetOSPlatform(),
-              *payload->FindStringPath(
+              *payload_dict.FindStringByDottedPath(
                   ReportingJobConfigurationBase::DeviceDictionaryBuilder::
                       GetOSPlatformPath()));
     EXPECT_EQ(GetOSVersion(),
-              *payload->FindStringPath(
+              *payload_dict.FindStringByDottedPath(
                   ReportingJobConfigurationBase::DeviceDictionaryBuilder::
                       GetOSVersionPath()));
-    EXPECT_EQ(
-        policy::GetDeviceName(),
-        *payload->FindStringPath(ReportingJobConfigurationBase::
-                                     DeviceDictionaryBuilder::GetNamePath()));
+    EXPECT_EQ(policy::GetDeviceName(),
+              *payload_dict.FindStringByDottedPath(
+                  ReportingJobConfigurationBase::DeviceDictionaryBuilder::
+                      GetNamePath()));
   } else {
-    EXPECT_FALSE(
-        payload->FindStringPath(ReportingJobConfigurationBase::
-                                    DeviceDictionaryBuilder::GetDMTokenPath()));
-    EXPECT_FALSE(payload->FindStringPath(
+    EXPECT_FALSE(payload_dict.FindStringByDottedPath(
+        ReportingJobConfigurationBase::DeviceDictionaryBuilder::
+            GetDMTokenPath()));
+    EXPECT_FALSE(payload_dict.FindStringByDottedPath(
         ReportingJobConfigurationBase::DeviceDictionaryBuilder::
             GetClientIdPath()));
-    EXPECT_FALSE(payload->FindStringPath(
+    EXPECT_FALSE(payload_dict.FindStringByDottedPath(
         ReportingJobConfigurationBase::BrowserDictionaryBuilder::
             GetMachineUserPath()));
-    EXPECT_FALSE(payload->FindStringPath(
+    EXPECT_FALSE(payload_dict.FindStringByDottedPath(
         ReportingJobConfigurationBase::DeviceDictionaryBuilder::
             GetOSPlatformPath()));
-    EXPECT_FALSE(payload->FindStringPath(
+    EXPECT_FALSE(payload_dict.FindStringByDottedPath(
         ReportingJobConfigurationBase::DeviceDictionaryBuilder::
             GetOSVersionPath()));
-    EXPECT_FALSE(payload->FindStringPath(
+    EXPECT_FALSE(payload_dict.FindStringByDottedPath(
         ReportingJobConfigurationBase::DeviceDictionaryBuilder::GetNamePath()));
   }
 
-  base::Value* events =
-      payload->FindPath(RealtimeReportingJobConfiguration::kEventListKey);
+  const base::Value* events =
+      payload_dict.Find(RealtimeReportingJobConfiguration::kEventListKey);
   EXPECT_EQ(base::Value::Type::LIST, events->type());
   EXPECT_EQ(1u, events->GetList().size());
 }
@@ -1949,18 +2083,20 @@ TEST_F(CloudPolicyClientTest, RealtimeReportMerge) {
   absl::optional<base::Value> payload =
       base::JSONReader::Read(job_config->GetPayload());
   ASSERT_TRUE(payload);
+  const base::Value::Dict& payload_dict = payload->GetDict();
 
-  ASSERT_EQ("name2@gmail.com", *payload->FindStringPath("profile.gaiaEmail"));
-  ASSERT_EQ("User-Agent2", *payload->FindStringPath("browser.userAgent"));
-  ASSERT_EQ("Profile 1", *payload->FindStringPath("profile.profileName"));
+  ASSERT_EQ("name2@gmail.com",
+            *payload_dict.FindStringByDottedPath("profile.gaiaEmail"));
+  ASSERT_EQ("User-Agent2",
+            *payload_dict.FindStringByDottedPath("browser.userAgent"));
+  ASSERT_EQ("Profile 1",
+            *payload_dict.FindStringByDottedPath("profile.profileName"));
   ASSERT_EQ("C:\\User Data\\Profile 1",
-            *payload->FindStringPath("profile.profilePath"));
-  ASSERT_EQ("1.0.0.0", *payload->FindStringPath("browser.version"));
-  ASSERT_EQ(
-      2u,
-      payload->FindListPath(RealtimeReportingJobConfiguration::kEventListKey)
-          ->GetList()
-          .size());
+            *payload_dict.FindStringByDottedPath("profile.profilePath"));
+  ASSERT_EQ("1.0.0.0", *payload_dict.FindStringByDottedPath("browser.version"));
+  ASSERT_EQ(2u, payload_dict
+                    .FindList(RealtimeReportingJobConfiguration::kEventListKey)
+                    ->size());
 }
 
 TEST_F(CloudPolicyClientTest, UploadEncryptedReport) {
@@ -2295,7 +2431,8 @@ TEST_F(CloudPolicyClientTest, ShouldRejectUnsignedCommands) {
 
   client_->FetchRemoteCommands(
       std::make_unique<RemoteCommandJob::UniqueIDType>(kLastCommandId), {},
-      kSignatureType, std::move(callback));
+      kSignatureType, dm_protocol::kChromeUserRemoteCommandType,
+      std::move(callback));
   base::RunLoop().RunUntilIdle();
 }
 
@@ -2324,7 +2461,8 @@ TEST_F(CloudPolicyClientTest,
 
   client_->FetchRemoteCommands(
       std::make_unique<RemoteCommandJob::UniqueIDType>(kLastCommandId), {},
-      kSignatureType, std::move(callback));
+      kSignatureType, dm_protocol::kChromeUserRemoteCommandType,
+      std::move(callback));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_THAT(received_commands, ElementsAre());
@@ -2350,7 +2488,8 @@ TEST_F(CloudPolicyClientTest, ShouldNotFailIfRemoteCommandResponseIsEmpty) {
 
   client_->FetchRemoteCommands(
       std::make_unique<RemoteCommandJob::UniqueIDType>(kLastCommandId), {},
-      kSignatureType, std::move(callback));
+      kSignatureType, dm_protocol::kChromeUserRemoteCommandType,
+      std::move(callback));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_THAT(received_commands, ElementsAre());
@@ -2395,7 +2534,8 @@ TEST_F(CloudPolicyClientTest, FetchSecureRemoteCommands) {
       1, remote_command_request.remote_command_request().command_results(0));
   client_->FetchRemoteCommands(
       std::make_unique<RemoteCommandJob::UniqueIDType>(kLastCommandId),
-      command_results, kSignatureType, std::move(callback));
+      command_results, kSignatureType,
+      dm_protocol::kChromeUserRemoteCommandType, std::move(callback));
   run_loop.Run();
   EXPECT_EQ(DeviceManagementService::JobConfiguration::TYPE_REMOTE_COMMANDS,
             job_type_);
@@ -2565,7 +2705,7 @@ TEST_F(CloudPolicyClientTest, PolicyReregistration) {
                           net::OK, DeviceManagementService::kDeviceNotFound)));
   EXPECT_CALL(observer_, OnRegistrationStateChanged);
   EXPECT_CALL(observer_, OnClientError);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DM_STATUS_SERVICE_DEVICE_NOT_FOUND, client_->last_dm_status());
   EXPECT_FALSE(client_->GetPolicyFor(policy_type_, std::string()));
@@ -2611,7 +2751,7 @@ TEST_F(CloudPolicyClientTest, PolicyReregistrationFailsWithNonMatchingDMToken) {
                           net::OK, DeviceManagementService::kDeviceNotFound)));
   EXPECT_CALL(observer_, OnRegistrationStateChanged);
   EXPECT_CALL(observer_, OnClientError);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DM_STATUS_SERVICE_DEVICE_NOT_FOUND, client_->last_dm_status());
   EXPECT_FALSE(client_->GetPolicyFor(policy_type_, std::string()));
@@ -2659,7 +2799,7 @@ TEST_F(CloudPolicyClientTest, PolicyReregistrationAfterDMTokenDeletion) {
               net::OK, DeviceManagementService::kDeviceNotFound, response)));
   EXPECT_CALL(observer_, OnRegistrationStateChanged);
   EXPECT_CALL(observer_, OnClientError);
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(DM_STATUS_SERVICE_DEVICE_NEEDS_RESET, client_->last_dm_status());
   EXPECT_FALSE(client_->GetPolicyFor(policy_type_, std::string()));
@@ -2690,60 +2830,6 @@ TEST_F(CloudPolicyClientTest, PolicyReregistrationAfterDMTokenDeletion) {
   EXPECT_FALSE(client_->requires_reregistration());
   EXPECT_FALSE(client_->GetPolicyFor(policy_type_, std::string()));
   EXPECT_EQ(DM_STATUS_SUCCESS, client_->last_dm_status());
-}
-
-TEST_F(CloudPolicyClientTest, PolicyFetchDMTokenDeletion_Disabled) {
-  // Disable the DMToken deletion feature.
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(features::kDmTokenDeletion);
-
-  RegisterClient();
-  EXPECT_TRUE(client_->is_registered());
-  EXPECT_FALSE(client_->requires_reregistration());
-
-  DeviceManagementService::JobConfiguration::JobType upload_type;
-  em::DeviceManagementResponse response;
-  response.add_error_detail(em::CBCM_DELETION_POLICY_PREFERENCE_DELETE_TOKEN);
-  EXPECT_CALL(job_creation_handler_, OnJobCreation)
-      .WillOnce(DoAll(
-          service_.CaptureJobType(&upload_type),
-          service_.SendJobResponseAsync(
-              net::OK, DeviceManagementService::kDeviceNotFound, response)));
-  EXPECT_CALL(observer_, OnRegistrationStateChanged);
-  EXPECT_CALL(observer_, OnClientError);
-
-  client_->FetchPolicy();
-  base::RunLoop().RunUntilIdle();
-
-  // Because the feature is disabled by default, the presence of the token
-  // deletion error detail still results in the "not found" DM status.
-  EXPECT_EQ(DM_STATUS_SERVICE_DEVICE_NOT_FOUND, client_->last_dm_status());
-}
-
-TEST_F(CloudPolicyClientTest, PolicyFetchDMTokenDeletion_Forced) {
-  // Enable the forced DMToken deletion feature.
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeatureWithParameters(features::kDmTokenDeletion,
-                                                  {{"forced", "true"}});
-
-  RegisterClient();
-  EXPECT_TRUE(client_->is_registered());
-  EXPECT_FALSE(client_->requires_reregistration());
-
-  DeviceManagementService::JobConfiguration::JobType upload_type;
-  EXPECT_CALL(job_creation_handler_, OnJobCreation)
-      .WillOnce(DoAll(service_.CaptureJobType(&upload_type),
-                      service_.SendJobResponseAsync(
-                          net::OK, DeviceManagementService::kDeviceNotFound)));
-  EXPECT_CALL(observer_, OnRegistrationStateChanged);
-  EXPECT_CALL(observer_, OnClientError);
-
-  client_->FetchPolicy();
-  base::RunLoop().RunUntilIdle();
-
-  // The final DM status signals for DMToken deletion even though the
-  // corresponding error detail was never added to the response.
-  EXPECT_EQ(DM_STATUS_SERVICE_DEVICE_NEEDS_RESET, client_->last_dm_status());
 }
 #endif  // !BUILDFLAG(IS_CHROMEOS)
 
@@ -2806,7 +2892,7 @@ TEST_F(CloudPolicyClientTest,
   ExpectAndCaptureJob(GetPolicyResponse());
   EXPECT_CALL(observer_, OnPolicyFetched);
 
-  client_->FetchPolicy();
+  client_->FetchPolicy(kReason);
   base::RunLoop().RunUntilIdle();
 
   // Try to manually finish the robot auth code fetch job.

@@ -41,29 +41,31 @@ enum class VulkanImplementationName : uint32_t {
 
 enum class WebGPUAdapterName : uint32_t {
   kDefault = 0,
-  kCompat = 1,
-  kSwiftShader = 2,
+  kD3D11 = 1,
+  kOpenGLES = 2,
+  kSwiftShader = 3,
 };
 
 // Affecting how chromium handles GPUPowerPreference in
 // GPURequestAdapterOptions.
 enum class WebGPUPowerPreference : uint32_t {
+  // No explicit power preference.
+  kNone = 0,
   // Choose the preferred adapter when GPUPowerPreference is not given.
   // Has no impact when GPUPowerPreference is given.
-  kDefaultLowPower = 0,
-  kDefaultHighPerformance = 1,
+  kDefaultLowPower = 1,
+  kDefaultHighPerformance = 2,
   // Choose the forced adapter regardless of whether GPUPowerPreference is set
   // or not.
-  kForceLowPower = 2,
-  kForceHighPerformance = 3,
+  kForceLowPower = 3,
+  kForceHighPerformance = 4,
 };
 
 enum class GrContextType : uint32_t {
-  kGL = 0,
-  kVulkan = 1,
-  kMetal = 2,
-  kDawn = 3,
-  kLast = kDawn,
+  kGL,      // Ganesh
+  kVulkan,  // Ganesh
+  kGraphiteDawn,
+  kGraphiteMetal,
 };
 
 enum class DawnBackendValidationLevel : uint32_t {
@@ -219,7 +221,7 @@ struct GPU_EXPORT GpuPreferences {
 
   // ===================================
   // Settings from //gpu/command_buffer/service/gpu_switches.h
-  // The type of the GrContext.
+  // The type of the GrContext or Graphite Context.
   GrContextType gr_context_type = GrContextType::kGL;
 
   // Use Vulkan for rasterization and display compositing.
@@ -244,10 +246,6 @@ struct GPU_EXPORT GpuPreferences {
   // when this limit is reached.
   uint32_t vulkan_sync_cpu_memory_limit = 0u;
 
-  // Use Metal for rasterization and Skia-based display compositing. Note that
-  // this is compatible with GL-based display compositing.
-  bool enable_metal = false;
-
   // ===================================
   // Settings from //cc/base/switches.h
   // Enable the GPU benchmarking extension; used by tests only.
@@ -268,7 +266,10 @@ struct GPU_EXPORT GpuPreferences {
 
   // The adapter selecting strategy related to GPUPowerPreference.
   WebGPUPowerPreference use_webgpu_power_preference =
-      WebGPUPowerPreference::kDefaultHighPerformance;
+      WebGPUPowerPreference::kNone;
+
+  // Force the use of WebGPU Compatibility mode for all WebGPU content.
+  bool force_webgpu_compat = false;
 
   // The Dawn features(toggles) enabled on the creation of Dawn devices.
   std::vector<std::string> enabled_dawn_features_list;

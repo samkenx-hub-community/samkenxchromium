@@ -5,7 +5,6 @@
 package org.chromium.chrome.browser.share.share_sheet;
 
 import android.app.Activity;
-import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 
 import androidx.annotation.VisibleForTesting;
@@ -105,7 +104,6 @@ public class ShareSheetUsageRankingHelper {
         mLinkToggleMetricsDetails = linkToggleMetricsDetails;
     }
 
-    @VisibleForTesting
     void setTargetsForTesting(List<String> targets) {
         mDisableBridgeForTesting = true;
         mTargetsForTesting = targets;
@@ -116,11 +114,9 @@ public class ShareSheetUsageRankingHelper {
             Callback<List<PropertyModel>> callback) {
         String type = contentTypesToTypeForRanking(contentTypes);
 
-        PackageManager pm = ContextUtils.getApplicationContext().getPackageManager();
-        List<ResolveInfo> availableResolveInfos =
-                pm.queryIntentActivities(ShareHelper.getShareTextAppCompatibilityIntent(), 0);
-        availableResolveInfos.addAll(pm.queryIntentActivities(
-                ShareHelper.getShareFileAppCompatibilityIntent(params.getFileContentType()), 0));
+        List<ResolveInfo> availableResolveInfos = ShareHelper.getCompatibleAppsForSharingText();
+        availableResolveInfos.addAll(
+                ShareHelper.getCompatibleAppsForSharingFiles(params.getFileContentType()));
 
         List<String> availableActivities = new ArrayList<String>();
         Map<String, ResolveInfo> resolveInfos = new HashMap<String, ResolveInfo>();

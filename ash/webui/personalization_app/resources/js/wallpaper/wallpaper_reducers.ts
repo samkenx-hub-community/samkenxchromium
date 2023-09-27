@@ -12,7 +12,7 @@ import {PersonalizationState} from '../personalization_state.js';
 import {isImageDataUrl, isNonEmptyArray} from '../utils.js';
 
 import {DefaultImageSymbol, kDefaultImageSymbol} from './constants.js';
-import {findAlbumById, isDefaultImage, isFilePath} from './utils.js';
+import {findAlbumById, isDefaultImage, isFilePath, isImageEqualToSelected} from './utils.js';
 import {WallpaperActionName} from './wallpaper_actions.js';
 import {DailyRefreshType, WallpaperState} from './wallpaper_state.js';
 
@@ -43,7 +43,7 @@ function backdropReducer(
 
 function loadingReducer(
     state: WallpaperState['loading'], action: Actions,
-    _: PersonalizationState): WallpaperState['loading'] {
+    globalState: PersonalizationState): WallpaperState['loading'] {
   switch (action.name) {
     case WallpaperActionName.BEGIN_LOAD_IMAGES_FOR_COLLECTIONS:
       return {
@@ -61,7 +61,7 @@ function loadingReducer(
         local: {...state.local, data: {...state.local.data, [action.id]: true}},
       };
     case WallpaperActionName.BEGIN_LOAD_SELECTED_IMAGE:
-      return {...state, selected: true};
+      return {...state, selected: {attribution: true, image: true}};
     case WallpaperActionName.BEGIN_SELECT_IMAGE:
       return {...state, setImage: state.setImage + 1};
     case WallpaperActionName.END_SELECT_IMAGE:
@@ -141,10 +141,17 @@ function loadingReducer(
         },
       };
     case WallpaperActionName.SET_SELECTED_IMAGE:
-      if (state.setImage === 0) {
-        return {...state, selected: false};
+      if (globalState.wallpaper.pendingSelected && action.image &&
+          !isImageEqualToSelected(
+              globalState.wallpaper.pendingSelected, action.image)) {
+        // If the user is in the process of selecting a new image, but the
+        // received image does not match what the user last selected, make sure
+        // loading.selected stays true.
+        return state;
       }
-      return state;
+      return {...state, selected: {...state.selected, image: false}};
+    case WallpaperActionName.SET_ATTRIBUTION:
+      return {...state, selected: {...state.selected, attribution: false}};
     case WallpaperActionName.BEGIN_UPDATE_DAILY_REFRESH_IMAGE:
       return {...state, refreshWallpaper: true};
     case WallpaperActionName.SET_UPDATED_DAILY_REFRESH_IMAGE:
@@ -313,6 +320,17 @@ function localReducer(
           [action.id]: action.data,
         },
       };
+    default:
+      return state;
+  }
+}
+
+function attributionReducer(
+    state: WallpaperState['attribution'], action: Actions,
+    _: PersonalizationState): WallpaperState['attribution'] {
+  switch (action.name) {
+    case WallpaperActionName.SET_ATTRIBUTION:
+      return action.attribution;
     default:
       return state;
   }
@@ -607,14 +625,40 @@ function googlePhotosReducer(
   }
 }
 
+function seaPenReducer(
+    state: WallpaperState['seaPen'], action: Actions,
+    _: PersonalizationState): WallpaperState['seaPen'] {
+  switch (action.name) {
+    case WallpaperActionName.BEGIN_SEARCH_IMAGE_THUMBNAILS:
+      return {
+        thumbnailsLoading: true,
+        query: action.query,
+        thumbnails: state.thumbnails,
+      };
+    case WallpaperActionName.SET_IMAGE_THUMBNAILS:
+      console.log('seaPenReducer, text: ', action.query);
+      assert(!!action.query, 'input text is empty.');
+      console.log('seapenReducer, thumbnails: ', action.images);
+      return {
+        thumbnailsLoading: false,
+        query: action.query,
+        thumbnails: action.images,
+      };
+    default:
+      return state;
+  }
+}
+
 export const wallpaperReducers:
     {[K in keyof WallpaperState]: ReducerFunction<WallpaperState[K]>} = {
       backdrop: backdropReducer,
       loading: loadingReducer,
       local: localReducer,
+      attribution: attributionReducer,
       currentSelected: currentSelectedReducer,
       pendingSelected: pendingSelectedReducer,
       dailyRefresh: dailyRefreshReducer,
       fullscreen: fullscreenReducer,
       googlePhotos: googlePhotosReducer,
+      seaPen: seaPenReducer,
     };

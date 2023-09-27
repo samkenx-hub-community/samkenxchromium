@@ -13,6 +13,7 @@
 #include "third_party/blink/renderer/core/css/parser/css_variable_parser.h"
 #include "third_party/blink/renderer/core/css/properties/css_parsing_utils.h"
 #include "third_party/blink/renderer/core/css/resolver/style_builder_converter.h"
+#include "third_party/blink/renderer/core/frame/web_feature.h"
 
 namespace blink {
 
@@ -94,12 +95,30 @@ class StyleFeatureSet : public MediaQueryParser::FeatureSet {
   }
   bool IsAllowedWithoutValue(const String& feature,
                              const ExecutionContext*) const override {
-    return false;
+    return true;
   }
   bool IsCaseSensitive(const String& feature) const override {
     // TODO(crbug.com/1302630): non-custom properties are case-insensitive.
     return true;
   }
+  bool SupportsRange() const override { return false; }
+};
+
+class StateFeatureSet : public MediaQueryParser::FeatureSet {
+  STACK_ALLOCATED();
+
+ public:
+  bool IsAllowed(const String& feature) const override {
+    return (RuntimeEnabledFeatures::CSSStickyContainerQueriesEnabled() &&
+            feature == media_feature_names::kStuckMediaFeature) ||
+           (RuntimeEnabledFeatures::CSSSnapContainerQueriesEnabled() &&
+            feature == media_feature_names::kSnappedMediaFeature);
+  }
+  bool IsAllowedWithoutValue(const String& feature,
+                             const ExecutionContext*) const override {
+    return true;
+  }
+  bool IsCaseSensitive(const String& feature) const override { return false; }
   bool SupportsRange() const override { return false; }
 };
 
@@ -170,7 +189,22 @@ const MediaQueryExpNode* ContainerQueryParser::ConsumeQueryInParens(
 
     if (const MediaQueryExpNode* query =
             ConsumeFeatureQuery(block, offsets, StyleFeatureSet())) {
-      return MediaQueryExpNode::Function(query, "style");
+      context_.Count(WebFeature::kCSSStyleContainerQuery);
+      return MediaQueryExpNode::Function(query, AtomicString("style"));
+    }
+  } else if ((RuntimeEnabledFeatures::CSSStickyContainerQueriesEnabled() ||
+              RuntimeEnabledFeatures::CSSSnapContainerQueriesEnabled()) &&
+             range.Peek().GetType() == kFunctionToken &&
+             range.Peek().FunctionId() == CSSValueID::kState) {
+    // state(stuck: [ none | top | left | right | bottom | inset-* ] )
+    // state(snapped: [ none | block | inline ] )
+    CSSParserTokenRange block = range.ConsumeBlock();
+    block.ConsumeWhitespace();
+    range.ConsumeWhitespace();
+
+    if (const MediaQueryExpNode* query =
+            ConsumeFeatureQuery(block, offsets, StateFeatureSet())) {
+      return MediaQueryExpNode::Function(query, AtomicString("state"));
     }
   }
   range = original_range;

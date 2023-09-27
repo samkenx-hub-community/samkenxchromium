@@ -14,8 +14,6 @@
 #include "ash/wm/splitview/split_view_utils.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/window_positioning_utils.h"
-#include "ash/wm/window_state.h"
-#include "ash/wm/wm_event.h"
 #include "chromeos/ui/base/window_state_type.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window.h"
@@ -32,8 +30,6 @@ BaseState::~BaseState() = default;
 void BaseState::OnWMEvent(WindowState* window_state, const WMEvent* event) {
   if (event->IsWorkspaceEvent()) {
     HandleWorkspaceEvents(window_state, event);
-    if (window_state->IsPip())
-      window_state->UpdatePipBounds();
     if (window_state->IsSnapped() && !window_state->CanSnap())
       window_state->Restore();
     return;
@@ -107,33 +103,6 @@ WindowStateType BaseState::GetStateForTransitionEvent(WindowState* window_state,
 }
 
 // static
-void BaseState::CenterWindow(WindowState* window_state) {
-  if (!window_state->IsNormalOrSnapped())
-    return;
-  aura::Window* window = window_state->window();
-  if (window_state->IsSnapped()) {
-    gfx::Rect center_in_screen = display::Screen::GetScreen()
-                                     ->GetDisplayNearestWindow(window)
-                                     .work_area();
-    gfx::Size size = window_state->HasRestoreBounds()
-                         ? window_state->GetRestoreBoundsInScreen().size()
-                         : window->bounds().size();
-    center_in_screen.ClampToCenteredSize(size);
-    window_state->SetRestoreBoundsInScreen(center_in_screen);
-    window_state->Restore();
-  } else {
-    gfx::Rect center_in_parent =
-        screen_util::GetDisplayWorkAreaBoundsInParent(window);
-    center_in_parent.ClampToCenteredSize(window->bounds().size());
-    const SetBoundsWMEvent event(center_in_parent,
-                                 /*animate=*/true);
-    window_state->OnWMEvent(&event);
-  }
-  // Centering window is treated as if a user moved and resized the window.
-  window_state->set_bounds_changed_by_user(true);
-}
-
-// static
 void BaseState::CycleSnap(WindowState* window_state, WMEventType event) {
   auto* shell = Shell::Get();
   // For tablet mode, use |TabletModeWindowState::CycleTabletSnap|.
@@ -155,13 +124,16 @@ void BaseState::CycleSnap(WindowState* window_state, WMEventType event) {
       // restrictive than |WindowState::CanSnap|.
       DCHECK(SplitViewController::Get(window)->IsWindowInSplitView(window));
       SplitViewController::Get(window)->SnapWindow(
-          window, is_desired_primary_snapped
-                      ? SplitViewController::SnapPosition::kPrimary
-                      : SplitViewController::SnapPosition::kSecondary);
+          window,
+          is_desired_primary_snapped
+              ? SplitViewController::SnapPosition::kPrimary
+              : SplitViewController::SnapPosition::kSecondary,
+          WindowSnapActionSource::kKeyboardShortcutToSnap);
     } else {
-      const WMEvent wm_event(is_desired_primary_snapped
-                                 ? WM_EVENT_SNAP_PRIMARY
-                                 : WM_EVENT_SNAP_SECONDARY);
+      const WindowSnapWMEvent wm_event(
+          is_desired_primary_snapped ? WM_EVENT_SNAP_PRIMARY
+                                     : WM_EVENT_SNAP_SECONDARY,
+          WindowSnapActionSource::kKeyboardShortcutToSnap);
       window_state->OnWMEvent(&wm_event);
     }
     window_state->ReadOutWindowCycleSnapAction(
@@ -220,8 +192,7 @@ gfx::Rect BaseState::GetSnappedWindowBoundsInParent(
     aura::Window* window,
     const WindowStateType state_type,
     float snap_ratio) {
-  DCHECK(state_type == WindowStateType::kPrimarySnapped ||
-         state_type == WindowStateType::kSecondarySnapped);
+  DCHECK(chromeos::IsSnappedWindowStateType(state_type));
   gfx::Rect bounds_in_parent;
   if (ShouldAllowSplitView()) {
     bounds_in_parent =

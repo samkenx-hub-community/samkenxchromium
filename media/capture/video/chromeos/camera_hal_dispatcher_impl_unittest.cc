@@ -9,6 +9,7 @@
 
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/posix/safe_strerror.h"
 #include "base/run_loop.h"
 #include "base/synchronization/waitable_event.h"
@@ -173,7 +174,7 @@ class CameraHalDispatcherImplTest : public ::testing::Test {
     dispatcher_->initial_effects_ = GetDefaultCameraEffectsConfigForTesting();
   }
 
-  void TearDown() override { delete dispatcher_; }
+  void TearDown() override { delete dispatcher_.ExtractAsDangling(); }
 
   scoped_refptr<base::SingleThreadTaskRunner> GetProxyTaskRunner() {
     return dispatcher_->proxy_task_runner_;
@@ -258,7 +259,7 @@ class CameraHalDispatcherImplTest : public ::testing::Test {
  protected:
   // We can't use std::unique_ptr here because the constructor and destructor of
   // CameraHalDispatcherImpl are private.
-  CameraHalDispatcherImpl* dispatcher_;
+  raw_ptr<CameraHalDispatcherImpl, ExperimentalAsh> dispatcher_;
   base::WaitableEvent register_client_event_;
   int32_t last_register_client_result_;
   std::atomic<int> quit_count_ = 0;

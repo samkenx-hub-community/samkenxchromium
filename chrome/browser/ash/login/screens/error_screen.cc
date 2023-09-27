@@ -39,7 +39,6 @@
 #include "chromeos/ash/components/network/network_handler.h"
 #include "chromeos/ash/components/network/network_state_handler.h"
 #include "chromeos/dbus/power/power_manager_client.h"
-#include "components/session_manager/core/session_manager.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "third_party/cros_system_api/dbus/service_constants.h"
 #include "ui/gfx/native_widget_types.h"
@@ -192,9 +191,7 @@ void ErrorScreen::ShowConnectingIndicator(bool show) {
 }
 
 void ErrorScreen::SetIsPersistentError(bool is_persistent) {
-  if (view_) {
-    view_->SetIsPersistentError(is_persistent);
-  }
+  is_persistent_ = is_persistent;
 }
 
 base::CallbackListSubscription ErrorScreen::RegisterConnectRequestCallback(
@@ -218,7 +215,7 @@ void ErrorScreen::ShowNetworkErrorMessage(NetworkStateInformer::State state,
       NetworkStateInformer::GetNetworkName(network_path);
 
   const bool is_behind_captive_portal =
-      NetworkStateInformer::IsBehindCaptivePortal(state, reason);
+      state == NetworkStateInformer::CAPTIVE_PORTAL;
   const bool is_proxy_error = NetworkStateInformer::IsProxyError(state, reason);
   const bool is_loading_timeout =
       (reason == NetworkError::ERROR_REASON_LOADING_TIMEOUT);
@@ -263,10 +260,10 @@ void ErrorScreen::ShowImpl() {
     return;
   }
 
-  view_->Show();
+  const bool is_closeable =
+      LoginDisplayHost::default_host()->HasUserPods() && !is_persistent_;
+  view_->ShowScreenWithParam(is_closeable);
   LOG(WARNING) << "Network error screen message is shown";
-  session_manager::SessionManager::Get()->NotifyNetworkErrorScreenShown();
-  NetworkHandler::Get()->network_state_handler()->RequestPortalDetection();
 }
 
 void ErrorScreen::HideImpl() {
@@ -436,7 +433,8 @@ void ErrorScreen::StartGuestSessionAfterOwnershipCheck(
       return;
     case CrosSettingsProvider::PERMANENTLY_UNTRUSTED:
       // Only allow guest sessions if there is no owner yet.
-      if (ownership_status == DeviceSettingsService::OWNERSHIP_NONE) {
+      if (ownership_status ==
+          DeviceSettingsService::OwnershipStatus::kOwnershipNone) {
         break;
       }
       return;
@@ -456,7 +454,7 @@ void ErrorScreen::StartGuestSessionAfterOwnershipCheck(
   }
 
   guest_login_performer_ =
-      std::make_unique<ChromeLoginPerformer>(this, AuthMetricsRecorder::Get());
+      std::make_unique<ChromeLoginPerformer>(this, AuthEventsRecorder::Get());
   guest_login_performer_->LoginOffTheRecord();
 }
 

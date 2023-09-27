@@ -5,9 +5,9 @@
 package org.chromium.chrome.browser.infobar;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -24,10 +24,8 @@ import org.chromium.base.test.util.AdvancedMockContext;
 import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.UrlUtils;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.WebContentsFactory;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -36,6 +34,7 @@ import org.chromium.chrome.browser.tab.TabTestUtils;
 import org.chromium.chrome.browser.tab.TabWebContentsDelegateAndroid;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
 import org.chromium.chrome.test.util.InfoBarTestAnimationListener;
 import org.chromium.chrome.test.util.InfoBarUtil;
@@ -54,7 +53,7 @@ import java.util.concurrent.TimeoutException;
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 @Batch(Batch.PER_CLASS)
-@DisableFeatures({ChromeFeatureList.MESSAGES_FOR_ANDROID_INFRASTRUCTURE})
+@DisableFeatures(ChromeFeatureList.MESSAGES_FOR_ANDROID_INFRASTRUCTURE)
 public class InfoBarTest {
     @ClassRule
     public static ChromeTabbedActivityTestRule sActivityTestRule =
@@ -64,8 +63,6 @@ public class InfoBarTest {
     public BlankCTATabInitialStateRule mInitialStateRule =
             new BlankCTATabInitialStateRule(sActivityTestRule, false);
 
-    private static final long MAX_TIMEOUT = 2000L;
-    private static final int CHECK_INTERVAL = 500;
     private static final String POPUP_PAGE =
             "/chrome/test/data/popup_blocker/popup-window-open.html";
     private static final String HELLO_WORLD_URL = UrlUtils.encodeHtmlDataUri("<html>"
@@ -74,7 +71,6 @@ public class InfoBarTest {
             + "</html>");
     private static final String SHARED_PREF_DISPLAYED_FRE_OR_SECOND_PROMO_VERSION =
             "displayed_data_reduction_promo_version";
-    private static final String M51_VERSION = "Chrome 51.0.2704.0";
 
     private static EmbeddedTestServer sTestServer = sActivityTestRule.getTestServer();
     private InfoBarTestAnimationListener mListener;
@@ -230,7 +226,6 @@ public class InfoBarTest {
     @Test
     @MediumTest
     @Feature({"Browser", "Main"})
-    @DisabledTest(message = "https://crbug.com/1269025")
     public void testInfoBarForPopUp() throws TimeoutException, ExecutionException {
         sActivityTestRule.loadUrl(sTestServer.getURL(POPUP_PAGE));
         mListener.addInfoBarAnimationFinished("InfoBar not added");
@@ -296,7 +291,7 @@ public class InfoBarTest {
                 () -> sActivityTestRule.getInfoBarContainer().addAnimationListener(removeListener));
         PostTask.runOrPostTask(TaskTraits.UI_DEFAULT, () -> {
             WebContents newContents = WebContentsFactory.createWebContents(
-                    Profile.getLastUsedRegularProfile(), false);
+                    Profile.getLastUsedRegularProfile(), false, false);
             TabTestUtils.swapWebContents(
                     sActivityTestRule.getActivity().getActivityTab(), newContents, false, false);
         });

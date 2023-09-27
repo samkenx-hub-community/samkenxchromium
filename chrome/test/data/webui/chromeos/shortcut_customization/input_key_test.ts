@@ -9,7 +9,8 @@ import 'chrome://webui-test/mojo_webui_test_support.js';
 import {IronIconElement} from '//resources/polymer/v3_0/iron-icon/iron-icon.js';
 import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 import {AcceleratorLookupManager} from 'chrome://shortcut-customization/js/accelerator_lookup_manager.js';
-import {InputKeyElement, keyToIconNameMap} from 'chrome://shortcut-customization/js/input_key.js';
+import {InputKeyElement, KeyInputState} from 'chrome://shortcut-customization/js/input_key.js';
+import {keyToIconNameMap} from 'chrome://shortcut-customization/js/shortcut_utils.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {isVisible} from 'chrome://webui-test/test_util.js';
 
@@ -85,8 +86,9 @@ suite('inputKeyTest', function() {
     const iconWrapperElement = inputKeyElement.shadowRoot!.querySelector(
                                    '#key > div') as HTMLDivElement;
     assertTrue(isVisible(iconWrapperElement));
-    assertEquals('screenshot', iconWrapperElement.ariaLabel);
-    assertEquals('img', iconWrapperElement.getAttribute('role'));
+    const iconDescriptionElement = inputKeyElement.shadowRoot!.querySelector(
+                                       '#icon-description') as HTMLDivElement;
+    assertEquals('take screenshot', iconDescriptionElement.textContent);
   });
 
   test('MetaKeyShowLauncherIcon', async () => {
@@ -104,7 +106,9 @@ suite('inputKeyTest', function() {
     assertTrue(isVisible(iconElement));
     assertTrue(isVisible(iconWrapperElement));
     assertEquals('shortcut-customization-keys:launcher', iconElement.icon);
-    assertEquals('launcher', iconWrapperElement.ariaLabel);
+    const iconDescriptionElement = inputKeyElement.shadowRoot!.querySelector(
+                                       '#icon-description') as HTMLDivElement;
+    assertEquals('meta launcher', iconDescriptionElement.textContent);
   });
 
   test('MetaKeyShowSearchIcon', async () => {
@@ -115,13 +119,44 @@ suite('inputKeyTest', function() {
     await flush();
 
     // Should show search icon when hasLauncherButton is false.
-    const iconElement2 = inputKeyElement.shadowRoot!.querySelector(
-                             '#key-icon') as IronIconElement;
-    const iconWrapperElement2 = inputKeyElement.shadowRoot!.querySelector(
-                                    '#key > div') as HTMLDivElement;
-    assertTrue(isVisible(iconElement2));
-    assertTrue(isVisible(iconWrapperElement2));
-    assertEquals('shortcut-customization-keys:search', iconElement2.icon);
-    assertEquals('search', iconWrapperElement2.ariaLabel);
+    const iconElement = inputKeyElement.shadowRoot!.querySelector(
+                            '#key-icon') as IronIconElement;
+    const iconWrapperElement = inputKeyElement.shadowRoot!.querySelector(
+                                   '#key > div') as HTMLDivElement;
+    assertTrue(isVisible(iconElement));
+    assertTrue(isVisible(iconWrapperElement));
+    assertEquals('shortcut-customization-keys:search', iconElement.icon);
+
+    const iconDescriptionElement = inputKeyElement.shadowRoot!.querySelector(
+                                       '#icon-description') as HTMLDivElement;
+    assertEquals('meta search', iconDescriptionElement.textContent);
+  });
+
+  test('LwinKeyAsSearchModifier', async () => {
+    inputKeyElement = initInputKeyElement();
+    inputKeyElement.key = 'Meta';
+    inputKeyElement.keyState = KeyInputState.ALPHANUMERIC_SELECTED;
+
+    manager!.setHasLauncherButton(true);
+    await flush();
+
+    // Should show launcher icon when hasLauncherButton is true.
+    const iconElement = inputKeyElement.shadowRoot!.querySelector(
+                            '#key-icon') as IronIconElement;
+    assertEquals('shortcut-customization-keys:launcher', iconElement.icon);
+    // Lwin key should be treated as a search modifier key.
+    assertEquals(KeyInputState.MODIFIER_SELECTED, inputKeyElement.keyState);
+  });
+
+  test('OtherKeyStateUnchanged', async () => {
+    inputKeyElement = initInputKeyElement();
+    inputKeyElement.key = 'a';
+    inputKeyElement.keyState = KeyInputState.ALPHANUMERIC_SELECTED;
+
+    manager!.setHasLauncherButton(true);
+    await flush();
+
+    // other keys should keep their original state.
+    assertEquals(KeyInputState.ALPHANUMERIC_SELECTED, inputKeyElement.keyState);
   });
 });

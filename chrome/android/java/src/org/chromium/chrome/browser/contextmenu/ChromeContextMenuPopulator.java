@@ -13,7 +13,6 @@ import static org.chromium.chrome.browser.contextmenu.ContextMenuItemWithIconBut
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.net.MailTo;
 import android.net.Uri;
@@ -52,7 +51,6 @@ import org.chromium.chrome.browser.share.ShareDelegate;
 import org.chromium.chrome.browser.share.ShareDelegate.ShareOrigin;
 import org.chromium.chrome.browser.share.ShareHelper;
 import org.chromium.chrome.browser.share.link_to_text.LinkToTextHelper;
-import org.chromium.chrome.browser.tasks.tab_management.TabUiFeatureUtilities;
 import org.chromium.components.browser_ui.share.ShareParams;
 import org.chromium.components.embedder_support.contextmenu.ContextMenuParams;
 import org.chromium.components.embedder_support.util.UrlUtilities;
@@ -89,9 +87,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
     private final ContextMenuParams mParams;
     private @Nullable UkmRecorder.Bridge mUkmRecorderBridge;
     private ContextMenuNativeDelegate mNativeDelegate;
-    private static final String LENS_SEARCH_MENU_ITEM_KEY = "searchWithGoogleLensMenuItem";
-    private static final String LENS_SHOP_MENU_ITEM_KEY = "shopWithGoogleLensMenuItem";
-    private static final String SEARCH_BY_IMAGE_MENU_ITEM_KEY = "searchByImageMenuItem";
     private static final String LENS_SUPPORT_STATUS_HISTOGRAM_NAME =
             "ContextMenu.LensSupportStatus";
 
@@ -243,17 +238,8 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
             if (FirstRunStatus.getFirstRunFlowComplete() && !isEmptyUrl(mParams.getUrl())
                     && UrlUtilities.isAcceptedScheme(mParams.getUrl())) {
                 if (mMode == ContextMenuMode.NORMAL) {
-                    if (TabUiFeatureUtilities.ENABLE_TAB_GROUP_AUTO_CREATION.getValue()) {
-                        linkGroup.add(createListItem(Item.OPEN_IN_NEW_TAB));
-                    } else {
-                        if (TabUiFeatureUtilities.showContextMenuOpenNewTabInGroupItemFirst()) {
-                            linkGroup.add(createListItem(Item.OPEN_IN_NEW_TAB_IN_GROUP));
-                            linkGroup.add(createListItem(Item.OPEN_IN_NEW_TAB));
-                        } else {
-                            linkGroup.add(createListItem(Item.OPEN_IN_NEW_TAB));
-                            linkGroup.add(createListItem(Item.OPEN_IN_NEW_TAB_IN_GROUP));
-                        }
-                    }
+                    linkGroup.add(createListItem(Item.OPEN_IN_NEW_TAB_IN_GROUP));
+                    linkGroup.add(createListItem(Item.OPEN_IN_NEW_TAB));
                     if (!mItemDelegate.isIncognito() && mItemDelegate.isIncognitoSupported()) {
                         linkGroup.add(createListItem(Item.OPEN_IN_INCOGNITO_TAB));
                     }
@@ -460,8 +446,8 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
     public boolean onItemSelected(int itemId) {
         if (itemId == R.id.contextmenu_open_in_new_tab) {
             recordContextMenuSelection(ContextMenuUma.Action.OPEN_IN_NEW_TAB);
-            mItemDelegate.onOpenInNewTab(
-                    mParams.getUrl(), mParams.getReferrer(), /*navigateToTab=*/false);
+            mItemDelegate.onOpenInNewTab(mParams.getUrl(), mParams.getReferrer(),
+                    /*navigateToTab=*/false, mParams.getAdditionalNavigationParams());
         } else if (itemId == R.id.contextmenu_open_in_new_tab_in_group) {
             recordContextMenuSelection(ContextMenuUma.Action.OPEN_IN_NEW_TAB_IN_GROUP);
             mItemDelegate.onOpenInNewTabInGroup(mParams.getUrl(), mParams.getReferrer());
@@ -618,7 +604,8 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         } else if (itemId == R.id.contextmenu_learn_more) {
             recordContextMenuSelection(ContextMenuUma.Action.LEARN_MORE);
             mItemDelegate.onOpenInNewTab(new GURL(LinkToTextHelper.SHARED_HIGHLIGHTING_SUPPORT_URL),
-                    mParams.getReferrer(), /*navigateToTab=*/true);
+                    mParams.getReferrer(), /*navigateToTab=*/true,
+                    /*additionalNavigationParams=*/null);
         } else {
             assert false;
         }
@@ -883,9 +870,10 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
      * @param isLink Whether the item is SHARE_LINK.
      */
     private static Pair<Drawable, CharSequence> createRecentShareAppInfo(boolean isLink) {
-        Intent shareIntent = isLink ? ShareHelper.getShareTextAppCompatibilityIntent()
-                                    : ShareHelper.getShareImageAppCompatibilityIntent();
-        return ShareHelper.getShareableIconAndName(shareIntent);
+        return isLink ? ShareHelper.getShareableIconAndNameForText()
+                      // Use jpeg as a generic image type to be shared. Most apps accepting jpeg
+                      // should also accept other image types.
+                      : ShareHelper.getShareableIconAndNameForFileContentType("image/jpeg");
     }
 
     /**

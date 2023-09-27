@@ -10,10 +10,6 @@
 #import "ios/chrome/browser/ui/toolbar/buttons/toolbar_configuration.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 CGFloat kFakeImageWidth = 30;
 CGFloat kFakeSpacing = 16;
@@ -78,7 +74,7 @@ CGFloat kFakeTextBoxWidth = 240;
   // Popup uses same colors as the toolbar, so the ToolbarConfiguration is
   // used to get the style.
   ToolbarConfiguration* configuration =
-      [[ToolbarConfiguration alloc] initWithStyle:NORMAL];
+      [[ToolbarConfiguration alloc] initWithStyle:ToolbarStyle::kNormal];
 
   UIView* containerView = [[UIView alloc] init];
   [containerView addSubview:self.popupViewController.view];

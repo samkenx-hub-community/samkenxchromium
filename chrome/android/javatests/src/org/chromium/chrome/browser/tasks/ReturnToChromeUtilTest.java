@@ -13,10 +13,11 @@ import static org.chromium.chrome.features.start_surface.StartSurfaceTestUtils.c
 
 import android.app.Activity;
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 import android.text.TextUtils;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Assert;
 import org.junit.Rule;
@@ -51,6 +52,7 @@ import org.chromium.chrome.browser.tasks.tab_management.TabUiTestHelper;
 import org.chromium.chrome.features.start_surface.StartSurfaceTestUtils;
 import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeApplicationTestUtils;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
 import org.chromium.chrome.test.util.ChromeTabUtils;
@@ -70,8 +72,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @RunWith(ParameterizedRunner.class)
 @UseRunnerDelegate(ChromeJUnit4RunnerDelegate.class)
-@EnableFeatures({ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID,
-        ChromeFeatureList.START_SURFACE_RETURN_TIME + "<Study",
+@EnableFeatures({ChromeFeatureList.START_SURFACE_RETURN_TIME + "<Study",
         ChromeFeatureList.START_SURFACE_ANDROID + "<Study"})
 // clang-format off
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE,
@@ -153,7 +154,8 @@ public class ReturnToChromeUtilTest {
         assertEquals(3, mActivityTestRule.getActivity().getTabModelSelector().getTotalTabCount());
 
         // Trigger hide and resume.
-        ChromeApplicationTestUtils.fireHomeScreenIntent(InstrumentationRegistry.getTargetContext());
+        ChromeApplicationTestUtils.fireHomeScreenIntent(
+                ApplicationProvider.getApplicationContext());
         mActivityTestRule.resumeMainActivityFromLauncher();
 
         Assert.assertTrue(
@@ -186,8 +188,8 @@ public class ReturnToChromeUtilTest {
         // Instant start is not applicable since we need to create tabs and restart.
         assumeTrue(!mUseInstantStart);
 
-        EmbeddedTestServer testServer =
-                EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        EmbeddedTestServer testServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         String url = testServer.getURL("/chrome/test/data/android/about.html");
 
         mActivityTestRule.startMainActivityOnBlankPage();
@@ -211,8 +213,8 @@ public class ReturnToChromeUtilTest {
         assertEquals(10, mActivityTestRule.getActivity().getTabModelSelector().getTotalTabCount());
         assertEquals(9, mActivityTestRule.getActivity().getCurrentTabModel().index());
         // Make sure the grid tab switcher is scrolled down to show the selected tab.
-        mRenderTestRule.render(mActivityTestRule.getActivity().findViewById(
-                                       org.chromium.chrome.tab_ui.R.id.tab_list_view),
+        mRenderTestRule.render(
+                mActivityTestRule.getActivity().findViewById(R.id.tab_list_recycler_view),
                 "10_web_tabs-select_last");
     }
 
@@ -251,11 +253,15 @@ public class ReturnToChromeUtilTest {
         } else {
             mActivityTestRule.waitForActivityNativeInitializationComplete();
         }
-        mBackPressHandler = TestThreadUtils.runOnUiThreadBlockingNoException(
-                ()
-                        -> new ReturnToChromeBackPressHandler(
-                                mActivityTestRule.getActivity().getActivityTabProvider(),
-                                () -> {}));
+        mBackPressHandler = TestThreadUtils.runOnUiThreadBlockingNoException(() -> {
+            return new ReturnToChromeBackPressHandler(
+                    mActivityTestRule.getActivity().getActivityTabProvider(),
+                    (shouldHandleTabSwitcherShown)
+                            -> {},
+                    mActivityTestRule.getActivity()::getActivityTab,
+                    mActivityTestRule.getActivity().getLayoutStateProviderSupplier(),
+                    () -> { return -1L; }, false);
+        });
     }
 
     private void waitTabModelRestoration() {

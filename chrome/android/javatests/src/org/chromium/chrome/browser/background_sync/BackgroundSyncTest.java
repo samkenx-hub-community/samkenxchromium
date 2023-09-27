@@ -6,9 +6,8 @@ package org.chromium.chrome.browser.background_sync;
 
 import static org.chromium.base.test.util.ScalableTimeout.scaleTimeout;
 
-import android.support.test.InstrumentationRegistry;
-
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -90,7 +89,6 @@ public final class BackgroundSyncTest {
 
     @After
     public void tearDown() {
-        if (mTestServer != null) mTestServer.stopAndDestroyServer();
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             BackgroundSyncBackgroundTaskScheduler.getInstance().removeObserver(mSchedulerObserver);
         });

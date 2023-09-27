@@ -4,12 +4,15 @@
 
 #include "chrome/browser/ui/views/profiles/signin_view_controller_delegate_views.h"
 
+#include "base/check_deref.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/weak_ptr.h"
 #include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_avatar_icon_util.h"
+#include "chrome/browser/search_engine_choice/search_engine_choice_service.h"
+#include "chrome/browser/search_engine_choice/search_engine_choice_service_factory.h"
 #include "chrome/browser/signin/reauth_result.h"
 #include "chrome/browser/signin/signin_promo.h"
 #include "chrome/browser/sync/sync_service_factory.h"
@@ -17,7 +20,8 @@
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
-#include "chrome/browser/ui/signin_view_controller.h"
+#include "chrome/browser/ui/search_engine_choice/search_engine_choice_tab_helper.h"
+#include "chrome/browser/ui/signin/signin_view_controller.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/webui/signin/profile_customization_ui.h"
@@ -34,7 +38,6 @@
 #include "content/public/browser/web_contents.h"
 #include "google_apis/gaia/core_account_id.h"
 #include "google_apis/gaia/gaia_urls.h"
-#include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/ui_base_types.h"
 #include "ui/views/bubble/bubble_frame_view.h"
@@ -58,10 +61,10 @@ const int kSyncConfirmationDialogWidth = 512;
 const int kSyncConfirmationDialogHeight = 487;
 const int kSigninErrorDialogHeight = 164;
 
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+#if BUILDFLAG(ENABLE_DICE_SUPPORT) || BUILDFLAG(IS_CHROMEOS_LACROS)
 const int kReauthDialogWidth = 540;
 const int kReauthDialogHeight = 520;
-#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
+#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT) || BUILDFLAG(IS_CHROMEOS_LACROS)
 
 int GetSyncConfirmationDialogPreferredHeight(Profile* profile) {
   // If sync is disabled, then the sync confirmation dialog looks like an error
@@ -80,6 +83,14 @@ void CloseModalSigninInBrowser(
     return;
 
   browser->signin_view_controller()->CloseModalSignin();
+#if BUILDFLAG(ENABLE_SEARCH_ENGINE_CHOICE)
+  SearchEngineChoiceService* search_engine_choice_service =
+      SearchEngineChoiceServiceFactory::GetForProfile(browser->profile());
+  if (search_engine_choice_service &&
+      search_engine_choice_service->CanShowDialog(CHECK_DEREF(browser.get()))) {
+    ShowSearchEngineChoiceDialog(*browser);
+  }
+#endif
   if (show_profile_switch_iph) {
     browser->window()->MaybeShowProfileSwitchIPH();
   }
@@ -128,7 +139,7 @@ SigninViewControllerDelegateViews::CreateSigninErrorWebView(Browser* browser) {
                              InitializeSigninWebDialogUI(true));
 }
 
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+#if BUILDFLAG(ENABLE_DICE_SUPPORT) || BUILDFLAG(IS_CHROMEOS_LACROS)
 // static
 std::unique_ptr<views::WebView>
 SigninViewControllerDelegateViews::CreateReauthConfirmationWebView(
@@ -138,9 +149,7 @@ SigninViewControllerDelegateViews::CreateReauthConfirmationWebView(
                              kReauthDialogHeight, kReauthDialogWidth,
                              InitializeSigninWebDialogUI(false));
 }
-#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
-#if BUILDFLAG(ENABLE_DICE_SUPPORT) || BUILDFLAG(IS_CHROMEOS_LACROS)
 // static
 std::unique_ptr<views::WebView>
 SigninViewControllerDelegateViews::CreateProfileCustomizationWebView(
@@ -178,7 +187,6 @@ SigninViewControllerDelegateViews::CreateEnterpriseConfirmationWebView(
     const AccountInfo& account_info,
     bool profile_creation_required_by_policy,
     bool show_link_data_option,
-    SkColor profile_color,
     signin::SigninChoiceCallback callback) {
   std::unique_ptr<views::WebView> web_view = CreateDialogWebView(
       browser, GURL(chrome::kChromeUIEnterpriseProfileWelcomeURL),
@@ -195,7 +203,7 @@ SigninViewControllerDelegateViews::CreateEnterpriseConfirmationWebView(
       browser,
       EnterpriseProfileWelcomeUI::ScreenType::kEnterpriseAccountCreation,
       account_info, profile_creation_required_by_policy, show_link_data_option,
-      profile_color, std::move(callback));
+      std::move(callback));
 
   return web_view;
 }
@@ -419,7 +427,7 @@ SigninViewControllerDelegate::CreateSigninErrorDelegate(Browser* browser) {
       browser, ui::MODAL_TYPE_WINDOW, true, false);
 }
 
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+#if BUILDFLAG(ENABLE_DICE_SUPPORT) || BUILDFLAG(IS_CHROMEOS_LACROS)
 // static
 SigninViewControllerDelegate*
 SigninViewControllerDelegate::CreateReauthConfirmationDelegate(
@@ -431,9 +439,7 @@ SigninViewControllerDelegate::CreateReauthConfirmationDelegate(
           browser, access_point),
       browser, ui::MODAL_TYPE_CHILD, false, true);
 }
-#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
-#if BUILDFLAG(ENABLE_DICE_SUPPORT) || BUILDFLAG(IS_CHROMEOS_LACROS)
 // static
 SigninViewControllerDelegate*
 SigninViewControllerDelegate::CreateProfileCustomizationDelegate(
@@ -456,12 +462,11 @@ SigninViewControllerDelegate::CreateEnterpriseConfirmationDelegate(
     const AccountInfo& account_info,
     bool profile_creation_required_by_policy,
     bool show_link_data_option,
-    SkColor profile_color,
     signin::SigninChoiceCallback callback) {
   return new SigninViewControllerDelegateViews(
       SigninViewControllerDelegateViews::CreateEnterpriseConfirmationWebView(
           browser, account_info, profile_creation_required_by_policy,
-          show_link_data_option, profile_color, std::move(callback)),
+          show_link_data_option, std::move(callback)),
       browser, ui::MODAL_TYPE_WINDOW, true, false);
 }
 #endif

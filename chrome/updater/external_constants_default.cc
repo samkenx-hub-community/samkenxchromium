@@ -11,6 +11,7 @@
 #include "chrome/updater/external_constants.h"
 #include "chrome/updater/updater_branding.h"
 #include "components/crx_file/crx_verifier.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 
 namespace updater {
@@ -23,6 +24,12 @@ class DefaultExternalConstants : public ExternalConstants {
   // Overrides of ExternalConstants:
   std::vector<GURL> UpdateURL() const override {
     return std::vector<GURL>{GURL(UPDATE_CHECK_URL)};
+  }
+
+  GURL CrashUploadURL() const override { return GURL(CRASH_UPLOAD_URL); }
+
+  GURL DeviceManagementURL() const override {
+    return GURL(DEVICE_MANAGEMENT_SERVER_URL);
   }
 
   bool UseCUP() const override { return true; }
@@ -43,6 +50,12 @@ class DefaultExternalConstants : public ExternalConstants {
 
   base::TimeDelta OverinstallTimeout() const override {
     return base::Minutes(2);
+  }
+
+  base::TimeDelta IdleCheckPeriod() const override { return base::Minutes(5); }
+
+  absl::optional<bool> IsMachineManaged() const override {
+    return absl::nullopt;
   }
 
  private:

@@ -8,13 +8,13 @@
 #include "ash/public/cpp/screen_backlight_observer.h"
 #include "ash/public/cpp/tablet_mode_observer.h"
 #include "ash/webui/eche_app_ui/mojom/eche_app.mojom.h"
+#include "base/memory/raw_ptr.h"
 #include "chromeos/services/network_config/public/cpp/cros_network_config_observer.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
 
-namespace ash {
-namespace eche_app {
+namespace ash::eche_app {
 
 extern const char kJsonDeviceNameKey[];
 extern const char kJsonBoardNameKey[];
@@ -23,10 +23,13 @@ extern const char kJsonWifiConnectionStateKey[];
 extern const char kJsonDebugModeKey[];
 extern const char kJsonGaiaIdKey[];
 extern const char kJsonDeviceTypeKey[];
+extern const char kJsonOsVersionKey[];
+extern const char kJsonChannelKey[];
 extern const char kJsonMeasureLatencyKey[];
 extern const char kJsonSendStartSignalingKey[];
 extern const char kJsonDisableStunServerKey[];
 extern const char kJsonCheckAndroidNetworkInfoKey[];
+extern const char kJsonProcessAndroidAccessibilityTreeKey[];
 
 class SystemInfo;
 
@@ -41,6 +44,7 @@ class SystemInfoProvider
   explicit SystemInfoProvider(
       std::unique_ptr<SystemInfo> system_info,
       chromeos::network_config::mojom::CrosNetworkConfig* cros_network_config);
+  SystemInfoProvider();
   ~SystemInfoProvider() override;
 
   SystemInfoProvider(const SystemInfoProvider&) = delete;
@@ -64,8 +68,10 @@ class SystemInfoProvider
   void SetAndroidDeviceNetworkInfoChanged(bool is_different_network,
                                           bool android_device_on_cellular);
 
+  bool is_different_network() { return is_different_network_; }
+  bool android_device_on_cellular() { return android_device_on_cellular_; }
+
  protected:
-  SystemInfoProvider();
   std::string hashed_wifi_ssid_;
 
  private:
@@ -81,30 +87,26 @@ class SystemInfoProvider
   void SetTabletModeChanged(bool enabled);
 
   // network_config::CrosNetworkConfigObserver overrides:
-  void OnNetworkStateChanged(
-      chromeos::network_config::mojom::NetworkStatePropertiesPtr network)
-      override;
-
-  // Callback invoked from within FetchWifiNetworkSsidHash() that produces a
-  // list of networks.
-  void OnWifiNetworkListSsidFetch(
+  void OnActiveNetworksChanged(
       std::vector<chromeos::network_config::mojom::NetworkStatePropertiesPtr>
-          networks);
+          networks) override;
   void FetchWifiNetworkList();
-  void OnWifiNetworkList(
+  void OnActiveWifiNetworkListFetched(
       std::vector<chromeos::network_config::mojom::NetworkStatePropertiesPtr>
           networks);
 
+  bool is_different_network_ = false;
+  bool android_device_on_cellular_ = false;
   mojo::Receiver<mojom::SystemInfoProvider> info_receiver_{this};
   mojo::Remote<mojom::SystemInfoObserver> observer_remote_;
   mojo::Receiver<chromeos::network_config::mojom::CrosNetworkConfigObserver>
       cros_network_config_receiver_{this};
   std::unique_ptr<SystemInfo> system_info_;
-  chromeos::network_config::mojom::CrosNetworkConfig* cros_network_config_;
+  raw_ptr<chromeos::network_config::mojom::CrosNetworkConfig, ExperimentalAsh>
+      cros_network_config_;
   chromeos::network_config::mojom::ConnectionStateType wifi_connection_state_;
 };
 
-}  // namespace eche_app
-}  // namespace ash
+}  // namespace ash::eche_app
 
 #endif  // ASH_WEBUI_ECHE_APP_UI_SYSTEM_INFO_PROVIDER_H_

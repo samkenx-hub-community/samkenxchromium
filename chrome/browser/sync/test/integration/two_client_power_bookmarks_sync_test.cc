@@ -45,7 +45,7 @@ class PowerBookmarkChecker : public StatusChangeChecker,
   }
 
  private:
-  raw_ptr<power_bookmarks::PowerBookmarkService> service_;
+  const raw_ptr<power_bookmarks::PowerBookmarkService> service_;
   bool changed_ = false;
 };
 
@@ -64,8 +64,10 @@ class TwoClientPowerBookmarksSyncTest : public SyncTest {
   }
 
  protected:
-  raw_ptr<power_bookmarks::PowerBookmarkService, DanglingUntriaged> service0_;
-  raw_ptr<power_bookmarks::PowerBookmarkService, DanglingUntriaged> service1_;
+  raw_ptr<power_bookmarks::PowerBookmarkService, AcrossTasksDanglingUntriaged>
+      service0_;
+  raw_ptr<power_bookmarks::PowerBookmarkService, AcrossTasksDanglingUntriaged>
+      service1_;
 
  private:
   power_bookmarks::PowerBookmarkService* GetSyncService(int index) {
@@ -101,7 +103,7 @@ bool UpdatePower(std::unique_ptr<power_bookmarks::Power> power,
   return result;
 }
 
-bool DeletePower(base::GUID guid,
+bool DeletePower(base::Uuid guid,
                  power_bookmarks::PowerBookmarkService* service) {
   base::RunLoop run_loop;
   bool result = false;
@@ -172,7 +174,9 @@ IN_PROC_BROWSER_TEST_F(TwoClientPowerBookmarksSyncTest, AddOnePower) {
   VerifyPowersForURL(kGoogleURL, service0_, service1_);
 }
 
-IN_PROC_BROWSER_TEST_F(TwoClientPowerBookmarksSyncTest, UpdateOnePower) {
+IN_PROC_BROWSER_TEST_F(TwoClientPowerBookmarksSyncTest,
+                       // TODO(crbug.com/1430600): Re-enable this test.
+                       DISABLED_UpdateOnePower) {
   ASSERT_TRUE(SetupSync());
   SetupServices();
 

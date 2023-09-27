@@ -4,8 +4,8 @@
 
 #import "ios/chrome/browser/reading_list/reading_list_distiller_page.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/functional/bind.h"
-#import "base/mac/foundation_util.h"
 #import "base/strings/string_util.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
@@ -17,7 +17,7 @@
 #import "ios/chrome/browser/reading_list/favicon_web_state_dispatcher_impl.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/web/public/js_messaging/web_frame.h"
-#import "ios/web/public/js_messaging/web_frame_util.h"
+#import "ios/web/public/js_messaging/web_frames_manager.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ios/web/public/security/ssl_status.h"
@@ -25,10 +25,6 @@
 #import "net/base/mac/url_conversions.h"
 #import "net/cert/cert_status_flags.h"
 #import "url/url_constants.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 // The delay given to the web page to render after the PageLoaded callback.
@@ -249,7 +245,12 @@ bool ReadingListDistillerPage::IsGoogleCachedAMPPage() {
 }
 
 void ReadingListDistillerPage::HandleGoogleCachedAMPPage() {
-  web::WebFrame* web_frame = web::GetMainFrame(CurrentWebState());
+  web::WebState* web_state = CurrentWebState();
+  if (!web_state) {
+    return;
+  }
+  web::WebFrame* web_frame =
+      web_state->GetPageWorldWebFramesManager()->GetMainWebFrame();
   if (!web_frame) {
     return;
   }
@@ -293,7 +294,12 @@ bool ReadingListDistillerPage::IsWikipediaPage() {
 }
 
 void ReadingListDistillerPage::HandleWikipediaPage() {
-  web::WebFrame* web_frame = web::GetMainFrame(CurrentWebState());
+  web::WebState* web_state = CurrentWebState();
+  if (!web_state) {
+    return;
+  }
+  web::WebFrame* web_frame =
+      web_state->GetPageWorldWebFramesManager()->GetMainWebFrame();
   if (!web_frame) {
     return;
   }

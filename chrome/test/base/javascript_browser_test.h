@@ -46,11 +46,13 @@ class JavaScriptBrowserTest : public InProcessBrowserTest {
   // |RunJavaScriptBrowserTestF| call.
   std::u16string BuildRunTestJSCall(bool is_async,
                                     const std::string& test_name,
-                                    std::vector<base::Value> args);
+                                    base::Value::List args);
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   test::AshBrowserTestStarter* ash_starter() { return ash_starter_.get(); }
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+  Profile* GetProfile() const;
 
  private:
   // User added libraries.

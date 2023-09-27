@@ -5,54 +5,58 @@
 package org.chromium.chrome.browser.omnibox.suggestions.base;
 
 import android.content.Context;
+import android.util.ArrayMap;
 
 import androidx.annotation.NonNull;
-import androidx.collection.ArraySet;
+import androidx.annotation.Nullable;
 
-import org.chromium.base.metrics.RecordHistogram;
-import org.chromium.chrome.browser.omnibox.R;
-import org.chromium.chrome.browser.omnibox.action.OmniboxActionType;
-import org.chromium.chrome.browser.omnibox.suggestions.ActionChipsDelegate;
+import org.chromium.chrome.browser.omnibox.OmniboxMetrics;
 import org.chromium.chrome.browser.omnibox.suggestions.SuggestionHost;
-import org.chromium.chrome.browser.omnibox.suggestions.SuggestionsMetrics;
 import org.chromium.components.browser_ui.widget.chips.ChipProperties;
 import org.chromium.components.omnibox.AutocompleteMatch;
-import org.chromium.components.omnibox.action.OmniboxPedal;
+import org.chromium.components.omnibox.action.OmniboxAction;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
 import org.chromium.ui.modelutil.PropertyModel;
-
-import java.util.Set;
 
 /**
  * A class that handles model creation for the Action Chips.
  */
 public class ActionChipsProcessor {
-    // Only show action chips for the top 3 suggestions.
-    private static final int MAX_POSITION = 3;
-
     private final @NonNull Context mContext;
-    private final @NonNull ActionChipsDelegate mActionChipsDelegate;
     private final @NonNull SuggestionHost mSuggestionHost;
-    private @NonNull Set<Integer> mLastVisiblePedals = new ArraySet<>();
-    private int mJourneysActionShownPosition = -1;
+    private final @NonNull ArrayMap<OmniboxAction, Integer> mVisibleActions;
+
+    /** The action that was executed, or null if no action was executed by the user. */
+    private @Nullable OmniboxAction mExecutedAction;
 
     /**
      * @param context An Android context.
      * @param suggestionHost Component receiving suggestion events.
-     * @param actionChipsDelegate A delegate that will responsible for pedals.
      */
-    public ActionChipsProcessor(@NonNull Context context, @NonNull SuggestionHost suggestionHost,
-            @NonNull ActionChipsDelegate actionChipsDelegate) {
+    public ActionChipsProcessor(@NonNull Context context, @NonNull SuggestionHost suggestionHost) {
         mContext = context;
         mSuggestionHost = suggestionHost;
-        mActionChipsDelegate = actionChipsDelegate;
+        mVisibleActions = new ArrayMap<>();
     }
 
-    public void onUrlFocusChange(boolean hasFocus) {
-        if (!hasFocus) {
-            recordActionsShown();
+    public void onOmniboxSessionStateChange(boolean activated) {
+        // Note: do not record any histograms if we did not show Actions.
+        if (activated || mVisibleActions.isEmpty()) {
+            return;
         }
+
+        mVisibleActions.forEach((OmniboxAction action, Integer position) -> {
+            var wasValid = action.recordActionShown(position, action == mExecutedAction);
+            OmniboxMetrics.recordOmniboxActionIsValid(wasValid);
+        });
+
+        OmniboxMetrics.recordOmniboxActionIsUsed(mExecutedAction != null);
+        mVisibleActions.clear();
+    }
+
+    public void onSuggestionsReceived() {
+        mVisibleActions.clear();
     }
 
     /**
@@ -60,10 +64,10 @@ public class ActionChipsProcessor {
      *
      * @param suggestion The suggestion to process.
      * @param model Property model to update.
-     * @param position The position for the list of OmniboxPedal among omnibox suggestions.
+     * @param position The position of the suggestion with OmniboxAction(s) on the suggestion list.
      */
     public void populateModel(AutocompleteMatch suggestion, PropertyModel model, int position) {
-        if (!doesProcessSuggestion(suggestion, position)) {
+        if (suggestion.getActions().isEmpty()) {
             model.set(ActionChipsProperties.ACTION_CHIPS, null);
             return;
         }
@@ -71,65 +75,29 @@ public class ActionChipsProcessor {
         var actionChipList = suggestion.getActions();
         var modelList = new ModelList();
 
-        // The header item increases lead-in padding before the first actual chip is shown.
-        // In default state, the chips will align with the suggestion text, but when scrolled
-        // the chips may show up under the decoration.
-        modelList.add(new ListItem(ActionChipsProperties.ViewType.HEADER, new PropertyModel()));
-
-        for (OmniboxPedal chip : actionChipList) {
-            final var chipIcon = mActionChipsDelegate.getIcon(chip);
+        for (OmniboxAction chip : actionChipList) {
             final var chipModel =
                     new PropertyModel.Builder(ChipProperties.ALL_KEYS)
-                            .with(ChipProperties.TEXT, chip.getHint())
-                            .with(ChipProperties.CONTENT_DESCRIPTION,
-                                    mContext.getString(
-                                            R.string.accessibility_omnibox_pedal, chip.getHint()))
+                            .with(ChipProperties.TEXT, chip.hint)
+                            .with(ChipProperties.CONTENT_DESCRIPTION, chip.accessibilityHint)
                             .with(ChipProperties.ENABLED, true)
                             .with(ChipProperties.CLICK_HANDLER, m -> executeAction(chip, position))
-                            .with(ChipProperties.ICON, chipIcon.iconRes)
-                            .with(ChipProperties.APPLY_ICON_TINT, chipIcon.tintWithTextColor)
+                            .with(ChipProperties.ICON, chip.icon.iconRes)
+                            .with(ChipProperties.APPLY_ICON_TINT, chip.icon.tintWithTextColor)
                             .build();
 
             modelList.add(new ListItem(ActionChipsProperties.ViewType.CHIP, chipModel));
-
-            if (chip.hasPedalId()) {
-                mLastVisiblePedals.add(chip.getPedalID());
-            } else if (chip.hasActionId()
-                    && chip.getActionID() == OmniboxActionType.HISTORY_CLUSTERS) {
-                mJourneysActionShownPosition = position;
-            }
+            mVisibleActions.put(chip, position);
         }
 
         model.set(ActionChipsProperties.ACTION_CHIPS, modelList);
     }
 
-    private boolean doesProcessSuggestion(AutocompleteMatch suggestion, int position) {
-        return suggestion.getActions().size() > 0 && position < MAX_POSITION;
-    }
-
-    private void executeAction(@NonNull OmniboxPedal omniboxPedal, int position) {
-        if (omniboxPedal.hasActionId()
-                && omniboxPedal.getActionID() == OmniboxActionType.HISTORY_CLUSTERS) {
-            RecordHistogram.recordEnumeratedHistogram("Omnibox.SuggestionUsed.ResumeJourney",
-                    position, SuggestionsMetrics.MAX_AUTOCOMPLETE_POSITION);
-        }
-        mSuggestionHost.finishInteraction();
-        mActionChipsDelegate.execute(omniboxPedal);
-    }
-
     /**
-     * Record the actions shown for all action types (Journeys + any pedals).
+     * Invoke action associated with the ActionChip.
      */
-    private void recordActionsShown() {
-        for (Integer pedal : mLastVisiblePedals) {
-            SuggestionsMetrics.recordPedalShown(pedal);
-        }
-        if (mJourneysActionShownPosition != -1) {
-            RecordHistogram.recordExactLinearHistogram("Omnibox.ResumeJourneyShown",
-                    mJourneysActionShownPosition, SuggestionsMetrics.MAX_AUTOCOMPLETE_POSITION);
-        }
-
-        mJourneysActionShownPosition = -1;
-        mLastVisiblePedals.clear();
+    private void executeAction(@NonNull OmniboxAction action, int position) {
+        mExecutedAction = action;
+        mSuggestionHost.onOmniboxActionClicked(action);
     }
 }

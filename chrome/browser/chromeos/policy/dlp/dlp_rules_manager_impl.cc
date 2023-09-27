@@ -15,9 +15,10 @@
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/values.h"
-#include "chrome/browser/ash/policy/dlp/dlp_files_controller.h"
+#include "chrome/browser/ash/policy/dlp/dlp_files_controller_ash.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chromeos/policy/dlp/data_transfer_dlp_controller.h"
+#include "chrome/browser/chromeos/policy/dlp/dlp_files_controller_lacros.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_histogram_helper.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_policy_constants.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_reporting_manager.h"
@@ -43,23 +44,8 @@ using UrlConditionId = DlpRulesManagerImpl::UrlConditionId;
 
 using RulesConditionsMap = std::map<RuleId, UrlConditionId>;
 
-template <typename T>
-struct MatchedRuleInfo {
-  MatchedRuleInfo(DlpRulesManager::Level level,
-                  absl::optional<RuleId> rule_id,
-                  absl::optional<T> url_condition)
-      : level(level), rule_id(rule_id), url_condition(url_condition) {}
-  MatchedRuleInfo(const MatchedRuleInfo&) = default;
-  MatchedRuleInfo() = default;
-  MatchedRuleInfo& operator=(const MatchedRuleInfo&) = default;
-  ~MatchedRuleInfo() = default;
-
-  DlpRulesManager::Level level;
-  absl::optional<RuleId> rule_id;
-  absl::optional<T> url_condition;
-};
-
-constexpr char kWildCardMatching[] = "*";
+constexpr char kDrivePattern[] = "drive.google.com";
+constexpr char kOneDrivePattern[] = "onedrive.live.com";
 
 DlpRulesManager::Restriction GetClassMapping(const std::string& restriction) {
   static constexpr auto kRestrictionsMap =
@@ -93,19 +79,58 @@ DlpRulesManager::Level GetLevelMapping(const std::string& level) {
                                   : it->second;
 }
 
-DlpRulesManager::Component GetComponentMapping(const std::string& component) {
+data_controls::Component GetComponentMapping(const std::string& component) {
   static constexpr auto kComponentsMap =
-      base::MakeFixedFlatMap<base::StringPiece, DlpRulesManager::Component>(
-          {{dlp::kArc, DlpRulesManager::Component::kArc},
-           {dlp::kCrostini, DlpRulesManager::Component::kCrostini},
-           {dlp::kPluginVm, DlpRulesManager::Component::kPluginVm},
-           {dlp::kDrive, DlpRulesManager::Component::kDrive},
-           {dlp::kUsb, DlpRulesManager::Component::kUsb}});
+      base::MakeFixedFlatMap<base::StringPiece, data_controls::Component>(
+          {{dlp::kArc, data_controls::Component::kArc},
+           {dlp::kCrostini, data_controls::Component::kCrostini},
+           {dlp::kPluginVm, data_controls::Component::kPluginVm},
+           {dlp::kDrive, data_controls::Component::kDrive},
+           {dlp::kOneDrive, data_controls::Component::kOneDrive},
+           {dlp::kUsb, data_controls::Component::kUsb}});
 
   auto* it = kComponentsMap.find(component);
   return (it == kComponentsMap.end())
-             ? DlpRulesManager::Component::kUnknownComponent
+             ? data_controls::Component::kUnknownComponent
              : it->second;
+}
+
+::dlp::DlpComponent GetComponentProtoMapping(const std::string& component) {
+  static constexpr auto kComponentsMap =
+      base::MakeFixedFlatMap<base::StringPiece, ::dlp::DlpComponent>(
+          {{dlp::kArc, ::dlp::DlpComponent::ARC},
+           {dlp::kCrostini, ::dlp::DlpComponent::CROSTINI},
+           {dlp::kPluginVm, ::dlp::DlpComponent::PLUGIN_VM},
+           {dlp::kDrive, ::dlp::DlpComponent::GOOGLE_DRIVE},
+           {dlp::kUsb, ::dlp::DlpComponent::USB}});
+
+  auto* it = kComponentsMap.find(component);
+  return (it == kComponentsMap.end()) ? ::dlp::DlpComponent::UNKNOWN_COMPONENT
+                                      : it->second;
+}
+
+// Creates a condition set for the given `url`.
+scoped_refptr<url_matcher::URLMatcherConditionSet> CreateConditionSet(
+    url_matcher::URLMatcher* matcher,
+    UrlConditionId condition_id,
+    const std::string& url) {
+  CHECK(matcher);
+
+  std::string scheme;
+  std::string host;
+  uint16_t port = 0;
+  std::string path;
+  std::string query;
+  bool match_subdomains = true;
+
+  if (!url_matcher::util::FilterToComponents(
+          url, &scheme, &host, &match_subdomains, &port, &path, &query)) {
+    LOG(ERROR) << "Invalid pattern " << url;
+    return nullptr;
+  }
+  return url_matcher::util::CreateConditionSet(matcher, condition_id, scheme,
+                                               host, match_subdomains, port,
+                                               path, query, /*allow=*/true);
 }
 
 // Creates `urls` conditions, saves patterns strings mapping in
@@ -118,91 +143,57 @@ void AddUrlConditions(url_matcher::URLMatcher* matcher,
                       RuleId rule_id,
                       std::map<UrlConditionId, RuleId>& map) {
   DCHECK(urls);
-  std::string scheme;
-  std::string host;
-  uint16_t port = 0;
-  std::string path;
-  std::string query;
-  bool match_subdomains = true;
   for (const auto& list_entry : *urls) {
     std::string url = list_entry.GetString();
-    if (!url_matcher::util::FilterToComponents(
-            url, &scheme, &host, &match_subdomains, &port, &path, &query)) {
-      LOG(ERROR) << "Invalid pattern " << url;
+
+    ++condition_id;
+    auto condition_set = CreateConditionSet(matcher, condition_id, url);
+    if (!condition_set) {
       continue;
     }
-    auto condition_set = url_matcher::util::CreateConditionSet(
-        matcher, ++condition_id, scheme, host, match_subdomains, port, path,
-        query, /*allow=*/true);
-
     conditions.push_back(std::move(condition_set));
     map[condition_id] = rule_id;
     patterns_mapping[condition_id] = url;
   }
 }
 
-// Matches `url` against `url_matcher` patterns and returns the rules IDs
-// configured with the matched patterns.
-RulesConditionsMap MatchUrlAndGetRulesMapping(
-    const GURL& url,
-    const url_matcher::URLMatcher* url_matcher,
-    const std::map<UrlConditionId, RuleId>& rules_map) {
-  DCHECK(url_matcher);
-  const std::set<UrlConditionId> url_conditions_ids =
-      url_matcher->MatchURL(url);
-
-  RulesConditionsMap rules_conditions_map;
-  for (const auto& id : url_conditions_ids) {
-    rules_conditions_map[rules_map.at(id)] = id;
+// Returns the URLs associated with the given component. An empty vector is
+// returned if there are none.
+std::vector<std::string> GetAssociatedUrlsConditions(
+    data_controls::Component component) {
+  switch (component) {
+    case data_controls::Component::kDrive:
+      return {kDrivePattern};
+    case data_controls::Component::kOneDrive:
+      return {kOneDrivePattern};
+    case data_controls::Component::kUnknownComponent:
+    case data_controls::Component::kArc:
+    case data_controls::Component::kCrostini:
+    case data_controls::Component::kPluginVm:
+    case data_controls::Component::kUsb:
+      return {};
   }
-  return rules_conditions_map;
 }
 
-// Determines the maximum level of the rules of given
-// `restriction` joined with the `selected_rules`, and returns MatchedRuleInfo
-// of the matched rule.
-template <typename T>
-MatchedRuleInfo<T> GetMaxJoinRestrictionLevelAndRuleId(
-    const DlpRulesManager::Restriction restriction,
-    const std::map<RuleId, T>& selected_rules,
-    const std::map<DlpRulesManager::Restriction,
-                   std::map<RuleId, DlpRulesManager::Level>>& restrictions_map,
-    const bool ignore_allow = false) {
-  auto restriction_it = restrictions_map.find(restriction);
-  if (restriction_it == restrictions_map.end()) {
-    return MatchedRuleInfo<T>(DlpRulesManager::Level::kAllow, absl::nullopt,
-                              absl::nullopt);
+// Add URL conditions associated with the given `component`.
+void AddAssociatedUrlConditions(
+    data_controls::Component component,
+    url_matcher::URLMatcher* matcher,
+    UrlConditionId& condition_id,
+    url_matcher::URLMatcherConditionSet::Vector& conditions,
+    std::map<UrlConditionId, std::string>& patterns_mapping,
+    RuleId rule_id,
+    std::map<UrlConditionId, RuleId>& map) {
+  base::Value::List destinations_urls;
+
+  for (const auto& url : GetAssociatedUrlsConditions(component)) {
+    destinations_urls.Append(url);
   }
 
-  const std::map<RuleId, DlpRulesManager::Level>& restriction_rules =
-      restriction_it->second;
-
-  DlpRulesManager::Level max_level = DlpRulesManager::Level::kNotSet;
-  absl::optional<T> url_condition = absl::nullopt;
-  absl::optional<RuleId> matched_rule_id = absl::nullopt;
-
-  for (const auto& rule_pair : selected_rules) {
-    const auto& restriction_rule_itr = restriction_rules.find(rule_pair.first);
-    if (restriction_rule_itr == restriction_rules.end()) {
-      continue;
-    }
-    if (ignore_allow &&
-        restriction_rule_itr->second == DlpRulesManager::Level::kAllow) {
-      continue;
-    }
-    if (restriction_rule_itr->second > max_level) {
-      max_level = restriction_rule_itr->second;
-      url_condition = rule_pair.second;
-      matched_rule_id = rule_pair.first;
-    }
+  if (!destinations_urls.empty()) {
+    AddUrlConditions(matcher, condition_id, &destinations_urls, conditions,
+                     patterns_mapping, rule_id, map);
   }
-
-  if (max_level == DlpRulesManager::Level::kNotSet) {
-    return MatchedRuleInfo<T>(DlpRulesManager::Level::kAllow, absl::nullopt,
-                              absl::nullopt);
-  }
-
-  return MatchedRuleInfo(max_level, matched_rule_id, url_condition);
 }
 
 void OnSetDlpFilesPolicy(const ::dlp::SetDlpFilesPolicyResponse response) {
@@ -243,119 +234,9 @@ void DlpRulesManagerImpl::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(policy_prefs::kDlpClipboardCheckSizeLimit, 0);
 }
 
-DlpRulesManager::Level DlpRulesManagerImpl::IsRestricted(
-    const GURL& source,
-    Restriction restriction) const {
-  DCHECK(src_url_matcher_);
-  DCHECK(restriction == Restriction::kPrinting ||
-         restriction == Restriction::kPrivacyScreen ||
-         restriction == Restriction::kScreenshot ||
-         restriction == Restriction::kScreenShare);
-
-  const RulesConditionsMap src_rules_map = MatchUrlAndGetRulesMapping(
-      source, src_url_matcher_.get(), src_url_rules_mapping_);
-
-  return GetMaxJoinRestrictionLevelAndRuleId(restriction, src_rules_map,
-                                             restrictions_map_)
-      .level;
-}
-
-DlpRulesManager::Level DlpRulesManagerImpl::IsRestrictedByAnyRule(
-    const GURL& source,
-    Restriction restriction,
-    std::string* out_source_pattern,
-    RuleMetadata* out_rule_metadata) const {
-  DCHECK(src_url_matcher_);
-
-  const RulesConditionsMap src_rules_map = MatchUrlAndGetRulesMapping(
-      source, src_url_matcher_.get(), src_url_rules_mapping_);
-
-  const MatchedRuleInfo rule_info = GetMaxJoinRestrictionLevelAndRuleId(
-      restriction, src_rules_map, restrictions_map_,
-      /*ignore_allow=*/true);
-
-  if (rule_info.url_condition.has_value() && out_source_pattern) {
-    UrlConditionId src_condition_id = rule_info.url_condition.value();
-    *out_source_pattern = src_patterns_mapping_.at(src_condition_id);
-  }
-  if (rule_info.rule_id.has_value() && out_rule_metadata) {
-    auto rule_metadata_itr =
-        rules_id_metadata_mapping_.find(rule_info.rule_id.value());
-    if (rule_metadata_itr != rules_id_metadata_mapping_.end()) {
-      *out_rule_metadata = rule_metadata_itr->second;
-    }
-  }
-
-  return rule_info.level;
-}
-
-DlpRulesManager::Level DlpRulesManagerImpl::IsRestrictedDestination(
-    const GURL& source,
-    const GURL& destination,
-    Restriction restriction,
-    std::string* out_source_pattern,
-    std::string* out_destination_pattern,
-    RuleMetadata* out_rule_metadata) const {
-  DCHECK(src_url_matcher_);
-  DCHECK(dst_url_matcher_);
-  DCHECK(restriction == Restriction::kClipboard ||
-         restriction == Restriction::kFiles);
-
-  // Allow copy/paste within the same document.
-  if (url::IsSameOriginWith(source, destination))
-    return Level::kAllow;
-
-  const RulesConditionsMap src_rules_map = MatchUrlAndGetRulesMapping(
-      source, src_url_matcher_.get(), src_url_rules_mapping_);
-
-  const RulesConditionsMap dst_rules_map = MatchUrlAndGetRulesMapping(
-      destination, dst_url_matcher_.get(), dst_url_rules_mapping_);
-
-  std::map<DlpRulesManagerImpl::RuleId,
-           std::pair<DlpRulesManagerImpl::UrlConditionId,
-                     DlpRulesManagerImpl::UrlConditionId>>
-      intersection_rules;
-  auto src_map_itr = src_rules_map.begin();
-  auto dst_map_itr = dst_rules_map.begin();
-  while (src_map_itr != src_rules_map.end() &&
-         dst_map_itr != dst_rules_map.end()) {
-    if (src_map_itr->first < dst_map_itr->first) {
-      ++src_map_itr;
-    } else if (dst_map_itr->first < src_map_itr->first) {
-      ++dst_map_itr;
-    } else {
-      intersection_rules.insert(std::make_pair(
-          src_map_itr->first,
-          std::make_pair(src_map_itr->second, dst_map_itr->second)));
-      ++src_map_itr;
-      ++dst_map_itr;
-    }
-  }
-
-  const MatchedRuleInfo rule_info = GetMaxJoinRestrictionLevelAndRuleId(
-      restriction, intersection_rules, restrictions_map_);
-  if (rule_info.url_condition.has_value() && out_source_pattern &&
-      out_destination_pattern) {
-    UrlConditionId src_condition_id = rule_info.url_condition.value().first;
-    UrlConditionId dst_condition_id = rule_info.url_condition.value().second;
-    if (out_source_pattern)
-      *out_source_pattern = src_patterns_mapping_.at(src_condition_id);
-    if (out_destination_pattern)
-      *out_destination_pattern = dst_patterns_mapping_.at(dst_condition_id);
-    if (rule_info.rule_id.has_value() && out_rule_metadata) {
-      auto rule_metadata_itr =
-          rules_id_metadata_mapping_.find(rule_info.rule_id.value());
-      if (rule_metadata_itr != rules_id_metadata_mapping_.end()) {
-        *out_rule_metadata = rule_metadata_itr->second;
-      }
-    }
-  }
-  return rule_info.level;
-}
-
 DlpRulesManager::Level DlpRulesManagerImpl::IsRestrictedComponent(
     const GURL& source,
-    const Component& destination,
+    const data_controls::Component& destination,
     Restriction restriction,
     std::string* out_source_pattern,
     RuleMetadata* out_rule_metadata) const {
@@ -363,7 +244,7 @@ DlpRulesManager::Level DlpRulesManagerImpl::IsRestrictedComponent(
   DCHECK(restriction == Restriction::kClipboard ||
          restriction == Restriction::kFiles);
 
-  if (destination == Component::kUnknownComponent) {
+  if (destination == data_controls::Component::kUnknownComponent) {
     return DlpRulesManager::Level::kAllow;
   }
 
@@ -408,67 +289,6 @@ DlpRulesManager::Level DlpRulesManagerImpl::IsRestrictedComponent(
   return rule_info.level;
 }
 
-DlpRulesManager::AggregatedDestinations
-DlpRulesManagerImpl::GetAggregatedDestinations(const GURL& source,
-                                               Restriction restriction) const {
-  DCHECK(src_url_matcher_);
-  DCHECK(dst_url_matcher_);
-  DCHECK(restriction == Restriction::kClipboard ||
-         restriction == Restriction::kFiles);
-
-  auto restriction_it = restrictions_map_.find(restriction);
-  if (restriction_it == restrictions_map_.end()) {
-    return std::map<Level, std::set<std::string>>();
-  }
-  const std::map<RuleId, DlpRulesManager::Level>& restriction_rules =
-      restriction_it->second;
-
-  const RulesConditionsMap src_rules_map = MatchUrlAndGetRulesMapping(
-      source, src_url_matcher_.get(), src_url_rules_mapping_);
-  // We need to check all possible destinations for rules that apply to it and
-  // to the `source`. There can be many matching rules, but we want to keep only
-  // the highest enforced level for each destination.
-  std::map<std::string, Level> destination_level_map;
-  // If there's a wildcard for a level, we should ignore all destinations for
-  // lower levels.
-  Level wildcard_level = Level::kNotSet;
-  for (auto dst_map_itr : dst_url_rules_mapping_) {
-    auto src_map_itr = src_rules_map.find(dst_map_itr.second);
-    if (src_map_itr == src_rules_map.end()) {
-      continue;
-    }
-    const auto& restriction_rule_itr =
-        restriction_rules.find(src_map_itr->first);
-    if (restriction_rule_itr == restriction_rules.end()) {
-      continue;
-    }
-    UrlConditionId dst_condition_id = dst_map_itr.first;
-    std::string destination_pattern =
-        dst_patterns_mapping_.at(dst_condition_id);
-    Level level = restriction_rule_itr->second;
-    auto it = destination_level_map.find(destination_pattern);
-    if (it == destination_level_map.end() || level > it->second) {
-      destination_level_map[destination_pattern] = restriction_rule_itr->second;
-    }
-    if (destination_pattern == kWildCardMatching && level > wildcard_level) {
-      wildcard_level = level;
-    }
-  }
-
-  std::map<Level, std::set<std::string>> result;
-  for (auto it : destination_level_map) {
-    if (it.first == kWildCardMatching) {
-      result[it.second] = {it.first};
-    } else if (it.second >= wildcard_level &&
-               result[it.second].find(kWildCardMatching) ==
-                   result[it.second].end()) {
-      result[it.second].insert(it.first);
-    }
-  }
-
-  return result;
-}
-
 DlpRulesManager::AggregatedComponents
 DlpRulesManagerImpl::GetAggregatedComponents(const GURL& source,
                                              Restriction restriction) const {
@@ -476,8 +296,8 @@ DlpRulesManagerImpl::GetAggregatedComponents(const GURL& source,
   DCHECK(restriction == Restriction::kClipboard ||
          restriction == Restriction::kFiles);
 
-  std::map<Level, std::set<Component>> result;
-  for (Component component : components) {
+  std::map<Level, std::set<data_controls::Component>> result;
+  for (data_controls::Component component : data_controls::kAllComponents) {
     std::string out_source_pattern;
     Level level = IsRestrictedComponent(source, component, restriction,
                                         &out_source_pattern, nullptr);
@@ -514,49 +334,8 @@ DlpReportingManager* DlpRulesManagerImpl::GetReportingManager() const {
   return reporting_manager_.get();
 }
 
-#if BUILDFLAG(IS_CHROMEOS_ASH)
 DlpFilesController* DlpRulesManagerImpl::GetDlpFilesController() const {
   return files_controller_.get();
-}
-#endif
-
-std::string DlpRulesManagerImpl::GetSourceUrlPattern(
-    const GURL& source_url,
-    Restriction restriction,
-    Level level,
-    RuleMetadata* out_rule_metadata) const {
-  const std::set<UrlConditionId> url_conditions_ids =
-      src_url_matcher_->MatchURL(source_url);
-
-  std::map<RuleId, UrlConditionId> rules_conditions_map;
-  for (const auto& condition_id : url_conditions_ids) {
-    rules_conditions_map.insert(
-        std::make_pair(src_url_rules_mapping_.at(condition_id), condition_id));
-  }
-  auto restriction_itr = restrictions_map_.find(restriction);
-  if (restriction_itr == restrictions_map_.end())
-    return std::string();
-
-  const auto rules_levels_map = restriction_itr->second;
-  for (const auto& rule_level_entry : rules_levels_map) {
-    auto rule_id = rule_level_entry.first;
-    auto lvl = rule_level_entry.second;
-    auto rule_condition_itr = rules_conditions_map.find(rule_id);
-    if (lvl == level && rule_condition_itr != rules_conditions_map.end()) {
-      auto condition_id = rule_condition_itr->second;
-      auto condition_pattern_itr = src_patterns_mapping_.find(condition_id);
-      if (condition_pattern_itr != src_patterns_mapping_.end()) {
-        if (out_rule_metadata) {
-          auto rule_metadata_itr = rules_id_metadata_mapping_.find(rule_id);
-          if (rule_metadata_itr != rules_id_metadata_mapping_.end()) {
-            *out_rule_metadata = rule_metadata_itr->second;
-          }
-        }
-        return condition_pattern_itr->second;
-      }
-    }
-  }
-  return std::string();
 }
 
 size_t DlpRulesManagerImpl::GetClipboardCheckSizeLimitInBytes() const {
@@ -577,6 +356,14 @@ void DlpRulesManagerImpl::DlpDaemonRestarted() {
   OnPolicyUpdate();
 }
 
+void DlpRulesManagerImpl::Shutdown() {
+  // There are FilesController implementations such as DlpFilesControllerAsh
+  // that are using the Profile to do some cleanup (e.g., stop observing the
+  // VolumeManager). This cleanup must be done when the KeyedService::Shutdown
+  // method is called.
+  files_controller_.reset();
+}
+
 void DlpRulesManagerImpl::OnPolicyUpdate() {
   components_rules_.clear();
   restrictions_map_.clear();
@@ -589,7 +376,7 @@ void DlpRulesManagerImpl::OnPolicyUpdate() {
   src_conditions_.clear();
   dst_conditions_.clear();
   rules_id_metadata_mapping_.clear();
-#if BUILDFLAG(IS_CHROMEOS_ASH)
+#if BUILDFLAG(IS_CHROMEOS_ASH) || BUILDFLAG(IS_CHROMEOS_LACROS)
   files_controller_ = nullptr;
 #endif
 
@@ -639,8 +426,13 @@ void DlpRulesManagerImpl::OnPolicyUpdate() {
     if (destinations_components) {
       for (const auto& component : *destinations_components) {
         DCHECK(component.is_string());
-        components_rules_[GetComponentMapping(component.GetString())].insert(
-            rules_counter);
+        data_controls::Component component_mapping =
+            GetComponentMapping(component.GetString());
+        components_rules_[component_mapping].insert(rules_counter);
+        AddAssociatedUrlConditions(component_mapping, dst_url_matcher_.get(),
+                                   dst_url_condition_id, dst_conditions_,
+                                   dst_patterns_mapping_, rules_counter,
+                                   dst_url_rules_mapping_);
       }
     }
 
@@ -690,7 +482,17 @@ void DlpRulesManagerImpl::OnPolicyUpdate() {
           }
         }
 
-        // TODO(crbug.com/1321088): Add components to SetDlpFilesPolicyRequest.
+        if (rule_has_components) {
+          for (const auto& component : *destinations_components) {
+            DCHECK(component.is_string());
+            files_rule.add_destination_components(
+                GetComponentProtoMapping(component.GetString()));
+            for (const auto& url : GetAssociatedUrlsConditions(
+                     GetComponentMapping(component.GetString()))) {
+              files_rule.add_destination_urls(url);
+            }
+          }
+        }
 
         files_rule.set_level(GetLevelProtoEnum(rule_level));
         request_to_daemon.mutable_rules()->Add(std::move(files_rule));
@@ -727,7 +529,11 @@ void DlpRulesManagerImpl::OnPolicyUpdate() {
           request_to_daemon, base::BindOnce(&OnSetDlpFilesPolicy));
 #if BUILDFLAG(IS_CHROMEOS_ASH)
       if (!files_controller_) {
-        files_controller_ = std::make_unique<DlpFilesController>(*this);
+        files_controller_ = std::make_unique<DlpFilesControllerAsh>(*this);
+      }
+#elif BUILDFLAG(IS_CHROMEOS_LACROS)
+      if (!files_controller_) {
+        files_controller_ = std::make_unique<DlpFilesControllerLacros>(*this);
       }
 #endif
     } else if (chromeos::DlpClient::Get() &&

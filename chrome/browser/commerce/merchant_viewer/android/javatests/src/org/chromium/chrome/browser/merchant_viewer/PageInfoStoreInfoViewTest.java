@@ -38,7 +38,6 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.base.test.util.Restriction;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.commerce.ShoppingServiceFactory;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -49,9 +48,10 @@ import org.chromium.chrome.browser.page_info.ChromePageInfoHighlight;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.commerce.core.ShoppingService;
 import org.chromium.components.commerce.core.ShoppingService.MerchantInfo;
 import org.chromium.components.commerce.core.ShoppingService.MerchantInfoCallback;
@@ -67,7 +67,7 @@ import java.io.IOException;
  * Tests for PageInfoStoreInfo view.
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
-@Features.EnableFeatures(
+@EnableFeatures(
         {PageInfoFeatures.PAGE_INFO_STORE_INFO_NAME, ChromeFeatureList.COMMERCE_MERCHANT_VIEWER})
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 @Restriction({UiRestriction.RESTRICTION_TYPE_PHONE})
@@ -111,7 +111,7 @@ public class PageInfoStoreInfoViewTest {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             new ChromePageInfo(activity.getModalDialogManagerSupplier(), null,
                     PageInfoController.OpenedFromSource.TOOLBAR,
-                    () -> mMockStoreInfoActionHandler, null)
+                    () -> mMockStoreInfoActionHandler, null, null)
                     .show(tab, ChromePageInfoHighlight.forStoreInfo(fromStoreIcon));
         });
         onViewWaiting(allOf(withId(R.id.page_info_url_wrapper), isDisplayed()));

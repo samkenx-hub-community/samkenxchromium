@@ -7,7 +7,6 @@
 #include <memory>
 #include <utility>
 
-#include "base/metrics/histogram_functions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "mojo/public/cpp/base/big_buffer.h"
 #include "third_party/blink/public/common/features.h"
@@ -44,7 +43,6 @@
 
 namespace blink {
 
-using mojom::blink::PermissionStatus;
 using mojom::blink::PermissionService;
 
 // This class deals with all the Blob promises and executes the write
@@ -77,7 +75,7 @@ class ClipboardPromise::BlobPromiseResolverFunction final
 
   ScriptValue Call(ScriptState* script_state, ScriptValue value) final {
     ExceptionState exception_state(script_state->GetIsolate(),
-                                   ExceptionState::kExecutionContext,
+                                   ExceptionContextType::kOperationInvoke,
                                    "Clipboard", "write");
     if (type_ == ResolveType::kFulfill) {
       HeapVector<Member<Blob>>* blob_list =
@@ -338,11 +336,12 @@ void ClipboardPromise::HandleWriteText(const String& data) {
                     WrapPersistent(this)));
 }
 
-void ClipboardPromise::HandleReadWithPermission(PermissionStatus status) {
+void ClipboardPromise::HandleReadWithPermission(
+    mojom::blink::PermissionStatus status) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!GetExecutionContext())
     return;
-  if (status != PermissionStatus::GRANTED) {
+  if (status != mojom::blink::PermissionStatus::GRANTED) {
     script_promise_resolver_->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kNotAllowedError, "Read permission denied."));
     return;
@@ -425,11 +424,12 @@ void ClipboardPromise::OnRead(Blob* blob) {
   ReadNextRepresentation();
 }
 
-void ClipboardPromise::HandleReadTextWithPermission(PermissionStatus status) {
+void ClipboardPromise::HandleReadTextWithPermission(
+    mojom::blink::PermissionStatus status) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!GetExecutionContext())
     return;
-  if (status != PermissionStatus::GRANTED) {
+  if (status != mojom::blink::PermissionStatus::GRANTED) {
     script_promise_resolver_->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kNotAllowedError, "Read permission denied."));
     return;
@@ -473,11 +473,12 @@ void ClipboardPromise::HandlePromiseBlobsWrite(
   WriteNextRepresentation();
 }
 
-void ClipboardPromise::HandleWriteWithPermission(PermissionStatus status) {
+void ClipboardPromise::HandleWriteWithPermission(
+    mojom::blink::PermissionStatus status) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!GetExecutionContext())
     return;
-  if (status != PermissionStatus::GRANTED) {
+  if (status != mojom::blink::PermissionStatus::GRANTED) {
     script_promise_resolver_->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kNotAllowedError, "Write permission denied."));
     return;
@@ -506,11 +507,12 @@ void ClipboardPromise::HandleWriteWithPermission(PermissionStatus status) {
       script_state_, ScriptPromise::All(script_state_, promise_list), this);
 }
 
-void ClipboardPromise::HandleWriteTextWithPermission(PermissionStatus status) {
+void ClipboardPromise::HandleWriteTextWithPermission(
+    mojom::blink::PermissionStatus status) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!GetExecutionContext())
     return;
-  if (status != PermissionStatus::GRANTED) {
+  if (status != mojom::blink::PermissionStatus::GRANTED) {
     script_promise_resolver_->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kNotAllowedError, "Write permission denied."));
     return;
@@ -579,23 +581,6 @@ void ClipboardPromise::RequestPermission(
     return;
   }
 
-  bool has_transient_user_activation =
-      LocalFrame::HasTransientUserActivation(GetLocalFrame());
-  base::UmaHistogramBoolean("Blink.Clipboard.HasTransientUserActivation",
-                            has_transient_user_activation);
-  // `will_be_sanitized` is false only when we are trying to read/write
-  // web custom formats.
-  // TODO(ansollan): Remove this block as custom formats don't need both a user
-  // gesture and a permission grant to use custom clipboard.
-  if (!will_be_sanitized &&
-      RuntimeEnabledFeatures::ClipboardCustomFormatsEnabled() &&
-      !has_transient_user_activation) {
-    script_promise_resolver_->Reject(MakeGarbageCollected<DOMException>(
-        DOMExceptionCode::kSecurityError,
-        "Must be handling a user gesture to use custom clipboard"));
-    return;
-  }
-
   if (!GetPermissionService()) {
     script_promise_resolver_->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kNotAllowedError,
@@ -603,6 +588,8 @@ void ClipboardPromise::RequestPermission(
     return;
   }
 
+  bool has_transient_user_activation =
+      LocalFrame::HasTransientUserActivation(GetLocalFrame());
   auto permission_descriptor = CreateClipboardPermissionDescriptor(
       permission, /*has_user_gesture=*/has_transient_user_activation,
       /*will_be_sanitized=*/will_be_sanitized);
@@ -617,7 +604,11 @@ void ClipboardPromise::RequestPermission(
 LocalFrame* ClipboardPromise::GetLocalFrame() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   ExecutionContext* context = GetExecutionContext();
-  DCHECK(context);
+  // In case the context was destroyed and the caller didn't check for it, we
+  // just return nullptr.
+  if (!context) {
+    return nullptr;
+  }
   LocalFrame* local_frame = To<LocalDOMWindow>(context)->GetFrame();
   return local_frame;
 }

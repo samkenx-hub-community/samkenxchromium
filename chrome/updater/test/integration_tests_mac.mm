@@ -6,13 +6,15 @@
 #include <string>
 #include <vector>
 
+#include "base/apple/bridging.h"
+#include "base/apple/foundation_util.h"
 #include "base/base_paths.h"
 #include "base/command_line.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/logging.h"
-#include "base/mac/foundation_util.h"
+#include "base/notreached.h"
 #include "base/path_service.h"
 #include "base/process/launch.h"
 #include "base/run_loop.h"
@@ -26,7 +28,6 @@
 #include "base/version.h"
 #include "build/build_config.h"
 #include "chrome/common/chrome_paths.h"
-#include "chrome/common/mac/launchd.h"
 #include "chrome/updater/constants.h"
 #include "chrome/updater/external_constants_builder.h"
 #include "chrome/updater/persisted_data.h"
@@ -34,36 +35,16 @@
 #include "chrome/updater/test/integration_tests_impl.h"
 #include "chrome/updater/updater_branding.h"
 #include "chrome/updater/updater_scope.h"
-#include "chrome/updater/util/launchd_util.h"
 #import "chrome/updater/util/mac_util.h"
-#include "chrome/updater/util/unittest_util.h"
+#include "chrome/updater/util/unit_test_util.h"
 #include "chrome/updater/util/util.h"
 #include "components/crx_file/crx_verifier.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 
-namespace updater {
-namespace test {
+namespace updater::test {
 namespace {
-
-Launchd::Domain LaunchdDomain(UpdaterScope scope) {
-  switch (scope) {
-    case UpdaterScope::kSystem:
-      return Launchd::Domain::Local;
-    case UpdaterScope::kUser:
-      return Launchd::Domain::User;
-  }
-}
-
-Launchd::Type LaunchdType(UpdaterScope scope) {
-  switch (scope) {
-    case UpdaterScope::kSystem:
-      return Launchd::Type::Daemon;
-    case UpdaterScope::kUser:
-      return Launchd::Type::Agent;
-  }
-}
 
 base::FilePath GetExecutablePath() {
   base::FilePath out_dir;
@@ -74,7 +55,7 @@ base::FilePath GetExecutablePath() {
 
 absl::optional<base::FilePath> GetActiveFile(UpdaterScope /*scope*/,
                                              const std::string& id) {
-  // The active user is always managaged in the updater scope for the user.
+  // The active user is always managed in the updater scope for the user.
   const absl::optional<base::FilePath> path =
       GetLibraryFolderPath(UpdaterScope::kUser);
   if (!path)
@@ -93,29 +74,31 @@ base::FilePath GetSetupExecutablePath() {
   return GetExecutablePath();
 }
 
-void EnterTestMode(const GURL& url) {
+void EnterTestMode(const GURL& update_url,
+                   const GURL& crash_upload_url,
+                   const GURL& device_management_url,
+                   const base::TimeDelta& idle_timeout) {
   ASSERT_TRUE(ExternalConstantsBuilder()
-                  .SetUpdateURL(std::vector<std::string>{url.spec()})
+                  .SetUpdateURL(std::vector<std::string>{update_url.spec()})
+                  .SetCrashUploadURL(crash_upload_url.spec())
+                  .SetDeviceManagementURL(device_management_url.spec())
                   .SetUseCUP(false)
                   .SetInitialDelay(base::Milliseconds(100))
-                  .SetServerKeepAliveTime(base::Seconds(1))
+                  .SetServerKeepAliveTime(base::Seconds(2))
                   .SetCrxVerifierFormat(crx_file::VerifierFormat::CRX3)
                   .SetOverinstallTimeout(base::Seconds(5))
+                  .SetIdleCheckPeriod(idle_timeout)
                   .Modify());
 }
 
 void Clean(UpdaterScope scope) {
   CleanProcesses();
 
-  Launchd::Domain launchd_domain = LaunchdDomain(scope);
-  Launchd::Type launchd_type = LaunchdType(scope);
-
   absl::optional<base::FilePath> path = GetInstallDirectory(scope);
   EXPECT_TRUE(path);
   if (path)
     EXPECT_TRUE(base::DeletePathRecursively(*path));
-  EXPECT_TRUE(Launchd::GetInstance()->DeletePlist(
-      launchd_domain, launchd_type, updater::CopyWakeLaunchdName(scope)));
+  EXPECT_TRUE(base::DeleteFile(*GetWakeTaskPlistPath(scope)));
 
   path = GetInstallDirectory(scope);
   EXPECT_TRUE(path);
@@ -127,10 +110,7 @@ void Clean(UpdaterScope scope) {
   if (keystone_path)
     EXPECT_TRUE(base::DeletePathRecursively(*keystone_path));
 
-  @autoreleasepool {
-    RemoveJobFromLaunchd(scope, launchd_domain, launchd_type,
-                         CopyWakeLaunchdName(scope));
-  }
+  EXPECT_TRUE(RemoveWakeJobFromLaunchd(scope));
 
   // Also clean up any other versions of the updater that are around.
   base::CommandLine launchctl(base::FilePath("/bin/launchctl"));
@@ -153,12 +133,8 @@ void Clean(UpdaterScope scope) {
 void ExpectClean(UpdaterScope scope) {
   ExpectCleanProcesses();
 
-  Launchd::Domain launchd_domain = LaunchdDomain(scope);
-  Launchd::Type launchd_type = LaunchdType(scope);
-
   // Files must not exist on the file system.
-  EXPECT_FALSE(Launchd::GetInstance()->PlistExists(
-      launchd_domain, launchd_type, updater::CopyWakeLaunchdName(scope)));
+  EXPECT_FALSE(base::PathExists(*GetWakeTaskPlistPath(scope)));
 
   absl::optional<base::FilePath> path = GetInstallDirectory(scope);
   EXPECT_TRUE(path);
@@ -166,14 +142,13 @@ void ExpectClean(UpdaterScope scope) {
     // If the path exists, then expect only the log and json files to be
     // present.
     int count = CountDirectoryFiles(*path);
-    EXPECT_LE(count, 2) << base::JoinString(
+    EXPECT_LE(count, 1) << base::JoinString(
         [](const base::FilePath& dir) {
-          base::FileEnumerator it(dir, false, base::FileEnumerator::FILES);
           std::vector<base::FilePath::StringType> files;
-          for (base::FilePath name = it.Next(); !name.empty();
-               name = it.Next()) {
-            files.push_back(name.value());
-          }
+          base::FileEnumerator(dir, false, base::FileEnumerator::FILES)
+              .ForEach([&files](const base::FilePath& name) {
+                files.push_back(name.value());
+              });
 
           return files;
         }(*path),
@@ -181,9 +156,6 @@ void ExpectClean(UpdaterScope scope) {
 
     if (count >= 1) {
       EXPECT_TRUE(base::PathExists(path->AppendASCII("updater.log")));
-    }
-    if (count == 2) {
-      EXPECT_TRUE(base::PathExists(path->AppendASCII("prefs.json")));
     }
   }
   // Keystone must not exist on the file system.
@@ -195,26 +167,17 @@ void ExpectClean(UpdaterScope scope) {
 }
 
 void ExpectInstalled(UpdaterScope scope) {
-  Launchd::Domain launchd_domain = LaunchdDomain(scope);
-  Launchd::Type launchd_type = LaunchdType(scope);
-
   absl::optional<base::FilePath> keystone_path = GetKeystoneFolderPath(scope);
   ASSERT_TRUE(keystone_path);
-  absl::optional<base::FilePath> ksadmin_symlink =
-      keystone_path->Append(FILE_PATH_LITERAL(KEYSTONE_NAME ".bundle"))
-          .Append(FILE_PATH_LITERAL("Contents"))
-          .Append(FILE_PATH_LITERAL("MacOS"))
-          .Append(FILE_PATH_LITERAL("ksadmin"));
 
   // Files must exist on the file system.
-  for (const auto& path : {GetInstallDirectory(scope), keystone_path,
-                           GetKSAdminPath(scope), ksadmin_symlink}) {
+  for (const auto& path :
+       {GetInstallDirectory(scope), keystone_path, GetKSAdminPath(scope)}) {
     ASSERT_TRUE(path) << path;
     EXPECT_TRUE(base::PathExists(*path)) << path;
   }
 
-  EXPECT_TRUE(Launchd::GetInstance()->PlistExists(launchd_domain, launchd_type,
-                                                  CopyWakeLaunchdName(scope)));
+  EXPECT_TRUE(base::PathExists(*GetWakeTaskPlistPath(scope)));
 }
 
 absl::optional<base::FilePath> GetInstalledExecutablePath(UpdaterScope scope) {
@@ -264,7 +227,7 @@ void ExpectNotActive(UpdaterScope scope, const std::string& app_id) {
 
 bool WaitForUpdaterExit(UpdaterScope /*scope*/) {
   return WaitFor(
-      base::BindRepeating([]() {
+      [] {
         std::string ps_stdout;
         EXPECT_TRUE(
             base::GetAppOutput({"ps", "ax", "-o", "command"}, &ps_stdout));
@@ -273,9 +236,8 @@ bool WaitForUpdaterExit(UpdaterScope /*scope*/) {
           return true;
         }
         return false;
-      }),
-      base::BindLambdaForTesting(
-          []() { VLOG(0) << "Still waiting for updater to exit..."; }));
+      },
+      [] { VLOG(0) << "Still waiting for updater to exit..."; });
 }
 
 void SetupRealUpdaterLowerVersion(UpdaterScope scope) {
@@ -303,19 +265,22 @@ void SetupRealUpdaterLowerVersion(UpdaterScope scope) {
 }
 
 void SetupFakeLegacyUpdater(UpdaterScope scope) {
-  base::FilePath test_ticket_store_path;
+  base::FilePath updater_test_data_path;
   ASSERT_TRUE(
-      base::PathService::Get(chrome::DIR_TEST_DATA, &test_ticket_store_path));
-  test_ticket_store_path =
-      test_ticket_store_path.Append(FILE_PATH_LITERAL("updater"))
-          .Append(FILE_PATH_LITERAL("Keystone.legacy.ticketstore"));
+      base::PathService::Get(chrome::DIR_TEST_DATA, &updater_test_data_path));
+  updater_test_data_path =
+      updater_test_data_path.Append(FILE_PATH_LITERAL("updater"));
 
+  base::FilePath keystone_path = GetKeystoneFolderPath(scope).value();
   base::FilePath keystone_ticket_store_path =
-      GetKeystoneFolderPath(scope)->Append(FILE_PATH_LITERAL("TicketStore"));
+      keystone_path.Append(FILE_PATH_LITERAL("TicketStore"));
   ASSERT_TRUE(base::CreateDirectory(keystone_ticket_store_path));
-  ASSERT_TRUE(base::CopyFile(test_ticket_store_path,
-                             keystone_ticket_store_path.Append(
-                                 FILE_PATH_LITERAL("Keystone.ticketstore"))));
+  ASSERT_TRUE(base::CopyFile(
+      updater_test_data_path.AppendASCII("Keystone.legacy.ticketstore"),
+      keystone_ticket_store_path.AppendASCII("Keystone.ticketstore")));
+  ASSERT_TRUE(base::CopyFile(
+      updater_test_data_path.AppendASCII("CountingMetrics.plist"),
+      keystone_path.AppendASCII("CountingMetrics.plist")));
 }
 
 void ExpectLegacyUpdaterMigrated(UpdaterScope scope) {
@@ -327,8 +292,8 @@ void ExpectLegacyUpdaterMigrated(UpdaterScope scope) {
   EXPECT_FALSE(
       persisted_data->GetProductVersion("com.google.keystone").IsValid());
 
-  // Uninstalled app should not be migrated.
-  EXPECT_FALSE(
+  // Uninstalled app should be migrated.
+  EXPECT_TRUE(
       persisted_data->GetProductVersion("com.chromium.NonExistApp").IsValid());
 
   // App Kipple.
@@ -341,6 +306,8 @@ void ExpectLegacyUpdaterMigrated(UpdaterScope scope) {
   EXPECT_TRUE(persisted_data->GetBrandCode(kKippleApp).empty());
   EXPECT_TRUE(persisted_data->GetBrandPath(kKippleApp).empty());
   EXPECT_TRUE(persisted_data->GetFingerprint(kKippleApp).empty());
+  EXPECT_FALSE(persisted_data->GetDateLastActive(kKippleApp));    // no data.
+  EXPECT_FALSE(persisted_data->GetDateLastRollcall(kKippleApp));  // wrong type.
 
   // App PopularApp.
   const std::string kPopularApp = "com.chromium.PopularApp";
@@ -349,13 +316,31 @@ void ExpectLegacyUpdaterMigrated(UpdaterScope scope) {
   EXPECT_EQ(persisted_data->GetExistenceCheckerPath(kPopularApp),
             base::FilePath("/"));
   EXPECT_EQ(persisted_data->GetAP(kPopularApp), "GOOG");
-  EXPECT_TRUE(persisted_data->GetBrandCode(kKippleApp).empty());
+  EXPECT_TRUE(persisted_data->GetBrandCode(kPopularApp).empty());
   EXPECT_EQ(persisted_data->GetBrandPath(kPopularApp), base::FilePath("/"));
   EXPECT_TRUE(persisted_data->GetFingerprint(kPopularApp).empty());
+  EXPECT_EQ(persisted_data->GetDateLastActive(kPopularApp).value(), 5921);
+  EXPECT_EQ(persisted_data->GetDateLastRollcall(kPopularApp).value(), 5922);
+
+  EXPECT_EQ(persisted_data->GetCohort(kPopularApp), "TestCohort");
+  EXPECT_EQ(persisted_data->GetCohortName(kPopularApp), "TestCohortName");
+  EXPECT_EQ(persisted_data->GetCohortHint(kPopularApp), "TestCohortHint");
+
+  // App CorruptedApp (client-regulated counting data is corrupted).
+  const std::string kCorruptedApp = "com.chromium.CorruptedApp";
+  EXPECT_EQ(persisted_data->GetProductVersion(kCorruptedApp),
+            base::Version("1.2.1"));
+  EXPECT_EQ(persisted_data->GetExistenceCheckerPath(kCorruptedApp),
+            base::FilePath("/"));
+  EXPECT_EQ(persisted_data->GetAP(kCorruptedApp), "canary");
+  EXPECT_FALSE(persisted_data->GetDateLastActive(kCorruptedApp));
+  EXPECT_FALSE(persisted_data->GetDateLastRollcall(kCorruptedApp));
 }
 
-void InstallApp(UpdaterScope scope, const std::string& app_id) {
-  RegisterApp(scope, app_id);
+void InstallApp(UpdaterScope scope,
+                const std::string& app_id,
+                const base::Version& version) {
+  RegisterApp(scope, app_id, version);
 }
 
 void UninstallApp(UpdaterScope scope, const std::string& app_id) {
@@ -363,11 +348,41 @@ void UninstallApp(UpdaterScope scope, const std::string& app_id) {
                           base::FilePath(FILE_PATH_LITERAL("NONE")));
 }
 
-void RunOfflineInstall(UpdaterScope scope,
-                       bool is_legacy_install,
-                       bool is_silent_install) {
-  // TODO(crbug.com/1286574).
+base::CommandLine MakeElevated(base::CommandLine command_line) {
+  command_line.PrependWrapper("/usr/bin/sudo");
+  return command_line;
 }
 
-}  // namespace test
-}  // namespace updater
+void SetPlatformPolicies(const base::Value::Dict& values) {
+  const CFStringRef domain = CFSTR("com.google.Keystone");
+
+  // Synchronize just to be safe. Ignore spurious errors if the domain
+  // does not yet exist.
+  CFPreferencesSynchronize(domain, kCFPreferencesAnyUser,
+                           kCFPreferencesCurrentHost);
+
+  NSMutableDictionary* all_policies = [NSMutableDictionary dictionary];
+  for (const auto [app_id, policies] : values) {
+    ASSERT_TRUE(policies.is_dict());
+    NSMutableDictionary* app_policies = [NSMutableDictionary dictionary];
+    for (const auto [name, value] : policies.GetDict()) {
+      NSString* key = base::SysUTF8ToNSString(name);
+      if (value.is_string()) {
+        app_policies[key] = base::SysUTF8ToNSString(value.GetString());
+      } else if (value.is_int()) {
+        app_policies[key] = [NSNumber numberWithInt:value.GetInt()];
+      } else if (value.is_bool()) {
+        app_policies[key] = [NSNumber numberWithInt:value.GetBool()];
+      }
+    }
+    all_policies[base::SysUTF8ToNSString(app_id)] = app_policies;
+  }
+
+  CFPreferencesSetValue(CFSTR("updatePolicies"),
+                        base::apple::NSToCFPtrCast(all_policies), domain,
+                        kCFPreferencesAnyUser, kCFPreferencesCurrentHost);
+  ASSERT_TRUE(CFPreferencesSynchronize(domain, kCFPreferencesAnyUser,
+                                       kCFPreferencesCurrentHost));
+}
+
+}  // namespace updater::test

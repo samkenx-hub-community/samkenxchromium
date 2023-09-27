@@ -4,31 +4,29 @@
 
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_view_controller.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/dcheck_is_on.h"
 #import "base/ios/block_types.h"
 #import "base/ios/ios_util.h"
-#import "base/mac/foundation_util.h"
 #import "base/metrics/histogram_functions.h"
 #import "base/notreached.h"
 #import "base/numerics/safe_conversions.h"
-#import "ios/chrome/browser/tabs/features.h"
+#import "ios/chrome/browser/shared/ui/util/rtl_geometry.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_collection_drag_drop_handler.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_collection_drag_drop_metrics.h"
-#import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/grid_image_data_source.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_cell.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_constants.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_layout.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_context_menu/tab_context_menu_provider.h"
-#import "ios/chrome/browser/ui/tab_switcher/tab_grid/transitions/grid_transition_layout.h"
+#import "ios/chrome/browser/ui/tab_switcher/tab_grid/transitions/legacy_grid_transition_layout.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_switcher_item.h"
+#import "ios/chrome/browser/ui/tab_switcher/tab_utils.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/chrome/grit/ios_strings.h"
+#import "ios/public/provider/chrome/browser/modals/modals_api.h"
+#import "ios/web/public/web_state_id.h"
 #import "ui/base/l10n/l10n_util_mac.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -58,12 +56,16 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   NSMutableArray<TabSwitcherItem*>* _items;
 
   // Identifier of the selected item.
-  NSString* _selectedItemID;
+  web::WebStateID _selectedItemID;
+
+  // Identifier of the lastest dragged item. This property is set when the item
+  // is long pressed which does not always result in a drag action.
+  web::WebStateID _draggedItemID;
 
   // Identifier of the last item to be inserted. This is used to track if the
   // active tab was newly created when building the animation layout for
   // transitions.
-  NSString* _lastInsertedItemID;
+  web::WebStateID _lastInsertedItemID;
 
   // Constraints used to update the view during drag and drop actions.
   NSLayoutConstraint* _dragEnabledConstraint;
@@ -78,9 +80,6 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   // Tracks if the view is available.
   BOOL _available;
 
-  // Tracks if the view is visible.
-  BOOL _visible;
-
   // Tracks if a drag action is in progress.
   BOOL _dragSessionEnabled;
   BOOL _localDragActionInProgress;
@@ -90,6 +89,9 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
   // YES if view controller's content has appeared.
   BOOL _contentAppeared;
+
+  // Tracks if there is a scroll in progress.
+  BOOL _scrollInProgress;
 }
 
 - (instancetype)init {
@@ -110,6 +112,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   _localDragActionInProgress = NO;
   _dropAnimationInProgress = NO;
   _contentAppeared = NO;
+  _scrollInProgress = NO;
 
   [self configureCollectionView];
   [self configureDropOverlayView];
@@ -132,7 +135,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   // Update the delegate, in case it wasn't set when `items` was populated.
   [self.delegate pinnedTabsViewController:self didChangeItemCount:_items.count];
 
-  _lastInsertedItemID = nil;
+  _lastInsertedItemID = web::WebStateID();
   _contentAppeared = YES;
 }
 
@@ -147,15 +150,19 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
   _dragSessionEnabled = enabled;
 
+  __weak __typeof(self) weakSelf = self;
   [UIView animateWithDuration:kPinnedViewDragAnimationTime
-                   animations:^{
-                     self->_dragEnabledConstraint.active = enabled;
-                     self->_defaultConstraint.active = !enabled;
-                     [self updateDropOverlayViewVisibility];
-                     [self resetViewBackgrounds];
-                     [self.view.superview layoutIfNeeded];
-                   }
-                   completion:nil];
+      animations:^{
+        self->_dragEnabledConstraint.active = enabled;
+        self->_defaultConstraint.active = !enabled;
+        [self updateDropOverlayViewVisibility];
+        [self resetViewBackgrounds];
+        [self.view.superview layoutIfNeeded];
+        [self.view layoutIfNeeded];
+      }
+      completion:^(BOOL finished) {
+        [weakSelf popLastInsertedItem];
+      }];
 }
 
 - (void)pinnedTabsAvailable:(BOOL)available {
@@ -167,6 +174,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   if (visible == _visible) {
     return;
   }
+  _visible = visible;
 
   // Show the view if `visible` is true to ensure smooth animation.
   if (visible) {
@@ -174,13 +182,17 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
     self.view.hidden = NO;
   }
 
+  // Tell the delegate that the visibility has changed in order to update the
+  // tab grid view inset before hiding the pinned view.
+  [self.delegate pinnedTabsViewControllerVisibilityDidChange:self];
+
   __weak __typeof(self) weakSelf = self;
   [UIView animateWithDuration:kPinnedViewFadeInTime
       animations:^{
         self.view.alpha = visible ? 1.0 : 0.0;
       }
       completion:^(BOOL finished) {
-        [weakSelf updatePinnedTabsVisibilityAfterAnimation:visible];
+        [weakSelf updatePinnedTabsVisibilityAfterAnimation];
       }];
 }
 
@@ -195,18 +207,18 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   [self dragSessionEnabled:NO];
 }
 
-- (GridTransitionLayout*)transitionLayout {
+- (LegacyGridTransitionLayout*)transitionLayout {
   [self.collectionView layoutIfNeeded];
 
-  GridTransitionActiveItem* activeItem;
-  GridTransitionItem* selectionItem;
+  LegacyGridTransitionActiveItem* activeItem;
+  LegacyGridTransitionItem* selectionItem;
 
   NSIndexPath* selectedItemIndexPath =
       self.collectionView.indexPathsForSelectedItems.firstObject;
-  PinnedCell* selectedCell = base::mac::ObjCCastStrict<PinnedCell>(
+  PinnedCell* selectedCell = base::apple::ObjCCastStrict<PinnedCell>(
       [self.collectionView cellForItemAtIndexPath:selectedItemIndexPath]);
 
-  if ([selectedCell hasIdentifier:_selectedItemID]) {
+  if (selectedCell.itemIdentifier == _selectedItemID) {
     UICollectionViewLayoutAttributes* attributes = [self.collectionView
         layoutAttributesForItemAtIndexPath:selectedItemIndexPath];
     // Normalize frame to window coordinates. The attributes class applies this
@@ -216,23 +228,23 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
     PinnedTransitionCell* activeCell =
         [PinnedTransitionCell transitionCellFromCell:selectedCell];
-    activeItem = [GridTransitionActiveItem itemWithCell:activeCell
-                                                 center:attributes.center
-                                                   size:attributes.size];
+    activeItem = [LegacyGridTransitionActiveItem itemWithCell:activeCell
+                                                       center:attributes.center
+                                                         size:attributes.size];
     // If the active item is the last inserted item, it needs to be animated
     // differently.
-    if ([selectedCell hasIdentifier:_lastInsertedItemID]) {
+    if (selectedCell.itemIdentifier == _lastInsertedItemID) {
       activeItem.isAppearing = YES;
     }
 
-    selectionItem = [GridTransitionItem
+    selectionItem = [LegacyGridTransitionItem
         itemWithCell:[PinnedCell transitionSelectionCellFromCell:selectedCell]
               center:attributes.center];
   }
 
-  return [GridTransitionLayout layoutWithInactiveItems:@[]
-                                            activeItem:activeItem
-                                         selectionItem:selectionItem];
+  return [LegacyGridTransitionLayout layoutWithInactiveItems:@[]
+                                                  activeItem:activeItem
+                                               selectionItem:selectionItem];
 }
 
 - (BOOL)isCollectionEmpty {
@@ -259,15 +271,9 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 #pragma mark - TabCollectionConsumer
 
 - (void)populateItems:(NSArray<TabSwitcherItem*>*)items
-       selectedItemID:(NSString*)selectedItemID {
-#if DCHECK_IS_ON()
-  // Consistency check: ensure no IDs are duplicated.
-  NSMutableSet<NSString*>* identifiers = [[NSMutableSet alloc] init];
-  for (TabSwitcherItem* item in items) {
-    [identifiers addObject:item.identifier];
-  }
-  DCHECK_EQ(identifiers.count, items.count);
-#endif
+       selectedItemID:(web::WebStateID)selectedItemID {
+  // Note: Keep as a DCHECK, as this can be costly.
+  DCHECK(!HasDuplicateIdentifiers(items));
 
   _items = [items mutableCopy];
   _selectedItemID = selectedItemID;
@@ -285,7 +291,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
 - (void)insertItem:(TabSwitcherItem*)item
            atIndex:(NSUInteger)index
-    selectedItemID:(NSString*)selectedItemID {
+    selectedItemID:(web::WebStateID)selectedItemID {
   // Consistency check: `item`'s ID is not in `_items`.
   DCHECK([self indexOfItemWithID:item.identifier] == NSNotFound);
 
@@ -301,8 +307,8 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
       }];
 }
 
-- (void)removeItemWithID:(NSString*)removedItemID
-          selectedItemID:(NSString*)selectedItemID {
+- (void)removeItemWithID:(web::WebStateID)removedItemID
+          selectedItemID:(web::WebStateID)selectedItemID {
   NSUInteger index = [self indexOfItemWithID:removedItemID];
   if (index == NSNotFound) {
     return;
@@ -321,8 +327,8 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
       }];
 }
 
-- (void)selectItemWithID:(NSString*)selectedItemID {
-  if ([_selectedItemID isEqualToString:selectedItemID]) {
+- (void)selectItemWithID:(web::WebStateID)selectedItemID {
+  if (_selectedItemID == selectedItemID) {
     return;
   }
 
@@ -333,13 +339,13 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   [self scrollCollectionViewToSelectedItemAnimated:NO];
 }
 
-- (void)replaceItemID:(NSString*)itemID withItem:(TabSwitcherItem*)item {
-  DCHECK([item.identifier isEqualToString:itemID] ||
+- (void)replaceItemID:(web::WebStateID)itemID withItem:(TabSwitcherItem*)item {
+  DCHECK(item.identifier == itemID ||
          [self indexOfItemWithID:item.identifier] == NSNotFound);
 
   NSUInteger index = [self indexOfItemWithID:itemID];
   _items[index] = item;
-  PinnedCell* cell = base::mac::ObjCCastStrict<PinnedCell>(
+  PinnedCell* cell = base::apple::ObjCCastStrict<PinnedCell>(
       [self.collectionView cellForItemAtIndexPath:CreateIndexPath(index)]);
   // `cell` may be nil if it is scrolled offscreen.
   if (cell) {
@@ -347,7 +353,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   }
 }
 
-- (void)moveItemWithID:(NSString*)itemID toIndex:(NSUInteger)toIndex {
+- (void)moveItemWithID:(web::WebStateID)itemID toIndex:(NSUInteger)toIndex {
   NSUInteger fromIndex = [self indexOfItemWithID:itemID];
   if (fromIndex == toIndex || toIndex == NSNotFound ||
       fromIndex == NSNotFound) {
@@ -382,8 +388,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 }
 
 - (void)dismissModals {
-  // Should never be called for this class.
-  NOTREACHED();
+  ios::provider::DismissModalsForCollectionView(self.collectionView);
 }
 
 #pragma mark - UICollectionViewDataSource
@@ -411,7 +416,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   }
 
   TabSwitcherItem* item = _items[itemIndex];
-  PinnedCell* cell = base::mac::ObjCCastStrict<PinnedCell>([collectionView
+  PinnedCell* cell = base::apple::ObjCCastStrict<PinnedCell>([collectionView
       dequeueReusableCellWithReuseIdentifier:kPinnedCellIdentifier
                                 forIndexPath:indexPath]);
 
@@ -439,7 +444,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 - (UIContextMenuConfiguration*)collectionView:(UICollectionView*)collectionView
     contextMenuConfigurationForItemAtIndexPath:(NSIndexPath*)indexPath
                                          point:(CGPoint)point {
-  PinnedCell* cell = base::mac::ObjCCastStrict<PinnedCell>(
+  PinnedCell* cell = base::apple::ObjCCastStrict<PinnedCell>(
       [self.collectionView cellForItemAtIndexPath:indexPath]);
   return [self.menuProvider
       contextMenuConfigurationForTabCell:cell
@@ -455,7 +460,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
     // view. This is important to prevent cells from animating indefinitely.
     // This is safe because the animation state of GridCells is set in
     // `configureCell:withItem:` whenever a cell is used.
-    [base::mac::ObjCCastStrict<PinnedCell>(cell) hideActivityIndicator];
+    [base::apple::ObjCCastStrict<PinnedCell>(cell) hideActivityIndicator];
   }
 }
 
@@ -463,6 +468,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
 - (void)collectionView:(UICollectionView*)collectionView
     dragSessionWillBegin:(id<UIDragSession>)session {
+  [self.dragDropHandler dragWillBeginForItemWithID:_draggedItemID];
   _dragEndAtNewIndex = NO;
   _localDragActionInProgress = YES;
   base::UmaHistogramEnumeration(kUmaPinnedViewDragDropTabs,
@@ -474,7 +480,6 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 - (void)collectionView:(UICollectionView*)collectionView
      dragSessionDidEnd:(id<UIDragSession>)session {
   _localDragActionInProgress = NO;
-
   DragDropTabs dragEvent = _dragEndAtNewIndex
                                ? DragDropTabs::kDragEndAtNewIndex
                                : DragDropTabs::kDragEndAtSameIndex;
@@ -494,8 +499,10 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
            itemsForBeginningDragSession:(id<UIDragSession>)session
                             atIndexPath:(NSIndexPath*)indexPath {
   TabSwitcherItem* item = _items[indexPath.item];
+  _draggedItemID = item.identifier;
+
   UIDragItem* dragItem =
-      [self.dragDropHandler dragItemForItemWithID:item.identifier];
+      [self.dragDropHandler dragItemForItemWithID:_draggedItemID];
   return [NSArray arrayWithObjects:dragItem, nil];
 }
 
@@ -509,7 +516,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
 - (UIDragPreviewParameters*)collectionView:(UICollectionView*)collectionView
     dragPreviewParametersForItemAtIndexPath:(NSIndexPath*)indexPath {
-  PinnedCell* pinedCell = base::mac::ObjCCastStrict<PinnedCell>(
+  PinnedCell* pinedCell = base::apple::ObjCCastStrict<PinnedCell>(
       [self.collectionView cellForItemAtIndexPath:indexPath]);
   return pinedCell.dragPreviewParameters;
 }
@@ -593,10 +600,10 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
                          reuseIdentifier:kCellIdentifier];
       placeholder.previewParametersProvider =
           ^UIDragPreviewParameters*(UICollectionViewCell* placeholderCell) {
-        PinnedCell* pinnedCell =
-            base::mac::ObjCCastStrict<PinnedCell>(placeholderCell);
-        return pinnedCell.dragPreviewParameters;
-      };
+            PinnedCell* pinnedCell =
+                base::apple::ObjCCastStrict<PinnedCell>(placeholderCell);
+            return pinnedCell.dragPreviewParameters;
+          };
 
       id<UICollectionViewDropPlaceholderContext> context =
           [coordinator dropItem:item.dragItem toPlaceholder:placeholder];
@@ -612,6 +619,17 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   return _available;
 }
 
+#pragma mark - UIScrollViewDelegate
+
+- (void)scrollViewDidScroll:(UIScrollView*)scrollView {
+  _scrollInProgress = YES;
+}
+
+- (void)scrollViewDidEndScrollingAnimation:(UIScrollView*)scrollView {
+  _scrollInProgress = NO;
+  [self popLastInsertedItem];
+}
+
 #pragma mark - Private properties
 
 - (NSUInteger)selectedIndex {
@@ -619,6 +637,56 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 }
 
 #pragma mark - Private
+
+// Animates the lastest inserted item (if any) with a pop animation.
+// This method is called when :
+// - The pinned overlay is hidden.
+// - A scroll animation ends.
+- (void)popLastInsertedItem {
+  if (_dragSessionEnabled || !_lastInsertedItemID.valid()) {
+    return;
+  }
+
+  NSUInteger itemIndex = [self indexOfItemWithID:_lastInsertedItemID];
+
+  // Check `itemIndex` boundaries in order to filter out possible race
+  // conditions while mutating the collection.
+  if (itemIndex == NSNotFound || itemIndex >= _items.count) {
+    return;
+  }
+
+  PinnedCell* pinnedCell = base::apple::ObjCCastStrict<PinnedCell>(
+      [self.collectionView cellForItemAtIndexPath:CreateIndexPath(itemIndex)]);
+  CGAffineTransform originalTransform = pinnedCell.transform;
+
+  // Initial attributes.
+  pinnedCell.alpha = 0;
+  pinnedCell.hidden = NO;
+  pinnedCell.transform =
+      CGAffineTransformScale(pinnedCell.transform, kPinnedCellPopInitialScale,
+                             kPinnedCellPopInitialScale);
+
+  const BOOL isSelectedItem = _lastInsertedItemID == _selectedItemID;
+  _lastInsertedItemID = web::WebStateID();
+
+  __weak __typeof(self) weakSelf = self;
+  [UIView animateWithDuration:kPinnedViewPopAnimationTime
+      animations:^{
+        pinnedCell.alpha = 1;
+        pinnedCell.transform = originalTransform;
+        [self.view layoutIfNeeded];
+      }
+      completion:^(BOOL finished) {
+        if (isSelectedItem) {
+          [weakSelf refreshSelectedItem];
+        }
+      }];
+}
+
+// Refreshes the selected item when the last popped item was selected.
+- (void)refreshSelectedItem {
+  [self selectCollectionViewItemWithID:_selectedItemID animated:NO];
+}
 
 // Updates the visibility of the pinned view.
 - (void)updatePinnedTabsVisibility {
@@ -630,10 +698,10 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 // `selectedItemID` is saved to an instance variable.
 - (void)performBatchUpdateForInsertingItem:(TabSwitcherItem*)item
                                    atIndex:(NSUInteger)index
-                            selectedItemID:(NSString*)selectedItemID {
+                            selectedItemID:(web::WebStateID)selectedItemID {
   [_items insertObject:item atIndex:index];
-  _selectedItemID = [selectedItemID copy];
-  _lastInsertedItemID = [item.identifier copy];
+  _selectedItemID = selectedItemID;
+  _lastInsertedItemID = item.identifier;
   [self.delegate pinnedTabsViewController:self didChangeItemCount:_items.count];
 
   [self.collectionView insertItemsAtIndexPaths:@[ CreateIndexPath(index) ]];
@@ -643,7 +711,8 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 // specified `index` from the collection view and updates its appearance.
 // `selectedItemID` is saved to an instance variable.
 - (void)performBatchUpdateForRemovingItemAtIndex:(NSUInteger)index
-                                  selectedItemID:(NSString*)selectedItemID {
+                                  selectedItemID:
+                                      (web::WebStateID)selectedItemID {
   [_items removeObjectAtIndex:index];
   _selectedItemID = selectedItemID;
   [self.delegate pinnedTabsViewController:self didChangeItemCount:_items.count];
@@ -677,8 +746,11 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   collectionView.dropDelegate = self;
   collectionView.dragInteractionEnabled = YES;
   collectionView.showsHorizontalScrollIndicator = NO;
+  collectionView.accessibilityIdentifier = kPinnedViewIdentifier;
 
   self.view = collectionView;
+
+  UIView* backgroundView;
 
   // Only apply the blur if transparency effects are not disabled.
   if (!UIAccessibilityIsReduceTransparencyEnabled()) {
@@ -686,17 +758,18 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
     UIBlurEffect* blurEffect =
         [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterialDark];
-    UIVisualEffectView* blurEffectView =
-        [[UIVisualEffectView alloc] initWithEffect:blurEffect];
-
-    blurEffectView.frame = collectionView.bounds;
-    blurEffectView.autoresizingMask =
-        UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-
-    collectionView.backgroundView = blurEffectView;
+    backgroundView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
   } else {
     _backgroundColor = [UIColor colorNamed:kPrimaryBackgroundColor];
+
+    backgroundView = [[UIView alloc] init];
   }
+
+  backgroundView.frame = collectionView.bounds;
+  backgroundView.autoresizingMask =
+      UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+
+  collectionView.backgroundView = backgroundView;
   collectionView.backgroundColor = _backgroundColor;
 
   _dragEnabledConstraint = [collectionView.heightAnchor
@@ -716,10 +789,19 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 
   UILabel* label = [[UILabel alloc] init];
   label.numberOfLines = 0;
+  label.textAlignment = NSTextAlignmentCenter;
   label.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+  label.adjustsFontForContentSizeCategory = YES;
+  label.adjustsFontSizeToFitWidth = YES;
   label.textColor = [UIColor colorNamed:kTextPrimaryColor];
   label.text = l10n_util::GetNSString(IDS_IOS_PINNED_TABS_DRAG_TO_PIN_LABEL);
   label.translatesAutoresizingMaskIntoConstraints = NO;
+
+  // Mirror the label for RTL (see crbug.com/1426256).
+  if (base::i18n::IsRTL()) {
+    label.transform = CGAffineTransformScale(label.transform, -1, 1);
+  }
+
   [_dropOverlayView addSubview:label];
 
   AddSameConstraints(_dropOverlayView, self.collectionView.backgroundView);
@@ -728,71 +810,85 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
         constraintEqualToAnchor:_dropOverlayView.centerYAnchor],
     [label.centerXAnchor
         constraintEqualToAnchor:_dropOverlayView.centerXAnchor],
+    [label.leadingAnchor
+        constraintGreaterThanOrEqualToAnchor:_dropOverlayView.leadingAnchor
+                                    constant:kPinnedViewHorizontalPadding],
+    [label.trailingAnchor
+        constraintLessThanOrEqualToAnchor:_dropOverlayView.trailingAnchor
+                                 constant:-kPinnedViewHorizontalPadding],
+    [label.bottomAnchor constraintEqualToAnchor:_dropOverlayView.bottomAnchor],
+    [label.topAnchor constraintEqualToAnchor:_dropOverlayView.topAnchor],
   ]];
 
   [self updateDropOverlayViewVisibility];
 }
 
-// Configures `cell`'s identifier and title synchronously, favicon and snapshot
-// asynchronously with information from `item`.
+// Configures `cell`'s identifier and title synchronously, and favicon and
+// snapshot asynchronously from `item`.
 - (void)configureCell:(PinnedCell*)cell withItem:(TabSwitcherItem*)item {
   if (item) {
     cell.itemIdentifier = item.identifier;
     cell.title = item.title;
-    NSString* itemIdentifier = item.identifier;
-    [self.imageDataSource faviconForIdentifier:itemIdentifier
-                                    completion:^(UIImage* icon) {
-                                      // Only update the icon if the cell is not
-                                      // already reused for another item.
-                                      if ([cell hasIdentifier:itemIdentifier]) {
-                                        cell.icon = icon;
-                                      }
-                                    }];
-    [self.imageDataSource
-        snapshotForIdentifier:itemIdentifier
-                   completion:^(UIImage* snapshot) {
-                     if ([cell hasIdentifier:itemIdentifier]) {
-                       cell.snapshot = snapshot;
-                     }
-                   }];
+    [item fetchFavicon:^(TabSwitcherItem* innerItem, UIImage* icon) {
+      // Only update the icon if the cell is not already reused for another
+      // item.
+      if (cell.itemIdentifier == innerItem.identifier) {
+        cell.icon = icon;
+      }
+    }];
+    [item fetchSnapshot:^(TabSwitcherItem* innerItem, UIImage* snapshot) {
+      // Only update the icon if the cell is not already reused for another
+      // item.
+      if (cell.itemIdentifier == innerItem.identifier) {
+        cell.snapshot = snapshot;
+      }
+    }];
   }
+
+  cell.accessibilityIdentifier =
+      [NSString stringWithFormat:@"%@%ld", kPinnedCellIdentifier,
+                                 [self indexOfItemWithID:cell.itemIdentifier]];
 
   if (item.showsActivity) {
     [cell showActivityIndicator];
   } else {
     [cell hideActivityIndicator];
   }
+  if (_contentAppeared && cell.itemIdentifier == _lastInsertedItemID) {
+    cell.hidden = YES;
+  }
 }
 
 // Returns the index in `_items` of the first item whose identifier is
 // `identifier`.
-- (NSUInteger)indexOfItemWithID:(NSString*)identifier {
-  // Check that identifier exists and not empty.
-  if (identifier.length == 0) {
+- (NSUInteger)indexOfItemWithID:(web::WebStateID)identifier {
+  // Check that identifier is valid.
+  if (!identifier.valid()) {
     return NSNotFound;
   }
 
   auto selectedTest =
       ^BOOL(TabSwitcherItem* item, NSUInteger index, BOOL* stop) {
-        return [item.identifier isEqualToString:identifier];
+        return item.identifier == identifier;
       };
   return [_items indexOfObjectPassingTest:selectedTest];
 }
 
 // Updates the pinned tabs view visibility after an animation.
-- (void)updatePinnedTabsVisibilityAfterAnimation:(BOOL)visible {
-  _visible = visible;
-  if (!visible) {
+- (void)updatePinnedTabsVisibilityAfterAnimation {
+  if (!_visible) {
     self.view.hidden = YES;
   }
 
   // Don't call the delegate if the pinned view is hidden after a tab grid page
   // change.
-  if (!visible && _items.count > 0) {
+  if (!_visible && _items.count > 0) {
     return;
   }
 
-  [self.delegate pinnedTabsViewControllerVisibilityDidChange:self];
+  if (_visible && _items.count == 1) {
+    [self popLastInsertedItem];
+  }
 }
 
 // Shows `_dropOverlayView` when a external drag action is in progress.
@@ -857,7 +953,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
   NSUInteger index = base::checked_cast<NSUInteger>(indexPath.item);
   DCHECK_LT(index, _items.count);
 
-  NSString* itemID = _items[index].identifier;
+  const web::WebStateID itemID = _items[index].identifier;
   [self.delegate pinnedTabsViewController:self didSelectItemWithID:itemID];
 }
 
@@ -870,7 +966,7 @@ NSIndexPath* CreateIndexPath(NSInteger index) {
 }
 
 // Selects the collection view's item with `itemID`.
-- (void)selectCollectionViewItemWithID:(NSString*)itemID
+- (void)selectCollectionViewItemWithID:(web::WebStateID)itemID
                               animated:(BOOL)animated {
   NSUInteger itemIndex = [self indexOfItemWithID:itemID];
 

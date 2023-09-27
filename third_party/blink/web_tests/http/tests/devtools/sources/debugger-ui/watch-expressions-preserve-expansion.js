@@ -2,11 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ElementsTestRunner} from 'elements_test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+
+import * as SourcesModule from 'devtools/panels/sources/sources.js';
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
   TestRunner.addResult(
       `Test that watch expressions expansion state is restored after update.\n`);
-  await TestRunner.loadLegacyModule('elements'); await TestRunner.loadTestModule('elements_test_runner');
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
+  await TestRunner.loadLegacyModule('sources');
   await TestRunner.showPanel('sources');
   await TestRunner.evaluateInPagePromise(`
       var globalObject = {
@@ -29,7 +35,7 @@
       }());
   `);
 
-  var watchExpressionsPane = Sources.WatchExpressionsSidebarPane.instance();
+  var watchExpressionsPane = SourcesModule.WatchExpressionsSidebarPane.WatchExpressionsSidebarPane.instance();
   UI.panels.sources.sidebarPaneStack
       .showView(UI.panels.sources.watchSidebarPane)
       .then(() => {
@@ -64,7 +70,7 @@
   }
 
   function dumpWatchExpressions() {
-    var pane = Sources.WatchExpressionsSidebarPane.instance();
+    var pane = SourcesModule.WatchExpressionsSidebarPane.WatchExpressionsSidebarPane.instance();
 
     for (var i = 0; i < pane.watchExpressions.length; i++) {
       var watch = pane.watchExpressions[i];
@@ -92,7 +98,7 @@
   function expandProperties(watchExpressionTreeElement, path, callback) {
     const treeOutline = watchExpressionTreeElement.treeOutline;
     treeOutline.addEventListener(
-        UI.TreeOutline.Events.ElementAttached, elementAttached);
+        UIModule.TreeOutline.Events.ElementAttached, elementAttached);
     watchExpressionTreeElement.expand();
 
     function elementAttached(event) {
@@ -113,13 +119,13 @@
       }
 
       treeOutline.removeEventListener(
-          UI.TreeOutline.Events.ElementAttached, elementAttached);
+          UIModule.TreeOutline.Events.ElementAttached, elementAttached);
       callback();
     }
   }
 
   function expandWatchExpression(path, callback) {
-    var pane = Sources.WatchExpressionsSidebarPane.instance();
+    var pane = SourcesModule.WatchExpressionsSidebarPane.WatchExpressionsSidebarPane.instance();
     var expression = path.shift();
     for (var i = 0; i < pane.watchExpressions.length; i++) {
       var watch = pane.watchExpressions[i];

@@ -15,10 +15,10 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.rule.ServiceTestRule;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
+import androidx.test.rule.ServiceTestRule;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -32,11 +32,11 @@ import org.chromium.base.task.TaskTraits;
 import org.chromium.base.test.BaseJUnit4ClassRunner;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.DoNotBatch;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeApplicationImpl;
 import org.chromium.chrome.browser.dependency_injection.ChromeAppComponent;
 import org.chromium.chrome.browser.notifications.NotificationUmaTracker;
 import org.chromium.chrome.browser.notifications.StandardNotificationBuilder;
+import org.chromium.chrome.test.R;
 import org.chromium.components.content_settings.ContentSettingValues;
 import org.chromium.components.embedder_support.util.Origin;
 
@@ -133,7 +133,7 @@ public class TrustedWebActivityClientTest {
 
     @Before
     public void setUp() throws TimeoutException, RemoteException {
-        mTargetContext = InstrumentationRegistry.getTargetContext();
+        mTargetContext = ApplicationProvider.getApplicationContext();
         mBuilder = new StandardNotificationBuilder(mTargetContext);
 
         ChromeAppComponent component = ChromeApplicationImpl.getComponent();
@@ -243,7 +243,7 @@ public class TrustedWebActivityClientTest {
     @Test
     @SmallTest
     public void createLaunchIntent() {
-        Context context = InstrumentationRegistry.getContext();
+        Context context = ApplicationProvider.getApplicationContext();
         String targetPackageName = mTargetContext.getPackageName();
 
         // This should return null because there are no ResolveInfos.

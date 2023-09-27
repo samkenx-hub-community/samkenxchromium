@@ -22,10 +22,10 @@
 
 namespace {
 
-// Returns false if a notification item shouldn't be created for |route|.
-// If a route should be hidden, it's not possible to create an item
-// for this route until the next time |OnModuleUpdated()| is called.
-bool ShouldHideNotification(const raw_ptr<Profile> profile,
+// Returns false if a notification item shouldn't be created for |route|. If a
+// route should be hidden, it's impossible to create an item for this route
+// until the next time |OnRoutesUpdated()| is called.
+bool ShouldHideNotification(Profile* profile,
                             const media_router::MediaRoute& route) {
   // TODO(crbug.com/1195382): Display multizone group route.
   if (route.is_connecting()) {
@@ -33,19 +33,19 @@ bool ShouldHideNotification(const raw_ptr<Profile> profile,
   }
   std::unique_ptr<media_router::CastMediaSource> source =
       media_router::CastMediaSource::FromMediaSource(route.media_source());
-  if (!source) {
-    return true;
-  }
   if (media_router::GlobalMediaControlsCastStartStopEnabled(profile)) {
     // Show local site-initiated Mirroring routes.
-    if (route.is_local() &&
+    if (source && route.is_local() &&
         media_router::IsSiteInitiatedMirroringSource(source->source_id())) {
       return false;
     }
     // Hide a route if it contains a Streaming App, i.e. Tab/Desktop Mirroring
     // and Remote Playback routes.
-    if (source->ContainsStreamingApp()) {
-      return true;
+    if (source && source->ContainsStreamingApp()) {
+      // Don't hide it in case of MirroringType::kOffscreenTab.
+      // This happens when 1UA mode is being used. It uses a URL for MediaSource
+      // and a streaming receiver app for CastMediaSource.
+      return !route.media_source().url().SchemeIsHTTPOrHTTPS();
     }
   } else if (route.controller_type() !=
              media_router::RouteControllerType::kGeneric) {

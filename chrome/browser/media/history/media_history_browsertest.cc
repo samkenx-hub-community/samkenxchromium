@@ -81,66 +81,54 @@ class MediaHistoryBrowserTest : public InProcessBrowserTest,
   static bool SetupPageAndStartPlaying(Browser* browser, const GURL& url) {
     EXPECT_TRUE(ui_test_utils::NavigateToURL(browser, url));
 
-    bool played = false;
-    EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-        browser->tab_strip_model()->GetActiveWebContents(),
-        "attemptPlayVideo();", &played));
-    return played;
+    return content::EvalJs(browser->tab_strip_model()->GetActiveWebContents(),
+                           "attemptPlayVideo();")
+        .ExtractBool();
   }
 
   static bool SetupPageAndStartPlayingAudioOnly(Browser* browser,
                                                 const GURL& url) {
     EXPECT_TRUE(ui_test_utils::NavigateToURL(browser, url));
 
-    bool played = false;
-    EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-        browser->tab_strip_model()->GetActiveWebContents(),
-        "attemptPlayAudioOnly();", &played));
-    return played;
+    return content::EvalJs(browser->tab_strip_model()->GetActiveWebContents(),
+                           "attemptPlayAudioOnly();")
+        .ExtractBool();
   }
 
   static bool SetupPageAndStartPlayingVideoOnly(Browser* browser,
                                                 const GURL& url) {
     EXPECT_TRUE(ui_test_utils::NavigateToURL(browser, url));
 
-    bool played = false;
-    EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-        browser->tab_strip_model()->GetActiveWebContents(),
-        "attemptPlayVideoOnly();", &played));
-    return played;
+    return content::EvalJs(browser->tab_strip_model()->GetActiveWebContents(),
+                           "attemptPlayVideoOnly();")
+        .ExtractBool();
   }
 
   static bool EnterPictureInPicture(Browser* browser) {
-    bool success = false;
-    return content::ExecuteScriptAndExtractBool(
-               browser->tab_strip_model()->GetActiveWebContents(),
-               "enterPictureInPicture();", &success) &&
-           success;
+    return content::EvalJs(browser->tab_strip_model()->GetActiveWebContents(),
+                           "enterPictureInPicture();")
+        .ExtractBool();
   }
 
   static bool SetMediaMetadata(Browser* browser) {
-    return content::ExecuteScript(
-        browser->tab_strip_model()->GetActiveWebContents(),
-        "setMediaMetadata();");
+    return content::ExecJs(browser->tab_strip_model()->GetActiveWebContents(),
+                           "setMediaMetadata();");
   }
 
   static bool SetMediaMetadataWithArtwork(Browser* browser) {
-    return content::ExecuteScript(
-        browser->tab_strip_model()->GetActiveWebContents(),
-        "setMediaMetadataWithArtwork();");
+    return content::ExecJs(browser->tab_strip_model()->GetActiveWebContents(),
+                           "setMediaMetadataWithArtwork();");
   }
 
   static bool FinishPlaying(Browser* browser) {
-    return content::ExecuteScript(
-        browser->tab_strip_model()->GetActiveWebContents(), "finishPlaying();");
+    return content::ExecJs(browser->tab_strip_model()->GetActiveWebContents(),
+                           "finishPlaying();");
   }
 
   static bool WaitForSignificantPlayback(Browser* browser) {
-    bool seeked = false;
-    EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-        browser->tab_strip_model()->GetActiveWebContents(),
-        "waitForSignificantPlayback();", &seeked));
-    return seeked;
+    return content::EvalJs(browser->tab_strip_model()->GetActiveWebContents(),
+                           "waitForSignificantPlayback();")
+        .ExtractBool();
   }
 
   static std::vector<mojom::MediaHistoryPlaybackSessionRowPtr>
@@ -626,7 +614,7 @@ IN_PROC_BROWSER_TEST_P(MediaHistoryBrowserTest, DISABLED_GetPlaybackSessions) {
     // Start the first page again and seek to 4 seconds in with different
     // metadata.
     EXPECT_TRUE(SetupPageAndStartPlaying(browser, GetTestURL()));
-    EXPECT_TRUE(content::ExecuteScript(
+    EXPECT_TRUE(content::ExecJs(
         browser->tab_strip_model()->GetActiveWebContents(), "seekToFour()"));
 
     media_session::test::MockMediaSessionMojoObserver observer(
@@ -777,9 +765,9 @@ IN_PROC_BROWSER_TEST_P(MediaHistoryBrowserTest,
   {
     // Start a second session on a different URL.
     EXPECT_TRUE(SetupPageAndStartPlaying(browser, GetTestAltURL()));
-    EXPECT_TRUE(content::ExecuteScript(
-        browser->tab_strip_model()->GetActiveWebContents(),
-        "setMediaMetadataWithAltArtwork();"));
+    EXPECT_TRUE(
+        content::ExecJs(browser->tab_strip_model()->GetActiveWebContents(),
+                        "setMediaMetadataWithAltArtwork();"));
 
     media_session::test::MockMediaSessionMojoObserver observer(
         *GetMediaSession(browser));
@@ -1117,10 +1105,8 @@ IN_PROC_BROWSER_TEST_P(MediaHistoryBrowserTest,
   web_contents->WasHidden();
 
   // Wait for significant playback in the background tab.
-  bool seeked = false;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractBool(
-      web_contents, "waitForSignificantPlayback();", &seeked));
-  ASSERT_TRUE(seeked);
+  ASSERT_EQ(true,
+            content::EvalJs(web_contents, "waitForSignificantPlayback();"));
 
   // Create another browser. This is important in the incognito case as
   // destroying `browser` (which happens from CloseAllTabs()) will delete the
@@ -1159,13 +1145,10 @@ IN_PROC_BROWSER_TEST_P(MediaHistoryBrowserTest, DoNotRecordWatchtime_Muted) {
   // Setup the test page and mute the player.
   auto* web_contents = browser->tab_strip_model()->GetActiveWebContents();
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser, GetTestURL()));
-  ASSERT_TRUE(content::ExecuteScript(web_contents, "mute();"));
+  ASSERT_TRUE(content::ExecJs(web_contents, "mute();"));
 
   // Start playing the video.
-  bool played = false;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractBool(
-      web_contents, "attemptPlayVideo();", &played));
-  ASSERT_TRUE(played);
+  ASSERT_EQ(true, content::EvalJs(web_contents, "attemptPlayVideo();"));
 
   // Wait for significant playback in the muted tab.
   WaitForSignificantPlayback(browser);
@@ -1206,7 +1189,7 @@ class MediaHistoryForPrerenderBrowserTest : public MediaHistoryBrowserTest {
   }
 
   void SetUp() override {
-    prerender_helper_.SetUp(embedded_test_server());
+    prerender_helper_.RegisterServerRequestMonitor(embedded_test_server());
     MediaHistoryBrowserTest::SetUp();
   }
 
@@ -1218,7 +1201,8 @@ class MediaHistoryForPrerenderBrowserTest : public MediaHistoryBrowserTest {
   content::WebContents* web_contents() { return web_contents_; }
 
  protected:
-  raw_ptr<content::WebContents, DanglingUntriaged> web_contents_ = nullptr;
+  raw_ptr<content::WebContents, AcrossTasksDanglingUntriaged> web_contents_ =
+      nullptr;
   content::test::PrerenderTestHelper prerender_helper_;
   base::test::ScopedFeatureList feature_list_;
 };

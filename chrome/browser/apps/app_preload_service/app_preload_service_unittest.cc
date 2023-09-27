@@ -12,7 +12,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
 #include "chrome/browser/apps/app_preload_service/app_preload_service_factory.h"
-#include "chrome/browser/apps/app_preload_service/proto/app_provisioning.pb.h"
+#include "chrome/browser/apps/app_preload_service/proto/app_preload.pb.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
 #include "chrome/browser/ash/app_list/arc/arc_app_list_prefs.h"
@@ -20,16 +20,15 @@
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/test/base/testing_profile.h"
+#include "chromeos/ash/components/system/fake_statistics_provider.h"
 #include "components/prefs/pref_service.h"
 #include "components/services/app_service/public/cpp/app_registry_cache.h"
 #include "components/services/app_service/public/cpp/app_update.h"
 #include "components/user_manager/scoped_user_manager.h"
 #include "components/user_manager/user_manager.h"
 #include "content/public/test/browser_task_environment.h"
-#include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "services/network/test/test_url_loader_factory.h"
-#include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace {
@@ -50,14 +49,17 @@ namespace apps {
 class AppPreloadServiceTest : public testing::Test {
  protected:
   AppPreloadServiceTest()
-      : scoped_user_manager_(std::make_unique<ash::FakeChromeUserManager>()) {
+      : scoped_user_manager_(std::make_unique<ash::FakeChromeUserManager>()),
+        startup_check_resetter_(
+            AppPreloadService::DisablePreloadsOnStartupForTesting()) {
     scoped_feature_list_.InitAndEnableFeature(features::kAppPreloadService);
+    AppPreloadServiceFactory::SkipApiKeyCheckForTesting(true);
   }
 
   void SetUp() override {
     testing::Test::SetUp();
 
-    GetFakeUserManager()->set_current_user_new(true);
+    GetFakeUserManager()->SetIsCurrentUserNew(true);
 
     TestingProfile::Builder profile_builder;
     profile_builder.SetSharedURLLoaderFactory(
@@ -66,6 +68,10 @@ class AppPreloadServiceTest : public testing::Test {
     profile_ = profile_builder.Build();
 
     web_app::test::AwaitStartWebAppProviderAndSubsystems(GetProfile());
+  }
+
+  void TearDown() override {
+    AppPreloadServiceFactory::SkipApiKeyCheckForTesting(false);
   }
 
   Profile* GetProfile() { return profile_.get(); }
@@ -78,11 +84,13 @@ class AppPreloadServiceTest : public testing::Test {
   network::TestURLLoaderFactory url_loader_factory_;
 
  private:
+  // BrowserTaskEnvironment has to be the first member or test will break.
   content::BrowserTaskEnvironment task_environment_;
   base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<TestingProfile> profile_;
   user_manager::ScopedUserManager scoped_user_manager_;
-  data_decoder::test::InProcessDataDecoder in_process_data_decoder_;
+  ash::system::ScopedFakeStatisticsProvider fake_statistics_provider_;
+  base::AutoReset<bool> startup_check_resetter_;
 };
 
 TEST_F(AppPreloadServiceTest, ServiceAccessPerProfile) {
@@ -134,8 +142,9 @@ TEST_F(AppPreloadServiceTest, ServiceAccessPerProfile) {
 }
 
 TEST_F(AppPreloadServiceTest, FirstLoginStartedPrefSet) {
-  // Ensure that the AppPreloadService is created.
-  AppPreloadService::Get(GetProfile());
+  auto* service = AppPreloadService::Get(GetProfile());
+  // Start the login flow, but do not wait for it to finish.
+  service->StartFirstLoginFlowForTesting(base::DoNothing());
 
   auto flow_started =
       GetStateManager(GetProfile()).FindBool(kFirstLoginFlowStartedKey);
@@ -150,7 +159,7 @@ TEST_F(AppPreloadServiceTest, FirstLoginStartedPrefSet) {
 TEST_F(AppPreloadServiceTest, FirstLoginCompletedPrefSetAfterSuccess) {
   // An empty response indicates that the request completed successfully, but
   // there are no apps to install.
-  proto::AppProvisioningListAppsResponse response;
+  proto::AppPreloadListResponse response;
 
   url_loader_factory_.AddResponse(
       AppPreloadServerConnector::GetServerUrl().spec(),
@@ -158,7 +167,7 @@ TEST_F(AppPreloadServiceTest, FirstLoginCompletedPrefSetAfterSuccess) {
 
   base::test::TestFuture<bool> result;
   auto* service = AppPreloadService::Get(GetProfile());
-  service->SetInstallationCompleteCallbackForTesting(result.GetCallback());
+  service->StartFirstLoginFlowForTesting(result.GetCallback());
   ASSERT_TRUE(result.Get());
 
   // We expect that the key has been set after the first login flow has been
@@ -170,11 +179,11 @@ TEST_F(AppPreloadServiceTest, FirstLoginCompletedPrefSetAfterSuccess) {
 }
 
 TEST_F(AppPreloadServiceTest, FirstLoginExistingUserNotStarted) {
-  GetFakeUserManager()->set_current_user_new(false);
+  GetFakeUserManager()->SetIsCurrentUserNew(false);
   TestingProfile existing_user_profile;
 
-  // Ensure that the AppPreloadService is created.
-  AppPreloadService::Get(&existing_user_profile);
+  auto* service = AppPreloadService::Get(&existing_user_profile);
+  service->StartFirstLoginFlowForTesting(base::DoNothing());
 
   auto flow_started = GetStateManager(&existing_user_profile)
                           .FindBool(kFirstLoginFlowStartedKey);
@@ -186,11 +195,10 @@ TEST_F(AppPreloadServiceTest, IgnoreAndroidAppInstall) {
   constexpr char kPackageName[] = "com.peanuttypes";
   constexpr char kActivityName[] = "com.peanuttypes.PeanutTypesActivity";
 
-  proto::AppProvisioningListAppsResponse response;
+  proto::AppPreloadListResponse response;
   auto* app = response.add_apps_to_install();
   app->set_name("Peanut Types");
-  app->set_install_reason(
-      proto::AppProvisioningListAppsResponse::INSTALL_REASON_OEM);
+  app->set_install_reason(proto::AppPreloadListResponse::INSTALL_REASON_OEM);
 
   url_loader_factory_.AddResponse(
       AppPreloadServerConnector::GetServerUrl().spec(),
@@ -198,7 +206,7 @@ TEST_F(AppPreloadServiceTest, IgnoreAndroidAppInstall) {
 
   base::test::TestFuture<bool> result;
   auto* service = AppPreloadService::Get(GetProfile());
-  service->SetInstallationCompleteCallbackForTesting(result.GetCallback());
+  service->StartFirstLoginFlowForTesting(result.GetCallback());
   ASSERT_TRUE(result.Get());
 
   // It's hard to assert conclusively that nothing happens in this case, but for
@@ -217,7 +225,7 @@ TEST_F(AppPreloadServiceTest, FirstLoginStartedNotCompletedAfterServerError) {
 
   base::test::TestFuture<bool> result;
   auto* service = AppPreloadService::Get(GetProfile());
-  service->SetInstallationCompleteCallbackForTesting(result.GetCallback());
+  service->StartFirstLoginFlowForTesting(result.GetCallback());
   ASSERT_FALSE(result.Get());
 
   auto flow_started =

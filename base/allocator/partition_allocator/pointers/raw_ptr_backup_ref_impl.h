@@ -9,7 +9,7 @@
 
 #include <type_traits>
 
-#include "base/allocator/partition_allocator/address_pool_manager_bitmap.h"
+#include "base/allocator/partition_allocator/chromeos_buildflags.h"
 #include "base/allocator/partition_allocator/partition_address_space.h"
 #include "base/allocator/partition_allocator/partition_alloc_base/compiler_specific.h"
 #include "base/allocator/partition_allocator/partition_alloc_base/component_export.h"
@@ -18,7 +18,12 @@
 #include "base/allocator/partition_allocator/partition_alloc_config.h"
 #include "base/allocator/partition_allocator/partition_alloc_constants.h"
 #include "base/allocator/partition_allocator/partition_alloc_forward.h"
+#include "base/allocator/partition_allocator/tagging.h"
 #include "build/build_config.h"
+
+#if !BUILDFLAG(HAS_64_BIT_POINTERS)
+#include "base/allocator/partition_allocator/address_pool_manager_bitmap.h"
+#endif
 
 #if !BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
 #error "Included under wrong build option"
@@ -31,13 +36,63 @@ PA_COMPONENT_EXPORT(RAW_PTR)
 void CheckThatAddressIsntWithinFirstPartitionPage(uintptr_t address);
 #endif
 
-template <bool AllowDangling = false>
-struct RawPtrBackupRefImpl {
-  // Note that `RawPtrBackupRefImpl` itself is not thread-safe. If multiple
-  // threads modify the same smart pointer object without synchronization, a
-  // data race will occur.
+class BackupRefPtrGlobalSettings {
+ public:
+  static void EnableExperimentalAsh() {
+    PA_CHECK(!experimental_ash_raw_ptr_enabled_);
+    experimental_ash_raw_ptr_enabled_ = true;
+  }
+
+  static void DisableExperimentalAshForTest() {
+    PA_CHECK(experimental_ash_raw_ptr_enabled_);
+    experimental_ash_raw_ptr_enabled_ = false;
+  }
+
+  PA_ALWAYS_INLINE static bool IsExperimentalAshEnabled() {
+    return experimental_ash_raw_ptr_enabled_;
+  }
 
  private:
+  // Write-once settings that should be in its own cacheline, as they're
+  // accessed frequently on a hot path.
+  PA_ALIGNAS(partition_alloc::internal::kPartitionCachelineSize)
+  static inline bool experimental_ash_raw_ptr_enabled_ = false;
+  [[maybe_unused]] char
+      padding_[partition_alloc::internal::kPartitionCachelineSize - 1];
+};
+
+// Note that `RawPtrBackupRefImpl` itself is not thread-safe. If multiple
+// threads modify the same raw_ptr object without synchronization, a data race
+// will occur.
+template <bool AllowDangling = false, bool ExperimentalAsh = false>
+struct RawPtrBackupRefImpl {
+  // These are needed for correctness, or else we may end up manipulating
+  // ref-count where we shouldn't, thus affecting the BRP's integrity. Unlike
+  // the first two, kMustZeroOnDestruct wouldn't be needed if raw_ptr was used
+  // correctly, but we already caught cases where a value is written after
+  // destruction.
+  static constexpr bool kMustZeroOnInit = true;
+  static constexpr bool kMustZeroOnMove = true;
+  static constexpr bool kMustZeroOnDestruct = true;
+
+ private:
+  PA_ALWAYS_INLINE static bool UseBrp(uintptr_t address) {
+    // Pointer annotated with ExperimentalAsh are subject to a separate,
+    // Ash-related experiment.
+    //
+    // Note that this can be enabled only before the BRP partition is created,
+    // so it's impossible for this function to change its answer for a specific
+    // pointer. (This relies on the original partition to not be BRP-enabled.)
+    if constexpr (ExperimentalAsh) {
+#if BUILDFLAG(PA_IS_CHROMEOS_ASH)
+      if (!BackupRefPtrGlobalSettings::IsExperimentalAshEnabled()) {
+        return false;
+      }
+#endif
+    }
+    return partition_alloc::IsManagedByPartitionAllocBRPPool(address);
+  }
+
   PA_ALWAYS_INLINE static bool IsSupportedAndNotNull(uintptr_t address) {
     // There are many situations where the compiler can prove that
     // `ReleaseWrappedPtr` is called on a value that is always nullptr, but the
@@ -60,8 +115,7 @@ struct RawPtrBackupRefImpl {
 
     // This covers the nullptr case, as address 0 is never in any
     // PartitionAlloc pool.
-    bool is_in_brp_pool =
-        partition_alloc::IsManagedByPartitionAllocBRPPool(address);
+    bool use_brp = UseBrp(address);
 
     // There may be pointers immediately after the allocation, e.g.
     //   {
@@ -81,12 +135,12 @@ struct RawPtrBackupRefImpl {
     // it must be at least partition page away from the beginning of a super
     // page.
 #if BUILDFLAG(PA_DCHECK_IS_ON) || BUILDFLAG(ENABLE_BACKUP_REF_PTR_SLOW_CHECKS)
-    if (is_in_brp_pool) {
+    if (use_brp) {
       CheckThatAddressIsntWithinFirstPartitionPage(address);
     }
 #endif
 
-    return is_in_brp_pool;
+    return use_brp;
   }
 
 #if BUILDFLAG(BACKUP_REF_PTR_POISON_OOB_PTR)

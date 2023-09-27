@@ -163,6 +163,11 @@ export class EntryList {
     this.fullPath = '/';
 
     /**
+     * @public {?FileSystem}
+     */
+    this.filesystem = null;
+
+    /**
      * @public {boolean} EntryList can be a placeholder of a real volume (e.g.
      * MyFiles or DriveFakeRootEntryList), it can be disabled if the
      * corresponding volume type is disabled.
@@ -199,7 +204,7 @@ export class EntryList {
   /** @override */
   getMetadata(success, error) {
     // Defaults modificationTime to current time just to have a valid value.
-    setTimeout(() => success({modificationTime: new Date()}));
+    setTimeout(() => success({modificationTime: new Date(), size: 0}));
   }
 
   /**
@@ -216,16 +221,13 @@ export class EntryList {
   }
 
   /**
-   * @param {function(Entry)|function(FilesAppEntry)} success callback, it
-   * returns itself since EntryList is intended to be used as root node and the
-   * Web Standard says to do so.
-   * @param {function(Entry)|function(FilesAppEntry)} error callback, not used
-   * for this implementation.
-   *
+   * @param {(function(DirectoryEntry)|function(FilesAppDirEntry))=} success
+   *     callback.
+   * @param {function(Error)=} error callback.
    * @override
    */
   getParent(success, error) {
-    setTimeout(success, 0, this);
+    setTimeout((self) => success(self), 0, this);
   }
 
   /**
@@ -257,12 +259,19 @@ export class EntryList {
   /**
    * @param {!VolumeInfo} volumeInfo that's desired to be removed.
    * This method is specific to VolumeEntry/EntryList instance.
+   * Note: we compare the volumeId instead of the whole volumeInfo reference
+   * because the same volume could be mounted multiple times and every time a
+   * new volumeInfo is created.
    * @return {number} index of entry on this EntryList or -1 if not found.
    */
   findIndexByVolumeInfo(volumeInfo) {
-    return this.children_.findIndex(childEntry => {
-      return /** @type {VolumeEntry} */ (childEntry).volumeInfo === volumeInfo;
-    });
+    return this.children_.findIndex(
+        childEntry =>
+            /** @type {VolumeEntry} */ (childEntry).volumeInfo ?
+            /** @type {VolumeEntry} */ (childEntry).volumeInfo.volumeId ===
+                volumeInfo.volumeId :
+            false,
+    );
   }
 
   /**
@@ -340,6 +349,50 @@ export class EntryList {
         return null;
     }
   }
+
+  /**
+   * @param {!DirectoryEntry|!FilesAppDirEntry} newParent
+   * @param {string=} newName
+   * @param {(function(Entry)|function(FilesAppEntry))=} success
+   * @param {function(FileError)=} error
+   */
+  copyTo(newParent, newName, success, error) {}
+
+  /**
+   * @param {!DirectoryEntry|!FilesAppDirEntry} newParent
+   * @param {string} newName
+   * @param {(function(Entry)|function(FilesAppEntry))=} success
+   * @param {function(FileError)=} error
+   */
+  moveTo(newParent, newName, success, error) {}
+
+  /**
+   * @param {function(Entry)|function(FilesAppEntry)} success
+   * @param {function(FileError)=} error
+   */
+  remove(success, error) {}
+
+  /**
+   * @param {string} path
+   * @param {!FileSystemFlags=} options
+   * @param {(function(!FileEntry)|function(!FilesAppEntry))=} success
+   * @param {function(!FileError)=} error
+   */
+  getFile(path, options, success, error) {}
+
+  /**
+   * @param {string} path
+   * @param {!FileSystemFlags=} options
+   * @param {(function(!DirectoryEntry)|function(!FilesAppDirEntry))=} success
+   * @param {function(!FileError)=} error
+   */
+  getDirectory(path, options, success, error) {}
+
+  /**
+   * @param {function()} success
+   * @param {function(!Error)=} error
+   */
+  removeRecursively(success, error) {}
 }
 
 /**
@@ -403,6 +456,7 @@ export class VolumeEntry {
   /**
    * @return {?FileSystem} FileSystem for this volume.
    * This method is defined on Entry.
+   * @override
    */
   get filesystem() {
     return this.rootEntry_ ? this.rootEntry_.filesystem : null;
@@ -517,16 +571,14 @@ export class VolumeEntry {
   }
 
   /**
-   * @param {function(Entry)|function(FilesAppEntry)} success callback, it
-   * returns itself since EntryList is intended to be used as root node and the
-   * Web Standard says to do so.
-   * @param {function(Entry)|function(FilesAppEntry)} error callback, not used
-   * for this implementation.
-   *
+   * @param {(function(DirectoryEntry)|function(FilesAppDirEntry))=} success
+   *     callback, it returns itself since EntryList is intended to be used as
+   * root node and the Web Standard says to do so.
+   * @param {function(Error)=} error callback, not used for this implementation.
    * @override
    */
   getParent(success, error) {
-    setTimeout(success, 0, this);
+    setTimeout((self) => success(self), 0, this);
   }
 
   /** @override */
@@ -590,12 +642,19 @@ export class VolumeEntry {
   /**
    * @param {!VolumeInfo} volumeInfo that's desired to be removed.
    * This method is specific to VolumeEntry/EntryList instance.
+   * Note: we compare the volumeId instead of the whole volumeInfo reference
+   * because the same volume could be mounted multiple times and every time a
+   * new volumeInfo is created.
    * @return {number} index of entry within VolumeEntry or -1 if not found.
    */
   findIndexByVolumeInfo(volumeInfo) {
     return this.children_.findIndex(
         childEntry =>
-            /** @type {VolumeEntry} */ (childEntry).volumeInfo === volumeInfo);
+            /** @type {VolumeEntry} */ (childEntry).volumeInfo ?
+            /** @type {VolumeEntry} */ (childEntry).volumeInfo.volumeId ===
+                volumeInfo.volumeId :
+            false,
+    );
   }
 
   /**
@@ -651,6 +710,34 @@ export class VolumeEntry {
     }
     return false;
   }
+
+  /**
+   * @param {!DirectoryEntry|!FilesAppDirEntry} newParent
+   * @param {string=} newName
+   * @param {(function(Entry)|function(FilesAppEntry))=} success
+   * @param {function(FileError)=} error
+   */
+  copyTo(newParent, newName, success, error) {}
+
+  /**
+   * @param {!DirectoryEntry|!FilesAppDirEntry} newParent
+   * @param {string} newName
+   * @param {(function(!Entry)|function(!FilesAppEntry))=} success
+   * @param {function(!FileError)=} error
+   */
+  moveTo(newParent, newName, success, error) {}
+
+  /**
+   * @param {function(!Entry)|function(!FilesAppEntry)} success
+   * @param {function(!FileError)=} error
+   */
+  remove(success, error) {}
+
+  /**
+   * @param {function()} success
+   * @param {function(!Error)=} error
+   */
+  removeRecursively(success, error) {}
 }
 
 /**
@@ -715,6 +802,11 @@ export class FakeEntryImpl {
     this.type_name = 'FakeEntry';
 
     this.fullPath = '/';
+
+    /**
+     * @public {?FileSystem}
+     */
+    this.filesystem = null;
   }
 
   /**
@@ -724,7 +816,7 @@ export class FakeEntryImpl {
    *  @override
    */
   getParent(success, error) {
-    setTimeout(success, 0, this);
+    setTimeout((self) => success(self), 0, this);
   }
 
   /** @override */
@@ -759,9 +851,11 @@ export class FakeEntryImpl {
     return /** @type{string} */ (this.rootType);
   }
 
-  /** @override */
+  /**
+   * @override
+   */
   getMetadata(success, error) {
-    setTimeout(() => success({}));
+    setTimeout(() => success({modificationTime: new Date(), size: 0}));
   }
 
   /** @override */
@@ -797,6 +891,50 @@ export class FakeEntryImpl {
     }
     return VolumeManagerCommon.getVolumeTypeFromRootType(this.rootType);
   }
+
+  /**
+   * @param {!DirectoryEntry|!FilesAppDirEntry} newParent
+   * @param {string=} newName
+   * @param {(function(Entry)|function(FilesAppEntry))=} success
+   * @param {function(FileError)=} error
+   */
+  copyTo(newParent, newName, success, error) {}
+
+  /**
+   * @param {!DirectoryEntry|!FilesAppDirEntry} newParent
+   * @param {string} newName
+   * @param {(function(Entry)|function(FilesAppEntry))=} success
+   * @param {function(FileError)=} error
+   */
+  moveTo(newParent, newName, success, error) {}
+
+  /**
+   * @param {function(Entry)|function(FilesAppEntry)} success
+   * @param {function(FileError)=} error
+   */
+  remove(success, error) {}
+
+  /**
+   * @param {string} path
+   * @param {!FileSystemFlags=} options
+   * @param {(function(!FileEntry)|function(!FilesAppEntry))=} success
+   * @param {function(!FileError)=} error
+   */
+  getFile(path, options, success, error) {}
+
+  /**
+   * @param {string} path
+   * @param {!FileSystemFlags=} options
+   * @param {(function(!DirectoryEntry)|function(!FilesAppDirEntry))=} success
+   * @param {function(!FileError)=} error
+   */
+  getDirectory(path, options, success, error) {}
+
+  /**
+   * @param {function()} success
+   * @param {function(!Error)=} error
+   */
+  removeRecursively(success, error) {}
 }
 
 /**

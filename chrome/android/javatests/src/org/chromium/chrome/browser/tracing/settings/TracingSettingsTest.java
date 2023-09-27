@@ -10,7 +10,6 @@ import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 import android.util.Pair;
 
 import androidx.core.app.NotificationCompat;
@@ -18,8 +17,10 @@ import androidx.preference.CheckBoxPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.After;
@@ -33,7 +34,6 @@ import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.settings.SettingsActivity;
@@ -143,7 +143,6 @@ public class TracingSettingsTest {
     @Test
     @MediumTest
     @Feature({"Preferences"})
-    @DisabledTest(message = "crbug.com/1111655")
     public void testRecordTrace() throws Exception {
         mActivityTestRule.startMainActivityOnBlankPage();
         mSettingsActivityTestRule.startSettingsActivity();
@@ -299,7 +298,7 @@ public class TracingSettingsTest {
 
             // Simulate clicking the preference, which should open a new preferences fragment in
             // a new activity.
-            Context context = InstrumentationRegistry.getTargetContext();
+            Context context = ApplicationProvider.getApplicationContext();
             Assert.assertNotNull(categoriesPref.getExtras());
             Assert.assertFalse(categoriesPref.getExtras().isEmpty());
             SettingsLauncher settingsLauncher = new SettingsLauncherImpl();

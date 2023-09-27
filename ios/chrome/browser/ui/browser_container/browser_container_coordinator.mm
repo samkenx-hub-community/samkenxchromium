@@ -7,33 +7,34 @@
 #import <Availability.h>
 
 #import "base/check.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
+#import "components/search_engines/template_url_service.h"
 #import "ios/chrome/browser/link_to_text/link_to_text_payload.h"
-#import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/overlays/public/overlay_presenter.h"
 #import "ios/chrome/browser/screen_time/screen_time_buildflags.h"
+#import "ios/chrome/browser/search_engines/template_url_service_factory.h"
+#import "ios/chrome/browser/shared/coordinator/alert/alert_coordinator.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/public/commands/activity_service_commands.h"
+#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
-#import "ios/chrome/browser/ui/alert_coordinator/alert_coordinator.h"
 #import "ios/chrome/browser/ui/browser_container/browser_container_mediator.h"
 #import "ios/chrome/browser/ui/browser_container/browser_container_view_controller.h"
 #import "ios/chrome/browser/ui/browser_container/browser_edit_menu_handler.h"
 #import "ios/chrome/browser/ui/browser_container/edit_menu_alert_delegate.h"
+#import "ios/chrome/browser/ui/fullscreen/fullscreen_controller.h"
 #import "ios/chrome/browser/ui/link_to_text/link_to_text_mediator.h"
 #import "ios/chrome/browser/ui/overlays/overlay_container_coordinator.h"
 #import "ios/chrome/browser/ui/partial_translate/partial_translate_mediator.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/ui/search_with/search_with_mediator.h"
 #import "url/gurl.h"
 
 #if BUILDFLAG(IOS_SCREEN_TIME_ENABLED)
 #import "ios/chrome/browser/screen_time/features.h"
 #import "ios/chrome/browser/ui/screen_time/screen_time_coordinator.h"
-#endif
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
 #endif
 
 @interface BrowserContainerCoordinator () <EditMenuAlertDelegate>
@@ -48,6 +49,8 @@
 @property(nonatomic, strong) LinkToTextMediator* linkToTextMediator;
 // The mediator used for the Partial Translate feature.
 @property(nonatomic, strong) PartialTranslateMediator* partialTranslateMediator;
+// The mediator used for the Search With feature.
+@property(nonatomic, strong) SearchWithMediator* searchWithMediator;
 // The handler for the edit menu.
 @property(nonatomic, strong) BrowserEditMenuHandler* browserEditMenuHandler;
 // The overlay container coordinator for OverlayModality::kWebContentArea.
@@ -88,17 +91,19 @@
 
   self.browserEditMenuHandler = [[BrowserEditMenuHandler alloc] init];
   self.viewController.browserEditMenuHandler = self.browserEditMenuHandler;
-  self.browserEditMenuHandler.rootView = self.viewController.view;
   self.browserEditMenuHandler.linkToTextDelegate = self.linkToTextMediator;
 
-  if (base::FeatureList::IsEnabled(kIOSEditMenuPartialTranslate)) {
+  if (IsPartialTranslateEnabled()) {
     PrefService* prefService =
         browserState->GetOriginalChromeBrowserState()->GetPrefs();
+    FullscreenController* fullscreenController =
+        FullscreenController::FromBrowser(self.browser);
 
     self.partialTranslateMediator = [[PartialTranslateMediator alloc]
-          initWithWebStateList:webStateList->AsWeakPtr()
+          initWithWebStateList:webStateList
         withBaseViewController:self.viewController
                    prefService:prefService
+          fullscreenController:fullscreenController
                      incognito:incognito];
     self.partialTranslateMediator.alertDelegate = self;
     CommandDispatcher* dispatcher = browser->GetCommandDispatcher();
@@ -107,6 +112,20 @@
     self.partialTranslateMediator.browserHandler = handler;
     self.browserEditMenuHandler.partialTranslateDelegate =
         self.partialTranslateMediator;
+  }
+
+  if (IsSearchWithEnabled()) {
+    TemplateURLService* templateURLService =
+        ios::TemplateURLServiceFactory::GetForBrowserState(browserState);
+    self.searchWithMediator =
+        [[SearchWithMediator alloc] initWithWebStateList:webStateList
+                                      templateURLService:templateURLService
+                                               incognito:incognito];
+    CommandDispatcher* dispatcher = browser->GetCommandDispatcher();
+    id<ApplicationCommands> handler =
+        HandlerForProtocol(dispatcher, ApplicationCommands);
+    self.searchWithMediator.applicationCommandHandler = handler;
+    self.browserEditMenuHandler.searchWithDelegate = self.searchWithMediator;
   }
 
   [self.webContentAreaOverlayContainerCoordinator start];
@@ -128,13 +147,17 @@
 - (void)stop {
   if (!self.started)
     return;
+  [self dismissAlertCoordinator];
   self.started = NO;
   [self.webContentAreaOverlayContainerCoordinator stop];
   [self.screenTimeCoordinator stop];
   [self.partialTranslateMediator shutdown];
+  [self.searchWithMediator shutdown];
   self.viewController = nil;
   self.mediator = nil;
   self.linkToTextMediator = nil;
+  self.partialTranslateMediator = nil;
+  self.searchWithMediator = nil;
   [super stop];
 }
 
@@ -148,9 +171,13 @@
                                                    browser:self.browser
                                                      title:title
                                                    message:message];
+  __weak BrowserContainerCoordinator* weakSelf = self;
   for (EditMenuAlertDelegateAction* action in actions) {
     [self.alertCoordinator addItemWithTitle:action.title
-                                     action:action.action
+                                     action:^{
+                                       action.action();
+                                       [weakSelf dismissAlertCoordinator];
+                                     }
                                       style:action.style
                                   preferred:action.preferred
                                     enabled:YES];
@@ -176,6 +203,11 @@
   self.screenTimeCoordinator = screenTimeCoordinator;
 
 #endif
+}
+
+- (void)dismissAlertCoordinator {
+  [self.alertCoordinator stop];
+  self.alertCoordinator = nil;
 }
 
 @end

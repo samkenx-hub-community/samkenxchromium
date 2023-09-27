@@ -11,7 +11,9 @@
 #include "ash/ash_export.h"
 #include "ash/wm/overview/overview_session.h"
 #include "ash/wm/overview/overview_types.h"
+#include "ash/wm/raster_scale/raster_scale_layer_observer.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "ui/aura/client/transient_window_client_observer.h"
 #include "ui/aura/window_observer.h"
@@ -66,6 +68,10 @@ class ASH_EXPORT ScopedOverviewTransformWindow
       const ScopedOverviewTransformWindow&) = delete;
   ~ScopedOverviewTransformWindow() override;
 
+  aura::Window* window() const { return window_; }
+
+  OverviewGridWindowFillMode type() const { return type_; }
+
   // Starts an animation sequence which will use animation settings specified by
   // |animation_type|. The |animation_settings| container is populated with
   // scoped entities and the container should be destroyed at the end of the
@@ -78,7 +84,7 @@ class ASH_EXPORT ScopedOverviewTransformWindow
   //      OVERVIEW_ANIMATION_RESTORE_WINDOW, &animation_settings);
   //  // Calls to SetTransform & SetOpacity will use the same animation settings
   //  // until animation_settings is destroyed.
-  //  OverviewUtil::SetTransform(root_window, new_transform);
+  //  SetTransform(root_window, new_transform) in `overview_utils.h`;
   //  overview_window.SetOpacity(1);
   void BeginScopedAnimation(OverviewAnimationType animation_type,
                             ScopedAnimationSettings* animation_settings);
@@ -86,8 +92,7 @@ class ASH_EXPORT ScopedOverviewTransformWindow
   // Returns true if this overview window contains the |target|.
   bool Contains(const aura::Window* target) const;
 
-  // Returns transformed bounds of the overview window. See
-  // OverviewUtil::GetTransformedBounds for more details.
+  // Returns transformed bounds of the overview window.
   gfx::RectF GetTransformedBounds() const;
 
   // Returns the kTopViewInset property of |window_| unless there are transient
@@ -95,11 +100,11 @@ class ASH_EXPORT ScopedOverviewTransformWindow
   int GetTopInset() const;
 
   // Restores and animates the managed window to its non overview mode state. If
-  // `animate_back` is false, the window will just be restored and not animated.
-  // If |reset_transform| equals false, the window's transform will not be reset
-  // to identity transform when exiting the overview mode. See
-  // OverviewItem::RestoreWindow() for details why we need this.
-  void RestoreWindow(bool reset_transform, bool was_saved_desk_grid_showing);
+  // `animate` is false, the window will just be restored and not animated. If
+  // `reset_transform` equals false, the window's transform will not be reset to
+  // identity transform when exiting the overview mode. See
+  // `OverviewItem::RestoreWindow()` for details why we need this.
+  void RestoreWindow(bool reset_transform, bool animate);
 
   // Prepares for overview mode by doing any necessary actions before entering.
   void PrepareForOverview();
@@ -117,18 +122,16 @@ class ASH_EXPORT ScopedOverviewTransformWindow
   gfx::RectF ShrinkRectToFitPreservingAspectRatio(const gfx::RectF& rect,
                                                   const gfx::RectF& bounds,
                                                   int top_view_inset,
-                                                  int title_height);
+                                                  int title_height) const;
 
   // Returns the window used to show the content in overview mode.
   // For minimized window this will be a window that hosts mirrored layers.
-  aura::Window* GetOverviewWindow() const;
+  aura::Window* GetOverviewWindow();
 
   // Closes the transient root of the window managed by |this|.
   void Close();
 
-  // TODO(sammiequon): Rename this function as tucked floated windows behave the
-  // same way as minimized windows.
-  bool IsMinimized() const;
+  bool IsMinimizedOrTucked() const;
 
   // Ensures that a window is visible by setting its opacity to 1.
   void EnsureVisible();
@@ -156,17 +159,13 @@ class ASH_EXPORT ScopedOverviewTransformWindow
                              ui::PropertyChangeReason reason) override;
   void OnWindowDestroying(aura::Window* window) override;
 
-  aura::Window* window() const { return window_; }
-
-  OverviewGridWindowFillMode type() const { return type_; }
-
  private:
-  friend class OverviewHighlightControllerTest;
+  friend class OverviewFocusCyclerTest;
   friend class OverviewTestBase;
   FRIEND_TEST_ALL_PREFIXES(OverviewSessionTest, CloseAnimationShadow);
   class LayerCachingAndFilteringObserver;
 
-  // If true, makes Close() execute synchronously when used in tests.
+  // If true, makes `CloseWidget()` execute synchronously when used in tests.
   static void SetImmediateCloseForTests(bool immediate);
 
   // Closes the window managed by |this|.
@@ -180,10 +179,10 @@ class ASH_EXPORT ScopedOverviewTransformWindow
 
   // A weak pointer to the overview item that owns |this|. Guaranteed to be not
   // null for the lifetime of |this|.
-  OverviewItem* overview_item_;
+  raw_ptr<OverviewItem, ExperimentalAsh> overview_item_;
 
   // A weak pointer to the real window in the overview.
-  aura::Window* window_;
+  raw_ptr<aura::Window, ExperimentalAsh> window_;
 
   // The original opacity of the window before entering overview mode.
   float original_opacity_;
@@ -216,6 +215,11 @@ class ASH_EXPORT ScopedOverviewTransformWindow
 
   base::ScopedMultiSourceObservation<aura::Window, aura::WindowObserver>
       window_observations_{this};
+
+  // While the transform window exists, apply dynamic raster scale to the
+  // underlying window.
+  absl::optional<ScopedRasterScaleLayerObserverLock>
+      raster_scale_observer_lock_;
 
   base::WeakPtrFactory<ScopedOverviewTransformWindow> weak_ptr_factory_{this};
 };

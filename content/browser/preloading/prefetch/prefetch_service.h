@@ -7,13 +7,15 @@
 
 #include <map>
 
+#include "base/dcheck_is_on.h"
 #include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
 #include "content/browser/preloading/prefetch/prefetch_container.h"
 #include "content/browser/preloading/prefetch/prefetch_status.h"
-#include "content/browser/preloading/prefetch/prefetch_streaming_url_loader_status.h"
+#include "content/browser/preloading/prefetch/prefetch_streaming_url_loader_common_types.h"
 #include "content/common/content_export.h"
 #include "content/public/browser/global_routing_id.h"
+#include "content/public/browser/service_worker_context.h"
 #include "net/cookies/canonical_cookie.h"
 #include "net/url_request/redirect_info.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
@@ -32,10 +34,35 @@ class URLLoaderFactory;
 namespace content {
 
 class BrowserContext;
+class PrefetchMatchResolver;
 class PrefetchOriginProber;
 class PrefetchProxyConfigurator;
 class PrefetchServiceDelegate;
 class ServiceWorkerContext;
+
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+enum class PrefetchRedirectResult {
+  kSuccessRedirectFollowed = 0,
+  kFailedNullPrefetch = 1,
+  kFailedRedirectsDisabled = 2,
+  kFailedInvalidMethod = 3,
+  kFailedInvalidResponseCode = 4,
+  kFailedInvalidChangeInNetworkContext = 5,
+  kFailedIneligible = 6,
+  kFailedInsufficientReferrerPolicy = 7,
+  kMaxValue = kFailedInsufficientReferrerPolicy,
+};
+
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+enum class PrefetchRedirectNetworkContextTransition {
+  kDefaultToDefault = 0,
+  kDefaultToIsolated = 1,
+  kIsolatedToDefault = 2,
+  kIsolatedToIsolated = 3,
+  kMaxValue = kIsolatedToIsolated,
+};
 
 // Manages all prefetches within a single BrowserContext. Responsible for
 // checking the eligibility of the prefetch, making the network request for the
@@ -43,12 +70,14 @@ class ServiceWorkerContext;
 // needed.
 class CONTENT_EXPORT PrefetchService {
  public:
+  static PrefetchService* GetFromFrameTreeNodeId(int frame_tree_node_id);
+  static void SetFromFrameTreeNodeIdForTesting(
+      int frame_tree_node_id,
+      std::unique_ptr<PrefetchService> prefetch_service);
+
   // |browser_context| must outlive this instance. In general this should always
   // be true, since |PrefetchService| will be indirectly owned by
   // |BrowserContext|.
-  static std::unique_ptr<PrefetchService> CreateIfPossible(
-      BrowserContext* browser_context);
-
   explicit PrefetchService(BrowserContext* browser_context);
   virtual ~PrefetchService();
 
@@ -65,34 +94,40 @@ class CONTENT_EXPORT PrefetchService {
     return prefetch_proxy_configurator_.get();
   }
 
-  PrefetchOriginProber* GetPrefetchOriginProber() const {
-    return origin_prober_.get();
-  }
-
+  virtual PrefetchOriginProber* GetPrefetchOriginProber() const;
   virtual void PrefetchUrl(base::WeakPtr<PrefetchContainer> prefetch_container);
 
   // Called when a navigation to `url` that will be served by
   // `prefetch_container` is likely to occur in the immediate future.
-  // |url| and |prefetch_container->GetURL()| might not be the same
+  // |url| and |prefetch_container.GetURL()| might not be the same
   // because of No-Vary-Search non-exact url match.
-  virtual void PrepareToServe(
-      const GURL& url,
-      base::WeakPtr<PrefetchContainer> prefetch_container);
+  virtual void PrepareToServe(const GURL& url,
+                              PrefetchContainer& prefetch_container);
 
   // Finds the prefetch (if any) that can be used to serve a navigation to
   // |url|, and then calls |on_prefetch_to_serve_ready| with that prefetch.
-  using OnPrefetchToServeReady = base::OnceCallback<void(
-      base::WeakPtr<PrefetchContainer> prefetch_to_serve)>;
-  void GetPrefetchToServe(const GURL& url,
-                          OnPrefetchToServeReady on_prefetch_to_serve_ready);
+  using OnPrefetchToServeReady =
+      base::OnceCallback<void(PrefetchContainer::Reader prefetch_to_serve)>;
+  void GetPrefetchToServe(const PrefetchContainer::Key& key,
+                          PrefetchMatchResolver& prefetch_match_resolver);
 
   // Copies any cookies in the isolated network context associated with
   // |prefetch_container| to the default network context.
-  void CopyIsolatedCookies(base::WeakPtr<PrefetchContainer> prefetch_container);
+  virtual void CopyIsolatedCookies(const PrefetchContainer::Reader& reader);
 
   // Removes the prefetch with the given |prefetch_container_key| from
   // |all_prefetches_|.
   void RemovePrefetch(const PrefetchContainer::Key& prefetch_container_key);
+
+  // Destroys the prefetch with the given |prefetch_container_key|. Called
+  // to remove a prefetch when making room for a new prefetch, and sets the
+  // status to |PrefetchStatus::kPrefetchEvicted| before destruction to record
+  // this.
+  void EvictPrefetch(const PrefetchContainer::Key& prefetch_container_key);
+
+  // Called by PrefetchDocumentManager when it finishes processing the latest
+  // update of speculation candidates.
+  void OnCandidatesUpdated();
 
   // Helper functions to control the behavior of the eligibility check when
   // testing.
@@ -119,14 +154,25 @@ class CONTENT_EXPORT PrefetchService {
   // with result and an optional status stating why the prefetch is not
   // eligible.
   using OnEligibilityResultCallback =
-      base::OnceCallback<void(const GURL& url,
-                              base::WeakPtr<PrefetchContainer>,
+      base::OnceCallback<void(base::WeakPtr<PrefetchContainer>,
                               bool eligible,
                               absl::optional<PrefetchStatus> status)>;
   void CheckEligibilityOfPrefetch(
       const GURL& url,
       base::WeakPtr<PrefetchContainer> prefetch_container,
       OnEligibilityResultCallback result_callback) const;
+
+  void CheckHasServiceWorker(
+      const GURL& url,
+      base::WeakPtr<PrefetchContainer> prefetch_container,
+      OnEligibilityResultCallback result_callback) const;
+
+  void OnGotServiceWorkerResult(
+      const GURL& url,
+      base::WeakPtr<PrefetchContainer> prefetch_container,
+      base::Time check_has_service_worker_start_time,
+      OnEligibilityResultCallback result_callback,
+      ServiceWorkerCapability service_worker_capability) const;
 
   // Called after getting the existing cookies associated with
   // |prefetch_container|. If there are any cookies, then the prefetch is not
@@ -150,7 +196,6 @@ class CONTENT_EXPORT PrefetchService {
   // |prefetch_container|. If there is an existing proxy, then the prefetch is
   // not eligible.
   void OnGotProxyLookupResult(
-      const GURL& url,
       base::WeakPtr<PrefetchContainer> prefetch_container,
       OnEligibilityResultCallback result_callback,
       bool has_proxy) const;
@@ -159,7 +204,6 @@ class CONTENT_EXPORT PrefetchService {
   // prefetch is eligible it is added to the queue to be prefetched. If it is
   // not eligible, then we consider making it a decoy request.
   void OnGotEligibilityResult(
-      const GURL& url,
       base::WeakPtr<PrefetchContainer> prefetch_container,
       bool eligible,
       absl::optional<PrefetchStatus> status);
@@ -168,7 +212,8 @@ class CONTENT_EXPORT PrefetchService {
   // determined. If its eligible, then the prefetch will continue, otherwise it
   // is stopped.
   void OnGotEligibilityResultForRedirect(
-      const GURL& url,
+      const net::RedirectInfo& redirect_info,
+      network::mojom::URLResponseHeadPtr redirect_head,
       base::WeakPtr<PrefetchContainer> prefetch_container,
       bool eligible,
       absl::optional<PrefetchStatus> status);
@@ -177,11 +222,13 @@ class CONTENT_EXPORT PrefetchService {
   // possible.
   void Prefetch();
 
-  // Pops the first valid prefetch from |prefetch_queue_|. If there are no
-  // valid prefetches in the queue, then nullptr is returned. In this context,
-  // for a prefetch to be valid, it must not be null and it must be on a visible
-  // web contents.
-  base::WeakPtr<PrefetchContainer> PopNextPrefetchContainer();
+  // Pops the first valid prefetch (determined by PrefetchDocumentManager) from
+  // |prefetch_queue_|. Returns a tuple containing the popped prefetch and
+  // (optionally) an already completed prefetch that needs to be evicted to make
+  // space for the new prefetch. If there are no valid prefetches in the queue,
+  // then (nullptr, nullptr) is returned.
+  std::tuple<base::WeakPtr<PrefetchContainer>, base::WeakPtr<PrefetchContainer>>
+  PopNextPrefetchContainer();
 
   // Once the network request for a prefetch starts, ownership is transferred
   // from the referring |PrefetchDocumentManager| to |this|. After
@@ -190,21 +237,28 @@ class CONTENT_EXPORT PrefetchService {
   // or less, then it is kept forever.
   void TakeOwnershipOfPrefetch(
       base::WeakPtr<PrefetchContainer> prefetch_container);
+  void OnPrefetchTimeout(base::WeakPtr<PrefetchContainer> prefetch);
   void ResetPrefetch(base::WeakPtr<PrefetchContainer> prefetch_container);
 
-  // Starts the network request for the given |prefetch_container|.
-  void StartSinglePrefetch(base::WeakPtr<PrefetchContainer> prefetch_container);
+  // Starts the given |prefetch_container|. If |prefetch_to_evict| is specified,
+  // it is evicted immediately before starting |prefetch_container|.
+  void StartSinglePrefetch(base::WeakPtr<PrefetchContainer> prefetch_container,
+                           base::WeakPtr<PrefetchContainer> prefetch_to_evict);
+
+  // Creates a new URL loader and starts a network request for
+  // |prefetch_container|. |MakePrefetchRequest| must have been previously
+  // called.
+  void SendPrefetchRequest(base::WeakPtr<PrefetchContainer> prefetch_container);
 
   // Gets the URL loader for the given |prefetch_container|. If an override was
   // set by |SetURLLoaderFactoryForTesting|, then that will be returned instead.
-  network::mojom::URLLoaderFactory* GetURLLoaderFactory(
+  network::mojom::URLLoaderFactory* GetURLLoaderFactoryForCurrentPrefetch(
       base::WeakPtr<PrefetchContainer> prefetch_container);
 
   // Called when the request for |prefetch_container| is redirected.
-  PrefetchStreamingURLLoaderStatus OnPrefetchRedirect(
-      base::WeakPtr<PrefetchContainer> prefetch_container,
-      const net::RedirectInfo& redirect_info,
-      const network::mojom::URLResponseHead& response_head);
+  void OnPrefetchRedirect(base::WeakPtr<PrefetchContainer> prefetch_container,
+                          const net::RedirectInfo& redirect_info,
+                          network::mojom::URLResponseHeadPtr redirect_head);
 
   // Called when the response for |prefetch_container| has started. Based on
   // |head|, returns a status to inform the |PrefetchStreamingURLLoader| whether
@@ -225,16 +279,61 @@ class CONTENT_EXPORT PrefetchService {
   // isolated network context and are ready to be written to the default network
   // context.
   void OnGotIsolatedCookiesForCopy(
-      base::WeakPtr<PrefetchContainer> prefetch_container,
+      PrefetchContainer::Reader reader,
       const net::CookieAccessResultList& cookie_list,
       const net::CookieAccessResultList& excluded_cookies);
 
+  enum class HandlePrefetchContainerResult {
+    // No prefetch was available to be used.
+    kNotAvailable,
+    // There was a prefetch available but it is not usable.
+    kNotUsable,
+    // The prefetch will be served.
+    kToBeServed,
+    // The prefetch cannot be served because Cookies have changed.
+    kNotToBeServedCookiesChanged,
+    // The prefetch's head has not yet been received.
+    kWaitForHead
+  };
+
+  using FallbackToRegularNavigationWhenPrefetchNotUsable = base::StrongAlias<
+      class FallbackToRegularNavigationWhenPrefetchNotUsableTag,
+      bool>;
   // Helper function for |GetPrefetchToServe| to return |prefetch_container| via
-  // |on_prefetch_to_serve_ready|. Starts the cookie copy process for the given
-  // prefetch if needed, and updates its state.
-  void ReturnPrefetchToServe(
-      base::WeakPtr<PrefetchContainer> prefetch_container,
-      OnPrefetchToServeReady on_prefetch_to_serve_ready);
+  // |on_prefetch_to_serve_ready| callback in |prefetch_match_resolver|. Starts
+  // the cookie copy process for the given prefetch if needed, and updates its
+  // state.
+  HandlePrefetchContainerResult ReturnPrefetchToServe(
+      const GURL& prefetch_url,
+      PrefetchContainer::Reader reader,
+      PrefetchMatchResolver& prefetch_match_resolver,
+      FallbackToRegularNavigationWhenPrefetchNotUsable
+          when_prefetch_not_used_fallback_to_regular_navigation =
+              FallbackToRegularNavigationWhenPrefetchNotUsable(true));
+
+  // Helper function for |GetPrefetchToServe| to wait for head of a
+  // potentially matching CL in order to decide if we can use it or not for
+  // the current navigation.
+  // Once we make the decision to use a prefetch, call |PrepareToServe| and
+  // |GetPrefetchToServe| again in order to enforce that prefetches that are
+  // served are served from |prefetches_ready_to_serve_|.
+  void WaitOnPrefetchToServeHead(
+      const PrefetchContainer::Key& key,
+      base::WeakPtr<PrefetchMatchResolver> prefetch_match_resolver,
+      const GURL& prefetch_url,
+      base::WeakPtr<PrefetchContainer> prefetch_container);
+
+  // Helper function for |GetPrefetchToServe| which identifies the
+  // |prefetch_container|'s that could potentially be served.
+  std::vector<PrefetchContainer*> FindPrefetchContainerToServe(
+      const PrefetchContainer::Key& key);
+
+  // Helper function for |GetPrefetchToServe| which handles a
+  // |prefetch_container| that could potentially be served to the navigation.
+  HandlePrefetchContainerResult HandlePrefetchContainerToServe(
+      const PrefetchContainer::Key& key,
+      PrefetchContainer& prefetch_container,
+      PrefetchMatchResolver& prefetch_match_resolver);
 
   // Checks if there is a prefetch in |all_prefetches_| with the same URL as
   // |prefetch_container| but from a different referring RenderFrameHost.
@@ -242,7 +341,9 @@ class CONTENT_EXPORT PrefetchService {
   void RecordExistingPrefetchWithMatchingURL(
       base::WeakPtr<PrefetchContainer> prefetch_container) const;
 
-  raw_ptr<BrowserContext> browser_context_;
+  void DumpPrefetchesForDebug() const;
+
+  raw_ptr<BrowserContext, AcrossTasksDanglingUntriaged> browser_context_;
 
   // Delegate provided by embedder that controls specific behavior of |this|.
   // May be nullptr if embedder doesn't provide a delegate.
@@ -282,7 +383,18 @@ class CONTENT_EXPORT PrefetchService {
   // response, and have started the cookie copy process. A prefetch is added to
   // this map when |PrepareToServe| is called on it, and once in this map, it
   // can be returned by |GetPrefetchToServe|.
-  std::map<GURL, base::WeakPtr<PrefetchContainer>> prefetches_ready_to_serve_;
+  // The other way a prefetch could be in this map is if the prefetch matches
+  // exactly by URL and we're waiting for head.
+  //
+  // Unlike other maps, the URL in `PrefetchContainer::Key` can be different
+  // from `PrefetchContainer::GetURL()` due to No-Vary-Search.
+  std::map<PrefetchContainer::Key, base::WeakPtr<PrefetchContainer>>
+      prefetches_ready_to_serve_;
+
+// Protects against Prefetch() being called recursively.
+#if DCHECK_IS_ON()
+  bool prefetch_reentrancy_guard_ = false;
+#endif
 
   SEQUENCE_CHECKER(sequence_checker_);
 

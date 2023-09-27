@@ -6,6 +6,7 @@
 #define CHROME_BROWSER_POLICY_MESSAGING_LAYER_UPLOAD_FILE_UPLOAD_JOB_H_
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "base/containers/flat_map.h"
@@ -16,7 +17,6 @@
 #include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
 #include "base/sequence_checker.h"
-#include "base/strings/string_piece.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/task_traits.h"
 #include "base/thread_annotations.h"
@@ -46,14 +46,14 @@ class FileUploadJob {
   // `session_token` and `access_parameters`.
   class Delegate {
    public:
-    virtual ~Delegate() = default;
+    virtual ~Delegate();
 
     // Asynchronously initializes upload.
     // Calls back with `total` and `session_token` are set, or Status in case
     // of error.
     virtual void DoInitiate(
-        base::StringPiece origin_path,
-        base::StringPiece upload_parameters,
+        std::string_view origin_path,
+        std::string_view upload_parameters,
         base::OnceCallback<
             void(StatusOr<std::pair<int64_t /*total*/,
                                     std::string /*session_token*/>>)> cb) = 0;
@@ -65,7 +65,7 @@ class FileUploadJob {
     virtual void DoNextStep(
         int64_t total,
         int64_t uploaded,
-        base::StringPiece session_token,
+        std::string_view session_token,
         ScopedReservation scoped_reservation,
         base::OnceCallback<
             void(StatusOr<std::pair<int64_t /*uploaded*/,
@@ -74,12 +74,22 @@ class FileUploadJob {
     // Asynchronously finalizes upload (once `uploaded` reached `total`).
     // Calls back with `access_parameters`, or Status in case of error.
     virtual void DoFinalize(
-        base::StringPiece session_token,
+        std::string_view session_token,
         base::OnceCallback<void(StatusOr<std::string /*access_parameters*/>)>
             cb) = 0;
 
+    // Asynchronously deletes the original file (either upon success, or when
+    // the failure happened when `retry_count` dropped to 0). Doesn't wait for
+    // completion and doesn't report the outcome.
+    virtual void DoDeleteFile(std::string_view origin_path) = 0;
+
+    // Returns weak pointer.
+    base::WeakPtr<Delegate> GetWeakPtr();
+
    protected:
-    Delegate() = default;
+    Delegate();
+
+    base::WeakPtrFactory<Delegate> weak_ptr_factory_{this};
   };
 
   // Singleton manager class responsible for keeping track of incoming jobs:
@@ -103,7 +113,7 @@ class FileUploadJob {
     void Register(Priority priority,
                   Record record_copy,
                   ::ash::reporting::LogUploadEvent log_upload_event,
-                  Delegate* delegate,  // not owned, must outlive the Job!
+                  base::WeakPtr<Delegate> delegate,
                   base::OnceCallback<void(StatusOr<FileUploadJob*>)> result_cb);
 
     // Accessor.
@@ -157,6 +167,10 @@ class FileUploadJob {
     // Repost new event if successful, then complete.
     void RepostAndComplete();
 
+    // Compose and post a retry event (with decremented retry count and no
+    // tracker - thus initiating a new FileUploadJob).
+    void PostRetry() const;
+
     SEQUENCE_CHECKER(sequence_checker_);
 
     const base::WeakPtr<FileUploadJob> job_;
@@ -172,7 +186,7 @@ class FileUploadJob {
   // event. When upload is going to be started, `tracker` is empty yet.
   FileUploadJob(const UploadSettings& settings,
                 const UploadTracker& tracker,
-                Delegate* delegate);  // not owned, must outlive the Job!
+                base::WeakPtr<Delegate> delegate);
   FileUploadJob(const FileUploadJob& other) = delete;
   FileUploadJob& operator=(const FileUploadJob& other) = delete;
   ~FileUploadJob();
@@ -223,20 +237,24 @@ class FileUploadJob {
   void DoneFinalize(base::ScopedClosureRunner done,
                     StatusOr<std::string /*access_parameters*/> result);
 
+  // Creates scoped closure runner that augments `done_cb` with the ability to
+  // asynchronously delete the original file upon success or the failure that
+  // happened when `retry_count` dropped to 0.
+  base::ScopedClosureRunner CompletionCb(base::OnceClosure done_cb);
+
   // Post event.
   static void AddRecordToStorage(Priority priority,
                                  Record record_copy,
                                  base::OnceCallback<void(Status)> done_cb);
 
-  // Unowned delegate that performs actual actions.
-  // It must outlive the job (the same delegate may be used by multiple jobs).
-  const base::raw_ptr<Delegate> delegate_;
+  // Unowned delegate that performs actual actions (the same delegate is used by
+  // multiple jobs).
+  const base::WeakPtr<Delegate> delegate_;
 
   SEQUENCE_CHECKER(job_sequence_checker_);
 
-  // Note: Cannot be const, since `retry_count` needs to be decremented.
-  UploadSettings settings_ GUARDED_BY_CONTEXT(job_sequence_checker_);
-
+  // Job parameters matching the event.
+  const UploadSettings settings_;
   UploadTracker tracker_ GUARDED_BY_CONTEXT(job_sequence_checker_);
 
   // Event helper instance for event currently being processed by the job

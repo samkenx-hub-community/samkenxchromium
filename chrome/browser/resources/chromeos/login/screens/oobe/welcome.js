@@ -6,9 +6,11 @@
  * @fileoverview Polymer element for displaying material design OOBE.
  */
 
+import '//resources/cr_elements/chromeos/cros_color_overrides.css.js';
 import '//resources/cr_elements/cr_input/cr_input.js';
 import '//resources/cr_elements/cr_shared_vars.css.js';
 import '//resources/polymer/v3_0/iron-icon/iron-icon.js';
+import '../../components/oobe_a11y_option.js';
 import '../../components/oobe_icons.html.js';
 import '../../components/oobe_i18n_dropdown.js';
 import '../../components/common_styles/oobe_common_styles.css.js';
@@ -842,9 +844,11 @@ class OobeWelcomeScreen extends OobeWelcomeScreenBase {
           ', giving default hint in English.');
     }
     this.cleanupChromeVoxHint_();
+    // |msgId| depends on both feature enabled status and tablet mode.
     const msgId = this.$.welcomeScreen.isInTabletMode ?
-        'chromeVoxHintAnnouncementTextTablet' :
-        'chromeVoxHintAnnouncementTextLaptop';
+        'chromeVoxHintAnnouncementTextTabletExpanded' :
+        'chromeVoxHintAnnouncementTextLaptopExpanded';
+
     const message = this.i18n(msgId);
     chrome.tts.speak(message, options, () => {
       this.showChromeVoxHint_();

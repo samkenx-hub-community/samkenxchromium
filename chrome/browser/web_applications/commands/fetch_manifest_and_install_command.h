@@ -7,9 +7,11 @@
 
 #include <memory>
 
+#include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
 #include "base/values.h"
 #include "chrome/browser/web_applications/commands/web_app_command.h"
+#include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
 #include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/browser/web_applications/web_app_install_manager.h"
 #include "chrome/browser/web_applications/web_app_install_params.h"
@@ -17,14 +19,18 @@
 #include "components/webapps/browser/install_result_code.h"
 #include "components/webapps/browser/installable/installable_logging.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
+#include "components/webapps/common/web_app_id.h"
+#include "content/public/browser/web_contents_observer.h"
 #include "third_party/blink/public/mojom/manifest/manifest.mojom-forward.h"
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
+#include "base/files/file_path.h"
 #include "chromeos/crosapi/mojom/arc.mojom.h"
 #endif
 
 namespace content {
 class WebContents;
+class NavigationHandle;
 }
 
 namespace web_app {
@@ -37,7 +43,8 @@ class NoopLockDescription;
 class WebAppDataRetriever;
 
 // Install web app from manifest for current `WebContents`.
-class FetchManifestAndInstallCommand : public WebAppCommandTemplate<NoopLock> {
+class FetchManifestAndInstallCommand : public WebAppCommandTemplate<NoopLock>,
+                                       public content::WebContentsObserver {
  public:
   // `use_fallback` allows getting fallback information from current document
   // to enable installing a non-promotable site.
@@ -55,12 +62,15 @@ class FetchManifestAndInstallCommand : public WebAppCommandTemplate<NoopLock> {
   // WebAppCommandTemplate<NoopLock>:
   const LockDescription& lock_description() const override;
   void StartWithLock(std::unique_ptr<NoopLock> lock) override;
-  void OnSyncSourceRemoved() override;
   void OnShutdown() override;
   content::WebContents* GetInstallingWebContents() override;
   base::Value ToDebugValue() const override;
 
  private:
+  // content::WebContentsObserver:
+  void DidFinishNavigation(
+      content::NavigationHandle* navigation_handle) override;
+
   void Abort(webapps::InstallResultCode code);
   bool IsWebContentsDestroyed();
 
@@ -105,11 +115,12 @@ class FetchManifestAndInstallCommand : public WebAppCommandTemplate<NoopLock> {
       DownloadedIconsHttpResults icons_http_results);
   void OnDialogCompleted(bool user_accepted,
                          std::unique_ptr<WebAppInstallInfo> web_app_info);
-  void OnInstallFinalizedMaybeReparentTab(const AppId& app_id,
+  void OnInstallFinalizedMaybeReparentTab(const webapps::AppId& app_id,
                                           webapps::InstallResultCode code,
                                           OsHooksErrors os_hooks_errors);
 
-  void OnInstallCompleted(const AppId& app_id, webapps::InstallResultCode code);
+  void OnInstallCompleted(const webapps::AppId& app_id,
+                          webapps::InstallResultCode code);
 
   void LogInstallInfo();
 
@@ -131,10 +142,14 @@ class FetchManifestAndInstallCommand : public WebAppCommandTemplate<NoopLock> {
 
   InstallErrorLogEntry install_error_log_entry_;
 
-  AppId app_id_;
+  webapps::AppId app_id_;
   std::unique_ptr<WebAppInstallInfo> web_app_info_;
   blink::mojom::ManifestPtr opt_manifest_;
   base::Value::Dict debug_log_;
+
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+  absl::optional<base::FilePath> app_profile_path_;
+#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
 
   base::WeakPtrFactory<FetchManifestAndInstallCommand> weak_ptr_factory_{this};
 };

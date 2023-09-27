@@ -13,22 +13,19 @@ class HTMLUListElement;
 class HTMLOListElement;
 
 LayoutNGOutsideListMarker::LayoutNGOutsideListMarker(Element* element)
-    : LayoutNGBlockFlowMixin<LayoutBlockFlow>(element) {}
+    : LayoutNGBlockFlow(element) {}
 
 bool LayoutNGOutsideListMarker::IsOfType(LayoutObjectType type) const {
   return type == kLayoutObjectNGOutsideListMarker ||
-         LayoutNGMixin<LayoutBlockFlow>::IsOfType(type);
+         LayoutNGBlockFlow::IsOfType(type);
 }
 
 void LayoutNGOutsideListMarker::WillCollectInlines() {
   list_marker_.UpdateMarkerTextIfNeeded(*this);
 }
 
-LayoutBox::PaginationBreakability
-LayoutNGOutsideListMarker::GetPaginationBreakability(
-    FragmentationEngine engine) const {
-  // Outside list markers are always monolithic.
-  return kForbidBreaks;
+bool LayoutNGOutsideListMarker::IsMonolithic() const {
+  return true;
 }
 
 bool LayoutNGOutsideListMarker::NeedsOccupyWholeLine() const {

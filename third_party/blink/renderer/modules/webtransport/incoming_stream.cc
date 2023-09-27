@@ -58,8 +58,8 @@ class IncomingStream::UnderlyingByteSource final
   ScriptPromise Cancel(v8::Local<v8::Value> reason,
                        ExceptionState& exception_state) override {
     uint8_t code = 0;
-    WebTransportError* exception = V8WebTransportError::ToImplWithTypeCheck(
-        script_state_->GetIsolate(), reason);
+    WebTransportError* exception =
+        V8WebTransportError::ToWrappable(script_state_->GetIsolate(), reason);
     if (exception) {
       code = exception->streamErrorCode().value_or(0);
     }
@@ -198,7 +198,7 @@ void IncomingStream::ProcessClose() {
   if (fin_received_.value()) {
     ScriptState::Scope scope(script_state_);
     ExceptionState exception_state(script_state_->GetIsolate(),
-                                   ExceptionState::kUnknownContext, "", "");
+                                   ExceptionContextType::kUnknown, "", "");
     CloseAbortAndReset(exception_state);
     // Ignore exception because stream will be errored soon.
     if (exception_state.HadException()) {

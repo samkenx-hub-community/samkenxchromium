@@ -33,9 +33,8 @@ import org.chromium.chrome.browser.theme.ThemeUtils;
 import org.chromium.chrome.browser.toolbar.R;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuButtonHelper;
 import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
-import org.chromium.components.browser_ui.widget.animation.Interpolators;
 import org.chromium.components.browser_ui.widget.highlight.PulseDrawable;
-import org.chromium.ui.interpolators.BakedBezierInterpolator;
+import org.chromium.ui.interpolators.Interpolators;
 
 /**
  * The overflow menu button.
@@ -126,6 +125,9 @@ public class MenuButton extends FrameLayout implements TintObserver {
         int color = ThemeUtils.getThemedToolbarIconTint(getContext(), mBrandedColorScheme)
                             .getDefaultColor();
         mMenuImageButtonAnimationDrawable.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+
+        // Not reliably set in tests.
+        if (mStateSupplier == null) return;
 
         // As an optimization, don't re-calculate drawable state for the update badge unless we
         // intend to actually show it.
@@ -304,7 +306,6 @@ public class MenuButton extends FrameLayout implements TintObserver {
         drawable.draw(canvas);
     }
 
-    @VisibleForTesting
     public @BrandedColorScheme int getBrandedColorSchemeForTesting() {
         return mBrandedColorScheme;
     }
@@ -339,13 +340,13 @@ public class MenuButton extends FrameLayout implements TintObserver {
             final View menuButton, final View menuBadge) {
         // Create badge ObjectAnimators.
         ObjectAnimator badgeFadeAnimator = ObjectAnimator.ofFloat(menuBadge, View.ALPHA, 1.f);
-        badgeFadeAnimator.setInterpolator(BakedBezierInterpolator.FADE_IN_CURVE);
+        badgeFadeAnimator.setInterpolator(Interpolators.LINEAR_OUT_SLOW_IN_INTERPOLATOR);
 
         int pixelTranslation =
                 menuBadge.getResources().getDimensionPixelSize(R.dimen.menu_badge_translation_y);
         ObjectAnimator badgeTranslateYAnimator =
                 ObjectAnimator.ofFloat(menuBadge, View.TRANSLATION_Y, pixelTranslation, 0.f);
-        badgeTranslateYAnimator.setInterpolator(BakedBezierInterpolator.TRANSFORM_CURVE);
+        badgeTranslateYAnimator.setInterpolator(Interpolators.FAST_OUT_SLOW_IN_INTERPOLATOR);
 
         // Create menu button ObjectAnimator.
         ObjectAnimator menuButtonFadeAnimator = ObjectAnimator.ofFloat(menuButton, View.ALPHA, 0.f);
@@ -386,11 +387,11 @@ public class MenuButton extends FrameLayout implements TintObserver {
             final View menuButton, final View menuBadge) {
         // Create badge ObjectAnimator.
         ObjectAnimator badgeFadeAnimator = ObjectAnimator.ofFloat(menuBadge, View.ALPHA, 0.f);
-        badgeFadeAnimator.setInterpolator(BakedBezierInterpolator.FADE_OUT_CURVE);
+        badgeFadeAnimator.setInterpolator(Interpolators.FAST_OUT_LINEAR_IN_INTERPOLATOR);
 
         // Create menu button ObjectAnimator.
         ObjectAnimator menuButtonFadeAnimator = ObjectAnimator.ofFloat(menuButton, View.ALPHA, 1.f);
-        menuButtonFadeAnimator.setInterpolator(BakedBezierInterpolator.FADE_IN_CURVE);
+        menuButtonFadeAnimator.setInterpolator(Interpolators.LINEAR_OUT_SLOW_IN_INTERPOLATOR);
 
         // Create AnimatorSet and listeners.
         AnimatorSet set = new AnimatorSet();
@@ -413,7 +414,6 @@ public class MenuButton extends FrameLayout implements TintObserver {
         return set;
     }
 
-    @VisibleForTesting
     void setOriginalBackgroundForTesting(Drawable background) {
         mOriginalBackground = background;
         setBackground(mOriginalBackground);

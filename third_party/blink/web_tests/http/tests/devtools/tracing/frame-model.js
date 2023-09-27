@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {PerformanceTestRunner} from 'performance_test_runner';
+
+import * as TimelineModule from 'devtools/panels/timeline/timeline.js';
+
 (async function() {
   TestRunner.addResult(`Test the frames are correctly built based on trace events\n`);
-  await TestRunner.loadLegacyModule('timeline'); await TestRunner.loadTestModule('performance_test_runner');
+  await TestRunner.loadLegacyModule('timeline');
   await TestRunner.showPanel('timeline');
 
   var sessionId = '4.20';
@@ -1896,7 +1901,7 @@
     TestRunner.addResult('Test: ' + testName);
 
     for (var frame of performanceModel.frameModel().getFrames()) {
-      TestRunner.addResult(Timeline.TimelineUIUtils.frameDuration(frame).textContent);
+      TestRunner.addResult(TimelineModule.TimelineUIUtils.TimelineUIUtils.frameDuration(frame).textContent);
       PerformanceTestRunner.dumpFrame(frame);
     }
   }

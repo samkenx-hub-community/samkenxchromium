@@ -26,12 +26,14 @@
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkColorSpace.h"
+#include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkImageGenerator.h"
 #include "third_party/skia/include/core/SkImageInfo.h"
 #include "third_party/skia/include/core/SkPixmap.h"
 #include "third_party/skia/include/core/SkRefCnt.h"
 #include "third_party/skia/include/core/SkYUVAPixmaps.h"
 #include "third_party/skia/include/gpu/GrDirectContext.h"
+#include "third_party/skia/include/gpu/ganesh/SkImageGanesh.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/skia_conversions.h"
 
@@ -94,8 +96,9 @@ bool AreDisplayListDrawingResultsSame(const gfx::Rect& layer_rect,
 
 Region ImageRectsToRegion(const DiscardableImageMap::Rects& rects) {
   Region region;
-  for (const auto& r : rects.container())
+  for (const auto& r : rects) {
     region.Union(r);
+  }
   return region;
 }
 
@@ -212,7 +215,7 @@ PaintImage CreateAnimatedImage(const gfx::Size& size,
       .set_paint_image_generator(sk_make_sp<FakePaintImageGenerator>(
           SkImageInfo::MakeN32Premul(size.width(), size.height()),
           std::move(frames)))
-      .set_animation_type(PaintImage::AnimationType::ANIMATED)
+      .set_animation_type(PaintImage::AnimationType::kAnimated)
       .set_repetition_count(repetition_count)
       .TakePaintImage();
 }
@@ -225,7 +228,7 @@ PaintImage CreateBitmapImage(const gfx::Size& size, SkColorType color_type) {
   bitmap.eraseColor(SK_AlphaTRANSPARENT);
   return PaintImageBuilder::WithDefault()
       .set_id(PaintImage::GetNextId())
-      .set_image(SkImage::MakeFromBitmap(bitmap),
+      .set_image(SkImages::RasterFromBitmap(bitmap),
                  PaintImage::GetNextContentId())
       .TakePaintImage();
 }
@@ -288,9 +291,9 @@ PaintImage CreateNonDiscardablePaintImage(const gfx::Size& size) {
   bitmap.eraseColor(SK_AlphaTRANSPARENT);
   return PaintImageBuilder::WithDefault()
       .set_id(PaintImage::GetNextId())
-      .set_texture_image(
-          SkImage::MakeFromBitmap(bitmap)->makeTextureImage(context.get()),
-          PaintImage::GetNextContentId())
+      .set_texture_image(SkImages::TextureFromImage(
+                             context.get(), SkImages::RasterFromBitmap(bitmap)),
+                         PaintImage::GetNextContentId())
       .TakePaintImage();
 }
 

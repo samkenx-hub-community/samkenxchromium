@@ -10,7 +10,11 @@
 
 #include "ash/ash_export.h"
 #include "ash/public/cpp/keyboard/keyboard_controller_observer.h"
+#include "ash/shelf/shelf_observer.h"
+#include "ash/system/unified/unified_system_tray.h"
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "ui/compositor/layer_animation_observer.h"
@@ -36,7 +40,9 @@ class ToastManagerImplTest;
 class SystemToastStyle;
 
 class ASH_EXPORT ToastOverlay : public ui::ImplicitAnimationObserver,
-                                public KeyboardControllerObserver {
+                                public KeyboardControllerObserver,
+                                public ShelfObserver,
+                                public UnifiedSystemTray::Observer {
  public:
   class ASH_EXPORT Delegate {
    public:
@@ -63,7 +69,6 @@ class ASH_EXPORT ToastOverlay : public ui::ImplicitAnimationObserver,
                const std::u16string& dismiss_text,
                const gfx::VectorIcon& leading_icon,
                base::TimeDelta duration,
-               bool show_on_lock_screen,
                bool persist_on_hover,
                aura::Window* root_window,
                base::RepeatingClosure dismiss_callback);
@@ -89,9 +94,15 @@ class ASH_EXPORT ToastOverlay : public ui::ImplicitAnimationObserver,
   // Returns false if `is_dismiss_button_highlighted_` is false.
   bool MaybeActivateHighlightedDismissButton();
 
+  // UnifiedSystemTray::Observer:
+  void OnSliderBubbleHeightChanged() override;
+
+  // Returns if the dismiss button is highlighted in the toast. If the toast
+  // does not have a dismiss button, it returns false.
+  bool IsDismissButtonHighlighted() const;
+
  private:
   friend class ToastManagerImplTest;
-  friend class ClipboardHistoryControllerRefreshTest;
   friend class DesksTestApi;
 
   class ToastDisplayObserver;
@@ -99,6 +110,10 @@ class ASH_EXPORT ToastOverlay : public ui::ImplicitAnimationObserver,
 
   // Returns the current bounds of the overlay, which is based on visibility.
   gfx::Rect CalculateOverlayBounds();
+
+  // Calculates the y offset used to shift side aligned toasts up whenever a
+  // slider bubble is visible.
+  int CalculateSliderBubbleOffset();
 
   // Executed the callback and closes the toast.
   void OnButtonClicked();
@@ -114,16 +129,21 @@ class ASH_EXPORT ToastOverlay : public ui::ImplicitAnimationObserver,
   // KeyboardControllerObserver:
   void OnKeyboardOccludedBoundsChanged(const gfx::Rect& new_bounds) override;
 
+  // ShelfObserver:
+  void OnShelfWorkAreaInsetsChanged() override;
+  void OnHotseatStateChanged(HotseatState old_state,
+                             HotseatState new_state) override;
+
   views::Widget* widget_for_testing();
   views::LabelButton* dismiss_button_for_testing();
 
-  Delegate* const delegate_;
+  const raw_ptr<Delegate, ExperimentalAsh> delegate_;
   const std::u16string text_;
   const std::u16string dismiss_text_;
   std::unique_ptr<views::Widget> overlay_widget_;
   std::unique_ptr<SystemToastStyle> overlay_view_;
   std::unique_ptr<ToastDisplayObserver> display_observer_;
-  aura::Window* root_window_;
+  raw_ptr<aura::Window, ExperimentalAsh> root_window_;
   base::RepeatingClosure dismiss_callback_;
 
   gfx::Size widget_size_;
@@ -132,6 +152,12 @@ class ASH_EXPORT ToastOverlay : public ui::ImplicitAnimationObserver,
   // `current_toast_expiration_timer_` if we are allowing for the toast to
   // persist on hover.
   std::unique_ptr<ToastHoverObserver> hover_observer_;
+
+  base::ScopedObservation<UnifiedSystemTray, UnifiedSystemTray::Observer>
+      scoped_unified_system_tray_observer_{this};
+
+  // Used to observe shelf and hotseat state to update toast baseline.
+  base::ScopedObservation<Shelf, ShelfObserver> shelf_observation_{this};
 };
 
 }  // namespace ash

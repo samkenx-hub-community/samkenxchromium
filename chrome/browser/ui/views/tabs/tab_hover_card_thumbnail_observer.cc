@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ui/views/tabs/tab_hover_card_thumbnail_observer.h"
 
+#include "chrome/browser/ui/tabs/tab_style.h"
+
 TabHoverCardThumbnailObserver::TabHoverCardThumbnailObserver() = default;
 TabHoverCardThumbnailObserver::~TabHoverCardThumbnailObserver() = default;
 
@@ -18,7 +20,7 @@ void TabHoverCardThumbnailObserver::Observe(
     return;
 
   subscription_ = current_image_->Subscribe();
-  subscription_->SetSizeHint(TabStyle::GetPreviewImageSize());
+  subscription_->SetSizeHint(TabStyle::Get()->GetPreviewImageSize());
   subscription_->SetUncompressedImageCallback(base::BindRepeating(
       &TabHoverCardThumbnailObserver::ThumbnailImageCallback,
       base::Unretained(this), base::Unretained(current_image_.get())));

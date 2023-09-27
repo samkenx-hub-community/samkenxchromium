@@ -20,6 +20,7 @@
 #include "ash/system/tray/tray_bubble_wrapper.h"
 #include "ash/test/ash_test_base.h"
 #include "ash/test/test_ash_web_view_factory.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/display/test/display_manager_test_api.h"
@@ -124,6 +125,8 @@ class EcheTrayTest : public AshTestBase {
     eche_connection_status_handler_->AddObserver(
         &fake_connection_status_observer_);
     eche_tray_ = StatusAreaWidgetTestHelper::GetStatusAreaWidget()->eche_tray();
+    eche_tray_->SetEcheConnectionStatusHandler(
+        eche_connection_status_handler_.get());
     phone_hub_tray_ =
         StatusAreaWidgetTestHelper::GetStatusAreaWidget()->phone_hub_tray();
 
@@ -162,9 +165,12 @@ class EcheTrayTest : public AshTestBase {
 
  private:
   FakeConnectionStatusObserver fake_connection_status_observer_;
-  EcheTray* eche_tray_ = nullptr;  // Not owned
-  PhoneHubTray* phone_hub_tray_ = nullptr;  // Not owned
-  ToastManagerImpl* toast_manager_ = nullptr;
+  raw_ptr<EcheTray, DanglingUntriaged | ExperimentalAsh> eche_tray_ =
+      nullptr;  // Not owned
+  raw_ptr<PhoneHubTray, DanglingUntriaged | ExperimentalAsh> phone_hub_tray_ =
+      nullptr;  // Not owned
+  raw_ptr<ToastManagerImpl, DanglingUntriaged | ExperimentalAsh>
+      toast_manager_ = nullptr;
 
   // Calling the factory constructor is enough to set it up.
   std::unique_ptr<TestAshWebViewFactory> test_web_view_factory_ =
@@ -701,71 +707,13 @@ TEST_F(EcheTrayTest, OnConnectionStatusChanged) {
   eche_tray()->OnConnectionStatusChanged(
       ConnectionStatus::kConnectionStatusConnecting);
 
-  EXPECT_EQ(GetLastConnectionChangedForUiStatus(),
-            ConnectionStatus::kConnectionStatusDisconnected);
   EXPECT_EQ(GetNumConnectionStatusForUiChangedCalls(), 0u);
   EXPECT_TRUE(eche_tray()->get_initializer_webview_for_test());
 
   eche_tray()->OnConnectionStatusChanged(
-      ConnectionStatus::kConnectionStatusDisconnected);
-  EXPECT_EQ(GetNumConnectionStatusForUiChangedCalls(), 0u);
+      ConnectionStatus::kConnectionStatusConnected);
+  EXPECT_EQ(GetNumConnectionStatusForUiChangedCalls(), 1u);
   EXPECT_TRUE(eche_tray()->get_initializer_webview_for_test());
-}
-
-TEST_F(EcheTrayTest, DISABLED_OnThemeChanged) {
-  ResetUnloadWebContent();
-  eche_tray()->LoadBubble(
-      GURL("http://google.com"), CreateTestImage(), u"app 1", u"your phone",
-      eche_app::mojom::ConnectionStatus::kConnectionStatusDisconnected,
-      eche_app::mojom::AppStreamLaunchEntryPoint::APPS_LIST);
-  eche_tray()->ShowBubble();
-
-  EXPECT_TRUE(eche_tray()->is_active());
-  EXPECT_TRUE(eche_tray()->GetArrowBackButtonForTesting());
-  EXPECT_TRUE(eche_tray()->GetMinimizeButtonForTesting());
-  EXPECT_TRUE(eche_tray()->GetCloseButtonForTesting());
-
-  eche_tray()->OnThemeChanged();
-
-  // Buttons still exist
-  eche_tray()->ShowBubble();
-  EXPECT_TRUE(eche_tray()->is_active());
-  EXPECT_TRUE(eche_tray()->GetArrowBackButtonForTesting());
-  EXPECT_TRUE(eche_tray()->GetMinimizeButtonForTesting());
-  EXPECT_TRUE(eche_tray()->GetCloseButtonForTesting());
-  EXPECT_FALSE(is_web_content_unloaded_);
-
-  eche_tray()->PurgeAndClose();
-  EXPECT_FALSE(eche_tray()->is_active());
-  EXPECT_FALSE(eche_tray()->GetArrowBackButtonForTesting());
-  EXPECT_FALSE(eche_tray()->GetMinimizeButtonForTesting());
-  EXPECT_FALSE(eche_tray()->GetCloseButtonForTesting());
-}
-
-TEST_F(EcheTrayTest, OnThemeChangedNoBubble) {
-  ResetUnloadWebContent();
-  eche_tray()->LoadBubble(
-      GURL("http://google.com"), CreateTestImage(), u"app 1", u"your phone",
-      eche_app::mojom::ConnectionStatus::kConnectionStatusDisconnected,
-      eche_app::mojom::AppStreamLaunchEntryPoint::APPS_LIST);
-
-  eche_tray()->ShowBubble();
-  EXPECT_TRUE(eche_tray()->is_active());
-  EXPECT_TRUE(eche_tray()->GetArrowBackButtonForTesting());
-  EXPECT_TRUE(eche_tray()->GetMinimizeButtonForTesting());
-  EXPECT_TRUE(eche_tray()->GetCloseButtonForTesting());
-
-  eche_tray()->PurgeAndClose();
-  EXPECT_FALSE(eche_tray()->is_active());
-  EXPECT_FALSE(eche_tray()->GetArrowBackButtonForTesting());
-  EXPECT_FALSE(eche_tray()->GetMinimizeButtonForTesting());
-  EXPECT_FALSE(eche_tray()->GetCloseButtonForTesting());
-
-  eche_tray()->OnThemeChanged();
-  EXPECT_FALSE(eche_tray()->is_active());
-  EXPECT_FALSE(eche_tray()->GetArrowBackButtonForTesting());
-  EXPECT_FALSE(eche_tray()->GetMinimizeButtonForTesting());
-  EXPECT_FALSE(eche_tray()->GetCloseButtonForTesting());
 }
 
 }  // namespace ash

@@ -9,11 +9,9 @@ import android.graphics.Rect;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextUtils;
-import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
-import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
@@ -26,6 +24,7 @@ import androidx.annotation.VisibleForTesting;
 import org.chromium.base.Log;
 import org.chromium.base.StrictModeContext;
 import org.chromium.components.browser_ui.widget.text.VerticallyFixedEditText;
+import org.chromium.ui.text.EmptyTextWatcher;
 
 /**
  * An {@link EditText} that shows autocomplete text at the end.
@@ -35,7 +34,6 @@ public class AutocompleteEditText
     private static final String TAG = "AutocompleteEdit";
 
     private static final boolean DEBUG = false;
-    private final AccessibilityManager mAccessibilityManager;
 
     private AutocompleteEditTextModelBase mModel;
     private boolean mIgnoreTextChangesForAutocomplete = true;
@@ -49,16 +47,11 @@ public class AutocompleteEditText
      */
     private boolean mDisableTextScrollingFromAutocomplete;
 
-    private boolean mIgnoreImeForTest;
-
     /** Local copy of the OnKeyListener. */
     private @Nullable OnKeyListener mOnKeyListener;
 
     public AutocompleteEditText(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mAccessibilityManager =
-                (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
-
         addTextWatcherForPaste();
     }
 
@@ -68,13 +61,7 @@ public class AutocompleteEditText
      * user's typing, so we need to handle this case as well.
      */
     private void addTextWatcherForPaste() {
-        addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
+        addTextChangedListener(new EmptyTextWatcher() {
             @Override
             public void afterTextChanged(Editable editable) {
                 if (wasLastEditPaste() && !mIgnoreTextChangesForAutocomplete) {
@@ -103,16 +90,12 @@ public class AutocompleteEditText
         mNativeInitialized = true;
     }
 
-    @VisibleForTesting
-    public AccessibilityManager getAccessibilityManagerForTesting() {
-        return mAccessibilityManager;
-    }
-
     private void ensureModel() {
         if (mModel != null) return;
 
         mModel = new SpannableAutocompleteEditTextModel(this);
         mModel.setIgnoreTextChangeFromAutocomplete(true);
+        mModel.setLayoutDirectionIsLtr(getLayoutDirection() != LAYOUT_DIRECTION_RTL);
         mModel.onFocusChanged(hasFocus());
         mModel.onSetText(getText());
         mModel.onTextChanged(getText(), 0, 0, getText().length());
@@ -287,11 +270,6 @@ public class AutocompleteEditText
         return mModel.getInputConnection();
     }
 
-    @VisibleForTesting
-    public void setIgnoreImeForTest(boolean ignore) {
-        mIgnoreImeForTest = ignore;
-    }
-
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
         InputConnection target = super.onCreateInputConnection(outAttrs);
@@ -303,7 +281,6 @@ public class AutocompleteEditText
         if (DEBUG) Log.i(TAG, "onCreateInputConnection: " + target);
         ensureModel();
         InputConnection retVal = mModel.onCreateInputConnection(target);
-        if (mIgnoreImeForTest) return null;
         return retVal;
     }
 
@@ -316,7 +293,6 @@ public class AutocompleteEditText
                 return true;
             }
 
-            if (mIgnoreImeForTest) return true;
             if (mModel == null) return super.dispatchKeyEvent(event);
             return mModel.dispatchKeyEvent(event);
         } finally {
@@ -357,12 +333,15 @@ public class AutocompleteEditText
     }
 
     @Override
-    public boolean isAccessibilityEnabled() {
-        return mAccessibilityManager != null && mAccessibilityManager.isEnabled();
-    }
+    public void onUpdateSelectionForTesting(int selStart, int selEnd) {}
 
     @Override
-    public void onUpdateSelectionForTesting(int selStart, int selEnd) {}
+    public void onRtlPropertiesChanged(int layoutDirection) {
+        super.onRtlPropertiesChanged(layoutDirection);
+        if (mModel != null) {
+            mModel.setLayoutDirectionIsLtr(layoutDirection != LAYOUT_DIRECTION_RTL);
+        }
+    }
 
     @Override
     public String getKeyboardPackageName() {

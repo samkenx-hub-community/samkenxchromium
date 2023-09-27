@@ -10,13 +10,15 @@
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/search.h"
+#include "chrome/browser/search_engine_choice/search_engine_choice_service.h"
+#include "chrome/browser/search_engine_choice/search_engine_choice_service_factory.h"
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/privacy_sandbox/privacy_sandbox_prompt.h"
 #include "chrome/common/extensions/chrome_manifest_url_handlers.h"
 #include "chrome/common/webui_url_constants.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
@@ -24,18 +26,22 @@
 
 namespace {
 
+constexpr char kPrivacySandboxPromptHelperEventHistogram[] =
+    "Settings.PrivacySandbox.PromptHelperEvent";
+
 // Gets the type of prompt that should be displayed for |profile|, this includes
 // the possibility of no prompt being required.
 PrivacySandboxService::PromptType GetRequiredPromptType(Profile* profile) {
   if (!profile || !profile->IsRegularProfile())
     return PrivacySandboxService::PromptType::kNone;
 
-  auto* privacy_sandbox_serivce =
+  auto* privacy_sandbox_service =
       PrivacySandboxServiceFactory::GetForProfile(profile);
-  if (!privacy_sandbox_serivce)
+  if (!privacy_sandbox_service) {
     return PrivacySandboxService::PromptType::kNone;
+  }
 
-  return privacy_sandbox_serivce->GetRequiredPromptType();
+  return privacy_sandbox_service->GetRequiredPromptType();
 }
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -70,16 +76,28 @@ PrivacySandboxPromptHelper::~PrivacySandboxPromptHelper() = default;
 PrivacySandboxPromptHelper::PrivacySandboxPromptHelper(
     content::WebContents* web_contents)
     : WebContentsObserver(web_contents),
-      content::WebContentsUserData<PrivacySandboxPromptHelper>(*web_contents) {}
+      content::WebContentsUserData<PrivacySandboxPromptHelper>(*web_contents) {
+  base::UmaHistogramEnumeration(
+      kPrivacySandboxPromptHelperEventHistogram,
+      SettingsPrivacySandboxPromptHelperEvent::kCreated);
+}
 
 void PrivacySandboxPromptHelper::DidFinishNavigation(
     content::NavigationHandle* navigation_handle) {
-  if (!ProfileRequiresPrompt(profile()))
+  if (!ProfileRequiresPrompt(profile())) {
+    base::UmaHistogramEnumeration(
+        kPrivacySandboxPromptHelperEventHistogram,
+        SettingsPrivacySandboxPromptHelperEvent::kPromptNotRequired);
     return;
+  }
 
   // Only valid top frame navigations are considered.
   if (!navigation_handle || !navigation_handle->HasCommitted() ||
-      !navigation_handle->IsInPrimaryMainFrame()) {
+      !navigation_handle->IsInPrimaryMainFrame() ||
+      navigation_handle->IsSameDocument()) {
+    base::UmaHistogramEnumeration(
+        kPrivacySandboxPromptHelperEventHistogram,
+        SettingsPrivacySandboxPromptHelperEvent::kNonTopFrameNavigation);
     return;
   }
 
@@ -102,6 +120,9 @@ void PrivacySandboxPromptHelper::DidFinishNavigation(
           GURL(url::kAboutBlankURL), content::Referrer(),
           WindowOpenDisposition::NEW_FOREGROUND_TAB,
           ui::PAGE_TRANSITION_AUTO_TOPLEVEL, /*is_renderer_initiated=*/false));
+      base::UmaHistogramEnumeration(
+          kPrivacySandboxPromptHelperEventHistogram,
+          SettingsPrivacySandboxPromptHelperEvent::kAboutBlankOpened);
       return;
     }
   }
@@ -112,24 +133,62 @@ void PrivacySandboxPromptHelper::DidFinishNavigation(
   // distinguish between different types of NTPs.
   if (!PrivacySandboxService::IsUrlSuitableForPrompt(
           navigation_handle->GetURL())) {
+    base::UmaHistogramEnumeration(
+        kPrivacySandboxPromptHelperEventHistogram,
+        SettingsPrivacySandboxPromptHelperEvent::kUrlNotSuitable);
     return;
   }
 
   // If a Sync setup is in progress, the prompt should not be shown.
   if (auto* sync_service = SyncServiceFactory::GetForProfile(profile())) {
-    if (sync_service->IsSetupInProgress())
+    if (sync_service->IsSetupInProgress()) {
+      base::UmaHistogramEnumeration(
+          kPrivacySandboxPromptHelperEventHistogram,
+          SettingsPrivacySandboxPromptHelperEvent::kSyncSetupInProgress);
       return;
+    }
   }
+
+// Defer the prompt to the next Chrome run if the Search Engine Choice
+// dialog will be or has been displayed in the current run.
+// The build flag check is needed because we don't build the Search Engine
+// Choice dialog on Fuchsia.
+// TODO(b/301061968): Add a test for when the user makes the search engine
+// choice in the FRE and then opens a browser where the prompt should be shown.
+#if BUILDFLAG(ENABLE_SEARCH_ENGINE_CHOICE)
+  SearchEngineChoiceService* search_engine_choice_service =
+      SearchEngineChoiceServiceFactory::GetForProfile(profile());
+  if (search_engine_choice_service &&
+      !search_engine_choice_service->WasChoiceMadeInFRE()) {
+    base::UmaHistogramEnumeration(kPrivacySandboxPromptHelperEventHistogram,
+                                  SettingsPrivacySandboxPromptHelperEvent::
+                                      kSearchEngineChoiceDialogShown);
+    return;
+  }
+#endif
 
   auto* browser =
       chrome::FindBrowserWithWebContents(navigation_handle->GetWebContents());
 
+  // If a sign-in dialog is being currently displayed, the prompt should
+  // not be shown to avoid conflict.
+  if (browser->signin_view_controller()->ShowsModalDialog()) {
+    base::UmaHistogramEnumeration(
+        kPrivacySandboxPromptHelperEventHistogram,
+        SettingsPrivacySandboxPromptHelperEvent::kSigninDialogShown);
+    return;
+  }
+
   // If a Privacy Sandbox prompt already exists for this browser, do not attempt
   // to open another one.
-  if (auto* privacy_sandbox_serivce =
+  if (auto* privacy_sandbox_service =
           PrivacySandboxServiceFactory::GetForProfile(profile())) {
-    if (privacy_sandbox_serivce->IsPromptOpenForBrowser(browser))
+    if (privacy_sandbox_service->IsPromptOpenForBrowser(browser)) {
+      base::UmaHistogramEnumeration(kPrivacySandboxPromptHelperEventHistogram,
+                                    SettingsPrivacySandboxPromptHelperEvent::
+                                        kPromptAlreadyExistsForBrowser);
       return;
+    }
   }
 
   const bool is_window_too_small = !CanWindowFitPrivacySandboxPrompt(browser);
@@ -139,6 +198,9 @@ void PrivacySandboxPromptHelper::DidFinishNavigation(
   // the dialog. The dialog is blocking modal, that is why we want to prevent it
   // from showing if there isn't enough space.
   if (is_window_too_small) {
+    base::UmaHistogramEnumeration(
+        kPrivacySandboxPromptHelperEventHistogram,
+        SettingsPrivacySandboxPromptHelperEvent::kWindowTooSmall);
     return;
   }
 
@@ -154,6 +216,9 @@ void PrivacySandboxPromptHelper::DidFinishNavigation(
           navigation_handle->GetWebContents()));
 
   ShowPrivacySandboxPrompt(browser, GetRequiredPromptType(profile()));
+  base::UmaHistogramEnumeration(
+      kPrivacySandboxPromptHelperEventHistogram,
+      SettingsPrivacySandboxPromptHelperEvent::kPromptShown);
 }
 
 // static

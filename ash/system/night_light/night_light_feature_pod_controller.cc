@@ -7,12 +7,12 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/quick_settings_catalogs.h"
+#include "ash/public/cpp/schedule_enums.h"
 #include "ash/public/cpp/system_tray_client.h"
 #include "ash/resources/vector_icons/vector_icons.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
-#include "ash/system/machine_learning/user_settings_event_logger.h"
 #include "ash/system/model/clock_model.h"
 #include "ash/system/model/system_tray_model.h"
 #include "ash/system/night_light/night_light_controller_impl.h"
@@ -27,16 +27,6 @@
 #include "ui/base/l10n/l10n_util.h"
 
 namespace ash {
-namespace {
-
-void LogUserNightLightEvent(const bool enabled) {
-  auto* logger = ml::UserSettingsEventLogger::Get();
-  if (logger) {
-    logger->LogNightLightUkmEvent(enabled);
-  }
-}
-
-}  // namespace
 
 NightLightFeaturePodController::NightLightFeaturePodController(
     UnifiedSystemTrayController* tray_controller)
@@ -55,8 +45,9 @@ FeaturePodButton* NightLightFeaturePodController::CreateButton() {
   const bool visible =
       Shell::Get()->session_controller()->ShouldEnableSettings();
   button_->SetVisible(visible);
-  if (visible)
+  if (visible) {
     TrackVisibilityUMA();
+  }
 
   button_->SetLabel(
       l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_NIGHT_LIGHT_BUTTON_LABEL));
@@ -75,8 +66,7 @@ std::unique_ptr<FeatureTile> NightLightFeaturePodController::CreateTile(
                           weak_factory_.GetWeakPtr()),
       /*is_togglable=*/true);
   tile_ = tile.get();
-  const bool visible =
-      Shell::Get()->session_controller()->ShouldEnableSettings();
+  const bool visible = TrayPopupUtils::CanShowNightLightFeatureTile();
   tile_->SetVisible(visible);
   if (visible) {
     TrackVisibilityUMA();
@@ -98,7 +88,6 @@ void NightLightFeaturePodController::OnIconPressed() {
                      ->GetEnabled());
 
   Shell::Get()->night_light_controller()->Toggle();
-  LogUserNightLightEvent(Shell::Get()->night_light_controller()->GetEnabled());
   Update();
 
   if (Shell::Get()->night_light_controller()->GetEnabled()) {
@@ -143,25 +132,29 @@ void NightLightFeaturePodController::Refresh() {
 const std::u16string NightLightFeaturePodController::GetPodSubLabel() {
   auto* controller = Shell::Get()->night_light_controller();
   const bool is_enabled = controller->GetEnabled();
-  const NightLightController::ScheduleType schedule_type =
-      controller->GetScheduleType();
+  const ScheduleType schedule_type = controller->GetScheduleType();
   std::u16string sublabel;
   switch (schedule_type) {
-    case NightLightController::ScheduleType::kNone:
+    case ScheduleType::kNone:
       return l10n_util::GetStringUTF16(
           is_enabled ? IDS_ASH_STATUS_TRAY_NIGHT_LIGHT_ON_STATE
                      : IDS_ASH_STATUS_TRAY_NIGHT_LIGHT_OFF_STATE);
-    case NightLightController::ScheduleType::kSunsetToSunrise:
+    case ScheduleType::kSunsetToSunrise:
       return l10n_util::GetStringUTF16(
           is_enabled
               ? IDS_ASH_STATUS_TRAY_NIGHT_LIGHT_ON_STATE_SUNSET_TO_SUNRISE_SCHEDULED
               : IDS_ASH_STATUS_TRAY_NIGHT_LIGHT_OFF_STATE_SUNSET_TO_SUNRISE_SCHEDULED);
-    case NightLightController::ScheduleType::kCustom:
-      const TimeOfDay time = is_enabled ? controller->GetCustomEndTime()
+    case ScheduleType::kCustom:
+      const TimeOfDay time_of_day = is_enabled
+                                        ? controller->GetCustomEndTime()
                                         : controller->GetCustomStartTime();
+      const absl::optional<base::Time> time = time_of_day.ToTimeToday();
+      if (!time) {
+        return std::u16string();
+      }
       const std::u16string time_str =
           base::TimeFormatTimeOfDayWithHourClockType(
-              time.ToTimeToday(),
+              *time,
               Shell::Get()->system_tray_model()->clock()->hour_clock_type(),
               base::kKeepAmPm);
       return is_enabled

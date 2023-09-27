@@ -5,13 +5,12 @@
 #include "components/desks_storage/core/saved_desk_builder.h"
 
 #include "ash/public/cpp/desk_template.h"
-#include "base/guid.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "base/uuid.h"
 #include "components/app_constants/constants.h"
 #include "components/app_restore/app_launch_info.h"
 #include "components/desks_storage/core/desk_template_conversion.h"
-#include "components/desks_storage/core/saved_desk_test_util.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 
 namespace desks_storage {
@@ -143,6 +142,7 @@ BuiltApp SavedDeskGenericAppBuilder::Build() {
         absl::optional<int32_t>(static_cast<int32_t>(disposition_.value()));
   }
 
+  app_launch_info->app_name = name_;
   app_launch_info->window_id = window_id_;
 
   return BuiltApp(BuiltApp::Status::kOk, std::move(window_info),
@@ -153,7 +153,7 @@ const std::string& SavedDeskGenericAppBuilder::GetAppId() {
   if (app_id_)
     return app_id_.value();
 
-  app_id_ = base::GUID::GenerateRandomV4().AsLowercaseString();
+  app_id_ = base::Uuid::GenerateRandomV4().AsLowercaseString();
   return app_id_.value();
 }
 
@@ -275,7 +275,7 @@ BuiltApp SavedDeskBrowserBuilder::Build() {
       continue;
     DCHECK(built_group.tab_group);
 
-    generic_app.launch_info->tab_group_infos.value().push_back(
+    generic_app.launch_info->tab_group_infos.push_back(
         *built_group.tab_group.release());
   }
 
@@ -342,7 +342,7 @@ SavedDeskBuilder::SavedDeskBuilder()
     : desk_name_("unnamed desk"),
       desk_source_(ash::DeskTemplateSource::kUser),
       desk_type_(ash::DeskTemplateType::kTemplate) {
-  desk_uuid_ = base::GUID::GenerateRandomV4();
+  desk_uuid_ = base::Uuid::GenerateRandomV4();
   created_time_ = base::Time::Now();
 }
 SavedDeskBuilder::~SavedDeskBuilder() = default;
@@ -362,7 +362,7 @@ std::unique_ptr<ash::DeskTemplate> SavedDeskBuilder::Build() {
 }
 
 SavedDeskBuilder& SavedDeskBuilder::SetUuid(const std::string& uuid) {
-  desk_uuid_ = base::GUID::ParseCaseInsensitive(uuid);
+  desk_uuid_ = base::Uuid::ParseCaseInsensitive(uuid);
   return *this;
 }
 

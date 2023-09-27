@@ -5,9 +5,9 @@
 package org.chromium.chrome.browser.download;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.annotation.Nullable;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
 import org.hamcrest.Matchers;
@@ -70,20 +70,17 @@ public class DownloadMessageUiControllerTest {
 
     static class TestDelegate implements DownloadMessageUiController.Delegate {
         @Override
-        @Nullable
-        public Context getContext() {
-            return InstrumentationRegistry.getTargetContext();
+        public @Nullable Context getContext() {
+            return ApplicationProvider.getApplicationContext();
         }
 
         @Override
-        @Nullable
-        public MessageDispatcher getMessageDispatcher() {
+        public @Nullable MessageDispatcher getMessageDispatcher() {
             return null;
         }
 
         @Override
-        @Nullable
-        public ModalDialogManager getModalDialogManager() {
+        public @Nullable ModalDialogManager getModalDialogManager() {
             return null;
         }
 
@@ -154,7 +151,7 @@ public class DownloadMessageUiControllerTest {
     private static void markItemComplete(OfflineItem item) {
         item.state = OfflineItemState.COMPLETE;
         item.title = TEST_FILE_NAME;
-        item.url = JUnitTestGURLs.getGURL(JUnitTestGURLs.EXAMPLE_URL);
+        item.url = JUnitTestGURLs.EXAMPLE_URL;
         item.receivedBytes = 10L;
         item.totalSizeBytes = 10L;
     }

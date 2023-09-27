@@ -18,31 +18,21 @@ import org.chromium.base.annotations.NativeMethods;
 @JNINamespace("external_intents")
 public class ExternalIntentsFeatures extends Features {
     public static final String EXTERNAL_NAVIGATION_DEBUG_LOGS_NAME = "ExternalNavigationDebugLogs";
-    public static final String EXTERNAL_NAVIGATION_SUBFRAME_REDIRECTS_NAME =
-            "ExternalNavigationSubframeRedirects";
-    public static final String BLOCK_SUBFRAME_INTENT_TO_SELF_NAME = "BlockSubframeIntentToSelf";
-    public static final String BLOCK_FRAME_RENAVIGATIONS_NAME = "BlockFrameRenavigations";
-    public static final String DO_NOT_REQUIRE_SPECIALIZED_CCT_HANDLER_NAME =
-            "DoNotRequireSpecializedCCTHandler";
+    public static final String BLOCK_FRAME_RENAVIGATIONS_NAME = "BlockFrameRenavigations3";
     public static final String BLOCK_INTENTS_TO_SELF_NAME = "BlockIntentsToSelf";
+    public static final String TRUSTED_CLIENT_GESTURE_BYPASS_NAME = "TrustedClientGestureBypass";
 
     public static final ExternalIntentsFeatures EXTERNAL_NAVIGATION_DEBUG_LOGS =
             new ExternalIntentsFeatures(0, EXTERNAL_NAVIGATION_DEBUG_LOGS_NAME);
 
-    public static final ExternalIntentsFeatures EXTERNAL_NAVIGATION_SUBFRAME_REDIRECTS =
-            new ExternalIntentsFeatures(1, EXTERNAL_NAVIGATION_SUBFRAME_REDIRECTS_NAME);
-
-    public static final ExternalIntentsFeatures BLOCK_SUBFRAME_INTENT_TO_SELF =
-            new ExternalIntentsFeatures(2, BLOCK_SUBFRAME_INTENT_TO_SELF_NAME);
-
     public static final ExternalIntentsFeatures BLOCK_FRAME_RENAVIGATIONS =
-            new ExternalIntentsFeatures(3, BLOCK_FRAME_RENAVIGATIONS_NAME);
-
-    public static final ExternalIntentsFeatures DO_NOT_REQUIRE_SPECIALIZED_CCT_HANDLER =
-            new ExternalIntentsFeatures(4, DO_NOT_REQUIRE_SPECIALIZED_CCT_HANDLER_NAME);
+            new ExternalIntentsFeatures(1, BLOCK_FRAME_RENAVIGATIONS_NAME);
 
     public static final ExternalIntentsFeatures BLOCK_INTENTS_TO_SELF =
-            new ExternalIntentsFeatures(5, BLOCK_INTENTS_TO_SELF_NAME);
+            new ExternalIntentsFeatures(2, BLOCK_INTENTS_TO_SELF_NAME);
+
+    public static final ExternalIntentsFeatures TRUSTED_CLIENT_GESTURE_BYPASS =
+            new ExternalIntentsFeatures(3, TRUSTED_CLIENT_GESTURE_BYPASS_NAME);
 
     private final int mOrdinal;
 

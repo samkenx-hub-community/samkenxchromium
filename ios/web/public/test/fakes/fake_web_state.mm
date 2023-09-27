@@ -10,6 +10,7 @@
 #import "base/functional/bind.h"
 #import "base/functional/callback.h"
 #import "base/strings/sys_string_conversions.h"
+#import "components/sessions/core/session_id.h"
 #import "ios/web/common/crw_content_view.h"
 #import "ios/web/js_messaging/web_frames_manager_impl.h"
 #import "ios/web/public/js_messaging/web_frame.h"
@@ -21,10 +22,6 @@
 #import "ios/web/session/session_certificate_policy_cache_impl.h"
 #import "ios/web/web_state/policy_decision_state_tracker.h"
 #import "ui/gfx/image/image.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace web {
 
@@ -40,9 +37,12 @@ void FakeWebState::CloseWebState() {
   is_closed_ = true;
 }
 
-FakeWebState::FakeWebState(NSString* stable_identifier)
-    : stable_identifier_(stable_identifier ? stable_identifier
-                                           : [[NSUUID UUID] UUIDString]) {}
+FakeWebState::FakeWebState()
+    : stable_identifier_([[NSUUID UUID] UUIDString]),
+      unique_identifier_(web::WebStateID::NewUnique()) {
+  DCHECK(stable_identifier_.length);
+  DCHECK(unique_identifier_.valid());
+}
 
 FakeWebState::~FakeWebState() {
   for (auto& observer : observers_)
@@ -53,11 +53,17 @@ FakeWebState::~FakeWebState() {
     observer.ResetWebState();
 }
 
+void FakeWebState::SerializeToProto(proto::WebStateStorage& storage) const {}
+
 WebStateDelegate* FakeWebState::GetDelegate() {
   return nil;
 }
 
 void FakeWebState::SetDelegate(WebStateDelegate* delegate) {}
+
+std::unique_ptr<WebState> FakeWebState::Clone() const {
+  return std::make_unique<FakeWebState>();
+}
 
 bool FakeWebState::IsRealized() const {
   return is_realized_;
@@ -169,13 +175,15 @@ FakeWebState::GetSessionCertificatePolicyCache() {
   return nullptr;
 }
 
-CRWSessionStorage* FakeWebState::BuildSessionStorage() {
+CRWSessionStorage* FakeWebState::BuildSessionStorage() const {
   CRWSessionStorage* session_storage = [[CRWSessionStorage alloc] init];
-  session_storage.userData =
-      web::SerializableUserDataManager::FromWebState(this)
-          ->GetUserDataForSession();
   session_storage.itemStorages = @[ [[CRWNavigationItemStorage alloc] init] ];
   session_storage.stableIdentifier = stable_identifier_;
+  session_storage.uniqueIdentifier = unique_identifier_;
+  if (const SerializableUserDataManager* manager =
+          SerializableUserDataManager::FromWebState(this)) {
+    session_storage.userData = manager->GetUserDataForSession();
+  }
   return session_storage;
 }
 
@@ -230,6 +238,10 @@ NSString* FakeWebState::GetStableIdentifier() const {
   return stable_identifier_;
 }
 
+WebStateID FakeWebState::GetUniqueIdentifier() const {
+  return unique_identifier_;
+}
+
 const std::string& FakeWebState::GetContentsMimeType() const {
   return mime_type_;
 }
@@ -250,10 +262,7 @@ const GURL& FakeWebState::GetLastCommittedURL() const {
   return url_;
 }
 
-GURL FakeWebState::GetCurrentURL(URLVerificationTrustLevel* trust_level) const {
-  if (trust_level) {
-    *trust_level = trust_level_;
-  }
+absl::optional<GURL> FakeWebState::GetLastCommittedURLIfTrusted() const {
   return url_;
 }
 
@@ -375,18 +384,6 @@ void FakeWebState::OnVisibleSecurityStateChanged() {
   }
 }
 
-void FakeWebState::OnWebFrameDidBecomeAvailable(WebFrame* frame) {
-  for (auto& observer : observers_) {
-    observer.WebFrameDidBecomeAvailable(this, frame);
-  }
-}
-
-void FakeWebState::OnWebFrameWillBecomeUnavailable(WebFrame* frame) {
-  for (auto& observer : observers_) {
-    observer.WebFrameWillBecomeUnavailable(this, frame);
-  }
-}
-
 void FakeWebState::ShouldAllowRequest(
     NSURLRequest* request,
     WebStatePolicyDecider::RequestInfo request_info,
@@ -455,10 +452,6 @@ void FakeWebState::SetVisibleURL(const GURL& url) {
   url_ = url;
 }
 
-void FakeWebState::SetTrustLevel(URLVerificationTrustLevel trust_level) {
-  trust_level_ = trust_level;
-}
-
 void FakeWebState::SetCanTakeSnapshot(bool can_take_snapshot) {
   can_take_snapshot_ = can_take_snapshot;
 }
@@ -515,9 +508,6 @@ bool FakeWebState::SetSessionStateData(NSData* data) {
 NSData* FakeWebState::SessionStateData() {
   return nil;
 }
-
-void FakeWebState::SetSwipeRecognizerProvider(
-    id<CRWSwipeRecognizerProvider> delegate) {}
 
 PermissionState FakeWebState::GetStateForPermission(
     Permission permission) const {
@@ -585,6 +575,10 @@ id<CRWFindInteraction> FakeWebState::GetFindInteraction()
 }
 
 id FakeWebState::GetActivityItem() API_AVAILABLE(ios(16.4)) {
+  return nil;
+}
+
+UIColor* FakeWebState::GetThemeColor() {
   return nil;
 }
 

@@ -7,15 +7,18 @@
 #include <utility>
 #include <vector>
 
-#include "ash/constants/ash_features.h"
 #include "base/check_is_test.h"
+#include "chrome/browser/apps/app_service/app_launch_params.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_base.h"
 #include "chrome/browser/apps/app_service/intent_util.h"
+#include "chrome/browser/apps/app_service/launch_utils.h"
+#include "chrome/browser/ash/crostini/crostini_features.h"
+#include "chrome/browser/ash/file_manager/fileapi_util.h"
 #include "chrome/browser/ash/guest_os/guest_os_registry_service_factory.h"
-#include "chrome/browser/profiles/profile.h"
 #include "components/services/app_service/public/cpp/app_types.h"
 #include "components/services/app_service/public/cpp/intent_util.h"
+#include "storage/browser/file_system/file_system_context.h"
 
 namespace apps {
 
@@ -49,6 +52,22 @@ void GuestOSApps::Initialize() {
   }
   AppPublisher::Publish(std::move(apps), AppType(),
                         /*should_notify_initialized=*/true);
+}
+
+std::vector<guest_os::LaunchArg> GuestOSApps::ArgsFromIntent(
+    const apps::Intent* intent) {
+  std::vector<guest_os::LaunchArg> args;
+  if (!intent || intent->files.empty()) {
+    return args;
+  }
+  args.reserve(intent->files.size());
+  storage::FileSystemContext* file_system_context =
+      file_manager::util::GetFileManagerFileSystemContext(profile());
+  for (auto& file : intent->files) {
+    args.emplace_back(
+        file_system_context->CrackURLInFirstPartyContext(file->url));
+  }
+  return args;
 }
 
 void GuestOSApps::GetCompressedIconData(const std::string& app_id,
@@ -89,6 +108,23 @@ void GuestOSApps::OnRegistryUpdated(
   }
 }
 
+void GuestOSApps::LaunchAppWithParams(AppLaunchParams&& params,
+                                      LaunchCallback callback) {
+  auto event_flags = apps::GetEventFlags(params.disposition,
+                                         /*prefer_container=*/false);
+  if (params.intent) {
+    LaunchAppWithIntent(params.app_id, event_flags, std::move(params.intent),
+                        params.launch_source,
+                        std::make_unique<WindowInfo>(params.display_id),
+                        std::move(callback));
+  } else {
+    Launch(params.app_id, event_flags, params.launch_source,
+           std::make_unique<WindowInfo>(params.display_id));
+    // TODO(crbug.com/1244506): Add launch return value.
+    std::move(callback).Run(LaunchResult());
+  }
+}
+
 AppPtr GuestOSApps::CreateApp(
     const guest_os::GuestOsRegistryService::Registration& registration,
     bool generate_new_icon_key) {
@@ -106,8 +142,11 @@ AppPtr GuestOSApps::CreateApp(
   }
 
   if (generate_new_icon_key) {
-    app->icon_key = std::move(
-        *icon_key_factory_.CreateIconKey(IconEffects::kCrOsStandardIcon));
+    IconEffects icon_effects = IconEffects::kCrOsStandardIcon;
+    if (crostini::CrostiniFeatures::Get()->IsMultiContainerAllowed(profile_)) {
+      icon_effects |= IconEffects::kGuestOsBadge;
+    }
+    app->icon_key = std::move(*icon_key_factory_.CreateIconKey(icon_effects));
   }
 
   app->last_launch_time = registration.LastLaunchTime();
@@ -145,11 +184,9 @@ apps::IntentFilters CreateIntentFilterForAppService(
   // can (e.g. a proprietary file type), we should look at the file extensions
   // that the app can support. We find these extension types by checking what
   // extensions correspond to the app's supported mime types.
-  std::vector<std::string> extension_types;
-  if (ash::features::ShouldGuestOsFileTasksUseAppService()) {
-    extension_types = mime_types_service->GetExtensionTypesFromMimeTypes(
-        mime_types_set, registration.VmName(), registration.ContainerName());
-  }
+  std::vector<std::string> extension_types =
+      mime_types_service->GetExtensionTypesFromMimeTypes(
+          mime_types_set, registration.VmName(), registration.ContainerName());
   std::vector<std::string> mime_types(mime_types_set.begin(),
                                       mime_types_set.end());
 

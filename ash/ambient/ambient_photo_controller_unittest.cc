@@ -12,12 +12,11 @@
 #include "ash/ambient/ambient_constants.h"
 #include "ash/ambient/ambient_controller.h"
 #include "ash/ambient/ambient_photo_cache.h"
-#include "ash/ambient/ambient_weather_controller.h"
+#include "ash/ambient/ambient_ui_settings.h"
 #include "ash/ambient/model/ambient_animation_photo_config.h"
 #include "ash/ambient/model/ambient_backend_model.h"
 #include "ash/ambient/model/ambient_backend_model_observer.h"
 #include "ash/ambient/model/ambient_photo_config.h"
-#include "ash/ambient/model/ambient_weather_model.h"
 #include "ash/ambient/test/ambient_ash_test_base.h"
 #include "ash/ambient/test/ambient_test_util.h"
 #include "ash/ambient/test/ambient_topic_queue_test_delegate.h"
@@ -26,6 +25,7 @@
 #include "ash/public/cpp/ambient/fake_ambient_backend_controller_impl.h"
 #include "ash/public/cpp/ambient/proto/photo_cache_entry.pb.h"
 #include "ash/shell.h"
+#include "ash/webui/personalization_app/mojom/personalization_app.mojom-shared.h"
 #include "base/barrier_closure.h"
 #include "base/base_paths.h"
 #include "base/check.h"
@@ -80,6 +80,9 @@ class AmbientPhotoControllerTest : public AmbientAshTestBase {
  protected:
   void SetUp() override {
     AmbientAshTestBase::SetUp();
+    // Force the `AmbientUiSettings` to be any setting that has photos, or
+    // `photo_controller()` will be null and the tests will crash.
+    SetAmbientTheme(personalization_app::mojom::AmbientTheme::kSlideshow);
     // This is common to all AmbientPhotoConfigs and mimics real-world behavior:
     // When OnImagesReady() is called, the UI synchronously starts rendering.
     ON_CALL(images_ready_observer_, OnImagesReady)
@@ -152,8 +155,9 @@ class AmbientPhotoControllerTest : public AmbientAshTestBase {
   }
 
   void RunUntilImagesReady() {
-    if (photo_controller()->ambient_backend_model()->ImagesReady())
+    if (photo_controller()->ambient_backend_model()->ImagesReady()) {
       return;
+    }
 
     static constexpr base::TimeDelta kTimeout = base::Seconds(3);
     base::test::ScopedRunLoopTimeout loop_timeout(FROM_HERE, kTimeout);
@@ -412,7 +416,7 @@ TEST_F(AmbientPhotoControllerTest, ShouldNotDeleteImagesOnDisk) {
 
   // Stop to refresh images.
   photo_controller()->StopScreenUpdate();
-  FastForwardToNextImage();
+  FastForwardByPhotoRefreshInterval();
 
   EXPECT_EQ(GetSavedCacheIndices().size(), 3u);
 
@@ -426,7 +430,7 @@ TEST_F(AmbientPhotoControllerTest, ShouldNotDeleteImagesOnDisk) {
 TEST_F(AmbientPhotoControllerTest, ShouldReadCacheWhenNoMoreTopics) {
   Init();
   FetchImage();
-  FastForwardToNextImage();
+  FastForwardByPhotoRefreshInterval();
   // Topics is empty. Will read from cache, which is empty.
   PhotoWithDetails image;
   photo_controller()->ambient_backend_model()->GetCurrentAndNextImages(
@@ -453,7 +457,7 @@ TEST_F(AmbientPhotoControllerTest,
        ShouldTry100TimesToReadCacheWhenNoMoreTopics) {
   Init();
   FetchImage();
-  FastForwardToNextImage();
+  FastForwardByPhotoRefreshInterval();
   // Topics is empty. Will read from cache, which is empty.
   PhotoWithDetails image;
   photo_controller()->ambient_backend_model()->GetCurrentAndNextImages(
@@ -510,7 +514,7 @@ TEST_F(AmbientPhotoControllerTest, ShouldReadCacheWhenImageDownloadingFailed) {
 TEST_F(AmbientPhotoControllerTest, ShouldPopulateDetailsWhenReadFromCache) {
   Init();
   FetchImage();
-  FastForwardToNextImage();
+  FastForwardByPhotoRefreshInterval();
   // Topics is empty. Will read from cache, which is empty.
   PhotoWithDetails image;
   photo_controller()->ambient_backend_model()->GetCurrentAndNextImages(
@@ -554,7 +558,7 @@ TEST_F(AmbientPhotoControllerTest, ShouldReadCacheWhenImageDecodingFailed) {
 TEST_F(AmbientPhotoControllerTest, ShouldResumWhenHaveMoreTopics) {
   Init();
   FetchImage();
-  FastForwardToNextImage();
+  FastForwardByPhotoRefreshInterval();
   // Topics is empty. Will read from cache, which is empty.
   PhotoWithDetails image;
   photo_controller()->ambient_backend_model()->GetCurrentAndNextImages(
@@ -704,36 +708,6 @@ TEST_F(AmbientPhotoControllerTest, ShouldNotLoadDuplicateImages) {
   EXPECT_TRUE(photo_controller()->ambient_backend_model()->IsHashDuplicate(
       base::SHA1HashString("image data 2")));
   EXPECT_TRUE(photo_controller()->ambient_backend_model()->ImagesReady());
-}
-
-TEST_F(AmbientPhotoControllerTest, ShouldStartToRefreshWeather) {
-  auto* model = weather_controller()->weather_model();
-  EXPECT_FALSE(model->show_celsius());
-  EXPECT_TRUE(model->weather_condition_icon().isNull());
-
-  WeatherInfo info;
-  info.show_celsius = true;
-  info.condition_icon_url = "https://fake-icon-url";
-  info.temp_f = 70.0f;
-  backend_controller()->SetWeatherInfo(info);
-
-  // Start to refresh weather as screen update starts.
-  photo_controller()->StartScreenUpdate(
-      std::make_unique<AmbientTopicQueueTestDelegate>());
-  base::RunLoop().RunUntilIdle();
-
-  EXPECT_TRUE(model->show_celsius());
-  EXPECT_FALSE(model->weather_condition_icon().isNull());
-  EXPECT_GT(info.temp_f, 0);
-
-  // Refresh weather again after time passes.
-  info.show_celsius = false;
-  info.temp_f = -70.0f;
-  backend_controller()->SetWeatherInfo(info);
-
-  FastForwardToRefreshWeather();
-  EXPECT_FALSE(model->show_celsius());
-  EXPECT_LT(info.temp_f, 0);
 }
 
 TEST_F(AmbientPhotoControllerTest, IsScreenUpdateActive) {

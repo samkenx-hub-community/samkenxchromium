@@ -25,19 +25,18 @@ class CORE_EXPORT NGFragmentItems final {
  public:
   NGFragmentItems(const NGFragmentItems& other);
   explicit NGFragmentItems(NGFragmentItemsBuilder* builder);
-  ~NGFragmentItems();
 
-  wtf_size_t Size() const { return size_; }
+  wtf_size_t Size() const { return items_.size(); }
 
   using Span = base::span<const NGFragmentItem>;
-  Span Items() const { return base::make_span(ItemsData(), size_); }
+  Span Items() const { return base::make_span(ItemsData(), items_.size()); }
   bool Equals(const Span& span) const {
     return ItemsData() == span.data() && Size() == span.size();
   }
   bool IsSubSpan(const Span& span) const;
 
   const NGFragmentItem& front() const {
-    CHECK_GE(size_, 1u);
+    CHECK_GE(items_.size(), 1u);
     return items_[0];
   }
 
@@ -59,7 +58,9 @@ class CORE_EXPORT NGFragmentItems final {
   wtf_size_t SizeOfEarlierFragments() const {
     return size_of_earlier_fragments_;
   }
-  wtf_size_t EndItemIndex() const { return size_of_earlier_fragments_ + size_; }
+  wtf_size_t EndItemIndex() const {
+    return size_of_earlier_fragments_ + items_.size();
+  }
   bool HasItemIndex(wtf_size_t index) const {
     return index >= SizeOfEarlierFragments() && index < EndItemIndex();
   }
@@ -84,10 +85,13 @@ class CORE_EXPORT NGFragmentItems final {
   // Return true if any items inside the culled inline occur here. In that case,
   // |is_first_container| and |is_last_container| will also be set to indicate
   // whether this is the first/last container for the culled inline. If false is
-  // returned, these out-parameters must be ignored.
+  // returned, the |is_first_container| and |is_last_container| out-parameters
+  // must be ignored. |child_has_any_child_items| will be set to true if there
+  // are any items inside the LayoutInline at all, regardless of return value.
   bool IsContainerForCulledInline(const LayoutInline&,
                                   bool* is_first_container,
-                                  bool* is_last_container) const;
+                                  bool* is_last_container,
+                                  bool* child_has_any_child_items) const;
 
   // Mark items dirty when |child| is removed from the tree.
   static void DirtyLinesFromChangedChild(const LayoutObject& child,
@@ -104,12 +108,6 @@ class CORE_EXPORT NGFragmentItems final {
       const NGPhysicalBoxFragment& new_fragment,
       const NGPhysicalBoxFragment& containing_fragment);
 
-  // The byte size of this instance.
-  constexpr static wtf_size_t ByteSizeFor(wtf_size_t count) {
-    return sizeof(NGFragmentItems) + count * sizeof(NGFragmentItem);
-  }
-  wtf_size_t ByteSize() const { return ByteSizeFor(Size()); }
-
 #if DCHECK_IS_ON()
   void CheckAllItemsAreValid() const;
 #endif
@@ -117,7 +115,7 @@ class CORE_EXPORT NGFragmentItems final {
   void Trace(Visitor*) const;
 
  private:
-  const NGFragmentItem* ItemsData() const { return items_; }
+  const NGFragmentItem* ItemsData() const { return items_.data(); }
 
   static bool CanReuseAll(NGInlineCursor* cursor);
   static bool TryDirtyFirstLineFor(const LayoutObject& layout_object,
@@ -129,15 +127,11 @@ class CORE_EXPORT NGFragmentItems final {
   String text_content_;
   String first_line_text_content_;
 
-  // Note: To make |Trace()| handles flexible array |items_| correctly, |size_|
-  // must be an immutable.
-  const wtf_size_t size_;
-
   // Total size of |NGFragmentItem| in earlier fragments when block fragmented.
   // 0 for the first |NGFragmentItems|.
-  mutable wtf_size_t size_of_earlier_fragments_;
+  mutable wtf_size_t size_of_earlier_fragments_ = 0u;
 
-  NGFragmentItem items_[0];
+  HeapVector<NGFragmentItem> items_;
 };
 
 }  // namespace blink

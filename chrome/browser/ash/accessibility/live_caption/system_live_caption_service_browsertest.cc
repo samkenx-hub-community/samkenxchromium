@@ -8,6 +8,7 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/accessibility/live_caption/live_caption_controller_factory.h"
 #include "chrome/browser/ash/accessibility/live_caption/system_live_caption_service_factory.h"
 #include "chrome/browser/ash/login/session/user_session_initializer.h"
@@ -119,7 +120,7 @@ class SystemLiveCaptionServiceTest : public InProcessBrowserTest {
     const base::FilePath profile_path =
         profile_manager->GenerateNextProfileDirectoryPath();
     secondary_profile_ =
-        profiles::testing::CreateProfileSync(profile_manager, profile_path);
+        &profiles::testing::CreateProfileSync(profile_manager, profile_path);
     CHECK(secondary_profile_);
 
     // Replace our CrosSpeechRecognitionService with a fake one. We can pass a
@@ -175,6 +176,8 @@ class SystemLiveCaptionServiceTest : public InProcessBrowserTest {
     speech::SodaInstaller::GetInstance()->NotifySodaInstalledForTesting(
         speech::LanguageCode::kEnUs);
     speech::SodaInstaller::GetInstance()->NotifySodaInstalledForTesting();
+    // Events must propogate, so we wait after install.
+    base::RunLoop().RunUntilIdle();
     SystemLiveCaptionServiceFactory::GetInstance()
         ->GetForProfile(primary_profile_)
         ->OnNonChromeOutputStarted();
@@ -182,9 +185,11 @@ class SystemLiveCaptionServiceTest : public InProcessBrowserTest {
   }
 
   // Unowned.
-  Profile* primary_profile_;
-  Profile* secondary_profile_;
-  speech::FakeSpeechRecognitionService* fake_speech_recognition_service_;
+  raw_ptr<Profile, DanglingUntriaged | ExperimentalAsh> primary_profile_;
+  raw_ptr<Profile, DanglingUntriaged | ExperimentalAsh> secondary_profile_;
+  raw_ptr<speech::FakeSpeechRecognitionService,
+          DanglingUntriaged | ExperimentalAsh>
+      fake_speech_recognition_service_;
 
   base::test::ScopedFeatureList scoped_feature_list_;
 };
@@ -253,9 +258,10 @@ IN_PROC_BROWSER_TEST_F(SystemLiveCaptionServiceTest, SodaError) {
 // Tests that our feature listens to the correct SODA language.
 IN_PROC_BROWSER_TEST_F(SystemLiveCaptionServiceTest, SodaIrrelevantError) {
   // Set audio output running
-  SystemLiveCaptionServiceFactory::GetInstance()
-      ->GetForProfile(primary_profile_)
-      ->OnNonChromeOutputStarted();
+  auto* live_caption_service =
+      SystemLiveCaptionServiceFactory::GetInstance()->GetForProfile(
+          primary_profile_);
+  live_caption_service->OnNonChromeOutputStarted();
   // Enable feature so that we start listening for SODA install status.
   SetLiveCaptionsPref(primary_profile_, /*enabled=*/true);
 
@@ -275,7 +281,10 @@ IN_PROC_BROWSER_TEST_F(SystemLiveCaptionServiceTest, SodaIrrelevantError) {
   speech::SodaInstaller::GetInstance()->NotifySodaInstalledForTesting(
       speech::LanguageCode::kEnUs);
   base::RunLoop().RunUntilIdle();
-
+  // Tell the caption service audio is running again. This is needed since we
+  // don't actually go to a fake cras audio system in this test.
+  live_caption_service->OnNonChromeOutputStarted();
+  base::RunLoop().RunUntilIdle();
   // We should have ignored the unrelated error.
   EXPECT_TRUE(fake_speech_recognition_service_->is_capturing_audio());
 }

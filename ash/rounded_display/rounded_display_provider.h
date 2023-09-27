@@ -5,12 +5,10 @@
 #ifndef ASH_ROUNDED_DISPLAY_ROUNDED_DISPLAY_PROVIDER_H_
 #define ASH_ROUNDED_DISPLAY_ROUNDED_DISPLAY_PROVIDER_H_
 
-#include <cstdint>
 #include <memory>
 #include <vector>
 
 #include "ash/ash_export.h"
-#include "base/allocator/partition_allocator/pointers/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "ui/display/display.h"
 #include "ui/gfx/geometry/rounded_corners_f.h"
@@ -77,10 +75,11 @@ class ASH_EXPORT RoundedDisplayProvider {
 
   // Creates RoundedDisplayGutters if needed and returns true if we created
   // gutters else returns false.
-  // As an optimization, we create gutters only for non-zero corners of the
-  // display. We can have displays that don't have rounded bottom edges, so we
-  // skip creation of lower-left and lower-right NonOverlayGutters and for the
-  // horizontal orientation, we skip the creation of the lower OverlayGutter.
+  // To minimize the use of overlay planes, we only create a gutter if it has
+  // at least a single non-zero corner mask drawn into it.
+  // For example, for a display that doesn't have rounded bottom edges, and
+  // based on the `strategy_`, we need to create upper and lower OverlayGutters,
+  // we will skip the creation of the lower OverlayGutter.
   bool CreateGutters(const display::Display& display,
                      const gfx::RoundedCornersF& panel_radii);
 
@@ -94,26 +93,22 @@ class ASH_EXPORT RoundedDisplayProvider {
 
   // The current display state for which rounded display is enabled.
   float current_device_scale_factor_ = 0.0;
-  display::Display::Rotation current_rotation_ =
+  display::Display::Rotation current_logical_rotation_ =
       display::Display::Rotation::ROTATE_0;
   gfx::RoundedCornersF current_panel_radii_;
 
   // The specified strategy to determine direction of overlay gutters.
   Strategy strategy_ = Strategy::kScanout;
 
-  // Stores the overlay gutters based on the `overlay_gutters_orientation_`.
+  // Stores the overlay gutters that are created based on the `strategy_`.
   std::vector<std::unique_ptr<RoundedDisplayGutter>> overlay_gutters_;
-
-  // Stores the non-overlay gutters.
-  std::vector<std::unique_ptr<RoundedDisplayGutter>> non_overlay_gutters_;
 
   // OverlayRoundedDisplayGutter creation is delegated to this factory.
   std::unique_ptr<RoundedDisplayGutterFactory> gutter_factory_;
 
   // Represents the surface on which the `host_` render the mask textures of the
-  // rounded-display corners. It gets destroyed when its window_tree_host
-  // is destroyed.
-  base::raw_ptr<aura::Window> host_window_;
+  // rounded-display corners.
+  std::unique_ptr<aura::Window> host_window_;
 
   // Responsible to render the mask textures by submitting compositor frames.
   std::unique_ptr<RoundedDisplayHost> host_;

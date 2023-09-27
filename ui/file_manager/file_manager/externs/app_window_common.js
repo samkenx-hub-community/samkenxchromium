@@ -25,3 +25,19 @@ Window.prototype.reload = function() {};
  * @type {boolean}
  */
 Window.prototype.IN_TEST;
+
+/**
+ * The function below is added by tslib_shim.ts to the global namespace.
+ *
+ * @param {*} decorators
+ * @param {*} target
+ * @param {string=} key
+ * @param {*=} desc
+ */
+const __decorate = function(decorators, target, key, desc) {};
+
+/**
+ * Set this to true to log action data in the console for debugging purpose.
+ * @type {boolean}
+ */
+Window.prototype.DEBUG_STORE;

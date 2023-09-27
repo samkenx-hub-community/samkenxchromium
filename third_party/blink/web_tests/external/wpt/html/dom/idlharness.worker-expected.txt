@@ -1,5 +1,5 @@
 This is a testharness.js-based test.
-Found 746 tests; 737 PASS, 9 FAIL, 0 TIMEOUT, 0 NOTRUN.
+Found 756 tests; 750 PASS, 6 FAIL, 0 TIMEOUT, 0 NOTRUN.
 PASS idl_test setup
 PASS idl_test validation
 PASS Partial interface Document: original interface defined
@@ -89,6 +89,8 @@ PASS HTMLStyleElement includes LinkStyle: member names are unique
 PASS HTMLBodyElement includes WindowEventHandlers: member names are unique
 PASS HTMLAnchorElement includes HTMLHyperlinkElementUtils: member names are unique
 PASS HTMLAreaElement includes HTMLHyperlinkElementUtils: member names are unique
+PASS HTMLInputElement includes PopoverInvokerElement: member names are unique
+PASS HTMLButtonElement includes PopoverInvokerElement: member names are unique
 PASS CanvasRenderingContext2D includes CanvasState: member names are unique
 PASS CanvasRenderingContext2D includes CanvasTransform: member names are unique
 PASS CanvasRenderingContext2D includes CanvasCompositing: member names are unique
@@ -280,9 +282,9 @@ PASS TextMetrics interface: attribute actualBoundingBoxAscent
 PASS TextMetrics interface: attribute actualBoundingBoxDescent
 PASS TextMetrics interface: attribute emHeightAscent
 PASS TextMetrics interface: attribute emHeightDescent
-FAIL TextMetrics interface: attribute hangingBaseline assert_true: The prototype object must have a property "hangingBaseline" expected true got false
-FAIL TextMetrics interface: attribute alphabeticBaseline assert_true: The prototype object must have a property "alphabeticBaseline" expected true got false
-FAIL TextMetrics interface: attribute ideographicBaseline assert_true: The prototype object must have a property "ideographicBaseline" expected true got false
+PASS TextMetrics interface: attribute hangingBaseline
+PASS TextMetrics interface: attribute alphabeticBaseline
+PASS TextMetrics interface: attribute ideographicBaseline
 PASS ImageData interface: existence and properties of interface object
 PASS ImageData interface object length
 PASS ImageData interface object name
@@ -420,7 +422,9 @@ PASS OffscreenCanvasRenderingContext2D interface: operation arc(unrestricted dou
 PASS OffscreenCanvasRenderingContext2D interface: operation ellipse(unrestricted double, unrestricted double, unrestricted double, unrestricted double, unrestricted double, unrestricted double, unrestricted double, optional boolean)
 PASS CustomElementRegistry interface: existence and properties of interface object
 PASS ElementInternals interface: existence and properties of interface object
+PASS VisibilityStateEntry interface: existence and properties of interface object
 FAIL UserActivation interface: existence and properties of interface object assert_false: expected false got true
+PASS ToggleEvent interface: existence and properties of interface object
 PASS DataTransfer interface: existence and properties of interface object
 PASS DataTransferItemList interface: existence and properties of interface object
 PASS DataTransferItem interface: existence and properties of interface object
@@ -429,6 +433,12 @@ PASS Window interface: existence and properties of interface object
 PASS BarProp interface: existence and properties of interface object
 PASS Location interface: existence and properties of interface object
 PASS History interface: existence and properties of interface object
+PASS Navigation interface: existence and properties of interface object
+PASS NavigationHistoryEntry interface: existence and properties of interface object
+PASS NavigationTransition interface: existence and properties of interface object
+PASS NavigateEvent interface: existence and properties of interface object
+PASS NavigationDestination interface: existence and properties of interface object
+PASS NavigationCurrentEntryChangeEvent interface: existence and properties of interface object
 PASS PopStateEvent interface: existence and properties of interface object
 PASS HashChangeEvent interface: existence and properties of interface object
 PASS PageTransitionEvent interface: existence and properties of interface object

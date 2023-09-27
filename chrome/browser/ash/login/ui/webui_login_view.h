@@ -9,7 +9,8 @@
 #include <string>
 
 #include "ash/public/cpp/login_accelerators.h"
-#include "ash/public/cpp/system_tray_observer.h"
+#include "ash/system/tray/system_tray_observer.h"
+#include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 #include "base/scoped_observation.h"
 #include "chrome/browser/ui/chrome_web_modal_dialog_manager_delegate.h"
@@ -105,8 +106,9 @@ class WebUILoginView : public views::View,
   // Toggles status area visibility.
   void SetStatusAreaVisible(bool visible);
 
-  // Sets whether UI should be enabled.
-  void SetUIEnabled(bool enabled);
+  // Sets whether keyboard events can be forwarded from the WebUI and the system
+  // tray is available.
+  void SetKeyboardEventsAndSystemTrayEnabled(bool enabled);
 
   void set_is_hidden(bool hidden) { is_hidden_ = hidden; }
 
@@ -128,7 +130,6 @@ class WebUILoginView : public views::View,
   void GetAccessibleNodeData(ui::AXNodeData* node_data) override;
 
   // session_manager::SessionManagerObserver:
-  void OnNetworkErrorScreenShown() override;
   void OnLoginOrLockScreenVisible() override;
 
  private:
@@ -175,7 +176,7 @@ class WebUILoginView : public views::View,
   base::WeakPtr<LoginDisplayHostWebUI> controller_;
 
   // WebView for rendering a webpage as a webui login.
-  views::WebView* web_view_ = nullptr;
+  raw_ptr<views::WebView, ExperimentalAsh> web_view_ = nullptr;
 
   // Converts keyboard events on the WebContents to accelerators.
   views::UnhandledKeyboardEventHandler unhandled_keyboard_event_handler_;

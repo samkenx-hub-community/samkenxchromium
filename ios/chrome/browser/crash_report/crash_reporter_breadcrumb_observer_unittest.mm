@@ -4,25 +4,22 @@
 
 #import "components/breadcrumbs/core/crash_reporter_breadcrumb_observer.h"
 
+#import "base/containers/contains.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "base/test/task_environment.h"
 #import "components/breadcrumbs/core/breadcrumb_manager.h"
 #import "components/breadcrumbs/core/breadcrumb_manager_keyed_service.h"
 #import "components/breadcrumbs/core/crash_reporter_breadcrumb_constants.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/crash_report/breadcrumbs/breadcrumb_manager_keyed_service_factory.h"
 #import "ios/chrome/browser/crash_report/crash_helper.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/common/crash_report/crash_helper.h"
 #import "ios/testing/scoped_block_swizzler.h"
 #import "testing/gtest/include/gtest/gtest.h"
 #import "testing/gtest_mac.h"
 #import "testing/platform_test.h"
 #import "third_party/crashpad/crashpad/client/annotation_list.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 // Tests that CrashReporterBreadcrumbObserver attaches observed breadcrumb
 // events to crash reports.
@@ -137,7 +134,7 @@ TEST_F(CrashReporterBreadcrumbObserverTest,
 
   std::string breadcrumbs = BreadcrumbAnnotations();
   // 1 incognito
-  EXPECT_NE(breadcrumbs.find("I Breadcrumb Event"), std::string::npos);
+  EXPECT_TRUE(base::Contains(breadcrumbs, "I Breadcrumb Event"));
   // 3 total
   auto iter = breadcrumbs.find(event);
   int count = 0;

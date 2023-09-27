@@ -21,6 +21,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/strings/stringprintf.h"
@@ -32,6 +33,7 @@
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
 #include "chrome/browser/policy/developer_tools_policy_handler.h"
 #include "chrome/browser/signin/identity_test_environment_profile_adaptor.h"
+#include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile_manager.h"
@@ -349,9 +351,10 @@ class ArcPolicyBridgeTestBase {
   std::unique_ptr<user_manager::ScopedUserManager> user_manager_enabler_;
   std::unique_ptr<TestingProfileManager> testing_profile_manager_;
   base::RunLoop run_loop_;
-  TestingProfile* profile_;
+  raw_ptr<TestingProfile, DanglingUntriaged | ExperimentalAsh> profile_;
   std::unique_ptr<ArcBridgeService> bridge_service_;
-  CertStoreService* cert_store_service_;  // Not owned.
+  raw_ptr<CertStoreService, DanglingUntriaged | ExperimentalAsh>
+      cert_store_service_;  // Not owned.
 
   std::unique_ptr<ArcSessionManager> arc_session_manager_;
   std::unique_ptr<ArcPolicyBridge> policy_bridge_;
@@ -419,7 +422,7 @@ TEST_F(ArcPolicyBridgeTest, EmptyPolicyTest) {
                              kMountPhysicalMediaDisabledPolicySetting + "}");
 }
 
-TEST_F(ArcPolicyBridgeTest, DISABLED_ArcPolicyTest) {
+TEST_F(ArcPolicyBridgeTest, ArcPolicyTest) {
   policy_map().Set(
       policy::key::kArcPolicy, policy::POLICY_LEVEL_MANDATORY,
       policy::POLICY_SCOPE_USER, policy::POLICY_SOURCE_CLOUD,
@@ -433,8 +436,8 @@ TEST_F(ArcPolicyBridgeTest, DISABLED_ArcPolicyTest) {
                   "}"),
       nullptr);
   GetPoliciesAndVerifyResult(
-      "\"apkCacheEnabled\":true,"
-      "{\"applications\":"
+      "{\"apkCacheEnabled\":true,"
+      "\"applications\":"
       "[{\"installType\":\"REQUIRED\","
       "\"lockTaskAllowed\":false,"
       "\"packageName\":\"com.google.android.apps.youtube.kids\","
@@ -629,13 +632,13 @@ TEST_F(ArcPolicyBridgeTest, ForceDevToolsAvailabilityTest) {
           policy::DeveloperToolsPolicyHandler::Availability::kDisallowed)));
   base::test::ScopedCommandLine command_line;
   command_line.GetProcessCommandLine()->AppendSwitch(
-      ash::switches::kForceDevToolsAvailable);
+      switches::kForceDevToolsAvailable);
   GetPoliciesAndVerifyResult(
       "{\"apkCacheEnabled\":true,\"debuggingFeaturesDisabled\":false,"
       "\"guid\":\"" +
       instance_guid() + "\"," + kMountPhysicalMediaDisabledPolicySetting + "}");
   command_line.GetProcessCommandLine()->RemoveSwitch(
-      ash::switches::kForceDevToolsAvailable);
+      switches::kForceDevToolsAvailable);
 }
 
 TEST_F(ArcPolicyBridgeTest, ManagedConfigurationVariablesTest) {
@@ -777,6 +780,22 @@ TEST_F(ArcPolicyBridgeTest, ManualChildUserPoliciesSet) {
       base::StrCat({"{\"apkCacheEnabled\":true,\"guid\":\"", instance_guid(),
                     "\",", kMountPhysicalMediaDisabledPolicySetting, ",",
                     kSupervisedUserPlayStoreModePolicySetting, "}"}));
+}
+
+TEST_P(ArcPolicyBridgeAffiliatedTest, ForceEnableApkCacheTest) {
+  base::test::ScopedCommandLine command_line;
+  command_line.GetProcessCommandLine()->AppendSwitch(
+      ash::switches::kArcForceEnableApkCache);
+
+  const std::string expected_apk_cache_enabled_result(
+      "{\"apkCacheEnabled\":true,\"guid\":\"" + instance_guid() + "\"," +
+      kMountPhysicalMediaDisabledPolicySetting + "}");
+
+  // Cache should be enabled regardless of affiliation
+  GetPoliciesAndVerifyResultWithAffiliation(
+      /* expected_policy_json_affiliated */ expected_apk_cache_enabled_result,
+      /* expected_policy_json_not_affiliated */
+      expected_apk_cache_enabled_result);
 }
 
 TEST_P(ArcPolicyBridgeAffiliatedTest, ApkCacheEnabledTest) {

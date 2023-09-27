@@ -19,8 +19,10 @@
 #include "url/gurl.h"
 
 TouchToFillControllerWebAuthnDelegate::TouchToFillControllerWebAuthnDelegate(
-    WebAuthnRequestDelegateAndroid* request_delegate)
-    : request_delegate_(request_delegate) {}
+    WebAuthnRequestDelegateAndroid* request_delegate,
+    bool should_show_hybrid_option)
+    : request_delegate_(request_delegate),
+      should_show_hybrid_option_(should_show_hybrid_option) {}
 
 TouchToFillControllerWebAuthnDelegate::
     ~TouchToFillControllerWebAuthnDelegate() = default;
@@ -38,8 +40,7 @@ void TouchToFillControllerWebAuthnDelegate::OnCredentialSelected(
 void TouchToFillControllerWebAuthnDelegate::OnPasskeyCredentialSelected(
     const password_manager::PasskeyCredential& credential,
     base::OnceClosure action_complete) {
-  request_delegate_->OnWebAuthnAccountSelected(
-      *base::Base64Decode(credential.id().value()));
+  request_delegate_->OnWebAuthnAccountSelected(credential.credential_id());
   std::move(action_complete).Run();
 }
 
@@ -51,6 +52,12 @@ void TouchToFillControllerWebAuthnDelegate::OnManagePasswordsSelected(
       password_manager::ManagePasswordsReferrer::kTouchToFill,
       /*manage_passkeys=*/true);
   OnDismiss(std::move(action_complete));
+}
+
+void TouchToFillControllerWebAuthnDelegate::OnHybridSignInSelected(
+    base::OnceClosure action_complete) {
+  request_delegate_->ShowHybridSignIn();
+  std::move(action_complete).Run();
 }
 
 void TouchToFillControllerWebAuthnDelegate::OnDismiss(
@@ -65,6 +72,10 @@ const GURL& TouchToFillControllerWebAuthnDelegate::GetFrameUrl() {
 
 bool TouchToFillControllerWebAuthnDelegate::ShouldTriggerSubmission() {
   return false;
+}
+
+bool TouchToFillControllerWebAuthnDelegate::ShouldShowHybridOption() {
+  return should_show_hybrid_option_;
 }
 
 gfx::NativeView TouchToFillControllerWebAuthnDelegate::GetNativeView() {

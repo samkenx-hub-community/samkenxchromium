@@ -5,6 +5,7 @@
 #include "chrome/browser/ash/fileapi/file_change_service.h"
 
 #include "base/files/scoped_temp_dir.h"
+#include "base/memory/raw_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/test/bind.h"
 #include "base/unguessable_token.h"
@@ -13,6 +14,7 @@
 #include "chrome/browser/ash/file_manager/path_util.h"
 #include "chrome/browser/ash/fileapi/file_change_service_factory.h"
 #include "chrome/browser/ash/fileapi/file_change_service_observer.h"
+#include "chrome/browser/ash/fileapi/file_system_backend.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
 #include "chrome/test/base/browser_with_test_window_test.h"
 #include "chrome/test/base/testing_profile_manager.h"
@@ -22,7 +24,6 @@
 #include "mojo/public/cpp/system/string_data_source.h"
 #include "storage/browser/blob/blob_storage_context.h"
 #include "storage/browser/file_system/external_mount_points.h"
-#include "storage/browser/file_system/file_system_backend.h"
 #include "storage/browser/file_system/file_system_context.h"
 #include "storage/browser/file_system/file_system_operation_runner.h"
 #include "storage/browser/test/async_file_test_helper.h"
@@ -111,8 +112,9 @@ class TempFileSystem {
             name_, storage::kFileSystemTypeLocal,
             storage::FileSystemMountOption(), temp_dir_.GetPath()));
 
-    GetFileSystemContext(profile_)->external_backend()->GrantFileAccessToOrigin(
-        file_manager::util::GetFilesAppOrigin(), base::FilePath(name_));
+    ash::FileSystemBackend::Get(*GetFileSystemContext(profile_))
+        ->GrantFileAccessToOrigin(file_manager::util::GetFilesAppOrigin(),
+                                  base::FilePath(name_));
   }
 
   // Synchronously creates the file specified by `url`.
@@ -211,7 +213,7 @@ class TempFileSystem {
   }
 
  private:
-  Profile* const profile_;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
   const url::Origin origin_;
   const std::string name_;
   base::ScopedTempDir temp_dir_;
@@ -223,7 +225,7 @@ class FileChangeServiceTest : public BrowserWithTestWindowTest {
  public:
   FileChangeServiceTest()
       : fake_user_manager_(new FakeChromeUserManager),
-        user_manager_enabler_(base::WrapUnique(fake_user_manager_)) {}
+        user_manager_enabler_(base::WrapUnique(fake_user_manager_.get())) {}
 
   FileChangeServiceTest(const FileChangeServiceTest& other) = delete;
   FileChangeServiceTest& operator=(const FileChangeServiceTest& other) = delete;
@@ -244,7 +246,8 @@ class FileChangeServiceTest : public BrowserWithTestWindowTest {
     return CreateProfileWithName(kPrimaryProfileName);
   }
 
-  FakeChromeUserManager* fake_user_manager_;
+  raw_ptr<FakeChromeUserManager, DanglingUntriaged | ExperimentalAsh>
+      fake_user_manager_;
   user_manager::ScopedUserManager user_manager_enabler_;
 };
 

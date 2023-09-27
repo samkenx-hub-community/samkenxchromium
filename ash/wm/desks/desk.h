@@ -11,10 +11,11 @@
 
 #include "ash/ash_export.h"
 #include "base/containers/flat_map.h"
-#include "base/guid.h"
+#include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "base/uuid.h"
 #include "ui/aura/window_observer.h"
 
 namespace ash {
@@ -80,7 +81,7 @@ class ASH_EXPORT Desk {
   // used to support per-desk z-orders for all-desk windows. Entries are stored
   // in ascending `order`.
   struct AllDeskWindowStackingData {
-    aura::Window* window = nullptr;
+    raw_ptr<aura::Window, DanglingUntriaged | ExperimentalAsh> window = nullptr;
     // The z-order of the window.
     // Note: this is reversed from how child windows are ordered in
     // `aura::Window`, so an entry with `order == 0` means topmost.
@@ -100,7 +101,7 @@ class ASH_EXPORT Desk {
 
   int container_id() const { return container_id_; }
 
-  const base::GUID& uuid() const { return uuid_; }
+  const base::Uuid& uuid() const { return uuid_; }
 
   const std::vector<aura::Window*>& windows() const { return windows_; }
 
@@ -160,7 +161,7 @@ class ASH_EXPORT Desk {
 
   // Sets the desks `uuid_` to the `new_guid` if `new_guid` is valid, used when
   // restoring desks on sign-in. If `new_guid` is invalid no change happens.
-  void SetGuid(base::GUID new_guid);
+  void SetGuid(base::Uuid new_guid);
 
   // Prepares for the animation to activate this desk (i.e. this desk is not
   // active yet), by showing its containers on all root windows while setting
@@ -248,12 +249,18 @@ class ASH_EXPORT Desk {
   // windows. This is a no-op if there is no data for the current desk.
   void RestackAllDeskWindows();
 
-  // Called when an all-desk window has been added.
-  void AddAllDeskWindow(aura::Window* window);
+  // Start tracking the z-order of `window`. Called when `window` has been
+  // turned into an all-desk window, or if it has been moved to a new root.
+  void TrackAllDeskWindow(aura::Window* window);
 
-  // Called when an all-desk window has been removed (either from being closed
-  // or not longer being all-desk).
-  void RemoveAllDeskWindow(aura::Window* window);
+  // Remove all-desk window tracking for `window`. Called when an all-desk
+  // window has been removed, or moved to a new root. `recent_root` is the root
+  // that we have all desk window data associated with and when the window has
+  // moved to a new root, it will be different than `window->GetRootWindow()`.
+  void UntrackAllDeskWindow(aura::Window* window, aura::Window* recent_root);
+
+  // Called when an all-desk window has been moved from one root to another.
+  void AllDeskWindowMovedToNewRoot(aura::Window* window);
 
   // Returns true if notification of content update is suspended.
   bool ContentUpdateNotificationSuspended() const;
@@ -290,8 +297,13 @@ class ASH_EXPORT Desk {
   // content update notification disablers.
   void ResumeContentUpdateNotification(bool notify_when_fully_resumed);
 
+  // Returns true if this desk has ADW tracking data for `window` on a root
+  // other than its current root. This indicates that `window` has been moved
+  // from one root to another.
+  bool HasAllDeskWindowDataOnOtherRoot(aura::Window* window) const;
+
   // Uniquely identifies the desk.
-  base::GUID uuid_;
+  base::Uuid uuid_;
 
   // The associated container ID with this desk.
   const int container_id_;
@@ -348,6 +360,10 @@ class ASH_EXPORT Desk {
   // down. Keyed by root window.
   base::flat_map<aura::Window*, std::vector<AllDeskWindowStackingData>>
       all_desk_window_stacking_;
+
+  // Used to track the last active root when the desk is being deactivated.
+  // Should be null if the current desk is active.
+  raw_ptr<aura::Window, ExperimentalAsh> last_active_root_ = nullptr;
 
   // Tracks whether |this| has been interacted with this week. This value is
   // reset by the DesksController.

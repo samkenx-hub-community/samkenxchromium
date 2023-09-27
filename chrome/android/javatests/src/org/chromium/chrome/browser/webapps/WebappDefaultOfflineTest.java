@@ -48,7 +48,7 @@ public class WebappDefaultOfflineTest {
     @Test
     @SmallTest
     @Feature({"Webapps"})
-    @EnableFeatures({ChromeFeatureList.PWA_DEFAULT_OFFLINE_PAGE})
+    @EnableFeatures(ChromeFeatureList.PWA_DEFAULT_OFFLINE_PAGE)
     public void testDefaultOffline() throws Exception {
         // Make sure the navigations to the test app result in a 404 error.
         final String testAppUrl =
@@ -71,6 +71,9 @@ public class WebappDefaultOfflineTest {
         assertEquals("\"data:image/png;base64," + WebappActivityTestRule.TEST_ICON + "\"",
                 JavaScriptUtils.executeJavaScriptAndWaitForResult(
                         tab.getWebContents(), "document.getElementById('icon').src;"));
+        assertEquals("\"inline\"",
+                JavaScriptUtils.executeJavaScriptAndWaitForResult(tab.getWebContents(),
+                        "document.getElementById('offlineIcon').style.display;"));
     }
 
     private WebappInfo getDefaultWebappInfo(String url) {

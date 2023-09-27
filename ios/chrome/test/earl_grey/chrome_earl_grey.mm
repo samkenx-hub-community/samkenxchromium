@@ -5,15 +5,18 @@
 #import "ios/chrome/test/earl_grey/chrome_earl_grey.h"
 
 #import <Foundation/Foundation.h>
+#import <WebKit/WebKit.h>
 
+#import "base/apple/foundation_util.h"
 #import "base/format_macros.h"
 #import "base/json/json_string_value_serializer.h"
 #import "base/logging.h"
-#import "base/mac/foundation_util.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/test/ios/wait_util.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey_app_interface.h"
 #import "ios/chrome/test/earl_grey/chrome_matchers.h"
+#import "ios/chrome/test/earl_grey/chrome_test_case_app_interface.h"
 #import "ios/chrome/test/scoped_eg_synchronization_disabler.h"
 #import "ios/testing/earl_grey/app_launch_configuration.h"
 #import "ios/testing/earl_grey/app_launch_manager.h"
@@ -22,10 +25,6 @@
 #import "ios/testing/nserror_util.h"
 #import "ios/web/public/test/element_selector.h"
 #import "net/base/mac/url_conversions.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using base::test::ios::kWaitForActionTimeout;
 using base::test::ios::kWaitForJSCompletionTimeout;
@@ -40,6 +39,10 @@ using chrome_test_util::OpenLinkInNewWindowButton;
 using chrome_test_util::ShareButton;
 
 namespace {
+
+// Accessibility ID of the Activity menu.
+NSString* kActivityMenuIdentifier = @"ActivityListView";
+
 NSString* const kWaitForPageToStartLoadingError = @"Page did not start to load";
 NSString* const kWaitForPageToFinishLoadingError =
     @"Page did not finish loading";
@@ -97,11 +100,6 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
 // Waits for session restoration to finish within a timeout, or a GREYAssert is
 // induced.
 - (void)waitForRestoreSessionToFinish;
-
-// Perform a tap with a timeout, or a GREYAssert is induced. Occasionally EG
-// doesn't sync up properly to the animations of tab switcher, so it is
-// necessary to poll.
-- (void)waitForAndTapButton:(id<GREYMatcher>)button;
 
 @end
 
@@ -170,6 +168,10 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   // After clearing browsing history via code, wait for the UI to be done
   // with any updates. This includes icons from the new tab page being removed.
   GREYWaitForAppToIdle(@"App failed to idle");
+}
+
+- (void)killWebKitNetworkProcess {
+  [ChromeEarlGreyAppInterface killWebKitNetworkProcess];
 }
 
 - (NSInteger)browsingHistoryEntryCount {
@@ -250,6 +252,10 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   return [ChromeEarlGreyAppInterface mainTabCount];
 }
 
+- (NSUInteger)inactiveTabCount {
+  return [ChromeEarlGreyAppInterface inactiveTabCount];
+}
+
 - (NSUInteger)incognitoTabCount {
   return [ChromeEarlGreyAppInterface incognitoTabCount];
 }
@@ -312,6 +318,11 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
 
 - (void)closeCurrentTab {
   [ChromeEarlGreyAppInterface closeCurrentTab];
+  GREYWaitForAppToIdle(@"App failed to idle");
+}
+
+- (void)pinCurrentTab {
+  [ChromeEarlGreyAppInterface pinCurrentTab];
   GREYWaitForAppToIdle(@"App failed to idle");
 }
 
@@ -402,9 +413,36 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   EG_TEST_HELPER_ASSERT_TRUE(matchedElement, errorDescription);
 }
 
+- (void)waitForNotSufficientlyVisibleElementWithMatcher:
+    (id<GREYMatcher>)matcher {
+  NSString* errorDescription = [NSString
+      stringWithFormat:
+          @"Failed waiting for element with matcher %@ to become not visible",
+          matcher];
+
+  GREYCondition* waitForElement = [GREYCondition
+      conditionWithName:errorDescription
+                  block:^{
+                    NSError* error = nil;
+                    [[EarlGrey selectElementWithMatcher:matcher]
+                        assertWithMatcher:grey_sufficientlyVisible()
+                                    error:&error];
+                    return error != nil;
+                  }];
+
+  bool matchedElement =
+      [waitForElement waitWithTimeout:kWaitForUIElementTimeout.InSecondsF()];
+  EG_TEST_HELPER_ASSERT_TRUE(matchedElement, errorDescription);
+}
+
 - (void)waitForUIElementToAppearWithMatcher:(id<GREYMatcher>)matcher {
   [self waitForUIElementToAppearWithMatcher:matcher
                                     timeout:kWaitForUIElementTimeout];
+}
+
+- (BOOL)testUIElementAppearanceWithMatcher:(id<GREYMatcher>)matcher {
+  return [self testUIElementAppearanceWithMatcher:matcher
+                                          timeout:kWaitForUIElementTimeout];
 }
 
 - (void)waitForUIElementToAppearWithMatcher:(id<GREYMatcher>)matcher
@@ -412,7 +450,13 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   NSString* errorDescription = [NSString
       stringWithFormat:@"Failed waiting for element with matcher %@ to appear",
                        matcher];
+  bool matched = [self testUIElementAppearanceWithMatcher:matcher
+                                                  timeout:timeout];
+  EG_TEST_HELPER_ASSERT_TRUE(matched, errorDescription);
+}
 
+- (BOOL)testUIElementAppearanceWithMatcher:(id<GREYMatcher>)matcher
+                                   timeout:(base::TimeDelta)timeout {
   ConditionBlock condition = ^{
     NSError* error = nil;
     [[EarlGrey selectElementWithMatcher:matcher] assertWithMatcher:grey_notNil()
@@ -420,8 +464,7 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
     return error == nil;
   };
 
-  bool matched = WaitUntilConditionOrTimeout(timeout, condition);
-  EG_TEST_HELPER_ASSERT_TRUE(matched, errorDescription);
+  return WaitUntilConditionOrTimeout(timeout, condition);
 }
 
 - (void)waitForUIElementToDisappearWithMatcher:(id<GREYMatcher>)matcher {
@@ -563,6 +606,25 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
       stringWithFormat:@"Failed waiting for main tab count to become %" PRIuNS
                         "; actual count: %" PRIuNS,
                        count, actualCount];
+  EG_TEST_HELPER_ASSERT_TRUE(tabCountEqual, errorString);
+}
+
+- (void)waitForInactiveTabCount:(NSUInteger)count {
+  NSString* errorString = [NSString
+      stringWithFormat:
+          @"Failed waiting for inactive tab count to become %" PRIuNS, count];
+
+  // Allow the UI to become idle, in case any tabs are being opened or closed.
+  GREYWaitForAppToIdle(@"App failed to idle");
+
+  GREYCondition* tabCountCheck = [GREYCondition
+      conditionWithName:errorString
+                  block:^{
+                    return
+                        [ChromeEarlGreyAppInterface inactiveTabCount] == count;
+                  }];
+  bool tabCountEqual =
+      [tabCountCheck waitWithTimeout:kWaitForUIElementTimeout.InSecondsF()];
   EG_TEST_HELPER_ASSERT_TRUE(tabCountEqual, errorString);
 }
 
@@ -754,14 +816,6 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   [ChromeEarlGreyAppInterface signInWithoutSyncWithIdentity:identity];
 }
 
-- (void)startSync {
-  [ChromeEarlGreyAppInterface startSync];
-}
-
-- (void)stopSync {
-  [ChromeEarlGreyAppInterface stopSync];
-}
-
 - (void)
     addUserDemographicsToSyncServerWithBirthYear:(int)rawBirthYear
                                           gender:
@@ -833,11 +887,6 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
       addFakeSyncServerLegacyBookmarkWithURL:spec
                                        title:title
                    originator_client_item_id:originator_client_item_id];
-}
-
-- (void)addFakeSyncServerTypedURL:(const GURL&)URL {
-  NSString* spec = base::SysUTF8ToNSString(URL.spec());
-  [ChromeEarlGreyAppInterface addFakeSyncServerTypedURL:spec];
 }
 
 - (void)addFakeSyncServerHistoryVisit:(const GURL&)URL {
@@ -952,6 +1001,10 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   bool success = [verifyURLs waitWithTimeout:timeout.InSecondsF()];
   EG_TEST_HELPER_ASSERT_NO_ERROR(blockError);
   EG_TEST_HELPER_ASSERT_TRUE(success, errorString);
+}
+
+- (BOOL)isSyncHistoryDataTypeSelected {
+  return [ChromeEarlGreyAppInterface isSyncHistoryDataTypeSelected];
 }
 
 #pragma mark - Window utilities (EG2)
@@ -1180,9 +1233,25 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
 
 #pragma mark - SignIn Utilities (EG2)
 
-- (void)signOutAndClearIdentities {
-  [ChromeEarlGreyAppInterface signOutAndClearIdentities];
+- (void)signOutAndClearIdentitiesAndWaitForCompletion {
+  __block BOOL isSignoutFinished = NO;
+  [ChromeEarlGreyAppInterface signOutAndClearIdentitiesWithCompletion:^{
+    isSignoutFinished = YES;
+  }];
 
+  GREYCondition* signOutFinished = [GREYCondition
+      conditionWithName:@"Sign-out done, and identities & browsing data cleared"
+                  block:^{
+                    return isSignoutFinished;
+                  }];
+  bool success =
+      [signOutFinished waitWithTimeout:kWaitForActionTimeout.InSecondsF()];
+  EG_TEST_HELPER_ASSERT_TRUE(
+      success, @"Failed waiting for sign-out & cleaning completion");
+}
+
+- (void)signOutAndClearIdentities {
+  [ChromeEarlGreyAppInterface signOutAndClearIdentitiesWithCompletion:nil];
   GREYCondition* allIdentitiesCleared = [GREYCondition
       conditionWithName:@"All Chrome identities were cleared"
                   block:^{
@@ -1198,15 +1267,6 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
 
 - (void)addBookmarkWithSyncPassphrase:(NSString*)syncPassphrase {
   [ChromeEarlGreyAppInterface addBookmarkWithSyncPassphrase:syncPassphrase];
-}
-
-- (void)waitForBookmarksToFinishLoading {
-  EG_TEST_HELPER_ASSERT_NO_ERROR(
-      [ChromeEarlGreyAppInterface waitForBookmarksToFinishinLoading]);
-}
-
-- (void)clearBookmarks {
-  EG_TEST_HELPER_ASSERT_NO_ERROR([ChromeEarlGreyAppInterface clearBookmarks]);
 }
 
 - (base::Value)evaluateJavaScript:(NSString*)javaScript {
@@ -1268,10 +1328,6 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   return [ChromeEarlGreyAppInterface isUKMEnabled];
 }
 
-- (BOOL)isSynthesizedRestoreSessionEnabled {
-  return [ChromeEarlGreyAppInterface isSynthesizedRestoreSessionEnabled];
-}
-
 - (BOOL)isTestFeatureEnabled {
   return [ChromeEarlGreyAppInterface isTestFeatureEnabled];
 }
@@ -1280,8 +1336,8 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   return [ChromeEarlGreyAppInterface isDemographicMetricsReportingEnabled];
 }
 
-- (BOOL)isSyncHistoryDataTypeEnabled {
-  return [ChromeEarlGreyAppInterface isSyncHistoryDataTypeEnabled];
+- (BOOL)isReplaceSyncWithSigninEnabled {
+  return [ChromeEarlGreyAppInterface isReplaceSyncWithSigninEnabled];
 }
 
 - (BOOL)appHasLaunchSwitch:(const std::string&)launchSwitch {
@@ -1314,21 +1370,22 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   return [ChromeEarlGreyAppInterface isUseLensToSearchForImageEnabled];
 }
 
-- (BOOL)isThumbstripEnabledForWindowWithNumber:(int)windowNumber {
-  return [ChromeEarlGreyAppInterface
-      isThumbstripEnabledForWindowWithNumber:windowNumber];
-}
-
 - (BOOL)isWebChannelsEnabled {
   return [ChromeEarlGreyAppInterface isWebChannelsEnabled];
 }
 
-- (BOOL)isSFSymbolEnabled {
-  return [ChromeEarlGreyAppInterface isSFSymbolEnabled];
-}
-
 - (BOOL)isUIButtonConfigurationEnabled {
   return [ChromeEarlGreyAppInterface isUIButtonConfigurationEnabled];
+}
+
+- (BOOL)isBottomOmniboxSteadyStateEnabled {
+  return [ChromeEarlGreyAppInterface isBottomOmniboxSteadyStateEnabled];
+}
+
+- (BOOL)isUnfocusedOmniboxAtBottom {
+  return self.isBottomOmniboxSteadyStateEnabled && !self.isIPadIdiom &&
+         self.isSplitToolbarMode &&
+         [self userBooleanPref:prefs::kBottomOmnibox];
 }
 
 #pragma mark - ContentSettings
@@ -1359,8 +1416,11 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
 #pragma mark - Default Utilities (EG2)
 
 - (void)setUserDefaultObject:(id)value forKey:(NSString*)defaultName {
-  return [ChromeEarlGreyAppInterface setUserDefaultObject:value
-                                                   forKey:defaultName];
+  [ChromeEarlGreyAppInterface setUserDefaultObject:value forKey:defaultName];
+}
+
+- (void)removeUserDefaultObjectForKey:(NSString*)key {
+  [ChromeEarlGreyAppInterface removeUserDefaultObjectForKey:key];
 }
 
 #pragma mark - Pref Utilities (EG2)
@@ -1402,6 +1462,21 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
   [ChromeEarlGreyAppInterface
         setIntegerValue:value
       forLocalStatePref:base::SysUTF8ToNSString(prefName)];
+}
+
+- (void)setTimeValue:(base::Time)value
+    forLocalStatePref:(const std::string&)UTF8PrefName {
+  NSString* prefName = base::SysUTF8ToNSString(UTF8PrefName);
+  return [ChromeEarlGreyAppInterface setTimeValue:value
+                                forLocalStatePref:prefName];
+}
+
+- (void)setStringValue:(const std::string&)UTF8Value
+     forLocalStatePref:(const std::string&)UTF8PrefName {
+  NSString* value = base::SysUTF8ToNSString(UTF8Value);
+  NSString* prefName = base::SysUTF8ToNSString(UTF8PrefName);
+  return [ChromeEarlGreyAppInterface setStringValue:value
+                                  forLocalStatePref:prefName];
 }
 
 // Returns a base::Value representation of the requested pref.
@@ -1544,7 +1619,17 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
                        pageTitle:(NSString*)pageTitle {
   [[EarlGrey selectElementWithMatcher:ShareButton()] performAction:grey_tap()];
 
-  {
+  NSString* hostString = base::SysUTF8ToNSString(URL.host());
+  if (@available(iOS 17, *)) {
+    XCUIApplication* currentApplication = [[XCUIApplication alloc] init];
+    BOOL hostStringPresent = [currentApplication.otherElements[hostString]
+        waitForExistenceWithTimeout:2];
+    BOOL pageTitlePresent = [currentApplication.otherElements[pageTitle]
+        waitForExistenceWithTimeout:2];
+    GREYAssert(hostStringPresent || pageTitlePresent,
+               @"Either hostString %d or pageTitle %d was not present",
+               hostStringPresent, pageTitlePresent);
+  } else {
 #if TARGET_IPHONE_SIMULATOR
     // The activity view share sheet blocks EarlGrey's synchronization on
     // the simulators. Ref:
@@ -1556,7 +1641,6 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
     ScopedMatchNonAccessibilityElements enabler;
 
     // Page title is added asynchronously, so wait for its appearance.
-    NSString* hostString = base::SysUTF8ToNSString(URL.host());
     [self waitForMatcher:grey_allOf(ActivityViewHeader(hostString, pageTitle),
                                     grey_sufficientlyVisible(), nil)];
   }
@@ -1586,6 +1670,109 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration) {
 
 - (void)stopWatcher {
   [ChromeEarlGreyAppInterface stopWatcher];
+}
+
+#pragma mark - ActivitySheet utilities
+
+- (void)verifyActivitySheetVisible {
+  if (@available(iOS 17.0, *)) {
+    NSError* error = nil;
+    GREYAssert([EarlGrey activitySheetPresentWithError:&error],
+               @"Activity sheet not visible");
+  } else {
+    [[EarlGrey
+        selectElementWithMatcher:grey_accessibilityID(kActivityMenuIdentifier)]
+        assertWithMatcher:grey_sufficientlyVisible()];
+  }
+}
+
+- (void)verifyActivitySheetNotVisible {
+  if (@available(iOS 17.0, *)) {
+    NSError* error = nil;
+    // Note that -activitySheetAbsentWithError's return value is incorrect, so
+    // only check the error.
+    [EarlGrey activitySheetAbsentWithError:&error];
+    EG_TEST_HELPER_ASSERT_NO_ERROR(error);
+  } else {
+    [[EarlGrey
+        selectElementWithMatcher:grey_accessibilityID(kActivityMenuIdentifier)]
+        assertWithMatcher:grey_nil()];
+  }
+}
+
+- (void)verifyTextNotVisibleInActivitySheetWithID:(NSString*)text {
+  if (@available(iOS 17, *)) {
+    NSError* error = nil;
+    GREYAssert([EarlGrey activitySheetPresentWithError:&error],
+               @"Activity sheet not visible");
+    XCUIApplication* currentApplication = [[XCUIApplication alloc] init];
+    XCUIElement* activitySheet =
+        currentApplication.otherElements[@"ActivityListView"];
+    XCUIElementQuery* activityTexts =
+        [activitySheet descendantsMatchingType:XCUIElementTypeStaticText];
+    XCUIElement* staticText =
+        [activityTexts elementMatchingType:XCUIElementTypeStaticText
+                                identifier:text];
+    GREYAssert(!staticText.exists, @"staticText %@ visible", text);
+  } else {
+    [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(text)]
+        assertWithMatcher:grey_notVisible()];
+  }
+}
+
+- (void)verifyTextVisibleInActivitySheetWithID:(NSString*)text {
+  if (@available(iOS 17, *)) {
+    NSError* error = nil;
+    GREYAssert([EarlGrey activitySheetPresentWithError:&error],
+               @"Activity sheet not visible");
+
+    XCUIApplication* currentApplication = [[XCUIApplication alloc] init];
+    XCUIElement* activitySheet =
+        currentApplication.otherElements[@"ActivityListView"];
+    XCUIElementQuery* activityTexts =
+        [activitySheet descendantsMatchingType:XCUIElementTypeStaticText];
+    XCUIElement* staticText =
+        [activityTexts elementMatchingType:XCUIElementTypeStaticText
+                                identifier:text];
+    GREYAssert(staticText.exists, @"staticText %@ not visible", text);
+  } else {
+    [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(text)]
+        assertWithMatcher:grey_sufficientlyVisible()];
+  }
+}
+
+- (void)tapButtonInActivitySheetWithID:(NSString*)buttonLabel {
+  if (@available(iOS 17, *)) {
+    NSError* error = nil;
+    GREYAssertTrue([EarlGrey tapButtonInActivitySheetWithId:buttonLabel
+                                                      error:&error],
+                   @"Button %@ not present in activity sheet", buttonLabel);
+    EG_TEST_HELPER_ASSERT_NO_ERROR(error);
+  } else {
+    [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(buttonLabel)]
+        performAction:grey_tap()];
+  }
+}
+
+- (void)closeActivitySheet {
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    // Tap the share button to dismiss the popover.
+    [[EarlGrey selectElementWithMatcher:chrome_test_util::TabShareButton()]
+        performAction:grey_tap()];
+  } else {
+    if (@available(iOS 17, *)) {
+      [EarlGrey closeActivitySheetWithError:nil];
+    } else {
+      NSString* dismissLabel = @"Close";
+      [[EarlGrey
+          selectElementWithMatcher:
+              grey_allOf(
+                  chrome_test_util::ButtonWithAccessibilityLabel(dismissLabel),
+                  grey_not(
+                      grey_accessibilityTrait(UIAccessibilityTraitNotEnabled)),
+                  grey_interactable(), nullptr)] performAction:grey_tap()];
+    }
+  }
 }
 
 @end

@@ -4,15 +4,12 @@
 
 #import "ios/chrome/browser/ui/ntp/metrics/feed_metrics_constants.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 const int kMinScrollThreshold = 140;
 const int kGoodVisitTimeInFeedSeconds = 60;
 const int kNonShortClickSeconds = 10;
 const int kMinutesBetweenSessions = 5;
 const int kMaxCardsInFeed = 50;
+const int kRangeForActivityBucketsInDays = 28;
 
 NSString* const kArticleVisitTimestampKey = @"ShortClickInteractionTimestamp";
 NSString* const kLongFeedVisitTimeAggregateKey =
@@ -30,6 +27,11 @@ NSString* const kLastInteractionTimeForFollowingGoodVisits =
     @"LastInteractionTimeForGoodVisitsFollowing";
 NSString* const kLastDayTimeInFeedReportedKey = @"LastDayTimeInFeedReported";
 NSString* const kTimeSpentInFeedAggregateKey = @"TimeSpentInFeedAggregate";
+NSString* const kActivityBucketLastReportedDateKey =
+    @"ActivityBucketLastReportedDate";
+NSString* const kActivityBucketLastReportedDateArrayKey =
+    @"ActivityBucketLastReportedDateArray";
+NSString* const kActivityBucketKey = @"FeedActivityBucket";
 
 #pragma mark - Histograms
 
@@ -49,6 +51,8 @@ const char kDiscoverFeedCardShownAtIndex[] =
     "NewTabPage.ContentSuggestions.Shown";
 const char kFollowingFeedCardShownAtIndex[] =
     "ContentSuggestions.Feed.WebFeed.Shown";
+const char kAllFeedsActivityBucketsHistogram[] =
+    "ContentSuggestions.Feed.AllFeeds.Activity";
 const char kDiscoverFeedNoticeCardFulfilled[] =
     "ContentSuggestions.Feed.NoticeCardFulfilled2";
 const char kDiscoverFeedArticlesFetchNetworkDurationSuccess[] =
@@ -89,13 +93,12 @@ const char kFollowCountAfterUnfollow[] =
     "ContentSuggestions.Feed.WebFeed.FollowCount.AfterUnfollow";
 const char kFollowCountWhenEngaged[] =
     "ContentSuggestions.Feed.WebFeed.FollowCount.Engaged";
-const char kActionOnNTP[] = "IOS.ContentSuggestions.ActionOnNTP";
-const char kActionOnStartSurface[] =
-    "IOS.ContentSuggestions.ActionOnStartSurface";
 const char kDiscoverIndexWhenSwitchingFeed[] =
     "ContentSuggestions.Feed.CardIndexOnSwitch";
 const char kFollowingIndexWhenSwitchingFeed[] =
     "ContentSuggestions.Feed.WebFeed.CardIndexOnSwitch";
+const char kFeedSignInUI[] = "ContentSuggestions.Feed.FeedSignInUI";
+const char kFeedSyncPromo[] = "ContentSuggestions.Feed.FeedSyncPromo";
 
 #pragma mark - User Actions
 
@@ -189,3 +192,17 @@ const char kFeedSignInPromoUIContinueTapped[] =
     "ContentSuggestions.Feed.SignIn.FeedSignInPromoUIContinueTapped";
 const char kFeedSignInPromoUICancelTapped[] =
     "ContentSuggestions.Feed.SignIn.FeedSignInPromoUICancelTapped";
+const char kShowFeedSignInOnlyUIWithUserId[] =
+    "ContentSuggestions.Feed.SignIn.ShowFeedSignInOnlyUIWithUserId";
+const char kShowFeedSignInOnlyUIWithoutUserId[] =
+    "ContentSuggestions.Feed.SignIn.ShowFeedSignInOnlyUIWithoutUserId";
+const char kShowSyncHalfSheetFromFeed[] =
+    "ContentSuggestions.Feed.SignIn.ShowSyncHalfSheetFromFeed";
+const char kShowSignInOnlyFlowFromFeed[] =
+    "ContentSuggestions.Feed.SignIn.ShowSignInOnlyFlowFromFeed";
+const char kShowSignInDisableToastFromFeed[] =
+    "ContentSuggestions.Feed.SignIn.ShowSignInDisableToastFromFeed";
+const char kShowSyncFlowFromFeed[] =
+    "ContentSuggestions.Feed.Sync.ShowSyncFlowFromFeed";
+const char kShowDisableToastFromFeed[] =
+    "ContentSuggestions.Feed.Sync.ShowDisableToastFromFeed";

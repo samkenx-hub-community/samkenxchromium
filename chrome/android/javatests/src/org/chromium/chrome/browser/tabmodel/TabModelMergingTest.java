@@ -10,9 +10,9 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build.VERSION_CODES;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.Assert;

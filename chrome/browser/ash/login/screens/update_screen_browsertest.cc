@@ -8,6 +8,7 @@
 
 #include "ash/constants/ash_features.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/scoped_mock_time_message_loop_task_runner.h"
 #include "base/test/simple_test_tick_clock.h"
@@ -28,7 +29,7 @@
 #include "chrome/browser/ui/webui/ash/login/oobe_ui.h"
 #include "chrome/browser/ui/webui/ash/login/update_screen_handler.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chromeos/ash/components/dbus/update_engine/fake_update_engine_client.h"
 #include "chromeos/ash/components/network/network_connection_handler.h"
@@ -51,8 +52,8 @@ const test::UIPath kCellularPermissionBack = {"oobe-update",
 const test::UIPath kLowBatteryWarningMessage = {"oobe-update",
                                                 "battery-warning"};
 const test::UIPath kErrorMessage = {"error-message"};
-const test::UIPath kBetterUpdateCheckingForUpdatesDialog = {
-    "oobe-update", "checking-for-updates-dialog"};
+const test::UIPath kBetterUpdateCheckingForUpdatesDialog = {"oobe-update",
+                                                            "checking-update"};
 const test::UIPath kUpdateInProgressDialog = {"oobe-update",
                                               "update-in-progress-dialog"};
 const test::UIPath kRestartingDialog = {"oobe-update", "restarting-dialog"};
@@ -202,6 +203,7 @@ class UpdateScreenTest : public OobeBaseTest,
   }
 
   void ShowUpdateScreen() {
+    WaitForOobeUI();
     WizardController::default_controller()->AdvanceToScreen(
         UpdateView::kScreenId);
     // When opt out option is not available we try to wait and don't show the
@@ -258,11 +260,14 @@ class UpdateScreenTest : public OobeBaseTest,
 
   NetworkPortalDetectorMixin network_portal_detector_{&mixin_host_};
 
-  UpdateScreen* update_screen_ = nullptr;
+  raw_ptr<UpdateScreen, DanglingUntriaged | ExperimentalAsh> update_screen_ =
+      nullptr;
   // Version updater - owned by `update_screen_`.
-  VersionUpdater* version_updater_ = nullptr;
+  raw_ptr<VersionUpdater, DanglingUntriaged | ExperimentalAsh>
+      version_updater_ = nullptr;
   // Error screen - owned by OobeUI.
-  ErrorScreen* error_screen_ = nullptr;
+  raw_ptr<ErrorScreen, DanglingUntriaged | ExperimentalAsh> error_screen_ =
+      nullptr;
 
   base::SimpleTestTickClock tick_clock_;
 

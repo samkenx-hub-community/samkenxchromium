@@ -15,6 +15,7 @@
 #include "base/json/json_file_value_serializer.h"
 #include "base/json/json_string_value_serializer.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/path_service.h"
 #include "base/ranges/algorithm.h"
@@ -38,9 +39,9 @@
 #include "chrome/browser/prefs/pref_service_syncable_util.h"
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "components/prefs/pref_change_registrar.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_service_observer.h"
-#include "components/sync/driver/sync_user_settings.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_service_observer.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "components/sync_preferences/pref_service_syncable.h"
 #include "components/sync_preferences/pref_service_syncable_observer.h"
 #endif
@@ -193,7 +194,7 @@ class ExternalPrefLoader::PrioritySyncReadyWaiter
 
   void Finish() { std::move(done_closure_).Run(); }
 
-  Profile* profile_;
+  raw_ptr<Profile, LeakedDanglingUntriaged | ExperimentalAsh> profile_;
 
   base::OnceClosure done_closure_;
 

@@ -22,8 +22,7 @@ namespace {
 // Bluetooth setting instead.
 bool ShouldApplyUserBluetoothSetting(user_manager::UserType user_type) {
   return user_type == user_manager::USER_TYPE_REGULAR ||
-         user_type == user_manager::USER_TYPE_CHILD ||
-         user_type == user_manager::USER_TYPE_ACTIVE_DIRECTORY;
+         user_type == user_manager::USER_TYPE_CHILD;
 }
 
 }  // namespace
@@ -45,7 +44,8 @@ void BluetoothPowerControllerImpl::RegisterProfilePrefs(
 BluetoothPowerControllerImpl::BluetoothPowerControllerImpl(
     AdapterStateController* adapter_state_controller)
     : adapter_state_controller_(adapter_state_controller) {
-  adapter_state_controller_observation_.Observe(adapter_state_controller_);
+  adapter_state_controller_observation_.Observe(
+      adapter_state_controller_.get());
 }
 
 BluetoothPowerControllerImpl::~BluetoothPowerControllerImpl() = default;

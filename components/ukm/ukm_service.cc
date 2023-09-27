@@ -19,7 +19,6 @@
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "components/metrics/log_decoder.h"
-#include "components/metrics/metrics_features.h"
 #include "components/metrics/metrics_log.h"
 #include "components/metrics/metrics_service_client.h"
 #include "components/metrics/ukm_demographic_metrics_provider.h"
@@ -30,6 +29,7 @@
 #include "components/ukm/ukm_recorder_impl.h"
 #include "components/ukm/ukm_rotation_scheduler.h"
 #include "services/metrics/public/cpp/delegating_ukm_recorder.h"
+#include "services/metrics/public/cpp/ukm_recorder_client_interface_registry.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
 #include "third_party/metrics_proto/ukm/report.pb.h"
 #include "third_party/metrics_proto/user_demographics.pb.h"
@@ -199,22 +199,22 @@ UkmService::UkmService(PrefService* pref_service,
                        std::unique_ptr<metrics::UkmDemographicMetricsProvider>
                            demographics_provider,
                        uint64_t external_client_id)
-    : pref_service_(pref_service),
+    : recorder_client_registry_(
+          std::make_unique<metrics::UkmRecorderClientInterfaceRegistry>()),
+      pref_service_(pref_service),
       external_client_id_(external_client_id),
       client_(client),
       demographics_provider_(std::move(demographics_provider)),
-      reporting_service_(client, pref_service) {
+      reporting_service_(client, pref_service),
+      task_runner_(base::SequencedTaskRunner::GetCurrentDefault()) {
   DCHECK(pref_service_);
   DCHECK(client_);
   DVLOG(1) << "UkmService::Constructor";
   reporting_service_.Initialize();
 
-  if (base::FeatureList::IsEnabled(
-          metrics::features::kMetricsClearLogsOnClonedInstall)) {
-    cloned_install_subscription_ = client->AddOnClonedInstallDetectedCallback(
-        base::BindOnce(&UkmService::OnClonedInstallDetected,
-                       self_ptr_factory_.GetWeakPtr()));
-  }
+  cloned_install_subscription_ = client->AddOnClonedInstallDetectedCallback(
+      base::BindOnce(&UkmService::OnClonedInstallDetected,
+                     self_ptr_factory_.GetWeakPtr()));
 
   base::RepeatingClosure rotate_callback = base::BindRepeating(
       &UkmService::RotateLog, self_ptr_factory_.GetWeakPtr());
@@ -434,6 +434,22 @@ void UkmService::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterUint64Pref(prefs::kUkmClientId, 0);
   registry->RegisterIntegerPref(prefs::kUkmSessionId, 0);
   UkmReportingService::RegisterPrefs(registry);
+}
+
+void UkmService::OnRecorderParametersChanged() {
+  task_runner_->PostTask(
+      FROM_HERE, base::BindOnce(&UkmService::OnRecorderParametersChangedImpl,
+                                self_ptr_factory_.GetWeakPtr()));
+}
+
+void UkmService::OnRecorderParametersChangedImpl() {
+  auto params = mojom::UkmRecorderParameters::New();
+  params->is_enabled = recording_enabled();
+
+  std::set<uint64_t> events = GetObservedEventHashes();
+  params->event_hash_bypass_list.insert(params->event_hash_bypass_list.end(),
+                                        events.begin(), events.end());
+  recorder_client_registry_->SetRecorderParameters(std::move(params));
 }
 
 void UkmService::StartInitTask() {

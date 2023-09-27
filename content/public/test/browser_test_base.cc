@@ -19,6 +19,7 @@
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/i18n/icu_util.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -50,6 +51,7 @@
 #include "content/browser/startup_data_impl.h"
 #include "content/browser/startup_helper.h"
 #include "content/browser/storage_partition_impl.h"
+#include "content/browser/tracing/background_tracing_manager_impl.h"
 #include "content/browser/tracing/memory_instrumentation_util.h"
 #include "content/browser/tracing/startup_tracing_controller.h"
 #include "content/browser/tracing/tracing_controller_impl.h"
@@ -59,11 +61,11 @@
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/network_service_instance.h"
+#include "content/public/browser/network_service_util.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/main_function_params.h"
-#include "content/public/common/network_service_util.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/no_renderer_crashes_assertion.h"
 #include "content/public/test/test_launcher.h"
@@ -86,7 +88,9 @@
 #include "services/tracing/public/cpp/trace_startup.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/compositor/compositor_switches.h"
+#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/display/display_switches.h"
+#include "ui/gfx/animation/animation_test_api.h"
 #include "ui/gl/gl_implementation.h"
 #include "ui/gl/gl_switches.h"
 
@@ -135,7 +139,12 @@
 #include "ui/platform_window/fuchsia/initialize_presenter_api_view.h"
 #endif  // BUILDFLAG(IS_FUCHSIA)
 
+#if BUILDFLAG(IS_WIN)
+#include "base/test/test_reg_util_win.h"
+#endif  // BUILDFLAG(IS_WIN)
+
 namespace content {
+
 namespace {
 
 // Whether an instance of BrowserTestBase has already been created in this
@@ -266,6 +275,16 @@ BrowserTestBase::BrowserTestBase() {
   handle_sigterm_ = true;
 #endif
 
+#if BUILDFLAG(IS_WIN)
+  // Disallow overriding HKLM during browser test startup. This is because it
+  // will interfere with process launches, which rely on there being a valid
+  // HKLM. This functionality is restored just before the test fixture itself
+  // starts in ProxyRunTestOnMainThreadLoop, after browser startup has been
+  // completed.
+  registry_util::RegistryOverrideManager::
+      SetAllowHKLMRegistryOverrideForIntegrationTests(/*allow=*/false);
+#endif
+
   // This is called through base::TestSuite initially. It'll also be called
   // inside BrowserMain, so tell the code to ignore the check that it's being
   // called more than once
@@ -371,6 +390,16 @@ void BrowserTestBase::SetUp() {
     command_line->AppendSwitch(switches::kDisableGLDrawingForTests);
 #endif
 
+  // Disable animations when verifying pixel output, as they make tests flaky.
+  if (command_line->HasSwitch(switches::kVerifyPixels)) {
+    disable_layer_animations_ =
+        std::make_unique<ui::ScopedAnimationDurationScaleMode>(
+            ui::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+    disable_rich_animations_ =
+        gfx::AnimationTestApi::SetRichAnimationRenderMode(
+            gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  }
+
   bool use_software_gl = true;
 
   // We usually use software GL as this works on all bots. The command
@@ -382,10 +411,12 @@ void BrowserTestBase::SetUp() {
   if (command_line->HasSwitch("enable-gpu"))
     use_software_gl = false;
 
-#if BUILDFLAG(IS_MAC)
-  // On Mac we always use hardware GL.
+#if BUILDFLAG(IS_APPLE)
+  // On Apple we always use hardware GL.
   use_software_gl = false;
+#endif
 
+#if BUILDFLAG(IS_MAC)
   // Expand the network service sandbox to allow reading the test TLS
   // certificates.
   SetNetworkTestCertsDirectoryForTesting(net::GetTestCertsDirectory());
@@ -394,13 +425,6 @@ void BrowserTestBase::SetUp() {
 #if BUILDFLAG(IS_ANDROID)
   // On Android we always use hardware GL.
   use_software_gl = false;
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  // If the test is running on the chromeos envrionment (such as
-  // device or vm bots), we use hardware GL.
-  if (base::SysInfo::IsRunningOnChromeOS())
-    use_software_gl = false;
 #endif
 
 #if BUILDFLAG(IS_FUCHSIA)
@@ -586,7 +610,7 @@ void BrowserTestBase::SetUp() {
   // Unlike other platforms, android_browsertests can reuse the same process for
   // multiple tests. Need to reset startup metrics to allow recording them
   // again.
-  startup_metric_utils::ResetSessionForTesting();
+  startup_metric_utils::GetBrowser().ResetSessionForTesting();
 
   base::i18n::AllowMultipleInitializeCallsForTesting();
   base::i18n::InitializeICU();
@@ -768,8 +792,7 @@ void BrowserTestBase::SimulateNetworkServiceCrash() {
   FlushNetworkServiceInstanceForTesting();
 
   // Need to re-initialize the network process.
-  initialized_network_process_ = false;
-  InitializeNetworkProcess();
+  ForceInitializeNetworkProcess();
 }
 
 void BrowserTestBase::IgnoreNetworkServiceCrashes() {
@@ -878,12 +901,24 @@ void BrowserTestBase::ProxyRunTestOnMainThreadLoop() {
       // to avoid navigations silently failing. This won't catch all cases, i.e.
       // if the test creates a new window or tab and navigates that.
       initial_navigation_observer = std::make_unique<InitialNavigationObserver>(
-          initial_web_contents_,
+          initial_web_contents_.get(),
           base::BindOnce(&BrowserTestBase::InitializeNetworkProcess,
                          base::Unretained(this)));
     }
-    initial_web_contents_ = nullptr;
+    initial_web_contents_.reset();
+
+    OnRestartNetworkServiceForTesting(
+        base::BindRepeating(&BrowserTestBase::ForceInitializeNetworkProcess,
+                            base::Unretained(this)));
+
     SetUpOnMainThread();
+
+#if BUILDFLAG(IS_WIN)
+    // Now that most of process startup is complete, including launching the
+    // network service process, HKLM override can be safely permitted again.
+    registry_util::RegistryOverrideManager::
+        SetAllowHKLMRegistryOverrideForIntegrationTests(/*allow=*/true);
+#endif  // BUILDFLAG(IS_WIN)
 
     if (!IsSkipped()) {
       initial_navigation_observer.reset();
@@ -904,6 +939,8 @@ void BrowserTestBase::ProxyRunTestOnMainThreadLoop() {
 
     TearDownOnMainThread();
     AssertThatNetworkServiceDidNotCrash();
+
+    OnRestartNetworkServiceForTesting(base::NullCallback());
   }
 
   PostRunTestOnMainThread();
@@ -978,7 +1015,7 @@ void BrowserTestBase::UseSoftwareCompositing() {
 
 void BrowserTestBase::SetInitialWebContents(WebContents* web_contents) {
   DCHECK(!initial_web_contents_);
-  initial_web_contents_ = web_contents;
+  initial_web_contents_ = web_contents->GetWeakPtr();
 }
 
 void BrowserTestBase::AssertThatNetworkServiceDidNotCrash() {
@@ -989,7 +1026,7 @@ void BrowserTestBase::AssertThatNetworkServiceDidNotCrash() {
   // TODO(https://crbug.com/1169431#c2): Enable NetworkService crash detection
   // on Fuchsia.
 #if !BUILDFLAG(IS_FUCHSIA)
-  if (network_service_test_.is_bound()) {
+  if (initialized_network_process_ && network_service_test_.is_bound()) {
     // If there was a crash, then |network_service_test_| will receive an error
     // notification, but it's not guaranteed to have arrived at this point.
     // Flush the remote to make sure the notification has been received.
@@ -999,6 +1036,11 @@ void BrowserTestBase::AssertThatNetworkServiceDidNotCrash() {
         << "Expecting no NetworkService crashes";
   }
 #endif
+}
+
+void BrowserTestBase::ForceInitializeNetworkProcess() {
+  initialized_network_process_ = false;
+  InitializeNetworkProcess();
 }
 
 void BrowserTestBase::InitializeNetworkProcess() {

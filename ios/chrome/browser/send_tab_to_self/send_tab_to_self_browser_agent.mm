@@ -19,19 +19,15 @@
 #import "components/send_tab_to_self/metrics_util.h"
 #import "components/send_tab_to_self/send_tab_to_self_model.h"
 #import "components/send_tab_to_self/send_tab_to_self_sync_service.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/infobars/infobar_ios.h"
 #import "ios/chrome/browser/infobars/infobar_manager_impl.h"
 #import "ios/chrome/browser/infobars/infobar_utils.h"
-#import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/send_tab_to_self/ios_send_tab_to_self_infobar_delegate.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/sync/send_tab_to_self_sync_service_factory.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
 #import "ios/web/public/web_state.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 BROWSER_USER_DATA_KEY_IMPL(SendTabToSelfBrowserAgent)
 
@@ -93,23 +89,24 @@ void SendTabToSelfBrowserAgent::EntriesRemovedRemotely(
   NOTIMPLEMENTED();
 }
 
-void SendTabToSelfBrowserAgent::WebStateActivatedAt(
-    WebStateList* web_state_list,
-    web::WebState* old_web_state,
-    web::WebState* new_web_state,
-    int active_index,
-    ActiveWebStateChangeReason reason) {
-  DCHECK(pending_entry_);
+#pragma mark - WebStateListObserver
 
-  // This can happen if the user close the last tab in the tab picker.
-  if (!new_web_state) {
+void SendTabToSelfBrowserAgent::WebStateListDidChange(
+    WebStateList* web_state_list,
+    const WebStateListChange& change,
+    const WebStateListStatus& status) {
+  // The active WebState can be null if the user close the last tab in the tab
+  // picker.
+  if (!status.active_web_state_change() || !status.new_active_web_state) {
     return;
   }
 
-  DisplayInfoBar(new_web_state, pending_entry_);
-
+  DCHECK(pending_entry_);
+  DisplayInfoBar(status.new_active_web_state, pending_entry_);
   CleanUpObserversAndVariables();
 }
+
+#pragma mark - WebStateObserver
 
 void SendTabToSelfBrowserAgent::WasShown(web::WebState* web_state) {
   DCHECK(pending_entry_);

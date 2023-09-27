@@ -51,6 +51,8 @@ _HEADER = '''
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
+import("//build/config/android/config.gni")
+
 config("xnnpack_config") {
   include_dirs = [
     "//third_party/pthreadpool/src/include",
@@ -73,6 +75,7 @@ config("xnnpack_config") {
     "XNN_ENABLE_ASSEMBLY=1",
     "XNN_ENABLE_GEMM_M_SPECIALIZATION=1",
     "XNN_ENABLE_MEMOPT=1",
+    "XNN_ENABLE_CPUINFO=1",
     "XNN_ENABLE_SPARSE=1",
     "XNN_LOG_LEVEL=0",
     "XNN_LOG_TO_STDIO=0",
@@ -102,6 +105,33 @@ source_set("xnnpack") {
 
   public_configs = [ ":xnnpack_config" ]
 }
+
+# This is a target that cannot depend on //base.
+source_set("xnnpack_standalone") {
+  public = [ "src/include/xnnpack.h" ]
+
+  configs -= [ "//build/config/compiler:chromium_code" ]
+  configs += [ "//build/config/compiler:no_chromium_code" ]
+  configs += [ "//build/config/sanitizers:cfi_icall_generalize_pointers" ]
+
+  sources = [
+%SRCS%
+  ]
+
+  deps = [
+%STANDALONE_TARGETS%,
+    "//third_party/cpuinfo",
+    "//third_party/fp16",
+    "//third_party/fxdiv",
+    "//third_party/pthreadpool:pthreadpool_standalone",
+  ]
+
+  public_configs = [ ":xnnpack_config" ]
+  
+  if (!(is_android && use_order_profiling)) {
+    assert_no_deps = [ "//base" ]
+  }
+}
 '''.strip()
 
 _TARGET_TMPL = '''
@@ -126,6 +156,34 @@ source_set("%TARGET_NAME%") {
   ]
 
   public_configs = [ ":xnnpack_config" ]
+}
+
+# This is a target that cannot depend on //base.
+source_set("%TARGET_NAME%_standalone") {
+  cflags = [
+%ARGS%
+  ]
+
+  sources = [
+%SRCS%
+  ]
+
+  configs -= [ "//build/config/compiler:chromium_code" ]
+  configs += [ "//build/config/compiler:no_chromium_code" ]
+  configs += [ "//build/config/sanitizers:cfi_icall_generalize_pointers" ]
+
+  deps = [
+    "//third_party/cpuinfo",
+    "//third_party/fp16",
+    "//third_party/fxdiv",
+    "//third_party/pthreadpool:pthreadpool_standalone",
+  ]
+
+  public_configs = [ ":xnnpack_config" ]
+  
+  if (!(is_android && use_order_profiling)) {
+    assert_no_deps = [ "//base" ]
+  }
 }
 '''.strip()
 
@@ -352,6 +410,9 @@ def MakeXNNPACKSourceSet(ss, other_targets):
   ]))
   target = target.replace('%TARGETS%', ',\n'.join([
     '    ":%s"' % t for t in sorted(other_targets)
+  ]))
+  target = target.replace('%STANDALONE_TARGETS%', ',\n'.join([
+    '    ":%s_standalone"' % t for t in sorted(other_targets)
   ]))
   return target
 

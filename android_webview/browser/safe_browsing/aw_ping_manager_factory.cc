@@ -9,7 +9,7 @@
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/safe_browsing/content/browser/web_ui/safe_browsing_ui.h"
 #include "components/safe_browsing/core/browser/ping_manager.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 
 namespace safe_browsing {
 
@@ -49,7 +49,8 @@ KeyedService* AwPingManagerFactory::BuildServiceInstanceFor(
       // user population values in android_webview, we should consider
       // threading the user population through for client reports
       /*get_user_population_callback=*/base::NullCallback(),
-      /*get_page_load_token_callback_=*/base::NullCallback());
+      /*get_page_load_token_callback_=*/base::NullCallback(),
+      /*hats_delegate=*/nullptr);
 }
 
 std::string AwPingManagerFactory::GetProtocolConfigClientName() const {

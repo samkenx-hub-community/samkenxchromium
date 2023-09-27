@@ -154,11 +154,14 @@ mojom::blink::DirectBoundUDPSocketOptionsPtr CreateBoundUDPSocketOptions(
     return {};
   }
 
-  if (options->hasIpv6Only() && local_ip != net::IPAddress::IPv6AllZeros()) {
-    exception_state.ThrowTypeError(
-        "ipv6Only can only be specified when localAddress is [::] or "
-        "equivalent.");
-    return {};
+  if (options->hasIpv6Only()) {
+    if (local_ip != net::IPAddress::IPv6AllZeros()) {
+      exception_state.ThrowTypeError(
+          "ipv6Only can only be specified when localAddress is [::] or "
+          "equivalent.");
+      return {};
+    }
+    socket_options->ipv6_only = options->ipv6Only();
   }
 
   socket_options->local_addr =
@@ -194,6 +197,7 @@ UDPSocket* UDPSocket::Create(ScriptState* script_state,
 
 UDPSocket::UDPSocket(ScriptState* script_state)
     : Socket(script_state),
+      ActiveScriptWrappable<UDPSocket>({}),
       udp_socket_(
           MakeGarbageCollected<UDPSocketMojoRemote>(GetExecutionContext())) {}
 

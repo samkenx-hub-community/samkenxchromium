@@ -5,6 +5,7 @@
 import contextlib
 import logging
 import re
+from concurrent.futures import Executor
 from typing import Collection, Dict, Optional, Tuple
 
 from requests.exceptions import RequestException
@@ -50,10 +51,14 @@ class BuildResolver:
         'steps.*.logs.*.view_url',
     ]
 
-    def __init__(self, web: Web, git_cl: GitCL,
+    def __init__(self,
+                 web: Web,
+                 git_cl: GitCL,
+                 io_pool: Optional[Executor] = None,
                  can_trigger_jobs: bool = False):
         self._web = web
         self._git_cl = git_cl
+        self._io_pool = io_pool
         self._can_trigger_jobs = can_trigger_jobs
 
     def _builder_predicate(self, build: Build) -> Dict[str, str]:
@@ -64,11 +69,13 @@ class BuildResolver:
         }
 
     def _build_statuses_from_responses(self, raw_builds) -> BuildStatuses:
+        raw_builds = list(raw_builds)
+        map_fn = self._io_pool.map if self._io_pool else map
+        statuses = map_fn(self._status_if_interrupted, raw_builds)
         return {
             Build(build['builder']['builder'], build['number'], build['id'],
-                  build['builder']['bucket']):
-            self._status_if_interrupted(build)
-            for build in raw_builds
+                  build['builder']['bucket']): status
+            for build, status in zip(raw_builds, statuses)
         }
 
     def resolve_builds(self,
@@ -196,7 +203,7 @@ class BuildResolver:
 
     def log_builds(self, build_statuses: BuildStatuses):
         """Log builds in a tabular format."""
-        self._warn_about_infra_failures(build_statuses)
+        self._warn_about_incomplete_results(build_statuses)
         finished_builds = {
             build: result or '--'
             for build, (status, result) in build_statuses.items()
@@ -219,15 +226,16 @@ class BuildResolver:
             _log.info('Scheduled or started builds:')
             self._log_build_statuses(unfinished_builds)
 
-    def _warn_about_infra_failures(self, build_statuses: BuildStatuses):
-        builds_with_infra_failures = GitCL.filter_infra_failed(build_statuses)
-        if builds_with_infra_failures:
-            _log.warning('Some builds have infrastructure failures:')
-            for build in sorted(builds_with_infra_failures,
+    def _warn_about_incomplete_results(self, build_statuses: BuildStatuses):
+        builds_with_incomplete_results = GitCL.filter_incomplete(
+            build_statuses)
+        if builds_with_incomplete_results:
+            _log.warning('Some builds have incomplete results:')
+            for build in sorted(builds_with_incomplete_results,
                                 key=_build_sort_key):
                 _log.warning('  "%s" build %s', build.builder_name,
                              str(build.build_number or '--'))
-            _log.warning('Examples of infrastructure failures include:')
+            _log.warning('Examples of incomplete results include:')
             _log.warning('  * Shard terminated the harness after timing out.')
             _log.warning('  * Harness exited early due to '
                          'excessive unexpected failures.')
@@ -239,7 +247,12 @@ class BuildResolver:
                 'docs/testing/web_test_expectations.md#handle-bot-timeouts')
 
     def _log_build_statuses(self, build_statuses: BuildStatuses):
-        template = '  %-20s %-7s %-9s %-6s'
+        assert build_statuses
+        builder_names = [build.builder_name for build in build_statuses]
+        # Clamp to a minimum width to visually separate the `BUILDER` and
+        # `NUMBER` columns.
+        name_column_width = max(20, *map(len, builder_names))
+        template = f'  %-{name_column_width}s %-7s %-9s %-6s'
         _log.info(template, 'BUILDER', 'NUMBER', 'STATUS', 'BUCKET')
         for build in sorted(build_statuses, key=_build_sort_key):
             _log.info(template, build.builder_name,

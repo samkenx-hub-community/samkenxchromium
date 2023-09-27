@@ -53,12 +53,13 @@ struct DisplayDeleter {
 
 // Server configuration related enums and structs.
 enum class PrimarySelectionProtocol { kNone, kGtk, kZwp };
-enum class CompositorVersion { kV3, kV4 };
 enum class ShouldUseExplicitSynchronizationProtocol { kNone, kUse };
 enum class EnableAuraShellProtocol { kEnabled, kDisabled };
 
 struct ServerConfig {
-  CompositorVersion compositor_version = CompositorVersion::kV4;
+  TestZcrTextInputExtensionV1::Version text_input_extension_version =
+      TestZcrTextInputExtensionV1::Version::kV12;
+  TestCompositor::Version compositor_version = TestCompositor::Version::kV4;
   PrimarySelectionProtocol primary_selection_protocol =
       PrimarySelectionProtocol::kNone;
   ShouldUseExplicitSynchronizationProtocol use_explicit_synchronization =
@@ -66,6 +67,9 @@ struct ServerConfig {
   EnableAuraShellProtocol enable_aura_shell =
       EnableAuraShellProtocol::kDisabled;
   bool surface_submission_in_pixel_coordinates = true;
+  bool supports_viewporter_surface_scaling = false;
+  bool use_aura_output_manager = false;
+  bool use_ime_keep_selection_fix = false;
 };
 
 class TestWaylandServerThread;
@@ -87,6 +91,7 @@ class TestWaylandServerThread : public base::Thread,
   class OutputDelegate;
 
   TestWaylandServerThread();
+  explicit TestWaylandServerThread(const ServerConfig& config);
 
   TestWaylandServerThread(const TestWaylandServerThread&) = delete;
   TestWaylandServerThread& operator=(const TestWaylandServerThread&) = delete;
@@ -98,9 +103,7 @@ class TestWaylandServerThread : public base::Thread,
   // descriptor that a client can connect to. The caller is responsible for
   // ensuring that this file descriptor gets closed (for example, by calling
   // wl_display_connect).
-  // Instantiates an xdg_shell of version |shell_version|; versions 6 and 7
-  // (stable) are supported.
-  bool Start(const ServerConfig& config);
+  bool Start();
 
   // Runs 'callback' or 'closure' on the server thread; blocks until the
   // callable is run and all pending Wayland requests and events are delivered.
@@ -122,7 +125,10 @@ class TestWaylandServerThread : public base::Thread,
   }
 
   TestOutput* CreateAndInitializeOutput(TestOutputMetrics metrics = {}) {
-    auto output = std::make_unique<TestOutput>(std::move(metrics));
+    auto output = std::make_unique<TestOutput>(
+        base::BindRepeating(&TestWaylandServerThread::OnTestOutputMetricsFlush,
+                            base::Unretained(this)),
+        std::move(metrics));
     if (output_.aura_shell_enabled()) {
       output->set_aura_shell_enabled();
     }
@@ -132,6 +138,12 @@ class TestWaylandServerThread : public base::Thread,
     globals_.push_back(std::move(output));
     return output_ptr;
   }
+
+  // Called when the Flush() is called for a TestOutput associated with
+  // `output_resource`. When called sends the corresponding events for the
+  // `metrics` to clients of the zaura_output_manager.
+  void OnTestOutputMetricsFlush(wl_resource* output_resource,
+                                const TestOutputMetrics& metrics);
 
   TestDataDeviceManager* data_device_manager() { return &data_device_manager_; }
   TestSeat* seat() { return &seat_; }
@@ -210,15 +222,13 @@ class TestWaylandServerThread : public base::Thread,
   TestServerListener client_destroy_listener_;
   raw_ptr<wl_client> client_ = nullptr;
   raw_ptr<wl_event_loop> event_loop_ = nullptr;
-  raw_ptr<wl_protocol_logger> protocol_logger_ = nullptr;
+  raw_ptr<wl_protocol_logger, DanglingUntriaged> protocol_logger_ = nullptr;
+
+  ServerConfig config_;
 
   // Represent Wayland global objects
-  // Compositor version is selected dynamically by server config but version is
-  // actually set on construction thus both compositor version objects appear
-  // here.
-  // TODO(crbug.com/1315587): Refactor this pattern when required.
-  TestCompositor compositor_v4_;
-  TestCompositor compositor_v3_;
+  TestCompositor compositor_;
+
   TestSubCompositor sub_compositor_;
   TestViewporter viewporter_;
   TestAlphaCompositing alpha_compositing_;
@@ -231,7 +241,7 @@ class TestWaylandServerThread : public base::Thread,
   MockXdgShell xdg_shell_;
   TestZAuraOutputManager zaura_output_manager_;
   TestZAuraShell zaura_shell_;
-  MockZcrColorManagerV1 zcr_color_manager_v1_;
+  ::testing::NiceMock<MockZcrColorManagerV1> zcr_color_manager_v1_;
   TestZcrStylus zcr_stylus_;
   TestZcrTextInputExtensionV1 zcr_text_input_extension_v1_;
   TestZwpTextInputManagerV1 zwp_text_input_manager_v1_;

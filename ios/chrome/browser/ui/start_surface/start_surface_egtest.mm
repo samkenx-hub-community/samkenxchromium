@@ -18,10 +18,6 @@
 #import "net/test/embedded_test_server/embedded_test_server.h"
 #import "ui/base/l10n/l10n_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 // The delay to wait for an element to appear before tapping on it.
 constexpr base::TimeDelta kWaitElementTimeout = base::Seconds(2);
@@ -51,6 +47,12 @@ constexpr base::TimeDelta kWaitElementTimeout = base::Seconds(2);
 // Tests that navigating to a page and restarting upon cold start, an NTP page
 // is opened with the Return to Recent Tab tile.
 - (void)testColdStartOpenStartSurface {
+// TODO(crbug.com/1430040): Test is flaky on iPad device. Re-enable the test.
+#if !TARGET_IPHONE_SIMULATOR
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_DISABLED(@"This test is flaky on iPad device.");
+  }
+#endif
   GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
   const GURL destinationUrl = self.testServer->GetURL("/pony.html");
   [ChromeEarlGrey loadURL:destinationUrl];

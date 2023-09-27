@@ -5,7 +5,6 @@
 #include "base/command_line.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/bind.h"
-#include "base/test/metrics/histogram_tester.h"
 #include "build/build_config.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
@@ -26,9 +25,6 @@
 // of the BrowserWindow is mocked via FullscreenControllerTestWindow.
 
 namespace {
-
-const char kFullscreenReshowHistogramName[] =
-    "ExclusiveAccess.BubbleReshowsPerSession.Fullscreen";
 
 // FullscreenControllerTestWindow ----------------------------------------------
 
@@ -85,7 +81,7 @@ class FullscreenControllerTestWindow : public TestBrowserWindow,
   bool IsTransitionReentrant(bool new_fullscreen);
 
   WindowState state_;
-  raw_ptr<Browser> browser_;
+  raw_ptr<Browser, DanglingUntriaged> browser_;
 };
 
 FullscreenControllerTestWindow::FullscreenControllerTestWindow()
@@ -231,7 +227,7 @@ class FullscreenControllerStateUnitTest : public BrowserWithTestWindowTest,
   // FullscreenControllerStateTest:
   bool ShouldSkipStateAndEventPair(State state, Event event) override;
   Browser* GetBrowser() override;
-  raw_ptr<FullscreenControllerTestWindow> window_ = nullptr;
+  raw_ptr<FullscreenControllerTestWindow, DanglingUntriaged> window_ = nullptr;
 };
 
 FullscreenControllerStateUnitTest::FullscreenControllerStateUnitTest() =
@@ -488,22 +484,15 @@ TEST_F(FullscreenControllerStateUnitTest, GetFullscreenState) {
 
 // Test that switching tabs takes the browser out of tab fullscreen.
 TEST_F(FullscreenControllerStateUnitTest, ExitTabFullscreenViaSwitchingTab) {
-  base::HistogramTester histogram_tester;
-
   AddTab(browser(), GURL(url::kAboutBlankURL));
   AddTab(browser(), GURL(url::kAboutBlankURL));
   ASSERT_TRUE(InvokeEvent(ENTER_TAB_FULLSCREEN));
   ASSERT_TRUE(InvokeEvent(WINDOW_CHANGE));
   ASSERT_TRUE(browser()->window()->IsFullscreen());
-  histogram_tester.ExpectTotalCount(kFullscreenReshowHistogramName, 0);
 
   browser()->tab_strip_model()->SelectNextTab();
   ChangeWindowFullscreenState();
   EXPECT_FALSE(browser()->window()->IsFullscreen());
-
-  // Do a simple test that histograms are being recorded upon exiting the
-  // fullscreen session (when simplified-fullscreen-ui is enabled).
-  histogram_tester.ExpectUniqueSample(kFullscreenReshowHistogramName, 0, 1);
 }
 
 // Test that switching tabs via detaching the active tab (which is in tab
@@ -808,7 +797,7 @@ class FullscreenChangeObserver : public content::WebContentsObserver {
   FullscreenChangeObserver(const FullscreenChangeObserver&) = delete;
   FullscreenChangeObserver& operator=(const FullscreenChangeObserver&) = delete;
 
-  MOCK_METHOD2(DidToggleFullscreenModeForTab, void(bool, bool));
+  MOCK_METHOD(void, DidToggleFullscreenModeForTab, (bool, bool));
 };
 
 // Tests that going from tab fullscreen -> browser fullscreen causes an explicit

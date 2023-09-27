@@ -22,6 +22,7 @@
 #include "remoting/base/logging.h"
 #include "remoting/base/oauth_token_getter.h"
 #include "remoting/base/rsa_key_pair.h"
+#include "remoting/host/chromeos/chromeos_enterprise_params.h"
 #include "remoting/host/chromoting_host.h"
 #include "remoting/host/chromoting_host_context.h"
 #include "remoting/host/ftl_signaling_connector.h"
@@ -42,6 +43,11 @@
 #include "remoting/signaling/log_to_server.h"
 #include "remoting/signaling/signaling_id_util.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "base/feature_list.h"
+#include "remoting/host/chromeos/features.h"
+#endif
 
 #if BUILDFLAG(IS_LINUX)
 #include "remoting/host/linux/wayland_manager.h"
@@ -73,54 +79,25 @@ It2MeHost::DeferredConnectContext::DeferredConnectContext() = default;
 
 It2MeHost::DeferredConnectContext::~DeferredConnectContext() = default;
 
-It2MeHost::It2MeHost() = default;
+It2MeHost::It2MeHost() {
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  host_event_reporter_factory_ =
+      base::BindRepeating(&HostEventReporter::Create);
+#endif
+}
 
 It2MeHost::~It2MeHost() {
   // Check that resources that need to be torn down on the UI thread are gone.
   DCHECK(!desktop_environment_factory_.get());
 }
 
-void It2MeHost::set_enable_dialogs(bool enable) {
+void It2MeHost::set_chrome_os_enterprise_params(
+    ChromeOsEnterpriseParams params) {
 #if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
-  enable_dialogs_ = enable;
+  chrome_os_enterprise_params_ = std::move(params);
 #else
-  NOTREACHED() << "It2MeHost::set_enable_dialogs is only supported on ChromeOS";
-#endif
-}
-
-void It2MeHost::set_enable_notifications(bool enable) {
-#if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
-  enable_notifications_ = enable;
-#else
-  NOTREACHED() << "It2MeHost::set_enable_notifications is only supported on "
-               << "ChromeOS";
-#endif
-}
-
-void It2MeHost::set_terminate_upon_input(bool terminate_upon_input) {
-#if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
-  terminate_upon_input_ = terminate_upon_input;
-#else
-  NOTREACHED()
-      << "It2MeHost::set_terminate_upon_input is only supported on ChromeOS";
-#endif
-}
-
-void It2MeHost::set_enable_curtaining(bool enable) {
-#if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
-  enable_curtaining_ = enable;
-#else
-  NOTREACHED() << "It2MeHost::set_enable_curtaining is only supported "
-                  "on ChromeOS";
-#endif
-}
-
-void It2MeHost::set_is_enterprise_session(bool is_enterprise_session) {
-#if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
-  is_enterprise_session_ = is_enterprise_session;
-#else
-  NOTREACHED()
-      << "It2MeHost::set_is_enterprise_session is only supported on ChromeOS";
+  NOTREACHED() << "It2MeHost::set_chrome_os_enterprise_params is only "
+               << "supported on ChromeOS";
 #endif
 }
 
@@ -209,7 +186,7 @@ void It2MeHost::ConnectOnNetworkThread(
   // Skip this check for enterprise sessions, as they use the device specific
   // robot account as host, and we should not expect the customers to add this
   // internal account to their host domain list.
-  if (!is_enterprise_session_ && !required_host_domain_list_.empty()) {
+  if (!required_host_domain_list_.empty() && !is_enterprise_session()) {
     bool matched = false;
     for (const auto& domain : required_host_domain_list_) {
       if (base::EndsWith(username, std::string("@") + domain,
@@ -232,6 +209,7 @@ void It2MeHost::ConnectOnNetworkThread(
   register_request_ = std::move(connection_context->register_request);
   register_request_->StartRequest(
       signal_strategy_.get(), host_key_pair_, authorized_helper_,
+      std::move(chrome_os_enterprise_params_),
       base::BindOnce(&It2MeHost::OnReceivedSupportID, base::Unretained(this)));
 
   HOST_LOG << "NAT traversal enabled: " << nat_traversal_enabled_;
@@ -288,10 +266,22 @@ void It2MeHost::ConnectOnNetworkThread(
     options.desktop_capture_options()->set_prefer_cursor_embedded(true);
   }
 #endif
-  options.set_enable_user_interface(enable_dialogs_);
-  options.set_enable_notifications(enable_notifications_);
-  options.set_terminate_upon_input(terminate_upon_input_);
-  options.set_enable_curtaining(enable_curtaining_);
+
+#if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
+  if (chrome_os_enterprise_params_.has_value()) {
+    options.set_enable_user_interface(
+        !chrome_os_enterprise_params_->suppress_user_dialogs);
+    options.set_enable_notifications(
+        !chrome_os_enterprise_params_->suppress_notifications);
+    options.set_terminate_upon_input(
+        chrome_os_enterprise_params_->terminate_upon_input);
+    options.set_enable_curtaining(
+        chrome_os_enterprise_params_->curtain_local_user_session);
+    options.set_enable_file_transfer(
+        chrome_os_enterprise_params_->allow_file_transfer &&
+        enterprise_file_transfer_allowed_);
+  }
+#endif
 
   if (max_clipboard_size_.has_value()) {
     options.set_clipboard_size(max_clipboard_size_.value());
@@ -310,7 +300,8 @@ void It2MeHost::ConnectOnNetworkThread(
   host_event_logger_ =
       HostEventLogger::Create(host_->status_monitor(), kApplicationName);
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-  host_event_reporter_ = HostEventReporter::Create(host_->status_monitor());
+  host_event_reporter_ =
+      host_event_reporter_factory_.Run(host_->status_monitor());
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
   // Connect signaling and start the host.
@@ -363,13 +354,27 @@ void It2MeHost::OnClientConnected(const std::string& signaling_id) {
 void It2MeHost::OnClientDisconnected(const std::string& signaling_id) {
   DCHECK(host_context_->network_task_runner()->BelongsToCurrentThread());
 
-  DisconnectOnNetworkThread();
+  // Handling HostStatusObserver events should not cause the destruction of the
+  // ChromotingHost instance, however that is exactly what happens inside of
+  // DisconnectOnNetworkThread() so we post a task to disconnect asynchronously
+  // which will allow any other HostStatusObservers to handle the event as well
+  // before everything is torn down.
+  host_context_->network_task_runner()->PostTask(
+      FROM_HERE, base::BindOnce(&It2MeHost::DisconnectOnNetworkThread, this,
+                                protocol::ErrorCode::OK));
 }
 
 ValidationCallback It2MeHost::GetValidationCallbackForTesting() {
   return base::BindRepeating(&It2MeHost::ValidateConnectionDetails,
                              base::Unretained(this));
 }
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+void It2MeHost::SetHostEventReporterFactoryForTesting(
+    HostEventReporterFactory factory) {
+  host_event_reporter_factory_ = factory;
+}
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 void It2MeHost::OnPolicyUpdate(base::Value::Dict policies) {
   // The policy watcher runs on the |ui_task_runner|.
@@ -385,6 +390,24 @@ void It2MeHost::OnPolicyUpdate(base::Value::Dict policies) {
   // the connection process.
   remote_support_connections_allowed_ =
       policies.FindBool(GetRemoteSupportPolicyKey()).value_or(true);
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  enterprise_file_transfer_allowed_ =
+      policies
+          .FindBool(policy::key::kRemoteAccessHostAllowEnterpriseFileTransfer)
+          .value_or(false);
+
+  if (base::FeatureList::IsEnabled(
+          remoting::features::kForceEnableEnterpriseCrdFileTransfer)) {
+    HOST_LOG
+        << "Overriding enable enterprise file transfer policy. Original value: "
+        << enterprise_file_transfer_allowed_;
+    enterprise_file_transfer_allowed_ = true;
+  }
+
+  HOST_LOG << "RemoteAccessHostEnterpriseFileTransfer capability is enabled: "
+           << enterprise_file_transfer_allowed_;
+#endif
 
   absl::optional<bool> nat_policy_value =
       policies.FindBool(policy::key::kRemoteAccessHostFirewallTraversal);
@@ -726,7 +749,12 @@ void It2MeHost::ValidateConnectionDetails(
 
   // Show a confirmation dialog to the user to allow them to confirm/reject it.
   // If dialogs are suppressed, just call the callback directly.
-  if (enable_dialogs_) {
+  if (is_enterprise_session() &&
+      chrome_os_enterprise_params_->suppress_user_dialogs) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(std::move(result_callback), ValidationResult::SUCCESS));
+  } else {
     confirmation_dialog_proxy_ = std::make_unique<It2MeConfirmationDialogProxy>(
         host_context_->ui_task_runner(),
         confirmation_dialog_factory_->Create());
@@ -734,10 +762,6 @@ void It2MeHost::ValidateConnectionDetails(
         client_username,
         base::BindOnce(&It2MeHost::OnConfirmationResult, base::Unretained(this),
                        std::move(result_callback)));
-  } else {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(std::move(result_callback), ValidationResult::SUCCESS));
   }
 }
 
@@ -765,7 +789,7 @@ const char* It2MeHost::GetRemoteSupportPolicyKey() const {
   // sessions initiated by the enterprise admin via a RemoteCommand. This case
   // is handled specifically by the policy to disallow enterprise remote support
   // connections (RemoteAccessHostAllowEnterpriseRemoteSupportConnections).
-  if (is_enterprise_session_) {
+  if (is_enterprise_session()) {
     return policy::key::
         kRemoteAccessHostAllowEnterpriseRemoteSupportConnections;
   }
@@ -775,6 +799,10 @@ const char* It2MeHost::GetRemoteSupportPolicyKey() const {
 
 It2MeHostFactory::It2MeHostFactory() = default;
 It2MeHostFactory::~It2MeHostFactory() = default;
+
+std::unique_ptr<It2MeHostFactory> It2MeHostFactory::Clone() const {
+  return std::make_unique<It2MeHostFactory>();
+}
 
 scoped_refptr<It2MeHost> It2MeHostFactory::CreateIt2MeHost() {
   return new It2MeHost();

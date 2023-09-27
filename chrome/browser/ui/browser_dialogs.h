@@ -5,6 +5,7 @@
 #ifndef CHROME_BROWSER_UI_BROWSER_DIALOGS_H_
 #define CHROME_BROWSER_UI_BROWSER_DIALOGS_H_
 
+#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -14,22 +15,30 @@
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/ui/bookmarks/bookmark_editor.h"
-#include "chrome/browser/web_applications/web_app_callback_app_identity.h"
-#include "chrome/browser/web_applications/web_app_id.h"
 #include "content/public/browser/bluetooth_delegate.h"
 #include "content/public/browser/login_delegate.h"
 #include "extensions/buildflags/buildflags.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/interaction/element_identifier.h"
 #include "ui/base/models/dialog_model.h"
 #include "ui/gfx/native_widget_types.h"
 
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
+#include "chrome/browser/web_applications/web_app_callback_app_identity.h"
+#include "chrome/browser/web_applications/web_app_id.h"
+#include "chrome/browser/web_applications/web_app_install_info.h"
+#include "chrome/browser/web_applications/web_app_uninstall_dialog_user_options.h"
+#include "components/webapps/browser/installable/installable_metrics.h"
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
+
 class Browser;
 class GURL;
 class LoginHandler;
 class Profile;
-struct WebAppInstallInfo;
 
 namespace base {
 class FilePath;
@@ -70,9 +79,18 @@ class WebDialogDelegate;
 struct SelectedFileInfo;
 }  // namespace ui
 
+namespace views {
+class Widget;
+}  // namespace views
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
 namespace webapps {
+class MlInstallOperationTracker;
 struct Screenshot;
 }  // namespace webapps
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
 
 namespace chrome {
 
@@ -94,8 +112,8 @@ gfx::NativeWindow ShowWebDialog(gfx::NativeView parent,
                                 bool show = true);
 
 // Show `dialog_model` as a modal dialog to `browser`.
-void ShowBrowserModal(Browser* browser,
-                      std::unique_ptr<ui::DialogModel> dialog_model);
+views::Widget* ShowBrowserModal(Browser* browser,
+                                std::unique_ptr<ui::DialogModel> dialog_model);
 
 // Show `dialog_model` as a bubble anchored to `anchor_element` in `browser`.
 // `anchor_element` must refer to an element currently present in `browser`.
@@ -143,21 +161,36 @@ void ShowBluetoothDevicePairConfirmDialog(
     content::BluetoothDelegate::PairPromptCallback close_callback);
 #endif  // PAIR_BLUETOOTH_ON_DEMAND()
 
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
 // Callback used to indicate whether a user has accepted the installation of a
 // web app. The boolean parameter is true when the user accepts the dialog. The
 // WebAppInstallInfo parameter contains the information about the app,
 // possibly modified by the user.
 using AppInstallationAcceptanceCallback =
-    base::OnceCallback<void(bool, std::unique_ptr<WebAppInstallInfo>)>;
+    base::OnceCallback<void(bool, std::unique_ptr<web_app::WebAppInstallInfo>)>;
 
 // Shows the Web App install bubble.
 //
 // |web_app_info| is the WebAppInstallInfo being converted into an app.
 // |web_app_info.app_url| should contain a start url from a web app manifest
 // (for a Desktop PWA), or the current url (when creating a shortcut app).
-void ShowWebAppInstallDialog(content::WebContents* web_contents,
-                             std::unique_ptr<WebAppInstallInfo> web_app_info,
-                             AppInstallationAcceptanceCallback callback);
+void ShowWebAppInstallDialog(
+    content::WebContents* web_contents,
+    std::unique_ptr<web_app::WebAppInstallInfo> web_app_info,
+    std::unique_ptr<webapps::MlInstallOperationTracker> install_tracker,
+    AppInstallationAcceptanceCallback callback);
+
+// Creates a dialog that requests the consent from the user to install the
+// requested apps as sub apps to the named parent app. This is triggered by
+// an app calling the Multi App API add() function. The dialog is modal to
+// the browser containing the app calling the API. |sub_apps| contains the
+// information to represent each app to the user.
+views::Widget* CreateSubAppsInstallDialogWidget(
+    const std::string_view parent_app_name,
+    const std::string_view parent_app_scope,
+    const std::vector<std::unique_ptr<web_app::WebAppInstallInfo>>& sub_apps,
+    gfx::NativeWindow window);
 
 // When an app changes its icon or name, that is considered an app identity
 // change which (for some types of apps) needs confirmation from the user.
@@ -178,7 +211,16 @@ void ShowWebAppIdentityUpdateDialog(
     content::WebContents* web_contents,
     web_app::AppIdentityDialogCallback callback);
 
-#if !BUILDFLAG(IS_ANDROID)
+// Shows the web app uninstallation dialog on a page whenever user has decided
+// to uninstall an installed dPWA from a variety of OS surfaces and chrome.
+void ShowWebAppUninstallDialog(
+    Profile* profile,
+    const webapps::AppId& app_id,
+    webapps::WebappUninstallSource uninstall_source,
+    gfx::NativeWindow parent,
+    std::map<SquareSizePx, SkBitmap> icon_bitmaps,
+    web_app::UninstallDialogCallback uninstall_dialog_result_callback);
+
 // Callback used to indicate whether a user has accepted the launch of a
 // web app. The |allowed| is true when the user allows the app to launch.
 // |remember_user_choice| is true if the user wants to persist the decision.
@@ -190,17 +232,15 @@ using WebAppLaunchAcceptanceCallback =
 void ShowWebAppProtocolLaunchDialog(
     const GURL& url,
     Profile* profile,
-    const web_app::AppId& app_id,
+    const webapps::AppId& app_id,
     WebAppLaunchAcceptanceCallback close_callback);
 
 // Shows the pre-launch dialog for a file handling PWA launch. The user can
 // allow or block the launch.
 void ShowWebAppFileLaunchDialog(const std::vector<base::FilePath>& file_paths,
                                 Profile* profile,
-                                const web_app::AppId& app_id,
+                                const webapps::AppId& app_id,
                                 WebAppLaunchAcceptanceCallback close_callback);
-#endif  // !BUILDFLAG(IS_ANDROID)
-
 // Sets whether |ShowWebAppDialog| should accept immediately without any
 // user interaction. |auto_open_in_window| sets whether the open in window
 // checkbox is checked.
@@ -227,7 +267,8 @@ enum class PwaInProductHelpState {
 // shown.
 void ShowPWAInstallBubble(
     content::WebContents* web_contents,
-    std::unique_ptr<WebAppInstallInfo> web_app_info,
+    std::unique_ptr<web_app::WebAppInstallInfo> web_app_info,
+    std::unique_ptr<webapps::MlInstallOperationTracker> install_tracker,
     AppInstallationAcceptanceCallback callback,
     PwaInProductHelpState iph_state = PwaInProductHelpState::kNotShown);
 
@@ -236,7 +277,8 @@ void ShowPWAInstallBubble(
 // confirm or cancel install in this dialog.
 void ShowWebAppDetailedInstallDialog(
     content::WebContents* web_contents,
-    std::unique_ptr<WebAppInstallInfo> web_app_info,
+    std::unique_ptr<web_app::WebAppInstallInfo> web_app_info,
+    std::unique_ptr<webapps::MlInstallOperationTracker> install_tracker,
     AppInstallationAcceptanceCallback callback,
     const std::vector<webapps::Screenshot>& screenshots,
     PwaInProductHelpState iph_state = PwaInProductHelpState::kNotShown);
@@ -244,6 +286,9 @@ void ShowWebAppDetailedInstallDialog(
 // Sets whether |ShowPWAInstallBubble| should accept immediately without any
 // user interaction.
 void SetAutoAcceptPWAInstallConfirmationForTesting(bool auto_accept);
+
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
 
 #if BUILDFLAG(IS_MAC)
 

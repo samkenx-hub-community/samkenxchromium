@@ -6,7 +6,6 @@
 #define ASH_PUBLIC_CPP_CLIPBOARD_HISTORY_CONTROLLER_H_
 
 #include <memory>
-#include <set>
 
 #include "ash/public/cpp/ash_public_export.h"
 #include "base/functional/callback_forward.h"
@@ -35,10 +34,18 @@ class ASH_PUBLIC_EXPORT ClipboardHistoryController {
     // Called when the clipboard history menu is shown.
     virtual void OnClipboardHistoryMenuShown(
         crosapi::mojom::ClipboardHistoryControllerShowSource show_source) {}
+
     // Called when the user pastes from the clipboard history menu.
     virtual void OnClipboardHistoryPasted() {}
-    // Called when item(s) are added to, removed from, or updated in the
-    // clipboard history.
+
+    // Called when:
+    // 1. item(s) are added to, removed from, or updated in the clipboard
+    // history; or
+    // 2. clipboard history's availability (based on the session state and the
+    // login status) changes.
+    // NOTE: Observers will only be notified once about an atomic update
+    // affecting multiple items, e.g., adding a new item and the oldest item
+    // being removed as a result.
     virtual void OnClipboardHistoryItemsUpdated() {}
   };
 
@@ -48,20 +55,19 @@ class ASH_PUBLIC_EXPORT ClipboardHistoryController {
   virtual void AddObserver(Observer* observer) = 0;
   virtual void RemoveObserver(Observer* observer) = 0;
 
-  // Returns whether the clipboard history menu is able to show.
-  virtual bool CanShowMenu() const = 0;
+  // Returns whether clipboard history is enabled and non-empty.
+  virtual bool HasAvailableHistoryItems() const = 0;
 
-  // Shows the clipboard history menu triggered by `source_type` at the
-  // position specified by `anchor_rect`, provided the menu can currently be
+  // Attempts to show the clipboard history menu triggered by `source_type` at
+  // the position specified by `anchor_rect`. Returns whether the menu was
   // shown. `show_source` indicates how the user opened the menu. As long as the
   // menu is shown, `callback` runs just before the menu closes to indicate
   // whether a clipboard history paste is imminent.
-  // TODO(b/267694199): Make these functions return whether the menu was shown.
-  virtual void ShowMenu(
+  virtual bool ShowMenu(
       const gfx::Rect& anchor_rect,
       ui::MenuSourceType source_type,
       crosapi::mojom::ClipboardHistoryControllerShowSource show_source) = 0;
-  virtual void ShowMenu(
+  virtual bool ShowMenu(
       const gfx::Rect& anchor_rect,
       ui::MenuSourceType source_type,
       crosapi::mojom::ClipboardHistoryControllerShowSource show_source,
@@ -79,11 +85,15 @@ class ASH_PUBLIC_EXPORT ClipboardHistoryController {
   // current mode, `callback` will be called with an empty history list.
   virtual void GetHistoryValues(GetHistoryValuesCallback callback) const = 0;
 
-  // Returns a list of item ids for items contained in the clipboard history.
+  // Returns a list of ids for items in the clipboard history, if clipboard
+  // history is enabled. Otherwise, returns an empty list.
   virtual std::vector<std::string> GetHistoryItemIds() const = 0;
 
-  // Pastes the clipboard item specified by the item id.
-  virtual bool PasteClipboardItemById(const std::string& item_id) = 0;
+  // Pastes the clipboard item specified by `item_id` from `paste_source`.
+  virtual bool PasteClipboardItemById(
+      const std::string& item_id,
+      int event_flags,
+      crosapi::mojom::ClipboardHistoryControllerShowSource paste_source) = 0;
 
   // Deletes the clipboard item specified by the item id.
   virtual bool DeleteClipboardItemById(const std::string& item_id) = 0;

@@ -15,6 +15,7 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/i18n/case_conversion.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/escape.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
@@ -117,7 +118,7 @@ class FileBrowserHandlerExecutor {
       const Extension* extension,
       int handler_pid);
 
-  Profile* profile_;
+  raw_ptr<Profile, ExperimentalAsh> profile_;
   scoped_refptr<const Extension> extension_;
   const std::string action_id_;
   file_tasks::FileTaskFinishedCallback done_;
@@ -132,8 +133,7 @@ FileBrowserHandlerExecutor::SetupFileAccessPermissions(
     const std::vector<FileSystemURL>& file_urls) {
   DCHECK(handler_extension.get());
 
-  storage::ExternalFileSystemBackend* backend =
-      file_system_context_handler->external_backend();
+  auto* backend = ash::FileSystemBackend::Get(*file_system_context_handler);
 
   std::unique_ptr<FileDefinitionList> file_definition_list(
       new FileDefinitionList);
@@ -146,9 +146,7 @@ FileBrowserHandlerExecutor::SetupFileAccessPermissions(
     base::FilePath local_path = url.path();
     base::FilePath virtual_path = url.virtual_path();
 
-    const bool is_native_file =
-        url.type() == storage::kFileSystemTypeLocal ||
-        url.type() == storage::kFileSystemTypeRestrictedLocal;
+    const bool is_native_file = url.type() == storage::kFileSystemTypeLocal;
 
     // If the file is from a physical volume, actual file must be found.
     if (is_native_file) {
@@ -318,8 +316,9 @@ void FileBrowserHandlerExecutor::SetupHandlerHostFileAccessPermissions(
       FileBrowserHandler::FindForActionId(extension_.get(), action_id_);
   for (FileDefinitionList::const_iterator iter = file_definition_list->begin();
        iter != file_definition_list->end(); ++iter) {
-    if (!action)
+    if (!action) {
       continue;
+    }
     if (action->CanRead()) {
       content::ChildProcessSecurityPolicy::GetInstance()->GrantReadFile(
           handler_pid, iter->absolute_path);
@@ -339,8 +338,9 @@ bool ExecuteFileBrowserHandler(Profile* profile,
                                const std::vector<FileSystemURL>& file_urls,
                                file_tasks::FileTaskFinishedCallback done) {
   // Forbid calling undeclared handlers.
-  if (!FileBrowserHandler::FindForActionId(extension, action_id))
+  if (!FileBrowserHandler::FindForActionId(extension, action_id)) {
     return false;
+  }
 
   // The executor object will be self deleted on completion.
   (new FileBrowserHandlerExecutor(profile, extension, action_id))

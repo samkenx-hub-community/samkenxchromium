@@ -15,6 +15,7 @@
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
@@ -155,7 +156,7 @@ class AndroidSmsAppSetupControllerImplTest : public testing::Test {
     }
 
     // AndroidSmsAppSetupControllerImpl::PwaDelegate:
-    absl::optional<web_app::AppId> GetPwaForUrl(const GURL& install_url,
+    absl::optional<webapps::AppId> GetPwaForUrl(const GURL& install_url,
                                                 Profile* profile) override {
       if (!base::Contains(url_to_pwa_map_, install_url))
         return absl::nullopt;
@@ -168,7 +169,7 @@ class AndroidSmsAppSetupControllerImplTest : public testing::Test {
     }
 
     void RemovePwa(
-        const web_app::AppId& app_id,
+        const webapps::AppId& app_id,
         Profile* profile,
         AndroidSmsAppSetupController::SuccessCallback callback) override {
       for (const auto& url_pwa_pair : url_to_pwa_map_) {
@@ -183,8 +184,8 @@ class AndroidSmsAppSetupControllerImplTest : public testing::Test {
     }
 
    private:
-    FakeCookieManager* fake_cookie_manager_;
-    base::flat_map<GURL, web_app::AppId> url_to_pwa_map_;
+    raw_ptr<FakeCookieManager, ExperimentalAsh> fake_cookie_manager_;
+    base::flat_map<GURL, webapps::AppId> url_to_pwa_map_;
   };
 
   AndroidSmsAppSetupControllerImplTest()
@@ -451,12 +452,13 @@ class AndroidSmsAppSetupControllerImplTest : public testing::Test {
   absl::optional<bool> last_delete_cookie_result_;
   absl::optional<bool> last_remove_app_result_;
 
-  raw_ptr<web_app::FakeWebAppProvider> provider_;
+  raw_ptr<web_app::FakeWebAppProvider, DanglingUntriaged> provider_;
 
   TestingProfile profile_;
-  HostContentSettingsMap* host_content_settings_map_;
+  raw_ptr<HostContentSettingsMap, ExperimentalAsh> host_content_settings_map_;
   std::unique_ptr<FakeCookieManager> fake_cookie_manager_;
-  TestPwaDelegate* test_pwa_delegate_;
+  raw_ptr<TestPwaDelegate, DanglingUntriaged | ExperimentalAsh>
+      test_pwa_delegate_;
   std::unique_ptr<AndroidSmsAppSetupController> setup_controller_;
 };
 

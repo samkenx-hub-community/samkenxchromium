@@ -56,7 +56,7 @@ export class EarconEngine {
     this.defaultPitch = Note.G3;
 
     /** @public {string} The choice of base sound for most controls. */
-    this.controlSound = SoundFile.CONTROL;
+    this.controlSound = WavSoundFile.CONTROL;
 
     /**
      * @public {number} The delay between sounds in the on/off sweep effect,
@@ -98,6 +98,9 @@ export class EarconEngine {
      */
     this.buffers_ = {};
 
+    /** @private {!Object<string, AudioBufferSourceNode>} */
+    this.loops_ = {};
+
     /**
      * The source audio nodes for queued tick / tocks for progress.
      * Kept around so they can be canceled.
@@ -115,9 +118,6 @@ export class EarconEngine {
     /** @private {?number} The setInterval ID for progress sounds. */
     this.progressIntervalID_ = null;
 
-    /** @private {boolean} */
-    this.persistProgressTicks_ = false;
-
     /**
      * Maps a earcon name to the last source input audio for that
      * earcon.
@@ -129,9 +129,11 @@ export class EarconEngine {
     this.currentTrackedEarcon_;
 
     // Initialization: load the base sound data files asynchronously.
-    Object.values(SoundFile)
+    Object.values(WavSoundFile)
         .concat(Object.values(Reverb))
         .forEach(sound => this.loadSound(sound, `${BASE_URL}${sound}.wav`));
+    Object.values(OggSoundFile)
+        .forEach(sound => this.loadSound(sound, `${BASE_URL}${sound}.ogg`));
   }
 
   /**
@@ -142,10 +144,10 @@ export class EarconEngine {
     // These earcons are not tracked by the engine via their audio sources.
     switch (earcon) {
       case EarconId.CHROMEVOX_LOADED:
-        this.cancelProgressPersistent();
+        this.onChromeVoxLoaded();
         return;
       case EarconId.CHROMEVOX_LOADING:
-        this.startProgressPersistent();
+        this.onChromeVoxLoading();
         return;
       case EarconId.PAGE_FINISH_LOADING:
         this.cancelProgress();
@@ -196,7 +198,7 @@ export class EarconEngine {
         this.onTextField();
         break;
       case EarconId.INVALID_KEYPRESS:
-        this.onWrap();
+        this.onInvalidKeypress();
         break;
       case EarconId.LINK:
         this.onLink();
@@ -334,6 +336,7 @@ export class EarconEngine {
    * @param {{pitch: (number | undefined),
    *          time: (number | undefined),
    *          gain: (number | undefined),
+   *          loop: (boolean | undefined),
    *          pan: (number | undefined),
    *          reverb: (number | undefined)}=} opt_properties
    *     An object where you can override the default pitch, gain, pan,
@@ -344,10 +347,14 @@ export class EarconEngine {
   play(sound, opt_properties = {}) {
     const source = this.context_.createBufferSource();
     source.buffer = this.buffers_[sound];
+    if (opt_properties.loop) {
+      this.loops_[sound] = source;
+    }
 
     const pitch = opt_properties.pitch ?? this.defaultPitch;
     // Changes the playback rate of the sample – which also changes the pitch.
     source.playbackRate.value = this.multiplierFor_(pitch);
+    source.loop = opt_properties.loop ?? false;
 
     const destination = this.createCommonFilters(opt_properties);
     source.connect(destination);
@@ -363,28 +370,41 @@ export class EarconEngine {
     return source;
   }
 
+  /**
+   * Stops the loop of the specified sound file, if one exists.
+   * @param {string} sound The name of the sound file.
+   */
+  stopLoop(sound) {
+    if (!this.loops_[sound]) {
+      return;
+    }
+
+    this.loops_[sound].stop();
+    delete this.loops_[sound];
+  }
+
   /** Play the static sound. */
   onStatic() {
-    this.play(SoundFile.STATIC, {gain: this.staticVolume});
+    this.play(WavSoundFile.STATIC, {gain: this.staticVolume});
   }
 
   /** Play the link sound. */
   onLink() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume});
     this.play(this.controlSound, {pitch: Note.G4});
   }
 
   /** Play the button sound. */
   onButton() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume});
     this.play(this.controlSound);
   }
 
   /** Play the text field sound. */
   onTextField() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume});
     this.play(
-        SoundFile.STATIC,
+        WavSoundFile.STATIC,
         {time: this.baseDelay * 1.5, gain: this.clickVolume * 0.5});
     this.play(this.controlSound, {pitch: Note.B3});
     this.play(
@@ -394,7 +414,7 @@ export class EarconEngine {
 
   /** Play the pop up button sound. */
   onPopUpButton() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume});
 
     this.play(this.controlSound);
     this.play(
@@ -407,33 +427,33 @@ export class EarconEngine {
 
   /** Play the check on sound. */
   onCheckOn() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume});
     this.play(this.controlSound, {pitch: Note.D3});
     this.play(this.controlSound, {pitch: Note.D4, time: this.baseDelay * 2});
   }
 
   /** Play the check off sound. */
   onCheckOff() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume});
     this.play(this.controlSound, {pitch: Note.D4});
     this.play(this.controlSound, {pitch: Note.D3, time: this.baseDelay * 2});
   }
 
   /** Play the smart sticky mode on sound. */
   onSmartStickyModeOn() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume * 0.5});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume * 0.5});
     this.play(this.controlSound, {pitch: Note.D4});
   }
 
   /** Play the smart sticky mode off sound. */
   onSmartStickyModeOff() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume * 0.5});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume * 0.5});
     this.play(this.controlSound, {pitch: Note.D3});
   }
 
   /** Play the select control sound. */
   onSelect() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume});
     this.play(this.controlSound);
     this.play(this.controlSound, {time: this.baseDelay});
     this.play(this.controlSound, {time: this.baseDelay * 2});
@@ -441,7 +461,7 @@ export class EarconEngine {
 
   /** Play the slider sound. */
   onSlider() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume});
     this.play(this.controlSound);
     this.play(
         this.controlSound, {time: this.baseDelay, gain: 0.5, pitch: Note.A3});
@@ -458,21 +478,26 @@ export class EarconEngine {
 
   /** Play the skim sound. */
   onSkim() {
-    this.play(SoundFile.SKIM);
+    this.play(WavSoundFile.SKIM);
   }
 
   /** Play the selection sound. */
   onSelection() {
-    this.play(SoundFile.SELECTION);
+    this.play(OggSoundFile.SELECTION);
   }
 
   /** Play the selection reverse sound. */
   onSelectionReverse() {
-    this.play(SoundFile.SELECTION_REVERSE);
+    this.play(OggSoundFile.SELECTION_REVERSE);
+  }
+
+  /** Play the invalid keypress sound. */
+  onInvalidKeypress() {
+    this.play(OggSoundFile.INVALID_KEYPRESS);
   }
 
   onNoPointerAnchor() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume * 0.2});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume * 0.2});
     const freq1 = this.frequencyFor_(Note.A_FLAT4);
     this.generateSinusoidal({
       attack: 0.00001,
@@ -572,92 +597,6 @@ export class EarconEngine {
     envelopeNode.connect(destination);
   }
 
-  /**
-   * Play a sweep over a bunch of notes in a scale, with an echo,
-   * for the ChromeVox on or off sounds.
-   *
-   * @param {boolean} reverse Whether to play in the reverse direction.
-   */
-  onChromeVoxSweep(reverse) {
-    const pitches = [
-      Note.C2,
-      Note.D3,
-      Note.G3,
-      Note.C3,
-      Note.D4,
-      Note.G4,
-      Note.C4,
-      Note.D5,
-      Note.G5,
-    ];
-
-    if (reverse) {
-      pitches.reverse();
-    }
-
-    const attack = 0.015;
-    const dur = pitches.length * this.sweepDelay;
-
-    const destination = this.createCommonFilters({reverb: 2.0});
-    for (let k = 0; k < this.sweepEchoCount; k++) {
-      const envelopeNode = this.context_.createGain();
-      const startTime = this.context_.currentTime + this.sweepEchoDelay * k;
-      const sweepGain = Math.pow(0.3, k);
-      const overtones = 2;
-      let overtoneGain = sweepGain;
-      for (let i = 0; i < overtones; i++) {
-        const osc = this.context_.createOscillator();
-        osc.start(startTime);
-        osc.stop(startTime + dur);
-
-        const gainNode = this.context_.createGain();
-        osc.connect(gainNode);
-        gainNode.connect(envelopeNode);
-
-        for (let j = 0; j < pitches.length; j++) {
-          let freqDecay;
-          if (reverse) {
-            freqDecay = Math.pow(0.75, pitches.length - j);
-          } else {
-            freqDecay = Math.pow(0.75, j);
-          }
-          const gain = overtoneGain * freqDecay;
-          const pitch = pitches[j] + this.sweepPitch;
-          const freq = (i + 1) * this.frequencyFor_(pitch);
-          if (j === 0) {
-            osc.frequency.setValueAtTime(freq, startTime);
-            gainNode.gain.setValueAtTime(gain, startTime);
-          } else {
-            osc.frequency.exponentialRampToValueAtTime(
-                freq, startTime + j * this.sweepDelay);
-            gainNode.gain.linearRampToValueAtTime(
-                gain, startTime + j * this.sweepDelay);
-          }
-          osc.frequency.setValueAtTime(
-              freq, startTime + j * this.sweepDelay + this.sweepDelay - attack);
-        }
-
-        overtoneGain *= 0.1 + 0.2 * k;
-      }
-
-      envelopeNode.gain.setValueAtTime(0, startTime);
-      envelopeNode.gain.linearRampToValueAtTime(1, startTime + this.sweepDelay);
-      envelopeNode.gain.setValueAtTime(1, startTime + dur - attack * 2);
-      envelopeNode.gain.linearRampToValueAtTime(0, startTime + dur);
-      envelopeNode.connect(destination);
-    }
-  }
-
-  /** Play the "ChromeVox On" sound. */
-  onChromeVoxOn() {
-    this.onChromeVoxSweep(false);
-  }
-
-  /** Play the "ChromeVox Off" sound. */
-  onChromeVoxOff() {
-    this.onChromeVoxSweep(true);
-  }
-
   /** Play an alert sound. */
   onAlert() {
     const freq1 = this.frequencyFor_(this.alertPitch - 2);
@@ -686,7 +625,7 @@ export class EarconEngine {
 
   /** Play a wrap sound. */
   onWrap() {
-    this.play(SoundFile.STATIC, {gain: this.clickVolume * 0.3});
+    this.play(WavSoundFile.STATIC, {gain: this.clickVolume * 0.3});
     const freq1 = this.frequencyFor_(this.wrapPitch - 8);
     const freq2 = this.frequencyFor_(this.wrapPitch + 8);
     this.generateSinusoidal({
@@ -711,7 +650,8 @@ export class EarconEngine {
       let t = this.progressTime_ - this.context_.currentTime;
       this.progressSources_.push([
         this.progressTime_,
-        this.play(SoundFile.STATIC, {gain: 0.5 * this.progressGain_, time: t}),
+        this.play(
+            WavSoundFile.STATIC, {gain: 0.5 * this.progressGain_, time: t}),
       ]);
       this.progressSources_.push([
         this.progressTime_,
@@ -727,7 +667,8 @@ export class EarconEngine {
 
       this.progressSources_.push([
         this.progressTime_,
-        this.play(SoundFile.STATIC, {gain: 0.5 * this.progressGain_, time: t}),
+        this.play(
+            WavSoundFile.STATIC, {gain: 0.5 * this.progressGain_, time: t}),
       ]);
       this.progressSources_.push([
         this.progressTime_,
@@ -757,10 +698,6 @@ export class EarconEngine {
    * explicitly canceled.
    */
   startProgress() {
-    if (this.persistProgressTicks_) {
-      return;
-    }
-
     if (this.progressIntervalID_) {
       this.cancelProgress();
     }
@@ -775,9 +712,6 @@ export class EarconEngine {
 
   /** Stop playing any tick / tock progress sounds. */
   cancelProgress() {
-    if (this.persistProgressTicks_) {
-      return;
-    }
     if (!this.progressIntervalID_) {
       return;
     }
@@ -791,28 +725,18 @@ export class EarconEngine {
     this.progressIntervalID_ = null;
   }
 
-  /**
-   * Similar to the non-persistent variant above, but does not allow for
-   * cancellation by other calls to startProgress*.
-   */
-  startProgressPersistent() {
-    if (this.persistProgressTicks_) {
-      return;
-    }
-    this.startProgress();
-    this.persistProgressTicks_ = true;
+  /** Plays sound indicating ChromeVox is loading. */
+  onChromeVoxLoading() {
+    this.play(OggSoundFile.CHROMEVOX_LOADING, {loop: true});
   }
 
   /**
-   * Similar to the non-persistent variant above, but does not allow for
-   * cancellation by other calls to cancelProgress*.
+   * Plays the sound indicating ChromeVox has loaded, and cancels the ChromeVox
+   * loading sound.
    */
-  cancelProgressPersistent() {
-    if (!this.persistProgressTicks_) {
-      return;
-    }
-    this.persistProgressTicks_ = false;
-    this.cancelProgress();
+  onChromeVoxLoaded() {
+    this.stopLoop(OggSoundFile.CHROMEVOX_LOADING);
+    this.play(OggSoundFile.CHROMEVOX_LOADED);
   }
 
   /**
@@ -862,12 +786,19 @@ export class EarconEngine {
 // Local to module.
 
 /* @enum {string} The list of sound data files to load. */
-const SoundFile = {
+const WavSoundFile = {
   CONTROL: 'control',
-  SELECTION: 'selection',
-  SELECTION_REVERSE: 'selection_reverse',
   SKIM: 'skim',
   STATIC: 'static',
+};
+
+/* @enum {string} The list of sound data files to load. */
+const OggSoundFile = {
+  CHROMEVOX_LOADED: 'chromevox_loaded',
+  CHROMEVOX_LOADING: 'chromevox_loading',
+  INVALID_KEYPRESS: 'invalid_keypress',
+  SELECTION: 'selection',
+  SELECTION_REVERSE: 'selection_reverse',
 };
 
 /** @enum {string} The list of reverb data files to load. */

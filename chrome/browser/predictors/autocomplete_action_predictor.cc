@@ -11,24 +11,24 @@
 
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
-#include "base/guid.h"
 #include "base/i18n/case_conversion.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/observer_list.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/uuid.h"
+#include "chrome/browser/browser_features.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/predictors/autocomplete_action_predictor_factory.h"
 #include "chrome/browser/predictors/predictor_database.h"
 #include "chrome/browser/predictors/predictor_database_factory.h"
-#include "chrome/browser/prefetch/prefetch_prefs.h"
 #include "chrome/browser/preloading/chrome_preloading.h"
 #include "chrome/browser/preloading/prefetch/no_state_prefetch/no_state_prefetch_manager_factory.h"
+#include "chrome/browser/preloading/preloading_prefs.h"
 #include "chrome/browser/preloading/prerender/prerender_manager.h"
 #include "chrome/browser/preloading/prerender/prerender_utils.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/common/chrome_features.h"
 #include "components/history/core/browser/in_memory_database.h"
 #include "components/no_state_prefetch/browser/no_state_prefetch_handle.h"
 #include "components/no_state_prefetch/browser/no_state_prefetch_manager.h"
@@ -37,10 +37,29 @@
 #include "components/omnibox/browser/base_search_provider.h"
 #include "components/omnibox/browser/omnibox_log.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/preloading_data.h"
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/common/content_features.h"
 #include "third_party/blink/public/common/features.h"
+#include "ui/base/page_transition_types.h"
+
+namespace {
+void SetIsNavigationInDomainCallback(content::PreloadingData* preloading_data) {
+  preloading_data->SetIsNavigationInDomainCallback(
+      chrome_preloading_predictor::kOmniboxDirectURLInput,
+      base::BindRepeating(
+          [](content::NavigationHandle* navigation_handle) -> bool {
+            auto transition_type = navigation_handle->GetPageTransition();
+            return (transition_type & ui::PAGE_TRANSITION_FROM_ADDRESS_BAR) &&
+                   ui::PageTransitionCoreTypeIs(
+                       transition_type,
+                       ui::PageTransition::PAGE_TRANSITION_TYPED) &&
+                   ui::PageTransitionIsNewNavigation(
+                       navigation_handle->GetPageTransition());
+          }));
+}
+}  // namespace
 
 namespace {
 
@@ -48,12 +67,15 @@ namespace {
 // be PRERENDER or PRECONNECT. Due to the current design, the prerender one
 // should be higher than the preconnect one, otherwise preconnect will never
 // run.
+// Android uses lower thresholds determined based on an experiment. For
+// non-Android, we're now running a similar experiment with a different
+// progress. See https://crbug.com/1399401 for the current progress.
 const base::FeatureParam<double> kPrerenderDUIConfidenceCutoff{
     &features::kAutocompleteActionPredictorConfidenceCutoff,
-    "prerender_dui_confidence_cutoff", 0.8};
+    "prerender_dui_confidence_cutoff", BUILDFLAG(IS_ANDROID) ? 0.5 : 0.8};
 const base::FeatureParam<double> kPreconnectConfidenceCutoff{
     &features::kAutocompleteActionPredictorConfidenceCutoff,
-    "preconnect_dui_confidence_cutoff", 0.5};
+    "preconnect_dui_confidence_cutoff", BUILDFLAG(IS_ANDROID) ? 0.3 : 0.5};
 
 const int kMinimumNumberOfHits = 3;
 const size_t kMaximumTransitionalMatchesSize = 1024 * 1024;  // 1 MB.
@@ -207,13 +229,16 @@ void AutocompleteActionPredictor::StartPrerendering(
   content::PreloadingURLMatchCallback same_url_matcher =
       content::PreloadingData::GetSameURLMatcher(url);
 
+  SetIsNavigationInDomainCallback(preloading_data);
+
   if (prerender_utils::IsDirectUrlInputPrerenderEnabled()) {
     // Create new PreloadingAttempt and pass all the values corresponding to
     // this prerendering attempt for Prerender.
     content::PreloadingAttempt* preloading_attempt =
         preloading_data->AddPreloadingAttempt(
             chrome_preloading_predictor::kOmniboxDirectURLInput,
-            content::PreloadingType::kPrerender, std::move(same_url_matcher));
+            content::PreloadingType::kPrerender, std::move(same_url_matcher),
+            web_contents.GetPrimaryMainFrame()->GetPageUkmSourceId());
 
     PrerenderManager::CreateForWebContents(&web_contents);
     auto* prerender_manager = PrerenderManager::FromWebContents(&web_contents);
@@ -228,7 +253,8 @@ void AutocompleteActionPredictor::StartPrerendering(
         preloading_data->AddPreloadingAttempt(
             chrome_preloading_predictor::kOmniboxDirectURLInput,
             content::PreloadingType::kNoStatePrefetch,
-            std::move(same_url_matcher));
+            std::move(same_url_matcher),
+            web_contents.GetPrimaryMainFrame()->GetPageUkmSourceId());
 
     content::SessionStorageNamespace* session_storage_namespace =
         web_contents.GetController().GetDefaultSessionStorageNamespace();
@@ -275,6 +301,17 @@ void AutocompleteActionPredictor::StartPrerendering(
 }
 
 AutocompleteActionPredictor::Action
+AutocompleteActionPredictor::DecideActionByConfidence(double confidence) {
+  Action action = ACTION_NONE;
+  if (confidence >= kPrerenderDUIConfidenceCutoff.Get()) {
+    action = ACTION_PRERENDER;
+  } else if (confidence >= kPreconnectConfidenceCutoff.Get()) {
+    action = ACTION_PRECONNECT;
+  }
+  return action;
+}
+
+AutocompleteActionPredictor::Action
 AutocompleteActionPredictor::RecommendAction(
     const std::u16string& user_text,
     const AutocompleteMatch& match,
@@ -287,14 +324,10 @@ AutocompleteActionPredictor::RecommendAction(
                             is_in_db);
 
   // Map the confidence to an action.
-  Action action = ACTION_NONE;
-  if (confidence >= kPrerenderDUIConfidenceCutoff.Get()) {
-    action = ACTION_PRERENDER;
-  } else if (confidence >= kPreconnectConfidenceCutoff.Get()) {
-    action = ACTION_PRECONNECT;
-  }
+  Action action = DecideActionByConfidence(confidence);
 
-  // Downgrade prefetch to preconnect if this is a search match.
+  // Downgrade prerender to preconnect if this is a search match.
+  // Default search result engine pre* is managed by `SearchPrefetchService`.
   if (action == ACTION_PRERENDER && AutocompleteMatch::IsSearchType(match.type))
     action = ACTION_PRECONNECT;
 
@@ -308,6 +341,7 @@ AutocompleteActionPredictor::RecommendAction(
 
     auto* preloading_data =
         content::PreloadingData::GetOrCreateForWebContents(web_contents);
+    SetIsNavigationInDomainCallback(preloading_data);
 
     // We multiply confidence by 100 to pass the percentage and cast it into int
     // for logs.
@@ -347,7 +381,7 @@ void AutocompleteActionPredictor::OnOmniboxOpenedUrl(const OmniboxLog& log) {
   if (!log.is_popup_open || log.is_paste_and_go)
     return;
 
-  const AutocompleteMatch& match = log.result->match_at(log.selected_index);
+  const AutocompleteMatch& match = log.result->match_at(log.selection.line);
   const GURL& opened_url = match.destination_url;
 
   // Abandon the current prefetch. If it is to be used, it will be used very
@@ -413,7 +447,7 @@ void AutocompleteActionPredictor::UpdateDatabaseFromTransitionalMatches(
 
       auto it = db_cache_.find(key);
       if (it == db_cache_.end()) {
-        row.id = base::GenerateGUID();
+        row.id = base::Uuid::GenerateRandomV4().AsLowercaseString();
         row.number_of_hits = is_hit ? 1 : 0;
         row.number_of_misses = is_hit ? 0 : 1;
 

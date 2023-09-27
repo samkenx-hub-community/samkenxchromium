@@ -6,8 +6,8 @@
 
 #include <utility>
 
-#include "base/guid.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/uuid.h"
 #include "build/build_config.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "third_party/blink/public/common/browser_interface_broker_proxy.h"
@@ -80,8 +80,8 @@ class PromiseResolverCallbacks final : public UserMediaRequest::Callbacks {
 
   void OnSuccess(const MediaStreamVector& streams,
                  CaptureController* capture_controller) override {
-    if (media_type_ == UserMediaRequestType::kDisplayMediaSet) {
-      OnSuccessGetDisplayMediaSet(streams);
+    if (media_type_ == UserMediaRequestType::kAllScreensMedia) {
+      OnSuccessGetAllScreensMedia(streams);
       return;
     }
 
@@ -127,9 +127,9 @@ class PromiseResolverCallbacks final : public UserMediaRequest::Callbacks {
   }
 
  private:
-  void OnSuccessGetDisplayMediaSet(const MediaStreamVector& streams) {
+  void OnSuccessGetAllScreensMedia(const MediaStreamVector& streams) {
     DCHECK(!streams.empty());
-    DCHECK_EQ(UserMediaRequestType::kDisplayMediaSet, media_type_);
+    DCHECK_EQ(UserMediaRequestType::kAllScreensMedia, media_type_);
     resolver_->Resolve(streams);
   }
 
@@ -234,27 +234,10 @@ bool TransientActivationRequirementSatisfied(LocalDOMWindow* window) {
   return false;
 }
 
-void RecordEnumerateDevicesLatency(base::TimeTicks start_time) {
-  const base::TimeDelta elapsed = base::TimeTicks::Now() - start_time;
-  base::UmaHistogramTimes("WebRTC.EnumerateDevices.Latency", elapsed);
-}
-
 #if !BUILDFLAG(IS_ANDROID)
-// Killswitch for remotely shutting off new functionality in case
-// anything goes wrong.
-// TODO(crbug.com/1382329): Remove this flag.
-BASE_FEATURE(kAllowCaptureControllerForGetUserMediaScreenCapture,
-             "AllowCaptureControllerForGetUserMediaScreenCapture",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 bool IsExtensionScreenSharingFunctionCall(const MediaStreamConstraints* options,
                                           ExceptionState& exception_state) {
   DCHECK(!exception_state.HadException());
-
-  if (!base::FeatureList::IsEnabled(
-          kAllowCaptureControllerForGetUserMediaScreenCapture)) {
-    return false;
-  }
 
   if (!options) {
     return false;
@@ -347,6 +330,9 @@ MediaStreamConstraints* ToMediaStreamConstraints(
   if (source->hasSurfaceSwitching()) {
     constraints->setSurfaceSwitching(source->surfaceSwitching());
   }
+  if (source->hasMonitorTypeSurfaces()) {
+    constraints->setMonitorTypeSurfaces(source->monitorTypeSurfaces());
+  }
   return constraints;
 }
 
@@ -365,7 +351,8 @@ MediaDevices* MediaDevices::mediaDevices(Navigator& navigator) {
 }
 
 MediaDevices::MediaDevices(Navigator& navigator)
-    : Supplement<Navigator>(navigator),
+    : ActiveScriptWrappable<MediaDevices>({}),
+      Supplement<Navigator>(navigator),
       ExecutionContextLifecycleObserver(navigator.DomWindow()),
       stopped_(false),
       dispatcher_host_(navigator.GetExecutionContext()),
@@ -375,6 +362,7 @@ MediaDevices::~MediaDevices() = default;
 
 ScriptPromise MediaDevices::enumerateDevices(ScriptState* script_state,
                                              ExceptionState& exception_state) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   UpdateWebRTCMethodCount(RTCAPIName::kEnumerateDevices);
   if (!script_state->ContextIsValid()) {
     exception_state.ThrowDOMException(DOMExceptionCode::kNotSupportedError,
@@ -387,20 +375,21 @@ ScriptPromise MediaDevices::enumerateDevices(ScriptState* script_state,
       script_state, "Media.MediaDevices.EnumerateDevices", base::Seconds(4));
   const ScriptPromise promise = result_tracker->Promise();
 
-  enumerate_device_requests_.Set(
-      result_tracker, RequestMetadata{.start_time = base::TimeTicks::Now()});
+  enumerate_device_requests_.insert(result_tracker);
 
   LocalFrame* frame = LocalDOMWindow::From(script_state)->GetFrame();
   GetDispatcherHost(frame).EnumerateDevices(
-      true /* audio input */, true /* video input */, true /* audio output */,
-      true /* request_video_input_capabilities */,
-      true /* request_audio_input_capabilities */,
+      /*request_audio_input=*/true, /*request_video_input=*/true,
+      /*request_audio_output=*/true,
+      /*request_video_input_capabilities=*/true,
+      /*request_audio_input_capabilities=*/true,
       WTF::BindOnce(&MediaDevices::DevicesEnumerated, WrapPersistent(this),
                     WrapPersistent(result_tracker)));
   return promise;
 }
 
 MediaTrackSupportedConstraints* MediaDevices::getSupportedConstraints() const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return MediaTrackSupportedConstraints::Create();
 }
 
@@ -408,6 +397,7 @@ ScriptPromise MediaDevices::getUserMedia(
     ScriptState* script_state,
     const UserMediaStreamConstraints* options,
     ExceptionState& exception_state) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   // This timeout of base::Seconds(8) is an initial value and based on the data
   // in Media.MediaDevices.GetUserMedia.Latency, it should be iterated upon.
   auto* resolver = MakeGarbageCollected<
@@ -435,6 +425,7 @@ ScriptPromise MediaDevices::SendUserMediaRequest(
     ScriptPromiseResolverWithTracker<UserMediaRequestResult>* resolver,
     const MediaStreamConstraints* options,
     ExceptionState& exception_state) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(!exception_state.HadException());
 
   ScriptState* script_state = resolver->GetScriptState();
@@ -516,16 +507,16 @@ ScriptPromise MediaDevices::SendUserMediaRequest(
   return promise;
 }
 
-ScriptPromise MediaDevices::getDisplayMediaSet(
+ScriptPromise MediaDevices::getAllScreensMedia(
     ScriptState* script_state,
-    const DisplayMediaStreamOptions* options,
     ExceptionState& exception_state) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   // This timeout of base::Seconds(6) is an initial value and based on the data
-  // in Media.MediaDevices.GetDisplayMediaSet.Latency, it should be iterated
+  // in Media.MediaDevices.GetAllScreensMedia.Latency, it should be iterated
   // upon.
   auto* resolver = MakeGarbageCollected<
       ScriptPromiseResolverWithTracker<UserMediaRequestResult>>(
-      script_state, "Media.MediaDevices.GetDisplayMediaSet", base::Seconds(6));
+      script_state, "Media.MediaDevices.GetAllScreensMedia", base::Seconds(6));
 
   ExecutionContext* const context = GetExecutionContext();
   if (!context) {
@@ -536,15 +527,19 @@ ScriptPromise MediaDevices::getDisplayMediaSet(
     return ScriptPromise();
   }
 
-  return SendUserMediaRequest(UserMediaRequestType::kDisplayMediaSet, resolver,
-                              ToMediaStreamConstraints(options),
-                              exception_state);
+  MediaStreamConstraints* constraints = MediaStreamConstraints::Create();
+  constraints->setVideo(
+      MakeGarbageCollected<V8UnionBooleanOrMediaTrackConstraints>(true));
+  constraints->setAutoSelectAllScreens(true);
+  return SendUserMediaRequest(UserMediaRequestType::kAllScreensMedia, resolver,
+                              constraints, exception_state);
 }
 
 ScriptPromise MediaDevices::getDisplayMedia(
     ScriptState* script_state,
     const DisplayMediaStreamOptions* options,
     ExceptionState& exception_state) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   LocalDOMWindow* const window = DomWindow();
   // This timeout of base::Seconds(6) is an initial value and based on the data
   // in Media.MediaDevices.GetDisplayMedia.Latency, it should be iterated upon.
@@ -598,9 +593,10 @@ ScriptPromise MediaDevices::getDisplayMedia(
     if (capture_controller->IsBound()) {
       resolver->RecordAndThrowDOMException(
           exception_state, DOMExceptionCode::kInvalidStateError,
-          "setFocusBehavior() can only be called before getDisplayMedia() or"
-          "immediately after.",
+          "A CaptureController object may only be used with a single "
+          "getDisplayMedia() invocation.",
           UserMediaRequestResult::kInvalidStateError);
+
       return ScriptPromise();
     }
     capture_controller->SetIsBound(true);
@@ -624,6 +620,7 @@ ScriptPromise MediaDevices::getDisplayMedia(
 void MediaDevices::setCaptureHandleConfig(ScriptState* script_state,
                                           const CaptureHandleConfig* config,
                                           ExceptionState& exception_state) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(config->hasExposeOrigin());
   DCHECK(config->hasHandle());
 
@@ -682,10 +679,13 @@ void MediaDevices::setCaptureHandleConfig(ScriptState* script_state,
       .SetCaptureHandleConfig(std::move(config_ptr));
 }
 
-ScriptPromise MediaDevices::ProduceCropTarget(ScriptState* script_state,
-                                              Element* element,
-                                              ExceptionState& exception_state) {
-  DCHECK(IsMainThread());
+ScriptPromise MediaDevices::ProduceSubCaptureTarget(
+    ScriptState* script_state,
+    Element* element,
+    ExceptionState& exception_state,
+    SubCaptureTargetType type) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  CHECK_EQ(type, SubCaptureTargetType::kCropTarget);
 
 #if BUILDFLAG(IS_ANDROID)
   exception_state.ThrowDOMException(DOMExceptionCode::kNotSupportedError,
@@ -707,10 +707,9 @@ ScriptPromise MediaDevices::ProduceCropTarget(ScriptState* script_state,
     return ScriptPromise();
   }
 
-  if (!element || !element->IsSupportedByRegionCapture()) {
-    exception_state.ThrowDOMException(
-        DOMExceptionCode::kNotSupportedError,
-        "Support for this subtype is not yet implemented.");
+  if (!element) {
+    exception_state.ThrowDOMException(DOMExceptionCode::kNotSupportedError,
+                                      "Invalid element.");
     return ScriptPromise();
   }
 
@@ -769,11 +768,12 @@ const AtomicString& MediaDevices::InterfaceName() const {
 }
 
 ExecutionContext* MediaDevices::GetExecutionContext() const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return ExecutionContextLifecycleObserver::GetExecutionContext();
 }
 
 void MediaDevices::RemoveAllEventListeners() {
-  EventTargetWithInlineData::RemoveAllEventListeners();
+  EventTarget::RemoveAllEventListeners();
   DCHECK(!HasEventListeners());
   StopObserving();
 }
@@ -781,27 +781,28 @@ void MediaDevices::RemoveAllEventListeners() {
 void MediaDevices::AddedEventListener(
     const AtomicString& event_type,
     RegisteredEventListener& registered_listener) {
-  EventTargetWithInlineData::AddedEventListener(event_type,
-                                                registered_listener);
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  EventTarget::AddedEventListener(event_type, registered_listener);
   StartObserving();
 }
 
 void MediaDevices::RemovedEventListener(
     const AtomicString& event_type,
     const RegisteredEventListener& registered_listener) {
-  EventTargetWithInlineData::RemovedEventListener(event_type,
-                                                  registered_listener);
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  EventTarget::RemovedEventListener(event_type, registered_listener);
   if (!HasEventListeners()) {
     StopObserving();
   }
 }
 
 bool MediaDevices::HasPendingActivity() const {
-  DCHECK(stopped_ || receiver_.is_bound() == HasEventListeners());
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return receiver_.is_bound();
 }
 
 void MediaDevices::ContextDestroyed() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (stopped_) {
     return;
   }
@@ -813,18 +814,20 @@ void MediaDevices::ContextDestroyed() {
 void MediaDevices::OnDevicesChanged(
     mojom::blink::MediaDeviceType type,
     const Vector<WebMediaDeviceInfo>& device_infos) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(GetExecutionContext());
-
-  if (RuntimeEnabledFeatures::OnDeviceChangeEnabled()) {
-    ScheduleDispatchEvent(Event::Create(event_type_names::kDevicechange));
+  if (current_device_infos_[static_cast<wtf_size_t>(type)] == device_infos) {
+    return;
   }
 
-  if (device_change_test_callback_) {
-    std::move(device_change_test_callback_).Run();
+  current_device_infos_[static_cast<wtf_size_t>(type)] = device_infos;
+  if (RuntimeEnabledFeatures::OnDeviceChangeEnabled()) {
+    ScheduleDispatchEvent(Event::Create(event_type_names::kDevicechange));
   }
 }
 
 void MediaDevices::ScheduleDispatchEvent(Event* event) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   scheduled_events_.push_back(event);
   if (dispatch_scheduled_events_task_handle_.IsActive()) {
     return;
@@ -839,6 +842,7 @@ void MediaDevices::ScheduleDispatchEvent(Event* event) {
 }
 
 void MediaDevices::DispatchScheduledEvents() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (stopped_) {
     return;
   }
@@ -851,6 +855,35 @@ void MediaDevices::DispatchScheduledEvents() {
 }
 
 void MediaDevices::StartObserving() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (receiver_.is_bound() || stopped_ || starting_observation_) {
+    return;
+  }
+
+  LocalDOMWindow* window = To<LocalDOMWindow>(GetExecutionContext());
+  if (!window) {
+    return;
+  }
+
+  starting_observation_ = true;
+  GetDispatcherHost(window->GetFrame())
+      .EnumerateDevices(/*request_audio_input=*/true,
+                        /*request_video_input=*/true,
+                        /*request_audio_output=*/true,
+                        /*request_video_input_capabilities=*/false,
+                        /*request_audio_input_capabilities=*/false,
+                        WTF::BindOnce(&MediaDevices::FinalizeStartObserving,
+                                      WrapPersistent(this)));
+}
+
+void MediaDevices::FinalizeStartObserving(
+    const Vector<Vector<WebMediaDeviceInfo>>& enumeration,
+    Vector<mojom::blink::VideoInputDeviceCapabilitiesPtr>
+        video_input_capabilities,
+    Vector<mojom::blink::AudioInputDeviceCapabilitiesPtr>
+        audio_input_capabilities) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  starting_observation_ = false;
   if (receiver_.is_bound() || stopped_) {
     return;
   }
@@ -859,6 +892,8 @@ void MediaDevices::StartObserving() {
   if (!window) {
     return;
   }
+
+  current_device_infos_ = enumeration;
 
   GetDispatcherHost(window->GetFrame())
       .AddMediaDevicesListener(true /* audio input */, true /* video input */,
@@ -869,6 +904,7 @@ void MediaDevices::StartObserving() {
 }
 
 void MediaDevices::StopObserving() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!receiver_.is_bound()) {
     return;
   }
@@ -907,12 +943,11 @@ void MediaDevices::DevicesEnumerated(
         video_input_capabilities,
     Vector<mojom::blink::AudioInputDeviceCapabilitiesPtr>
         audio_input_capabilities) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!enumerate_device_requests_.Contains(result_tracker)) {
     return;
   }
 
-  const RequestMetadata request_metadata =
-      enumerate_device_requests_.at(result_tracker);
   enumerate_device_requests_.erase(result_tracker);
 
   ScriptState* script_state = result_tracker->GetScriptState();
@@ -974,25 +1009,13 @@ void MediaDevices::DevicesEnumerated(
   }
 
   RecordEnumeratedDevices(result_tracker->GetScriptState(), media_devices);
-  // TODO(crbug.com/1395324): Remove this custom EnumerateDevices latency
-  // tracking by reverting crrev.com/c/3944912/ once the
-  // ScriptPromiseResolverWithTracker based latency monitoring reaches stable.
-  RecordEnumerateDevicesLatency(request_metadata.start_time);
-
-  if (enumerate_devices_test_callback_) {
-    std::move(enumerate_devices_test_callback_).Run(media_devices);
-  }
-
   result_tracker->Resolve(media_devices);
 }
 
 void MediaDevices::OnDispatcherHostConnectionError() {
-  for (auto& entry : enumerate_device_requests_) {
-    ScriptPromiseResolverWithTracker<EnumerateDevicesResult>* result_tracker =
-        entry.key;
-    RequestMetadata& metadata = entry.value;
-
-    RecordEnumerateDevicesLatency(metadata.start_time);
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  for (ScriptPromiseResolverWithTracker<EnumerateDevicesResult>*
+           result_tracker : enumerate_device_requests_) {
     result_tracker->Reject(
         MakeGarbageCollected<DOMException>(DOMExceptionCode::kAbortError,
                                            "enumerateDevices() failed."),
@@ -1000,14 +1023,11 @@ void MediaDevices::OnDispatcherHostConnectionError() {
   }
   enumerate_device_requests_.clear();
   dispatcher_host_.reset();
-
-  if (connection_error_test_callback_) {
-    std::move(connection_error_test_callback_).Run();
-  }
 }
 
 mojom::blink::MediaDevicesDispatcherHost& MediaDevices::GetDispatcherHost(
     LocalFrame* frame) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   ExecutionContext* const execution_context = GetExecutionContext();
   DCHECK(execution_context);
 
@@ -1029,6 +1049,7 @@ mojom::blink::MediaDevicesDispatcherHost& MediaDevices::GetDispatcherHost(
 void MediaDevices::SetDispatcherHostForTesting(
     mojo::PendingRemote<mojom::blink::MediaDevicesDispatcherHost>
         dispatcher_host) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   ExecutionContext* const execution_context = GetExecutionContext();
   DCHECK(execution_context);
 
@@ -1049,7 +1070,7 @@ void MediaDevices::Trace(Visitor* visitor) const {
   visitor->Trace(crop_id_resolvers_);
 #endif
   Supplement<Navigator>::Trace(visitor);
-  EventTargetWithInlineData::Trace(visitor);
+  EventTarget::Trace(visitor);
   ExecutionContextLifecycleObserver::Trace(visitor);
 }
 
@@ -1057,6 +1078,7 @@ void MediaDevices::Trace(Visitor* visitor) const {
 void MediaDevices::EnqueueMicrotaskToCloseFocusWindowOfOpportunity(
     const String& id,
     CaptureController* capture_controller) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   ExecutionContext* const context = GetExecutionContext();
   if (!context) {
     return;
@@ -1070,6 +1092,7 @@ void MediaDevices::EnqueueMicrotaskToCloseFocusWindowOfOpportunity(
 void MediaDevices::CloseFocusWindowOfOpportunity(
     const String& id,
     CaptureController* capture_controller) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   ExecutionContext* const context = GetExecutionContext();
   if (!context) {
     return;  // Note: We're still back by the browser-side timer.
@@ -1091,7 +1114,7 @@ void MediaDevices::CloseFocusWindowOfOpportunity(
 // and signals success.
 void MediaDevices::ResolveProduceCropIdPromise(Element* element,
                                                const WTF::String& crop_id) {
-  DCHECK(IsMainThread());
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(element);  // Persistent.
 
   const auto it = crop_id_resolvers_.find(element);
@@ -1103,7 +1126,7 @@ void MediaDevices::ResolveProduceCropIdPromise(Element* element,
     resolver->Reject();
     RecordUma(ProduceCropTargetPromiseResult::kPromiseRejected);
   } else {
-    const base::GUID guid = base::GUID::ParseLowercase(crop_id.Ascii());
+    const base::Uuid guid = base::Uuid::ParseLowercase(crop_id.Ascii());
     DCHECK(guid.is_valid());
     element->SetRegionCaptureCropId(
         std::make_unique<RegionCaptureCropId>(blink::GUIDToToken(guid)));

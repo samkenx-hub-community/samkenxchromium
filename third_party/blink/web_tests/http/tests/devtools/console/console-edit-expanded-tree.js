@@ -2,10 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
   TestRunner.addResult('Tests that expanded tree element is editable in console.\n');
 
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('console');
 
   await TestRunner.evaluateInPagePromise(`
@@ -29,7 +34,7 @@
       var node = message.contentElement();
 
       for (var node = message.contentElement(); node; node = node.traverseNextNode(message.contentElement())) {
-        const treeElement = UI.TreeElement.getTreeElementBylistItemNode(node);
+        const treeElement = UIModule.TreeOutline.TreeElement.getTreeElementBylistItemNode(node);
         if (treeElement) {
           onTreeElement(treeElement.firstChild());
           return;

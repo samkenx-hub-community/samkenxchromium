@@ -16,6 +16,7 @@
 
 #include "base/command_line.h"
 #include "base/containers/contains.h"
+#include "base/debug/stack_trace.h"
 #include "base/feature_list.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
@@ -46,6 +47,7 @@
 #include "chrome/browser/extensions/chrome_content_browser_client_extensions_part.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/navigation_predictor/navigation_predictor_keyed_service_factory.h"
+#include "chrome/browser/navigation_predictor/preloading_model_keyed_service_factory.h"
 #include "chrome/browser/permissions/adaptive_quiet_notification_permission_ui_enabler.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/delete_profile_helper.h"
@@ -76,10 +78,11 @@
 #include "components/bookmarks/common/bookmark_pref_names.h"
 #include "components/browsing_data/core/pref_names.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
+#include "components/crash/core/common/crash_key.h"
+#include "components/policy/core/common/policy_pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/search_engines/default_search_manager.h"
-#include "components/services/screen_ai/buildflags/buildflags.h"
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/base/signin_buildflags.h"
 #include "components/signin/public/base/signin_metrics.h"
@@ -87,6 +90,7 @@
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/primary_account_mutator.h"
 #include "components/supervised_user/core/common/buildflags.h"
+#include "components/supervised_user/core/common/pref_names.h"
 #include "components/sync/base/stop_source.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
@@ -98,16 +102,11 @@
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/extensions/extension_service.h"
+#include "extensions/browser/api/management/management_api.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/extension_set.h"
 #include "extensions/common/manifest.h"
-#endif
-
-#if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
-#include "chrome/browser/accessibility/pdf_ocr_controller.h"
-#include "chrome/browser/accessibility/pdf_ocr_controller_factory.h"
-#include "ui/accessibility/accessibility_features.h"
 #endif
 
 #if BUILDFLAG(ENABLE_SESSION_SERVICE)
@@ -116,10 +115,10 @@
 #endif
 
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
-#include "chrome/browser/supervised_user/child_accounts/child_account_service.h"
 #include "chrome/browser/supervised_user/child_accounts/child_account_service_factory.h"
-#include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
+#include "components/supervised_user/core/browser/child_account_service.h"
+#include "components/supervised_user/core/browser/supervised_user_service.h"
 #include "components/supervised_user/core/common/supervised_user_constants.h"
 #endif
 
@@ -131,6 +130,8 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "components/live_caption/live_caption_controller.h"
+#else
+#include "chrome/browser/profiles/profile_manager_android.h"
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -145,6 +146,7 @@
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/browser_process_platform_part_ash.h"
 #include "chromeos/ash/components/browser_context_helper/browser_context_helper.h"
+#include "chromeos/ash/components/browser_context_helper/browser_context_types.h"
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
 #include "components/user_manager/user_type.h"
@@ -162,6 +164,7 @@
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
 #include "chrome/browser/lacros/account_manager/account_profile_mapper.h"
 #include "chrome/browser/ui/startup/first_run_service.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/startup/browser_params_proxy.h"
 #include "components/account_manager_core/chromeos/account_manager_facade_factory.h"
 #endif
@@ -178,6 +181,44 @@
 using content::BrowserThread;
 
 namespace {
+
+// There may be multiple profile creations happening, but only one stack trace
+// is recorded (the most recent one). See https://crbug.com/1472849
+void SetCrashKeysForAsyncProfileCreation(Profile* profile,
+                                         bool creation_complete) {
+  static crash_reporter::CrashKeyString<1024> async_profile_creation_trace_key(
+      "ProfileAsyncCreationStartStack");
+  static crash_reporter::CrashKeyString<32> async_profile_creation_basename(
+      "ProfileAsyncCreationStartBasename");
+  static base::NoDestructor<base::FilePath> basename_for_current_trace;
+
+  base::FilePath profile_dir_basename = profile->GetPath().BaseName();
+
+  if (creation_complete) {
+    if (profile_dir_basename == *basename_for_current_trace) {
+      async_profile_creation_trace_key.Clear();
+      async_profile_creation_basename.Clear();
+      basename_for_current_trace->clear();
+    }
+    return;
+  }
+
+  crash_reporter::SetCrashKeyStringToStackTrace(
+      &async_profile_creation_trace_key, base::debug::StackTrace());
+  async_profile_creation_basename.Set(profile_dir_basename.AsUTF8Unsafe());
+  *basename_for_current_trace = profile_dir_basename;
+}
+
+// Assigns `profile` to `captured_profile` and runs `closure`.
+void CaptureProfile(base::WeakPtr<Profile>* captured_profile,
+                    base::OnceClosure closure,
+                    Profile* profile) {
+  CHECK(captured_profile);
+  if (profile) {
+    *captured_profile = profile->GetWeakPtr();
+  }
+  std::move(closure).Run();
+}
 
 int64_t ComputeFilesSize(const base::FilePath& directory,
                          const base::FilePath::StringType& pattern) {
@@ -390,6 +431,8 @@ ProfileManager::ProfileManager(const base::FilePath& user_data_dir)
   closing_all_browsers_subscription_ = chrome::AddClosingAllBrowsersCallback(
       base::BindRepeating(&ProfileManager::OnClosingAllBrowsersChanged,
                           base::Unretained(this)));
+#else
+  profile_manager_android_ = std::make_unique<ProfileManagerAndroid>(this);
 #endif
 
   if (ProfileShortcutManager::IsFeatureEnabled() && !user_data_dir_.empty())
@@ -514,7 +557,7 @@ Profile* ProfileManager::MaybeForceOffTheRecordMode(Profile* profile) {
     return nullptr;
   if (profile->IsGuestSession() || profile->IsSystemProfile() ||
       IncognitoModePrefs::GetAvailability(profile->GetPrefs()) ==
-          IncognitoModePrefs::Availability::kForced) {
+          policy::IncognitoModeAvailability::kForced) {
     return profile->GetPrimaryOTRProfile(/*create_if_needed=*/true);
   }
   return profile;
@@ -936,9 +979,12 @@ void ProfileManager::CreateMultiProfileAsync(
   // adding an entry to ProfileAttributesStorage. Creating a new
   // ProfileAttributesEntry consistently before writing the profile folder to
   // disk would resolve this.
+  // The TaskPriority should be `USER_BLOCKING` because `CreateProfileAsync`
+  // will eventually open a new browser window or navigates to the sign-in page,
+  // either of which will block the user's interaction.
   base::ThreadPool::PostTask(
       FROM_HERE,
-      {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
+      {base::MayBlock(), base::TaskPriority::USER_BLOCKING,
        base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN},
       base::BindOnce(&NukeProfileFromDisk, new_path,
                      base::BindOnce(&ProfileManager::CreateProfileAsync,
@@ -979,7 +1025,7 @@ base::FilePath ProfileManager::GetPrimaryUserProfilePath() {
   return profile_manager->user_data_dir().Append(
       profile_manager->GetInitialProfileDir());
 }
-#endif
+#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
 
 base::FilePath ProfileManager::GenerateNextProfileDirectoryPath() {
   PrefService* local_state = g_browser_process->local_state();
@@ -1283,10 +1329,16 @@ void ProfileManager::AddKeepAlive(const Profile* profile,
 
   info->keep_alives[origin]++;
 
+  for (auto& observer : observers_) {
+    observer.OnKeepAliveAdded(profile, origin);
+  }
+
   VLOG(1) << "AddKeepAlive(" << profile->GetDebugName() << ", " << origin
           << "). keep_alives=" << info->keep_alives;
 
   if (origin == ProfileKeepAliveOrigin::kBrowserWindow ||
+      origin == ProfileKeepAliveOrigin::kProfileCreationFlow ||
+      origin == ProfileKeepAliveOrigin::kProfileStatistics ||
       (origin == ProfileKeepAliveOrigin::kProfilePickerView &&
        base::FeatureList::IsEnabled(features::kDestroySystemProfiles))) {
     ClearFirstBrowserWindowKeepAlive(profile);
@@ -1300,7 +1352,8 @@ void ProfileManager::RemoveKeepAlive(const Profile* profile,
   CHECK(profile);
   CHECK(!profile->IsOffTheRecord());
 
-  ProfileInfo* info = GetProfileInfoByPath(profile->GetPath());
+  const base::FilePath profile_path = profile->GetPath();
+  ProfileInfo* info = GetProfileInfoByPath(profile_path);
   if (!info) {
     // Can be null in unit tests, when the Profile was not created via
     // ProfileManager.
@@ -1313,6 +1366,22 @@ void ProfileManager::RemoveKeepAlive(const Profile* profile,
   }
 
   DCHECK(base::Contains(info->keep_alives, origin));
+
+#if !BUILDFLAG(IS_ANDROID)
+  // When removing the last keep alive of an ephemeral profile, schedule the
+  // profile for deletion if it is not yet marked.
+  bool ephemeral =
+      IsRegisteredAsEphemeral(&GetProfileAttributesStorage(), profile_path);
+  bool marked_for_deletion = IsProfileDirectoryMarkedForDeletion(profile_path);
+  if (ephemeral && !marked_for_deletion &&
+      GetTotalRefCount(info->keep_alives) == 1) {
+    delete_profile_helper_->ScheduleEphemeralProfileForDeletion(
+        profile_path,
+        std::make_unique<ScopedProfileKeepAlive>(
+            profile, ProfileKeepAliveOrigin::kProfileDeletionProcess));
+  }
+#endif
+
   info->keep_alives[origin]--;
   DCHECK_LE(0, info->keep_alives[origin]);
 
@@ -1429,13 +1498,13 @@ void ProfileManager::DoFinalInitForServices(Profile* profile,
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   bool extensions_enabled = !go_off_the_record;
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kDisableLoginScreenApps) &&
-      ash::ProfileHelper::IsSigninProfile(profile)) {
+  if ((!base::CommandLine::ForCurrentProcess()->HasSwitch(
+           switches::kDisableLoginScreenApps) &&
+       ash::ProfileHelper::IsSigninProfile(profile)) ||
+      ash::ProfileHelper::IsLockScreenAppProfile(profile) ||
+      ash::IsShimlessRmaAppBrowserContext(profile)) {
     extensions_enabled = true;
   }
-  if (ash::ProfileHelper::IsLockScreenAppProfile(profile))
-    extensions_enabled = true;
 #endif
   extensions::ExtensionSystem::Get(profile)->InitForRegularProfile(
       extensions_enabled);
@@ -1471,10 +1540,22 @@ void ProfileManager::DoFinalInitForServices(Profile* profile,
   // initializing the supervised flag if necessary).
   ChildAccountServiceFactory::GetForProfile(profile)->Init();
   SupervisedUserServiceFactory::GetForProfile(profile)->Init();
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  // After the ManagementPolicy has been set, update it for the Supervised User
+  // Extension Delegate, which has been created before the profile
+  // initialization and needs to obtain the new policies.
+  extensions::ManagementAPI::GetFactoryInstance()
+      ->Get(profile)
+      ->GetSupervisedUserExtensionsDelegate()
+      ->UpdateManagementPolicyRegistration();
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 #endif
 
   // Ensure NavigationPredictorKeyedService is started.
   NavigationPredictorKeyedServiceFactory::GetForProfile(profile);
+
+  // Ensure PreloadingModelKeyedService is started.
+  PreloadingModelKeyedServiceFactory::GetForProfile(profile);
 
   IdentityManagerFactory::GetForProfile(profile)->OnNetworkInitialized();
   AccountReconcilorFactory::GetForProfile(profile);
@@ -1497,14 +1578,6 @@ void ProfileManager::DoFinalInitForServices(Profile* profile,
       AccessibilityLabelsServiceFactory::GetForProfile(profile);
   if (accessibility_service)
     accessibility_service->Init();
-
-#if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
-  // TODO(crbug.com/1393069): Dynamically create PdfOcrController when needed
-  // and destroy it when no longer used.
-  if (features::IsPdfOcrEnabled()) {
-    screen_ai::PdfOcrControllerFactory::GetForProfile(profile);
-  }
-#endif  // BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   ash::AccountManagerPolicyControllerFactory::GetForBrowserContext(profile);
@@ -1558,6 +1631,8 @@ ProfileManager::ProfileInfo::FromUnownedProfile(Profile* profile) {
   std::unique_ptr<ProfileInfo> info(new ProfileInfo());
   info->unowned_profile_ = profile;
 
+  SetCrashKeysForAsyncProfileCreation(profile, /*creation_complete=*/false);
+
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   // Lacros primary profile should not be destroyed, this KeepAlive will be
   // set and not expected to be removed at any point. On Secondary profiles, we
@@ -1581,6 +1656,7 @@ void ProfileManager::ProfileInfo::TakeOwnershipOfProfile(
 void ProfileManager::ProfileInfo::MarkProfileAsCreated(Profile* profile) {
   DCHECK_EQ(GetRawProfile(), profile);
   created_ = true;
+  SetCrashKeysForAsyncProfileCreation(profile, /*creation_complete=*/true);
 }
 
 Profile* ProfileManager::ProfileInfo::GetCreatedProfile() const {
@@ -1703,14 +1779,36 @@ Profile* ProfileManager::CreateAndInitializeProfile(
   // profile corruption. Note that this check also covers the case when we have
   // already started loading the profile but it is not fully initialized yet,
   // which would make Bad Things happen if we returned it.
-  CHECK(!GetProfileByPathInternal(profile_dir));
+  ProfileInfo* info = GetProfileInfoByPath(profile_dir);
+  if (info) {
+    SCOPED_CRASH_KEY_STRING32("CreateAndInitializeProfile", "basename",
+                              profile_dir.BaseName().AsUTF8Unsafe());
+    CHECK(!info->GetCreatedProfile())
+        << "Profile is loaded twice " << profile_dir;
+
+    // Load the profile synchronously while it's being loaded asynchronously.
+    // Try recovering from this and avoid crashing.
+    // See https://crbug.com/1472849
+    base::debug::DumpWithoutCrashing();
+    base::RunLoop loop(base::RunLoop::Type::kNestableTasksAllowed);
+    // Use a weak pointer, in case the profile is deleted by a task executed by
+    // the `RunLoop`.
+    base::WeakPtr<Profile> profile_being_loaded;
+    // Using `init_callbacks` rather than `created_callbacks`, so that the
+    // profile is fully initialized, like in the main codepath of this function.
+    info->init_callbacks.push_back(base::BindOnce(
+        &CaptureProfile, &profile_being_loaded, loop.QuitClosure()));
+    loop.Run();
+    return profile_being_loaded.get();
+  }
+
   std::unique_ptr<Profile> profile = CreateProfileHelper(profile_dir);
   if (!profile)
     return nullptr;
 
   // Place the unique_ptr inside ProfileInfo, which was added by
   // OnProfileCreationStarted().
-  ProfileInfo* info = GetProfileInfoByPath(profile->GetPath());
+  info = GetProfileInfoByPath(profile->GetPath());
   DCHECK(info);
   info->TakeOwnershipOfProfile(std::move(profile));
   info->MarkProfileAsCreated(info->GetRawProfile());
@@ -1816,23 +1914,6 @@ absl::optional<base::FilePath> ProfileManager::FindLastActiveProfile(
   }
   return found_entry ? absl::optional<base::FilePath>(found_entry->GetPath())
                      : absl::nullopt;
-}
-
-// static
-void ProfileManager::CleanUpGuestProfile() {
-// ChromeOS handles guest data independently.
-#if !BUILDFLAG(IS_CHROMEOS_ASH)
-  ProfileManager* profile_manager = g_browser_process->profile_manager();
-
-  Profile* profile =
-      profile_manager->GetProfileByPath(profile_manager->GetGuestProfilePath());
-  if (profile) {
-    // Clear all browsing data once a Guest Session completes. The Guest
-    // profile has BrowserContextKeyedServices that the ProfileDestroyer
-    // can't delete it properly.
-    profiles::RemoveBrowsingDataForProfile(GetGuestProfilePath());
-  }
-#endif  //! BUILDFLAG(IS_CHROMEOS_ASH)
 }
 
 DeleteProfileHelper& ProfileManager::GetDeleteProfileHelper() {
@@ -1955,6 +2036,13 @@ void ProfileManager::AddProfileToStorage(Profile* profile) {
   init_params.user_name = username;
   init_params.is_consented_primary_account = is_consented_primary_account;
 
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+  init_params.is_omitted =
+      base::FeatureList::IsEnabled(
+          chromeos::features::kExperimentalWebAppProfileIsolation) &&
+      Profile::IsWebAppProfilePath(profile->GetPath());
+#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
+
   init_params.is_ephemeral = IsForceEphemeralProfilesEnabled(profile);
   init_params.is_signed_in_with_credential_provider =
       profile->GetPrefs()->GetBoolean(prefs::kSignedInWithCredentialProvider);
@@ -1986,6 +2074,7 @@ void ProfileManager::SaveActiveProfiles() {
   base::Value::List& profile_list = update.Get();
 
   profile_list.clear();
+  has_updated_last_opened_profiles_ = true;
 
   // crbug.com/120112 -> several non-off-the-record profiles might have the same
   // GetBaseName(). In that case, we cannot restore both
@@ -2065,21 +2154,18 @@ void ProfileManager::OnBrowserClosed(Browser* browser) {
     base::UmaHistogramCustomCounts("Profile.Guest.OTR.Lifetime",
                                    duration.InMinutes(), 1,
                                    base::Days(28).InMinutes(), 100);
-
-    CleanUpGuestProfile();
+    // ChromeOS handles guest data independently.
+#if !BUILDFLAG(IS_CHROMEOS_ASH)
+    // Clear all browsing data once a Guest Session completes. The Guest profile
+    // has BrowserContextKeyedServices that the ProfileDestroyer can't delete
+    // properly.
+    profiles::RemoveBrowsingDataForProfile(profile->GetPath());
+#endif  //! BUILDFLAG(IS_CHROMEOS_ASH)
   }
 
   base::FilePath path = profile->GetPath();
-  ProfileInfo* info = GetProfileInfoByPath(path);
   if (IsProfileDirectoryMarkedForDeletion(path)) {
     // Do nothing if the profile is already being deleted.
-  } else if (IsRegisteredAsEphemeral(&GetProfileAttributesStorage(), path) &&
-             info->keep_alives[ProfileKeepAliveOrigin::kProfileCreationFlow] ==
-                 0) {
-    // Delete if the profile is an ephemeral profile and it is not in the
-    // profile creation flow.
-    // TODO(crbug.com/1369535): Delete the profile when there is no keep alive.
-    delete_profile_helper_->ScheduleEphemeralProfileForDeletion(path);
   } else if (!profile->IsOffTheRecord()) {
     auto* browsing_data_lifetime_manager =
         ChromeBrowsingDataLifetimeManagerFactory::GetForProfile(

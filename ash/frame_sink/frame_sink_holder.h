@@ -14,6 +14,7 @@
 #include "ash/frame_sink/ui_resource_manager.h"
 #include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
+#include "base/scoped_observation.h"
 #include "cc/trees/layer_tree_frame_sink_client.h"
 #include "components/viz/common/frame_sinks/begin_frame_source.h"
 #include "components/viz/common/quads/compositor_frame.h"
@@ -143,7 +144,7 @@ class ASH_EXPORT FrameSinkHolder final : public cc::LayerTreeFrameSinkClient,
 
   // The currently observed `BeginFrameSource` which will notify us with
   // `OnBeginFrameDerivedImpl()`.
-  viz::BeginFrameSource* begin_frame_source_ = nullptr;
+  raw_ptr<viz::BeginFrameSource, ExperimentalAsh> begin_frame_source_ = nullptr;
 
   // True if we submitted a compositor frame and are waiting for a call to
   // `DidReceiveCompositorFrameAck()`.
@@ -158,11 +159,6 @@ class ASH_EXPORT FrameSinkHolder final : public cc::LayerTreeFrameSinkClient,
   // If either changes, we'll need to allocate a new local surface ID.
   gfx::Size last_frame_size_in_pixels_;
   float last_frame_device_scale_factor_ = 1.0f;
-
-  // The root window to which `this` holder becomes an observer to extend its
-  // lifespan till all the in-flight resource to display compositor are
-  // reclaimed.
-  base::raw_ptr<aura::Window> root_window_for_deletion_ = nullptr;
 
   // Keeps track of resources that are currently available to be reused in a
   // compositor frame and the resources that are in-use by the display
@@ -184,6 +180,14 @@ class ASH_EXPORT FrameSinkHolder final : public cc::LayerTreeFrameSinkClient,
 
   // The callback to generate the next compositor frame.
   GetCompositorFrameCallback get_compositor_frame_callback_;
+
+  // Observation of the root window to which this holder becomes an observer to
+  // extend its lifespan till all the in-flight resource to display compositor
+  // are reclaimed.
+  base::ScopedObservation<aura::Window, aura::WindowObserver>
+      root_window_observation_{this};
+  base::ScopedObservation<viz::BeginFrameSource, viz::BeginFrameObserver>
+      begin_frame_observation_{this};
 
   base::WeakPtrFactory<FrameSinkHolder> weak_ptr_factory_{this};
 };

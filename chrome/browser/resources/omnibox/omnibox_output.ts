@@ -4,9 +4,13 @@
 
 import {assert} from 'chrome://resources/js/assert_ts.js';
 
-import {ACMatchClassification, AutocompleteAdditionalInfo, AutocompleteMatch, OmniboxResponse} from './omnibox.mojom-webui.js';
+import {ACMatchClassification, AutocompleteMatch, DictionaryEntry, OmniboxResponse} from './omnibox.mojom-webui.js';
 import {OmniboxElement} from './omnibox_element.js';
 import {DisplayInputs, OmniboxInput} from './omnibox_input.js';
+// @ts-ignore:next-line
+import outputColumnWidthSheet from './omnibox_output_column_widths.css' assert {type : 'css'};
+// @ts-ignore:next-line
+import outputResultsGroupSheet from './output_results_group.css' assert {type : 'css'};
 
 interface ResultsDetails {
   cursorPosition: number;
@@ -178,6 +182,8 @@ class OutputResultsGroup extends OmniboxElement {
 
   constructor() {
     super('output-results-group-template');
+    this.shadowRoot!.adoptedStyleSheets =
+        [outputColumnWidthSheet, outputResultsGroupSheet];
   }
 
   setResultsGroup(resultsGroup: OmniboxResponse) {
@@ -332,11 +338,10 @@ class OutputMatch extends HTMLTableRowElement {
 
   constructor(match: AutocompleteMatch) {
     super();
-    let mouseMoved = false;
-    this.addEventListener('mousedown', () => mouseMoved = false);
-    this.addEventListener('mousemove', () => mouseMoved = true);
     this.addEventListener(
-        'click', () => !mouseMoved && this.classList.toggle('expanded'));
+        'click',
+        () => !document.getSelection()?.toString() &&
+            this.classList.toggle('expanded'));
 
     COLUMNS.forEach(column => {
       const property = column.create(match);
@@ -617,8 +622,8 @@ class OutputJsonProperty extends OutputProperty {
   }
 }
 
-class OutputAdditionalInfoProperty extends OutputProperty {
-  constructor(value: AutocompleteAdditionalInfo[]) {
+class OutputDictionaryProperty extends OutputProperty {
+  constructor(value: DictionaryEntry[]) {
     super(value.map(({key, value}) => `${key}: ${value}`).join('\n'));
 
     const container = document.createElement('div');
@@ -634,7 +639,7 @@ class OutputAdditionalInfoProperty extends OutputProperty {
 
     const link = document.createElement('a');
     link.download = 'AdditionalInfo.json';
-    link.href = OutputAdditionalInfoProperty.createDownloadLink(value);
+    link.href = OutputDictionaryProperty.createDownloadLink(value);
     container.appendChild(link);
 
     this.appendChild(container);
@@ -642,8 +647,7 @@ class OutputAdditionalInfoProperty extends OutputProperty {
     return this;
   }
 
-  private static createDownloadLink(value: AutocompleteAdditionalInfo[]):
-      string {
+  private static createDownloadLink(value: DictionaryEntry[]): string {
     const obj = value.reduce((obj: Record<string, string>, {key, value}) => {
       obj[key] = value;
       return obj;
@@ -870,9 +874,13 @@ const COLUMNS: Column[] = [
       'pedal-id', false, 'Pedal ID\nThe ID of attached Pedal, or zero if none.',
       match => new OutputTextProperty(String(match.pedalId))),
   new Column(
+      ['Scoring Signals'], '', 'scoring-signals', false,
+      'Scoring Signals\nSignals used by the ML Model to score suggestions.',
+      match => new OutputDictionaryProperty(match.scoringSignals)),
+  new Column(
       ['Additional Info'], '', 'additional-info', true,
       'Additional Info\nProvider-specific information about the result.',
-      match => new OutputAdditionalInfoProperty(match.additionalInfo)),
+      match => new OutputDictionaryProperty(match.additionalInfo)),
 ];
 
 customElements.define('omnibox-output', OmniboxOutput);
@@ -894,7 +902,7 @@ customElements.define(
 customElements.define(
     'output-json-property', OutputJsonProperty, {extends: 'td'});
 customElements.define(
-    'output-additional-info-property', OutputAdditionalInfoProperty,
+    'output-additional-info-property', OutputDictionaryProperty,
     {extends: 'td'});
 customElements.define(
     'output-url-property', OutputUrlProperty, {extends: 'td'});

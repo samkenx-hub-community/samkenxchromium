@@ -4,16 +4,77 @@
 
 #include "content/browser/attribution_reporting/attribution_config.h"
 
+#include <cmath>
+
+#include "base/metrics/field_trial_params.h"
 #include "base/time/time.h"
+#include "components/attribution_reporting/features.h"
 
 namespace content {
+
+namespace {
+
+const base::FeatureParam<int> kMaxReportingOriginsPerSiteParam{
+    &attribution_reporting::features::kConversionMeasurement,
+    "max_reporting_origins_per_source_reporting_site",
+    AttributionConfig::RateLimitConfig::
+        kDefaultMaxReportingOriginsPerSourceReportingSite};
+
+const base::FeatureParam<base::TimeDelta> kFirstNavigationReportWindowDeadline{
+    &attribution_reporting::features::kConversionMeasurement,
+    "first_report_window_deadline",
+    AttributionConfig::EventLevelLimit::kDefaultFirstReportWindowDeadline};
+
+const base::FeatureParam<base::TimeDelta> kSecondNavigationReportWindowDeadline{
+    &attribution_reporting::features::kConversionMeasurement,
+    "second_report_window_deadline",
+    AttributionConfig::EventLevelLimit::kDefaultSecondReportWindowDeadline};
+
+const base::FeatureParam<base::TimeDelta> kFirstEventReportWindowDeadline{
+    &attribution_reporting::features::kConversionMeasurement,
+    "first_event_report_window_deadline",
+    AttributionConfig::EventLevelLimit::kDefaultFirstReportWindowDeadline};
+
+const base::FeatureParam<base::TimeDelta> kSecondEventReportWindowDeadline{
+    &attribution_reporting::features::kConversionMeasurement,
+    "second_event_report_window_deadline",
+    AttributionConfig::EventLevelLimit::kDefaultSecondReportWindowDeadline};
+
+const base::FeatureParam<base::TimeDelta> kAggregateReportMinDelay{
+    &attribution_reporting::features::kConversionMeasurement,
+    "aggregate_report_min_delay",
+    AttributionConfig::AggregateLimit::kDefaultMinDelay};
+
+const base::FeatureParam<base::TimeDelta> kAggregateReportDelaySpan{
+    &attribution_reporting::features::kConversionMeasurement,
+    "aggregate_report_delay_span",
+    AttributionConfig::AggregateLimit::kDefaultDelaySpan};
+
+const base::FeatureParam<double> kNavigationMaxInfoGain{
+    &attribution_reporting::features::kConversionMeasurement,
+    "navigation_max_info_gain",
+    AttributionConfig::EventLevelLimit::kDefaultMaxNavigationInfoGain};
+
+const base::FeatureParam<double> kEventMaxInfoGain{
+    &attribution_reporting::features::kConversionMeasurement,
+    "event_max_info_gain",
+    AttributionConfig::EventLevelLimit::kDefaultMaxEventInfoGain};
+
+bool AreReportWindowDeadlinesValid(
+    base::TimeDelta first_report_window_deadline,
+    base::TimeDelta second_report_window_deadline) {
+  return !first_report_window_deadline.is_negative() &&
+         first_report_window_deadline < second_report_window_deadline;
+}
+
+}  // namespace
 
 bool AttributionConfig::Validate() const {
   if (max_sources_per_origin <= 0) {
     return false;
   }
 
-  if (max_destinations_per_source_site_reporting_origin <= 0) {
+  if (max_destinations_per_source_site_reporting_site <= 0) {
     return false;
   }
 
@@ -29,8 +90,23 @@ bool AttributionConfig::Validate() const {
     return false;
   }
 
+  if (!destination_rate_limit.Validate()) {
+    return false;
+  }
+
   return true;
 }
+
+AttributionConfig::RateLimitConfig::RateLimitConfig()
+    : max_reporting_origins_per_source_reporting_site(
+          kMaxReportingOriginsPerSiteParam.Get()) {
+  if (max_reporting_origins_per_source_reporting_site <= 0) {
+    max_reporting_origins_per_source_reporting_site =
+        kDefaultMaxReportingOriginsPerSourceReportingSite;
+  }
+}
+
+AttributionConfig::RateLimitConfig::~RateLimitConfig() = default;
 
 bool AttributionConfig::RateLimitConfig::Validate() const {
   if (time_window <= base::TimeDelta()) {
@@ -46,6 +122,14 @@ bool AttributionConfig::RateLimitConfig::Validate() const {
   }
 
   if (max_attributions <= 0) {
+    return false;
+  }
+
+  if (max_reporting_origins_per_source_reporting_site <= 0) {
+    return false;
+  }
+
+  if (!origins_per_site_window.is_positive()) {
     return false;
   }
 
@@ -65,21 +149,19 @@ bool AttributionConfig::EventLevelLimit::Validate() const {
     return false;
   }
 
-  if (max_attributions_per_navigation_source <= 0) {
+  if (randomized_response_epsilon < 0 ||
+      std::isnan(randomized_response_epsilon)) {
     return false;
   }
 
-  if (max_attributions_per_event_source <= 0) {
+  if (!AreReportWindowDeadlinesValid(
+          first_navigation_report_window_deadline,
+          second_navigation_report_window_deadline)) {
     return false;
   }
 
-  if (navigation_source_randomized_response_rate < 0 ||
-      navigation_source_randomized_response_rate > 1) {
-    return false;
-  }
-
-  if (event_source_randomized_response_rate < 0 ||
-      event_source_randomized_response_rate > 1) {
+  if (!AreReportWindowDeadlinesValid(first_event_report_window_deadline,
+                                     second_event_report_window_deadline)) {
     return false;
   }
 
@@ -100,6 +182,92 @@ bool AttributionConfig::AggregateLimit::Validate() const {
   }
 
   if (delay_span < base::TimeDelta()) {
+    return false;
+  }
+
+  if (null_reports_rate_include_source_registration_time < 0 ||
+      null_reports_rate_include_source_registration_time > 1) {
+    return false;
+  }
+
+  if (null_reports_rate_exclude_source_registration_time < 0 ||
+      null_reports_rate_exclude_source_registration_time > 1) {
+    return false;
+  }
+
+  if (max_aggregatable_reports_per_source <= 0) {
+    return false;
+  }
+
+  return true;
+}
+
+AttributionConfig::AttributionConfig() = default;
+AttributionConfig::AttributionConfig(const AttributionConfig&) = default;
+AttributionConfig::AttributionConfig(AttributionConfig&&) = default;
+AttributionConfig::~AttributionConfig() = default;
+
+AttributionConfig& AttributionConfig::operator=(const AttributionConfig&) =
+    default;
+AttributionConfig& AttributionConfig::operator=(AttributionConfig&&) = default;
+
+AttributionConfig::EventLevelLimit::EventLevelLimit()
+    : first_navigation_report_window_deadline(
+          kFirstNavigationReportWindowDeadline.Get()),
+      second_navigation_report_window_deadline(
+          kSecondNavigationReportWindowDeadline.Get()),
+      first_event_report_window_deadline(kFirstEventReportWindowDeadline.Get()),
+      second_event_report_window_deadline(
+          kSecondEventReportWindowDeadline.Get()),
+      max_navigation_info_gain(kNavigationMaxInfoGain.Get()),
+      max_event_info_gain(kEventMaxInfoGain.Get()) {
+  if (!AreReportWindowDeadlinesValid(
+          first_navigation_report_window_deadline,
+          second_navigation_report_window_deadline)) {
+    first_navigation_report_window_deadline = kDefaultFirstReportWindowDeadline;
+    second_navigation_report_window_deadline =
+        kDefaultSecondReportWindowDeadline;
+  }
+
+  if (!AreReportWindowDeadlinesValid(first_event_report_window_deadline,
+                                     second_event_report_window_deadline)) {
+    first_event_report_window_deadline = kDefaultFirstReportWindowDeadline;
+    second_event_report_window_deadline = kDefaultSecondReportWindowDeadline;
+  }
+}
+
+AttributionConfig::EventLevelLimit::EventLevelLimit(const EventLevelLimit&) =
+    default;
+AttributionConfig::EventLevelLimit::EventLevelLimit(EventLevelLimit&&) =
+    default;
+AttributionConfig::EventLevelLimit::~EventLevelLimit() = default;
+
+AttributionConfig::EventLevelLimit&
+AttributionConfig::EventLevelLimit::operator=(const EventLevelLimit&) = default;
+AttributionConfig::EventLevelLimit&
+AttributionConfig::EventLevelLimit::operator=(EventLevelLimit&&) = default;
+
+AttributionConfig::AggregateLimit::AggregateLimit()
+    : min_delay(kAggregateReportMinDelay.Get()),
+      delay_span(kAggregateReportDelaySpan.Get()) {
+  if (min_delay.is_negative()) {
+    min_delay = kDefaultMinDelay;
+  }
+  if (delay_span.is_negative()) {
+    delay_span = kDefaultDelaySpan;
+  }
+}
+
+bool AttributionConfig::DestinationRateLimit::Validate() const {
+  if (max_per_reporting_site <= 0) {
+    return false;
+  }
+
+  if (max_total < max_per_reporting_site) {
+    return false;
+  }
+
+  if (!rate_limit_window.is_positive()) {
     return false;
   }
 

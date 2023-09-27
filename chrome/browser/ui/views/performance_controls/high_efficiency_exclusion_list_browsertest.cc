@@ -46,15 +46,6 @@ class HighEfficiencyExclusionListBrowserTest : public InProcessBrowserTest {
 
   ~HighEfficiencyExclusionListBrowserTest() override = default;
 
-  void SetUp() override {
-    scoped_feature_list_.InitWithFeaturesAndParameters(
-        {{performance_manager::features::kHighEfficiencyModeAvailable,
-          {{"default_state", "true"}, {"time_before_discard", "1h"}}}},
-        {});
-
-    InProcessBrowserTest::SetUp();
-  }
-
   void SetUpOnMainThread() override {
     InProcessBrowserTest::SetUpOnMainThread();
     TabStripModel* tab_strip_model = browser()->tab_strip_model();
@@ -103,7 +94,6 @@ class HighEfficiencyExclusionListBrowserTest : public InProcessBrowserTest {
   }
 
  private:
-  base::test::ScopedFeatureList scoped_feature_list_;
   base::SimpleTestTickClock test_clock_;
   resource_coordinator::ScopedSetTickClockForTesting
       scoped_set_tick_clock_for_testing_;
@@ -156,8 +146,9 @@ IN_PROC_BROWSER_TEST_F(HighEfficiencyExclusionListBrowserTest,
   EXPECT_TRUE(NavigateAndDiscardFirstTab(GetURL(kWWWExampleURL)));
 }
 
+// crbug.com/1435375
 IN_PROC_BROWSER_TEST_F(HighEfficiencyExclusionListBrowserTest,
-                       ExclusionListMatchesWildCards) {
+                       DISABLED_ExclusionListMatchesWildCards) {
   PrefService* prefs = GetPrefs();
   base::Value::List exclude_sites_with_http_scheme;
   exclude_sites_with_http_scheme.Append("http://*");

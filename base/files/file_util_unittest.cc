@@ -28,7 +28,6 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
-#include "base/guid.h"
 #include "base/logging.h"
 #include "base/path_service.h"
 #include "base/rand_util.h"
@@ -45,6 +44,7 @@
 #include "base/threading/platform_thread.h"
 #include "base/threading/thread.h"
 #include "base/time/time.h"
+#include "base/uuid.h"
 #include "build/build_config.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "testing/multiprocess_func_list.h"
@@ -659,7 +659,7 @@ TEST_F(FileUtilTest, DevicePathToDriveLetter) {
   // Get a drive letter.
   std::wstring real_drive_letter = AsWString(
       ToUpperASCII(AsStringPiece16(temp_dir_.GetPath().value().substr(0, 2))));
-  if (!isalpha(real_drive_letter[0]) || ':' != real_drive_letter[1]) {
+  if (!IsAsciiAlpha(real_drive_letter[0]) || ':' != real_drive_letter[1]) {
     LOG(ERROR) << "Can't get a drive letter to test with.";
     return;
   }
@@ -3009,6 +3009,24 @@ TEST_F(FileUtilTest, FILEToFile) {
   EXPECT_EQ(file.GetLength(), 5L);
 }
 
+#if BUILDFLAG(IS_WIN)
+TEST_F(FileUtilTest, GetSecureSystemTemp) {
+  FilePath secure_system_temp;
+  ASSERT_EQ(GetSecureSystemTemp(&secure_system_temp), !!::IsUserAnAdmin());
+  if (!::IsUserAnAdmin()) {
+    return;
+  }
+
+  FilePath dir_windows;
+  ASSERT_TRUE(PathService::Get(DIR_WINDOWS, &dir_windows));
+  FilePath dir_program_files;
+  ASSERT_TRUE(PathService::Get(DIR_PROGRAM_FILES, &dir_program_files));
+
+  ASSERT_TRUE((dir_windows.AppendASCII("SystemTemp") == secure_system_temp) ||
+              (dir_program_files == secure_system_temp));
+}
+#endif  // BUILDFLAG(IS_WIN)
+
 TEST_F(FileUtilTest, CreateNewTempDirectoryTest) {
   FilePath temp_dir;
   ASSERT_TRUE(CreateNewTempDirectory(FilePath::StringType(), &temp_dir));
@@ -3016,9 +3034,9 @@ TEST_F(FileUtilTest, CreateNewTempDirectoryTest) {
 
 #if BUILDFLAG(IS_WIN)
   FilePath expected_parent_dir;
-  EXPECT_TRUE(PathService::Get(
-      ::IsUserAnAdmin() ? int{DIR_PROGRAM_FILES} : int{DIR_TEMP},
-      &expected_parent_dir));
+  if (!GetSecureSystemTemp(&expected_parent_dir)) {
+    EXPECT_TRUE(PathService::Get(DIR_TEMP, &expected_parent_dir));
+  }
   EXPECT_TRUE(expected_parent_dir.IsParent(temp_dir));
 #endif  // BUILDFLAG(IS_WIN)
 
@@ -4567,7 +4585,7 @@ TEST(FileUtilMultiThreadedTest, MultiThreadedTempFiles) {
     ScopedFILE output_file(CreateAndOpenTemporaryStream(&output_filename));
     EXPECT_TRUE(output_file);
 
-    const std::string content = GenerateGUID();
+    const std::string content = Uuid::GenerateRandomV4().AsLowercaseString();
 #if BUILDFLAG(IS_WIN)
     HANDLE handle =
         reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(output_file.get())));

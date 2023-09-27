@@ -4,9 +4,8 @@
 
 package org.chromium.chrome.browser.ui.signin.account_picker;
 
-import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static androidx.test.espresso.matcher.ViewMatchers.isRoot;
+import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
 import static org.hamcrest.core.AllOf.allOf;
@@ -33,10 +32,11 @@ import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.R;
+import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.night_mode.ChromeNightModeTestUtils;
 import org.chromium.chrome.browser.share.send_tab_to_self.SendTabToSelfCoordinator;
+import org.chromium.chrome.browser.ui.signin.R;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetCoordinator.EntryPoint;
 import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
@@ -45,6 +45,7 @@ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.signin.base.GoogleServiceAuthError;
 import org.chromium.components.signin.base.GoogleServiceAuthError.State;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
+import org.chromium.ui.test.util.DeviceRestriction;
 import org.chromium.ui.test.util.NightModeTestUtils;
 import org.chromium.ui.test.util.RenderTestRule;
 import org.chromium.ui.test.util.ViewUtils;
@@ -58,6 +59,7 @@ import java.io.IOException;
 @ParameterAnnotations.UseRunnerDelegate(ChromeJUnit4RunnerDelegate.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 @Batch(Batch.PER_CLASS)
+@Restriction(DeviceRestriction.RESTRICTION_TYPE_NON_AUTO)
 public class AccountPickerBottomSheetRenderTest {
     private static final String TEST_EMAIL1 = "test.account1@gmail.com";
     private static final String FULL_NAME1 = "Test Account1";
@@ -154,8 +156,8 @@ public class AccountPickerBottomSheetRenderTest {
             throws IOException {
         mAccountManagerTestRule.addAccount(TEST_EMAIL1, FULL_NAME1, GIVEN_NAME1, null);
         buildAndShowCollapsedBottomSheet();
-        onView(isRoot()).check(ViewUtils.waitForView(allOf(withText(TEST_EMAIL1), isDisplayed())));
-        onView(isRoot()).check(ViewUtils.waitForView(allOf(withText(FULL_NAME1), isDisplayed())));
+        ViewUtils.waitForVisibleView(allOf(withText(TEST_EMAIL1), isDisplayed()));
+        ViewUtils.waitForVisibleView(allOf(withText(FULL_NAME1), isDisplayed()));
         mRenderTestRule.render(
                 mCoordinator.getBottomSheetViewForTesting(), "collapsed_sheet_with_account");
     }
@@ -169,8 +171,8 @@ public class AccountPickerBottomSheetRenderTest {
         mAccountPickerDelegate.setSendTabToSelfEntryPoint();
         mAccountManagerTestRule.addAccount(TEST_EMAIL1, FULL_NAME1, GIVEN_NAME1, null);
         buildAndShowCollapsedBottomSheet();
-        onView(isRoot()).check(ViewUtils.waitForView(allOf(withText(TEST_EMAIL1), isDisplayed())));
-        onView(isRoot()).check(ViewUtils.waitForView(allOf(withText(FULL_NAME1), isDisplayed())));
+        ViewUtils.waitForVisibleView(allOf(withText(TEST_EMAIL1), isDisplayed()));
+        ViewUtils.waitForVisibleView(allOf(withText(FULL_NAME1), isDisplayed()));
         mRenderTestRule.render(mCoordinator.getBottomSheetViewForTesting(),
                 "collapsed_sheet_with_account_for_send_tab_to_self");
     }
@@ -305,7 +307,7 @@ public class AccountPickerBottomSheetRenderTest {
         View view = mCoordinator.getBottomSheetViewForTesting();
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> { view.findViewById(R.id.account_picker_selected_account).performClick(); });
-        CriteriaHelper.pollUiThread(view.findViewById(R.id.account_picker_account_list)::isShown);
+        ViewUtils.onViewWaiting(allOf(withId(R.id.account_picker_account_list), isDisplayed()));
     }
 
     private void buildAndShowCollapsedBottomSheet() {
@@ -316,11 +318,9 @@ public class AccountPickerBottomSheetRenderTest {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             mCoordinator = new AccountPickerBottomSheetCoordinator(
                     mActivityTestRule.getActivity().getWindowAndroid(), getBottomSheetController(),
-                    mAccountPickerDelegate, accountPickerBottomSheetStrings);
-
+                    mAccountPickerDelegate, accountPickerBottomSheetStrings, null);
         });
-        CriteriaHelper.pollUiThread(mCoordinator.getBottomSheetViewForTesting().findViewById(
-                R.id.account_picker_selected_account)::isShown);
+        ViewUtils.onViewWaiting(allOf(withId(R.id.account_picker_selected_account), isDisplayed()));
     }
 
     private BottomSheetController getBottomSheetController() {

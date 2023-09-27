@@ -49,7 +49,6 @@
 #include "third_party/blink/public/platform/modules/mediastream/web_media_stream.h"
 #include "third_party/blink/public/platform/modules/remoteplayback/web_remote_playback_client.h"
 #include "third_party/blink/public/platform/task_type.h"
-#include "third_party/blink/public/platform/web_inband_text_track.h"
 #include "third_party/blink/public/platform/web_media_player.h"
 #include "third_party/blink/public/platform/web_media_player_source.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
@@ -88,7 +87,6 @@
 #include "third_party/blink/renderer/core/html/track/automatic_track_selection.h"
 #include "third_party/blink/renderer/core/html/track/cue_timeline.h"
 #include "third_party/blink/renderer/core/html/track/html_track_element.h"
-#include "third_party/blink/renderer/core/html/track/inband_text_track.h"
 #include "third_party/blink/renderer/core/html/track/loadable_text_track.h"
 #include "third_party/blink/renderer/core/html/track/text_track_container.h"
 #include "third_party/blink/renderer/core/html/track/text_track_list.h"
@@ -442,6 +440,7 @@ void HTMLMediaElement::OnMediaControlsEnabledChange(Document* document) {
 HTMLMediaElement::HTMLMediaElement(const QualifiedName& tag_name,
                                    Document& document)
     : HTMLElement(tag_name, document),
+      ActiveScriptWrappable<HTMLMediaElement>({}),
       ExecutionContextLifecycleStateObserver(GetExecutionContext()),
       load_timer_(document.GetTaskRunner(TaskType::kInternalMedia),
                   this,
@@ -647,16 +646,17 @@ void HTMLMediaElement::DidMoveToNewDocument(Document& old_document) {
 
 bool HTMLMediaElement::ShouldReusePlayer(Document& old_document,
                                          Document& new_document) const {
+  // A NULL frame implies a NULL domWindow, so just check one of them
+  if (!old_document.GetFrame() || !new_document.GetFrame()) {
+    return false;
+  }
+
   // Don't reuse player if the Document Picture-in-Picture API is disabled for
   // both documents.
   if (!RuntimeEnabledFeatures::DocumentPictureInPictureAPIEnabled(
           old_document.domWindow()->GetExecutionContext()) &&
       !RuntimeEnabledFeatures::DocumentPictureInPictureAPIEnabled(
           new_document.domWindow()->GetExecutionContext())) {
-    return false;
-  }
-
-  if (!old_document.GetFrame() || !new_document.GetFrame()) {
     return false;
   }
 
@@ -724,8 +724,21 @@ bool HTMLMediaElement::SupportsFocus() const {
   return ShouldShowControls() || HTMLElement::SupportsFocus();
 }
 
-bool HTMLMediaElement::IsMouseFocusable() const {
-  return !IsFullscreen() && SupportsFocus();
+bool HTMLMediaElement::IsFocusable() const {
+  if (!SupportsFocus()) {
+    return false;
+  }
+  return !IsFullscreen() || HTMLElement::IsFocusable();
+}
+
+bool HTMLMediaElement::IsKeyboardFocusable() const {
+  // Media elements are keyboard focusable if they are focusable at all,
+  // and don't have a negative tabindex set.
+  return IsFocusable() && tabIndex() >= 0;
+}
+
+int HTMLMediaElement::DefaultTabIndex() const {
+  return 0;
 }
 
 void HTMLMediaElement::ParseAttribute(
@@ -791,8 +804,8 @@ void HTMLMediaElement::ParserDidSetAttributes() {
 // operation. Indeed, it is required per spec to set the muted state based on
 // the content attribute when the object is created.
 void HTMLMediaElement::CloneNonAttributePropertiesFrom(const Element& other,
-                                                       CloneChildrenFlag flag) {
-  HTMLElement::CloneNonAttributePropertiesFrom(other, flag);
+                                                       NodeCloningData& data) {
+  HTMLElement::CloneNonAttributePropertiesFrom(other, data);
 
   if (FastHasAttribute(html_names::kMutedAttr))
     muted_ = true;
@@ -809,8 +822,7 @@ bool HTMLMediaElement::LayoutObjectIsNeeded(const DisplayStyle& style) const {
   return ShouldShowControls() && HTMLElement::LayoutObjectIsNeeded(style);
 }
 
-LayoutObject* HTMLMediaElement::CreateLayoutObject(const ComputedStyle&,
-                                                   LegacyLayout) {
+LayoutObject* HTMLMediaElement::CreateLayoutObject(const ComputedStyle&) {
   return MakeGarbageCollected<LayoutMedia>(this);
 }
 
@@ -945,20 +957,19 @@ HTMLMediaElement::NetworkState HTMLMediaElement::getNetworkState() const {
   return network_state_;
 }
 
-String HTMLMediaElement::canPlayType(ExecutionContext* context,
-                                     const String& mime_type) const {
+String HTMLMediaElement::canPlayType(const String& mime_type) const {
   MIMETypeRegistry::SupportsType support =
       GetSupportsType(ContentType(mime_type));
 
   if (IdentifiabilityStudySettings::Get()->ShouldSampleType(
           blink::IdentifiableSurface::Type::kHTMLMediaElement_CanPlayType)) {
-    blink::IdentifiabilityMetricBuilder(context->UkmSourceID())
+    blink::IdentifiabilityMetricBuilder(GetDocument().UkmSourceID())
         .Add(
             blink::IdentifiableSurface::FromTypeAndToken(
                 blink::IdentifiableSurface::Type::kHTMLMediaElement_CanPlayType,
                 IdentifiabilityBenignStringToken(mime_type)),
             static_cast<uint64_t>(support))
-        .Record(context->UkmRecorder());
+        .Record(GetDocument().UkmRecorder());
   }
   String can_play;
 
@@ -1497,9 +1508,7 @@ void HTMLMediaElement::StartPlayerLoad() {
   }
 
   LocalFrame* frame = LocalFrameForPlayer();
-  // TODO(srirama.m): Figure out how frame can be null when
-  // coming from executeDeferredLoad()
-  if (!frame) {
+  if (!frame || !GetExecutionContext()) {
     MediaLoadingFailed(
         WebMediaPlayer::kNetworkStateFormatError,
         BuildElementErrorMessage("Player load failure: document has no frame"));
@@ -1981,7 +1990,6 @@ void HTMLMediaElement::SetNetworkState(WebMediaPlayer::NetworkState state) {
   if (state == WebMediaPlayer::kNetworkStateIdle) {
     if (network_state_ > kNetworkIdle) {
       ChangeNetworkStateFromLoadingToIdle();
-      SetShouldDelayLoadEvent(false);
     } else {
       SetNetworkState(kNetworkIdle);
     }
@@ -2463,6 +2471,10 @@ bool HTMLMediaElement::HasVideo() const {
 
 bool HTMLMediaElement::HasAudio() const {
   return web_media_player_ && web_media_player_->HasAudio();
+}
+
+bool HTMLMediaElement::IsEncrypted() const {
+  return is_encrypted_media_;
 }
 
 bool HTMLMediaElement::seeking() const {
@@ -3265,65 +3277,7 @@ void HTMLMediaElement::RemoveVideoTrack(WebMediaPlayer::TrackId track_id) {
   videoTracks().Remove(track_id);
 }
 
-void HTMLMediaElement::AddTextTrack(WebInbandTextTrack* web_track) {
-  // 4.8.12.11.2 Sourcing in-band text tracks
-  // 1. Associate the relevant data with a new text track and its corresponding
-  // new TextTrack object.
-  auto* text_track = MakeGarbageCollected<InbandTextTrack>(web_track, *this);
-
-  // 2. Set the new text track's kind, label, and language based on the
-  // semantics of the relevant data, as defined by the relevant specification.
-  // If there is no label in that data, then the label must be set to the empty
-  // string.
-  // 3. Associate the text track list of cues with the rules for updating the
-  // text track rendering appropriate for the format in question.
-  // 4. If the new text track's kind is metadata, then set the text track
-  // in-band metadata track dispatch type as follows, based on the type of the
-  // media resource:
-  // 5. Populate the new text track's list of cues with the cues parsed so far,
-  // folllowing the guidelines for exposing cues, and begin updating it
-  // dynamically as necessary.
-  //   - Thess are all done by the media engine.
-
-  // 6. Set the new text track's readiness state to loaded.
-  text_track->SetReadinessState(TextTrack::kLoaded);
-
-  // 7. Set the new text track's mode to the mode consistent with the user's
-  // preferences and the requirements of the relevant specification for the
-  // data.
-  //  - This will happen in honorUserPreferencesForAutomaticTextTrackSelection()
-  ScheduleTextTrackResourceLoad();
-
-  // 8. Add the new text track to the media element's list of text tracks.
-  // 9. Fire an event with the name addtrack, that does not bubble and is not
-  // cancelable, and that uses the TrackEvent interface, with the track
-  // attribute initialized to the text track's TextTrack object, at the media
-  // element's textTracks attribute's TextTrackList object.
-  textTracks()->Append(text_track);
-}
-
-void HTMLMediaElement::RemoveTextTrack(WebInbandTextTrack* web_track) {
-  if (!text_tracks_)
-    return;
-
-  // This cast is safe because InbandTextTrack is the only concrete
-  // implementation of WebInbandTextTrackClient.
-  auto* text_track = To<InbandTextTrack>(web_track->Client());
-  if (!text_track)
-    return;
-
-  text_tracks_->Remove(text_track);
-}
-
 void HTMLMediaElement::ForgetResourceSpecificTracks() {
-  // Implements the "forget the media element's media-resource-specific tracks"
-  // algorithm.  The order is explicitly specified as text, then audio, and
-  // finally video.  Also 'removetrack' events should not be fired.
-  if (text_tracks_) {
-    auto scope = GetCueTimeline().BeginIgnoreUpdateScope();
-    text_tracks_->RemoveAllInbandTracks();
-  }
-
   audio_tracks_->RemoveAll();
   video_tracks_->RemoveAll();
 
@@ -3368,18 +3322,6 @@ TextTrack* HTMLMediaElement::addTextTrack(const AtomicString& kind,
 
   // 5. Return the new TextTrack object.
   return text_track;
-}
-
-Vector<TextTrackMetadata> HTMLMediaElement::GetTextTrackMetadata() {
-  TextTrackList* tracks = textTracks();
-  Vector<TextTrackMetadata> result;
-  for (unsigned i = 0; i < tracks->length(); i++) {
-    TextTrack* track = tracks->AnonymousIndexedGetter(i);
-    result.emplace_back(track->language().GetString().Utf8(),
-                        track->kind().GetString().Utf8(),
-                        track->label().GetString().Utf8(), track->id().Utf8());
-  }
-  return result;
 }
 
 TextTrackList* HTMLMediaElement::textTracks() {
@@ -4930,6 +4872,9 @@ void HTMLMediaElement::ReportCurrentTimeToMediaSource() {
 }
 
 void HTMLMediaElement::OnRemotePlaybackMetadataChange() {
+  if (remote_playback_client_) {
+    remote_playback_client_->MediaMetadataChanged(video_codec_, audio_codec_);
+  }
   for (auto& observer : media_player_observer_remote_set_->Value()) {
     observer->OnRemotePlaybackMetadataChange(
         media_session::mojom::blink::RemotePlaybackMetadata::New(

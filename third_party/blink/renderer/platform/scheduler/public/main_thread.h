@@ -16,10 +16,10 @@ namespace blink {
 class MainThreadTaskRunnerRestricted {
  private:
   // Permitted users of `MainThread::GetTaskRunner`.
+  friend class BlinkCategorizedWorkerPoolDelegate;
   friend class BlinkInitializer;
   friend class BlobBytesProvider;
   friend class CachedStorageArea;
-  friend class CategorizedWorkerPoolImpl;
   friend class FontCache;
   friend class InspectorNetworkAgent;
   friend class MemoryCache;
@@ -33,7 +33,7 @@ class MainThreadTaskRunnerRestricted {
   friend class WebGLWebCodecsVideoFrame;
   friend class WebRtcVideoFrameAdapter;
   friend class WorkerGlobalScope;
-  friend class HibernationHandler;
+  friend class CanvasHibernationHandler;
   friend class HibernatedCanvasMemoryDumpProvider;
   friend MainThreadTaskRunnerRestricted AccessMainThreadForGpuFactories();
   friend MainThreadTaskRunnerRestricted

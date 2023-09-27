@@ -4,24 +4,20 @@
 
 package org.chromium.components.payments;
 
-import androidx.annotation.VisibleForTesting;
-
-import org.chromium.base.FeatureList;
 import org.chromium.base.annotations.JNINamespace;
-import org.chromium.base.annotations.NativeMethods;
 
 /**
- * Exposes payment specific features in to java since files in org.chromium.components.payments
- * package package cannot depend on
- * org.chromium.chrome.browser.flags.org.chromium.chrome.browser.flags.ChromeFeatureList.
+ * Exposes payment specific features to java since files in org.chromium.components.payments
+ * cannot depend on org.chromium.chrome.browser.flags.ChromeFeatureList.
+ *
+ * Features listed here should be also registered in kFeaturesExposedToJava in
+ * components/payments/content/android/payment_feature_map.cc
  */
 @JNINamespace("payments::android")
-public class PaymentFeatureList {
+public abstract class PaymentFeatureList {
     /** Alphabetical: */
     public static final String ADD_IDENTITY_IN_CAN_MAKE_PAYMENT_EVENT =
             "AddIdentityInCanMakePaymentEvent";
-    public static final String ALLOW_DISCOVERABLE_CREDENTIALS_FOR_SECURE_PAYMENT_CONFIRMATION =
-            "AllowDiscoverableCredentialsForSecurePaymentConfirmation";
     public static final String ANDROID_APP_PAYMENT_UPDATE_EVENTS = "AndroidAppPaymentUpdateEvents";
     public static final String ENFORCE_FULL_DELEGATION = "EnforceFullDelegation";
     public static final String GPAY_APP_DYNAMIC_UPDATE = "GPayAppDynamicUpdate";
@@ -33,30 +29,25 @@ public class PaymentFeatureList {
     public static final String WEB_PAYMENTS_APP_STORE_BILLING_DEBUG = "AppStoreBillingDebug";
     public static final String WEB_PAYMENTS_EXPERIMENTAL_FEATURES =
             "WebPaymentsExperimentalFeatures";
-    public static final String WEB_PAYMENTS_MODIFIERS = "WebPaymentsModifiers";
     public static final String WEB_PAYMENTS_SINGLE_APP_UI_SKIP = "WebPaymentsSingleAppUiSkip";
-
-    // Do not instantiate this class.
-    private PaymentFeatureList() {}
 
     /**
      * Returns whether the specified feature is enabled or not.
      *
      * Note: Features queried through this API must be added to the array
-     * |kFeaturesExposedToJava| in components/payments/content/android/payment_feature_list.cc
+     * |kFeaturesExposedToJava| in components/payments/content/android/payment_feature_map.cc
      *
      * @param featureName The name of the feature to query.
      * @return Whether the feature is enabled or not.
      */
     public static boolean isEnabled(String featureName) {
-        assert FeatureList.isNativeInitialized();
-        return PaymentFeatureListJni.get().isEnabled(featureName);
+        return PaymentFeatureMap.isEnabled(featureName);
     }
 
     /**
-     * Returns whether the feature is enabled or not. *
+     * Returns whether the feature is enabled or not.
      * Note: Features queried through this API must be added to the array
-     * |kFeaturesExposedToJava| in components/payments/content/android/payment_feature_list.cc
+     * |kFeaturesExposedToJava| in components/payments/content/android/payment_feature_map.cc
      *
      * @param featureName The name of the feature to query.
      * @return true when either the specified feature or |WEB_PAYMENTS_EXPERIMENTAL_FEATURES| is
@@ -64,15 +55,5 @@ public class PaymentFeatureList {
      */
     public static boolean isEnabledOrExperimentalFeaturesEnabled(String featureName) {
         return isEnabled(WEB_PAYMENTS_EXPERIMENTAL_FEATURES) || isEnabled(featureName);
-    }
-
-    /**
-     * The interface implemented by the automatically generated JNI bindings class
-     * PaymentsFeatureListJni.
-     */
-    @VisibleForTesting
-    @NativeMethods
-    public interface Natives {
-        boolean isEnabled(String featureName);
     }
 }

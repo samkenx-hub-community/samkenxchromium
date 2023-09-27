@@ -4,9 +4,11 @@
 
 #include <memory>
 #include <utility>
+#include "build/build_config.h"
 
 #include "base/files/file.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/browser/ash/file_system_provider/observer.h"
@@ -29,6 +31,7 @@ namespace {
 
 using ash::file_system_provider::MountContext;
 using ash::file_system_provider::Observer;
+using ash::file_system_provider::OperationCompletion;
 using ash::file_system_provider::ProvidedFileSystemInfo;
 using ash::file_system_provider::ProvidedFileSystemInterface;
 using ash::file_system_provider::RequestManager;
@@ -52,7 +55,8 @@ class NotificationButtonClicker : public RequestManager::Observer {
 
   // RequestManager::Observer overrides.
   void OnRequestCreated(int request_id, RequestType type) override {}
-  void OnRequestDestroyed(int request_id) override {}
+  void OnRequestDestroyed(int request_id,
+                          OperationCompletion completion) override {}
   void OnRequestExecuted(int request_id) override {}
   void OnRequestFulfilled(int request_id,
                           const RequestValue& result,
@@ -60,7 +64,7 @@ class NotificationButtonClicker : public RequestManager::Observer {
   void OnRequestRejected(int request_id,
                          const RequestValue& result,
                          base::File::Error error) override {}
-  void OnRequestTimeouted(int request_id) override {
+  void OnRequestTimedOut(int request_id) override {
     // Call asynchronously so the notification is setup is completed.
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(&NotificationButtonClicker::ClickButton,
@@ -121,7 +125,7 @@ class AbortOnUnresponsivePerformer : public Observer {
       base::File::Error error) override {}
 
  private:
-  Service* service_;  // Not owned.
+  raw_ptr<Service, ExperimentalAsh> service_;  // Not owned.
   std::vector<std::unique_ptr<NotificationButtonClicker>> clickers_;
 };
 
@@ -492,8 +496,13 @@ IN_PROC_BROWSER_TEST_F(FileSystemProviderServiceWorkerApiTest, Unmount) {
       << message_;
 }
 
+#if BUILDFLAG(IS_CHROMEOS)
+#define MAYBE_Unresponsive_Extension DISABLED_Unresponsive_Extension
+#else
+#define MAYBE_Unresponsive_Extension Unresponsive_Extension
+#endif
 IN_PROC_BROWSER_TEST_F(FileSystemProviderServiceWorkerApiTest,
-                       Unresponsive_Extension) {
+                       MAYBE_Unresponsive_Extension) {
   AbortOnUnresponsivePerformer performer(browser()->profile());
   ASSERT_TRUE(LoadExtension(test_data_dir_.AppendASCII(
       "file_system_provider/service_worker/unresponsive_extension/provider")));

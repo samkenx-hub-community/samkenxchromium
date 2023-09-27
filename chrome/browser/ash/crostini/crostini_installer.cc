@@ -4,9 +4,9 @@
 
 #include "chrome/browser/ash/crostini/crostini_installer.h"
 
+#include <algorithm>
 #include <string>
 
-#include "base/cxx17_backports.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
@@ -100,8 +100,9 @@ void RecordTimeFromDeviceSetupToInstallMetric() {
       FROM_HERE, {base::MayBlock()},
       base::BindOnce(&ash::StartupUtils::GetTimeSinceOobeFlagFileCreation),
       base::BindOnce([](base::TimeDelta time_from_device_setup) {
-        if (time_from_device_setup.is_zero())
+        if (time_from_device_setup.is_zero()) {
           return;
+        }
 
         // The magic number 1471228928 is used for legacy reasons and changing
         // it would invalidate already logged data.
@@ -385,7 +386,7 @@ void CrostiniInstaller::OnDiskImageCreated(bool success,
 }
 
 void CrostiniInstaller::OnContainerDownloading(int32_t download_percent) {
-  container_download_percent_ = base::clamp(download_percent, 0, 100);
+  container_download_percent_ = std::clamp(download_percent, 0, 100);
   RunProgressCallback();
 }
 
@@ -465,7 +466,7 @@ void CrostiniInstaller::RunProgressCallback() {
   // TODO(https://crbug.com/1000173): Calculate configure container step
   // progress based on real progress.
 
-  double progress = state_start_mark + base::clamp(state_fraction, 0.0, 1.0) *
+  double progress = state_start_mark + std::clamp(state_fraction, 0.0, 1.0) *
                                            (state_end_mark - state_start_mark);
   progress_callback_.Run(installing_state_, progress);
 }
@@ -588,8 +589,9 @@ void CrostiniInstaller::OnAvailableDiskSpace(absl::optional<int64_t> bytes) {
 
   DCHECK_EQ(installing_state_, InstallerState::kStart);
 
-  if (bytes.has_value())
+  if (bytes.has_value()) {
     free_disk_space_ = bytes.value();
+  }
   // Don't enforce minimum disk size on dev box or trybots because
   // base::SysInfo::AmountOfFreeDiskSpace returns zero in testing.
   if (base::SysInfo::IsRunningOnChromeOS() &&
@@ -621,6 +623,11 @@ void CrostiniInstaller::OnAvailableDiskSpace(absl::optional<int64_t> bytes) {
   // subsequently set |state_| to |ERROR|.
   DCHECK_EQ(restart_id_ == CrostiniManager::kUninitializedRestartId,
             state_ == State::ERROR);
+}
+
+// static
+void CrostiniInstaller::EnsureFactoryBuilt() {
+  CrostiniInstallerFactory::GetInstance();
 }
 
 }  // namespace crostini

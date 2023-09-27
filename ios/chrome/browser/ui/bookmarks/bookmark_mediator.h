@@ -11,13 +11,16 @@ class AuthenticationService;
 class GURL;
 @class MDCSnackbarMessage;
 class PrefService;
-class SyncSetupService;
 @class URLWithTitle;
 
 namespace bookmarks {
 class BookmarkNode;
 class BookmarkModel;
 }  // namespace bookmarks
+
+namespace syncer {
+class SyncService;
+}
 
 namespace user_prefs {
 class PrefRegistrySyncable;
@@ -28,10 +31,14 @@ class PrefRegistrySyncable;
 
 - (instancetype)init NS_UNAVAILABLE;
 - (instancetype)
-    initWithWithBookmarkModel:(bookmarks::BookmarkModel*)bookmarkModel
-                        prefs:(PrefService*)prefs
-        authenticationService:(AuthenticationService*)authenticationService
-             syncSetupService:(SyncSetupService*)syncSetupService
+    initWithWithLocalOrSyncableBookmarkModel:
+        (bookmarks::BookmarkModel*)localOrSyncableBookmarkModel
+                        accountBookmarkModel:
+                            (bookmarks::BookmarkModel*)accountBookmarkModel
+                                       prefs:(PrefService*)prefs
+                       authenticationService:
+                           (AuthenticationService*)authenticationService
+                                 syncService:(syncer::SyncService*)syncService
     NS_DESIGNATED_INITIALIZER;
 
 // Registers the feature preferences.
@@ -46,6 +53,13 @@ class PrefRegistrySyncable;
 - (MDCSnackbarMessage*)addBookmarkWithTitle:(NSString*)title
                                         URL:(const GURL&)URL
                                  editAction:(void (^)())editAction;
+
+// Bulk adds URLs to bookmarks by automatically using their hostname + path as
+// title. Returns a snackbar toast message with the amount of bookmarks
+// successfully added and with the viewAction passed. Skips adding invalid URLs
+// or URLs already bookmarked.
+- (MDCSnackbarMessage*)bulkAddBookmarksWithURLs:(NSArray<NSURL*>*)URLs
+                                     viewAction:(void (^)())viewAction;
 
 // Adds bookmarks for `URLs` into `folder`. Returns a message to be displayed
 // after the Bookmark has been added.

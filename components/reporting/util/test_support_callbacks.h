@@ -21,8 +21,7 @@
 #include "base/thread_annotations.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
-namespace reporting {
-namespace test {
+namespace reporting::test {
 
 // Usage (in tests only):
 //
@@ -76,7 +75,17 @@ class TestMultiEvent {
   // for cases when the caller requires it.
   [[nodiscard]] base::RepeatingCallback<void(ResType... res)> repeating_cb() {
     return base::BindPostTaskToCurrentDefault(base::BindRepeating(
-        &TestMultiEvent::SetResult, weak_ptr_factory_.GetWeakPtr()));
+        [](base::WeakPtr<TestMultiEvent<ResType...>> self, ResType... res) {
+          if (!self) {
+            return;
+          }
+          ASSERT_FALSE(self->repeated_cb_called_)
+              << "repeating_cb() called more than once, but it is only "
+                 "intended to be called once.";
+          self->SetResult(std::forward<ResType>(res)...);
+          self->repeated_cb_called_ = true;
+        },
+        weak_ptr_factory_.GetWeakPtr()));
   }
 
  protected:
@@ -107,6 +116,7 @@ class TestMultiEvent {
 
   base::Lock lock_;
   absl::optional<TupleType> result_;
+  bool repeated_cb_called_{false};
   base::WeakPtrFactory<TestMultiEvent<ResType...>> weak_ptr_factory_{this};
 };
 
@@ -166,7 +176,7 @@ class TestCallbackWaiter : public TestEvent<bool> {
 
   void Attach(int more = 1) {
     const int old_counter = counter_.Increment(more);
-    DCHECK_GT(old_counter, 0) << "Cannot attach when already being released";
+    CHECK_GT(old_counter, 0) << "Cannot attach when already being released";
   }
 
   void Signal() {
@@ -203,8 +213,6 @@ class TestCallbackAutoWaiter : public TestCallbackWaiter {
   TestCallbackAutoWaiter();
   ~TestCallbackAutoWaiter();
 };
-
-}  // namespace test
-}  // namespace reporting
+}  // namespace reporting::test
 
 #endif  // COMPONENTS_REPORTING_UTIL_TEST_SUPPORT_CALLBACKS_H_

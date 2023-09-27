@@ -5,6 +5,8 @@
 #ifndef ASH_CAPTURE_MODE_KEY_ITEM_VIEW_H_
 #define ASH_CAPTURE_MODE_KEY_ITEM_VIEW_H_
 
+#include "ash/style/system_shadow.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/views/view.h"
 
@@ -27,6 +29,8 @@ class KeyItemView : public views::View {
   ~KeyItemView() override;
 
   // views::View:
+  void AddedToWidget() override;
+  void OnBoundsChanged(const gfx::Rect& previous_bounds) override;
   void OnThemeChanged() override;
   void Layout() override;
   gfx::Size CalculatePreferredSize() const override;
@@ -39,8 +43,13 @@ class KeyItemView : public views::View {
 
  private:
   const ui::KeyboardCode key_code_;
-  views::ImageView* icon_ = nullptr;
-  views::Label* label_ = nullptr;
+  raw_ptr<views::ImageView, ExperimentalAsh> icon_ = nullptr;
+  raw_ptr<views::Label, ExperimentalAsh> label_ = nullptr;
+
+  // The shadow around each key item UI component in the combo. The shadow
+  // should be `SystemShadowOnTextureLayer` as the corners are perfectly
+  // rounded.
+  std::unique_ptr<SystemShadow> shadow_;
 };
 
 }  // namespace ash

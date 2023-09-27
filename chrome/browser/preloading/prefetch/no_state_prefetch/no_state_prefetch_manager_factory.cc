@@ -30,13 +30,19 @@ NoStatePrefetchManager* NoStatePrefetchManagerFactory::GetForBrowserContext(
 
 // static
 NoStatePrefetchManagerFactory* NoStatePrefetchManagerFactory::GetInstance() {
-  return base::Singleton<NoStatePrefetchManagerFactory>::get();
+  static base::NoDestructor<NoStatePrefetchManagerFactory> instance;
+  return instance.get();
 }
 
 NoStatePrefetchManagerFactory::NoStatePrefetchManagerFactory()
     : ProfileKeyedServiceFactory(
           "NoStatePrefetchManager",
-          ProfileSelections::BuildForRegularAndIncognito()) {
+          ProfileSelections::Builder()
+              .WithRegular(ProfileSelection::kOwnInstance)
+              // TODO(crbug.com/1418376): Check if this service is needed in
+              // Guest mode.
+              .WithGuest(ProfileSelection::kOwnInstance)
+              .Build()) {
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   DependsOn(
       extensions::ExtensionsBrowserClient::Get()->GetExtensionSystemFactory());
@@ -47,11 +53,12 @@ NoStatePrefetchManagerFactory::NoStatePrefetchManagerFactory()
   DependsOn(SyncServiceFactory::GetInstance());
 }
 
-NoStatePrefetchManagerFactory::~NoStatePrefetchManagerFactory() {}
+NoStatePrefetchManagerFactory::~NoStatePrefetchManagerFactory() = default;
 
-KeyedService* NoStatePrefetchManagerFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+NoStatePrefetchManagerFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* browser_context) const {
-  return new NoStatePrefetchManager(
+  return std::make_unique<NoStatePrefetchManager>(
       Profile::FromBrowserContext(browser_context),
       std::make_unique<ChromeNoStatePrefetchManagerDelegate>(
           Profile::FromBrowserContext(browser_context)));

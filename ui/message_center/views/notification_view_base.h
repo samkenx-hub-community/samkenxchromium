@@ -110,6 +110,7 @@ class MESSAGE_CENTER_EXPORT NotificationViewBase
   bool IsManuallyExpandedOrCollapsed() const override;
   void SetManuallyExpandedOrCollapsed(ExpandState state) override;
   void OnSettingsButtonPressed(const ui::Event& event) override;
+  void OnSnoozeButtonPressed(const ui::Event& event) override;
 
   // views::InkDropObserver:
   void InkDropAnimationStarted() override;
@@ -148,6 +149,9 @@ class MESSAGE_CENTER_EXPORT NotificationViewBase
 
   // Inline settings view contains inline settings.
   views::Builder<views::BoxLayoutView> CreateInlineSettingsBuilder();
+
+  // Snooze settings view contains snooze settings.
+  views::Builder<views::BoxLayoutView> CreateSnoozeSettingsBuilder();
 
   // Actions row contains inline action buttons and inline textfield. Use the
   // given layout manager for the actions row.
@@ -191,6 +195,9 @@ class MESSAGE_CENTER_EXPORT NotificationViewBase
   virtual void CreateOrUpdateInlineSettingsViews(
       const Notification& notification) = 0;
 
+  virtual void CreateOrUpdateSnoozeSettingsViews(
+      const Notification& notification) = 0;
+
   // Add view to `left_content_` in its appropriate position according to
   // `left_content_count_`. Return a pointer to added view.
   template <typename T>
@@ -202,9 +209,13 @@ class MESSAGE_CENTER_EXPORT NotificationViewBase
   // Reorder the view in `left_content_` according to `left_content_count_`.
   void ReorderViewInLeftContent(views::View* view);
 
-  // Thic function is called when the UI changes from notification view to
+  // This function is called when the UI changes from notification view to
   // inline settings or vice versa.
   virtual void ToggleInlineSettings(const ui::Event& event);
+
+  // This function is called when the UI changes from notification view to
+  // snooze settings or vice versa.
+  virtual void ToggleSnoozeSettings(const ui::Event& event);
 
   // Called when a user clicks on a notification action button, identified by
   // `index`.
@@ -235,6 +246,9 @@ class MESSAGE_CENTER_EXPORT NotificationViewBase
   views::View* inline_settings_row() { return settings_row_; }
   const views::View* inline_settings_row() const { return settings_row_; }
 
+  views::View* snooze_settings_row() { return snooze_row_; }
+  const views::View* snooze_settings_row() const { return snooze_row_; }
+
   views::View* image_container_view() { return image_container_view_; }
   const views::View* image_container_view() const {
     return image_container_view_;
@@ -260,11 +274,16 @@ class MESSAGE_CENTER_EXPORT NotificationViewBase
     inline_settings_enabled_ = inline_settings_enabled;
   }
 
+  bool snooze_settings_enabled() const { return snooze_settings_enabled_; }
+  void set_snooze_settings_enabled(bool snooze_settings_enabled) {
+    snooze_settings_enabled_ = snooze_settings_enabled;
+  }
+
   bool hide_icon_on_expanded() const { return hide_icon_on_expanded_; }
 
   virtual bool IsExpandable() const = 0;
 
-  virtual void SetExpandButtonEnabled(bool enabled);
+  virtual void SetExpandButtonVisibility(bool visible);
 
   // Returns the size of `icon_view_`.
   virtual gfx::Size GetIconViewSize() const = 0;
@@ -322,7 +341,7 @@ class MESSAGE_CENTER_EXPORT NotificationViewBase
   void CreateOrUpdateActionButtonViews(const Notification& notification);
 
   // View containing close and settings buttons
-  NotificationControlButtonsView* control_buttons_view_ = nullptr;
+  raw_ptr<NotificationControlButtonsView> control_buttons_view_ = nullptr;
 
   // Whether this notification is expanded or not.
   bool expanded_ = false;
@@ -343,30 +362,35 @@ class MESSAGE_CENTER_EXPORT NotificationViewBase
   // Describes whether this view is for an ash/ChromeOS notification (ash
   // notification UI uses AshNotificationView, which has customized layout,
   // header view, etc.).
-  bool for_ash_notification_ = true;
+  const bool for_ash_notification_;
 
   // Describes whether the view can display inline settings or not.
   bool inline_settings_enabled_ = false;
 
+  // Describes whether the view can display snooze settings or not.
+  bool snooze_settings_enabled_ = false;
+
   // Container views directly attached to this view.
-  NotificationHeaderView* header_row_ = nullptr;
-  views::View* content_row_ = nullptr;
+  raw_ptr<NotificationHeaderView> header_row_ = nullptr;
+  raw_ptr<views::View> content_row_ = nullptr;
   raw_ptr<views::View> actions_row_ = nullptr;
-  views::View* settings_row_ = nullptr;
+  raw_ptr<views::View> settings_row_ = nullptr;
+  raw_ptr<views::View> snooze_row_ = nullptr;
 
   // Containers for left and right side on |content_row_|
-  views::View* left_content_ = nullptr;
-  views::View* right_content_ = nullptr;
+  raw_ptr<views::View> left_content_ = nullptr;
+  raw_ptr<views::View> right_content_ = nullptr;
 
   // Views which are dynamically created inside view hierarchy.
   raw_ptr<views::Label, DanglingUntriaged> message_label_ = nullptr;
   raw_ptr<views::Label, DanglingUntriaged> status_view_ = nullptr;
   raw_ptr<ProportionalImageView, DanglingUntriaged> icon_view_ = nullptr;
-  views::View* image_container_view_ = nullptr;
+  raw_ptr<views::View> image_container_view_ = nullptr;
   std::vector<views::LabelButton*> action_buttons_;
   std::vector<views::View*> item_views_;
   raw_ptr<views::ProgressBar, DanglingUntriaged> progress_bar_view_ = nullptr;
-  raw_ptr<CompactTitleMessageView> compact_title_message_view_ = nullptr;
+  raw_ptr<CompactTitleMessageView, DanglingUntriaged>
+      compact_title_message_view_ = nullptr;
   raw_ptr<views::View> action_buttons_row_ = nullptr;
   raw_ptr<NotificationInputContainer> inline_reply_ = nullptr;
 

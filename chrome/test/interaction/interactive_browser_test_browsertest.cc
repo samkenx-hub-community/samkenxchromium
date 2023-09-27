@@ -21,6 +21,8 @@ namespace {
 DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
 constexpr char kDocumentWithNamedElement[] = "/select.html";
 constexpr char kDocumentWithLinks[] = "/links.html";
+constexpr char kScrollableDocument[] =
+    "/scroll/scrollable_page_with_content.html";
 }  // namespace
 
 class InteractiveBrowserTestBrowsertest : public InteractiveBrowserTest {
@@ -92,6 +94,34 @@ IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, ExecuteJs) {
                   })));
 }
 
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       ExecuteJsFireAndForget) {
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  RunTestSequence(
+      InstrumentTab(kWebContentsId), NavigateWebContents(kWebContentsId, url),
+      ExecuteJs(kWebContentsId, "() => { window.value = 1; }",
+                ExecuteJsMode::kFireAndForget),
+      WithElement(kWebContentsId, base::BindOnce([](ui::TrackedElement* el) {
+                    const auto result = AsInstrumentedWebContents(el)->Evaluate(
+                        "() => window.value");
+                    EXPECT_EQ(1, result.GetInt());
+                  })));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       ExecuteJsFailsOnThrow) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(
+          InstrumentTab(kWebContentsId),
+          NavigateWebContents(kWebContentsId, url),
+          ExecuteJs(kWebContentsId, "() => { throw new Error('an error'); }")));
+}
+
 IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, CheckJsResult) {
   const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
   const std::string str("a string");
@@ -124,6 +154,36 @@ IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, CheckJsResult) {
                     testing::Ne(std::string("another string"))));
 }
 
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       CheckJsResultWithPromise) {
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  RunTestSequence(InstrumentTab(kWebContentsId),
+                  NavigateWebContents(kWebContentsId, url),
+                  CheckJsResult(kWebContentsId,
+                                "() => new Promise((resolve, reject) => "
+                                "setTimeout(() => resolve(true), 100))"),
+                  CheckJsResult(kWebContentsId,
+                                "() => new Promise((resolve, reject) => "
+                                "setTimeout(() => resolve(1), 100))",
+                                1));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       CheckJsResultWithPromiseFailsOnReject) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(
+          InstrumentTab(kWebContentsId),
+          NavigateWebContents(kWebContentsId, url),
+          CheckJsResult(kWebContentsId,
+                        "() => new Promise((resolve, reject) => "
+                        "setTimeout(() => reject('rejected'), 100))")));
+}
+
 IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, CheckJsResult_Fails) {
   UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
   private_test_impl().set_aborted_callback_for_testing(aborted.Get());
@@ -135,6 +195,35 @@ IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, CheckJsResult_Fails) {
                       NavigateWebContents(kWebContentsId, url),
                       ExecuteJs(kWebContentsId, "() => { window.value = 1; }"),
                       CheckJsResult(kWebContentsId, "() => window.value", 2)));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       CheckJsResult_ThrowError_Fails) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(
+          InstrumentTab(kWebContentsId),
+          NavigateWebContents(kWebContentsId, url),
+          CheckJsResult(kWebContentsId,
+                        "() => { throw new Error('an error'); }", 2)));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       CheckJsResult_NoArgument_Fails) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(InstrumentTab(kWebContentsId),
+                      NavigateWebContents(kWebContentsId, url),
+                      ExecuteJs(kWebContentsId, "() => { window.value = 0; }"),
+                      CheckJsResult(kWebContentsId, "() => window.value")));
 }
 
 IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, ExecuteJsAt) {
@@ -150,6 +239,53 @@ IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, ExecuteJsAt) {
                             kWhere, "(el) => el.intValue");
                     EXPECT_EQ(1, result.GetInt());
                   })));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       ExecuteJsAtFireAndForget) {
+  const DeepQuery kWhere{"#select"};
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  RunTestSequence(
+      InstrumentTab(kWebContentsId), NavigateWebContents(kWebContentsId, url),
+      ExecuteJsAt(kWebContentsId, kWhere, "(el) => { el.intValue = 1; }",
+                  ExecuteJsMode::kFireAndForget),
+      WithElement(kWebContentsId,
+                  base::BindLambdaForTesting([&kWhere](ui::TrackedElement* el) {
+                    const auto result =
+                        AsInstrumentedWebContents(el)->EvaluateAt(
+                            kWhere, "(el) => el.intValue");
+                    EXPECT_EQ(1, result.GetInt());
+                  })));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       ExecuteJsAtFailsIfElementNotPresent) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const DeepQuery kWhere{"#aaaaa"};
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(
+          InstrumentTab(kWebContentsId),
+          NavigateWebContents(kWebContentsId, url),
+          ExecuteJsAt(kWebContentsId, kWhere, "(el) => { el.intValue = 1; }")));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       ExecuteJsAtFailsOnThrow) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const DeepQuery kWhere{"#select"};
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(InstrumentTab(kWebContentsId),
+                      NavigateWebContents(kWebContentsId, url),
+                      ExecuteJsAt(kWebContentsId, kWhere,
+                                  "(el) => { throw new Error('an error'); }")));
 }
 
 IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, CheckJsResultAt) {
@@ -188,6 +324,48 @@ IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, CheckJsResultAt) {
 }
 
 IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       CheckJsResultAtWithPromise) {
+  const DeepQuery kWhere{"#select"};
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  RunTestSequence(
+      InstrumentTab(kWebContentsId), NavigateWebContents(kWebContentsId, url),
+      ExecuteJsAt(kWebContentsId, kWhere,
+                  R"((el) => {
+            el.intValue = 1;
+            el.stringValue = 'a string';
+          })"),
+      CheckJsResultAt(
+          kWebContentsId, kWhere,
+          "(el) => new Promise((resolve, reject) => resolve(el.intValue))"),
+      CheckJsResultAt(
+          kWebContentsId, kWhere,
+          "(el) => new Promise((resolve, reject) => resolve(el.intValue))", 1),
+      CheckJsResultAt(
+          kWebContentsId, kWhere,
+          "(el) => new Promise((resolve, reject) => resolve(el.stringValue))"),
+      CheckJsResultAt(
+          kWebContentsId, kWhere,
+          "(el) => new Promise((resolve, reject) => resolve(el.stringValue))",
+          "a string"));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       CheckJsResultAtWithPromiseFailsOnReject) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const DeepQuery kWhere{"#select"};
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(InstrumentTab(kWebContentsId),
+                      NavigateWebContents(kWebContentsId, url),
+                      CheckJsResultAt(kWebContentsId, kWhere,
+                                      "(el) => new Promise((resolve, reject) "
+                                      "=> reject('rejected!'))")));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
                        CheckJsResultAt_Fails) {
   UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
   private_test_impl().set_aborted_callback_for_testing(aborted.Get());
@@ -201,6 +379,54 @@ IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
           NavigateWebContents(kWebContentsId, url),
           ExecuteJsAt(kWebContentsId, kWhere, "(el) => { el.intValue = 1; }"),
           CheckJsResultAt(kWebContentsId, kWhere, "(el) => el.intValue", 2)));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       CheckJsResultAt_ThrowsError_Fails) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const DeepQuery kWhere{"#select"};
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(
+          InstrumentTab(kWebContentsId),
+          NavigateWebContents(kWebContentsId, url),
+          CheckJsResultAt(kWebContentsId, kWhere,
+                          "(el) => { throw new Error('an error'); }", 2)));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       CheckJsResultAt_BadPath_Fails) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const DeepQuery kWhere{"#aaaaa"};
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(
+          InstrumentTab(kWebContentsId),
+          NavigateWebContents(kWebContentsId, url),
+          CheckJsResultAt(kWebContentsId, kWhere, "(el) => el.intValue", 2)));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
+                       CheckJsResultAt_NoArgument_Fails) {
+  UNCALLED_MOCK_CALLBACK(ui::InteractionSequence::AbortedCallback, aborted);
+  private_test_impl().set_aborted_callback_for_testing(aborted.Get());
+
+  const DeepQuery kWhere{"#select"};
+  const GURL url = embedded_test_server()->GetURL(kDocumentWithNamedElement);
+  EXPECT_CALL_IN_SCOPE(
+      aborted, Run,
+      RunTestSequence(
+          InstrumentTab(kWebContentsId),
+          NavigateWebContents(kWebContentsId, url),
+          ExecuteJsAt(kWebContentsId, kWhere,
+                      "(el) => { el.stringValue = ''; }"),
+          CheckJsResultAt(kWebContentsId, kWhere, "(el) => el.stringValue")));
 }
 
 IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
@@ -261,6 +487,28 @@ IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest,
       InAnyContext(verify_is_at_tab_index(incognito_browser, kIncognito2Id, 1)),
       InAnyContext(
           verify_is_at_tab_index(incognito_browser, kIncognito1Id, 2)));
+}
+
+IN_PROC_BROWSER_TEST_F(InteractiveBrowserTestBrowsertest, ScrollIntoView) {
+  DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kTabId);
+  const GURL url = embedded_test_server()->GetURL(kScrollableDocument);
+  const DeepQuery kLink{"#link"};
+  const DeepQuery kText{"#text"};
+
+  constexpr char kElementIsInViewport[] = R"(
+    (el) => {
+      const bounds = el.getBoundingClientRect();
+      return bounds.right >= 0 && bounds.bottom >= 0 &&
+             bounds.x < window.innerWidth && bounds.y < window.innerHeight;
+    }
+  )";
+
+  RunTestSequence(InstrumentTab(kTabId), NavigateWebContents(kTabId, url),
+                  CheckJsResultAt(kTabId, kLink, kElementIsInViewport, true),
+                  CheckJsResultAt(kTabId, kText, kElementIsInViewport, false),
+                  ScrollIntoView(kTabId, kText),
+                  CheckJsResultAt(kTabId, kLink, kElementIsInViewport, false),
+                  CheckJsResultAt(kTabId, kText, kElementIsInViewport, true));
 }
 
 // Parameter for WebUI coverage tests.

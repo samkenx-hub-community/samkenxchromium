@@ -15,7 +15,6 @@
 #include "chrome/browser/ash/login/session/user_session_manager_test_api.h"
 #include "chrome/browser/ash/login/test/cryptohome_mixin.h"
 #include "chrome/browser/ash/login/test/device_state_mixin.h"
-#include "chrome/browser/ash/login/test/embedded_policy_test_server_mixin.h"
 #include "chrome/browser/ash/login/test/embedded_test_server_setup_mixin.h"
 #include "chrome/browser/ash/login/test/js_checker.h"
 #include "chrome/browser/ash/login/test/login_manager_mixin.h"
@@ -29,6 +28,7 @@
 #include "chrome/browser/ash/policy/core/device_local_account.h"
 #include "chrome/browser/ash/policy/core/device_policy_builder.h"
 #include "chrome/browser/ash/policy/core/device_policy_cros_browser_test.h"
+#include "chrome/browser/ash/policy/test_support/embedded_policy_test_server_mixin.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/webui/ash/login/family_link_notice_screen_handler.h"
@@ -254,8 +254,7 @@ IN_PROC_BROWSER_TEST_F(PublicSessionTosScreenTest, Skipped) {
   histogram_tester_.ExpectTotalCount("OOBE.StepCompletionTime.Tos", 0);
 }
 
-// TODO(crbug.com/1418704) flaky.
-IN_PROC_BROWSER_TEST_F(PublicSessionTosScreenTest, DISABLED_Accepted) {
+IN_PROC_BROWSER_TEST_F(PublicSessionTosScreenTest, Accepted) {
   SetUpTermsOfServiceUrlPolicy();
   StartPublicSession();
 

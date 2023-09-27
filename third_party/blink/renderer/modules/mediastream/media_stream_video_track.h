@@ -83,12 +83,13 @@ class MODULES_EXPORT MediaStreamVideoTrack : public MediaStreamTrackPlatform {
       const MediaStreamComponent* component,
       const String& id) override;
 
-  // MediaStreamTrack overrides.
+  // MediaStreamTrackPlatform overrides.
   void SetEnabled(bool enabled) override;
   void SetContentHint(
       WebMediaStreamTrack::ContentHintType content_hint) override;
   void StopAndNotify(base::OnceClosure callback) override;
   void GetSettings(MediaStreamTrackPlatform::Settings& settings) const override;
+  MediaStreamTrackPlatform::VideoFrameStats GetVideoFrameStats() const override;
   MediaStreamTrackPlatform::CaptureHandle GetCaptureHandle() override;
   void AddCropVersionCallback(uint32_t crop_version,
                               base::OnceClosure callback) override;
@@ -145,12 +146,9 @@ class MODULES_EXPORT MediaStreamVideoTrack : public MediaStreamTrackPlatform {
 
   // Setting information about the track size.
   // Called from MediaStreamVideoSource at track initialization.
-  void SetTargetSizeAndFrameRate(int width,
-                                 int height,
-                                 absl::optional<double> frame_rate) {
+  void SetTargetSize(int width, int height) {
     width_ = width;
     height_ = height;
-    frame_rate_ = frame_rate;
   }
 
   // Setting information about the track size.
@@ -183,7 +181,9 @@ class MODULES_EXPORT MediaStreamVideoTrack : public MediaStreamTrackPlatform {
 
   MediaStreamVideoSource* source() const { return source_.get(); }
 
-  void OnFrameDropped(media::VideoCaptureFrameDropReason reason);
+  // Sink dropping frames affects logging and UMAs, but not the MediaStreamTrack
+  // Statistics API since such frames were delivered to the sink before drop.
+  void OnSinkDroppedFrame(media::VideoCaptureFrameDropReason reason);
 
   bool IsRefreshFrameTimerRunningForTesting() {
     return refresh_timer_.IsRunning();
@@ -198,6 +198,18 @@ class MODULES_EXPORT MediaStreamVideoTrack : public MediaStreamTrackPlatform {
   }
 
   bool UsingAlpha();
+
+  // Warning: This value should not be changed, because doing so would change
+  // the meaning of logged UMA events for histograms Media.VideoCapture.Error
+  // and Media.VideoCapture.MaxFrameDropExceeded.
+  static constexpr int kMaxConsecutiveFrameDropForSameReasonCount = 10;
+  // Number of logs for dropped frames to be emitted before suppressing.
+  static constexpr int kMaxEmittedLogsForDroppedFramesBeforeSuppressing = 3;
+  // Suppressed logs for dropped frames will still be emitted this often.
+  static constexpr int kFrequencyForSuppressedLogs = 100;
+
+  void SetEmitLogMessageForTesting(
+      base::RepeatingCallback<void(const std::string&)> emit_log_message);
 
  private:
   FRIEND_TEST_ALL_PREFIXES(MediaStreamRemoteVideoSourceTest, StartTrack);
@@ -247,7 +259,6 @@ class MODULES_EXPORT MediaStreamVideoTrack : public MediaStreamTrackPlatform {
   // Remembering our desired video size and frame rate.
   int width_ = 0;
   int height_ = 0;
-  absl::optional<double> frame_rate_;
   absl::optional<double> computed_frame_rate_;
   media::VideoCaptureFormat computed_source_format_;
   base::RepeatingTimer refresh_timer_;

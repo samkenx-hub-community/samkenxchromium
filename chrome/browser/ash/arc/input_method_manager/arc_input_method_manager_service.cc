@@ -19,6 +19,7 @@
 #include "base/containers/cxx20_erase.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/singleton.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/string_piece.h"
@@ -30,6 +31,7 @@
 #include "components/crx_file/id_util.h"
 #include "components/prefs/pref_service.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window.h"
 #include "ui/base/ime/ash/component_extension_ime_manager.h"
@@ -156,11 +158,11 @@ class ArcInputMethodStateDelegateImpl : public ArcInputMethodState::Delegate {
     return ash::input_method::InputMethodDescriptor(
         input_method_id, display_name, std::string() /* indicator */, layout,
         languages, false /* is_login_keyboard */, GURL(info->settings_url),
-        GURL() /* input_view_url */);
+        GURL() /* input_view_url */, /*handwriting_language=*/absl::nullopt);
   }
 
  private:
-  Profile* const profile_;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
 };
 
 // The default implmentation of WindowDelegate.
@@ -206,7 +208,7 @@ class ArcInputMethodManagerService::ArcInputMethodBoundsObserver
   }
 
  private:
-  ArcInputMethodManagerService* owner_;
+  raw_ptr<ArcInputMethodManagerService, ExperimentalAsh> owner_;
 };
 
 class ArcInputMethodManagerService::InputMethodEngineObserver
@@ -279,7 +281,7 @@ class ArcInputMethodManagerService::InputMethodEngineObserver
   void OnInputMethodOptionsChanged(const std::string& engine_id) override {}
 
  private:
-  ArcInputMethodManagerService* const owner_;
+  const raw_ptr<ArcInputMethodManagerService, ExperimentalAsh> owner_;
 };
 
 class ArcInputMethodManagerService::InputMethodObserver
@@ -309,7 +311,7 @@ class ArcInputMethodManagerService::InputMethodObserver
   }
 
  private:
-  ArcInputMethodManagerService* const owner_;
+  const raw_ptr<ArcInputMethodManagerService, ExperimentalAsh> owner_;
 };
 
 class ArcInputMethodManagerService::TabletModeObserver
@@ -333,7 +335,7 @@ class ArcInputMethodManagerService::TabletModeObserver
     owner_->NotifyInputMethodManagerObservers(enabled);
   }
 
-  ArcInputMethodManagerService* owner_;
+  raw_ptr<ArcInputMethodManagerService, ExperimentalAsh> owner_;
 };
 
 // static
@@ -717,7 +719,6 @@ void ArcInputMethodManagerService::Focus(int context_id) {
 
 void ArcInputMethodManagerService::Blur() {
   active_connection_.reset();
-  is_virtual_keyboard_shown_ = false;
 }
 
 void ArcInputMethodManagerService::UpdateTextInputState() {

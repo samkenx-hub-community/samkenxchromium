@@ -40,6 +40,10 @@ namespace ui_controls {
 // tests.
 void EnableUIControls();
 
+// Reset the state in ui controls logic that are updated by the test to the
+// initial state.
+void ResetUIControlsIfEnabled();
+
 #if BUILDFLAG(IS_APPLE)
 bool IsUIControlsEnabled();
 #endif
@@ -96,7 +100,7 @@ bool SendKeyEventsNotifyWhenDone(gfx::NativeWindow window,
 
 // This value specifies that no window hint is given and an appropriate target
 // window should be deduced from the target or current mouse position.
-constexpr gfx::NativeWindow kNoWindowHint = gfx::kNullNativeWindow;
+constexpr gfx::NativeWindow kNoWindowHint = gfx::NativeWindow();
 
 // Simulate a mouse move.
 //
@@ -177,7 +181,7 @@ bool SendTouchEventsNotifyWhenDone(int action,
                                    base::OnceClosure task);
 #endif
 
-#if defined(USE_AURA)
+#if BUILDFLAG(IS_CHROMEOS_ASH) || BUILDFLAG(IS_WIN)
 class UIControlsAura;
 void InstallUIControlsAura(UIControlsAura* instance);
 #endif

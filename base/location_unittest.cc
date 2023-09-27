@@ -4,7 +4,6 @@
 
 #include "base/location.h"
 
-#include "base/debug/debugging_buildflags.h"
 #include "base/trace_event/base_tracing.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -31,10 +30,8 @@ TEST(LocationTest, CurrentYieldsCorrectValue) {
   Location here = WhereAmI();
   EXPECT_NE(here.program_counter(), WhereAmI().program_counter());
   EXPECT_THAT(here.file_name(), ::testing::EndsWith("location_unittest.cc"));
-#if BUILDFLAG(ENABLE_LOCATION_SOURCE)
   EXPECT_EQ(here.line_number(), previous_line + 1);
   EXPECT_STREQ("TestBody", here.function_name());
-#endif
 }
 
 #if BUILDFLAG(ENABLE_BASE_TRACING)

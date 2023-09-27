@@ -44,6 +44,7 @@ namespace password_manager_util {
 // For credentials returned from PasswordStore::GetLogins, the enum specifies
 // the type of the match for the requested page. Higher value always means
 // weaker match.
+// GENERATED_JAVA_ENUM_PACKAGE: org.chromium.chrome.browser.password_manager
 enum class GetLoginMatchType {
   // Exact origin or Android credentials.
   kExact,
@@ -123,19 +124,18 @@ base::StringPiece GetSignonRealmWithProtocolExcluded(
 GetLoginMatchType GetMatchType(const password_manager::PasswordForm& form);
 
 // Given all non-blocklisted |non_federated_matches|, finds and populates
-// |non_federated_same_scheme|, |best_matches|, and |preferred_match|
-// accordingly. For comparing credentials the following rule is used: non-psl
-// match is better than psl match, most recently used match is better than other
-// matches. In case of tie, an arbitrary credential from the tied ones is chosen
-// for |best_matches| and |preferred_match|.
+// |non_federated_same_scheme|, |best_matches| accordingly.
+// For comparing credentials the following rule is used: non-psl match is better
+// than psl match, most recently used match is better than other matches. In
+// case of tie, an arbitrary credential from the tied ones is chosen for
+// |best_matches|.
 void FindBestMatches(
     const std::vector<const password_manager::PasswordForm*>&
         non_federated_matches,
     password_manager::PasswordForm::Scheme scheme,
     std::vector<const password_manager::PasswordForm*>*
         non_federated_same_scheme,
-    std::vector<const password_manager::PasswordForm*>* best_matches,
-    const password_manager::PasswordForm** preferred_match);
+    std::vector<const password_manager::PasswordForm*>* best_matches);
 
 // Returns a form with the given |username_value| from |forms|, or nullptr if
 // none exists. If multiple matches exist, returns the first one.
@@ -179,7 +179,6 @@ bool ShouldShowBiometricAuthenticationBeforeFillingPromo(
 
 // Helper which checks if biometric authentication is available.
 bool CanUseBiometricAuth(device_reauth::DeviceAuthenticator* authenticator,
-                         device_reauth::DeviceAuthRequester requester,
                          password_manager::PasswordManagerClient* client);
 
 // Strips any authentication data, as well as query and ref portions of URL.
@@ -207,18 +206,8 @@ bool IsCredentialProviderEnabledOnStartup(const PrefService* prefs);
 void SetCredentialProviderEnabledOnStartup(PrefService* prefs, bool enabled);
 #endif
 
-// Retrieves the extended top level domain for a given |url|
-// ("https://www.facebook.com/" => "facebook.com"). If the calculated top
-// private domain matches an entry from the |psl_extensions| (e.g. "app.link"),
-// the domain is extended by one level ("https://facebook.app.link/" =>
-// "facebook.app.link"). If the |url| is not a valid URI or has an unsupported
-// schema (e.g. "android://"), empty string is returned.
-std::string GetExtendedTopLevelDomain(
-    const GURL& url,
-    const base::flat_set<std::string>& psl_extensions);
-
 // Contains all special symbols considered for password-generation.
-constexpr char kSpecialSymbols[] = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+inline constexpr char kSpecialSymbols[] = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
 
 // Helper functions for character type classification. The built-in functions
 // depend on locale, platform and other stuff. To make the output more
@@ -234,6 +223,9 @@ bool IsUppercaseLetter(char16_t c);
 // Checks if a supplied character |c| is a special symbol.
 // Special symbols are defined by the string |kSpecialSymbols|.
 bool IsSpecialSymbol(char16_t c);
+
+// Returns true if 'type' is a username in a password-less form.
+bool IsSingleUsernameType(autofill::ServerFieldType type);
 
 }  // namespace password_manager_util
 

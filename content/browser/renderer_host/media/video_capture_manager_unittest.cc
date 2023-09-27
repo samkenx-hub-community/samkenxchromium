@@ -189,6 +189,9 @@ class MockFrameObserver : public VideoCaptureControllerEventHandler {
   void OnBufferReady(const VideoCaptureControllerID& id,
                      const ReadyBuffer& buffer,
                      const std::vector<ReadyBuffer>& scaled_buffers) override {}
+  void OnFrameDroppedEarly(const VideoCaptureControllerID& id,
+                           media::VideoCaptureFrameDropReason reason) override {
+  }
   void OnNewCropVersion(const VideoCaptureControllerID& id,
                         uint32_t crop_version) override {}
   void OnFrameWithEmptyRegionCapture(const VideoCaptureControllerID&) override {
@@ -361,7 +364,8 @@ class VideoCaptureManagerTest : public testing::Test {
 #endif
 
   BrowserTaskEnvironment task_environment_;
-  raw_ptr<ScreenlockMonitorTestSource> screenlock_monitor_source_;
+  raw_ptr<ScreenlockMonitorTestSource, DanglingUntriaged>
+      screenlock_monitor_source_;
   std::unique_ptr<ScreenlockMonitor> screenlock_monitor_;
   std::map<VideoCaptureControllerID, VideoCaptureController*> controllers_;
   scoped_refptr<VideoCaptureManager> vcm_;

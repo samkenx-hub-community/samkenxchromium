@@ -14,11 +14,13 @@
 
 // Opens the Most Visited associated with this `item` at the `mostVisitedItem`.
 - (void)openMostVisitedItem:(NSObject*)item atIndex:(NSInteger)mostVisitedIndex;
+
 // Handles the actions tapping the "Return to Recent Tab" item that returns the
 // user to the last opened tab.
 - (void)openMostRecentTab;
-// Handles the actions following a tap on a trending query.
-- (void)loadSuggestedQuery:(QuerySuggestionConfig*)config;
+
+// Opens the displayed tab resumption item.
+- (void)openTabResumptionItem;
 
 @end
 

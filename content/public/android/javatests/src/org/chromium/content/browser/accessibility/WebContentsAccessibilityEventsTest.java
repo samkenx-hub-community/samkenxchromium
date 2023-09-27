@@ -17,8 +17,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.DisabledTest;
+import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.MinAndroidSdkLevel;
 import org.chromium.content_public.browser.test.ContentJUnit4ClassRunner;
 
@@ -27,7 +27,7 @@ import org.chromium.content_public.browser.test.ContentJUnit4ClassRunner;
  */
 @RunWith(ContentJUnit4ClassRunner.class)
 @SuppressLint("VisibleForTests")
-@Batch(Batch.PER_CLASS)
+@DoNotBatch(reason = "Flaky tests")
 public class WebContentsAccessibilityEventsTest {
     // File path that holds all the relevant tests.
     private static final String BASE_FILE_PATH = "content/test/data/accessibility/event/";
@@ -301,20 +301,8 @@ public class WebContentsAccessibilityEventsTest {
 
     @Test
     @SmallTest
-    public void test_ariaDropeffectChanged() {
-        performTest("aria-dropeffect-changed.html", EMPTY_EXPECTATIONS_FILE);
-    }
-
-    @Test
-    @SmallTest
     public void test_ariaFlowTo() {
         performTest("aria-flow-to.html", EMPTY_EXPECTATIONS_FILE);
-    }
-
-    @Test
-    @SmallTest
-    public void test_ariaGrabbedChanged() {
-        performTest("aria-grabbed-changed.html", EMPTY_EXPECTATIONS_FILE);
     }
 
     @Test
@@ -358,12 +346,6 @@ public class WebContentsAccessibilityEventsTest {
     public void test_ariaHiddenSingleDescendantVisibilityHidden() {
         performTest(
                 "aria-hidden-single-descendant-visibility-hidden.html", EMPTY_EXPECTATIONS_FILE);
-    }
-
-    @Test
-    @SmallTest
-    public void test_ariaInvalidChanged() {
-        performTest("aria-invalid-changed.html", EMPTY_EXPECTATIONS_FILE);
     }
 
     @Test
@@ -444,6 +426,12 @@ public class WebContentsAccessibilityEventsTest {
     @SmallTest
     public void test_ariaSelectedChanged() {
         performTest("aria-selected-changed.html", "aria-selected-changed-expected-android.txt");
+    }
+
+    @Test
+    @SmallTest
+    public void test_ariaSelectedChangedNewSubtree() {
+        performTest("aria-selected-changed-new-subtree.html", EMPTY_EXPECTATIONS_FILE);
     }
 
     @Test
@@ -1007,7 +995,7 @@ public class WebContentsAccessibilityEventsTest {
     @Test
     @SmallTest
     public void test_selectMenu() {
-        performTest("select-menu.html", "select-menu-expected-android.txt");
+        performTest("selectlist.html", "selectlist-expected-android.txt");
     }
 
     @Test

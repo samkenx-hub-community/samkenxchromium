@@ -21,8 +21,9 @@ extern GuideName* const kContentAreaGuide;
 extern GuideName* const kPrimaryToolbarGuide;
 // A guide that is constrained to match the frame of the secondary toolbar.
 extern GuideName* const kSecondaryToolbarGuide;
-// A guide that is constrained to match the frame of the omnibox.
-extern GuideName* const kOmniboxGuide;
+// A guide that is constrained to match the frame of the omnibox when it's in
+// the primary toolbar.
+extern GuideName* const kTopOmniboxGuide;
 // A guide that is constrained to match the frame of the leading image view in
 // the omnibox.
 extern GuideName* const kOmniboxLeadingImageGuide;
@@ -49,5 +50,7 @@ extern GuideName* const kDiscoverFeedHeaderMenuGuide;
 // A guide that is constrained to match the frame of the bottom toolbar in the
 // tab grid.
 extern GuideName* const kTabGridBottomToolbarGuide;
+// A guide that is constrained to match the frame of the first Autofill result.
+extern GuideName* const kAutofillFirstSuggestionGuide;
 
 #endif  // IOS_CHROME_BROWSER_SHARED_UI_UTIL_LAYOUT_GUIDE_NAMES_H_

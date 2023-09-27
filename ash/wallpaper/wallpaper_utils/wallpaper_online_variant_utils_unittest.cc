@@ -33,6 +33,11 @@ TEST(WallpaperOnlineVariantUtilsTest, FirstValidVariant) {
       light_variant, dark_variant, morning_variant, late_afternoon_variant};
   EXPECT_EQ(morning_variant,
             *FirstValidVariant(variants, ScheduleCheckpoint::kMorning));
+  // For time of day wallpapers, morning variant is used for light mode.
+  EXPECT_EQ(morning_variant,
+            *FirstValidVariant(variants, ScheduleCheckpoint::kDisabled));
+  EXPECT_EQ(dark_variant,
+            *FirstValidVariant(variants, ScheduleCheckpoint::kEnabled));
 }
 
 TEST(WallpaperOnlineVariantUtilsTest, IsSuitableOnlineWallpaperVariant) {
@@ -51,6 +56,29 @@ TEST(WallpaperOnlineVariantUtilsTest, IsSuitableOnlineWallpaperVariant) {
     const OnlineWallpaperVariant variant = OnlineWallpaperVariant(
         1, GURL("http://example.com"), mapping_pair.second);
     EXPECT_TRUE(IsSuitableOnlineWallpaperVariant(variant, mapping_pair.first));
+  }
+}
+
+TEST(WallpaperOnlineVariantUtilsTest,
+     IsSuitableOnlineWallpaperVariant_PreviewType) {
+  const std::map<ScheduleCheckpoint, backdrop::Image::ImageType>
+      expected_mapping = {{ScheduleCheckpoint::kSunrise,
+                           backdrop::Image_ImageType_IMAGE_TYPE_PREVIEW_MODE},
+                          {ScheduleCheckpoint::kMorning,
+                           backdrop::Image_ImageType_IMAGE_TYPE_PREVIEW_MODE},
+                          {ScheduleCheckpoint::kLateAfternoon,
+                           backdrop::Image_ImageType_IMAGE_TYPE_PREVIEW_MODE},
+                          {ScheduleCheckpoint::kSunset,
+                           backdrop::Image_ImageType_IMAGE_TYPE_PREVIEW_MODE},
+                          {ScheduleCheckpoint::kDisabled,
+                           backdrop::Image_ImageType_IMAGE_TYPE_PREVIEW_MODE},
+                          {ScheduleCheckpoint::kEnabled,
+                           backdrop::Image_ImageType_IMAGE_TYPE_PREVIEW_MODE}};
+
+  for (const auto& mapping_pair : expected_mapping) {
+    const OnlineWallpaperVariant variant = OnlineWallpaperVariant(
+        1, GURL("http://example.com"), mapping_pair.second);
+    EXPECT_FALSE(IsSuitableOnlineWallpaperVariant(variant, mapping_pair.first));
   }
 }
 

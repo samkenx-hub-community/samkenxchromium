@@ -14,6 +14,7 @@
 #include "base/android/scoped_java_ref.h"
 #include "base/containers/flat_map.h"
 #include "base/memory/weak_ptr.h"
+#include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/thumbnail/cc/thumbnail_cache.h"
 #include "content/public/browser/render_widget_host_view.h"
 
@@ -44,8 +45,7 @@ class TabContentManager : public thumbnail::ThumbnailCacheObserver {
                     jint compression_queue_max_size,
                     jint write_queue_max_size,
                     jboolean use_approximation_thumbnail,
-                    jboolean save_jpeg_thumbnails,
-                    jdouble jpeg_aspect_ratio);
+                    jboolean save_jpeg_thumbnails);
 
   TabContentManager(const TabContentManager&) = delete;
   TabContentManager& operator=(const TabContentManager&) = delete;
@@ -60,12 +60,22 @@ class TabContentManager : public thumbnail::ThumbnailCacheObserver {
   // Get the live layer from the cache.
   scoped_refptr<cc::slim::Layer> GetLiveLayer(int tab_id);
 
-  scoped_refptr<ThumbnailLayer> GetStaticLayer(int tab_id);
+  // Returns the static ThumbnailLayer for a `tab_id`. Note that the lifecycle
+  // of the thumbnail is managed by the ThumbnailCache and not the
+  // ThumbnailLayer. When displaying a layer it is important that
+  // UpdateVisibleIds is called with all the Tab IDs that are required for
+  // before calling GetStaticLayer. ThumbnailLayer's should not be retained as
+  // their lifecycle is managed by this class.
+  ThumbnailLayer* GetStaticLayer(int tab_id);
 
+  // Deprecated: This will be replace by just GetStaticLayer soon.
   // Get the static thumbnail from the cache, or the NTP.
-  scoped_refptr<ThumbnailLayer> GetOrCreateStaticLayer(int tab_id,
-                                                       bool force_disk_read);
+  ThumbnailLayer* GetOrCreateStaticLayer(int tab_id, bool force_disk_read);
   // JNI methods.
+
+  // Updates visible tab ids to page into the thumbnail cache.
+  void UpdateVisibleIds(const std::vector<int>& priority_ids,
+                        int primary_tab_id);
 
   // Should be called when a tab gets a new live layer that should be served
   // by the cache to the CompositorView.
@@ -84,6 +94,7 @@ class TabContentManager : public thumbnail::ThumbnailCacheObserver {
                         jfloat thumbnail_scale,
                         jboolean write_to_cache,
                         jdouble aspect_ratio,
+                        jboolean return_bitmap,
                         const base::android::JavaParamRef<jobject>& j_callback);
   void CacheTabWithBitmap(JNIEnv* env,
                           const base::android::JavaParamRef<jobject>& tab,
@@ -99,15 +110,21 @@ class TabContentManager : public thumbnail::ThumbnailCacheObserver {
   void NativeRemoveTabThumbnail(int tab_id);
   void RemoveTabThumbnail(JNIEnv* env, jint tab_id);
   void OnUIResourcesWereEvicted();
+  void WaitForJpegTabThumbnail(
+      JNIEnv* env,
+      jint tab_id,
+      const base::android::JavaParamRef<jobject>& j_callback);
   void GetEtc1TabThumbnail(
       JNIEnv* env,
       jint tab_id,
       jdouble aspect_ratio,
+      jboolean save_jpeg,
       const base::android::JavaParamRef<jobject>& j_callback);
   void SetCaptureMinRequestTimeForTesting(JNIEnv* env, jint timeMs);
-  jint GetPendingReadbacksForTesting(JNIEnv* env);
+  jint GetInFlightCapturesForTesting(JNIEnv* env);
 
   // ThumbnailCacheObserver implementation;
+  void OnThumbnailAddedToCache(thumbnail::TabId tab_id) override;
   void OnFinishedThumbnailRead(thumbnail::TabId tab_id) override;
 
  private:
@@ -122,10 +139,17 @@ class TabContentManager : public thumbnail::ThumbnailCacheObserver {
   content::RenderWidgetHostView* GetRwhvForTab(
       JNIEnv* env,
       const base::android::JavaParamRef<jobject>& tab);
+  std::unique_ptr<thumbnail::ThumbnailCaptureTracker, base::OnTaskRunnerDeleter>
+  TrackCapture(thumbnail::TabId tab_id);
+  void OnTrackingFinished(int tab_id,
+                          thumbnail::ThumbnailCaptureTracker* tracker);
   void OnTabReadback(int tab_id,
+                     std::unique_ptr<thumbnail::ThumbnailCaptureTracker,
+                                     base::OnTaskRunnerDeleter> tracker,
                      base::android::ScopedJavaGlobalRef<jobject> j_callback,
                      bool write_to_cache,
                      double aspect_ratio,
+                     bool return_bitmap,
                      float thumbnail_scale,
                      const SkBitmap& bitmap);
 
@@ -136,6 +160,9 @@ class TabContentManager : public thumbnail::ThumbnailCacheObserver {
       bool result,
       const SkBitmap& bitmap);
 
+  base::flat_map<thumbnail::TabId,
+                 base::WeakPtr<thumbnail::ThumbnailCaptureTracker>>
+      in_flight_captures_;
   std::unique_ptr<thumbnail::ThumbnailCache> thumbnail_cache_;
   ThumbnailLayerMap static_layer_cache_;
   LayerMap live_layer_list_;

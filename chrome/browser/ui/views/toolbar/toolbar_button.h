@@ -14,6 +14,7 @@
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/pointer/touch_ui_controller.h"
 #include "ui/base/theme_provider.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/gfx/animation/animation_delegate.h"
 #include "ui/gfx/animation/slide_animation.h"
 #include "ui/gfx/geometry/point.h"
@@ -133,6 +134,8 @@ class ToolbarButton : public views::LabelButton,
 
   // Returns if the button inkdrop should persist after the user interacts with
   // IPH for the button. Override this to change default behavior.
+  // TODO(crbug.com/1419653): Investigate if this is still needed and if so how
+  // it can be applied to all Buttons rather than just ToolbarButtons.
   virtual bool ShouldShowInkdropAfterIphInteraction();
 
   // Function to show the dropdown menu.
@@ -147,6 +150,29 @@ class ToolbarButton : public views::LabelButton,
   // This color is typically used for the icon and text of toolbar buttons.
   virtual SkColor GetForegroundColor(ButtonState state) const;
 
+  // Returns the icon size of the toolbar button
+  virtual int GetIconSize() const;
+
+  // Retuns true if a non-empty border should be painted.
+  virtual bool ShouldPaintBorder() const;
+
+  // Retuns true if the background highlight color should be blended
+  // with the toolbar color.
+  virtual bool ShouldBlendHighlightColor() const;
+
+  // Returns whether to directly use the highlight as background instead
+  // of blending it with the toolbar colors.
+  // TODO(shibalik): remove this method after fixing for profile button.
+  virtual bool ShouldDirectlyUseHighlightAsBackground() const;
+
+  // Virtual method to explicitly set the highlighted text color instead of the
+  // default behavior of the HighlightColorAnimation.
+  virtual absl::optional<SkColor> GetHighlightTextColor() const;
+
+  // Virtual method to explicitly set the highlighted border color instead of
+  // the default behavior of the HighlightColorAnimation.
+  virtual absl::optional<SkColor> GetHighlightBorderColor() const;
+
   // Updates the images using the given icons and specific colors.
   void UpdateIconsWithColors(const gfx::VectorIcon& icon,
                              SkColor normal_color,
@@ -155,6 +181,7 @@ class ToolbarButton : public views::LabelButton,
                              SkColor disabled_color);
 
   static constexpr int kDefaultIconSize = 16;
+  static constexpr int kDefaultIconSizeChromeRefresh = 20;
   static constexpr int kDefaultTouchableIconSize = 24;
 
  private:
@@ -211,8 +238,12 @@ class ToolbarButton : public views::LabelButton,
   };
 
   struct VectorIcons {
-    const gfx::VectorIcon& icon;
-    const gfx::VectorIcon& touch_icon;
+    // This field is not a raw_ref<> because it was filtered by the rewriter
+    // for: #constexpr-ctor-field-initializer
+    RAW_PTR_EXCLUSION const gfx::VectorIcon& icon;
+    // This field is not a raw_ref<> because it was filtered by the rewriter
+    // for: #constexpr-ctor-field-initializer
+    RAW_PTR_EXCLUSION const gfx::VectorIcon& touch_icon;
   };
 
   void TouchUiChanged();
@@ -253,6 +284,7 @@ class ToolbarButton : public views::LabelButton,
   const bool trigger_menu_on_long_press_;
 
   // Determines whether to highlight the button for in-product help.
+  // TODO(crbug.com/1419653): Remove this member after issue is addressed.
   bool has_in_product_help_promo_ = false;
 
   // Y position of mouse when left mouse button is pressed.

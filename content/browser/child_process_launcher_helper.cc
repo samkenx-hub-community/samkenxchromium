@@ -18,7 +18,7 @@
 #include "base/task/task_traits.h"
 #include "build/build_config.h"
 #include "content/browser/child_process_launcher.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/child_process_launcher_utils.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/sandboxed_process_launcher_delegate.h"
@@ -148,11 +148,8 @@ void ChildProcessLauncherHelper::LaunchOnLauncherThread() {
 
   Process process;
   if (BeforeLaunchOnLauncherThread(*files_to_register, options_ptr)) {
-// TODO(crbug.com/1412835): iOS is single process mode for now.
-#if !BUILDFLAG(IS_IOS)
     base::FieldTrialList::PopulateLaunchOptionsWithFieldTrialState(
         command_line(), options_ptr);
-#endif
     process =
         LaunchProcessOnLauncherThread(options_ptr, std::move(files_to_register),
 #if BUILDFLAG(IS_ANDROID)

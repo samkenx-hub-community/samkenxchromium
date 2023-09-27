@@ -12,6 +12,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/system/sys_info.h"
+#include "chrome/browser/apps/almanac_api_client/proto/client_context.pb.h"
 #include "components/version_info/channel.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
@@ -23,7 +24,7 @@ struct VersionInfo {
   // The ash Chrome browser version of the device. e.g. "107.0.5296.0"
   std::string ash_chrome;
   // The ChromeOS platform version of the device. e.g. "15088.0.0"
-  // The value is set to "unknown" if the version was not known.
+  // The value is empty if the version is not known.
   std::string platform;
   // The channel of the build.
   version_info::Channel channel = version_info::Channel::UNKNOWN;
@@ -35,11 +36,30 @@ struct DeviceInfo {
   DeviceInfo& operator=(const DeviceInfo& other);
   ~DeviceInfo();
 
+  // Returns a ClientDeviceContext proto containing the device-specific fields
+  // from this DeviceInfo.
+  proto::ClientDeviceContext ToDeviceContext() const;
+
+  // Returns a ClientUserContext proto containing the user-specific fields from
+  // this DeviceInfo.
+  proto::ClientUserContext ToUserContext() const;
+
   // The board family of the device. e.g. "brya"
   std::string board;
 
   // The model of the device. e.g. "taniks"
   std::string model;
+
+  // The HWID which identifies the hardware configuration of the device. Can be
+  // empty if not running on a ChromeOS device. e.g.
+  // "REDRIX-CLQY C4B-G4H-D3D-U7F-X54-I9N".
+  std::string hardware_id;
+
+  // The custom-label tag for the device sending the request, used to
+  // distinguish between variations of a device which have different branding
+  // but the same hardware. Only set for devices with custom-label variants.
+  // e.g. "OEM-1".
+  absl::optional<std::string> custom_label_tag;
 
   // The user type of the profile currently running. e.g. "unmanaged"
   std::string user_type;
@@ -65,19 +85,20 @@ class DeviceInfoManager {
   ~DeviceInfoManager();
 
   // Asynchronously fetches device information. Must be called from the UI
-  // thread.
+  // thread. DeviceInfo is not expected to change over the lifetime of a
+  // Profile, so it is okay (and more efficient) to store the DeviceInfo instead
+  // of repeatedly querying this method.
   void GetDeviceInfo(base::OnceCallback<void(DeviceInfo)> callback);
 
  private:
-  void OnPlatformVersionNumber(base::OnceCallback<void(DeviceInfo)> callback,
-                               DeviceInfo device_info,
-                               const absl::optional<std::string>& version);
+  void OnLoadedVersionAndCustomLabel(
+      base::OnceCallback<void(DeviceInfo)> callback,
+      DeviceInfo device_info);
   void OnModelInfo(base::OnceCallback<void(DeviceInfo)> callback,
                    DeviceInfo device_info,
                    base::SysInfo::HardwareInfo hardware_info);
 
-  base::raw_ptr<Profile> profile_;
-  absl::optional<DeviceInfo> device_info_ = absl::nullopt;
+  raw_ptr<Profile, DanglingUntriaged> profile_;
 
   // |weak_ptr_factory_| must be the last member of this class.
   base::WeakPtrFactory<DeviceInfoManager> weak_ptr_factory_{this};

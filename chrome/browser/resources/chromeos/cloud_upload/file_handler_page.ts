@@ -4,8 +4,9 @@
 
 import {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import {assert, assertNotReached} from 'chrome://resources/js/assert_ts.js';
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 
-import {DialogTask, UserAction} from './cloud_upload.mojom-webui.js';
+import {DialogTask, MetricsRecordedSetupPage, UserAction} from './cloud_upload.mojom-webui.js';
 import {CloudUploadBrowserProxy} from './cloud_upload_browser_proxy.js';
 import {AccordionTopCardElement, BaseCardElement, CloudProviderCardElement, CloudProviderType, FileHandlerCardElement, LocalHandlerCardElement} from './file_handler_card.js';
 import {getTemplate} from './file_handler_page.html.js';
@@ -20,7 +21,7 @@ export class FileHandlerPageElement extends HTMLElement {
    * The local file tasks that the user could use to open the file. There are
    * separate buttons for the Drive and Office PWA apps.
    */
-  tasks: DialogTask[] = [];
+  localTasks: DialogTask[] = [];
   /**
    * References to the HTMLElement used to display the tasks that the user can
    * select.
@@ -61,35 +62,37 @@ export class FileHandlerPageElement extends HTMLElement {
     try {
       const dialogArgs = await this.proxy.handler.getDialogArgs();
       assert(dialogArgs.args);
-      assert(dialogArgs.args.tasks);
+      assert(dialogArgs.args.localTasks);
       // Adjust the dialog's size if there are no local tasks to display.
-      if (dialogArgs.args.tasks.length == 0) {
-        this.style.height = '310px';
+      if (dialogArgs.args.localTasks.length == 0) {
+        this.$('#dialog').style.height = '315px';
       }
 
       const {name, icon, type} =
           this.getDriveAppInfo(dialogArgs.args.fileNames);
 
-      const fileTypeElement = this.$<HTMLSpanElement>('#file-type');
-      assert(fileTypeElement);
-      fileTypeElement.innerText = type;
+      const titleElement = this.$<HTMLSpanElement>('#title');
+      assert(titleElement);
+      titleElement.innerText =
+          loadTimeData.getStringF('fileHandlerTitle', type);
 
       const driveCard = new CloudProviderCardElement();
       driveCard.setParameters(
-          CloudProviderType.DRIVE, name, 'Uses Google Drive');
+          CloudProviderType.DRIVE, name,
+          loadTimeData.getString('googleDriveStorage'));
       driveCard.setIconClass(icon);
       driveCard.id = 'drive';
       this.addCloudProviderCard(driveCard);
 
       const officeCard = new CloudProviderCardElement();
       officeCard.setParameters(
-          CloudProviderType.ONE_DRIVE, 'Microsoft 365',
-          'Uses Microsoft OneDrive');
+          CloudProviderType.ONE_DRIVE, loadTimeData.getString('microsoft365'),
+          loadTimeData.getString('oneDriveStorage'));
       officeCard.setIconClass('office');
       officeCard.id = 'onedrive';
       this.addCloudProviderCard(officeCard);
 
-      const localTasks = dialogArgs.args.tasks;
+      const localTasks = dialogArgs.args.localTasks;
       if (localTasks.length == 0) {
         return;
       }
@@ -106,16 +109,14 @@ export class FileHandlerPageElement extends HTMLElement {
         localHandlerCard.setParameters(task.position, task.title);
         localHandlerCard.setIconUrl(task.iconUrl);
         localHandlerCard.id = this.toStringId(task.position);
-        if (i == dialogArgs.args.tasks.length - 1) {
+        if (i == dialogArgs.args.localTasks.length - 1) {
           // Round bottom for last card.
           localHandlerCard.$('#container')!.classList.add('round-bottom');
         }
         this.addLocalHandlerCard(localHandlerCard);
-
-        // Set `this.tasks` at end of `initDynamicContent` as an indication of
-        // completion.
-        this.tasks = dialogArgs.args.tasks;
       }
+      // Set local tasks to indicate completion (used in tests).
+      this.localTasks = dialogArgs.args.localTasks;
     } catch (e) {
       // TODO(b:243095484) Define expected behavior.
       console.error(
@@ -208,14 +209,25 @@ export class FileHandlerPageElement extends HTMLElement {
   // different types, or any error finding the right app, we just default to
   // Docs.
   private getDriveAppInfo(fileNames: string[]) {
-    // TODO(b:254586358): i18n these names.
-    const fileName = fileNames[0] || '';
-    if (/\.xlsx?$/.test(fileName)) {
-      return {name: 'Google Sheets', icon: 'sheets', type: 'Excel'};
+    const fileName = (fileNames[0] || '').toLowerCase();
+    if (/\.xls[m,x]?$/.test(fileName)) {
+      return {
+        name: loadTimeData.getString('googleSheets'),
+        icon: 'sheets',
+        type: loadTimeData.getString('excel'),
+      };
     } else if (/\.pptx?$/.test(fileName)) {
-      return {name: 'Google Slides', icon: 'slides', type: 'Powerpoint'};
+      return {
+        name: loadTimeData.getString('googleSlides'),
+        icon: 'slides',
+        type: loadTimeData.getString('powerPoint'),
+      };
     } else {
-      return {name: 'Google Docs', icon: 'docs', type: 'Word'};
+      return {
+        name: loadTimeData.getString('googleDocs'),
+        icon: 'docs',
+        type: loadTimeData.getString('word'),
+      };
     }
   }
 
@@ -272,7 +284,6 @@ export class FileHandlerPageElement extends HTMLElement {
         continue;
       }
       if (providerCard.type === CloudProviderType.DRIVE) {
-        // TODO(petermarshall): Remove kSetUpGoogleDrive step or use it here.
         this.proxy.handler.respondWithUserActionAndClose(
             UserAction.kConfirmOrUploadToGoogleDrive);
         return;
@@ -297,6 +308,7 @@ export class FileHandlerPageElement extends HTMLElement {
   }
 
   private onCancelButtonClick(): void {
+    this.proxy.handler.recordCancel(MetricsRecordedSetupPage.kFileHandlerPage);
     this.proxy.handler.respondWithUserActionAndClose(UserAction.kCancel);
   }
 

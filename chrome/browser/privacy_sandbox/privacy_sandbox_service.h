@@ -38,6 +38,10 @@ namespace browsing_topics {
 class BrowsingTopicsService;
 }
 
+namespace views {
+class Widget;
+}
+
 // Service which encapsulates logic related to displaying and controlling the
 // users Privacy Sandbox settings. This service contains the chrome/ specific
 // logic used by the UI, including decision making around what the users'
@@ -57,7 +61,8 @@ class PrivacySandboxService : public KeyedService {
     kM1Consent = 3,
     kM1NoticeROW = 4,
     kM1NoticeEEA = 5,
-    kMaxValue = kM1NoticeEEA,
+    kM1NoticeRestricted = 6,
+    kMaxValue = kM1NoticeRestricted,
   };
 
   // An exhaustive list of actions related to showing & interacting with the
@@ -97,7 +102,14 @@ class PrivacySandboxService : public KeyedService {
     kConsentMoreButtonClicked = 14,
     kNoticeMoreButtonClicked = 15,
 
-    kMaxValue = kNoticeMoreButtonClicked,
+    // Restricted notice interactions
+    kRestrictedNoticeAcknowledge = 16,
+    kRestrictedNoticeOpenSettings = 17,
+    kRestrictedNoticeShown = 18,
+    kRestrictedNoticeClosedNoInteraction = 19,
+    kRestrictedNoticeMoreButtonClicked = 20,
+
+    kMaxValue = kRestrictedNoticeMoreButtonClicked,
   };
 
   // TODO(crbug.com/1378703): Integrate this when handling Notice and Consent
@@ -118,12 +130,17 @@ class PrivacySandboxService : public KeyedService {
     // User migrated from EEA to ROW, and had already previously finished the
     // EEA consent flow.
     kEEAFlowCompletedBeforeRowMigration = 6,
-    kMaxValue = kEEAFlowCompletedBeforeRowMigration,
+    // User migrated from ROW to EEA, but had already disabled Topics from
+    // settings.
+    kROWFlowCompletedAndTopicsDisabledBeforeEEAMigration = 7,
+    // The user is restricted with a guardian, so a direct notice is shown.
+    kNoticeShownToGuardian = 8,
+    kMaxValue = kNoticeShownToGuardian,
   };
 
   PrivacySandboxService(
       privacy_sandbox::PrivacySandboxSettings* privacy_sandbox_settings,
-      content_settings::CookieSettings* cookie_settings,
+      scoped_refptr<content_settings::CookieSettings> cookie_settings,
       PrefService* pref_service,
       content::InterestGroupManager* interest_group_manager,
       profile_metrics::BrowserProfileType profile_type,
@@ -160,15 +177,17 @@ class PrivacySandboxService : public KeyedService {
   // Functions for coordinating the display of the Privacy Sandbox prompts
   // across multiple browser windows. Only relevant for Desktop.
 
+#if !BUILDFLAG(IS_ANDROID)
   // Informs the service that a Privacy Sandbox prompt has been opened
   // or closed for |browser|.
   // Virtual to allow mocking in tests.
-  virtual void PromptOpenedForBrowser(Browser* browser);
+  virtual void PromptOpenedForBrowser(Browser* browser, views::Widget* widget);
   virtual void PromptClosedForBrowser(Browser* browser);
 
   // Returns whether a Privacy Sandbox prompt is currently open for |browser|.
   // Virtual to allow mocking in tests.
   virtual bool IsPromptOpenForBrowser(Browser* browser);
+#endif  // !BUILDFLAG(IS_ANDROID)
 
   // Disables the display of the Privacy Sandbox prompt for testing. When
   // |disabled| is true, GetRequiredPromptType() will only ever return that no
@@ -203,16 +222,20 @@ class PrivacySandboxService : public KeyedService {
   // Privacy Sandbox related UI is updated appropriately.
   virtual bool IsPrivacySandboxRestricted();
 
+  // Returns whether the Privacy Sandbox is configured to show a restricted
+  // notice.
+  virtual bool IsRestrictedNoticeEnabled();
+
   // Called when the V2 Privacy Sandbox preference is changed.
   void OnPrivacySandboxV2PrefChanged();
 
-  // Returns whether the FirstPartySets preference is enabled.
+  // Returns whether the RelatedWebsiteSets preference is enabled.
   bool IsFirstPartySetsDataAccessEnabled() const;
 
-  // Returns whether the FirstPartySets preference is managed.
+  // Returns whether the RelatedWebsiteSets preference is managed.
   virtual bool IsFirstPartySetsDataAccessManaged() const;
 
-  // Toggles the FirstPartySets preference.
+  // Toggles the RelatedWebsiteSets preference.
   void SetFirstPartySetsDataAccessEnabled(bool enabled);
 
   // Returns the set of eTLD + 1's on which the user was joined to a FLEDGE
@@ -370,6 +393,18 @@ class PrivacySandboxService : public KeyedService {
       RecordPrivacySandbox4StartupMetrics_PromptNotSuppressed_ROW);
   FRIEND_TEST_ALL_PREFIXES(PrivacySandboxServiceM1Test,
                            RecordPrivacySandbox4StartupMetrics_APIs);
+  FRIEND_TEST_ALL_PREFIXES(
+      PrivacySandboxServiceM1RestrictedNoticePromptTest,
+      RecordPrivacySandbox4StartupMetrics_PromptNotSuppressed);
+  FRIEND_TEST_ALL_PREFIXES(
+      PrivacySandboxServiceM1RestrictedNoticeUserCurrentlyUnrestricted,
+      RecordPrivacySandbox4StartupMetrics_GraduationFlow);
+  FRIEND_TEST_ALL_PREFIXES(
+      PrivacySandboxServiceM1RestrictedNoticeUserCurrentlyRestricted,
+      RecordPrivacySandbox4StartupMetrics_GraduationFlow);
+  FRIEND_TEST_ALL_PREFIXES(
+      PrivacySandboxServiceM1RestrictedNoticeUserCurrentlyUnrestricted,
+      RecordPrivacySandbox4StartupMetrics_GraduationFlowWhenNoticeShownToGuardian);
 
   // Should be used only for tests when mocking the service.
   PrivacySandboxService();
@@ -455,10 +490,16 @@ class PrivacySandboxService : public KeyedService {
     kPromptNotShownDueToTrialConsentDeclined = 8,
     kPromptNotShownDueToTrialsDisabledAfterNoticeShown = 9,
     kPromptNotShownDueToManagedState = 10,
+    kRestrictedNoticeNotShownDueToNoticeShownToGuardian = 11,
+    kRestrictedNoticePromptWaiting = 12,
+    kRestrictedNoticeFlowCompleted = 13,
+    kRestrictedNoticeNotShownDueToFullNoticeAcknowledged = 14,
+    kWaitingForGraduationRestrictedNoticeFlowNotCompleted = 15,
+    kWaitingForGraduationRestrictedNoticeFlowCompleted = 16,
 
     // Add values above this line with a corresponding label in
     // tools/metrics/histograms/enums.xml
-    kMaxValue = kPromptNotShownDueToManagedState,
+    kMaxValue = kWaitingForGraduationRestrictedNoticeFlowCompleted,
   };
 
   // Helper function to log first party sets state.
@@ -521,16 +562,23 @@ class PrivacySandboxService : public KeyedService {
       privacy_sandbox::TopicsConsentUpdateSource source,
       bool did_consent) const;
 
+#if !BUILDFLAG(IS_ANDROID)
+  // If appropriate based on feature state, closes all currently open Privacy
+  // Sandbox prompts.
+  void MaybeCloseOpenPrompts();
+#endif  // !BUILDFLAG(IS_ANDROID)
+
  private:
-  raw_ptr<privacy_sandbox::PrivacySandboxSettings> privacy_sandbox_settings_;
-  raw_ptr<content_settings::CookieSettings> cookie_settings_;
+  raw_ptr<privacy_sandbox::PrivacySandboxSettings, DanglingUntriaged>
+      privacy_sandbox_settings_;
+  scoped_refptr<content_settings::CookieSettings> cookie_settings_;
   raw_ptr<PrefService> pref_service_;
   raw_ptr<content::InterestGroupManager> interest_group_manager_;
   profile_metrics::BrowserProfileType profile_type_;
   raw_ptr<content::BrowsingDataRemover> browsing_data_remover_;
   raw_ptr<HostContentSettingsMap> host_content_settings_map_;
 #if !BUILDFLAG(IS_ANDROID)
-  raw_ptr<TrustSafetySentimentService> sentiment_service_;
+  raw_ptr<TrustSafetySentimentService, DanglingUntriaged> sentiment_service_;
 #endif
   raw_ptr<browsing_topics::BrowsingTopicsService> browsing_topics_service_;
   raw_ptr<first_party_sets::FirstPartySetsPolicyService>
@@ -538,20 +586,20 @@ class PrivacySandboxService : public KeyedService {
 
   PrefChangeRegistrar user_prefs_registrar_;
 
-  // The set of Browser windows which have an open Privacy Sandbox prompt.
-  std::set<Browser*> browsers_with_open_prompts_;
+#if !BUILDFLAG(IS_ANDROID)
+  // A map of Browser windows which have an open Privacy Sandbox prompt,
+  // to the Widget for that prompt.
+  std::map<Browser*, views::Widget*> browsers_to_open_prompts_;
+#endif
 
   // Fake implementation for current and blocked topics.
+  static constexpr int kFakeTaxonomyVersion = 1;
   std::set<privacy_sandbox::CanonicalTopic> fake_current_topics_ = {
-      {browsing_topics::Topic(1),
-       privacy_sandbox::CanonicalTopic::AVAILABLE_TAXONOMY},
-      {browsing_topics::Topic(2),
-       privacy_sandbox::CanonicalTopic::AVAILABLE_TAXONOMY}};
+      {browsing_topics::Topic(1), kFakeTaxonomyVersion},
+      {browsing_topics::Topic(2), kFakeTaxonomyVersion}};
   std::set<privacy_sandbox::CanonicalTopic> fake_blocked_topics_ = {
-      {browsing_topics::Topic(3),
-       privacy_sandbox::CanonicalTopic::AVAILABLE_TAXONOMY},
-      {browsing_topics::Topic(4),
-       privacy_sandbox::CanonicalTopic::AVAILABLE_TAXONOMY}};
+      {browsing_topics::Topic(3), kFakeTaxonomyVersion},
+      {browsing_topics::Topic(4), kFakeTaxonomyVersion}};
 
   // Informs the TrustSafetySentimentService, if it exists, that a
   // Privacy Sandbox 3 interaction for an area has occurred The area is

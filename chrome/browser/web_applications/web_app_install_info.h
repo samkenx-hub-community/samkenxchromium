@@ -12,7 +12,9 @@
 #include <string>
 #include <vector>
 
+#include "base/containers/flat_set.h"
 #include "base/values.h"
+#include "base/version.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/scope_extension_info.h"
 #include "chrome/browser/web_applications/web_app_id.h"
@@ -21,7 +23,7 @@
 #include "components/services/app_service/public/cpp/protocol_handler_info.h"
 #include "components/services/app_service/public/cpp/share_target.h"
 #include "components/services/app_service/public/cpp/url_handler_info.h"
-#include "components/webapps/common/web_page_metadata.mojom-forward.h"
+#include "components/webapps/common/web_app_id.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/permissions_policy/permissions_policy.h"
 #include "third_party/blink/public/mojom/manifest/display_mode.mojom.h"
@@ -30,6 +32,9 @@
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
+
+static_assert(BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+              BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA));
 
 class SkBitmap;
 
@@ -93,6 +98,7 @@ struct IconSizes {
   IconSizes(IconSizes&&) noexcept;
   IconSizes& operator=(const IconSizes&);
   IconSizes& operator=(IconSizes&&) noexcept;
+  base::Value AsDebugValue() const;
 
   const std::vector<SquareSizePx>& GetSizesForPurpose(
       IconPurpose purpose) const;
@@ -167,7 +173,12 @@ struct WebAppShortcutsMenuItemInfo {
   // designed for monochrome contexts.
   // See https://www.w3.org/TR/appmanifest/#purpose-member
   std::vector<Icon> monochrome;
+
+  // Sizes of successfully downloaded icons for this shortcut menu item.
+  IconSizes downloaded_icon_sizes{};
 };
+
+namespace web_app {
 
 // Structure used when installing a web page as an app.
 struct WebAppInstallInfo {
@@ -177,29 +188,49 @@ struct WebAppInstallInfo {
     MOBILE_CAPABLE_APPLE
   };
 
-  // Returns a copy of the |other| that has only the fields that should be
-  // copied/derived from various sources (e.g generated icons, manifest
-  // properties). This will strip out app-like fields such as file handlers etc.
+  // Returns a copy of `other` retaining only the fields that are needed for
+  // a shortcut (e.g icons), and using the document title and URL instead of
+  // manifest properties. This will strip out app-like fields (e.g. file
+  // handlers).
   static WebAppInstallInfo CreateInstallInfoForCreateShortcut(
       const GURL& document_url,
+      const std::u16string& document_title,
       const WebAppInstallInfo& other);
 
+  // This creates a WebAppInstallInfo where the `manifest_id` is derived from
+  // the `start_url` using `GenerateManifestIdFromStartUrlOnly`.
+  static std::unique_ptr<WebAppInstallInfo> CreateWithStartUrlForTesting(
+      const GURL& start_url);
+
+  // TODO(b/280862254): Remove this constructor to force users to use specify
+  // the manifest_id and start_url (or call `CreateWithStartUrlForTesting`).
   WebAppInstallInfo();
+
+  // TODO(b/280862254): Remove this constructor to force users to use specify
+  // both the manifest_id and start_url (or call
+  // `CreateWithStartUrlForTesting`).
+  explicit WebAppInstallInfo(const webapps::ManifestId& manifest_id);
+
+  // The `manifest_id` and the `start_url` MUST be valid. The `manifest_id` MUST
+  // be created properly, and cannot contain refs (e.g. '#refs').
+  WebAppInstallInfo(const webapps::ManifestId& manifest_id,
+                    const GURL& start_url);
 
   // Deleted to prevent accidental copying. Use Clone() to deep copy explicitly.
   WebAppInstallInfo& operator=(const WebAppInstallInfo&) = delete;
 
   WebAppInstallInfo(WebAppInstallInfo&&);
   WebAppInstallInfo& operator=(WebAppInstallInfo&&);
-
-  explicit WebAppInstallInfo(const webapps::mojom::WebPageMetadata& metadata);
   ~WebAppInstallInfo();
 
   // Creates a deep copy of this struct.
   WebAppInstallInfo Clone() const;
 
   // Id specified in the manifest.
-  absl::optional<std::string> manifest_id;
+  // TODO(b/280862254): After the manifest id constructor is required, this can
+  // be guaranteed to be valid & non-empty.
+  // https://www.w3.org/TR/appmanifest/#id-member
+  webapps::ManifestId manifest_id;
 
   // Title of the application.
   std::u16string title;
@@ -290,6 +321,8 @@ struct WebAppInstallInfo {
   // Vector of shortcut icon bitmaps keyed by their square size. The index of a
   // given |IconBitmaps| matches that of the shortcut in
   // |shortcuts_menu_item_infos| whose bitmaps it contains.
+  // Notes: It is not guaranteed that these are populated if the menu items are.
+  // See https://crbug.com/1427444.
   ShortcutsMenuIconBitmaps shortcuts_menu_icon_bitmaps;
 
   // The URL protocols/schemes that the app can handle.
@@ -301,7 +334,15 @@ struct WebAppInstallInfo {
 
   // The app intends to have an extended scope containing URLs described by this
   // information.
-  std::vector<web_app::ScopeExtensionInfo> scope_extensions;
+  base::flat_set<web_app::ScopeExtensionInfo> scope_extensions;
+
+  // `scope_extensions` after going through validation with associated origins.
+  // Only entries that have been validated by the corresponding origins remain.
+  // See
+  // https://github.com/WICG/manifest-incubations/blob/gh-pages/scope_extensions-explainer.md
+  // for association requirements.
+  absl::optional<base::flat_set<web_app::ScopeExtensionInfo>>
+      validated_scope_extensions;
 
   // URL within scope to launch on the lock screen for a "show on lock screen"
   // action. Valid iff this is considered a lock-screen-capable app.
@@ -343,12 +384,24 @@ struct WebAppInstallInfo {
   // Id of the app that called the SUB_APP API to install this app. This field
   // is only used when the app is installed as a sub app through the SUB_APP
   // API.
-  absl::optional<web_app::AppId> parent_app_id;
+  absl::optional<webapps::AppId> parent_app_id;
+
+  // A list of additional terms to use when matching this app against
+  // identifiers in admin policies (for shelf pinning, default file handlers,
+  // etc).
+  // Note that list is not meant to be an exhaustive enumeration of all possible
+  // policy_ids but rather just a supplement for tricky cases.
+  std::vector<std::string> additional_policy_ids;
+
+  // Used to specify the version of an Isolated Web App that is being installed.
+  base::Version isolated_web_app_version;
 
  private:
   // Used this method in Clone() method. Use Clone() to deep copy explicitly.
   WebAppInstallInfo(const WebAppInstallInfo& other);
 };
+
+}  // namespace web_app
 
 bool operator==(const IconSizes& icon_sizes1, const IconSizes& icon_sizes2);
 

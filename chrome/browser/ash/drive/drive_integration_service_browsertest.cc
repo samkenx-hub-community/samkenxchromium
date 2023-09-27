@@ -6,16 +6,15 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
-#include "base/auto_reset.h"
-#include "base/base_switches.h"
 #include "base/command_line.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
-#include "base/functional/bind.h"
 #include "base/run_loop.h"
+#include "base/scoped_observation.h"
 #include "base/test/bind.h"
 #include "base/test/gmock_callback_support.h"
 #include "base/test/mock_callback.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/ash/drive/drive_integration_service.h"
 #include "chrome/browser/ash/drive/drive_integration_service_browser_test_base.h"
@@ -24,10 +23,11 @@
 #include "chrome/browser/ui/browser.h"
 #include "chromeos/ash/components/drivefs/fake_drivefs.h"
 #include "chromeos/ash/components/drivefs/mojom/drivefs.mojom.h"
-#include "chromeos/ash/components/standalone_browser/browser_support.h"
+#include "chromeos/ash/components/standalone_browser/feature_refs.h"
 #include "chromeos/components/drivefs/mojom/drivefs_native_messaging.mojom.h"
 #include "chromeos/crosapi/mojom/drive_integration_service.mojom.h"
 #include "components/drive/drive_pref_names.h"
+#include "components/drive/file_errors.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/pref_test_utils.h"
 #include "content/public/test/browser_test.h"
@@ -35,7 +35,6 @@
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
-#include "testing/gmock/include/gmock/gmock.h"
 
 namespace drive {
 
@@ -305,18 +304,12 @@ IN_PROC_BROWSER_TEST_F(DriveIntegrationServiceBrowserTest,
   }
 }
 
-class DriveMirrorSyncStatusObserver : public DriveIntegrationServiceObserver {
+class DriveMirrorSyncStatusObserver : public DriveIntegrationService::Observer {
  public:
   explicit DriveMirrorSyncStatusObserver(bool expected_status)
       : expected_status_(expected_status) {
     quit_closure_ = run_loop_.QuitClosure();
   }
-
-  DriveMirrorSyncStatusObserver(const DriveMirrorSyncStatusObserver&) = delete;
-  DriveMirrorSyncStatusObserver& operator=(
-      const DriveMirrorSyncStatusObserver&) = delete;
-
-  ~DriveMirrorSyncStatusObserver() override {}
 
   void WaitForStatusChange() { run_loop_.Run(); }
 
@@ -352,19 +345,17 @@ class DriveIntegrationBrowserTestWithMirrorSyncEnabled
   ~DriveIntegrationBrowserTestWithMirrorSyncEnabled() override {}
 
   void ToggleMirrorSync(bool status) {
-    auto observer = std::make_unique<DriveMirrorSyncStatusObserver>(status);
-    auto* drive_service =
-        DriveIntegrationServiceFactory::FindForProfile(browser()->profile());
-    drive_service->AddObserver(observer.get());
-
-    browser()->profile()->GetPrefs()->SetBoolean(
-        prefs::kDriveFsEnableMirrorSync, status);
-    observer->WaitForStatusChange();
-    EXPECT_EQ(browser()->profile()->GetPrefs()->GetBoolean(
-                  prefs::kDriveFsEnableMirrorSync),
-              status);
-
-    drive_service->RemoveObserver(observer.get());
+    DriveMirrorSyncStatusObserver observer(status);
+    base::ScopedObservation<DriveIntegrationService,
+                            DriveIntegrationService::Observer>
+        scoped_observer(&observer);
+    Profile* const profile = browser()->profile();
+    scoped_observer.Observe(
+        DriveIntegrationServiceFactory::FindForProfile(profile));
+    PrefService* const prefs = profile->GetPrefs();
+    prefs->SetBoolean(prefs::kDriveFsEnableMirrorSync, status);
+    observer.WaitForStatusChange();
+    EXPECT_EQ(prefs->GetBoolean(prefs::kDriveFsEnableMirrorSync), status);
   }
 
   void AddSyncingPath(const base::FilePath& path) {
@@ -384,8 +375,10 @@ class DriveIntegrationBrowserTestWithBulkPinningEnabled
     : public DriveIntegrationServiceBrowserTest {
  public:
   DriveIntegrationBrowserTestWithBulkPinningEnabled() {
-    scoped_feature_list_.InitWithFeatures({ash::features::kDriveFsBulkPinning},
-                                          {});
+    scoped_feature_list_.InitWithFeatures(
+        {ash::features::kDriveFsBulkPinning,
+         ash::features::kFeatureManagementDriveFsBulkPinning},
+        {});
   }
 
  private:
@@ -585,76 +578,84 @@ IN_PROC_BROWSER_TEST_F(DriveIntegrationBrowserTestWithMirrorSyncEnabled,
   run_loop.Run();
 }
 
-class FakeSearchQueryImpl : public drivefs::mojom::SearchQuery {
- public:
-  // Produces 2 pages of fake results, each page with 2 items with a combined
-  // size of 75 bytes (50 + 25). From the 3rd call onwards, returns an empty
-  // page.
-  void GetNextPage(GetNextPageCallback reply) override {
-    std::vector<drivefs::mojom::QueryItemPtr> page;
-
-    if (pages_counter_ < 2) {
-      pages_counter_++;
-      auto qi1 = drivefs::mojom::QueryItem::New();
-      auto qi2 = drivefs::mojom::QueryItem::New();
-      qi1->metadata = drivefs::mojom::FileMetadata::New();
-      qi2->metadata = drivefs::mojom::FileMetadata::New();
-      qi1->metadata->capabilities = drivefs::mojom::Capabilities::New();
-      qi2->metadata->capabilities = drivefs::mojom::Capabilities::New();
-      qi1->metadata->size = 50;
-      qi2->metadata->size = 25;
-      qi1->metadata->available_offline = true;
-      qi2->metadata->available_offline = true;
-      qi1->metadata->pinned = true;
-      qi2->metadata->pinned = true;
-      page.emplace_back(std::move(qi1));
-      page.emplace_back(std::move(qi2));
-    }
-
-    std::move(reply).Run(drive::FILE_ERROR_OK, std::move(page));
-  }
-
- private:
-  int pages_counter_ = 0;
-};
-
 IN_PROC_BROWSER_TEST_F(DriveIntegrationBrowserTestWithBulkPinningEnabled,
-                       GetTotalPinnedSize) {
+                       GetTotalPinnedSizeWithErrorIgnoresReturnedSize) {
   auto* drive_integration_service =
       DriveIntegrationServiceFactory::FindForProfile(browser()->profile());
   auto* fake_drivefs = GetFakeDriveFsForProfile(browser()->profile());
 
-  FakeSearchQueryImpl fake_search_query_impl;
-  mojo::Receiver<drivefs::mojom::SearchQuery> receiver(&fake_search_query_impl);
-
-  EXPECT_CALL(*fake_drivefs, StartSearchQuery(_, _))
-      .WillOnce([&](mojo::PendingReceiver<drivefs::mojom::SearchQuery>
-                        pending_receiver,
-                    drivefs::mojom::QueryParametersPtr query_params) {
-        receiver.Bind(std::move(pending_receiver));
-      });
+  EXPECT_CALL(*fake_drivefs, GetOfflineFilesSpaceUsage(_))
+      .WillOnce(RunOnceCallback<0>(drive::FILE_ERROR_FAILED, 1000));
 
   base::RunLoop run_loop;
   base::MockOnceCallback<void(int64_t)> mock_callback;
-  EXPECT_CALL(mock_callback, Run(/* 2 * (25 + 50) = */ 150))
+  EXPECT_CALL(mock_callback, Run(-1))
       .WillOnce(RunClosure(run_loop.QuitClosure()));
 
   drive_integration_service->GetTotalPinnedSize(mock_callback.Get());
-
   run_loop.Run();
+}
+
+IN_PROC_BROWSER_TEST_F(DriveIntegrationBrowserTestWithBulkPinningEnabled,
+                       GetTotalPinnedSizeReturnsCorrectSize) {
+  auto* drive_integration_service =
+      DriveIntegrationServiceFactory::FindForProfile(browser()->profile());
+  auto* fake_drivefs = GetFakeDriveFsForProfile(browser()->profile());
+
+  EXPECT_CALL(*fake_drivefs, GetOfflineFilesSpaceUsage(_))
+      .WillOnce(RunOnceCallback<0>(drive::FILE_ERROR_OK, 1024));
+
+  base::RunLoop run_loop;
+  base::MockOnceCallback<void(int64_t)> mock_callback;
+  EXPECT_CALL(mock_callback, Run(1024))
+      .WillOnce(RunClosure(run_loop.QuitClosure()));
+
+  drive_integration_service->GetTotalPinnedSize(mock_callback.Get());
+  run_loop.Run();
+}
+
+IN_PROC_BROWSER_TEST_F(DriveIntegrationBrowserTestWithBulkPinningEnabled,
+                       GetTotalPinnedSizeReturnsCachedSizeOnNextRequest) {
+  auto* drive_integration_service =
+      DriveIntegrationServiceFactory::FindForProfile(browser()->profile());
+  auto* fake_drivefs = GetFakeDriveFsForProfile(browser()->profile());
+
+  EXPECT_CALL(*fake_drivefs, GetOfflineFilesSpaceUsage(_))
+      .WillOnce(RunOnceCallback<0>(drive::FILE_ERROR_OK, 1024));
+
+  // First invocation of `GetTotalPinnedSize` should invoke the fake drivefs.
+  base::RunLoop run_loop;
+  base::MockOnceCallback<void(int64_t)> mock_callback;
+  EXPECT_CALL(mock_callback, Run(1024))
+      .WillOnce(RunClosure(run_loop.QuitClosure()));
+
+  drive_integration_service->GetTotalPinnedSize(mock_callback.Get());
+  run_loop.Run();
+
+  // Second invocation of `GetTotalPinnedSize` should reuse the same value but
+  // cached not calling fake drivefs instead.
+  base::RunLoop run_loop_2;
+  base::MockOnceCallback<void(int64_t)> cached_mock_callback;
+  EXPECT_CALL(cached_mock_callback, Run(1024))
+      .WillOnce(RunClosure(run_loop_2.QuitClosure()));
+
+  drive_integration_service->GetTotalPinnedSize(cached_mock_callback.Get());
+  run_loop_2.Run();
 }
 
 class DriveIntegrationServiceBrowserTestLacros
     : public DriveIntegrationServiceBrowserTestBase {
  protected:
+  DriveIntegrationServiceBrowserTestLacros() {
+    scoped_feature_list_.InitWithFeatures(
+        ash::standalone_browser::GetFeatureRefs(), {});
+  }
+
   // browser() does not exist in Lacros, so get the profile from ProfileManager.
   Profile* profile() { return ProfileManager::GetPrimaryUserProfile(); }
 
  private:
-  base::AutoReset<bool> set_lacros_enabled_ =
-      ash::standalone_browser::BrowserSupport::SetLacrosEnabledForTest(true);
-  base::AutoReset<absl::optional<bool>> set_lacros_primary_ =
-      crosapi::browser_util::SetLacrosPrimaryBrowserForTest(true);
+  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 class MockDriveFsNativeMessageHostBridge

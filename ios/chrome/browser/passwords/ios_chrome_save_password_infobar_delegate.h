@@ -14,6 +14,8 @@
 
 #import "ios/chrome/browser/passwords/ios_chrome_password_infobar_metrics_recorder.h"
 
+@class CommandDispatcher;
+
 namespace password_manager {
 class PasswordFormManagerForUI;
 }
@@ -29,7 +31,10 @@ class IOSChromeSavePasswordInfoBarDelegate : public ConfirmInfoBarDelegate {
   IOSChromeSavePasswordInfoBarDelegate(
       absl::optional<std::string> account_to_store_password,
       bool password_update,
-      std::unique_ptr<password_manager::PasswordFormManagerForUI> form_to_save);
+      password_manager::metrics_util::PasswordAccountStorageUserState
+          account_storage_user_state,
+      std::unique_ptr<password_manager::PasswordFormManagerForUI> form_to_save,
+      CommandDispatcher* dispatcher);
 
   IOSChromeSavePasswordInfoBarDelegate(
       const IOSChromeSavePasswordInfoBarDelegate&) = delete;
@@ -51,6 +56,9 @@ class IOSChromeSavePasswordInfoBarDelegate : public ConfirmInfoBarDelegate {
 
   // The URL host for which the credentials are being saved for.
   NSString* GetURLHostText() const;
+
+  // Gets the command dispatcher.
+  CommandDispatcher* GetDispatcher() const { return dispatcher_; }
 
   // The account where the password will be saved, or absl::nullopt if it's
   // saved locally.
@@ -99,6 +107,9 @@ class IOSChromeSavePasswordInfoBarDelegate : public ConfirmInfoBarDelegate {
   // ConfirmInfoBarDelegate implementation.
   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
 
+  // CommandDispatcher for dispatching commands.
+  CommandDispatcher* dispatcher_ = nullptr;
+
   // The password_manager::PasswordFormManager managing the form we're asking
   // the user about, and should save as per their decision.
   const std::unique_ptr<password_manager::PasswordFormManagerForUI>
@@ -110,6 +121,10 @@ class IOSChromeSavePasswordInfoBarDelegate : public ConfirmInfoBarDelegate {
   // The account where the password will be stored, or absl::nullopt if the
   // password will only be stored on this device.
   const absl::optional<std::string> account_to_store_password_;
+
+  // Used to record metrics related to passwords account storage.
+  const password_manager::metrics_util::PasswordAccountStorageUserState
+      account_storage_user_state_;
 
   // Used to track the results we get from the info bar.
   password_manager::metrics_util::UIDismissalReason infobar_response_ =

@@ -24,6 +24,9 @@ BASE_DECLARE_FEATURE(kJourneysLabels);
 // Enables images for Journeys in UI.
 BASE_DECLARE_FEATURE(kJourneysImages);
 
+// Enables images to cover the full container for Journeys in UI.
+extern const base::FeatureParam<bool> kJourneysImagesCover;
+
 // Enables persisting and using persisted clusters.
 BASE_DECLARE_FEATURE(kPersistedClusters);
 
@@ -72,9 +75,12 @@ BASE_DECLARE_FEATURE(kJourneysPersistCachesToPrefs);
 // batches.
 BASE_DECLARE_FEATURE(kHistoryClustersNavigationContextClustering);
 
-// Enables either the hide visits thumbs-down or menu item on individual visits
-// of persisted clusters.
-BASE_DECLARE_FEATURE(kHideVisits);
+// Enables Journeys creating new tab groups that have names derived from the
+// cluster title. If disabled, new tab groups are anonymous.
+BASE_DECLARE_FEATURE(kJourneysNamedNewTabGroups);
+
+// Enables filtering of the zero-state Journeys WebUI.
+BASE_DECLARE_FEATURE(kJourneysZeroStateFiltering);
 
 // Order consistently with config.h.
 
@@ -89,6 +95,9 @@ BASE_DECLARE_FEATURE(kHideVisits);
 BASE_DECLARE_FEATURE(kSidePanelJourneys);
 extern const base::FeatureParam<bool> kSidePanelJourneysOpensFromOmnibox;
 BASE_DECLARE_FEATURE(kSidePanelJourneysQueryless);
+
+// Enables renaming Journeys in the UI.
+BASE_DECLARE_FEATURE(kRenameJourneys);
 
 }  // namespace history_clusters
 

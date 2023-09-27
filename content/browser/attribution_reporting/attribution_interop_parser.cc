@@ -20,18 +20,13 @@
 #include "base/strings/string_piece.h"
 #include "base/time/time.h"
 #include "base/types/expected.h"
+#include "base/types/expected_macros.h"
 #include "base/types/optional_util.h"
 #include "base/values.h"
-#include "components/attribution_reporting/source_registration.h"
-#include "components/attribution_reporting/source_registration_error.mojom.h"
 #include "components/attribution_reporting/source_type.mojom.h"
 #include "components/attribution_reporting/suitable_origin.h"
 #include "components/attribution_reporting/test_utils.h"
-#include "components/attribution_reporting/trigger_registration.h"
-#include "components/attribution_reporting/trigger_registration_error.mojom.h"
 #include "content/browser/attribution_reporting/attribution_config.h"
-#include "content/browser/attribution_reporting/attribution_trigger.h"
-#include "content/browser/attribution_reporting/storable_source.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
 
@@ -68,6 +63,22 @@ class ScopedContext {
   const raw_ref<ContextPath> path_;
 };
 
+std::ostream& operator<<(std::ostream& out, const ContextPath& path) {
+  if (path.empty()) {
+    return out << "input root";
+  }
+
+  for (Context context : path) {
+    absl::visit(
+        base::Overloaded{
+            [&](base::StringPiece key) { out << "[\"" << key << "\"]"; },
+            [&](size_t index) { out << '[' << index << ']'; },
+        },
+        context);
+  }
+  return out;
+}
+
 // Writes a newline on destruction.
 class ErrorWriter {
  public:
@@ -82,10 +93,6 @@ class ErrorWriter {
   ErrorWriter& operator=(ErrorWriter&&) = delete;
 
   std::ostringstream& operator*() { return *stream_; }
-
-  void operator()(base::StringPiece key) { *stream_ << "[\"" << key << "\"]"; }
-
-  void operator()(size_t index) { *stream_ << '[' << index << ']'; }
 
  private:
   const raw_ref<std::ostringstream> stream_;
@@ -110,7 +117,10 @@ class AttributionInteropParser {
     if (base::Value* sources = input.Find(kKeySources)) {
       auto context = PushContext(kKeySources);
       ParseListOfDicts(sources, [&](base::Value::Dict source) {
-        ParseSource(std::move(source));
+        ParseRegistration(std::move(source),
+                          /*context_origin_key=*/"source_origin",
+                          /*parse_source_type=*/true,
+                          /*header=*/"Attribution-Reporting-Register-Source");
       });
     }
 
@@ -118,7 +128,10 @@ class AttributionInteropParser {
     if (base::Value* triggers = input.Find(kKeyTriggers)) {
       auto context = PushContext(kKeyTriggers);
       ParseListOfDicts(triggers, [&](base::Value::Dict trigger) {
-        ParseTrigger(std::move(trigger));
+        ParseRegistration(std::move(trigger),
+                          /*context_origin_key=*/"destination_origin",
+                          /*parse_source_type=*/false,
+                          /*header=*/"Attribution-Reporting-Register-Trigger");
       });
     }
 
@@ -126,7 +139,7 @@ class AttributionInteropParser {
       return base::unexpected(error_stream_.str());
     }
 
-    base::ranges::sort(events_, /*comp=*/{}, &GetEventTime);
+    base::ranges::sort(events_);
     return std::move(events_);
   }
 
@@ -136,14 +149,32 @@ class AttributionInteropParser {
     ParseInt(dict, "max_sources_per_origin", config.max_sources_per_origin,
              required);
 
-    ParseInt(dict, "max_destinations_per_source_site_reporting_origin",
-             config.max_destinations_per_source_site_reporting_origin,
-             required);
+    ParseInt(dict, "max_destinations_per_source_site_reporting_site",
+             config.max_destinations_per_source_site_reporting_site, required);
 
-    int rate_limit_time_window;
-    if (ParseInt(dict, "rate_limit_time_window", rate_limit_time_window,
-                 required)) {
-      config.rate_limit.time_window = base::Days(rate_limit_time_window);
+    ParseInt(dict, "max_destinations_per_rate_limit_window_reporting_site",
+             config.destination_rate_limit.max_per_reporting_site, required);
+
+    ParseInt(dict, "max_destinations_per_rate_limit_window",
+             config.destination_rate_limit.max_total, required);
+
+    int destination_rate_limit_window_in_minutes;
+    if (ParseInt(dict, "destination_rate_limit_window_in_minutes",
+                 destination_rate_limit_window_in_minutes, required)) {
+      config.destination_rate_limit.rate_limit_window =
+          base::Minutes(destination_rate_limit_window_in_minutes);
+    }
+
+    ParseDouble(dict, "max_navigation_info_gain",
+                config.event_level_limit.max_navigation_info_gain, required);
+    ParseDouble(dict, "max_event_info_gain",
+                config.event_level_limit.max_event_info_gain, required);
+
+    int rate_limit_time_window_in_days;
+    if (ParseInt(dict, "rate_limit_time_window_in_days",
+                 rate_limit_time_window_in_days, required)) {
+      config.rate_limit.time_window =
+          base::Days(rate_limit_time_window_in_days);
     }
 
     ParseInt64(dict, "rate_limit_max_source_registration_reporting_origins",
@@ -153,15 +184,19 @@ class AttributionInteropParser {
                config.rate_limit.max_attribution_reporting_origins, required);
     ParseInt64(dict, "rate_limit_max_attributions",
                config.rate_limit.max_attributions, required);
+    ParseInt(dict, "rate_limit_max_reporting_origins_per_source_reporting_site",
+             config.rate_limit.max_reporting_origins_per_source_reporting_site,
+             required);
+
+    int rate_limit_origins_per_site_window_in_days;
+    if (ParseInt(dict, "rate_limit_origins_per_site_window_in_days",
+                 rate_limit_origins_per_site_window_in_days, required)) {
+      config.rate_limit.origins_per_site_window =
+          base::Days(rate_limit_origins_per_site_window_in_days);
+    }
 
     ParseInt(dict, "max_event_level_reports_per_destination",
              config.event_level_limit.max_reports_per_destination, required);
-    ParseInt(dict, "max_attributions_per_navigation_source",
-             config.event_level_limit.max_attributions_per_navigation_source,
-             required);
-    ParseInt(dict, "max_attributions_per_event_source",
-             config.event_level_limit.max_attributions_per_event_source,
-             required);
     ParseUint64(
         dict, "navigation_source_trigger_data_cardinality",
         config.event_level_limit.navigation_source_trigger_data_cardinality,
@@ -169,15 +204,8 @@ class AttributionInteropParser {
     ParseUint64(dict, "event_source_trigger_data_cardinality",
                 config.event_level_limit.event_source_trigger_data_cardinality,
                 required);
-    ParseRandomizedResponseRate(
-        dict, "navigation_source_randomized_response_rate",
-        config.event_level_limit.navigation_source_randomized_response_rate,
-        required);
-    ParseRandomizedResponseRate(
-        dict, "event_source_randomized_response_rate",
-        config.event_level_limit.event_source_randomized_response_rate,
-        required);
-
+    ParseDouble(dict, "randomized_response_epsilon",
+                config.event_level_limit.randomized_response_epsilon, required);
     ParseInt(dict, "max_aggregatable_reports_per_destination",
              config.aggregate_limit.max_reports_per_destination, required);
     ParseInt64(dict, "aggregatable_budget_per_source",
@@ -199,6 +227,8 @@ class AttributionInteropParser {
           base::Minutes(aggregatable_report_delay_span);
     }
 
+    // TODO(linnan): Parse null reports rate if it's supported in interop tests.
+
     return error_stream_.str();
   }
 
@@ -218,18 +248,8 @@ class AttributionInteropParser {
 
   ErrorWriter Error() {
     has_error_ = true;
-
-    if (context_path_.empty()) {
-      error_stream_ << "input root";
-    }
-
-    ErrorWriter writer(error_stream_);
-    for (Context context : context_path_) {
-      absl::visit(writer, context);
-    }
-
-    error_stream_ << ": ";
-    return writer;
+    error_stream_ << context_path_ << ": ";
+    return ErrorWriter(error_stream_);
   }
 
   void ParseListOfDicts(
@@ -276,19 +296,24 @@ class AttributionInteropParser {
     }
   }
 
-  void ParseSource(base::Value::Dict source_dict) {
-    base::Time source_time = ParseDistinctTime(source_dict);
+  void ParseRegistration(base::Value::Dict dict,
+                         const base::StringPiece context_origin_key,
+                         const bool parse_source_type,
+                         const base::StringPiece header) {
+    const base::Time time = ParseDistinctTime(dict);
 
-    absl::optional<SuitableOrigin> source_origin;
+    absl::optional<SuitableOrigin> context_origin;
     absl::optional<SuitableOrigin> reporting_origin;
     absl::optional<SourceType> source_type;
 
-    ParseDict(source_dict, kRegistrationRequestKey,
-              [&](base::Value::Dict dict) {
-                source_origin = ParseOrigin(dict, "source_origin");
-                reporting_origin = ParseOrigin(dict, kAttributionSrcUrlKey);
-                source_type = ParseSourceType(dict);
-              });
+    ParseDict(dict, kRegistrationRequestKey, [&](base::Value::Dict reg_req) {
+      context_origin = ParseOrigin(reg_req, context_origin_key);
+      reporting_origin = ParseOrigin(reg_req, kAttributionSrcUrlKey);
+
+      if (parse_source_type) {
+        source_type = ParseSourceType(reg_req);
+      }
+    });
 
     if (has_error_) {
       return;
@@ -296,92 +321,33 @@ class AttributionInteropParser {
 
     auto context = PushContext(kResponsesKey);
     ParseListOfDicts(
-        source_dict.Find(kResponsesKey),
-        [&](base::Value::Dict dict) {
-          VerifyReportingOrigin(dict, *reporting_origin);
+        dict.Find(kResponsesKey),
+        [&](base::Value::Dict response) {
+          VerifyReportingOrigin(response, *reporting_origin);
 
-          bool debug_permission = ParseDebugPermission(dict);
+          const bool debug_permission = ParseDebugPermission(response);
 
           if (has_error_) {
             return;
           }
 
-          ParseDict(dict, kResponseKey, [&](base::Value::Dict response_dict) {
-            ParseDict(
-                response_dict, "Attribution-Reporting-Register-Source",
-                [&](base::Value::Dict registration_dict) {
-                  auto registration =
-                      attribution_reporting::SourceRegistration::Parse(
-                          std::move(registration_dict));
-                  if (!registration.has_value()) {
-                    *Error() << registration.error();
-                    return;
-                  }
+          ParseDict(
+              response, kResponseKey, [&](base::Value::Dict response_dict) {
+                auto context = PushContext(header);
+                absl::optional<base::Value> registration =
+                    response_dict.Extract(header);
+                if (!registration.has_value()) {
+                  *Error() << "must be present";
+                  return;
+                }
 
-                  events_.emplace_back(
-                      StorableSource(std::move(*reporting_origin),
-                                     std::move(*registration), source_time,
-                                     std::move(*source_origin), *source_type,
-                                     /*is_within_fenced_frame=*/false),
-                      debug_permission);
-                });
-          });
-        },
-        /*expected_size=*/1);
-  }
-
-  void ParseTrigger(base::Value::Dict trigger_dict) {
-    base::Time trigger_time = ParseDistinctTime(trigger_dict);
-
-    absl::optional<SuitableOrigin> destination_origin;
-    absl::optional<SuitableOrigin> reporting_origin;
-
-    ParseDict(trigger_dict, kRegistrationRequestKey,
-              [&](base::Value::Dict dict) {
-                destination_origin = ParseOrigin(dict, "destination_origin");
-                reporting_origin = ParseOrigin(dict, kAttributionSrcUrlKey);
+                auto& event = events_.emplace_back(std::move(*reporting_origin),
+                                                   std::move(*context_origin));
+                event.source_type = source_type;
+                event.registration = std::move(*registration);
+                event.time = time;
+                event.debug_permission = debug_permission;
               });
-
-    if (has_error_) {
-      return;
-    }
-
-    auto context = PushContext(kResponsesKey);
-    ParseListOfDicts(
-        trigger_dict.Find(kResponsesKey),
-        [&](base::Value::Dict dict) {
-          VerifyReportingOrigin(dict, *reporting_origin);
-
-          bool debug_permission = ParseDebugPermission(dict);
-
-          if (has_error_) {
-            return;
-          }
-
-          ParseDict(dict, kResponseKey, [&](base::Value::Dict response_dict) {
-            ParseDict(response_dict, "Attribution-Reporting-Register-Trigger",
-                      [&](base::Value::Dict registration_dict) {
-                        auto trigger_registration =
-                            attribution_reporting::TriggerRegistration::Parse(
-                                std::move(registration_dict));
-                        if (!trigger_registration.has_value()) {
-                          *Error() << trigger_registration.error();
-                          return;
-                        }
-
-                        events_.emplace_back(
-                            AttributionTriggerAndTime{
-                                .trigger = AttributionTrigger(
-                                    std::move(*reporting_origin),
-                                    std::move(*trigger_registration),
-                                    std::move(*destination_origin),
-                                    /*attestation=*/absl::nullopt,
-                                    /*is_within_fenced_frame=*/false),
-                                .time = trigger_time,
-                            },
-                            debug_permission);
-                      });
-          });
         },
         /*expected_size=*/1);
   }
@@ -413,7 +379,9 @@ class AttributionInteropParser {
     if (v && base::StringToInt64(*v, &milliseconds)) {
       base::Time time = offset_time_ + base::Milliseconds(milliseconds);
       if (!time.is_null() && !time.is_inf()) {
-        if (base::ranges::find(events_, time, &GetEventTime) != events_.end()) {
+        auto iter = base::ranges::find(
+            events_, time, [](const auto& event) { return event.time; });
+        if (iter != events_.end()) {
           *Error() << "must be distinct from all others: " << milliseconds;
         }
         return time;
@@ -556,34 +524,40 @@ class AttributionInteropParser {
                         allow_zero);
   }
 
-  void ParseRandomizedResponseRate(const base::Value::Dict& dict,
-                                   base::StringPiece key,
-                                   double& result,
-                                   bool required) {
+  void ParseDouble(const base::Value::Dict& dict,
+                   base::StringPiece key,
+                   double& result,
+                   bool required) {
     auto context = PushContext(key);
-
     const base::Value* value = dict.Find(key);
 
     if (value) {
-      absl::optional<double> d = value->GetIfDouble();
-      if (d && *d >= 0 && *d <= 1) {
-        result = *d;
-        return;
+      const std::string* s = value->GetIfString();
+      if (s) {
+        if (*s == "inf") {
+          result = std::numeric_limits<double>::infinity();
+          return;
+        }
+        if (base::StringToDouble(*s, &result) && result >= 0) {
+          return;
+        }
       }
     } else if (!required) {
       return;
     }
 
-    *Error() << "must be a double between 0 and 1 formatted as string";
+    *Error() << "must be \"inf\" or a non-negative double formated as a "
+                "base-10 string";
   }
 };
 
 }  // namespace
 
 AttributionSimulationEvent::AttributionSimulationEvent(
-    absl::variant<StorableSource, AttributionTriggerAndTime> event,
-    bool debug_permission)
-    : event(std::move(event)), debug_permission(debug_permission) {}
+    SuitableOrigin reporting_origin,
+    SuitableOrigin context_origin)
+    : reporting_origin(std::move(reporting_origin)),
+      context_origin(std::move(context_origin)) {}
 
 AttributionSimulationEvent::~AttributionSimulationEvent() = default;
 
@@ -614,17 +588,6 @@ std::string MergeAttributionConfig(const base::Value::Dict& dict,
                                    AttributionConfig& config) {
   return AttributionInteropParser().ParseConfig(dict, config,
                                                 /*required=*/false);
-}
-
-base::Time GetEventTime(const AttributionSimulationEvent& event) {
-  return absl::visit(
-      base::Overloaded{
-          [](const StorableSource& source) {
-            return source.common_info().source_time();
-          },
-          [](const AttributionTriggerAndTime& trigger) { return trigger.time; },
-      },
-      event.event);
 }
 
 }  // namespace content

@@ -9,10 +9,10 @@
 #import "base/memory/scoped_refptr.h"
 #import "base/time/default_clock.h"
 #import "components/reading_list/core/reading_list_model.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/reading_list/offline_url_utils.h"
 #import "ios/chrome/browser/reading_list/reading_list_model_factory.h"
 #import "ios/chrome/browser/reading_list/reading_list_test_utils.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/navigation/reload_type.h"
 #import "ios/web/public/test/fakes/fake_navigation_manager.h"
@@ -21,10 +21,6 @@
 #import "net/base/network_change_notifier.h"
 #import "testing/gtest/include/gtest/gtest.h"
 #import "testing/platform_test.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 const char kTestURL[] = "http://foo.bar";

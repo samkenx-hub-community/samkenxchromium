@@ -35,6 +35,7 @@ class HistoryClustersServiceTestApi {
     options.duplicate_policy = history::QueryOptions::KEEP_ALL_DUPLICATES;
     history_service_->GetAnnotatedVisits(
         options,
+        /*compute_redirect_chain_start_properties=*/true,
         base::BindLambdaForTesting(
             [&](std::vector<history::AnnotatedVisit> visits) {
               annotated_visits = std::move(visits);
@@ -64,10 +65,6 @@ class HistoryClustersServiceTestApi {
 
   void SetAllKeywordsCache(HistoryClustersService::KeywordMap cache) {
     history_clusters_service_->all_keywords_cache_ = cache;
-  }
-
-  void SetAllUrlKeywordsCache(HistoryClustersService::URLKeywordSet cache) {
-    history_clusters_service_->all_url_keywords_cache_ = cache;
   }
 
   HistoryClustersService* const history_clusters_service_;

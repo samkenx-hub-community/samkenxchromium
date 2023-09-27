@@ -13,7 +13,7 @@
 #include "chrome/browser/unified_consent/unified_consent_service_factory.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "components/signin/public/base/signin_buildflags.h"
-#include "components/sync/driver/sync_service_impl.h"
+#include "components/sync/service/sync_service_impl.h"
 #include "components/sync/test/fake_server_network_resources.h"
 #include "content/public/test/browser_test.h"
 
@@ -47,13 +47,8 @@ IN_PROC_BROWSER_TEST_F(BrowsingDataCounterUtilsBrowserTest,
   // Sign the profile in.
   EXPECT_TRUE(GetClient(0)->SignInPrimaryAccount());
 
-#if BUILDFLAG(IS_CHROMEOS)
-  // On Chrome OS sync in turned on by default.
-  EXPECT_TRUE(ShouldShowCookieException(GetProfile(0)));
-#else
   // Sign-in alone shouldn't lead to a cookie exception.
   EXPECT_FALSE(ShouldShowCookieException(GetProfile(0)));
-#endif
 
   // Enable sync.
   EXPECT_TRUE(GetClient(0)->SetupSync());

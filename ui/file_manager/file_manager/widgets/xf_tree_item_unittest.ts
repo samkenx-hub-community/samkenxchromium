@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {getTrustedHTML} from 'chrome://resources/js/static_types.js';
 import {assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {eventToPromise} from 'chrome://webui-test/test_util.js';
 
@@ -10,13 +11,16 @@ import {constants} from '../foreground/js/constants.js';
 
 import {XfIcon} from './xf_icon.js';
 import {XfTree} from './xf_tree.js';
-import {TREE_ITEM_INDENT, TreeItemCollapsedEvent, TreeItemExpandedEvent, TreeItemRenamedEvent, XfTreeItem} from './xf_tree_item.js';
+import {TREE_ITEM_INDENT, type TreeItemCollapsedEvent, type TreeItemExpandedEvent, XfTreeItem} from './xf_tree_item.js';
 
 /** Construct a single tree item. */
 async function setUpSingleTreeItem() {
   document.body.setAttribute('theme', 'refresh23');
-  document.body.innerHTML =
-      '<xf-tree><xf-tree-item id="item1" label="item1"></xf-tree-item></xf-tree>';
+  document.body.innerHTML = getTrustedHTML`
+    <xf-tree>
+      <xf-tree-item id="item1" label="item1"></xf-tree-item>
+    </xf-tree>
+  `;
   const element = document.querySelector('xf-tree-item');
   assertNotEquals(null, element);
   await waitForElementUpdate(element!);
@@ -30,7 +34,9 @@ async function setUpNestedTreeItems() {
   //    └── item1b
   //        └── item1bi
   // ── item2
-  document.body.innerHTML = '<xf-tree><xf-tree>';
+  document.body.innerHTML = getTrustedHTML`
+    <xf-tree><xf-tree>
+  `;
   const tree = document.querySelector('xf-tree')!;
   assertNotEquals(null, tree);
 
@@ -101,7 +107,6 @@ export async function testRenderWithSingleTreeItem(done: () => void) {
 
   // Test attributes on the root element.
   assertEquals('treeitem', root.getAttribute('role'));
-  assertEquals('-1', root.getAttribute('tabindex'));
   assertEquals('false', root.getAttribute('aria-selected'));
   assertFalse(root.hasAttribute('aria-expanded'));
   assertEquals('false', root.getAttribute('aria-disabled'));
@@ -422,112 +427,6 @@ export async function testRemoveSelectedItem(done: () => void) {
   done();
 }
 
-/** Tests rename of the tree item. */
-export async function testRenameTreeItem(done: () => void) {
-  await setUpSingleTreeItem();
-
-  // Check input should not exist by default.
-  const item1 = getTreeItemById('item1');
-  assertFalse(item1.editing);
-  assertEquals(null, item1.shadowRoot!.querySelector('.rename'));
-
-  // Rename item1 by enable editing mode.
-  item1.editing = true;
-  await waitForElementUpdate(item1);
-  let renameInput =
-      item1.shadowRoot!.querySelector<HTMLInputElement>('.rename')!;
-  assertNotEquals(null, renameInput);
-
-  // Rename input should be focused and text should be selected.
-  assertEquals(renameInput, item1.shadowRoot!.activeElement);
-  assertEquals(0, renameInput.selectionStart);
-  assertEquals(item1.label.length, renameInput.selectionEnd);
-
-  // Change text then cancel the rename.
-  renameInput.value = 'rename1';
-  renameInput.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
-  await waitForElementUpdate(item1);
-
-  // Check rename input is disappeared and the label is not changed.
-  assertEquals(null, item1.shadowRoot!.querySelector('.rename'));
-  const {treeLabel} = getTreeItemInnerElements(item1);
-  assertEquals(item1, document.activeElement);
-  assertFalse(item1.editing);
-  assertEquals('item1', treeLabel.textContent);
-  assertEquals('item1', item1.label);
-
-  // Rename again and commit the change.
-  const renamedEventPromise: Promise<TreeItemRenamedEvent> =
-      eventToPromise(XfTreeItem.events.TREE_ITEM_RENAMED, item1);
-  item1.editing = true;
-  await waitForElementUpdate(item1);
-  renameInput = item1.shadowRoot!.querySelector<HTMLInputElement>('.rename')!;
-  renameInput.value = 'rename2';
-  renameInput.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
-  await waitForElementUpdate(item1);
-
-  // Check event is triggered and the label is changed.
-  assertEquals(null, item1.shadowRoot!.querySelector('.rename'));
-  const {treeLabel: treeLabelAfterRename} = getTreeItemInnerElements(item1);
-  assertEquals(item1, document.activeElement);
-  assertFalse(item1.editing);
-  assertEquals('rename2', treeLabelAfterRename.textContent);
-  assertEquals('rename2', item1.label);
-  const renamedEvent = await renamedEventPromise;
-  assertEquals(item1, renamedEvent.detail.item);
-  assertEquals('item1', renamedEvent.detail.oldLabel);
-  assertEquals('rename2', renamedEvent.detail.newLabel);
-
-  done();
-}
-
-/** Tests that blur of rename input will commit the rename. */
-export async function testBlurToCommitRename(done: () => void) {
-  await setUpSingleTreeItem();
-
-  // Rename item1 by enable editing mode.
-  const item1 = getTreeItemById('item1');
-  item1.editing = true;
-  await waitForElementUpdate(item1);
-  const renameInput =
-      item1.shadowRoot!.querySelector<HTMLInputElement>('.rename')!;
-  renameInput.value = 'new name';
-
-  // Check blur() should commit the rename.
-  renameInput.blur();
-  await waitForElementUpdate(item1);
-  const {treeLabel} = getTreeItemInnerElements(item1);
-  assertFalse(item1.editing);
-  assertEquals('new name', treeLabel.textContent);
-  assertEquals('new name', item1.label);
-
-  done();
-}
-
-/** Tests that empty string won't commit the rename. */
-export async function testNoRenameWithEmptyString(done: () => void) {
-  await setUpSingleTreeItem();
-
-  // Rename item1 by enable editing mode.
-  const item1 = getTreeItemById('item1');
-  item1.editing = true;
-  await waitForElementUpdate(item1);
-  const renameInput =
-      item1.shadowRoot!.querySelector<HTMLInputElement>('.rename')!;
-  renameInput.value = '   ';
-
-  // Check pressing Enter with empty string shouldn't commit the rename.
-  renameInput.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
-  await waitForElementUpdate(item1);
-  const {treeLabel} = getTreeItemInnerElements(item1);
-  assertEquals(item1, document.activeElement);
-  assertFalse(item1.editing);
-  assertEquals('item1', treeLabel.textContent);
-  assertEquals('item1', item1.label);
-
-  done();
-}
-
 /** Tests that iconSet has higher priority than icon property. */
 export async function testIconSetIgnoreIcon(done: () => void) {
   await setUpSingleTreeItem();
@@ -545,6 +444,26 @@ export async function testIconSetIgnoreIcon(done: () => void) {
   const {treeLabelIcon} = getTreeItemInnerElements(item1);
   assertEquals(null, treeLabelIcon.type);
   assertEquals('fake-base64-data', treeLabelIcon.iconSet!.icon32x32Url);
+
+  done();
+}
+
+/** Tests the has-children attribute. */
+export async function testHasChildrenAttribute(done: () => void) {
+  await setUpSingleTreeItem();
+  const item1 = getTreeItemById('item1');
+
+  // Check has-children attribute is false because we have no children.
+  assertEquals('false', item1.getAttribute('has-children'));
+
+  // Add a child item for item1.
+  const item1a = document.createElement('xf-tree-item');
+  item1a.id = 'item1a';
+  item1.appendChild(item1a);
+  await waitForElementUpdate(item1);
+
+  // Check has-children attribute is true now because we have 1 child now.
+  assertEquals('true', item1.getAttribute('has-children'));
 
   done();
 }

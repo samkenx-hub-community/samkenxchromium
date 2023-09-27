@@ -11,6 +11,7 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chromeos/ash/components/dbus/userdataauth/fake_userdataauth_client.h"
@@ -305,6 +306,14 @@ class UserDataAuthClientImpl : public UserDataAuthClient {
                     std::move(callback));
   }
 
+  void GetArcDiskFeatures(
+      const ::user_data_auth::GetArcDiskFeaturesRequest& request,
+      GetArcDiskFeaturesCallback callback) override {
+    CallProtoMethod(::user_data_auth::kGetArcDiskFeatures,
+                    ::user_data_auth::kUserDataAuthInterface, request,
+                    std::move(callback));
+  }
+
  private:
   // Calls cryptohomed's |method_name| method in |interface_name| interface,
   // passing in |request| as input with |timeout_ms|. Once the (asynchronous)
@@ -447,7 +456,7 @@ class UserDataAuthClientImpl : public UserDataAuthClient {
   }
 
   // D-Bus proxy for cryptohomed, not owned.
-  dbus::ObjectProxy* proxy_ = nullptr;
+  raw_ptr<dbus::ObjectProxy, ExperimentalAsh> proxy_ = nullptr;
 
   // List of observers for dbus signals.
   base::ObserverList<Observer> observer_list_;

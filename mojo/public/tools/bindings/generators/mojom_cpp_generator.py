@@ -409,6 +409,7 @@ class Generator(generator.Generator):
         "should_inline_union": ShouldInlineUnion,
         "is_array_kind": mojom.IsArrayKind,
         "is_bool_kind": mojom.IsBoolKind,
+        "is_default_constructible": self._IsDefaultConstructible,
         "is_enum_kind": mojom.IsEnumKind,
         "is_nullable_value_kind_packed_field":
         pack.IsNullableValueKindPackedField,
@@ -544,10 +545,10 @@ class Generator(generator.Generator):
 
   def _DefaultValue(self, field):
     if not field.default:
-      if self._IsTypemappedKind(field.kind):
-        return "mojo::DefaultConstructTraits::CreateInstance<%s>()" % (
-            self._GetCppWrapperType(field.kind))
-      return ""
+      if mojom.IsNullableKind(field.kind) or self._IsDefaultConstructible(
+          field.kind):
+        return ""
+      return "mojo::internal::DefaultConstructTag()"
 
     if mojom.IsStructKind(field.kind):
       assert field.default == "default"
@@ -652,13 +653,8 @@ class Generator(generator.Generator):
       return "constexpr %s %s = %s" % (self._GetNameForKind(
           constant.kind), constant.name, self._ConstantValue(constant))
 
-  def _GetCppWrapperType(self,
-                         kind,
-                         add_same_module_namespaces=False,
-                         ignore_nullable=False):
+  def _GetCppWrapperType(self, kind, add_same_module_namespaces=False):
     def _AddOptional(type_name):
-      if ignore_nullable:
-        return type_name
       return "absl::optional<%s>" % type_name
 
     if self._IsTypemappedKind(kind):
@@ -740,6 +736,12 @@ class Generator(generator.Generator):
     if kind.is_nullable:
       return _AddOptional(_kind_to_cpp_type[kind.MakeUnnullableKind()])
     return _kind_to_cpp_type[kind]
+
+  def _IsDefaultConstructible(self, kind):
+    if self._IsTypemappedKind(kind):
+      return self.typemap[self._GetFullMojomNameForKind(
+          kind)]["default_constructible"]
+    return True
 
   def _IsMoveOnlyKind(self, kind):
     if self._IsTypemappedKind(kind):

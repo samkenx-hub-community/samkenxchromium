@@ -4,12 +4,13 @@
 
 package org.chromium.chrome.browser.keyboard_accessory.bar_component;
 
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
+
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -17,6 +18,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import static org.chromium.chrome.browser.keyboard_accessory.AccessoryAction.AUTOFILL_SUGGESTION;
+import static org.chromium.chrome.browser.keyboard_accessory.AccessoryAction.CREDMAN_CONDITIONAL_UI_REENTRY;
 import static org.chromium.chrome.browser.keyboard_accessory.AccessoryAction.GENERATE_PASSWORD_AUTOMATIC;
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryProperties.ANIMATION_LISTENER;
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryProperties.BAR_ITEMS;
@@ -43,7 +45,6 @@ import org.chromium.base.task.test.CustomShadowAsyncTask;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.keyboard_accessory.AccessoryAction;
-import org.chromium.chrome.browser.keyboard_accessory.AccessoryBarContents;
 import org.chromium.chrome.browser.keyboard_accessory.ManualFillingMetricsRecorder;
 import org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryProperties.AutofillBarItem;
 import org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryProperties.BarItem;
@@ -240,27 +241,36 @@ public class KeyboardAccessoryControllerTest {
                 new PropertyProvider<>(GENERATE_PASSWORD_AUTOMATIC);
         PropertyProvider<AutofillSuggestion[]> autofillSuggestionProvider =
                 new PropertyProvider<>(AUTOFILL_SUGGESTION);
+        PropertyProvider<Action[]> credManProvider =
+                new PropertyProvider<>(CREDMAN_CONDITIONAL_UI_REENTRY);
 
         mCoordinator.registerActionProvider(generationProvider);
+        mCoordinator.registerActionProvider(credManProvider);
         mCoordinator.registerAutofillProvider(autofillSuggestionProvider, mMockAutofillDelegate);
 
         AutofillSuggestion suggestion1 = new AutofillSuggestion("FirstSuggestion", "",
-                /* itemTag= */ "", 0, false, 0, false, false, false, /* featureForIPH= */ "");
+                /* itemTag= */ "", 0, false, PopupItemId.AUTOCOMPLETE_ENTRY, false, false, false,
+                /* featureForIPH= */ "");
         AutofillSuggestion suggestion2 = new AutofillSuggestion("SecondSuggestion", "",
-                /* itemTag= */ "", 0, false, 0, false, false, false, /* featureForIPH= */ "");
+                /* itemTag= */ "", 0, false, PopupItemId.AUTOCOMPLETE_ENTRY, false, false, false,
+                /* featureForIPH= */ "");
         Action generationAction = new Action("Generate", GENERATE_PASSWORD_AUTOMATIC, (a) -> {});
+        Action credManAction =
+                new Action("Show Passkeys", CREDMAN_CONDITIONAL_UI_REENTRY, (a) -> {});
         autofillSuggestionProvider.notifyObservers(
                 new AutofillSuggestion[] {suggestion1, suggestion2});
         generationProvider.notifyObservers(new Action[] {generationAction});
+        credManProvider.notifyObservers(new Action[] {credManAction});
 
         // Autofill suggestions should always come last before mandatory tab switcher.
-        assertThat(mModel.get(BAR_ITEMS).size(), is(3));
-        assertThat(mModel.get(BAR_ITEMS).get(0).getAction(), is(generationAction));
-        assertThat(mModel.get(BAR_ITEMS).get(1), instanceOf(AutofillBarItem.class));
-        AutofillBarItem autofillBarItem1 = (AutofillBarItem) mModel.get(BAR_ITEMS).get(1);
-        assertThat(autofillBarItem1.getSuggestion(), is(suggestion1));
+        assertThat(mModel.get(BAR_ITEMS).size(), is(4));
+        assertThat(mModel.get(BAR_ITEMS).get(0).getAction(), is(credManAction));
+        assertThat(mModel.get(BAR_ITEMS).get(1).getAction(), is(generationAction));
         assertThat(mModel.get(BAR_ITEMS).get(2), instanceOf(AutofillBarItem.class));
-        AutofillBarItem autofillBarItem2 = (AutofillBarItem) mModel.get(BAR_ITEMS).get(2);
+        AutofillBarItem autofillBarItem1 = (AutofillBarItem) mModel.get(BAR_ITEMS).get(2);
+        assertThat(autofillBarItem1.getSuggestion(), is(suggestion1));
+        assertThat(mModel.get(BAR_ITEMS).get(3), instanceOf(AutofillBarItem.class));
+        AutofillBarItem autofillBarItem2 = (AutofillBarItem) mModel.get(BAR_ITEMS).get(3);
         assertThat(autofillBarItem2.getSuggestion(), is(suggestion2));
     }
 
@@ -300,7 +310,8 @@ public class KeyboardAccessoryControllerTest {
         mCoordinator.registerAutofillProvider(autofillSuggestionProvider, mMockAutofillDelegate);
 
         AutofillSuggestion suggestion = new AutofillSuggestion("Suggestion", "", /* itemTag= */ "",
-                0, false, 0, false, false, false, /* featureForIPH= */ "");
+                0, false, PopupItemId.AUTOCOMPLETE_ENTRY, false, false, false,
+                /* featureForIPH= */ "");
         Action generationAction = new Action("Generate", GENERATE_PASSWORD_AUTOMATIC, (a) -> {});
         autofillSuggestionProvider.notifyObservers(
                 new AutofillSuggestion[] {suggestion, suggestion});
@@ -337,16 +348,15 @@ public class KeyboardAccessoryControllerTest {
     public void testCreatesAddressItemWithIPH() {
         PropertyProvider<AutofillSuggestion[]> autofillSuggestionProvider =
                 new PropertyProvider<>(AUTOFILL_SUGGESTION);
-        int suggestionId = 0x1; // The address ID is located in the least 16 bit.
         AutofillSuggestion addressSuggestion =
                 new AutofillSuggestion("John", "Main Str", /* itemTag= */ "", 0, false,
-                        suggestionId, false, false, false, /* featureForIPH= */ "");
+                        PopupItemId.ADDRESS_ENTRY, false, false, false, /* featureForIPH= */ "");
         mCoordinator.registerAutofillProvider(autofillSuggestionProvider, mMockAutofillDelegate);
         autofillSuggestionProvider.notifyObservers(
                 new AutofillSuggestion[] {addressSuggestion, addressSuggestion, addressSuggestion});
 
-        assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
-        mCoordinator.prepareUserEducation();
+        // assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
+        // mCoordinator.prepareUserEducation();
         assertThat(getAutofillItemAt(0).getFeatureForIPH(),
                 is(FeatureConstants.KEYBOARD_ACCESSORY_ADDRESS_FILL_FEATURE));
         assertThat(getAutofillItemAt(1).getFeatureForIPH(), is(nullValue()));
@@ -357,16 +367,15 @@ public class KeyboardAccessoryControllerTest {
     public void testCreatesPaymentItemWithIPH() {
         PropertyProvider<AutofillSuggestion[]> autofillSuggestionProvider =
                 new PropertyProvider<>(AUTOFILL_SUGGESTION);
-        int suggestionId = 0x10000; // The payment ID is located in the higher 16 bit.
         AutofillSuggestion paymentSuggestion = new AutofillSuggestion("John", "4828 ****",
-                /* itemTag= */ "", 0, false, suggestionId, false, false, false,
+                /* itemTag= */ "", 0, false, PopupItemId.CREDIT_CARD_ENTRY, false, false, false,
                 /* featureForIPH= */ "");
         mCoordinator.registerAutofillProvider(autofillSuggestionProvider, mMockAutofillDelegate);
         autofillSuggestionProvider.notifyObservers(
                 new AutofillSuggestion[] {paymentSuggestion, paymentSuggestion, paymentSuggestion});
 
-        assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
-        mCoordinator.prepareUserEducation();
+        // assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
+        // mCoordinator.prepareUserEducation();
         assertThat(getAutofillItemAt(0).getFeatureForIPH(),
                 is(FeatureConstants.KEYBOARD_ACCESSORY_PAYMENT_FILLING_FEATURE));
         assertThat(getAutofillItemAt(1).getFeatureForIPH(), is(nullValue()));
@@ -377,16 +386,15 @@ public class KeyboardAccessoryControllerTest {
     public void testIPHFeatureSetForAutofillSuggestion() {
         PropertyProvider<AutofillSuggestion[]> autofillSuggestionProvider =
                 new PropertyProvider<>(AUTOFILL_SUGGESTION);
-        int suggestionId = 0x10000; // The payment ID is located in the higher 16 bit.
         AutofillSuggestion paymentSuggestion = new AutofillSuggestion("John", "4828 ****",
-                /* itemTag= */ "", 0, false, suggestionId, false, false, false,
+                /* itemTag= */ "", 0, false, PopupItemId.CREDIT_CARD_ENTRY, false, false, false,
                 FeatureConstants.KEYBOARD_ACCESSORY_PAYMENT_VIRTUAL_CARD_FEATURE);
         mCoordinator.registerAutofillProvider(autofillSuggestionProvider, mMockAutofillDelegate);
         autofillSuggestionProvider.notifyObservers(
                 new AutofillSuggestion[] {paymentSuggestion, paymentSuggestion, paymentSuggestion});
 
-        assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
-        mCoordinator.prepareUserEducation();
+        // assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
+        // mCoordinator.prepareUserEducation();
         assertThat(getAutofillItemAt(0).getFeatureForIPH(),
                 is(FeatureConstants.KEYBOARD_ACCESSORY_PAYMENT_VIRTUAL_CARD_FEATURE));
         // Other suggestions also have explicit IPH strings, but only the first suggestion's string
@@ -400,20 +408,39 @@ public class KeyboardAccessoryControllerTest {
         PropertyProvider<AutofillSuggestion[]> autofillSuggestionProvider =
                 new PropertyProvider<>(AUTOFILL_SUGGESTION);
         AutofillSuggestion passwordSuggestion1 = new AutofillSuggestion("John", "****",
-                /* itemTg= */ "", 0, false, PopupItemId.ITEM_ID_USERNAME_ENTRY, false, false, false,
+                /* itemTg= */ "", 0, false, PopupItemId.USERNAME_ENTRY, false, false, false,
                 /* featureForIPH= */ "");
         AutofillSuggestion passwordSuggestion2 = new AutofillSuggestion("Eva", "*******",
-                /* itemTag= */ "", 0, false, PopupItemId.ITEM_ID_PASSWORD_ENTRY, false, false,
-                false, /* featureForIPH= */ "");
+                /* itemTag= */ "", 0, false, PopupItemId.PASSWORD_ENTRY, false, false, false,
+                /* featureForIPH= */ "");
         mCoordinator.registerAutofillProvider(autofillSuggestionProvider, mMockAutofillDelegate);
         autofillSuggestionProvider.notifyObservers(new AutofillSuggestion[] {
                 passwordSuggestion1, passwordSuggestion2, passwordSuggestion2});
 
-        assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
-        mCoordinator.prepareUserEducation();
+        // assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
+        // mCoordinator.prepareUserEducation();
         assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
         assertThat(getAutofillItemAt(1).getFeatureForIPH(),
                 is(FeatureConstants.KEYBOARD_ACCESSORY_PASSWORD_FILLING_FEATURE));
+        assertThat(getAutofillItemAt(2).getFeatureForIPH(), is(nullValue()));
+    }
+
+    @Test
+    public void testCreatesAddressItemWithExternallyProvidedIPH() {
+        PropertyProvider<AutofillSuggestion[]> autofillSuggestionProvider =
+                new PropertyProvider<>(AUTOFILL_SUGGESTION);
+        AutofillSuggestion addressSuggestion = new AutofillSuggestion("John", "Main Str",
+                /* itemTag= */ "", 0, false, PopupItemId.ADDRESS_ENTRY, false, false, false,
+                FeatureConstants.KEYBOARD_ACCESSORY_EXTERNAL_ACCOUNT_PROFILE_FEATURE);
+        mCoordinator.registerAutofillProvider(autofillSuggestionProvider, mMockAutofillDelegate);
+        autofillSuggestionProvider.notifyObservers(
+                new AutofillSuggestion[] {addressSuggestion, addressSuggestion, addressSuggestion});
+
+        // assertThat(getAutofillItemAt(0).getFeatureForIPH(), is(nullValue()));
+        // mCoordinator.prepareUserEducation();
+        assertThat(getAutofillItemAt(0).getFeatureForIPH(),
+                is(FeatureConstants.KEYBOARD_ACCESSORY_EXTERNAL_ACCOUNT_PROFILE_FEATURE));
+        assertThat(getAutofillItemAt(1).getFeatureForIPH(), is(nullValue()));
         assertThat(getAutofillItemAt(2).getFeatureForIPH(), is(nullValue()));
     }
 
@@ -447,94 +474,7 @@ public class KeyboardAccessoryControllerTest {
     }
 
     @Test
-    public void testRecordsOneImpressionForEveryInitialContentOnVisibilityChange() {
-        assertThat(RecordHistogram.getHistogramTotalCountForTesting(
-                           KeyboardAccessoryMetricsRecorder.UMA_KEYBOARD_ACCESSORY_BAR_SHOWN),
-                is(0));
-
-        // Adding a tab contributes to the tabs and the total bucket.
-        setTabs(new KeyboardAccessoryData.Tab[] {mTestTab});
-        mCoordinator.show();
-
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_TABS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.ANY_CONTENTS), is(1));
-
-        // Adding an action contributes to the actions bucket. Tabs and total are logged again.
-        mCoordinator.dismiss(); // Hide, so it's brought up again.
-        mModel.get(BAR_ITEMS).add(new BarItem(
-                BarItem.Type.ACTION_BUTTON, new Action(null, GENERATE_PASSWORD_AUTOMATIC, null)));
-        mCoordinator.show();
-
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_ACTIONS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_TABS), is(2));
-        assertThat(getShownMetricsCount(AccessoryBarContents.ANY_CONTENTS), is(2));
-
-        // Adding suggestions adds to the suggestions bucket - and again to tabs and total.
-        mCoordinator.dismiss(); // Hide, so it's brought up again.
-        PropertyProvider<AutofillSuggestion[]> autofillSuggestionProvider =
-                new PropertyProvider<>(AUTOFILL_SUGGESTION);
-        AutofillSuggestion suggestion = new AutofillSuggestion("Label", "sublabel",
-                /* itemTag= */ "", 0, false, 0, false, false, false, /* featureForIPH= */ "");
-        mCoordinator.registerAutofillProvider(autofillSuggestionProvider, mMockAutofillDelegate);
-        autofillSuggestionProvider.notifyObservers(new AutofillSuggestion[] {suggestion});
-        mCoordinator.show();
-
-        // Hiding the keyboard clears actions, so don't log more actions from here on out.
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_AUTOFILL_SUGGESTIONS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_ACTIONS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_TABS), is(3));
-        assertThat(getShownMetricsCount(AccessoryBarContents.ANY_CONTENTS), is(3));
-
-        // Removing suggestions adds to everything but the suggestions bucket. The value remains.
-        mCoordinator.dismiss(); // Hide, so it's brought up again.
-        autofillSuggestionProvider.notifyObservers(new AutofillSuggestion[0]);
-        mCoordinator.show();
-
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_AUTOFILL_SUGGESTIONS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_ACTIONS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_TABS), is(4));
-        assertThat(getShownMetricsCount(AccessoryBarContents.ANY_CONTENTS), is(4));
-    }
-
-    @Test
-    public void testRecordsContentBarImpressionOnceAndContentsUpToOnce() {
-        assertThat(RecordHistogram.getHistogramTotalCountForTesting(
-                           KeyboardAccessoryMetricsRecorder.UMA_KEYBOARD_ACCESSORY_BAR_SHOWN),
-                is(0));
-
-        // First showing contains tabs only.
-        setTabs(new KeyboardAccessoryData.Tab[] {mTestTab});
-        mCoordinator.show();
-
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_TABS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.ANY_CONTENTS), is(1));
-
-        // New actions are recorded in specific buckets but don't affect the general ANY_CONTENTS.
-        mModel.get(BAR_ITEMS).add(new BarItem(
-                BarItem.Type.ACTION_BUTTON, new Action(null, GENERATE_PASSWORD_AUTOMATIC, null)));
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_ACTIONS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.ANY_CONTENTS), is(1));
-
-        PropertyProvider<AutofillSuggestion[]> autofillSuggestionProvider =
-                new PropertyProvider<>(AUTOFILL_SUGGESTION);
-        AutofillSuggestion suggestion = new AutofillSuggestion("Label", "sublabel",
-                /* itemTag= */ "", 0, false, 0, false, false, false, /* featureForIPH= */ "");
-        mCoordinator.registerAutofillProvider(autofillSuggestionProvider, mMockAutofillDelegate);
-        autofillSuggestionProvider.notifyObservers(new AutofillSuggestion[] {suggestion});
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_AUTOFILL_SUGGESTIONS), is(1));
-
-        // The other changes were not recorded again - just the changes.
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_ACTIONS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_TABS), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.NO_CONTENTS), is(0));
-    }
-
-    @Test
     public void testRecordsAgainIfExistingItemsChange() {
-        assertThat(RecordHistogram.getHistogramTotalCountForTesting(
-                           KeyboardAccessoryMetricsRecorder.UMA_KEYBOARD_ACCESSORY_BAR_SHOWN),
-                is(0));
-
         // Add a tab and show, so the accessory is permanently visible.
         setTabs(new KeyboardAccessoryData.Tab[] {mTestTab});
         mCoordinator.show();
@@ -546,7 +486,6 @@ public class KeyboardAccessoryControllerTest {
                         new BarItem(BarItem.Type.ACTION_BUTTON,
                                 new Action("Two", GENERATE_PASSWORD_AUTOMATIC, null))});
         assertThat(getGenerationImpressionCount(), is(1));
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_ACTIONS), is(1));
 
         // Adding another action leaves bar impressions unchanged but affects the actions bucket.
         mModel.get(BAR_ITEMS).set(
@@ -554,7 +493,6 @@ public class KeyboardAccessoryControllerTest {
                                        new Action("Uno", GENERATE_PASSWORD_AUTOMATIC, null)),
                         new BarItem(BarItem.Type.ACTION_BUTTON,
                                 new Action("Dos", GENERATE_PASSWORD_AUTOMATIC, null))});
-        assertThat(getShownMetricsCount(AccessoryBarContents.WITH_ACTIONS), is(1));
         assertThat(getGenerationImpressionCount(), is(2));
     }
 
@@ -584,11 +522,6 @@ public class KeyboardAccessoryControllerTest {
         return RecordHistogram.getHistogramValueCountForTesting(
                 ManualFillingMetricsRecorder.UMA_KEYBOARD_ACCESSORY_ACTION_IMPRESSION,
                 AccessoryAction.GENERATE_PASSWORD_AUTOMATIC);
-    }
-
-    private int getShownMetricsCount(@AccessoryBarContents int bucket) {
-        return RecordHistogram.getHistogramValueCountForTesting(
-                KeyboardAccessoryMetricsRecorder.UMA_KEYBOARD_ACCESSORY_BAR_SHOWN, bucket);
     }
 
     private void setTabs(KeyboardAccessoryData.Tab[] tabs) {

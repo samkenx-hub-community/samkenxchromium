@@ -31,25 +31,25 @@ class EditAddressProfileDialogControllerImpl
 
   // Sets up the controller and offers to edit the `profile` before saving it.
   // If `original_profile` is not nullptr, this indicates that this dialog is
-  // opened from an update prompt. The originating prompt (save or update) will
-  // be re-opened once the user makes a decision with respect to the
-  // offer-to-edit prompt. The `is_migration_to_account` argument is used to
-  // re-open the original prompt in a correct state.
+  // opened from an update prompt. The `on_user_decision_callback` will be
+  // called when user closes the dialog. `is_migration_to_account` is used to
+  // determine if a subset of editor fields should be made required.
   void OfferEdit(const AutofillProfile& profile,
                  const AutofillProfile* original_profile,
+                 const std::u16string& footer_message,
                  AutofillClient::AddressProfileSavePromptCallback
-                     address_profile_save_prompt_callback,
+                     on_user_decision_callback,
                  bool is_migration_to_account);
 
   // EditAddressProfileDialogController:
   std::u16string GetWindowTitle() const override;
+  const std::u16string& GetFooterMessage() const override;
   std::u16string GetOkButtonLabel() const override;
   const AutofillProfile& GetProfileToEdit() const override;
   bool GetIsValidatable() const override;
-  void OnUserDecision(
+  void OnDialogClosed(
       AutofillClient::SaveAddressProfileOfferUserDecision decision,
       const AutofillProfile& profile_with_edits) override;
-  void OnDialogClosed() override;
 
   // content::WebContentsObserver:
   void WebContentsDestroyed() override;
@@ -66,10 +66,12 @@ class EditAddressProfileDialogControllerImpl
   // nullptr if no dialog is currently shown.
   raw_ptr<AutofillBubbleBase> dialog_view_ = nullptr;
 
+  // Editor's footnote message.
+  std::u16string footer_message_;
+
   // Callback to run once the user makes a decision with respect to saving the
   // address profile currently being edited.
-  AutofillClient::AddressProfileSavePromptCallback
-      address_profile_save_prompt_callback_;
+  AutofillClient::AddressProfileSavePromptCallback on_user_decision_callback_;
 
   // Contains the details of the address profile that the user requested to edit
   // before saving.

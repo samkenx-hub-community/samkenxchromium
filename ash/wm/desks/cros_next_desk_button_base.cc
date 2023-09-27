@@ -4,6 +4,7 @@
 
 #include "ash/wm/desks/cros_next_desk_button_base.h"
 
+#include "ash/wm/desks/desk_bar_view_base.h"
 #include "ash/wm/overview/overview_constants.h"
 #include "ash/wm/overview/overview_utils.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -11,6 +12,7 @@
 #include "ui/views/border.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
+#include "ui/views/view_utils.h"
 
 namespace ash {
 
@@ -23,8 +25,11 @@ constexpr int kFocusRingRadius = 16;
 CrOSNextDeskButtonBase::CrOSNextDeskButtonBase(
     const std::u16string& text,
     bool set_text,
+    DeskBarViewBase* bar_view,
     base::RepeatingClosure pressed_callback)
-    : LabelButton(pressed_callback), pressed_callback_(pressed_callback) {
+    : LabelButton(pressed_callback),
+      bar_view_(bar_view),
+      pressed_callback_(pressed_callback) {
   DCHECK(!text.empty());
   if (set_text) {
     SetText(text);
@@ -47,15 +52,24 @@ CrOSNextDeskButtonBase::CrOSNextDeskButtonBase(
   views::InstallRoundRectHighlightPathGenerator(
       this, gfx::Insets(kFocusRingHaloInset), kFocusRingRadius);
   views::FocusRing* focus_ring = views::FocusRing::Get(this);
+  focus_ring->SetOutsetFocusRingDisabled(true);
   focus_ring->SetColorId(ui::kColorAshFocusRing);
-  focus_ring->SetHasFocusPredicate(
-      [&](views::View* view) { return IsViewHighlighted(); });
+  if (bar_view_->type() == DeskBarViewBase::Type::kOverview) {
+    focus_ring->SetHasFocusPredicate(
+        base::BindRepeating([](const views::View* view) {
+          const auto* v = views::AsViewClass<CrOSNextDeskButtonBase>(view);
+          CHECK(v);
+          return v->is_focused();
+        }));
+  }
 }
 
 CrOSNextDeskButtonBase::~CrOSNextDeskButtonBase() = default;
 
 void CrOSNextDeskButtonBase::OnFocus() {
-  UpdateOverviewHighlightForFocusAndSpokenFeedback(this);
+  if (bar_view_->type() == DeskBarViewBase::Type::kOverview) {
+    MoveFocusToView(this);
+  }
   UpdateFocusState();
   View::OnFocus();
 }
@@ -69,19 +83,20 @@ views::View* CrOSNextDeskButtonBase::GetView() {
   return this;
 }
 
-void CrOSNextDeskButtonBase::MaybeActivateHighlightedView() {
+void CrOSNextDeskButtonBase::MaybeActivateFocusedView() {
   pressed_callback_.Run();
 }
 
-void CrOSNextDeskButtonBase::MaybeCloseHighlightedView(bool primary_action) {}
+void CrOSNextDeskButtonBase::MaybeCloseFocusedView(bool primary_action) {}
 
-void CrOSNextDeskButtonBase::MaybeSwapHighlightedView(bool right) {}
+void CrOSNextDeskButtonBase::MaybeSwapFocusedView(bool right) {}
 
-void CrOSNextDeskButtonBase::OnViewHighlighted() {
+void CrOSNextDeskButtonBase::OnFocusableViewFocused() {
   UpdateFocusState();
+  bar_view_->ScrollToShowViewIfNecessary(this);
 }
 
-void CrOSNextDeskButtonBase::OnViewUnhighlighted() {
+void CrOSNextDeskButtonBase::OnFocusableViewBlurred() {
   UpdateFocusState();
 }
 

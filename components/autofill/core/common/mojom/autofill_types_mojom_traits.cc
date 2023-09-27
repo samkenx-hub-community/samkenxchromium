@@ -177,6 +177,10 @@ bool StructTraits<
     return false;
   if (!data.ReadValue(&out->value))
     return false;
+  uint32_t max_length = out->value.length();
+  out->selection_end = std::min(data.selection_end(), max_length);
+  out->selection_start = std::min(data.selection_start(), out->selection_end);
+  DCHECK_LE(out->selection_start, out->selection_end);
 
   if (!data.ReadFormControlType(&out->form_control_type))
     return false;
@@ -403,7 +407,6 @@ bool StructTraits<autofill::mojom::PasswordGenerationUIDataDataView,
 
   return data.ReadGenerationElementId(&out->generation_element_id) &&
          data.ReadGenerationElement(&out->generation_element) &&
-         data.ReadUserTypedPassword(&out->user_typed_password) &&
          data.ReadTextDirection(&out->text_direction) &&
          data.ReadFormData(&out->form_data);
 }
@@ -416,23 +419,6 @@ bool StructTraits<
          data.ReadPasswordRendererId(&out->password_renderer_id) &&
          data.ReadNewPasswordRendererId(&out->new_password_renderer_id) &&
          data.ReadConfirmPasswordRendererId(&out->confirm_password_renderer_id);
-}
-
-bool StructTraits<autofill::mojom::AutoselectFirstSuggestionDataView,
-                  autofill::AutoselectFirstSuggestion>::
-    Read(autofill::mojom::AutoselectFirstSuggestionDataView data,
-         autofill::AutoselectFirstSuggestion* out) {
-  *out =
-      autofill::AutoselectFirstSuggestion(data.autoselect_first_suggestion());
-  return true;
-}
-
-bool StructTraits<autofill::mojom::FormElementWasClickedDataView,
-                  autofill::FormElementWasClicked>::
-    Read(autofill::mojom::FormElementWasClickedDataView data,
-         autofill::FormElementWasClicked* out) {
-  *out = autofill::FormElementWasClicked(data.form_element_was_clicked());
-  return true;
 }
 
 }  // namespace mojo

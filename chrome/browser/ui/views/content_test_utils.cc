@@ -31,7 +31,7 @@ void GiveItSomeTime(base::TimeDelta delta) {
 void TestTextInputViaKeyEvent(content::WebContents* contents) {
   // Replace the dialog content with a single text input element and focus it.
   ASSERT_TRUE(content::WaitForLoadStop(contents));
-  ASSERT_TRUE(content::ExecuteScript(contents, R"(
+  ASSERT_TRUE(content::ExecJs(contents, R"(
     document.body.innerHTML = trustedTypes.emptyHTML;
     const input = document.createElement('input');
     input.type = 'text';
@@ -53,9 +53,8 @@ void TestTextInputViaKeyEvent(content::WebContents* contents) {
   while (result != "a") {
     GiveItSomeTime(base::Milliseconds(100));
 
-    ASSERT_TRUE(content::ExecuteScriptAndExtractString(contents, R"(
-      window.domAutomationController.send(
-          document.getElementById('text-id').value);
-    )", &result));
+    result =
+        content::EvalJs(contents, "document.getElementById('text-id').value;")
+            .ExtractString();
   }
 }

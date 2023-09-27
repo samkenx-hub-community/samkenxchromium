@@ -9,9 +9,10 @@
  * a subpage with lots of other settings on Chrome OS.
  */
 import 'chrome://resources/cr_elements/cr_link_row/cr_link_row.js';
-import '../controls/settings_toggle_button.js';
+import '/shared/settings/controls/settings_toggle_button.js';
 import '../settings_page/settings_animated_pages.js';
 import '../settings_shared.css.js';
+// clang-format off
 // <if expr="not is_macosx and not is_chromeos">
 import './captions_subpage.js';
 import '../settings_page/settings_subpage.js';
@@ -20,22 +21,28 @@ import '../settings_page/settings_subpage.js';
 // <if expr="is_win or is_macosx">
 import './live_caption_section.js';
 
+import {CaptionsBrowserProxyImpl} from '/shared/settings/a11y_page/captions_browser_proxy.js';
 // </if>
-
+// clang-format on
+import {SettingsToggleButtonElement} from '/shared/settings/controls/settings_toggle_button.js';
 import {WebUiListenerMixin} from 'chrome://resources/cr_elements/web_ui_listener_mixin.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {BaseMixin} from '../base_mixin.js';
-import {SettingsToggleButtonElement} from '../controls/settings_toggle_button.js';
 import {loadTimeData} from '../i18n_setup.js';
 import {routes} from '../route.js';
 import {Router} from '../router.js';
 
+import {AccessibilityBrowserProxy, AccessibilityBrowserProxyImpl} from './a11y_browser_proxy.js';
 import {getTemplate} from './a11y_page.html.js';
-// <if expr="is_win or is_macosx">
-import {CaptionsBrowserProxyImpl} from './captions_browser_proxy.js';
+
+// clang-format off
+// <if expr="not is_chromeos">
+import {LanguageHelper, LanguagesModel} from '../languages_page/languages_types.js';
 
 // </if>
+// clang-format on
+
 
 const SettingsA11yPageElementBase =
     WebUiListenerMixin(BaseMixin(PolymerElement));
@@ -68,6 +75,17 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
       },
 
       // <if expr="not is_chromeos">
+      /**
+       * Read-only reference to the languages model provided by the
+       * 'settings-languages' instance.
+       */
+      languages: {
+        type: Object,
+        notify: true,
+      },
+
+      languageHelper: Object,
+
       enableLiveCaption_: {
         type: Boolean,
         value: function() {
@@ -138,10 +156,31 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
           return opensExternally;
         },
       },
+
+      /**
+       * Whether to show the overscroll history navigation setting.
+       */
+      showOverscrollHistoryNavigationToggle_: {
+        type: Boolean,
+        value: function() {
+          let showOverscroll = false;
+          // <if expr="is_win or is_linux or is_macosx">
+          showOverscroll = loadTimeData.getBoolean(
+              'overscrollHistoryNavigationSettingEnabled');
+          // </if>
+          return showOverscroll;
+        },
+      },
     };
   }
 
+  private accessibilityBrowserProxy: AccessibilityBrowserProxy =
+      AccessibilityBrowserProxyImpl.getInstance();
+
   // <if expr="not is_chromeos">
+  languages: LanguagesModel;
+  languageHelper: LanguageHelper;
+
   private enableLiveCaption_: boolean;
   private showFocusHighlightOption_: boolean;
   // </if>
@@ -149,6 +188,7 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
   private showAccessibilityLabelsSetting_: boolean;
   private showPdfOcrToggle_: boolean;
   private captionSettingsOpensExternally_: boolean;
+  private showOverscrollHistoryNavigationToggle_: boolean;
 
 
   override ready() {
@@ -193,8 +233,6 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
   private onPdfOcrChange_(event: Event) {
     const pdfOcrOn = (event.target as SettingsToggleButtonElement).checked;
     if (pdfOcrOn) {
-      // TODO(crbug.com/1393069): Downloads a pdf ocr model if not yet
-      // downloaded.
       console.error(
           'Need to check a pdf ocr model and download it if necessary');
     }
@@ -209,7 +247,7 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
   // </if>
 
   // <if expr="is_chromeos">
-  private onManageSystemAccessibilityFeaturesTap_() {
+  private onManageSystemAccessibilityFeaturesClick_() {
     window.location.href = 'chrome://os-settings/osAccessibility';
   }
   // </if>
@@ -229,6 +267,20 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
       Router.getInstance().navigateTo(routes.CAPTIONS);
     }
   }
+
+  // <if expr="is_win or is_linux">
+  private onOverscrollHistoryNavigationChange_(event: Event) {
+    const enabled = (event.target as SettingsToggleButtonElement).checked;
+    this.accessibilityBrowserProxy.recordOverscrollHistoryNavigationChanged(
+        enabled);
+  }
+  // </if>
+
+  // <if expr="is_macosx">
+  private onMacTrackpadGesturesLinkClick_() {
+    this.accessibilityBrowserProxy.openTrackpadGesturesSettings();
+  }
+  // </if>
 }
 
 customElements.define(SettingsA11yPageElement.is, SettingsA11yPageElement);

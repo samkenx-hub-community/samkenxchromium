@@ -70,11 +70,17 @@ PasswordManagerPorter::PasswordManagerPorter(
       presenter_(presenter),
       on_export_progress_callback_(on_export_progress_callback) {}
 
-PasswordManagerPorter::~PasswordManagerPorter() = default;
+PasswordManagerPorter::~PasswordManagerPorter() {
+  // There may be open file selection dialogs. We need to let them know that we
+  // have gone away so that they do not attempt to call us back.
+  if (select_file_dialog_) {
+    select_file_dialog_->ListenerDestroyed();
+  }
+}
 
 bool PasswordManagerPorter::Export(content::WebContents* web_contents) {
   if (exporter_ && exporter_->GetProgressStatus() ==
-                       password_manager::ExportProgressStatus::IN_PROGRESS) {
+                       password_manager::ExportProgressStatus::kInProgress) {
     return false;
   }
 
@@ -102,7 +108,7 @@ void PasswordManagerPorter::CancelExport() {
 password_manager::ExportProgressStatus
 PasswordManagerPorter::GetExportProgressStatus() {
   return exporter_ ? exporter_->GetProgressStatus()
-                   : password_manager::ExportProgressStatus::NOT_STARTED;
+                   : password_manager::ExportProgressStatus::kNotStarted;
 }
 
 void PasswordManagerPorter::SetExporterForTesting(
@@ -115,9 +121,10 @@ void PasswordManagerPorter::Import(
     password_manager::PasswordForm::Store to_store,
     ImportResultsCallback results_callback) {
   DCHECK(web_contents);
-
   if (!import_results_callback_.is_null() ||
-      (importer_ && importer_->IsRunning())) {
+      (importer_ &&
+       (importer_->IsState(password_manager::PasswordImporter::kInProgress) ||
+        importer_->IsState(password_manager::PasswordImporter::kConflicts)))) {
     // Early return to prevent crashes due to already active import process in
     // other window.
     password_manager::ImportResults results;
@@ -135,6 +142,51 @@ void PasswordManagerPorter::Import(
 
   PresentFileSelector(web_contents,
                       PasswordManagerPorter::Type::PASSWORD_IMPORT);
+}
+
+void PasswordManagerPorter::ContinueImport(
+    const std::vector<int>& selected_ids,
+    ImportResultsCallback results_callback) {
+  if (importer_ &&
+      importer_->IsState(password_manager::PasswordImporter::kConflicts)) {
+    importer_->ContinueImport(selected_ids, std::move(results_callback));
+    return;
+  }
+  // Respond with `IMPORT_ALREADY_ACTIVE`, when `PasswordImporter` is available
+  // and not in the `CONFLICTS` state. Otherwise, return `UNKNOWN_ERROR`.
+  // This code can be reached in 2 cases:
+  // 1) `chrome.passwordsPrivate.continueImport` is called from the dev console.
+  //    This should prevent crashing the browser by calling the private API.
+  // 2) Import state is not synced across tabs, hence if import has been
+  // launched from one window, but then continued from another window. If the
+  // user also continues in the original window, we reach this code.
+  password_manager::ImportResults results;
+  if (importer_) {
+    results.status =
+        password_manager::ImportResults::Status::IMPORT_ALREADY_ACTIVE;
+  } else {
+    results.status = password_manager::ImportResults::Status::UNKNOWN_ERROR;
+  }
+
+  // For consistency |results_callback| is always run asynchronously.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(std::move(results_callback), results));
+}
+
+void PasswordManagerPorter::ResetImporter(bool delete_file) {
+  // Importer can be reset only in kNotStarted, kFinished, kConflicts states,
+  // but not in kInProgress.
+  if (!importer_ ||
+      importer_->IsState(password_manager::PasswordImporter::kInProgress)) {
+    return;
+  }
+  if (delete_file &&
+      importer_->IsState(password_manager::PasswordImporter::kFinished)) {
+    // File deletion can only be triggered if the importer is in kFinished
+    // state.
+    importer_->DeleteFile();
+  }
+  importer_.reset();
 }
 
 void PasswordManagerPorter::SetImporterForTesting(
@@ -227,10 +279,6 @@ void PasswordManagerPorter::ExportDone() {
   exporter_.reset();
 }
 
-void PasswordManagerPorter::ImportDone() {
-  importer_.reset();
-}
-
 void PasswordManagerPorter::ImportPasswordsFromPath(
     const base::FilePath& path) {
   DCHECK(!import_results_callback_.is_null());
@@ -238,7 +286,5 @@ void PasswordManagerPorter::ImportPasswordsFromPath(
     importer_ =
         std::make_unique<password_manager::PasswordImporter>(presenter_);
   }
-  importer_->Import(path, to_store_, std::move(import_results_callback_),
-                    base::BindOnce(&PasswordManagerPorter::ImportDone,
-                                   weak_ptr_factory_.GetWeakPtr()));
+  importer_->Import(path, to_store_, std::move(import_results_callback_));
 }

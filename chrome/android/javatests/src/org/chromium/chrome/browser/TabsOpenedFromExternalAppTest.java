@@ -9,12 +9,11 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Browser;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
 
 import org.hamcrest.Matchers;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -153,12 +152,8 @@ public class TabsOpenedFromExternalAppTest {
 
     @Before
     public void setUp() {
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-    }
-
-    @After
-    public void tearDown() {
-        mTestServer.stopAndDestroyServer();
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
     }
 
     /**
@@ -179,7 +174,7 @@ public class TabsOpenedFromExternalAppTest {
         if (extras != null) intent.putExtras(extras);
 
         if (firstParty) {
-            Context context = InstrumentationRegistry.getTargetContext();
+            Context context = ApplicationProvider.getApplicationContext();
             intent.setPackage(context.getPackageName());
             IntentUtils.addTrustedIntentExtras(intent);
         }

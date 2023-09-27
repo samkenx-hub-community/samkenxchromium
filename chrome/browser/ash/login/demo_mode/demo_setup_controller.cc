@@ -4,11 +4,10 @@
 
 #include "chrome/browser/ash/login/demo_mode/demo_setup_controller.h"
 
-#include <cctype>
 #include <utility>
 
 #include "ash/components/arc/arc_util.h"
-#include "ash/constants/ash_features.h"
+#include "ash/constants/ash_pref_names.h"
 #include "ash/constants/ash_switches.h"
 #include "base/barrier_closure.h"
 #include "base/command_line.h"
@@ -30,7 +29,6 @@
 #include "chrome/browser/ash/policy/enrollment/enrollment_requisition_manager.h"
 #include "chrome/browser/ash/policy/enrollment/enrollment_status.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
 #include "chromeos/ash/components/dbus/dbus_thread_manager.h"
 #include "chromeos/ash/components/install_attributes/install_attributes.h"
@@ -39,6 +37,9 @@
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 #include "google_apis/gaia/google_service_auth_error.h"
+#include "third_party/abseil-cpp/absl/strings/ascii.h"
+#include "third_party/icu/source/common/unicode/bytestream.h"
+#include "third_party/icu/source/common/unicode/casemap.h"
 #include "ui/base/l10n/l10n_util.h"
 
 namespace ash {
@@ -48,7 +49,6 @@ namespace {
 using ErrorCode = DemoSetupController::DemoSetupError::ErrorCode;
 using RecoveryMethod = DemoSetupController::DemoSetupError::RecoveryMethod;
 
-constexpr char kDemoRequisition[] = "cros-demo-mode";
 constexpr char kDemoSetupDownloadDurationHistogram[] =
     "DemoMode.Setup.DownloadDuration";
 constexpr char kDemoSetupEnrollDurationHistogram[] =
@@ -246,14 +246,14 @@ DemoSetupController::DemoSetupError::CreateFromEnrollmentStatus(
 // static
 DemoSetupController::DemoSetupError
 DemoSetupController::DemoSetupError::CreateFromOtherEnrollmentError(
-    EnterpriseEnrollmentHelper::OtherError error) {
+    EnrollmentLauncher::OtherError error) {
   const std::string debug_message =
       base::StringPrintf("Other error: %d", error);
   switch (error) {
-    case EnterpriseEnrollmentHelper::OTHER_ERROR_DOMAIN_MISMATCH:
+    case EnrollmentLauncher::OTHER_ERROR_DOMAIN_MISMATCH:
       return DemoSetupError(ErrorCode::kAlreadyLocked,
                             RecoveryMethod::kPowerwash, debug_message);
-    case EnterpriseEnrollmentHelper::OTHER_ERROR_FATAL:
+    case EnrollmentLauncher::OTHER_ERROR_FATAL:
       return DemoSetupError(ErrorCode::kUnexpectedError,
                             RecoveryMethod::kUnknown, debug_message);
   }
@@ -389,7 +389,8 @@ DemoSetupController::DemoSetupError::GetLocalizedRecoveryMessage() const {
 
 std::string DemoSetupController::DemoSetupError::GetDebugDescription() const {
   return base::StringPrintf("DemoSetupError (code: %d, recovery: %d) : %s",
-                            error_code_, recovery_method_,
+                            static_cast<int>(error_code_),
+                            static_cast<int>(recovery_method_),
                             debug_message_.c_str());
 }
 
@@ -403,7 +404,7 @@ void DemoSetupController::RegisterLocalStatePrefs(
 // static
 void DemoSetupController::ClearDemoRequisition() {
   if (policy::EnrollmentRequisitionManager::GetDeviceRequisition() ==
-      kDemoRequisition) {
+      policy::EnrollmentRequisitionManager::kDemoRequisition) {
     policy::EnrollmentRequisitionManager::SetDeviceRequisition(std::string());
     // If device requisition is `kDemoRequisition`, it means the sub
     // organization was also set by the demo setup controller, so remove it as
@@ -488,13 +489,27 @@ DemoSetupController::DemoSetupController() = default;
 
 DemoSetupController::~DemoSetupController() = default;
 
+void DemoSetupController::SetAndCanonicalizeRetailerName(
+    const std::string& retailer_name) {
+  icu::StringByteSink<std::string> byte_sink(&retailer_name_);
+  UErrorCode error_code = U_ZERO_ERROR;
+  icu::CaseMap::utf8Fold(/* options= */ 0, retailer_name, byte_sink,
+                         /* edits= */ nullptr, error_code);
+  retailer_name_.erase(
+      std::remove_if(retailer_name_.begin(), retailer_name_.end(),
+                     [](unsigned char c) {
+                       return absl::ascii_ispunct(c) || absl::ascii_isspace(c);
+                     }),
+      retailer_name_.end());
+}
+
 void DemoSetupController::Enroll(
     OnSetupSuccess on_setup_success,
     OnSetupError on_setup_error,
     const OnSetCurrentSetupStep& set_current_setup_step) {
   DCHECK_NE(demo_config_, DemoSession::DemoModeConfig::kNone)
       << "Demo config needs to be explicitly set before calling Enroll()";
-  DCHECK(!enrollment_helper_);
+  DCHECK(!enrollment_launcher_);
 
   set_current_setup_step_ = set_current_setup_step;
   on_setup_success_ = std::move(on_setup_success);
@@ -539,14 +554,10 @@ void DemoSetupController::LoadDemoComponents() {
   base::OnceClosure load_callback =
       base::BindOnce(&DemoSetupController::OnDemoComponentsLoaded,
                      weak_ptr_factory_.GetWeakPtr());
-  if (chromeos::features::IsDemoModeSWAEnabled()) {
-    base::RepeatingClosure barrier_closure =
-        base::BarrierClosure(2, std::move(load_callback));
-    demo_components_->LoadResourcesComponent(barrier_closure);
-    demo_components_->LoadAppComponent(barrier_closure);
-  } else {
-    demo_components_->LoadResourcesComponent(std::move(load_callback));
-  }
+  base::RepeatingClosure barrier_closure =
+      base::BarrierClosure(2, std::move(load_callback));
+  demo_components_->LoadResourcesComponent(barrier_closure);
+  demo_components_->LoadAppComponent(barrier_closure);
 }
 
 void DemoSetupController::OnDemoComponentsLoaded() {
@@ -568,16 +579,13 @@ void DemoSetupController::OnDemoComponentsLoaded() {
         DemoComponents::kDemoModeResourcesComponentName));
     return;
   }
-
-  if (chromeos::features::IsDemoModeSWAEnabled()) {
-    auto app_component_error = demo_components_->app_component_error().value_or(
-        component_updater::CrOSComponentManager::Error::NOT_FOUND);
-    if (app_component_error !=
-        component_updater::CrOSComponentManager::Error::NONE) {
-      SetupFailed(DemoSetupError::CreateFromComponentError(
-          app_component_error, DemoComponents::kDemoModeAppComponentName));
-      return;
-    }
+  auto app_component_error = demo_components_->app_component_error().value_or(
+      component_updater::CrOSComponentManager::Error::NOT_FOUND);
+  if (app_component_error !=
+      component_updater::CrOSComponentManager::Error::NONE) {
+    SetupFailed(DemoSetupError::CreateFromComponentError(
+        app_component_error, DemoComponents::kDemoModeAppComponentName));
+    return;
   }
 
   VLOG(1) << "Starting online enrollment";
@@ -585,17 +593,17 @@ void DemoSetupController::OnDemoComponentsLoaded() {
   enroll_start_time_ = base::TimeTicks::Now();
 
   DCHECK(policy::EnrollmentRequisitionManager::GetDeviceRequisition().empty());
-  policy::EnrollmentRequisitionManager::SetDeviceRequisition(kDemoRequisition);
+  policy::EnrollmentRequisitionManager::SetDeviceRequisition(
+      policy::EnrollmentRequisitionManager::kDemoRequisition);
   policy::EnrollmentRequisitionManager::SetSubOrganization(
       GetSubOrganizationEmail());
   policy::EnrollmentConfig config;
   config.mode = policy::EnrollmentConfig::MODE_ATTESTATION;
   config.management_domain = policy::kDemoModeDomain;
 
-  enrollment_helper_ = EnterpriseEnrollmentHelper::Create(
-      this, nullptr, config, policy::kDemoModeDomain,
-      policy::LicenseType::kEnterprise);
-  enrollment_helper_->EnrollUsingAttestation();
+  enrollment_launcher_ = EnrollmentLauncher::Create(
+      this, config, policy::kDemoModeDomain, policy::LicenseType::kEnterprise);
+  enrollment_launcher_->EnrollUsingAttestation();
 }
 
 void DemoSetupController::OnAuthError(const GoogleServiceAuthError& error) {
@@ -606,8 +614,7 @@ void DemoSetupController::OnEnrollmentError(policy::EnrollmentStatus status) {
   SetupFailed(DemoSetupError::CreateFromEnrollmentStatus(status));
 }
 
-void DemoSetupController::OnOtherError(
-    EnterpriseEnrollmentHelper::OtherError error) {
+void DemoSetupController::OnOtherError(EnrollmentLauncher::OtherError error) {
   SetupFailed(DemoSetupError::CreateFromOtherEnrollmentError(error));
 }
 
@@ -684,7 +691,7 @@ void DemoSetupController::Reset() {
   DCHECK_NE(demo_config_, DemoSession::DemoModeConfig::kNone);
 
   // `demo_config_` is not reset here, because it is needed for retrying setup.
-  enrollment_helper_.reset();
+  enrollment_launcher_.reset();
   ClearDemoRequisition();
 }
 

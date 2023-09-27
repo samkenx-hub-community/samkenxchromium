@@ -117,11 +117,10 @@ NetworkChangeNotifierMac::CalculateConnectionType(
     return CONNECTION_WIFI;
   }
   if (@available(iOS 12, *)) {
-    CTTelephonyNetworkInfo* info =
-        [[[CTTelephonyNetworkInfo alloc] init] autorelease];
+    CTTelephonyNetworkInfo* info = [[CTTelephonyNetworkInfo alloc] init];
     NSDictionary<NSString*, NSString*>*
         service_current_radio_access_technology =
-            [info serviceCurrentRadioAccessTechnology];
+            info.serviceCurrentRadioAccessTechnology;
     NSSet<NSString*>* technologies_2g = [NSSet
         setWithObjects:CTRadioAccessTechnologyGPRS, CTRadioAccessTechnologyEdge,
                        CTRadioAccessTechnologyCDMA1x, nil];
@@ -264,9 +263,9 @@ void NetworkChangeNotifierMac::SetDynamicStoreNotificationKeys(
   // SCDynamicStore API does not exist on iOS.
   NOTREACHED();
 #else
-  base::ScopedCFTypeRef<CFMutableArrayRef> notification_keys(
+  base::apple::ScopedCFTypeRef<CFMutableArrayRef> notification_keys(
       CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks));
-  base::ScopedCFTypeRef<CFStringRef> key(
+  base::apple::ScopedCFTypeRef<CFStringRef> key(
       SCDynamicStoreKeyCreateNetworkGlobalEntity(
           nullptr, kSCDynamicStoreDomainState, kSCEntNetInterface));
   CFArrayAppendValue(notification_keys.get(), key.get());
@@ -279,7 +278,7 @@ void NetworkChangeNotifierMac::SetDynamicStoreNotificationKeys(
 
   // Set the notification keys.  This starts us receiving notifications.
   bool ret = SCDynamicStoreSetNotificationKeys(store, notification_keys.get(),
-                                               nullptr);
+                                               /*patterns=*/nullptr);
   // TODO(willchan): Figure out a proper way to handle this rather than crash.
   CHECK(ret);
 #endif  // BUILDFLAG(IS_IOS)

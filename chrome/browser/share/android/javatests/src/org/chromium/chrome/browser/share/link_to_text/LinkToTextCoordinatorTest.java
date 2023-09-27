@@ -27,10 +27,10 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.robolectric.Robolectric;
-import org.robolectric.annotation.Config;
 
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.JniMocker;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.share.ChromeShareExtras;
 import org.chromium.chrome.browser.share.share_sheet.ChromeOptionShareCallback;
 import org.chromium.chrome.browser.share.share_sheet.ShareSheetLinkToggleCoordinator.LinkToggleState;
@@ -43,13 +43,11 @@ import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.url.GURL;
 import org.chromium.url.JUnitTestGURLs;
-import org.chromium.url.ShadowGURL;
 
 /**
  * Tests for {@link LinkToTextCoordinator}.
  */
 @RunWith(BaseRobolectricTestRunner.class)
-@Config(shadows = {ShadowGURL.class})
 public class LinkToTextCoordinatorTest {
     @Rule
     public JniMocker jniMocker = new JniMocker();
@@ -80,8 +78,8 @@ public class LinkToTextCoordinatorTest {
     private boolean mIsRemoteRequestResultSet;
 
     private static final String SELECTED_TEXT = "selection";
-    private static final String VISIBLE_URL = JUnitTestGURLs.EXAMPLE_URL;
-    private static final String BLOCKLIST_URL = JUnitTestGURLs.URL_1;
+    private static final String VISIBLE_URL = JUnitTestGURLs.EXAMPLE_URL.getSpec();
+    private static final String BLOCKLIST_URL = JUnitTestGURLs.URL_1.getSpec();
     private static final String SELECTED_TEXT_LONG =
             "This textbook has more freedom than most (but see some exceptions).";
     private static final long SHARE_START_TIME = 1L;
@@ -127,6 +125,7 @@ public class LinkToTextCoordinatorTest {
         doNothing().when(mShareCallback).showShareSheet(any(), any(), anyLong());
         when(mTab.getWebContents()).thenReturn(mWebContents);
         when(mTab.getWindowAndroid()).thenReturn(mWindow);
+        when(mTab.getContext()).thenReturn(mActivity);
 
         jniMocker.mock(LinkToTextBridgeJni.TEST_HOOKS, mLinkToTextBridge);
         when(mLinkToTextBridge.shouldOfferLinkToText(any(GURL.class))).thenAnswer((invocation) -> {
@@ -163,9 +162,23 @@ public class LinkToTextCoordinatorTest {
         String selector = "selector";
         String expectedUrlToShare = VISIBLE_URL + "#:~:text=selector";
         mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback, mChromeShareExtras,
-                SHARE_START_TIME, VISIBLE_URL, SELECTED_TEXT);
+                SHARE_START_TIME, VISIBLE_URL, SELECTED_TEXT, false);
         mLinkToTextCoordinator.onSelectorReady(selector);
         checkShowsShareSheetWithLink(expectedUrlToShare);
+    }
+
+    @Test
+    @SmallTest
+    public void showShareSheetTest_UseLinkInTitle() {
+        String selector = "selector";
+        String expectedUrlToShare = VISIBLE_URL + "#:~:text=selector";
+        mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback, mChromeShareExtras,
+                SHARE_START_TIME, VISIBLE_URL, SELECTED_TEXT, true);
+        mLinkToTextCoordinator.onSelectorReady(selector);
+        checkShowsShareSheetWithLink(expectedUrlToShare);
+        Assert.assertEquals("Title is different.",
+                mActivity.getString(R.string.sharing_including_link_title_template, VISIBLE_URL),
+                mLinkToTextCoordinator.getShareParams(LinkToggleState.LINK).getTitle());
     }
 
     @Test
@@ -178,7 +191,7 @@ public class LinkToTextCoordinatorTest {
                 VISIBLE_URL + "#:~:text=selector1&text=selector2&text=selector3";
 
         mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback, mChromeShareExtras,
-                SHARE_START_TIME, VISIBLE_URL, SELECTED_TEXT);
+                SHARE_START_TIME, VISIBLE_URL, SELECTED_TEXT, false);
         mLinkToTextCoordinator.onSelectorReady(fragmentDirective);
         checkShowsShareSheetWithLink(expectedUrlToShare);
     }
@@ -187,10 +200,9 @@ public class LinkToTextCoordinatorTest {
     @SmallTest
     public void showShareSheetTest_EmptySelector() {
         String selector = "";
-        String expectedUrlToShare = "";
 
         mLinkToTextCoordinator.initLinkToTextCoordinator(
-                mTab, mShareCallback, mChromeShareExtras, 1, VISIBLE_URL, SELECTED_TEXT);
+                mTab, mShareCallback, mChromeShareExtras, 1, VISIBLE_URL, SELECTED_TEXT, false);
         mLinkToTextCoordinator.onSelectorReady(selector);
         checkShowsShareSheetWithNoLink();
     }
@@ -199,7 +211,7 @@ public class LinkToTextCoordinatorTest {
     @SmallTest
     public void getPreviewTextLongTest() {
         mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback, mChromeShareExtras,
-                SHARE_START_TIME, VISIBLE_URL, SELECTED_TEXT_LONG);
+                SHARE_START_TIME, VISIBLE_URL, SELECTED_TEXT_LONG, false);
         Assert.assertEquals(
                 "This textbook has more freedom t...", mLinkToTextCoordinator.getPreviewText());
     }
@@ -208,7 +220,7 @@ public class LinkToTextCoordinatorTest {
     @SmallTest
     public void getPreviewTextTest() {
         mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback, mChromeShareExtras,
-                SHARE_START_TIME, VISIBLE_URL, SELECTED_TEXT);
+                SHARE_START_TIME, VISIBLE_URL, SELECTED_TEXT, false);
         Assert.assertEquals("selection", mLinkToTextCoordinator.getPreviewText());
     }
 
@@ -216,7 +228,7 @@ public class LinkToTextCoordinatorTest {
     @SmallTest
     public void shareLinkToTextTest_BlocklistUrl() {
         mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback, mChromeShareExtras,
-                SHARE_START_TIME, BLOCKLIST_URL, SELECTED_TEXT);
+                SHARE_START_TIME, BLOCKLIST_URL, SELECTED_TEXT, false);
         mLinkToTextCoordinator.shareLinkToText();
 
         // Check that shows share sheet without link to text
@@ -231,7 +243,7 @@ public class LinkToTextCoordinatorTest {
     @SmallTest
     public void shareLinkToTextTest_GenerationError() {
         mLinkToTextCoordinator.initLinkToTextCoordinator(
-                mTab, mShareCallback, mChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "");
+                mTab, mShareCallback, mChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "", false);
         setGenerationRemoteRequestResults("", Integer.valueOf(LinkGenerationError.EMPTY_SELECTION),
                 Integer.valueOf(LinkGenerationReadyStatus.REQUESTED_AFTER_READY));
         mLinkToTextCoordinator.shareLinkToText();
@@ -248,7 +260,7 @@ public class LinkToTextCoordinatorTest {
     @SmallTest
     public void shareLinkToTextTest_Timeout_BeforeRemoteRequestComplete() {
         mLinkToTextCoordinator.initLinkToTextCoordinator(
-                mTab, mShareCallback, mChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "");
+                mTab, mShareCallback, mChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "", false);
         mLinkToTextCoordinator.shareLinkToText();
         mLinkToTextCoordinator.timeout();
 
@@ -274,7 +286,7 @@ public class LinkToTextCoordinatorTest {
     @SmallTest
     public void shareLinkToTextTest_Timeout_AfterRemoteRequestComplete() {
         mLinkToTextCoordinator.initLinkToTextCoordinator(
-                mTab, mShareCallback, mChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "");
+                mTab, mShareCallback, mChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "", false);
         setGenerationRemoteRequestResults("selector", Integer.valueOf(LinkGenerationError.NONE),
                 Integer.valueOf(LinkGenerationReadyStatus.REQUESTED_AFTER_READY));
         mLinkToTextCoordinator.shareLinkToText();
@@ -296,7 +308,7 @@ public class LinkToTextCoordinatorTest {
     @SmallTest
     public void shareLinkToTextTest_OmniboxNavigation_BeforeRemoteRequestComplete() {
         mLinkToTextCoordinator.initLinkToTextCoordinator(
-                mTab, mShareCallback, mChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "");
+                mTab, mShareCallback, mChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "", false);
         mLinkToTextCoordinator.shareLinkToText();
         mLinkToTextCoordinator.onUpdateUrl(mTab, new GURL(VISIBLE_URL));
 
@@ -321,8 +333,8 @@ public class LinkToTextCoordinatorTest {
     @Test
     @SmallTest
     public void shareLinkToTextTest_Reshare_Success() {
-        mLinkToTextCoordinator.initLinkToTextCoordinator(
-                mTab, mShareCallback, mReshareChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "");
+        mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback,
+                mReshareChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "", false);
         setReshareRemoteRequestResults("selector");
         mLinkToTextCoordinator.shareLinkToText();
 
@@ -337,8 +349,8 @@ public class LinkToTextCoordinatorTest {
     @Test
     @SmallTest
     public void shareLinkToTextTest_Reshare_Timeout_BeforeRemoteRequestComplete() {
-        mLinkToTextCoordinator.initLinkToTextCoordinator(
-                mTab, mShareCallback, mReshareChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "");
+        mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback,
+                mReshareChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "", false);
         mLinkToTextCoordinator.shareLinkToText();
         mLinkToTextCoordinator.timeout();
 
@@ -360,8 +372,8 @@ public class LinkToTextCoordinatorTest {
     @Test
     @SmallTest
     public void shareLinkToTextTest_Reshare_Timeout_AfterRemoteRequestComplete() {
-        mLinkToTextCoordinator.initLinkToTextCoordinator(
-                mTab, mShareCallback, mReshareChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "");
+        mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback,
+                mReshareChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "", false);
         setReshareRemoteRequestResults("selector");
         mLinkToTextCoordinator.shareLinkToText();
 
@@ -381,8 +393,8 @@ public class LinkToTextCoordinatorTest {
     @Test
     @SmallTest
     public void shareLinkToTextTest_Reshare_OmniboxNavigation_BeforeRemoteRequestComplete() {
-        mLinkToTextCoordinator.initLinkToTextCoordinator(
-                mTab, mShareCallback, mReshareChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "");
+        mLinkToTextCoordinator.initLinkToTextCoordinator(mTab, mShareCallback,
+                mReshareChromeShareExtras, SHARE_START_TIME, VISIBLE_URL, "", false);
         mLinkToTextCoordinator.shareLinkToText();
         mLinkToTextCoordinator.onUpdateUrl(mTab, new GURL(VISIBLE_URL));
 

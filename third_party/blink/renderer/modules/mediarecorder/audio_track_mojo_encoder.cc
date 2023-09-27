@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -33,10 +33,12 @@ void LogError(const std::string& message, media::EncoderStatus error) {
 namespace blink {
 
 AudioTrackMojoEncoder::AudioTrackMojoEncoder(
+    scoped_refptr<base::SequencedTaskRunner> encoder_task_runner,
     AudioTrackRecorder::CodecId codec,
     OnEncodedAudioCB on_encoded_audio_cb,
     uint32_t bits_per_second)
     : AudioTrackEncoder(std::move(on_encoded_audio_cb)),
+      encoder_task_runner_(std::move(encoder_task_runner)),
       bits_per_second_(bits_per_second),
       current_status_(
           media::EncoderStatus::Codes::kEncoderInitializeNeverCompleted) {
@@ -90,10 +92,14 @@ void AudioTrackMojoEncoder::OnSetFormat(
   if (bits_per_second_ > 0)
     options.bitrate = bits_per_second_;
 
-  auto output_cb = base::BindPostTaskToCurrentDefault(WTF::BindRepeating(
-      &AudioTrackMojoEncoder::OnEncodeOutput, weak_factory_.GetWeakPtr()));
-  auto done_cb = base::BindPostTaskToCurrentDefault(WTF::BindOnce(
-      &AudioTrackMojoEncoder::OnInitializeDone, weak_factory_.GetWeakPtr()));
+  auto output_cb = base::BindPostTask(
+      encoder_task_runner_,
+      WTF::BindRepeating(&AudioTrackMojoEncoder::OnEncodeOutput,
+                         weak_factory_.GetWeakPtr()));
+  auto done_cb =
+      base::BindPostTask(encoder_task_runner_,
+                         WTF::BindOnce(&AudioTrackMojoEncoder::OnInitializeDone,
+                                       weak_factory_.GetWeakPtr()));
   mojo_encoder_->Initialize(options, std::move(output_cb), std::move(done_cb));
 }
 
@@ -118,8 +124,9 @@ void AudioTrackMojoEncoder::EncodeAudio(
     return;
   }
 
-  auto done_cb = base::BindPostTaskToCurrentDefault(WTF::BindOnce(
-      &AudioTrackMojoEncoder::OnEncodeDone, weak_factory_.GetWeakPtr()));
+  auto done_cb = base::BindPostTask(
+      encoder_task_runner_, WTF::BindOnce(&AudioTrackMojoEncoder::OnEncodeDone,
+                                          weak_factory_.GetWeakPtr()));
   mojo_encoder_->Encode(std::move(input_bus), capture_time, std::move(done_cb));
 }
 
@@ -166,7 +173,7 @@ void AudioTrackMojoEncoder::OnEncodeOutput(
       reinterpret_cast<char*>(encoded_buffer.encoded_data.get()),
       encoded_buffer.encoded_data_size);
   on_encoded_audio_cb_.Run(encoded_buffer.params, encoded_data,
-                           encoded_buffer.timestamp);
+                           std::move(codec_desc), encoded_buffer.timestamp);
 }
 
 }  // namespace blink

@@ -88,13 +88,6 @@ void CheckDuplicateOngoingDownloads(
           std::move(callback).Run(
               OfflinePageUtils::DuplicateCheckResult::NOT_FOUND);
         } else {
-          // Using CUSTOM_COUNTS instead of time-oriented histogram to record
-          // samples in seconds rather than milliseconds.
-          UMA_HISTOGRAM_CUSTOM_COUNTS(
-              "OfflinePages.DownloadRequestTimeSinceDuplicateRequested",
-              (OfflineTimeNow() - latest_request_time).InSeconds(),
-              base::Seconds(1).InSeconds(), base::Days(7).InSeconds(), 50);
-
           std::move(callback).Run(
               OfflinePageUtils::DuplicateCheckResult::DUPLICATE_REQUEST_FOUND);
         }
@@ -146,7 +139,7 @@ content::WebContents::Getter GetWebContentsGetter(
 }
 
 void AcquireFileAccessPermissionDoneForScheduleDownload(
-    content::WebContents* web_contents,
+    const content::WebContents::Getter& wc_getter,
     const std::string& name_space,
     const GURL& url,
     OfflinePageUtils::DownloadUIActionFlags ui_action,
@@ -154,6 +147,11 @@ void AcquireFileAccessPermissionDoneForScheduleDownload(
     bool granted) {
   if (!granted)
     return;
+  content::WebContents* web_contents = wc_getter.Run();
+  if (!web_contents) {
+    return;
+  }
+
   OfflinePageTabHelper* tab_helper =
       OfflinePageTabHelper::FromWebContents(web_contents);
   if (!tab_helper)
@@ -279,13 +277,6 @@ void OfflinePageUtils::CheckDuplicateDownloads(
       // Then check for ongoing downloads, that is, requests.
       CheckDuplicateOngoingDownloads(browser_context, url, std::move(callback));
     } else {
-      // Using CUSTOM_COUNTS instead of time-oriented histogram to record
-      // samples in seconds rather than milliseconds.
-      UMA_HISTOGRAM_CUSTOM_COUNTS(
-          "OfflinePages.DownloadRequestTimeSinceDuplicateSaved",
-          (OfflineTimeNow() - latest_saved_time).InSeconds(),
-          base::Seconds(1).InSeconds(), base::Days(7).InSeconds(), 50);
-
       std::move(callback).Run(DuplicateCheckResult::DUPLICATE_PAGE_FOUND);
     }
   };
@@ -310,7 +301,8 @@ void OfflinePageUtils::ScheduleDownload(content::WebContents* web_contents,
   AcquireFileAccessPermission(
       web_contents,
       base::BindOnce(&AcquireFileAccessPermissionDoneForScheduleDownload,
-                     web_contents, name_space, url, ui_action, request_origin));
+                     GetWebContentsGetter(web_contents), name_space, url,
+                     ui_action, request_origin));
 }
 
 // static

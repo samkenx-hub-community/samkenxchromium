@@ -12,7 +12,7 @@
 #include "chrome/browser/ui/webui/constrained_web_dialog_ui.h"
 #include "chrome/browser/ui/webui/webui_util.h"
 #include "chrome/common/url_constants.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/signin_resources.h"
 #include "content/public/browser/web_ui.h"
@@ -65,9 +65,7 @@ SigninEmailConfirmationUI::SigninEmailConfirmationUI(content::WebUI* web_ui)
   webui::SetLoadTimeDataDefaults(g_browser_process->GetApplicationLocale(),
                                  &strings);
   source->AddLocalizedStrings(strings);
-  source->AddString(
-      "chromeRefresh2023Attribute",
-      features::IsChromeRefresh2023() ? "chrome-refresh-2023" : "");
+  webui::SetupChromeRefresh2023(source);
 }
 
 SigninEmailConfirmationUI::~SigninEmailConfirmationUI() {}

@@ -5,7 +5,15 @@
 /**
  * @fileoverview Class to manage the ChromeVox menus.
  */
-import {Command, CommandStore} from '../common/command_store.js';
+import {AsyncUtil} from '../../common/async_util.js';
+import {EventGenerator} from '../../common/event_generator.js';
+import {KeyCode} from '../../common/key_code.js';
+import {StringUtil} from '../../common/string_util.js';
+import {Command, CommandCategory} from '../common/command.js';
+import {CommandStore} from '../common/command_store.js';
+import {KeyMap} from '../common/key_map.js';
+import {KeySequence} from '../common/key_sequence.js';
+import {KeyUtil} from '../common/key_util.js';
 import {Msgs} from '../common/msgs.js';
 import {PanelNodeMenuData, PanelNodeMenuId, PanelNodeMenuItemData} from '../common/panel_menu_data.js';
 
@@ -102,6 +110,21 @@ export class MenuManager {
     this.nodeMenuDictionary_[itemData.menuId].addItemFromData(itemData);
   }
 
+  /** @param {!PanelMenu} menu */
+  async addOSKeyboardShortcutsMenuItem(menu) {
+    let localizedSlash =
+        await AsyncUtil.getLocalizedDomKeyStringForKeyCode(KeyCode.OEM_2);
+    if (!localizedSlash) {
+      localizedSlash = '/';
+    }
+    menu.addMenuItem(
+        Msgs.getMsg('open_keyboard_shortcuts_menu'),
+        `Ctrl+Alt+${localizedSlash}`, '', '', async () => {
+          EventGenerator.sendKeyPress(
+              KeyCode.OEM_2 /* forward slash */, {'ctrl': true, 'alt': true});
+        });
+  }
+
   /**
    * Create a new search menu with the given name and add it to the menu bar.
    * @param {string} menuMsg The msg id of the new menu to add.
@@ -132,6 +155,32 @@ export class MenuManager {
     $('menus_background').appendChild(this.searchMenu_.menuContainerElement);
     this.menus_.push(this.searchMenu_);
     return this.searchMenu_;
+  }
+
+  /**
+   * Advance the index of the current active menu by |delta|.
+   * @param {number} delta The number to add to the active menu index.
+   */
+  advanceActiveMenuBy(delta) {
+    let activeIndex = this.menus_.findIndex(menu => menu === this.activeMenu_);
+
+    if (activeIndex >= 0) {
+      activeIndex += delta;
+      activeIndex = (activeIndex + this.menus_.length) % this.menus_.length;
+    } else {
+      if (delta >= 0) {
+        activeIndex = 0;
+      } else {
+        activeIndex = this.menus_.length - 1;
+      }
+    }
+
+    activeIndex = this.findEnabledMenuIndex(activeIndex, delta > 0 ? 1 : -1);
+    if (activeIndex === -1) {
+      return;
+    }
+
+    this.activateMenu(this.menus_[activeIndex], true /* activateFirstItem */);
   }
 
   /**
@@ -187,6 +236,65 @@ export class MenuManager {
     const specifiedMenu =
         this.menus_.find(menu => menu.menuMsg === opt_menuTitle);
     return specifiedMenu || this.searchMenu_ || this.menus_[0];
+  }
+
+  /**
+   * @return {!Promise<Array<Object<{command: string, sequence:
+   *     KeySequence}>>>}
+   */
+  async getSortedKeyBindings() {
+    // TODO(accessibility): Commands should be based off of CommandStore and
+    // not the keymap. There are commands that don't have a key binding (e.g.
+    // commands for touch).
+    const keymap = KeyMap.get();
+
+    const sortedBindings = keymap.bindings().slice();
+    for (const binding of sortedBindings) {
+      const command = binding.command;
+      const keySeq = binding.sequence;
+      binding.keySeq = await KeyUtil.keySequenceToString(keySeq, true);
+      const titleMsgId = CommandStore.messageForCommand(command);
+      if (!titleMsgId) {
+        // Title messages are intentionally missing for some keyboard
+        // shortcuts.
+        if (!(command in COMMANDS_WITH_NO_MSG_ID) &&
+            !MenuManager.disableMissingMsgsErrorsForTesting) {
+          console.error('No localization for: ' + command);
+        }
+        binding.title = '';
+        continue;
+      }
+      const title = Msgs.getMsg(titleMsgId);
+      binding.title = StringUtil.toTitleCase(title);
+    }
+    sortedBindings.sort(
+        (binding1, binding2) =>
+            binding1.title.localeCompare(String(binding2.title)));
+    return sortedBindings;
+  }
+
+  /**
+   * @param {!PanelMenu} actionsMenu
+   * @param {!PanelMenu} chromevoxMenu
+   * @param {!PanelMenu} jumpMenu
+   * @param {!PanelMenu} speechMenu
+   * @return {!Object<!CommandCategory, ?PanelMenu>}
+   */
+  makeCategoryMapping(actionsMenu, chromevoxMenu, jumpMenu, speechMenu) {
+    return {
+      [CommandCategory.ACTIONS]: actionsMenu,
+      [CommandCategory.BRAILLE]: null,
+      [CommandCategory.CONTROLLING_SPEECH]: speechMenu,
+      [CommandCategory.DEVELOPER]: null,
+      [CommandCategory.HELP_COMMANDS]: chromevoxMenu,
+      [CommandCategory.INFORMATION]: speechMenu,
+      [CommandCategory.JUMP_COMMANDS]: jumpMenu,
+      [CommandCategory.MODIFIER_KEYS]: chromevoxMenu,
+      [CommandCategory.NAVIGATION]: jumpMenu,
+      [CommandCategory.NO_CATEGORY]: null,
+      [CommandCategory.OVERVIEW]: jumpMenu,
+      [CommandCategory.TABLES]: jumpMenu,
+    };
   }
 
   /**
@@ -285,3 +393,24 @@ export class MenuManager {
     this.searchMenu_ = menu;
   }
 }
+
+
+/** @type {boolean} */
+MenuManager.disableMissingMsgsErrorsForTesting = false;
+
+// Local to module.
+
+const COMMANDS_WITH_NO_MSG_ID = [
+  'nativeNextCharacter',
+  'nativePreviousCharacter',
+  'nativeNextWord',
+  'nativePreviousWord',
+  'enableLogging',
+  'disableLogging',
+  'dumpTree',
+  'showActionsMenu',
+  'enableChromeVoxArcSupportForCurrentApp',
+  'disableChromeVoxArcSupportForCurrentApp',
+  'showTalkBackKeyboardShortcuts',
+  'copy',
+];

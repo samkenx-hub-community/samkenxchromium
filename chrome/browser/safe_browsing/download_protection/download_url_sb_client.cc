@@ -12,7 +12,7 @@
 #include "components/safe_browsing/content/browser/safe_browsing_navigation_observer_manager.h"
 #include "components/safe_browsing/content/browser/ui_manager.h"
 #include "components/safe_browsing/core/common/features.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/download_item_utils.h"
 
 namespace safe_browsing {
@@ -124,7 +124,7 @@ void DownloadUrlSBClient::ReportMalware(SBThreatType threat_type) {
   hit_report->referrer_url = referrer_url_;
   hit_report->is_subresource = true;
   hit_report->threat_type = threat_type;
-  hit_report->threat_source = database_manager_->GetThreatSource();
+  hit_report->threat_source = database_manager_->GetNonBrowseUrlThreatSource();
   hit_report->post_data = post_data;
   hit_report->extended_reporting_level = extended_reporting_level_;
   hit_report->is_enhanced_protection = is_enhanced_protection_;

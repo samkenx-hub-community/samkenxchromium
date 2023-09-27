@@ -9,13 +9,13 @@
 #include <memory>
 #include <string>
 
+#include "base/apple/foundation_util.h"
+#include "base/apple/osstatus_logging.h"
+#include "base/apple/scoped_cftyperef.h"
+#include "base/apple/scoped_mach_port.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
-#include "base/mac/foundation_util.h"
-#include "base/mac/mac_logging.h"
 #include "base/mac/mac_util.h"
-#include "base/mac/scoped_cftyperef.h"
-#include "base/mac/scoped_mach_port.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/strcat.h"
@@ -127,7 +127,7 @@ static AudioDeviceID FindFirstOutputSubdevice(
   const AudioObjectPropertyAddress property_address = {
       kAudioAggregateDevicePropertyFullSubDeviceList,
       kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
-  base::ScopedCFTypeRef<CFArrayRef> subdevices;
+  base::apple::ScopedCFTypeRef<CFArrayRef> subdevices;
   UInt32 size = sizeof(subdevices);
   OSStatus result = AudioObjectGetPropertyData(
       aggregate_device_id, &property_address, 0 /* inQualifierDataSize */,
@@ -146,7 +146,7 @@ static AudioDeviceID FindFirstOutputSubdevice(
   const CFIndex count = CFArrayGetCount(subdevices);
   for (CFIndex i = 0; i != count; ++i) {
     CFStringRef value =
-        base::mac::CFCast<CFStringRef>(CFArrayGetValueAtIndex(subdevices, i));
+        base::apple::CFCast<CFStringRef>(CFArrayGetValueAtIndex(subdevices, i));
     if (value) {
       std::string uid = base::SysCFStringRefToUTF8(value);
       output_subdevice_id = AudioManagerMac::GetAudioDeviceIdByUId(false, uid);
@@ -189,6 +189,9 @@ AUAudioInputStream::AUAudioInputStream(
       last_sample_time_(0.0),
       last_number_of_frames_(0),
       glitch_reporter_(SystemGlitchReporter::StreamType::kCapture),
+      peak_detector_(base::BindRepeating(&AudioManager::TraceAmplitudePeak,
+                                         base::Unretained(manager_),
+                                         /*trace_start=*/true)),
       log_callback_(log_callback) {
   DCHECK(manager_);
   CHECK(log_callback_ != AudioManager::LogCallback());
@@ -1126,8 +1129,12 @@ OSStatus AUAudioInputStream::Provide(UInt32 number_of_frames,
   capture_time -= AudioTimestampHelper::FramesToTime(fifo_.GetAvailableFrames(),
                                                      format_.mSampleRate);
 
+  const int bytes_per_sample = format_.mBitsPerChannel / 8;
+
+  peak_detector_.FindPeak(audio_data, number_of_frames, bytes_per_sample);
+
   // Copy captured (and interleaved) data into FIFO.
-  fifo_.Push(audio_data, number_of_frames, format_.mBitsPerChannel / 8);
+  fifo_.Push(audio_data, number_of_frames, bytes_per_sample);
 
   // Consume and deliver the data when the FIFO has a block of available data.
   while (fifo_.available_blocks()) {
@@ -1294,7 +1301,8 @@ void AUAudioInputStream::UpdateCaptureTimestamp(
         lost_frames, input_params_.sample_rate());
     glitch_reporter_.UpdateStats(lost_audio_duration);
     if (lost_audio_duration.is_positive()) {
-      glitch_accumulator_.Add({.duration = lost_audio_duration, .count = 1});
+      glitch_accumulator_.Add(AudioGlitchInfo::SingleBoundedGlitch(
+          lost_audio_duration, AudioGlitchInfo::Direction::kCapture));
     }
   }
 

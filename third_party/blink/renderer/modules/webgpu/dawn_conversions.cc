@@ -19,6 +19,7 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_union_gpuextent3ddict_unsignedlongenforcerangesequence.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_union_gpuorigin2ddict_unsignedlongenforcerangesequence.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_union_gpuorigin3ddict_unsignedlongenforcerangesequence.h"
+#include "third_party/blink/renderer/modules/webgpu/gpu_device.h"
 #include "third_party/blink/renderer/modules/webgpu/gpu_pipeline_layout.h"
 #include "third_party/blink/renderer/modules/webgpu/gpu_shader_module.h"
 #include "third_party/blink/renderer/modules/webgpu/gpu_texture.h"
@@ -52,11 +53,15 @@ bool ConvertToDawn(const V8GPUColor* in,
 
 bool ConvertToDawn(const V8GPUExtent3D* in,
                    WGPUExtent3D* out,
+                   GPUDevice* device,
                    ExceptionState& exception_state) {
   switch (in->GetContentType()) {
     case V8GPUExtent3D::ContentType::kGPUExtent3DDict: {
       const GPUExtent3DDict* dict = in->GetAsGPUExtent3DDict();
       *out = {dict->width(), dict->height(), dict->depthOrArrayLayers()};
+      if (dict->hasDepth()) {
+        device->AddSingletonWarning(GPUSingletonWarning::kDepthKey);
+      }
       return true;
     }
 
@@ -172,9 +177,9 @@ bool ConvertToDawn(const GPUImageCopyTexture* in,
 }
 
 // Dawn represents `undefined` as the special uint32_t value
-// WGPU_STRIDE_UNDEFINED (0xFFFF'FFFF). Blink must make sure that an actual
-// value of 0xFFFF'FFFF coming in from JS is not treated as
-// WGPU_STRIDE_UNDEFINED, so it injects an error in that case.
+// WGPU_COPY_STRIDE_UNDEFINED (0xFFFF'FFFF). Blink must make sure that an
+// actual value of 0xFFFF'FFFF coming in from JS is not treated as
+// WGPU_COPY_STRIDE_UNDEFINED, so it injects an error in that case.
 const char* ValidateTextureDataLayout(const GPUImageDataLayout* webgpu_layout,
                                       WGPUTextureDataLayout* dawn_layout) {
   DCHECK(webgpu_layout);
@@ -182,21 +187,21 @@ const char* ValidateTextureDataLayout(const GPUImageDataLayout* webgpu_layout,
   uint32_t bytesPerRow = 0;
   if (webgpu_layout->hasBytesPerRow()) {
     bytesPerRow = webgpu_layout->bytesPerRow();
-    if (bytesPerRow == WGPU_STRIDE_UNDEFINED) {
+    if (bytesPerRow == WGPU_COPY_STRIDE_UNDEFINED) {
       return "bytesPerRow must be a multiple of 256";
     }
   } else {
-    bytesPerRow = WGPU_STRIDE_UNDEFINED;
+    bytesPerRow = WGPU_COPY_STRIDE_UNDEFINED;
   }
 
   uint32_t rowsPerImage = 0;
   if (webgpu_layout->hasRowsPerImage()) {
     rowsPerImage = webgpu_layout->rowsPerImage();
-    if (rowsPerImage == WGPU_STRIDE_UNDEFINED) {
+    if (rowsPerImage == WGPU_COPY_STRIDE_UNDEFINED) {
       return "rowsPerImage is too large";
     }
   } else {
-    rowsPerImage = WGPU_STRIDE_UNDEFINED;
+    rowsPerImage = WGPU_COPY_STRIDE_UNDEFINED;
   }
 
   *dawn_layout = {};

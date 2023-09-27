@@ -8,12 +8,7 @@
 #import "components/password_manager/core/browser/affiliation/affiliation_utils.h"
 #import "components/password_manager/core/browser/password_ui_utils.h"
 #import "components/password_manager/core/browser/ui/credential_ui_entry.h"
-#import "components/password_manager/core/browser/well_known_change_password_util.h"
-#import "components/sync/base/features.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "components/password_manager/core/browser/well_known_change_password/well_known_change_password_util.h"
 
 namespace {
 
@@ -68,16 +63,8 @@ NSSet<NSString*>* GetOriginsFromCredential(
   if (self) {
     _signonRealm = [NSString
         stringWithUTF8String:credential.GetFirstSignonRealm().c_str()];
-    auto facetUri = password_manager::FacetURI::FromPotentiallyInvalidSpec(
-        credential.GetFirstSignonRealm());
-    if (facetUri.IsValidAndroidFacetURI() &&
-        !credential.GetDisplayName().empty()) {
-      _changePasswordURL = password_manager::CreateChangePasswordUrl(
-          GURL(credential.GetAffiliatedWebRealm()));
-    } else {
-      _changePasswordURL =
-          password_manager::CreateChangePasswordUrl(credential.GetURL());
-    }
+    _changePasswordURL = credential.GetChangePasswordURL();
+
     _origins = [GetOriginsFromCredential(credential) allObjects];
     _websites = GetWebsitesFromFacets(credential.facets);
 
@@ -92,10 +79,7 @@ NSSet<NSString*>* GetOriginsFromCredential(
           base::SysUTF8ToNSString(credential.federation_origin.host());
     }
 
-    if (base::FeatureList::IsEnabled(syncer::kPasswordNotesWithBackup)) {
-      _note = base::SysUTF16ToNSString(credential.note);
-    }
-
+    _note = base::SysUTF16ToNSString(credential.note);
     _credentialType = credential.blocked_by_user ? CredentialTypeBlocked
                                                  : CredentialTypeRegular;
     if (_credentialType == CredentialTypeRegular &&

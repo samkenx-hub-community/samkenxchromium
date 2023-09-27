@@ -21,6 +21,8 @@ build_webui("build") {
   }
 
   web_component_files = [
+    "elements/viewer-attachment.ts",
+    "elements/viewer-attachment-bar.ts",
     "elements/viewer-bookmark.ts",
     "elements/viewer-document-outline.ts",
     "elements/viewer-download-controls.ts",
@@ -98,6 +100,8 @@ build_webui("build") {
   ]
 
   icons_html_files = [ "elements/icons.html" ]
+
+  html_to_wrapper_scheme = "chrome"
 
   # TypeScript Compiler parameters
   ts_composite = true

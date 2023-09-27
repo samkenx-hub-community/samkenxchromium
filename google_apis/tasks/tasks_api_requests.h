@@ -12,6 +12,8 @@
 #include "base/memory/weak_ptr.h"
 #include "base/types/expected.h"
 #include "google_apis/common/base_requests.h"
+#include "google_apis/tasks/tasks_api_request_types.h"
+#include "google_apis/tasks/tasks_api_response_types.h"
 
 class GURL;
 
@@ -30,8 +32,7 @@ class RequestSender;
 
 namespace tasks {
 
-class TaskLists;
-class Tasks;
+enum class TaskStatus;
 
 // Fetches all the authenticated user's task lists and invokes `callback_` when
 // done.
@@ -109,6 +110,96 @@ class ListTasksRequest : public UrlFetchRequestBase {
   const std::string page_token_;
 
   base::WeakPtrFactory<ListTasksRequest> weak_ptr_factory_{this};
+};
+
+// Partially updates the specified task.
+// `payload` - the request body with the fields to update.
+// https://developers.google.com/tasks/reference/rest/v1/tasks/patch
+class PatchTaskRequest : public UrlFetchRequestBase {
+ public:
+  using Callback = base::OnceCallback<void(ApiErrorCode status_code)>;
+
+  PatchTaskRequest(RequestSender* sender,
+                   Callback callback,
+                   const std::string& task_list_id,
+                   const std::string& task_id,
+                   const TaskRequestPayload& payload);
+  PatchTaskRequest(const PatchTaskRequest&) = delete;
+  PatchTaskRequest& operator=(const PatchTaskRequest&) = delete;
+  ~PatchTaskRequest() override;
+
+ protected:
+  // UrlFetchRequestBase:
+  GURL GetURL() const override;
+  ApiErrorCode MapReasonToError(ApiErrorCode code,
+                                const std::string& reason) override;
+  bool IsSuccessfulErrorCode(ApiErrorCode error) override;
+  HttpRequestMethod GetRequestType() const override;
+  bool GetContentData(std::string* upload_content_type,
+                      std::string* upload_content) override;
+  void ProcessURLFetchResults(
+      const network::mojom::URLResponseHead* response_head,
+      const base::FilePath response_file,
+      std::string response_body) override;
+  void RunCallbackOnPrematureFailure(ApiErrorCode code) override;
+
+ private:
+  Callback callback_;
+  const std::string task_list_id_;
+  const std::string task_id_;
+  const TaskRequestPayload payload_;
+
+  base::WeakPtrFactory<PatchTaskRequest> weak_ptr_factory_{this};
+};
+
+// Creates a new task on the specified task list.
+// `task_list_id`     - task list identifier. Required.
+// `previous_task_id` - previous sibling task identifier. If the task is created
+//                      at the first position among its siblings, this parameter
+//                      is omitted. Optional.
+// `payload`          - the request body with the fields needed to create a new
+//                      task.
+// `callback`         - done callback.
+// https://developers.google.com/tasks/reference/rest/v1/tasks/insert
+class InsertTaskRequest : public UrlFetchRequestBase {
+ public:
+  using Callback = base::OnceCallback<void(
+      base::expected<std::unique_ptr<Task>, ApiErrorCode>)>;
+
+  InsertTaskRequest(RequestSender* sender,
+                    const std::string& task_list_id,
+                    const std::string& previous_task_id,
+                    const TaskRequestPayload& payload,
+                    Callback callback);
+  InsertTaskRequest(const InsertTaskRequest&) = delete;
+  InsertTaskRequest& operator=(const InsertTaskRequest&) = delete;
+  ~InsertTaskRequest() override;
+
+ protected:
+  // UrlFetchRequestBase:
+  GURL GetURL() const override;
+  ApiErrorCode MapReasonToError(ApiErrorCode code,
+                                const std::string& reason) override;
+  bool IsSuccessfulErrorCode(ApiErrorCode error) override;
+  HttpRequestMethod GetRequestType() const override;
+  bool GetContentData(std::string* upload_content_type,
+                      std::string* upload_content) override;
+  void ProcessURLFetchResults(
+      const network::mojom::URLResponseHead* response_head,
+      const base::FilePath response_file,
+      std::string response_body) override;
+  void RunCallbackOnPrematureFailure(ApiErrorCode code) override;
+
+ private:
+  static std::unique_ptr<Task> Parse(std::string json);
+  void OnDataParsed(std::unique_ptr<Task> task_lists);
+
+  const std::string task_list_id_;
+  const std::string previous_task_id_;
+  const TaskRequestPayload payload_;
+  Callback callback_;
+
+  base::WeakPtrFactory<InsertTaskRequest> weak_ptr_factory_{this};
 };
 
 }  // namespace tasks

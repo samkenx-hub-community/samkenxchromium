@@ -9,8 +9,10 @@
 
 #include "ash/ash_export.h"
 #include "ash/public/cpp/desk_template.h"
+#include "ash/style/system_dialog_delegate_view.h"
 #include "ash/wm/desks/desks_controller.h"
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "ui/views/widget/widget.h"
@@ -21,8 +23,6 @@ class Window;
 }
 
 namespace ash {
-
-class SavedDeskDialog;
 
 // SavedDeskDialogController controls when to show the various confirmation
 // dialogs for modifying saved desks.
@@ -62,9 +62,12 @@ class ASH_EXPORT SavedDeskDialogController : public views::WidgetObserver {
   // views::WidgetObserver:
   void OnWidgetDestroying(views::Widget* widget) override;
 
+  // Helper function to get the system dialog view for Jelly tests.
+  const SystemDialogDelegateView* GetSystemDialogViewForTesting() const;
+
  private:
   // Creates and shows the dialog on `root_window`.
-  void CreateDialogWidget(std::unique_ptr<SavedDeskDialog> dialog,
+  void CreateDialogWidget(std::unique_ptr<views::WidgetDelegate> dialog,
                           aura::Window* root_window);
 
   // Returns true if a dialog can be shown.
@@ -76,7 +79,7 @@ class ASH_EXPORT SavedDeskDialogController : public views::WidgetObserver {
   void OnUserCanceledUnsupportedAppsDialog();
 
   // Pointer to the widget (if any) that contains the current dialog.
-  views::Widget* dialog_widget_ = nullptr;
+  raw_ptr<views::Widget, ExperimentalAsh> dialog_widget_ = nullptr;
 
   // When a caller creates an unsupported apps dialog, they provide a callback
   // for the result. Since we can only bind the callback once, we have to store

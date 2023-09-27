@@ -6,10 +6,6 @@
 
 #import "ios/chrome/browser/push_notification/push_notification_client_id.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 TestPushNotificationClient::TestPushNotificationClient(size_t client_id)
     : PushNotificationClient(static_cast<PushNotificationClientId>(client_id)) {
 }
@@ -38,4 +34,12 @@ bool TestPushNotificationClient::HasNotificationReceivedInteraction() {
 void TestPushNotificationClient::SetBackgroundFetchResult(
     UIBackgroundFetchResult result) {
   fetch_result_ = result;
+}
+
+void TestPushNotificationClient::OnSceneActiveForegroundBrowserReady() {
+  is_browser_ready_ = true;
+}
+
+bool TestPushNotificationClient::IsBrowserReady() {
+  return is_browser_ready_;
 }

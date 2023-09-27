@@ -160,7 +160,7 @@ PaintImage Image::ResizeAndOrientImage(
   const SkImageInfo surface_info = SkImageInfo::MakeN32(
       size.width(), size.height(), image.GetSkImageInfo().alphaType(),
       surface_color_space);
-  sk_sp<SkSurface> surface = SkSurface::MakeRaster(surface_info);
+  sk_sp<SkSurface> surface = SkSurfaces::Raster(surface_info);
   if (!surface)
     return PaintImage();
 
@@ -342,8 +342,8 @@ scoped_refptr<Image> Image::ImageForDefaultFrame() {
 }
 
 PaintImageBuilder Image::CreatePaintImageBuilder() {
-  auto animation_type = MaybeAnimated() ? PaintImage::AnimationType::ANIMATED
-                                        : PaintImage::AnimationType::STATIC;
+  auto animation_type = MaybeAnimated() ? PaintImage::AnimationType::kAnimated
+                                        : PaintImage::AnimationType::kStatic;
   return PaintImageBuilder::WithDefault()
       .set_id(stable_image_id_)
       .set_animation_type(animation_type)

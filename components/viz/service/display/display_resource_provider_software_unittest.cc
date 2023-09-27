@@ -23,7 +23,6 @@
 #include "components/viz/client/client_resource_provider.h"
 #include "components/viz/common/resources/bitmap_allocation.h"
 #include "components/viz/common/resources/release_callback.h"
-#include "components/viz/common/resources/resource_format_utils.h"
 #include "components/viz/common/resources/returned_resource.h"
 #include "components/viz/common/resources/shared_bitmap.h"
 #include "components/viz/service/display/shared_bitmap_manager.h"
@@ -54,12 +53,12 @@ static void CollectResources(std::vector<ReturnedResource>* array,
 
 static SharedBitmapId CreateAndFillSharedBitmap(SharedBitmapManager* manager,
                                                 const gfx::Size& size,
-                                                ResourceFormat format,
+                                                SharedImageFormat format,
                                                 uint32_t value) {
   SharedBitmapId shared_bitmap_id = SharedBitmap::GenerateId();
 
   base::MappedReadOnlyRegion shm =
-      bitmap_allocation::AllocateSharedBitmap(size, RGBA_8888);
+      bitmap_allocation::AllocateSharedBitmap(size, format);
   manager->ChildAllocatedSharedBitmap(shm.region.Map(), shared_bitmap_id);
   base::span<uint32_t> span =
       shm.mapping.GetMemoryAsSpan<uint32_t>(size.GetArea());
@@ -79,14 +78,6 @@ class DisplayResourceProviderSoftwareTest : public testing::Test {
     child_resource_provider_->ShutdownAndReleaseAllResources();
   }
 
-  TransferableResource CreateResource(ResourceFormat format) {
-    constexpr gfx::Size size(64, 64);
-    SharedBitmapId shared_bitmap_id = CreateAndFillSharedBitmap(
-        shared_bitmap_manager_.get(), size, format, 0);
-
-    return TransferableResource::MakeSoftware(shared_bitmap_id, size, format);
-  }
-
  protected:
   const std::unique_ptr<TestSharedBitmapManager> shared_bitmap_manager_;
   const std::unique_ptr<DisplayResourceProviderSoftware> resource_provider_;
@@ -95,7 +86,7 @@ class DisplayResourceProviderSoftwareTest : public testing::Test {
 
 TEST_F(DisplayResourceProviderSoftwareTest, ReadSoftwareResources) {
   gfx::Size size(64, 64);
-  ResourceFormat format = RGBA_8888;
+  SharedImageFormat format = SinglePlaneFormat::kRGBA_8888;
   const uint32_t kBadBeef = 0xbadbeef;
   SharedBitmapId shared_bitmap_id = CreateAndFillSharedBitmap(
       shared_bitmap_manager_.get(), size, format, kBadBeef);

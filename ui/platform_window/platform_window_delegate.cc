@@ -14,6 +14,13 @@
 
 namespace ui {
 
+bool PlatformWindowDelegate::State::ProducesFrameOnUpdateFrom(
+    const State& old) const {
+  // Changing the bounds origin won't produce a new frame. Anything else will.
+  return old.bounds_dip.size() != bounds_dip.size() || old.size_px != size_px ||
+         old.window_scale != window_scale || old.raster_scale != raster_scale;
+}
+
 std::string PlatformWindowDelegate::State::ToString() const {
   std::stringstream result;
   result << "State {";
@@ -34,12 +41,24 @@ void PlatformWindowDelegate::OnWindowTiledStateChanged(
     WindowTiledEdges new_tiled_edges) {}
 #endif
 
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+void PlatformWindowDelegate::OnFullscreenModeChanged() {}
+#endif
+
 absl::optional<gfx::Size> PlatformWindowDelegate::GetMinimumSizeForWindow() {
   return absl::nullopt;
 }
 
 absl::optional<gfx::Size> PlatformWindowDelegate::GetMaximumSizeForWindow() {
   return absl::nullopt;
+}
+
+bool PlatformWindowDelegate::CanMaximize() {
+  return false;
+}
+
+bool PlatformWindowDelegate::CanFullscreen() {
+  return false;
 }
 
 SkPath PlatformWindowDelegate::GetWindowMaskForWindowShapeInPixels() {
@@ -70,6 +89,12 @@ void PlatformWindowDelegate::SetFrameRateThrottleEnabled(bool enabled) {}
 
 void PlatformWindowDelegate::OnTooltipShownOnServer(const std::u16string& text,
                                                     const gfx::Rect& bounds) {}
+
+bool PlatformWindowDelegate::OnRotateFocus(
+    PlatformWindowDelegate::RotateDirection direction,
+    bool reset) {
+  return false;
+}
 
 void PlatformWindowDelegate::OnTooltipHiddenOnServer() {}
 

@@ -626,7 +626,7 @@ BookmarkManagerPrivateOpenInNewTabFunction::RunOnReady() {
   ExtensionTabUtil::OpenTabParams options;
   options.url = node->url().spec();
   options.active = params->active;
-  options.bookmark_id = node->id();
+  options.bookmark_id = node->uuid();
 
   auto result =
       extensions::ExtensionTabUtil::OpenTab(this, options, user_gesture());
@@ -675,7 +675,7 @@ BookmarkManagerPrivateOpenInNewWindowFunction::RunOnReady() {
       continue;  // The URL was filtered out; ignore this node.
     UrlAndId url_and_id;
     url_and_id.url = node->url();
-    url_and_id.id = node->id();
+    url_and_id.id = node->uuid();
     url_and_ids.push_back(url_and_id);
   }
   DCHECK_EQ(urls.size(), url_and_ids.size());
@@ -744,7 +744,7 @@ void BookmarkManagerPrivateIOFunction::ShowSelectFileDialog(
   file_type_info.extensions[0].push_back(FILE_PATH_LITERAL("html"));
   gfx::NativeWindow owning_window =
       web_contents ? platform_util::GetTopLevel(web_contents->GetNativeView())
-                   : gfx::kNullNativeWindow;
+                   : gfx::NativeWindow();
   // |web_contents| can be nullptr (for background pages), which is fine. In
   // such a case if file-selection dialogs are forbidden by policy, we will not
   // show an InfoBar, which is better than letting one appear out of the blue.

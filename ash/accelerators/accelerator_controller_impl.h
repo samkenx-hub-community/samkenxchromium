@@ -12,7 +12,11 @@
 #include <set>
 #include <vector>
 
+#include "ash/accelerators/accelerator_capslock_state_machine.h"
 #include "ash/accelerators/accelerator_history_impl.h"
+#include "ash/accelerators/accelerator_launcher_state_machine.h"
+#include "ash/accelerators/accelerator_prefs.h"
+#include "ash/accelerators/accelerator_shift_disable_capslock_state_machine.h"
 #include "ash/accelerators/accelerator_table.h"
 #include "ash/accelerators/ash_accelerator_configuration.h"
 #include "ash/accelerators/exit_warning_handler.h"
@@ -23,6 +27,7 @@
 #include "ash/public/cpp/accelerators.h"
 #include "base/files/file_path.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/timer/timer.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/accelerators/accelerator_map.h"
@@ -37,6 +42,18 @@ namespace ash {
 struct AcceleratorData;
 class ExitWarningHandler;
 
+/**
+Encode a shortcut as an int.
+- The low 16 bits represent the key code.
+- The high 16 bits represent the modififers.
+  - The 31 bit: Command key
+  - The 30 bit: Alt key
+  - The 29 bit: Control key
+  - The 28 bit: Shift key
+  - All other bits are 0
+*/
+ASH_EXPORT int GetEncodedShortcut(const ui::Accelerator& accelerator);
+
 // AcceleratorControllerImpl provides functions for registering or unregistering
 // global keyboard accelerators, which are handled earlier than any windows. It
 // also implements several handlers as an accelerator target.
@@ -44,7 +61,8 @@ class ASH_EXPORT AcceleratorControllerImpl
     : public ui::AcceleratorTarget,
       public AcceleratorController,
       public input_method::InputMethodManager::Observer,
-      public AshAcceleratorConfiguration::Observer {
+      public AshAcceleratorConfiguration::Observer,
+      public AcceleratorPrefs::Observer {
  public:
   // TestApi is used for tests to get internal implementation details.
   class TestApi {
@@ -87,7 +105,8 @@ class ASH_EXPORT AcceleratorControllerImpl
                                      const std::string& side);
 
    private:
-    AcceleratorControllerImpl* controller_;  // Not owned.
+    raw_ptr<AcceleratorControllerImpl, DanglingUntriaged | ExperimentalAsh>
+        controller_;  // Not owned.
   };
 
   explicit AcceleratorControllerImpl(AshAcceleratorConfiguration* config);
@@ -118,6 +137,9 @@ class ASH_EXPORT AcceleratorControllerImpl
 
   // AshAcceleratorConfiguration::Observer overrides:
   void OnAcceleratorsUpdated() override;
+
+  // AcceleratorPrefs::Observer overrides:
+  void OnShortcutPolicyUpdated() override;
 
   // Registers global keyboard accelerators for the specified target. If
   // multiple targets are registered for any given accelerator, a target
@@ -221,9 +243,14 @@ class ASH_EXPORT AcceleratorControllerImpl
 
   // A tracker for the current and previous accelerators.
   std::unique_ptr<AcceleratorHistoryImpl> accelerator_history_;
+  std::unique_ptr<AcceleratorLauncherStateMachine> launcher_state_machine_;
+  std::unique_ptr<AcceleratorCapslockStateMachine> capslock_state_machine_;
+  std::unique_ptr<AcceleratorShiftDisableCapslockStateMachine>
+      shift_disable_state_machine_;
 
   // Manages all accelerator mappings.
-  AshAcceleratorConfiguration* accelerator_configuration_;
+  raw_ptr<AshAcceleratorConfiguration, ExperimentalAsh>
+      accelerator_configuration_;
 
   // Handles the exit accelerator which requires a double press to exit and
   // shows a popup with an explanation.

@@ -10,13 +10,6 @@
 // App interface for the NTP.
 @interface NewTabPageAppInterface : NSObject
 
-// Returns the short name of the default search engine.
-+ (NSString*)defaultSearchEngine;
-
-// Resets the default search engine to `defaultSearchEngine`.
-// `defaultSearchEngine` should be its short name.
-+ (void)resetSearchEngineTo:(NSString*)defaultSearchEngine;
-
 // Returns the width the search field is supposed to have when the collection
 // has `collectionWidth`. `traitCollection` is the trait collection of the view
 // displaying the omnibox, its Size Class is used in the computation.
@@ -35,6 +28,18 @@
 
 // Returns the Discover header label.
 + (UILabel*)discoverHeaderLabel;
+
+// Resets SetUpList prefs to clear any completed items.
++ (void)resetSetUpListPrefs;
+
+// Returns YES if the SetUpListItemView for SignInSync is complete.
++ (BOOL)setUpListItemSignInSyncIsComplete;
+
+// Returns YES if the SetUpListItemView for DefaultBrowser is complete.
++ (BOOL)setUpListItemDefaultBrowserIsComplete;
+
+// Returns YES if the SetUpListItemView for Autofill is complete.
++ (BOOL)setUpListItemAutofillIsComplete;
 
 @end
 

@@ -108,10 +108,9 @@ void SetManualProxy(base::Value::Dict* manual,
 
 base::Value::Dict OncValueWithMode(const std::string& source,
                                    const std::string& mode) {
-  base::Value::Dict result;
-  result.Set(::onc::network_config::kType,
-             CreateEffectiveValue(source, base::Value(mode)));
-  return result;
+  return base::Value::Dict().Set(
+      ::onc::network_config::kType,
+      CreateEffectiveValue(source, base::Value(mode)));
 }
 
 absl::optional<base::Value::Dict> OncValueForManualProxyList(
@@ -260,7 +259,7 @@ bool UIProxyConfigService::MergeEnforcedProxyConfig(
   DCHECK(local_state_prefs_);
   DCHECK(network_profile_handler_);
   PrefService* top_pref_service =
-      profile_prefs_ ? profile_prefs_ : local_state_prefs_;
+      profile_prefs_ ? profile_prefs_.get() : local_state_prefs_.get();
 
   // Get prefs proxy config if available.
   net::ProxyConfigWithAnnotation pref_config;

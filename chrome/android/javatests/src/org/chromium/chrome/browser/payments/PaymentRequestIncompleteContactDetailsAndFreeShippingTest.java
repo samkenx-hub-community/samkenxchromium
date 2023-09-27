@@ -13,15 +13,14 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.test.util.CommandLineFlags;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.autofill.AutofillTestHelper;
-import org.chromium.chrome.browser.autofill.PersonalDataManager.AutofillProfile;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.payments.PaymentRequestTestRule.AppPresence;
 import org.chromium.chrome.browser.payments.PaymentRequestTestRule.FactorySpeed;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.R;
+import org.chromium.components.autofill.AutofillProfile;
 
 import java.util.concurrent.TimeoutException;
 
@@ -33,6 +32,9 @@ import java.util.concurrent.TimeoutException;
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 public class PaymentRequestIncompleteContactDetailsAndFreeShippingTest {
+    // A fake payment method.
+    private static final String BOBPAY_TEST = "https://bobpay.test";
+
     @Rule
     public PaymentRequestTestRule mPaymentRequestTestRule = new PaymentRequestTestRule(
             "payment_request_contact_details_and_free_shipping_test.html");
@@ -42,10 +44,18 @@ public class PaymentRequestIncompleteContactDetailsAndFreeShippingTest {
         AutofillTestHelper helper = new AutofillTestHelper();
         // The user has a shipping address with a valid email address on disk. However the phone
         // number is invalid.
-        helper.setProfile(
-                new AutofillProfile("", "https://example.test", true, "" /* honorific prefix */,
-                        "Jon Doe", "Google", "340 Main St", "CA", "Los Angeles", "", "90291", "",
-                        "US", "" /* invalid phone number */, "jon.doe@google.com", "en-US"));
+        helper.setProfile(AutofillProfile.builder()
+                                  .setFullName("Jon Doe")
+                                  .setCompanyName("Google")
+                                  .setStreetAddress("340 Main St")
+                                  .setRegion("CA")
+                                  .setLocality("Los Angeles")
+                                  .setPostalCode("90291")
+                                  .setCountryCode("US")
+                                  .setPhoneNumber("" /* invalid phone number */)
+                                  .setEmailAddress("jon.doe@google.com")
+                                  .setLanguageCode("en-US")
+                                  .build());
 
         mPaymentRequestTestRule.addPaymentAppFactory(
                 AppPresence.HAVE_APPS, FactorySpeed.FAST_FACTORY);
@@ -54,10 +64,11 @@ public class PaymentRequestIncompleteContactDetailsAndFreeShippingTest {
     /** Update the shipping address with valid data and see that the contacts section is updated. */
     @Test
     @MediumTest
-    @DisabledTest(message = "crbug.com/1182234")
     @Feature({"Payments"})
     public void testEditIncompleteShippingAndPay() throws TimeoutException {
-        mPaymentRequestTestRule.triggerUIAndWait("buy", mPaymentRequestTestRule.getReadyForInput());
+        mPaymentRequestTestRule.runJavaScriptAndWaitForUIEvent(
+            "buyWithMethods([{supportedMethods: '" + BOBPAY_TEST + "'}]);",
+            mPaymentRequestTestRule.getReadyForInput());
         mPaymentRequestTestRule.clickInShippingAddressAndWait(
                 R.id.payments_section, mPaymentRequestTestRule.getReadyForInput());
 
@@ -92,10 +103,11 @@ public class PaymentRequestIncompleteContactDetailsAndFreeShippingTest {
     /** Add a shipping address with valid data and see that the contacts section is updated. */
     @Test
     @MediumTest
-    @DisabledTest(message = "crbug.com/1182234")
     @Feature({"Payments"})
     public void testEditIncompleteShippingAndContactAndPay() throws TimeoutException {
-        mPaymentRequestTestRule.triggerUIAndWait("buy", mPaymentRequestTestRule.getReadyForInput());
+        mPaymentRequestTestRule.runJavaScriptAndWaitForUIEvent(
+            "buyWithMethods([{supportedMethods: '" + BOBPAY_TEST + "'}]);",
+            mPaymentRequestTestRule.getReadyForInput());
         mPaymentRequestTestRule.clickInShippingAddressAndWait(
                 R.id.payments_section, mPaymentRequestTestRule.getReadyForInput());
 

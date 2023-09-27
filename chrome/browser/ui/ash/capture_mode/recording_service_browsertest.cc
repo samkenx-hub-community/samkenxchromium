@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "ash/capture_mode/capture_mode_types.h"
 #include "ash/public/cpp/capture_mode/capture_mode_test_api.h"
 #include "ash/public/cpp/test/shell_test_api.h"
 #include "base/check.h"
@@ -75,7 +76,6 @@ class WebmVerifier {
         base::BindRepeating(&WebmVerifier::OnNewConfig, base::Unretained(this)),
         base::BindRepeating(&WebmVerifier::OnNewBuffers,
                             base::Unretained(this)),
-        /*ignore_text_tracks=*/true,
         base::BindRepeating(&WebmVerifier::OnEncryptedMediaInitData,
                             base::Unretained(this)),
         base::BindRepeating(&WebmVerifier::OnNewMediaSegment,
@@ -110,10 +110,7 @@ class WebmVerifier {
 
  private:
   void OnInit(const media::StreamParser::InitParameters&) {}
-  bool OnNewConfig(std::unique_ptr<media::MediaTracks> tracks,
-                   const media::StreamParser::TextTrackConfigMap&) {
-    return true;
-  }
+  bool OnNewConfig(std::unique_ptr<media::MediaTracks> tracks) { return true; }
   bool OnNewBuffers(const media::StreamParser::BufferQueueMap& map) {
     return true;
   }
@@ -150,7 +147,8 @@ class RecordingServiceBrowserTest : public InProcessBrowserTest {
     // muxer to discard video frames if it expects audio frames but got none,
     // which may cause the produced webm file to be empty. See issues
     // https://crbug.com/1151167 and https://crbug.com/1151418.
-    ash::CaptureModeTestApi().SetAudioRecordingEnabled(false);
+    ash::CaptureModeTestApi().SetAudioRecordingMode(
+        ash::AudioRecordingMode::kOff);
   }
 
   aura::Window* GetBrowserWindow() const {
@@ -213,7 +211,7 @@ IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest, RecordWindow) {
 
 IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest, RecordWindowMultiDisplay) {
   display::test::DisplayManagerTestApi(ash::ShellTestApi().display_manager())
-      .UpdateDisplay("300x200,301+0-400x400");
+      .UpdateDisplay("300x200,301+0-400x350");
 
   ash::CaptureModeTestApi capture_mode_test_api;
   capture_mode_test_api.StartForWindow(/*for_video=*/true);
@@ -262,7 +260,8 @@ IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest, RecordWindowMultiDisplay) {
   VerifyVideoFileAndDelete(video_path);
 }
 
-IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest, RecordRegion) {
+// TODO(b/273521375): Flaky.
+IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest, DISABLED_RecordRegion) {
   ash::CaptureModeTestApi test_api;
   test_api.StartForRegion(/*for_video=*/true);
   // Select a random partial region of the screen.
@@ -270,8 +269,9 @@ IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest, RecordRegion) {
   FinishVideoRecordingTest(&test_api);
 }
 
+// TODO(b/273521375): Flaky.
 IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest,
-                       RecordingServiceEndpointDropped) {
+                       DISABLED_RecordingServiceEndpointDropped) {
   ash::CaptureModeTestApi test_api;
   test_api.StartForFullscreen(/*for_video=*/true);
   test_api.PerformCapture();
@@ -298,7 +298,7 @@ IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest,
   VerifyVideoFileAndDelete(video_path, /*allow_empty=*/true);
 }
 
-// TODO(crbug.com/1423872): Flaky.
+// TODO(b/273521375): Flaky.
 IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest,
                        DISABLED_SuccessiveRecording) {
   ash::CaptureModeTestApi test_api;
@@ -311,7 +311,7 @@ IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest,
 }
 
 // Tests that recording will be interrupted once screen capture becomes locked.
-// TODO(crbug.com/1423872): Flaky.
+// TODO(b/273521375): Flaky.
 IN_PROC_BROWSER_TEST_F(RecordingServiceBrowserTest,
                        DISABLED_RecordingInterruptedOnCaptureLocked) {
   ash::CaptureModeTestApi test_api;

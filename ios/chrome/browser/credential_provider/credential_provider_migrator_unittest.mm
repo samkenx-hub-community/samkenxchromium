@@ -17,10 +17,6 @@
 #import "testing/platform_test.h"
 #import "url/gurl.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 
 using base::test::ios::kWaitForFileOperationTimeout;
@@ -34,6 +30,7 @@ ArchivableCredential* TestCredential() {
   NSString* keychainIdentifier = @"keychain_identifier_value";
   NSString* url = @"http://www.alpha.example.com/path/and?args=8";
   NSString* recordIdentifier = @"recordIdentifier";
+  NSString* note = @"note";
   return [[ArchivableCredential alloc] initWithFavicon:nil
                                     keychainIdentifier:keychainIdentifier
                                                   rank:1
@@ -41,8 +38,7 @@ ArchivableCredential* TestCredential() {
                                      serviceIdentifier:url
                                            serviceName:nil
                                                   user:username
-                                  validationIdentifier:nil
-                                                  note:nil];
+                                                  note:note];
 }
 
 class CredentialProviderMigratorTest : public PlatformTest {
@@ -60,7 +56,11 @@ class CredentialProviderMigratorTest : public PlatformTest {
       base::MakeRefCounted<testing::NiceMock<MockPasswordStoreInterface>>();
 
  private:
-  base::test::SingleThreadTaskEnvironment task_environment_;
+  // Mocking time is required for password notes since they are created with the
+  // creation_date metadata, which is compared in AddLogin() call expectations.
+  base::test::SingleThreadTaskEnvironment task_environment_{
+      base::test::TaskEnvironment::MainThreadType::IO,
+      base::test::TaskEnvironment::TimeSource::MOCK_TIME};
 };
 
 // Tests basic migration for 1 credential.

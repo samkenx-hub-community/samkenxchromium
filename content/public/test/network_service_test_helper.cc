@@ -21,6 +21,7 @@
 #include "base/task/thread_pool.h"
 #include "base/threading/thread_restrictions.h"
 #include "build/build_config.h"
+#include "content/public/browser/network_service_util.h"
 #include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/test_host_resolver.h"
@@ -32,7 +33,9 @@
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "net/base/address_family.h"
 #include "net/base/address_list.h"
+#include "net/base/address_map_linux.h"
 #include "net/base/ip_address.h"
+#include "net/base/network_change_notifier.h"
 #include "net/cert/ev_root_ca_metadata.h"
 #include "net/cert/mock_cert_verifier.h"
 #include "net/disk_cache/disk_cache.h"
@@ -64,6 +67,8 @@
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/test/android/url_utils.h"
+#include "net/dns/system_dns_config_change_notifier.h"
+#include "services/network/public/mojom/system_dns_config_observer.mojom.h"
 #endif
 
 namespace content {
@@ -415,6 +420,27 @@ class SimpleCache : public network::mojom::SimpleCache {
   base::WeakPtrFactory<SimpleCache> weak_factory_{this};
 };
 
+#if BUILDFLAG(IS_ANDROID)
+class ProxySystemDnsConfigChangeObserver
+    : public net::SystemDnsConfigChangeNotifier::Observer {
+ public:
+  explicit ProxySystemDnsConfigChangeObserver(
+      mojo::PendingRemote<network::mojom::SystemDnsConfigObserver>
+          mojo_observer)
+      : mojo_observer_(std::move(mojo_observer)) {}
+  virtual ~ProxySystemDnsConfigChangeObserver() = default;
+
+  void OnSystemDnsConfigChanged(
+      absl::optional<net::DnsConfig> config) override {
+    net::DnsConfig invalid_config;
+    mojo_observer_->OnConfigChanged(config ? *config : invalid_config);
+  }
+
+ private:
+  mojo::Remote<network::mojom::SystemDnsConfigObserver> mojo_observer_;
+};
+#endif
+
 }  // namespace
 
 class NetworkServiceTestHelper::NetworkServiceTestImpl
@@ -587,6 +613,25 @@ class NetworkServiceTestHelper::NetworkServiceTestImpl
         ->ReplaceSystemDnsConfigForTesting(std::move(callback));
   }
 
+#if BUILDFLAG(IS_ANDROID)
+  void AddSystemDnsConfigObserver(
+      mojo::PendingRemote<network::mojom::SystemDnsConfigObserver>
+          remote_observer,
+      AddSystemDnsConfigObserverCallback callback) override {
+    CHECK(!proxy_dns_config_observer_);
+
+    proxy_dns_config_observer_ =
+        std::make_unique<ProxySystemDnsConfigChangeObserver>(
+            std::move(remote_observer));
+    auto* system_dns_config_notifier =
+        net::NetworkChangeNotifier::GetSystemDnsConfigNotifier();
+    CHECK(system_dns_config_notifier);
+    system_dns_config_notifier->AddObserver(proxy_dns_config_observer_.get());
+
+    std::move(callback).Run();
+  }
+#endif
+
   void SetTestDohConfig(net::SecureDnsMode secure_dns_mode,
                         const net::DnsOverHttpsConfig& doh_config,
                         SetTestDohConfigCallback callback) override {
@@ -650,7 +695,10 @@ class NetworkServiceTestHelper::NetworkServiceTestImpl
   void BindReceiver(
       mojo::PendingReceiver<network::mojom::NetworkServiceTest> receiver) {
     receivers_.Add(this, std::move(receiver));
-    if (!registered_as_destruction_observer_) {
+    if (base::CurrentIOThread::IsSet() &&
+        !registered_as_destruction_observer_) {
+      // Needs to be called on the IO thread.
+      // TODO(https://crbug.846445): Check this is still needed.
       base::CurrentIOThread::Get()->AddDestructionObserver(this);
       registered_as_destruction_observer_ = true;
     }
@@ -756,6 +804,16 @@ class NetworkServiceTestHelper::NetworkServiceTestImpl
     system_task_ptr->Start(std::move(results_cb));
   }
 
+#if BUILDFLAG(IS_LINUX)
+  void GetAddressMapCacheLinux(
+      GetAddressMapCacheLinuxCallback callback) override {
+    const net::AddressMapOwnerLinux* address_map_owner =
+        net::NetworkChangeNotifier::GetAddressMapOwner();
+    std::move(callback).Run(address_map_owner->GetAddressMap(),
+                            address_map_owner->GetOnlineLinks());
+  }
+#endif  // BUILDFLAG(IS_LINUX)
+
  private:
   void OnMemoryPressure(
       base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
@@ -793,6 +851,10 @@ class NetworkServiceTestHelper::NetworkServiceTestImpl
           base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE;
   int write_result_;
   std::unique_ptr<disk_cache::Backend> disk_cache_backend_;
+#if BUILDFLAG(IS_ANDROID)
+  std::unique_ptr<ProxySystemDnsConfigChangeObserver>
+      proxy_dns_config_observer_;
+#endif
 
   base::WeakPtrFactory<NetworkServiceTestImpl> weak_factory_{this};
 };
@@ -829,4 +891,15 @@ void NetworkServiceTestHelper::RegisterNetworkBinders(
       base::Unretained(this)));
 }
 
+std::unique_ptr<NetworkServiceTestHelper>
+NetworkServiceTestHelper::CreateInProcessReceiver(
+    mojo::PendingReceiver<network::mojom::NetworkServiceTest> receiver) {
+  CHECK(!base::CommandLine::ForCurrentProcess()->HasSwitch(
+            switches::kProcessType) &&
+        IsInProcessNetworkService());
+  std::unique_ptr<NetworkServiceTestHelper> helper(
+      new NetworkServiceTestHelper());
+  helper->network_service_test_impl_->BindReceiver(std::move(receiver));
+  return helper;
+}
 }  // namespace content

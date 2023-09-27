@@ -31,6 +31,7 @@
 #include "third_party/blink/public/mojom/permissions_policy/policy_value.mojom-blink-forward.h"
 #include "third_party/blink/public/platform/web_url_request.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_controller.h"
+#include "third_party/blink/renderer/bindings/core/v8/to_v8_traits.h"
 #include "third_party/blink/renderer/core/css/css_property_names.h"
 #include "third_party/blink/renderer/core/css/style_change_reason.h"
 #include "third_party/blink/renderer/core/display_lock/display_lock_utilities.h"
@@ -38,6 +39,7 @@
 #include "third_party/blink/renderer/core/dom/events/event.h"
 #include "third_party/blink/renderer/core/dom/node.h"
 #include "third_party/blink/renderer/core/dom/shadow_root.h"
+#include "third_party/blink/renderer/core/execution_context/agent.h"
 #include "third_party/blink/renderer/core/exported/web_plugin_container_impl.h"
 #include "third_party/blink/renderer/core/frame/csp/content_security_policy.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
@@ -127,6 +129,7 @@ HTMLPlugInElement::HTMLPlugInElement(const QualifiedName& tag_name,
                                      Document& doc,
                                      const CreateElementFlags flags)
     : HTMLFrameOwnerElement(tag_name, doc),
+      ActiveScriptWrappable<HTMLPlugInElement>({}),
       is_delaying_load_event_(false),
       // needs_plugin_update_(!IsCreatedByParser) allows HTMLObjectElement to
       // delay EmbeddedContentView updates until after all children are
@@ -347,13 +350,13 @@ void HTMLPlugInElement::DetachLayoutTree(bool performing_reattach) {
   HTMLFrameOwnerElement::DetachLayoutTree(performing_reattach);
 }
 
-LayoutObject* HTMLPlugInElement::CreateLayoutObject(const ComputedStyle& style,
-                                                    LegacyLayout legacy) {
+LayoutObject* HTMLPlugInElement::CreateLayoutObject(
+    const ComputedStyle& style) {
   // Fallback content breaks the DOM->layoutObject class relationship of this
   // class and all superclasses because createObject won't necessarily return
   // a LayoutEmbeddedObject or LayoutEmbeddedContent.
   if (UseFallbackContent())
-    return LayoutObject::CreateObject(this, style, legacy);
+    return LayoutObject::CreateObject(this, style);
 
   if (IsImageType()) {
     LayoutImage* image = MakeGarbageCollected<LayoutImage>(this);
@@ -383,7 +386,7 @@ v8::Local<v8::Object> HTMLPlugInElement::PluginWrapper() {
   // If the host dynamically turns off JavaScript (or Java) we will still
   // return the cached allocated Bindings::Instance. Not supporting this
   // edge-case is OK.
-  v8::Isolate* isolate = V8PerIsolateData::MainThreadIsolate();
+  v8::Isolate* isolate = GetDocument().GetAgent().isolate();
   if (plugin_wrapper_.IsEmpty()) {
     WebPluginContainerImpl* plugin;
 
@@ -410,6 +413,100 @@ v8::Local<v8::Object> HTMLPlugInElement::PluginWrapper() {
     }
   }
   return plugin_wrapper_.Get(isolate);
+}
+
+ScriptValue HTMLPlugInElement::AnonymousNamedGetter(const AtomicString& name) {
+  if (!GetExecutionContext()) {
+    // PluginWrapper() is guaranteed nullptr if there's no ExecutionContext.
+    return ScriptValue();
+  }
+
+  v8::Local<v8::Context> context =
+      GetExecutionContext()->GetIsolate()->GetCurrentContext();
+  ScriptState* script_state = ScriptState::From(context);
+  if (!script_state->World().IsMainWorld()) {
+    if (script_state->World().IsIsolatedWorld()) {
+      UseCounter::Count(GetExecutionContext(),
+                        WebFeature::kPluginInstanceAccessFromIsolatedWorld);
+    }
+    // The plugin system cannot deal with multiple worlds, so block any
+    // non-main world access.
+    return ScriptValue();
+  }
+  UseCounter::Count(GetExecutionContext(),
+                    WebFeature::kPluginInstanceAccessFromMainWorld);
+
+  v8::Local<v8::Object> instance = PluginWrapper();
+  if (instance.IsEmpty()) {
+    return ScriptValue();
+  }
+
+  v8::Local<v8::String> v8_name =
+      V8AtomicString(script_state->GetIsolate(), name);
+  bool has_own_property;
+  v8::Local<v8::Value> value;
+  if (!instance->HasOwnProperty(context, v8_name).To(&has_own_property) ||
+      !has_own_property || !instance->Get(context, v8_name).ToLocal(&value)) {
+    return ScriptValue();
+  }
+
+  UseCounter::Count(GetExecutionContext(),
+                    WebFeature::kPluginInstanceAccessSuccessful);
+  return ScriptValue(script_state->GetIsolate(), value);
+}
+
+NamedPropertySetterResult HTMLPlugInElement::AnonymousNamedSetter(
+    const AtomicString& name,
+    const ScriptValue& value) {
+  if (!GetExecutionContext()) {
+    // PluginWrapper() is guaranteed nullptr if there's no ExecutionContext.
+    return NamedPropertySetterResult::kDidNotIntercept;
+  }
+
+  v8::Local<v8::Context> context =
+      GetExecutionContext()->GetIsolate()->GetCurrentContext();
+  ScriptState* script_state = ScriptState::From(context);
+  if (!script_state->World().IsMainWorld()) {
+    // The plugin system cannot deal with multiple worlds, so block any
+    // non-main world access.
+    return NamedPropertySetterResult::kDidNotIntercept;
+  }
+
+  v8::Local<v8::Object> instance = PluginWrapper();
+  if (instance.IsEmpty()) {
+    return NamedPropertySetterResult::kDidNotIntercept;
+  }
+
+  // Don't intercept any of the properties of the HTMLPluginElement.
+  v8::Local<v8::String> v8_name =
+      V8AtomicString(script_state->GetIsolate(), name);
+  v8::Local<v8::Object> this_wrapper =
+      ToV8Traits<HTMLPlugInElement>::ToV8(script_state, this)
+          .ToLocalChecked()
+          .As<v8::Object>();
+  bool instance_has_property;
+  bool holder_has_property;
+  if (!instance->HasOwnProperty(context, v8_name).To(&instance_has_property) ||
+      !this_wrapper->Has(context, v8_name).To(&holder_has_property) ||
+      (!instance_has_property && holder_has_property)) {
+    return NamedPropertySetterResult::kDidNotIntercept;
+  }
+
+  // FIXME: The gTalk pepper plugin is the only plugin to make use of
+  // SetProperty and that is being deprecated. This can be removed as soon as
+  // it goes away.
+  // Call SetProperty on a pepper plugin's scriptable object. Note that we
+  // never set the return value here which would indicate that the plugin has
+  // intercepted the SetProperty call, which means that the property on the
+  // DOM element will also be set. For plugin's that don't intercept the call
+  // (all except gTalk) this makes no difference at all. For gTalk the fact
+  // that the property on the DOM element also gets set is inconsequential.
+  bool created;
+  if (!instance->CreateDataProperty(context, v8_name, value.V8Value())
+           .To(&created)) {
+    return NamedPropertySetterResult::kDidNotIntercept;
+  }
+  return NamedPropertySetterResult::kIntercepted;
 }
 
 WebPluginContainerImpl* HTMLPlugInElement::PluginEmbeddedContentView() const {
@@ -506,8 +603,7 @@ bool HTMLPlugInElement::IsKeyboardFocusable() const {
   }
 
   return GetDocument().IsActive() && embedded_content_view &&
-         embedded_content_view->SupportsKeyboardFocus() &&
-         IsBaseElementFocusable();
+         embedded_content_view->SupportsKeyboardFocus() && IsFocusable();
 }
 
 bool HTMLPlugInElement::HasCustomFocusLogic() const {
@@ -824,10 +920,9 @@ void HTMLPlugInElement::UpdateServiceTypeIfEmpty() {
   }
 }
 
-scoped_refptr<const ComputedStyle>
-HTMLPlugInElement::CustomStyleForLayoutObject(
+const ComputedStyle* HTMLPlugInElement::CustomStyleForLayoutObject(
     const StyleRecalcContext& style_recalc_context) {
-  scoped_refptr<const ComputedStyle> style =
+  const ComputedStyle* style =
       OriginalStyleForLayoutObject(style_recalc_context);
   if (IsImageType() && !GetLayoutObject() && style &&
       LayoutObjectIsNeeded(*style)) {

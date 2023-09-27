@@ -38,8 +38,6 @@ DECLARE_RESOURCE_ID(IDR_ANDROID_INFOBAR_NOTIFICATIONS_OFF,
 DECLARE_RESOURCE_ID(IDR_ANDROID_INFOBAR_PREVIEWS, R.drawable.infobar_chrome)
 DECLARE_RESOURCE_ID(IDR_ANDROID_INFOBAR_SAFETYTIP_SHIELD,
                     R.drawable.safetytip_shield)
-DECLARE_RESOURCE_ID(IDR_ANDROID_INFOBAR_SAVE_PASSWORD,
-                    R.drawable.ic_vpn_key_blue)
 DECLARE_RESOURCE_ID(IDR_ANDROID_INFOBAR_TRANSLATE, R.drawable.infobar_translate)
 LINK_RESOURCE_ID(IDR_AUTOFILL_GOOGLE_PAY_WITH_DIVIDER,
                  R.drawable.google_pay_with_divider)
@@ -54,6 +52,9 @@ DECLARE_RESOURCE_ID(IDR_ANDORID_MESSAGE_PERMISSION_CAMERA,
 DECLARE_RESOURCE_ID(IDR_ANDROID_MESSAGE_SETTINGS, R.drawable.settings_cog)
 DECLARE_RESOURCE_ID(IDR_ANDROID_MESSAGE_SAFETY_CHECK, R.drawable.safety_check)
 DECLARE_RESOURCE_ID(IDR_ANDROID_MESSAGE_SHIELD, R.drawable.shield)
+DECLARE_RESOURCE_ID(IDR_ANDROID_MESSAGE_SHIELD_BLUE,
+                    R.drawable.blue_google_shield)
+DECLARE_RESOURCE_ID(IDR_ANDROID_MESSAGE_SHIELD_GRAY, R.drawable.gray_shield)
 DECLARE_RESOURCE_ID(IDR_ANDORID_MESSAGE_PASSWORD_MANAGER_ERROR,
                     R.drawable.ic_key_error)
 DECLARE_RESOURCE_ID(IDR_ANDROID_IC_MOBILE_FRIENDLY,
@@ -69,41 +70,13 @@ DECLARE_RESOURCE_ID(IDR_ANDROID_PASSWORD_MANAGER_LOGO_24DP,
                     R.drawable.ic_vpn_key_blue)
 #endif
 
-// Autofill popup and keyboard accessory images.
-// We use Android's |VectorDrawableCompat| for the following images that are
-// displayed using |DropdownAdapter|.
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_AMEX, R.drawable.amex_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_DINERS, R.drawable.diners_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_DISCOVER, R.drawable.discover_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_ELO, R.drawable.elo_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_GENERIC, R.drawable.ic_credit_card_black)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_JCB, R.drawable.jcb_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_MASTERCARD, R.drawable.mc_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_MIR, R.drawable.mir_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_TROY, R.drawable.troy_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_UNIONPAY, R.drawable.unionpay_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_CC_VISA, R.drawable.visa_card)
-LINK_RESOURCE_ID(IDR_AUTOFILL_GOOGLE_PAY, R.drawable.google_pay)
-// Use DECLARE_RESOURCE_ID here as these resources are used for android only.
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_CC_SCAN_NEW,
-                    R.drawable.ic_photo_camera_black)
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_HTTP_WARNING,
-                    R.drawable.ic_info_outline_grey_16dp)
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_HTTPS_INVALID_WARNING,
-                    R.drawable.ic_warning_red_16dp)
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_OFFER_TAG_GREEN,
-                    R.drawable.ic_offer_tag)
-
 DECLARE_RESOURCE_ID(IDR_SEND_TAB_TO_SELF, R.drawable.send_tab)
-
-// We display settings and edit icon for keyboard accessory using Android's
-// |VectorDrawableCompat|. We do not display these icons for autofill popup.
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_SETTINGS, R.drawable.ic_settings_black)
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_CREATE, R.drawable.ic_edit_24dp)
 
 // Icon displayed in the save address message on Android.
 DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_ADDRESS,
                     R.drawable.gm_filled_location_on_24)
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_UPLOAD_ADDRESS,
+                    R.drawable.ic_cloud_upload_24dp)
 
 // We use PNG files for the following images.
 LINK_RESOURCE_ID(IDR_CREDIT_CARD_CVC_HINT_BACK, R.drawable.cvc_icon)

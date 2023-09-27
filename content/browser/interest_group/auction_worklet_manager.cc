@@ -15,9 +15,11 @@
 
 #include "base/check.h"
 #include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "base/hash/hash.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
@@ -29,8 +31,10 @@
 #include "content/browser/interest_group/debuggable_auction_worklet.h"
 #include "content/browser/interest_group/subresource_url_authorizations.h"
 #include "content/browser/interest_group/subresource_url_builder.h"
+#include "content/browser/renderer_host/frame_tree_node.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
 #include "content/common/content_export.h"
+#include "content/services/auction_worklet/public/mojom/auction_network_events_handler.mojom-forward.h"
 #include "content/services/auction_worklet/public/mojom/auction_shared_storage_host.mojom.h"
 #include "content/services/auction_worklet/public/mojom/bidder_worklet.mojom.h"
 #include "content/services/auction_worklet/public/mojom/seller_worklet.mojom.h"
@@ -321,28 +325,34 @@ void AuctionWorkletManager::WorkletOwner::OnProcessAssigned() {
 
   Delegate* delegate = worklet_manager_->delegate();
   mojo::PendingRemote<network::mojom::URLLoaderFactory> url_loader_factory;
+  mojo::PendingRemote<auction_worklet::mojom::AuctionNetworkEventsHandler>
+      auction_network_events_handler;
   RenderFrameHostImpl* const rfh = delegate->GetFrame();
   url_loader_factory_proxy_ = std::make_unique<AuctionURLLoaderFactoryProxy>(
       url_loader_factory.InitWithNewPipeAndPassReceiver(),
+      auction_network_events_handler.InitWithNewPipeAndPassReceiver(),
       base::BindRepeating(&Delegate::GetFrameURLLoaderFactory,
                           base::Unretained(delegate)),
       base::BindRepeating(&Delegate::GetTrustedURLLoaderFactory,
                           base::Unretained(delegate)),
       base::BindOnce(&Delegate::PreconnectSocket, base::Unretained(delegate)),
+      /*force_reload=*/rfh->reload_type() == ReloadType::BYPASSING_CACHE,
       worklet_manager_->top_window_origin(), worklet_manager_->frame_origin(),
       // NOTE: `rfh` can be null in tests.
       /*renderer_process_id=*/
       rfh ? absl::optional<int>(rfh->GetProcess()->GetID()) : absl::nullopt,
       /*is_for_seller_=*/worklet_info_.type == WorkletType::kSeller,
       delegate->GetClientSecurityState(), worklet_info_.script_url,
-      worklet_info_.wasm_url, worklet_info_.signals_url);
+      worklet_info_.wasm_url, worklet_info_.signals_url,
+      worklet_info_.needs_cors_for_additional_bid,
+      rfh->frame_tree_node()->frame_tree_node_id());
 
   switch (worklet_info_.type) {
     case WorkletType::kBidder: {
       mojo::PendingReceiver<auction_worklet::mojom::BidderWorklet>
           worklet_receiver = bidder_worklet_.BindNewPipeAndPassReceiver();
       worklet_debug_ = base::WrapUnique(new DebuggableAuctionWorklet(
-          delegate->GetFrame(), &process_handle_, worklet_info_.script_url,
+          delegate->GetFrame(), process_handle_, worklet_info_.script_url,
           bidder_worklet_.get()));
       process_handle_.GetService()->LoadBidderWorklet(
           std::move(worklet_receiver),
@@ -350,7 +360,8 @@ void AuctionWorkletManager::WorkletOwner::OnProcessAssigned() {
               delegate->GetFrame(),
               url::Origin::Create(worklet_info_.script_url)),
           worklet_debug_->should_pause_on_start(),
-          std::move(url_loader_factory), worklet_info_.script_url,
+          std::move(url_loader_factory),
+          std::move(auction_network_events_handler), worklet_info_.script_url,
           worklet_info_.wasm_url, worklet_info_.signals_url,
           worklet_manager_->top_window_origin(),
           GetAuctionWorkletPermissionsPolicyState(delegate->GetFrame(),
@@ -366,7 +377,7 @@ void AuctionWorkletManager::WorkletOwner::OnProcessAssigned() {
       mojo::PendingReceiver<auction_worklet::mojom::SellerWorklet>
           worklet_receiver = seller_worklet_.BindNewPipeAndPassReceiver();
       worklet_debug_ = base::WrapUnique(new DebuggableAuctionWorklet(
-          delegate->GetFrame(), &process_handle_, worklet_info_.script_url,
+          delegate->GetFrame(), process_handle_, worklet_info_.script_url,
           seller_worklet_.get()));
       process_handle_.GetService()->LoadSellerWorklet(
           std::move(worklet_receiver),
@@ -374,7 +385,8 @@ void AuctionWorkletManager::WorkletOwner::OnProcessAssigned() {
               delegate->GetFrame(),
               url::Origin::Create(worklet_info_.script_url)),
           worklet_debug_->should_pause_on_start(),
-          std::move(url_loader_factory), worklet_info_.script_url,
+          std::move(url_loader_factory),
+          std::move(auction_network_events_handler), worklet_info_.script_url,
           worklet_info_.signals_url, worklet_manager_->top_window_origin(),
           GetAuctionWorkletPermissionsPolicyState(delegate->GetFrame(),
                                                   worklet_info_.script_url),
@@ -416,23 +428,49 @@ AuctionWorkletManager::WorkletKey::WorkletKey(
     const GURL& script_url,
     const absl::optional<GURL>& wasm_url,
     const absl::optional<GURL>& signals_url,
+    bool needs_cors_for_additional_bid,
     absl::optional<uint16_t> experiment_group_id)
     : type(type),
       script_url(script_url),
       wasm_url(wasm_url),
       signals_url(signals_url),
+      needs_cors_for_additional_bid(needs_cors_for_additional_bid),
       experiment_group_id(experiment_group_id) {}
 
 AuctionWorkletManager::WorkletKey::WorkletKey(const WorkletKey&) = default;
 AuctionWorkletManager::WorkletKey::WorkletKey(WorkletKey&&) = default;
 AuctionWorkletManager::WorkletKey::~WorkletKey() = default;
 
+namespace {
+size_t CombineHash(size_t hash, size_t new_value) {
+  static constexpr size_t kMagic =
+      sizeof(size_t) > 4 ? 0x9e3779b97f4a7c15 : 0x9e3779b9;
+  hash ^= new_value + kMagic + (hash << 6) + (hash >> 2);
+  return hash;
+}
+}  // namespace
+
+size_t AuctionWorkletManager::WorkletKey::GetHash() const {
+  using base::FastHash;
+  size_t hash = (type == WorkletType::kBidder ? 0x1ee4cafc : 0x8dfe2bb7);
+  hash = CombineHash(hash, FastHash(script_url.spec()));
+  hash = CombineHash(hash, wasm_url ? FastHash(wasm_url->spec()) : 0xaf57570a);
+  hash = CombineHash(hash,
+                     signals_url ? FastHash(signals_url->spec()) : 0xbee1271e);
+  hash = CombineHash(hash,
+                     needs_cors_for_additional_bid ? 0x6748ee16 : 0xc2a13cd1);
+  hash = CombineHash(hash,
+                     experiment_group_id ? *experiment_group_id : 0xd60fc235);
+  return hash;
+}
+
 bool AuctionWorkletManager::WorkletKey::WorkletKey::operator<(
     const WorkletKey& other) const {
   return std::tie(type, script_url, wasm_url, signals_url,
-                  experiment_group_id) <
+                  needs_cors_for_additional_bid, experiment_group_id) <
          std::tie(other.type, other.script_url, other.wasm_url,
-                  other.signals_url, other.experiment_group_id);
+                  other.signals_url, other.needs_cors_for_additional_bid,
+                  other.experiment_group_id);
 }
 
 AuctionWorkletManager::WorkletHandle::~WorkletHandle() {
@@ -562,10 +600,12 @@ AuctionWorkletManager::WorkletKey AuctionWorkletManager::BidderWorkletKey(
     const GURL& bidding_logic_url,
     const absl::optional<GURL>& wasm_url,
     const absl::optional<GURL>& trusted_bidding_signals_url,
+    bool needs_cors_for_additional_bid,
     absl::optional<uint16_t> experiment_group_id) {
   return WorkletKey(WorkletType::kBidder,
                     /*script_url=*/bidding_logic_url, wasm_url,
                     /*signals_url=*/trusted_bidding_signals_url,
+                    needs_cors_for_additional_bid,
                     trusted_bidding_signals_url.has_value()
                         ? experiment_group_id
                         : absl::nullopt);
@@ -575,13 +615,14 @@ void AuctionWorkletManager::RequestBidderWorklet(
     const GURL& bidding_logic_url,
     const absl::optional<GURL>& wasm_url,
     const absl::optional<GURL>& trusted_bidding_signals_url,
+    bool needs_cors_for_additional_bid,
     absl::optional<uint16_t> experiment_group_id,
     base::OnceClosure worklet_available_callback,
     FatalErrorCallback fatal_error_callback,
     std::unique_ptr<WorkletHandle>& out_worklet_handle) {
   RequestWorkletByKey(
       BidderWorkletKey(bidding_logic_url, wasm_url, trusted_bidding_signals_url,
-                       experiment_group_id),
+                       needs_cors_for_additional_bid, experiment_group_id),
       std::move(worklet_available_callback), std::move(fatal_error_callback),
       out_worklet_handle);
 }
@@ -597,6 +638,7 @@ void AuctionWorkletManager::RequestSellerWorklet(
                           /*script_url=*/decision_logic_url,
                           /*wasm_url=*/absl::nullopt,
                           /*signals_url=*/trusted_scoring_signals_url,
+                          /*needs_cors_for_additional_bid=*/false,
                           experiment_group_id);
   RequestWorkletByKey(std::move(worklet_info),
                       std::move(worklet_available_callback),

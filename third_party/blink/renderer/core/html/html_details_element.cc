@@ -26,6 +26,7 @@
 #include "third_party/blink/renderer/core/css_value_keywords.h"
 #include "third_party/blink/renderer/core/dom/element_traversal.h"
 #include "third_party/blink/renderer/core/dom/events/event.h"
+#include "third_party/blink/renderer/core/dom/events/mutation_event_suppression_scope.h"
 #include "third_party/blink/renderer/core/dom/flat_tree_traversal.h"
 #include "third_party/blink/renderer/core/dom/shadow_root.h"
 #include "third_party/blink/renderer/core/dom/slot_assignment.h"
@@ -37,8 +38,7 @@
 #include "third_party/blink/renderer/core/html/html_summary_element.h"
 #include "third_party/blink/renderer/core/html/shadow/shadow_element_names.h"
 #include "third_party/blink/renderer/core/html_names.h"
-#include "third_party/blink/renderer/core/layout/layout_block_flow.h"
-#include "third_party/blink/renderer/core/layout/layout_object_factory.h"
+#include "third_party/blink/renderer/core/layout/ng/layout_ng_block_flow.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
@@ -46,21 +46,8 @@
 
 namespace blink {
 
-namespace {
-
-bool IsFirstSummary(const Node& node) {
-  DCHECK(IsA<HTMLDetailsElement>(node.parentElement()));
-  if (!IsA<HTMLSummaryElement>(node))
-    return false;
-  return node.parentElement() &&
-         &node ==
-             Traversal<HTMLSummaryElement>::FirstChild(*node.parentElement());
-}
-
-}  // namespace
-
 HTMLDetailsElement::HTMLDetailsElement(Document& document)
-    : HTMLElement(html_names::kDetailsTag, document), is_open_(false) {
+    : HTMLElement(html_names::kDetailsTag, document) {
   UseCounter::Count(document, WebFeature::kDetailsElement);
   EnsureUserAgentShadowRoot().SetSlotAssignmentMode(
       SlotAssignmentMode::kManual);
@@ -77,9 +64,13 @@ void HTMLDetailsElement::DispatchPendingEvent(
     GetDocument().SetToggleDuringParsing(false);
 }
 
-LayoutObject* HTMLDetailsElement::CreateLayoutObject(const ComputedStyle& style,
-                                                     LegacyLayout legacy) {
-  return LayoutObjectFactory::CreateBlockFlow(*this, style, legacy);
+LayoutObject* HTMLDetailsElement::CreateLayoutObject(
+    const ComputedStyle& style) {
+  if (RuntimeEnabledFeatures::DetailsStylingEnabled()) {
+    return HTMLElement::CreateLayoutObject(style);
+  }
+
+  return LayoutObject::CreateBlockFlowOrListItem(this, style);
 }
 
 // Creates shadow DOM:
@@ -99,11 +90,17 @@ void HTMLDetailsElement::DidAddUserAgentShadowRoot(ShadowRoot& root) {
 
   summary_slot_ = MakeGarbageCollected<HTMLSlotElement>(GetDocument());
   summary_slot_->SetIdAttribute(shadow_element_names::kIdDetailsSummary);
+  if (RuntimeEnabledFeatures::DetailsStylingEnabled()) {
+    summary_slot_->SetShadowPseudoId(shadow_element_names::kIdDetailsSummary);
+  }
   summary_slot_->AppendChild(default_summary);
   root.AppendChild(summary_slot_);
 
   content_slot_ = MakeGarbageCollected<HTMLSlotElement>(GetDocument());
   content_slot_->SetIdAttribute(shadow_element_names::kIdDetailsContent);
+  if (RuntimeEnabledFeatures::DetailsStylingEnabled()) {
+    content_slot_->SetShadowPseudoId(shadow_element_names::kIdDetailsContent);
+  }
   content_slot_->SetInlineStyleProperty(CSSPropertyID::kContentVisibility,
                                         CSSValueID::kHidden);
   content_slot_->EnsureDisplayLockContext().SetIsDetailsSlotElement(true);
@@ -111,8 +108,8 @@ void HTMLDetailsElement::DidAddUserAgentShadowRoot(ShadowRoot& root) {
                                         CSSValueID::kBlock);
   root.AppendChild(content_slot_);
 
-  auto* default_summary_style = MakeGarbageCollected<HTMLStyleElement>(
-      GetDocument(), CreateElementFlags::ByCreateElement());
+  auto* default_summary_style =
+      MakeGarbageCollected<HTMLStyleElement>(GetDocument());
   // This style is required only if this <details> shows the UA-provided
   // <summary>, not a light child <summary>.
   default_summary_style->setTextContent(R"CSS(
@@ -145,9 +142,13 @@ void HTMLDetailsElement::ManuallyAssignSlots() {
   HeapVector<Member<Node>> summary_nodes;
   HeapVector<Member<Node>> content_nodes;
   for (Node& child : NodeTraversal::ChildrenOf(*this)) {
-    if (!child.IsSlotable())
+    if (!child.IsSlotable()) {
+      CHECK(!IsA<HTMLSummaryElement>(child));
       continue;
-    if (IsFirstSummary(child)) {
+    }
+    bool is_first_summary =
+        summary_nodes.empty() && IsA<HTMLSummaryElement>(child);
+    if (is_first_summary) {
       summary_nodes.push_back(child);
     } else {
       content_nodes.push_back(child);
@@ -165,6 +166,13 @@ void HTMLDetailsElement::Trace(Visitor* visitor) const {
 
 void HTMLDetailsElement::ParseAttribute(
     const AttributeModificationParams& params) {
+  CHECK(params.reason != AttributeModificationReason::kByParser ||
+        !parentNode())
+      << "This code depends on the parser setting attributes before inserting "
+         "into the document; if that were not the case we would need to "
+         "handle setting of either open or name by the parser, and "
+         "potentially change the open attribute during that handling.";
+
   if (params.name == html_names::kOpenAttr) {
     bool old_value = is_open_;
     is_open_ = !params.new_value.IsNull();
@@ -184,6 +192,27 @@ void HTMLDetailsElement::ParseAttribute(
     if (is_open_) {
       content->RemoveInlineStyleProperty(CSSPropertyID::kContentVisibility);
       content->RemoveInlineStyleProperty(CSSPropertyID::kDisplay);
+
+      // The name attribute links multiple details elements into an
+      // exclusive accordion.  So if this one has a name, close the
+      // other ones with the same name.
+      CHECK_NE(params.reason,
+               AttributeModificationReason::kBySynchronizationOfLazyAttribute);
+      // TODO(https://crbug.com/1444057): Should this be in
+      // AttributeChanged instead?
+      if (RuntimeEnabledFeatures::AccordionPatternEnabled() &&
+          !GetName().empty() &&
+          params.reason == AttributeModificationReason::kDirectly) {
+        // It's important that we have a copy of the set of details
+        // elements, because the setAttribute call can trigger mutation
+        // events that change the set.
+        HeapVector<Member<HTMLDetailsElement>> details_with_name(
+            OtherElementsInNameGroup());
+        for (HTMLDetailsElement* other_details : details_with_name) {
+          CHECK_NE(other_details, this);
+          other_details->setAttribute(html_names::kOpenAttr, g_null_atom);
+        }
+      }
     } else {
       content->SetInlineStyleProperty(CSSPropertyID::kDisplay,
                                       CSSValueID::kBlock);
@@ -191,14 +220,77 @@ void HTMLDetailsElement::ParseAttribute(
                                       CSSValueID::kHidden);
       content->EnsureDisplayLockContext().SetIsDetailsSlotElement(true);
     }
+  } else {
+    HTMLElement::ParseAttribute(params);
+  }
+}
 
+void HTMLDetailsElement::AttributeChanged(
+    const AttributeModificationParams& params) {
+  const QualifiedName& name = params.name;
+  if (name == html_names::kNameAttr) {
+    MaybeCloseForExclusivity();
+  }
+
+  HTMLElement::AttributeChanged(params);
+}
+
+Node::InsertionNotificationRequest HTMLDetailsElement::InsertedInto(
+    ContainerNode& insertion_point) {
+  Node::InsertionNotificationRequest result =
+      HTMLElement::InsertedInto(insertion_point);
+
+  {
+    // Don't fire mutation events for any changes to the open attribute
+    // that this causes.
+    MutationEventSuppressionScope scope(GetDocument());
+
+    MaybeCloseForExclusivity();
+  }
+
+  return result;
+}
+
+void HTMLDetailsElement::MaybeCloseForExclusivity() {
+  if (!RuntimeEnabledFeatures::AccordionPatternEnabled() || GetName().empty() ||
+      !is_open_) {
     return;
   }
-  HTMLElement::ParseAttribute(params);
+
+  DCHECK(RuntimeEnabledFeatures::OptimizedNodeCloneOrderEnabled())
+      << "OptimizedNodeCloneOrder should ship before AccordionPattern";
+  HeapVector<Member<HTMLDetailsElement>> details_with_name(
+      OtherElementsInNameGroup());
+  for (HTMLDetailsElement* other_details : details_with_name) {
+    CHECK_NE(other_details, this);
+    if (other_details->is_open_) {
+      // close this details element
+      ToggleOpen();
+      break;
+    }
+  }
 }
 
 void HTMLDetailsElement::ToggleOpen() {
   setAttribute(html_names::kOpenAttr, is_open_ ? g_null_atom : g_empty_atom);
+}
+
+HeapVector<Member<HTMLDetailsElement>>
+HTMLDetailsElement::OtherElementsInNameGroup() {
+  CHECK(RuntimeEnabledFeatures::AccordionPatternEnabled());
+  HeapVector<Member<HTMLDetailsElement>> result;
+  const AtomicString& name = GetName();
+  if (name.empty()) {
+    return result;
+  }
+  HTMLDetailsElement* details = Traversal<HTMLDetailsElement>::Next(TreeRoot());
+  while (details) {
+    if (details != this && details->GetName() == name) {
+      result.push_back(details);
+    }
+    details = Traversal<HTMLDetailsElement>::Next(*details);
+  }
+  return result;
 }
 
 bool HTMLDetailsElement::IsInteractiveContent() const {

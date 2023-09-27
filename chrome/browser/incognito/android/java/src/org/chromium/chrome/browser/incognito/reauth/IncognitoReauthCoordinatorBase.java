@@ -98,6 +98,15 @@ abstract class IncognitoReauthCoordinatorBase implements IncognitoReauthCoordina
         mIncognitoReauthView = LayoutInflater.from(mContext).inflate(
                 R.layout.incognito_reauth_view, /*root=*/null);
 
+        // When the re-auth view is shown, then own all the on touch events happening on it.
+        // This prevents the touch event to propagate to other children when our re-auth view
+        // is part of a ViewGroup when shown inside tab-switcher.
+        mIncognitoReauthView.setOnTouchListener((view, motionEvent) -> {
+            // Consume the click event.
+            view.performClick();
+            return true;
+        });
+
         assert mPropertyModel == null : "Property model must not be reused.";
         mPropertyModel =
                 createPropertyModel(mIncognitoReauthMediator::onUnlockIncognitoButtonClicked,
@@ -123,7 +132,6 @@ abstract class IncognitoReauthCoordinatorBase implements IncognitoReauthCoordina
      *
      * @param incognitoReauthView The mock {@link View} to set instead of the actual re-auth view.
      */
-    @VisibleForTesting
     protected void setIncognitoReauthViewForTesting(View incognitoReauthView) {
         mIncognitoReauthView = incognitoReauthView;
     }
@@ -131,7 +139,6 @@ abstract class IncognitoReauthCoordinatorBase implements IncognitoReauthCoordina
     /**
      * Test-only method to set a mock {@link PropertyModel}.
      */
-    @VisibleForTesting
     protected void setPropertyModelForTesting(PropertyModel propertyModel) {
         mPropertyModel = propertyModel;
     }
@@ -139,7 +146,6 @@ abstract class IncognitoReauthCoordinatorBase implements IncognitoReauthCoordina
     /**
      * Test-only method to set a mock {@link PropertyModelChangeProcessor}.
      */
-    @VisibleForTesting
     protected void setModelChangeProcessorForTesting(
             PropertyModelChangeProcessor modelChangeProcessor) {
         mModelChangeProcessor = modelChangeProcessor;

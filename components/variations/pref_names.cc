@@ -42,7 +42,6 @@ const char kVariationsFailedToFetchSeedStreak[] =
 // * Written to by a pref observer based on per-profile sync data. This pref is
 //   a profile-keyed dictionary so it can be updated based only on the new value
 //   of a single profile's groups.
-//   TODO:b/264838828: implement the write path.
 // * Read by variations code when processing the finch seed at startup. This
 //   code cares only about the union of the groups across all profiles.
 const char kVariationsGoogleGroups[] = "variations_google_groups";
@@ -86,9 +85,16 @@ const char kVariationsSafeCompressedSeed[] = "variations_safe_compressed_seed";
 
 // The serialized base::Time used for safe seed expiry checks. This is usually
 // the time at which the last known "safe" seed was received; however, it could
-// be a build timestamp if the received date is unknown. An empty
-// (default-constructed) base::Time if there is no known "safe" seed. This is a
-// server-provided timestamp.
+// be one of the following:
+// (A) A build timestamp if the received date is unknown.
+// (B) A client-provided timestamp set during the FRE on select platforms in
+//     ChromeFeatureListCreator::SetupInitialPrefs() when the client fetches a
+//     seed from a Variations server and the regular seed is promoted to the
+//     safe seed.
+// (C) An empty (default-constructed) base::Time if there is no known "safe"
+//     seed.
+//
+// This is a server-provided timestamp unless it stores (B).
 const char kVariationsSafeSeedDate[] = "variations_safe_seed_date";
 
 // The serialized base::Time from the fetch corresponding to the safe seed, i.e.
@@ -125,6 +131,10 @@ const char kVariationsSafeSeedSignature[] = "variations_safe_seed_signature";
 
 // The serialized base::Time from the last seed received. This is a
 // server-provided timestamp.
+//
+// On select platforms, this is set to a client-provided timestamp until a seed
+// is fetched from a Variations server and the pref is updated with a
+// server-provided timestamp. See ChromeFeatureListCreator::SetupInitialPrefs().
 const char kVariationsSeedDate[] = "variations_seed_date";
 
 // Digital signature of the binary variations seed data, base64-encoded.

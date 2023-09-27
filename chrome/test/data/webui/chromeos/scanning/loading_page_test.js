@@ -26,12 +26,29 @@ suite('loadingPageTest', function() {
   let fakePrefersColorSchemeDarkMediaQuery = null;
 
   /**
+   * Type alias for SVGUseElement.
+   * @typedef {{href: {baseVal: string}}}
+   */
+  let SVGUseElement;
+
+  /**
    * @param {boolean} enabled
    * @return {!Promise}
    */
   function setFakePrefersColorSchemeDark(enabled) {
     assertTrue(!!loadingPage);
     fakePrefersColorSchemeDarkMediaQuery.matches = enabled;
+
+    return flushTasks();
+  }
+
+  /**
+   * @param {boolean} enabled
+   * @returns {!Promise}
+   */
+  function setJellyEnabled(enabled) {
+    assertTrue(!!loadingPage);
+    loadingPage.setIsJellyEnabledForTesting(enabled);
 
     return flushTasks();
   }
@@ -63,16 +80,18 @@ suite('loadingPageTest', function() {
   // Verify the loading page, then the no scanners page is shown when no
   // scanners are available.
   test('noScanners', () => {
-    assertTrue(
-        isVisible(/** @type {!HTMLElement} */ (loadingPage.$$('#loadingDiv'))));
+    assertTrue(isVisible(/** @type {!HTMLElement} */ (
+        loadingPage.shadowRoot.querySelector('#loadingDiv'))));
     assertFalse(isVisible(
-        /** @type {!HTMLElement} */ (loadingPage.$$('#noScannersDiv'))));
+        /** @type {!HTMLElement} */ (
+            loadingPage.shadowRoot.querySelector('#noScannersDiv'))));
 
     loadingPage.appState = AppState.NO_SCANNERS;
-    assertFalse(
-        isVisible(/** @type {!HTMLElement} */ (loadingPage.$$('#loadingDiv'))));
+    assertFalse(isVisible(/** @type {!HTMLElement} */ (
+        loadingPage.shadowRoot.querySelector('#loadingDiv'))));
     assertTrue(isVisible(
-        /** @type {!HTMLElement} */ (loadingPage.$$('#noScannersDiv'))));
+        /** @type {!HTMLElement} */ (
+            loadingPage.shadowRoot.querySelector('#noScannersDiv'))));
   });
 
   // Verify clicking the retry button on the no scanners page fires the
@@ -85,7 +104,7 @@ suite('loadingPageTest', function() {
       retryEventFired = true;
     });
 
-    loadingPage.$$('#retryButton').click();
+    loadingPage.shadowRoot.querySelector('#retryButton').click();
     assertTrue(retryEventFired);
   });
 
@@ -99,41 +118,84 @@ suite('loadingPageTest', function() {
       learnMoreEventFired = true;
     });
 
-    loadingPage.$$('#learnMoreButton').click();
+    loadingPage.shadowRoot.querySelector('#learnMoreButton').click();
     assertTrue(learnMoreEventFired);
   });
 
+  // TODO(b/276493795): After the Jelly experiment is launched, remove test.
   // Verify correct 'no scanners' svg displayed when page is in dark mode.
   test('noScannersSvgSetByColorScheme', async () => {
+    await setJellyEnabled(false);
     const lightModeSvg = `${scanningSrcBase}svg/no_scanners.svg`;
     const darkModeSvg = `${scanningSrcBase}svg/no_scanners_dark.svg`;
     const getNoScannersSvg = () => (/** @type {!HTMLImageElement} */ (
-        loadingPage.$$('#noScannersDiv img')));
+        loadingPage.shadowRoot.querySelector('#noScannersDiv img')));
 
     // Setup UI to display no scanners div.
     loadingPage.appState = AppState.NO_SCANNERS;
     await setFakePrefersColorSchemeDark(false);
-    assertEquals(getNoScannersSvg().src, lightModeSvg);
+    assertEquals(lightModeSvg, getNoScannersSvg().src);
 
     // Mock media query state for dark mode.
     await setFakePrefersColorSchemeDark(true);
-    assertEquals(getNoScannersSvg().src, darkModeSvg);
+    assertEquals(darkModeSvg, getNoScannersSvg().src);
   });
 
-  // Verify correct 'loading scanners' svg displayed when page is in dark mode.
-  test('scanLoadingSvgSetByColorScheme', async () => {
-    const lightModeSvg = `${scanningSrcBase}svg/scanners_loading.svg`;
-    const darkModeSvg = `${scanningSrcBase}svg/scanners_loading_dark.svg`;
-    const getLoadingSvg = () =>
-        (/** @type {!HTMLImageElement} */ (loadingPage.$$('#loadingDiv img')));
+  // Verify "no scanners" dynamic SVG use when dynamic colors enabled.
+  test('jellyColors_NoScannersSvg', async () => {
+    await setJellyEnabled(true);
+    const dynamicSvg = `svg/illo_no_scanner.svg#illo_no_scanner`;
+    const getNoScannersSvgValue = () =>
+        (/** @type {!SVGUseElement} */ (
+             loadingPage.shadowRoot.querySelector('#noScannersDiv > svg > use'))
+             .href.baseVal);
 
     // Setup UI to display no scanners div.
     loadingPage.appState = AppState.NO_SCANNERS;
     await setFakePrefersColorSchemeDark(false);
-    assertEquals(getLoadingSvg().src, lightModeSvg);
+    assertEquals(dynamicSvg, getNoScannersSvgValue());
 
     // Mock media query state for dark mode.
     await setFakePrefersColorSchemeDark(true);
-    assertEquals(getLoadingSvg().src, darkModeSvg);
+    assertEquals(dynamicSvg, getNoScannersSvgValue());
+  });
+
+  // TODO(b/276493795): After the Jelly experiment is launched, remove test.
+  // Verify correct 'loading scanners' svg displayed when page is in dark mode.
+  test('scanLoadingSvgSetByColorScheme', async () => {
+    await setJellyEnabled(false);
+    const lightModeSvg = `${scanningSrcBase}svg/scanners_loading.svg`;
+    const darkModeSvg = `${scanningSrcBase}svg/scanners_loading_dark.svg`;
+    const getLoadingSvg = () => (/** @type {!HTMLImageElement} */ (
+        loadingPage.shadowRoot.querySelector('#loadingDiv img')));
+
+    // Setup UI to display no scanners div.
+    loadingPage.appState = AppState.NO_SCANNERS;
+    await setFakePrefersColorSchemeDark(false);
+    assertEquals(lightModeSvg, getLoadingSvg().src);
+
+    // Mock media query state for dark mode.
+    await setFakePrefersColorSchemeDark(true);
+    assertEquals(darkModeSvg, getLoadingSvg().src);
+  });
+
+  // Verify "loading scanners" dynamic SVG use when dynamic colors enabled.
+  test('jellyColors_LoadingScannersSvg', async () => {
+    await setJellyEnabled(true);
+    const dynamicSvg = `svg/illo_loading_scanner.svg#illo_loading_scanner`;
+
+    const getLoadingScannersSvgValue = () =>
+        (/** @type {!SVGUseElement} */ (
+             loadingPage.shadowRoot.querySelector('#loadingDiv > svg > use'))
+             .href.baseVal);
+
+    // Setup UI to display no scanners div.
+    loadingPage.appState = AppState.NO_SCANNERS;
+    await setFakePrefersColorSchemeDark(false);
+    assertEquals(dynamicSvg, getLoadingScannersSvgValue());
+
+    // Mock media query state for dark mode.
+    await setFakePrefersColorSchemeDark(true);
+    assertEquals(dynamicSvg, getLoadingScannersSvgValue());
   });
 });

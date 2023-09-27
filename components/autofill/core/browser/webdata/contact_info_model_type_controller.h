@@ -9,14 +9,16 @@
 #include "base/scoped_observation.h"
 #include "components/signin/public/identity_manager/account_managed_status_finder.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
-#include "components/sync/driver/model_type_controller.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_service_observer.h"
+#include "components/sync/service/model_type_controller.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_service_observer.h"
 
 namespace autofill {
 
-class ContactInfoModelTypeController : public syncer::ModelTypeController,
-                                       public syncer::SyncServiceObserver {
+class ContactInfoModelTypeController
+    : public syncer::ModelTypeController,
+      public syncer::SyncServiceObserver,
+      public signin::IdentityManager::Observer {
  public:
   ContactInfoModelTypeController(
       std::unique_ptr<syncer::ModelTypeControllerDelegate>
@@ -33,11 +35,14 @@ class ContactInfoModelTypeController : public syncer::ModelTypeController,
       const ContactInfoModelTypeController&) = delete;
 
   // ModelTypeController overrides.
-  bool ShouldRunInTransportOnlyMode() const override;
   PreconditionState GetPreconditionState() const override;
 
   // SyncServiceObserver overrides.
   void OnStateChanged(syncer::SyncService* sync) override;
+
+  // IdentityManager::Observer overrides.
+  void OnRefreshTokensLoaded() override;
+  void OnExtendedAccountInfoUpdated(const AccountInfo& info) override;
 
  private:
   // Called by the `managed_status_finder_` when it determines the account type.
@@ -47,6 +52,9 @@ class ContactInfoModelTypeController : public syncer::ModelTypeController,
   base::ScopedObservation<syncer::SyncService, syncer::SyncServiceObserver>
       sync_service_observation_{this};
   const raw_ptr<signin::IdentityManager> identity_manager_;
+  base::ScopedObservation<signin::IdentityManager,
+                          signin::IdentityManager::Observer>
+      identity_manager_observer_{this};
   std::unique_ptr<signin::AccountManagedStatusFinder> managed_status_finder_;
 };
 

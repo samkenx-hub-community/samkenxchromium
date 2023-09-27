@@ -12,7 +12,7 @@
 #include "components/safe_browsing/core/common/safe_browsing_prefs.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/sync/base/user_selectable_type.h"
-#include "components/sync/driver/sync_user_settings.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "google_apis/gaia/gaia_auth_util.h"
 #include "google_apis/gaia/gaia_urls.h"
 #include "url/origin.h"
@@ -65,14 +65,14 @@ bool IsSyncAccountCredential(const GURL& url,
 }
 
 bool IsSyncAccountEmail(const std::string& username,
-                        const signin::IdentityManager* identity_manager) {
+                        const signin::IdentityManager* identity_manager,
+                        signin::ConsentLevel consent_level) {
   // |identity_manager| can be null if user is not signed in.
   if (!identity_manager)
     return false;
 
   std::string sync_email =
-      identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSync)
-          .email;
+      identity_manager->GetPrimaryAccountInfo(consent_level).email;
 
   if (sync_email.empty() || username.empty())
     return false;

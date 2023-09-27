@@ -8,9 +8,9 @@
 #import "components/content_settings/core/common/features.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/drag_and_drop/url_drag_drop_handler.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/rtl_geometry.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/ntp/incognito/incognito_view_util.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_url_loader_delegate.h"
 #import "ios/chrome/browser/ui/toolbar/public/toolbar_constants.h"
@@ -23,10 +23,6 @@
 #import "ios/web/public/navigation/referrer.h"
 #import "net/base/mac/url_conversions.h"
 #import "ui/base/l10n/l10n_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 

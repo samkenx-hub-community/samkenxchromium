@@ -44,6 +44,11 @@ class PrinterQuery {
       base::OnceCallback<void(std::unique_ptr<PrintSettings>,
                               mojom::ResultCode)>;
 
+#if BUILDFLAG(IS_WIN)
+  using OnDidUpdatePrintableAreaCallback =
+      base::OnceCallback<void(bool success)>;
+#endif
+
   static std::unique_ptr<PrinterQuery> Create(
       content::GlobalRenderFrameHostId rfh_id);
 
@@ -88,6 +93,22 @@ class PrinterQuery {
                           base::OnceClosure callback);
 #endif
 
+#if BUILDFLAG(IS_WIN)
+  // Updates the printable area of the provided `PrintSettings` object.
+  // Caller has to ensure that `this` and `print_settings` are alive until
+  // `callback` runs.
+  // TODO(crbug.com/1424368):  Remove this if the printable areas can be made
+  // fully available from `PrintBackend::GetPrinterSemanticCapsAndDefaults()`.
+  virtual void UpdatePrintableArea(PrintSettings* print_settings,
+                                   OnDidUpdatePrintableAreaCallback callback);
+#endif
+
+  // Sets the printable area in `print_settings` to be the default printable
+  // area. Intended to be used only for virtual printers. Does not communicate
+  // with printer drivers, so it does not require special OOPPD handling.
+  static void ApplyDefaultPrintableAreaToVirtualPrinterPrintSettings(
+      PrintSettings& print_settings);
+
 #if BUILDFLAG(ENABLE_OOP_PRINTING)
   // Provide the client ID when the caller has registered with the
   // `PrintBackendServiceManager` for getting settings for system print.
@@ -101,9 +122,6 @@ class PrinterQuery {
 
   // Returns true if a PrintingContext is still associated to this instance.
   bool is_valid() const;
-
-  // Posts the given task to be run.
-  bool PostTask(const base::Location& from_here, base::OnceClosure task);
 
   // Provide an override for generating worker threads in tests.
   static void SetCreatePrinterQueryCallbackForTest(
@@ -158,6 +176,10 @@ class PrinterQuery {
       std::unique_ptr<printing::PrintSettings> new_settings,
       SettingsCallback callback);
 #endif
+
+  // Used by `TransferContextToNewWorker()`.  Virtual to support testing.
+  virtual std::unique_ptr<PrintJobWorker> CreatePrintJobWorker(
+      PrintJob* print_job);
 
   PrintingContext* printing_context() { return printing_context_.get(); }
 

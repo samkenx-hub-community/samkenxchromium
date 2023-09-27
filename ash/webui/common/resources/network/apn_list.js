@@ -12,6 +12,7 @@ import './network_shared.css.js';
 import 'chrome://resources/polymer/v3_0/iron-list/iron-list.js';
 import 'chrome://resources/ash/common/network/apn_list_item.js';
 import 'chrome://resources/ash/common/network/apn_detail_dialog.js';
+import '//resources/cr_elements/icons.html.js';
 
 import {assert} from '//resources/ash/common/assert.js';
 import {I18nBehavior, I18nBehaviorInterface} from '//resources/ash/common/i18n_behavior.js';
@@ -22,6 +23,9 @@ import {OncMojo} from 'chrome://resources/ash/common/network/onc_mojo.js';
 import {ApnProperties, ApnState, ApnType, ManagedCellularProperties} from 'chrome://resources/mojo/chromeos/services/network_config/public/mojom/cros_network_config.mojom-webui.js';
 
 import {getTemplate} from './apn_list.html.js';
+
+/* @type {string} */
+const SHILL_INVALID_APN_ERROR = 'invalid-apn';
 
 /**
  * @constructor
@@ -50,9 +54,18 @@ export class ApnList extends ApnListBase {
         type: Object,
       },
 
+      errorState: String,
+
       shouldOmitLinks: {
         type: Boolean,
         value: false,
+      },
+
+      /** @private */
+      apns_: {
+        type: Object,
+        value: [],
+        computed: 'computeApns_(managedCellularProperties)',
       },
 
       /** @private */
@@ -78,13 +91,68 @@ export class ApnList extends ApnListBase {
   }
 
   /**
+   * @return {boolean}
+   * @private
+   */
+  shouldShowZeroStateText_() {
+    if (!this.managedCellularProperties) {
+      return true;
+    }
+
+    if (this.managedCellularProperties.connectedApn) {
+      return false;
+    }
+
+    // Don't display the zero-state text if there's an APN-related error.
+    if (this.errorState === SHILL_INVALID_APN_ERROR) {
+      return false;
+    }
+
+    const customApnList = this.managedCellularProperties.customApnList;
+    return !customApnList || customApnList.length === 0;
+  }
+
+  /**
+   * @return {boolean}
+   * @private
+   */
+  shouldShowErrorMessage_() {
+    // In some instances, there can be an |errorState| and also a connected APN.
+    // Don't show the error message as the network is actually connected.
+    if (this.managedCellularProperties &&
+        this.managedCellularProperties.connectedApn) {
+      return false;
+    }
+
+    return this.errorState === SHILL_INVALID_APN_ERROR;
+  }
+
+  /**
+   * @return {string}
+   * @private
+   */
+  getErrorMessage_() {
+    if (!this.managedCellularProperties || !this.errorState) {
+      return '';
+    }
+
+    const customApnList = this.managedCellularProperties.customApnList;
+    if (customApnList &&
+        customApnList.some(apn => apn.state === ApnState.kEnabled)) {
+      return this.i18n('apnSettingsCustomApnsErrorMessage');
+    }
+
+    return this.i18n('apnSettingsDatabaseApnsErrorMessage');
+  }
+
+  /**
    * Returns an array with all the APN properties that need to be displayed.
    * TODO(b/162365553): Handle managedCellularProperties.apnList.policyValue
    * when policies are included.
    * @return {Array<!ApnProperties>}
    * @private
    */
-  getApns_() {
+  computeApns_() {
     if (!this.managedCellularProperties) {
       return [];
     }
@@ -93,7 +161,6 @@ export class ApnList extends ApnListBase {
     const customApnList = this.managedCellularProperties.customApnList;
 
     if (!connectedApn) {
-      // TODO(b/162365553): Show error when there is no connected APN.
       return customApnList || [];
     }
 
@@ -101,10 +168,8 @@ export class ApnList extends ApnListBase {
       return [connectedApn];
     }
 
-    const connectedApnIndex = customApnList.findIndex(
-        (apn) => OncMojo.apnMatch(
-            /** @type {!ApnProperties} */ (apn),
-            /** @type {!ApnProperties} */ (connectedApn)));
+    const connectedApnIndex =
+        customApnList.findIndex((apn) => apn.id === connectedApn.id);
 
     if (connectedApnIndex != -1) {
       customApnList.splice(connectedApnIndex, 1);

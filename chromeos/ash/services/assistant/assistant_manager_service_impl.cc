@@ -16,10 +16,12 @@
 #include "base/barrier_closure.h"
 #include "base/check.h"
 #include "base/command_line.h"
+#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/i18n/rtl.h"
 #include "base/logging.h"
+#include "base/memory/raw_ref.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
 #include "base/run_loop.h"
@@ -113,36 +115,41 @@ class SpeechRecognitionObserverWrapper
 
   // libassistant::mojom::SpeechRecognitionObserver implementation:
   void OnSpeechLevelUpdated(float speech_level_in_decibels) override {
-    for (auto& it : interaction_subscribers_)
+    for (auto& it : *interaction_subscribers_) {
       it.OnSpeechLevelUpdated(speech_level_in_decibels);
+    }
   }
 
   void OnSpeechRecognitionStart() override {
-    for (auto& it : interaction_subscribers_)
+    for (auto& it : *interaction_subscribers_) {
       it.OnSpeechRecognitionStarted();
+    }
   }
 
   void OnIntermediateResult(const std::string& high_confidence_text,
                             const std::string& low_confidence_text) override {
-    for (auto& it : interaction_subscribers_) {
+    for (auto& it : *interaction_subscribers_) {
       it.OnSpeechRecognitionIntermediateResult(high_confidence_text,
                                                low_confidence_text);
     }
   }
 
   void OnSpeechRecognitionEnd() override {
-    for (auto& it : interaction_subscribers_)
+    for (auto& it : *interaction_subscribers_) {
       it.OnSpeechRecognitionEndOfUtterance();
+    }
   }
 
   void OnFinalResult(const std::string& recognized_text) override {
-    for (auto& it : interaction_subscribers_)
+    for (auto& it : *interaction_subscribers_) {
       it.OnSpeechRecognitionFinalResult(recognized_text);
+    }
   }
 
  private:
   // Owned by our parent, |AssistantManagerServiceImpl|.
-  const base::ObserverList<AssistantInteractionSubscriber>&
+  const raw_ref<const base::ObserverList<AssistantInteractionSubscriber>,
+                ExperimentalAsh>
       interaction_subscribers_;
 
   mojo::Receiver<libassistant::mojom::SpeechRecognitionObserver> receiver_{
@@ -690,8 +697,7 @@ AssistantQueryResponseType AssistantManagerServiceImpl::GetQueryResponseType()
   if (device_settings_host_->has_setting_changed()) {
     return AssistantQueryResponseType::kDeviceAction;
   } else if (!receive_url_response_.empty()) {
-    if (receive_url_response_.find("www.google.com/search?") !=
-        std::string::npos) {
+    if (base::Contains(receive_url_response_, "www.google.com/search?")) {
       return AssistantQueryResponseType::kSearchFallback;
     } else {
       return AssistantQueryResponseType::kTargetedAction;
@@ -778,6 +784,8 @@ void AssistantManagerServiceImpl::ClearAfterStop() {
   scoped_app_list_event_subscriber_.Reset();
   interaction_subscribers_.Clear();
   state_observers_.Clear();
+
+  is_first_init = true;
 }
 
 }  // namespace ash::assistant

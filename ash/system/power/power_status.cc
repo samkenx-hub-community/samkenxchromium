@@ -7,10 +7,10 @@
 #include <algorithm>
 #include <cmath>
 
-#include "ash/constants/ash_features.h"
 #include "ash/public/cpp/power_utils.h"
 #include "ash/resources/vector_icons/vector_icons.h"
 #include "ash/strings/grit/ash_strings.h"
+#include "ash/style/ash_color_provider.h"
 #include "ash/system/power/battery_image_source.h"
 #include "base/i18n/number_formatting.h"
 #include "base/i18n/time_formatting.h"
@@ -18,9 +18,12 @@
 #include "base/memory/ptr_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/dbus/power/power_manager_client.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/time_format.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
+#include "ui/color/color_provider.h"
 #include "ui/display/display.h"
 #include "ui/display/screen.h"
 #include "ui/gfx/color_palette.h"
@@ -81,7 +84,50 @@ int PowerSourceToMessageID(
   return 0;
 }
 
+SkColor GetDefaultBatteryBadgeColor(const ui::ColorProvider* color_provider) {
+  bool use_color_provider =
+      chromeos::features::IsJellyrollEnabled() && color_provider;
+
+  if (use_color_provider) {
+    return color_provider->GetColor(cros_tokens::kButtonLabelColorPrimary);
+  } else {
+    return ash::AshColorProvider::Get()->GetContentLayerColor(
+        ash::AshColorProvider::ContentLayerType::kBatteryBadgeColor);
+  }
+}
+
+SkColor GetDefaultAlertColor(const ui::ColorProvider* color_provider) {
+  bool use_color_provider =
+      chromeos::features::IsJellyrollEnabled() && color_provider;
+
+  if (use_color_provider) {
+    return color_provider->GetColor(cros_tokens::kColorAlert);
+  } else {
+    return ash::AshColorProvider::Get()->GetContentLayerColor(
+        ash::AshColorProvider::ContentLayerType::kIconColorAlert);
+  }
+}
+
 }  // namespace
+
+BatteryColors PowerStatus::BatteryImageInfo::ResolveColors(
+    const PowerStatus::BatteryImageInfo& info,
+    const ui::ColorProvider* color_provider) {
+  BatteryColors resolved_colors;
+
+  resolved_colors.foreground_color =
+      info.battery_color_preferences.foreground_color;
+
+  resolved_colors.badge_color =
+      info.battery_color_preferences.badge_color.value_or(
+          (info.charge_percent > 50)
+              ? GetDefaultBatteryBadgeColor(color_provider)
+              : info.battery_color_preferences.foreground_color);
+
+  resolved_colors.alert_color = GetDefaultAlertColor(color_provider);
+
+  return resolved_colors;
+}
 
 bool PowerStatus::BatteryImageInfo::ApproximatelyEqual(
     const BatteryImageInfo& o) const {
@@ -237,8 +283,10 @@ std::string PowerStatus::GetCurrentPowerSourceID() const {
   return proto_.external_power_source_id();
 }
 
-PowerStatus::BatteryImageInfo PowerStatus::GetBatteryImageInfo() const {
-  BatteryImageInfo info;
+PowerStatus::BatteryImageInfo PowerStatus::GenerateBatteryImageInfo(
+    const SkColor foreground_color,
+    absl::optional<SkColor> badge_color) const {
+  BatteryImageInfo info(foreground_color, badge_color);
   CalculateBatteryImageInfo(&info);
   return info;
 }
@@ -248,29 +296,20 @@ void PowerStatus::CalculateBatteryImageInfo(BatteryImageInfo* info) const {
 
   if (!IsUsbChargerConnected() && !IsBatteryPresent()) {
     info->icon_badge = &kUnifiedMenuBatteryXIcon;
-    if (features::IsDarkLightModeEnabled()) {
-      info->badge_outline = &kUnifiedMenuBatteryXOutlineMaskIcon;
-    } else {
-      info->badge_outline = &kUnifiedMenuBatteryXOutlineIcon;
-    }
+    info->badge_outline = &kUnifiedMenuBatteryXOutlineMaskIcon;
     info->charge_percent = 0;
     return;
   }
 
   if (IsUsbChargerConnected()) {
     info->icon_badge = &kUnifiedMenuBatteryUnreliableIcon;
-    if (features::IsDarkLightModeEnabled()) {
-      info->badge_outline = &kUnifiedMenuBatteryUnreliableOutlineMaskIcon;
-    } else {
-      info->badge_outline = &kUnifiedMenuBatteryUnreliableOutlineIcon;
-    }
+    info->badge_outline = &kUnifiedMenuBatteryUnreliableOutlineMaskIcon;
   } else if (IsLinePowerConnected()) {
     info->icon_badge = &kUnifiedMenuBatteryBoltIcon;
-    if (features::IsDarkLightModeEnabled()) {
-      info->badge_outline = &kUnifiedMenuBatteryBoltOutlineMaskIcon;
-    } else {
-      info->badge_outline = &kUnifiedMenuBatteryBoltOutlineIcon;
-    }
+    info->badge_outline = &kUnifiedMenuBatteryBoltOutlineMaskIcon;
+  } else if (IsBatterySaverActive()) {
+    info->icon_badge = &kBatterySaverPlusIcon;
+    info->badge_outline = &kBatterySaverPlusOutlineIcon;
   } else {
     info->icon_badge = nullptr;
     info->badge_outline = nullptr;
@@ -283,11 +322,7 @@ void PowerStatus::CalculateBatteryImageInfo(BatteryImageInfo* info) const {
   if (GetBatteryPercent() < kCriticalBatteryChargePercentage &&
       !info->icon_badge) {
     info->icon_badge = &kUnifiedMenuBatteryAlertIcon;
-    if (features::IsDarkLightModeEnabled()) {
-      info->badge_outline = &kUnifiedMenuBatteryAlertOutlineMaskIcon;
-    } else {
-      info->badge_outline = &kUnifiedMenuBatteryAlertOutlineIcon;
-    }
+    info->badge_outline = &kUnifiedMenuBatteryAlertOutlineMaskIcon;
   }
 }
 
@@ -295,11 +330,10 @@ void PowerStatus::CalculateBatteryImageInfo(BatteryImageInfo* info) const {
 gfx::ImageSkia PowerStatus::GetBatteryImage(
     const BatteryImageInfo& info,
     int height,
-    SkColor bg_color,
-    SkColor fg_color,
-    absl::optional<SkColor> badge_color) {
-  auto* source = new BatteryImageSource(info, height, bg_color, fg_color,
-                                        std::move(badge_color));
+    const ui::ColorProvider* color_provider) {
+  BatteryColors colors =
+      PowerStatus::BatteryImageInfo::ResolveColors(info, color_provider);
+  auto* source = new BatteryImageSource(info, height, colors);
   return gfx::ImageSkia(base::WrapUnique(source), source->size());
 }
 
@@ -400,9 +434,15 @@ double PowerStatus::GetPreferredMinimumPower() const {
   return proto_.preferred_minimum_external_power();
 }
 
+bool PowerStatus::IsBatterySaverActive() const {
+  return battery_saver_active_;
+}
+
 PowerStatus::PowerStatus() {
   chromeos::PowerManagerClient::Get()->AddObserver(this);
   chromeos::PowerManagerClient::Get()->RequestStatusUpdate();
+  chromeos::PowerManagerClient::Get()->GetBatterySaverModeState(base::BindOnce(
+      &PowerStatus::OnGotBatterySaverState, weak_ptr_factory_.GetWeakPtr()));
 }
 
 PowerStatus::~PowerStatus() {
@@ -412,13 +452,42 @@ PowerStatus::~PowerStatus() {
 void PowerStatus::SetProtoForTesting(
     const power_manager::PowerSupplyProperties& proto) {
   proto_ = proto;
+  proto_initialized_ = true;
+}
+
+void PowerStatus::SetBatterySaverStateForTesting(bool active) {
+  battery_saver_active_ = active;
 }
 
 void PowerStatus::PowerChanged(
     const power_manager::PowerSupplyProperties& proto) {
   proto_ = proto;
+  proto_initialized_ = true;
   for (auto& observer : observers_)
     observer.OnPowerStatusChanged();
+}
+
+void PowerStatus::BatterySaverModeStateChanged(
+    const power_manager::BatterySaverModeState& state) {
+  const bool prev_active = battery_saver_active_;
+  battery_saver_active_ = state.enabled();
+  if (prev_active == battery_saver_active_) {
+    return;
+  }
+  if (!proto_initialized_) {
+    // Don't update clients
+    return;
+  }
+  for (auto& observer : observers_) {
+    observer.OnPowerStatusChanged();
+  }
+}
+
+void PowerStatus::OnGotBatterySaverState(
+    absl::optional<power_manager::BatterySaverModeState> state) {
+  if (state) {
+    BatterySaverModeStateChanged(*state);
+  }
 }
 
 }  // namespace ash

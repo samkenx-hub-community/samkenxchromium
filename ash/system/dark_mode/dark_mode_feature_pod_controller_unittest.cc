@@ -13,9 +13,9 @@
 #include "ash/system/unified/unified_system_tray.h"
 #include "ash/system/unified/unified_system_tray_bubble.h"
 #include "ash/test/ash_test_base.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
-#include "chromeos/constants/chromeos_features.h"
 
 namespace ash {
 
@@ -28,13 +28,8 @@ class DarkModeFeaturePodControllerTest
 
   // AshTestBase:
   void SetUp() override {
-    if (IsQsRevampEnabled()) {
-      feature_list_.InitWithFeatures(
-          {chromeos::features::kDarkLightMode, features::kQsRevamp}, {});
-    } else {
-      feature_list_.InitWithFeatures({chromeos::features::kDarkLightMode},
-                                     {features::kQsRevamp});
-    }
+    feature_list_.InitWithFeatureState(features::kQsRevamp,
+                                       IsQsRevampEnabled());
     AshTestBase::SetUp();
 
     system_tray_ = GetPrimaryUnifiedSystemTray();
@@ -76,7 +71,8 @@ class DarkModeFeaturePodControllerTest
   std::unique_ptr<DarkModeFeaturePodController> feature_pod_controller_;
   std::unique_ptr<FeaturePodButton> button_;
   std::unique_ptr<FeatureTile> tile_;
-  UnifiedSystemTray* system_tray_ = nullptr;
+  raw_ptr<UnifiedSystemTray, DanglingUntriaged | ExperimentalAsh> system_tray_ =
+      nullptr;
 };
 
 INSTANTIATE_TEST_SUITE_P(QsRevamp,

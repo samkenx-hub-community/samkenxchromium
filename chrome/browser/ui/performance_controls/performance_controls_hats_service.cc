@@ -8,6 +8,7 @@
 #include "base/logging.h"
 #include "base/strings/string_number_conversions.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/performance_manager/public/user_tuning/battery_saver_mode_manager.h"
 #include "chrome/browser/performance_manager/public/user_tuning/user_performance_tuning_manager.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/hats/hats_service.h"
@@ -21,8 +22,6 @@ PerformanceControlsHatsService::PerformanceControlsHatsService(Profile* profile)
   PrefService* local_state = g_browser_process->local_state();
   if (local_state) {
     if (base::FeatureList::IsEnabled(
-            performance_manager::features::kHighEfficiencyModeAvailable) &&
-        base::FeatureList::IsEnabled(
             performance_manager::features::
                 kPerformanceControlsHighEfficiencyOptOutSurvey)) {
       performance_manager::user_tuning::UserPerformanceTuningManager::
@@ -32,8 +31,6 @@ PerformanceControlsHatsService::PerformanceControlsHatsService(Profile* profile)
 
     local_pref_registrar_.Init(local_state);
     if (base::FeatureList::IsEnabled(
-            performance_manager::features::kBatterySaverModeAvailable) &&
-        base::FeatureList::IsEnabled(
             performance_manager::features::
                 kPerformanceControlsBatterySaverOptOutSurvey)) {
       local_pref_registrar_.Add(
@@ -104,9 +101,8 @@ void PerformanceControlsHatsService::OpenedNewTabPage() {
   }
 
   base::Time last_battery_timestamp =
-      performance_manager::user_tuning::UserPerformanceTuningManager::
-          GetInstance()
-              ->GetLastBatteryUsageTimestamp();
+      performance_manager::user_tuning::BatterySaverModeManager::GetInstance()
+          ->GetLastBatteryUsageTimestamp();
 
   // A battery performance survey for users with a battery-powered device.
   if (base::FeatureList::IsEnabled(

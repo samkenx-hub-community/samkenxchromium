@@ -19,13 +19,13 @@ import org.junit.runner.RunWith;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.sync.SyncTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetControllerProvider;
@@ -58,7 +58,8 @@ public class SendTabToSelfCoordinatorTest {
         mSyncTestRule.setUpAccountAndSignInForTesting();
         CriteriaHelper.pollUiThread(() -> {
             return SendTabToSelfAndroidBridge
-                    .getEntryPointDisplayReason(Profile.getLastUsedRegularProfile(), HTTP_URL)
+                    .getEntryPointDisplayReason(
+                            Profile.getLastUsedRegularProfile(), HTTP_URL.getSpec())
                     .equals(Optional.of(EntryPointDisplayReason.OFFER_FEATURE));
         });
 
@@ -128,9 +129,9 @@ public class SendTabToSelfCoordinatorTest {
         WindowAndroid windowAndroid = activity.getWindowAndroid();
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             SendTabToSelfCoordinator coordinator =
-                    new SendTabToSelfCoordinator(activity, windowAndroid, HTTP_URL, "Page",
-                            BottomSheetControllerProvider.from(windowAndroid),
-                            Profile.getLastUsedRegularProfile());
+                    new SendTabToSelfCoordinator(activity, windowAndroid, HTTP_URL.getSpec(),
+                            "Page", BottomSheetControllerProvider.from(windowAndroid),
+                            Profile.getLastUsedRegularProfile(), null);
             coordinator.show();
         });
     }

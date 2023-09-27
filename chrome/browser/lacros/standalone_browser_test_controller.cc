@@ -110,7 +110,7 @@ void StandaloneBrowserTestController::InstallWebApp(
     const std::string& start_url,
     apps::WindowMode window_mode,
     InstallWebAppCallback callback) {
-  auto info = std::make_unique<WebAppInstallInfo>();
+  auto info = std::make_unique<web_app::WebAppInstallInfo>();
   info->title = u"Test Web App";
   info->start_url = GURL(start_url);
   info->display_mode = WindowModeToDisplayMode(window_mode);
@@ -174,12 +174,13 @@ void StandaloneBrowserTestController::TtsSpeak(
 }
 
 void StandaloneBrowserTestController::InstallSubApp(
-    const web_app::AppId& parent_app_id,
+    const webapps::AppId& parent_app_id,
     const std::string& sub_app_start_url,
     InstallSubAppCallback callback) {
-  auto info = std::make_unique<WebAppInstallInfo>();
+  auto info = std::make_unique<web_app::WebAppInstallInfo>();
   info->start_url = GURL(sub_app_start_url);
   info->parent_app_id = parent_app_id;
+  info->title = u"Test Web App";
 
   Profile* profile = ProfileManager::GetPrimaryUserProfile();
   auto* provider = web_app::WebAppProvider::GetForWebApps(profile);
@@ -223,7 +224,7 @@ void StandaloneBrowserTestController::GetExtensionKeeplist(
 
 void StandaloneBrowserTestController::WebAppInstallationDone(
     InstallWebAppCallback callback,
-    const web_app::AppId& installed_app_id,
+    const webapps::AppId& installed_app_id,
     webapps::InstallResultCode code) {
   std::move(callback).Run(code == webapps::InstallResultCode::kSuccessNewInstall
                               ? installed_app_id

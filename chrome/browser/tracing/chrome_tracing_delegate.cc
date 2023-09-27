@@ -62,8 +62,8 @@ using tracing::BackgroundTracingStateManager;
 
 bool IsBackgroundTracingCommandLine() {
   auto tracing_mode = tracing::GetBackgroundTracingSetupMode();
-  if (tracing_mode == BackgroundTracingSetupMode::kFromConfigFile ||
-      tracing_mode == BackgroundTracingSetupMode::kFromFieldTrialLocalOutput) {
+  if (tracing_mode == BackgroundTracingSetupMode::kFromJsonConfigFile ||
+      tracing_mode == BackgroundTracingSetupMode::kFromProtoConfigFile) {
     return true;
   }
   return false;
@@ -151,13 +151,12 @@ void ChromeTracingDelegate::OnBrowserAdded(Browser* browser) {
 
 bool ChromeTracingDelegate::IsActionAllowed(
     BackgroundScenarioAction action,
-    const content::BackgroundTracingConfig& config,
-    bool requires_anonymized_data,
-    bool ignore_trace_limit) const {
+    bool requires_anonymized_data) const {
   // If the background tracing is specified on the command-line, we allow
   // any scenario to be traced and uploaded.
-  if (IsBackgroundTracingCommandLine())
+  if (IsBackgroundTracingCommandLine()) {
     return true;
+  }
 
   if (requires_anonymized_data &&
       (incognito_launched_ || chrome::IsOffTheRecordSessionActive())) {
@@ -178,19 +177,10 @@ bool ChromeTracingDelegate::IsActionAllowed(
     return false;
   }
 
-  // Check the trace limit for both kStartTracing and kUploadTrace actions
-  // because there is no point starting a trace that can't be uploaded.
-  if (!ignore_trace_limit && state.DidRecentlyUploadForScenario(config)) {
-    tracing::RecordDisallowedMetric(
-        tracing::TracingFinalizationDisallowedReason::kTraceUploadedRecently);
-    return false;
-  }
-
   return true;
 }
 
-bool ChromeTracingDelegate::IsAllowedToBeginBackgroundScenario(
-    const content::BackgroundTracingConfig& config,
+bool ChromeTracingDelegate::OnBackgroundTracingActive(
     bool requires_anonymized_data) {
   // We call Initialize() only when a tracing scenario tries to start, and
   // unless this happens we never save state. In particular, if the background
@@ -206,38 +196,26 @@ bool ChromeTracingDelegate::IsAllowedToBeginBackgroundScenario(
       BackgroundTracingStateManager::GetInstance();
   state.Initialize(g_browser_process->local_state());
 
-  // If the config includes a crash scenario, ignore the trace limit so that a
-  // trace can be taken on crash. We check if the trigger is actually due to a
-  // crash later before uploading.
-  const bool ignore_trace_limit = config.has_crash_scenario();
-
-  if (!IsActionAllowed(BackgroundScenarioAction::kStartTracing, config,
-                       requires_anonymized_data, ignore_trace_limit)) {
+  if (!IsActionAllowed(BackgroundScenarioAction::kStartTracing,
+                       requires_anonymized_data)) {
     return false;
   }
 
-  state.NotifyTracingStarted();
+  state.OnTracingStarted();
   return true;
 }
 
-bool ChromeTracingDelegate::IsAllowedToEndBackgroundScenario(
-    const content::BackgroundTracingConfig& config,
-    bool requires_anonymized_data,
-    bool is_crash_scenario) {
+bool ChromeTracingDelegate::OnBackgroundTracingIdle(
+    bool requires_anonymized_data) {
   BackgroundTracingStateManager& state =
       BackgroundTracingStateManager::GetInstance();
-  state.NotifyFinalizationStarted();
+  state.OnTracingStopped();
 
-  // If a crash scenario triggered, ignore the trace upload limit and continue
-  // uploading.
-  const bool ignore_trace_limit = is_crash_scenario;
+  return IsActionAllowed(BackgroundScenarioAction::kUploadTrace,
+                         requires_anonymized_data);
+}
 
-  if (!IsActionAllowed(BackgroundScenarioAction::kUploadTrace, config,
-                       requires_anonymized_data, ignore_trace_limit)) {
-    return false;
-  }
-
-  state.OnScenarioUploaded(config.scenario_name());
+bool ChromeTracingDelegate::ShouldSaveUnuploadedTrace() const {
   return true;
 }
 
@@ -267,6 +245,8 @@ bool ChromeTracingDelegate::IsSystemWideTracingEnabled() {
 absl::optional<base::Value::Dict>
 ChromeTracingDelegate::GenerateMetadataDict() {
   base::Value::Dict metadata_dict;
+  // Do not include low anonymity field trials, to prevent them from being
+  // included in chrometto reports.
   std::vector<std::string> variations;
   variations::GetFieldTrialActiveGroupIdsAsStrings(base::StringPiece(),
                                                    &variations);

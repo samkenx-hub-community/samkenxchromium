@@ -17,7 +17,7 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
 import org.chromium.base.test.BaseRobolectricTestRunner;
-import org.chromium.chrome.browser.autofill.PersonalDataManager.AutofillProfile;
+import org.chromium.components.autofill.AutofillProfile;
 
 /**
  * Unit tests for the AutofillContact class.
@@ -32,7 +32,7 @@ public class AutofillContactUnitTest {
 
     @Test
     public void testIsEqualOrSupersetOf_RequestAllFields() {
-        AutofillProfile dummyProfile = new AutofillProfile();
+        AutofillProfile dummyProfile = AutofillProfile.builder().build();
         Context mockContext = spy(RuntimeEnvironment.application);
         doReturn(MESSAGE).when(mockContext).getString(anyInt());
 
@@ -73,7 +73,7 @@ public class AutofillContactUnitTest {
 
     @Test
     public void testIsEqualOrSupersetOf_RequestSomeFields() {
-        AutofillProfile dummyProfile = new AutofillProfile();
+        AutofillProfile dummyProfile = AutofillProfile.builder().build();
         Context mockContext = spy(RuntimeEnvironment.application);
         doReturn(MESSAGE).when(mockContext).getString(anyInt());
 
@@ -99,7 +99,7 @@ public class AutofillContactUnitTest {
 
     @Test
     public void testGetRelevanceScore_RequestAllFields() {
-        AutofillProfile dummyProfile = new AutofillProfile();
+        AutofillProfile dummyProfile = AutofillProfile.builder().build();
         Context mockContext = spy(RuntimeEnvironment.application);
         doReturn(MESSAGE).when(mockContext).getString(anyInt());
 
@@ -156,7 +156,7 @@ public class AutofillContactUnitTest {
 
     @Test
     public void testGetRelevanceScore_RequestSomeFields() {
-        AutofillProfile dummyProfile = new AutofillProfile();
+        AutofillProfile dummyProfile = AutofillProfile.builder().build();
         Context mockContext = spy(RuntimeEnvironment.application);
         doReturn(MESSAGE).when(mockContext).getString(anyInt());
 

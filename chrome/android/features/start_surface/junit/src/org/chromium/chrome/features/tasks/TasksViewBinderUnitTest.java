@@ -8,6 +8,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import static org.chromium.chrome.features.tasks.TasksSurfaceProperties.BACKGROUND_COLOR;
 import static org.chromium.chrome.features.tasks.TasksSurfaceProperties.FAKE_SEARCH_BOX_CLICK_LISTENER;
 import static org.chromium.chrome.features.tasks.TasksSurfaceProperties.FAKE_SEARCH_BOX_TEXT_WATCHER;
 import static org.chromium.chrome.features.tasks.TasksSurfaceProperties.INCOGNITO_COOKIE_CONTROLS_MANAGER;
@@ -33,7 +34,6 @@ import static org.chromium.chrome.features.tasks.TasksSurfaceProperties.VOICE_SE
 
 import android.app.Activity;
 import android.graphics.drawable.ColorDrawable;
-import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.view.ViewGroup;
@@ -59,6 +59,7 @@ import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.ui.base.TestActivity;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.ui.modelutil.PropertyModelChangeProcessor;
+import org.chromium.ui.text.EmptyTextWatcher;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -101,10 +102,10 @@ public class TasksViewBinderUnitTest {
     @SmallTest
     public void testSetTabCarouselMode() {
         mTasksViewPropertyModel.set(IS_TAB_CAROUSEL_VISIBLE, true);
-        assertTrue(isViewVisible(R.id.carousel_tab_switcher_container));
+        assertTrue(isViewVisible(R.id.tab_switcher_module_container));
 
         mTasksViewPropertyModel.set(IS_TAB_CAROUSEL_VISIBLE, false);
-        assertFalse(isViewVisible(R.id.carousel_tab_switcher_container));
+        assertFalse(isViewVisible(R.id.tab_switcher_module_container));
     }
 
     @Test
@@ -125,15 +126,7 @@ public class TasksViewBinderUnitTest {
         assertTrue(isViewVisible(R.id.search_box));
 
         AtomicBoolean textChanged = new AtomicBoolean();
-        TextWatcher textWatcher = new TextWatcher() {
-            @Override
-            public void afterTextChanged(Editable s) {
-                // do nothing.
-            }
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                // do nothing.
-            }
+        TextWatcher textWatcher = new EmptyTextWatcher() {
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 textChanged.set(true);
@@ -242,14 +235,10 @@ public class TasksViewBinderUnitTest {
     @SmallTest
     public void testSetIncognitoMode() {
         mTasksViewPropertyModel.set(IS_INCOGNITO, true);
-        int backgroundColor = ChromeColors.getPrimaryBackgroundColor(mActivity, true);
-        ColorDrawable viewColor = (ColorDrawable) mTasksView.getBackground();
-        assertEquals(backgroundColor, viewColor.getColor());
+        assertTrue(mTasksView.getSearchBoxCoordinator().getIncognitoModeForTesting());
 
         mTasksViewPropertyModel.set(IS_INCOGNITO, false);
-        backgroundColor = ChromeColors.getPrimaryBackgroundColor(mActivity, false);
-        viewColor = (ColorDrawable) mTasksView.getBackground();
-        assertEquals(backgroundColor, viewColor.getColor());
+        assertFalse(mTasksView.getSearchBoxCoordinator().getIncognitoModeForTesting());
     }
 
     @Test
@@ -352,5 +341,17 @@ public class TasksViewBinderUnitTest {
         mTasksViewPropertyModel.set(TOP_TOOLBAR_PLACEHOLDER_HEIGHT, 16);
 
         assertEquals(16, params.height);
+    }
+
+    @Test
+    @SmallTest
+    public void testSetBackgroundColor() {
+        int backgroundColor = ChromeColors.getPrimaryBackgroundColor(mActivity, true);
+        mTasksViewPropertyModel.set(BACKGROUND_COLOR, backgroundColor);
+        assertEquals(backgroundColor, ((ColorDrawable) mTasksView.getBackground()).getColor());
+
+        int newBackgroundColor = ChromeColors.getPrimaryBackgroundColor(mActivity, false);
+        mTasksViewPropertyModel.set(BACKGROUND_COLOR, newBackgroundColor);
+        assertEquals(newBackgroundColor, ((ColorDrawable) mTasksView.getBackground()).getColor());
     }
 }

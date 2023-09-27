@@ -8,10 +8,12 @@
 #include <memory>
 #include <string>
 
+#include "base/memory/raw_ptr.h"
 #include "chromeos/ash/services/multidevice_setup/account_status_change_delegate_notifier.h"
 #include "chromeos/ash/services/multidevice_setup/host_status_provider.h"
 #include "chromeos/ash/services/multidevice_setup/public/cpp/oobe_completion_tracker.h"
 #include "chromeos/ash/services/multidevice_setup/public/mojom/multidevice_setup.mojom.h"
+#include "components/session_manager/core/session_manager_observer.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/remote.h"
 
@@ -34,7 +36,8 @@ class HostDeviceTimestampManager;
 class AccountStatusChangeDelegateNotifierImpl
     : public AccountStatusChangeDelegateNotifier,
       public HostStatusProvider::Observer,
-      public OobeCompletionTracker::Observer {
+      public OobeCompletionTracker::Observer,
+      public session_manager::SessionManagerObserver {
  public:
   class Factory {
    public:
@@ -82,6 +85,9 @@ class AccountStatusChangeDelegateNotifierImpl
   static const char
       kVerifiedHostDeviceIdFromMostRecentHostStatusUpdatePrefName[];
 
+  //   static const char kMultiDeviceShowSetupNotificationNextUnlock[];
+  static const char kMultiDeviceLastSessionStartTime[];
+
   AccountStatusChangeDelegateNotifierImpl(
       HostStatusProvider* host_status_provider,
       PrefService* pref_service,
@@ -98,6 +104,13 @@ class AccountStatusChangeDelegateNotifierImpl
 
   // OobeCompletionTracker::Observer:
   void OnOobeCompleted() override;
+
+  // SessionManagerObserver::
+  void OnSessionStateChanged() override;
+
+  void UpdateSessionStartTimeIfEligible();
+
+  bool IsInPhoneHubNotificationExperimentGroup();
 
   void CheckForMultiDeviceEvents(
       const HostStatusProvider::HostStatusWithDevice& host_status_with_device);
@@ -125,11 +138,12 @@ class AccountStatusChangeDelegateNotifierImpl
   absl::optional<mojom::HostStatus> host_status_from_most_recent_update_;
 
   mojo::Remote<mojom::AccountStatusChangeDelegate> delegate_remote_;
-  HostStatusProvider* host_status_provider_;
-  PrefService* pref_service_;
-  HostDeviceTimestampManager* host_device_timestamp_manager_;
-  OobeCompletionTracker* oobe_completion_tracker_;
-  base::Clock* clock_;
+  raw_ptr<HostStatusProvider, ExperimentalAsh> host_status_provider_;
+  raw_ptr<PrefService, ExperimentalAsh> pref_service_;
+  raw_ptr<HostDeviceTimestampManager, ExperimentalAsh>
+      host_device_timestamp_manager_;
+  raw_ptr<OobeCompletionTracker, ExperimentalAsh> oobe_completion_tracker_;
+  raw_ptr<base::Clock, ExperimentalAsh> clock_;
 };
 
 }  // namespace multidevice_setup

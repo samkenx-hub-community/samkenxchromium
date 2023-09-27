@@ -8,9 +8,9 @@ import android.content.Context;
 import android.view.View;
 
 import androidx.annotation.ColorInt;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Callback;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsUtils;
@@ -89,14 +89,13 @@ public class TopToolbarOverlayMediator {
         mTopUiThemeColorProvider = topUiThemeColorProvider;
         mModel = model;
         mIsVisibilityManuallyControlled = manualVisibilityControl;
-
         mIsOnValidLayout = (mLayoutStateProvider.getActiveLayoutType() & layoutsToShowOn) > 0;
         updateVisibility();
 
         mSceneChangeObserver = new LayoutStateObserver() {
             @Override
-            public void onStartedShowing(@LayoutType int layout, boolean showToolbar) {
-                mIsOnValidLayout = (layout & layoutsToShowOn) > 0;
+            public void onStartedShowing(@LayoutType int layoutType) {
+                mIsOnValidLayout = (layoutType & layoutsToShowOn) > 0;
                 updateVisibility();
             }
         };
@@ -109,6 +108,7 @@ public class TopToolbarOverlayMediator {
             updateVisibility();
             updateThemeColor(tab);
             updateProgress();
+            updateAnonymize(tab);
         };
         mTabObserver = new CurrentTabObserver(tabSupplier, new EmptyTabObserver() {
             @Override
@@ -125,6 +125,7 @@ public class TopToolbarOverlayMediator {
             public void onContentChanged(Tab tab) {
                 updateVisibility();
                 updateThemeColor(tab);
+                updateAnonymize(tab);
             }
         }, activityTabCallback);
 
@@ -202,8 +203,7 @@ public class TopToolbarOverlayMediator {
      * @param tab The tab to get the background color for.
      * @return The background color.
      */
-    @ColorInt
-    private int getToolbarBackgroundColor(Tab tab) {
+    private @ColorInt int getToolbarBackgroundColor(Tab tab) {
         if (sToolbarBackgroundColorForTesting != null) return sToolbarBackgroundColorForTesting;
         return mTopUiThemeColorProvider.getSceneLayerBackground(tab);
     }
@@ -213,8 +213,7 @@ public class TopToolbarOverlayMediator {
      * @param backgroundColor The tab's background color.
      * @return The url bar color.
      */
-    @ColorInt
-    private int getUrlBarBackgroundColor(Tab tab, @ColorInt int backgroundColor) {
+    private @ColorInt int getUrlBarBackgroundColor(Tab tab, @ColorInt int backgroundColor) {
         if (sUrlBarColorForTesting != null) return sUrlBarColorForTesting;
         return ThemeUtils.getTextBoxColorForToolbarBackground(mContext, tab, backgroundColor);
     }
@@ -255,9 +254,17 @@ public class TopToolbarOverlayMediator {
         if (mIsVisibilityManuallyControlled) {
             mModel.set(TopToolbarOverlayProperties.VISIBLE, mManualVisibility && mIsOnValidLayout);
         } else {
-            mModel.set(TopToolbarOverlayProperties.VISIBLE,
+            boolean visibility =
                     !BrowserControlsUtils.areBrowserControlsOffScreen(mBrowserControlsStateProvider)
-                            && mIsOnValidLayout);
+                    && mIsOnValidLayout;
+            mModel.set(TopToolbarOverlayProperties.VISIBLE, visibility);
+        }
+    }
+
+    private void updateAnonymize(Tab tab) {
+        if (!mIsVisibilityManuallyControlled && ToolbarFeatures.shouldSuppressCaptures()) {
+            boolean isNativePage = tab.isNativePage();
+            mModel.set(TopToolbarOverlayProperties.ANONYMIZE, isNativePage);
         }
     }
 
@@ -285,25 +292,24 @@ public class TopToolbarOverlayMediator {
         updateVisibility();
     }
 
-    @VisibleForTesting
     void setVisibilityManuallyControlledForTesting(boolean manuallyControlled) {
         mIsVisibilityManuallyControlled = manuallyControlled;
         updateShadowState();
         updateVisibility();
     }
 
-    @VisibleForTesting
     static void setIsTabletForTesting(Boolean isTablet) {
         sIsTabletForTesting = isTablet;
+        ResettersForTesting.register(() -> sIsTabletForTesting = null);
     }
 
-    @VisibleForTesting
     static void setToolbarBackgroundColorForTesting(@ColorInt int color) {
         sToolbarBackgroundColorForTesting = color;
+        ResettersForTesting.register(() -> sToolbarBackgroundColorForTesting = null);
     }
 
-    @VisibleForTesting
     static void setUrlBarColorForTesting(@ColorInt int color) {
         sUrlBarColorForTesting = color;
+        ResettersForTesting.register(() -> sUrlBarColorForTesting = null);
     }
 }

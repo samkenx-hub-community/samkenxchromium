@@ -10,6 +10,7 @@
 #include "base/component_export.h"
 #include "base/containers/flat_set.h"
 #include "base/functional/callback.h"
+#include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/unguessable_token.h"
@@ -107,10 +108,11 @@ class COMPONENT_EXPORT(GLOBAL_MEDIA_CONTROLS) MediaSessionNotificationItem
   // This will stop the media session associated with this item. The item will
   // then call |MediaNotificationController::RemoveItem()| to ensure removal.
   void Dismiss() override;
-  media_message_center::SourceType SourceType() override;
   void SetVolume(float volume) override {}
   void SetMute(bool mute) override;
   bool RequestMediaRemoting() override;
+  media_message_center::Source GetSource() const override;
+  media_message_center::SourceType GetSourceType() const override;
   absl::optional<base::UnguessableToken> GetSourceId() const override;
 
   // Stops the media session.
@@ -140,6 +142,9 @@ class COMPONENT_EXPORT(GLOBAL_MEDIA_CONTROLS) MediaSessionNotificationItem
   // the media duration is too short.
   media_session::mojom::RemotePlaybackMetadataPtr GetRemotePlaybackMetadata()
       const;
+
+  // Returns whether the item is actively playing.
+  bool IsPlaying() const;
 
   void FlushForTesting();
 
@@ -182,8 +187,8 @@ class COMPONENT_EXPORT(GLOBAL_MEDIA_CONTROLS) MediaSessionNotificationItem
   // to be globally unique.
   const std::string request_id_;
 
-  // The source of the media session (e.g. arc, web).
-  const Source source_;
+  // The source of the media session.
+  const media_message_center::Source source_;
 
   // The ID assigned to `source_`.
   absl::optional<base::UnguessableToken> source_id_;

@@ -49,8 +49,16 @@ import java.util.TreeMap;
  *
  * // Assert
  * histogramWatcher.assertExpected();
+ *
+ * Alternatively, Java's try-with-resources can be used to wrap the act block to make the assert
+ * implicit. This can be especially helpful when a test case needs to create multiple watchers,
+ * as the watcher variables are scoped separately and cannot be accidentally swapped.
+ *
+ * try (HistogramWatcher ignored = HistogramWatcher.newSingleRecordWatcher("Histogram1") {
+ *     [code under test that is expected to record the histogram above]
+ * }
  */
-public class HistogramWatcher {
+public class HistogramWatcher implements AutoCloseable {
     /**
      * Create a new {@link HistogramWatcher.Builder} to instantiate {@link HistogramWatcher}.
      */
@@ -109,15 +117,15 @@ public class HistogramWatcher {
          * value}.
          */
         public Builder expectBooleanRecord(String histogram, boolean value) {
-            return expectBooleanRecords(histogram, value, 1);
+            return expectBooleanRecordTimes(histogram, value, 1);
         }
 
         /**
          * Add an expectation that {@code histogram} will be recorded a number of {@code times} with
          * a boolean {@code value}.
          */
-        public Builder expectBooleanRecords(String histogram, boolean value, int times) {
-            return expectIntRecords(histogram, value ? 1 : 0, times);
+        public Builder expectBooleanRecordTimes(String histogram, boolean value, int times) {
+            return expectIntRecordTimes(histogram, value ? 1 : 0, times);
         }
 
         /**
@@ -125,17 +133,25 @@ public class HistogramWatcher {
          * value}.
          */
         public Builder expectIntRecord(String histogram, int value) {
-            return expectIntRecords(histogram, value, 1);
+            return expectIntRecordTimes(histogram, value, 1);
+        }
+
+        /**
+         * Add expectations that {@code histogram} will be recorded with each of the int {@code
+         * values} provided.
+         */
+        public Builder expectIntRecords(String histogram, int... values) {
+            for (int value : values) {
+                expectIntRecord(histogram, value);
+            }
+            return this;
         }
 
         /**
          * Add an expectation that {@code histogram} will be recorded a number of {@code times} with
          * an int {@code value}.
          */
-        public Builder expectIntRecords(String histogram, int value, int times) {
-            if (value < 0) {
-                throw new IllegalArgumentException("Histograms cannot record negative values");
-            }
+        public Builder expectIntRecordTimes(String histogram, int value, int times) {
             if (times < 0) {
                 throw new IllegalArgumentException(
                         "Cannot expect records a negative number of times");
@@ -155,14 +171,14 @@ public class HistogramWatcher {
          * Add an expectation that {@code histogram} will be recorded once with any value.
          */
         public Builder expectAnyRecord(String histogram) {
-            return expectAnyRecords(histogram, 1);
+            return expectAnyRecordTimes(histogram, 1);
         }
 
         /**
          * Add an expectation that {@code histogram} will be recorded a number of {@code times} with
          * any values.
          */
-        public Builder expectAnyRecords(String histogram, int times) {
+        public Builder expectAnyRecordTimes(String histogram, int times) {
             HistogramAndValue histogramAndValue = new HistogramAndValue(histogram, ANY_VALUE);
             incrementRecordsExpected(histogramAndValue, times);
             incrementTotalRecordsExpected(histogram, times);
@@ -242,6 +258,16 @@ public class HistogramWatcher {
             mStartingSamples.put(
                     histogram, RecordHistogram.getHistogramSamplesForTesting(histogram));
         }
+    }
+
+    /**
+     * Implements {@link AutoCloseable}. Note while this interface throws an {@link Exception}, we
+     * do not have to, and this allows call sites that know they're handling a
+     * {@link HistogramWatcher} to not catch or declare an exception either.
+     */
+    @Override
+    public void close() {
+        assertExpected();
     }
 
     /**

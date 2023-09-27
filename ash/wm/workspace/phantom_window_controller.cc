@@ -12,13 +12,14 @@
 #include "ash/style/ash_color_id.h"
 #include "ash/style/ash_color_provider.h"
 #include "ash/wm/window_util.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "ui/aura/window.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/layer.h"
+#include "ui/compositor/presentation_time_recorder.h"
 #include "ui/compositor/scoped_layer_animation_settings.h"
 #include "ui/display/screen.h"
 #include "ui/gfx/canvas.h"
-#include "ui/gfx/geometry/rect.h"
 #include "ui/views/animation/animation_builder.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
@@ -58,7 +59,7 @@ constexpr int kMaximizeCueHeight = 36;
 constexpr int kMaximizeCueHorizontalInsets = 16;
 constexpr int kMaximizeCueVerticalInsets = 8;
 
-constexpr int kPhantomWindowCornerRadius = 4;
+constexpr int kPhantomWindowCornerRadius = 12;
 constexpr gfx::Insets kPhantomWindowInsets(8);
 
 // The move up factor of starting y-position from the target position for
@@ -74,6 +75,9 @@ constexpr base::TimeDelta kMaximizeCueExitAnimationDurationMs =
 // The delay of the maximize cue entrance and exit animation.
 constexpr base::TimeDelta kMaximizeCueAnimationDelayMs =
     base::Milliseconds(100);
+
+constexpr char kShowPresentationHistogramName[] =
+    "Ash.PhantomWindowController.Show.PresentationTime";
 
 }  // namespace
 
@@ -105,11 +109,15 @@ void PhantomWindowController::Show(const gfx::Rect& window_bounds_in_screen) {
       floor((start_bounds_in_screen.height() - start_height) / 2.0f),
       floor((start_bounds_in_screen.width() - start_width) / 2.0f)));
 
+  aura::Window* root =
+      window_util::GetRootWindowMatching(target_bounds_in_screen_);
+  auto presentation_time_recorder = CreatePresentationTimeHistogramRecorder(
+      root->layer()->GetCompositor(), kShowPresentationHistogramName);
+  presentation_time_recorder->RequestNext();
+
   // Create a phantom widget with starting size so `ShowPhantomWidget()` can
   // animate from that current size to |target_bounds_in_screen|.
-  phantom_widget_ = CreatePhantomWidget(
-      window_util::GetRootWindowMatching(target_bounds_in_screen_),
-      start_bounds_in_screen);
+  phantom_widget_ = CreatePhantomWidget(root, start_bounds_in_screen);
   ShowPhantomWidget();
 }
 
@@ -184,6 +192,11 @@ views::Widget* PhantomWindowController::GetMaximizeCueForTesting() const {
   return maximize_cue_widget_.get();
 }
 
+const gfx::Rect& PhantomWindowController::GetTargetBoundsInScreenForTesting()
+    const {
+  return target_bounds_in_screen_;
+}
+
 std::unique_ptr<views::Widget> PhantomWindowController::CreatePhantomWidget(
     aura::Window* root_window,
     const gfx::Rect& bounds_in_screen) {
@@ -207,11 +220,13 @@ std::unique_ptr<views::Widget> PhantomWindowController::CreatePhantomWidget(
   phantom_widget->SetContentsView(
       views::Builder<views::View>()
           .SetBackground(views::CreateThemedRoundedRectBackground(
-              kColorAshShieldAndBase20, kPhantomWindowCornerRadius))
+              kColorAshPhantomWindowBackgroundColor,
+              kPhantomWindowCornerRadius))
           .SetBorder(std::make_unique<views::HighlightBorder>(
               kPhantomWindowCornerRadius,
-              views::HighlightBorder::Type::kHighlightBorder1,
-              /*use_light_colors=*/false))
+              chromeos::features::IsJellyrollEnabled()
+                  ? views::HighlightBorder::Type::kHighlightBorderNoShadow
+                  : views::HighlightBorder::Type::kHighlightBorder1))
           .Build());
   return phantom_widget;
 }
@@ -233,6 +248,7 @@ std::unique_ptr<views::Widget> PhantomWindowController::CreateMaximizeCue(
 
   ui::Layer* layer = maximize_cue_widget->GetLayer();
   layer->SetBackgroundBlur(ColorProvider::kBackgroundBlurSigma);
+  layer->SetBackdropFilterQuality(ColorProvider::kBackgroundBlurQuality);
   layer->SetRoundedCornerRadius(gfx::RoundedCornersF(kMaximizeCueHeight / 2.f));
 
   aura::Window* maximize_cue_widget_window =
@@ -251,8 +267,9 @@ std::unique_ptr<views::Widget> PhantomWindowController::CreateMaximizeCue(
               kColorAshShieldAndBase20, kPhantomWindowCornerRadius))
           .SetBorder(std::make_unique<views::HighlightBorder>(
               kPhantomWindowCornerRadius,
-              views::HighlightBorder::Type::kHighlightBorder1,
-              /*use_light_colors=*/false))
+              chromeos::features::IsJellyrollEnabled()
+                  ? views::HighlightBorder::Type::kHighlightBorderNoShadow
+                  : views::HighlightBorder::Type::kHighlightBorder1))
           .AddChildren(
               views::Builder<views::Label>()
                   .SetText(l10n_util::GetStringUTF16(

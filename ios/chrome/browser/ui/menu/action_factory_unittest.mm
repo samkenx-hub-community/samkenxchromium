@@ -8,7 +8,7 @@
 #import "base/test/scoped_feature_list.h"
 #import "base/test/task_environment.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/ui/menu/action_factory+protected.h"
 #import "ios/chrome/browser/ui/menu/menu_action_type.h"
 #import "ios/chrome/browser/ui/menu/menu_histograms.h"
@@ -22,10 +22,6 @@
 #import "ui/base/l10n/l10n_util_mac.h"
 #import "ui/base/test/ios/ui_image_test_utils.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 MenuScenarioHistogram kTestMenuScenario = MenuScenarioHistogram::kHistoryEntry;
@@ -83,8 +79,8 @@ TEST_F(ActionFactoryTest, BookmarkAction) {
   EXPECT_EQ(expectedImage, action.image);
 }
 
-// Tests that the close action has the right title and image.
-TEST_F(ActionFactoryTest, CloseAction) {
+// Tests that the close regular tab action has the right title and image.
+TEST_F(ActionFactoryTest, CloseRegularTabAction) {
   ActionFactory* factory =
       [[ActionFactory alloc] initWithScenario:kTestMenuScenario];
 
@@ -93,7 +89,24 @@ TEST_F(ActionFactoryTest, CloseAction) {
   NSString* expectedTitle =
       l10n_util::GetNSString(IDS_IOS_CONTENT_CONTEXT_CLOSETAB);
 
-  UIAction* action = [factory actionToCloseTabWithBlock:^{
+  UIAction* action = [factory actionToCloseRegularTabWithBlock:^{
+  }];
+
+  EXPECT_TRUE([expectedTitle isEqualToString:action.title]);
+  EXPECT_EQ(expectedImage, action.image);
+}
+
+// Tests that the close pinned tab action has the right title and image.
+TEST_F(ActionFactoryTest, ClosePinnedTabAction) {
+  ActionFactory* factory =
+      [[ActionFactory alloc] initWithScenario:kTestMenuScenario];
+
+  UIImage* expectedImage =
+      DefaultSymbolWithPointSize(kXMarkSymbol, kSymbolActionPointSize);
+  NSString* expectedTitle =
+      l10n_util::GetNSString(IDS_IOS_CONTENT_CONTEXT_CLOSEPINNEDTAB);
+
+  UIAction* action = [factory actionToClosePinnedTabWithBlock:^{
   }];
 
   EXPECT_TRUE([expectedTitle isEqualToString:action.title]);
@@ -238,7 +251,8 @@ TEST_F(ActionFactoryTest, MoveFolderAction) {
   ActionFactory* factory =
       [[ActionFactory alloc] initWithScenario:kTestMenuScenario];
 
-  UIImage* expectedImage = [UIImage imageNamed:@"move_folder"];
+  UIImage* expectedImage = MakeSymbolMulticolor(
+      CustomSymbolWithPointSize(kMoveFolderSymbol, kSymbolActionPointSize));
 
   NSString* expectedTitle =
       l10n_util::GetNSString(IDS_IOS_BOOKMARK_CONTEXT_MENU_MOVE);
@@ -247,7 +261,7 @@ TEST_F(ActionFactoryTest, MoveFolderAction) {
   }];
 
   EXPECT_TRUE([expectedTitle isEqualToString:action.title]);
-  EXPECT_EQ(expectedImage, action.image);
+  EXPECT_NSEQ(expectedImage, action.image);
 }
 
 // Tests that the Mark As Read action has the right title and image.

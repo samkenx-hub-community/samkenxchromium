@@ -38,9 +38,7 @@ using ::guest_view::GuestViewManager;
 using ::guest_view::TestGuestViewManager;
 using ::pdf_extension_test_util::GetOnlyMimeHandlerView;
 
-PDFExtensionTestBase::PDFExtensionTestBase() {
-  GuestViewManager::set_factory_for_testing(&factory_);
-}
+PDFExtensionTestBase::PDFExtensionTestBase() = default;
 
 void PDFExtensionTestBase::SetUpCommandLine(
     base::CommandLine* /*command_line*/) {
@@ -134,26 +132,25 @@ void PDFExtensionTestBase::TestGetSelectedTextReply(const GURL& url,
 
   // Reach into the guest and hook into it such that it posts back a 'flush'
   // message after every getSelectedTextReply message sent.
-  ASSERT_TRUE(
-      content::ExecuteScript(guest->GetGuestMainFrame(),
-                             "viewer.overrideSendScriptingMessageForTest();"));
+  ASSERT_TRUE(content::ExecJs(guest->GetGuestMainFrame(),
+                              "viewer.overrideSendScriptingMessageForTest();"));
 
   // Add an event listener for flush messages and request the selected text.
   // If we get a flush message without receiving getSelectedText we know that
   // the message didn't come through.
-  bool success = false;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractBool(
-      GetActiveWebContents(),
-      "window.addEventListener('message', function(event) {"
-      "  if (event.data == 'flush')"
-      "    window.domAutomationController.send(false);"
-      "  if (event.data.type == 'getSelectedTextReply')"
-      "    window.domAutomationController.send(true);"
-      "});"
-      "document.getElementsByTagName('embed')[0].postMessage("
-      "    {type: 'getSelectedText'});",
-      &success));
-  ASSERT_EQ(expect_success, success);
+  ASSERT_EQ(
+      expect_success,
+      content::EvalJs(GetActiveWebContents(),
+                      "new Promise(resolve => {"
+                      "  window.addEventListener('message', function(event) {"
+                      "    if (event.data == 'flush')"
+                      "      resolve(false);"
+                      "    if (event.data.type == 'getSelectedTextReply')"
+                      "      resolve(true);"
+                      "  });"
+                      "  document.getElementsByTagName('embed')[0].postMessage("
+                      "      {type: 'getSelectedText'});"
+                      "});"));
 }
 
 WebContents* PDFExtensionTestBase::GetActiveWebContents() {
@@ -165,19 +162,8 @@ TestGuestViewManager* PDFExtensionTestBase::GetGuestViewManager(
   if (!profile) {
     profile = browser()->profile();
   }
-  // TODO(wjmaclean): Re-implement FromBrowserContext in the
-  // TestGuestViewManager class to avoid all callers needing this cast.
-  auto* manager = static_cast<TestGuestViewManager*>(
-      TestGuestViewManager::FromBrowserContext(profile));
-  // Test code may access the TestGuestViewManager before it would be created
-  // during creation of the first guest.
-  if (!manager) {
-    manager =
-        static_cast<TestGuestViewManager*>(GuestViewManager::CreateWithDelegate(
-            profile, ExtensionsAPIClient::Get()->CreateGuestViewManagerDelegate(
-                         profile)));
-  }
-  return manager;
+  return factory_.GetOrCreateTestGuestViewManager(
+      profile, ExtensionsAPIClient::Get()->CreateGuestViewManagerDelegate());
 }
 
 content::RenderFrameHost* PDFExtensionTestBase::GetPluginFrame(

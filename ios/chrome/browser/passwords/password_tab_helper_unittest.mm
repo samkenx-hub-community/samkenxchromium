@@ -12,7 +12,7 @@
 #import "components/autofill/ios/form_util/unique_id_data_tab_helper.h"
 #import "components/password_manager/core/browser/manage_passwords_referrer.h"
 #import "components/password_manager/core/browser/password_manager_constants.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/web/public/navigation/navigation_manager.h"
@@ -27,10 +27,6 @@
 #import "testing/platform_test.h"
 #import "third_party/ocmock/OCMock/OCMock.h"
 #import "third_party/ocmock/gtest_support.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -58,6 +54,7 @@ class PasswordTabHelperTest : public PlatformTest {
     id dispatcher = [[CommandDispatcher alloc] init];
     id mockApplicationSettingsCommandHandler =
         OCMProtocolMock(@protocol(ApplicationSettingsCommands));
+    dispatcher_ = mockApplicationSettingsCommandHandler;
     [dispatcher
         startDispatchingToTarget:mockApplicationSettingsCommandHandler
                      forProtocol:@protocol(ApplicationSettingsCommands)];

@@ -12,15 +12,16 @@
 #import <vector>
 
 #import "base/observer_list.h"
-#import "ios/chrome/browser/main/browser_observer.h"
-#import "ios/chrome/browser/main/browser_user_data.h"
-#import "ios/chrome/browser/web_state_list/web_state_list_observer.h"
+#import "ios/chrome/browser/sessions/web_state_list_serialization.h"
+#import "ios/chrome/browser/shared/model/browser/browser_observer.h"
+#import "ios/chrome/browser/shared/model/browser/browser_user_data.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list_observer.h"
 #import "ios/web/public/web_state_observer.h"
 
 class AllWebStateObservationForwarder;
 class ChromeBrowserState;
 @class SessionWindowIOS;
-@class SessionIOSFactory;
+@class SessionWindowIOSFactory;
 class SessionRestorationObserver;
 @class SessionServiceIOS;
 class WebStateList;
@@ -55,16 +56,18 @@ class SessionRestorationBrowserAgent
   void AddObserver(SessionRestorationObserver* observer);
   void RemoveObserver(SessionRestorationObserver* observer);
 
-  // Restores the `window` (for example, after a crash). If there is only one ,
-  // tab showing the NTP, then this tab should be clobbered, otherwise, the tabs
-  // from the restored sessions should be added at the end of the current list
-  // of tabs. Returns YES if the single NTP tab is closed.
-  bool RestoreSessionWindow(SessionWindowIOS* window);
+  // Restores the `window` (for example, after a crash) within the provided
+  // `scope`. Session restoration scope defines which sessions should be
+  // restored: all, regular or pinned. If there is only one tab showing the
+  // NTP, then this tab should be clobbered, otherwise, the tabs from the
+  // restored sessions should be added at the end of the current list of tabs.
+  void RestoreSessionWindow(SessionWindowIOS* window,
+                            SessionRestorationScope scope);
 
   // Restores the session whose ID matches the session ID set for this agent.
   // Restoration is done via RestoreSessionWindow(), above, and the return
   // value of that method is returned.
-  bool RestoreSession();
+  void RestoreSession();
 
   // Persists the current list of tabs to disk, either immediately or deferred
   // based on the value of `immediately`.
@@ -80,7 +83,17 @@ class SessionRestorationBrowserAgent
   BROWSER_USER_DATA_KEY_DECL();
 
   SessionRestorationBrowserAgent(Browser* browser,
-                                 SessionServiceIOS* session_service);
+                                 SessionServiceIOS* session_service,
+                                 bool enable_pinned_web_states);
+
+  // Returns array of CRWSessionStorage for the provided session restoration
+  // `scope`. This method is mainly needed to remove the dropped session
+  // storages, which eases the iteration through the array using the same
+  // order of indexes.
+  static NSArray<CRWSessionStorage*>* GetRestoredSessionStoragesForScope(
+      SessionRestorationScope scope,
+      NSArray<CRWSessionStorage*>* session_storages,
+      int restored_count);
 
   // Returns true if the current session can be saved.
   bool CanSaveSession();
@@ -89,29 +102,14 @@ class SessionRestorationBrowserAgent
   void BrowserDestroyed(Browser* browser) override;
 
   // WebStateListObserver methods.
-  void WebStateActivatedAt(WebStateList* web_state_list,
-                           web::WebState* old_web_state,
-                           web::WebState* new_web_state,
-                           int active_index,
-                           ActiveWebStateChangeReason reason) override;
-  void WillDetachWebStateAt(WebStateList* web_state_list,
-                            web::WebState* web_state,
-                            int index) override;
-  void WebStateDetachedAt(WebStateList* web_state_list,
-                          web::WebState* web_state,
-                          int index) override;
-  void WebStateInsertedAt(WebStateList* web_state_list,
-                          web::WebState* web_state,
-                          int index,
-                          bool activating) override;
-  void WebStateReplacedAt(WebStateList* web_state_list,
-                          web::WebState* old_web_state,
-                          web::WebState* new_web_state,
-                          int index) override;
-  void WebStateMoved(WebStateList* web_state_list,
-                     web::WebState* web_state,
-                     int from_index,
-                     int to_index) override;
+  void WebStateListWillChange(WebStateList* web_state_list,
+                              const WebStateListChangeDetach& detach_change,
+                              const WebStateListStatus& status) override;
+  void WebStateListDidChange(WebStateList* web_state_list,
+                             const WebStateListChange& change,
+                             const WebStateListStatus& status) override;
+  void WillBeginBatchOperation(WebStateList* web_state_list) override;
+  void BatchOperationEnded(WebStateList* web_state_list) override;
 
   // web::WebStateObserver methods.
   void DidFinishNavigation(web::WebState* web_state,
@@ -130,14 +128,22 @@ class SessionRestorationBrowserAgent
 
   ChromeBrowserState* browser_state_ = nullptr;
 
-  // Session Factory used to create session data for saving.
-  SessionIOSFactory* session_ios_factory_ = nullptr;
+  // SessionWindowIOSFactory used to create session data for saving.
+  SessionWindowIOSFactory* session_window_ios_factory_ = nullptr;
 
   // Session identifier for this agent.
   __strong NSString* session_identifier_ = nil;
 
   // True when session restoration is in progress.
   bool restoring_session_ = false;
+
+  // Used to delay saves requested while a batch operation was in progress.
+  // The save will be scheduled with a delay unless any of the SaveSession()
+  // call was asking for no delay.
+  bool save_after_batch_ = false;
+  bool save_immediately_ = false;
+
+  const bool enable_pinned_web_states_;
 
   // Observer for the active web state in `browser_`'s web state list.
   std::unique_ptr<AllWebStateObservationForwarder> all_web_state_observer_;

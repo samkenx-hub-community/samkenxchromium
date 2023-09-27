@@ -4,6 +4,8 @@
 
 #include "ash/components/arc/net/arc_net_utils.h"
 
+#include <netinet/in.h>
+
 #include "chromeos/ash/components/login/login_state/login_state.h"
 #include "chromeos/ash/components/network/device_state.h"
 #include "chromeos/ash/components/network/network_event_log.h"
@@ -141,6 +143,78 @@ std::string IPv4AddressToString(uint32_t addr) {
   return !inet_ntop(AF_INET, &ia, buf, sizeof(buf)) ? std::string() : buf;
 }
 
+std::string KeyManagementMethodToString(arc::mojom::KeyManagement management) {
+  switch (management) {
+    case arc::mojom::KeyManagement::kIeee8021X:
+      return "WEP-8021X";
+    case arc::mojom::KeyManagement::kFtEap:
+      return "FT-EAP";
+    case arc::mojom::KeyManagement::kFtPsk:
+      return "FT-PSK";
+    case arc::mojom::KeyManagement::kFtSae:
+      return "FT-SAE";
+    case arc::mojom::KeyManagement::kWpaEap:
+      return "WPA-EAP";
+    case arc::mojom::KeyManagement::kWpaEapSha256:
+      return "WPA-EAP-SHA256";
+    case arc::mojom::KeyManagement::kWpaPsk:
+      return "WPA-PSK";
+    case arc::mojom::KeyManagement::kSae:
+      return "SAE";
+    case arc::mojom::KeyManagement::kNone:
+      return "None";
+  }
+  return "unknown";
+}
+
+patchpanel::SocketConnectionEvent::IpProtocol TranslateIpProtocol(
+    arc::mojom::IpProtocol proto) {
+  switch (proto) {
+    case arc::mojom::IpProtocol::kTcp:
+      return patchpanel::SocketConnectionEvent::IpProtocol::
+          SocketConnectionEvent_IpProtocol_TCP;
+    case arc::mojom::IpProtocol::kUdp:
+      return patchpanel::SocketConnectionEvent::IpProtocol::
+          SocketConnectionEvent_IpProtocol_UDP;
+    case arc::mojom::IpProtocol::kUnknown:
+      NET_LOG(ERROR) << "Unknown IP protocol";
+      return patchpanel::SocketConnectionEvent::IpProtocol::
+          SocketConnectionEvent_IpProtocol_UNKNOWN_PROTO;
+  }
+}
+
+patchpanel::SocketConnectionEvent::SocketEvent TranslateSocketEvent(
+    arc::mojom::SocketEvent event) {
+  switch (event) {
+    case arc::mojom::SocketEvent::kOpen:
+      return patchpanel::SocketConnectionEvent::SocketEvent::
+          SocketConnectionEvent_SocketEvent_OPEN;
+    case arc::mojom::SocketEvent::kClose:
+      return patchpanel::SocketConnectionEvent::SocketEvent::
+          SocketConnectionEvent_SocketEvent_CLOSE;
+    case arc::mojom::SocketEvent::kUnknown:
+      NET_LOG(ERROR) << "Unknown socket event";
+      return patchpanel::SocketConnectionEvent::SocketEvent::
+          SocketConnectionEvent_SocketEvent_UNKNOWN_EVENT;
+  }
+}
+
+patchpanel::SocketConnectionEvent::QosCategory TranslateQosCategory(
+    arc::mojom::QosCategory category) {
+  switch (category) {
+    case arc::mojom::QosCategory::kRealtimeInteractive:
+      return patchpanel::SocketConnectionEvent::QosCategory::
+          SocketConnectionEvent_QosCategory_REALTIME_INTERACTIVE;
+    case arc::mojom::QosCategory::kMultimediaConferencing:
+      return patchpanel::SocketConnectionEvent::QosCategory::
+          SocketConnectionEvent_QosCategory_MULTIMEDIA_CONFERENCING;
+    case arc::mojom::QosCategory::kUnknown:
+      NET_LOG(ERROR) << "Unknown QoS category";
+      return patchpanel::SocketConnectionEvent::QosCategory::
+          SocketConnectionEvent_QosCategory_UNKNOWN_CATEGORY;
+  }
+}
+
 }  // namespace
 
 namespace arc::net_utils {
@@ -258,6 +332,38 @@ std::string TranslateEapPhase2Method(arc::mojom::EapPhase2Method method) {
   return "";
 }
 
+std::string TranslateEapMethodToOnc(arc::mojom::EapMethod method) {
+  switch (method) {
+    case arc::mojom::EapMethod::kLeap:
+      return onc::eap::kLEAP;
+    case arc::mojom::EapMethod::kPeap:
+      return onc::eap::kPEAP;
+    case arc::mojom::EapMethod::kTls:
+      return onc::eap::kEAP_TLS;
+    case arc::mojom::EapMethod::kTtls:
+      return onc::eap::kEAP_TTLS;
+    case arc::mojom::EapMethod::kNone:
+      return std::string();
+  }
+  NET_LOG(ERROR) << "Unknown EAP method: " << method;
+  return std::string();
+}
+
+std::string TranslateEapPhase2MethodToOnc(arc::mojom::EapPhase2Method method) {
+  switch (method) {
+    case arc::mojom::EapPhase2Method::kPap:
+      return onc::eap::kPAP;
+    case arc::mojom::EapPhase2Method::kMschap:
+      return onc::eap::kMSCHAP;
+    case arc::mojom::EapPhase2Method::kMschapv2:
+      return onc::eap::kMSCHAPv2;
+    case arc::mojom::EapPhase2Method::kNone:
+      return std::string();
+  }
+  NET_LOG(ERROR) << "Unknown EAP phase 2 method: " << method;
+  return std::string();
+}
+
 std::string TranslateKeyManagement(mojom::KeyManagement management) {
   switch (management) {
     case arc::mojom::KeyManagement::kIeee8021X:
@@ -277,6 +383,18 @@ std::string TranslateKeyManagement(mojom::KeyManagement management) {
   }
   NET_LOG(ERROR) << "Unknown key management";
   return "";
+}
+
+std::string TranslateKeyManagementToOnc(mojom::KeyManagement management) {
+  if (management == arc::mojom::KeyManagement::kIeee8021X) {
+    return onc::wifi::kWEP_8021X;
+  } else if (management == arc::mojom::KeyManagement::kNone) {
+    return std::string();
+  }
+  // Currently other key managements are not handled.
+  NET_LOG(ERROR) << "Key management is not supported or invalid: "
+                 << KeyManagementMethodToString(management);
+  return std::string();
 }
 
 arc::mojom::SecurityType TranslateWiFiSecurity(
@@ -429,4 +547,70 @@ std::vector<arc::mojom::NetworkConfigurationPtr> TranslateNetworkStates(
   return networks;
 }
 
+base::Value::List TranslateSubjectNameMatchListToValue(
+    const std::vector<std::string>& string_list) {
+  base::Value::List result;
+  for (const auto& item : string_list) {
+    // Type and value is separated by ":" in vector, separate them by splitting
+    // at ":".
+    int idx = item.find(":");
+    std::string type = item.substr(0, idx);
+    std::string value = item.substr(idx + 1, item.size());
+    base::Value::Dict entry;
+    entry.Set(::onc::eap_subject_alternative_name_match::kType, type);
+    entry.Set(::onc::eap_subject_alternative_name_match::kValue, value);
+    result.Append(std::move(entry));
+  }
+  return result;
+}
+
+std::unique_ptr<patchpanel::SocketConnectionEvent>
+TranslateSocketConnectionEvent(const mojom::SocketConnectionEventPtr& mojom) {
+  std::unique_ptr<patchpanel::SocketConnectionEvent> msg =
+      std::make_unique<patchpanel::SocketConnectionEvent>();
+
+  msg->set_saddr(
+      std::string{reinterpret_cast<const char*>(mojom->src_addr.bytes().data()),
+                  mojom->src_addr.size()});
+  msg->set_daddr(reinterpret_cast<const char*>(mojom->dst_addr.bytes().data()),
+                 mojom->dst_addr.size());
+
+  msg->set_sport(mojom->src_port);
+  msg->set_dport(mojom->dst_port);
+
+  if (const auto protocol = TranslateIpProtocol(mojom->proto);
+      protocol != patchpanel::SocketConnectionEvent::IpProtocol::
+                      SocketConnectionEvent_IpProtocol_UNKNOWN_PROTO) {
+    msg->set_proto(protocol);
+  } else {
+    NET_LOG(ERROR) << "IP protocol is unknown, translate socket connection "
+                      "event failed. IP protocol is: "
+                   << mojom->proto;
+    return nullptr;
+  }
+
+  if (const auto event = TranslateSocketEvent(mojom->event);
+      event != patchpanel::SocketConnectionEvent::SocketEvent::
+                   SocketConnectionEvent_SocketEvent_UNKNOWN_EVENT) {
+    msg->set_event(event);
+  } else {
+    NET_LOG(ERROR) << "Socket event is unknown, translate socket connection "
+                      "event failed. Socket event is: "
+                   << mojom->event;
+    return nullptr;
+  }
+
+  if (const auto category = TranslateQosCategory(mojom->qos_category);
+      category != patchpanel::SocketConnectionEvent::QosCategory::
+                      SocketConnectionEvent_QosCategory_UNKNOWN_CATEGORY) {
+    msg->set_category(category);
+  } else {
+    NET_LOG(ERROR) << "QoS category is unknown, translate socket connection "
+                      "event failed. QoS category is: "
+                   << mojom->qos_category;
+    return nullptr;
+  }
+
+  return msg;
+}
 }  // namespace arc::net_utils

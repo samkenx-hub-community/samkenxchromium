@@ -10,7 +10,6 @@
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/constants/ash_switches.h"
-#include "ash/public/cpp/sensor_disabled_notification_delegate.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
@@ -18,9 +17,12 @@
 #include "ash/system/privacy_hub/privacy_hub_metrics.h"
 #include "ash/system/privacy_hub/privacy_hub_notification.h"
 #include "ash/system/privacy_hub/privacy_hub_notification_controller.h"
+#include "ash/system/privacy_hub/sensor_disabled_notification_delegate.h"
 #include "ash/system/video_conference/fake_video_conference_tray_controller.h"
 #include "ash/test/ash_test_base.h"
 #include "base/command_line.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ref.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "components/prefs/pref_change_registrar.h"
@@ -36,6 +38,8 @@ using testing::_;
 namespace ash {
 
 namespace {
+
+using Sensor = SensorDisabledNotificationDelegate::Sensor;
 
 class MockSwitchAPI : public CameraPrivacySwitchAPI {
  public:
@@ -81,13 +85,13 @@ class ScopedCameraMuteToggler {
  public:
   explicit ScopedCameraMuteToggler(bool software_switch)
       : camera_privacy_switch_controller_(
-            Shell::Get()->privacy_hub_controller()->camera_controller()),
+            *CameraPrivacySwitchController::Get()),
         software_switch_(software_switch) {
     if (software_switch_) {
       Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
           prefs::kUserCameraAllowed, /*value=*/false);
     } else {
-      camera_privacy_switch_controller_.OnCameraHWPrivacySwitchStateChanged(
+      camera_privacy_switch_controller_->OnCameraHWPrivacySwitchStateChanged(
           std::string(), cros::mojom::CameraPrivacySwitchState::ON);
     }
   }
@@ -97,27 +101,56 @@ class ScopedCameraMuteToggler {
       Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
           prefs::kUserCameraAllowed, /*value=*/true);
     } else {
-      camera_privacy_switch_controller_.OnCameraHWPrivacySwitchStateChanged(
+      camera_privacy_switch_controller_->OnCameraHWPrivacySwitchStateChanged(
           std::string(), cros::mojom::CameraPrivacySwitchState::OFF);
     }
   }
 
  private:
-  CameraPrivacySwitchController& camera_privacy_switch_controller_;
+  const raw_ref<CameraPrivacySwitchController, ExperimentalAsh>
+      camera_privacy_switch_controller_;
   const bool software_switch_;
 };
 
 }  // namespace
 
-class PrivacyHubCameraControllerTestBase : public AshTestBase {
+class PrivacyHubCameraTestBase
+    : public AshTestBase,
+      public testing::WithParamInterface<std::tuple<bool, bool, bool>> {
  public:
-  PrivacyHubCameraControllerTestBase()
+  PrivacyHubCameraTestBase()
       : AshTestBase(base::test::TaskEnvironment::TimeSource::MOCK_TIME) {
-    scoped_feature_list_.InitAndEnableFeature(ash::features::kCrosPrivacyHub);
+    std::vector<base::test::FeatureRef> enabled_features;
+    std::vector<base::test::FeatureRef> disabled_features;
+    if (IsPrivacyHubEnabled()) {
+      enabled_features.push_back(ash::features::kCrosPrivacyHubV0);
+    } else {
+      disabled_features.push_back(ash::features::kCrosPrivacyHubV0);
+    }
+    if (IsPrivacyIndicatorsEnabled()) {
+      enabled_features.push_back(features::kPrivacyIndicators);
+    } else {
+      disabled_features.push_back(features::kPrivacyIndicators);
+    }
+    if (IsVideoConferenceEnabled()) {
+      fake_video_conference_tray_controller_ =
+          std::make_unique<FakeVideoConferenceTrayController>();
+      enabled_features.push_back(features::kVideoConference);
+      enabled_features.push_back(features::kCameraEffectsSupportedByHardware);
+    } else {
+      disabled_features.push_back(features::kVideoConference);
+      disabled_features.push_back(features::kCameraEffectsSupportedByHardware);
+    }
+    scoped_feature_list_.InitWithFeatures(enabled_features, disabled_features);
   }
 
-  ~PrivacyHubCameraControllerTestBase() override = default;
+  ~PrivacyHubCameraTestBase() override {
+    fake_video_conference_tray_controller_.reset();
+  }
 
+  CameraPrivacySwitchSynchronizer* Synchronizer() {
+    return PrivacyHubController::Get()->CameraSynchronizerForTest();
+  }
   // AshTestBase:
   void SetUp() override {
     AshTestBase::SetUp();
@@ -125,9 +158,26 @@ class PrivacyHubCameraControllerTestBase : public AshTestBase {
     auto mock_switch = std::make_unique<::testing::NiceMock<MockSwitchAPI>>();
     mock_switch_ = mock_switch.get();
 
-    controller_ = &Shell::Get()->privacy_hub_controller()->camera_controller();
-    controller_->SetCameraPrivacySwitchAPIForTest(std::move(mock_switch));
+    Synchronizer()->SetCameraPrivacySwitchAPIForTest(std::move(mock_switch));
+
+    if (IsPrivacyHubEnabled()) {
+      // Set up the fake `SensorDisabledNotificationDelegate`.
+      // In production it is set only if Privacy Hub is enabled.
+      scoped_delegate_ =
+          std::make_unique<ScopedSensorDisabledNotificationDelegateForTest>(
+              std::make_unique<FakeSensorDisabledNotificationDelegate>());
+    }
   }
+
+  void TearDown() override {
+    // We need to destroy the delegate while the Ash still exists.
+    scoped_delegate_.reset();
+    AshTestBase::TearDown();
+  }
+
+  bool IsPrivacyIndicatorsEnabled() { return std::get<0>(GetParam()); }
+  bool IsVideoConferenceEnabled() { return std::get<1>(GetParam()); }
+  bool IsPrivacyHubEnabled() { return std::get<2>(GetParam()); }
 
   void SetUserPref(bool allowed) {
     Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
@@ -141,62 +191,24 @@ class PrivacyHubCameraControllerTestBase : public AshTestBase {
         ->GetBoolean(prefs::kUserCameraAllowed);
   }
 
-  void LaunchAppAccessingCamera(const std::u16string& app_name) {
-    delegate_.LaunchAppAccessingCamera(app_name);
-    controller_->ActiveApplicationsChanged(/*application_added=*/true);
-  }
-
-  void CloseAppAccessingCamera(const std::u16string& app_name) {
-    delegate_.CloseAppAccessingCamera(app_name);
-    controller_->ActiveApplicationsChanged(/*application_added=*/false);
-  }
-
-  ::testing::NiceMock<MockSwitchAPI>* mock_switch_;
-
-  CameraPrivacySwitchController* controller_;
-  base::test::ScopedFeatureList scoped_feature_list_;
-  const base::HistogramTester histogram_tester_;
-  FakeSensorDisabledNotificationDelegate delegate_;
-};
-
-class PrivacyHubCameraControllerTest
-    : public PrivacyHubCameraControllerTestBase,
-      public testing::WithParamInterface<std::tuple<bool, bool>> {
  protected:
-  PrivacyHubCameraControllerTest() {
-    std::vector<base::test::FeatureRef> enabled_features{};
-    if (IsPrivacyIndicatorsEnabled()) {
-      enabled_features.push_back(features::kPrivacyIndicators);
-    }
-    if (IsVideoConferenceEnabled()) {
-      fake_video_conference_tray_controller_ =
-          std::make_unique<FakeVideoConferenceTrayController>();
-      enabled_features.push_back(features::kVideoConference);
-      base::CommandLine::ForCurrentProcess()->AppendSwitch(
-          switches::kCameraEffectsSupportedByHardware);
-    }
-    scoped_feature_list_ = std::make_unique<base::test::ScopedFeatureList>();
-    scoped_feature_list_->InitWithFeatures(enabled_features, {});
-  }
+  raw_ptr<::testing::NiceMock<MockSwitchAPI>,
+          DanglingUntriaged | ExperimentalAsh>
+      mock_switch_;
 
-  ~PrivacyHubCameraControllerTest() override {
-    fake_video_conference_tray_controller_.reset();
-  }
-  bool IsPrivacyIndicatorsEnabled() { return std::get<0>(GetParam()); }
-
-  bool IsVideoConferenceEnabled() { return std::get<1>(GetParam()); }
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+  std::unique_ptr<ScopedSensorDisabledNotificationDelegateForTest>
+      scoped_delegate_;
 
   std::unique_ptr<FakeVideoConferenceTrayController>
       fake_video_conference_tray_controller_;
-
-  std::unique_ptr<base::test::ScopedFeatureList> scoped_feature_list_;
 };
 
-INSTANTIATE_TEST_SUITE_P(All,
-                         PrivacyHubCameraControllerTest,
-                         testing::Combine(testing::Bool(), testing::Bool()));
-// Test reaction on UI action.
-TEST_P(PrivacyHubCameraControllerTest, UIAction) {
+using PrivacyHubCameraSynchronizerTest = PrivacyHubCameraTestBase;
+
+// Test reaction on user pref change (e.g. in UI).
+TEST_P(PrivacyHubCameraSynchronizerTest, UserPrefChange) {
   const std::vector<bool> user_pref_sequence{false, true, true, false, true};
   const int number_of_changes = [&]() {
     int cnt = 0;
@@ -218,64 +230,107 @@ TEST_P(PrivacyHubCameraControllerTest, UIAction) {
   for (const bool pref_val : user_pref_sequence) {
     SetUserPref(pref_val);
     // User toggle ON means the camera is DISABLED.
-    const CameraSWPrivacySwitchSetting expected_val =
+    CameraSWPrivacySwitchSetting expected_val =
         pref_val ? CameraSWPrivacySwitchSetting::kEnabled
                  : CameraSWPrivacySwitchSetting::kDisabled;
+    if (!IsPrivacyHubEnabled() && !IsVideoConferenceEnabled()) {
+      // If both VC and PrivacyHub features are off, the camera will always be
+      // re-enabled
+      expected_val = CameraSWPrivacySwitchSetting::kEnabled;
+    }
     EXPECT_EQ(captured_val, expected_val);
   }
 }
 
-TEST_P(PrivacyHubCameraControllerTest, OnCameraSoftwarePrivacySwitchChanged) {
-  // When |prefs::kUserCameraAllowed| is true and CrOS Camera Service
+TEST_P(PrivacyHubCameraSynchronizerTest, OnCameraSoftwarePrivacySwitchChanged) {
+  // When `prefs::kUserCameraAllowed` is true and CrOS Camera Service
   // communicates the SW privacy switch state as UNKNOWN or ON, the states
-  // mismatch and SetCameraSWPrivacySwitch(kEnabled) should be called to correct
-  // the mismatch.
+  // mismatch and `SetCameraSWPrivacySwitch(kEnabled)` should be called to
+  // correct the mismatch.
   EXPECT_CALL(*mock_switch_,
               SetCameraSWPrivacySwitch(CameraSWPrivacySwitchSetting::kEnabled))
       .Times(::testing::Exactly(3));
   SetUserPref(true);
-  controller_->OnCameraSWPrivacySwitchStateChanged(
+  Synchronizer()->OnCameraSWPrivacySwitchStateChanged(
       cros::mojom::CameraPrivacySwitchState::UNKNOWN);
-  controller_->OnCameraSWPrivacySwitchStateChanged(
+  Synchronizer()->OnCameraSWPrivacySwitchStateChanged(
       cros::mojom::CameraPrivacySwitchState::ON);
 
-  // When |prefs::kUserCameraAllowed| is false and CrOS Camera Service
-  // communicates the SW privacy switch state as UNKNOWN or OFF, the states
-  // mismatch and SetCameraSWPrivacySwitch(kDisabled) should be called to
-  // correct the mismatch.
-  EXPECT_CALL(*mock_switch_,
-              SetCameraSWPrivacySwitch(CameraSWPrivacySwitchSetting::kDisabled))
-      .Times(::testing::Exactly(3));
-  SetUserPref(false);
-  controller_->OnCameraSWPrivacySwitchStateChanged(
-      cros::mojom::CameraPrivacySwitchState::UNKNOWN);
-  controller_->OnCameraSWPrivacySwitchStateChanged(
-      cros::mojom::CameraPrivacySwitchState::OFF);
+  if (IsPrivacyHubEnabled() || IsVideoConferenceEnabled()) {
+    // When `prefs::kUserCameraAllowed` is false and CrOS Camera Service
+    // communicates the SW privacy switch state as UNKNOWN or OFF, the states
+    // mismatch and `SetCameraSWPrivacySwitch(kDisabled)` should be called to
+    // correct the mismatch.
+    EXPECT_CALL(*mock_switch_, SetCameraSWPrivacySwitch(
+                                   CameraSWPrivacySwitchSetting::kDisabled))
+        .Times(::testing::Exactly(3));
+    SetUserPref(false);
+    Synchronizer()->OnCameraSWPrivacySwitchStateChanged(
+        cros::mojom::CameraPrivacySwitchState::UNKNOWN);
+    Synchronizer()->OnCameraSWPrivacySwitchStateChanged(
+        cros::mojom::CameraPrivacySwitchState::OFF);
 
-  // When the SW privacy switch states match in Privacy Hub and CrOS Camera
-  // Service, SetCameraSWPrivacySwitch() should not be called.
-  EXPECT_CALL(*mock_switch_, SetCameraSWPrivacySwitch(_))
-      .Times(::testing::Exactly(2));
+    // When the SW privacy switch states match in Privacy Hub and CrOS Camera
+    // Service, `SetCameraSWPrivacySwitch()` should not be called.
+    EXPECT_CALL(*mock_switch_, SetCameraSWPrivacySwitch(_))
+        .Times(::testing::Exactly(2));
 
-  // When |prefs::kUserCameraAllowed| is true and CrOS Camera Service
-  // communicates the SW privacy switch state as OFF, the states match and
-  // SetCameraSWPrivacySwitch() should not be called.
-  SetUserPref(true);
-  controller_->OnCameraSWPrivacySwitchStateChanged(
-      cros::mojom::CameraPrivacySwitchState::OFF);
+    // When `prefs::kUserCameraAllowed` is true and CrOS Camera Service
+    // communicates the SW privacy switch state as OFF, the states match and
+    // `SetCameraSWPrivacySwitch()` should not be called.
+    SetUserPref(true);
+    Synchronizer()->OnCameraSWPrivacySwitchStateChanged(
+        cros::mojom::CameraPrivacySwitchState::OFF);
 
-  // When |prefs::kUserCameraAllowed| is false and CrOS Camera Service
-  // communicates the SW privacy switch state as ON, the states match and
-  // SetCameraSWPrivacySwitch() should not be called.
-  SetUserPref(false);
-  controller_->OnCameraSWPrivacySwitchStateChanged(
-      cros::mojom::CameraPrivacySwitchState::ON);
+    // When `prefs::kUserCameraAllowed` is false and CrOS Camera Service
+    // communicates the SW privacy switch state as ON, the states match and
+    // `SetCameraSWPrivacySwitch()` should not be called.
+    SetUserPref(false);
+    Synchronizer()->OnCameraSWPrivacySwitchStateChanged(
+        cros::mojom::CameraPrivacySwitchState::ON);
+  }
 }
+
+class NotificationTestBase : public PrivacyHubCameraTestBase {
+ public:
+  void SetUp() override {
+    PrivacyHubCameraTestBase::SetUp();
+    controller_ = CameraPrivacySwitchController::Get();
+  }
+
+  void LaunchAppAccessingCamera(const std::u16string& app_name) {
+    delegate()->LaunchAppAccessingCamera(app_name);
+    controller_->ActiveApplicationsChanged(/*application_added=*/true);
+  }
+
+  void CloseAppAccessingCamera(const std::u16string& app_name) {
+    delegate()->CloseAppAccessingCamera(app_name);
+    controller_->ActiveApplicationsChanged(/*application_added=*/false);
+  }
+
+  message_center::Notification* GetSWSwitchNotification() {
+    return FindNotificationById(
+        PrivacyHubNotificationController::kCombinedNotificationId);
+  }
+
+  FakeSensorDisabledNotificationDelegate* delegate() {
+    return static_cast<FakeSensorDisabledNotificationDelegate*>(
+        PrivacyHubNotificationController::Get()
+            ->sensor_disabled_notification_delegate());
+  }
+
+  raw_ptr<CameraPrivacySwitchController, DanglingUntriaged | ExperimentalAsh>
+      controller_;
+  const base::HistogramTester histogram_tester_;
+};
+
+class PrivacyHubCameraControllerTest : public NotificationTestBase {};
 
 TEST_P(PrivacyHubCameraControllerTest,
        OnCameraHardwarePrivacySwitchChangedMultipleCameras) {
   CameraPrivacySwitchController& controller =
-      Shell::Get()->privacy_hub_controller()->camera_controller();
+      *CameraPrivacySwitchController::Get();
+
   // We have 2 cameras in the system.
   controller.OnCameraCountChanged(2);
   // Camera is enabled in Privacy Hub.
@@ -284,25 +339,15 @@ TEST_P(PrivacyHubCameraControllerTest,
   // Somebody switched the camera off by the hardware switch.
   controller.OnCameraHWPrivacySwitchStateChanged(
       std::string(), cros::mojom::CameraPrivacySwitchState::OFF);
-  EXPECT_FALSE(FindNotificationById(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
+  // Is shall be no SW notification.
+  EXPECT_FALSE(GetSWSwitchNotification());
 
-  // Somebody switched the camera off by the hardware switch.
+  // Somebody switched the camera on by the hardware switch.
   controller.OnCameraHWPrivacySwitchStateChanged(
       std::string(), cros::mojom::CameraPrivacySwitchState::ON);
+  // Is shall be no SW notification.
+  EXPECT_FALSE(GetSWSwitchNotification());
 
-  // The notifications don't show with Privacy Indicators or Video Conference
-  // enabled.
-  if (IsPrivacyIndicatorsEnabled() || IsVideoConferenceEnabled()) {
-    return;
-  }
-
-  message_center::MessageCenter* const message_center =
-      message_center::MessageCenter::Get();
-  // This particular notification ("Do you want to disable all cameras?") should
-  // appear only if there are multiple cameras.
-  EXPECT_TRUE(FindNotificationById(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
   // User pref didn't change.
   EXPECT_TRUE(GetUserPref());
   // We didn't log any notification clicks so far.
@@ -316,31 +361,12 @@ TEST_P(PrivacyHubCameraControllerTest,
                     kPrivacyHubCameraEnabledFromNotificationHistogram,
                 false),
             0);
-  // Click on the notification button.
-  message_center->ClickOnNotificationButton(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId, 0);
-  // This must change the user pref for the camera (disabling all cameras).
-  EXPECT_FALSE(GetUserPref());
-  // The notification should be cleared after it has been clicked on.
-  EXPECT_FALSE(FindNotificationById(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
-  // The histograms were updated.
-  EXPECT_EQ(histogram_tester_.GetBucketCount(
-                privacy_hub_metrics::
-                    kPrivacyHubCameraEnabledFromNotificationHistogram,
-                true),
-            0);
-  EXPECT_EQ(histogram_tester_.GetBucketCount(
-                privacy_hub_metrics::
-                    kPrivacyHubCameraEnabledFromNotificationHistogram,
-                false),
-            1);
 }
 
 TEST_P(PrivacyHubCameraControllerTest,
        OnCameraHardwarePrivacySwitchChangedOneCamera) {
   CameraPrivacySwitchController& controller =
-      Shell::Get()->privacy_hub_controller()->camera_controller();
+      *CameraPrivacySwitchController::Get();
   // We have 1 camera in the system.
   controller.OnCameraCountChanged(1);
   // Camera is enabled in Privacy Hub.
@@ -349,14 +375,15 @@ TEST_P(PrivacyHubCameraControllerTest,
   // Somebody switched the camera off by the hardware switch.
   controller.OnCameraHWPrivacySwitchStateChanged(
       std::string(), cros::mojom::CameraPrivacySwitchState::OFF);
-  // This particular notification should appear only if there are multiple
-  // cameras.
-  EXPECT_FALSE(message_center::MessageCenter::Get()->FindNotificationById(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
+  // Is shall be no SW notification.
+  EXPECT_FALSE(GetSWSwitchNotification());
 
   // Switching the hardware switch back again.
   controller.OnCameraHWPrivacySwitchStateChanged(
       std::string(), cros::mojom::CameraPrivacySwitchState::ON);
+  // Is shall be no SW notification.
+  EXPECT_FALSE(GetSWSwitchNotification());
+
   // This didn't cause any change in the setting toggle.
   EXPECT_TRUE(GetUserPref());
   // There were no changes to the histograms.
@@ -376,31 +403,21 @@ TEST_P(PrivacyHubCameraControllerTest,
 TEST_P(PrivacyHubCameraControllerTest,
        OnCameraHardwarePrivacySwitchChangedNotificationClearing) {
   CameraPrivacySwitchController& controller =
-      Shell::Get()->privacy_hub_controller()->camera_controller();
+      *CameraPrivacySwitchController::Get();
   SetUserPref(true);
   controller.OnCameraCountChanged(2);
 
   controller.OnCameraHWPrivacySwitchStateChanged(
       "0", cros::mojom::CameraPrivacySwitchState::ON);
 
-  if (IsPrivacyIndicatorsEnabled() || IsVideoConferenceEnabled()) {
-    LaunchAppAccessingCamera(u"app_name");
-  }
+  LaunchAppAccessingCamera(u"app_name");
 
-  auto* notification = FindNotificationById(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId);
-  if (IsVideoConferenceEnabled() || IsPrivacyIndicatorsEnabled()) {
-    EXPECT_FALSE(notification);
-  } else {
-    EXPECT_TRUE(notification);
-    // User should be able to clear the notification manually
-    EXPECT_FALSE(notification->rich_notification_data().pinned);
-  }
   // Notification should be cleared when hardware mute is disabled
   controller.OnCameraHWPrivacySwitchStateChanged(
       "0", cros::mojom::CameraPrivacySwitchState::OFF);
-  EXPECT_FALSE(FindNotificationById(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
+
+  // Parameters shall not be changed
+  EXPECT_TRUE(GetUserPref());
 }
 
 TEST_P(PrivacyHubCameraControllerTest,
@@ -409,22 +426,19 @@ TEST_P(PrivacyHubCameraControllerTest,
   message_center::MessageCenter* const message_center =
       message_center::MessageCenter::Get();
   ASSERT_TRUE(message_center);
-  ASSERT_FALSE(FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId));
+  ASSERT_FALSE(GetSWSwitchNotification());
 
   // An application starts accessing the camera.
   controller_->ActiveApplicationsChanged(/*application_added=*/true);
 
-  auto* notification = FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId);
   if (IsVideoConferenceEnabled()) {
     // No Notification should be sent. Return early because the rest of the test
     // tests notification behavior.
-    EXPECT_FALSE(notification);
+    EXPECT_FALSE(GetSWSwitchNotification());
     return;
   }
   // A notification should be fired.
-  EXPECT_TRUE(notification);
+  EXPECT_TRUE(GetSWSwitchNotification());
   EXPECT_FALSE(GetUserPref());
 
   EXPECT_EQ(histogram_tester_.GetBucketCount(
@@ -436,8 +450,7 @@ TEST_P(PrivacyHubCameraControllerTest,
   message_center->ClickOnNotificationButton(
       PrivacyHubNotificationController::kCombinedNotificationId, 0);
   EXPECT_TRUE(GetUserPref());
-  EXPECT_FALSE(FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId));
+  EXPECT_FALSE(GetSWSwitchNotification());
   EXPECT_EQ(histogram_tester_.GetBucketCount(
                 privacy_hub_metrics::
                     kPrivacyHubCameraEnabledFromNotificationHistogram,
@@ -452,19 +465,16 @@ TEST_P(PrivacyHubCameraControllerTest,
   message_center::MessageCenter* const message_center =
       message_center::MessageCenter::Get();
   ASSERT_TRUE(message_center);
-  ASSERT_FALSE(FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId));
+  ASSERT_FALSE(GetSWSwitchNotification());
 
   // An application starts accessing the camera.
   controller_->ActiveApplicationsChanged(/*application_added=*/true);
 
-  auto* notification = FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId);
   if (IsVideoConferenceEnabled()) {
-    EXPECT_FALSE(notification);
+    EXPECT_FALSE(GetSWSwitchNotification());
   } else {
     // A notification should be fired.
-    EXPECT_TRUE(notification);
+    EXPECT_TRUE(GetSWSwitchNotification());
   }
   EXPECT_FALSE(GetUserPref());
 
@@ -476,77 +486,47 @@ TEST_P(PrivacyHubCameraControllerTest,
 
     // The user pref should not be changed.
     EXPECT_FALSE(GetUserPref());
-    EXPECT_FALSE(FindNotificationById(
-        PrivacyHubNotificationController::kCombinedNotificationId));
+    EXPECT_FALSE(GetSWSwitchNotification());
   }
 
   SetUserPref(true);
 
-  ASSERT_FALSE(FindNotificationById(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
-
   // Flip the hardware switch.
-  Shell::Get()
-      ->privacy_hub_controller()
-      ->camera_controller()
-      .OnCameraHWPrivacySwitchStateChanged(
-          "0", cros::mojom::CameraPrivacySwitchState::ON);
-  if (IsVideoConferenceEnabled() || IsPrivacyIndicatorsEnabled()) {
-    // No notification is fired for switch changes during the capture session.
-    // But one will be fired if a new session starts.
-    EXPECT_FALSE(FindNotificationById(
-        PrivacyHubNotificationController::kCombinedNotificationId));
-    EXPECT_TRUE(GetUserPref());
+  controller_->OnCameraHWPrivacySwitchStateChanged(
+      "0", cros::mojom::CameraPrivacySwitchState::ON);
 
-    // Adds a second application.
-    controller_->ActiveApplicationsChanged(/*application_added=*/true);
-  }
-
-  notification = FindNotificationById(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId);
-  if (IsVideoConferenceEnabled() || IsPrivacyIndicatorsEnabled()) {
-    EXPECT_FALSE(notification);
-  } else {
-    EXPECT_TRUE(notification);
-  }
+  // No notification is fired for switch changes during the capture session.
+  // But one will be fired if a new session starts.
+  EXPECT_FALSE(GetSWSwitchNotification());
   EXPECT_TRUE(GetUserPref());
 
-  if (IsVideoConferenceEnabled()) {
-    return;
-  }
-  // Clicking on the body should open the privacy hub settings page.
-  message_center->ClickOnNotification(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId);
+  // Adds a second application.
+  controller_->ActiveApplicationsChanged(/*application_added=*/true);
 
-  // The user pref should not be changed.
+  // Is shall be no SW notification.
+  EXPECT_FALSE(GetSWSwitchNotification());
+
   EXPECT_TRUE(GetUserPref());
-  EXPECT_FALSE(FindNotificationById(
-      kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
 }
 
 TEST_P(PrivacyHubCameraControllerTest, CameraOffNotificationRemoveViaUserPref) {
   SetUserPref(false);
-  ASSERT_FALSE(FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId));
+  ASSERT_FALSE(GetSWSwitchNotification());
 
   // An application starts accessing the camera.
   controller_->ActiveApplicationsChanged(/*application_added=*/true);
-  auto* notification = FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId);
   if (IsVideoConferenceEnabled()) {
-    EXPECT_FALSE(notification);
+    EXPECT_FALSE(GetSWSwitchNotification());
   } else {
     // A notification should be fired.
-    EXPECT_TRUE(FindNotificationById(
-        PrivacyHubNotificationController::kCombinedNotificationId));
+    EXPECT_TRUE(GetSWSwitchNotification());
   }
   EXPECT_FALSE(GetUserPref());
 
   // Enabling camera via the user pref should clear the notification.
   SetUserPref(true);
   EXPECT_TRUE(GetUserPref());
-  EXPECT_FALSE(FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId));
+  EXPECT_FALSE(GetSWSwitchNotification());
 }
 
 TEST_P(PrivacyHubCameraControllerTest, InSessionSwitchNotification) {
@@ -561,24 +541,24 @@ TEST_P(PrivacyHubCameraControllerTest, InSessionSwitchNotification) {
   controller_->ActiveApplicationsChanged(/*application_added=*/true);
   // Disable the camera after the application count has changed.
   SetUserPref(false);
-  if (IsPrivacyIndicatorsEnabled() || IsVideoConferenceEnabled()) {
-    EXPECT_FALSE(FindNotificationById(
-        PrivacyHubNotificationController::kCombinedNotificationId));
-    EXPECT_FALSE(GetUserPref());
-    // Trigger the notification by simulating a second application accessing the
-    // camera.
-    controller_->ActiveApplicationsChanged(/*application_added=*/true);
-  }
-  auto* notification = FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId);
+  // A notification should not be fired (when pref set to false while an app was
+  // running).
+  EXPECT_FALSE(GetSWSwitchNotification());
+  EXPECT_FALSE(GetUserPref());
+
+  // Trigger the notification by simulating a second application accessing the
+  // camera.
+  controller_->ActiveApplicationsChanged(/*application_added=*/true);
+
+  // If VC enabled - no notification to be shown.
   if (IsVideoConferenceEnabled()) {
-    EXPECT_FALSE(notification);
-    EXPECT_FALSE(GetUserPref());
+    EXPECT_FALSE(GetSWSwitchNotification());
+    // No notifications shown - nothing left to test.
     return;
   }
 
-  // A notification should be fired.
-  EXPECT_TRUE(notification);
+  // Otherwise - a notification to be shown if a new app started.
+  EXPECT_TRUE(GetSWSwitchNotification());
   EXPECT_FALSE(GetUserPref());
 
   EXPECT_EQ(histogram_tester_.GetBucketCount(
@@ -586,12 +566,11 @@ TEST_P(PrivacyHubCameraControllerTest, InSessionSwitchNotification) {
                     kPrivacyHubCameraEnabledFromNotificationHistogram,
                 true),
             0);
-  // Enabling camera via clicking on the button should clear the notification
+  // Enabling camera via clicking on the button should clear the notification.
   message_center->ClickOnNotificationButton(
       PrivacyHubNotificationController::kCombinedNotificationId, 0);
   EXPECT_TRUE(GetUserPref());
-  EXPECT_FALSE(FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId));
+  EXPECT_FALSE(GetSWSwitchNotification());
   EXPECT_EQ(histogram_tester_.GetBucketCount(
                 privacy_hub_metrics::
                     kPrivacyHubCameraEnabledFromNotificationHistogram,
@@ -606,8 +585,7 @@ TEST_P(PrivacyHubCameraControllerTest,
   SetUserPref(true);
 
   // The notification should not be in the message center initially.
-  EXPECT_FALSE(FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId));
+  EXPECT_FALSE(GetSWSwitchNotification());
 
   // This is the effect of an application starting to access the camera.
   controller_->ActiveApplicationsChanged(/*application_added=*/true);
@@ -615,43 +593,33 @@ TEST_P(PrivacyHubCameraControllerTest,
   // Disabling camera using the software switch.
   SetUserPref(false);
 
-  if (IsPrivacyIndicatorsEnabled() || IsVideoConferenceEnabled()) {
-    // No notification pops up if the switch is modified during the stream.
-    EXPECT_FALSE(FindNotificationById(
-        PrivacyHubNotificationController::kCombinedNotificationId));
+  // No notification pops up if just the switch is modified.
+  EXPECT_FALSE(GetSWSwitchNotification());
 
-    controller_->ActiveApplicationsChanged(/*application_added=*/true);
-  }
+  controller_->ActiveApplicationsChanged(/*application_added=*/true);
 
-  auto* notification = FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId);
   if (IsVideoConferenceEnabled()) {
-    EXPECT_FALSE(notification);
+    EXPECT_FALSE(GetSWSwitchNotification());
   } else {
-    EXPECT_TRUE(notification);
+    EXPECT_TRUE(GetSWSwitchNotification());
   }
 
   // The only active application stops accessing the camera the camera.
   controller_->ActiveApplicationsChanged(/*application_added=*/false);
-  if (IsPrivacyIndicatorsEnabled() || IsVideoConferenceEnabled()) {
-    // The notification should still be shown, because two apps were accessing
-    // the camera.
-    if (IsVideoConferenceEnabled()) {
-      EXPECT_FALSE(FindNotificationById(
-          PrivacyHubNotificationController::kCombinedNotificationId));
-    } else {
-      EXPECT_TRUE(FindNotificationById(
-          PrivacyHubNotificationController::kCombinedNotificationId));
-    }
 
-    controller_->ActiveApplicationsChanged(/*application_added=*/false);
+  // The notification should still be shown, because two apps were accessing
+  // the camera.
+  if (IsVideoConferenceEnabled()) {
+    EXPECT_FALSE(GetSWSwitchNotification());
+  } else {
+    EXPECT_TRUE(GetSWSwitchNotification());
   }
 
-  // Existing notification
-  // `PrivacyHubNotificationController::kCombinedNotificationId` should be
-  // removed as the number of active applications is 0 now.
-  EXPECT_FALSE(FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId));
+  controller_->ActiveApplicationsChanged(/*application_added=*/false);
+
+  // Existing notification should be removed as the number of active
+  // applications is 0 now.
+  EXPECT_FALSE(GetSWSwitchNotification());
 }
 
 // Tests if the camera software switch notification contains proper text.
@@ -661,16 +629,14 @@ TEST_P(PrivacyHubCameraControllerTest, NotificationText) {
   }
   // Disabling camera using the software switch.
   SetUserPref(false);
-  EXPECT_FALSE(FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId));
+  EXPECT_FALSE(GetSWSwitchNotification());
 
   // Launch app1 that's accessing camera, a notification should be displayed
   // with the application name in the notification body.
   const std::u16string app1 = u"app1";
   LaunchAppAccessingCamera(app1);
 
-  message_center::Notification* notification = FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId);
+  message_center::Notification* notification = GetSWSwitchNotification();
   ASSERT_TRUE(notification);
   EXPECT_EQ(
       l10n_util::GetStringUTF16(IDS_PRIVACY_HUB_CAMERA_OFF_NOTIFICATION_TITLE),
@@ -687,13 +653,12 @@ TEST_P(PrivacyHubCameraControllerTest, NotificationText) {
   const std::u16string app2 = u"app2";
   LaunchAppAccessingCamera(app2);
 
-  notification = FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId);
+  notification = GetSWSwitchNotification();
   ASSERT_TRUE(notification);
   EXPECT_EQ(
       l10n_util::GetStringFUTF16(
           IDS_PRIVACY_HUB_CAMERA_OFF_NOTIFICATION_MESSAGE_WITH_TWO_APP_NAMES,
-          app2, app1),
+          app1, app2),
       notification->message());
 
   // Launch app3 that's also accessing camera, a notification should be
@@ -701,8 +666,7 @@ TEST_P(PrivacyHubCameraControllerTest, NotificationText) {
   const std::u16string app3 = u"app3";
   LaunchAppAccessingCamera(app3);
 
-  notification = FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId);
+  notification = GetSWSwitchNotification();
   ASSERT_TRUE(notification);
   EXPECT_EQ(l10n_util::GetStringUTF16(
                 IDS_PRIVACY_HUB_CAMERA_OFF_NOTIFICATION_MESSAGE),
@@ -712,13 +676,12 @@ TEST_P(PrivacyHubCameraControllerTest, NotificationText) {
   // contain the name of the two remaining applications.
   CloseAppAccessingCamera(app2);
 
-  notification = FindNotificationById(
-      PrivacyHubNotificationController::kCombinedNotificationId);
+  notification = GetSWSwitchNotification();
   ASSERT_TRUE(notification);
   EXPECT_EQ(
       l10n_util::GetStringFUTF16(
           IDS_PRIVACY_HUB_CAMERA_OFF_NOTIFICATION_MESSAGE_WITH_TWO_APP_NAMES,
-          app3, app1),
+          app1, app3),
       notification->message());
 }
 
@@ -737,8 +700,8 @@ TEST_P(PrivacyHubCameraControllerTest, MetricCollection) {
                 false),
             0);
 
-  CameraPrivacySwitchController::SetAndLogCameraPreferenceFromNotification(
-      false);
+  PrivacyHubNotificationController::SetAndLogSensorPreferenceFromNotification(
+      Sensor::kCamera, false);
   EXPECT_EQ(histogram_tester_.GetBucketCount(
                 privacy_hub_metrics::
                     kPrivacyHubCameraEnabledFromNotificationHistogram,
@@ -750,8 +713,8 @@ TEST_P(PrivacyHubCameraControllerTest, MetricCollection) {
                 false),
             1);
 
-  CameraPrivacySwitchController::SetAndLogCameraPreferenceFromNotification(
-      true);
+  PrivacyHubNotificationController::SetAndLogSensorPreferenceFromNotification(
+      Sensor::kCamera, true);
   EXPECT_EQ(histogram_tester_.GetBucketCount(
                 privacy_hub_metrics::
                     kPrivacyHubCameraEnabledFromNotificationHistogram,
@@ -764,41 +727,146 @@ TEST_P(PrivacyHubCameraControllerTest, MetricCollection) {
             1);
 }
 
+TEST_P(PrivacyHubCameraControllerTest,
+       ForceDisableAccessShouldDisableUserPref) {
+  SetUserPref(true);
+
+  auto& controller = *CameraPrivacySwitchController::Get();
+
+  controller.SetForceDisableCameraAccess(true);
+
+  EXPECT_FALSE(GetUserPref());
+}
+
+TEST_P(PrivacyHubCameraControllerTest,
+       ForceDisableAccessShouldAlsoWorkBeforeUserPrefIsRegistered) {
+  SetUserPref(true);
+
+  // Create a local version of the controller, so we can delay registration of
+  // the user pref service.
+  CameraPrivacySwitchController controller;
+
+  controller.SetForceDisableCameraAccess(true);
+
+  controller.OnActiveUserPrefServiceChanged(
+      Shell::Get()->session_controller()->GetActivePrefService());
+
+  EXPECT_FALSE(GetUserPref());
+}
+
+TEST_P(PrivacyHubCameraControllerTest,
+       ForceDisableAccessShouldPreventPrefChanges) {
+  auto& controller = *CameraPrivacySwitchController::Get();
+  controller.SetForceDisableCameraAccess(true);
+
+  SetUserPref(true);
+  EXPECT_FALSE(GetUserPref());
+}
+
+TEST_P(PrivacyHubCameraControllerTest, ShouldBeAbleToStopForceDisableAccess) {
+  auto& controller = *CameraPrivacySwitchController::Get();
+
+  controller.SetForceDisableCameraAccess(true);
+  ASSERT_TRUE(controller.IsCameraAccessForceDisabled());
+
+  controller.SetForceDisableCameraAccess(false);
+  ASSERT_FALSE(controller.IsCameraAccessForceDisabled());
+}
+
+TEST_P(PrivacyHubCameraControllerTest,
+       ShouldBeAbleToChangePrefAfterStoppingForceDisableAccess) {
+  auto& controller = *CameraPrivacySwitchController::Get();
+  controller.SetForceDisableCameraAccess(true);
+  controller.SetForceDisableCameraAccess(false);
+
+  SetUserPref(true);
+  EXPECT_TRUE(GetUserPref());
+}
+
+TEST_P(PrivacyHubCameraControllerTest,
+       StoppingForceDisableAccessShouldNotCrashEvenBeforeUserPrefIsRegistered) {
+  // Create a local version of the controller, so we can delay registration of
+  // the user pref service.
+  CameraPrivacySwitchController controller;
+
+  // Neither of these should crash (by trying to access the user pref).
+  controller.SetForceDisableCameraAccess(true);
+  controller.SetForceDisableCameraAccess(false);
+}
+
+TEST_P(PrivacyHubCameraControllerTest,
+       ShouldRestorePreviousPrefAfterForceDisableAccess) {
+  auto& controller = *CameraPrivacySwitchController::Get();
+
+  for (const bool previous_value : {true, false}) {
+    SetUserPref(previous_value);
+    controller.SetForceDisableCameraAccess(true);
+    controller.SetForceDisableCameraAccess(false);
+    EXPECT_EQ(GetUserPref(), previous_value);
+  }
+}
+
+TEST_P(PrivacyHubCameraControllerTest,
+       ShouldRestorePreviousPrefEvenAfterRecreatingTheController) {
+  // This test ensures that we restore the previous pref value, even if
+  // it was force disabled and then Chrome crashed.
+
+  for (const bool previous_value : {true, false}) {
+    SetUserPref(previous_value);
+
+    absl::optional<CameraPrivacySwitchController> controller;
+
+    // Create the controller.
+    controller.emplace();
+    controller->OnActiveUserPrefServiceChanged(
+        Shell::Get()->session_controller()->GetActivePrefService());
+
+    // Force disable camera access.
+    controller->SetForceDisableCameraAccess(true);
+
+    // Simulate crash and restart by destroying and recreating the controller.
+    controller.emplace();
+    controller->OnActiveUserPrefServiceChanged(
+        Shell::Get()->session_controller()->GetActivePrefService());
+
+    // The previous pref value should be restored.
+    EXPECT_EQ(GetUserPref(), previous_value);
+  }
+}
+
+TEST_P(PrivacyHubCameraControllerTest,
+       ShouldRestorePreviousPrefEvenAfterForceDisableAccessTwice) {
+  // This test ensures that force disabling camera access a second time will
+  // not overwrite the stored previous value (which should keep reflecting the
+  // state from before we force disabled camera access the first time).
+
+  for (const bool previous_value : {true, false}) {
+    SetUserPref(previous_value);
+
+    absl::optional<CameraPrivacySwitchController> controller;
+
+    // Create the controller.
+    controller.emplace();
+    controller->OnActiveUserPrefServiceChanged(
+        Shell::Get()->session_controller()->GetActivePrefService());
+
+    // Force disable camera access.
+    controller->SetForceDisableCameraAccess(true);
+    // Twice.
+    controller->SetForceDisableCameraAccess(true);
+
+    // Simulate crash and restart by destroying and recreating the controller.
+    controller.emplace();
+    controller->OnActiveUserPrefServiceChanged(
+        Shell::Get()->session_controller()->GetActivePrefService());
+
+    // The previous pref value should be restored.
+    EXPECT_EQ(GetUserPref(), previous_value);
+  }
+}
+
 class PrivacyIndicatorAndVideoConferenceCameraControllerTest
-    : public PrivacyHubCameraControllerTestBase,
-      public testing::WithParamInterface<std::tuple<bool, bool>> {
- public:
-  PrivacyIndicatorAndVideoConferenceCameraControllerTest() {
-    std::vector<base::test::FeatureRef> enabled_features{
-        ash::features::kCrosPrivacyHub};
-    if (IsPrivacyIndicatorsEnabled()) {
-      enabled_features.push_back(features::kPrivacyIndicators);
-    }
-    if (IsVideoConferenceEnabled()) {
-      fake_video_conference_tray_controller_ =
-          std::make_unique<FakeVideoConferenceTrayController>();
-      enabled_features.push_back(features::kVideoConference);
-      base::CommandLine::ForCurrentProcess()->AppendSwitch(
-          switches::kCameraEffectsSupportedByHardware);
-    }
-    scoped_feature_list_.InitWithFeatures(enabled_features, {});
-  }
-  ~PrivacyIndicatorAndVideoConferenceCameraControllerTest() override {
-    fake_video_conference_tray_controller_.reset();
-  }
-
-  bool IsPrivacyIndicatorsEnabled() { return std::get<0>(GetParam()); }
-
-  bool IsVideoConferenceEnabled() { return std::get<1>(GetParam()); }
-
-  std::unique_ptr<FakeVideoConferenceTrayController>
-      fake_video_conference_tray_controller_;
-  base::test::ScopedFeatureList scoped_feature_list_;
-};
-
-INSTANTIATE_TEST_SUITE_P(All,
-                         PrivacyIndicatorAndVideoConferenceCameraControllerTest,
-                         testing::Combine(testing::Bool(), testing::Bool()));
+    : public NotificationTestBase {};
 
 // With VcControls or Privacy Indicators enabled, tests that no notification
 // shows up if the switches are toggled when the number of capturing apps does
@@ -813,35 +881,31 @@ TEST_P(PrivacyIndicatorAndVideoConferenceCameraControllerTest,
   for (bool app_running : {false, true}) {
     if (app_running) {
       LaunchAppAccessingCamera(app_name);
-      EXPECT_FALSE(FindNotificationById(
-          PrivacyHubNotificationController::kCombinedNotificationId));
+      EXPECT_FALSE(GetSWSwitchNotification());
     }
     // Disable camera using the software switch. No notification should show.
     SetUserPref(/*allowed=*/false);
 
-    EXPECT_FALSE(FindNotificationById(
-        PrivacyHubNotificationController::kCombinedNotificationId));
+    EXPECT_FALSE(GetSWSwitchNotification());
 
     // Re-enable the camera, there still should be no notification.
     SetUserPref(/*allowed=*/true);
 
-    EXPECT_FALSE(FindNotificationById(
-        PrivacyHubNotificationController::kCombinedNotificationId));
+    EXPECT_FALSE(GetSWSwitchNotification());
 
     // Repeat the test with the hardware switch.
-    CameraPrivacySwitchController& controller =
-        Shell::Get()->privacy_hub_controller()->camera_controller();
-    controller.OnCameraHWPrivacySwitchStateChanged(
+    auto* controller = CameraPrivacySwitchController::Get();
+    controller->OnCameraHWPrivacySwitchStateChanged(
         std::string(), cros::mojom::CameraPrivacySwitchState::ON);
 
-    EXPECT_FALSE(FindNotificationById(
-        kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
+    // It shall not cause SW notification
+    EXPECT_FALSE(GetSWSwitchNotification());
 
-    controller.OnCameraHWPrivacySwitchStateChanged(
+    controller->OnCameraHWPrivacySwitchStateChanged(
         std::string(), cros::mojom::CameraPrivacySwitchState::OFF);
 
-    EXPECT_FALSE(FindNotificationById(
-        kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
+    // It shall not cause SW notification
+    EXPECT_FALSE(GetSWSwitchNotification());
 
     if (app_running) {
       CloseAppAccessingCamera(app_name);
@@ -854,30 +918,28 @@ TEST_P(PrivacyIndicatorAndVideoConferenceCameraControllerTest,
 // is muted.
 TEST_P(PrivacyIndicatorAndVideoConferenceCameraControllerTest,
        NotificationShowsIfNewAppStartsCapturing) {
-  if (!IsPrivacyIndicatorsEnabled() && !IsVideoConferenceEnabled()) {
-    return;
-  }
   for (bool software_switch : {true, false}) {
     SCOPED_TRACE(::testing::Message()
                  << "software_switch: " << software_switch);
     auto scoped_software_switch_toggler =
         ScopedCameraMuteToggler(/*software_switch=*/software_switch);
-    ASSERT_FALSE(FindNotificationById(
-        software_switch
-            ? PrivacyHubNotificationController::kCombinedNotificationId
-            : kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
+
+    // independently from the software_switch - shall be no notification.
+    EXPECT_FALSE(GetSWSwitchNotification());
 
     // Simulate an app accessing the camera, a notification should show.
     LaunchAppAccessingCamera(u"app_name");
 
-    auto* notification = FindNotificationById(
-        software_switch
-            ? PrivacyHubNotificationController::kCombinedNotificationId
-            : kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId);
-    if (IsVideoConferenceEnabled() || !software_switch) {
-      EXPECT_FALSE(notification);
+    if (IsVideoConferenceEnabled()) {
+      // No notification when VC is enabled.
+      EXPECT_FALSE(GetSWSwitchNotification());
     } else {
-      EXPECT_TRUE(notification);
+      // No VC - notification to be shown only for SW switch.
+      if (software_switch) {
+        EXPECT_TRUE(GetSWSwitchNotification());
+      } else {
+        EXPECT_FALSE(GetSWSwitchNotification());
+      }
     }
   }
 }
@@ -891,22 +953,24 @@ TEST_P(PrivacyIndicatorAndVideoConferenceCameraControllerTest,
         std::make_unique<ScopedCameraMuteToggler>(
             /*software_switch=*/software_switch);
 
-    // Simulate an app accessing the camera, a notification should show.
+    // Simulate an app accessing the camera.
     LaunchAppAccessingCamera(u"app_name");
-    auto* notification = FindNotificationById(
-        PrivacyHubNotificationController::kCombinedNotificationId);
-    if (IsVideoConferenceEnabled() || !software_switch) {
-      EXPECT_FALSE(notification);
+
+    if (IsVideoConferenceEnabled()) {
+      // No notification when VC is enabled.
+      EXPECT_FALSE(GetSWSwitchNotification());
     } else {
-      EXPECT_TRUE(notification);
+      // No VC - notification to be shown only for SW switch.
+      if (software_switch) {
+        EXPECT_TRUE(GetSWSwitchNotification());
+      } else {
+        EXPECT_FALSE(GetSWSwitchNotification());
+      }
     }
     // Reverses the switch, the notification should go away.
     scoped_software_switch_toggler.reset();
 
-    EXPECT_FALSE(FindNotificationById(
-        software_switch
-            ? PrivacyHubNotificationController::kCombinedNotificationId
-            : kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
+    EXPECT_FALSE(GetSWSwitchNotification());
   }
 }
 
@@ -921,22 +985,21 @@ TEST_P(PrivacyIndicatorAndVideoConferenceCameraControllerTest,
     const std::u16string app_name = u"app_name";
     LaunchAppAccessingCamera(app_name);
 
-    auto* notification = FindNotificationById(
-        software_switch
-            ? PrivacyHubNotificationController::kCombinedNotificationId
-            : kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId);
-    if (IsVideoConferenceEnabled() || !software_switch) {
-      EXPECT_FALSE(notification);
+    if (IsVideoConferenceEnabled()) {
+      // No notification when VC is enabled.
+      EXPECT_FALSE(GetSWSwitchNotification());
     } else {
-      EXPECT_TRUE(notification);
+      // No VC - notification to be shown only for SW switch.
+      if (software_switch) {
+        EXPECT_TRUE(GetSWSwitchNotification());
+      } else {
+        EXPECT_FALSE(GetSWSwitchNotification());
+      }
     }
 
     CloseAppAccessingCamera(app_name);
 
-    EXPECT_FALSE(FindNotificationById(
-        software_switch
-            ? PrivacyHubNotificationController::kCombinedNotificationId
-            : kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
+    EXPECT_FALSE(GetSWSwitchNotification());
   }
 }
 
@@ -951,24 +1014,44 @@ TEST_P(PrivacyIndicatorAndVideoConferenceCameraControllerTest,
     const std::u16string app_name = u"app_name";
     LaunchAppAccessingCamera(app_name);
 
-    auto* notification = FindNotificationById(
-        software_switch
-            ? PrivacyHubNotificationController::kCombinedNotificationId
-            : kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId);
-    if (IsVideoConferenceEnabled() || !software_switch) {
-      EXPECT_FALSE(notification);
+    if (IsVideoConferenceEnabled()) {
+      // No notification when VC is enabled.
+      EXPECT_FALSE(GetSWSwitchNotification());
     } else {
-      EXPECT_TRUE(notification);
+      // No VC - notification to be shown only for SW switch.
+      if (software_switch) {
+        EXPECT_TRUE(GetSWSwitchNotification());
+      } else {
+        EXPECT_FALSE(GetSWSwitchNotification());
+      }
     }
 
     // Remove the capturing app, the notification should disappear.
     CloseAppAccessingCamera(app_name);
 
-    EXPECT_FALSE(FindNotificationById(
-        software_switch
-            ? PrivacyHubNotificationController::kCombinedNotificationId
-            : kPrivacyHubHWCameraSwitchOffSWCameraSwitchOnNotificationId));
+    EXPECT_FALSE(GetSWSwitchNotification());
   }
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    PrivacyHubCameraSynchronizerTest,
+    testing::Combine(/*IsPrivacyIndicatorsEnabled=*/testing::Bool(),
+                     /*IsVideoConferenceEnabled=*/testing::Bool(),
+                     /*IsPrivacyHubEnabled()=*/testing::Bool()));
+
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    PrivacyHubCameraControllerTest,
+    testing::Combine(/*IsPrivacyIndicatorsEnabled=*/testing::Bool(),
+                     /*IsVideoConferenceEnabled=*/testing::Bool(),
+                     /*IsPrivacyHubEnabled()=*/testing::Values(true)));
+
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    PrivacyIndicatorAndVideoConferenceCameraControllerTest,
+    testing::Combine(/*IsPrivacyIndicatorsEnabled=*/testing::Bool(),
+                     /*IsVideoConferenceEnabled=*/testing::Bool(),
+                     /*IsPrivacyHubEnabled()=*/testing::Values(true)));
 
 }  // namespace ash

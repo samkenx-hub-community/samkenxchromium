@@ -6,6 +6,7 @@
 
 #include "base/check_op.h"
 #include "base/memory/raw_ptr.h"
+#include "base/no_destructor.h"
 #include "base/notreached.h"
 #include "base/observer_list.h"
 #include "base/scoped_observation.h"
@@ -29,9 +30,11 @@ class ServiceWorkerContextAdapter::RunningServiceWorker
   void Subscribe(content::RenderProcessHost* worker_process_host);
   void Unsubscribe();
 
+  // content::RenderProcessHostObserver:
   void RenderProcessExited(
       content::RenderProcessHost* host,
       const content::ChildProcessTerminationInfo& info) override;
+  void InProcessRendererExiting(content::RenderProcessHost* host) override;
   void RenderProcessHostDestroyed(content::RenderProcessHost* host) override;
 
  private:
@@ -77,8 +80,16 @@ void ServiceWorkerContextAdapter::RunningServiceWorker::RenderProcessExited(
 }
 
 void ServiceWorkerContextAdapter::RunningServiceWorker::
+    InProcessRendererExiting(content::RenderProcessHost* host) {
+  CHECK(content::RenderProcessHost::run_renderer_in_process());
+  adapter_->OnRenderProcessExited(version_id_);
+
+  /* This object is deleted inside the above, don't touch "this". */
+}
+
+void ServiceWorkerContextAdapter::RunningServiceWorker::
     RenderProcessHostDestroyed(content::RenderProcessHost* host) {
-  NOTREACHED();
+  NOTREACHED_NORETURN();
 }
 
 // ServiceWorkerContextAdapter::RunningServiceWorker ---------------------------
@@ -124,7 +135,7 @@ content::ServiceWorkerExternalRequestResult
 ServiceWorkerContextAdapter::StartingExternalRequest(
     int64_t service_worker_version_id,
     content::ServiceWorkerExternalRequestTimeoutType timeout_type,
-    const std::string& request_uuid) {
+    const base::Uuid& request_uuid) {
   NOTIMPLEMENTED();
   return content::ServiceWorkerExternalRequestResult::kOk;
 }
@@ -132,7 +143,7 @@ ServiceWorkerContextAdapter::StartingExternalRequest(
 content::ServiceWorkerExternalRequestResult
 ServiceWorkerContextAdapter::FinishedExternalRequest(
     int64_t service_worker_version_id,
-    const std::string& request_uuid) {
+    const base::Uuid& request_uuid) {
   NOTIMPLEMENTED();
   return content::ServiceWorkerExternalRequestResult::kOk;
 }
@@ -205,9 +216,9 @@ service_manager::InterfaceProvider&
 ServiceWorkerContextAdapter::GetRemoteInterfaces(
     int64_t service_worker_version_id) {
   NOTIMPLEMENTED();
-  static service_manager::InterfaceProvider interface_provider(
-      base::SingleThreadTaskRunner::GetCurrentDefault());
-  return interface_provider;
+  static base::NoDestructor<service_manager::InterfaceProvider>
+      interface_provider(base::SingleThreadTaskRunner::GetCurrentDefault());
+  return *interface_provider;
 }
 
 void ServiceWorkerContextAdapter::StartServiceWorkerAndDispatchMessage(
@@ -239,10 +250,10 @@ const base::flat_map<int64_t /* version_id */,
                      content::ServiceWorkerRunningInfo>&
 ServiceWorkerContextAdapter::GetRunningServiceWorkerInfos() {
   NOTIMPLEMENTED();
-  static base::flat_map<int64_t /* version_id */,
-                        content::ServiceWorkerRunningInfo>
+  static const base::NoDestructor<
+      base::flat_map<int64_t, content::ServiceWorkerRunningInfo>>
       unused;
-  return unused;
+  return *unused;
 }
 
 void ServiceWorkerContextAdapter::OnRegistrationCompleted(const GURL& scope) {

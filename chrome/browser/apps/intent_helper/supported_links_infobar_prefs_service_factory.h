@@ -5,8 +5,10 @@
 #ifndef CHROME_BROWSER_APPS_INTENT_HELPER_SUPPORTED_LINKS_INFOBAR_PREFS_SERVICE_FACTORY_H_
 #define CHROME_BROWSER_APPS_INTENT_HELPER_SUPPORTED_LINKS_INFOBAR_PREFS_SERVICE_FACTORY_H_
 
-#include "base/memory/singleton.h"
+#include "base/no_destructor.h"
 #include "components/keyed_service/content/browser_context_keyed_service_factory.h"
+
+class Profile;
 
 namespace apps {
 
@@ -24,14 +26,13 @@ class SupportedLinksInfoBarPrefsServiceFactory
       const SupportedLinksInfoBarPrefsServiceFactory&) = delete;
 
  private:
-  friend struct base::DefaultSingletonTraits<
-      SupportedLinksInfoBarPrefsServiceFactory>;
+  friend base::NoDestructor<SupportedLinksInfoBarPrefsServiceFactory>;
 
   SupportedLinksInfoBarPrefsServiceFactory();
   ~SupportedLinksInfoBarPrefsServiceFactory() override;
 
   // BrowserContextKeyedServiceFactory:
-  KeyedService* BuildServiceInstanceFor(
+  std::unique_ptr<KeyedService> BuildServiceInstanceForBrowserContext(
       content::BrowserContext* context) const override;
   // Service needs to be running immediately in order to observe uninstalls.
   bool ServiceIsCreatedWithBrowserContext() const override;

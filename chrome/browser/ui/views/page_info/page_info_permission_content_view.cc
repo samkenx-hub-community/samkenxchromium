@@ -16,6 +16,7 @@
 #include "components/strings/grit/components_strings.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/views/controls/button/checkbox.h"
 #include "ui/views/controls/button/toggle_button.h"
 #include "ui/views/controls/label.h"
@@ -99,8 +100,9 @@ PageInfoPermissionContentView::PageInfoPermissionContentView(
       (title_height - GetLayoutConstant(PAGE_INFO_ICON_SIZE)) / 2;
   icon_->SetProperty(views::kMarginsKey, gfx::Insets::VH(margin, 0));
   toggle_button_->SetProperty(views::kMarginsKey, gfx::Insets::VH(margin, 0));
-
-  AddChildView(PageInfoViewFactory::CreateSeparator());
+  AddChildView(PageInfoViewFactory::CreateSeparator(
+      ChromeLayoutProvider::Get()->GetDistanceMetric(
+          DISTANCE_HORIZONTAL_SEPARATOR_PADDING_PAGE_INFO_VIEW)));
   // TODO(crbug.com/1225563): Consider to use permission specific text.
   AddChildView(std::make_unique<RichHoverButton>(
       base::BindRepeating(
@@ -151,13 +153,20 @@ void PageInfoPermissionContentView::SetPermissionInfo(
       permissions::PermissionUtil::IsPermission(type_) &&
       permissions::PermissionUtil::CanPermissionBeAllowedOnce(
           permission_.type) &&
-      (permission_.default_setting != CONTENT_SETTING_BLOCK ||
-       permission_.setting != CONTENT_SETTING_DEFAULT));
+      (permission_.setting != CONTENT_SETTING_BLOCK));
   PreferredSizeChanged();
 }
 
 void PageInfoPermissionContentView::OnToggleButtonPressed() {
   PageInfoUI::ToggleBetweenAllowAndBlock(permission_);
+
+  // One time permissible permissions show a remember me checkbox only for the
+  // non-deny state.
+  if (permissions::PermissionUtil::CanPermissionBeAllowedOnce(
+          permission_.type)) {
+    PreferredSizeChanged();
+  }
+
   PermissionChanged();
 }
 
@@ -168,5 +177,6 @@ void PageInfoPermissionContentView::OnRememberSettingPressed() {
 
 void PageInfoPermissionContentView::PermissionChanged() {
   presenter_->OnSitePermissionChanged(permission_.type, permission_.setting,
+                                      permission_.requesting_origin,
                                       permission_.is_one_time);
 }

@@ -6,6 +6,7 @@
 #include "base/command_line.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/ash/login/login_manager_test.h"
 #include "chrome/browser/ash/login/test/js_checker.h"
 #include "chrome/browser/ash/login/test/login_manager_mixin.h"
@@ -47,7 +48,7 @@ class ProxyAuthDialogWaiter : public content::WindowedNotificationObserver {
     return true;
   }
 
-  LoginHandler* login_handler_;
+  raw_ptr<LoginHandler, ExperimentalAsh> login_handler_;
 };
 
 }  // namespace
@@ -91,6 +92,7 @@ IN_PROC_BROWSER_TEST_F(ProxyAuthOnUserBoardScreenTest,
   ProxyAuthDialogWaiter auth_dialog_waiter;
   ASSERT_TRUE(LoginScreenTestApi::ClickAddUserButton());
   OobeScreenWaiter(UserCreationView::kScreenId).Wait();
+  test::OobeJS().TapOnPath({"user-creation", "selfButton"});
   test::OobeJS().TapOnPath({"user-creation", "nextButton"});
   OobeScreenWaiter(GaiaView::kScreenId).Wait();
   auth_dialog_waiter.Wait();

@@ -9,25 +9,31 @@
 #import "components/feature_engagement/public/event_constants.h"
 #import "components/feature_engagement/public/feature_constants.h"
 #import "components/feature_engagement/public/tracker.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
+#import "components/segmentation_platform/embedder/default_model/device_switcher_result_dispatcher.h"
+#import "ios/chrome/app/tests_hook.h"
 #import "ios/chrome/browser/feature_engagement/tracker_factory.h"
+#import "ios/chrome/browser/iph_for_new_chrome_user/utils.h"
+#import "ios/chrome/browser/segmentation_platform/segmentation_platform_service_factory.h"
+#import "ios/chrome/browser/shared/coordinator/layout_guide/layout_guide_util.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state_browser_agent.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/shared/ui/util/layout_guide_names.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/shared/ui/util/util_swift.h"
+#import "ios/chrome/browser/ui/bubble/bubble_constants.h"
 #import "ios/chrome/browser/ui/bubble/bubble_view_controller_presenter.h"
-#import "ios/chrome/browser/ui/main/layout_guide_util.h"
-#import "ios/chrome/browser/ui/main/scene_state.h"
-#import "ios/chrome/browser/ui/main/scene_state_browser_agent.h"
 #import "ios/chrome/browser/ui/popup_menu/overflow_menu/feature_flags.h"
+#import "ios/chrome/browser/ui/popup_menu/overflow_menu/overflow_menu_constants.h"
 #import "ios/chrome/browser/ui/popup_menu/overflow_menu/overflow_menu_swift.h"
 #import "ios/chrome/browser/ui/popup_menu/public/popup_menu_ui_updating.h"
-#import "ios/chrome/grit/ios_chromium_strings.h"
+#import "ios/chrome/grit/ios_branded_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+namespace {
+base::TimeDelta kPromoDisplayDelayForTests = base::Seconds(1);
+}  // namespace
 
 @interface PopupMenuHelpCoordinator () <SceneStateObserver>
 
@@ -46,9 +52,9 @@
 // potential IPH bubble.
 @property(nonatomic, strong) UILayoutGuide* layoutGuide;
 
-// Whether the user is still in the same session as when the popup menu IPH was
-// triggered
-@property(nonatomic, assign) BOOL inSessionWithPopupMenuIPH;
+// Whether the user is still in the same session as when the history menu item
+// IPH was triggered
+@property(nonatomic, assign) BOOL inSessionWithHistoryMenuItemIPH;
 
 // The tracker for feature engagement. May return null after the coordinator has
 // been stopped (thus the returned value must be checked for null).
@@ -57,7 +63,23 @@
 
 @end
 
-@implementation PopupMenuHelpCoordinator
+@implementation PopupMenuHelpCoordinator {
+  segmentation_platform::DeviceSwitcherResultDispatcher*
+      _deviceSwitcherResultDispatcher;
+}
+
+- (instancetype)initWithBaseViewController:(UIViewController*)viewController
+                                   browser:(Browser*)browser {
+  self = [super initWithBaseViewController:viewController browser:browser];
+  if (self) {
+    if (!browser->GetBrowserState()->IsOffTheRecord()) {
+      _deviceSwitcherResultDispatcher =
+          segmentation_platform::SegmentationPlatformServiceFactory::
+              GetDispatcherForBrowserState(browser->GetBrowserState());
+    }
+  }
+  return self;
+}
 
 #pragma mark - Getters
 
@@ -94,31 +116,50 @@
   [sceneState removeObserver:self];
 }
 
-- (void)showOverflowMenuIPHInViewController:(UIViewController*)menu {
-  // There are 2 reasons to show the IPH in the overflow menu:
-  // 1. The alternate flow is enabled and the feature tracker says it can show.
-  // 2. The user is still in a session where they saw the initial IPH.
-  BOOL shouldShowIPH =
-      (IsNewOverflowMenuAlternateIPHEnabled() && [self canShowIPH]) ||
-      self.inSessionWithPopupMenuIPH;
-  if (!shouldShowIPH) {
+- (NSNumber*)highlightDestination {
+  if (self.inSessionWithHistoryMenuItemIPH) {
+    return [NSNumber numberWithInt:static_cast<NSInteger>(
+                                       overflow_menu::Destination::History)];
+  }
+  return nil;
+}
+
+- (void)showHistoryOnOverflowMenuIPHInViewController:(UIViewController*)menu {
+  // Show the IPH in the overflow menu if user is still in a session where they
+  // saw the IPH of the three-dot menu item.
+  if (!self.inSessionWithHistoryMenuItemIPH) {
     return;
   }
 
-  self.overflowMenuBubblePresenter = [self newOverflowMenuBubblePresenter];
-  // The overflow menu IPH should be horizontally centered, but beneath the
-  // destination list.
+  CGFloat anchorXInParent =
+      CGRectGetMidX(self.uiConfiguration.highlightedDestinationFrame);
+  CGFloat anchorX =
+      [menu.view.window convertPoint:CGPointMake(anchorXInParent, 0)
+                            fromView:menu.view]
+          .x;
+  // in global coordinate system
   CGPoint anchorPoint = CGPointMake(
-      CGRectGetMidX(self.uiConfiguration.destinationListScreenFrame),
-      CGRectGetMaxY(self.uiConfiguration.destinationListScreenFrame));
+      anchorX, CGRectGetMaxY(self.uiConfiguration.destinationListScreenFrame));
+
+  self.overflowMenuBubblePresenter = [self
+      newOverflowMenuBubblePresenterWithAnchorXInParent:anchorXInParent
+                                        parentViewWidth:
+                                            self.uiConfiguration
+                                                .destinationListScreenFrame.size
+                                                .width];
 
   if (![self.overflowMenuBubblePresenter canPresentInView:menu.view
                                               anchorPoint:anchorPoint]) {
+    // Reset the highlight status of the destination as we will miss the other
+    // path of resetting it when dismissing the IPH.
+    self.uiConfiguration.highlightDestination = -1;
+    // No effect besides leaving it in a clean state.
+    self.uiConfiguration.highlightedDestinationFrame = CGRectZero;
     return;
   }
 
-  self.inSessionWithPopupMenuIPH = NO;
-  self.uiConfiguration.highlightDestinationsRow = YES;
+  self.inSessionWithHistoryMenuItemIPH = NO;
+
   [self.overflowMenuBubblePresenter presentInViewController:menu
                                                        view:menu.view
                                                 anchorPoint:anchorPoint];
@@ -127,13 +168,16 @@
 #pragma mark - Popup Menu Button Bubble/IPH methods
 
 - (BubbleViewControllerPresenter*)newPopupMenuBubblePresenter {
-  NSString* text = l10n_util::GetNSString(IDS_IOS_OVERFLOW_MENU_TIP);
+  NSString* text =
+      l10n_util::GetNSString(IDS_IOS_VIEW_BROWSING_HISTORY_OVERFLOW_MENU_TIP);
 
   // Prepare the dismissal callback.
   __weak __typeof(self) weakSelf = self;
-  ProceduralBlockWithSnoozeAction dismissalCallback =
-      ^(feature_engagement::Tracker::SnoozeAction snoozeAction) {
-        [weakSelf popupMenuIPHDidDismissWithSnoozeAction:snoozeAction];
+  CallbackWithIPHDismissalReasonType dismissalCallback =
+      ^(IPHDismissalReasonType IPHDismissalReasonType,
+        feature_engagement::Tracker::SnoozeAction snoozeAction) {
+        [weakSelf popupMenuIPHDidDismissWithReasonType:IPHDismissalReasonType
+                                          SnoozeAction:snoozeAction];
       };
 
   // Create the BubbleViewControllerPresenter.
@@ -144,23 +188,29 @@
       [[BubbleViewControllerPresenter alloc]
           initDefaultBubbleWithText:text
                      arrowDirection:arrowDirection
-                          alignment:BubbleAlignmentTrailing
+                          alignment:BubbleAlignmentBottomOrTrailing
                isLongDurationBubble:NO
                   dismissalCallback:dismissalCallback];
   bubbleViewControllerPresenter.voiceOverAnnouncement = text;
   return bubbleViewControllerPresenter;
 }
 
-- (void)popupMenuIPHDidDismissWithSnoozeAction:
-    (feature_engagement::Tracker::SnoozeAction)snoozeAction {
+- (void)popupMenuIPHDidDismissWithReasonType:
+            (IPHDismissalReasonType)IPHDismissalReasonType
+                                SnoozeAction:
+                                    (feature_engagement::Tracker::SnoozeAction)
+                                        snoozeAction {
+  if (IPHDismissalReasonType == IPHDismissalReasonType::kTappedAnchorView) {
+    self.inSessionWithHistoryMenuItemIPH = YES;
+  }
   [self trackerIPHDidDismissWithSnoozeAction:snoozeAction];
   [self.UIUpdater updateUIForIPHDismissed];
   self.popupMenuBubblePresenter = nil;
 }
 
-- (void)showPopupMenuBubbleIfNecessary {
-  // The alternate IPH flow only shows the IPH when entering the menu.
-  if (IsNewOverflowMenuAlternateIPHEnabled()) {
+- (void)prepareToShowPopupMenuBubble {
+  // There must be a feature engagment tracker to show a bubble.
+  if (!self.featureEngagementTracker) {
     return;
   }
 
@@ -173,11 +223,24 @@
           if (!success) {
             return;
           }
-          [weakSelf showPopupMenuBubbleIfNecessary];
+          [weakSelf prepareToShowPopupMenuBubble];
         }));
     return;
   }
 
+  if (tests_hook::DelayAppLaunchPromos()) {
+    __weak __typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                 kPromoDisplayDelayForTests.InNanoseconds()),
+                   dispatch_get_main_queue(), ^{
+                     [weakSelf showPopupMenuBubbleIfNecessary];
+                   });
+  } else {
+    [self showPopupMenuBubbleIfNecessary];
+  }
+}
+
+- (void)showPopupMenuBubbleIfNecessary {
   // Skip if a presentation is already in progress
   if (self.popupMenuBubblePresenter) {
     return;
@@ -203,31 +266,39 @@
   }
 
   // Early return if the engagement tracker won't display the IPH.
-  if (![self canShowIPH]) {
+  if (![self canShowIPHForPopupMenu]) {
     return;
   }
 
   // Present the bubble after the delay.
   self.popupMenuBubblePresenter = bubblePresenter;
-  self.inSessionWithPopupMenuIPH = YES;
   [self.popupMenuBubblePresenter
       presentInViewController:self.baseViewController
                          view:self.baseViewController.view
-                  anchorPoint:anchorPoint];
-  [self.UIUpdater updateUIForIPHDisplayed:PopupMenuTypeToolsMenu];
+                  anchorPoint:anchorPoint
+              anchorViewFrame:anchorFrame];
+  [self.UIUpdater updateUIForOverflowMenuIPHDisplayed];
 }
 
 #pragma mark - Overflow Menu Bubble methods
 
-- (BubbleViewControllerPresenter*)newOverflowMenuBubblePresenter {
-  NSString* text = l10n_util::GetNSString(IDS_IOS_OVERFLOW_MENU_CAROUSEL_TIP);
+- (BubbleViewControllerPresenter*)
+    newOverflowMenuBubblePresenterWithAnchorXInParent:(CGFloat)anchorXInParent
+                                      parentViewWidth:(CGFloat)parentViewWidth {
+  NSString* text =
+      l10n_util::GetNSString(IDS_IOS_VIEW_BROWSING_HISTORY_OVERFLOW_MENU_TIP);
 
   // Prepare the dismissal callback.
   __weak __typeof(self) weakSelf = self;
-  ProceduralBlockWithSnoozeAction dismissalCallback =
-      ^(feature_engagement::Tracker::SnoozeAction snoozeAction) {
+  CallbackWithIPHDismissalReasonType dismissalCallback =
+      ^(IPHDismissalReasonType IPHDismissalReasonType,
+        feature_engagement::Tracker::SnoozeAction snoozeAction) {
         [weakSelf overflowMenuIPHDidDismissWithSnoozeAction:snoozeAction];
       };
+
+  BubbleAlignment alignment = anchorXInParent < 0.5 * parentViewWidth
+                                  ? BubbleAlignmentTopOrLeading
+                                  : BubbleAlignmentBottomOrTrailing;
 
   // Create the BubbleViewControllerPresenter.
   BubbleArrowDirection arrowDirection = BubbleArrowDirectionUp;
@@ -235,21 +306,18 @@
       [[BubbleViewControllerPresenter alloc]
           initDefaultBubbleWithText:text
                      arrowDirection:arrowDirection
-                          alignment:BubbleAlignmentCenter
+                          alignment:alignment
                isLongDurationBubble:NO
                   dismissalCallback:dismissalCallback];
   bubbleViewControllerPresenter.voiceOverAnnouncement =
-      l10n_util::GetNSString(IDS_IOS_OVERFLOW_MENU_CAROUSEL_TIP_VOICEOVER);
+      l10n_util::GetNSString(IDS_IOS_VIEW_BROWSING_HISTORY_OVERFLOW_MENU_TIP);
   return bubbleViewControllerPresenter;
 }
 
 - (void)overflowMenuIPHDidDismissWithSnoozeAction:
     (feature_engagement::Tracker::SnoozeAction)snoozeAction {
-  if (IsNewOverflowMenuAlternateIPHEnabled()) {
-    [self trackerIPHDidDismissWithSnoozeAction:snoozeAction];
-  }
   self.overflowMenuBubblePresenter = nil;
-  self.uiConfiguration.highlightDestinationsRow = NO;
+  self.uiConfiguration.highlightDestination = -1;
 }
 
 #pragma mark - SceneStateObserver
@@ -257,19 +325,24 @@
 - (void)sceneState:(SceneState*)sceneState
     transitionedToActivationLevel:(SceneActivationLevel)level {
   if (level <= SceneActivationLevelBackground) {
-    self.inSessionWithPopupMenuIPH = NO;
+    self.inSessionWithHistoryMenuItemIPH = NO;
   } else if (level >= SceneActivationLevelForegroundActive) {
-    [self showPopupMenuBubbleIfNecessary];
+    [self prepareToShowPopupMenuBubble];
   }
 }
 
 #pragma mark - Feature Engagement Tracker queries
 
 // Queries the feature engagement tracker to see if IPH can currently be
-// displayed. Once this is called, the IPH MUST be shown and dismissed.
-- (BOOL)canShowIPH {
+// displayed. Once this is returning YES, the IPH MUST be shown and dismissed.
+- (BOOL)canShowIPHForPopupMenu {
+  if (!iph_for_new_chrome_user::IsUserEligible(
+          _deviceSwitcherResultDispatcher)) {
+    return NO;
+  }
   feature_engagement::Tracker* tracker = self.featureEngagementTracker;
-  const base::Feature& feature = feature_engagement::kIPHOverflowMenuTipFeature;
+  const base::Feature& feature =
+      feature_engagement::kIPHiOSHistoryOnOverflowMenuFeature;
   return tracker && tracker->ShouldTriggerHelpUI(feature);
 }
 
@@ -279,7 +352,7 @@
   feature_engagement::Tracker* tracker = self.featureEngagementTracker;
   if (tracker) {
     const base::Feature& feature =
-        feature_engagement::kIPHOverflowMenuTipFeature;
+        feature_engagement::kIPHiOSHistoryOnOverflowMenuFeature;
     tracker->DismissedWithSnooze(feature, snoozeAction);
   }
 }

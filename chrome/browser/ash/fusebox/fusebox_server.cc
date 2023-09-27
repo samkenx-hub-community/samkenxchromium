@@ -20,6 +20,7 @@
 #include "base/types/expected.h"
 #include "chrome/browser/ash/file_manager/fileapi_util.h"
 #include "chrome/browser/ash/file_manager/path_util.h"
+#include "chrome/browser/ash/fileapi/file_system_backend.h"
 #include "chrome/browser/ash/fusebox/fusebox_copy_to_fd.h"
 #include "chrome/browser/ash/fusebox/fusebox_errno.h"
 #include "chrome/browser/ash/fusebox/fusebox_read_writer.h"
@@ -30,7 +31,6 @@
 #include "storage/browser/file_system/async_file_util.h"
 #include "storage/browser/file_system/copy_or_move_hook_delegate.h"
 #include "storage/browser/file_system/external_mount_points.h"
-#include "storage/browser/file_system/file_system_backend.h"
 #include "storage/browser/file_system/file_system_url.h"
 #include "storage/common/file_system/file_system_util.h"
 #include "third_party/cros_system_api/dbus/fusebox/dbus-constants.h"
@@ -177,7 +177,7 @@ base::expected<Parsed, ParseError> ParseFileSystemURL(
       return base::unexpected(ParseError(ENOENT));
   }
 
-  if (!fs_context->external_backend()->CanHandleType(fs_url.type())) {
+  if (!ash::FileSystemBackend::Get(*fs_context)->CanHandleType(fs_url.type())) {
     LOG(ERROR) << "Backend cannot handle "
                << storage::GetFileSystemTypeString(fs_url.type());
     return base::unexpected(ParseError(EINVAL));
@@ -194,7 +194,9 @@ void FillInDirEntryProto(DirEntryProto* dir_entry_proto,
                          bool read_only) {
   dir_entry_proto->set_mode_bits(
       Server::MakeModeBits(info.is_directory, read_only));
-  dir_entry_proto->set_size(info.size);
+  // The base::File::Info comment says that info.size is "undefined when
+  // info.is_directory is true".
+  dir_entry_proto->set_size(info.is_directory ? 0 : info.size);
   dir_entry_proto->set_mtime(
       info.last_modified.ToDeltaSinceWindowsEpoch().InMicroseconds());
 }
@@ -784,7 +786,35 @@ storage::FileSystemURL Server::ResolveFilename(Profile* profile,
       ->CrackURLInFirstPartyContext(GURL(resolved.first));
 }
 
-base::Value Server::GetDebugJSON() {
+base::FilePath Server::InverseResolveFSURL(
+    const storage::FileSystemURL& fs_url) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  std::string fs_url_as_string = fs_url.ToGURL().spec();
+
+  // Find the longest registered (in the "called Server::RegisterFSURLPrefix"
+  // sense) FileSystemURL that is a prefix of fs_url.
+  size_t best_size = 0;
+  base::StringPiece best_subdir;
+  for (const auto& i : prefix_map_) {
+    if ((best_size < i.second.fs_url_prefix.size()) &&
+        base::StartsWith(fs_url_as_string, i.second.fs_url_prefix)) {
+      best_size = i.second.fs_url_prefix.size();
+      best_subdir = i.first;
+    }
+  }
+
+  if (best_size > 0) {
+    return storage::StringToFilePath(
+        base::StrCat({file_manager::util::kFuseBoxMediaSlashPath, best_subdir,
+                      fs_url_as_string.substr(best_size)}));
+  }
+
+  return base::FilePath();
+}
+
+void Server::GetDebugJSONForKey(
+    std::string_view key,
+    base::OnceCallback<void(JSONKeyValuePair)> callback) {
   base::Value::Dict subdirs;
   subdirs.Set(kMonikerSubdir, base::Value("[special]"));
   for (const auto& i : prefix_map_) {
@@ -797,7 +827,7 @@ base::Value Server::GetDebugJSON() {
   base::Value::Dict dict;
   dict.Set("monikers", moniker_map_.GetDebugJSON());
   dict.Set("subdirs", std::move(subdirs));
-  return base::Value(std::move(dict));
+  std::move(callback).Run(std::make_pair(key, base::Value(std::move(dict))));
 }
 
 void Server::Close2(const Close2RequestProto& request_proto,
@@ -1120,8 +1150,10 @@ void Server::Rename(const RenameRequestProto& request_proto,
   //   - ArcDocumentsProviderAsyncFileUtil::CopyInForeignFile
   //   - ArcDocumentsProviderAsyncFileUtil::CreateSnapshotFile
   //   - MTPFileSystemBackendDelegate::CreateFileStreamWriter
-  //   - ProviderAsyncFileUtil::CopyInForeignFile
+  //   - ProviderAsyncFileUtil::CopyInForeignFile (*)
   //   - ProviderAsyncFileUtil::CreateSnapshotFile
+  //
+  // (*) ProviderAsyncFileUtil::CopyInForeignFile was added in August 2023.
   if (!src_parsed->fs_url.IsInSameFileSystem(dst_parsed->fs_url) &&
       UseTempFile(dst_fs_url_as_string)) {
     auto outer_callback = base::BindPostTaskToCurrentDefault(
@@ -1144,11 +1176,10 @@ void Server::Rename(const RenameRequestProto& request_proto,
       base::BindOnce(&RunRenameCallbackBaseFileError, std::move(callback),
                      src_parsed->fs_context));
 
-  constexpr storage::FileSystemOperation::CopyOrMoveOptionSet options =
-      storage::FileSystemOperation::CopyOrMoveOptionSet(
-          storage::FileSystemOperation::CopyOrMoveOption::kPreserveLastModified,
-          storage::FileSystemOperation::CopyOrMoveOption::
-              kRemovePartiallyCopiedFilesOnError);
+  constexpr storage::FileSystemOperation::CopyOrMoveOptionSet options = {
+      storage::FileSystemOperation::CopyOrMoveOption::kPreserveLastModified,
+      storage::FileSystemOperation::CopyOrMoveOption::
+          kRemovePartiallyCopiedFilesOnError};
 
   content::GetIOThreadTaskRunner({})->PostTask(
       FROM_HERE,
@@ -1410,8 +1441,9 @@ void Server::ReplyToMakeTempDir(base::ScopedTempDir scoped_temp_dir,
   const blink::StorageKey storage_key =
       blink::StorageKey::CreateFromStringForTesting(
           "http://fusebox-server.example.com");
-  fs_context->external_backend()->GrantFileAccessToOrigin(
-      storage_key.origin(), base::FilePath(mount_name));
+  ash::FileSystemBackend::Get(*fs_context)
+      ->GrantFileAccessToOrigin(storage_key.origin(),
+                                base::FilePath(mount_name));
 
   storage::FileSystemURL fs_url =
       mount_points->CreateExternalFileSystemURL(storage_key, mount_name, {});

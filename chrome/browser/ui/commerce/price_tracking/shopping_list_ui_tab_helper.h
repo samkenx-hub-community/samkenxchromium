@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -17,12 +17,13 @@
 #include "ui/gfx/image/image.h"
 
 class GURL;
-
+class SidePanelUI;
 namespace bookmarks {
 class BookmarkModel;
 }
 
 namespace content {
+class NavigationHandle;
 class WebContents;
 }  // namespace content
 
@@ -30,12 +31,18 @@ namespace image_fetcher {
 class ImageFetcher;
 }
 
+namespace views {
+class View;
+}  // namespace views
+
 namespace commerce {
 
 struct CommerceSubscription;
 
 // This tab helper is used to update and maintain the state of the shopping list
 // and price tracking UI on desktop.
+// TODO(b:283833590): Rename this class since it serves for all shopping
+// features now.
 class ShoppingListUiTabHelper
     : public content::WebContentsObserver,
       public content::WebContentsUserData<ShoppingListUiTabHelper>,
@@ -53,6 +60,8 @@ class ShoppingListUiTabHelper
   virtual const gfx::Image& GetProductImage();
   // Return whether the PriceTrackingIconView is visible.
   virtual bool ShouldShowPriceTrackingIconView();
+  // Return whether the PriceInsightsIconView is visible.
+  virtual bool ShouldShowPriceInsightsIconView();
 
   // The URL for the last fetched product image. A reference to this object
   // should not be kept directly, if one is needed, a copy should be made.
@@ -62,14 +71,15 @@ class ShoppingListUiTabHelper
   virtual bool IsPriceTracking();
 
   // content::WebContentsObserver implementation
-  void NavigationEntryCommitted(
-      const content::LoadCommittedDetails& load_details) override;
+  void DidFinishNavigation(
+      content::NavigationHandle* navigation_handle) override;
+  void DidStopLoading() override;
 
   // SubscriptionsObserver
-  void OnSubscribe(const std::vector<CommerceSubscription>& subscriptions,
+  void OnSubscribe(const CommerceSubscription& subscription,
                    bool succeeded) override;
 
-  void OnUnsubscribe(const std::vector<CommerceSubscription>& subscriptions,
+  void OnUnsubscribe(const CommerceSubscription& subscription,
                      bool succeeded) override;
 
   // Update this tab helper (and associated observers) to use a different
@@ -80,6 +90,12 @@ class ShoppingListUiTabHelper
   virtual void SetPriceTrackingState(bool enable,
                                      bool is_new_bookmark,
                                      base::OnceCallback<void(bool)> callback);
+  void OnPriceInsightsIconClicked();
+
+  // Return the PriceInsightsInfo for the last fetched product URL. A reference
+  // to this object should not be kept directly, if one is needed, a copy should
+  // be made.
+  virtual const absl::optional<PriceInsightsInfo>& GetPriceInsightsInfo();
 
  protected:
   ShoppingListUiTabHelper(content::WebContents* contents,
@@ -89,12 +105,18 @@ class ShoppingListUiTabHelper
 
   const absl::optional<bool>& GetPendingTrackingStateForTesting();
 
+  virtual std::unique_ptr<views::View> CreateShoppingInsightsWebView();
+
  private:
   friend class content::WebContentsUserData<ShoppingListUiTabHelper>;
   friend class ShoppingListUiTabHelperTest;
 
   void HandleProductInfoResponse(const GURL& url,
-                                 const absl::optional<ProductInfo>& info);
+                                 const absl::optional<const ProductInfo>& info);
+
+  void HandlePriceInsightsInfoResponse(
+      const GURL& url,
+      const absl::optional<PriceInsightsInfo>& info);
 
   void HandleImageFetcherResponse(
       const GURL image_url,
@@ -103,9 +125,32 @@ class ShoppingListUiTabHelper
 
   void UpdatePriceTrackingIconView();
 
+  void UpdatePriceInsightsIconView();
+
   // Update the flag tracking the price tracking state of the product from
   // subscriptions.
   void UpdatePriceTrackingStateFromSubscriptions();
+
+  void HandleSubscriptionChange(const CommerceSubscription& sub);
+
+  void TriggerUpdateForIconView();
+
+  bool ShouldIgnoreSameUrlNavigation();
+
+  bool IsSameDocumentWithSameCommittedUrl(
+      content::NavigationHandle* navigation_handle);
+
+  // Make the ShoppingInsights entry available in the side panel.
+  void MakeShoppingInsightsSidePanelAvailable();
+
+  // Make the ShoppingInsights entry unavailable in the side panel. If the
+  // ShoppingInsights side panel is currently showing, close the side panel
+  // first.
+  void MakeShoppingInsightsSidePanelUnavailable();
+
+  SidePanelUI* GetSidePanelUI() const;
+
+  void DelayUpdateForIconView();
 
   // The shopping service is tied to the lifetime of the browser context
   // which will always outlive this tab helper.
@@ -135,6 +180,17 @@ class ShoppingListUiTabHelper
   // callback from the (un)subscribe event. If no value, there is no pending
   // state, otherwise true means "tracking" and false means "not tracking".
   absl::optional<bool> pending_tracking_state_;
+
+  // A flag to indicating whether the first load after a navigation has
+  // completed.
+  bool is_first_load_for_nav_finished_{false};
+
+  // The url from the previous successful main frame navigation. This will be
+  // empty if this is the first navigation for this tab or post-restart.
+  GURL previous_main_frame_url_;
+
+  // The PriceInsightsInfo associated with the last committed URL.
+  absl::optional<PriceInsightsInfo> price_insights_info_;
 
   // Automatically remove this observer from its host when destroyed.
   base::ScopedObservation<ShoppingService, SubscriptionsObserver>

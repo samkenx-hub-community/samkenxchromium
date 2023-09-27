@@ -26,10 +26,6 @@
 #include "net/cert/cert_status_flags.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 using password_manager::PasswordFormManagerForUI;
 using password_manager::PasswordManagerMetricsRecorder;
 using password_manager::PasswordStore;
@@ -171,7 +167,7 @@ void WebViewPasswordManagerClient::PromptUserToEnableAutosignin() {
   NOTIMPLEMENTED();
 }
 
-bool WebViewPasswordManagerClient::IsIncognito() const {
+bool WebViewPasswordManagerClient::IsOffTheRecord() const {
   return web_state_->GetBrowserState()->IsOffTheRecord();
 }
 
@@ -253,7 +249,7 @@ void WebViewPasswordManagerClient::NotifyUserCredentialsWereLeaked(
 
 bool WebViewPasswordManagerClient::IsSavingAndFillingEnabled(
     const GURL& url) const {
-  return *saving_passwords_enabled_ && !IsIncognito() &&
+  return *saving_passwords_enabled_ && !IsOffTheRecord() &&
          !net::IsCertStatusError(GetMainFrameCertStatus()) &&
          IsFillingEnabled(url);
 }
@@ -312,30 +308,10 @@ bool WebViewPasswordManagerClient::IsNewTabPage() const {
   return false;
 }
 
-password_manager::FieldInfoManager*
-WebViewPasswordManagerClient::GetFieldInfoManager() const {
-  return nullptr;
-}
-
 safe_browsing::PasswordProtectionService*
 WebViewPasswordManagerClient::GetPasswordProtectionService() const {
   // TODO(crbug.com/1148229): Enable PhishGuard in web_view.
   return nullptr;
-}
-
-void WebViewPasswordManagerClient::CheckProtectedPasswordEntry(
-    password_manager::metrics_util::PasswordType password_type,
-    const std::string& username,
-    const std::vector<password_manager::MatchingReusedCredential>&
-        matching_reused_credentials,
-    bool password_field_exists,
-    uint64_t reused_password_hash,
-    const std::string& domain) {
-  // TODO(crbug.com/1147967): Enable PhishGuard in web_view.
-}
-
-void WebViewPasswordManagerClient::LogPasswordReuseDetectedEvent() {
-  // TODO(crbug.com/1147967): Enable PhishGuard in web_view.
 }
 
 }  // namespace ios_web_view

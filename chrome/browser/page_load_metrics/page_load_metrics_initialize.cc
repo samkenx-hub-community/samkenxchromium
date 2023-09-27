@@ -21,6 +21,7 @@
 #include "chrome/browser/page_load_metrics/observers/gws_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/https_engagement_metrics/https_engagement_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/javascript_frameworks_ukm_observer.h"
+#include "chrome/browser/page_load_metrics/observers/lcp_critical_path_predictor_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/loading_predictor_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/local_network_requests_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/multi_tab_loading_page_load_metrics_observer.h"
@@ -29,11 +30,13 @@
 #include "chrome/browser/page_load_metrics/observers/page_anchors_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/portal_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/prefetch_page_load_metrics_observer.h"
+#include "chrome/browser/page_load_metrics/observers/preview_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/protocol_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/scheme_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/security_state_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/service_worker_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/signed_exchange_page_load_metrics_observer.h"
+#include "chrome/browser/page_load_metrics/observers/tab_strip_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/third_party_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/observers/translate_page_load_metrics_observer.h"
 #include "chrome/browser/page_load_metrics/page_load_metrics_memory_tracker_factory.h"
@@ -43,8 +46,7 @@
 #include "components/no_state_prefetch/browser/no_state_prefetch_contents.h"
 #include "components/page_load_metrics/browser/metrics_web_contents_observer.h"
 #include "components/page_load_metrics/browser/observers/ad_metrics/ads_page_load_metrics_observer.h"
-#include "components/page_load_metrics/browser/observers/assert_page_load_metrics_observer.h"
-#include "components/page_load_metrics/browser/observers/cache_transparency_page_load_metrics_observer.h"
+#include "components/page_load_metrics/browser/observers/zstd_page_load_metrics_observer.h"
 #include "components/page_load_metrics/browser/page_load_metrics_embedder_base.h"
 #include "components/page_load_metrics/browser/page_load_metrics_memory_tracker.h"
 #include "components/page_load_metrics/browser/page_load_tracker.h"
@@ -106,10 +108,6 @@ PageLoadMetricsEmbedder::~PageLoadMetricsEmbedder() = default;
 
 void PageLoadMetricsEmbedder::RegisterEmbedderObservers(
     page_load_metrics::PageLoadTracker* tracker) {
-#if DCHECK_IS_ON()
-  tracker->AddObserver(std::make_unique<AssertPageLoadMetricsObserver>());
-#endif
-
   // TODO(crbug.com/1299103): Integrate side panel metrics with UKM.
   if (IsSidePanel(web_contents())) {
 #if defined(TOOLKIT_VIEWS)
@@ -176,7 +174,12 @@ void PageLoadMetricsEmbedder::RegisterEmbedderObservers(
     if (loading_predictor_observer)
       tracker->AddObserver(std::move(loading_predictor_observer));
     tracker->AddObserver(
+        std::make_unique<LcpCriticalPathPredictorPageLoadMetricsObserver>());
+    tracker->AddObserver(
         std::make_unique<LocalNetworkRequestsPageLoadMetricsObserver>());
+    tracker->AddObserver(
+        std::make_unique<TabStripPageLoadMetricsObserver>(web_contents()));
+    tracker->AddObserver(std::make_unique<PreviewPageLoadMetricsObserver>());
   }
   tracker->AddObserver(
       std::make_unique<OmniboxSuggestionUsedMetricsObserver>());
@@ -190,8 +193,7 @@ void PageLoadMetricsEmbedder::RegisterEmbedderObservers(
           tracker->GetWebContents());
   if (translate_observer)
     tracker->AddObserver(std::move(translate_observer));
-  tracker->AddObserver(
-      std::make_unique<CacheTransparencyPageLoadMetricsObserver>());
+  tracker->AddObserver(std::make_unique<ZstdPageLoadMetricsObserver>());
 }
 
 bool PageLoadMetricsEmbedder::IsNewTabPageUrl(const GURL& url) {

@@ -22,6 +22,7 @@ import org.chromium.chrome.browser.feed.FeedServiceBridge;
 import org.chromium.chrome.browser.feed.R;
 import org.chromium.chrome.browser.feed.StreamKind;
 import org.chromium.chrome.browser.feed.v2.FeedUserActionType;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
 import org.chromium.ui.modelutil.ModelListAdapter;
 import org.chromium.ui.modelutil.PropertyModel;
@@ -39,7 +40,6 @@ public class FeedManagementMediator {
     private ModelList mModelList;
     private final Context mContext;
     private final FollowManagementLauncher mFollowManagementLauncher;
-    private final AutoplayManagementLauncher mAutoplayManagementLauncher;
     private final @StreamKind int mInitiatingStreamKind;
 
     /**
@@ -49,20 +49,11 @@ public class FeedManagementMediator {
         void launchFollowManagement(Context mContext);
     }
 
-    /**
-     * Interface to supply a method which can launch the AutoplayManagementActivity.
-     */
-    public interface AutoplayManagementLauncher {
-        void launchAutoplayManagement(Context mContext);
-    }
-
     FeedManagementMediator(Context context, ModelList modelList,
-            FollowManagementLauncher followLauncher, AutoplayManagementLauncher autoplayLauncher,
-            @StreamKind int initiatingStreamKind) {
+            FollowManagementLauncher followLauncher, @StreamKind int initiatingStreamKind) {
         mModelList = modelList;
         mContext = context;
         mFollowManagementLauncher = followLauncher;
-        mAutoplayManagementLauncher = autoplayLauncher;
         mInitiatingStreamKind = initiatingStreamKind;
 
         // Add the menu items into the menu.
@@ -70,20 +61,17 @@ public class FeedManagementMediator {
                 R.string.feed_manage_activity_description, this::handleActivityClick);
         mModelList.add(new ModelListAdapter.ListItem(
                 FeedManagementItemProperties.DEFAULT_ITEM_TYPE, activityModel));
-        PropertyModel interestsModel = generateListItem(R.string.feed_manage_interests,
-                R.string.feed_manage_interests_description, this::handleInterestsClick);
+        int descResource = ChromeFeatureList.isEnabled(ChromeFeatureList.FEED_FOLLOW_UI_UPDATE)
+                ? R.string.feed_manage_interests_description_ui_update
+                : R.string.feed_manage_interests_description;
+        PropertyModel interestsModel = generateListItem(
+                R.string.feed_manage_interests, descResource, this::handleInterestsClick);
         mModelList.add(new ModelListAdapter.ListItem(
                 FeedManagementItemProperties.DEFAULT_ITEM_TYPE, interestsModel));
         PropertyModel hiddenModel = generateListItem(R.string.feed_manage_hidden,
                 R.string.feed_manage_hidden_description, this::handleHiddenClick);
         mModelList.add(new ModelListAdapter.ListItem(
                 FeedManagementItemProperties.DEFAULT_ITEM_TYPE, hiddenModel));
-        if (FeedServiceBridge.isAutoplayEnabled()) {
-            PropertyModel autoplayModel = generateListItem(R.string.feed_manage_autoplay,
-                    R.string.feed_manage_autoplay_description, this::handleAutoplayClick);
-            mModelList.add(new ModelListAdapter.ListItem(
-                    FeedManagementItemProperties.DEFAULT_ITEM_TYPE, autoplayModel));
-        }
         PropertyModel followingModel = generateListItem(R.string.feed_manage_following,
                 R.string.feed_manage_following_description, this::handleFollowingClick);
         mModelList.add(new ModelListAdapter.ListItem(
@@ -110,18 +98,16 @@ public class FeedManagementMediator {
         builder.setShowTitle(true);
         builder.setShareState(CustomTabsIntent.SHARE_STATE_ON);
         Intent intent = builder.build().intent;
+        intent.setPackage(mContext.getPackageName());
+        // Adding trusted extras lets us know that the intent came from Chrome.
+        intent.putExtra(TRUSTED_APPLICATION_CODE_EXTRA, getAuthenticationToken());
         intent.setData(Uri.parse(uri));
         intent.setAction(Intent.ACTION_VIEW);
         intent.setClassName(mContext, "org.chromium.chrome.browser.customtabs.CustomTabActivity");
-
-        // Do the things that createCustomTabActivityIntent does:
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // Needed for pre-N versions of android.
         intent.putExtra(Browser.EXTRA_APPLICATION_ID, mContext.getPackageName());
-
-        // Adding trusted extras lets us know that the intent came from Chrome.
-        intent.setPackage(mContext.getPackageName());
-        intent.putExtra(TRUSTED_APPLICATION_CODE_EXTRA, getAuthenticationToken());
         mContext.startActivity(intent);
+
         // TODO(https://crbug.com/1195209): Record uma by calling ReportOtherUserAction
         // on the stream.
     }
@@ -158,14 +144,6 @@ public class FeedManagementMediator {
         FeedServiceBridge.reportOtherUserAction(
                 mInitiatingStreamKind, FeedUserActionType.TAPPED_MANAGE_INTERESTS);
         launchUriActivity("https://www.google.com/preferences/interests/hidden?sh=n");
-    }
-
-    @VisibleForTesting
-    void handleAutoplayClick(View view) {
-        Log.d(TAG, "Autoplay click caught.");
-        FeedServiceBridge.reportOtherUserAction(
-                mInitiatingStreamKind, FeedUserActionType.OPENED_AUTOPLAY_SETTINGS);
-        mAutoplayManagementLauncher.launchAutoplayManagement(mContext);
     }
 
     @VisibleForTesting

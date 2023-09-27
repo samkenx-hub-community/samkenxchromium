@@ -20,6 +20,7 @@ import time
 import constants
 import file_util
 import gtest_utils
+import mac_util
 import iossim_util
 import test_apps
 from test_result_util import ResultCollection, TestResult, TestStatus
@@ -32,6 +33,7 @@ LOGGER = logging.getLogger(__name__)
 DERIVED_DATA = os.path.expanduser('~/Library/Developer/Xcode/DerivedData')
 DEFAULT_TEST_REPO = 'https://chromium.googlesource.com/chromium/src'
 HOST_IS_DOWN_ERROR = 'Domain=NSPOSIXErrorDomain Code=64 "Host is down"'
+MIG_SERVER_DIED_ERROR = '(ipc/mig) server died'
 
 
 # TODO(crbug.com/1077277): Move commonly used error classes to
@@ -120,20 +122,6 @@ class XCTestPlugInNotFoundError(TestRunnerError):
         'XCTest not found: %s' % xctest_path)
 
 
-class MacToolchainNotFoundError(TestRunnerError):
-  """The mac_toolchain is not specified."""
-  def __init__(self, mac_toolchain):
-    super(MacToolchainNotFoundError, self).__init__(
-        'mac_toolchain is not specified or not found: "%s"' % mac_toolchain)
-
-
-class XcodePathNotFoundError(TestRunnerError):
-  """The path to Xcode.app is not specified."""
-  def __init__(self, xcode_path):
-    super(XcodePathNotFoundError, self).__init__(
-        'xcode_path is not specified or does not exist: "%s"' % xcode_path)
-
-
 class ShardingDisabledError(TestRunnerError):
   """Temporary error indicating that sharding is not yet implemented."""
   def __init__(self):
@@ -143,9 +131,16 @@ class ShardingDisabledError(TestRunnerError):
 
 class HostIsDownError(TestRunnerError):
   """Simulator host is down, usually due to a corrupted runtime."""
-
   def __init__(self):
     super(HostIsDownError, self).__init__('Simulator host is down!')
+
+
+class MIGServerDiedError(TestRunnerError):
+  """(ipc/mig) server died error, causing simulator unable to start"""
+
+  def __init__(self):
+    super(MIGServerDiedError,
+          self).__init__('iOS runtime embedded in Xcode might be corrupted.')
 
 
 def get_device_ios_version(udid):
@@ -280,6 +275,11 @@ def print_process_output(proc,
     # is resolved.
     if HOST_IS_DOWN_ERROR in line:
       raise HostIsDownError()
+
+    # crbug/1449927: Mitigation to exit earlier to clear Xcode cache
+    # in order to self-recover on the next run.
+    if MIG_SERVER_DIED_ERROR in line:
+      raise MIGServerDiedError()
 
   if parser:
     parser.Finalize()
@@ -623,7 +623,8 @@ class TestRunner(object):
     cmd = self.get_launch_command(test_app, out_dir, destination, self.shards)
     try:
       result = self._run(cmd=cmd, shards=self.shards or 1)
-      if result.crashed and not result.crashed_tests():
+      if (result.crashed and not result.spawning_test_launcher and
+          not result.crashed_tests()):
         # If the app crashed but not during any particular test case, assume
         # it crashed on startup. Try one more time.
         self.shutdown_and_restart()
@@ -635,13 +636,15 @@ class TestRunner(object):
 
       result.report_to_result_sink()
 
-      if result.crashed and not result.crashed_tests():
+      if (result.crashed and not result.spawning_test_launcher and
+          not result.crashed_tests()):
         raise AppLaunchError
 
       overall_result.add_result_collection(result)
 
       try:
-        while result.crashed and result.crashed_tests():
+        while (result.crashed and not result.spawning_test_launcher and
+               result.crashed_tests()):
           # If the app crashes during a specific test case, then resume at the
           # next test case. This is achieved by filtering out every test case
           # which has already run.
@@ -671,7 +674,8 @@ class TestRunner(object):
       # Retry failed test cases.
       test_app.excluded_tests = []
       never_expected_tests = overall_result.never_expected_tests()
-      if self.retries and never_expected_tests:
+      if (self.retries and not result.spawning_test_launcher and
+          never_expected_tests):
         LOGGER.warning('%s tests failed and will be retried.\n',
                        len(never_expected_tests))
         for i in range(self.retries):
@@ -792,6 +796,10 @@ class SimulatorTestRunner(TestRunner):
     """Wipes the simulator."""
     iossim_util.wipe_simulator_by_udid(self.udid)
 
+  def disable_hw_keyboard(self):
+    """Disables hardware keyboard input."""
+    iossim_util.disable_hardware_keyboard(self.udid)
+
   def get_home_directory(self):
     """Returns the simulator's home directory."""
     return iossim_util.get_home_directory(self.platform, self.version)
@@ -802,6 +810,7 @@ class SimulatorTestRunner(TestRunner):
     self.kill_simulators()
     self.wipe_simulator()
     self.wipe_derived_data()
+    self.disable_hw_keyboard()
     self.homedir = self.get_home_directory()
     # Crash reports have a timestamp in their file name, formatted as
     # YYYY-MM-DD-HHMMSS. Save the current time in the same format so
@@ -1021,6 +1030,7 @@ class DeviceTestRunner(TestRunner):
     self.uninstall_apps()
     self.wipe_derived_data()
     self.install_app()
+    self.restart_usbmuxd()
 
   def extract_test_data(self):
     """Extracts data emitted by the test."""
@@ -1148,3 +1158,14 @@ class DeviceTestRunner(TestRunner):
         env_vars=self.env_vars,
         repeat_count=self.repeat_count,
         test_args=self.test_args)
+
+  # TODO(crbug.com/1469697): there's a bug in Xcode 15 such that the devices
+  # will get disconnected from Xcode after a reboot. We should revisit this
+  # later to see if Apple will resolve this issue. Moreover, if the issue is
+  # not resolved, we should aim to add some restrictions to this call such
+  # that stop_usbmuxd is not called every single time.
+  def restart_usbmuxd(self):
+    if xcode_util.using_xcode_15_or_higher():
+      LOGGER.warning(
+          "Restarting usbmuxd to ensure device is re-paired to Xcode...")
+      mac_util.stop_usbmuxd()

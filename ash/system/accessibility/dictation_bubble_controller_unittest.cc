@@ -5,7 +5,6 @@
 #include "ash/system/accessibility/dictation_bubble_controller.h"
 
 #include "ash/accessibility/accessibility_controller_impl.h"
-#include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
@@ -14,7 +13,6 @@
 #include "ash/system/accessibility/dictation_bubble_view.h"
 #include "ash/test/ash_test_base.h"
 #include "base/test/scoped_feature_list.h"
-#include "chromeos/constants/chromeos_features.h"
 
 namespace ash {
 
@@ -28,10 +26,6 @@ class DictationBubbleControllerTest : public AshTestBase {
 
   // AshTestBase:
   void SetUp() override {
-    scoped_feature_list_.InitWithFeatures(
-        /*enabled_features=*/{},
-        /*disabled_features=*/{features::kNotificationsRefresh});
-
     AshTestBase::SetUp();
     Shell::Get()->accessibility_controller()->dictation().SetEnabled(true);
   }
@@ -59,6 +53,11 @@ class DictationBubbleControllerTest : public AshTestBase {
 
   DictationBubbleView* GetView() {
     return GetController()->dictation_bubble_view_;
+  }
+
+  DictationHintView* GetHintView() {
+    DictationBubbleView* view = GetView();
+    return view->hint_view_;
   }
 
   bool IsBubbleVisible() { return GetController()->widget_->IsVisible(); }
@@ -98,9 +97,6 @@ class DictationBubbleControllerTest : public AshTestBase {
   std::vector<std::u16string> GetVisibleHints() {
     return GetView()->GetVisibleHintsForTesting();
   }
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 TEST_F(DictationBubbleControllerTest, ShowText) {
@@ -165,10 +161,6 @@ TEST_F(DictationBubbleControllerTest, ShowMacroFailImage) {
 // Verifies that the bubble UI respects the dark mode setting. For convenience
 // purposes, we perform checks on the label's text and background color.
 TEST_F(DictationBubbleControllerTest, DarkMode) {
-  // Enable dark mode feature.
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(chromeos::features::kDarkLightMode);
-  ASSERT_TRUE(chromeos::features::IsDarkLightModeEnabled());
   auto* dark_light_mode_controller = DarkLightModeControllerImpl::Get();
   dark_light_mode_controller->OnActiveUserPrefServiceChanged(
       Shell::Get()->session_controller()->GetPrimaryUserPrefService());
@@ -234,6 +226,16 @@ TEST_F(DictationBubbleControllerTest, HideBeforeShow) {
        absl::optional<std::vector<DictationBubbleHintType>>());
   EXPECT_TRUE(GetView());
   EXPECT_TRUE(IsBubbleVisible());
+
+  HideAndCheckExpectations();
+}
+
+TEST_F(DictationBubbleControllerTest, DictationHintViewClassHasTheRightName) {
+  EXPECT_FALSE(GetView());
+  Show(DictationBubbleIconType::kStandby, absl::optional<std::u16string>(),
+       absl::optional<std::vector<DictationBubbleHintType>>());
+  EXPECT_TRUE(GetView());
+  EXPECT_STREQ(GetHintView()->GetClassName(), "DictationHintView");
 
   HideAndCheckExpectations();
 }

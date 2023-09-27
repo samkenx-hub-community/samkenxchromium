@@ -11,12 +11,14 @@
 #include <string>
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "content/public/browser/browser_context.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/android/scoped_java_ref.h"
@@ -30,6 +32,9 @@ class PrefStore;
 class ProfileDestroyer;
 class ProfileKey;
 class TestingProfile;
+class ThemeService;
+class TemplateURLService;
+class InstantService;
 
 namespace base {
 class FilePath;
@@ -45,10 +50,10 @@ class WebUI;
 namespace policy {
 class SchemaRegistryService;
 class ProfilePolicyConnector;
+class ProfileCloudPolicyManager;
 class UserCloudPolicyManager;
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-class ActiveDirectoryPolicyManager;
 class UserCloudPolicyManagerAsh;
 #endif
 }  // namespace policy
@@ -298,6 +303,10 @@ class Profile : public content::BrowserContext {
   virtual const Profile* GetOriginalProfile() const = 0;
 
   // Returns whether the profile is associated with the account of a child.
+  // This method should not be used in new code to gate child-specific
+  // functionality. Prefer a feture specific method
+  // (eg. `SupervisedUserService::IsURLFilteringEnabled()`) or alternatively
+  // use `SupervisedUserService::IsSubjectToParentalControls()`.
   virtual bool IsChild() const = 0;
 
   // Returns whether opening browser windows is allowed in this profile. For
@@ -346,13 +355,10 @@ class Profile : public content::BrowserContext {
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   // Returns the UserCloudPolicyManagerAsh.
   virtual policy::UserCloudPolicyManagerAsh* GetUserCloudPolicyManagerAsh() = 0;
-
-  // Returns the ActiveDirectoryPolicyManager.
-  virtual policy::ActiveDirectoryPolicyManager*
-  GetActiveDirectoryPolicyManager() = 0;
 #else
   // Returns the UserCloudPolicyManager.
   virtual policy::UserCloudPolicyManager* GetUserCloudPolicyManager() = 0;
+  virtual policy::ProfileCloudPolicyManager* GetProfileCloudPolicyManager() = 0;
 #endif
 
   virtual policy::ProfilePolicyConnector* GetProfilePolicyConnector() = 0;
@@ -439,6 +445,13 @@ class Profile : public content::BrowserContext {
 
   // Returns true if this is the main profile as defined above.
   virtual bool IsMainProfile() const = 0;
+
+  // Returns true if the profile path is for an web app profile.
+  static bool IsWebAppProfilePath(const base::FilePath& profile_path);
+
+  // Returns true if the name of the profile (i.e. `profile_path.BaseName()`) is
+  // for an web app profile.
+  static bool IsWebAppProfileName(const std::string& profile_path);
 #endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
 
   bool CanUseDiskWhenOffTheRecord() override;
@@ -494,6 +507,27 @@ class Profile : public content::BrowserContext {
 
   base::WeakPtr<Profile> GetWeakPtr();
 
+  // Experimental getters/setters to gauge the performance of caching
+  // frequently used KeyedServices in a Profile pointer.
+  void set_theme_service(ThemeService* theme_service) {
+    theme_service_ = theme_service;
+  }
+  const absl::optional<raw_ptr<ThemeService>>& theme_service() {
+    return theme_service_;
+  }
+  void set_template_url_service(TemplateURLService* template_url_service) {
+    template_url_service_ = template_url_service;
+  }
+  const absl::optional<raw_ptr<TemplateURLService>>& template_url_service() {
+    return template_url_service_;
+  }
+  void set_instant_service(InstantService* instant_service) {
+    instant_service_ = instant_service;
+  }
+  const absl::optional<raw_ptr<InstantService>>& instant_service() {
+    return instant_service_;
+  }
+
  protected:
   // Creates an OffTheRecordProfile which points to this Profile.
   static std::unique_ptr<Profile> CreateOffTheRecordProfile(
@@ -529,6 +563,12 @@ class Profile : public content::BrowserContext {
   // increment and decrement the level, respectively, rather than set it to
   // true or false, so that calls can be nested.
   int accessibility_pause_level_ = 0;
+
+  // Experimental objects to gauge the performance of caching frequently used
+  // KeyedServices in a Profile pointer.
+  absl::optional<raw_ptr<ThemeService>> theme_service_;
+  absl::optional<raw_ptr<TemplateURLService>> template_url_service_;
+  absl::optional<raw_ptr<InstantService>> instant_service_;
 
   base::ObserverList<ProfileObserver,
                      /*check_empty=*/true,

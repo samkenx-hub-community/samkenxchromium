@@ -20,6 +20,7 @@
 #include "base/values.h"
 #include "content/public/common/common_param_traits.h"
 #include "content/public/common/socket_permission_request.h"
+#include "extensions/common/api/messaging/channel_type.h"
 #include "extensions/common/api/messaging/message.h"
 #include "extensions/common/api/messaging/messaging_endpoint.h"
 #include "extensions/common/api/messaging/port_context.h"
@@ -47,7 +48,6 @@
 #include "ipc/ipc_message_macros.h"
 #include "ipc/ipc_message_start.h"
 #include "ipc/ipc_message_utils.h"
-#include "ui/accessibility/ax_param_traits.h"
 #include "url/gurl.h"
 #include "url/origin.h"
 
@@ -67,6 +67,9 @@ IPC_ENUM_TRAITS_MAX_VALUE(extensions::MessagingEndpoint::Type,
 
 IPC_ENUM_TRAITS_MAX_VALUE(extensions::SerializationFormat,
                           extensions::SerializationFormat::kLast)
+
+IPC_ENUM_TRAITS_MAX_VALUE(extensions::ChannelType,
+                          extensions::ChannelType::kLast)
 
 // Parameters structure for ExtensionHostMsg_AddAPIActionToActivityLog and
 // ExtensionHostMsg_AddEventToActivityLog.
@@ -98,44 +101,6 @@ IPC_STRUCT_BEGIN(ExtensionHostMsg_DOMAction_Params)
   // Type of DOM API call.
   IPC_STRUCT_MEMBER(int, call_type)
 IPC_STRUCT_END()
-
-// Parameters structure for ExtensionHostMsg_RequestWorker.
-IPC_STRUCT_TRAITS_BEGIN(extensions::mojom::RequestParams)
-  // Message name.
-  IPC_STRUCT_TRAITS_MEMBER(name)
-
-  // List of message arguments.
-  IPC_STRUCT_TRAITS_MEMBER(arguments)
-
-  // Extension ID this request was sent from. This can be empty, in the case
-  // where we expose APIs to normal web pages using the extension function
-  // system.
-  IPC_STRUCT_TRAITS_MEMBER(extension_id)
-
-  // URL of the frame the request was sent from. This isn't necessarily an
-  // extension url. Extension requests can also originate from content scripts,
-  // in which case extension_id will indicate the ID of the associated
-  // extension. Or, they can originate from hosted apps or normal web pages.
-  IPC_STRUCT_TRAITS_MEMBER(source_url)
-
-  // Unique request id to match requests and responses.
-  IPC_STRUCT_TRAITS_MEMBER(request_id)
-
-  // True if request has a callback specified.
-  IPC_STRUCT_TRAITS_MEMBER(has_callback)
-
-  // True if request is executed in response to an explicit user gesture.
-  IPC_STRUCT_TRAITS_MEMBER(user_gesture)
-
-  // If this API call is for a service worker, then this is the worker thread
-  // id. Otherwise, this is kMainThreadId.
-  IPC_STRUCT_TRAITS_MEMBER(worker_thread_id)
-
-  // If this API call is for a service worker, then this is the service
-  // worker version id. Otherwise, this is set to
-  // blink::mojom::kInvalidServiceWorkerVersionId.
-  IPC_STRUCT_TRAITS_MEMBER(service_worker_version_id)
-IPC_STRUCT_TRAITS_END()
 
 // Struct containing information about the sender of connect() calls that
 // originate from a tab.
@@ -258,6 +223,15 @@ IPC_STRUCT_BEGIN(ExtensionMsg_ResponseWorkerData)
   IPC_STRUCT_MEMBER(extensions::mojom::ExtraResponseDataPtr, extra_data)
 IPC_STRUCT_END()
 
+IPC_STRUCT_BEGIN(ExtensionMsg_OnConnectData)
+  IPC_STRUCT_MEMBER(extensions::PortId, target_port_id)
+  IPC_STRUCT_MEMBER(extensions::ChannelType, channel_type)
+  IPC_STRUCT_MEMBER(std::string, channel_name)
+  IPC_STRUCT_MEMBER(ExtensionMsg_TabConnectionInfo, tab_source)
+  IPC_STRUCT_MEMBER(ExtensionMsg_ExternalConnectionInfo,
+                    external_connection_info)
+IPC_STRUCT_END()
+
 // Singly-included section for custom IPC traits.
 #ifndef INTERNAL_EXTENSIONS_COMMON_EXTENSION_MESSAGES_H_
 #define INTERNAL_EXTENSIONS_COMMON_EXTENSION_MESSAGES_H_
@@ -283,14 +257,11 @@ IPC_MESSAGE_ROUTED2(ExtensionMsg_ValidateMessagePort,
                     extensions::PortId /* port_id */)
 
 // Dispatch the Port.onConnect event for message channels.
-IPC_MESSAGE_ROUTED5(ExtensionMsg_DispatchOnConnect,
+IPC_MESSAGE_ROUTED2(ExtensionMsg_DispatchOnConnect,
                     // For main thread, this is kMainThreadId.
                     // TODO(lazyboy): Can this be absl::optional<int> instead?
                     int /* worker_thread_id */,
-                    extensions::PortId /* target_port_id */,
-                    std::string /* channel_name */,
-                    ExtensionMsg_TabConnectionInfo /* source */,
-                    ExtensionMsg_ExternalConnectionInfo)
+                    ExtensionMsg_OnConnectData /* connect_data */)
 
 // Deliver a message sent with ExtensionHostMsg_PostMessage.
 IPC_MESSAGE_ROUTED3(ExtensionMsg_DeliverMessage,
@@ -314,9 +285,10 @@ IPC_MESSAGE_ROUTED1(ExtensionHostMsg_EventAck, int /* message_id */)
 // Open a channel to all listening contexts owned by the extension with
 // the given ID. This responds asynchronously with ExtensionMsg_AssignPortId.
 // If an error occurred, the opener will be notified asynchronously.
-IPC_MESSAGE_CONTROL4(ExtensionHostMsg_OpenChannelToExtension,
+IPC_MESSAGE_CONTROL5(ExtensionHostMsg_OpenChannelToExtension,
                      extensions::PortContext /* source_context */,
                      ExtensionMsg_ExternalConnectionInfo,
+                     extensions::ChannelType /* channel_type */,
                      std::string /* channel_name */,
                      extensions::PortId /* port_id */)
 
@@ -327,9 +299,10 @@ IPC_MESSAGE_CONTROL3(ExtensionHostMsg_OpenChannelToNativeApp,
 
 // Get a port handle to the given tab.  The handle can be used for sending
 // messages to the extension.
-IPC_MESSAGE_CONTROL4(ExtensionHostMsg_OpenChannelToTab,
+IPC_MESSAGE_CONTROL5(ExtensionHostMsg_OpenChannelToTab,
                      extensions::PortContext /* source_context */,
                      ExtensionMsg_TabTargetConnectionInfo,
+                     extensions::ChannelType /* channel_type */,
                      std::string /* channel_name */,
                      extensions::PortId /* port_id */)
 
@@ -371,10 +344,6 @@ IPC_MESSAGE_ROUTED2(ExtensionHostMsg_ContentScriptsExecuting,
                     ExecutingScriptsMap,
                     GURL /* url of the _topmost_ frame */)
 
-// Optional Ack message sent to the browser to notify that the response to a
-// function has been processed.
-IPC_MESSAGE_ROUTED1(ExtensionHostMsg_ResponseAck, int /* request_id */)
-
 // Informs the browser to increment the keepalive count for the lazy background
 // page, keeping it alive.
 IPC_MESSAGE_ROUTED0(ExtensionHostMsg_IncrementLazyKeepaliveCount)
@@ -415,11 +384,6 @@ IPC_MESSAGE_CONTROL2(ExtensionHostMsg_WakeEventPage,
 // Messages related to Extension Service Worker.
 #undef IPC_MESSAGE_START
 #define IPC_MESSAGE_START ExtensionWorkerMsgStart
-// A service worker thread sends this message when an extension service worker
-// starts an API request. The browser will always respond with a
-// ExtensionMsg_ResponseWorker.
-IPC_MESSAGE_CONTROL1(ExtensionHostMsg_RequestWorker,
-                     extensions::mojom::RequestParams)
 
 // The browser sends this message in response to all service worker extension
 // api calls.
@@ -437,48 +401,5 @@ IPC_MESSAGE_CONTROL4(ExtensionHostMsg_EventAckWorker,
                      int64_t /* service_worker_version_id */,
                      int /* worker_thread_id */,
                      int /* event_id */)
-
-// Optional Ack message sent to the browser to notify that the response to a
-// function has been processed.
-IPC_MESSAGE_CONTROL2(ExtensionHostMsg_WorkerResponseAck,
-                     int /* request_id */,
-                     int64_t /* service_worker_version_id */)
-
-IPC_STRUCT_BEGIN(ExtensionMsg_AccessibilityEventBundleParams)
-  // ID of the accessibility tree that this event applies to.
-  IPC_STRUCT_MEMBER(ui::AXTreeID, tree_id)
-
-  // Zero or more updates to the accessibility tree to apply first.
-  IPC_STRUCT_MEMBER(std::vector<ui::AXTreeUpdate>, updates)
-
-  // Zero or more events to fire after the tree updates have been applied.
-  IPC_STRUCT_MEMBER(std::vector<ui::AXEvent>, events)
-
-  // The mouse location in screen coordinates.
-  IPC_STRUCT_MEMBER(gfx::Point, mouse_location)
-IPC_STRUCT_END()
-
-IPC_STRUCT_BEGIN(ExtensionMsg_AccessibilityLocationChangeParams)
-  // ID of the accessibility tree that this event applies to.
-  IPC_STRUCT_MEMBER(ui::AXTreeID, tree_id)
-
-  // ID of the object whose location is changing.
-  IPC_STRUCT_MEMBER(int, id)
-
-  // The object's new location info.
-  IPC_STRUCT_MEMBER(ui::AXRelativeBounds, new_location)
-IPC_STRUCT_END()
-
-// Forward an accessibility message to an extension process where an
-// extension is using the automation API to listen for accessibility events.
-IPC_MESSAGE_CONTROL2(ExtensionMsg_AccessibilityEventBundle,
-                     ExtensionMsg_AccessibilityEventBundleParams /* events */,
-                     bool /* is_active_profile */)
-
-// Forward an accessibility location change message to an extension process
-// where an extension is using the automation API to listen for
-// accessibility events.
-IPC_MESSAGE_CONTROL1(ExtensionMsg_AccessibilityLocationChange,
-                     ExtensionMsg_AccessibilityLocationChangeParams)
 
 #endif  // EXTENSIONS_COMMON_EXTENSION_MESSAGES_H_

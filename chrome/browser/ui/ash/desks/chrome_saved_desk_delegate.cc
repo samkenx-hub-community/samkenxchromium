@@ -11,6 +11,7 @@
 #include "ash/strings/grit/ash_strings.h"
 #include "base/check.h"
 #include "base/functional/bind.h"
+#include "base/trace_event/trace_event.h"
 #include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
@@ -24,6 +25,7 @@
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/ui/ash/desks/admin_template_service_factory.h"
 #include "chrome/browser/ui/ash/desks/chrome_desks_util.h"
 #include "chrome/browser/ui/ash/desks/desks_client.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -32,10 +34,12 @@
 #include "components/app_constants/constants.h"
 #include "components/app_restore/app_launch_info.h"
 #include "components/app_restore/app_restore_data.h"
+#include "components/app_restore/app_restore_utils.h"
 #include "components/app_restore/full_restore_save_handler.h"
 #include "components/app_restore/full_restore_utils.h"
 #include "components/app_restore/restore_data.h"
 #include "components/app_restore/window_properties.h"
+#include "components/desks_storage/core/admin_template_service.h"
 #include "components/favicon/core/favicon_service.h"
 #include "components/services/app_service/public/cpp/app_registry_cache.h"
 #include "components/services/app_service/public/cpp/app_types.h"
@@ -49,13 +53,10 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/image/image_skia.h"
+#include "ui/wm/core/window_properties.h"
 #include "url/gurl.h"
 
 namespace {
-
-// Name for app not available toast.
-constexpr char kAppNotAvailableTemplateToastName[] =
-    "AppNotAvailableTemplateToast";
 
 // Returns the TabStripModel that associates with `window` if the given `window`
 // contains a browser frame, otherwise returns nullptr.
@@ -97,6 +98,26 @@ bool IsAppAvailable(const std::string& app_id,
   return app != nullptr;
 }
 
+// Updates `out_app_names` with titles of browser apps that aren't available
+// on this device.  This is confusingly determined by resolving the `app_name`
+// field to an app ID and running said ID through `IsAppAvailable`.  If the
+// app is unavailable we append the app_title to `out_app_names`.
+void GetUnavailableBrowserAppNames(
+    const app_restore::RestoreData::LaunchList& launch_list,
+    apps::AppServiceProxy* app_service_proxy,
+    std::vector<std::u16string>& out_app_names) {
+  for (const auto& [id, restore_data] : launch_list) {
+    if (restore_data->app_type_browser.value_or(false) &&
+        restore_data->app_name.has_value()) {
+      std::string app_id =
+          app_restore::GetAppIdFromAppName(restore_data->app_name.value());
+      if (!IsAppAvailable(app_id, app_service_proxy)) {
+        out_app_names.push_back(restore_data->title.value_or(u""));
+      }
+    }
+  }
+}
+
 // Returns a vector of human readable unavailable app names from
 // `desk_template`.
 std::vector<std::u16string> GetUnavailableAppNames(
@@ -114,6 +135,13 @@ std::vector<std::u16string> GetUnavailableAppNames(
   for (const auto& [app_id, launch_list] : launch_lists) {
     if (launch_list.empty()) {
       continue;
+    }
+
+    // If the app ID is a browser then we need to iterate through its windows
+    // to catch uninstalled PWAs.
+    if (app_id == app_constants::kChromeAppId ||
+        app_id == app_constants::kLacrosAppId) {
+      GetUnavailableBrowserAppNames(launch_list, app_service_proxy, app_names);
     }
 
     if (!IsAppAvailable(app_id, app_service_proxy)) {
@@ -151,9 +179,10 @@ void ShowUnavailableAppToast(
       break;
   }
 
-  ash::ToastData toast_data = {/*id=*/kAppNotAvailableTemplateToastName,
-                               ash::ToastCatalogName::kAppNotAvailable,
-                               /*text=*/toast_string};
+  ash::ToastData toast_data = {
+      /*id=*/chrome_desks_util::kAppNotAvailableTemplateToastName,
+      ash::ToastCatalogName::kAppNotAvailable,
+      /*text=*/toast_string};
   ash::ToastManager::Get()->Show(std::move(toast_data));
 }
 
@@ -164,6 +193,7 @@ void ShowUnavailableAppToast(
 void ImageResultToImageSkia(
     base::OnceCallback<void(const gfx::ImageSkia&)> callback,
     const favicon_base::FaviconRawBitmapResult& result) {
+  TRACE_EVENT0("ui", "chrome_saved_desk_delegate::ImageResultToImageSkia");
   if (!result.is_valid()) {
     std::move(callback).Run(gfx::ImageSkia());
     return;
@@ -181,6 +211,7 @@ void ImageResultToImageSkia(
 base::OnceCallback<void(apps::IconValuePtr icon_value)>
 AppIconResultToImageSkia(
     base::OnceCallback<void(const gfx::ImageSkia&)> callback) {
+  TRACE_EVENT0("ui", "chrome_saved_desk_delegate::AppIconResultToImageSkia");
   return base::BindOnce(
       [](base::OnceCallback<void(const gfx::ImageSkia&)> image_skia_callback,
          apps::IconValuePtr icon_value) {
@@ -201,6 +232,7 @@ ChromeSavedDeskDelegate::~ChromeSavedDeskDelegate() = default;
 void ChromeSavedDeskDelegate::GetAppLaunchDataForSavedDesk(
     aura::Window* window,
     GetAppLaunchDataCallback callback) const {
+  TRACE_EVENT0("ui", "ChromeSavedDeskDelegate::GetAppLaunchDataForSavedDesk");
   DCHECK(callback);
 
   const user_manager::User* active_user =
@@ -260,16 +292,10 @@ void ChromeSavedDeskDelegate::GetAppLaunchDataForSavedDesk(
     app_launch_info->container = app_restore_data->container;
     app_launch_info->disposition = app_restore_data->disposition;
     app_launch_info->file_paths = app_restore_data->file_paths;
+    app_launch_info->override_url = app_restore_data->override_url;
     if (app_restore_data->intent) {
       app_launch_info->intent = app_restore_data->intent->Clone();
     }
-  }
-
-  // Use app id from lacros if available. This will only be set for lacros
-  // app windows.
-  if (auto app_name = DesksClient::Get()->GetAppIdForLacrosWindow(window)) {
-    app_launch_info->app_name = *app_name;
-    app_launch_info->app_type_browser = true;
   }
 
   if (app_id != app_constants::kChromeAppId &&
@@ -324,16 +350,25 @@ desks_storage::DeskModel* ChromeSavedDeskDelegate::GetDeskModel() {
   return DesksClient::Get()->GetDeskModel();
 }
 
-bool ChromeSavedDeskDelegate::IsIncognitoWindow(aura::Window* window) const {
+desks_storage::AdminTemplateService*
+ChromeSavedDeskDelegate::GetAdminTemplateService() {
+  return ash::AdminTemplateServiceFactory::GetForProfile(
+      ProfileManager::GetPrimaryUserProfile());
+}
+
+bool ChromeSavedDeskDelegate::IsWindowPersistable(aura::Window* window) const {
   BrowserView* browser_view =
       BrowserView::GetBrowserViewForNativeWindow(window);
-  return browser_view && browser_view->GetIncognito();
+  return !(browser_view && browser_view->GetIncognito()) &&
+         window->GetProperty(wm::kPersistableKey);
 }
 
 absl::optional<gfx::ImageSkia>
 ChromeSavedDeskDelegate::MaybeRetrieveIconForSpecialIdentifier(
     const std::string& identifier,
     const ui::ColorProvider* color_provider) const {
+  TRACE_EVENT0(
+      "ui", "ChromeSavedDeskDelegate::MaybeRetrieveIconForSpecialIdentifier");
   if (identifier == chrome::kChromeUINewTabURL) {
     ui::ResourceBundle& rb = ui::ResourceBundle::GetSharedInstance();
     return absl::make_optional<gfx::ImageSkia>(apps::CreateStandardIconImage(
@@ -355,8 +390,9 @@ void ChromeSavedDeskDelegate::GetFaviconForUrl(
     const std::string& page_url,
     base::OnceCallback<void(const gfx::ImageSkia&)> callback,
     base::CancelableTaskTracker* tracker) const {
+  TRACE_EVENT0("ui", "ChromeSavedDeskDelegate::GetFaviconForUrl");
   // Get the icons from lacros favicon service.
-  if (crosapi::browser_util::IsLacrosPrimaryBrowser()) {
+  if (crosapi::browser_util::IsLacrosEnabled()) {
     crosapi::CrosapiManager::Get()
         ->crosapi_ash()
         ->desk_template_ash()
@@ -379,6 +415,7 @@ void ChromeSavedDeskDelegate::GetIconForAppId(
     const std::string& app_id,
     int desired_icon_size,
     base::OnceCallback<void(const gfx::ImageSkia&)> callback) const {
+  TRACE_EVENT0("ui", "ChromeSavedDeskDelegate::GetIconForAppId");
   auto* app_service_proxy = apps::AppServiceProxyFactory::GetForProfile(
       ProfileManager::GetActiveUserProfile());
   if (!app_service_proxy) {
@@ -427,11 +464,12 @@ bool ChromeSavedDeskDelegate::IsWindowSupportedForSavedDesk(
   }
 
   // Exclude incognito browser window.
-  return !IsIncognitoWindow(window);
+  return IsWindowPersistable(window);
 }
 
 std::string ChromeSavedDeskDelegate::GetAppShortName(
     const std::string& app_id) {
+  TRACE_EVENT0("ui", "ChromeSavedDeskDelegate::GetAppShortName");
   std::string name;
   auto* app_service_proxy = apps::AppServiceProxyFactory::GetForProfile(
       ProfileManager::GetActiveUserProfile());
@@ -447,15 +485,21 @@ void ChromeSavedDeskDelegate::OnLacrosChromeInfoReturned(
     GetAppLaunchDataCallback callback,
     std::unique_ptr<app_restore::AppLaunchInfo> app_launch_info,
     crosapi::mojom::DeskTemplateStatePtr state) {
+  TRACE_EVENT0("ui", "ChromeSavedDeskDelegate::OnLacrosChromeInfoReturned");
   if (state.is_null()) {
     std::move(callback).Run({});
     return;
   }
 
-  app_launch_info->tab_group_infos = state->groups;
+  app_launch_info->tab_group_infos =
+      state->groups.value_or(std::vector<tab_groups::TabGroupInfo>());
   app_launch_info->urls = state->urls;
   app_launch_info->active_tab_index = state->active_index;
   app_launch_info->first_non_pinned_tab_index = state->first_non_pinned_index;
+  if (state->browser_app_name.has_value()) {
+    app_launch_info->app_name = state->browser_app_name.value();
+    app_launch_info->app_type_browser = true;
+  }
 
   std::move(callback).Run(std::move(app_launch_info));
 }
@@ -464,6 +508,7 @@ void ChromeSavedDeskDelegate::GetLacrosChromeInfo(
     GetAppLaunchDataCallback callback,
     const std::string& window_unique_id,
     std::unique_ptr<app_restore::AppLaunchInfo> app_launch_info) {
+  TRACE_EVENT0("ui", "ChromeSavedDeskDelegate::GetLacrosChromeInfo");
   crosapi::BrowserManager* browser_manager = crosapi::BrowserManager::Get();
   if (!browser_manager || !browser_manager->IsRunning()) {
     LOG(WARNING)

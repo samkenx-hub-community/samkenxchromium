@@ -5,41 +5,47 @@
 #ifndef ASH_SYSTEM_TRAY_TRAY_EVENT_FILTER_H_
 #define ASH_SYSTEM_TRAY_TRAY_EVENT_FILTER_H_
 
-#include <set>
-
 #include "ash/ash_export.h"
-#include "ui/events/event_handler.h"
+#include "ash/bubble/bubble_event_filter.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 
 namespace ui {
 class LocatedEvent;
 }
 
-namespace ash {
-class TrayBubbleBase;
+namespace views {
+class Widget;
+}  // namespace views
 
-// Handles events for a tray bubble, e.g. to close the system tray bubble when
-// the user clicks outside it.
-class ASH_EXPORT TrayEventFilter : public ui::EventHandler {
+namespace ash {
+
+class TrayBackgroundView;
+class TrayBubbleView;
+
+// Handles events for tray bubbles, closing the system tray bubble when the user
+// clicks outside of it.
+class ASH_EXPORT TrayEventFilter : public BubbleEventFilter {
  public:
-  TrayEventFilter();
+  TrayEventFilter(views::Widget* bubble_widget,
+                  TrayBubbleView* bubble_view,
+                  TrayBackgroundView* tray_button);
 
   TrayEventFilter(const TrayEventFilter&) = delete;
   TrayEventFilter& operator=(const TrayEventFilter&) = delete;
 
   ~TrayEventFilter() override;
 
-  void AddBubble(TrayBubbleBase* bubble);
-  void RemoveBubble(TrayBubbleBase* bubble);
-
-  // ui::EventHandler:
-  void OnMouseEvent(ui::MouseEvent* event) override;
-  void OnTouchEvent(ui::TouchEvent* event) override;
+  // BubbleEventFilter:
   void OnGestureEvent(ui::GestureEvent* event) override;
+  bool ShouldRunOnClickOutsideCallback(const ui::LocatedEvent& event) override;
 
  private:
-  void ProcessPressedEvent(const ui::LocatedEvent& event);
+  const raw_ptr<views::Widget> bubble_widget_;
+  const raw_ptr<TrayBubbleView> bubble_view_;
+  const raw_ptr<TrayBackgroundView> tray_button_;
 
-  std::set<TrayBubbleBase*> bubbles_;
+  base::WeakPtrFactory<TrayEventFilter> weak_factory_{this};
 };
 
 }  // namespace ash

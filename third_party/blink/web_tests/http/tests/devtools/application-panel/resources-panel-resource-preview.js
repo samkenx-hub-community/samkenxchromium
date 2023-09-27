@@ -2,13 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ApplicationTestRunner} from 'application_test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+import * as Common from 'devtools/core/common/common.js';
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
   TestRunner.addResult(`Tests Application Panel preview for resources of different types.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('application_test_runner');
+  await TestRunner.loadLegacyModule('console');
     // Note: every test that uses a storage API must manually clean-up state from previous tests.
   await ApplicationTestRunner.resetState();
 
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.loadLegacyModule('source_frame');
   await TestRunner.showPanel('resources');
   await TestRunner.loadHTML(`
@@ -37,7 +45,7 @@
     TestRunner.addResult(label);
     dump(view.sidebar.sidebarTree.rootElement(), '');
     var visibleView = view.visibleView;
-    if (visibleView instanceof UI.SearchableView)
+    if (visibleView instanceof UIModule.SearchableView.SearchableView)
       visibleView = visibleView.children()[0];
     var typeLabel = 'unknown';
     for (var type of types) {
@@ -50,8 +58,8 @@
   }
 
   async function revealResourceWithDisplayName(name) {
-    var target = SDK.targetManager.primaryPageTarget();
-    var model = target.model(SDK.ResourceTreeModel);
+    var target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    var model = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
     var resource = null;
     for (var r of model.mainFrame.resources()) {
       if (r.displayName !== name)

@@ -25,10 +25,6 @@
 #import "ios/testing/earl_grey/app_launch_manager.h"
 #import "ios/testing/earl_grey/earl_grey_test.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 std::unique_ptr<ScopedAllowCrashOnStartup> gAllowCrashOnStartup;
 }  // namespace
@@ -132,12 +128,6 @@ std::unique_ptr<ScopedAllowCrashOnStartup> gAllowCrashOnStartup;
 // Corresponds to VariationsSafeModeEndToEndBrowserTest.ExtendedSafeSeedEndToEnd
 // in variations_safe_mode_browsertest.cc.
 - (void)testVariationsSafeModeEndToEnd {
-#if !TARGET_OS_SIMULATOR
-  if ([ChromeEarlGrey isIPadIdiom]) {
-    // TODO(crbug.com/1297123): Disabled on iPad device
-    EARL_GREY_TEST_SKIPPED(@"Test is failing on iPad devices");
-  }
-#endif
   AppLaunchConfiguration config = [self appConfigurationForTestCase];
 
   // Set the safe seed value. Validate that the seed is set but not active.

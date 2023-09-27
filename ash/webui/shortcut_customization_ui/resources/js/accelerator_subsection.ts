@@ -11,7 +11,7 @@ import {DomRepeat, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer
 import {AcceleratorLookupManager} from './accelerator_lookup_manager.js';
 import {getTemplate} from './accelerator_subsection.html.js';
 import {AcceleratorCategory, AcceleratorInfo, AcceleratorState, AcceleratorSubcategory, AcceleratorType, LayoutInfo} from './shortcut_types.js';
-import {getSubcategoryNameStringId} from './shortcut_utils.js';
+import {compareAcceleratorInfos, getSubcategoryNameStringId, isCustomizationAllowed} from './shortcut_utils.js';
 
 /**
  * This interface is used to hold all the data needed by an
@@ -105,18 +105,26 @@ export class AcceleratorSubsectionElement extends
     // subsection's accelerators are kept distinct from each other.
     const tempAccelRowData: AcceleratorRowData[] = [];
     layoutInfos!.forEach((layoutInfo) => {
-      if (this.lookupManager.isStandardAccelerator(
-              layoutInfo.source, layoutInfo.action)) {
-        const acceleratorInfos = this.lookupManager.getStandardAcceleratorInfos(
-            layoutInfo.source, layoutInfo.action);
-        acceleratorInfos.filter((accel) => {
-          // Hide accelerators that are default and disabled.
-          // TODO(michaelcheco): Confirm that this is the intended
-          // behavior for accelerators that are default and disabled.
-          return !(
-              accel.type === AcceleratorType.kDefault &&
-              accel.state === AcceleratorState.kDisabledByUser);
-        });
+      if (this.lookupManager.isStandardAccelerator(layoutInfo.style)) {
+        const acceleratorInfos =
+            this.lookupManager
+                .getStandardAcceleratorInfos(
+                    layoutInfo.source, layoutInfo.action)
+                .filter((accel) => {
+                  // Hide accelerators that are default and disabled because the
+                  // necessary keys aren't available on the keyboard.
+                  return !(
+                      accel.type === AcceleratorType.kDefault &&
+                      (accel.state === AcceleratorState.kDisabledByUser ||
+                       accel.state ===
+                           AcceleratorState.kDisabledByUnavailableKeys));
+                });
+        // Do not hide empty accelerator rows if customization is enabled.
+        if (!isCustomizationAllowed()) {
+          if (acceleratorInfos.length === 0) {
+            return;
+          }
+        }
         const accelRowData: AcceleratorRowData = {
           layoutInfo,
           acceleratorInfos,
@@ -133,8 +141,23 @@ export class AcceleratorSubsectionElement extends
     this.accelRowDataArray = tempAccelRowData;
   }
 
+  // Sorts the accelerators so that they are displayed based off of a heuristic.
+  protected getSortedAccelerators(accelerators: AcceleratorInfo[]):
+      AcceleratorInfo[] {
+    return accelerators.sort(compareAcceleratorInfos);
+  }
+
   static get template(): HTMLTemplateElement {
     return getTemplate();
+  }
+
+  // Show lock icon next to subcategory if customization is enabled and the
+  // category is locked.
+  private shouldShowLockIcon(): boolean {
+    if (!isCustomizationAllowed()) {
+      return false;
+    }
+    return this.lookupManager.isCategoryLocked(this.category);
   }
 }
 

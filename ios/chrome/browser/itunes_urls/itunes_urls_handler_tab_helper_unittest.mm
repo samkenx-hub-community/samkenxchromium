@@ -7,7 +7,7 @@
 #import <Foundation/Foundation.h>
 
 #import "base/test/metrics/histogram_tester.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/shared/public/commands/web_content_commands.h"
 #import "ios/chrome/test/fakes/fake_web_content_handler.h"
 #import "ios/web/public/navigation/web_state_policy_decider.h"
@@ -15,10 +15,6 @@
 #import "ios/web/public/test/web_task_environment.h"
 #import "testing/gtest_mac.h"
 #import "testing/platform_test.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 const char kITunesURLsHandlingResultHistogram[] =

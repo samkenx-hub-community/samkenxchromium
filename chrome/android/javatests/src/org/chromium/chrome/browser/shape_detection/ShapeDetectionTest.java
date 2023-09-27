@@ -4,8 +4,7 @@
 
 package org.chromium.chrome.browser.shape_detection;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
 
 import org.junit.Assert;
@@ -55,20 +54,14 @@ public class ShapeDetectionTest {
     @Restriction(ChromeRestriction.RESTRICTION_TYPE_GOOGLE_PLAY_SERVICES)
     @DisabledTest(message = "https://crbug.com/1139470")
     public void testBarcodeDetection() throws TimeoutException {
-        EmbeddedTestServer testServer =
-                EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-        try {
-            Tab tab = mActivityTestRule.getActivity().getActivityTab();
-            TabTitleObserver titleObserver =
-                    new TabTitleObserver(tab, BARCODE_TEST_EXPECTED_TAB_TITLE);
-            mActivityTestRule.loadUrl(
-                    testServer.getURL("/chrome/test/data/android/barcode_detection.html"));
-            titleObserver.waitForTitleUpdate(10);
-
-            Assert.assertEquals(BARCODE_TEST_EXPECTED_TAB_TITLE, tab.getTitle());
-        } finally {
-            testServer.stopAndDestroyServer();
-        }
+        EmbeddedTestServer testServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
+        Tab tab = mActivityTestRule.getActivity().getActivityTab();
+        TabTitleObserver titleObserver = new TabTitleObserver(tab, BARCODE_TEST_EXPECTED_TAB_TITLE);
+        mActivityTestRule.loadUrl(
+                testServer.getURL("/chrome/test/data/android/barcode_detection.html"));
+        titleObserver.waitForTitleUpdate(10);
+        Assert.assertEquals(BARCODE_TEST_EXPECTED_TAB_TITLE, tab.getTitle());
     }
 
     /**
@@ -80,20 +73,14 @@ public class ShapeDetectionTest {
     @LargeTest
     @Restriction(ChromeRestriction.RESTRICTION_TYPE_GOOGLE_PLAY_SERVICES)
     public void testTextDetection() throws TimeoutException {
-        EmbeddedTestServer testServer =
-                EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-        try {
-            Tab tab = mActivityTestRule.getActivity().getActivityTab();
-            TabTitleObserver titleObserver =
-                    new TabTitleObserver(tab, TEXT_TEST_EXPECTED_TAB_TITLE);
-            mActivityTestRule.loadUrl(
-                    testServer.getURL("/chrome/test/data/android/text_detection.html"));
-            titleObserver.waitForTitleUpdate(10);
-            Assert.assertEquals(
-                    TEXT_TEST_EXPECTED_TAB_TITLE, ChromeTabUtils.getTitleOnUiThread(tab));
-        } finally {
-            testServer.stopAndDestroyServer();
-        }
+        EmbeddedTestServer testServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
+        Tab tab = mActivityTestRule.getActivity().getActivityTab();
+        TabTitleObserver titleObserver = new TabTitleObserver(tab, TEXT_TEST_EXPECTED_TAB_TITLE);
+        mActivityTestRule.loadUrl(
+                testServer.getURL("/chrome/test/data/android/text_detection.html"));
+        titleObserver.waitForTitleUpdate(10);
+        Assert.assertEquals(TEXT_TEST_EXPECTED_TAB_TITLE, ChromeTabUtils.getTitleOnUiThread(tab));
     }
 
     /**

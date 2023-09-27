@@ -11,6 +11,7 @@
 #include <string>
 
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "media/base/cdm_callback_promise.h"
 #include "media/base/win/mf_helpers.h"
@@ -101,7 +102,7 @@ class MediaFoundationSimpleCdmPromise : public SimpleCdmPromise {
   }
 
  private:
-  PromiseState* promise_state_ = nullptr;
+  raw_ptr<PromiseState> promise_state_ = nullptr;
 };
 
 class MediaFoundationCdmSessionPromise : public NewSessionCdmPromise {
@@ -144,7 +145,7 @@ class MediaFoundationCdmSessionPromise : public NewSessionCdmPromise {
   }
 
  private:
-  PromiseState* promise_state_ = nullptr;
+  raw_ptr<PromiseState> promise_state_ = nullptr;
   SessionIdCB session_created_cb_;
 };
 
@@ -262,12 +263,21 @@ STDMETHODIMP MediaFoundationClearKeySession::GetKeyStatuses(
   }
   ZeroMemory(key_status_array, key_status_count * sizeof(MFMediaKeyStatus));
 
+  // Special key ID to crash the CDM. The key ID must match the key ID used
+  // for crash testing in media/test/data/media_foundation_fallback.html
+  const std::vector<uint8_t> kCrashKeyId =
+      ByteArrayFromGUID(GetGUIDFromString("crash-crashcrash"));
+
   for (UINT i = 0; i < key_status_count; ++i) {
     key_status_array[i].cbKeyId = keys_info_[i]->key_id.size();
     key_status_array[i].pbKeyId = static_cast<BYTE*>(
-        CoTaskMemAlloc(sizeof(keys_info_[i]->key_id.size())));
+        CoTaskMemAlloc(keys_info_[i]->key_id.size() * sizeof(uint8_t)));
     if (key_status_array[i].pbKeyId == nullptr) {
       return E_OUTOFMEMORY;
+    }
+
+    if (keys_info_[i]->key_id == kCrashKeyId) {
+      CHECK(false) << "Crash on special crash key ID.";
     }
 
     key_status_array[i].eMediaKeyStatus = ToMFKeyStatus(keys_info_[i]->status);
@@ -314,6 +324,9 @@ STDMETHODIMP MediaFoundationClearKeySession::GenerateRequest(
   } else if (wcscmp(init_data_type, L"webm") == 0) {
     eme_init_data_type = EmeInitDataType::WEBM;
     DVLOG_FUNC(3) << "eme_init_data_type=WEBM";
+  } else if (wcscmp(init_data_type, L"keyids") == 0) {
+    eme_init_data_type = EmeInitDataType::KEYIDS;
+    DVLOG_FUNC(3) << "eme_init_data_type=KEYIDS";
   } else {
     DLOG(ERROR) << __func__
                 << ": Unsupported init_data_type=" << init_data_type;

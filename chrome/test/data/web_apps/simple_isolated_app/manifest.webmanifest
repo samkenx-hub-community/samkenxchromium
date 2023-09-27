@@ -1,12 +1,16 @@
 {
   "name": "Simple Isolated App",
+  "version": "1.0.0",
   "id": "/",
   "scope": "/",
   "start_url": "/index.html",
   "display": "standalone",
   "permissions_policy": {
-    "usb": [ "*" ],
-    "direct-sockets": [ "*" ]
+    "clipboard-read": [ "*" ],
+    "clipboard-write": [ "*" ],
+    "cross-origin-isolated": [ "*" ],
+    "direct-sockets": [ "*" ],
+    "usb": [ "*" ]
   },
   "icons": [
     {

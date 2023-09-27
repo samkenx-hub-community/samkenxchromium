@@ -10,10 +10,10 @@
 #include "chrome/browser/sync/test/integration/sync_test.h"
 #include "chrome/browser/sync/test/integration/updated_progress_marker_checker.h"
 #include "chrome/common/webui_url_constants.h"
-#include "components/sync/driver/glue/sync_transport_data_prefs.h"
-#include "components/sync/driver/sync_service_impl.h"
 #include "components/sync/engine/polling_constants.h"
 #include "components/sync/protocol/client_commands.pb.h"
+#include "components/sync/service/glue/sync_transport_data_prefs.h"
+#include "components/sync/service/sync_service_impl.h"
 #include "content/public/test/browser_test.h"
 #include "net/dns/mock_host_resolver.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -99,8 +99,6 @@ IN_PROC_BROWSER_TEST_F(SingleClientPollingSyncTest,
 // It first starts up a client, executes a sync cycle and stops it. After a
 // simulated pause, the client gets started up again and we expect a sync cycle
 // to happen (which would be caused by polling).
-// Note, that there's a more realistic (and more complex) test for this in
-// two_client_polling_sync_test.cc too.
 IN_PROC_BROWSER_TEST_F(SingleClientPollingSyncTest,
                        PRE_ShouldPollWhenIntervalExpiredAcrossRestarts) {
   base::Time start = base::Time::Now();

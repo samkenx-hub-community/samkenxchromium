@@ -19,6 +19,7 @@
 #import "base/task/single_thread_task_runner.h"
 #import "base/task/thread_pool.h"
 #import "base/time/default_tick_clock.h"
+#import "build/blink_buildflags.h"
 #import "components/content_settings/core/browser/cookie_settings.h"
 #import "components/content_settings/core/common/content_settings_pattern.h"
 #import "components/crash/core/common/crash_key.h"
@@ -38,6 +39,7 @@
 #import "components/open_from_clipboard/clipboard_recent_content.h"
 #import "components/prefs/json_pref_store.h"
 #import "components/prefs/pref_service.h"
+#import "components/previous_session_info/previous_session_info.h"
 #import "components/signin/public/identity_manager/tribool.h"
 #import "components/translate/core/browser/translate_download_manager.h"
 #import "components/translate/core/browser/translate_metrics_logger_impl.h"
@@ -48,21 +50,22 @@
 #import "components/variations/variations_crash_keys.h"
 #import "components/variations/variations_ids_provider.h"
 #import "components/variations/variations_switches.h"
-#import "ios/chrome/browser/application_context/application_context_impl.h"
-#import "ios/chrome/browser/browser_state/browser_state_keyed_service_factories.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state_manager.h"
+#import "ios/chrome/browser/application_context/model/application_context_impl.h"
+#import "ios/chrome/browser/browser_state/model/browser_state_keyed_service_factories.h"
 #import "ios/chrome/browser/crash_report/crash_helper.h"
 #import "ios/chrome/browser/first_run/first_run.h"
 #import "ios/chrome/browser/flags/about_flags.h"
 #import "ios/chrome/browser/metrics/ios_chrome_metrics_service_accessor.h"
 #import "ios/chrome/browser/metrics/ios_expired_histograms_array.h"
 #import "ios/chrome/browser/open_from_clipboard/create_clipboard_recent_content.h"
-#import "ios/chrome/browser/paths/paths.h"
+#import "ios/chrome/browser/optimization_guide/optimization_guide_service_factory.h"
 #import "ios/chrome/browser/policy/browser_policy_connector_ios.h"
-#import "ios/chrome/browser/prefs/pref_names.h"
 #import "ios/chrome/browser/promos_manager/promos_manager.h"
 #import "ios/chrome/browser/safe_browsing/safe_browsing_metrics_collector_factory.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state_manager.h"
+#import "ios/chrome/browser/shared/model/paths/paths.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/signin/signin_util.h"
 #import "ios/chrome/browser/translate/chrome_ios_translate_client.h"
 #import "ios/chrome/browser/translate/translate_service_ios.h"
@@ -76,6 +79,7 @@
 #import "net/http/http_stream_factory.h"
 #import "net/url_request/url_request.h"
 #import "rlz/buildflags/buildflags.h"
+#import "ui/base/l10n/l10n_util.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 #import "ui/base/resource/resource_bundle.h"
 
@@ -86,10 +90,6 @@
 
 #if DCHECK_IS_ON()
 #import "ui/display/screen_base.h"
-#endif
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
 #endif
 
 namespace {
@@ -133,6 +133,10 @@ void IOSChromeMainParts::PreCreateMainMessageLoop() {
   const std::string loaded_locale =
       ui::ResourceBundle::InitSharedInstanceWithLocale(
           std::string(), nullptr, ui::ResourceBundle::LOAD_COMMON_RESOURCES);
+  std::string app_locale = l10n_util::GetApplicationLocale(std::string());
+  [[PreviousSessionInfo sharedInstance]
+      setReportParameterValue:base::SysUTF8ToNSString(app_locale)
+                       forKey:@"icu_locale_input"];
   CHECK(!loaded_locale.empty());
 
   base::FilePath resources_pack_path;
@@ -239,17 +243,22 @@ void IOSChromeMainParts::PreCreateThreads() {
   // On iOS we know that ProfilingClient is the only user of
   // PoissonAllocationSampler, there are no others. Therefore, make
   // memory_system include it dynamically.
+  // We pass an empty string as process type to the dispatcher to keep
+  // consistency with other main delegates where the browser process is denoted
+  // this way.
   memory_system::Initializer()
       .SetProfilingClientParameters(
           channel, metrics::CallStackProfileParams::Process::kBrowser)
       .SetDispatcherParameters(memory_system::DispatcherParameters::
-                                   PoissonAllocationSamplerInclusion::kDynamic)
+                                   PoissonAllocationSamplerInclusion::kDynamic,
+                               memory_system::DispatcherParameters::
+                                   AllocationTraceRecorderInclusion::kIgnore,
+                               "")
       .Initialize(memory_system_);
 
   variations::InitCrashKeys();
 
-  metrics::EnableExpiryChecker(::kExpiredHistogramsHashes,
-                               ::kNumExpiredHistograms);
+  metrics::EnableExpiryChecker(::kExpiredHistogramsHashes);
 
   // TODO(crbug.com/1164533): Remove code below some time after February 2021.
   NSString* const kRemoveProtectionFromPrefFileKey =
@@ -267,6 +276,10 @@ void IOSChromeMainParts::PreCreateThreads() {
   application_context_->PreCreateThreads();
 }
 
+void IOSChromeMainParts::PostCreateThreads() {
+  application_context_->PostCreateThreads();
+}
+
 void IOSChromeMainParts::PreMainMessageLoopRun() {
   application_context_->PreMainMessageLoopRun();
 
@@ -281,6 +294,9 @@ void IOSChromeMainParts::PreMainMessageLoopRun() {
 
   // Ensure ClipboadRecentContentIOS is created.
   ClipboardRecentContent::SetInstance(CreateClipboardRecentContentIOS());
+
+  // Initialize opt guide.
+  OptimizationGuideServiceFactory::InitializePredictionModelStore();
 
   // Ensure that the browser state is initialized.
   EnsureBrowserStateKeyedServiceFactoriesBuilt();
@@ -360,12 +376,6 @@ void IOSChromeMainParts::PreMainMessageLoopRun() {
   safe_browsing_service->Initialize(last_used_browser_state->GetPrefs(),
                                     user_data_path,
                                     safe_browsing_metrics_collector);
-
-  // Ensure the Fullscren Promos Manager is initialized.
-  PromosManager* promos_manager = application_context_->GetPromosManager();
-  if (promos_manager) {
-    promos_manager->Init();
-  }
 }
 
 void IOSChromeMainParts::PostMainMessageLoopRun() {
@@ -386,8 +396,11 @@ void IOSChromeMainParts::SetUpFieldTrials(
   base::SetRecordActionTaskRunner(web::GetUIThreadTaskRunner({}));
 
   // FeatureList requires VariationsIdsProvider to be created.
+#if !BUILDFLAG(USE_BLINK)
+  // TODO(crbug.com/1427308) Move variations to PostEarlyInitialization.
   variations::VariationsIdsProvider::Create(
       variations::VariationsIdsProvider::Mode::kUseSignedInState);
+#endif
 
   // Initialize FieldTrialList to support FieldTrials that use one-time
   // randomization.
@@ -402,17 +415,20 @@ void IOSChromeMainParts::SetUpFieldTrials(
   std::vector<std::string> variation_ids =
       RegisterAllFeatureVariationParameters(&flags_storage, feature_list.get());
 
+#if !BUILDFLAG(USE_BLINK)
+  // TODO(crbug.com/1427308) Move variations to PostEarlyInitialization.
   application_context_->GetVariationsService()->SetUpFieldTrials(
       variation_ids, command_line_variation_ids,
       std::vector<base::FeatureList::FeatureOverrideInfo>(),
       std::move(feature_list), &ios_field_trials_);
+#endif
 }
 
 void IOSChromeMainParts::SetupMetrics() {
   metrics::MetricsService* metrics = application_context_->GetMetricsService();
-  metrics->GetSyntheticTrialRegistry()->AddSyntheticTrialObserver(
+  metrics->GetSyntheticTrialRegistry()->AddObserver(
       variations::VariationsIdsProvider::GetInstance());
-  metrics->GetSyntheticTrialRegistry()->AddSyntheticTrialObserver(
+  metrics->GetSyntheticTrialRegistry()->AddObserver(
       variations::SyntheticTrialsActiveGroupIdProvider::GetInstance());
   // Now that field trials have been created, initializes metrics recording.
   metrics->InitializeMetricsRecordingState();

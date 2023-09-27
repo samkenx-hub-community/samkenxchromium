@@ -132,7 +132,7 @@ SearchPrefetchBaseBrowserTest::GetSearchPrefetchAndNonPrefetch(
 
   TemplateURLRef::SearchTermsArgs search_terms_args =
       TemplateURLRef::SearchTermsArgs(base::ASCIIToUTF16(search_terms));
-  search_terms_args.is_prefetch = false;
+  search_terms_args.prefetch_param = "";
 
   GURL search_url =
       GURL(template_url_service->GetDefaultSearchProvider()
@@ -141,7 +141,7 @@ SearchPrefetchBaseBrowserTest::GetSearchPrefetchAndNonPrefetch(
                                    template_url_service->search_terms_data(),
                                    nullptr));
 
-  search_terms_args.is_prefetch = true;
+  search_terms_args.prefetch_param = "cs";
 
   GURL prefetch_url =
       GURL(template_url_service->GetDefaultSearchProvider()
@@ -429,5 +429,6 @@ AutocompleteMatch SearchPrefetchBaseBrowserTest::CreateSearchSuggestionMatch(
   match.keyword = base::UTF8ToUTF16(original_query);
   if (prefetch_hint)
     match.RecordAdditionalInfo("should_prefetch", "true");
+  match.allowed_to_be_default_match = true;
   return match;
 }

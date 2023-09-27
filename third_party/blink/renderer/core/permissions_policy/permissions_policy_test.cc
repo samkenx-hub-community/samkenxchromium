@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/ranges/algorithm.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/public/common/permissions_policy/origin_with_possible_wildcards.h"
 #include "third_party/blink/public/mojom/permissions_policy/permissions_policy.mojom-blink.h"
@@ -16,7 +17,6 @@
 #include "third_party/blink/renderer/core/frame/settings.h"
 #include "third_party/blink/renderer/core/loader/empty_clients.h"
 #include "third_party/blink/renderer/core/testing/page_test_base.h"
-#include "third_party/blink/renderer/platform/testing/histogram_tester.h"
 #include "url/gurl.h"
 #include "url/origin.h"
 
@@ -66,11 +66,11 @@ const char* const kInvalidHeaderPolicies[] = {
     "badfeaturename 'self'",
     "1.0",
     "geolocation 'src'",  // Only valid for iframe allow attribute.
-    "geolocation data://badorigin",
+    "geolocation data:///badorigin",
     "geolocation https://bad;origin",
     "geolocation https:/bad,origin",
     "geolocation https://example.com, https://a.com",
-    "geolocation *, payment data://badorigin",
+    "geolocation *, payment data:///badorigin",
     "geolocation ws://xn--fd\xbcwsw3taaaaaBaa333aBBBBBBJBBJBBBt",
 };
 }  // namespace
@@ -199,12 +199,23 @@ class PermissionsPolicyParserParsingTest
       ASSERT_EQ(actual_declaration.allowed_origins.size(),
                 expected_declaration.allowed_origins.size());
       for (size_t j = 0; j < actual_declaration.allowed_origins.size(); ++j) {
-        EXPECT_TRUE(
-            actual_declaration.allowed_origins[j].origin.IsSameOriginWith(
-                url::Origin::Create(
-                    GURL(expected_declaration.allowed_origins[j].origin))));
+        const url::Origin origin = url::Origin::Create(
+            GURL(expected_declaration.allowed_origins[j].origin));
         EXPECT_EQ(
-            actual_declaration.allowed_origins[j].has_subdomain_wildcard,
+            actual_declaration.allowed_origins[j].CSPSourceForTest().scheme,
+            origin.scheme());
+        EXPECT_EQ(actual_declaration.allowed_origins[j].CSPSourceForTest().host,
+                  origin.host());
+        if (actual_declaration.allowed_origins[j].CSPSourceForTest().port !=
+            url::PORT_UNSPECIFIED) {
+          EXPECT_EQ(
+              actual_declaration.allowed_origins[j].CSPSourceForTest().port,
+              origin.port());
+        }
+        EXPECT_EQ(
+            actual_declaration.allowed_origins[j]
+                .CSPSourceForTest()
+                .is_host_wildcard,
             expected_declaration.allowed_origins[j].has_subdomain_wildcard);
       }
     }
@@ -576,8 +587,7 @@ const PermissionsPolicyParserTestCase
                     /* self_if_matches */ absl::nullopt,
                     /* matches_all_origins */ false,
                     /* matches_opaque_src */ false,
-                    {{ORIGIN_A_SUBDOMAIN_ESCAPED,
-                      /*has_subdomain_wildcard=*/false}},
+                    {},
                 },
             },
         },
@@ -604,10 +614,10 @@ const PermissionsPolicyParserTestCase
             /* test_name */ "ImproperWildcardsIncluded",
             /* feature_policy_string */
             "fullscreen *://example.com https://foo.*.example.com "
-            "https://*.*.example.com https://example.com:*",
+            "https://*.*.example.com",
             /* permissions_policy_string */
             "fullscreen=(\"*://example.com\" \"https://foo.*.example.com\" "
-            "\"https://*.*.example.com\"  \"https://example.com:*\")",
+            "\"https://*.*.example.com\")",
             /* self_origin */ ORIGIN_A,
             /* src_origin */ ORIGIN_B,
             /* expected_parse_result */
@@ -617,10 +627,7 @@ const PermissionsPolicyParserTestCase
                     /* self_if_matches */ absl::nullopt,
                     /* matches_all_origins */ false,
                     /* matches_opaque_src */ false,
-                    {{"https://%2A.%2A.example.com",
-                      /*has_subdomain_wildcard=*/false},
-                     {"https://foo.%2A.example.com",
-                      /*has_subdomain_wildcard=*/false}},
+                    {},
                 },
             },
         },
@@ -800,8 +807,8 @@ TEST_F(PermissionsPolicyParserParsingTest,
       PermissionsPolicyParser::ParseHeader(
           "worse-feature 'none', geolocation 'self'" /* feature_policy_header */
           ,
-          "bad-feature=*, geolocation=\"data://bad-origin\"" /* permissions_policy_header
-                                                              */
+          "bad-feature=*, geolocation=\"data:///bad-origin\"" /* permissions_policy_header
+                                                               */
           ,
           origin_a_.get(), feature_policy_logger, permissions_policy_logger,
           nullptr /* context */
@@ -828,7 +835,7 @@ TEST_F(PermissionsPolicyParserParsingTest,
       permissions_policy_logger.GetMessages(),
       {
           "Permissions Policy: Unrecognized feature: 'bad-feature'.",
-          "Permissions Policy: Unrecognized origin: 'data://bad-origin'.",
+          "Permissions Policy: Unrecognized origin: 'data:///bad-origin'.",
       });
 }
 
@@ -902,7 +909,7 @@ TEST_F(PermissionsPolicyParserTest, ParseTooLongPolicy) {
 // Test histogram counting the use of permissions policies in header.
 TEST_F(PermissionsPolicyParserTest, HeaderHistogram) {
   const char* histogram_name = "Blink.UseCounter.FeaturePolicy.Header";
-  HistogramTester tester;
+  base::HistogramTester tester;
   PolicyParserMessageBuffer logger;
 
   PermissionsPolicyParser::ParseFeaturePolicyForTest(
@@ -923,7 +930,7 @@ TEST_F(PermissionsPolicyParserTest, HeaderHistogram) {
 // Test counting the use of each permissions policy only once per header.
 TEST_F(PermissionsPolicyParserTest, HistogramMultiple) {
   const char* histogram_name = "Blink.UseCounter.FeaturePolicy.Header";
-  HistogramTester tester;
+  base::HistogramTester tester;
   PolicyParserMessageBuffer logger;
 
   // If the same feature is listed multiple times, it should only be counted
@@ -1039,17 +1046,14 @@ class FeaturePolicyMutationTest : public testing::Test {
   ParsedPermissionsPolicy test_policy = {
       {mojom::blink::PermissionsPolicyFeature::kFullscreen,
        /*allowed_origins=*/
-       {blink::OriginWithPossibleWildcards(url_origin_a_,
-                                           /*has_subdomain_wildcard=*/false),
-        blink::OriginWithPossibleWildcards(url_origin_b_,
-                                           /*has_subdomain_wildcard=*/false)},
+       {*blink::OriginWithPossibleWildcards::FromOrigin(url_origin_a_),
+        *blink::OriginWithPossibleWildcards::FromOrigin(url_origin_b_)},
        /*self_if_matches=*/absl::nullopt,
        /*matches_all_origins=*/false,
        /*matches_opaque_src=*/false},
       {mojom::blink::PermissionsPolicyFeature::kGeolocation,
        /*=allowed_origins*/
-       {blink::OriginWithPossibleWildcards(url_origin_a_,
-                                           /*has_subdomain_wildcard=*/false)},
+       {*blink::OriginWithPossibleWildcards::FromOrigin(url_origin_a_)},
        /*self_if_matches=*/absl::nullopt,
        /*matches_all_origins=*/false,
        /*matches_opaque_src=*/false}};

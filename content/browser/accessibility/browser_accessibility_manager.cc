@@ -38,12 +38,6 @@
 
 namespace content {
 
-namespace {
-// A function to call when focus changes, for testing only.
-base::LazyInstance<base::RepeatingClosure>::DestructorAtExit
-    g_focus_change_callback_for_testing = LAZY_INSTANCE_INITIALIZER;
-}  // namespace
-
 ui::AXTreeUpdate MakeAXTreeUpdateForTesting(
     const ui::AXNodeData& node1,
     const ui::AXNodeData& node2 /* = ui::AXNodeData() */,
@@ -191,7 +185,7 @@ void BrowserAccessibilityManager::FireFocusEventsIfNeeded() {
   // Don't fire focus events if the window itself doesn't have focus.
   // Bypass this check for some tests.
   if (!never_suppress_or_delay_events_for_testing_ &&
-      !g_focus_change_callback_for_testing.Get()) {
+      !AXTreeManager::GetFocusChangeCallbackForTesting()) {
     if (delegate_ && !delegate_->AccessibilityViewHasFocus())
       return;
   }
@@ -798,6 +792,18 @@ BrowserAccessibilityManager::GetFocusFromThisOrDescendantFrame() const {
   return GetActiveDescendant(obj);
 }
 
+void BrowserAccessibilityManager::Blur(const BrowserAccessibility& node) {
+  if (!delegate_) {
+    return;
+  }
+
+  ui::AXActionData action_data;
+  action_data.action = ax::mojom::Action::kBlur;
+  action_data.target_node_id = node.GetId();
+  delegate_->AccessibilityPerformAction(action_data);
+  BrowserAccessibilityStateImpl::GetInstance()->OnAccessibilityApiUsage();
+}
+
 void BrowserAccessibilityManager::SetFocus(const BrowserAccessibility& node) {
   if (!delegate_)
     return;
@@ -890,6 +896,30 @@ void BrowserAccessibilityManager::Increment(const BrowserAccessibility& node) {
 
   ui::AXActionData action_data;
   action_data.action = ax::mojom::Action::kIncrement;
+  action_data.target_node_id = node.GetId();
+  delegate_->AccessibilityPerformAction(action_data);
+  BrowserAccessibilityStateImpl::GetInstance()->OnAccessibilityApiUsage();
+}
+
+void BrowserAccessibilityManager::Expand(const BrowserAccessibility& node) {
+  if (!delegate_) {
+    return;
+  }
+
+  ui::AXActionData action_data;
+  action_data.action = ax::mojom::Action::kExpand;
+  action_data.target_node_id = node.GetId();
+  delegate_->AccessibilityPerformAction(action_data);
+  BrowserAccessibilityStateImpl::GetInstance()->OnAccessibilityApiUsage();
+}
+
+void BrowserAccessibilityManager::Collapse(const BrowserAccessibility& node) {
+  if (!delegate_) {
+    return;
+  }
+
+  ui::AXActionData action_data;
+  action_data.action = ax::mojom::Action::kCollapse;
   action_data.target_node_id = node.GetId();
   delegate_->AccessibilityPerformAction(action_data);
   BrowserAccessibilityStateImpl::GetInstance()->OnAccessibilityApiUsage();
@@ -1030,6 +1060,12 @@ void BrowserAccessibilityManager::LoadInlineTextBoxes(
     const BrowserAccessibility& node) {
   if (!delegate_)
     return;
+
+  if (!BrowserAccessibilityStateImpl::GetInstance()
+           ->GetAccessibilityMode()
+           .has_mode(ui::AXMode::kInlineTextBoxes)) {
+    return;
+  }
 
   ui::AXActionData action_data;
   action_data.action = ax::mojom::Action::kLoadInlineTextBoxes;
@@ -1609,7 +1645,8 @@ bool BrowserAccessibilityManager::IsRootFrameManager() const {
 ui::AXTreeUpdate BrowserAccessibilityManager::SnapshotAXTreeForTesting() {
   std::unique_ptr<ui::AXTreeSource<const ui::AXNode*>> tree_source(
       ax_serializable_tree()->CreateTreeSource());
-  ui::AXTreeSerializer<const ui::AXNode*> serializer(tree_source.get());
+  ui::AXTreeSerializer<const ui::AXNode*, std::vector<const ui::AXNode*>>
+      serializer(tree_source.get());
   ui::AXTreeUpdate update;
   serializer.SerializeChanges(GetRoot(), &update);
   return update;
@@ -1697,13 +1734,11 @@ void BrowserAccessibilityManager::BuildAXTreeHitTestCache() {
   // Use AXNodeID for this as nodes are unchanging with this cache.
   cached_node_rtree_ = std::make_unique<cc::RTree<ui::AXNodeID>>();
   cached_node_rtree_->Build(
-      storage,
-      [](const std::vector<const BrowserAccessibility*>& storage,
-         size_t index) {
+      storage.size(),
+      [&storage](size_t index) {
         return storage[index]->GetUnclippedRootFrameBoundsRect();
       },
-      [](const std::vector<const BrowserAccessibility*>& storage,
-         size_t index) { return storage[index]->GetId(); });
+      [&storage](size_t index) { return storage[index]->GetId(); });
 }
 
 void BrowserAccessibilityManager::BuildAXTreeHitTestCacheInternal(
@@ -1802,10 +1837,11 @@ void BrowserAccessibilityManager::CollectChangedNodesAndParentsForAtomicUpdate(
     // hypertext. Hypertext uses embedded object characters to represent
     // child objects, and the AXHyperText caches relevant object at
     // each embedded object character offset.
-    if (!changed_node->IsChildOfLeaf()) {
+    if (changed_node->data().role != ax::mojom::Role::kInlineTextBox) {
       BrowserAccessibility* parent_obj = GetFromAXNode(parent);
-      if (parent_obj)
+      if (parent_obj) {
         nodes_needing_update->insert(parent_obj->GetAXPlatformNode());
+      }
     }
 
     // When a node is editable, update the editable root too.

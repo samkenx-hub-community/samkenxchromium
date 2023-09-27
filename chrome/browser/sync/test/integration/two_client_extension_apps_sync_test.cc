@@ -397,7 +397,7 @@ IN_PROC_BROWSER_TEST_F(TwoClientExtensionAppsSyncTest,
   web_app::ScopedTestingPreinstalledAppData preinstalled_app_data;
   {
     const GURL kStartUrl = GURL("https://www.example.com/start_url");
-    const web_app::AppId kWebAppId =
+    const webapps::AppId kWebAppId =
         web_app::GenerateAppId(absl::nullopt, kStartUrl);
     web_app::ExternalInstallOptions options(
         GURL("https://www.example.com/install_url"),
@@ -408,7 +408,7 @@ IN_PROC_BROWSER_TEST_F(TwoClientExtensionAppsSyncTest,
     options.only_use_app_info_factory = true;
     options.app_info_factory = base::BindRepeating(
         [](GURL start_url) {
-          auto info = std::make_unique<WebAppInstallInfo>();
+          auto info = std::make_unique<web_app::WebAppInstallInfo>();
           info->title = u"Test app";
           info->start_url = start_url;
           return info;

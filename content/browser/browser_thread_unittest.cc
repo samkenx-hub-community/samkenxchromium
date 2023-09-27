@@ -29,7 +29,6 @@
 #include "content/browser/scheduler/browser_task_executor.h"
 #include "content/browser/scheduler/browser_task_priority.h"
 #include "content/browser/scheduler/browser_ui_thread_scheduler.h"
-#include "content/public/browser/browser_task_traits.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "testing/platform_test.h"
 
@@ -73,11 +72,9 @@ class SequenceManagerThreadDelegate : public base::Thread::Delegate {
     return default_task_runner_;
   }
 
-  void BindToCurrentThread(base::TimerSlack timer_slack) override {
+  void BindToCurrentThread() override {
     ui_sequence_manager_->BindToMessagePump(
         base::MessagePump::Create(base::MessagePumpType::DEFAULT));
-    ui_sequence_manager_->SetTimerSlack(timer_slack);
-    BrowserTaskExecutor::BindToUIThreadForTesting();
   }
 
  private:

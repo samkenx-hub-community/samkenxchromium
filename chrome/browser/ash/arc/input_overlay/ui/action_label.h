@@ -11,32 +11,25 @@
 #include "chrome/browser/ash/arc/input_overlay/actions/input_element.h"
 #include "chrome/browser/ash/arc/input_overlay/constants.h"
 #include "chrome/browser/ash/arc/input_overlay/db/proto/app_data.pb.h"
+#include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/button/label_button.h"
 
 namespace arc::input_overlay {
 
-// TODO(cuicuiruan): Currently, it shows the dom_code.
-// Will replace it with showing the result of dom_key / keyboard key depending
-// on different keyboard layout.
-std::string GetDisplayText(const ui::DomCode code);
+class ActionView;
 
 // ActionLabel shows text mapping hint for each action.
 class ActionLabel : public views::LabelButton {
  public:
+  METADATA_HEADER(ActionLabel);
   static std::vector<ActionLabel*> Show(
       views::View* parent,
       ActionType action_type,
       const InputElement& input_element,
-      int radius,
-      bool allow_reposition,
       TapLabelPosition label_position = TapLabelPosition::kTopLeft);
 
-  ActionLabel(int radius, MouseAction mouse_action, bool allow_reposition);
-  ActionLabel(int radius, const std::string& text, bool allow_reposition);
-  ActionLabel(int radius,
-              const std::string& text,
-              int index,
-              bool allow_reposition);
+  explicit ActionLabel(MouseAction mouse_action);
+  explicit ActionLabel(const std::u16string& text, size_t index = 0);
 
   ActionLabel(const ActionLabel&) = delete;
   ActionLabel& operator=(const ActionLabel&) = delete;
@@ -44,19 +37,17 @@ class ActionLabel : public views::LabelButton {
 
   void Init();
 
-  void SetTextActionLabel(const std::string& text);
+  void SetTextActionLabel(const std::u16string& text);
   void SetImageActionLabel(MouseAction mouse_action);
   void SetDisplayMode(DisplayMode mode);
+  void RemoveNewState();
   void ClearFocus();
   // It is possible that multiple labels are in one ActionView and these labels
   // are called sibling labels. This label reacts to sibling's focus change.
   void OnSiblingUpdateFocus(bool sibling_focused);
 
-  // TODO(b/260937747): Update or remove when removing flags
-  // |kArcInputOverlayAlphaV2| or |kArcInputOverlayBeta|.
-  // The label layout design is updated. This is used to update bounds
-  // for Alpha version.
-  virtual void UpdateBoundsAlpha() = 0;
+  ActionView* GetParent();
+
   virtual void UpdateBounds() = 0;
   virtual void UpdateLabelPositionType(TapLabelPosition label_position) = 0;
 
@@ -87,6 +78,8 @@ class ActionLabel : public views::LabelButton {
   gfx::Size touch_point_size_;
 
  private:
+  void OnButtonPressed();
+
   void SetToViewMode();
   void SetToEditMode();
   // In edit mode without mouse hover or focus.
@@ -106,10 +99,8 @@ class ActionLabel : public views::LabelButton {
   void SetBackgroundForEdit();
 
   bool IsInputUnbound();
-  // Customize a11y name.
-  void CustomizeAccessibilityName();
-
-  bool allow_reposition_;
+  // Calculate the accessible name.
+  std::u16string CalculateAccessibleName();
 };
 }  // namespace arc::input_overlay
 

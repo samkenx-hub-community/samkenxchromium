@@ -11,6 +11,7 @@
 
 #include "base/functional/callback.h"
 #include "base/types/expected.h"
+#include "base/uuid.h"
 #include "base/values.h"
 #include "chrome/common/extensions/api/tabs.h"
 #include "extensions/common/features/feature.h"
@@ -65,7 +66,7 @@ class ExtensionTabUtil {
     absl::optional<bool> active;
     absl::optional<bool> pinned;
     absl::optional<int> index;
-    absl::optional<int> bookmark_id;
+    absl::optional<base::Uuid> bookmark_id;
   };
 
   // Opens a new tab given an extension function |function| and creation
@@ -200,7 +201,7 @@ class ExtensionTabUtil {
   static GURL ResolvePossiblyRelativeURL(const std::string& url_string,
                                          const Extension* extension);
 
-  // Returns true if navigating to |url| would kill a page or the browser
+  // Returns true if navigating to |url| could kill a page or the browser
   // itself, whether by simulating a crash, browser quit, thread hang, or
   // equivalent. Extensions should be prevented from navigating to such URLs.
   //

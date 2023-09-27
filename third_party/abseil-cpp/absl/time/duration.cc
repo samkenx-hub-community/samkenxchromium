@@ -55,8 +55,7 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cctype>
-#include <cerrno>
+#include <chrono>  // NOLINT(build/c++11)
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -66,8 +65,9 @@
 #include <limits>
 #include <string>
 
+#include "absl/base/attributes.h"
 #include "absl/base/casts.h"
-#include "absl/base/macros.h"
+#include "absl/base/config.h"
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
@@ -400,16 +400,18 @@ int64_t IDivDuration(bool satq, const Duration num, const Duration den,
 Duration& Duration::operator+=(Duration rhs) {
   if (time_internal::IsInfiniteDuration(*this)) return *this;
   if (time_internal::IsInfiniteDuration(rhs)) return *this = rhs;
-  const int64_t orig_rep_hi = rep_hi_;
-  rep_hi_ =
-      DecodeTwosComp(EncodeTwosComp(rep_hi_) + EncodeTwosComp(rhs.rep_hi_));
+  const int64_t orig_rep_hi = rep_hi_.Get();
+  rep_hi_ = DecodeTwosComp(EncodeTwosComp(rep_hi_.Get()) +
+                           EncodeTwosComp(rhs.rep_hi_.Get()));
   if (rep_lo_ >= kTicksPerSecond - rhs.rep_lo_) {
-    rep_hi_ = DecodeTwosComp(EncodeTwosComp(rep_hi_) + 1);
+    rep_hi_ = DecodeTwosComp(EncodeTwosComp(rep_hi_.Get()) + 1);
     rep_lo_ -= kTicksPerSecond;
   }
   rep_lo_ += rhs.rep_lo_;
-  if (rhs.rep_hi_ < 0 ? rep_hi_ > orig_rep_hi : rep_hi_ < orig_rep_hi) {
-    return *this = rhs.rep_hi_ < 0 ? -InfiniteDuration() : InfiniteDuration();
+  if (rhs.rep_hi_.Get() < 0 ? rep_hi_.Get() > orig_rep_hi
+                            : rep_hi_.Get() < orig_rep_hi) {
+    return *this =
+               rhs.rep_hi_.Get() < 0 ? -InfiniteDuration() : InfiniteDuration();
   }
   return *this;
 }
@@ -417,18 +419,21 @@ Duration& Duration::operator+=(Duration rhs) {
 Duration& Duration::operator-=(Duration rhs) {
   if (time_internal::IsInfiniteDuration(*this)) return *this;
   if (time_internal::IsInfiniteDuration(rhs)) {
-    return *this = rhs.rep_hi_ >= 0 ? -InfiniteDuration() : InfiniteDuration();
+    return *this = rhs.rep_hi_.Get() >= 0 ? -InfiniteDuration()
+                                          : InfiniteDuration();
   }
-  const int64_t orig_rep_hi = rep_hi_;
-  rep_hi_ =
-      DecodeTwosComp(EncodeTwosComp(rep_hi_) - EncodeTwosComp(rhs.rep_hi_));
+  const int64_t orig_rep_hi = rep_hi_.Get();
+  rep_hi_ = DecodeTwosComp(EncodeTwosComp(rep_hi_.Get()) -
+                           EncodeTwosComp(rhs.rep_hi_.Get()));
   if (rep_lo_ < rhs.rep_lo_) {
-    rep_hi_ = DecodeTwosComp(EncodeTwosComp(rep_hi_) - 1);
+    rep_hi_ = DecodeTwosComp(EncodeTwosComp(rep_hi_.Get()) - 1);
     rep_lo_ += kTicksPerSecond;
   }
   rep_lo_ -= rhs.rep_lo_;
-  if (rhs.rep_hi_ < 0 ? rep_hi_ < orig_rep_hi : rep_hi_ > orig_rep_hi) {
-    return *this = rhs.rep_hi_ >= 0 ? -InfiniteDuration() : InfiniteDuration();
+  if (rhs.rep_hi_.Get() < 0 ? rep_hi_.Get() < orig_rep_hi
+                            : rep_hi_.Get() > orig_rep_hi) {
+    return *this = rhs.rep_hi_.Get() >= 0 ? -InfiniteDuration()
+                                          : InfiniteDuration();
   }
   return *this;
 }
@@ -439,7 +444,7 @@ Duration& Duration::operator-=(Duration rhs) {
 
 Duration& Duration::operator*=(int64_t r) {
   if (time_internal::IsInfiniteDuration(*this)) {
-    const bool is_neg = (r < 0) != (rep_hi_ < 0);
+    const bool is_neg = (r < 0) != (rep_hi_.Get() < 0);
     return *this = is_neg ? -InfiniteDuration() : InfiniteDuration();
   }
   return *this = ScaleFixed<SafeMultiply>(*this, r);
@@ -447,7 +452,7 @@ Duration& Duration::operator*=(int64_t r) {
 
 Duration& Duration::operator*=(double r) {
   if (time_internal::IsInfiniteDuration(*this) || !IsFinite(r)) {
-    const bool is_neg = (std::signbit(r) != 0) != (rep_hi_ < 0);
+    const bool is_neg = std::signbit(r) != (rep_hi_.Get() < 0);
     return *this = is_neg ? -InfiniteDuration() : InfiniteDuration();
   }
   return *this = ScaleDouble<std::multiplies>(*this, r);
@@ -455,7 +460,7 @@ Duration& Duration::operator*=(double r) {
 
 Duration& Duration::operator/=(int64_t r) {
   if (time_internal::IsInfiniteDuration(*this) || r == 0) {
-    const bool is_neg = (r < 0) != (rep_hi_ < 0);
+    const bool is_neg = (r < 0) != (rep_hi_.Get() < 0);
     return *this = is_neg ? -InfiniteDuration() : InfiniteDuration();
   }
   return *this = ScaleFixed<std::divides>(*this, r);
@@ -463,7 +468,7 @@ Duration& Duration::operator/=(int64_t r) {
 
 Duration& Duration::operator/=(double r) {
   if (time_internal::IsInfiniteDuration(*this) || !IsValidDivisor(r)) {
-    const bool is_neg = (std::signbit(r) != 0) != (rep_hi_ < 0);
+    const bool is_neg = std::signbit(r) != (rep_hi_.Get() < 0);
     return *this = is_neg ? -InfiniteDuration() : InfiniteDuration();
   }
   return *this = ScaleDouble<std::divides>(*this, r);

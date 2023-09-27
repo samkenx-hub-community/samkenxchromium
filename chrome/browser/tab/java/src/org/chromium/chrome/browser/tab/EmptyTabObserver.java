@@ -108,6 +108,9 @@ public class EmptyTabObserver implements TabObserver {
             Tab tab, NavigationHandle navigationHandle) {}
 
     @Override
+    public void onDidFinishNavigationEnd() {}
+
+    @Override
     public void didFirstVisuallyNonEmptyPaint(Tab tab) {}
 
     @Override
@@ -141,4 +144,13 @@ public class EmptyTabObserver implements TabObserver {
 
     @Override
     public void onContentViewScrollingStateChanged(boolean scrolling) {}
+
+    @Override
+    public void onNavigationStateChanged() {}
+
+    @Override
+    public void onDidChangeCloseSignalInterceptStatus() {}
+
+    @Override
+    public void onRootIdChanged(Tab tab, int newRootId) {}
 }

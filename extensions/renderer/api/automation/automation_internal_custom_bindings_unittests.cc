@@ -38,8 +38,8 @@ class AutomationInternalCustomBindingsTest
     bindings_system()->UpdateBindingsForContext(script_context);
 
     auto automation_internal_bindings =
-        std::make_unique<AutomationInternalCustomBindings>(script_context,
-                                                           bindings_system());
+        std::make_unique<AutomationInternalCustomBindings>(
+            script_context, bindings_system(), kMainThreadId);
     automation_internal_bindings_ = automation_internal_bindings.get();
     script_context->module_system()->RegisterNativeHandler(
         "automationInternal", std::move(automation_internal_bindings));
@@ -62,7 +62,7 @@ TEST_F(AutomationInternalCustomBindingsTest, ActionStringMapping) {
        action <= static_cast<uint32_t>(ax::mojom::Action::kMaxValue);
        ++action) {
     const char* val = ui::ToString(static_cast<ax::mojom::Action>(action));
-    EXPECT_NE(api::automation::ACTION_TYPE_NONE,
+    EXPECT_NE(api::automation::ActionType::kNone,
               api::automation::ParseActionType(val))
         << "No automation mapping found for ax::mojom::Action::" << val;
   }

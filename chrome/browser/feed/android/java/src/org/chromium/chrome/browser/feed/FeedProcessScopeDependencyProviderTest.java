@@ -13,10 +13,13 @@ import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
 
+import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.privacy.settings.PrivacyPreferencesManager;
 import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 
 /**
  * Tests for FeedProcessScopeDependencyProvider.
@@ -36,6 +39,10 @@ public final class FeedProcessScopeDependencyProviderTest {
         }
 
         // Boilerplate.
+        @Override
+        public void addObserver(Observer observer) {}
+        @Override
+        public void removeObserver(Observer observer) {}
         @Override
         public void setUsageAndCrashReporting(boolean enabled) {}
         @Override
@@ -68,6 +75,11 @@ public final class FeedProcessScopeDependencyProviderTest {
         }
         @Override
         public void setMetricsReportingEnabled(boolean enabled) {}
+
+        @Override
+        public ObservableSupplier<Boolean> getUsageAndCrashReportingPermittedObservableSupplier() {
+            return null;
+        }
     };
 
     @Before
@@ -76,7 +88,7 @@ public final class FeedProcessScopeDependencyProviderTest {
     }
 
     @Test
-    @Features.DisableFeatures({ChromeFeatureList.XSURFACE_METRICS_REPORTING})
+    @DisableFeatures({ChromeFeatureList.XSURFACE_METRICS_REPORTING})
     public void usageAndCrashReporting_featureDisabled() {
         mMetricsReportingEnabled = false;
         assertFalse(mProvider.isXsurfaceUsageAndCrashReportingEnabled());
@@ -86,7 +98,7 @@ public final class FeedProcessScopeDependencyProviderTest {
     }
 
     @Test
-    @Features.EnableFeatures({ChromeFeatureList.XSURFACE_METRICS_REPORTING})
+    @EnableFeatures({ChromeFeatureList.XSURFACE_METRICS_REPORTING})
     public void usageAndCrashReporting_featureEnabled() {
         mMetricsReportingEnabled = false;
         assertFalse(mProvider.isXsurfaceUsageAndCrashReportingEnabled());

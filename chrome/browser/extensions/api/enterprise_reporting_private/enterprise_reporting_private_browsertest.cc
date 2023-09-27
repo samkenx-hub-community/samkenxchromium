@@ -9,14 +9,13 @@
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/content_settings/host_content_settings_map_factory.h"
+#include "chrome/browser/enterprise/connectors/test/deep_scanning_test_utils.h"
 #include "chrome/browser/enterprise/util/managed_browser_utils.h"
-#include "chrome/browser/extensions/extension_function_test_utils.h"
 #include "chrome/browser/net/profile_network_context_service.h"
 #include "chrome/browser/net/profile_network_context_service_factory.h"
 #include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "chrome/browser/policy/policy_test_utils.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/safe_browsing/cloud_content_scanning/deep_scanning_test_utils.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/extensions/api/enterprise_reporting_private.h"
@@ -32,6 +31,7 @@
 #include "components/version_info/version_info.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test.h"
+#include "extensions/browser/api_test_utils.h"
 #include "net/cert/x509_certificate.h"
 #include "net/cert/x509_util.h"
 #include "net/ssl/client_cert_identity_test_util.h"
@@ -134,8 +134,7 @@ class EnterpriseReportingPrivateGetContextInfoBaseBrowserTest
 
   void SetupDMToken() {
 #if BUILDFLAG(IS_CHROMEOS)
-    policy::SetDMTokenForTesting(
-        policy::DMToken::CreateValidTokenForTesting("dm_token"));
+    policy::SetDMTokenForTesting(policy::DMToken::CreateValidToken("dm_token"));
 #else
     browser_dm_token_storage_ =
         std::make_unique<policy::FakeBrowserDMTokenStorage>();
@@ -199,7 +198,8 @@ class EnterpriseReportingPrivateGetContextInfoBrowserTest
       profile_policy_manager->core()->client()->SetupRegistration(
           "dm_token", "client_id", {});
 #else
-      safe_browsing::SetProfileDMToken(browser()->profile(), "dm_token");
+      enterprise_connectors::test::SetProfileDMToken(browser()->profile(),
+                                                     "dm_token");
       auto* profile_policy_manager =
           browser()->profile()->GetUserCloudPolicyManager();
 #endif
@@ -245,11 +245,10 @@ IN_PROC_BROWSER_TEST_P(
     Test) {
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -308,11 +307,10 @@ IN_PROC_BROWSER_TEST_P(
     Test) {
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -361,11 +359,10 @@ IN_PROC_BROWSER_TEST_P(EnterpriseReportingPrivateGetContextInfoBrowserTest,
                        MAYBE_AffiliationIDs) {
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -413,17 +410,16 @@ IN_PROC_BROWSER_TEST_P(EnterpriseReportingPrivateGetContextInfoBrowserTest,
 IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
                        TestFileAttachedProviderName) {
   SetupDMToken();
-  safe_browsing::SetAnalysisConnector(browser()->profile()->GetPrefs(),
-                                      enterprise_connectors::FILE_ATTACHED,
-                                      kGoogleServiceProvider);
+  enterprise_connectors::test::SetAnalysisConnector(
+      browser()->profile()->GetPrefs(), enterprise_connectors::FILE_ATTACHED,
+      kGoogleServiceProvider);
 
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -441,17 +437,16 @@ IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
 IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
                        TestFileDownloadedProviderName) {
   SetupDMToken();
-  safe_browsing::SetAnalysisConnector(browser()->profile()->GetPrefs(),
-                                      enterprise_connectors::FILE_DOWNLOADED,
-                                      kGoogleServiceProvider);
+  enterprise_connectors::test::SetAnalysisConnector(
+      browser()->profile()->GetPrefs(), enterprise_connectors::FILE_DOWNLOADED,
+      kGoogleServiceProvider);
 
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -469,17 +464,16 @@ IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
 IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
                        TestBulkDataEntryProviderName) {
   SetupDMToken();
-  safe_browsing::SetAnalysisConnector(browser()->profile()->GetPrefs(),
-                                      enterprise_connectors::BULK_DATA_ENTRY,
-                                      kGoogleServiceProvider);
+  enterprise_connectors::test::SetAnalysisConnector(
+      browser()->profile()->GetPrefs(), enterprise_connectors::BULK_DATA_ENTRY,
+      kGoogleServiceProvider);
 
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -497,17 +491,16 @@ IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
 IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
                        TestPrintProviderName) {
   SetupDMToken();
-  safe_browsing::SetAnalysisConnector(browser()->profile()->GetPrefs(),
-                                      enterprise_connectors::PRINT,
-                                      kGoogleServiceProvider);
+  enterprise_connectors::test::SetAnalysisConnector(
+      browser()->profile()->GetPrefs(), enterprise_connectors::PRINT,
+      kGoogleServiceProvider);
 
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -525,26 +518,25 @@ IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
 IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
                        TestAllProviderNamesSet) {
   SetupDMToken();
-  safe_browsing::SetAnalysisConnector(browser()->profile()->GetPrefs(),
-                                      enterprise_connectors::BULK_DATA_ENTRY,
-                                      kGoogleServiceProvider);
-  safe_browsing::SetAnalysisConnector(browser()->profile()->GetPrefs(),
-                                      enterprise_connectors::FILE_ATTACHED,
-                                      kOtherServiceProvider);
-  safe_browsing::SetAnalysisConnector(browser()->profile()->GetPrefs(),
-                                      enterprise_connectors::FILE_DOWNLOADED,
-                                      kAnotherServiceProvider);
-  safe_browsing::SetAnalysisConnector(browser()->profile()->GetPrefs(),
-                                      enterprise_connectors::PRINT,
-                                      kAndAnotherServiceProvider);
+  enterprise_connectors::test::SetAnalysisConnector(
+      browser()->profile()->GetPrefs(), enterprise_connectors::BULK_DATA_ENTRY,
+      kGoogleServiceProvider);
+  enterprise_connectors::test::SetAnalysisConnector(
+      browser()->profile()->GetPrefs(), enterprise_connectors::FILE_ATTACHED,
+      kOtherServiceProvider);
+  enterprise_connectors::test::SetAnalysisConnector(
+      browser()->profile()->GetPrefs(), enterprise_connectors::FILE_DOWNLOADED,
+      kAnotherServiceProvider);
+  enterprise_connectors::test::SetAnalysisConnector(
+      browser()->profile()->GetPrefs(), enterprise_connectors::PRINT,
+      kAndAnotherServiceProvider);
 
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -570,11 +562,10 @@ IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
 
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -587,16 +578,16 @@ IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
 IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
                        TestOnSecurityEventProviderNameSet) {
   SetupDMToken();
-  safe_browsing::SetOnSecurityEventReporting(browser()->profile()->GetPrefs(),
-                                             /* enabled= */ true);
+  enterprise_connectors::test::SetOnSecurityEventReporting(
+      browser()->profile()->GetPrefs(),
+      /* enabled= */ true);
 
   auto function =
       base::MakeRefCounted<EnterpriseReportingPrivateGetContextInfoFunction>();
-  auto context_info_value = std::unique_ptr<base::Value>(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          function.get(),
-          /*args*/ "[]", browser()));
-  ASSERT_TRUE(context_info_value.get());
+  auto context_info_value = api_test_utils::RunFunctionAndReturnSingleResult(
+      function.get(),
+      /*args*/ "[]", browser()->profile());
+  ASSERT_TRUE(context_info_value);
   ASSERT_TRUE(context_info_value->is_dict());
 
   enterprise_reporting_private::ContextInfo info;
@@ -604,7 +595,7 @@ IN_PROC_BROWSER_TEST_F(EnterpriseReportingPrivateGetContextInfoBaseBrowserTest,
       context_info_value->GetDict(), info));
 
   EXPECT_EQ(1UL, info.on_security_event_providers.size());
-  // SetOnSecurityEventReporting sets the provider name to google
+  // test::SetOnSecurityEventReporting sets the provider name to google
   EXPECT_EQ("google", info.on_security_event_providers[0]);
 }
 
@@ -643,11 +634,9 @@ class EnterpriseReportingPrivateGetCertificateTest : public policy::PolicyTest {
     params += kRequestingUrl;
     params += "\"]";
 
-    std::unique_ptr<base::Value> certificate_value =
-        std::unique_ptr<base::Value>(
-            extension_function_test_utils::RunFunctionAndReturnSingleResult(
-                function.get(), params, browser()));
-    EXPECT_TRUE(certificate_value.get());
+    auto certificate_value = api_test_utils::RunFunctionAndReturnSingleResult(
+        function.get(), params, browser()->profile());
+    EXPECT_TRUE(certificate_value);
     EXPECT_TRUE(certificate_value->is_dict());
 
     enterprise_reporting_private::Certificate cert;

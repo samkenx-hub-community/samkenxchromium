@@ -9,7 +9,8 @@
 
 #include "ash/public/cpp/login_accelerators.h"
 #include "ash/public/cpp/login_types.h"
-#include "ash/public/cpp/system_tray_observer.h"
+#include "ash/system/tray/system_tray_observer.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/scoped_observation_traits.h"
@@ -117,6 +118,7 @@ class OobeUIDialogDelegate : public ui::WebDialogDelegate,
                          const content::ContextMenuParams& params) override;
   std::vector<ui::Accelerator> GetAccelerators() override;
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override;
+  WebDialogDelegate::FrameKind GetWebDialogFrameKind() const override;
 
   // views::ViewObserver:
   void OnViewBoundsChanged(views::View* observed_view) override;
@@ -143,11 +145,11 @@ class OobeUIDialogDelegate : public ui::WebDialogDelegate,
 
   // Root widget. It is assumed that widget is placed as a full-screen inside
   // LockContainer.
-  views::Widget* widget_ = nullptr;
+  raw_ptr<views::Widget, ExperimentalAsh> widget_ = nullptr;
   // Reference to view owned by widget_.
-  LayoutWidgetDelegateView* layout_view_ = nullptr;
+  raw_ptr<LayoutWidgetDelegateView, ExperimentalAsh> layout_view_ = nullptr;
   // Reference to dialog view stored in widget_.
-  OobeWebDialogView* dialog_view_ = nullptr;
+  raw_ptr<OobeWebDialogView, ExperimentalAsh> dialog_view_ = nullptr;
 
   base::ScopedObservation<views::View, views::ViewObserver> view_observer_{
       this};

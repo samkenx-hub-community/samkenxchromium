@@ -20,7 +20,7 @@ class WindowDimmer;
 
 // Dialog which embeds the Parent Access UI, which verifies a
 // parent during a child session.
-class ParentAccessDialog : public ParentAccessUIHandlerDelegate,
+class ParentAccessDialog : public ParentAccessUiHandlerDelegate,
                            public SystemWebDialogDelegate {
  public:
   struct Result {
@@ -29,6 +29,7 @@ class ParentAccessDialog : public ParentAccessUIHandlerDelegate,
       kApproved,  // The parent was verified and they approved.
       kDeclined,  // The request was explicitly declined by the parent.
       kCanceled,  // The request was canceled/dismissed by the parent.
+      kDisabled,  // Making a request has been disabled by the parent.
       kError,     // An error occurred while handling the request.
     };
     Status status = Status::kCanceled;
@@ -52,14 +53,17 @@ class ParentAccessDialog : public ParentAccessUIHandlerDelegate,
   ui::ModalType GetDialogModalType() const override;
   void GetDialogSize(gfx::Size* size) const override;
   bool ShouldCloseDialogOnEscape() const override;
+  bool ShouldShowDialogTitle() const override;
+  bool ShouldShowCloseButton() const override;
 
-  // ParentAccessUIHandlerDelegate:
+  // ParentAccessUiHandlerDelegate:
   parent_access_ui::mojom::ParentAccessParamsPtr CloneParentAccessParams()
       override;
   void SetApproved(const std::string& parent_access_token,
                    const base::Time& expire_timestamp) override;
   void SetDeclined() override;
   void SetCanceled() override;
+  void SetDisabled() override;
   void SetError() override;
 
   parent_access_ui::mojom::ParentAccessParams* GetParentAccessParamsForTest()

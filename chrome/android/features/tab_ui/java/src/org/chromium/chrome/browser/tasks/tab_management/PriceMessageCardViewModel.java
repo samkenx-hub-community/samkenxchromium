@@ -32,7 +32,7 @@ public class PriceMessageCardViewModel {
     public static PropertyModel create(Context context,
             MessageCardView.DismissActionProvider uiDismissActionProvider,
             PriceMessageService.PriceMessageData data) {
-        boolean isIconVisible = data.getType() == PriceMessageType.PRICE_WELCOME ? false : true;
+        boolean isIconVisible = data.getType() != PriceMessageType.PRICE_WELCOME;
         String titleText = getTitle(context, data.getType());
         String descriptionText = getDescription(context, data.getType());
         String actionText = getActionText(context, data.getType());
@@ -97,7 +97,7 @@ public class PriceMessageCardViewModel {
             if ((PriceDropNotificationManagerFactory.create()).areAppNotificationsEnabled()) {
                 return context.getString(R.string.price_drop_alerts_card_get_notified);
             } else {
-                return context.getString(R.string.price_drop_alerts_card_go_to_settings);
+                return context.getString(R.string.go_to_os_settings);
             }
         }
         return null;

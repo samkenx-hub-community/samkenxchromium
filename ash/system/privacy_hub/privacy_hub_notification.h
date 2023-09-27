@@ -10,9 +10,10 @@
 #include <vector>
 
 #include "ash/ash_export.h"
-#include "ash/public/cpp/sensor_disabled_notification_delegate.h"
 #include "ash/public/cpp/system_notification_builder.h"
+#include "ash/system/privacy_hub/sensor_disabled_notification_delegate.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "ui/message_center/message_center_observer.h"
 #include "ui/message_center/public/cpp/notification_delegate.h"
 
 namespace ash {
@@ -49,18 +50,21 @@ class ASH_EXPORT PrivacyHubNotificationClickDelegate
 
 // Represents the information displayed in a `PrivacyHubNotification`.
 class ASH_EXPORT PrivacyHubNotificationDescriptor {
-  // `message_ids` must not be empty` and `delegate` must not be null.
+  // `message_ids` must not be empty`.
   // `message_ids.at(0)` should be the generic notification message with no
   // application names.
   // `message_ids.at(n)` should be the notification message with `n` application
   // names.
+  // `delegate` specifies the callback to be used when the button is clicked.
+  // if it is null (default), an action that sets all privacy toggles
+  // corresponding `sensors` to true.
  public:
   PrivacyHubNotificationDescriptor(
       const SensorDisabledNotificationDelegate::SensorSet& sensors,
       int title_id,
       const std::vector<int>& button_ids,
       const std::vector<int>& message_ids,
-      scoped_refptr<PrivacyHubNotificationClickDelegate> delegate);
+      scoped_refptr<PrivacyHubNotificationClickDelegate> delegate = nullptr);
   PrivacyHubNotificationDescriptor(
       const PrivacyHubNotificationDescriptor& other);
   PrivacyHubNotificationDescriptor& operator=(
@@ -90,8 +94,24 @@ class ASH_EXPORT PrivacyHubNotificationDescriptor {
 
 // This class wraps `SystemNotificationBuilder` and adds additional constraints
 // and shared behavior that applies to all Privacy Hub notifications.
-class ASH_EXPORT PrivacyHubNotification {
+class ASH_EXPORT PrivacyHubNotification
+    : public message_center::MessageCenterObserver {
  public:
+  // Class used to encapsulate the logic whether a notification should be
+  // throttled (suppressed because it has been manually dismissed recently);
+  class Throttler {
+   public:
+    Throttler() = default;
+    Throttler(const Throttler&) = delete;
+    Throttler& operator=(const Throttler&) = delete;
+    virtual ~Throttler() = default;
+
+    // Returns `true` if the notification should be suppressed.
+    virtual bool ShouldThrottle() = 0;
+    // To be called when a notification is dismissed by the user.
+    virtual void RecordDismissalByUser() = 0;
+  };
+
   // Create a new notification.
   // When calling `Show() or `Update()`:
   // If `sensors_` is empty, the generic notification message from `descriptor`
@@ -119,7 +139,11 @@ class ASH_EXPORT PrivacyHubNotification {
   PrivacyHubNotification(PrivacyHubNotification&&) = delete;
   PrivacyHubNotification& operator=(PrivacyHubNotification&&) = delete;
 
-  ~PrivacyHubNotification();
+  ~PrivacyHubNotification() override;
+
+  // message_center::MessageCenterObserver:
+  void OnNotificationRemoved(const std::string& notification_id,
+                             bool by_user) override;
 
   // Show the notification to the user for at least `kMinShowTime`. Every time
   // `Show()` is called, the notification will pop up. For silent updates, use
@@ -129,11 +153,17 @@ class ASH_EXPORT PrivacyHubNotification {
   // Hide the notification from the message center.
   void Hide();
 
+  // Returns true if this notificaiton is shown (present in the message center).
+  bool IsShown();
+
   // Silently updates the notification when needed, for example, when an
   // application stops accessing a sensor and the name of that application needs
   // to be removed from the notification without letting the notification pop up
   // again.
   void Update();
+
+  // Updates priority for notification that will be created via Show/Update.
+  void SetPriority(message_center::NotificationPriority priority);
 
   // Updates the value of `sensors_`.
   void SetSensors(SensorDisabledNotificationDelegate::SensorSet sensors);
@@ -143,7 +173,16 @@ class ASH_EXPORT PrivacyHubNotification {
   // `Show()` and `Hide()` are not going to work reliably.
   SystemNotificationBuilder& builder() { return builder_; }
 
+  // Sets a custom Throttler - the object that decides whether to suppress a
+  // notification due too too many repetitions.
+  void SetThrottler(std::unique_ptr<Throttler> throttler);
+
  private:
+  // Starts observation of dismissed messages
+  void StartDismissalObservation();
+  // Stops observation of dismissed messages
+  void StopDismissalObservation();
+
   // Get names of apps accessing sensors in `sensors_`. At most `number_of_apps`
   // elements will be returned.
   std::vector<std::u16string> GetAppsAccessingSensors(
@@ -183,6 +222,9 @@ class ASH_EXPORT PrivacyHubNotification {
   // determine if the notification is for the camera hardware switch to handle
   // it specially.
   NotificationCatalogName catalog_name_;
+
+  // Encapsulates the throttling logic for this notification.
+  std::unique_ptr<Throttler> throttler_;
 };
 
 }  // namespace ash

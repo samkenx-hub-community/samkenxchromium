@@ -9,10 +9,11 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "base/test/scoped_feature_list.h"
+#import "base/test/test_timeouts.h"
 #import "components/autofill/core/common/autofill_constants.h"
 #import "components/autofill/core/common/autofill_features.h"
 #import "components/autofill/ios/form_util/form_util_java_script_feature.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/web/chrome_web_client.h"
 #import "ios/web/public/js_messaging/web_frames_manager.h"
 #import "ios/web/public/test/fakes/fake_web_client.h"
@@ -23,10 +24,6 @@
 #import "ios/web/public/web_state.h"
 #import "testing/gtest_mac.h"
 #import "testing/platform_test.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using autofill::FieldRendererId;
 using autofill::FormRendererId;
@@ -107,16 +104,14 @@ class AutofillJavaScriptFeatureTest : public PlatformTest {
 
     // Wait for `SetUpForUniqueIDsWithInitialState` to complete.
     ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^bool {
-      return [web::test::ExecuteJavaScript(@"document[__gCrWeb.fill.ID_SYMBOL]",
-                                           web_state()) intValue] ==
-             static_cast<int>(next_available_id);
+      return [ExecuteJavaScript(@"document[__gCrWeb.fill.ID_SYMBOL]")
+                 intValue] == static_cast<int>(next_available_id);
     }));
   }
 
   web::WebFrame* main_web_frame() {
     web::WebFramesManager* frames_manager =
-        autofill::AutofillJavaScriptFeature::GetInstance()->GetWebFramesManager(
-            web_state());
+        feature()->GetWebFramesManager(web_state());
 
     return frames_manager->GetMainWebFrame();
   }
@@ -134,9 +129,15 @@ class AutofillJavaScriptFeatureTest : public PlatformTest {
                           base::BindOnce(^(NSString* actualResult) {
                             block_was_called = YES;
                           }));
-    base::test::ios::WaitUntilCondition(^bool() {
-      return block_was_called;
-    });
+    ASSERT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+        TestTimeouts::action_timeout(), ^bool() {
+          return block_was_called;
+        }));
+  }
+
+  id ExecuteJavaScript(NSString* java_script) {
+    return web::test::ExecuteJavaScriptForFeature(web_state(), java_script,
+                                                  feature());
   }
 
   autofill::AutofillJavaScriptFeature* feature() {
@@ -154,8 +155,7 @@ class AutofillJavaScriptFeatureTest : public PlatformTest {
 // Tests that `hasBeenInjected` returns YES after `inject` call.
 TEST_F(AutofillJavaScriptFeatureTest, InitAndInject) {
   LoadHtml(@"<html></html>");
-  EXPECT_NSEQ(@"object", web::test::ExecuteJavaScript(
-                             @"typeof __gCrWeb.autofill", web_state()));
+  EXPECT_NSEQ(@"object", ExecuteJavaScript(@"typeof __gCrWeb.autofill"));
 }
 
 // Tests forms extraction method
@@ -184,6 +184,7 @@ TEST_F(AutofillJavaScriptFeatureTest, ExtractForms) {
         @"id_attribute" : @"firstname",
         @"identifier" : @"firstname",
         @"form_control_type" : @"text",
+        @"placeholder_attribute" : @"",
         @"max_length" : GetDefaultMaxLength(),
         @"should_autocomplete" : @true,
         @"is_checkable" : @false,
@@ -200,6 +201,7 @@ TEST_F(AutofillJavaScriptFeatureTest, ExtractForms) {
         @"id_attribute" : @"lastname",
         @"identifier" : @"lastname",
         @"form_control_type" : @"text",
+        @"placeholder_attribute" : @"",
         @"max_length" : GetDefaultMaxLength(),
         @"should_autocomplete" : @true,
         @"is_checkable" : @false,
@@ -216,6 +218,7 @@ TEST_F(AutofillJavaScriptFeatureTest, ExtractForms) {
         @"id_attribute" : @"email",
         @"identifier" : @"email",
         @"form_control_type" : @"email",
+        @"placeholder_attribute" : @"",
         @"max_length" : GetDefaultMaxLength(),
         @"should_autocomplete" : @true,
         @"is_checkable" : @false,
@@ -235,9 +238,10 @@ TEST_F(AutofillJavaScriptFeatureTest, ExtractForms) {
                           block_was_called = YES;
                           result = [actualResult copy];
                         }));
-  base::test::ios::WaitUntilCondition(^bool() {
-    return block_was_called;
-  });
+  ASSERT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+      TestTimeouts::action_timeout(), ^bool() {
+        return block_was_called;
+      }));
 
   NSArray* resultArray = [NSJSONSerialization
       JSONObjectWithData:[result dataUsingEncoding:NSUTF8StringEncoding]
@@ -277,6 +281,7 @@ TEST_F(AutofillJavaScriptFeatureTest, ExtractForms2) {
         @"id_attribute" : @"firstname",
         @"identifier" : @"firstname",
         @"form_control_type" : @"text",
+        @"placeholder_attribute" : @"",
         @"max_length" : GetDefaultMaxLength(),
         @"should_autocomplete" : @true,
         @"is_checkable" : @false,
@@ -293,6 +298,7 @@ TEST_F(AutofillJavaScriptFeatureTest, ExtractForms2) {
         @"id_attribute" : @"lastname",
         @"identifier" : @"lastname",
         @"form_control_type" : @"text",
+        @"placeholder_attribute" : @"",
         @"max_length" : GetDefaultMaxLength(),
         @"should_autocomplete" : @true,
         @"is_checkable" : @false,
@@ -309,6 +315,7 @@ TEST_F(AutofillJavaScriptFeatureTest, ExtractForms2) {
         @"id_attribute" : @"email",
         @"identifier" : @"email",
         @"form_control_type" : @"email",
+        @"placeholder_attribute" : @"",
         @"max_length" : GetDefaultMaxLength(),
         @"should_autocomplete" : @true,
         @"is_checkable" : @false,
@@ -328,9 +335,10 @@ TEST_F(AutofillJavaScriptFeatureTest, ExtractForms2) {
                           block_was_called = YES;
                           result = [actualResult copy];
                         }));
-  base::test::ios::WaitUntilCondition(^bool() {
-    return block_was_called;
-  });
+  ASSERT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+      TestTimeouts::action_timeout(), ^bool() {
+        return block_was_called;
+      }));
 
   NSArray* resultArray = [NSJSONSerialization
       JSONObjectWithData:[result dataUsingEncoding:NSUTF8StringEncoding]
@@ -361,9 +369,10 @@ TEST_F(AutofillJavaScriptFeatureTest, ExtractFormlessForms_AllFormlessForms) {
                           block_was_called = YES;
                           result = [actualResult copy];
                         }));
-  base::test::ios::WaitUntilCondition(^bool() {
-    return block_was_called;
-  });
+  ASSERT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+      TestTimeouts::action_timeout(), ^bool() {
+        return block_was_called;
+      }));
 
   // Verify that the form is non-empty.
   NSArray* resultArray = [NSJSONSerialization
@@ -384,7 +393,7 @@ TEST_F(AutofillJavaScriptFeatureTest, FillActiveFormField) {
   NSString* get_element_javascript = @"document.getElementsByName('email')[0]";
   NSString* focus_element_javascript =
       [NSString stringWithFormat:@"%@.focus()", get_element_javascript];
-  web::test::ExecuteJavaScript(focus_element_javascript, web_state());
+  ExecuteJavaScript(focus_element_javascript);
   base::Value::Dict data;
   data.Set("name", "email");
   data.Set("identifier", "email");
@@ -402,8 +411,7 @@ TEST_F(AutofillJavaScriptFeatureTest, FillActiveFormField) {
       }));
   NSString* element_value_javascript =
       [NSString stringWithFormat:@"%@.value", get_element_javascript];
-  EXPECT_NSEQ(@"newemail@com", web::test::ExecuteJavaScript(
-                                   element_value_javascript, web_state()));
+  EXPECT_NSEQ(@"newemail@com", ExecuteJavaScript(element_value_javascript));
 }
 
 // Tests the generation of the name of the fields.
@@ -425,9 +433,10 @@ TEST_F(AutofillJavaScriptFeatureTest, TestExtractedFieldsNames) {
                           block_was_called = YES;
                           result = [actualResult copy];
                         }));
-  base::test::ios::WaitUntilCondition(^bool() {
-    return block_was_called;
-  });
+  ASSERT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+      TestTimeouts::action_timeout(), ^bool() {
+        return block_was_called;
+      }));
 
   NSArray* resultArray = [NSJSONSerialization
       JSONObjectWithData:[result dataUsingEncoding:NSUTF8StringEncoding]
@@ -489,9 +498,10 @@ TEST_F(AutofillJavaScriptFeatureTest, TestExtractedFieldsIDs) {
                           block_was_called = YES;
                           result = [actualResult copy];
                         }));
-  base::test::ios::WaitUntilCondition(^bool() {
-    return block_was_called;
-  });
+  ASSERT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+      TestTimeouts::action_timeout(), ^bool() {
+        return block_was_called;
+      }));
 
   NSArray* resultArray = [NSJSONSerialization
       JSONObjectWithData:[result dataUsingEncoding:NSUTF8StringEncoding]
@@ -521,11 +531,9 @@ TEST_F(AutofillJavaScriptFeatureTest, FillFormUsingRendererIDs) {
   RunFormsSearch();
 
   // Simulate interacting with the field that should be force filled.
-  web::test::ExecuteJavaScript(
-      @"var field = document.getElementById('firstname');"
-       "field.focus();"
-       "field.value = 'to_be_erased';",
-      web_state());
+  ExecuteJavaScript(@"var field = document.getElementById('firstname');"
+                     "field.focus();"
+                     "field.value = 'to_be_erased';");
 
   base::Value::Dict autofillData;
   autofillData.Set("formName", "testform");
@@ -579,7 +587,7 @@ TEST_F(AutofillJavaScriptFeatureTest, ClearForm) {
                                    field_data.first];
     NSString* focusScript =
         [NSString stringWithFormat:@"%@.focus()", getFieldScript];
-    web::test::ExecuteJavaScript(focusScript, web_state());
+    ExecuteJavaScript(focusScript);
     base::Value::Dict data;
     data.Set("unique_renderer_id", field_data.second);
     data.Set("value", "testvalue");

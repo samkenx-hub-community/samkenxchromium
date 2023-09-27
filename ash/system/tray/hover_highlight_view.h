@@ -9,12 +9,15 @@
 
 #include "ash/system/tray/actionable_view.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
+#include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/gfx/font.h"
 #include "ui/gfx/text_constants.h"
 
 namespace views {
 class Border;
+class ImageView;
 class Label;
 }  // namespace views
 
@@ -36,6 +39,7 @@ class ASH_EXPORT HoverHighlightView : public ActionableView {
     UNCHECKED_CHECKBOX
   };
 
+  METADATA_HEADER(HoverHighlightView);
   // If |listener| is null then no action is taken on click.
   explicit HoverHighlightView(ViewClickListener* listener);
 
@@ -99,6 +103,7 @@ class ASH_EXPORT HoverHighlightView : public ActionableView {
 
   bool is_populated() const { return is_populated_; }
 
+  views::ImageView* icon() { return icon_; }
   views::Label* text_label() { return text_label_; }
   views::Label* sub_text_label() { return sub_text_label_; }
   views::View* left_view() { return left_view_; }
@@ -112,7 +117,6 @@ class ASH_EXPORT HoverHighlightView : public ActionableView {
 
   // views::View:
   void GetAccessibleNodeData(ui::AXNodeData* node_data) override;
-  const char* GetClassName() const override;
 
  private:
   friend class TrayAccessibilityTest;
@@ -135,13 +139,20 @@ class ASH_EXPORT HoverHighlightView : public ActionableView {
   // be called before re-populating the view.
   bool is_populated_ = false;
 
-  ViewClickListener* const listener_ = nullptr;
-  views::Label* text_label_ = nullptr;
-  views::Label* sub_text_label_ = nullptr;
-  views::View* left_view_ = nullptr;
-  views::View* right_view_ = nullptr;
-  views::View* sub_row_ = nullptr;
-  TriView* tri_view_ = nullptr;
+  const raw_ptr<ViewClickListener, DanglingUntriaged | ExperimentalAsh>
+      listener_ = nullptr;
+  raw_ptr<views::ImageView, DanglingUntriaged | ExperimentalAsh> icon_ =
+      nullptr;
+  raw_ptr<views::Label, DanglingUntriaged | ExperimentalAsh> text_label_ =
+      nullptr;
+  raw_ptr<views::Label, DanglingUntriaged | ExperimentalAsh> sub_text_label_ =
+      nullptr;
+  raw_ptr<views::View, DanglingUntriaged | ExperimentalAsh> left_view_ =
+      nullptr;
+  raw_ptr<views::View, DanglingUntriaged | ExperimentalAsh> right_view_ =
+      nullptr;
+  raw_ptr<views::View, DanglingUntriaged | ExperimentalAsh> sub_row_ = nullptr;
+  raw_ptr<TriView, DanglingUntriaged | ExperimentalAsh> tri_view_ = nullptr;
   bool expandable_ = false;
   AccessibilityState accessibility_state_ = AccessibilityState::DEFAULT;
   base::CallbackListSubscription enabled_changed_subscription_ =

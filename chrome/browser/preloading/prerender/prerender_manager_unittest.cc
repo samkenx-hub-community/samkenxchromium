@@ -5,10 +5,10 @@
 #include <string>
 
 #include "base/test/scoped_feature_list.h"
+#include "chrome/browser/browser_features.h"
 #include "chrome/browser/preloading/chrome_preloading.h"
 #include "chrome/browser/preloading/prerender/prerender_manager.h"
 #include "chrome/browser/preloading/prerender/prerender_utils.h"
-#include "chrome/common/chrome_features.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
@@ -36,7 +36,7 @@ class PrerenderManagerTest : public ChromeRenderViewHostTestHarness {
   }
 
   void SetUp() override {
-    prerender_helper_.SetUp(&test_server_);
+    prerender_helper_.RegisterServerRequestMonitor(&test_server_);
     ASSERT_TRUE(test_server_.Start());
     ChromeRenderViewHostTestHarness::SetUp();
 
@@ -101,7 +101,7 @@ class PrerenderManagerTest : public ChromeRenderViewHostTestHarness {
       web_contents_delegate_;
 
   net::EmbeddedTestServer test_server_;
-  raw_ptr<PrerenderManager> prerender_manager_;
+  raw_ptr<PrerenderManager, DanglingUntriaged> prerender_manager_;
 };
 
 TEST_F(PrerenderManagerTest, StartCleanSearchSuggestionPrerender) {
@@ -199,7 +199,8 @@ TEST_F(PrerenderManagerTest, StartCleanPrerenderDirectUrlInput) {
   content::PreloadingAttempt* preloading_attempt =
       preloading_data->AddPreloadingAttempt(
           chrome_preloading_predictor::kOmniboxDirectURLInput,
-          content::PreloadingType::kPrerender, same_url_matcher);
+          content::PreloadingType::kPrerender, same_url_matcher,
+          GetActiveWebContents()->GetPrimaryMainFrame()->GetPageUkmSourceId());
 
   prerender_manager()->StartPrerenderDirectUrlInput(prerendering_url,
                                                     *preloading_attempt);
@@ -222,7 +223,8 @@ TEST_F(PrerenderManagerTest, StartNewPrerenderDirectUrlInput) {
   content::PreloadingAttempt* preloading_attempt =
       preloading_data->AddPreloadingAttempt(
           chrome_preloading_predictor::kOmniboxDirectURLInput,
-          content::PreloadingType::kPrerender, same_url_matcher);
+          content::PreloadingType::kPrerender, same_url_matcher,
+          GetActiveWebContents()->GetPrimaryMainFrame()->GetPageUkmSourceId());
 
   prerender_manager()->StartPrerenderDirectUrlInput(prerendering_url,
                                                     *preloading_attempt);
@@ -237,7 +239,8 @@ TEST_F(PrerenderManagerTest, StartNewPrerenderDirectUrlInput) {
   content::PreloadingAttempt* preloading_attempt2 =
       preloading_data->AddPreloadingAttempt(
           chrome_preloading_predictor::kOmniboxDirectURLInput,
-          content::PreloadingType::kPrerender, same_url_matcher);
+          content::PreloadingType::kPrerender, same_url_matcher,
+          GetActiveWebContents()->GetPrimaryMainFrame()->GetPageUkmSourceId());
   prerender_manager()->StartPrerenderDirectUrlInput(prerendering_url2,
                                                     *preloading_attempt2);
   host_observer.WaitForDestroyed();

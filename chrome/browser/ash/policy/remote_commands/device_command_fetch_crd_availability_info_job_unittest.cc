@@ -21,8 +21,6 @@
 #include "chrome/browser/ash/policy/remote_commands/user_session_type_test_util.h"
 #include "chrome/browser/ash/settings/device_settings_test_helper.h"
 #include "components/policy/proto/device_management_backend.pb.h"
-#include "extensions/common/value_builder.h"
-#include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/user_activity/user_activity_detector.h"
 
@@ -37,19 +35,18 @@ using chromeos::network_config::mojom::NetworkType;
 using chromeos::network_config::mojom::OncSource;
 using enterprise_management::CrdSessionAvailability;
 using enterprise_management::RemoteCommand;
-using extensions::DictionaryBuilder;
 using test::SessionTypeToString;
 using test::TestSessionType;
 using testing::Not;
 
 constexpr int64_t kUniqueID = 111222333444;
 
-RemoteCommand GenerateCommandProto(const std::string& payload) {
+RemoteCommand GenerateCommandProto() {
   RemoteCommand command_proto;
   command_proto.set_type(RemoteCommand::FETCH_CRD_AVAILABILITY_INFO);
   command_proto.set_command_id(kUniqueID);
   command_proto.set_age_of_command(0);
-  command_proto.set_payload(payload);
+  command_proto.set_payload("");
   return command_proto;
 }
 
@@ -119,13 +116,11 @@ class DeviceCommandFetchCrdAvailabilityInfoJobTest
     DeviceSettingsTestBase::TearDown();
   }
 
-  Result CreateAndRunJob(
-      const DictionaryBuilder& payload = DictionaryBuilder()) {
+  Result CreateAndRunJob() {
     DeviceCommandFetchCrdAvailabilityInfoJob job;
 
-    bool initialized =
-        job.Init(base::TimeTicks::Now(), GenerateCommandProto(payload.ToJSON()),
-                 enterprise_management::SignedData());
+    bool initialized = job.Init(base::TimeTicks::Now(), GenerateCommandProto(),
+                                enterprise_management::SignedData());
     if (!initialized) {
       ADD_FAILURE() << "Failed to initialize job";
       return Result{};
@@ -148,6 +143,10 @@ class DeviceCommandFetchCrdAvailabilityInfoJobTest
   void SetDeviceIdleTime(int idle_time_in_sec) {
     user_activity_detector_->set_last_activity_time_for_test(
         base::TimeTicks::Now() - base::Seconds(idle_time_in_sec));
+  }
+
+  void SetLastDeviceActivityTime(base::TimeTicks value) {
+    user_activity_detector_->set_last_activity_time_for_test(value);
   }
 
   ash::FakeChromeUserManager& user_manager() { return *user_manager_; }
@@ -194,6 +193,20 @@ TEST_F(DeviceCommandFetchCrdAvailabilityInfoJobTest,
   EXPECT_THAT(ParseJsonDict(result.payload),
               DictionaryHasValue("deviceIdleTimeInSeconds",
                                  base::Value(device_idle_time_in_sec)));
+}
+
+TEST_F(DeviceCommandFetchCrdAvailabilityInfoJobTest,
+       ShouldReturnMaxIntDeviceIdleTimeIfThereWasNoActivitySinceBoot) {
+  base::TimeTicks never;
+  ASSERT_TRUE(never.is_null());
+  SetLastDeviceActivityTime(never);
+
+  Result result = CreateAndRunJob();
+
+  EXPECT_THAT(
+      ParseJsonDict(result.payload),
+      DictionaryHasValue("deviceIdleTimeInSeconds",
+                         base::Value(std::numeric_limits<int32_t>::max())));
 }
 
 TEST_F(DeviceCommandFetchCrdAvailabilityInfoJobTest,

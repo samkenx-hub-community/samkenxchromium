@@ -46,6 +46,19 @@ parentMessagePipe.registerHandler(Message.STREAM_ACTION, async (message) => {
   streamActionCallback(/** @type {!StreamAction} */ (message.action));
 });
 
+let keyboardLayoutChangedCallback = null;
+parentMessagePipe.registerHandler(
+    Message.KEYBOARD_LAYOUT_INFO, async (message) => {
+      if (!keyboardLayoutChangedCallback) {
+        return;
+      }
+      keyboardLayoutChangedCallback(
+          /** @type {string} */ (message.id),
+          /** @type {string} */ (message.longName),
+          /** @type {string} */ (message.shortName),
+          /** @type {string} */ (message.layoutTag));
+    });
+
 let virtualKeyboardCallback = null;
 parentMessagePipe.registerHandler(
     Message.IS_VIRTUAL_KEYBOARD_ENABLED, async (message) => {
@@ -67,6 +80,24 @@ parentMessagePipe.registerHandler(
       androidNetworkInfoCallback(
           /** @type {boolean} */ (message.isDifferentNetwork),
           /** @type {boolean} */ (message.androidDeviceOnCellular));
+    });
+
+// Handle accessibility perform action.
+let performActionCallback = null;
+parentMessagePipe.registerHandler(
+    Message.ACCESSIBILITY_PERFORM_ACTION, async (action) => {
+      if (!performActionCallback) {
+        return Promise.resolve(false);
+      }
+      return performActionCallback(/** @type {Uint8Array} */ (action));
+    });
+let refreshWithExtraDataCallback = null;
+parentMessagePipe.registerHandler(
+    Message.ACCESSIBILITY_REFRESH_WITH_EXTRA_DATA, async (action) => {
+      if (!refreshWithExtraDataCallback) {
+        return Promise.resolve(null);
+      }
+      return refreshWithExtraDataCallback(/** @type {Uint8Array} */ (action));
     });
 
 // The implementation of echeapi.d.ts
@@ -146,6 +177,11 @@ const EcheApiBindingImpl = new (class {
         Message.ENUM_HISTOGRAM_MESSAGE, {histogram, value, maxValue});
   }
 
+  sendAccessibilityEventData(event) {
+    console.log('echeapi receiver.js sendAccessibilityEventData');
+    parentMessagePipe.sendMessage(Message.ACCESSIBILITY_EVENT_DATA, event);
+  }
+
   onStreamAction(callback) {
     console.log('echeapi receiver.js onStreamAction');
     streamActionCallback = callback;
@@ -166,6 +202,11 @@ const EcheApiBindingImpl = new (class {
         Message.CONNECTION_STATUS_CHANGED, {connectionStatus});
   }
 
+  requestCurrentKeyboardLayout() {
+    console.log('echeapi receiver.js requestCurrentKeyboardLayout');
+    parentMessagePipe.sendMessage(Message.KEYBOARD_LAYOUT_REQUEST);
+  }
+
   onReceivedVirtualKeyboardChanged(callback) {
     console.log('echeapi receiver.js onReceivedVirtualKeyboardChanged');
     virtualKeyboardCallback = callback;
@@ -175,20 +216,47 @@ const EcheApiBindingImpl = new (class {
     console.log('echeapi receiver.js onAndroidDeviceNetworkInfoChanged');
     androidNetworkInfoCallback = callback;
   }
+
+  onKeyboardLayoutChanged(callback) {
+    console.log('echeapi receiver.js onKeyboardLayoutChanged');
+    keyboardLayoutChangedCallback = callback;
+  }
+
+  // TODO: rename this and similar methods to set'Xxx'Callback
+  onPerformAction(callback) {
+    console.log('echeapi receiver.js onPerformAction');
+    performActionCallback = callback;
+  }
+
+  registerRefreshWithExtraDataCallback(callback) {
+    console.log('echeapi receiver.js registerRefreshWithExtraDataCallback');
+    refreshWithExtraDataCallback = callback;
+  }
 })();
 
 // Declare module echeapi and bind the implementation to echeapi.d.ts
 console.log('echeapi receiver.js start bind the implementation of echeapi');
 const echeapi = {};
+// webrtc
 echeapi.webrtc = {};
 echeapi.webrtc.sendSignal =
-    EcheApiBindingImpl.sendWebRtcSignal.bind(EcheApiBindingImpl);
+  EcheApiBindingImpl.sendWebRtcSignal.bind(EcheApiBindingImpl);
 echeapi.webrtc.tearDownSignal =
     EcheApiBindingImpl.tearDownSignal.bind(EcheApiBindingImpl);
 echeapi.webrtc.registerSignalReceiver =
     EcheApiBindingImpl.onWebRtcSignalReceived.bind(EcheApiBindingImpl);
 echeapi.webrtc.closeWindow =
     EcheApiBindingImpl.closeWindow.bind(EcheApiBindingImpl);
+// accessibility
+echeapi.accessibility = {};
+echeapi.accessibility.sendAccessibilityEventData =
+  EcheApiBindingImpl.sendAccessibilityEventData.bind(EcheApiBindingImpl);
+echeapi.accessibility.registerPerformActionReceiver =
+  EcheApiBindingImpl.onPerformAction.bind(EcheApiBindingImpl);
+echeapi.accessibility.registerRefreshWithExtraDataReceiver =
+    EcheApiBindingImpl.registerRefreshWithExtraDataCallback.bind(
+        EcheApiBindingImpl);
+// system
 echeapi.system = {};
 echeapi.system.getLocalUid =
     EcheApiBindingImpl.getLocalUid.bind(EcheApiBindingImpl);
@@ -215,6 +283,8 @@ echeapi.system.registerStreamActionReceiver =
 echeapi.system.registerVirtualKeyboardChangedReceiver =
     EcheApiBindingImpl.onReceivedVirtualKeyboardChanged.bind(
         EcheApiBindingImpl);
+echeapi.system.registerKeyboardLayoutChangedReceiver =
+    EcheApiBindingImpl.onKeyboardLayoutChanged.bind(EcheApiBindingImpl);
 echeapi.system.registerAndroidNetworkInfoChangedReceiver =
     EcheApiBindingImpl.onAndroidDeviceNetworkInfoChanged.bind(
         EcheApiBindingImpl);
@@ -222,5 +292,7 @@ echeapi.system.onStreamOrientationChanged =
     EcheApiBindingImpl.onStreamOrientationChanged.bind(EcheApiBindingImpl);
 echeapi.system.onConnectionStatusChanged =
     EcheApiBindingImpl.onConnectionStatusChanged.bind(EcheApiBindingImpl);
+echeapi.system.requestCurrentKeyboardLayout =
+    EcheApiBindingImpl.requestCurrentKeyboardLayout.bind(EcheApiBindingImpl);
 window['echeapi'] = echeapi;
 console.log('echeapi receiver.js finish bind the implementation of echeapi');

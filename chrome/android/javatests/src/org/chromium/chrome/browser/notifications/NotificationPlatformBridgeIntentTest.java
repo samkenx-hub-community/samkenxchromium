@@ -7,9 +7,9 @@ package org.chromium.chrome.browser.notifications;
 import android.app.Notification;
 import android.content.Context;
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.Assert;

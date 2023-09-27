@@ -8,7 +8,6 @@ See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts
 for more details about the presubmit API built into depot_tools.
 """
 
-USE_PYTHON3 = True
 ACTION_XML_PATH = '../../../tools/metrics/actions/actions.xml'
 PRESUBMIT_VERSION = '2.0.0'
 
@@ -148,18 +147,16 @@ def CheckNoNewJs(input_api, output_api):
     'chrome/browser/resources/internals/notifications/',
     'chrome/browser/resources/internals/query_tiles/',
     'chrome/browser/resources/inspect/',
-    'chrome/browser/resources/invalidations/',
     'chrome/browser/resources/nearby_internals/',
     'chrome/browser/resources/nearby_share/',
     'chrome/browser/resources/net_internals/',
     'chrome/browser/resources/network_speech_synthesis/',
+    'chrome/browser/resources/new_tab_page_incognito_guest/',
     'chrome/browser/resources/new_tab_page/untrusted/',
-    'chrome/browser/resources/ntp4/',
     'chrome/browser/resources/offline_pages/',
     'chrome/browser/resources/omnibox/',
     'chrome/browser/resources/settings/',
     'chrome/browser/resources/tools/',
-    'chrome/browser/resources/video_tutorials/',
   ]
 
   normalized_excluded_paths = []

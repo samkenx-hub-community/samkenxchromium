@@ -13,15 +13,18 @@
 #include "base/logging.h"
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
-#include "base/task/single_thread_task_runner.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/timer/timer.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/url_constants.h"
+#include "net/http/http_response_headers.h"
+#include "net/http/http_status_code.h"
 #include "ui/base/page_transition_types.h"
 #include "url/gurl.h"
+#include "url/url_constants.h"
 
 namespace web_app {
 namespace {
@@ -59,17 +62,14 @@ class LoaderTask : public content::WebContentsObserver {
   LoaderTask& operator=(LoaderTask&&) = delete;
   ~LoaderTask() override = default;
 
-  void LoadUrl(const GURL& url,
+  void LoadUrl(const content::NavigationController::LoadURLParams& load_params,
                content::WebContents* web_contents,
                UrlComparison url_comparison,
                WebAppUrlLoader::ResultCallback callback) {
-    url_ = url;
+    url_ = load_params.url;
     url_comparison_ = url_comparison;
     callback_ = std::move(callback);
     Observe(web_contents);
-
-    content::NavigationController::LoadURLParams load_params(url);
-    load_params.transition_type = ui::PAGE_TRANSITION_GENERATED;
 
     web_contents->GetController().LoadURLWithParams(load_params);
 
@@ -101,7 +101,15 @@ class LoaderTask : public content::WebContentsObserver {
     if (validated_url == content::kUnreachableWebDataURL) {
       // Navigation ends up in an error page. For example, network errors and
       // policy blocked URLs.
-      // TODO(https://crbug.com/1071300): Handle error codes appropriately.
+      PostResultTask(WebAppUrlLoader::Result::kFailedErrorPageLoaded);
+      return;
+    }
+
+    const net::HttpResponseHeaders* headers =
+        render_frame_host->GetLastResponseHeaders();
+    if (headers && headers->response_code() != net::HTTP_OK) {
+      // Navigation loads content but is not successful. For example, HTTP-500
+      // class of errors.
       PostResultTask(WebAppUrlLoader::Result::kFailedErrorPageLoaded);
       return;
     }
@@ -153,7 +161,7 @@ class LoaderTask : public content::WebContentsObserver {
     Observe(nullptr);
     // Post a task to avoid reentrancy issues e.g. adding a WebContentsObserver
     // while a previous observer call is being executed.
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(std::move(callback_), result));
   }
 
@@ -172,33 +180,73 @@ WebAppUrlLoader::WebAppUrlLoader() = default;
 
 WebAppUrlLoader::~WebAppUrlLoader() = default;
 
+void WebAppUrlLoader::LoadUrl(
+    content::NavigationController::LoadURLParams load_url_params,
+    content::WebContents* web_contents,
+    UrlComparison url_comparison,
+    ResultCallback callback) {
+  CHECK(web_contents);
+  PrepareForLoad(
+      web_contents,
+      base::BindOnce(&WebAppUrlLoader::LoadUrlInternal,
+                     weak_factory_.GetWeakPtr(), std::move(load_url_params),
+                     web_contents->GetWeakPtr(), url_comparison,
+                     std::move(callback)));
+}
+
 void WebAppUrlLoader::LoadUrl(const GURL& url,
                               content::WebContents* web_contents,
                               UrlComparison url_comparison,
                               ResultCallback callback) {
-  auto loader_task = std::make_unique<LoaderTask>();
-  auto* loader_task_ptr = loader_task.get();
-  loader_task_ptr->LoadUrl(
-      url, web_contents, url_comparison,
-      base::BindOnce(
-          [](ResultCallback callback, std::unique_ptr<LoaderTask> task,
-             Result result) {
-            std::move(callback).Run(result);
-            task.reset();
-          },
-          std::move(callback), std::move(loader_task)));
+  content::NavigationController::LoadURLParams load_params(url);
+  load_params.transition_type = ui::PAGE_TRANSITION_GENERATED;
+  LoadUrl(std::move(load_params), web_contents, url_comparison,
+          std::move(callback));
 }
 
 void WebAppUrlLoader::PrepareForLoad(content::WebContents* web_contents,
-                                     ResultCallback callback) {
-  LoadUrl(GURL(url::kAboutBlankURL), web_contents, UrlComparison::kExact,
-          base::BindOnce(
-              [](ResultCallback callback, Result result) {
-                base::UmaHistogramEnumeration(
-                    "Webapp.WebAppUrlLoaderPrepareForLoadResult", result);
-                std::move(callback).Run(result);
-              },
-              std::move(callback)));
+                                     base::OnceClosure complete) {
+  if (web_contents->GetLastCommittedURL().IsAboutBlank() &&
+      web_contents->IsDocumentOnLoadCompletedInPrimaryMainFrame()) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, std::move(complete));
+    return;
+  }
+
+  content::NavigationController::LoadURLParams load_params{
+      GURL(url::kAboutBlankURL)};
+  load_params.transition_type = ui::PAGE_TRANSITION_GENERATED;
+  LoadUrlInternal(load_params, web_contents->GetWeakPtr(),
+                  UrlComparison::kExact,
+                  base::BindOnce([](Result result) {
+                    base::UmaHistogramEnumeration(
+                        "Webapp.WebAppUrlLoaderPrepareForLoadResult", result);
+                  }).Then(std::move(complete)));
+}
+
+void WebAppUrlLoader::LoadUrlInternal(
+    const content::NavigationController::LoadURLParams& load_url_params,
+    base::WeakPtr<content::WebContents> web_contents,
+    UrlComparison url_comparison,
+    ResultCallback callback) {
+  if (!web_contents) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(std::move(callback),
+                       WebAppUrlLoader::Result::kFailedWebContentsDestroyed));
+    return;
+  }
+  auto loader_task = std::make_unique<LoaderTask>();
+  auto* loader_task_ptr = loader_task.get();
+  loader_task_ptr->LoadUrl(
+      load_url_params, web_contents.get(), url_comparison,
+      base::BindOnce(
+          [](std::unique_ptr<LoaderTask> task, Result result) {
+            task.reset();
+            return result;
+          },
+          std::move(loader_task))
+          .Then(std::move(callback)));
 }
 
 const char* ConvertUrlLoaderResultToString(WebAppUrlLoader::Result result) {

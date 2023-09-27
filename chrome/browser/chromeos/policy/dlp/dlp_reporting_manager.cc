@@ -16,7 +16,9 @@
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager_factory.h"
 #include "chrome/browser/policy/dm_token_utils.h"
 #include "components/reporting/client/report_queue.h"
+#include "components/reporting/client/report_queue_configuration.h"
 #include "components/reporting/client/report_queue_factory.h"
+#include "components/reporting/proto/synced/record_constants.pb.h"
 #include "components/reporting/util/status.h"
 #include "url/gurl.h"
 
@@ -109,7 +111,6 @@ DlpPolicyEvent_UserType GetCurrentUserType() {
       return DlpPolicyEvent_UserType_KIOSK;
     case user_manager::USER_TYPE_GUEST:
     case user_manager::USER_TYPE_CHILD:
-    case user_manager::USER_TYPE_ACTIVE_DIRECTORY:
       return DlpPolicyEvent_UserType_UNDEFINED_USER_TYPE;
     case user_manager::NUM_USER_TYPES:
       NOTREACHED();
@@ -184,28 +185,32 @@ void DlpPolicyEventBuilder::SetDestinationPattern(
 }
 
 void DlpPolicyEventBuilder::SetDestinationComponent(
-    DlpRulesManager::Component dst_component) {
+    data_controls::Component dst_component) {
   DlpPolicyEventDestination* event_destination = new DlpPolicyEventDestination;
   switch (dst_component) {
-    case (DlpRulesManager::Component::kArc):
+    case (data_controls::Component::kArc):
       event_destination->set_component(DlpPolicyEventDestination_Component_ARC);
       break;
-    case (DlpRulesManager::Component::kCrostini):
+    case (data_controls::Component::kCrostini):
       event_destination->set_component(
           DlpPolicyEventDestination_Component_CROSTINI);
       break;
-    case (DlpRulesManager::Component::kPluginVm):
+    case (data_controls::Component::kPluginVm):
       event_destination->set_component(
           DlpPolicyEventDestination_Component_PLUGIN_VM);
       break;
-    case (DlpRulesManager::Component::kUsb):
+    case (data_controls::Component::kUsb):
       event_destination->set_component(DlpPolicyEventDestination_Component_USB);
       break;
-    case (DlpRulesManager::Component::kDrive):
+    case (data_controls::Component::kDrive):
       event_destination->set_component(
           DlpPolicyEventDestination_Component_DRIVE);
       break;
-    case (DlpRulesManager::Component::kUnknownComponent):
+    case (data_controls::Component::kOneDrive):
+      event_destination->set_component(
+          DlpPolicyEventDestination_Component_ONEDRIVE);
+      break;
+    case (data_controls::Component::kUnknownComponent):
       event_destination->set_component(
           DlpPolicyEventDestination_Component_UNDEFINED_COMPONENT);
       break;
@@ -256,7 +261,7 @@ DlpPolicyEvent CreateDlpPolicyEvent(const std::string& src_pattern,
 }
 
 DlpPolicyEvent CreateDlpPolicyEvent(const std::string& src_pattern,
-                                    DlpRulesManager::Component dst_component,
+                                    data_controls::Component dst_component,
                                     DlpRulesManager::Restriction restriction,
                                     const std::string& rule_name,
                                     const std::string& rule_id,
@@ -270,9 +275,14 @@ DlpPolicyEvent CreateDlpPolicyEvent(const std::string& src_pattern,
 
 DlpReportingManager::DlpReportingManager()
     : report_queue_(
-          ::reporting::ReportQueueFactory::CreateSpeculativeReportQueue(
-              ::reporting::EventType::kUser,
-              ::reporting::Destination::DLP_EVENTS)) {}
+          ::reporting::ReportQueueFactory::CreateSpeculativeReportQueue([]() {
+            ::reporting::SourceInfo source_info;
+            source_info.set_source(::reporting::SourceInfo::ASH);
+            return ::reporting::ReportQueueConfiguration::Create(
+                       {.event_type = ::reporting::EventType::kUser,
+                        .destination = ::reporting::Destination::DLP_EVENTS})
+                .SetSourceInfo(std::move(source_info));
+          }())) {}
 
 DlpReportingManager::~DlpReportingManager() = default;
 
@@ -306,7 +316,7 @@ void DlpReportingManager::ReportEvent(const std::string& src_pattern,
 
 void DlpReportingManager::ReportEvent(
     const std::string& src_pattern,
-    const DlpRulesManager::Component dst_component,
+    const data_controls::Component dst_component,
     DlpRulesManager::Restriction restriction,
     DlpRulesManager::Level level,
     const std::string& rule_name,
@@ -337,7 +347,7 @@ void DlpReportingManager::ReportEvent(DlpPolicyEvent event) {
     return;
   }
   reporting::ReportQueue::EnqueueCallback callback = base::BindOnce(
-      &DlpReportingManager::OnEventEnqueued, base::Unretained(this));
+      &DlpReportingManager::OnEventEnqueued, weak_factory_.GetWeakPtr());
 
   switch (event.mode()) {
     case DlpPolicyEvent_Mode_BLOCK:
@@ -366,6 +376,7 @@ void DlpReportingManager::ReportEvent(DlpPolicyEvent event) {
   }
   report_queue_->Enqueue(std::make_unique<DlpPolicyEvent>(std::move(event)),
                          reporting::Priority::SLOW_BATCH, std::move(callback));
+  VLOG(1) << "DLP event sent to reporting infrastructure.";
 }
 
 }  // namespace policy

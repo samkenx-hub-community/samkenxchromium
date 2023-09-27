@@ -4,7 +4,9 @@
 
 #include "chrome/browser/ash/login/ui/login_feedback.h"
 
+#include "ash/constants/ash_features.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/webui/ash/os_feedback_dialog.h"
 #include "chrome/browser/ui/webui/feedback/feedback_dialog.h"
 #include "extensions/browser/api/feedback_private/feedback_private_api.h"
 
@@ -26,7 +28,7 @@ void LoginFeedback::Request(const std::string& description) {
 
   auto info = api->CreateFeedbackInfo(
       description_, std::string(), "Login", std::string(), GURL(),
-      extensions::api::feedback_private::FeedbackFlow::FEEDBACK_FLOW_LOGIN,
+      extensions::api::feedback_private::FeedbackFlow::kLogin,
       /*from_assistant=*/false,
       /*include_bluetooth_logs=*/false,
       /*show_questionnaire=*/false,
@@ -34,7 +36,11 @@ void LoginFeedback::Request(const std::string& description) {
       /*from_autofill=*/false,
       /*autofill_metadata=*/base::Value::Dict());
 
-  FeedbackDialog::CreateOrShow(profile_, *info);
+  if (ash::features::IsOsFeedbackDialogEnabled()) {
+    OsFeedbackDialog::ShowDialog(profile_, *info);
+  } else {
+    FeedbackDialog::CreateOrShow(profile_, *info);
+  }
 }
 
 }  // namespace ash

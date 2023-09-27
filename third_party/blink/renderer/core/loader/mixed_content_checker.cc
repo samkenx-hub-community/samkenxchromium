@@ -32,6 +32,8 @@
 #include "base/feature_list.h"
 #include "base/features.h"
 #include "base/metrics/field_trial_params.h"
+#include "build/build_config.h"
+#include "build/chromecast_buildflags.h"
 #include "services/network/public/cpp/is_potentially_trustworthy.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/features.h"
@@ -404,7 +406,7 @@ bool MixedContentChecker::ShouldBlockFetch(
     const KURL& url_before_redirects,
     ResourceRequest::RedirectStatus redirect_status,
     const KURL& url,
-    const absl::optional<String>& devtools_id,
+    base::optional_ref<const String> devtools_id,
     ReportingDisposition reporting_disposition,
     mojom::blink::ContentSecurityNotifier& notifier) {
   Frame* mixed_frame = InWhichFrameIsContentMixed(frame, url);
@@ -452,15 +454,24 @@ bool MixedContentChecker::ShouldBlockFetch(
           mojom::blink::InsecureRequestPolicy::kLeaveInsecureRequestsAlone ||
       settings->GetStrictMixedContentChecking();
 
-  const bool is_ip_address = GURL(url).HostIsIPAddress();
-
   mojom::blink::MixedContentContextType context_type =
       MixedContent::ContextTypeFromRequestContext(
           request_context, DecideCheckModeForPlugin(settings));
 
   switch (context_type) {
     case mojom::blink::MixedContentContextType::kOptionallyBlockable:
-      allowed = !strict_mode && !is_ip_address;
+
+#if BUILDFLAG(IS_FUCHSIA) && BUILDFLAG(ENABLE_CAST_RECEIVER)
+      // Fuchsia WebEngine can be configured to allow loading Mixed Content from
+      // an insecure IP address. This is a workaround to revert Fuchsia Cast
+      // Receivers to the behavior before crrev.com/c/4032146.
+      // TODO(crbug.com/1434440): Remove this workaround when there is a better
+      // way to disable blocking Mixed Content with an IP address.
+      allowed = !strict_mode;
+#else
+      allowed = !strict_mode && !GURL(url).HostIsIPAddress();
+#endif  // BUILDFLAG(IS_FUCHSIA) && BUILDFLAG(ENABLE_CAST_RECEIVER)
+
       if (allowed) {
         if (content_settings_client)
           content_settings_client->PassiveInsecureContentFound(url);
@@ -527,9 +538,9 @@ bool MixedContentChecker::ShouldBlockFetch(
   // TODO(lyf): check the IP address space for initiator, only skip when the
   // initiator is more public.
   if (RuntimeEnabledFeatures::PrivateNetworkAccessPermissionPromptEnabled()) {
-    if (target_address_space == network::mojom::blink::IPAddressSpace::kLocal ||
-        target_address_space ==
-            network::mojom::blink::IPAddressSpace::kLoopback) {
+    if (target_address_space ==
+            network::mojom::blink::IPAddressSpace::kPrivate ||
+        target_address_space == network::mojom::blink::IPAddressSpace::kLocal) {
       allowed = true;
     }
   }
@@ -787,19 +798,21 @@ bool MixedContentChecker::ShouldAutoupgrade(
   // autoupgrade because it might not make sense to request a certificate for
   // an IP address.
   if (GURL(request_url).HostIsIPAddress()) {
-    if (auto* window =
-            DynamicTo<LocalDOMWindow>(execution_context_for_logging)) {
-      window->AddConsoleMessage(
-          MixedContentChecker::
-              CreateConsoleMessageAboutFetchIPAddressNoAutoupgrade(
-                  fetch_client_settings_object->GlobalObjectUrl(),
-                  request_url));
-      AuditsIssue::ReportMixedContentIssue(
-          fetch_client_settings_object->GlobalObjectUrl(),
-          resource_request.Url(), resource_request.GetRequestContext(),
-          window->document()->GetFrame(),
-          MixedContentResolutionStatus::kMixedContentWarning,
-          resource_request.GetDevToolsId());
+    if (!request_url.ProtocolIs("https")) {
+      if (auto* window =
+              DynamicTo<LocalDOMWindow>(execution_context_for_logging)) {
+        window->AddConsoleMessage(
+            MixedContentChecker::
+                CreateConsoleMessageAboutFetchIPAddressNoAutoupgrade(
+                    fetch_client_settings_object->GlobalObjectUrl(),
+                    request_url));
+        AuditsIssue::ReportMixedContentIssue(
+            fetch_client_settings_object->GlobalObjectUrl(),
+            resource_request.Url(), resource_request.GetRequestContext(),
+            window->document()->GetFrame(),
+            MixedContentResolutionStatus::kMixedContentWarning,
+            resource_request.GetDevToolsId());
+      }
     }
     return false;
   }

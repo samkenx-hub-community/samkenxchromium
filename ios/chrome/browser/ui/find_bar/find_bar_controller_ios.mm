@@ -4,31 +4,25 @@
 
 #import "ios/chrome/browser/ui/find_bar/find_bar_controller_ios.h"
 
+#import "base/apple/bundle_locations.h"
+#import "base/apple/foundation_util.h"
 #import "base/format_macros.h"
 #import "base/i18n/rtl.h"
-#import "base/mac/bundle_locations.h"
-#import "base/mac/foundation_util.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/find_in_page/constants.h"
 #import "ios/chrome/browser/find_in_page/find_in_page_model.h"
-#import "ios/chrome/browser/shared/public/commands/browser_commands.h"
 #import "ios/chrome/browser/shared/public/commands/find_in_page_commands.h"
+#import "ios/chrome/browser/shared/ui/util/image/image_util.h"
 #import "ios/chrome/browser/shared/ui/util/rtl_geometry.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/find_bar/find_bar_constants.h"
 #import "ios/chrome/browser/ui/find_bar/find_bar_view.h"
 #import "ios/chrome/browser/ui/find_bar/find_bar_view_controller.h"
-#import "ios/chrome/browser/ui/image_util/image_util.h"
-#import "ios/chrome/browser/ui/toolbar/public/toolbar_constants.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 #import "ui/base/resource/resource_bundle.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 // For the first `kSearchDelayChars` characters, delay by `kSearchLongDelay`

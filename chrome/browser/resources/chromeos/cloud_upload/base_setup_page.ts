@@ -58,9 +58,8 @@ export class BaseSetupPageElement extends HTMLElement {
     contentElement.addEventListener(
         'scroll', this.updateContentFade.bind(undefined, contentElement),
         {passive: true});
-    // Focus the contentElement so that the screen reader reads the title and
-    // the description.
-    contentElement.focus();
+    // Focus the dialog so that the screen reader reads the title.
+    this.shadowRoot!.querySelector<HTMLElement>('#dialog')!.focus();
   }
 
   attributeChangedCallback(name: string, _oldValue: string, _newValue: string) {
@@ -68,7 +67,8 @@ export class BaseSetupPageElement extends HTMLElement {
 
     const dotsElement =
         this.shadowRoot?.querySelector('#dots') as HTMLDivElement;
-    dotsElement.innerHTML = '';
+    assert(window.trustedTypes);
+    dotsElement.innerHTML = window.trustedTypes.emptyHTML;
     const pages = parseInt(this.getAttribute('total-pages')!) || 0;
     const curPage = parseInt(this.getAttribute('page-number')!) || 0;
 

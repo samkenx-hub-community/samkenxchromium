@@ -4,13 +4,15 @@
 
 #import "ios/chrome/browser/crash_report/breadcrumbs/breadcrumb_manager_tab_helper.h"
 
+#import "base/containers/contains.h"
 #import "base/ios/ns_error_util.h"
 #import "base/strings/stringprintf.h"
 #import "components/breadcrumbs/core/breadcrumb_manager_keyed_service.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/crash_report/breadcrumbs/breadcrumb_manager_keyed_service_factory.h"
 #import "ios/chrome/browser/infobars/infobar_manager_impl.h"
-#import "ios/chrome/browser/url/chrome_url_constants.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
+#import "ios/chrome/browser/shared/model/url/url_util.h"
 #import "ios/net/protocol_handler_util.h"
 #import "ios/web/public/favicon/favicon_url.h"
 #import "ios/web/public/navigation/navigation_context.h"
@@ -20,21 +22,6 @@
 #import "ios/web/public/security/ssl_status.h"
 #import "ios/web/public/ui/crw_web_view_proxy.h"
 #import "ios/web/public/ui/crw_web_view_scroll_view_proxy.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
-namespace {
-
-// Returns true if navigation URL repesents Chrome's New Tab Page.
-bool IsNtpUrl(const GURL& url) {
-  return url.DeprecatedGetOriginAsURL() == kChromeUINewTabURL ||
-         (url.SchemeIs(url::kAboutScheme) &&
-          (url.path() == "//newtab" || url.path() == "//newtab/"));
-}
-
-}  // namespace
 
 using LoggingBlock = void (^)(const std::string& event);
 
@@ -82,7 +69,7 @@ BreadcrumbManagerTabHelper::~BreadcrumbManagerTabHelper() = default;
 
 void BreadcrumbManagerTabHelper::PlatformLogEvent(const std::string& event) {
   const bool is_scroll_event =
-      event.find(breadcrumbs::kBreadcrumbScroll) != std::string::npos;
+      base::Contains(event, breadcrumbs::kBreadcrumbScroll);
   if (!is_scroll_event) {
     // `sequentially_scrolled_` is incremented for each scroll event and reset
     // here when non-scrolling event is logged. The user can scroll multiple
@@ -101,7 +88,7 @@ void BreadcrumbManagerTabHelper::DidStartNavigation(
     web::NavigationContext* navigation_context) {
   LogDidStartNavigation(navigation_context->GetNavigationId(),
                         navigation_context->GetUrl(),
-                        IsNtpUrl(navigation_context->GetUrl()),
+                        IsUrlNtp(navigation_context->GetUrl()),
                         navigation_context->IsRendererInitiated(),
                         navigation_context->HasUserGesture(),
                         navigation_context->GetPageTransition());
@@ -116,7 +103,8 @@ void BreadcrumbManagerTabHelper::DidFinishNavigation(
     error_code = net::ERR_FAILED;
     NSError* final_error = base::ios::GetFinalUnderlyingErrorFromError(error);
     // Only errors with net::kNSErrorDomain have correct net error code.
-    if (final_error && [final_error.domain isEqual:net::kNSErrorDomain]) {
+    if (final_error &&
+        [final_error.domain isEqualToString:net::kNSErrorDomain]) {
       error_code = final_error.code;
     }
   }
@@ -128,7 +116,7 @@ void BreadcrumbManagerTabHelper::PageLoaded(
     web::WebState* web_state,
     web::PageLoadCompletionStatus load_completion_status) {
   LogPageLoaded(
-      IsNtpUrl(web_state->GetLastCommittedURL()),
+      IsUrlNtp(web_state->GetLastCommittedURL()),
       web_state->GetLastCommittedURL(),
       load_completion_status == web::PageLoadCompletionStatus::SUCCESS,
       web_state->GetContentsMimeType());

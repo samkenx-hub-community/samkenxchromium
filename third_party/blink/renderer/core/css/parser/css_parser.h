@@ -27,6 +27,7 @@ class ImmutableCSSPropertyValueSet;
 class StyleRule;
 class StyleRuleBase;
 class StyleRuleKeyframe;
+class StyleRuleTry;
 class StyleSheetContents;
 class CSSValue;
 class CSSPrimitiveValue;
@@ -70,13 +71,13 @@ class CORE_EXPORT CSSParser {
   static MutableCSSPropertyValueSet::SetResult ParseValue(
       MutableCSSPropertyValueSet*,
       CSSPropertyID unresolved_property,
-      const String&,
+      StringView value,
       bool important,
       const ExecutionContext* execution_context = nullptr);
   static MutableCSSPropertyValueSet::SetResult ParseValue(
       MutableCSSPropertyValueSet*,
       CSSPropertyID unresolved_property,
-      const String&,
+      StringView value,
       bool important,
       SecureContextMode,
       StyleSheetContents*,
@@ -85,7 +86,7 @@ class CORE_EXPORT CSSParser {
   static MutableCSSPropertyValueSet::SetResult ParseValueForCustomProperty(
       MutableCSSPropertyValueSet*,
       const AtomicString& property_name,
-      const String& value,
+      StringView value,
       bool important,
       SecureContextMode,
       StyleSheetContents*,
@@ -111,6 +112,9 @@ class CORE_EXPORT CSSParser {
       const String&);
   static StyleRuleKeyframe* ParseKeyframeRule(const CSSParserContext*,
                                               const String&);
+  static String ParseCustomPropertyName(const String&);
+
+  static StyleRuleTry* ParseTryRule(const CSSParserContext*, const String&);
 
   static bool ParseSupportsCondition(const String&, const ExecutionContext*);
 
@@ -129,8 +133,10 @@ class CORE_EXPORT CSSParser {
                                                const String&,
                                                CSSParserObserver&);
 
-  static CSSPrimitiveValue* ParseLengthPercentage(const String&,
-                                                  const CSSParserContext*);
+  static CSSPrimitiveValue* ParseLengthPercentage(
+      const String&,
+      const CSSParserContext*,
+      CSSPrimitiveValue::ValueRange);
 
   // https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-font
   // https://drafts.csswg.org/css-font-loading/#find-the-matching-font-faces
@@ -141,7 +147,7 @@ class CORE_EXPORT CSSParser {
   static MutableCSSPropertyValueSet::SetResult ParseValue(
       MutableCSSPropertyValueSet*,
       CSSPropertyID unresolved_property,
-      const String&,
+      StringView,
       bool important,
       const CSSParserContext*);
 };

@@ -5,8 +5,9 @@
 #include "chrome/browser/apps/app_service/promise_apps/promise_app_update.h"
 
 #include "base/logging.h"
+#include "base/strings/string_number_conversions.h"
 #include "chrome/browser/apps/app_service/package_id.h"
-#include "chrome/browser/apps/app_service/promise_apps/promise_apps.h"
+#include "chrome/browser/apps/app_service/promise_apps/promise_app.h"
 #include "components/services/app_service/public/cpp/macros.h"
 
 namespace apps {
@@ -18,6 +19,25 @@ PromiseAppUpdate::PromiseAppUpdate(const PromiseApp* state,
   if (state_ && delta_) {
     DCHECK_EQ(state_->package_id, delta->package_id);
   }
+}
+
+bool PromiseAppUpdate::operator==(const PromiseAppUpdate& rhs) const {
+  bool states_are_same = false;
+  bool deltas_are_same = false;
+  if (!this->state_ && !rhs.state_) {
+    states_are_same = true;
+  }
+  if (this->state_ && rhs.state_) {
+    states_are_same = *(this->state_) == *(rhs.state_);
+  }
+
+  if (!this->delta_ && !rhs.delta_) {
+    deltas_are_same = true;
+  }
+  if (this->delta_ && rhs.delta_) {
+    deltas_are_same = *(this->delta_) == *(rhs.delta_);
+  }
+  return states_are_same && deltas_are_same;
 }
 
 void PromiseAppUpdate::Merge(PromiseApp* state, const PromiseApp* delta) {
@@ -34,6 +54,7 @@ void PromiseAppUpdate::Merge(PromiseApp* state, const PromiseApp* delta) {
 
   SET_OPTIONAL_VALUE(progress);
   SET_ENUM_VALUE(status, PromiseStatus::kUnknown);
+  SET_OPTIONAL_VALUE(should_show);
 
   // When adding new fields to the PromiseApp struct, this function should also
   // be updated.
@@ -70,4 +91,26 @@ bool PromiseAppUpdate::StatusChanged() const {
   IS_VALUE_CHANGED_WITH_DEFAULT_VALUE(status, PromiseStatus::kUnknown);
 }
 
+bool PromiseAppUpdate::ShouldShow() const {
+  GET_VALUE_WITH_FALLBACK(should_show, false);
+}
+
+bool PromiseAppUpdate::ShouldShowChanged() const {
+  RETURN_OPTIONAL_VALUE_CHANGED(should_show);
+}
+
+std::ostream& operator<<(std::ostream& out, const PromiseAppUpdate& update) {
+  out << "Package_id: " << update.PackageId().ToString() << std::endl;
+  out << "- Progress Changed: " << update.ProgressChanged() << std::endl;
+  out << "- Progress: "
+      << (update.Progress().has_value()
+              ? base::NumberToString(update.Progress().value())
+              : "N/A")
+      << std::endl;
+  out << "- Status Changed: " << update.StatusChanged() << std::endl;
+  out << "- Status: " << EnumToString(update.Status()) << std::endl;
+  out << "- Should Show Changed: " << update.ShouldShowChanged() << std::endl;
+  out << "- Should Show: " << update.ShouldShow() << std::endl;
+  return out;
+}
 }  // namespace apps

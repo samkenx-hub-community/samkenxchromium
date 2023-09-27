@@ -11,7 +11,7 @@ import {assertFalse, assertGT, assertTrue} from 'chrome://webui-test/chai_assert
 import {eventToPromise} from 'chrome://webui-test/test_util.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 
-import {createAddressEntry, TestAutofillManager} from './passwords_and_autofill_fake_data.js';
+import {createAddressEntry, TestAutofillManager} from './autofill_fake_data.js';
 // clang-format on
 
 /**
@@ -50,11 +50,15 @@ export function expectEvent(
  * Creates the autofill section for the given list.
  */
 export async function createAutofillSection(
-    addresses: chrome.autofillPrivate.AddressEntry[],
-    prefValues: any): Promise<SettingsAutofillSectionElement> {
+    addresses: chrome.autofillPrivate.AddressEntry[], prefValues: any,
+    accountInfo?: chrome.autofillPrivate.AccountInfo):
+    Promise<SettingsAutofillSectionElement> {
   // Override the AutofillManagerImpl for testing.
   const autofillManager = new TestAutofillManager();
   autofillManager.data.addresses = addresses;
+  if (accountInfo) {
+    autofillManager.data.accountInfo = accountInfo;
+  }
   AutofillManagerImpl.setInstance(autofillManager);
 
   const section = document.createElement('settings-autofill-section');
@@ -70,16 +74,37 @@ export async function createAutofillSection(
  * has actually opened.
  */
 export function createAddressDialog(
-    address: chrome.autofillPrivate.AddressEntry):
+    address: chrome.autofillPrivate.AddressEntry,
+    accountInfo?: chrome.autofillPrivate.AccountInfo):
     Promise<SettingsAddressEditDialogElement> {
   return new Promise(function(resolve) {
     const section = document.createElement('settings-address-edit-dialog');
     section.address = address;
+    section.accountInfo = accountInfo;
     document.body.appendChild(section);
     eventToPromise('on-update-address-wrapper', section).then(function() {
       resolve(section);
     });
   });
+}
+
+export async function openAddressDialog(
+    section: SettingsAutofillSectionElement):
+    Promise<SettingsAddressEditDialogElement> {
+  let dialog =
+      section.shadowRoot!.querySelector('settings-address-edit-dialog');
+  assertFalse(!!dialog, 'stale dialog found');
+
+  section.$.addAddress.click();
+
+  flush();
+
+  dialog = section.shadowRoot!.querySelector('settings-address-edit-dialog');
+
+  assertTrue(!!dialog, 'the dialog element should be in the section subtree');
+
+  await eventToPromise('on-update-address-wrapper', dialog);
+  return dialog;
 }
 
 /**
@@ -178,4 +203,29 @@ export async function createRemoveAddressDialog(
   await flushTasks();
 
   return initiateRemoving(section, 0);
+}
+
+/**
+ * Performs some UI and manager manipulations to simulate the address removal.
+ */
+export async function deleteAddress(
+    section: SettingsAutofillSectionElement, manager: TestAutofillManager,
+    index: number) {
+  const dialog = await initiateRemoving(section, index);
+  const closePromise = eventToPromise('close', dialog.$.dialog);
+  dialog.$.remove.click();
+  await closePromise;
+
+  const address = [...manager.data.addresses];
+  address.splice(index, 1);
+  manager.data.addresses = address;
+  manager.lastCallback.setPersonalDataManagerListener!
+      (address, [], [], manager.data.accountInfo);
+  await flushTasks();
+}
+
+export function getAddressFieldValue(
+    address: chrome.autofillPrivate.AddressEntry,
+    type: chrome.autofillPrivate.ServerFieldType): string|undefined {
+  return address.fields.find(entry => entry.type === type)?.value;
 }

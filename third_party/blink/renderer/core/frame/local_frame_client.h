@@ -33,6 +33,7 @@
 
 #include <memory>
 
+#include "base/time/time.h"
 #include "mojo/public/cpp/bindings/pending_associated_receiver.h"
 #include "mojo/public/cpp/bindings/pending_associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -41,9 +42,11 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/loader/loading_behavior_flag.h"
 #include "third_party/blink/public/common/loader/url_loader_factory_bundle.h"
+#include "third_party/blink/public/common/performance/performance_timeline_constants.h"
 #include "third_party/blink/public/common/permissions_policy/document_policy_features.h"
 #include "third_party/blink/public/common/permissions_policy/permissions_policy.h"
 #include "third_party/blink/public/common/responsiveness_metrics/user_interaction_latency.h"
+#include "third_party/blink/public/common/subresource_load_metrics.h"
 #include "third_party/blink/public/common/tokens/tokens.h"
 #include "third_party/blink/public/common/use_counter/use_counter_feature.h"
 #include "third_party/blink/public/common/user_agent/user_agent_metadata.h"
@@ -115,7 +118,7 @@ class URLLoader;
 class ResourceLoadInfoNotifierWrapper;
 enum class SyncCondition;
 struct Impression;
-struct MobileFriendliness;
+struct JavaScriptFrameworkDetectionResult;
 
 namespace scheduler {
 class TaskAttributionId;
@@ -143,12 +146,12 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
 
   virtual void DispatchDidHandleOnloadEvents() = 0;
   virtual void DidFinishSameDocumentNavigation(
-      HistoryItem*,
       WebHistoryCommitType,
       bool is_synchronously_committed,
       mojom::blink::SameDocumentNavigationType,
       bool is_client_redirect,
       bool is_browser_initiated) {}
+  virtual void DidFailAsyncSameDocumentCommit() {}
   virtual void DispatchDidOpenDocumentInputStream(const KURL&) {}
   virtual void DispatchDidReceiveTitle(const String&) = 0;
   virtual void DispatchDidCommitLoad(
@@ -188,7 +191,8 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
       std::unique_ptr<SourceLocation> source_location,
       mojo::PendingRemote<mojom::blink::PolicyContainerHostKeepAliveHandle>
           initiator_policy_container_handle,
-      bool is_container_initiated) = 0;
+      bool is_container_initiated,
+      bool is_fullscreen_requested) = 0;
 
   virtual void DispatchWillSendSubmitEvent(HTMLFormElement*) = 0;
 
@@ -208,7 +212,8 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
   virtual void DidObserveInputDelay(base::TimeDelta input_delay) {}
 
   // Will be called when a user interaction is observed.
-  virtual void DidObserveUserInteraction(base::TimeDelta max_event_duration,
+  virtual void DidObserveUserInteraction(base::TimeTicks max_event_start,
+                                         base::TimeTicks max_event_end,
                                          UserInteractionType interaction_type) {
   }
 
@@ -219,20 +224,20 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
   // propogates renderer loading behavior to the browser process for histograms.
   virtual void DidObserveLoadingBehavior(LoadingBehaviorFlag) {}
 
+  // propagates framework detection info to the browser process for histograms.
+  virtual void DidObserveJavaScriptFrameworks(
+      const JavaScriptFrameworkDetectionResult&) {}
+
   // Will be called when a sub resource load happens.
   virtual void DidObserveSubresourceLoad(
-      uint32_t number_of_subresources_loaded,
-      uint32_t number_of_subresource_loads_handled_by_service_worker,
-      bool pervasive_payload_requested,
-      int64_t pervasive_bytes_fetched,
-      int64_t total_bytes_fetched) {}
+      const SubresourceLoadMetrics& subresource_load_metrics) {}
 
   // Will be called when a new UseCounterFeature has been observed in a frame.
   // This propagates feature usage to the browser process for histograms.
   virtual void DidObserveNewFeatureUsage(const UseCounterFeature&) {}
 
   // A new soft navigation was observed.
-  virtual void DidObserveSoftNavigation(uint32_t count) {}
+  virtual void DidObserveSoftNavigation(SoftNavigationMetrics metrics) {}
 
   // Reports that visible elements in the frame shifted (bit.ly/lsm-explainer).
   virtual void DidObserveLayoutShift(double score, bool after_input_or_scroll) {
@@ -253,8 +258,6 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
 
   virtual String UserAgentOverride() = 0;
   virtual String UserAgent() = 0;
-  virtual String FullUserAgent() = 0;
-  virtual String ReducedUserAgent() = 0;
   virtual absl::optional<blink::UserAgentMetadata> UserAgentMetadata() = 0;
 
   virtual String DoNotTrackValue() = 0;
@@ -447,12 +450,6 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
   virtual void BindDevToolsAgent(
       mojo::PendingAssociatedRemote<mojom::blink::DevToolsAgentHost> host,
       mojo::PendingAssociatedReceiver<mojom::blink::DevToolsAgent> receiver) {}
-
-  // AppCache ------------------------------------------------------------
-  virtual void UpdateSubresourceFactory(
-      std::unique_ptr<blink::PendingURLLoaderFactoryBundle> pending_factory) {}
-
-  virtual void DidChangeMobileFriendliness(const MobileFriendliness&) {}
 };
 
 }  // namespace blink

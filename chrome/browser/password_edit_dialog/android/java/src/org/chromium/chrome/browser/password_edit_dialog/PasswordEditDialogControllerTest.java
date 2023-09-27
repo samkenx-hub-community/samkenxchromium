@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.password_edit_dialog;
 
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
+
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -25,6 +27,7 @@ import org.robolectric.ParameterizedRobolectricTestRunner.Parameters;
 import org.robolectric.RuntimeEnvironment;
 
 import org.chromium.base.Callback;
+import org.chromium.base.test.BaseRobolectricTestRule;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
@@ -47,6 +50,9 @@ public class PasswordEditDialogControllerTest {
     private static final String INITIAL_PASSWORD = "password";
     private static final String CHANGED_PASSWORD = "passwordChanged";
     private static final String ACCOUNT_NAME = "foo@bar.com";
+
+    @Rule(order = -2)
+    public BaseRobolectricTestRule mBaseRule = new BaseRobolectricTestRule();
 
     @Rule
     public MockitoRule mMockitoRule = MockitoJUnit.rule();
@@ -92,7 +98,7 @@ public class PasswordEditDialogControllerTest {
         Assert.assertEquals(
                 mModalDialogManager.getShownDialogModel().get(ModalDialogProperties.TITLE),
                 r.getString(R.string.confirm_username_dialog_title));
-        Assert.assertThat("Usernames don't match",
+        assertThat("Usernames don't match",
                 mCustomViewModel.get(PasswordEditDialogProperties.USERNAMES), contains(USERNAMES));
         Assert.assertEquals("Selected username doesn't match", INITIAL_USERNAME_INDEX,
                 mCustomViewModel.get(PasswordEditDialogProperties.USERNAME_INDEX));
@@ -115,7 +121,7 @@ public class PasswordEditDialogControllerTest {
         Assert.assertEquals(
                 mModalDialogManager.getShownDialogModel().get(ModalDialogProperties.TITLE),
                 r.getString(R.string.confirm_username_dialog_title));
-        Assert.assertThat("Usernames don't match",
+        assertThat("Usernames don't match",
                 mCustomViewModel.get(PasswordEditDialogProperties.USERNAMES), contains(USERNAMES));
         Assert.assertEquals("Selected username doesn't match", INITIAL_USERNAME,
                 mCustomViewModel.get(PasswordEditDialogProperties.USERNAME));
@@ -148,7 +154,7 @@ public class PasswordEditDialogControllerTest {
         Assert.assertEquals(
                 mModalDialogManager.getShownDialogModel().get(ModalDialogProperties.TITLE),
                 r.getString(R.string.password_update_dialog_title));
-        Assert.assertThat("Usernames don't match",
+        assertThat("Usernames don't match",
                 mCustomViewModel.get(PasswordEditDialogProperties.USERNAMES),
                 contains(INITIAL_USERNAME));
         Assert.assertEquals("Selected username doesn't match", INITIAL_USERNAME,
@@ -183,7 +189,7 @@ public class PasswordEditDialogControllerTest {
                 mModalDialogManager.getShownDialogModel().get(ModalDialogProperties.TITLE),
                 r.getString(R.string.save_password));
         // Save dialog has only one username in usernames list - the one the user's just entered
-        Assert.assertThat("Usernames don't match",
+        assertThat("Usernames don't match",
                 mCustomViewModel.get(PasswordEditDialogProperties.USERNAMES),
                 contains(new String[] {INITIAL_USERNAME}));
         Assert.assertEquals("Selected username doesn't match", INITIAL_USERNAME,
@@ -240,9 +246,9 @@ public class PasswordEditDialogControllerTest {
         ModalDialogProperties.Controller dialogController =
                 mModalDialogModel.get(ModalDialogProperties.CONTROLLER);
 
-        Assert.assertThat(
+        assertThat(
                 mCustomViewModel.get(PasswordEditDialogProperties.USERNAME), is(INITIAL_USERNAME));
-        Assert.assertThat(
+        assertThat(
                 mCustomViewModel.get(PasswordEditDialogProperties.PASSWORD), is(INITIAL_PASSWORD));
 
         mCustomViewModel.set(PasswordEditDialogProperties.USERNAME, CHANGED_USERNAME);
@@ -367,7 +373,7 @@ public class PasswordEditDialogControllerTest {
 
         mCustomViewModel = mDialogCoordinator.getDialogViewModelForTesting();
 
-        Assert.assertThat(mCustomViewModel.get(PasswordEditDialogProperties.USERNAMES),
+        assertThat(mCustomViewModel.get(PasswordEditDialogProperties.USERNAMES),
                 contains(INITIAL_USERNAME));
     }
 

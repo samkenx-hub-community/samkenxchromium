@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/android/rules.gni")
+import("//third_party/jni_zero/jni_zero.gni")
 
 # Keep profiles and cookies in the same target due to bi-directional dependency
 # between Profile and CookiesFetcher.
@@ -19,7 +20,8 @@ android_library("java") {
     "//content/public/android:content_full_java",
     "//third_party/androidx:androidx_annotation_annotation_java",
   ]
-  annotation_processor_deps = [ "//base/android/jni_generator:jni_processor" ]
+
+  srcjar_deps = [ ":jni_headers" ]
   sources = [
     "java/src/org/chromium/chrome/browser/cookies/CanonicalCookie.java",
     "java/src/org/chromium/chrome/browser/cookies/CookiesFetcher.java",

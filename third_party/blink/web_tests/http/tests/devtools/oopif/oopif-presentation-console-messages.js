@@ -2,11 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+import * as Common from 'devtools/core/common/common.js';
+
 (async function() {
   TestRunner.addResult(`Test that links to UISourceCode work correctly when navigating OOPIF`);
 
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('sources');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('console');
 
   const messages = new Map();
@@ -49,7 +56,7 @@
   TestRunner.addResult('Revealing iframe source');
   await Common.Revealer.reveal(Workspace.workspace.uiSourceCodeForURL('http://devtools.oopif.test:8000/devtools/oopif/resources/empty.html'));
   TestRunner.addResult('\nClearing console');
-  SDK.ConsoleModel.requestClearMessages();
+  SDK.ConsoleModel.ConsoleModel.requestClearMessages();
   dumpMessages();
   TestRunner.completeTest();
 })();

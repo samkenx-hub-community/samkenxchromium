@@ -21,6 +21,7 @@
 #include "components/feature_engagement/public/event_constants.h"
 #include "components/feature_engagement/public/feature_constants.h"
 #include "components/feature_engagement/public/tracker.h"
+#include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -50,6 +51,10 @@ SideSearchIconView::SideSearchIconView(
   SetUpForInOutAnimation();
   SetPaintLabelOverSolidBackground(true);
   browser_->tab_strip_model()->AddObserver(this);
+  SetAccessibilityProperties(
+      /*role*/ absl::nullopt,
+      l10n_util::GetStringUTF16(
+          IDS_TOOLTIP_SIDE_SEARCH_TOOLBAR_BUTTON_NOT_ACTIVATED));
 }
 
 SideSearchIconView::~SideSearchIconView() {
@@ -100,7 +105,7 @@ void SideSearchIconView::UpdateImpl() {
   const bool was_visible = GetVisible();
   const bool should_show =
       tab_contents_helper->CanShowSidePanelForCommittedNavigation() &&
-      !side_search::IsSideSearchToggleOpen(browser_view);
+      !side_search::IsSideSearchToggleOpen(browser_);
   SetVisible(should_show);
 
   if (should_show && !was_visible) {
@@ -113,7 +118,9 @@ void SideSearchIconView::UpdateImpl() {
 
   if (!should_show) {
     HidePageActionLabel();
-    browser_view->CloseFeaturePromo(feature_engagement::kIPHSideSearchFeature);
+    browser_view->CloseFeaturePromo(
+        feature_engagement::kIPHSideSearchFeature,
+        user_education::FeaturePromoCloseReason::kAbortPromo);
   }
 }
 
@@ -125,15 +132,16 @@ void SideSearchIconView::OnExecuting(PageActionIconView::ExecuteSource source) {
   // Reset the slide animation if in progress.
   HidePageActionLabel();
 
-  BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser_);
+  SidePanelUI* side_panel_ui = SidePanelUI::GetSidePanelUIForBrowser(browser_);
 
   // TODO(crbug.com/1339789): BrowserView should never be null here, investigate
   // why GetBrowserViewForBrowser() is returning null in certain circumstances
   // and remove this check.
-  if (!browser_view)
+  if (!side_panel_ui) {
     return;
+  }
 
-  browser_view->side_panel_coordinator()->Show(
+  side_panel_ui->Show(
       SidePanelEntry::Id::kSideSearch,
       SidePanelUtil::SidePanelOpenTrigger::kSideSearchPageAction);
   auto* tracker = feature_engagement::TrackerFactory::GetForBrowserContext(
@@ -148,17 +156,14 @@ views::BubbleDialogDelegate* SideSearchIconView::GetBubble() const {
 
 const gfx::VectorIcon& SideSearchIconView::GetVectorIcon() const {
   // Default to the kSearchIcon if the DSE icon image is not available.
-  return vector_icons::kSearchIcon;
+  return OmniboxFieldTrial::IsChromeRefreshIconsEnabled()
+             ? vector_icons::kSearchChromeRefreshIcon
+             : vector_icons::kSearchIcon;
 }
 
 ui::ImageModel SideSearchIconView::GetSizedIconImage(int size) const {
   return DefaultSearchIconSource::GetOrCreateForBrowser(browser_)
       ->GetSizedIconImage(size);
-}
-
-std::u16string SideSearchIconView::GetTextForTooltipAndAccessibleName() const {
-  return l10n_util::GetStringUTF16(
-      IDS_TOOLTIP_SIDE_SEARCH_TOOLBAR_BUTTON_NOT_ACTIVATED);
 }
 
 void SideSearchIconView::AnimationProgressed(const gfx::Animation* animation) {

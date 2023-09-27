@@ -9,7 +9,7 @@
 #include "base/functional/callback_helpers.h"
 #include "content/browser/blob_storage/chrome_blob_storage_context.h"
 #include "content/browser/child_process_security_policy_impl.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/common/content_features.h"
 #include "net/base/features.h"
 #include "storage/browser/blob/blob_registry_impl.h"
@@ -31,11 +31,6 @@ class BindingDelegate : public storage::BlobRegistryImpl::Delegate {
   }
   bool CanAccessDataForOrigin(const url::Origin& origin) override {
     return security_policy_handle_.CanAccessDataForOrigin(origin);
-  }
-  file_access::ScopedFileAccessDelegate::RequestFilesAccessIOCallback
-  GetAccessCallback() override {
-    // TODO (b/262203074) create actual callback
-    return base::NullCallback();
   }
 
  private:
@@ -71,8 +66,7 @@ scoped_refptr<BlobRegistryWrapper> BlobRegistryWrapper::Create(
   return result;
 }
 
-BlobRegistryWrapper::BlobRegistryWrapper() {
-}
+BlobRegistryWrapper::BlobRegistryWrapper() = default;
 
 void BlobRegistryWrapper::Bind(
     int process_id,
@@ -85,7 +79,7 @@ void BlobRegistryWrapper::Bind(
               process_id)));
 }
 
-BlobRegistryWrapper::~BlobRegistryWrapper() {}
+BlobRegistryWrapper::~BlobRegistryWrapper() = default;
 
 void BlobRegistryWrapper::InitializeOnIOThreadDeprecated(
     scoped_refptr<ChromeBlobStorageContext> blob_storage_context,

@@ -158,16 +158,14 @@ var availableTests = [
   },
 
   function addNewAddress() {
-    function filterAddressProperties(addresses) {
-      return addresses.map(address => {
-        var filteredAddress = {};
-        ['fullNames', 'addressLevel1', 'addressLevel2', 'addressLevel3',
-         'postalCode', 'sortingCode', 'phoneNumbers', 'emailAddresses']
-            .forEach(property => {
-              filteredAddress[property] = address[property];
-            });
-        return filteredAddress;
+    function filterAddressProperties(address) {
+      const fieldMap = {};
+      address.fields.forEach(entry => {
+        if (!!entry.value) {
+          fieldMap[entry.type] = entry.value;
+        }
       });
+      return fieldMap;
     }
 
     chrome.autofillPrivate.getAddressList(
@@ -179,30 +177,68 @@ var availableTests = [
           chrome.test.listenOnce(
               chrome.autofillPrivate.onPersonalDataChanged,
               chrome.test.callbackPass(function(addressList, cardList) {
-                chrome.test.assertEq(
-                    [{
-                      fullNames: [NAME],
-                      addressLevel1: ADDRESS_LEVEL1,
-                      addressLevel2: ADDRESS_LEVEL2,
-                      addressLevel3: ADDRESS_LEVEL3,
-                      postalCode: POSTAL_CODE,
-                      sortingCode: SORTING_CODE,
-                      phoneNumbers: [PHONE],
-                      emailAddresses: [EMAIL]
-                    }],
-                    filterAddressProperties(addressList));
+                chrome.test.assertEq(1, addressList.length);
+                const expectedAddress = {
+                  NAME_FULL: NAME,
+                  ADDRESS_HOME_STATE: ADDRESS_LEVEL1,
+                  ADDRESS_HOME_CITY: ADDRESS_LEVEL2,
+                  ADDRESS_HOME_DEPENDENT_LOCALITY: ADDRESS_LEVEL3,
+                  ADDRESS_HOME_ZIP: POSTAL_CODE,
+                  ADDRESS_HOME_SORTING_CODE: SORTING_CODE,
+                  ADDRESS_HOME_COUNTRY: COUNTRY_CODE,
+                  PHONE_HOME_WHOLE_NUMBER: PHONE,
+                  EMAIL_ADDRESS: EMAIL,
+                };
+                const actualAddress = filterAddressProperties(addressList[0]);
+                Object.keys(expectedAddress).forEach(key => {
+                  chrome.test.assertEq(
+                      expectedAddress[key], actualAddress[key]);
+                })
               }));
 
           chrome.autofillPrivate.saveAddress({
-            fullNames: [NAME],
-            addressLevel1: ADDRESS_LEVEL1,
-            addressLevel2: ADDRESS_LEVEL2,
-            addressLevel3: ADDRESS_LEVEL3,
-            postalCode: POSTAL_CODE,
-            sortingCode: SORTING_CODE,
-            countryCode: COUNTRY_CODE,
-            phoneNumbers: [PHONE],
-            emailAddresses: [EMAIL]
+            fields: [
+              {
+                type: chrome.autofillPrivate.ServerFieldType.NAME_FULL,
+                value: NAME
+              },
+              {
+                type: chrome.autofillPrivate.ServerFieldType.ADDRESS_HOME_STATE,
+                value: ADDRESS_LEVEL1
+              },
+              {
+                type: chrome.autofillPrivate.ServerFieldType.ADDRESS_HOME_CITY,
+                value: ADDRESS_LEVEL2
+              },
+              {
+                type: chrome.autofillPrivate.ServerFieldType
+                          .ADDRESS_HOME_DEPENDENT_LOCALITY,
+                value: ADDRESS_LEVEL3
+              },
+              {
+                type: chrome.autofillPrivate.ServerFieldType.ADDRESS_HOME_ZIP,
+                value: POSTAL_CODE
+              },
+              {
+                type: chrome.autofillPrivate.ServerFieldType
+                          .ADDRESS_HOME_SORTING_CODE,
+                value: SORTING_CODE
+              },
+              {
+                type:
+                    chrome.autofillPrivate.ServerFieldType.ADDRESS_HOME_COUNTRY,
+                value: COUNTRY_CODE
+              },
+              {
+                type: chrome.autofillPrivate.ServerFieldType
+                          .PHONE_HOME_WHOLE_NUMBER,
+                value: PHONE
+              },
+              {
+                type: chrome.autofillPrivate.ServerFieldType.EMAIL_ADDRESS,
+                value: EMAIL
+              },
+            ],
           });
         }));
   },
@@ -213,16 +249,14 @@ var availableTests = [
     var UPDATED_NAME = 'UpdatedName';
     var UPDATED_PHONE = '1 987-987-9876'
 
-    function filterAddressProperties(addresses) {
-      return addresses.map(address => {
-        var filteredAddress = {};
-        ['guid', 'fullNames', 'addressLevel1', 'addressLevel2', 'addressLevel3',
-         'postalCode', 'sortingCode', 'phoneNumbers', 'emailAddresses']
-            .forEach(property => {
-              filteredAddress[property] = address[property];
-            });
-        return filteredAddress;
+    function filterAddressProperties(address) {
+      const filteredAddress = {guid: address.guid};
+      address.fields.map(entry => {
+        if (!!entry.value) {
+          filteredAddress[entry.type] = entry.value
+        }
       });
+      return filteredAddress;
     }
 
     chrome.autofillPrivate.getAddressList(
@@ -236,27 +270,41 @@ var availableTests = [
           chrome.test.listenOnce(
               chrome.autofillPrivate.onPersonalDataChanged,
               chrome.test.callbackPass(function(addressList, cardList) {
-                chrome.test.assertEq(
-                    [{
-                      guid: addressGuid,
-                      fullNames: [UPDATED_NAME],
-                      addressLevel1: ADDRESS_LEVEL1,
-                      addressLevel2: ADDRESS_LEVEL2,
-                      addressLevel3: ADDRESS_LEVEL3,
-                      postalCode: POSTAL_CODE,
-                      sortingCode: SORTING_CODE,
-                      phoneNumbers: [UPDATED_PHONE],
-                      emailAddresses: [EMAIL]
-                    }],
-                    filterAddressProperties(addressList));
+                chrome.test.assertEq(1, addressList.length);
+                const expectedAddress = {
+                  guid: addressGuid,
+                  NAME_FULL: UPDATED_NAME,
+                  ADDRESS_HOME_STATE: ADDRESS_LEVEL1,
+                  ADDRESS_HOME_CITY: ADDRESS_LEVEL2,
+                  ADDRESS_HOME_DEPENDENT_LOCALITY: ADDRESS_LEVEL3,
+                  ADDRESS_HOME_ZIP: POSTAL_CODE,
+                  ADDRESS_HOME_SORTING_CODE: SORTING_CODE,
+                  ADDRESS_HOME_COUNTRY: COUNTRY_CODE,
+                  PHONE_HOME_WHOLE_NUMBER: UPDATED_PHONE,
+                  EMAIL_ADDRESS: EMAIL,
+                };
+                const actualAddress = filterAddressProperties(addressList[0]);
+                Object.keys(expectedAddress).forEach(prop => {
+                  chrome.test.assertEq(
+                      expectedAddress[prop], actualAddress[prop]);
+                })
               }));
 
           // Update the address by saving an address with the same guid and
           // using some different information.
           chrome.autofillPrivate.saveAddress({
             guid: addressGuid,
-            fullNames: [UPDATED_NAME],
-            phoneNumbers: [UPDATED_PHONE]
+            fields: [
+              {
+                type: chrome.autofillPrivate.ServerFieldType.NAME_FULL,
+                value: UPDATED_NAME
+              },
+              {
+                type: chrome.autofillPrivate.ServerFieldType
+                          .PHONE_HOME_WHOLE_NUMBER,
+                value: UPDATED_PHONE
+              },
+            ],
           });
         }));
   },
@@ -472,60 +520,6 @@ var availableTests = [
     chrome.autofillPrivate.saveCreditCard({name: NAME});
   },
 
-  function validatePhoneNumbers() {
-    var COUNTRY_CODE = 'US';
-    var FAKE_NUMBER = '1-800-123-4567';
-    var ORIGINAL_NUMBERS = [FAKE_NUMBER];
-    var FIRST_NUMBER_TO_ADD = '1-800-234-5768';
-    // Same as original number, but without formatting.
-    var SECOND_NUMBER_TO_ADD = '18001234567';
-
-    var handler1 =
-        function(validateNumbers) {
-      chrome.test.assertEq(validateNumbers.length, 1);
-      chrome.test.assertEq(FAKE_NUMBER, validateNumbers[0]);
-
-      chrome.autofillPrivate.validatePhoneNumbers(
-          {
-            phoneNumbers: validateNumbers.concat(FIRST_NUMBER_TO_ADD),
-            indexOfNewNumber: 1,  // A new number (FIRST_NUMBER_TO_ADD) is added
-                                  // at the end of the list.
-            countryCode: COUNTRY_CODE
-          },
-          handler2);
-    }
-
-    var handler2 = function(validateNumbers) {
-      chrome.test.assertEq(validateNumbers.length, 2);
-      chrome.test.assertEq(FAKE_NUMBER, validateNumbers[0]);
-      chrome.test.assertEq(FIRST_NUMBER_TO_ADD, validateNumbers[1]);
-
-      chrome.autofillPrivate.validatePhoneNumbers(
-          {
-            phoneNumbers: validateNumbers.concat(SECOND_NUMBER_TO_ADD),
-            indexOfNewNumber: 2,  // A new number (SECOND_NUMBER_TO_ADD) is
-                                  // added at the end of the list.
-            countryCode: COUNTRY_CODE
-          },
-          handler3);
-    };
-
-    var handler3 = function(validateNumbers) {
-      // Newly-added number should not appear since it was the same as an
-      // existing number.
-      chrome.test.assertEq(validateNumbers.length, 2);
-      chrome.test.assertEq(FAKE_NUMBER, validateNumbers[0]);
-      chrome.test.assertEq(FIRST_NUMBER_TO_ADD, validateNumbers[1]);
-      chrome.test.succeed();
-    }
-
-    chrome.autofillPrivate.validatePhoneNumbers({
-      phoneNumbers: ORIGINAL_NUMBERS,
-      indexOfNewNumber: 0,
-      countryCode: COUNTRY_CODE
-    }, handler1);
-  },
-
   function isValidIban() {
     var handler1 = function(isValidIban) {
       // IBAN_VALUE should be valid, then follow up with invalid value.
@@ -540,6 +534,22 @@ var availableTests = [
     }
 
     chrome.autofillPrivate.isValidIban(IBAN_VALUE, handler1);
+  },
+
+  function authenticateUserAndFlipMandatoryAuthToggle() {
+    chrome.autofillPrivate.authenticateUserAndFlipMandatoryAuthToggle();
+    chrome.test.assertNoLastError();
+    chrome.test.succeed();
+  },
+
+  function authenticateUserToEditLocalCard() {
+    var handler = function(auth_succeeded) {
+      chrome.test.assertNoLastError();
+      chrome.test.succeed();
+      chrome.test.assertTrue(auth_succeeded);
+    }
+
+    chrome.autofillPrivate.authenticateUserToEditLocalCard(handler);
   },
 ];
 
@@ -560,12 +570,13 @@ var TESTS_FOR_CONFIG = {
       ['addNewIbanNoNickname', 'updateExistingIban_WithNickname'],
   'removeExistingIban': ['addNewIbanNoNickname', 'removeExistingIban'],
   'isValidIban': ['isValidIban'],
+  'authenticateUserAndFlipMandatoryAuthToggle':
+      ['authenticateUserAndFlipMandatoryAuthToggle'],
+  'authenticateUserToEditLocalCard': ['authenticateUserToEditLocalCard'],
 };
 
-chrome.test.getConfig(function(config) {
-  var testConfig = config.customArg;
-  var testsToRun = TESTS_FOR_CONFIG[testConfig] || [testConfig];
-  chrome.test.runTests(availableTests.filter(function(op) {
-    return testsToRun.includes(op.name);
-  }));
-});
+var testConfig = window.location.search.substring(1);
+var testsToRun = TESTS_FOR_CONFIG[testConfig] || [testConfig];
+chrome.test.runTests(availableTests.filter(function(op) {
+  return testsToRun.includes(op.name);
+}));

@@ -72,21 +72,14 @@ void FloatingAccessibilityController::Show(FloatingMenuPosition position) {
   init_params.max_height = kFloatingMenuHeight;
   init_params.translucent = true;
   init_params.close_on_deactivate = false;
+  init_params.type = TrayBubbleView::TrayBubbleType::kAccessibilityBubble;
   bubble_view_ = new FloatingAccessibilityBubbleView(init_params);
 
   menu_view_ = new FloatingAccessibilityView(this);
   menu_view_->SetBorder(views::CreateEmptyBorder(
       gfx::Insets::TLBR(kUnifiedTopShortcutSpacing, 0, 0, 0)));
-  bubble_view_->AddChildView(menu_view_);
-  bubble_view_->SetFocusBehavior(
-      ActionableView::FocusBehavior::ACCESSIBLE_ONLY);
-
-  // In dark light mode, we switch TrayBubbleView to use a textured layer
-  // instead of solid color layer, so no need to create an extra layer here.
-  if (!features::IsDarkLightModeEnabled()) {
-    menu_view_->SetPaintToLayer();
-    menu_view_->layer()->SetFillsBoundsOpaquely(false);
-  }
+  bubble_view_->AddChildView(menu_view_.get());
+  bubble_view_->SetFocusBehavior(views::View::FocusBehavior::ACCESSIBLE_ONLY);
 
   bubble_widget_ = views::BubbleDialogDelegateView::CreateBubble(bubble_view_);
   bubble_view_->SetCanActivate(true);
@@ -169,6 +162,7 @@ void FloatingAccessibilityController::OnDetailedMenuEnabled(bool enabled) {
     Shell::Get()
         ->accessibility_controller()
         ->UpdateAutoclickMenuBoundsIfNeeded();
+    bubble_view_->GetFocusManager()->ClearFocus();
   }
 }
 

@@ -4,14 +4,39 @@
   const baseOrigin = 'https://a.test:8443/';
   const base = baseOrigin + 'inspector-protocol/resources/';
 
+  // Order by phase.
+  function typeSortKey(type) {
+    switch (type) {
+      case 'join':
+        return 0;
+      case 'loaded':
+        return 1;
+      case 'bid':
+        return 2;
+      case 'win':
+        return 3;
+      default:
+        return type;
+    }
+  }
+
+  // Helper for sorting IG devtools events.
+  function compareEvents(a, b) {
+    let aTypeOrder = typeSortKey(a.type);
+    let bTypeOrder = typeSortKey(b.type);
+    return (aTypeOrder - bTypeOrder) ||
+        a.ownerOrigin.localeCompare(b.ownerOrigin, 'en') ||
+        a.name.localeCompare(b.name, 'en');
+  }
+
   async function joinInterestGroups(id) {
     const joinJs = `
     navigator.joinAdInterestGroup({
         name: ${id},
         owner: "${baseOrigin}",
-        biddingLogicUrl: "${base}fledge_bidding_logic.js.php",
+        biddingLogicURL: "${base}fledge_bidding_logic.js.php",
         ads: [{
-          renderUrl: 'https://example.com/render' + ${id},
+          renderURL: 'https://example.com/render' + ${id},
           metadata: {ad: 'metadata', here: [1, 2, 3]}
         }]
       }, 3000)`;
@@ -21,14 +46,14 @@
   async function runAdAuctionAndNavigateFencedFrame() {
     const auctionJs = `
       (async function() {
-        url = await navigator.runAdAuction({
-            decisionLogicUrl: "${base}fledge_decision_logic.js.php",
+        config = await navigator.runAdAuction({
+            decisionLogicURL: "${base}fledge_decision_logic.js.php",
             seller: "${baseOrigin}",
-            interestGroupBuyers: ["${baseOrigin}"]});
+            interestGroupBuyers: ["${baseOrigin}"],
+            resolveToConfig: true});
 
         const fencedFrame = document.createElement("fencedframe");
-        fencedFrame.mode = "opaque-ads";
-        fencedFrame.src = url;
+        fencedFrame.config = config;
         document.body.appendChild(fencedFrame);
       })();`;
     return session.evaluateAsync(auctionJs);
@@ -37,6 +62,9 @@
   events = [];
   async function logAndClearEvents() {
     testRunner.log(`Events logged: ${events.length}`);
+    // We need to sort events before dumping since ordering of bids is not
+    // deterministic.
+    events.sort(compareEvents);
     for (event of events) {
       testRunner.log(
         JSON.stringify(event, ['ownerOrigin', 'name', 'type'], 2));

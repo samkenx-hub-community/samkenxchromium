@@ -57,7 +57,13 @@ class AccountSelectionProperties {
      * sheet.
      */
     static class HeaderProperties {
-        public enum HeaderType { SIGN_IN, VERIFY, VERIFY_AUTO_REAUTHN }
+        public enum HeaderType {
+            SIGN_IN,
+            VERIFY,
+            VERIFY_AUTO_REAUTHN,
+            SIGN_IN_TO_IDP_STATIC,
+            SIGN_IN_ERROR
+        }
         static final ReadableObjectPropertyKey<Runnable> CLOSE_ON_CLICK_LISTENER =
                 new ReadableObjectPropertyKey<>("close_on_click_listener");
         static final ReadableObjectPropertyKey<String> IDP_FOR_DISPLAY =
@@ -70,9 +76,11 @@ class AccountSelectionProperties {
                 new ReadableObjectPropertyKey<>("brand_icon");
         static final ReadableObjectPropertyKey<HeaderType> TYPE =
                 new ReadableObjectPropertyKey<>("type");
+        static final ReadableObjectPropertyKey<String> RP_CONTEXT =
+                new ReadableObjectPropertyKey<>("rp_context");
 
         static final PropertyKey[] ALL_KEYS = {CLOSE_ON_CLICK_LISTENER, IDP_FOR_DISPLAY,
-                TOP_FRAME_FOR_DISPLAY, IFRAME_FOR_DISPLAY, IDP_BRAND_ICON, TYPE};
+                TOP_FRAME_FOR_DISPLAY, IFRAME_FOR_DISPLAY, IDP_BRAND_ICON, TYPE, RP_CONTEXT};
 
         private HeaderProperties() {}
     }
@@ -116,6 +124,47 @@ class AccountSelectionProperties {
     }
 
     /**
+     * Properties defined here reflect the state of the got it button in the AccountSelection
+     * sheet.
+     */
+    static class GotItButtonProperties {
+        static final ReadableObjectPropertyKey<IdentityProviderMetadata> IDP_METADATA =
+                new ReadableObjectPropertyKey<>("idp_metadata");
+        static final ReadableObjectPropertyKey<Runnable> ON_CLICK_LISTENER =
+                new ReadableObjectPropertyKey<>("on_click_listener");
+
+        static final PropertyKey[] ALL_KEYS = {IDP_METADATA, ON_CLICK_LISTENER};
+
+        private GotItButtonProperties() {}
+    }
+
+    /**
+     * Properties defined here reflect the state of the IDP sign in text in the AccountSelection
+     * sheet.
+     */
+    static class IdpSignInProperties {
+        static final ReadableObjectPropertyKey<String> IDP_FOR_DISPLAY =
+                new ReadableObjectPropertyKey<>("idp_for_display");
+
+        static final PropertyKey[] ALL_KEYS = {IDP_FOR_DISPLAY};
+
+        private IdpSignInProperties() {}
+    }
+
+    /**
+     * Properties defined here reflect the state of the error text in the AccountSelection
+     * sheet.
+     */
+    static class ErrorProperties {
+        static final ReadableObjectPropertyKey<String> IDP_FOR_DISPLAY =
+                new ReadableObjectPropertyKey<>("idp_for_display");
+
+        static final PropertyKey[] ALL_KEYS = {IDP_FOR_DISPLAY};
+
+        private ErrorProperties() {}
+    }
+
+    /**
      * Properties defined here reflect sections in the FedCM bottom sheet.
      */
     static class ItemProperties {
@@ -125,8 +174,17 @@ class AccountSelectionProperties {
                 new WritableObjectPropertyKey<>("data_sharing_consent");
         static final WritableObjectPropertyKey<PropertyModel> HEADER =
                 new WritableObjectPropertyKey<>("header");
+        static final WritableObjectPropertyKey<PropertyModel> IDP_SIGNIN =
+                new WritableObjectPropertyKey<>("idp_signin");
+        static final WritableObjectPropertyKey<PropertyModel> ERROR_SUMMARY =
+                new WritableObjectPropertyKey<>("error_summary");
+        static final WritableObjectPropertyKey<PropertyModel> ERROR_DESCRIPTION =
+                new WritableObjectPropertyKey<>("error_description");
+        static final WritableObjectPropertyKey<PropertyModel> GOT_IT_BUTTON =
+                new WritableObjectPropertyKey<>("got_it_btn");
 
-        static final PropertyKey[] ALL_KEYS = {CONTINUE_BUTTON, DATA_SHARING_CONSENT, HEADER};
+        static final PropertyKey[] ALL_KEYS = {CONTINUE_BUTTON, DATA_SHARING_CONSENT, HEADER,
+                IDP_SIGNIN, ERROR_SUMMARY, ERROR_DESCRIPTION, GOT_IT_BUTTON};
 
         private ItemProperties() {}
     }

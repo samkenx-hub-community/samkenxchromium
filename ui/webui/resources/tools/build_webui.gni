@@ -12,8 +12,10 @@ import("//tools/grit/preprocess_if_expr.gni")
 import("//tools/polymer/css_to_wrapper.gni")
 import("//tools/polymer/html_to_wrapper.gni")
 import("//tools/typescript/ts_library.gni")
+import("//ui/webui/resources/tools/bundle_js.gni")
 import("//ui/webui/resources/tools/generate_grd.gni")
-import("//ui/webui/resources/tools/optimize_webui.gni")
+import("//ui/webui/resources/tools/minify_js.gni")
+import("//ui/webui/webui_features.gni")
 
 if (use_blink) {
   import("//chrome/common/features.gni")
@@ -33,14 +35,15 @@ template("build_webui") {
     ts_out_dir = invoker.ts_out_dir
   }
 
-  optimize = false
+  optimize = optimize_webui
   if (defined(invoker.optimize)) {
     optimize = invoker.optimize
   }
 
-  optimize_ts = optimize && defined(invoker.optimize_webui_in_files)
+  minify = optimize
+  bundle = optimize && defined(invoker.optimize_webui_in_files)
 
-  enable_source_maps = false
+  enable_source_maps = enable_webui_inline_sourcemaps
   if (defined(invoker.enable_source_maps)) {
     assert(!invoker.enable_source_maps || !optimize)
     enable_source_maps = invoker.enable_source_maps
@@ -74,8 +77,16 @@ template("build_webui") {
     # Files that are passed as input to html_to_wrapper().
     html_files = []
     if (defined(invoker.web_component_files)) {
-      foreach(f, invoker.web_component_files) {
+      web_component_ts_files =
+          filter_include(invoker.web_component_files, [ "*.ts" ])
+      foreach(f, web_component_ts_files) {
         html_files += [ string_replace(f, ".ts", ".html") ]
+      }
+
+      web_component_js_files =
+          filter_include(invoker.web_component_files, [ "*.js" ])
+      foreach(f, web_component_js_files) {
+        html_files += [ string_replace(f, ".js", ".html") ]
       }
     }
     if (defined(invoker.icons_html_files)) {
@@ -130,9 +141,10 @@ template("build_webui") {
   #  4) ts_library()
   #  5) merge_js_source_maps() (only if the |invoker.enable_source_maps| flag is
   #     true)
-  #  6) optimize_webui() (only if |invoker.optimize| is true)
-  #  7) generate_grd()
-  #  8) grit()
+  #  6) optimize_webui() (only if invoker.optimize && defined(invoker.optimize_webui_in_files))
+  #  7) minify_js() (only if invoker.optimize && !defined(invoker.optimize_webui_in_files))
+  #  8) generate_grd()
+  #  9) grit()
 
   if (defined(invoker.static_files)) {
     preprocess_if_expr("preprocess_static_files") {
@@ -177,8 +189,15 @@ template("build_webui") {
       # ":html_wrapper_files".
       inline_sourcemaps = true
 
-      sources =
-          filter_include(get_target_outputs(":preprocess_ts_files"), [ "*.ts" ])
+      sources = filter_include(
+              get_target_outputs(":preprocess_ts_files"),
+              [
+                "*.ts",
+
+                # TODO(crbug.com/1173575): Remove once we no longer pass JS
+                # files to build_webui.
+                "*.js",
+              ])
       originals = []
       outputs = []
 
@@ -225,6 +244,10 @@ template("build_webui") {
       in_files = html_files
       minify = optimize
 
+      if (defined(invoker.html_to_wrapper_scheme)) {
+        scheme = invoker.html_to_wrapper_scheme
+      }
+
       if (defined(invoker.html_to_wrapper_template)) {
         template = invoker.html_to_wrapper_template
         if (invoker.html_to_wrapper_template == "detect") {
@@ -250,11 +273,16 @@ template("build_webui") {
   }
 
   if (defined(invoker.mojo_files_deps)) {
+    mojo_base_path = "."
+    if (defined(invoker.mojo_base_path)) {
+      mojo_base_path = invoker.mojo_base_path
+    }
+
     copy("copy_mojo") {
       visibility = [ ":build_ts" ]
       deps = invoker.mojo_files_deps
       sources = invoker.mojo_files
-      outputs = [ "${preprocess_dir}/{{source_file_part}}" ]
+      outputs = [ "${preprocess_dir}/${mojo_base_path}/{{source_file_part}}" ]
     }
   }
 
@@ -271,6 +299,7 @@ template("build_webui") {
       visibility = [
         ":$generate_grd_target_name",
         ":build_bundle",
+        ":build_min_js",
       ]
 
       if (enable_source_maps) {
@@ -345,7 +374,7 @@ template("build_webui") {
     merge_js_source_maps("merge_source_maps") {
       deps = [ ":build_ts" ]
       manifest_files =
-          filter_include(get_target_outputs(":build_ts"), [ "*.manifest" ])
+          filter_include(get_target_outputs(":build_ts"), [ "*_manifest.json" ])
       js_files = filter_include(get_target_outputs(":build_ts"), [ "*.js" ])
 
       sources = []
@@ -359,20 +388,43 @@ template("build_webui") {
     }
   }
 
-  if (optimize_ts) {
-    bundle_manifest = "bundle_manifest.json"
-
-    optimize_webui("build_bundle") {
-      visibility = [ ":$generate_grd_target_name" ]
+  if (bundle) {
+    bundle_js("build_bundle") {
+      visibility = [ ":build_min_js" ]
       host = invoker.optimize_webui_host
       input = rebase_path(ts_out_dir, root_build_dir)
       js_module_in_files = invoker.optimize_webui_in_files
-      out_manifest = "$target_gen_dir/$bundle_manifest"
+      out_folder = "$target_gen_dir/bundled"
       if (defined(invoker.optimize_webui_excludes)) {
         excludes = invoker.optimize_webui_excludes
       }
 
+      if (defined(invoker.optimize_webui_external_paths)) {
+        external_paths = invoker.optimize_webui_external_paths
+      }
+
       deps = [ ":build_ts" ]
+    }
+  }
+
+  if (minify) {
+    minify_js("build_min_js") {
+      visibility = [ ":$generate_grd_target_name" ]
+      in_folder = ts_out_dir
+      in_target = ":build_ts"
+      if (bundle) {
+        in_folder = "$target_gen_dir/bundled"
+        in_target = ":build_bundle"
+      }
+      out_folder = "$target_gen_dir/minified"
+
+      js_files = filter_include(get_target_outputs(in_target), [ "*.js" ])
+      in_files = []
+      foreach(_js_file, js_files) {
+        in_files += [ string_replace(_js_file, "$in_folder/", "") ]
+      }
+
+      deps = [ in_target ]
     }
   }
 
@@ -399,26 +451,26 @@ template("build_webui") {
           [ "${target_gen_dir}/preprocess_static_files_manifest.json" ]
     }
 
-    if (optimize_ts) {
-      deps += [ ":build_bundle" ]
-      manifest_files += [ "$target_gen_dir/$bundle_manifest" ]
-      resource_path_rewrites = []
-      foreach(f, invoker.optimize_webui_in_files) {
-        name = get_path_info(f, "name")
-        output_file = string_replace(f, "${name}.js", "${name}.rollup.js")
-        resource_path_rewrites += [ "${output_file}|${f}" ]
+    if (optimize) {
+      deps += [ ":build_min_js" ]
+      manifest_files += filter_include(get_target_outputs(":build_min_js"),
+                                       [ "*_manifest.json" ])
+      if (bundle) {
+        resource_path_rewrites = []
+        foreach(f, invoker.optimize_webui_in_files) {
+          name = get_path_info(f, "name")
+          output_file = string_replace(f, "${name}.js", "${name}.rollup.js")
+          resource_path_rewrites += [ "${output_file}|${f}" ]
+        }
       }
+    } else if (enable_source_maps) {
+      deps += [ ":merge_source_maps" ]
+      manifest_files += filter_include(get_target_outputs(":merge_source_maps"),
+                                       [ "*_manifest__processed.json" ])
     } else {
-      if (enable_source_maps) {
-        deps += [ ":merge_source_maps" ]
-        manifest_files +=
-            filter_include(get_target_outputs(":merge_source_maps"),
-                           [ "*.manifest" ])
-      } else {
-        deps += [ ":build_ts" ]
-        manifest_files +=
-            filter_include(get_target_outputs(":build_ts"), [ "*.manifest" ])
-      }
+      deps += [ ":build_ts" ]
+      manifest_files +=
+          filter_include(get_target_outputs(":build_ts"), [ "*_manifest.json" ])
     }
 
     if (defined(invoker.extra_grdp_deps)) {

@@ -60,6 +60,7 @@ class VIZ_SERVICE_EXPORT DCLayerOverlayProcessor final
   void OnOverlayCapsChanged() override;
   void UpdateHasHwOverlaySupport();
   void UpdateSystemHDRStatus();
+  void UpdateP010VideoProcessorSupport();
 
   void set_frames_since_last_qualified_multi_overlays_for_testing(int value) {
     frames_since_last_qualified_multi_overlays_ = value;
@@ -72,21 +73,20 @@ class VIZ_SERVICE_EXPORT DCLayerOverlayProcessor final
 
   // UpdateDCLayerOverlays() adds the quad at |it| to the overlay list
   // |dc_layer_overlays|.
-  void UpdateDCLayerOverlays(const gfx::RectF& display_rect,
+  void UpdateDCLayerOverlays(DisplayResourceProvider* resource_provider,
+                             const gfx::RectF& display_rect,
                              AggregatedRenderPass* render_pass,
                              const QuadList::Iterator& it,
                              const gfx::Rect& quad_rectangle_in_root_space,
                              bool is_overlay,
-                             QuadList::Iterator* new_it,
-                             size_t* new_index,
                              gfx::Rect* damage_rect,
                              OverlayCandidateList* dc_layer_overlays,
                              bool is_page_fullscreen_mode);
 
   // Returns an iterator to the element after |it|.
-  QuadList::Iterator ProcessForOverlay(const gfx::RectF& display_rect,
-                                       AggregatedRenderPass* render_pass,
-                                       const QuadList::Iterator& it);
+  void ProcessForOverlay(const gfx::RectF& display_rect,
+                         AggregatedRenderPass* render_pass,
+                         const QuadList::Iterator& it);
   void ProcessForUnderlay(const gfx::RectF& display_rect,
                           AggregatedRenderPass* render_pass,
                           const gfx::Rect& quad_rectangle,
@@ -125,9 +125,10 @@ class VIZ_SERVICE_EXPORT DCLayerOverlayProcessor final
   // candidates.
   void RemoveClearVideoQuadCandidatesIfMoving(
       const QuadList* quad_list,
-      std::vector<size_t>* candidate_index_list);
+      std::vector<QuadList::Iterator>& candidates);
 
   bool has_overlay_support_;
+  bool has_p010_video_processor_support_ = false;
   bool system_hdr_enabled_ = false;
   const int allowed_yuv_overlay_count_;
   int processed_yuv_overlay_count_ = 0;

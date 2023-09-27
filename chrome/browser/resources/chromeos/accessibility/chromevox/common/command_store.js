@@ -11,7 +11,7 @@
  *
  * If you are looking to add a user command, follow the below steps for best
  * integration with existing components:
- * 1. Add the command to the |Command| enum.
+ * 1. Add the command to the |Command| enum in command.js.
  * 2. Add a command below in CommandStore.COMMAND_DATA. Fill in each of the
  * relevant JSON keys.
  * Be sure to add a msg id and define it in chromevox/messages/messages.js which
@@ -21,6 +21,8 @@
  * dispatch method (onCommand).
  * 3. Add a key binding to KeySequence.
  */
+
+import {Command, CommandCategory} from './command.js';
 
 export class CommandStore {
   /**
@@ -84,215 +86,6 @@ export class CommandStore {
 }
 
 /**
- * List of commands. Please keep list alphabetical.
- * @enum {string}
- */
-export const Command = {
-  ANNOUNCE_BATTERY_DESCRIPTION: 'announceBatteryDescription',
-  ANNOUNCE_HEADERS: 'announceHeaders',
-  ANNOUNCE_RICH_TEXT_DESCRIPTION: 'announceRichTextDescription',
-  AUTORUNNER: 'autorunner',
-  BACKWARD: 'backward',
-  BOTTOM: 'bottom',
-  CONTEXT_MENU: 'contextMenu',
-  COPY: 'copy',
-  CYCLE_PUNCTUATION_ECHO: 'cyclePunctuationEcho',
-  CYCLE_TYPING_ECHO: 'cycleTypingEcho',
-  DEBUG: 'debug',
-  DECREASE_TTS_PITCH: 'decreaseTtsPitch',
-  DECREASE_TTS_RATE: 'decreaseTtsRate',
-  DECREASE_TTS_VOLUME: 'decreaseTtsVolume',
-  DISABLE_CHROMEVOX_ARC_SUPPORT_FOR_CURRENT_APP:
-      'disableChromeVoxArcSupportForCurrentApp',
-  DISABLE_LOGGING: 'disableLogging',
-  DUMP_TREE: 'dumpTree',
-  ENABLE_CHROMEVOX_ARC_SUPPORT_FOR_CURRENT_APP:
-      'enableChromeVoxArcSupportForCurrentApp',
-  ENABLE_CONSOLE_TTS: 'enableConsoleTts',
-  ENABLE_LOGGING: 'enableLogging',
-  ENTER_SHIFTER: 'enterShifter',
-  EXIT_SHIFTER: 'exitShifter',
-  EXIT_SHIFTER_CONTENT: 'exitShifterContent',
-  FORCE_CLICK_ON_CURRENT_ITEM: 'forceClickOnCurrentItem',
-  FORCE_DOUBLE_CLICK_ON_CURRENT_ITEM: 'forceDoubleClickOnCurrentItem',
-  FORCE_LONG_CLICK_ON_CURRENT_ITEM: 'forceLongClickOnCurrentItem',
-  FORWARD: 'forward',
-  FULLY_DESCRIBE: 'fullyDescribe',
-  GO_TO_COL_FIRST_CELL: 'goToColFirstCell',
-  GO_TO_COL_LAST_CELL: 'goToColLastCell',
-  GO_TO_FIRST_CELL: 'goToFirstCell',
-  GO_TO_LAST_CELL: 'goToLastCell',
-  GO_TO_ROW_FIRST_CELL: 'goToRowFirstCell',
-  GO_TO_ROW_LAST_CELL: 'goToRowLastCell',
-  HANDLE_TAB: 'handleTab',
-  HANDLE_TAB_PREV: 'handleTabPrev',
-  HELP: 'help',
-  INCREASE_TTS_PITCH: 'increaseTtsPitch',
-  INCREASE_TTS_RATE: 'increaseTtsRate',
-  INCREASE_TTS_VOLUME: 'increaseTtsVolume',
-  JUMP_TO_BOTTOM: 'jumpToBottom',
-  JUMP_TO_DETAILS: 'jumpToDetails',
-  JUMP_TO_TOP: 'jumpToTop',
-  LEFT: 'left',
-  LINE_DOWN: 'lineDown',
-  LINE_UP: 'lineUp',
-  MOVE_TO_END_OF_LINE: 'moveToEndOfLine',
-  MOVE_TO_START_OF_LINE: 'moveToStartOfLine',
-  NOP: 'nop',
-  NATIVE_NEXT_CHARACTER: 'nativeNextCharacter',
-  NATIVE_NEXT_WORD: 'nativeNextWord',
-  NATIVE_PREVIOUS_CHARACTER: 'nativePreviousCharacter',
-  NATIVE_PREVIOUS_WORD: 'nativePreviousWord',
-  NEXT_ARTICLE: 'nextArticle',
-  NEXT_AT_GRANULARITY: 'nextAtGranularity',
-  NEXT_BUTTON: 'nextButton',
-  NEXT_CHARACTER: 'nextCharacter',
-  NEXT_CHECKBOX: 'nextCheckbox',
-  NEXT_COL: 'nextCol',
-  NEXT_COMBO_BOX: 'nextComboBox',
-  NEXT_CONTROL: 'nextControl',
-  NEXT_EDIT_TEXT: 'nextEditText',
-  NEXT_FORM_FIELD: 'nextFormField',
-  NEXT_GRANULARITY: 'nextGranularity',
-  NEXT_GRAPHIC: 'nextGraphic',
-  NEXT_GROUP: 'nextGroup',
-  NEXT_HEADING: 'nextHeading',
-  NEXT_HEADING_1: 'nextHeading1',
-  NEXT_HEADING_2: 'nextHeading2',
-  NEXT_HEADING_3: 'nextHeading3',
-  NEXT_HEADING_4: 'nextHeading4',
-  NEXT_HEADING_5: 'nextHeading5',
-  NEXT_HEADING_6: 'nextHeading6',
-  NEXT_INVALID_ITEM: 'nextInvalidItem',
-  NEXT_LANDMARK: 'nextLandmark',
-  NEXT_LINE: 'nextLine',
-  NEXT_LINK: 'nextLink',
-  NEXT_LIST: 'nextList',
-  NEXT_LIST_ITEM: 'nextListItem',
-  NEXT_MATH: 'nextMath',
-  NEXT_MEDIA: 'nextMedia',
-  NEXT_OBJECT: 'nextObject',
-  NEXT_PAGE: 'nextPage',
-  NEXT_RADIO: 'nextRadio',
-  NEXT_ROW: 'nextRow',
-  NEXT_SECTION: 'nextSection',
-  NEXT_SENTENCE: 'nextSentence',
-  NEXT_SIMILAR_ITEM: 'nextSimilarItem',
-  NEXT_SLIDER: 'nextSlider',
-  NEXT_TABLE: 'nextTable',
-  NEXT_VISITED_LINK: 'nextVisitedLink',
-  NEXT_WORD: 'nextWord',
-  OPEN_CHROMEVOX_MENUS: 'openChromeVoxMenus',
-  OPEN_LONG_DESC: 'openLongDesc',
-  PAN_LEFT: 'panLeft',
-  PAN_RIGHT: 'panRight',
-  PASS_THROUGH_MODE: 'passThroughMode',
-  PAUSE_ALL_MEDIA: 'pauseAllMedia',
-  PREVIOUS_ARTICLE: 'previousArticle',
-  PREVIOUS_AT_GRANULARITY: 'previousAtGranularity',
-  PREVIOUS_BUTTON: 'previousButton',
-  PREVIOUS_CHARACTER: 'previousCharacter',
-  PREVIOUS_CHECKBOX: 'previousCheckbox',
-  PREVIOUS_COMBO_BOX: 'previousComboBox',
-  PREVIOUS_COL: 'previousCol',
-  PREVIOUS_CONTROL: 'previousControl',
-  PREVIOUS_EDIT_TEXT: 'previousEditText',
-  PREVIOUS_FORM_FIELD: 'previousFormField',
-  PREVIOUS_GRANULARITY: 'previousGranularity',
-  PREVIOUS_GRAPHIC: 'previousGraphic',
-  PREVIOUS_GROUP: 'previousGroup',
-  PREVIOUS_HEADING: 'previousHeading',
-  PREVIOUS_HEADING_1: 'previousHeading1',
-  PREVIOUS_HEADING_2: 'previousHeading2',
-  PREVIOUS_HEADING_3: 'previousHeading3',
-  PREVIOUS_HEADING_4: 'previousHeading4',
-  PREVIOUS_HEADING_5: 'previousHeading5',
-  PREVIOUS_HEADING_6: 'previousHeading6',
-  PREVIOUS_INVALID_ITEM: 'previousInvalidItem',
-  PREVIOUS_LANDMARK: 'previousLandmark',
-  PREVIOUS_LINE: 'previousLine',
-  PREVIOUS_LINK: 'previousLink',
-  PREVIOUS_LIST: 'previousList',
-  PREVIOUS_LIST_ITEM: 'previousListItem',
-  PREVIOUS_MATH: 'previousMath',
-  PREVIOUS_MEDIA: 'previousMedia',
-  PREVIOUS_OBJECT: 'previousObject',
-  PREVIOUS_PAGE: 'previousPage',
-  PREVIOUS_RADIO: 'previousRadio',
-  PREVIOUS_ROW: 'previousRow',
-  PREVIOUS_SECTION: 'previousSection',
-  PREVIOUS_SENTENCE: 'previousSentence',
-  PREVIOUS_SIMILAR_ITEM: 'previousSimilarItem',
-  PREVIOUS_SLIDER: 'previousSlider',
-  PREVIOUS_TABLE: 'previousTable',
-  PREVIOUS_VISITED_LINK: 'previousVisitedLink',
-  PREVIOUS_WORD: 'previousWord',
-  READ_CURRENT_TITLE: 'readCurrentTitle',
-  READ_CURRENT_URL: 'readCurrentURL',
-  READ_FROM_HERE: 'readFromHere',
-  READ_LINK_URL: 'readLinkURL',
-  READ_PHONETIC_PRONUNCIATION: 'readPhoneticPronunciation',
-  REPORT_ISSUE: 'reportIssue',
-  RESET_TEXT_TO_SPEECH_SETTINGS: 'resetTextToSpeechSettings',
-  RIGHT: 'right',
-  ROUTING: 'routing',
-  SCROLL_BACKWARD: 'scrollBackward',
-  SCROLL_FORWARD: 'scrollForward',
-  SHOW_ACTIONS_MENU: 'showActionsMenu',
-  SHOW_FORMS_LIST: 'showFormsList',
-  SHOW_HEADINGS_LIST: 'showHeadingsList',
-  SHOW_LANDMARKS_LIST: 'showLandmarksList',
-  SHOW_LEARN_MODE_PAGE: 'showLearnModePage',
-  SHOW_LINKS_LIST: 'showLinksList',
-  SHOW_LOG_PAGE: 'showLogPage',
-  SHOW_OPTIONS_PAGE: 'showOptionsPage',
-  SHOW_PANEL_MENU_MOST_RECENT: 'showPanelMenuMostRecent',
-  SHOW_TABLES_LIST: 'showTablesList',
-  SHOW_TALKBACK_KEYBOARD_SHORTCUTS: 'showTalkBackKeyboardShortcuts',
-  SHOW_TTS_SETTINGS: 'showTtsSettings',
-  SPEAK_TABLE_LOCATION: 'speakTableLocation',
-  SPEAK_TIME_AND_DATE: 'speakTimeAndDate',
-  START_HISTORY_RECORDING: 'startHistoryRecording',
-  STOP_HISTORY_RECORDING: 'stopHistoryRecording',
-  STOP_SPEECH: 'stopSpeech',
-  TOGGLE_BRAILLE_CAPTIONS: 'toggleBrailleCaptions',
-  TOGGLE_BRAILLE_TABLE: 'toggleBrailleTable',
-  TOGGLE_DICTATION: 'toggleDictation',
-  TOGGLE_EARCONS: 'toggleEarcons',
-  TOGGLE_KEYBOARD_HELP: 'toggleKeyboardHelp',
-  TOGGLE_SCREEN: 'toggleScreen',
-  TOGGLE_SEARCH_WIDGET: 'toggleSearchWidget',
-  TOGGLE_SELECTION: 'toggleSelection',
-  TOGGLE_SEMANTICS: 'toggleSemantics',
-  TOGGLE_SPEECH_ON_OR_OFF: 'toggleSpeechOnOrOff',
-  TOGGLE_STICKY_MODE: 'toggleStickyMode',
-  TOP: 'top',
-  VIEW_GRAPHIC_AS_BRAILLE: 'viewGraphicAsBraille',
-};
-
-/**
- * List of categories for the commands.
- * Note that the values here must correspond to the message resource tag for the
- * category.
- * @enum {string}
- */
-export const CommandCategory = {
-  ACTIONS: 'actions',
-  CONTROLLING_SPEECH: 'controlling_speech',
-  HELP_COMMANDS: 'help_commands',
-  INFORMATION: 'information',
-  JUMP_COMMANDS: 'jump_commands',
-  MODIFIER_KEYS: 'modifier_keys',
-  NAVIGATION: 'navigation',
-  OVERVIEW: 'overview',
-  TABLES: 'tables',
-  // The following categories are not displayed in the ChromeVox menus:
-  BRAILLE: 'braille',
-  DEVELOPER: 'developer',
-  NO_CATEGORY: 'no_category',
-};
-
-/**
  * @typedef {{
  *     category: !CommandCategory,
  *     msgId: (undefined|string),
@@ -310,569 +103,499 @@ let DataEntry;
  * @type {Object<!Command, !DataEntry>}
  */
 CommandStore.COMMAND_DATA = {
-  [Command.TOGGLE_STICKY_MODE]: {
-    msgId: 'toggle_sticky_mode',
-    category: CommandCategory.MODIFIER_KEYS,
+  [Command.ANNOUNCE_BATTERY_DESCRIPTION]: {
+    category: CommandCategory.INFORMATION,
+    msgId: 'announce_battery_description',
   },
-  [Command.PASS_THROUGH_MODE]: {
-    msgId: 'pass_through_key_description',
-    category: CommandCategory.MODIFIER_KEYS,
+  [Command.ANNOUNCE_HEADERS]: {
+    category: CommandCategory.TABLES,
+    msgId: 'announce_headers',
   },
-  [Command.STOP_SPEECH]: {
-    msgId: 'stop_speech_key',
-    category: CommandCategory.CONTROLLING_SPEECH,
+  [Command.ANNOUNCE_RICH_TEXT_DESCRIPTION]: {
+    category: CommandCategory.INFORMATION,
+    msgId: 'announce_rich_text_description',
   },
-  [Command.OPEN_CHROMEVOX_MENUS]: {
-    msgId: 'menus_title',
-    category: CommandCategory.NO_CATEGORY,
+  [Command.AUTORUNNER]: {category: CommandCategory.NO_CATEGORY},
+  [Command.BACKWARD]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'backward',
   },
-  [Command.RESET_TEXT_TO_SPEECH_SETTINGS]: {
-    msgId: 'reset_tts_settings',
-    category: CommandCategory.CONTROLLING_SPEECH,
+  [Command.BOTTOM]: {
+    category: CommandCategory.BRAILLE,
+    msgId: 'braille_bottom',
   },
-  [Command.DECREASE_TTS_RATE]: {
-    msgId: 'decrease_tts_rate',
-    category: CommandCategory.CONTROLLING_SPEECH,
-  },
-  [Command.INCREASE_TTS_RATE]: {
-    msgId: 'increase_tts_rate',
-    category: CommandCategory.CONTROLLING_SPEECH,
-  },
-  [Command.DECREASE_TTS_PITCH]: {
-    msgId: 'decrease_tts_pitch',
-    category: CommandCategory.CONTROLLING_SPEECH,
-  },
-  [Command.INCREASE_TTS_PITCH]: {
-    msgId: 'increase_tts_pitch',
-    category: CommandCategory.CONTROLLING_SPEECH,
-  },
-  [Command.DECREASE_TTS_VOLUME]: {
-    msgId: 'decrease_tts_volume',
-    category: CommandCategory.CONTROLLING_SPEECH,
-  },
-  [Command.INCREASE_TTS_VOLUME]: {
-    msgId: 'increase_tts_volume',
-    category: CommandCategory.CONTROLLING_SPEECH,
+  [Command.CONTEXT_MENU]: {
+    category: CommandCategory.INFORMATION,
+    msgId: 'show_context_menu',
   },
   [Command.CYCLE_PUNCTUATION_ECHO]: {
-    msgId: 'cycle_punctuation_echo',
     category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'cycle_punctuation_echo',
   },
   [Command.CYCLE_TYPING_ECHO]: {
+    category: CommandCategory.CONTROLLING_SPEECH,
     msgId: 'cycle_typing_echo',
+  },
+  [Command.DEBUG]: {category: CommandCategory.NO_CATEGORY},
+  [Command.DECREASE_TTS_PITCH]: {
     category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'decrease_tts_pitch',
   },
-  [Command.TOGGLE_DICTATION]: {
-    msgId: 'toggle_dictation',
-    category: CommandCategory.ACTIONS,
-  },
-  [Command.TOGGLE_EARCONS]: {
-    msgId: 'toggle_earcons',
+  [Command.DECREASE_TTS_RATE]: {
     category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'decrease_tts_rate',
   },
-  [Command.TOGGLE_SPEECH_ON_OR_OFF]: {
-    msgId: 'speech_on_off_description',
+  [Command.DECREASE_TTS_VOLUME]: {
     category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'decrease_tts_volume',
   },
-  [Command.HANDLE_TAB]: {
-    msgId: 'handle_tab_next',
+  [Command.ENABLE_CONSOLE_TTS]: {
+    category: CommandCategory.DEVELOPER,
+    msgId: 'enable_tts_log',
+  },
+  [Command.ENTER_SHIFTER]: {
     category: CommandCategory.NAVIGATION,
+    msgId: 'enter_content',
   },
-  [Command.HANDLE_TAB_PREV]: {
-    msgId: 'handle_tab_prev',
+  [Command.EXIT_SHIFTER]: {
     category: CommandCategory.NAVIGATION,
+    msgId: 'exit_content',
   },
-  [Command.FORWARD]: {
-    msgId: 'forward',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.BACKWARD]: {
-    msgId: 'backward',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.RIGHT]: {
-    msgId: 'right',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.LEFT]: {
-    msgId: 'left',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_GRANULARITY]: {
-    msgId: 'previous_granularity',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_GRANULARITY]: {
-    msgId: 'next_granularity',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_AT_GRANULARITY]: {
-    msgId: 'previous_at_granularity',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_AT_GRANULARITY]: {
-    msgId: 'next_at_granularity',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_CHARACTER]: {
-    msgId: 'previous_character',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_CHARACTER]: {
-    msgId: 'next_character',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_WORD]: {
-    msgId: 'previous_word',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_WORD]: {
-    msgId: 'next_word',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_LINE]: {
-    msgId: 'previous_line',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_LINE]: {
-    msgId: 'next_line',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_SENTENCE]: {
-    msgId: 'previous_sentence',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_SENTENCE]: {
-    msgId: 'next_sentence',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_OBJECT]: {
-    msgId: 'previous_object',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_OBJECT]: {
-    msgId: 'next_object',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_GROUP]: {
-    msgId: 'previous_group',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_GROUP]: {
-    msgId: 'next_group',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_SIMILAR_ITEM]: {
-    msgId: 'previous_similar_item',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_SIMILAR_ITEM]: {
-    msgId: 'next_similar_item',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.PREVIOUS_INVALID_ITEM]: {
-    msgId: 'previous_invalid_item',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.NEXT_INVALID_ITEM]: {
-    msgId: 'next_invalid_item',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.JUMP_TO_TOP]: {
-    msgId: 'jump_to_top',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.JUMP_TO_BOTTOM]: {
-    msgId: 'jump_to_bottom',
-    category: CommandCategory.NAVIGATION,
-  },
-
-  // Intentionally uncategorized.
-  [Command.MOVE_TO_START_OF_LINE]: {category: CommandCategory.NO_CATEGORY},
-  [Command.MOVE_TO_END_OF_LINE]: {category: CommandCategory.NO_CATEGORY},
-
-  [Command.JUMP_TO_DETAILS]: {
-    msgId: 'jump_to_details',
-    category: CommandCategory.NAVIGATION,
-  },
-  [Command.READ_FROM_HERE]: {
-    msgId: 'read_from_here',
-    category: CommandCategory.NAVIGATION,
-  },
+  [Command.EXIT_SHIFTER_CONTENT]: {category: CommandCategory.NO_CATEGORY},
   [Command.FORCE_CLICK_ON_CURRENT_ITEM]: {
-    msgId: 'force_click_on_current_item',
     category: CommandCategory.ACTIONS,
-  },
-  [Command.FORCE_LONG_CLICK_ON_CURRENT_ITEM]: {
-    msgId: 'force_long_click_on_current_item',
+    msgId: 'force_click_on_current_item',
   },
   [Command.FORCE_DOUBLE_CLICK_ON_CURRENT_ITEM]:
       {category: CommandCategory.NO_CATEGORY},
-  [Command.READ_LINK_URL]: {
-    msgId: 'read_link_url',
-    category: CommandCategory.INFORMATION,
+  [Command.FORCE_LONG_CLICK_ON_CURRENT_ITEM]: {
+    category: CommandCategory.NO_CATEGORY,
+    msgId: 'force_long_click_on_current_item',
   },
-  [Command.READ_CURRENT_TITLE]: {
-    msgId: 'read_current_title',
-    category: CommandCategory.INFORMATION,
-  },
-  [Command.READ_CURRENT_URL]: {
-    msgId: 'read_current_url',
-    category: CommandCategory.INFORMATION,
+  [Command.FORWARD]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'forward',
   },
   [Command.FULLY_DESCRIBE]: {
+    category: CommandCategory.INFORMATION,
     msgId: 'fully_describe',
-    category: CommandCategory.INFORMATION,
   },
-  [Command.SPEAK_TIME_AND_DATE]: {
-    msgId: 'speak_time_and_date',
-    category: CommandCategory.INFORMATION,
+  [Command.GO_TO_COL_FIRST_CELL]: {
+    category: CommandCategory.TABLES,
+    msgId: 'skip_to_col_beginning',
   },
-  [Command.TOGGLE_SELECTION]: {
-    msgId: 'toggle_selection',
-    category: CommandCategory.ACTIONS,
+  [Command.GO_TO_COL_LAST_CELL]: {
+    category: CommandCategory.TABLES,
+    msgId: 'skip_to_col_end',
   },
-  [Command.TOGGLE_SEARCH_WIDGET]: {
-    msgId: 'toggle_search_widget',
-    category: CommandCategory.INFORMATION,
+  [Command.GO_TO_FIRST_CELL]: {
+    category: CommandCategory.TABLES,
+    msgId: 'skip_to_beginning',
   },
-  [Command.TOGGLE_SCREEN]: {
-    msgId: 'toggle_screen',
-    category: CommandCategory.MODIFIER_KEYS,
+  [Command.GO_TO_LAST_CELL]: {
+    category: CommandCategory.TABLES,
+    msgId: 'skip_to_end',
   },
-  [Command.TOGGLE_BRAILLE_TABLE]:
-      {msgId: 'toggle_braille_table', category: CommandCategory.HELP_COMMANDS},
-  [Command.TOGGLE_KEYBOARD_HELP]: {
-    msgId: 'show_panel_menu',
-    category: CommandCategory.HELP_COMMANDS,
+  [Command.GO_TO_ROW_FIRST_CELL]: {
+    category: CommandCategory.TABLES,
+    msgId: 'skip_to_row_beginning',
   },
-  [Command.SHOW_PANEL_MENU_MOST_RECENT]: {
-    msgId: 'show_panel_menu',
-    category: CommandCategory.HELP_COMMANDS,
+  [Command.GO_TO_ROW_LAST_CELL]: {
+    category: CommandCategory.TABLES,
+    msgId: 'skip_to_row_end',
+  },
+  [Command.HANDLE_TAB]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'handle_tab_next',
+  },
+  [Command.HANDLE_TAB_PREV]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'handle_tab_prev',
   },
   [Command.HELP]: {
+    category: CommandCategory.HELP_COMMANDS,
     msgId: 'help',
-    category: CommandCategory.HELP_COMMANDS,
   },
-  [Command.CONTEXT_MENU]: {
-    msgId: 'show_context_menu',
-    category: CommandCategory.INFORMATION,
+  [Command.INCREASE_TTS_PITCH]: {
+    category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'increase_tts_pitch',
   },
-  [Command.SHOW_OPTIONS_PAGE]: {
-    msgId: 'show_options_page',
-    denySignedOut: true,
-    category: CommandCategory.HELP_COMMANDS,
+  [Command.INCREASE_TTS_RATE]: {
+    category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'increase_tts_rate',
   },
-  [Command.SHOW_LOG_PAGE]: {
-    msgId: 'show_log_page',
-    denySignedOut: true,
-    category: CommandCategory.HELP_COMMANDS,
+  [Command.INCREASE_TTS_VOLUME]: {
+    category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'increase_tts_volume',
   },
-  [Command.SHOW_LEARN_MODE_PAGE]: {
-    msgId: 'show_kb_explorer_page',
-    denySignedOut: true,
-    category: CommandCategory.HELP_COMMANDS,
+  [Command.JUMP_TO_BOTTOM]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'jump_to_bottom',
   },
-  [Command.SHOW_TTS_SETTINGS]: {
-    msgId: 'show_tts_settings',
-    category: CommandCategory.HELP_COMMANDS,
-    denySignedOut: true,
+  [Command.JUMP_TO_DETAILS]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'jump_to_details',
   },
-  [Command.TOGGLE_BRAILLE_CAPTIONS]: {
-    msgId: 'braille_captions',
-    category: CommandCategory.HELP_COMMANDS,
+  [Command.JUMP_TO_TOP]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'jump_to_top',
   },
-  [Command.REPORT_ISSUE]: {
-    denySignedOut: true,
-    msgId: 'panel_menu_item_report_issue',
-    category: CommandCategory.HELP_COMMANDS,
+  [Command.LEFT]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'left',
   },
-  [Command.SHOW_FORMS_LIST]: {
-    msgId: 'show_forms_list',
-    category: CommandCategory.OVERVIEW,
+  [Command.LINE_DOWN]: {
+    category: CommandCategory.BRAILLE,
+    msgId: 'braille_line_down',
   },
-  [Command.SHOW_HEADINGS_LIST]: {
-    msgId: 'show_headings_list',
-    category: CommandCategory.OVERVIEW,
+  [Command.LINE_UP]: {
+    category: CommandCategory.BRAILLE,
+    msgId: 'braille_line_up',
   },
-  [Command.SHOW_LANDMARKS_LIST]: {
-    msgId: 'show_landmarks_list',
-    category: CommandCategory.OVERVIEW,
-  },
-  [Command.SHOW_LINKS_LIST]: {
-    msgId: 'show_links_list',
-    category: CommandCategory.OVERVIEW,
-  },
-  [Command.SHOW_TABLES_LIST]: {
-    msgId: 'show_tables_list',
-    category: CommandCategory.OVERVIEW,
-  },
+  [Command.MOVE_TO_START_OF_LINE]: {category: CommandCategory.NO_CATEGORY},
+  [Command.MOVE_TO_END_OF_LINE]: {category: CommandCategory.NO_CATEGORY},
   [Command.NEXT_ARTICLE]: {category: CommandCategory.NO_CATEGORY},
-
+  [Command.NEXT_AT_GRANULARITY]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_at_granularity',
+  },
   [Command.NEXT_BUTTON]: {
-    msgId: 'next_button',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_button',
+  },
+  [Command.NEXT_CHARACTER]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_character',
   },
   [Command.NEXT_CHECKBOX]: {
-    msgId: 'next_checkbox',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_checkbox',
+  },
+  [Command.NEXT_COL]: {
+    category: CommandCategory.TABLES,
+    msgId: 'skip_to_next_col',
   },
   [Command.NEXT_COMBO_BOX]: {
-    msgId: 'next_combo_box',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_combo_box',
   },
   [Command.NEXT_CONTROL]: {category: CommandCategory.NO_CATEGORY},
   [Command.NEXT_EDIT_TEXT]: {
-    msgId: 'next_edit_text',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_edit_text',
   },
   [Command.NEXT_FORM_FIELD]: {
-    msgId: 'next_form_field',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_form_field',
+  },
+  [Command.NEXT_GRANULARITY]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_granularity',
   },
   [Command.NEXT_GRAPHIC]: {
-    msgId: 'next_graphic',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_graphic',
+  },
+  [Command.NEXT_GROUP]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_group',
   },
   [Command.NEXT_HEADING]: {
-    msgId: 'next_heading',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_heading',
   },
   [Command.NEXT_HEADING_1]: {
-    msgId: 'next_heading1',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_heading1',
   },
   [Command.NEXT_HEADING_2]: {
-    msgId: 'next_heading2',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_heading2',
   },
   [Command.NEXT_HEADING_3]: {
-    msgId: 'next_heading3',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_heading3',
   },
   [Command.NEXT_HEADING_4]: {
-    msgId: 'next_heading4',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_heading4',
   },
   [Command.NEXT_HEADING_5]: {
-    msgId: 'next_heading5',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_heading5',
   },
   [Command.NEXT_HEADING_6]: {
-    msgId: 'next_heading6',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_heading6',
+  },
+  [Command.NEXT_INVALID_ITEM]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_invalid_item',
   },
   [Command.NEXT_LANDMARK]: {
-    msgId: 'next_landmark',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_landmark',
+  },
+  [Command.NEXT_LINE]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_line',
   },
   [Command.NEXT_LINK]: {
-    msgId: 'next_link',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_link',
   },
   [Command.NEXT_LIST]: {
-    msgId: 'next_list',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_list',
   },
   [Command.NEXT_LIST_ITEM]: {
-    msgId: 'next_list_item',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_list_item',
   },
   [Command.NEXT_MATH]: {
-    msgId: 'next_math',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_math',
   },
   [Command.NEXT_MEDIA]: {
-    msgId: 'next_media',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_media',
+  },
+  [Command.NEXT_OBJECT]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_object',
   },
   [Command.NEXT_RADIO]: {
-    msgId: 'next_radio',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_radio',
+  },
+  [Command.NEXT_ROW]: {
+    category: CommandCategory.TABLES,
+    msgId: 'skip_to_next_row',
   },
   [Command.NEXT_SECTION]: {category: CommandCategory.NO_CATEGORY},
+  [Command.NEXT_SENTENCE]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_sentence',
+  },
+  [Command.NEXT_SIMILAR_ITEM]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_similar_item',
+  },
   [Command.NEXT_SLIDER]: {category: CommandCategory.NO_CATEGORY},
   [Command.NEXT_TABLE]: {
-    msgId: 'next_table',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_table',
   },
   [Command.NEXT_VISITED_LINK]: {
-    msgId: 'next_visited_link',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'next_visited_link',
+  },
+  [Command.NEXT_WORD]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'next_word',
+  },
+  [Command.NOP]: {category: CommandCategory.NO_CATEGORY},
+  [Command.OPEN_CHROMEVOX_MENUS]: {
+    category: CommandCategory.NO_CATEGORY,
+    msgId: 'menus_title',
+  },
+  [Command.OPEN_LONG_DESC]: {
+    category: CommandCategory.INFORMATION,
+    msgId: 'open_long_desc',
+  },
+  [Command.PAN_LEFT]: {
+    category: CommandCategory.BRAILLE,
+    msgId: 'braille_pan_left',
+  },
+  [Command.PAN_RIGHT]: {
+    category: CommandCategory.BRAILLE,
+    msgId: 'braille_pan_right',
+  },
+  [Command.PASS_THROUGH_MODE]: {
+    category: CommandCategory.MODIFIER_KEYS,
+    msgId: 'pass_through_key_description',
+  },
+  [Command.PAUSE_ALL_MEDIA]: {
+    category: CommandCategory.INFORMATION,
+    msgId: 'pause_all_media',
   },
   [Command.PREVIOUS_ARTICLE]: {category: CommandCategory.NO_CATEGORY},
+  [Command.PREVIOUS_AT_GRANULARITY]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'previous_at_granularity',
+  },
   [Command.PREVIOUS_BUTTON]: {
-    msgId: 'previous_button',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_button',
+  },
+  [Command.PREVIOUS_CHARACTER]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'previous_character',
   },
   [Command.PREVIOUS_CHECKBOX]: {
-    msgId: 'previous_checkbox',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_checkbox',
+  },
+  [Command.PREVIOUS_COL]: {
+    category: CommandCategory.TABLES,
+    msgId: 'skip_to_prev_col',
   },
   [Command.PREVIOUS_COMBO_BOX]: {
-    msgId: 'previous_combo_box',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_combo_box',
   },
   [Command.PREVIOUS_CONTROL]: {category: CommandCategory.NO_CATEGORY},
   [Command.PREVIOUS_EDIT_TEXT]: {
-    msgId: 'previous_edit_text',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_edit_text',
   },
   [Command.PREVIOUS_FORM_FIELD]: {
-    msgId: 'previous_form_field',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_form_field',
+  },
+  [Command.PREVIOUS_GRANULARITY]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'previous_granularity',
   },
   [Command.PREVIOUS_GRAPHIC]: {
-    msgId: 'previous_graphic',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_graphic',
+  },
+  [Command.PREVIOUS_GROUP]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'previous_group',
   },
   [Command.PREVIOUS_HEADING]: {
-    msgId: 'previous_heading',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_heading',
   },
   [Command.PREVIOUS_HEADING_1]: {
-    msgId: 'previous_heading1',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_heading1',
   },
   [Command.PREVIOUS_HEADING_2]: {
-    msgId: 'previous_heading2',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_heading2',
   },
   [Command.PREVIOUS_HEADING_3]: {
-    msgId: 'previous_heading3',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_heading3',
   },
   [Command.PREVIOUS_HEADING_4]: {
-    msgId: 'previous_heading4',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_heading4',
   },
   [Command.PREVIOUS_HEADING_5]: {
-    msgId: 'previous_heading5',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_heading5',
   },
   [Command.PREVIOUS_HEADING_6]: {
-    msgId: 'previous_heading6',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_heading6',
+  },
+  [Command.PREVIOUS_INVALID_ITEM]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'previous_invalid_item',
   },
   [Command.PREVIOUS_LANDMARK]: {
-    msgId: 'previous_landmark',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_landmark',
+  },
+  [Command.PREVIOUS_LINE]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'previous_line',
   },
   [Command.PREVIOUS_LINK]: {
-    msgId: 'previous_link',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_link',
   },
   [Command.PREVIOUS_LIST]: {
-    msgId: 'previous_list',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_list',
   },
   [Command.PREVIOUS_LIST_ITEM]: {
-    msgId: 'previous_list_item',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_list_item',
   },
   [Command.PREVIOUS_MATH]: {
-    msgId: 'previous_math',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_math',
   },
   [Command.PREVIOUS_MEDIA]: {
-    msgId: 'previous_media',
     category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_media',
+  },
+  [Command.PREVIOUS_OBJECT]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'previous_object',
   },
   [Command.PREVIOUS_RADIO]: {
+    category: CommandCategory.JUMP_COMMANDS,
     msgId: 'previous_radio',
-    category: CommandCategory.JUMP_COMMANDS,
-  },
-  [Command.PREVIOUS_SECTION]: {category: CommandCategory.NO_CATEGORY},
-  [Command.PREVIOUS_SLIDER]: {category: CommandCategory.NO_CATEGORY},
-  [Command.PREVIOUS_TABLE]: {
-    msgId: 'previous_table',
-    category: CommandCategory.JUMP_COMMANDS,
-  },
-  [Command.PREVIOUS_VISITED_LINK]: {
-    msgId: 'previous_visited_link',
-    category: CommandCategory.JUMP_COMMANDS,
-  },
-
-  // Table Actions.
-  [Command.ANNOUNCE_HEADERS]: {
-    msgId: 'announce_headers',
-    category: CommandCategory.TABLES,
-  },
-  [Command.SPEAK_TABLE_LOCATION]: {
-    msgId: 'speak_table_location',
-    category: CommandCategory.TABLES,
-  },
-  [Command.GO_TO_FIRST_CELL]: {
-    msgId: 'skip_to_beginning',
-    category: CommandCategory.TABLES,
-  },
-  [Command.GO_TO_LAST_CELL]:
-      {msgId: 'skip_to_end', category: CommandCategory.TABLES},
-  [Command.GO_TO_ROW_FIRST_CELL]: {
-    msgId: 'skip_to_row_beginning',
-    category: CommandCategory.TABLES,
-  },
-  [Command.GO_TO_ROW_LAST_CELL]: {
-    msgId: 'skip_to_row_end',
-    category: CommandCategory.TABLES,
-  },
-  [Command.GO_TO_COL_FIRST_CELL]: {
-    msgId: 'skip_to_col_beginning',
-    category: CommandCategory.TABLES,
-  },
-  [Command.GO_TO_COL_LAST_CELL]: {
-    msgId: 'skip_to_col_end',
-    category: CommandCategory.TABLES,
   },
   [Command.PREVIOUS_ROW]: {
+    category: CommandCategory.TABLES,
     msgId: 'skip_to_prev_row',
-    category: CommandCategory.TABLES,
   },
-  [Command.PREVIOUS_COL]: {
-    msgId: 'skip_to_prev_col',
-    category: CommandCategory.TABLES,
-  },
-  [Command.NEXT_ROW]: {
-    msgId: 'skip_to_next_row',
-    category: CommandCategory.TABLES,
-  },
-  [Command.NEXT_COL]: {
-    msgId: 'skip_to_next_col',
-    category: CommandCategory.TABLES,
-  },
-
-  // Generic Actions.
-  [Command.ENTER_SHIFTER]: {
-    msgId: 'enter_content',
+  [Command.PREVIOUS_SECTION]: {category: CommandCategory.NO_CATEGORY},
+  [Command.PREVIOUS_SENTENCE]: {
     category: CommandCategory.NAVIGATION,
+    msgId: 'previous_sentence',
   },
-  [Command.EXIT_SHIFTER]: {
-    msgId: 'exit_content',
+  [Command.PREVIOUS_SIMILAR_ITEM]: {
     category: CommandCategory.NAVIGATION,
+    msgId: 'previous_similar_item',
   },
-  [Command.EXIT_SHIFTER_CONTENT]: {category: CommandCategory.NO_CATEGORY},
-  [Command.OPEN_LONG_DESC]: {
-    msgId: 'open_long_desc',
-    category: CommandCategory.INFORMATION,
+  [Command.PREVIOUS_SLIDER]: {category: CommandCategory.NO_CATEGORY},
+  [Command.PREVIOUS_TABLE]: {
+    category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_table',
   },
-  [Command.PAUSE_ALL_MEDIA]: {
-    msgId: 'pause_all_media',
-    category: CommandCategory.INFORMATION,
+  [Command.PREVIOUS_VISITED_LINK]: {
+    category: CommandCategory.JUMP_COMMANDS,
+    msgId: 'previous_visited_link',
   },
-  [Command.ANNOUNCE_BATTERY_DESCRIPTION]: {
-    msgId: 'announce_battery_description',
-    category: CommandCategory.INFORMATION,
+  [Command.PREVIOUS_WORD]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'previous_word',
   },
-  [Command.ANNOUNCE_RICH_TEXT_DESCRIPTION]: {
-    msgId: 'announce_rich_text_description',
+  [Command.READ_CURRENT_TITLE]: {
     category: CommandCategory.INFORMATION,
+    msgId: 'read_current_title',
+  },
+  [Command.READ_CURRENT_URL]: {
+    category: CommandCategory.INFORMATION,
+    msgId: 'read_current_url',
+  },
+  [Command.READ_FROM_HERE]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'read_from_here',
+  },
+  [Command.READ_LINK_URL]: {
+    category: CommandCategory.INFORMATION,
+    msgId: 'read_link_url',
   },
   [Command.READ_PHONETIC_PRONUNCIATION]: {
-    msgId: 'read_phonetic_pronunciation',
     category: CommandCategory.INFORMATION,
+    msgId: 'read_phonetic_pronunciation',
   },
-
-  // Scrolling actions.
+  [Command.REPORT_ISSUE]: {
+    category: CommandCategory.HELP_COMMANDS,
+    denySignedOut: true,
+    msgId: 'panel_menu_item_report_issue',
+  },
+  [Command.RESET_TEXT_TO_SPEECH_SETTINGS]: {
+    category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'reset_tts_settings',
+  },
+  [Command.RIGHT]: {
+    category: CommandCategory.NAVIGATION,
+    msgId: 'right',
+  },
+  [Command.ROUTING]: {
+    category: CommandCategory.BRAILLE,
+    msgId: 'braille_routing',
+  },
   [Command.SCROLL_BACKWARD]: {
     category: CommandCategory.NO_CATEGORY,
     msgId: 'action_scroll_backward_description',
@@ -881,55 +604,113 @@ CommandStore.COMMAND_DATA = {
     category: CommandCategory.NO_CATEGORY,
     msgId: 'action_scroll_forward_description',
   },
-
-  // Math specific commands.
-  [Command.TOGGLE_SEMANTICS]: {
-    msgId: 'toggle_semantics',
+  [Command.SHOW_FORMS_LIST]: {
+    category: CommandCategory.OVERVIEW,
+    msgId: 'show_forms_list',
+  },
+  [Command.SHOW_HEADINGS_LIST]: {
+    category: CommandCategory.OVERVIEW,
+    msgId: 'show_headings_list',
+  },
+  [Command.SHOW_LANDMARKS_LIST]: {
+    category: CommandCategory.OVERVIEW,
+    msgId: 'show_landmarks_list',
+  },
+  [Command.SHOW_LEARN_MODE_PAGE]: {
+    category: CommandCategory.HELP_COMMANDS,
+    denySignedOut: true,
+    msgId: 'show_kb_explorer_page',
+  },
+  [Command.SHOW_LINKS_LIST]: {
+    category: CommandCategory.OVERVIEW,
+    msgId: 'show_links_list',
+  },
+  [Command.SHOW_LOG_PAGE]: {
+    category: CommandCategory.HELP_COMMANDS,
+    denySignedOut: true,
+    msgId: 'show_log_page',
+  },
+  [Command.SHOW_OPTIONS_PAGE]: {
+    category: CommandCategory.HELP_COMMANDS,
+    msgId: 'show_options_page',
+  },
+  [Command.SHOW_PANEL_MENU_MOST_RECENT]: {
+    category: CommandCategory.HELP_COMMANDS,
+    msgId: 'show_panel_menu',
+  },
+  [Command.SHOW_TABLES_LIST]: {
+    category: CommandCategory.OVERVIEW,
+    msgId: 'show_tables_list',
+  },
+  [Command.SHOW_TTS_SETTINGS]: {
+    category: CommandCategory.HELP_COMMANDS,
+    denySignedOut: true,
+    msgId: 'show_tts_settings',
+  },
+  [Command.SPEAK_TIME_AND_DATE]: {
     category: CommandCategory.INFORMATION,
+    msgId: 'speak_time_and_date',
   },
-
-  // Braille specific commands.
-  [Command.ROUTING]: {
-    msgId: 'braille_routing',
-    category: CommandCategory.BRAILLE,
-  },
-  [Command.PAN_LEFT]: {
-    msgId: 'braille_pan_left',
-    category: CommandCategory.BRAILLE,
-  },
-  [Command.PAN_RIGHT]: {
-    msgId: 'braille_pan_right',
-    category: CommandCategory.BRAILLE,
-  },
-  [Command.LINE_UP]: {
-    msgId: 'braille_line_up',
-    category: CommandCategory.BRAILLE,
-  },
-  [Command.LINE_DOWN]: {
-    msgId: 'braille_line_down',
-    category: CommandCategory.BRAILLE,
-  },
-  [Command.TOP]: {
-    msgId: 'braille_top',
-    category: CommandCategory.BRAILLE,
-  },
-  [Command.BOTTOM]: {
-    msgId: 'braille_bottom',
-    category: CommandCategory.BRAILLE,
-  },
-  [Command.VIEW_GRAPHIC_AS_BRAILLE]: {
-    msgId: 'view_graphic_as_braille',
-    category: CommandCategory.BRAILLE,
-  },
-
-  // Developer commands.
-  [Command.ENABLE_CONSOLE_TTS]: {
-    msgId: 'enable_tts_log',
-    category: CommandCategory.DEVELOPER,
+  [Command.SPEAK_TABLE_LOCATION]: {
+    category: CommandCategory.TABLES,
+    msgId: 'speak_table_location',
   },
   [Command.START_HISTORY_RECORDING]: {category: CommandCategory.NO_CATEGORY},
   [Command.STOP_HISTORY_RECORDING]: {category: CommandCategory.NO_CATEGORY},
-  [Command.AUTORUNNER]: {category: CommandCategory.NO_CATEGORY},
-  [Command.DEBUG]: {category: CommandCategory.NO_CATEGORY},
-  [Command.NOP]: {category: CommandCategory.NO_CATEGORY},
+  [Command.STOP_SPEECH]: {
+    category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'stop_speech_key',
+  },
+  [Command.TOGGLE_BRAILLE_CAPTIONS]: {
+    category: CommandCategory.HELP_COMMANDS,
+    msgId: 'braille_captions',
+  },
+  [Command.TOGGLE_BRAILLE_TABLE]: {
+    category: CommandCategory.HELP_COMMANDS,
+    msgId: 'toggle_braille_table',
+  },
+  [Command.TOGGLE_DICTATION]: {
+    category: CommandCategory.ACTIONS,
+    msgId: 'toggle_dictation',
+  },
+  [Command.TOGGLE_EARCONS]: {
+    category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'toggle_earcons',
+  },
+  [Command.TOGGLE_KEYBOARD_HELP]: {
+    category: CommandCategory.HELP_COMMANDS,
+    msgId: 'show_panel_menu',
+  },
+  [Command.TOGGLE_SCREEN]: {
+    category: CommandCategory.MODIFIER_KEYS,
+    msgId: 'toggle_screen',
+  },
+  [Command.TOGGLE_SEARCH_WIDGET]: {
+    category: CommandCategory.INFORMATION,
+    msgId: 'toggle_search_widget',
+  },
+  [Command.TOGGLE_SELECTION]: {
+    category: CommandCategory.ACTIONS,
+    msgId: 'toggle_selection',
+  },
+  [Command.TOGGLE_SEMANTICS]: {
+    category: CommandCategory.INFORMATION,
+    msgId: 'toggle_semantics',
+  },
+  [Command.TOGGLE_SPEECH_ON_OR_OFF]: {
+    category: CommandCategory.CONTROLLING_SPEECH,
+    msgId: 'speech_on_off_description',
+  },
+  [Command.TOGGLE_STICKY_MODE]: {
+    category: CommandCategory.MODIFIER_KEYS,
+    msgId: 'toggle_sticky_mode',
+  },
+  [Command.TOP]: {
+    category: CommandCategory.BRAILLE,
+    msgId: 'braille_top',
+  },
+  [Command.VIEW_GRAPHIC_AS_BRAILLE]: {
+    category: CommandCategory.BRAILLE,
+    msgId: 'view_graphic_as_braille',
+  },
 };

@@ -63,14 +63,12 @@ class WiredDisplayMediaRouteProvider : public mojom::MediaRouteProvider,
                    const url::Origin& origin,
                    int32_t frame_tree_node_id,
                    base::TimeDelta timeout,
-                   bool off_the_record,
                    CreateRouteCallback callback) override;
   void JoinRoute(const std::string& media_source,
                  const std::string& presentation_id,
                  const url::Origin& origin,
                  int32_t frame_tree_node_id,
                  base::TimeDelta timeout,
-                 bool off_the_record,
                  JoinRouteCallback callback) override;
   void TerminateRoute(const std::string& route_id,
                       TerminateRouteCallback callback) override;
@@ -92,8 +90,6 @@ class WiredDisplayMediaRouteProvider : public mojom::MediaRouteProvider,
       mojo::PendingRemote<mojom::MediaStatusObserver> observer,
       CreateMediaRouteControllerCallback callback) override;
   void GetState(GetStateCallback callback) override;
-  void GetMirroringStats(const std::string& route_id,
-                         GetMirroringStatsCallback callback) override;
 
   // display::DisplayObserver:
   void OnDidProcessDisplayChanges() override;

@@ -13,7 +13,6 @@
 #include "chrome/browser/ash/crosapi/crosapi_manager.h"
 #include "chrome/browser/ash/crosapi/web_app_service_ash.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/web_applications/externally_installed_web_app_prefs.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
 #include "chrome/browser/web_applications/web_app_install_utils.h"
@@ -38,6 +37,7 @@ namespace ash {
 
 // static
 void ApkWebAppInstaller::Install(Profile* profile,
+                                 const std::string& package_name,
                                  arc::mojom::WebAppInfoPtr web_app_info,
                                  arc::mojom::RawIconPngDataPtr icon,
                                  InstallFinishCallback callback,
@@ -50,7 +50,7 @@ void ApkWebAppInstaller::Install(Profile* profile,
   // CompleteInstallation().
   auto* installer =
       new ApkWebAppInstaller(profile, std::move(callback), weak_owner);
-  installer->Start(std::move(web_app_info), std::move(icon));
+  installer->Start(package_name, std::move(web_app_info), std::move(icon));
 }
 
 ApkWebAppInstaller::ApkWebAppInstaller(Profile* profile,
@@ -64,11 +64,12 @@ ApkWebAppInstaller::ApkWebAppInstaller(Profile* profile,
 
 ApkWebAppInstaller::~ApkWebAppInstaller() = default;
 
-void ApkWebAppInstaller::Start(arc::mojom::WebAppInfoPtr web_app_info,
+void ApkWebAppInstaller::Start(const std::string& package_name,
+                               arc::mojom::WebAppInfoPtr web_app_info,
                                arc::mojom::RawIconPngDataPtr icon) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   if (!weak_owner_.get()) {
-    CompleteInstallation(web_app::AppId(),
+    CompleteInstallation(webapps::AppId(),
                          webapps::InstallResultCode::kApkWebAppInstallFailed);
     return;
   }
@@ -78,13 +79,13 @@ void ApkWebAppInstaller::Start(arc::mojom::WebAppInfoPtr web_app_info,
   if (web_app_info.is_null() || !icon || !icon->icon_png_data ||
       !icon->icon_png_data.has_value() || icon->icon_png_data->empty()) {
     LOG(ERROR) << "Insufficient data to install a web app";
-    CompleteInstallation(web_app::AppId(),
+    CompleteInstallation(webapps::AppId(),
                          webapps::InstallResultCode::kApkWebAppInstallFailed);
     return;
   }
 
   DCHECK(!web_app_install_info_);
-  web_app_install_info_ = std::make_unique<WebAppInstallInfo>();
+  web_app_install_info_ = std::make_unique<web_app::WebAppInstallInfo>();
 
   web_app_install_info_->title = base::UTF8ToUTF16(web_app_info->title);
 
@@ -94,8 +95,9 @@ void ApkWebAppInstaller::Start(arc::mojom::WebAppInfoPtr web_app_info,
   web_app_install_info_->scope = GURL(web_app_info->scope_url);
   DCHECK(web_app_install_info_->scope.is_valid());
 
-  // The install_url and the start_url seem to be same in this case
-  // as far as ExternallyInstalledWebAppPrefs are concerned.
+  web_app_install_info_->additional_policy_ids.push_back(package_name);
+
+  // The install_url and the start_url seem to be same in this case.
   // This is because inside OnWebAppCreated(), the start_url is
   // passed to the external prefs to be stored as the install_url.
   web_app_install_info_->install_url = GURL(web_app_info->start_url);
@@ -123,20 +125,20 @@ void ApkWebAppInstaller::Start(arc::mojom::WebAppInfoPtr web_app_info,
                      base::Unretained(this)));
 }
 
-void ApkWebAppInstaller::CompleteInstallation(const web_app::AppId& id,
+void ApkWebAppInstaller::CompleteInstallation(const webapps::AppId& id,
                                               webapps::InstallResultCode code) {
   std::move(callback_).Run(id, is_web_only_twa_, sha256_fingerprint_, code);
   delete this;
 }
 
 void ApkWebAppInstaller::OnWebAppCreated(const GURL& start_url,
-                                         const web_app::AppId& app_id,
+                                         const webapps::AppId& app_id,
                                          webapps::InstallResultCode code) {
   // It is assumed that if |weak_owner_| is gone, |profile_| is gone too. The
   // web app will be automatically cleaned up by provider.
   if (!weak_owner_.get()) {
     CompleteInstallation(
-        web_app::AppId(),
+        webapps::AppId(),
         webapps::InstallResultCode::kCancelledOnWebAppProviderShuttingDown);
     return;
   }
@@ -146,11 +148,6 @@ void ApkWebAppInstaller::OnWebAppCreated(const GURL& start_url,
     return;
   }
 
-  // Otherwise, insert this web app into the externally installed ID map so it
-  // is not removed automatically. TODO(crbug.com/910008): have a less bad way
-  // of doing this.
-  web_app::ExternallyInstalledWebAppPrefs(profile_->GetPrefs())
-      .Insert(start_url, app_id, web_app::ExternalInstallSource::kArc);
   CompleteInstallation(app_id, code);
 }
 
@@ -165,7 +162,7 @@ void ApkWebAppInstaller::OnImageDecoded(const SkBitmap& decoded_image) {
     // Assume |profile_| is no longer valid - destroy this object and
     // terminate.
     CompleteInstallation(
-        web_app::AppId(),
+        webapps::AppId(),
         webapps::InstallResultCode::kCancelledOnWebAppProviderShuttingDown);
     return;
   }
@@ -176,13 +173,15 @@ void ApkWebAppInstaller::DoInstall() {
   if (web_app::IsWebAppsCrosapiEnabled()) {
     GURL start_url = web_app_install_info_->start_url;
 
-    std::unique_ptr<WebAppInstallInfo> web_app_install_info =
+    std::unique_ptr<web_app::WebAppInstallInfo> web_app_install_info =
         std::move(web_app_install_info_);
     auto arc_install_info = crosapi::mojom::ArcWebAppInstallInfo::New();
     arc_install_info->title = std::move(web_app_install_info->title);
     arc_install_info->start_url = std::move(web_app_install_info->start_url);
     arc_install_info->scope = std::move(web_app_install_info->scope);
     arc_install_info->theme_color = web_app_install_info->theme_color;
+    arc_install_info->additional_policy_ids =
+        std::move(web_app_install_info->additional_policy_ids);
     // Take the first icon (there should only be one).
     if (web_app_install_info->icon_bitmaps.any.size() > 0) {
       auto& [sizePx, bitmap] =
@@ -196,7 +195,7 @@ void ApkWebAppInstaller::DoInstall() {
             ->web_app_service_ash()
             ->GetWebAppProviderBridge();
     if (!web_app_provider_bridge) {
-      CompleteInstallation(web_app::AppId(),
+      CompleteInstallation(webapps::AppId(),
                            webapps::InstallResultCode::kWebAppProviderNotReady);
       return;
     }

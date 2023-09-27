@@ -10,6 +10,7 @@
 #include "ash/components/arc/arc_prefs.h"
 #include "ash/constants/ash_features.h"
 #include "base/command_line.h"
+#include "base/memory/raw_ptr.h"
 #include "base/system/sys_info.h"
 #include "base/test/icu_test_util.h"
 #include "base/test/scoped_command_line.h"
@@ -27,6 +28,7 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/webui/ash/login/consolidated_consent_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/demo_preferences_screen_handler.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
@@ -70,38 +72,10 @@ void DisableDBusForProfileManager() {
     command_line->AppendSwitch(switches::kTestType);
 }
 
-class FakeUserManagerWithLocalState : public ash::FakeChromeUserManager {
- public:
-  explicit FakeUserManagerWithLocalState(
-      TestingProfileManager* testing_profile_manager)
-      : testing_profile_manager_(testing_profile_manager),
-        test_local_state_(std::make_unique<TestingPrefServiceSimple>()) {
-    RegisterPrefs(test_local_state_->registry());
-  }
-
-  FakeUserManagerWithLocalState(const FakeUserManagerWithLocalState&) = delete;
-  FakeUserManagerWithLocalState& operator=(
-      const FakeUserManagerWithLocalState&) = delete;
-
-  PrefService* GetLocalState() const override {
-    return test_local_state_.get();
-  }
-
-  TestingProfileManager* testing_profile_manager() {
-    return testing_profile_manager_;
-  }
-
- private:
-  // Unowned pointer.
-  TestingProfileManager* const testing_profile_manager_;
-
-  std::unique_ptr<TestingPrefServiceSimple> test_local_state_;
-};
-
 class ScopedLogIn {
  public:
   ScopedLogIn(
-      FakeUserManagerWithLocalState* fake_user_manager,
+      ash::FakeChromeUserManager* fake_user_manager,
       const AccountId& account_id,
       user_manager::UserType user_type = user_manager::USER_TYPE_REGULAR)
       : fake_user_manager_(fake_user_manager), account_id_(account_id) {
@@ -112,8 +86,7 @@ class ScopedLogIn {
       command_line.AppendSwitch(switches::kTestType);
 
     switch (user_type) {
-      case user_manager::USER_TYPE_REGULAR:  // fallthrough
-      case user_manager::USER_TYPE_ACTIVE_DIRECTORY:
+      case user_manager::USER_TYPE_REGULAR:
         LogIn();
         break;
       case user_manager::USER_TYPE_PUBLIC_ACCOUNT:
@@ -148,7 +121,7 @@ class ScopedLogIn {
     fake_user_manager_->LoginUser(account_id_);
   }
 
-  FakeUserManagerWithLocalState* fake_user_manager_;
+  raw_ptr<ash::FakeChromeUserManager, ExperimentalAsh> fake_user_manager_;
   const AccountId account_id_;
 };
 
@@ -177,8 +150,7 @@ class ChromeArcUtilTest : public testing::Test {
     ASSERT_TRUE(profile_manager_->SetUp());
 
     user_manager_enabler_ = std::make_unique<user_manager::ScopedUserManager>(
-        std::make_unique<FakeUserManagerWithLocalState>(
-            profile_manager_.get()));
+        std::make_unique<ash::FakeChromeUserManager>());
 
     profile_ = profile_manager_->CreateTestingProfile(kTestProfileName);
   }
@@ -195,8 +167,8 @@ class ChromeArcUtilTest : public testing::Test {
 
   TestingProfile* profile() { return profile_; }
 
-  FakeUserManagerWithLocalState* GetFakeUserManager() const {
-    return static_cast<FakeUserManagerWithLocalState*>(
+  ash::FakeChromeUserManager* GetFakeUserManager() const {
+    return static_cast<ash::FakeChromeUserManager*>(
         user_manager::UserManager::Get());
   }
 
@@ -218,7 +190,8 @@ class ChromeArcUtilTest : public testing::Test {
   std::unique_ptr<TestingProfileManager> profile_manager_;
   std::unique_ptr<user_manager::ScopedUserManager> user_manager_enabler_;
   // Owned by |profile_manager_|
-  TestingProfile* profile_ = nullptr;
+  raw_ptr<TestingProfile, DanglingUntriaged | ExperimentalAsh> profile_ =
+      nullptr;
 };
 
 TEST_F(ChromeArcUtilTest, IsArcAllowedForProfile) {
@@ -282,31 +255,6 @@ TEST_F(ChromeArcUtilTest, IsArcAllowedForProfile_PublicAccount) {
   EXPECT_TRUE(IsArcAllowedForProfile(profile()));
 }
 
-TEST_F(ChromeArcUtilTest, IsArcAllowedForProfile_ActiveDirectoryEnabled) {
-  base::CommandLine::ForCurrentProcess()->InitFromArgv(
-      {"", "--arc-availability=officially-supported"});
-  ScopedLogIn login(
-      GetFakeUserManager(),
-      AccountId::AdFromUserEmailObjGuid("testing_profile@test",
-                                        "f04557de-5da2-40ce-ae9d-b8874d8da96e"),
-      user_manager::USER_TYPE_ACTIVE_DIRECTORY);
-  EXPECT_FALSE(
-      ash::ProfileHelper::Get()->GetUserByProfile(profile())->HasGaiaAccount());
-  EXPECT_TRUE(IsArcAllowedForProfileOnFirstCall(profile()));
-}
-
-TEST_F(ChromeArcUtilTest, IsArcAllowedForProfile_ActiveDirectoryDisabled) {
-  base::CommandLine::ForCurrentProcess()->InitFromArgv({""});
-  ScopedLogIn login(
-      GetFakeUserManager(),
-      AccountId::AdFromUserEmailObjGuid("testing_profile@test",
-                                        "f04557de-5da2-40ce-ae9d-b8874d8da96e"),
-      user_manager::USER_TYPE_ACTIVE_DIRECTORY);
-  EXPECT_FALSE(
-      ash::ProfileHelper::Get()->GetUserByProfile(profile())->HasGaiaAccount());
-  EXPECT_FALSE(IsArcAllowedForProfileOnFirstCall(profile()));
-}
-
 TEST_F(ChromeArcUtilTest, IsArcAllowedForProfile_KioskArcNotAvailable) {
   base::CommandLine::ForCurrentProcess()->InitFromArgv({""});
   ScopedLogIn login(GetFakeUserManager(),
@@ -343,8 +291,7 @@ TEST_F(ChromeArcUtilTest, IsArcAllowedForProfile_KioskArcSupported) {
 TEST_F(ChromeArcUtilTest, IsArcAllowedForProfile_GuestAccount) {
   base::CommandLine::ForCurrentProcess()->InitFromArgv(
       {"", "--arc-availability=officially-supported"});
-  ScopedLogIn login(GetFakeUserManager(),
-                    GetFakeUserManager()->GetGuestAccountId());
+  ScopedLogIn login(GetFakeUserManager(), user_manager::GuestAccountId());
   EXPECT_TRUE(IsArcAllowedForProfileOnFirstCall(profile()));
 }
 
@@ -502,14 +449,6 @@ TEST_F(ChromeArcUtilTest, AreArcAllOptInPreferencesIgnorableForProfile) {
   // OptIn prefs are unset, the function returns false.
   EXPECT_FALSE(AreArcAllOptInPreferencesIgnorableForProfile(profile()));
 
-  // Prefs are unused for Active Directory users.
-  {
-    ScopedLogIn login(GetFakeUserManager(),
-                      AccountId::AdFromUserEmailObjGuid(
-                          profile()->GetProfileUserName(), kTestGaiaId));
-    EXPECT_TRUE(AreArcAllOptInPreferencesIgnorableForProfile(profile()));
-  }
-
   // OptIn prefs are set to unmanaged/OFF values, and the function returns
   // false.
   profile()->GetPrefs()->SetBoolean(prefs::kArcBackupRestoreEnabled, false);
@@ -569,22 +508,6 @@ TEST_F(ChromeArcUtilTest, AreArcAllOptInPreferencesIgnorableForProfile) {
   EXPECT_TRUE(AreArcAllOptInPreferencesIgnorableForProfile(profile()));
 }
 
-// Test the IsActiveDirectoryUserForProfile() function for non-AD accounts.
-TEST_F(ChromeArcUtilTest, IsActiveDirectoryUserForProfile_Gaia) {
-  ScopedLogIn login(GetFakeUserManager(),
-                    AccountId::FromUserEmailGaiaId(
-                        profile()->GetProfileUserName(), kTestGaiaId));
-  EXPECT_FALSE(IsActiveDirectoryUserForProfile(profile()));
-}
-
-// Test the IsActiveDirectoryUserForProfile() function for AD accounts.
-TEST_F(ChromeArcUtilTest, IsActiveDirectoryUserForProfile_AD) {
-  ScopedLogIn login(GetFakeUserManager(),
-                    AccountId::AdFromUserEmailObjGuid(
-                        profile()->GetProfileUserName(), kTestGaiaId));
-  EXPECT_TRUE(IsActiveDirectoryUserForProfile(profile()));
-}
-
 TEST_F(ChromeArcUtilTest, TermsOfServiceNegotiationNeededForAlreadyAccepted) {
   base::CommandLine::ForCurrentProcess()->InitFromArgv(
       {"", "--arc-availability=officially-supported"});
@@ -640,16 +563,6 @@ TEST_F(ChromeArcUtilTest, TermsOfServiceOobeNegotiationNeededNoPlayStore) {
   DisableDBusForProfileManager();
   ScopedLogIn login(GetFakeUserManager(),
                     AccountId::FromUserEmailGaiaId(
-                        profile()->GetProfileUserName(), kTestGaiaId));
-  EXPECT_FALSE(IsArcTermsOfServiceOobeNegotiationNeeded());
-}
-
-TEST_F(ChromeArcUtilTest, TermsOfServiceOobeNegotiationNeededAdUser) {
-  base::CommandLine::ForCurrentProcess()->InitFromArgv(
-      {"", "--arc-availability=officially-supported"});
-  DisableDBusForProfileManager();
-  ScopedLogIn login(GetFakeUserManager(),
-                    AccountId::AdFromUserEmailObjGuid(
                         profile()->GetProfileUserName(), kTestGaiaId));
   EXPECT_FALSE(IsArcTermsOfServiceOobeNegotiationNeeded());
 }
@@ -873,8 +786,8 @@ TEST_F(ArcOobeTest, ShouldStartArcSilentlyForManagedProfile) {
 using ArcOobeOptInActiveInTest = ArcOobeTest;
 
 TEST_F(ArcOobeOptInActiveInTest, OobeOptInActive) {
-  // OOBE OptIn is active in case of OOBE controller is alive and the ARC ToS
-  // screen is currently showing.
+  // OOBE OptIn is active in case of OOBE controller is alive and the
+  // Consolidated Consent screen is currently showing.
   LogIn();
   EXPECT_FALSE(IsArcOobeOptInActive());
   CreateLoginDisplayHost();
@@ -882,7 +795,7 @@ TEST_F(ArcOobeOptInActiveInTest, OobeOptInActive) {
   const AccountId account_id = AccountId::FromUserEmailGaiaId(
       profile()->GetProfileUserName(), kTestGaiaId);
 
-  // OOBE OptIn can only start if Onobarding is not completed yet.
+  // OOBE OptIn can only start if Onboarding is not completed yet.
   EXPECT_TRUE(IsArcOobeOptInActive());
 
   // Set a version for the Onboarding to indicate that the user completed the
@@ -890,9 +803,10 @@ TEST_F(ArcOobeOptInActiveInTest, OobeOptInActive) {
   user_manager::KnownUser(g_browser_process->local_state())
       .SetOnboardingCompletedVersion(account_id, version_info::GetVersion());
   EXPECT_FALSE(IsArcOobeOptInActive());
-  // ARC ToS wizard but Onboarding flow completed.
+
+  // Consolidated Consent wizard but Onboarding flow completed.
   login_display_host()->StartWizard(
-      ash::ArcTermsOfServiceScreenView::kScreenId);
+      ash::ConsolidatedConsentScreenView::kScreenId);
   EXPECT_FALSE(IsArcOobeOptInActive());
 }
 

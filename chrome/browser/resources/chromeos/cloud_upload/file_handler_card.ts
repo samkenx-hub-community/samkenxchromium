@@ -17,7 +17,6 @@ export class BaseCardElement extends HTMLElement {
     shadowRoot.innerHTML = getTemplate();
     this.addStyles();
     this.addEventListener('keyup', this.onKeyUp.bind(this));
-    this.role = 'option';
   }
 
   $(query: string): HTMLElement {
@@ -27,7 +26,6 @@ export class BaseCardElement extends HTMLElement {
   addStyles() {
     this.$('#container')!.classList.add(
         'margin-top', 'round-top', 'round-bottom');
-    this.role = 'button';
     this.tabIndex = 0;
   }
 
@@ -53,10 +51,10 @@ export class AccordionTopCardElement extends BaseCardElement {
   override addStyles() {
     super.addStyles();
     this.$('#icon')!.style.display = 'none';
-    this.$('#title')!.innerHTML = 'Other apps';
+    this.$('#title')!.textContent = 'Other apps';
     this.$('#right-icon')!.classList.add('chevron');
-    this.$('#container')!.removeChild(this.$('paper-ripple'));
     this.ariaExpanded = 'false';
+    this.role = 'button';
   }
 
   toggleExpandedState(): boolean {
@@ -90,6 +88,8 @@ export class FileHandlerCardElement extends BaseCardElement {
   constructor() {
     super();
     this.ariaSelected = 'false';
+    this.ariaCurrent = 'false';
+    this.role = 'option';
   }
 
   updateSelection(selected: boolean) {
@@ -97,9 +97,11 @@ export class FileHandlerCardElement extends BaseCardElement {
     if (this.selected_) {
       this.$('#card')!.setAttribute('selected', '');
       this.ariaSelected = 'true';
+      this.ariaCurrent = 'true';
     } else {
       this.$('#card')!.removeAttribute('selected');
       this.ariaSelected = 'false';
+      this.ariaCurrent = 'false';
     }
   }
 
@@ -119,8 +121,8 @@ export class CloudProviderCardElement extends FileHandlerCardElement {
 
   setParameters(type: CloudProviderType, name: string, description: string) {
     this.type_ = type;
-    this.$('#title')!.innerHTML = name;
-    this.$('#description')!.innerHTML = description;
+    this.$('#title')!.textContent = name;
+    this.$('#description')!.textContent = description;
   }
 
   setIconClass(className: string) {
@@ -139,7 +141,7 @@ export class LocalHandlerCardElement extends FileHandlerCardElement {
 
   setParameters(taskPosition: number, name: string) {
     this.taskPosition_ = taskPosition;
-    this.$('#title')!.innerHTML = name;
+    this.$('#title')!.textContent = name;
   }
 
   setIconUrl(url: string) {

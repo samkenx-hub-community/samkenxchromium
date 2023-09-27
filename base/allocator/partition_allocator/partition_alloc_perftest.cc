@@ -15,7 +15,9 @@
 #include "base/allocator/partition_allocator/partition_alloc_base/threading/platform_thread_for_testing.h"
 #include "base/allocator/partition_allocator/partition_alloc_base/time/time.h"
 #include "base/allocator/partition_allocator/partition_alloc_check.h"
+#include "base/allocator/partition_allocator/partition_alloc_constants.h"
 #include "base/allocator/partition_allocator/partition_alloc_for_testing.h"
+#include "base/allocator/partition_allocator/partition_root.h"
 #include "base/allocator/partition_allocator/thread_cache.h"
 #include "base/debug/debugging_buildflags.h"
 #include "base/timer/lap_timer.h"
@@ -95,20 +97,18 @@ class PartitionAllocator : public Allocator {
   ~PartitionAllocator() override { alloc_.DestructForTesting(); }
 
   void* Alloc(size_t size) override {
-    return alloc_.AllocWithFlagsNoHooks(0, size, PartitionPageSize());
+    return alloc_.AllocInline<AllocFlags::kNoHooks>(size);
   }
-  void Free(void* data) override { ThreadSafePartitionRoot::FreeNoHooks(data); }
+  void Free(void* data) override {
+    // Even though it's easy to invoke the fast path with
+    // alloc_.Free<kNoHooks>(), we chose to use the slower path, because it's
+    // more common with PA-E.
+    PartitionRoot::FreeInlineInUnknownRoot<
+        partition_alloc::FreeFlags::kNoHooks>(data);
+  }
 
  private:
-  ThreadSafePartitionRoot alloc_{{
-      PartitionOptions::AlignedAlloc::kDisallowed,
-      PartitionOptions::ThreadCache::kDisabled,
-      PartitionOptions::Quarantine::kDisallowed,
-      PartitionOptions::Cookie::kAllowed,
-      PartitionOptions::BackupRefPtr::kDisabled,
-      PartitionOptions::BackupRefPtrZapping::kDisabled,
-      PartitionOptions::UseConfigurablePool::kNo,
-  }};
+  PartitionRoot alloc_{PartitionOptions{}};
 };
 
 class PartitionAllocatorWithThreadCache : public Allocator {
@@ -125,27 +125,23 @@ class PartitionAllocatorWithThreadCache : public Allocator {
   ~PartitionAllocatorWithThreadCache() override = default;
 
   void* Alloc(size_t size) override {
-    return allocator_.root()->AllocWithFlagsNoHooks(0, size,
-                                                    PartitionPageSize());
+    return allocator_.root()->AllocInline<AllocFlags::kNoHooks>(size);
   }
-  void Free(void* data) override { allocator_.root()->Free(data); }
+  void Free(void* data) override {
+    // Even though it's easy to invoke the fast path with
+    // alloc_.Free<kNoHooks>(), we chose to use the slower path, because it's
+    // more common with PA-E.
+    PartitionRoot::FreeInlineInUnknownRoot<
+        partition_alloc::FreeFlags::kNoHooks>(data);
+  }
 
  private:
   static constexpr partition_alloc::PartitionOptions kOpts = {
-    PartitionOptions::AlignedAlloc::kDisallowed,
 #if !BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
-    PartitionOptions::ThreadCache::kEnabled,
-#else
-    PartitionOptions::ThreadCache::kDisabled,
-#endif  // BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
-    PartitionOptions::Quarantine::kDisallowed,
-    PartitionOptions::Cookie::kAllowed,
-    PartitionOptions::BackupRefPtr::kDisabled,
-    PartitionOptions::BackupRefPtrZapping::kDisabled,
-    PartitionOptions::UseConfigurablePool::kNo,
+    .thread_cache = PartitionOptions::kEnabled,
+#endif
   };
-  PartitionAllocatorForTesting<internal::ThreadSafe, internal::DisallowLeaks>
-      allocator_{kOpts};
+  PartitionAllocatorForTesting<internal::DisallowLeaks> allocator_{kOpts};
   internal::ThreadCacheProcessScopeForTesting scope_;
 };
 
@@ -166,23 +162,19 @@ class PartitionAllocatorWithAllocationStackTraceRecorder : public Allocator {
     }
   }
 
-  void* Alloc(size_t size) override {
-    return alloc_.AllocWithFlags(0, size, nullptr);
-  }
+  void* Alloc(size_t size) override { return alloc_.AllocInline(size); }
 
-  void Free(void* data) override { ThreadSafePartitionRoot::Free(data); }
+  void Free(void* data) override {
+    // Even though it's easy to invoke the fast path with
+    // alloc_.Free<kNoHooks>(), we chose to use the slower path, because it's
+    // more common with PA-E.
+    PartitionRoot::FreeInlineInUnknownRoot<
+        partition_alloc::FreeFlags::kNoHooks>(data);
+  }
 
  private:
   bool const register_hooks_;
-  ThreadSafePartitionRoot alloc_{{
-      PartitionOptions::AlignedAlloc::kDisallowed,
-      PartitionOptions::ThreadCache::kDisabled,
-      PartitionOptions::Quarantine::kDisallowed,
-      PartitionOptions::Cookie::kAllowed,
-      PartitionOptions::BackupRefPtr::kDisabled,
-      PartitionOptions::BackupRefPtrZapping::kDisabled,
-      PartitionOptions::UseConfigurablePool::kNo,
-  }};
+  PartitionRoot alloc_{PartitionOptions{}};
   ::base::allocator::dispatcher::Dispatcher& dispatcher_ =
       ::base::allocator::dispatcher::Dispatcher::GetInstance();
   ::base::debug::tracer::AllocationTraceRecorder recorder_;

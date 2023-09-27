@@ -7,11 +7,7 @@
 #import "base/metrics/histogram_functions.h"
 #import "base/time/time.h"
 #import "ios/chrome/app/application_delegate/app_state.h"
-#import "ios/chrome/browser/ui/main/scene_state.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
 
 namespace {
 // Minimum amount of time for a normal/incognito transition to be considered.

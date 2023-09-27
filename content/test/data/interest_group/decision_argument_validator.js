@@ -11,6 +11,9 @@ function scoreAd(
   validateTrustedScoringSignals(trustedScoringSignals);
   validateBrowserSignals(browserSignals, /*isScoreAd=*/true);
   validateDirectFromSellerSignals(directFromSellerSignals);
+  if (browserSignals.bidCurrency === 'USD') {
+    return {desirability: bid, incomingBidInSellerCurrency: bid * 0.91};
+  }
   return bid;
 }
 
@@ -26,7 +29,9 @@ function reportResult(auctionConfig, browserSignals, directFromSellerSignals) {
 function validateAdMetadata(adMetadata) {
   const adMetadataJSON = JSON.stringify(adMetadata);
   if (adMetadataJSON !==
-      '{"renderUrl":"https://example.com/render","metadata":{"ad":"metadata","here":[1,2,3]}}')
+      '{"renderURL":"https://example.com/render",' +
+      '"renderUrl":"https://example.com/render",' +
+      '"metadata":{"ad":"metadata","here":[1,2,3]}}')
     throw 'Wrong adMetadata ' + adMetadataJSON;
 }
 
@@ -36,7 +41,7 @@ function validateBid(bid) {
 }
 
 function validateAuctionConfig(auctionConfig) {
-  if (Object.keys(auctionConfig).length !== 11) {
+  if (Object.keys(auctionConfig).length !== 15) {
     throw 'Wrong number of auctionConfig fields ' +
         JSON.stringify(auctionConfig);
   }
@@ -44,9 +49,20 @@ function validateAuctionConfig(auctionConfig) {
   if (!auctionConfig.seller.includes('b.test'))
     throw 'Wrong seller ' + auctionConfig.seller;
 
+  if (auctionConfig.decisionLogicURL !==
+      auctionConfig.seller + '/interest_group/decision_argument_validator.js') {
+    throw 'Wrong decisionLogicURL ' + auctionConfig.decisionLogicURL;
+  }
+
   if (auctionConfig.decisionLogicUrl !==
       auctionConfig.seller + '/interest_group/decision_argument_validator.js') {
     throw 'Wrong decisionLogicUrl ' + auctionConfig.decisionLogicUrl;
+  }
+
+  if (auctionConfig.trustedScoringSignalsURL !==
+    auctionConfig.seller + '/interest_group/trusted_scoring_signals.json') {
+    throw 'Wrong trustedScoringSignalsURL ' +
+        auctionConfig.trustedScoringSignalsURL;
   }
 
   if (auctionConfig.trustedScoringSignalsUrl !==
@@ -56,7 +72,7 @@ function validateAuctionConfig(auctionConfig) {
   }
 
   // TODO(crbug.com/1186444): Consider validating URL fields like
-  // auctionConfig.decisionLogicUrl once we decide what to do about URL
+  // auctionConfig.decisionLogicURL once we decide what to do about URL
   // normalization.
 
   if (auctionConfig.interestGroupBuyers.length !== 2 ||
@@ -103,6 +119,17 @@ function validateAuctionConfig(auctionConfig) {
         JSON.stringify(auctionConfig.perBuyerCumulativeTimeouts);
   }
 
+  if (auctionConfig.perBuyerCurrencies[buyerAOrigin] !== 'USD' ||
+      auctionConfig.perBuyerCurrencies[buyerBOrigin] !== 'CAD' ||
+      auctionConfig.perBuyerCurrencies['*'] !== 'EUR') {
+    throw 'Wrong perBuyerCurrencies ' +
+        JSON.stringify(auctionConfig.perBuyerCurrencies);
+  }
+  if (auctionConfig.sellerCurrency !== 'EUR') {
+    throw 'Wrong sellerCurrency ' +
+        JSON.stringify(auctionConfig.sellerCurrency);
+  }
+
   const perBuyerPrioritySignals = auctionConfig.perBuyerPrioritySignals;
   if (Object.keys(perBuyerPrioritySignals).length !== 2 ||
       JSON.stringify(perBuyerPrioritySignals[buyerAOrigin]) !==
@@ -120,6 +147,15 @@ function validateAuctionConfig(auctionConfig) {
 }
 
 function validateTrustedScoringSignals(signals) {
+  if (signals.renderURL["https://example.com/render"] !== "foo") {
+    throw 'Wrong trustedScoringSignals.renderURL ' +
+        signals.renderURL["https://example.com/render"];
+  }
+  if (signals.adComponentRenderURLs["https://example.com/render-component"] !==
+      1) {
+    throw 'Wrong trustedScoringSignals.adComponentRenderURLs ' +
+        signals.adComponentRenderURLs["https://example.com/render-component"];
+  }
   if (signals.renderUrl["https://example.com/render"] !== "foo") {
     throw 'Wrong trustedScoringSignals.renderUrl ' +
         signals.renderUrl["https://example.com/render"];
@@ -141,14 +177,18 @@ function validateBrowserSignals(browserSignals, isScoreAd) {
     throw 'Wrong componentSeller ' + browserSignals.componentSeller;
   if (!browserSignals.interestGroupOwner.startsWith('https://a.test'))
     throw 'Wrong interestGroupOwner ' + browserSignals.interestGroupOwner;
+  if (browserSignals.renderURL !== "https://example.com/render")
+    throw 'Wrong renderURL ' + browserSignals.renderURL;
   if (browserSignals.renderUrl !== "https://example.com/render")
     throw 'Wrong renderUrl ' + browserSignals.renderUrl;
   if (browserSignals.dataVersion !== 1234)
     throw 'Wrong dataVersion ' + browserSignals.dataVersion;
+  if (browserSignals.bidCurrency !== 'USD')
+    throw 'Wrong bidCurrency ' + browserSignals.bidCurrency;
 
   // Fields that vary by method.
   if (isScoreAd) {
-    if (Object.keys(browserSignals).length !== 6) {
+    if (Object.keys(browserSignals).length !== 8) {
       throw 'Wrong number of browser signals fields ' +
           JSON.stringify(browserSignals);
     }
@@ -158,16 +198,21 @@ function validateBrowserSignals(browserSignals, isScoreAd) {
     if (browserSignals.biddingDurationMsec < 0)
       throw 'Wrong biddingDurationMsec ' + browserSignals.biddingDurationMsec;
   } else {
-    if (Object.keys(browserSignals).length !== 7) {
+    if (Object.keys(browserSignals).length !== 10) {
       throw 'Wrong number of browser signals fields ' +
           JSON.stringify(browserSignals);
     }
     validateBid(browserSignals.bid);
+
     if (browserSignals.desirability !== 2)
       throw 'Wrong desireability ' + browserSignals.desirability;
     if (browserSignals.highestScoringOtherBid !== 0) {
       throw 'Wrong highestScoringOtherBid ' +
           browserSignals.highestScoringOtherBid;
+    }
+    if (browserSignals.highestScoringOtherBidCurrency !== 'EUR') {
+      throw 'Wrong highestScoringOtherBidCurrency ' +
+          browserSignals.highestScoringOtherBidCurrency;
     }
   }
 }
@@ -181,7 +226,8 @@ function validateDirectFromSellerSignals(directFromSellerSignals) {
   }
   const auctionSignalsJSON =
       JSON.stringify(directFromSellerSignals.auctionSignals);
-  if (auctionSignalsJSON !== '{"json":"for","all":["parties"]}') {
+  if (auctionSignalsJSON !== '{"json":"for","all":["parties"]}' &&
+      auctionSignalsJSON !== '{"all":["parties"],"json":"for"}') {
     throw 'Wrong directFromSellerSignals.auctionSignals ' +
         auctionSignalsJSON;
   }

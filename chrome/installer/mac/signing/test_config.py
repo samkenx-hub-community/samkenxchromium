@@ -2,21 +2,21 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from . import config
+import argparse
+
+from signing import config, model, standard_invoker
 
 
 class TestConfig(config.CodeSignConfig):
 
-    def __init__(self,
-                 identity='[IDENTITY]',
-                 installer_identity='[INSTALLER-IDENTITY]',
-                 notary_user='[NOTARY-USER]',
-                 notary_password='[NOTARY-PASSWORD]',
-                 **kwargs):
-        if 'notary_team_id' not in kwargs:
-            kwargs['notary_team_id'] = '[NOTARY-TEAM]'
-        super(TestConfig, self).__init__(identity, installer_identity,
-                                         notary_user, notary_password, **kwargs)
+    def __init__(self, **kwargs):
+        config_args = {
+            'invoker': TestInvoker.factory_with_args(),
+            'identity': '[IDENTITY]',
+            'installer_identity': '[INSTALLER-IDENTITY]',
+        }
+        config_args.update(kwargs)
+        super(TestConfig, self).__init__(**config_args)
 
     @staticmethod
     def is_chrome_branded():
@@ -67,3 +67,13 @@ class TestConfigInjectGetTaskAllow(TestConfig):
     @property
     def inject_get_task_allow_entitlement(self):
         return True
+
+
+class TestInvoker(standard_invoker.Invoker):
+
+    @staticmethod
+    def factory_with_args(**kwargs):
+        if 'notary_arg' not in kwargs:
+            kwargs['notary_arg'] = []
+        args = argparse.Namespace(**kwargs)
+        return lambda config: TestInvoker(args, config)

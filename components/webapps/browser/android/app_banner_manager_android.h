@@ -18,6 +18,7 @@
 #include "components/webapps/browser/android/installable/installable_ambient_badge_client.h"
 #include "components/webapps/browser/android/installable/installable_ambient_badge_message_controller.h"
 #include "components/webapps/browser/banners/app_banner_manager.h"
+#include "components/webapps/browser/installable/installable_data.h"
 #include "url/gurl.h"
 
 class SkBitmap;
@@ -110,11 +111,8 @@ class AppBannerManagerAndroid : public AppBannerManager {
   // Run before showing the ambient badge. This calls back to the
   // InstallableManager to continue checking service worker criteria for showing
   // ambient badge.
-  void PerformWorkerCheckForAmbientBadge();
-
-  // Checks whether the web page has sufficient engagement for showing the
-  // ambient badge.
-  bool HasSufficientEngagementForAmbientBadge();
+  void PerformWorkerCheckForAmbientBadge(InstallableParams params,
+                                         InstallableCallback callback);
 
  protected:
   // AppBannerManager overrides.
@@ -125,19 +123,24 @@ class AppBannerManagerAndroid : public AppBannerManager {
   void PerformInstallableWebAppCheck() override;
   void ResetCurrentPageData() override;
   void ShowBannerUi(WebappInstallSource install_source) override;
-  void MaybeShowAmbientBadge() override;
-  base::WeakPtr<AppBannerManager> GetWeakPtr() override;
-  void InvalidateWeakPtrs() override;
+  base::WeakPtr<AppBannerManager> GetWeakPtrForThisNavigation() override;
+  void InvalidateWeakPtrsForThisNavigation() override;
   bool IsSupportedNonWebAppPlatform(
       const std::u16string& platform) const override;
   bool IsRelatedNonWebAppInstalled(
       const blink::Manifest::RelatedApplication& related_app) const override;
   bool IsWebAppConsideredInstalled() const override;
-
-  // Callback invoked by the InstallableManager once it has finished checking
-  // service worker for showing ambient badge.
-  virtual void OnDidPerformWorkerCheckForAmbientBadge(
-      const InstallableData& data);
+  bool IsAppFullyInstalledForSiteUrl(const GURL& site_url) const override;
+  // Locally installed apps do not exist on Android.
+  bool IsAppPartiallyInstalledForSiteUrl(const GURL& site_url) const override;
+  void SaveInstallationDismissedForMl(const GURL& manifest_id) override;
+  void SaveInstallationIgnoredForMl(const GURL& manifest_id) override;
+  void SaveInstallationAcceptedForMl(const GURL& manifest_id) override;
+  void OnMlInstallPrediction(base::PassKey<MLInstallabilityPromoter>,
+                             std::string result_label) override;
+  bool IsMlPromotionBlockedByHistoryGuardrail(const GURL& manifest_id) override;
+  segmentation_platform::SegmentationPlatformService*
+  GetSegmentationPlatformService() override;
 
   void CheckEngagementForAmbientBadge();
 
@@ -160,6 +163,8 @@ class AppBannerManagerAndroid : public AppBannerManager {
 
   // Java-side object containing data about a native app.
   base::android::ScopedJavaGlobalRef<jobject> native_app_data_;
+
+  std::unique_ptr<AmbientBadgeManager> ambient_badge_manager_;
 
  private:
   // Creates the Java-side AppBannerManager.
@@ -194,8 +199,6 @@ class AppBannerManagerAndroid : public AppBannerManager {
 
   // The Java-side AppBannerManager.
   base::android::ScopedJavaGlobalRef<jobject> java_banner_manager_;
-
-  std::unique_ptr<AmbientBadgeManager> ambient_badge_manager_;
 
   // App package name for a native app banner.
   std::string native_app_package_;

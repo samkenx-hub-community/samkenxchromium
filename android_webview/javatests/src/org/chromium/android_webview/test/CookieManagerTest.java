@@ -8,10 +8,10 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 
-import android.support.test.InstrumentationRegistry;
 import android.util.Pair;
 
 import androidx.annotation.IntDef;
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
 
@@ -32,11 +32,11 @@ import org.chromium.android_webview.test.util.CookieUtils;
 import org.chromium.android_webview.test.util.CookieUtils.TestCallback;
 import org.chromium.android_webview.test.util.JSUtils;
 import org.chromium.base.Callback;
-import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.Feature;
+import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.test.util.JavaScriptUtils;
 import org.chromium.net.test.EmbeddedTestServer;
@@ -208,30 +208,21 @@ public class CookieManagerTest {
 
         EmbeddedTestServer embeddedTestServer = EmbeddedTestServer.createAndStartServer(
                 InstrumentationRegistry.getInstrumentation().getContext());
-        try {
-            final String url = embeddedTestServer.getURL("/echoheader?Cookie");
-            String cookieName = "java-test";
-            mCookieManager.setCookie(url, cookieName + "=should-not-work");
-
-            // Setting cookies should still affect the CookieManager itself
-            assertHasCookies(url);
-
-            mActivityTestRule.loadUrlSync(
-                    mAwContents, mContentsClient.getOnPageFinishedHelper(), url);
-            String jsValue = getCookieWithJavaScript(cookieName);
-            String message =
-                    "WebView should not expose cookies to JavaScript (with setAcceptCookie "
-                    + "disabled)";
-            Assert.assertEquals(message, "\"\"", jsValue);
-
-            final String cookieHeader = mActivityTestRule.getJavaScriptResultBodyTextContent(
-                    mAwContents, mContentsClient);
-            message = "WebView should not expose cookies via the Cookie header (with "
-                    + "setAcceptCookie disabled)";
-            Assert.assertEquals(message, "None", cookieHeader);
-        } finally {
-            embeddedTestServer.stopAndDestroyServer();
-        }
+        final String url = embeddedTestServer.getURL("/echoheader?Cookie");
+        String cookieName = "java-test";
+        mCookieManager.setCookie(url, cookieName + "=should-not-work");
+        // Setting cookies should still affect the CookieManager itself
+        assertHasCookies(url);
+        mActivityTestRule.loadUrlSync(mAwContents, mContentsClient.getOnPageFinishedHelper(), url);
+        String jsValue = getCookieWithJavaScript(cookieName);
+        String message = "WebView should not expose cookies to JavaScript (with setAcceptCookie "
+                + "disabled)";
+        Assert.assertEquals(message, "\"\"", jsValue);
+        final String cookieHeader =
+                mActivityTestRule.getJavaScriptResultBodyTextContent(mAwContents, mContentsClient);
+        message = "WebView should not expose cookies via the Cookie header (with "
+                + "setAcceptCookie disabled)";
+        Assert.assertEquals(message, "None", cookieHeader);
     }
 
     @Test
@@ -254,6 +245,51 @@ public class CookieManagerTest {
             waitForCookie(url);
             assertHasCookies(url);
             validateCookies(url, "httponly", "strictsamesite", "laxsamesite");
+        } finally {
+            webServer.shutdown();
+        }
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"AndroidWebView"})
+    public void testEmbedderCanSeePartitionedCookies() throws Throwable {
+        TestWebServer webServer = TestWebServer.start();
+        try {
+            // Set a partitioned cookie and an unpartitioned cookie to ensure that they are all
+            // visible to CookieManager in the app.
+            String cookies[] = {"partitioned_cookie=foo; SameSite=None; Secure; Partitioned",
+                    "unpartitioned_cookie=bar; SameSite=None; Secure"};
+            List<Pair<String, String>> responseHeaders = new ArrayList<Pair<String, String>>();
+            for (String cookie : cookies) {
+                responseHeaders.add(Pair.create("Set-Cookie", cookie));
+            }
+            String url = webServer.setResponse("/", "test", responseHeaders);
+            mActivityTestRule.loadUrlSync(
+                    mAwContents, mContentsClient.getOnPageFinishedHelper(), url);
+            waitForCookie(url);
+            assertHasCookies(url);
+            validateCookies(url, "partitioned_cookie", "unpartitioned_cookie");
+        } finally {
+            webServer.shutdown();
+        }
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"AndroidWebView"})
+    public void setPartitionedCookieWithCookieManager() throws Throwable {
+        TestWebServer webServer = TestWebServer.start();
+        try {
+            final String url = "https://www.example.com";
+            mCookieManager.setCookie(
+                    url, "partitioned=foo;Path=/;Secure;Partitioned;SameSite=None");
+
+            final String expected = "partitioned=foo; domain=www.example.com; path=/; "
+                    + "secure; partitioned; samesite=none";
+            List<String> cookieInfo = mCookieManager.getCookieInfo(url);
+            Assert.assertNotNull(cookieInfo);
+            Assert.assertEquals(expected, cookieInfo.get(0));
         } finally {
             webServer.shutdown();
         }
@@ -382,17 +418,13 @@ public class CookieManagerTest {
     @MediumTest
     @Feature({"AndroidWebView", "Privacy"})
     public void testSetCookie() {
-        Assert.assertEquals(
-                0, RecordHistogram.getHistogramTotalCountForTesting(SECURE_COOKIE_HISTOGRAM_NAME));
+        HistogramWatcher histogramExpectation = HistogramWatcher.newSingleRecordWatcher(
+                SECURE_COOKIE_HISTOGRAM_NAME, /* kNotASecureCookie */ 3);
         String url = "http://www.example.com";
         String cookie = "name=test";
         mCookieManager.setCookie(url, cookie);
         assertCookieEquals(cookie, url);
-        Assert.assertEquals(
-                1, RecordHistogram.getHistogramTotalCountForTesting(SECURE_COOKIE_HISTOGRAM_NAME));
-        Assert.assertEquals(1,
-                RecordHistogram.getHistogramValueCountForTesting(
-                        SECURE_COOKIE_HISTOGRAM_NAME, 3 /* kNotASecureCookie */));
+        histogramExpectation.assertExpected();
     }
 
     @Test
@@ -449,9 +481,10 @@ public class CookieManagerTest {
     @MediumTest
     @Feature({"AndroidWebView", "Privacy"})
     public void testSetSecureCookieForHttpUrlNotTargetingAndroidR() {
+        HistogramWatcher histogramExpectation = HistogramWatcher.newSingleRecordWatcher(
+                SECURE_COOKIE_HISTOGRAM_NAME, /* kFixedUp */ 4);
+
         mCookieManager.setWorkaroundHttpSecureCookiesForTesting(true);
-        Assert.assertEquals(
-                0, RecordHistogram.getHistogramTotalCountForTesting(SECURE_COOKIE_HISTOGRAM_NAME));
         String url = "http://www.example.com";
         String secureUrl = "https://www.example.com";
         String cookie = "name=test";
@@ -459,20 +492,17 @@ public class CookieManagerTest {
 
         Assert.assertTrue("Setting the cookie should succeed", success);
         assertCookieEquals(cookie, secureUrl);
-        Assert.assertEquals(
-                1, RecordHistogram.getHistogramTotalCountForTesting(SECURE_COOKIE_HISTOGRAM_NAME));
-        Assert.assertEquals(1,
-                RecordHistogram.getHistogramValueCountForTesting(
-                        SECURE_COOKIE_HISTOGRAM_NAME, 4 /* kFixedUp */));
+        histogramExpectation.assertExpected();
     }
 
     @Test
     @MediumTest
     @Feature({"AndroidWebView", "Privacy"})
     public void testSetSecureCookieForHttpUrlTargetingAndroidR() {
+        HistogramWatcher histogramExpectation = HistogramWatcher.newSingleRecordWatcher(
+                SECURE_COOKIE_HISTOGRAM_NAME, /* kDisallowedAndroidR */ 5);
+
         mCookieManager.setWorkaroundHttpSecureCookiesForTesting(false);
-        Assert.assertEquals(
-                0, RecordHistogram.getHistogramTotalCountForTesting(SECURE_COOKIE_HISTOGRAM_NAME));
         String url = "http://www.example.com";
         String secureUrl = "https://www.example.com";
         String cookie = "name=test";
@@ -481,29 +511,21 @@ public class CookieManagerTest {
         Assert.assertFalse("Setting the cookie should fail", success);
         assertNoCookies(url);
         assertNoCookies(secureUrl);
-
-        Assert.assertEquals(
-                1, RecordHistogram.getHistogramTotalCountForTesting(SECURE_COOKIE_HISTOGRAM_NAME));
-        Assert.assertEquals(1,
-                RecordHistogram.getHistogramValueCountForTesting(
-                        SECURE_COOKIE_HISTOGRAM_NAME, 5 /* kDisallowedAndroidR */));
+        histogramExpectation.assertExpected();
     }
 
     @Test
     @MediumTest
     @Feature({"AndroidWebView", "Privacy"})
     public void testSetSecureCookieForHttpsUrl() {
-        Assert.assertEquals(
-                0, RecordHistogram.getHistogramTotalCountForTesting(SECURE_COOKIE_HISTOGRAM_NAME));
+        HistogramWatcher histogramExpectation = HistogramWatcher.newSingleRecordWatcher(
+                SECURE_COOKIE_HISTOGRAM_NAME, /* kAlreadySecureScheme */ 1);
+
         String secureUrl = "https://www.example.com";
         String cookie = "name=test";
         mCookieManager.setCookie(secureUrl, cookie + ";secure");
         assertCookieEquals(cookie, secureUrl);
-        Assert.assertEquals(
-                1, RecordHistogram.getHistogramTotalCountForTesting(SECURE_COOKIE_HISTOGRAM_NAME));
-        Assert.assertEquals(1,
-                RecordHistogram.getHistogramValueCountForTesting(
-                        SECURE_COOKIE_HISTOGRAM_NAME, 1 /* kAlreadySecureScheme */));
+        histogramExpectation.assertExpected();
     }
 
     @Test
@@ -535,6 +557,8 @@ public class CookieManagerTest {
     @MediumTest
     @Feature({"AndroidWebView", "Privacy"})
     public void testSetCookieCallback_badUrl() throws Throwable {
+        HistogramWatcher histogramExpectation = HistogramWatcher.newSingleRecordWatcher(
+                SECURE_COOKIE_HISTOGRAM_NAME, /* kInvalidUrl */ 0);
         final String cookie = "name=test";
         final String brokenUrl = "foo";
 
@@ -545,11 +569,7 @@ public class CookieManagerTest {
         callback.getOnResultHelper().waitForCallback(callCount);
         Assert.assertFalse("Cookie should not be set for bad URLs", callback.getValue());
         assertNoCookies(brokenUrl);
-        Assert.assertEquals(
-                1, RecordHistogram.getHistogramTotalCountForTesting(SECURE_COOKIE_HISTOGRAM_NAME));
-        Assert.assertEquals(1,
-                RecordHistogram.getHistogramValueCountForTesting(
-                        SECURE_COOKIE_HISTOGRAM_NAME, 0 /* kInvalidUrl */));
+        histogramExpectation.assertExpected();
     }
 
     @Test
@@ -1218,9 +1238,9 @@ public class CookieManagerTest {
     @Feature({"AndroidWebView", "Privacy"})
     public void testInvokeAcceptFileSchemeCookiesTooLate() throws Throwable {
         // AwCookieManager only respects calls to setAcceptFileSchemeCookies() which happen *before*
-        // the underlying cookie store is first used. Here we call into the cookie store with dummy
-        // values to trigger this case, so we can test the CookieManager's observable state
-        // (mainly, that allowFileSchemeCookies() is consistent with the actual behavior of
+        // the underlying cookie store is first used. Here we call into the cookie store with
+        // placeholder values to trigger this case, so we can test the CookieManager's observable
+        // state (mainly, that allowFileSchemeCookies() is consistent with the actual behavior of
         // rejecting/accepting file scheme cookies).
         mCookieManager.setCookie("https://www.any.url.will.work/", "any-key=any-value");
 

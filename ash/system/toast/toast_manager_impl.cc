@@ -4,6 +4,7 @@
 
 #include "ash/system/toast/toast_manager_impl.h"
 
+#include "ash/public/cpp/system/scoped_toast_pause.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "base/functional/bind.h"
@@ -113,6 +114,11 @@ void ToastManagerImpl::Show(ToastData data) {
   const std::string& id = data.id;
   DCHECK(!id.empty());
 
+  // If `pause_counter_` is greater than 0, no toasts should be shown.
+  if (pause_counter_ > 0) {
+    return;
+  }
+
   auto existing_toast = base::ranges::find(queue_, id, &ToastData::id);
 
   if (existing_toast != queue_.end()) {
@@ -154,9 +160,10 @@ void ToastManagerImpl::Cancel(const std::string& id) {
 bool ToastManagerImpl::MaybeToggleA11yHighlightOnActiveToastDismissButton(
     const std::string& id) {
   DCHECK(IsRunning(id));
-  for (auto& iter : root_window_to_overlay_) {
-    if (iter.second && iter.second->MaybeToggleA11yHighlightOnDismissButton())
+  for (auto& [_, overlay] : root_window_to_overlay_) {
+    if (overlay && overlay->MaybeToggleA11yHighlightOnDismissButton()) {
       return true;
+    }
   }
 
   return false;
@@ -165,17 +172,36 @@ bool ToastManagerImpl::MaybeToggleA11yHighlightOnActiveToastDismissButton(
 bool ToastManagerImpl::MaybeActivateHighlightedDismissButtonOnActiveToast(
     const std::string& id) {
   DCHECK(IsRunning(id));
-  for (auto& iter : root_window_to_overlay_) {
-    if (iter.second && iter.second->MaybeActivateHighlightedDismissButton())
+  for (auto& [_, overlay] : root_window_to_overlay_) {
+    if (overlay && overlay->MaybeActivateHighlightedDismissButton()) {
       return true;
+    }
   }
 
   return false;
 }
 
-bool ToastManagerImpl::IsRunning(const std::string& id) const {
+bool ToastManagerImpl::IsRunning(std::string_view id) const {
   return HasActiveToasts() && current_toast_data_ &&
          current_toast_data_->id == id;
+}
+
+std::unique_ptr<ScopedToastPause> ToastManagerImpl::CreateScopedPause() {
+  return std::make_unique<ScopedToastPause>();
+}
+
+bool ToastManagerImpl::IsHighlighted(std::string_view id) const {
+  if (!IsRunning(id)) {
+    return false;
+  }
+
+  for (const auto& [_, overlay] : root_window_to_overlay_) {
+    if (overlay && overlay->IsDismissButtonHighlighted()) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void ToastManagerImpl::OnClosed() {
@@ -278,7 +304,6 @@ void ToastManagerImpl::CreateToastOverlayForRoot(aura::Window* root_window) {
   new_overlay = std::make_unique<ToastOverlay>(
       this, current_toast_data_->text, current_toast_data_->dismiss_text,
       *current_toast_data_->leading_icon, current_toast_data_->duration,
-      current_toast_data_->visible_on_lock_screen && locked_,
       current_toast_data_->persist_on_hover, root_window,
       current_toast_data_->dismiss_callback);
   new_overlay->Show(true);
@@ -290,15 +315,17 @@ void ToastManagerImpl::CreateToastOverlayForRoot(aura::Window* root_window) {
 }
 
 void ToastManagerImpl::CloseAllToastsWithAnimation() {
-  for (auto& iter : root_window_to_overlay_) {
-    if (iter.second)
-      iter.second->Show(false);
+  for (auto& [_, overlay] : root_window_to_overlay_) {
+    if (overlay) {
+      overlay->Show(false);
+    }
   }
 }
 
 void ToastManagerImpl::CloseAllToastsWithoutAnimation() {
-  for (auto& iter : root_window_to_overlay_)
-    iter.second.reset();
+  for (auto& [_, overlay] : root_window_to_overlay_) {
+    overlay.reset();
+  }
 
   // `OnClosed` (the other place where we stop the
   // `current_toast_expiration_timer_`) is only called when the toast is being
@@ -308,9 +335,10 @@ void ToastManagerImpl::CloseAllToastsWithoutAnimation() {
 }
 
 bool ToastManagerImpl::HasActiveToasts() const {
-  for (auto& iter : root_window_to_overlay_) {
-    if (iter.second)
+  for (const auto& [_, overlay] : root_window_to_overlay_) {
+    if (overlay) {
       return true;
+    }
   }
 
   return false;
@@ -330,6 +358,21 @@ void ToastManagerImpl::OnRootWindowAdded(aura::Window* root_window) {
 
 void ToastManagerImpl::OnRootWindowWillShutdown(aura::Window* root_window) {
   root_window_to_overlay_.erase(root_window);
+}
+
+void ToastManagerImpl::Pause() {
+  ++pause_counter_;
+
+  // Immediately closes all the toasts. Since `OnClosed` will not be called,
+  // manually resets `current_toast_data_` and `queue_`.
+  CloseAllToastsWithoutAnimation();
+  current_toast_data_.reset();
+  queue_.clear();
+}
+
+void ToastManagerImpl::Resume() {
+  CHECK_GT(pause_counter_, 0);
+  --pause_counter_;
 }
 
 }  // namespace ash

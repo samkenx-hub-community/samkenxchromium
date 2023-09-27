@@ -21,10 +21,6 @@
 
 namespace ash {
 
-COMPONENT_EXPORT(ASH_MEMORY) void UpdateMemoryParameters() {
-  ConfigureSwap();
-}
-
 namespace memory {
 
 namespace internal {

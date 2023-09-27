@@ -4,9 +4,8 @@
 
 import 'chrome://password-manager/password_manager.js';
 
-import {CheckupSubpage, CrExpandButtonElement, OpenWindowProxyImpl, Page, PasswordCheckInteraction, PasswordManagerImpl, PrefsBrowserProxyImpl, Router} from 'chrome://password-manager/password_manager.js';
+import {CheckupSubpage, CrExpandButtonElement, OpenWindowProxyImpl, Page, PasswordCheckInteraction, PasswordManagerImpl, PluralStringProxyImpl, Router} from 'chrome://password-manager/password_manager.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
-import {PluralStringProxyImpl} from 'chrome://resources/js/plural_string_proxy.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 import {TestOpenWindowProxy} from 'chrome://webui-test/test_open_window_proxy.js';
@@ -14,7 +13,6 @@ import {TestPluralStringProxy} from 'chrome://webui-test/test_plural_string_prox
 import {isVisible} from 'chrome://webui-test/test_util.js';
 
 import {TestPasswordManagerProxy} from './test_password_manager_proxy.js';
-import {TestPrefsBrowserProxy} from './test_prefs_browser_proxy.js';
 import {createAffiliatedDomain, createCredentialGroup, makeInsecureCredential, makePasswordManagerPrefs} from './test_util.js';
 
 suite('CheckupDetailsSectionTest', function() {
@@ -23,7 +21,6 @@ suite('CheckupDetailsSectionTest', function() {
   let openWindowProxy: TestOpenWindowProxy;
   let passwordManager: TestPasswordManagerProxy;
   let pluralString: TestPluralStringProxy;
-  let prefsProxy: TestPrefsBrowserProxy;
 
   setup(function() {
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
@@ -33,9 +30,6 @@ suite('CheckupDetailsSectionTest', function() {
     PasswordManagerImpl.setInstance(passwordManager);
     pluralString = new TestPluralStringProxy();
     PluralStringProxyImpl.setInstance(pluralString);
-    prefsProxy = new TestPrefsBrowserProxy();
-    prefsProxy.prefs = makePasswordManagerPrefs();
-    PrefsBrowserProxyImpl.setInstance(prefsProxy);
     Router.getInstance().navigateTo(Page.CHECKUP);
     return flushTasks();
   });
@@ -275,9 +269,9 @@ suite('CheckupDetailsSectionTest', function() {
     Router.getInstance().navigateTo(
         Page.CHECKUP_DETAILS, CheckupSubpage.REUSED);
     const insecurePasswords = [
-      makeInsecureCredential({url: 'test.com', username: 'viking', id: 0}),
+      makeInsecureCredential({url: 'Some app', username: 'viking', id: 0}),
       makeInsecureCredential({url: 'example.com', username: 'user', id: 1}),
-      makeInsecureCredential({url: 'Some app', username: 'Lalala', id: 2}),
+      makeInsecureCredential({url: 'test.com', username: 'Lalala', id: 2}),
       makeInsecureCredential(
           {url: 'accounts.google.com', username: 'corporateEmail', id: 3}),
       makeInsecureCredential(
@@ -285,10 +279,10 @@ suite('CheckupDetailsSectionTest', function() {
     ];
     passwordManager.data.groups = insecurePasswords.map(
         entry => createCredentialGroup(
-            {name: entry.urls.shown, credentials: [entry]}));
+            {name: entry.affiliatedDomains[0]!.name, credentials: [entry]}));
     passwordManager.data.credentialWithReusedPassword = [
-      {entries: insecurePasswords.slice(0, 3)},
-      {entries: insecurePasswords.slice(3, 5)},
+      {entries: insecurePasswords.slice(0, 3).sort(() => Math.random() - 0.5)},
+      {entries: insecurePasswords.slice(3, 5).sort(() => Math.random() - 0.5)},
     ];
 
     const section = document.createElement('checkup-details-section');
@@ -311,7 +305,7 @@ suite('CheckupDetailsSectionTest', function() {
 
       assertTrue(!!listItemElement);
       assertEquals(
-          expectedCredential.urls.shown,
+          expectedCredential.affiliatedDomains[0]!.name,
           listItemElement.$.shownUrl.textContent!.trim());
       assertEquals(
           expectedCredential.username,
@@ -396,6 +390,7 @@ suite('CheckupDetailsSectionTest', function() {
     ];
 
     const section = document.createElement('checkup-details-section');
+    section.prefs = makePasswordManagerPrefs();
     document.body.appendChild(section);
     await passwordManager.whenCalled('getInsecureCredentials');
     await flushTasks();
@@ -480,15 +475,9 @@ suite('CheckupDetailsSectionTest', function() {
       }),
     ];
 
-    prefsProxy.prefs = [
-      {
-        key: 'profile.password_dismiss_compromised_alert',
-        type: chrome.settingsPrivate.PrefType.BOOLEAN,
-        value: false,
-      },
-    ];
-
     const section = document.createElement('checkup-details-section');
+    section.prefs = makePasswordManagerPrefs();
+    section.prefs.profile.password_dismiss_compromised_alert.value = false;
     document.body.appendChild(section);
     await passwordManager.whenCalled('getInsecureCredentials');
     await flushTasks();
@@ -787,7 +776,7 @@ suite('CheckupDetailsSectionTest', function() {
     deleteDialog.$.delete.click();
     const interaction =
         await passwordManager.whenCalled('recordPasswordCheckInteraction');
-    const params = await passwordManager.whenCalled('removeSavedPassword');
+    const params = await passwordManager.whenCalled('removeCredential');
     assertEquals(params.id, credential.id);
     assertEquals(params.fromStores, credential.storedIn);
     assertEquals(PasswordCheckInteraction.REMOVE_PASSWORD, interaction);

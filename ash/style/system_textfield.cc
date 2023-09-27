@@ -4,8 +4,10 @@
 
 #include "ash/style/system_textfield.h"
 
+#include "ash/style/ash_color_id.h"
 #include "ash/style/system_textfield_controller.h"
-#include "system_textfield.h"
+#include "ash/style/typography.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/color/color_provider.h"
@@ -19,16 +21,10 @@ namespace ash {
 
 namespace {
 
-// The name of font family.
-constexpr char kGoogleSansFont[] = "Google Sans";
 // The heights of textfield containers for different font sizes.
 constexpr int kSmallContainerHeight = 24;
 constexpr int kMediumContainerHeight = 28;
 constexpr int kLargeContainerHeight = 28;
-// The font sizes in pixels.
-constexpr int kSmallFontSize = 12;
-constexpr int kMediumFontSize = 14;
-constexpr int kLargeFontSize = 16;
 // The minimum textfield container width.
 constexpr int kMinWidth = 80;
 // The gap between the focus ring and textfield container.
@@ -57,20 +53,19 @@ int GetContainerHeightFromType(SystemTextfield::Type type) {
 
 // Gets font list for different types.
 gfx::FontList GetFontListFromType(SystemTextfield::Type type) {
-  int font_size;
+  TypographyToken token;
   switch (type) {
     case SystemTextfield::Type::kSmall:
-      font_size = kSmallFontSize;
+      token = TypographyToken::kCrosAnnotation1;
       break;
     case SystemTextfield::Type::kMedium:
-      font_size = kMediumFontSize;
+      token = TypographyToken::kCrosBody1;
       break;
     case SystemTextfield::Type::kLarge:
-      font_size = kLargeFontSize;
+      token = TypographyToken::kCrosBody0;
       break;
   }
-  return gfx::FontList({kGoogleSansFont}, gfx::Font::NORMAL, font_size,
-                       gfx::Font::Weight::NORMAL);
+  return TypographyProvider::Get()->ResolveTypographyToken(token);
 }
 
 }  // namespace
@@ -78,21 +73,55 @@ gfx::FontList GetFontListFromType(SystemTextfield::Type type) {
 SystemTextfield::SystemTextfield(Type type) : type_(type) {
   SetFontList(GetFontListFromType(type_));
   SetBorder(views::CreateEmptyBorder(kBorderInsets));
+  // Remove the default hover effect, since the hover effect of system textfield
+  // appears not only on hover but also on focus.
+  RemoveHoverEffect();
+
+  // Override the very round highlight path set in `views::Textfield`.
+  views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
+                                                kCornerRadius);
 
   // Configure focus ring.
   auto* focus_ring = views::FocusRing::Get(this);
   DCHECK(focus_ring);
+  focus_ring->SetOutsetFocusRingDisabled(true);
   const float halo_thickness = focus_ring->GetHaloThickness();
   focus_ring->SetHaloInset(-kFocusRingGap - 0.5f * halo_thickness);
   focus_ring->SetColorId(cros_tokens::kCrosSysFocusRing);
-  focus_ring->SetHasFocusPredicate(
-      [&](views::View* view) -> bool { return show_focus_ring_; });
+  focus_ring->SetHasFocusPredicate(base::BindRepeating(
+      [](const SystemTextfield* textfield, const views::View* view) {
+        return textfield->show_focus_ring_;
+      },
+      base::Unretained(this)));
 
   enabled_changed_subscription_ = AddEnabledChangedCallback(base::BindRepeating(
       &SystemTextfield::OnEnabledStateChanged, base::Unretained(this)));
 }
 
 SystemTextfield::~SystemTextfield() = default;
+
+void SystemTextfield::SetTextColorId(ui::ColorId color_id) {
+  UpdateColorId(text_color_id_, color_id, /*is_background_color=*/false);
+}
+
+void SystemTextfield::SetSelectedTextColorId(ui::ColorId color_id) {
+  UpdateColorId(selected_text_color_id_, color_id,
+                /*is_background_color=*/false);
+}
+
+void SystemTextfield::SetSelectionBackgroundColorId(ui::ColorId color_id) {
+  UpdateColorId(selection_background_color_id_, color_id,
+                /*is_background_color=*/false);
+}
+
+void SystemTextfield::SetBackgroundColorId(ui::ColorId color_id) {
+  UpdateColorId(background_color_id_, color_id, /*is_background_color=*/true);
+}
+
+void SystemTextfield::SetPlaceholderTextColorId(ui::ColorId color_id) {
+  UpdateColorId(placeholder_text_color_id_, color_id,
+                /*is_background_color=*/false);
+}
 
 void SystemTextfield::SetActive(bool active) {
   if (IsActive() == active) {
@@ -122,11 +151,21 @@ void SystemTextfield::SetShowFocusRing(bool show) {
     return;
   }
   show_focus_ring_ = show;
+  views::FocusRing::Get(this)->SetOutsetFocusRingDisabled(true);
   views::FocusRing::Get(this)->SchedulePaint();
+}
+
+void SystemTextfield::SetShowBackground(bool show) {
+  show_background_ = show;
+  UpdateBackground();
 }
 
 void SystemTextfield::RestoreText() {
   SetText(restored_text_content_);
+}
+
+void SystemTextfield::SetBackgroundColorEnabled(bool enabled) {
+  is_background_color_enabled_ = enabled;
 }
 
 gfx::Size SystemTextfield::CalculatePreferredSize() const {
@@ -168,22 +207,14 @@ void SystemTextfield::OnThemeChanged() {
 }
 
 void SystemTextfield::OnFocus() {
-  if (delegate_) {
-    delegate_->OnTextfieldFocused(this);
-  } else {
-    SetActive(true);
-  }
-
+  views::Textfield::OnFocus();
+  SetShowFocusRing(true);
   UpdateBackground();
 }
 
 void SystemTextfield::OnBlur() {
-  if (delegate_) {
-    delegate_->OnTextfieldBlurred(this);
-  } else {
-    SetActive(false);
-  }
-
+  views::Textfield::OnBlur();
+  SetShowFocusRing(false);
   UpdateBackground();
 }
 
@@ -191,6 +222,21 @@ void SystemTextfield::OnEnabledStateChanged() {
   UpdateBackground();
   UpdateTextColor();
   SchedulePaint();
+}
+
+void SystemTextfield::UpdateColorId(absl::optional<ui::ColorId>& src,
+                                    ui::ColorId dst,
+                                    bool is_background_color) {
+  if (src && *src == dst) {
+    return;
+  }
+
+  src = dst;
+  if (is_background_color) {
+    UpdateBackground();
+  } else {
+    UpdateTextColor();
+  }
 }
 
 void SystemTextfield::UpdateTextColor() {
@@ -207,19 +253,29 @@ void SystemTextfield::UpdateTextColor() {
   }
 
   // Set text color and selection text and background (highlight part) colors.
-  SetColor(color_provider->GetColor(cros_tokens::kCrosSysOnSurface));
-  render_text->set_selection_color(
-      color_provider->GetColor(cros_tokens::kCrosSysOnSurface));
+  SetColor(color_provider->GetColor(
+      text_color_id_.value_or(cros_tokens::kCrosSysOnSurface)));
+  render_text->set_selection_color(color_provider->GetColor(
+      selected_text_color_id_.value_or(cros_tokens::kCrosSysOnSurface)));
   render_text->set_selection_background_focused_color(
-      color_provider->GetColor(cros_tokens::kCrosSysHighlightText));
+      color_provider->GetColor(selection_background_color_id_.value_or(
+          cros_tokens::kCrosSysHighlightText)));
 }
 
 void SystemTextfield::UpdateBackground() {
+  if (!is_background_color_enabled_) {
+    return;
+  }
   // Create a themed rounded rect background when the mouse hovers on the
   // textfield or the textfield is focused.
-  if (IsMouseHovered() || HasFocus()) {
+  if (IsMouseHovered() || HasFocus() || show_background_) {
+    ui::ColorId default_hover_state_color_id =
+        chromeos::features::IsJellyrollEnabled()
+            ? cros_tokens::kCrosSysHoverOnSubtle
+            : static_cast<ui::ColorId>(kColorAshControlBackgroundColorInactive);
     SetBackground(views::CreateThemedRoundedRectBackground(
-        cros_tokens::kCrosSysHoverOnSubtle, kCornerRadius));
+        background_color_id_.value_or(default_hover_state_color_id),
+        kCornerRadius));
     return;
   }
 

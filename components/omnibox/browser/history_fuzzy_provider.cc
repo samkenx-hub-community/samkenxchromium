@@ -36,6 +36,7 @@
 #include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/omnibox/browser/omnibox_triggered_feature_service.h"
 #include "components/url_formatter/elide_url.h"
+#include "third_party/metrics_proto/omnibox_event.pb.h"
 #include "third_party/metrics_proto/omnibox_focus_type.pb.h"
 #include "url/gurl.h"
 
@@ -448,7 +449,7 @@ class LoadSignificantUrls : public history::HistoryDBTask {
 
  private:
   Node node_;
-  raw_ptr<base::WaitableEvent, DanglingUntriaged> wait_event_;
+  raw_ptr<base::WaitableEvent, AcrossTasksDanglingUntriaged> wait_event_;
   Callback callback_;
 };
 
@@ -458,10 +459,10 @@ class LoadSignificantUrls : public history::HistoryDBTask {
 void HistoryFuzzyProvider::RecordOpenMatchMetrics(
     const AutocompleteResult& result,
     const AutocompleteMatch& match_opened) {
-  if (base::Contains(result, AutocompleteProvider::TYPE_HISTORY_FUZZY,
-                     [](const AutocompleteMatch& match) {
-                       return match.provider->type();
-                     })) {
+  if (base::ranges::any_of(result, [](const AutocompleteMatch& match) {
+        return match.provider && match.provider->type() ==
+                                     AutocompleteProvider::TYPE_HISTORY_FUZZY;
+      })) {
     const bool opened_fuzzy_match = match_opened.provider->type() ==
                                     AutocompleteProvider::TYPE_HISTORY_FUZZY;
     UMA_HISTOGRAM_BOOLEAN(kMetricPrecision, opened_fuzzy_match);
@@ -545,7 +546,7 @@ void HistoryFuzzyProvider::Start(const AutocompleteInput& input,
         });
     if (met_threshold) {
       client()->GetOmniboxTriggeredFeatureService()->FeatureTriggered(
-          OmniboxTriggeredFeatureService::Feature::kFuzzyUrlSuggestions);
+          metrics::OmniboxEventProto_Feature_FUZZY_URL_SUGGESTIONS);
     }
 
     // When in the counterfactual group, we do all the work of finding fuzzy
@@ -699,7 +700,13 @@ int HistoryFuzzyProvider::AddConvertedMatches(const ACMatches& matches,
   // to the most relevant result, so edit distance isn't needed.
   DCHECK_GE(penalty, 0);
   DCHECK_LE(penalty, 100);
-  match.relevance = match.relevance * (100 - penalty) / 100;
+  match.relevance -= match.relevance * penalty / 100;
+
+  // Scoring signals are calculated in the history and bookmark providers using
+  // the corrected input. These scoring signals are inaccurate for the true
+  // input, so clear them to prevent the ml model assigning an
+  // artificially high confidence to this suggestion.
+  match.scoring_signals.reset();
 
   return 1;
 }

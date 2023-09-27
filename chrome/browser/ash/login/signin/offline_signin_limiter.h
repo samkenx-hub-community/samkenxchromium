@@ -7,6 +7,7 @@
 
 #include <memory>
 
+#include "base/memory/raw_ptr.h"
 #include "base/power_monitor/power_observer.h"
 #include "base/time/time.h"
 #include "base/timer/wall_clock_timer.h"
@@ -69,6 +70,10 @@ class OfflineSigninLimiter : public KeyedService,
   // immediately.
   void UpdateLockScreenLimit();
 
+  // Reads the timestamp of the last online signin of the user from the Local
+  // State.
+  base::Time GetLastOnlineSigninTime();
+
   // Convenience method to get the time limit for SAML and no-SAML flows.
   // Returns nullopt if it is an invalid time.
   absl::optional<base::TimeDelta> GetGaiaNoSamlTimeLimit();
@@ -87,8 +92,11 @@ class OfflineSigninLimiter : public KeyedService,
   void UpdateOnlineSigninData(base::Time time,
                               absl::optional<base::TimeDelta> limit);
 
-  Profile* profile_;
-  const base::Clock* clock_;
+  // Helper function to get user for the given profile_.
+  const user_manager::User& GetUser();
+
+  raw_ptr<Profile, ExperimentalAsh> profile_;
+  raw_ptr<const base::Clock, ExperimentalAsh> clock_;
 
   PrefChangeRegistrar pref_change_registrar_;
 

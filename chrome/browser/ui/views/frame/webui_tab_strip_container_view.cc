@@ -4,12 +4,12 @@
 
 #include "chrome/browser/ui/views/frame/webui_tab_strip_container_view.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 
 #include "base/check_op.h"
 #include "base/command_line.h"
-#include "base/cxx17_backports.h"
 #include "base/feature_list.h"
 #include "base/i18n/message_formatter.h"
 #include "base/i18n/number_formatting.h"
@@ -618,7 +618,7 @@ void WebUITabStripContainerView::UpdateHeightForDragToOpen(float height_delta) {
   }
 
   current_drag_height_ =
-      base::clamp(*current_drag_height_ + height_delta, 0.0f,
+      std::clamp(*current_drag_height_ + height_delta, 0.0f,
                   static_cast<float>(GetPreferredSize().height()));
   PreferredSizeChanged();
 }
@@ -718,7 +718,8 @@ void WebUITabStripContainerView::SetContainerTargetVisibility(
     time_at_open_ = base::TimeTicks::Now();
 
     browser_view_->CloseFeaturePromo(
-        feature_engagement::kIPHWebUITabStripFeature);
+        feature_engagement::kIPHWebUITabStripFeature,
+        user_education::FeaturePromoCloseReason::kFeatureEngaged);
   } else {
     if (time_at_open_) {
       RecordTabStripUIOpenDurationHistogram(base::TimeTicks::Now() -

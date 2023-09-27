@@ -72,6 +72,9 @@ class NET_EXPORT UDPSocketPosix {
                  net::NetLog* net_log,
                  const net::NetLogSource& source);
 
+  UDPSocketPosix(DatagramSocket::BindType bind_type,
+                 NetLogWithSource source_net_log);
+
   UDPSocketPosix(const UDPSocketPosix&) = delete;
   UDPSocketPosix& operator=(const UDPSocketPosix&) = delete;
 
@@ -251,6 +254,10 @@ class NET_EXPORT UDPSocketPosix {
   // Returns a net error code.
   int SetDiffServCodePoint(DiffServCodePoint dscp);
 
+  // Sets IPV6_V6ONLY on the socket. If this flag is true, the socket will be
+  // restricted to only IPv6; false allows both IPv4 and IPv6 traffic.
+  int SetIPv6Only(bool ipv6_only);
+
   // Exposes the underlying socket descriptor for testing its state. Does not
   // release ownership of the descriptor.
   SocketDescriptor SocketDescriptorForTesting() const { return socket_; }
@@ -275,6 +282,14 @@ class NET_EXPORT UDPSocketPosix {
   // with the specified address family. The socket should only be created but
   // not bound or connected to an address.
   int AdoptOpenedSocket(AddressFamily address_family, int socket);
+
+  uint32_t get_multicast_interface_for_testing() {
+    return multicast_interface_;
+  }
+  bool get_msg_confirm_for_testing() { return sendto_flags_; }
+  bool get_experimental_recv_optimization_enabled_for_testing() {
+    return experimental_recv_optimization_enabled_;
+  }
 
  private:
   enum SocketOptions {

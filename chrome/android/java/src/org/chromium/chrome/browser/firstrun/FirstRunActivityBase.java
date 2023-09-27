@@ -12,22 +12,24 @@ import android.os.Bundle;
 import android.os.SystemClock;
 
 import androidx.annotation.CallSuper;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.IntentUtils;
 import org.chromium.base.Log;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.supplier.OneshotSupplierImpl;
-import org.chromium.chrome.browser.BackPressHelper;
+import org.chromium.chrome.browser.back_press.BackPressHelper;
 import org.chromium.chrome.browser.back_press.BackPressManager;
+import org.chromium.chrome.browser.back_press.SecondaryActivityBackPressUma.SecondaryActivity;
 import org.chromium.chrome.browser.customtabs.CustomTabsConnection;
 import org.chromium.chrome.browser.init.AsyncInitializationActivity;
 import org.chromium.chrome.browser.metrics.SimpleStartupForegroundSessionDetector;
 import org.chromium.chrome.browser.metrics.UmaUtils;
 import org.chromium.chrome.browser.policy.PolicyServiceFactory;
+import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.profiles.ProfileManagerUtils;
 import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
 import org.chromium.components.policy.PolicyService;
@@ -57,11 +59,12 @@ public abstract class FirstRunActivityBase
 
     public static final boolean DEFAULT_METRICS_AND_CRASH_REPORTING = true;
 
-    private static PolicyLoadListenerFactory sPolicyLoadListenerFactory;
+    private static PolicyLoadListenerFactory sPolicyLoadListenerFactoryForTesting;
 
     private boolean mNativeInitialized;
 
     private final FirstRunAppRestrictionInfo mFirstRunAppRestrictionInfo;
+    private final OneshotSupplierImpl<Profile> mProfileSupplier;
     private final OneshotSupplierImpl<PolicyService> mPolicyServiceSupplier;
     private final ObservableSupplierImpl<Boolean> mBackPressStateSupplier =
             new ObservableSupplierImpl<>() {
@@ -77,10 +80,11 @@ public abstract class FirstRunActivityBase
 
     public FirstRunActivityBase() {
         mFirstRunAppRestrictionInfo = FirstRunAppRestrictionInfo.takeMaybeInitialized();
+        mProfileSupplier = new OneshotSupplierImpl<>();
         mPolicyServiceSupplier = new OneshotSupplierImpl<>();
-        mPolicyLoadListener = sPolicyLoadListenerFactory == null
+        mPolicyLoadListener = sPolicyLoadListenerFactoryForTesting == null
                 ? new PolicyLoadListener(mFirstRunAppRestrictionInfo, mPolicyServiceSupplier)
-                : sPolicyLoadListenerFactory.inject(
+                : sPolicyLoadListenerFactoryForTesting.inject(
                         mFirstRunAppRestrictionInfo, mPolicyServiceSupplier);
         mStartTime = SystemClock.elapsedRealtime();
         mPolicyLoadListener.onAvailable(this::onPolicyLoadListenerAvailable);
@@ -109,12 +113,13 @@ public abstract class FirstRunActivityBase
     protected void onPreCreate() {
         super.onPreCreate();
         if (BackPressManager.isSecondaryActivityEnabled()) {
-            BackPressHelper.create(this, getOnBackPressedDispatcher(), this);
+            BackPressHelper.create(
+                    this, getOnBackPressedDispatcher(), this, getSecondaryActivity());
         } else {
             BackPressHelper.create(this, getOnBackPressedDispatcher(), () -> {
                 handleBackPress();
                 return true;
-            });
+            }, getSecondaryActivity());
         }
     }
 
@@ -147,6 +152,7 @@ public abstract class FirstRunActivityBase
         mNativeInitializedTime = SystemClock.elapsedRealtime();
         RecordHistogram.recordTimesHistogram(
                 "MobileFre.NativeInitialized", mNativeInitializedTime - mStartTime);
+        mProfileSupplier.set(Profile.getLastUsedRegularProfile());
         mPolicyServiceSupplier.set(PolicyServiceFactory.getGlobalPolicyService());
     }
 
@@ -168,6 +174,8 @@ public abstract class FirstRunActivityBase
      */
     @Override
     public abstract @BackPressResult int handleBackPress();
+
+    public abstract @SecondaryActivity int getSecondaryActivity();
 
     protected void flushPersistentData() {
         if (mNativeInitialized) {
@@ -223,11 +231,11 @@ public abstract class FirstRunActivityBase
         if (!mNativeInitialized) return;
 
         assert mNativeInitializedTime != 0;
-        long delayAfterNative = SystemClock.elapsedRealtime() - mNativeInitializedTime;
-        String histogramName = onDevicePolicyFound
-                ? "MobileFre.PolicyServiceInitDelayAfterNative.WithPolicy2"
-                : "MobileFre.PolicyServiceInitDelayAfterNative.WithoutPolicy2";
-        RecordHistogram.recordTimesHistogram(histogramName, delayAfterNative);
+    }
+
+    /** @return The supplier that provides the Profile (when available). */
+    public OneshotSupplier<Profile> getProfileSupplier() {
+        return mProfileSupplier;
     }
 
     /**
@@ -276,9 +284,9 @@ public abstract class FirstRunActivityBase
      * Forces the {@link FirstRunActivityBase}'s constructor to use a {@link PolicyLoadListener}
      * defined by a test, instead of creating its own instance.
      */
-    @VisibleForTesting
     public static void setPolicyLoadListenerFactoryForTesting(
             PolicyLoadListenerFactory policyLoadListenerFactory) {
-        sPolicyLoadListenerFactory = policyLoadListenerFactory;
+        sPolicyLoadListenerFactoryForTesting = policyLoadListenerFactory;
+        ResettersForTesting.register(() -> sPolicyLoadListenerFactoryForTesting = null);
     }
 }

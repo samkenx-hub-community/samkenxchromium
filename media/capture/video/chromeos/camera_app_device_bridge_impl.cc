@@ -10,6 +10,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/task/bind_post_task.h"
 #include "base/task/single_thread_task_runner.h"
+#include "components/device_event_log/device_event_log.h"
 #include "media/base/media_switches.h"
 #include "media/capture/video/chromeos/public/cros_features.h"
 #include "media/capture/video/chromeos/video_capture_device_chromeos_halv3.h"
@@ -25,9 +26,20 @@ CameraAppDeviceBridgeImpl::CameraAppDeviceBridgeImpl() {
       command_line->HasSwitch(switches::kUseFileForFakeVideoCapture);
   is_supported_ =
       ShouldUseCrosCameraService() && !use_fake_camera && !use_file_camera;
+  receivers_.set_disconnect_with_reason_handler(
+      base::BindRepeating(&CameraAppDeviceBridgeImpl::OnReceiverDisconnected,
+                          base::Unretained(this)));
 }
 
-CameraAppDeviceBridgeImpl::~CameraAppDeviceBridgeImpl() = default;
+CameraAppDeviceBridgeImpl::~CameraAppDeviceBridgeImpl() {
+  if (!mojo_task_runner_) {
+    return;
+  }
+  base::AutoLock lock(device_map_lock_);
+  for (auto& [_, app_device] : camera_app_devices_) {
+    mojo_task_runner_->DeleteSoon(FROM_HERE, std::move(app_device));
+  }
+}
 
 // static
 CameraAppDeviceBridgeImpl* CameraAppDeviceBridgeImpl::GetInstance() {
@@ -36,6 +48,11 @@ CameraAppDeviceBridgeImpl* CameraAppDeviceBridgeImpl::GetInstance() {
 
 void CameraAppDeviceBridgeImpl::BindReceiver(
     mojo::PendingReceiver<cros::mojom::CameraAppDeviceBridge> receiver) {
+  if (mojo_task_runner_) {
+    DCHECK(mojo_task_runner_->RunsTasksInCurrentSequence());
+  } else {
+    mojo_task_runner_ = base::SequencedTaskRunner::GetCurrentDefault();
+  }
   receivers_.Add(this, std::move(receiver));
 }
 
@@ -95,6 +112,13 @@ void CameraAppDeviceBridgeImpl::OnDeviceMojoDisconnected(
     }
   }
   std::move(remove_device).Run();
+}
+
+void CameraAppDeviceBridgeImpl::OnReceiverDisconnected(
+    uint32_t reason,
+    const std::string& description) {
+  CAMERA_LOG(EVENT) << "Receiver disconnected, reason " << reason << " ("
+                    << description << ")";
 }
 
 void CameraAppDeviceBridgeImpl::UpdateCameraInfo(const std::string& device_id) {
@@ -181,6 +205,7 @@ void CameraAppDeviceBridgeImpl::GetCameraAppDevice(
     const std::string& device_id,
     GetCameraAppDeviceCallback callback) {
   DCHECK(is_supported_);
+  DCHECK(mojo_task_runner_->RunsTasksInCurrentSequence());
 
   mojo::PendingRemote<cros::mojom::CameraAppDevice> device_remote;
   {
@@ -205,6 +230,7 @@ void CameraAppDeviceBridgeImpl::GetCameraAppDevice(
 }
 
 void CameraAppDeviceBridgeImpl::IsSupported(IsSupportedCallback callback) {
+  DCHECK(mojo_task_runner_->RunsTasksInCurrentSequence());
   std::move(callback).Run(is_supported_);
 }
 
@@ -212,6 +238,7 @@ void CameraAppDeviceBridgeImpl::SetVirtualDeviceEnabled(
     const std::string& device_id,
     bool enabled,
     SetVirtualDeviceEnabledCallback callback) {
+  DCHECK(mojo_task_runner_->RunsTasksInCurrentSequence());
   base::AutoLock lock(virtual_device_controller_lock_);
   if (!virtual_device_controller_) {
     std::move(callback).Run(false);
@@ -220,6 +247,26 @@ void CameraAppDeviceBridgeImpl::SetVirtualDeviceEnabled(
 
   virtual_device_controller_.Run(device_id, enabled);
   std::move(callback).Run(true);
+}
+
+void CameraAppDeviceBridgeImpl::SetDeviceInUse(const std::string& device_id,
+                                               bool in_use) {
+  base::AutoLock lock(devices_in_use_lock_);
+  if (in_use) {
+    devices_in_use_.insert(device_id);
+  } else {
+    devices_in_use_.erase(device_id);
+  }
+}
+
+void CameraAppDeviceBridgeImpl::IsDeviceInUse(const std::string& device_id,
+                                              IsDeviceInUseCallback callback) {
+  bool in_use;
+  {
+    base::AutoLock lock(devices_in_use_lock_);
+    in_use = devices_in_use_.contains(device_id);
+  }
+  std::move(callback).Run(in_use);
 }
 
 }  // namespace media

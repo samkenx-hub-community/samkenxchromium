@@ -30,8 +30,10 @@ public class AutocompleteResult {
     @IntDef({VerificationPoint.INVALID, VerificationPoint.SELECT_MATCH,
             VerificationPoint.UPDATE_MATCH, VerificationPoint.DELETE_MATCH,
             VerificationPoint.GROUP_BY_SEARCH_VS_URL_BEFORE,
-            VerificationPoint.GROUP_BY_SEARCH_VS_URL_AFTER})
+            VerificationPoint.GROUP_BY_SEARCH_VS_URL_AFTER, VerificationPoint.ON_TOUCH_MATCH,
+            VerificationPoint.GET_MATCHING_TAB})
     @Retention(RetentionPolicy.SOURCE)
+    // When updating this enum, please update corresponding enum in autocomplete_result_android.cc.
     public @interface VerificationPoint {
         int INVALID = 0;
         int SELECT_MATCH = 1;
@@ -39,6 +41,8 @@ public class AutocompleteResult {
         int DELETE_MATCH = 3;
         int GROUP_BY_SEARCH_VS_URL_BEFORE = 4;
         int GROUP_BY_SEARCH_VS_URL_AFTER = 5;
+        int ON_TOUCH_MATCH = 6;
+        int GET_MATCHING_TAB = 7;
     }
 
     /** An empty, initialized AutocompleteResult object. */
@@ -62,7 +66,7 @@ public class AutocompleteResult {
      * @param groupsInfo Additional information about the AutocompleteMatch groups.
      */
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    AutocompleteResult(long nativeResult, @Nullable List<AutocompleteMatch> suggestions,
+    public AutocompleteResult(long nativeResult, @Nullable List<AutocompleteMatch> suggestions,
             @Nullable GroupsInfo groupsInfo) {
         // Consider all locally constructed AutocompleteResult objects as coming from Cache.
         // These results do not have a native counterpart, meaning there's no corresponding C++

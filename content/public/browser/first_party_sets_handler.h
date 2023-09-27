@@ -119,8 +119,7 @@ class CONTENT_EXPORT FirstPartySetsHandler {
   // First-Party Sets and disjoint from each other. It doesn't require
   // disjointness with other sources, such as the public sets, since this policy
   // will be used override First-Party Sets in those sources.
-  static std::pair<base::expected<absl::monostate, ParseError>,
-                   std::vector<ParseWarning>>
+  static std::pair<base::expected<void, ParseError>, std::vector<ParseWarning>>
   ValidateEnterprisePolicy(const base::Value::Dict& policy);
 
   // Returns whether First-Party Sets is enabled.
@@ -138,11 +137,13 @@ class CONTENT_EXPORT FirstPartySetsHandler {
   //
   // Embedder should call this method as early as possible during browser
   // startup if First-Party Sets are enabled, since no First-Party Sets queries
-  // are answered until initialization is complete. Must not be called if
-  // `ContentBrowserClient::WillProvidePublicFirstPartySets` returns false or
-  // `ContentBrowserClient::IsFrstpartySetsEnabled` returns false.
+  // are answered until initialization is complete.
   //
-  // Must be called at most once.
+  // If this is called when First-Party Sets are enabled, or the embedder has
+  // not indicated it will provide the public First-Party Sets, the call is
+  // ignored.
+  //
+  // If this is called more than once, all but the first call are ignored.
   virtual void SetPublicFirstPartySets(const base::Version& version,
                                        base::File sets_file) = 0;
 
@@ -196,7 +197,6 @@ class CONTENT_EXPORT FirstPartySetsHandler {
   virtual void ComputeFirstPartySetMetadata(
       const net::SchemefulSite& site,
       const net::SchemefulSite* top_frame_site,
-      const std::set<net::SchemefulSite>& party_context,
       const net::FirstPartySetsContextConfig& config,
       base::OnceCallback<void(net::FirstPartySetMetadata)> callback) = 0;
 };

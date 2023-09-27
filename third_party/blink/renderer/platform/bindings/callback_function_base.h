@@ -11,6 +11,7 @@
 #include "third_party/blink/renderer/platform/bindings/script_state.h"
 #include "third_party/blink/renderer/platform/bindings/trace_wrapper_v8_reference.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
+#include "third_party/blink/renderer/platform/scheduler/public/task_attribution_info.h"
 
 namespace blink {
 
@@ -19,6 +20,9 @@ namespace blink {
 // overload resolutions, SFINAE technique, etc.) so that it's possible to
 // distinguish callback functions from anything else. Also it provides a common
 // implementation of callback functions.
+// This base class does not provide support for task attribution, so the
+// callback that require such a functionality should inherit from
+// CallbackFunctionWithTaskAttributionBase class.
 //
 // As the signatures of callback functions vary, this class does not implement
 // |Invoke| member function that performs "invoke" steps. Subclasses will
@@ -39,7 +43,7 @@ class PLATFORM_EXPORT CallbackFunctionBase
     if (!cached_data_) {
       // It's generally faster to get Isolate from the ScriptState object but
       // as long as we don't have one load the Isolate from the callback.
-      return callback_function_->GetIsolate();
+      return v8::Object::GetIsolate(callback_function_);
     }
     return cached_data_->incumbent_script_state_->GetIsolate();
   }
@@ -88,7 +92,7 @@ class PLATFORM_EXPORT CallbackFunctionBase
   //
   // NOTE: Do not abuse this function.  Let |Invoke| method defined in a
   // subclass do the right thing.  This function is rarely needed.
-  void EvaluateAsPartOfCallback(base::OnceCallback<void()> closure);
+  void EvaluateAsPartOfCallback(base::OnceCallback<void(ScriptState*)> closure);
 
   // Makes the underlying V8 function collectable by V8 Scavenger GC.  Do not
   // use this function unless you really need a hacky performance optimization.
@@ -98,20 +102,6 @@ class PLATFORM_EXPORT CallbackFunctionBase
   // runs.
   void DisposeV8FunctionImmediatelyToReduceMemoryFootprint() {
     callback_function_.Reset();
-  }
-
-  absl::optional<scheduler::TaskAttributionId> GetParentTaskId() const {
-    if (!cached_data_) {
-      return {};
-    }
-    return cached_data_->parent_task_id_;
-  }
-
-  void SetParentTaskId(absl::optional<scheduler::TaskAttributionId> task_id) {
-    if (!cached_data_) {
-      MakeCachedData();
-    }
-    cached_data_->parent_task_id_ = task_id;
   }
 
  protected:
@@ -158,8 +148,6 @@ class PLATFORM_EXPORT CallbackFunctionBase
     // is converted to an IDL value.
     // https://webidl.spec.whatwg.org/#dfn-callback-context
     Member<ScriptState> incumbent_script_state_;
-
-    absl::optional<scheduler::TaskAttributionId> parent_task_id_;
   };
 
   // The "callback function type" value.
@@ -170,6 +158,34 @@ class PLATFORM_EXPORT CallbackFunctionBase
   TraceWrapperV8Reference<v8::Object> callback_function_;
   // Pointer to lazily computed data which is not needed in most of the cases.
   mutable Member<CachedData> cached_data_;
+};
+
+// CallbackFunctionWithTaskAttributionBase is the common base class of callback
+// function that require task attribution support.
+// Callbacks that require such a functionality should be defined with
+// [SupportsTaskAttribution] IDL extended attribute.
+class PLATFORM_EXPORT CallbackFunctionWithTaskAttributionBase
+    : public CallbackFunctionBase {
+ public:
+  ~CallbackFunctionWithTaskAttributionBase() override = default;
+
+  scheduler::TaskAttributionInfo* GetParentTask() const { return parent_task_; }
+
+  void SetParentTask(scheduler::TaskAttributionInfo* task) {
+    parent_task_ = task;
+  }
+
+  void Trace(Visitor* visitor) const override {
+    CallbackFunctionBase::Trace(visitor);
+    visitor->Trace(parent_task_);
+  }
+
+ protected:
+  explicit CallbackFunctionWithTaskAttributionBase(v8::Local<v8::Object> object)
+      : CallbackFunctionBase(object) {}
+
+ private:
+  Member<scheduler::TaskAttributionInfo> parent_task_;
 };
 
 }  // namespace blink

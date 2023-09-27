@@ -7,6 +7,7 @@
 
 #include <memory>
 
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/ash/login/session/user_session_manager.h"
 
 namespace ash {
@@ -27,7 +28,7 @@ class UserSessionManagerTestApi {
   void InjectStubUserContext(const UserContext& user_context);
 
   void InjectAuthenticatorBuilder(
-      std::unique_ptr<StubAuthenticatorBuilder> builder);
+      std::unique_ptr<AuthenticatorBuilder> builder);
 
   // Controls whether browser instance should be launched after sign in
   // (used in tests).
@@ -43,7 +44,7 @@ class UserSessionManagerTestApi {
   OnboardingUserActivityCounter* get_onboarding_user_activity_counter();
 
  private:
-  UserSessionManager* session_manager_;  // not owned
+  raw_ptr<UserSessionManager, ExperimentalAsh> session_manager_;  // not owned
 };
 
 }  // namespace test

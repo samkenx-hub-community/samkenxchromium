@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+
+import * as SourcesModule from 'devtools/panels/sources/sources.js';
+
 (async function() {
   TestRunner.addResult(`Tests live edit feature.\n`);
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
+  await TestRunner.loadLegacyModule('sources');
   await TestRunner.showPanel('sources');
   await TestRunner.addScriptTag('resources/edit-me-when-paused-no-reveal.js');
 
@@ -74,7 +79,7 @@
 
     function didEditScriptSource() {
       TestRunner.addResult('Stepping into...');
-      TestRunner.addSniffer(Sources.SourcesView.prototype, 'showSourceLocation', didRevealAfterStepInto);
+      TestRunner.addSniffer(SourcesModule.SourcesView.SourcesView.prototype, 'showSourceLocation', didRevealAfterStepInto);
       panel._lastModificationTimeoutPassedForTest();
       SourcesTestRunner.stepInto();
     }

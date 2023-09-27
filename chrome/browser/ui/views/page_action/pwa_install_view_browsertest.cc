@@ -33,6 +33,7 @@
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_sync_bridge.h"
 #include "chrome/common/chrome_switches.h"
+#include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/feature_engagement/public/feature_constants.h"
@@ -49,6 +50,7 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "services/network/public/cpp/network_switches.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/views/view_observer.h"
 #include "ui/views/widget/any_widget_observer.h"
@@ -62,6 +64,7 @@
 #include "chrome/browser/ash/arc/arc_util.h"
 #include "chrome/browser/ash/arc/session/arc_session_manager.h"
 #include "chrome/common/chrome_features.h"
+#include "chromeos/ash/components/standalone_browser/feature_refs.h"
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 namespace {
@@ -116,10 +119,8 @@ class PwaInstallViewBrowserTest : public extensions::ExtensionBrowserTest {
             feature_engagement::kIPHDesktopPwaInstallFeature.name}}},
          {feature_engagement::kIPHDesktopPwaInstallFeature, {}}},
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-        {
-            features::kWebAppsCrosapi,
-            ash::features::kLacrosPrimary,
-        }
+        // TODO(crbug.com/1462253): Also test with Lacros flags enabled.
+        ash::standalone_browser::GetFeatureRefs()
 #else
         {}
 #endif
@@ -232,13 +233,13 @@ class PwaInstallViewBrowserTest : public extensions::ExtensionBrowserTest {
     app_banner_manager_->WaitForInstallableCheckTearDown();
   }
 
-  web_app::AppId ExecutePwaInstallIcon() {
+  webapps::AppId ExecutePwaInstallIcon() {
     chrome::SetAutoAcceptPWAInstallConfirmationForTesting(true);
 
-    web_app::AppId app_id;
+    webapps::AppId app_id;
     base::RunLoop run_loop;
     web_app::SetInstalledCallbackForTesting(base::BindLambdaForTesting(
-        [&app_id, &run_loop](const web_app::AppId& installed_app_id,
+        [&app_id, &run_loop](const webapps::AppId& installed_app_id,
                              webapps::InstallResultCode code) {
           app_id = installed_app_id;
           run_loop.Quit();
@@ -253,14 +254,14 @@ class PwaInstallViewBrowserTest : public extensions::ExtensionBrowserTest {
     return app_id;
   }
 
-  void UninstallWebApp(const web_app::AppId& app_id) {
+  void UninstallWebApp(const webapps::AppId& app_id) {
     base::RunLoop run_loop;
     web_app::WebAppProvider::GetForTest(browser()->profile())
-        ->install_finalizer()
+        ->scheduler()
         .UninstallWebApp(
             app_id, webapps::WebappUninstallSource::kAppMenu,
             base::BindLambdaForTesting([&](webapps::UninstallResultCode code) {
-              EXPECT_EQ(code, webapps::UninstallResultCode::kSuccess);
+              EXPECT_TRUE(UninstallSucceeded(code));
               run_loop.Quit();
             }));
     run_loop.Run();
@@ -278,7 +279,7 @@ class PwaInstallViewBrowserTest : public extensions::ExtensionBrowserTest {
 
     web_app::SetInstallBounceMetricTimeForTesting(test_time);
 
-    const web_app::AppId app_id = ExecutePwaInstallIcon();
+    const webapps::AppId app_id = ExecutePwaInstallIcon();
 
     web_app::SetInstallBounceMetricTimeForTesting(test_time + install_duration);
 
@@ -321,9 +322,11 @@ class PwaInstallViewBrowserTest : public extensions::ExtensionBrowserTest {
   std::string intercept_request_path_;
   std::string intercept_request_response_;
 
-  raw_ptr<PageActionIconView, DanglingUntriaged> pwa_install_view_ = nullptr;
-  raw_ptr<content::WebContents, DanglingUntriaged> web_contents_ = nullptr;
-  raw_ptr<webapps::TestAppBannerManagerDesktop, DanglingUntriaged>
+  raw_ptr<PageActionIconView, AcrossTasksDanglingUntriaged> pwa_install_view_ =
+      nullptr;
+  raw_ptr<content::WebContents, AcrossTasksDanglingUntriaged> web_contents_ =
+      nullptr;
+  raw_ptr<webapps::TestAppBannerManagerDesktop, AcrossTasksDanglingUntriaged>
       app_banner_manager_ = nullptr;
 
  private:
@@ -379,7 +382,7 @@ IN_PROC_BROWSER_TEST_F(PwaInstallViewBrowserTest,
                        PwaSetToOpenInTabIsInstallable) {
   bool installable = OpenTab(GetInstallableAppURL()).installable;
   ASSERT_TRUE(installable);
-  web_app::AppId app_id = ExecutePwaInstallIcon();
+  webapps::AppId app_id = ExecutePwaInstallIcon();
 
   // Change launch container to open in tab.
   web_app::WebAppProvider::GetForTest(browser()->profile())
@@ -585,7 +588,7 @@ IN_PROC_BROWSER_TEST_F(PwaInstallViewBrowserTest,
   GURL app_url = GetInstallableAppURL();
   bool installable = OpenTab(app_url).installable;
   ASSERT_TRUE(installable);
-  const web_app::AppId app_id = ExecutePwaInstallIcon();
+  const webapps::AppId app_id = ExecutePwaInstallIcon();
 
   // Use a new tab because installed app may have opened in new window.
   OpenTabResult result = OpenTab(app_url);
@@ -779,8 +782,8 @@ IN_PROC_BROWSER_TEST_F(PwaInstallViewBrowserTest, PwaIntallIphIgnored) {
   // shown once in an user session.
   web_app::RecordInstallIphIgnored(
       profile()->GetPrefs(),
-      web_app::GenerateAppId(/*manifest_id=*/absl::nullopt,
-                             app_banner_manager_->GetManifestStartUrl()),
+      web_app::GenerateAppId(/*manifest_id_path=*/absl::nullopt,
+                             GetInstallableAppURL()),
       base::Time::Now());
   bool installable = OpenTab(app_url).installable;
   ASSERT_TRUE(installable);
@@ -790,6 +793,17 @@ IN_PROC_BROWSER_TEST_F(PwaInstallViewBrowserTest, PwaIntallIphIgnored) {
   // IPH is not shown when the IPH is ignored recently.
   EXPECT_FALSE(controller->IsPromoActive(
       feature_engagement::kIPHDesktopPwaInstallFeature));
+}
+
+IN_PROC_BROWSER_TEST_F(PwaInstallViewBrowserTest, IconViewAccessibleName) {
+  const std::u16string& web_app_name =
+      webapps::AppBannerManager::GetInstallableWebAppName(web_contents_);
+  EXPECT_EQ(pwa_install_view_->GetAccessibleName(),
+            l10n_util::GetStringFUTF16(IDS_OMNIBOX_PWA_INSTALL_ICON_TOOLTIP,
+                                       web_app_name));
+  EXPECT_EQ(pwa_install_view_->GetTextForTooltipAndAccessibleName(),
+            l10n_util::GetStringFUTF16(IDS_OMNIBOX_PWA_INSTALL_ICON_TOOLTIP,
+                                       web_app_name));
 }
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)

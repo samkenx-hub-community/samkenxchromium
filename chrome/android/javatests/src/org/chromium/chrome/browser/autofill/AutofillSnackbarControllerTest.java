@@ -4,8 +4,6 @@
 
 package org.chromium.chrome.browser.autofill;
 
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import android.widget.Button;
@@ -23,12 +21,12 @@ import org.mockito.MockitoAnnotations;
 
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.JniMocker;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
 import java.util.concurrent.ExecutionException;
@@ -95,8 +93,8 @@ public class AutofillSnackbarControllerTest {
 
         clickSnackbarAction();
 
-        verify(mNativeMock, times(1)).onActionClicked(NATIVE_AUTOFILL_SNACKBAR_VIEW);
-        verify(mNativeMock, never()).onDismissed(NATIVE_AUTOFILL_SNACKBAR_VIEW);
+        verify(mNativeMock).onActionClicked(NATIVE_AUTOFILL_SNACKBAR_VIEW);
+        verify(mNativeMock).onDismissed(NATIVE_AUTOFILL_SNACKBAR_VIEW);
     }
 
     @Test
@@ -106,7 +104,7 @@ public class AutofillSnackbarControllerTest {
 
         timeoutSnackbar();
 
-        verify(mNativeMock, times(1)).onDismissed(NATIVE_AUTOFILL_SNACKBAR_VIEW);
+        verify(mNativeMock).onDismissed(NATIVE_AUTOFILL_SNACKBAR_VIEW);
     }
 
     private void showSnackbar() {

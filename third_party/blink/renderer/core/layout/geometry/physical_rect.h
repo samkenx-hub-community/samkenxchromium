@@ -19,7 +19,6 @@ class TextStream;
 
 namespace blink {
 
-class ComputedStyle;
 struct NGPhysicalBoxStrut;
 
 // PhysicalRect is the position and size of a rect (typically a fragment)
@@ -29,11 +28,6 @@ struct NGPhysicalBoxStrut;
 struct CORE_EXPORT PhysicalRect {
   constexpr PhysicalRect() = default;
   constexpr PhysicalRect(const PhysicalOffset& offset, const PhysicalSize& size)
-      : offset(offset), size(size) {}
-  // TODO(wangxianzhu): This is temporary for convenience of constructing
-  // PhysicalRect with LayoutBox::Size(), before we convert LayoutBox::Size() to
-  // PhysicalSize.
-  constexpr PhysicalRect(const PhysicalOffset& offset, const LayoutSize& size)
       : offset(offset), size(size) {}
   constexpr PhysicalRect(LayoutUnit left,
                          LayoutUnit top,
@@ -122,7 +116,6 @@ struct CORE_EXPORT PhysicalRect {
   bool InclusiveIntersect(const PhysicalRect&);
 
   void Expand(const NGPhysicalBoxStrut&);
-  void Expand(const LayoutRectOutsets&);
   void ExpandEdges(LayoutUnit top,
                    LayoutUnit right,
                    LayoutUnit bottom,
@@ -136,7 +129,6 @@ struct CORE_EXPORT PhysicalRect {
   void Inflate(LayoutUnit d) { ExpandEdges(d, d, d, d); }
 
   void Contract(const NGPhysicalBoxStrut&);
-  void Contract(const LayoutRectOutsets&);
   void ContractEdges(LayoutUnit top,
                      LayoutUnit right,
                      LayoutUnit bottom,
@@ -189,8 +181,6 @@ struct CORE_EXPORT PhysicalRect {
   constexpr LayoutRect ToLayoutRect() const {
     return LayoutRect(offset.left, offset.top, size.width, size.height);
   }
-  LayoutRect ToLayoutFlippedRect(const ComputedStyle&,
-                                 const PhysicalSize&) const;
 
   constexpr explicit operator gfx::RectF() const {
     return gfx::RectF(offset.left, offset.top, size.width, size.height);
@@ -214,15 +204,6 @@ struct CORE_EXPORT PhysicalRect {
 
   explicit PhysicalRect(const gfx::Rect& r)
       : offset(r.origin()), size(r.size()) {}
-
-  // Returns a big enough rect that can contain all reasonable rendered results.
-  // The rect can be used as a "non-clipping" clip rect. The rect can be
-  // modified to clip at one or more sides, e.g.
-  //   gfx::Rect r = LayoutRect::InfiniteRect();
-  //   r.set_width(clip_right - r.x());
-  static constexpr gfx::Rect InfiniteIntRect() {
-    return LayoutRect::InfiniteIntRect();
-  }
 
   void Scale(float s) {
     offset.Scale(s);
@@ -258,13 +239,6 @@ inline gfx::Rect ToEnclosingRect(const PhysicalRect& r) {
 }
 inline gfx::Rect ToPixelSnappedRect(const PhysicalRect& r) {
   return {r.PixelSnappedOffset(), r.PixelSnappedSize()};
-}
-
-// TODO(wangxianzhu): For temporary conversion from LayoutRect to PhysicalRect,
-// where the input will be changed to PhysicalRect soon, to avoid redundant
-// PhysicalRect() which can't be discovered by the compiler.
-inline PhysicalRect PhysicalRectToBeNoop(const LayoutRect& r) {
-  return PhysicalRect(r);
 }
 
 CORE_EXPORT PhysicalRect UnionRect(const Vector<PhysicalRect>& rects);

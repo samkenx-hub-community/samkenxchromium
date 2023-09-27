@@ -33,18 +33,18 @@ void WriteTestNativeHostManifest(const base::FilePath& target_dir,
                                  const base::FilePath& host_path,
                                  bool user_level,
                                  bool supports_native_initiated_connections) {
-  base::Value::Dict manifest;
-  manifest.Set("name", host_name);
-  manifest.Set("description", "Native Messaging Echo Test");
-  manifest.Set("type", "stdio");
-  manifest.Set("path", host_path.AsUTF8Unsafe());
-  manifest.Set("supports_native_initiated_connections",
-               supports_native_initiated_connections);
+  auto manifest = base::Value::Dict()
+                      .Set("name", host_name)
+                      .Set("description", "Native Messaging Echo Test")
+                      .Set("type", "stdio")
+                      .Set("path", host_path.AsUTF8Unsafe())
+                      .Set("supports_native_initiated_connections",
+                           supports_native_initiated_connections);
 
-  base::Value::List origins;
-  origins.Append(base::StringPrintf(
-      "chrome-extension://%s/", ScopedTestNativeMessagingHost::kExtensionId));
-  manifest.Set("allowed_origins", std::move(origins));
+  manifest.Set("allowed_origins",
+               base::Value::List().Append(base::StringPrintf(
+                   "chrome-extension://%s/",
+                   ScopedTestNativeMessagingHost::kExtensionId)));
 
   base::FilePath manifest_path = target_dir.AppendASCII(host_name + ".json");
   JSONFileValueSerializer serializer(manifest_path);
@@ -130,7 +130,9 @@ void ScopedTestNativeMessagingHost::RegisterTestHost(bool user_level) {
 #if BUILDFLAG(IS_WIN)
 // On Windows, a new codepath is used to directly launch .EXE-based Native
 // Hosts.
-void ScopedTestNativeMessagingHost::RegisterTestExeHost(bool user_level) {
+void ScopedTestNativeMessagingHost::RegisterTestExeHost(
+    std::string_view filename,
+    bool user_level) {
   base::ScopedAllowBlockingForTesting allow_blocking;
   ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
 
@@ -140,10 +142,9 @@ void ScopedTestNativeMessagingHost::RegisterTestExeHost(bool user_level) {
   ASSERT_NO_FATAL_FAILURE(registry_override_.OverrideRegistry(root_key));
 
   // Unlike in the |RegisterTestHost| case above, we must leave the Host
-  // .exe where it was built because the Host will fail to run from the
+  // .exe where it was built, because the Host will fail to run from the
   // temp_dir_ if is_component_build is set for the build.
-  base::FilePath host_path =
-      binary_dir.AppendASCII("native_messaging_test_echo_host.exe");
+  base::FilePath host_path = binary_dir.AppendASCII(filename);
   ASSERT_NO_FATAL_FAILURE(WriteTestNativeHostManifest(
       temp_dir_.GetPath(), kHostExeName, host_path, user_level, false));
 }

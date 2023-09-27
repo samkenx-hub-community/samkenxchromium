@@ -25,7 +25,6 @@ constexpr int kApproximationCacheSize = 5;
 constexpr int kCompressionQueueMaxSize = 2;
 constexpr int kWriteQueueMaxSize = 2;
 constexpr bool kUseApproximationThumbnail = true;
-constexpr bool kSaveJpegThumbnails = true;
 constexpr double kJpegAspectRatio = 0.85;
 
 class MockUIResourceProvider : public ui::UIResourceProvider {
@@ -52,8 +51,7 @@ class ThumbnailCacheTest : public ::testing::Test {
   void SetUp() override {
     thumbnail_cache_ = std::make_unique<ThumbnailCache>(
         kDefaultCacheSize, kApproximationCacheSize, kCompressionQueueMaxSize,
-        kWriteQueueMaxSize, kUseApproximationThumbnail, kSaveJpegThumbnails,
-        kJpegAspectRatio);
+        kWriteQueueMaxSize, kUseApproximationThumbnail, kJpegAspectRatio);
     thumbnail_cache_->SetUIResourceProvider(ui_resource_provider_.GetWeakPtr());
 
     EXPECT_CALL(ui_resource_provider_, CreateUIResource(::testing::_))
@@ -86,14 +84,24 @@ TEST_F(ThumbnailCacheTest, PruneCache) {
   ASSERT_TRUE(bitmap.tryAllocN32Pixels(kDimension * kKiB, kDimension));
   bitmap.setImmutable();
 
+  thumbnail_cache().UpdateVisibleIds(std::vector<TabId>({kTabId1, kTabId2}),
+                                     -1);
   EXPECT_TRUE(thumbnail_cache().CheckAndUpdateThumbnailMetaData(
       kTabId1, GURL("https://www.foo.com/")));
-  thumbnail_cache().Put(kTabId1, bitmap,
+  std::unique_ptr<ThumbnailCaptureTracker, base::OnTaskRunnerDeleter> tracker1(
+      new ThumbnailCaptureTracker(base::DoNothing()),
+      base::OnTaskRunnerDeleter(
+          base::SequencedTaskRunner::GetCurrentDefault()));
+  thumbnail_cache().Put(kTabId1, std::move(tracker1), bitmap,
                         /*thumbnail_scale=*/1.0f, kJpegAspectRatio);
 
   EXPECT_TRUE(thumbnail_cache().CheckAndUpdateThumbnailMetaData(
       kTabId2, GURL("https://www.bar.com/")));
-  thumbnail_cache().Put(kTabId2, bitmap,
+  std::unique_ptr<ThumbnailCaptureTracker, base::OnTaskRunnerDeleter> tracker2(
+      new ThumbnailCaptureTracker(base::DoNothing()),
+      base::OnTaskRunnerDeleter(
+          base::SequencedTaskRunner::GetCurrentDefault()));
+  thumbnail_cache().Put(kTabId2, std::move(tracker2), bitmap,
                         /*thumbnail_scale=*/1.0f, kJpegAspectRatio);
 
   EXPECT_TRUE(thumbnail_cache().Get(kTabId1, false, false));
@@ -131,9 +139,14 @@ TEST_F(ThumbnailCacheTest, MetricsEmission) {
   constexpr int kDimension = 4;
   ASSERT_TRUE(bitmap.tryAllocN32Pixels(kDimension * kKiB, kDimension));
   bitmap.setImmutable();
+  thumbnail_cache().UpdateVisibleIds(std::vector<TabId>({kTabId}), -1);
   EXPECT_TRUE(thumbnail_cache().CheckAndUpdateThumbnailMetaData(
       kTabId, GURL("https://www.foo.com/")));
-  thumbnail_cache().Put(kTabId, bitmap,
+  std::unique_ptr<ThumbnailCaptureTracker, base::OnTaskRunnerDeleter> tracker(
+      new ThumbnailCaptureTracker(base::DoNothing()),
+      base::OnTaskRunnerDeleter(
+          base::SequencedTaskRunner::GetCurrentDefault()));
+  thumbnail_cache().Put(kTabId, std::move(tracker), bitmap,
                         /*thumbnail_scale=*/1.0f, kJpegAspectRatio);
   RecordCacheMetrics();
 

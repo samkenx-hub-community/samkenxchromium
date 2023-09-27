@@ -15,6 +15,7 @@ namespace ash {
 
 namespace eche_app {
 class EcheConnectionStatusHandler;
+class SystemInfoProvider;
 }
 
 namespace phonehub {
@@ -37,6 +38,7 @@ class TetherController;
 class UserActionRecorder;
 class IconDecoder;
 class AppStreamManager;
+class PhoneHubUiReadinessRecorder;
 
 // Responsible for the core logic of the Phone Hub feature and exposes
 // interfaces via its public API. This class is intended to be a singleton.
@@ -71,9 +73,13 @@ class PhoneHubManager {
   virtual AppStreamManager* GetAppStreamManager() = 0;
   virtual eche_app::EcheConnectionStatusHandler*
   GetEcheConnectionStatusHandler() = 0;
+  virtual PhoneHubUiReadinessRecorder* GetPhoneHubUiReadinessRecorder() = 0;
   virtual void SetEcheConnectionStatusHandler(
       eche_app::EcheConnectionStatusHandler*
           eche_connection_status_handler) = 0;
+  virtual void SetSystemInfoProvider(
+      eche_app::SystemInfoProvider* system_info_provider) = 0;
+  virtual eche_app::SystemInfoProvider* GetSystemInfoProvider() = 0;
 
   // Retrieves the timestamp of the last successful discovery for active host,
   // or nullopt if it hasn't been seen in the current Chrome session.

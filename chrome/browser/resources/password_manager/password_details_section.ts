@@ -6,14 +6,15 @@ import 'chrome://resources/cr_elements/cr_icons.css.js';
 import 'chrome://resources/cr_elements/cr_shared_style.css.js';
 import './shared_style.css.js';
 import './site_favicon.js';
-import './password_details_card.js';
+import './credential_details/password_details_card.js';
+import './credential_details/passkey_details_card.js';
 
 import {CrIconButtonElement} from 'chrome://resources/cr_elements/cr_icon_button/cr_icon_button.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {getTemplate} from './password_details_section.html.js';
-import {PasswordManagerImpl} from './password_manager_proxy.js';
+import {PasswordManagerImpl, PasswordViewPageInteractions} from './password_manager_proxy.js';
 import {Page, Route, RouteObserverMixin, Router} from './router.js';
 
 export interface PasswordDetailsSectionElement {
@@ -58,6 +59,8 @@ export class PasswordDetailsSectionElement extends
         composed: true,
       }));
       this.navigateBack_();
+      PasswordManagerImpl.getInstance().recordPasswordViewInteraction(
+          PasswordViewPageInteractions.TIMED_OUT_IN_VIEW_PAGE);
     };
     PasswordManagerImpl.getInstance().addPasswordManagerAuthTimeoutListener(
         this.passwordManagerAuthTimeoutListener_);
@@ -84,18 +87,20 @@ export class PasswordDetailsSectionElement extends
     if (group && group.name) {
       this.selectedGroup_ = group;
       this.startListeningForUpdates_();
+      this.$.backButton.focus();
     } else {
       // Navigation happened directly. Find group with matching name.
+      PasswordManagerImpl.getInstance().recordPasswordViewInteraction(
+          PasswordViewPageInteractions.CREDENTIAL_REQUESTED_BY_URL);
       this.assignMatchingGroup(route.details as string);
     }
   }
 
   private navigateBack_() {
-    Router.getInstance().navigateTo(Page.PASSWORDS);
-  }
-
-  private getGroupName_(): string {
-    return this.selectedGroup_ ? this.selectedGroup_!.name : '';
+    // Keep search query when navigating back.
+    Router.getInstance().navigateTo(
+        Page.PASSWORDS, null,
+        Router.getInstance().currentRoute.queryParameters);
   }
 
   private async assignMatchingGroup(groupName: string) {
@@ -111,11 +116,16 @@ export class PasswordDetailsSectionElement extends
     }
     if (!selectedGroup) {
       this.navigateBack_();
+      PasswordManagerImpl.getInstance().recordPasswordViewInteraction(
+          PasswordViewPageInteractions.CREDENTIAL_NOT_FOUND);
       return;
     }
     assert(selectedGroup);
-    this.updateShownCredentials(selectedGroup).catch(this.navigateBack_);
-    this.startListeningForUpdates_();
+    this.updateShownCredentials(selectedGroup)
+        .then(this.startListeningForUpdates_.bind(this))
+        .catch(this.navigateBack_);
+    PasswordManagerImpl.getInstance().recordPasswordViewInteraction(
+        PasswordViewPageInteractions.CREDENTIAL_FOUND);
   }
 
   private startListeningForUpdates_() {
@@ -197,7 +207,8 @@ export class PasswordDetailsSectionElement extends
         .then(() => {
           // Use navigation to update page title if needed.
           Router.getInstance().navigateTo(
-              Page.PASSWORD_DETAILS, this.selectedGroup_);
+              Page.PASSWORD_DETAILS, this.selectedGroup_,
+              Router.getInstance().currentRoute.queryParameters);
         })
         .catch(this.navigateBack_);
   }

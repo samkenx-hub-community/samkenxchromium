@@ -4,19 +4,24 @@
 
 import '../module_header.js';
 import './suggest_tile.js';
-import './tile.js';
+import '../../discount.mojom-webui.js';
 
 import {CrLazyRenderElement} from 'chrome://resources/cr_elements/cr_lazy_render/cr_lazy_render.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
+import {listenOnce} from 'chrome://resources/js/util_ts.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
+import {Cart} from '../../cart.mojom-webui.js';
 import {Cluster, URLVisit} from '../../history_cluster_types.mojom-webui.js';
+import {LayoutType} from '../../history_clusters_layout_type.mojom-webui.js';
 import {I18nMixin, loadTimeData} from '../../i18n_setup.js';
+import {NewTabPageProxy} from '../../new_tab_page_proxy.js';
 import {InfoDialogElement} from '../info_dialog';
 import {ModuleDescriptor} from '../module_descriptor.js';
 
 import {HistoryClustersProxyImpl} from './history_clusters_proxy.js';
 import {getTemplate} from './module.html.js';
+import {TileModuleElement} from './tile.js';
 
 export const LAYOUT_1_MIN_IMAGE_VISITS = 2;
 export const LAYOUT_1_MIN_VISITS = 2;
@@ -24,19 +29,6 @@ export const LAYOUT_2_MIN_IMAGE_VISITS = 1;
 export const LAYOUT_2_MIN_VISITS = 3;
 export const LAYOUT_3_MIN_IMAGE_VISITS = 2;
 export const LAYOUT_3_MIN_VISITS = 4;
-export const MIN_RELATED_SEARCHES = 3;
-
-/**
- * Available module UI layouts. This enum must match the numbering for
- * NTPHistoryClustersModuleDisplayLayout in enums.xml. These values are
- * persisted to logs. Entries should not be renumbered, removed or reused.
- */
-export enum HistoryClusterLayoutType {
-  NONE = 0,
-  LAYOUT_1 = 1,  // 2 image visits
-  LAYOUT_2 = 2,  // 1 image visit & 2 non-image visits
-  LAYOUT_3 = 3,  // 2 image visits & 2 non-image visits
-}
 
 /**
  * Available module element types. This enum must match the numbering for
@@ -47,6 +39,20 @@ export enum HistoryClusterElementType {
   VISIT = 0,
   SUGGEST = 1,
   SHOW_ALL = 2,
+  CART = 3,
+  OPEN_ALL = 4,
+}
+
+/**
+ * The overall image presence state of the visit tiles on unloading the page.
+ * This enum must match the numbering for NTPHistoryClustersImageDisplayState in
+ * enums.xml. These values are persisted to logs. Entries should not be
+ * renumbered, removed or reused.
+ */
+export enum HistoryClusterImageDisplayState {
+  NONE = 0,
+  SOME = 1,
+  ALL = 2,
 }
 
 export interface HistoryClustersModuleElement {
@@ -72,15 +78,91 @@ export class HistoryClustersModuleElement extends I18nMixin
       /** The cluster displayed by this element. */
       cluster: Object,
 
+      /** The cart displayed by this element, could be null. */
+      cart: {
+        type: Object,
+        value: null,
+      },
+
+      /**
+         The discounts displayed on the visit tiles of this element, could be
+         empty.
+       */
+      discounts: {
+        type: Array,
+        value: [],
+      },
+
       searchResultPage: Object,
+
+      overflowScroll_: {
+        type: Boolean,
+        value: () => loadTimeData.getBoolean('modulesOverflowScrollbarEnabled'),
+        reflectToAttribute: true,
+      },
     };
   }
 
   cluster: Cluster;
-  layoutType: HistoryClusterLayoutType;
+  cart: Cart|null;
+  discounts: string[];
+  layoutType: LayoutType;
   searchResultPage: URLVisit;
+  private setDisabledModulesListenerId_: number|null = null;
 
-  private isLayout_(type: HistoryClusterLayoutType): boolean {
+  override ready() {
+    super.ready();
+
+    HistoryClustersProxyImpl.getInstance().handler.recordLayoutTypeShown(
+        this.layoutType, this.cluster.id);
+
+    listenOnce(window, 'unload', () => {
+      const visitTiles: TileModuleElement[] = Array.from(
+          this.shadowRoot!.querySelectorAll('ntp-history-clusters-tile'));
+      const count = visitTiles.reduce(
+          (acc, tile) => acc + (tile.hasImageUrl() ? 1 : 0), 0);
+      const state = (visitTiles.length === count) ?
+          HistoryClusterImageDisplayState.ALL :
+          (count === 0) ? HistoryClusterImageDisplayState.NONE :
+                          HistoryClusterImageDisplayState.SOME;
+      chrome.metricsPrivate.recordEnumerationValue(
+          `NewTabPage.HistoryClusters.Layout${
+              this.layoutType}.ImageDisplayState`,
+          state, Object.keys(HistoryClusterImageDisplayState).length);
+    });
+  }
+
+  override connectedCallback() {
+    super.connectedCallback();
+
+    if (loadTimeData.getBoolean(
+            'modulesChromeCartInHistoryClustersModuleEnabled')) {
+      this.setDisabledModulesListenerId_ =
+          NewTabPageProxy.getInstance()
+              .callbackRouter.setDisabledModules.addListener(
+                  async (_: boolean, ids: string[]) => {
+                    if (ids.includes('chrome_cart')) {
+                      this.cart = null;
+                    } else if (!this.cart) {
+                      const {cart} =
+                          await HistoryClustersProxyImpl.getInstance()
+                              .handler.getCartForCluster(this.cluster);
+                      this.cart = cart;
+                    }
+                  });
+    }
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+
+    if (this.setDisabledModulesListenerId_) {
+      NewTabPageProxy.getInstance().callbackRouter.removeListener(
+          this.setDisabledModulesListenerId_);
+    }
+  }
+
+  private isLayout_(type: LayoutType): boolean {
     return type === this.layoutType;
   }
 
@@ -94,14 +176,21 @@ export class HistoryClustersModuleElement extends I18nMixin
     this.recordClick_(HistoryClusterElementType.SUGGEST);
   }
 
+  private onCartTileClick_() {
+    this.recordClick_(HistoryClusterElementType.CART);
+  }
+
   private recordClick_(type: HistoryClusterElementType) {
     chrome.metricsPrivate.recordEnumerationValue(
         `NewTabPage.HistoryClusters.Layout${this.layoutType}.Click`, type,
         Object.keys(HistoryClusterElementType).length);
+    HistoryClustersProxyImpl.getInstance().handler.recordClick(this.cluster.id);
+
+    this.dispatchEvent(new Event('usage', {bubbles: true, composed: true}));
   }
 
   private recordTileClickIndex_(tile: HTMLElement, tileType: string) {
-    assert(this.layoutType !== HistoryClusterLayoutType.NONE);
+    assert(this.layoutType !== LayoutType.kNone);
     const index = Array.from(tile.parentNode!.children).indexOf(tile);
     chrome.metricsPrivate.recordValue(
         {
@@ -113,17 +202,17 @@ export class HistoryClustersModuleElement extends I18nMixin
           buckets: 10,
         },
         index);
-
-    this.dispatchEvent(new Event('usage', {bubbles: true, composed: true}));
   }
 
   private onDisableButtonClick_() {
+    HistoryClustersProxyImpl.getInstance().handler.recordDisabled(
+        this.cluster.id);
     const disableEvent = new CustomEvent('disable-module', {
       composed: true,
       detail: {
         message: loadTimeData.getStringF(
-            'disableModuleToastMessage',
-            loadTimeData.getString('modulesJourneysSentence2')),
+            'modulesDisableToastMessage',
+            loadTimeData.getString('modulesThisTypeOfCardText')),
       },
     });
     this.dispatchEvent(disableEvent);
@@ -131,7 +220,7 @@ export class HistoryClustersModuleElement extends I18nMixin
 
   private onDismissButtonClick_() {
     HistoryClustersProxyImpl.getInstance().handler.dismissCluster(
-        [this.searchResultPage, ...this.cluster.visits]);
+        [this.searchResultPage, ...this.cluster.visits], this.cluster.id);
     this.dispatchEvent(new CustomEvent('dismiss-module', {
       bubbles: true,
       composed: true,
@@ -152,62 +241,108 @@ export class HistoryClustersModuleElement extends I18nMixin
         this.cluster.label.substring(1, this.cluster.label.length - 1));
     this.recordClick_(HistoryClusterElementType.SHOW_ALL);
   }
+
+  private onOpenAllInTabGroupClick_() {
+    const urls = [this.searchResultPage, ...this.cluster.visits].map(
+        visit => visit.normalizedUrl);
+    HistoryClustersProxyImpl.getInstance().handler.openUrlsInTabGroup(
+        urls, this.cluster.tabGroupName ?? null);
+    this.recordClick_(HistoryClusterElementType.OPEN_ALL);
+  }
+
+  private shouldShowCartTile_(cart: Object): boolean {
+    return loadTimeData.getBoolean(
+               'modulesChromeCartInHistoryClustersModuleEnabled') &&
+        !!cart;
+  }
+
+  private getInfo_(discounts: string[]): TrustedHTML {
+    const hasDiscount = discounts.some((discount) => !!discount);
+    return this.i18nAdvanced(
+        hasDiscount ? 'modulesHistoryWithDiscountInfo' :
+                      'modulesJourneysInfo');
+  }
 }
 
 customElements.define(
     HistoryClustersModuleElement.is, HistoryClustersModuleElement);
 
-function recordSelectedLayout(option: HistoryClusterLayoutType) {
+function recordSelectedLayout(option: LayoutType) {
   chrome.metricsPrivate.recordEnumerationValue(
       'NewTabPage.HistoryClusters.DisplayLayout', option,
-      Object.keys(HistoryClusterLayoutType).length);
+      Object.keys(LayoutType).length);
 }
 
+// Sort the first "n" visits with images to the front of the list and splice the
+// `visits` array so that "Open All" and "Dismiss" cluster operations are
+// limited to the visible URL visits for the given card layout.
 function processLayoutVisits(
-    visits: URLVisit[], numVisits: number, numImageVisits: number): URLVisit[] {
-  const result: URLVisit[] = Array<URLVisit>(numVisits);
-  let currentImageIdx = 0;
-  let currentVisitIdx = numImageVisits;
-  for (let i = 0; i < visits.length; i++) {
-    if (currentImageIdx < numImageVisits && visits[i].hasUrlKeyedImage) {
-      result[currentImageIdx] = visits[i];
-      currentImageIdx++;
-    } else if (currentVisitIdx < numVisits) {
-      result[currentVisitIdx] = visits[i];
-      currentVisitIdx++;
-    } else {
-      break;
-    }
-  }
-  return result;
+    visits: URLVisit[], numVisits: number, numImageVisits: number) {
+  // Indexes are stored in reverse order and spliced in that order from the
+  // visits array to avoid affecting subsequent splice index order.
+  const nVisitsWithImagesIndices: number[] =
+      visits.reduce((acc: number[], visit: URLVisit, index: number) => {
+        if (acc.length < numImageVisits && visit.hasUrlKeyedImage) {
+          acc.unshift(index);
+        }
+        return acc;
+      }, []);
+
+  const nVisitsWithImages: URLVisit[] = [];
+  nVisitsWithImagesIndices.forEach(visitWithImageIndex => {
+    nVisitsWithImages.unshift(visits.splice(visitWithImageIndex, 1)[0]);
+  });
+
+  visits.unshift(...nVisitsWithImages);
+  visits.splice(numVisits, visits.length - numVisits);
 }
 
 async function createElement(): Promise<HistoryClustersModuleElement|null> {
-  const data =
-      await HistoryClustersProxyImpl.getInstance().handler.getCluster();
-  // Do not show module if no cluster or not enough related search results.
-  if (!data.cluster ||
-      data.cluster.relatedSearches.length < MIN_RELATED_SEARCHES) {
-    recordSelectedLayout(HistoryClusterLayoutType.NONE);
+  const {clusters} =
+      await HistoryClustersProxyImpl.getInstance().handler.getClusters();
+  // Do not show module if there are no clusters.
+  if (clusters.length === 0) {
+    recordSelectedLayout(LayoutType.kNone);
     return null;
   }
 
   const element = new HistoryClustersModuleElement();
-  element.cluster = data.cluster!;
+  element.cluster = clusters[0];
+  // Initialize the cart element when the feature is enabled.
+  if (loadTimeData.getBoolean(
+          'modulesChromeCartInHistoryClustersModuleEnabled')) {
+    const {cart} =
+        await HistoryClustersProxyImpl.getInstance().handler.getCartForCluster(
+            clusters[0]);
+    element.cart = cart;
+  }
   // Pull out the SRP to be used in the header and to open the cluster
   // in tab group.
-  element.searchResultPage = data.cluster!.visits[0];
+  element.searchResultPage = clusters[0]!.visits.shift()!;
 
-  // History cluster visits minus the SRP that is included, since the SRP
-  // isn't used in the layout.
-  const visits = element.cluster.visits.slice(1);
   // Count number of visits with images.
-  const imageCount = visits
+  const imageCount = element.cluster.visits
                          .filter(
                              (visit: URLVisit) =>
                                  visit.hasUrlKeyedImage && visit.isKnownToSync)
                          .length;
-  const visitCount = visits.length;
+  const visitCount = element.cluster.visits.length;
+  if (loadTimeData.getBoolean('historyClustersModuleDiscountsEnabled')) {
+    const {discounts} = await HistoryClustersProxyImpl.getInstance()
+                            .handler.getDiscountsForCluster(clusters[0]);
+    for (const visit of clusters[0].visits) {
+      let discountInValue = '';
+      for (const [url, discount] of discounts) {
+        if (url.url === visit.normalizedUrl.url && discount.length > 0) {
+          discountInValue = discount[0].valueInText;
+          visit.normalizedUrl.url = discount[0].annotatedVisitUrl.url;
+        }
+      }
+      element.discounts.push(discountInValue);
+    }
+  } else {
+    element.discounts = Array(visitCount).fill('');
+  }
 
   // Calculate which layout to use.
   if (imageCount >= LAYOUT_3_MIN_IMAGE_VISITS) {
@@ -215,25 +350,27 @@ async function createElement(): Promise<HistoryClustersModuleElement|null> {
     // Decide which one to use by checking if there are enough total
     // visits for layout 3.
     if (visitCount >= LAYOUT_3_MIN_VISITS) {
-      element.layoutType = HistoryClusterLayoutType.LAYOUT_3;
-      element.cluster.visits = processLayoutVisits(
-          visits, LAYOUT_3_MIN_VISITS, LAYOUT_3_MIN_IMAGE_VISITS);
+      element.layoutType = LayoutType.kLayout3;
+      processLayoutVisits(
+          element.cluster.visits, LAYOUT_3_MIN_VISITS,
+          LAYOUT_3_MIN_IMAGE_VISITS);
     } else {
       // If we have enough image visits, we have enough total visits
       // for layout 1, since all visits shown are image visits.
-      element.layoutType = HistoryClusterLayoutType.LAYOUT_1;
-      element.cluster.visits = processLayoutVisits(
-          visits, LAYOUT_1_MIN_VISITS, LAYOUT_1_MIN_IMAGE_VISITS);
+      element.layoutType = LayoutType.kLayout1;
+      processLayoutVisits(
+          element.cluster.visits, LAYOUT_1_MIN_VISITS,
+          LAYOUT_1_MIN_IMAGE_VISITS);
     }
   } else if (
       imageCount === LAYOUT_2_MIN_IMAGE_VISITS &&
       visitCount >= LAYOUT_2_MIN_VISITS) {
-    element.layoutType = HistoryClusterLayoutType.LAYOUT_2;
-    element.cluster.visits = processLayoutVisits(
-        visits, LAYOUT_2_MIN_VISITS, LAYOUT_2_MIN_IMAGE_VISITS);
+    element.layoutType = LayoutType.kLayout2;
+    processLayoutVisits(
+        element.cluster.visits, LAYOUT_2_MIN_VISITS, LAYOUT_2_MIN_IMAGE_VISITS);
   } else {
     // If the data doesn't fit any layout, don't show the module.
-    recordSelectedLayout(HistoryClusterLayoutType.NONE);
+    recordSelectedLayout(LayoutType.kNone);
     return null;
   }
 

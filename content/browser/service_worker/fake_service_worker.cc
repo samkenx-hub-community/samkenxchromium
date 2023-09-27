@@ -47,12 +47,17 @@ void FakeServiceWorker::FlushForTesting() {
 void FakeServiceWorker::InitializeGlobalScope(
     mojo::PendingAssociatedRemote<blink::mojom::ServiceWorkerHost>
         service_worker_host,
+    mojo::PendingAssociatedRemote<blink::mojom::AssociatedInterfaceProvider>
+        associated_interfaces_from_browser,
+    mojo::PendingAssociatedReceiver<blink::mojom::AssociatedInterfaceProvider>
+        associated_interfaces_to_browser,
     blink::mojom::ServiceWorkerRegistrationObjectInfoPtr registration_info,
     blink::mojom::ServiceWorkerObjectInfoPtr service_worker_info,
     blink::mojom::FetchHandlerExistence fetch_handler_existence,
     mojo::PendingReceiver<blink::mojom::ReportingObserver>
         reporting_observer_receiver,
-    blink::mojom::AncestorFrameType ancestor_frame_type) {
+    blink::mojom::AncestorFrameType ancestor_frame_type,
+    const blink::StorageKey& storage_key) {
   host_.Bind(std::move(service_worker_host));
 
   // Enable callers to use these endpoints without us actually binding them

@@ -3,11 +3,11 @@
 # found in the LICENSE file.
 
 source_set("fakes") {
-  configs += [ "//build/config/compiler:enable_arc" ]
   testonly = true
 
   deps = [
     "//base",
+    "//components/sessions:session_id",
     "//ios/web/common",
     "//ios/web/common:uikit",
     "//ios/web/js_messaging",

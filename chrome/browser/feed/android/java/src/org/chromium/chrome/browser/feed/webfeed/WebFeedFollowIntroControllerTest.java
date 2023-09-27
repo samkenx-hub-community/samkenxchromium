@@ -50,6 +50,7 @@ import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuHandler;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
+import org.chromium.components.browser_ui.widget.textbubble.TextBubble;
 import org.chromium.components.feature_engagement.FeatureConstants;
 import org.chromium.components.feature_engagement.Tracker;
 import org.chromium.components.feature_engagement.TriggerDetails;
@@ -74,8 +75,8 @@ import java.util.concurrent.TimeUnit;
 @LooperMode(LooperMode.Mode.LEGACY)
 public final class WebFeedFollowIntroControllerTest {
     private static final long SAFE_INTRO_WAIT_TIME_MILLIS = 3 * 1000 + 100;
-    private static final GURL sTestUrl = JUnitTestGURLs.getGURL(JUnitTestGURLs.EXAMPLE_URL);
-    private static final GURL sFaviconUrl = JUnitTestGURLs.getGURL(JUnitTestGURLs.RED_1);
+    private static final GURL sTestUrl = JUnitTestGURLs.EXAMPLE_URL;
+    private static final GURL sFaviconUrl = JUnitTestGURLs.RED_1;
     private static final byte[] sWebFeedId = "webFeedId".getBytes();
     private static final SharedPreferencesManager sSharedPreferencesManager =
             SharedPreferencesManager.getInstance();
@@ -174,11 +175,13 @@ public final class WebFeedFollowIntroControllerTest {
                 mTabSupplier, new View(mActivity), mFeedLauncher, mDialogManager, mSnackbarManager);
         mEmptyTabObserver = mWebFeedFollowIntroController.getEmptyTabObserverForTesting();
         mWebFeedFollowIntroController.setClockForTesting(mClock);
+        // TextBubble is impossible to show in a junit.
+        TextBubble.setSkipShowCheckForTesting(true);
     }
 
     @After
     public void tearDown() {
-        TrackerFactory.setTrackerForTests(null);
+        TextBubble.setSkipShowCheckForTesting(false);
     }
 
     @Test
@@ -227,8 +230,6 @@ public final class WebFeedFollowIntroControllerTest {
     public void meetsShowingRequirements_showsIntro_IPH() {
         mBaseTestValues.addFieldTrialParamOverride(
                 ChromeFeatureList.WEB_FEED, "intro_style", "IPH");
-        mBaseTestValues.addFeatureFlagOverride(
-                ChromeFeatureList.ANDROID_SCROLL_OPTIMIZATIONS, false);
         FeatureList.setTestValues(mBaseTestValues);
         resetWebFeedFollowIntroController();
 
@@ -256,8 +257,6 @@ public final class WebFeedFollowIntroControllerTest {
     public void sameWebFeedIsNotShownMoreThan3Times() {
         mBaseTestValues.addFieldTrialParamOverride(
                 ChromeFeatureList.WEB_FEED, "intro_style", "IPH");
-        mBaseTestValues.addFeatureFlagOverride(
-                ChromeFeatureList.ANDROID_SCROLL_OPTIMIZATIONS, false);
         FeatureList.setTestValues(mBaseTestValues);
         resetWebFeedFollowIntroController();
 

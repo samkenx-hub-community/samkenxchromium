@@ -7,8 +7,6 @@
  */
 import {BrailleKeyEvent} from '../../common/braille/braille_key_types.js';
 import {NavBraille} from '../../common/braille/nav_braille.js';
-import {LogType} from '../../common/log_types.js';
-import {SettingsManager} from '../../common/settings_manager.js';
 import {ChromeVoxState} from '../chromevox_state.js';
 import {LogStore} from '../logging/log_store.js';
 
@@ -23,11 +21,6 @@ export class BrailleBackground {
   constructor() {
     /** @private {boolean} */
     this.frozen_ = false;
-
-    /** @private {NavBraille} */
-    this.lastContent_ = null;
-    /** @private {?string} */
-    this.lastContentId_ = null;
 
     BrailleDisplayManager.instance.setCommandListener(
         (evt, content) => this.routeBrailleKeyEvent_(evt, content));
@@ -54,12 +47,7 @@ export class BrailleBackground {
       return;
     }
 
-    if (SettingsManager.getBoolean('enableBrailleLogging')) {
-      const logStr = 'Braille "' + params.text.toString() + '"';
-      LogStore.instance.writeTextLog(logStr, LogType.BRAILLE);
-      console.log(logStr);
-    }
-
+    LogStore.instance.writeBrailleLog(params.text.toString());
     this.setContent_(params, null);
   }
 
@@ -103,10 +91,7 @@ export class BrailleBackground {
 
   /** @override */
   async backTranslate(cells) {
-    return new Promise(resolve => {
-      BrailleTranslatorManager.instance.getDefaultTranslator().backTranslate(
-          cells, resolve);
-    });
+    return await BrailleTranslatorManager.backTranslate(cells);
   }
 
   /**
@@ -115,12 +100,8 @@ export class BrailleBackground {
    * @private
    */
   setContent_(newContent, newContentId) {
-    const updateContent = () => {
-      this.lastContent_ = newContentId ? newContent : null;
-      this.lastContentId_ = newContentId;
-      BrailleDisplayManager.instance.setContent(
-          newContent, BrailleInputHandler.instance.getExpansionType());
-    };
+    const updateContent = () => BrailleDisplayManager.instance.setContent(
+        newContent, BrailleInputHandler.instance.getExpansionType());
     BrailleInputHandler.instance.onDisplayContentChanged(
         newContent.text, updateContent);
     updateContent();

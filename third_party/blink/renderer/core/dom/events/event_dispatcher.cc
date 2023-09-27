@@ -41,6 +41,7 @@
 #include "third_party/blink/renderer/core/dom/events/window_event_context.h"
 #include "third_party/blink/renderer/core/dom/node.h"
 #include "third_party/blink/renderer/core/editing/editor.h"
+#include "third_party/blink/renderer/core/event_type_names.h"
 #include "third_party/blink/renderer/core/events/keyboard_event.h"
 #include "third_party/blink/renderer/core/events/mouse_event.h"
 #include "third_party/blink/renderer/core/events/simulated_event_util.h"
@@ -61,7 +62,6 @@
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
 #include "third_party/blink/renderer/platform/keyboard_codes.h"
 #include "ui/events/keycodes/dom/keycode_converter.h"
-
 namespace blink {
 
 DispatchEventResult EventDispatcher::DispatchEvent(Node& node, Event& event) {
@@ -187,7 +187,8 @@ DispatchEventResult EventDispatcher::Dispatch() {
     return DispatchEventResult::kNotCanceled;
   }
   std::unique_ptr<EventTiming> eventTiming;
-  LocalFrame* frame = node_->GetDocument().GetFrame();
+  auto& document = node_->GetDocument();
+  LocalFrame* frame = document.GetFrame();
   LocalDOMWindow* window = nullptr;
   if (frame) {
     window = frame->DomWindow();
@@ -218,7 +219,7 @@ DispatchEventResult EventDispatcher::Dispatch() {
     DCHECK(!frame->GetAdTracker() || !frame->GetAdTracker()->IsAdScriptInStack(
                                          AdTracker::StackType::kBottomAndTop));
     if (frame->IsAdFrame()) {
-      UseCounter::Count(node_->GetDocument(), WebFeature::kAdClick);
+      UseCounter::Count(document, WebFeature::kAdClick);
     }
   }
 
@@ -404,16 +405,16 @@ inline void EventDispatcher::DispatchEventPostProcess(
     // Non-bubbling events call only one default event handler, the one for the
     // target.
     node_->DefaultEventHandler(*event_);
-    DCHECK(!event_->defaultPrevented());
     // For bubbling events, call default event handlers on the same targets in
     // the same order as the bubbling phase.
-    if (!event_->DefaultHandled() && event_->bubbles()) {
+    if (!event_->DefaultHandled() && !event_->defaultPrevented() &&
+        event_->bubbles()) {
       wtf_size_t size = event_->GetEventPath().size();
       for (wtf_size_t i = 1; i < size; ++i) {
         event_->GetEventPath()[i].GetNode().DefaultEventHandler(*event_);
-        DCHECK(!event_->defaultPrevented());
-        if (event_->DefaultHandled())
+        if (event_->DefaultHandled() || event_->defaultPrevented()) {
           break;
+        }
       }
     }
   } else {

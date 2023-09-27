@@ -78,6 +78,7 @@
 #include "third_party/blink/public/web/web_security_policy.h"
 #include "third_party/blink/renderer/platform/blob/blob_data.h"
 #include "third_party/blink/renderer/platform/loader/fetch/back_forward_cache_loader_helper.h"
+#include "third_party/blink/renderer/platform/loader/fetch/fetch_utils.h"
 #include "third_party/blink/renderer/platform/loader/fetch/url_loader/resource_request_client.h"
 #include "third_party/blink/renderer/platform/loader/fetch/url_loader/resource_request_sender.h"
 #include "third_party/blink/renderer/platform/loader/fetch/url_loader/sync_load_response.h"
@@ -106,7 +107,8 @@ class URLLoader::Context : public ResourceRequestClient {
           scoped_refptr<base::SingleThreadTaskRunner> unfreezable_task_runner,
           scoped_refptr<network::SharedURLLoaderFactory> factory,
           mojo::PendingRemote<mojom::blink::KeepAliveHandle> keep_alive_handle,
-          BackForwardCacheLoaderHelper* back_forward_cache_loader_helper);
+          BackForwardCacheLoaderHelper* back_forward_cache_loader_helper,
+          Vector<std::unique_ptr<URLLoaderThrottle>> throttles);
 
   int request_id() const { return request_id_; }
   URLLoaderClient* client() const { return client_; }
@@ -133,9 +135,10 @@ class URLLoader::Context : public ResourceRequestClient {
 
   // ResourceRequestClient overrides:
   void OnUploadProgress(uint64_t position, uint64_t size) override;
-  bool OnReceivedRedirect(const net::RedirectInfo& redirect_info,
-                          network::mojom::URLResponseHeadPtr head,
-                          std::vector<std::string>* removed_headers) override;
+  void OnReceivedRedirect(
+      const net::RedirectInfo& redirect_info,
+      network::mojom::URLResponseHeadPtr head,
+      FollowRedirectCallback follow_redirect_callback) override;
   void OnReceivedResponse(
       network::mojom::URLResponseHeadPtr head,
       base::TimeTicks response_arrival_at_renderer) override;
@@ -151,15 +154,6 @@ class URLLoader::Context : public ResourceRequestClient {
 
  private:
   ~Context() override;
-
-  // Called when the body data stream is detached from the reader side.
-  void CancelBodyStreaming();
-
-  void OnBodyAvailable(MojoResult, const mojo::HandleSignalsState&);
-  void OnBodyHasBeenRead(uint32_t read_bytes);
-
-  static net::NetworkTrafficAnnotationTag GetTrafficAnnotationTag(
-      network::ResourceRequest* request);
 
   URLLoader* loader_;
 
@@ -188,10 +182,6 @@ class URLLoader::Context : public ResourceRequestClient {
   base::WaitableEvent* terminate_sync_load_event_;
 
   int request_id_;
-  bool in_two_phase_read_ = false;
-  bool is_in_on_body_available_ = false;
-
-  absl::optional<network::URLLoaderCompletionStatus> completion_status_;
 
   std::unique_ptr<ResourceRequestSender> resource_request_sender_;
 
@@ -199,6 +189,7 @@ class URLLoader::Context : public ResourceRequestClient {
 
   WeakPersistent<BackForwardCacheLoaderHelper>
       back_forward_cache_loader_helper_;
+  Vector<std::unique_ptr<URLLoaderThrottle>> throttles_;
 };
 
 // URLLoader::Context -------------------------------------------------------
@@ -211,7 +202,8 @@ URLLoader::Context::Context(
     scoped_refptr<base::SingleThreadTaskRunner> unfreezable_task_runner,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
     mojo::PendingRemote<mojom::blink::KeepAliveHandle> keep_alive_handle,
-    BackForwardCacheLoaderHelper* back_forward_cache_loader_helper)
+    BackForwardCacheLoaderHelper* back_forward_cache_loader_helper,
+    Vector<std::unique_ptr<URLLoaderThrottle>> throttles)
     : loader_(loader),
       has_devtools_request_id_(false),
       client_(nullptr),
@@ -223,7 +215,8 @@ URLLoader::Context::Context(
       request_id_(-1),
       resource_request_sender_(std::make_unique<ResourceRequestSender>()),
       url_loader_factory_(std::move(url_loader_factory)),
-      back_forward_cache_loader_helper_(back_forward_cache_loader_helper) {
+      back_forward_cache_loader_helper_(back_forward_cache_loader_helper),
+      throttles_(std::move(throttles)) {
   DCHECK(url_loader_factory_);
 }
 
@@ -281,9 +274,6 @@ void URLLoader::Context::Start(
   // TODO(horo): Check credentials flag is unset when credentials mode is omit.
   //             Check credentials flag is set when credentials mode is include.
 
-  const network::mojom::RequestDestination request_destination =
-      request->destination;
-
   scoped_refptr<WebURLRequestExtraData> empty_url_request_extra_data;
   WebURLRequestExtraData* url_request_extra_data;
   if (passed_url_request_extra_data) {
@@ -295,16 +285,9 @@ void URLLoader::Context::Start(
     url_request_extra_data = empty_url_request_extra_data.get();
   }
 
-  auto throttles =
-      url_request_extra_data->TakeURLLoaderThrottles().ReleaseVector();
-  // The frame request blocker is only for a frame's subresources.
-  if (url_request_extra_data->frame_request_blocker() &&
-      !IsRequestDestinationFrame(request_destination)) {
-    auto throttle = url_request_extra_data->frame_request_blocker()
-                        ->GetThrottleIfRequestsBlocked();
-    if (throttle) {
-      throttles.push_back(std::move(throttle));
-    }
+  std::vector<std::unique_ptr<blink::URLLoaderThrottle>> throttles;
+  for (auto& throttle : throttles_) {
+    throttles.push_back(std::move(throttle));
   }
 
   // TODO(falken): URLLoader should be able to get the top frame origin via some
@@ -332,7 +315,7 @@ void URLLoader::Context::Start(
           download_to_blob_registry.InitWithNewPipeAndPassReceiver());
     }
     net::NetworkTrafficAnnotationTag tag =
-        GetTrafficAnnotationTag(request.get());
+        FetchUtils::GetTrafficAnnotationTag(*request);
     resource_request_sender_->SendSync(
         std::move(request), tag, loader_options, sync_load_response,
         url_loader_factory_, std::move(throttles), timeout_interval,
@@ -344,12 +327,17 @@ void URLLoader::Context::Start(
 
   TRACE_EVENT_WITH_FLOW0("loading", "URLLoader::Context::Start", this,
                          TRACE_EVENT_FLAG_FLOW_OUT);
-  net::NetworkTrafficAnnotationTag tag = GetTrafficAnnotationTag(request.get());
+  net::NetworkTrafficAnnotationTag tag =
+      FetchUtils::GetTrafficAnnotationTag(*request);
   request_id_ = resource_request_sender_->SendAsync(
       std::move(request), GetMaybeUnfreezableTaskRunner(), tag, loader_options,
       cors_exempt_header_list_, base::WrapRefCounted(this), url_loader_factory_,
       std::move(throttles), std::move(resource_load_info_notifier_wrapper),
-      back_forward_cache_loader_helper_);
+      base::BindOnce(&BackForwardCacheLoaderHelper::EvictFromBackForwardCache,
+                     back_forward_cache_loader_helper_),
+      base::BindRepeating(
+          &BackForwardCacheLoaderHelper::DidBufferLoadWhileInBackForwardCache,
+          back_forward_cache_loader_helper_));
 
   if (freeze_mode_ != LoaderFreezeMode::kNone) {
     resource_request_sender_->Freeze(LoaderFreezeMode::kStrict);
@@ -362,12 +350,12 @@ void URLLoader::Context::OnUploadProgress(uint64_t position, uint64_t size) {
   }
 }
 
-bool URLLoader::Context::OnReceivedRedirect(
+void URLLoader::Context::OnReceivedRedirect(
     const net::RedirectInfo& redirect_info,
     network::mojom::URLResponseHeadPtr head,
-    std::vector<std::string>* removed_headers) {
+    FollowRedirectCallback follow_redirect_callback) {
   if (!client_) {
-    return false;
+    return;
   }
 
   TRACE_EVENT_WITH_FLOW0("loading", "URLLoader::Context::OnReceivedRedirect",
@@ -378,13 +366,17 @@ bool URLLoader::Context::OnReceivedRedirect(
       url_, *head, has_devtools_request_id_, request_id_);
 
   url_ = KURL(redirect_info.new_url);
-  return client_->WillFollowRedirect(
-      url_, redirect_info.new_site_for_cookies,
-      WebString::FromUTF8(redirect_info.new_referrer),
-      ReferrerUtils::NetToMojoReferrerPolicy(redirect_info.new_referrer_policy),
-      WebString::FromUTF8(redirect_info.new_method), response,
-      has_devtools_request_id_, removed_headers,
-      redirect_info.insecure_scheme_was_upgraded);
+  std::vector<std::string> removed_headers;
+  if (client_->WillFollowRedirect(
+          url_, redirect_info.new_site_for_cookies,
+          WebString::FromUTF8(redirect_info.new_referrer),
+          ReferrerUtils::NetToMojoReferrerPolicy(
+              redirect_info.new_referrer_policy),
+          WebString::FromUTF8(redirect_info.new_method), response,
+          has_devtools_request_id_, &removed_headers,
+          redirect_info.insecure_scheme_was_upgraded)) {
+    std::move(follow_redirect_callback).Run(std::move(removed_headers));
+  }
 }
 
 void URLLoader::Context::OnReceivedResponse(
@@ -459,8 +451,7 @@ void URLLoader::Context::OnCompletedRequest(
     } else {
       client_->DidFinishLoading(status.completion_time, total_transfer_size,
                                 encoded_body_size, status.decoded_body_length,
-                                status.should_report_corb_blocking,
-                                status.pervasive_payload_requested);
+                                status.should_report_corb_blocking);
     }
   }
 }
@@ -468,20 +459,6 @@ void URLLoader::Context::OnCompletedRequest(
 URLLoader::Context::~Context() {
   // We must be already cancelled at this point.
   DCHECK_LT(request_id_, 0);
-}
-
-void URLLoader::Context::CancelBodyStreaming() {
-  scoped_refptr<Context> protect(this);
-
-  if (client_) {
-    // TODO(yhirano): Set |stale_copy_in_cache| appropriately if possible.
-    client_->DidFail(WebURLError(net::ERR_ABORTED, url_),
-                     base::TimeTicks::Now(),
-                     URLLoaderClient::kUnknownEncodedDataLength, 0, 0);
-  }
-
-  // Notify the browser process that the request is canceled.
-  Cancel();
 }
 
 // URLLoader ----------------------------------------------------------------
@@ -493,16 +470,17 @@ URLLoader::URLLoader(
     scoped_refptr<base::SingleThreadTaskRunner> unfreezable_task_runner,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
     mojo::PendingRemote<mojom::blink::KeepAliveHandle> keep_alive_handle,
-    BackForwardCacheLoaderHelper* back_forward_cache_loader_helper)
-    : context_(
-          base::MakeRefCounted<Context>(this,
-                                        cors_exempt_header_list,
-                                        terminate_sync_load_event,
-                                        std::move(freezable_task_runner),
-                                        std::move(unfreezable_task_runner),
-                                        std::move(url_loader_factory),
-                                        std::move(keep_alive_handle),
-                                        back_forward_cache_loader_helper)) {}
+    BackForwardCacheLoaderHelper* back_forward_cache_loader_helper,
+    Vector<std::unique_ptr<URLLoaderThrottle>> throttles)
+    : context_(base::MakeRefCounted<Context>(this,
+                                             cors_exempt_header_list,
+                                             terminate_sync_load_event,
+                                             std::move(freezable_task_runner),
+                                             std::move(unfreezable_task_runner),
+                                             std::move(url_loader_factory),
+                                             std::move(keep_alive_handle),
+                                             back_forward_cache_loader_helper,
+                                             std::move(throttles))) {}
 
 URLLoader::URLLoader() = default;
 
@@ -641,113 +619,6 @@ void URLLoader::SetResourceRequestSenderForTesting(
     std::unique_ptr<ResourceRequestSender> resource_request_sender) {
   context_->SetResourceRequestSenderForTesting(  // IN-TEST
       std::move(resource_request_sender));
-}
-
-// static
-// We have this function at the bottom of this file because it confuses
-// syntax highliting.
-// TODO(kinuko): Deprecate this, we basically need to know the destination
-// and if it's for favicon or not.
-net::NetworkTrafficAnnotationTag URLLoader::Context::GetTrafficAnnotationTag(
-    network::ResourceRequest* request) {
-  if (request->is_favicon) {
-    return net::DefineNetworkTrafficAnnotation("favicon_loader", R"(
-      semantics {
-        sender: "Blink Resource Loader"
-        description:
-          "Chrome sends a request to download favicon for a URL."
-        trigger:
-          "Navigating to a URL."
-        data: "None."
-        destination: WEBSITE
-      }
-      policy {
-        cookies_allowed: YES
-        cookies_store: "user"
-        setting: "These requests cannot be disabled in settings."
-        policy_exception_justification:
-          "Not implemented."
-      })");
-  }
-  switch (request->destination) {
-    case network::mojom::RequestDestination::kDocument:
-    case network::mojom::RequestDestination::kIframe:
-    case network::mojom::RequestDestination::kFrame:
-    case network::mojom::RequestDestination::kFencedframe:
-    case network::mojom::RequestDestination::kWebIdentity:
-      NOTREACHED();
-      [[fallthrough]];
-
-    case network::mojom::RequestDestination::kEmpty:
-    case network::mojom::RequestDestination::kAudio:
-    case network::mojom::RequestDestination::kAudioWorklet:
-    case network::mojom::RequestDestination::kFont:
-    case network::mojom::RequestDestination::kImage:
-    case network::mojom::RequestDestination::kManifest:
-    case network::mojom::RequestDestination::kPaintWorklet:
-    case network::mojom::RequestDestination::kReport:
-    case network::mojom::RequestDestination::kScript:
-    case network::mojom::RequestDestination::kServiceWorker:
-    case network::mojom::RequestDestination::kSharedWorker:
-    case network::mojom::RequestDestination::kStyle:
-    case network::mojom::RequestDestination::kTrack:
-    case network::mojom::RequestDestination::kVideo:
-    case network::mojom::RequestDestination::kWebBundle:
-    case network::mojom::RequestDestination::kWorker:
-    case network::mojom::RequestDestination::kXslt:
-      return net::DefineNetworkTrafficAnnotation("blink_resource_loader", R"(
-      semantics {
-        sender: "Blink Resource Loader"
-        description:
-          "Blink-initiated request, which includes all resources for "
-          "normal page loads, chrome URLs, and downloads."
-        trigger:
-          "The user navigates to a URL or downloads a file. Also when a "
-          "webpage, ServiceWorker, or chrome:// uses any network communication."
-        data: "Anything the initiator wants to send."
-        destination: OTHER
-      }
-      policy {
-        cookies_allowed: YES
-        cookies_store: "user"
-        setting: "These requests cannot be disabled in settings."
-        policy_exception_justification:
-          "Not implemented. Without these requests, Chrome will be unable "
-          "to load any webpage."
-      })");
-
-    case network::mojom::RequestDestination::kEmbed:
-    case network::mojom::RequestDestination::kObject:
-      return net::DefineNetworkTrafficAnnotation(
-          "blink_extension_resource_loader", R"(
-        semantics {
-          sender: "Blink Resource Loader"
-          description:
-            "Blink-initiated request for resources required for NaCl instances "
-            "tagged with <embed> or <object>, or installed extensions."
-          trigger:
-            "An extension or NaCl instance may initiate a request at any time, "
-            "even in the background."
-          data: "Anything the initiator wants to send."
-          destination: OTHER
-        }
-        policy {
-          cookies_allowed: YES
-          cookies_store: "user"
-          setting:
-            "These requests cannot be disabled in settings, but they are "
-            "sent only if user installs extensions."
-          chrome_policy {
-            ExtensionInstallBlocklist {
-              ExtensionInstallBlocklist: {
-                entries: '*'
-              }
-            }
-          }
-        })");
-  }
-
-  return net::NetworkTrafficAnnotationTag::NotReached();
 }
 
 void URLLoader::Context::SetResourceRequestSenderForTesting(

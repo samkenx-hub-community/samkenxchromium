@@ -15,6 +15,7 @@
 #include "ash/style/typography.h"
 #include "ash/wm/desks/desk_mini_view.h"
 #include "ash/wm/desks/desk_preview_view.h"
+#include "ash/wm/desks/templates/saved_desk_constants.h"
 #include "ash/wm/desks/templates/saved_desk_grid_view.h"
 #include "ash/wm/desks/templates/saved_desk_item_view.h"
 #include "ash/wm/desks/templates/saved_desk_name_view.h"
@@ -35,7 +36,6 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/animation/animation_builder.h"
 #include "ui/views/layout/box_layout.h"
-#include "ui/views/view.h"
 #include "ui/wm/core/coordinate_conversion.h"
 #include "ui/wm/core/window_animations.h"
 #include "ui/wm/core/window_util.h"
@@ -52,7 +52,6 @@ constexpr gfx::Size kLabelSizePortrait = {464, 24};
 
 // "No items" label dimensions.
 constexpr gfx::Size kNoItemsLabelPadding = {16, 8};
-constexpr int kNoItemsLabelCornerRadius = 16;
 constexpr int kNoItemsLabelHeight = 32;
 
 // Between child spacing of Library page scroll content view.
@@ -63,6 +62,9 @@ constexpr int kGroupContentsBetweenChildSpacingDp = 20;
 
 // The size of the gradient applied to the top and bottom of the scroll view.
 constexpr int kScrollViewGradientSize = 32;
+
+// Elevation for the grid label text's shadow.
+constexpr int kLabelTextShadowElevation = 4;
 
 // Insets of Library page scroll content view. Note: the bottom inset is there
 // to slightly adjust the otherwise vertically centered scroll content up a tad.
@@ -130,6 +132,10 @@ std::unique_ptr<views::View> GetLabelAndGridGroupContents() {
 std::unique_ptr<views::Label> MakeGridLabel(int label_string_id) {
   auto label = std::make_unique<views::Label>(
       l10n_util::GetStringUTF16(label_string_id));
+  gfx::ShadowValues shadows =
+      gfx::ShadowValue::MakeChromeOSSystemUIShadowValues(
+          kLabelTextShadowElevation);
+  label->SetShadows(shadows);
   TypographyProvider::Get()->StyleLabel(TypographyToken::kCrosTitle1, *label);
   label->SetEnabledColorId(cros_tokens::kCrosSysOnSurface);
   label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
@@ -192,7 +198,7 @@ class SavedDeskLibraryWindowTargeter : public aura::WindowTargeter {
   }
 
  private:
-  SavedDeskLibraryView* const owner_;
+  const raw_ptr<SavedDeskLibraryView, ExperimentalAsh> owner_;
 };
 
 // -----------------------------------------------------------------------------
@@ -220,7 +226,7 @@ class SavedDeskLibraryEventHandler : public ui::EventHandler {
   void OnKeyEvent(ui::KeyEvent* event) override { owner_->OnKeyEvent(event); }
 
  private:
-  SavedDeskLibraryView* const owner_;
+  const raw_ptr<SavedDeskLibraryView, ExperimentalAsh> owner_;
 };
 
 // -----------------------------------------------------------------------------
@@ -308,7 +314,7 @@ SavedDeskLibraryView::SavedDeskLibraryView() {
 
     scroll_contents->AddChildView(std::move(group_contents));
   }
-  if (saved_desk_util::IsDeskSaveAndRecallEnabled()) {
+  if (saved_desk_util::IsSavedDesksEnabled()) {
     auto group_contents = GetLabelAndGridGroupContents();
     grid_labels_.push_back(group_contents->AddChildView(MakeGridLabel(
         IDS_ASH_DESKS_TEMPLATES_LIBRARY_SAVE_AND_RECALL_GRID_LABEL)));
@@ -322,7 +328,7 @@ SavedDeskLibraryView::SavedDeskLibraryView() {
   no_items_label_ =
       scroll_contents->AddChildView(std::make_unique<RoundedLabel>(
           kNoItemsLabelPadding.width(), kNoItemsLabelPadding.height(),
-          kNoItemsLabelCornerRadius, kNoItemsLabelHeight,
+          kSaveDeskCornerRadius, kNoItemsLabelHeight,
           l10n_util::GetStringUTF16(
               saved_desk_util::AreDesksTemplatesEnabled()
                   ? IDS_ASH_DESKS_TEMPLATES_LIBRARY_NO_TEMPLATES_OR_DESKS_LABEL
@@ -340,7 +346,7 @@ SavedDeskLibraryView::~SavedDeskLibraryView() {
 }
 
 SavedDeskItemView* SavedDeskLibraryView::GetItemForUUID(
-    const base::GUID& uuid) {
+    const base::Uuid& uuid) {
   for (auto* grid_view : grid_views()) {
     if (auto* item = grid_view->GetItemForUUID(uuid))
       return item;
@@ -350,7 +356,7 @@ SavedDeskItemView* SavedDeskLibraryView::GetItemForUUID(
 
 void SavedDeskLibraryView::AddOrUpdateEntries(
     const std::vector<const DeskTemplate*>& entries,
-    const base::GUID& order_first_uuid,
+    const base::Uuid& order_first_uuid,
     bool animate) {
   SavedDesks grouped = Group(entries);
   if (desk_template_grid_view_ && !grouped.desk_templates.empty()) {
@@ -365,7 +371,7 @@ void SavedDeskLibraryView::AddOrUpdateEntries(
   Layout();
 }
 
-void SavedDeskLibraryView::DeleteEntries(const std::vector<base::GUID>& uuids,
+void SavedDeskLibraryView::DeleteEntries(const std::vector<base::Uuid>& uuids,
                                          bool delete_animation) {
   if (desk_template_grid_view_)
     desk_template_grid_view_->DeleteEntries(uuids, delete_animation);
@@ -375,7 +381,7 @@ void SavedDeskLibraryView::DeleteEntries(const std::vector<base::GUID>& uuids,
   Layout();
 }
 
-void SavedDeskLibraryView::AnimateDeskLaunch(const base::GUID& uuid,
+void SavedDeskLibraryView::AnimateDeskLaunch(const base::Uuid& uuid,
                                              DeskMiniView* mini_view) {
   SavedDeskItemView* grid_item = GetItemForUUID(uuid);
   DCHECK(grid_item);
@@ -560,12 +566,16 @@ void SavedDeskLibraryView::Layout() {
 
   DCHECK_EQ(grid_views_.size(), grid_labels_.size());
   for (size_t i = 0; i != grid_views_.size(); ++i) {
-    // Make the grid label invisible if the corresponding grid view is
-    // empty. This will exclude it from the box layout.
-    grid_labels_[i]->SetVisible(!grid_views_[i]->grid_items().empty());
+    if (chromeos::features::IsJellyEnabled()) {
+      // Set label to be invisible to improve Jelly appearance(b/284210964).
+      grid_labels_[i]->SetVisible(false);
+    } else {
+      // Make the grid label invisible if the corresponding grid view is
+      // empty. This will exclude it from the box layout.
+      grid_labels_[i]->SetVisible(!grid_views_[i]->grid_items().empty());
+    }
     grid_labels_[i]->SetPreferredSize(landscape ? kLabelSizeLandscape
                                                 : kLabelSizePortrait);
-
     total_saved_desks += grid_views_[i]->grid_items().size();
   }
 
@@ -594,8 +604,7 @@ void SavedDeskLibraryView::OnKeyEvent(ui::KeyEvent* event) {
       is_scrolling_event = true;
       break;
     default:
-      // Ignore all other key events as arrow keys are used for moving
-      // highlight.
+      // Ignore all other key events as arrow keys are used for moving focus.
       is_scrolling_event = false;
       break;
   }

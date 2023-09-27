@@ -12,15 +12,15 @@
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
-#include "components/sync/base/command_line_switches.h"
-#include "components/sync/driver/trusted_vault_histograms.h"
+#include "components/trusted_vault/command_line_switches.h"
+#include "components/trusted_vault/trusted_vault_histograms.h"
 #include "components/trusted_vault/trusted_vault_server_constants.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "services/network/test/test_url_loader_factory.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
-namespace syncer {
+namespace trusted_vault {
 namespace {
 
 class TrustedVaultRegistrationVerifierTest : public testing::Test {
@@ -96,4 +96,4 @@ TEST_F(TrustedVaultRegistrationVerifierTest, ShouldReportMissingRegistration) {
 }
 
 }  // namespace
-}  // namespace syncer
+}  // namespace trusted_vault

@@ -50,7 +50,7 @@ class MockImageProvider : public ImageProvider {
     SkBitmap bitmap;
     bitmap.allocN32Pixels(10, 10);
     bitmap.eraseColor(SK_ColorBLACK);
-    sk_sp<SkImage> image = SkImage::MakeFromBitmap(bitmap);
+    sk_sp<SkImage> image = SkImages::RasterFromBitmap(bitmap);
     return ScopedResult(DecodedDrawImage(image, nullptr, SkSize::MakeEmpty(),
                                          SkSize::Make(1.0f, 1.0f),
                                          draw_image.filter_quality(), true));
@@ -119,7 +119,7 @@ TEST(PaintShaderTest, DecodePaintRecord) {
 
   // The rasterization of the shader is internal to skia, so use a raster canvas
   // to verify that the decoded paint does not have the encoded image.
-  auto surface = SkSurface::MakeRaster(SkImageInfo::MakeN32Premul(100, 100));
+  auto surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(100, 100));
   surface->getCanvas()->drawPaint(canvas.paint_);
 
   // Using the shader requests decode for images at the correct scale.

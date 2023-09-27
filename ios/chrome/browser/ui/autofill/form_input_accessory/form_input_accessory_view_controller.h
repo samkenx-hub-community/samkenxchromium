@@ -9,8 +9,9 @@
 
 #import "ios/chrome/browser/ui/autofill/form_input_accessory/form_input_accessory_consumer.h"
 
-@protocol BrandingViewControllerDelegate;
+@class BrandingViewController;
 @protocol FormSuggestionClient;
+@class LayoutGuideCenter;
 @class ManualFillAccessoryViewController;
 @protocol ManualFillAccessoryViewControllerDelegate;
 
@@ -22,9 +23,11 @@
 // Client in charge of handling actions in suggestions.
 @property(nonatomic, weak) id<FormSuggestionClient> formSuggestionClient;
 
-// Delegate object for the branding view controller.
-@property(nonatomic, weak) id<BrandingViewControllerDelegate>
-    brandingViewControllerDelegate;
+// The view controller to show the branding logo.
+@property(nonatomic, strong) BrandingViewController* brandingViewController;
+
+// The layout guide center to use to refer to the first suggestion label.
+@property(nonatomic, strong) LayoutGuideCenter* layoutGuideCenter;
 
 // Shows the manual fallback icons as the first option in the suggestions bar,
 // and locks them in that position.

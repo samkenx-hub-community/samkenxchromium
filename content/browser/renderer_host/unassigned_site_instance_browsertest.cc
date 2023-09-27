@@ -16,6 +16,7 @@
 #include "content/common/content_navigation_policy.h"
 #include "content/common/features.h"
 #include "content/public/browser/back_forward_cache.h"
+#include "content/public/browser/web_exposed_isolation_level.h"
 #include "content/public/test/back_forward_cache_util.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -60,22 +61,7 @@
 namespace content {
 
 namespace {
-
 const std::string kEmptySchemeForTesting = "empty-scheme";
-
-void InitBackForwardCacheFeature(base::test::ScopedFeatureList* feature_list,
-                                 bool enable_back_forward_cache) {
-  if (enable_back_forward_cache) {
-    feature_list->InitWithFeaturesAndParameters(
-        GetBasicBackForwardCacheFeatureForTesting(
-            {{kBackForwardCacheNoTimeEviction, {}},
-             {features::kBackForwardCacheMemoryControls, {}}}),
-        {});
-  } else {
-    feature_list->InitAndDisableFeature(features::kBackForwardCache);
-  }
-}
-
 }  // namespace
 
 // Note that this test suite is parametrized for RenderDocument and
@@ -214,8 +200,14 @@ IN_PROC_BROWSER_TEST_P(UnassignedSiteInstanceBrowserTest,
   } else {
     // With back/forward cache, we will swap browsing instance for same-site
     // navigations, not reusing the previous SiteInstance.
-    EXPECT_FALSE(unassigned_si->HasSite());
     EXPECT_FALSE(unassigned_si->IsRelatedSiteInstance(initial_si.get()));
+
+    // Because this was a renderer-initiated navigation, and the unassigned URL
+    // is about:blank, the committed document inherits its origin from the
+    // initiator which is `regular_url()` (https://crbug.com/585649).  Hence,
+    // the new SiteInstance should not stay unassigned, but rather it will have
+    // a site that reflects the initiator.  See https://crbug.com/1426928.
+    EXPECT_TRUE(unassigned_si->HasSite());
   }
 }
 
@@ -895,17 +887,19 @@ IN_PROC_BROWSER_TEST_P(UnassignedSiteInstanceBrowserTest,
   EXPECT_EQ(
       GURL("https://a.test"),
       web_contents->GetPrimaryMainFrame()->GetSiteInstance()->GetSiteURL());
-  EXPECT_EQ(
-      ProcessLock::FromSiteInfo(SiteInfo(
-          GURL("https://a.test"), GURL("https://a.test"),
-          false /* requires_origin_keyed_process */, false /* is_sandboxed */,
-          UrlInfo::kInvalidUniqueSandboxId,
-          StoragePartitionConfig::CreateDefault(browser_context),
-          WebExposedIsolationInfo::CreateNonIsolated(), false /* is_guest */,
-          false /* does_site_request_dedicated_process_for_coop */,
-          false /* is_jit_disabled */, false /* is_pdf */,
-          false /*is_fenced */)),
-      policy->GetProcessLock(process2->GetID()));
+  EXPECT_EQ(ProcessLock::FromSiteInfo(SiteInfo(
+                /*site_url=*/GURL("https://a.test"),
+                /*process_lock_url=*/GURL("https://a.test"),
+                /*requires_origin_keyed_process=*/false,
+                /*requires_origin_keyed_process_by_default=*/false,
+                /*is_sandboxed=*/false, UrlInfo::kInvalidUniqueSandboxId,
+                StoragePartitionConfig::CreateDefault(browser_context),
+                WebExposedIsolationInfo::CreateNonIsolated(),
+                WebExposedIsolationLevel::kNotIsolated, /*is_guest=*/false,
+                /*does_site_request_dedicated_process_for_coop=*/false,
+                /*is_jit_disabled=*/false, /*is_pdf=*/false,
+                /*is_fenced=*/false)),
+            policy->GetProcessLock(process2->GetID()));
 
   // Ensure also that the regular url process didn't change midway through the
   // navigation.

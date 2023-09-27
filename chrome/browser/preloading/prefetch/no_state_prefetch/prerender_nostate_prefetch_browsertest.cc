@@ -23,6 +23,7 @@
 #include "base/timer/elapsed_timer.h"
 #include "base/values.h"
 #include "build/build_config.h"
+#include "chrome/browser/browser_features.h"
 #include "chrome/browser/browsing_data/chrome_browsing_data_remover_constants.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/history/history_test_utils.h"
@@ -39,7 +40,6 @@
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/content_settings/core/browser/cookie_settings.h"
@@ -285,8 +285,7 @@ class NewTabNavigationOrSwapObserver : public TabStripModelObserver,
 class NoStatePrefetchBrowserTest
     : public test_utils::PrerenderInProcessBrowserTest {
  public:
-  NoStatePrefetchBrowserTest() {}
-
+  NoStatePrefetchBrowserTest() = default;
   NoStatePrefetchBrowserTest(const NoStatePrefetchBrowserTest&) = delete;
   NoStatePrefetchBrowserTest& operator=(const NoStatePrefetchBrowserTest&) =
       delete;
@@ -465,7 +464,8 @@ class NoStatePrefetchBrowserTest
   base::SimpleTestTickClock clock_;
 
  private:
-  base::test::ScopedFeatureList feature_list_;
+  // Disable sampling of UKM preloading logs.
+  content::test::PreloadingConfigOverride preloading_config_override_;
   std::unique_ptr<ukm::TestAutoSetUkmRecorder> test_ukm_recorder_;
   std::unique_ptr<content::test::PreloadingAttemptUkmEntryBuilder>
       omnibox_attempt_entry_builder_;
@@ -478,6 +478,7 @@ enum SplitCacheTestCase {
   kSplitCacheDisabled,
   kSplitCacheEnabledDoublePlusBitKeyed,
   kSplitCacheEnabledTripleKeyed,
+  kSplitCacheEnabledTripleKeyedSharedOpaque,
 };
 
 class NoStatePrefetchBrowserTestHttpCache
@@ -498,23 +499,27 @@ class NoStatePrefetchBrowserTestHttpCache
           net::features::kSplitCacheByNetworkIsolationKey);
     }
 
-    if (IsCrossSiteFlagSchemeEnabled()) {
+    if (GetParam() == kSplitCacheEnabledDoublePlusBitKeyed) {
       enabled_features.push_back(
           net::features::kEnableCrossSiteFlagNetworkIsolationKey);
     } else {
       disabled_features.push_back(
           net::features::kEnableCrossSiteFlagNetworkIsolationKey);
     }
+
+    if (GetParam() == kSplitCacheEnabledTripleKeyedSharedOpaque) {
+      enabled_features.push_back(
+          net::features::kEnableFrameSiteSharedOpaqueNetworkIsolationKey);
+    } else {
+      disabled_features.push_back(
+          net::features::kEnableFrameSiteSharedOpaqueNetworkIsolationKey);
+    }
+
     feature_list_.InitWithFeatures(enabled_features, disabled_features);
   }
 
   bool IsSplitCacheEnabled() const {
     return GetParam() != SplitCacheTestCase::kSplitCacheDisabled;
-  }
-
-  bool IsCrossSiteFlagSchemeEnabled() const {
-    return GetParam() ==
-           SplitCacheTestCase::kSplitCacheEnabledDoublePlusBitKeyed;
   }
 
  private:
@@ -549,12 +554,18 @@ IN_PROC_BROWSER_TEST_P(
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       current_browser(), src_server()->GetURL(prerender_path)));
 
-  if (IsCrossSiteFlagSchemeEnabled()) {
-    // If the NIK only uses an is-cross-site bit instead of the full frame site
-    // in the cache key, then the two iframes will share a cache partition.
-    WaitForRequestCount(image_src, 1);
-  } else {
-    WaitForRequestCount(image_src, 2);
+  switch (GetParam()) {
+    case SplitCacheTestCase::kSplitCacheEnabledDoublePlusBitKeyed:
+      // If the NIK only uses an is-cross-site bit instead of the full frame
+      // site in the cache key, then the two iframes will share a cache
+      // partition.
+      WaitForRequestCount(image_src, 1);
+      break;
+    case SplitCacheTestCase::kSplitCacheEnabledTripleKeyed:
+    case SplitCacheTestCase::kSplitCacheEnabledTripleKeyedSharedOpaque:
+    case SplitCacheTestCase::kSplitCacheDisabled:
+      WaitForRequestCount(image_src, 2);
+      break;
   }
 }
 
@@ -563,7 +574,8 @@ INSTANTIATE_TEST_SUITE_P(
     NoStatePrefetchBrowserTestHttpCache_DefaultAndAppendFrameOrigin,
     testing::ValuesIn(
         {SplitCacheTestCase::kSplitCacheEnabledTripleKeyed,
-         SplitCacheTestCase::kSplitCacheEnabledDoublePlusBitKeyed}),
+         SplitCacheTestCase::kSplitCacheEnabledDoublePlusBitKeyed,
+         SplitCacheTestCase::kSplitCacheEnabledTripleKeyedSharedOpaque}),
     [](const testing::TestParamInfo<SplitCacheTestCase>& info) {
       switch (info.param) {
         case (SplitCacheTestCase::kSplitCacheDisabled):
@@ -572,6 +584,8 @@ INSTANTIATE_TEST_SUITE_P(
           return "TripleKeyed";
         case (SplitCacheTestCase::kSplitCacheEnabledDoublePlusBitKeyed):
           return "DoublePlusBitKeyed";
+        case (SplitCacheTestCase::kSplitCacheEnabledTripleKeyedSharedOpaque):
+          return "TripleKeyedSharedOpaque";
       }
     });
 
@@ -685,7 +699,8 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(
         {SplitCacheTestCase::kSplitCacheDisabled,
          SplitCacheTestCase::kSplitCacheEnabledTripleKeyed,
-         SplitCacheTestCase::kSplitCacheEnabledDoublePlusBitKeyed}),
+         SplitCacheTestCase::kSplitCacheEnabledDoublePlusBitKeyed,
+         SplitCacheTestCase::kSplitCacheEnabledTripleKeyedSharedOpaque}),
     [](const testing::TestParamInfo<SplitCacheTestCase>& info) {
       switch (info.param) {
         case (SplitCacheTestCase::kSplitCacheDisabled):
@@ -694,6 +709,8 @@ INSTANTIATE_TEST_SUITE_P(
           return "TripleKeyed";
         case (SplitCacheTestCase::kSplitCacheEnabledDoublePlusBitKeyed):
           return "DoublePlusBitKeyed";
+        case (SplitCacheTestCase::kSplitCacheEnabledTripleKeyedSharedOpaque):
+          return "DoublePlusBitKeyedSharedOpaque";
       }
     });
 
@@ -967,10 +984,11 @@ IN_PROC_BROWSER_TEST_F(NoStatePrefetchBrowserTest,
   EXPECT_TRUE(WaitForLoadStop(
       current_browser()->tab_strip_model()->GetActiveWebContents()));
 
-  std::string html_content;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractString(
-      current_browser()->tab_strip_model()->GetActiveWebContents(),
-      "domAutomationController.send(document.body.innerHTML)", &html_content));
+  std::string html_content =
+      content::EvalJs(
+          current_browser()->tab_strip_model()->GetActiveWebContents(),
+          "document.body.innerHTML")
+          .ExtractString();
 
   // For any cross origin navigation (including prerender), SameSite Strict
   // cookies should not be sent, but Lax should.
@@ -996,10 +1014,11 @@ IN_PROC_BROWSER_TEST_F(NoStatePrefetchBrowserTest,
   EXPECT_TRUE(WaitForLoadStop(
       current_browser()->tab_strip_model()->GetActiveWebContents()));
 
-  std::string html_content;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractString(
-      current_browser()->tab_strip_model()->GetActiveWebContents(),
-      "domAutomationController.send(document.body.innerHTML)", &html_content));
+  std::string html_content =
+      content::EvalJs(
+          current_browser()->tab_strip_model()->GetActiveWebContents(),
+          "document.body.innerHTML")
+          .ExtractString();
 
   // For any same origin navigation (including prerender), SameSite Strict
   // cookies should not be sent, but Lax should.
@@ -1974,7 +1993,7 @@ class SpeculationNoStatePrefetchBrowserTest
     std::unique_ptr<TestPrerender> test_prerender =
         no_state_prefetch_contents_factory()->ExpectNoStatePrefetchContents(
             expected_final_status);
-    EXPECT_TRUE(ExecuteScript(GetActiveWebContents(), speculation_script));
+    EXPECT_TRUE(ExecJs(GetActiveWebContents(), speculation_script));
     if (should_navigate_away) {
       ASSERT_TRUE(ui_test_utils::NavigateToURL(
           current_browser(), src_server()->GetURL("/defaultresponse?page")));
@@ -2060,7 +2079,7 @@ class NoStatePrefetchPrerenderBrowserTest
   ~NoStatePrefetchPrerenderBrowserTest() override = default;
 
   void SetUp() override {
-    prerender_helper_.SetUp(embedded_test_server());
+    prerender_helper_.RegisterServerRequestMonitor(embedded_test_server());
     NoStatePrefetchMPArchBrowserTest::SetUp();
   }
 

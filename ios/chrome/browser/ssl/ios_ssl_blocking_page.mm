@@ -15,8 +15,8 @@
 #import "components/security_interstitials/core/ssl_error_options_mask.h"
 #import "components/security_interstitials/core/ssl_error_ui.h"
 #import "components/strings/grit/components_strings.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/safe_browsing/safe_browsing_metrics_collector_factory.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/components/security_interstitials/ios_blocking_page_controller_client.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/navigation/navigation_manager.h"
@@ -26,10 +26,6 @@
 #import "net/base/net_errors.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using security_interstitials::SSLErrorOptionsMask;
 using security_interstitials::SSLErrorUI;

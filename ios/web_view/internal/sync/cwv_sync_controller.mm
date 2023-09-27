@@ -5,24 +5,20 @@
 #import "ios/web_view/internal/sync/cwv_sync_controller_internal.h"
 
 #import <UIKit/UIKit.h>
-#include <memory>
+#import <memory>
 
-#include "base/strings/sys_string_conversions.h"
-#include "components/autofill/core/common/autofill_prefs.h"
-#include "components/password_manager/core/browser/password_manager_features_util.h"
-#include "components/signin/public/identity_manager/account_info.h"
-#include "components/signin/public/identity_manager/device_accounts_synchronizer.h"
-#include "components/signin/public/identity_manager/identity_manager.h"
-#include "components/signin/public/identity_manager/primary_account_mutator.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_user_settings.h"
+#import "base/strings/sys_string_conversions.h"
+#import "components/autofill/core/common/autofill_prefs.h"
+#import "components/password_manager/core/browser/password_manager_features_util.h"
+#import "components/signin/public/identity_manager/account_info.h"
+#import "components/signin/public/identity_manager/device_accounts_synchronizer.h"
+#import "components/signin/public/identity_manager/identity_manager.h"
+#import "components/signin/public/identity_manager/primary_account_mutator.h"
+#import "components/sync/service/sync_service.h"
+#import "components/sync/service/sync_user_settings.h"
 #import "ios/web_view/public/cwv_identity.h"
 #import "ios/web_view/public/cwv_sync_controller_data_source.h"
 #import "ios/web_view/public/cwv_sync_controller_delegate.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface CWVSyncController ()
 
@@ -30,9 +26,6 @@
 - (void)didShutdownSync;
 // Called by WebViewSyncControllerObserverBridge's |OnStateChanged|.
 - (void)syncStateDidChange;
-
-// Call to reload accounts from the |dataSource|.
-- (void)reloadAccounts;
 
 @end
 
@@ -104,18 +97,6 @@ __weak id<CWVSyncControllerDataSource> gSyncDataSource;
         std::make_unique<ios_web_view::WebViewSyncControllerObserverBridge>(
             self);
     _syncService->AddObserver(_observer.get());
-
-    // Refresh access tokens on foreground to extend expiration dates.
-    [[NSNotificationCenter defaultCenter]
-        addObserver:self
-           selector:@selector(reloadAccounts)
-               name:UIApplicationWillEnterForegroundNotification
-             object:nil];
-
-    // This allows internals of |_identityManager| to fetch and store the user's
-    // info and profile image. This must be called manually *after* all services
-    // have been started to avoid issues in https://crbug.com/441399.
-    _identityManager->OnNetworkInitialized();
   }
   return self;
 }
@@ -127,9 +108,9 @@ __weak id<CWVSyncControllerDataSource> gSyncDataSource;
 #pragma mark - Public Methods
 
 - (CWVIdentity*)currentIdentity {
-  if (_identityManager->HasPrimaryAccount(signin::ConsentLevel::kSync)) {
+  if (_identityManager->HasPrimaryAccount(signin::ConsentLevel::kSignin)) {
     CoreAccountInfo accountInfo =
-        _identityManager->GetPrimaryAccountInfo(signin::ConsentLevel::kSync);
+        _identityManager->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin);
     return [[CWVIdentity alloc]
         initWithEmail:base::SysUTF8ToNSString(accountInfo.email)
              fullName:nil
@@ -167,8 +148,8 @@ __weak id<CWVSyncControllerDataSource> gSyncDataSource;
   CHECK(_identityManager->HasAccountWithRefreshToken(accountId));
 
   _identityManager->GetPrimaryAccountMutator()->SetPrimaryAccount(
-      accountId, signin::ConsentLevel::kSync);
-  CHECK_EQ(_identityManager->GetPrimaryAccountId(signin::ConsentLevel::kSync),
+      accountId, signin::ConsentLevel::kSignin);
+  CHECK_EQ(_identityManager->GetPrimaryAccountId(signin::ConsentLevel::kSignin),
            accountId);
 
   autofill::prefs::SetUserOptedInWalletSyncTransport(_prefService, accountId,
@@ -216,13 +197,6 @@ __weak id<CWVSyncControllerDataSource> gSyncDataSource;
   if ([_delegate respondsToSelector:@selector(syncControllerDidUpdateState:)]) {
     [_delegate syncControllerDidUpdateState:self];
   }
-}
-
-- (void)reloadAccounts {
-  _identityManager->GetDeviceAccountsSynchronizer()
-      ->ReloadAllAccountsFromSystemWithPrimaryAccount(
-          _identityManager->GetPrimaryAccountInfo(signin::ConsentLevel::kSync)
-              .account_id);
 }
 
 @end

@@ -89,11 +89,11 @@ void MathMLTokenElement::ChildrenChanged(
   MathMLElement::ChildrenChanged(children_change);
 }
 
-LayoutObject* MathMLTokenElement::CreateLayoutObject(const ComputedStyle& style,
-                                                     LegacyLayout legacy) {
-  if (!RuntimeEnabledFeatures::MathMLCoreEnabled() ||
-      !style.IsDisplayMathType() || legacy == LegacyLayout::kForce)
-    return MathMLElement::CreateLayoutObject(style, legacy);
+LayoutObject* MathMLTokenElement::CreateLayoutObject(
+    const ComputedStyle& style) {
+  if (!style.IsDisplayMathType()) {
+    return MathMLElement::CreateLayoutObject(style);
+  }
   return MakeGarbageCollected<LayoutNGMathMLBlockFlow>(this);
 }
 

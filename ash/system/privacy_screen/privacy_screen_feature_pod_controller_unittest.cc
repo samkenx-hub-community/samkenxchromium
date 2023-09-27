@@ -12,12 +12,13 @@
 #include "ash/system/unified/feature_tile.h"
 #include "ash/test/ash_test_base.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "ui/display/fake/fake_display_snapshot.h"
 #include "ui/display/manager/display_change_observer.h"
 #include "ui/display/manager/display_manager.h"
 #include "ui/display/manager/test/action_logger.h"
+#include "ui/display/manager/test/fake_display_snapshot.h"
 #include "ui/display/manager/test/test_native_display_delegate.h"
 #include "ui/display/types/display_constants.h"
 
@@ -52,7 +53,7 @@ class PrivacyScreenFeaturePodControllerTest
     native_display_delegate_ =
         new display::test::TestNativeDisplayDelegate(logger_.get());
     display_manager()->configurator()->SetDelegateForTesting(
-        base::WrapUnique(native_display_delegate_));
+        base::WrapUnique(native_display_delegate_.get()));
     display_change_observer_ =
         std::make_unique<display::DisplayChangeObserver>(display_manager());
     test_api_ = std::make_unique<display::DisplayConfigurator::TestApi>(
@@ -109,7 +110,9 @@ class PrivacyScreenFeaturePodControllerTest
   base::test::ScopedFeatureList feature_list_;
 
   std::unique_ptr<display::test::ActionLogger> logger_;
-  display::test::TestNativeDisplayDelegate* native_display_delegate_ = nullptr;
+  raw_ptr<display::test::TestNativeDisplayDelegate,
+          DanglingUntriaged | ExperimentalAsh>
+      native_display_delegate_ = nullptr;
   std::unique_ptr<display::DisplayChangeObserver> display_change_observer_;
   std::unique_ptr<display::DisplayConfigurator::TestApi> test_api_;
   std::unique_ptr<display::DisplaySnapshot> owned_snapshot_;

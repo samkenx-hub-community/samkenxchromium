@@ -44,6 +44,7 @@
 #include "third_party/blink/public/common/loader/loading_behavior_flag.h"
 #include "third_party/blink/public/common/permissions_policy/document_policy.h"
 #include "third_party/blink/public/common/permissions_policy/permissions_policy.h"
+#include "third_party/blink/public/common/subresource_load_metrics.h"
 #include "third_party/blink/public/mojom/fenced_frame/fenced_frame.mojom-blink.h"
 #include "third_party/blink/public/mojom/frame/triggering_event_info.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/loader/content_security_notifier.mojom-blink.h"
@@ -53,6 +54,7 @@
 #include "third_party/blink/public/mojom/navigation/navigation_params.mojom-shared.h"
 #include "third_party/blink/public/mojom/page/page.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/page_state/page_state.mojom-blink.h"
+#include "third_party/blink/public/mojom/runtime_feature_state/runtime_feature_state.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/service_worker/controller_service_worker_mode.mojom-blink.h"
 #include "third_party/blink/public/mojom/timing/resource_timing.mojom-blink-forward.h"
 #include "third_party/blink/public/platform/scheduler/web_scoped_virtual_time_pauser.h"
@@ -85,9 +87,9 @@
 #include "third_party/blink/renderer/platform/loader/fetch/resource_error.h"
 #include "third_party/blink/renderer/platform/loader/fetch/resource_request.h"
 #include "third_party/blink/renderer/platform/loader/fetch/resource_response.h"
+#include "third_party/blink/renderer/platform/mojo/heap_mojo_remote.h"
 #include "third_party/blink/renderer/platform/storage/blink_storage_key.h"
 #include "third_party/blink/renderer/platform/weborigin/referrer.h"
-#include "third_party/blink/renderer/platform/wtf/gc_plugin.h"
 #include "third_party/blink/renderer/platform/wtf/hash_set.h"
 #include "third_party/blink/renderer/platform/wtf/shared_buffer.h"
 
@@ -112,6 +114,7 @@ class PrefetchedSignedExchangeManager;
 class SerializedScriptValue;
 class SubresourceFilter;
 class WebServiceWorkerNetworkProvider;
+struct JavaScriptFrameworkDetectionResult;
 
 namespace scheduler {
 class TaskAttributionId;
@@ -149,8 +152,6 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
   static bool WillLoadUrlAsEmpty(const KURL&);
 
   LocalFrame* GetFrame() const { return frame_; }
-
-  mojom::blink::ResourceTimingInfoPtr TakeNavigationTimingInfo();
 
   void DetachFromFrame(bool flush_microtask_queue);
 
@@ -205,6 +206,7 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
   WebString OriginCalculationDebugInfo() const override {
     return origin_calculation_debug_info_;
   }
+  bool HasLoadedNonInitialEmptyDocument() const override;
 
   MHTMLArchive* Archive() const { return archive_.Get(); }
 
@@ -227,6 +229,8 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
   void DidChangePerformanceTiming();
   void DidObserveInputDelay(base::TimeDelta input_delay);
   void DidObserveLoadingBehavior(LoadingBehaviorFlag);
+  void DidObserveJavaScriptFrameworks(
+      const JavaScriptFrameworkDetectionResult&);
 
   // https://html.spec.whatwg.org/multipage/history.html#url-and-history-update-steps
   void RunURLAndHistoryUpdateSteps(const KURL&,
@@ -461,11 +465,7 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
   }
 
   void UpdateSubresourceLoadMetrics(
-      uint32_t number_of_subresources_loaded,
-      uint32_t number_of_subresource_loads_handled_by_service_worker,
-      bool pervasive_payload_requested,
-      int64_t pervasive_bytes_fetched,
-      int64_t total_bytes_fetched);
+      const SubresourceLoadMetrics& subresource_load_metrics);
 
  protected:
   // Based on its MIME type, if the main document's response corresponds to an
@@ -573,7 +573,6 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
                            int64_t total_encoded_data_length,
                            int64_t total_encoded_body_length,
                            int64_t total_decoded_body_length,
-                           bool should_report_corb_blocking,
                            const absl::optional<WebURLError>& error) override;
   ProcessBackgroundDataCallback TakeProcessBackgroundDataCallback() override;
 
@@ -661,8 +660,7 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
   bool data_received_;
   const bool is_error_page_for_failed_navigation_;
 
-  GC_PLUGIN_IGNORE("https://crbug.com/1381979")
-  mojo::Remote<mojom::blink::ContentSecurityNotifier>
+  HeapMojoRemote<mojom::blink::ContentSecurityNotifier>
       content_security_notifier_;
 
   const scoped_refptr<SecurityOrigin> origin_to_commit_;
@@ -752,7 +750,7 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
   // |archive_|, but won't have |loading_main_document_from_mhtml_archive_| set.
   bool loading_main_document_from_mhtml_archive_ = false;
   const bool loading_srcdoc_ = false;
-  const KURL fallback_srcdoc_base_url_;
+  const KURL fallback_base_url_;
   const bool loading_url_as_empty_document_ = false;
   const bool is_static_data_ = false;
   CommitReason commit_reason_ = CommitReason::kRegular;
@@ -815,11 +813,20 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
 
   // Indicates whether the document should be loaded with its has_storage_access
   // bit set.
-  const bool has_storage_access_;
+  const bool load_with_storage_access_;
 
   // Only container-initiated navigations (e.g. iframe change src) report
   // their resource timing to the parent.
   mojom::blink::ParentResourceTimingAccess parent_resource_timing_access_;
+
+  // Indicates which browsing context group this frame belongs to. It is only
+  // set for a main frame committing in another browsing context group.
+  const absl::optional<BrowsingContextGroupInfo> browsing_context_group_info_;
+
+  // Runtime feature state override is applied to the document. They are applied
+  // before JavaScript context creation (i.e. CreateParserPostCommit).
+  const base::flat_map<mojom::blink::RuntimeFeatureState, bool>
+      modified_runtime_features_;
 };
 
 DECLARE_WEAK_IDENTIFIER_MAP(DocumentLoader);

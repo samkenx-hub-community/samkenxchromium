@@ -13,6 +13,7 @@
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chromeos/ash/components/dbus/userdataauth/install_attributes_client.h"
 #include "chromeos/dbus/tpm_manager/tpm_manager.pb.h"
@@ -105,9 +106,6 @@ class COMPONENT_EXPORT(ASH_INSTALL_ATTRIBUTES) InstallAttributes {
   // Checks whether this is a cloud (DM server) managed enterprise device.
   bool IsCloudManaged() const;
 
-  // Checks whether this is an Active Directory managed enterprise device.
-  bool IsActiveDirectoryManaged() const;
-
   // Checks whether this is a consumer kiosk enabled device.
   bool IsConsumerKioskDeviceWithAutoLaunch();
 
@@ -163,7 +161,6 @@ class COMPONENT_EXPORT(ASH_INSTALL_ATTRIBUTES) InstallAttributes {
   // Constants for the possible device modes that can be stored in the lockbox.
   static const char kConsumerDeviceMode[];
   static const char kEnterpriseDeviceMode[];
-  static const char kEnterpriseADDeviceMode[];
   static const char kLegacyRetailDeviceMode[];
   static const char kConsumerKioskDeviceMode[];
   static const char kDemoDeviceMode[];
@@ -231,7 +228,8 @@ class COMPONENT_EXPORT(ASH_INSTALL_ATTRIBUTES) InstallAttributes {
   void OnClearStoredOwnerPassword(
       const ::tpm_manager::ClearStoredOwnerPasswordReply& reply);
 
-  InstallAttributesClient* install_attributes_client_;
+  raw_ptr<InstallAttributesClient, DanglingUntriaged | ExperimentalAsh>
+      install_attributes_client_;
 
   base::WeakPtrFactory<InstallAttributes> weak_ptr_factory_{this};
 };

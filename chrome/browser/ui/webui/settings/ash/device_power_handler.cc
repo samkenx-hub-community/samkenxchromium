@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 
+#include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/public/cpp/power_utils.h"
 #include "base/functional/bind.h"
@@ -115,6 +116,8 @@ const char PowerHandler::kHasLidKey[] = "hasLid";
 const char PowerHandler::kAdaptiveChargingKey[] = "adaptiveCharging";
 const char PowerHandler::kAdaptiveChargingManagedKey[] =
     "adaptiveChargingManaged";
+const char PowerHandler::kBatterySaverFeatureEnabledKey[] =
+    "batterySaverFeatureEnabled";
 
 PowerHandler::TestAPI::TestAPI(PowerHandler* handler) : handler_(handler) {}
 
@@ -381,7 +384,9 @@ void PowerHandler::SendPowerSources() {
       "power-sources-changed", sources_list,
       base::Value(proto->external_power_source_id()),
       base::Value(proto->external_power() ==
-                  power_manager::PowerSupplyProperties_ExternalPower_USB));
+                  power_manager::PowerSupplyProperties_ExternalPower_USB),
+      base::Value(proto->external_power() ==
+                  power_manager::PowerSupplyProperties_ExternalPower_AC));
 }
 
 void PowerHandler::SendPowerManagementSettings(bool force) {
@@ -401,7 +406,8 @@ void PowerHandler::SendPowerManagementSettings(bool force) {
       prefs_->GetBoolean(ash::prefs::kPowerAdaptiveChargingEnabled);
   const bool adaptive_charging_managed =
       prefs_->IsManagedPreference(ash::prefs::kPowerAdaptiveChargingEnabled);
-
+  const bool battery_saver_feature_enabled =
+      ash::features::IsBatterySaverAvailable();
   // Don't notify the UI if nothing changed.
   if (!force && ac_idle_info == last_ac_idle_info_ &&
       battery_idle_info == last_battery_idle_info_ &&
@@ -409,7 +415,8 @@ void PowerHandler::SendPowerManagementSettings(bool force) {
       lid_closed_controlled == last_lid_closed_controlled_ &&
       has_lid == last_has_lid_ &&
       adaptive_charging == last_adaptive_charging_ &&
-      adaptive_charging_managed == last_adaptive_charging_managed_) {
+      adaptive_charging_managed == last_adaptive_charging_managed_ &&
+      battery_saver_feature_enabled == last_battery_saver_feature_enabled_) {
     return;
   }
 
@@ -432,6 +439,7 @@ void PowerHandler::SendPowerManagementSettings(bool force) {
   dict.Set(kHasLidKey, has_lid);
   dict.Set(kAdaptiveChargingKey, adaptive_charging);
   dict.Set(kAdaptiveChargingManagedKey, adaptive_charging_managed);
+  dict.Set(kBatterySaverFeatureEnabledKey, battery_saver_feature_enabled);
   FireWebUIListener(kPowerManagementSettingsChangedName, dict);
 
   last_ac_idle_info_ = ac_idle_info;
@@ -441,6 +449,7 @@ void PowerHandler::SendPowerManagementSettings(bool force) {
   last_has_lid_ = has_lid;
   last_adaptive_charging_ = adaptive_charging;
   last_adaptive_charging_managed_ = adaptive_charging_managed;
+  last_battery_saver_feature_enabled_ = battery_saver_feature_enabled;
 }
 
 void PowerHandler::OnGotSwitchStates(

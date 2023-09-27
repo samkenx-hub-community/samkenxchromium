@@ -5,10 +5,10 @@
 #import <WebKit/WebKit.h>
 #import <vector>
 
+#import "base/apple/foundation_util.h"
 #import "base/files/file_enumerator.h"
 #import "base/files/file_path.h"
 #import "base/files/file_util.h"
-#import "base/mac/foundation_util.h"
 #import "base/memory/ptr_util.h"
 #import "base/path_service.h"
 #import "base/strings/string_util.h"
@@ -35,16 +35,17 @@
 #import "components/sync_user_events/fake_user_event_service.h"
 #import "ios/chrome/browser/autofill/address_normalizer_factory.h"
 #import "ios/chrome/browser/autofill/form_suggestion_controller.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/infobars/infobar_manager_impl.h"
 #import "ios/chrome/browser/passwords/ios_chrome_password_store_factory.h"
 #import "ios/chrome/browser/passwords/password_controller.h"
-#import "ios/chrome/browser/paths/paths.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/paths/paths.h"
 #import "ios/chrome/browser/sync/ios_user_event_service_factory.h"
 #import "ios/chrome/browser/ui/autofill/chrome_autofill_client_ios.h"
 #import "ios/chrome/browser/web/chrome_web_client.h"
 #import "ios/web/public/js_messaging/web_frame.h"
 #import "ios/web/public/js_messaging/web_frames_manager.h"
+#import "ios/web/public/test/js_test_util.h"
 #import "ios/web/public/test/scoped_testing_web_client.h"
 #import "ios/web/public/test/task_observer_util.h"
 #import "ios/web/public/test/web_state_test_util.h"
@@ -53,10 +54,6 @@
 #import "ios/web/public/web_state.h"
 #import "testing/data_driven_testing/data_driven_test.h"
 #import "testing/platform_test.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using base::test::ios::kWaitForJSCompletionTimeout;
 using base::test::ios::WaitUntilConditionOrTimeout;
@@ -210,15 +207,13 @@ FormStructureBrowserTest::FormStructureBrowserTest()
        // TODO(crbug.com/1150895) Remove once launched.
        features::kAutofillParsingPatternProvider,
        features::kAutofillPageLanguageDetection,
-       // TODO(crbug.com/1335549): Remove once launched.
-       features::kAutofillParseIBANFields,
        // TODO(crbug.com/1311937): Remove once launched.
        features::kAutofillEnableSupportForPhoneNumberTrunkTypes,
        features::kAutofillInferCountryCallingCode,
-       // TODO(crbug.com/1352826): Remove once launched.
-       features::kAutofillMin3FieldTypesForLocalHeuristics,
        // TODO(crbug.com/1355264): Remove once launched.
-       features::kAutofillLabelAffixRemoval},
+       features::kAutofillLabelAffixRemoval,
+       // TODO(crbug.com/1441057): Remove once launched.
+       features::kAutofillEnableExpirationDateImprovements},
       // Disabled
       {// TODO(crbug.com/1311937): Remove once launched.
        // This feature is part of the AutofillRefinedPhoneNumberTypes rollout.
@@ -253,8 +248,7 @@ void FormStructureBrowserTest::SetUp() {
   infobars::InfoBarManager* infobar_manager =
       InfoBarManagerImpl::FromWebState(web_state());
   autofill_client_ = std::make_unique<TestAutofillClient>(
-      browser_state_.get(), web_state(), infobar_manager, autofill_agent_,
-      /*password_generation_manager=*/nullptr);
+      browser_state_.get(), web_state(), infobar_manager, autofill_agent_);
 
   std::string locale("en");
   autofill::AutofillDriverIOSFactory::CreateForWebState(
@@ -278,11 +272,13 @@ bool FormStructureBrowserTest::LoadHtmlWithoutSubresourcesAndInitRendererIds(
     return false;
   }
 
+  autofill::FormUtilJavaScriptFeature* feature =
+      autofill::FormUtilJavaScriptFeature::GetInstance();
+
   __block web::WebFrame* main_frame = nullptr;
   success = WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^bool {
     web::WebFramesManager* frames_manager =
-        autofill::FormUtilJavaScriptFeature::GetInstance()->GetWebFramesManager(
-            web_state());
+        feature->GetWebFramesManager(web_state());
     main_frame = frames_manager->GetMainWebFrame();
     return main_frame != nullptr;
   });
@@ -292,14 +288,13 @@ bool FormStructureBrowserTest::LoadHtmlWithoutSubresourcesAndInitRendererIds(
   DCHECK(main_frame);
 
   uint32_t next_available_id = 1;
-  autofill::FormUtilJavaScriptFeature::GetInstance()
-      ->SetUpForUniqueIDsWithInitialState(main_frame, next_available_id);
+  feature->SetUpForUniqueIDsWithInitialState(main_frame, next_available_id);
 
   // Wait for `SetUpForUniqueIDsWithInitialState` to complete.
   return WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^bool {
-    return [web::test::ExecuteJavaScript(@"document[__gCrWeb.fill.ID_SYMBOL]",
-                                         web_state()) intValue] ==
-           static_cast<int>(next_available_id);
+    return [web::test::ExecuteJavaScriptForFeature(
+               web_state(), @"document[__gCrWeb.fill.ID_SYMBOL]", feature)
+               intValue] == static_cast<int>(next_available_id);
   });
 }
 

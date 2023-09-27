@@ -27,6 +27,7 @@
 class AutocompleteInput;
 class AutocompleteProvider;
 class AutocompleteProviderClient;
+class OmniboxTriggeredFeatureService;
 class PrefService;
 class TemplateURLService;
 
@@ -96,14 +97,19 @@ class AutocompleteResult {
                           AutocompleteResult* old_matches);
 
   // Adds a new set of matches to the result set.  Does not re-sort.
-  // When `preserve` is true, the matches are appended without modifications.
-  void AppendMatches(const ACMatches& matches, bool preserve = false);
+  void AppendMatches(const ACMatches& matches);
+
+  // Modifies |matches| such that any duplicate matches are coalesced into
+  // representative "best" matches. The erased matches are moved into the
+  // |duplicate_matches| members of their representative matches.
+  void DeduplicateMatches(const AutocompleteInput& input,
+                          TemplateURLService* template_url_service);
 
   // Removes duplicates, puts the list in sorted order and culls to leave only
   // the best GetMaxMatches() matches. Sets the default match to the best match
   // and updates the alternate nav URL.
   //
-  // |preserve_default_match| can be used to prevent the default match from
+  // |default_match_to_preserve| can be used to prevent the default match from
   // being surprisingly swapped out during the asynchronous pass. If it has a
   // value, this method searches the results for that match, and promotes it to
   // the top. But we don't add back that match if it doesn't already exist.
@@ -112,7 +118,9 @@ class AutocompleteResult {
   // (except for the first match) or no tail suggestions.
   void SortAndCull(const AutocompleteInput& input,
                    TemplateURLService* template_url_service,
-                   const AutocompleteMatch* preserve_default_match = nullptr);
+                   OmniboxTriggeredFeatureService* triggered_feature_service,
+                   absl::optional<AutocompleteMatch> default_match_to_preserve =
+                       absl::nullopt);
 
   // Ensures that matches belonging to suggestion groups, i.e., those with a
   // suggestion_group_id value and a corresponding suggestion group info, are
@@ -138,6 +146,12 @@ class AutocompleteResult {
   //
   // Called after matches are deduped and sorted and before they are culled.
   void GroupAndDemoteMatchesInGroups();
+
+  // Filter and remove OmniboxActions according to Platform-specific rules.
+  void TrimOmniboxActions(bool is_zero_suggest);
+
+  // Split some `actions` on matches out to become their own matches.
+  void SplitActionsToSuggestions();
 
   // Sets |action| in matches that have Pedal-triggering text.
   void AttachPedalsToMatches(const AutocompleteInput& input,
@@ -176,9 +190,11 @@ class AutocompleteResult {
                                           ACMatches* matches);
 
   // If the top match is a Search Entity, and it was deduplicated with a
-  // non-entity match, split off the non-entity match from the list of
-  // duplicates, promote it to the top, and return true.
-  static bool DiscourageTopMatchFromBeingSearchEntity(ACMatches* matches);
+  // non-entity match, splits off the non-entity match from the list of
+  // duplicates and returns true. Otherwise returns false.
+  // The non-entity duplicate is promoted to the top, unless the entity match
+  // has Action in Suggest where it remains at the top.
+  static bool UndedupTopSearchEntityMatch(ACMatches* matches);
 
   // Just a helper function to encapsulate the logic of deciding how many
   // matches to keep, with respect to configured maximums, URL limits,
@@ -286,6 +302,8 @@ class AutocompleteResult {
   friend class AutocompleteResultForTesting;
   friend class AutocompleteProviderTest;
   friend class HistoryURLProviderTest;
+  FRIEND_TEST_ALL_PREFIXES(AutocompleteResultTest, Desktop_TwoColumnRealbox);
+  FRIEND_TEST_ALL_PREFIXES(AutocompleteResultTest, Android_TrimOmniboxActions);
 
   typedef std::map<AutocompleteProvider*, ACMatches> ProviderToMatches;
 
@@ -304,7 +322,9 @@ class AutocompleteResult {
   // Modifies |matches| such that any duplicate matches are coalesced into
   // representative "best" matches. The erased matches are moved into the
   // |duplicate_matches| members of their representative matches.
-  static void DeduplicateMatches(ACMatches* matches);
+  static void DeduplicateMatches(ACMatches* matches,
+                                 const AutocompleteInput& input,
+                                 TemplateURLService* template_url_service);
 
   // Returns true if |matches| contains a match with the same destination as
   // |match|.

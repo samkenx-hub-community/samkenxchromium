@@ -7,7 +7,9 @@
 #include "ash/accessibility/accessibility_controller_impl.h"
 #include "ash/constants/ash_features.h"
 #include "ash/constants/notifier_catalogs.h"
+#include "ash/public/cpp/shell_window_ids.h"
 #include "ash/public/cpp/system/toast_data.h"
+#include "ash/public/cpp/window_properties.h"
 #include "ash/screen_util.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
@@ -21,13 +23,12 @@
 #include "ash/wm/window_state.h"
 #include "base/command_line.h"
 #include "base/time/time.h"
+#include "ui/base/hit_test.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/layer.h"
-#include "ui/compositor/layer_animation_observer.h"
 #include "ui/compositor/layer_animator.h"
 #include "ui/compositor/scoped_layer_animation_settings.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
-#include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
 #include "ui/wm/core/transient_window_manager.h"
 
@@ -169,13 +170,16 @@ void WindowTransformAnimationObserver::OnImplicitAnimationsCompleted() {
   }
 
   for (auto* transient_window :
-       ::wm::TransientWindowManager::GetOrCreate(window_)
-           ->transient_children()) {
+       wm::TransientWindowManager::GetOrCreate(window_)->transient_children()) {
     // For now we only care about bubble dialog type transient children.
     views::BubbleDialogDelegate* bubble_delegate_view =
         AsBubbleDialogDelegate(transient_window);
-    if (bubble_delegate_view)
-      bubble_delegate_view->OnAnchorBoundsChanged();
+    if (bubble_delegate_view) {
+      if (!bubble_delegate_view->GetAnchorRect().IsEmpty() ||
+          bubble_delegate_view->GetAnchorView()) {
+        bubble_delegate_view->OnAnchorBoundsChanged();
+      }
+    }
   }
 
   delete this;
@@ -199,21 +203,11 @@ void DoSplitviewOpacityAnimation(ui::Layer* layer,
       target_opacity = 0.f;
       break;
     case SPLITVIEW_ANIMATION_PREVIEW_AREA_FADE_IN:
-      target_opacity = features::IsDarkLightModeEnabled()
-                           ? kDarkLightPreviewAreaHighlightOpacity
-                           : kPreviewAreaHighlightOpacity;
-      break;
     case SPLITVIEW_ANIMATION_HIGHLIGHT_FADE_IN:
     case SPLITVIEW_ANIMATION_OTHER_HIGHLIGHT_FADE_IN:
-      target_opacity = features::IsDarkLightModeEnabled()
-                           ? kDarkLightHighlightOpacity
-                           : kHighlightOpacity;
-      break;
     case SPLITVIEW_ANIMATION_HIGHLIGHT_FADE_IN_CANNOT_SNAP:
     case SPLITVIEW_ANIMATION_OTHER_HIGHLIGHT_FADE_IN_CANNOT_SNAP:
-      target_opacity = features::IsDarkLightModeEnabled()
-                           ? kDarkLightHighlightCannotSnapOpacity
-                           : kHighlightOpacity;
+      target_opacity = kHighlightOpacity;
       break;
     case SPLITVIEW_ANIMATION_OVERVIEW_ITEM_FADE_IN:
     case SPLITVIEW_ANIMATION_TEXT_FADE_IN:
@@ -355,14 +349,16 @@ void MaybeRestoreSplitView(bool refresh_snapped_windows) {
         case WindowStateType::kPrimarySnapped:
           if (!split_view_controller->primary_window()) {
             split_view_controller->SnapWindow(
-                window, SplitViewController::SnapPosition::kPrimary);
+                window, SplitViewController::SnapPosition::kPrimary,
+                WindowSnapActionSource::kSnapByDeskOrSessionChange);
           }
           break;
 
         case WindowStateType::kSecondarySnapped:
           if (!split_view_controller->secondary_window()) {
             split_view_controller->SnapWindow(
-                window, SplitViewController::SnapPosition::kSecondary);
+                window, SplitViewController::SnapPosition::kSecondary,
+                WindowSnapActionSource::kSnapByDeskOrSessionChange);
           }
           break;
 
@@ -371,8 +367,9 @@ void MaybeRestoreSplitView(bool refresh_snapped_windows) {
       }
 
       if (split_view_controller->state() ==
-          SplitViewController::State::kBothSnapped)
+          SplitViewController::State::kBothSnapped) {
         break;
+      }
     }
   }
 
@@ -515,15 +512,34 @@ SplitViewController::SnapPosition GetSnapPosition(
       vertical_edge_inset);
 }
 
-bool ShouldAutomaticallyGroupOnWindowsSnappedInClamshell() {
-  auto* snap_group_controller = Shell::Get()->snap_group_controller();
+bool IsSnapGroupEnabledInClamshellMode() {
+  auto* snap_group_controller = SnapGroupController::Get();
   TabletModeController* tablet_mode_controller =
       Shell::Get()->tablet_mode_controller();
   const bool in_tablet_mode =
       tablet_mode_controller && tablet_mode_controller->InTabletMode();
-  return snap_group_controller &&
-         snap_group_controller->IsArm1AutomaticallyLockEnabled() &&
-         !in_tablet_mode;
+  return snap_group_controller && !in_tablet_mode;
+}
+
+int GetWindowComponentForResize(aura::Window* window) {
+  SplitViewController* split_view_controller =
+      SplitViewController::Get(window->GetRootWindow());
+  CHECK(split_view_controller &&
+        split_view_controller->IsWindowInSplitView(window));
+  // TODO(b/288356322): Update the component for vertical splitview.
+  return window == split_view_controller->primary_window() ? HTRIGHT : HTLEFT;
+}
+
+views::Widget::InitParams CreateWidgetInitParams(
+    aura::Window* parent_window,
+    const std::string& widget_name) {
+  views::Widget::InitParams params(views::Widget::InitParams::TYPE_POPUP);
+  params.opacity = views::Widget::InitParams::WindowOpacity::kOpaque;
+  params.activatable = views::Widget::InitParams::Activatable::kNo;
+  params.parent = parent_window;
+  params.init_properties_container.SetProperty(kHideInDeskMiniViewKey, true);
+  params.name = widget_name;
+  return params;
 }
 
 }  // namespace ash

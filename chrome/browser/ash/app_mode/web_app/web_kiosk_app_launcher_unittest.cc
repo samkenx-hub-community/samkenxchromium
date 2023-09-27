@@ -6,7 +6,8 @@
 
 #include <memory>
 
-#include "base/auto_reset.h"
+#include "ash/constants/ash_features.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/gmock_callback_support.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -25,7 +26,7 @@
 #include "chrome/test/base/browser_with_test_window_test.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chromeos/ash/components/network/network_handler_test_helper.h"
-#include "chromeos/ash/components/standalone_browser/browser_support.h"
+#include "chromeos/ash/components/standalone_browser/feature_refs.h"
 #include "components/exo/shell_surface_util.h"
 #include "components/exo/wm_helper.h"
 #include "components/user_manager/scoped_user_manager.h"
@@ -36,8 +37,6 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
-
-using ash::standalone_browser::BrowserSupport;
 
 namespace ash {
 
@@ -95,7 +94,7 @@ const char16_t kAppTitle[] = u"app";
 std::unique_ptr<web_app::WebAppDataRetriever> CreateDataRetrieverWithData(
     const GURL& url) {
   auto data_retriever = std::make_unique<web_app::FakeDataRetriever>();
-  auto info = std::make_unique<WebAppInstallInfo>();
+  auto info = std::make_unique<web_app::WebAppInstallInfo>();
   info->start_url = url;
   info->title = kAppTitle;
   data_retriever->SetRendererWebAppInstallInfo(std::move(info));
@@ -124,7 +123,7 @@ class AppWindowCloser : public BrowserListObserver {
   }
 
  private:
-  Browser* app_browser_ = nullptr;
+  raw_ptr<Browser, DanglingUntriaged | ExperimentalAsh> app_browser_ = nullptr;
   // TODO(crbug/1379290): Use `TestFuture<void>` in all these tests
   TestFuture<bool> closed_waiter_;
 };
@@ -169,7 +168,7 @@ class WebKioskAppLauncherTest : public BrowserWithTestWindowTest {
     app_manager_->AddAppForTesting(account_id_, GURL(kAppInstallUrl));
 
     if (installed) {
-      WebAppInstallInfo info;
+      web_app::WebAppInstallInfo info;
       info.start_url = GURL(kAppLaunchUrl);
       info.title = kAppTitle;
       app_manager_->UpdateAppByAccountId(account_id_, info);
@@ -211,7 +210,8 @@ class WebKioskAppLauncherTest : public BrowserWithTestWindowTest {
 
  protected:
   AccountId account_id_;
-  web_app::TestWebAppUrlLoader* url_loader_;  // Owned by |launcher_|.
+  raw_ptr<web_app::TestWebAppUrlLoader, DanglingUntriaged | ExperimentalAsh>
+      url_loader_;  // Owned by `launcher_`.
 
  private:
   std::unique_ptr<WebKioskAppManager> app_manager_;
@@ -313,9 +313,12 @@ class WebKioskAppLauncherUsingLacrosTest : public WebKioskAppLauncherTest {
   WebKioskAppLauncherUsingLacrosTest()
       : browser_manager_(std::make_unique<crosapi::FakeBrowserManager>()),
         fake_user_manager_(new FakeChromeUserManager()),
-        scoped_user_manager_(base::WrapUnique(fake_user_manager_)),
+        scoped_user_manager_(base::WrapUnique(fake_user_manager_.get())),
         wm_helper_(std::make_unique<exo::WMHelper>()) {
-    scoped_feature_list_.InitAndEnableFeature(features::kWebKioskEnableLacros);
+    std::vector<base::test::FeatureRef> enabled =
+        ash::standalone_browser::GetFeatureRefs();
+    enabled.push_back(::features::kWebKioskEnableLacros);
+    scoped_feature_list_.InitWithFeatures(enabled, {});
   }
 
   void LoginWebKioskUser() {
@@ -342,13 +345,10 @@ class WebKioskAppLauncherUsingLacrosTest : public WebKioskAppLauncherTest {
   exo::WMHelper* wm_helper() const { return wm_helper_.get(); }
 
  private:
-  base::AutoReset<bool> set_lacros_enabled_ =
-      BrowserSupport::SetLacrosEnabledForTest(true);
-  base::AutoReset<absl::optional<bool>> set_lacros_primary_ =
-      crosapi::browser_util::SetLacrosPrimaryBrowserForTest(true);
   base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<crosapi::FakeBrowserManager> browser_manager_;
-  FakeChromeUserManager* fake_user_manager_;
+  raw_ptr<FakeChromeUserManager, DanglingUntriaged | ExperimentalAsh>
+      fake_user_manager_;
   user_manager::ScopedUserManager scoped_user_manager_;
   std::unique_ptr<exo::WMHelper> wm_helper_;
 };

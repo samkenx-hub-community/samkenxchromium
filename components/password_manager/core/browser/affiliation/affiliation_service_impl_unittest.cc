@@ -27,9 +27,6 @@
 #include "components/password_manager/core/browser/password_form_digest.h"
 #include "components/password_manager/core/common/password_manager_features.h"
 #include "components/password_manager/core/common/password_manager_pref_names.h"
-#include "components/prefs/pref_registry_simple.h"
-#include "components/prefs/pref_service.h"
-#include "components/prefs/testing_pref_service.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "services/network/test/test_network_connection_tracker.h"
@@ -135,12 +132,9 @@ class AffiliationServiceImplTest : public testing::Test {
   }
 
   void CreateService() {
-    prefs_.registry()->RegisterBooleanPref(
-        password_manager::prefs::kPasswordsGroupingInfoRequested, true);
-
     service_ = std::make_unique<AffiliationServiceImpl>(
         base::MakeRefCounted<network::TestSharedURLLoaderFactory>(),
-        background_task_runner(), &pref_service());
+        background_task_runner());
 
     network::TestNetworkConnectionTracker* network_connection_tracker =
         network::TestNetworkConnectionTracker::GetInstance();
@@ -151,11 +145,13 @@ class AffiliationServiceImplTest : public testing::Test {
     service_->Init(network_connection_tracker, database_path);
   }
 
-  void DestroyService() { service_->Shutdown(); }
+  void DestroyService() {
+    fake_affiliation_api_.SetFetcherFactory(nullptr);
+    service_->Shutdown();
+  }
 
   void RunUntilIdle() { task_environment_.RunUntilIdle(); }
 
-  TestingPrefServiceSimple& pref_service() { return prefs_; }
   AffiliationServiceImpl* service() { return service_.get(); }
   MockAffiliationConsumer* mock_consumer() { return &mock_consumer_; }
 
@@ -166,7 +162,6 @@ class AffiliationServiceImplTest : public testing::Test {
   FakeAffiliationAPI* fake_affiliation_api() { return &fake_affiliation_api_; }
 
  protected:
-  TestingPrefServiceSimple prefs_;
   std::unique_ptr<AffiliationServiceImpl> service_;
   FakeAffiliationAPI fake_affiliation_api_;
   scoped_refptr<base::TestSimpleTaskRunner> background_task_runner_ =
@@ -409,7 +404,7 @@ TEST_F(AffiliationServiceImplTest, NotFetchedYetMetricIfWaitingForResponse) {
 
   histogram_tester().ExpectUniqueSample(
       kGetChangePasswordURLMetricName,
-      metrics_util::GetChangePasswordUrlMetric::kNotFetchedYet, 1);
+      GetChangePasswordUrlMetric::kNotFetchedYet, 1);
 }
 
 TEST_F(AffiliationServiceImplTest, NoUrlOverrideAvailableMetric) {
@@ -417,7 +412,7 @@ TEST_F(AffiliationServiceImplTest, NoUrlOverrideAvailableMetric) {
 
   histogram_tester().ExpectUniqueSample(
       kGetChangePasswordURLMetricName,
-      metrics_util::GetChangePasswordUrlMetric::kNoUrlOverrideAvailable, 1);
+      GetChangePasswordUrlMetric::kNoUrlOverrideAvailable, 1);
 }
 
 TEST_F(AffiliationServiceImplTest, FoundForRequestedFacetMetric) {
@@ -449,7 +444,7 @@ TEST_F(AffiliationServiceImplTest, FoundForRequestedFacetMetric) {
 
   histogram_tester().ExpectUniqueSample(
       kGetChangePasswordURLMetricName,
-      metrics_util::GetChangePasswordUrlMetric::kUrlOverrideUsed, 1);
+      GetChangePasswordUrlMetric::kUrlOverrideUsed, 1);
 }
 
 TEST_F(AffiliationServiceImplTest, FoundForGroupedFacetMetric) {
@@ -479,7 +474,7 @@ TEST_F(AffiliationServiceImplTest, FoundForGroupedFacetMetric) {
 
   histogram_tester().ExpectUniqueSample(
       kGetChangePasswordURLMetricName,
-      metrics_util::GetChangePasswordUrlMetric::kGroupUrlOverrideUsed, 1);
+      GetChangePasswordUrlMetric::kGroupUrlOverrideUsed, 1);
 }
 
 TEST_F(AffiliationServiceImplTest, OnFetchSuccedeedRunsCallback) {
@@ -572,21 +567,10 @@ class AffiliationServiceImplTestWithFetcherFactory
                        base::Unretained(service_->GetBackendForTesting()),
                        std::move(fake_fetcher_factory)));
   }
-
-  void OnFormsCallback(
-      absl::variant<std::vector<std::unique_ptr<PasswordForm>>,
-                    PasswordStoreBackendError> forms_or_error) {
-    if (absl::holds_alternative<PasswordStoreBackendError>(forms_or_error))
-      return;
-    result_forms_.swap(
-        absl::get<std::vector<std::unique_ptr<PasswordForm>>>(forms_or_error));
-  }
-
-  std::vector<std::unique_ptr<PasswordForm>> result_forms_;
 };
 
 TEST_F(AffiliationServiceImplTestWithFetcherFactory,
-       GetAffiliationsAndBrandingSucceds) {
+       GetAffiliationsAndBrandingSucceeds) {
   // The first request allows on-demand fetching, and should trigger a fetch.
   // Then, it should succeed after the fetch is complete.
   service()->GetAffiliationsAndBranding(
@@ -653,72 +637,7 @@ TEST_F(AffiliationServiceImplTestWithFetcherFactory,
   testing::Mock::VerifyAndClearExpectations(mock_consumer());
 }
 
-TEST_F(AffiliationServiceImplTestWithFetcherFactory,
-       KeepPrefetchForFacetsUpdatesPref) {
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
-      password_manager::features::kPasswordsGrouping);
-
-  pref_service().SetBoolean(prefs::kPasswordsGroupingInfoRequested, false);
-
-  service()->KeepPrefetchForFacets(
-      {FacetURI::FromCanonicalSpec(kTestFacetURIAlpha1)});
-  background_task_runner()->RunUntilIdle();
-  ASSERT_TRUE(fake_affiliation_api()->HasPendingRequest());
-  fake_affiliation_api()->IgnoreNextRequest();
-  background_task_runner()->RunUntilIdle();
-  RunUntilIdle();
-
-  EXPECT_TRUE(
-      pref_service().GetBoolean(prefs::kPasswordsGroupingInfoRequested));
-}
-
-TEST_F(AffiliationServiceImplTestWithFetcherFactory,
-       GetGroupingInfoFetchesGroups) {
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
-      password_manager::features::kPasswordsGrouping);
-
-  pref_service().SetBoolean(prefs::kPasswordsGroupingInfoRequested, false);
-
-  base::MockCallback<AffiliationService::GroupsCallback> completion_callback;
-
-  service()->GetGroupingInfo({FacetURI::FromCanonicalSpec(kTestFacetURIAlpha1)},
-                             completion_callback.Get());
-  background_task_runner()->RunUntilIdle();
-
-  GroupedFacets group;
-  group.facets = {
-      Facet(FacetURI::FromCanonicalSpec(kTestFacetURIAlpha1)),
-      Facet(FacetURI::FromCanonicalSpec(kTestFacetURIAlpha2)),
-      Facet(FacetURI::FromCanonicalSpec(kTestFacetURIAlpha3)),
-      Facet(FacetURI::FromCanonicalSpec(kTestFacetURIBeta1)),
-  };
-
-  ASSERT_TRUE(fake_affiliation_api()->HasPendingRequest());
-  fake_affiliation_api()->AddTestEquivalenceClass(
-      GetTestEquivalenceClassAlpha());
-  fake_affiliation_api()->AddTestGrouping(group);
-  fake_affiliation_api()->ServeNextRequest();
-  background_task_runner()->RunUntilIdle();
-  RunUntilIdle();
-
-  EXPECT_CALL(completion_callback, Run(testing::UnorderedElementsAre(group)));
-  background_task_runner()->RunUntilIdle();
-  RunUntilIdle();
-
-  EXPECT_TRUE(
-      pref_service().GetBoolean(prefs::kPasswordsGroupingInfoRequested));
-}
-
-TEST_F(AffiliationServiceImplTestWithFetcherFactory,
-       GetGroupingInfoUsesCacheIfGroupsWereRequested) {
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
-      password_manager::features::kPasswordsGrouping);
-
-  pref_service().SetBoolean(prefs::kPasswordsGroupingInfoRequested, true);
-
+TEST_F(AffiliationServiceImplTestWithFetcherFactory, GetGroupingInfoUsesCache) {
   base::MockCallback<AffiliationService::GroupsCallback> completion_callback;
 
   service()->GetGroupingInfo({FacetURI::FromCanonicalSpec(kTestFacetURIAlpha1)},

@@ -2,11 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+import {BindingsTestRunner} from 'bindings_test_runner';
+
+import * as SourcesModule from 'devtools/panels/sources/sources.js';
+
 (async function() {
   TestRunner.addResult(
       `Verify that navigator shows proper UISourceCodes as shadow dom styles and scripts are added and removed.\n`);
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
-  await TestRunner.loadTestModule('bindings_test_runner');
+  await TestRunner.loadLegacyModule('sources');
   await TestRunner.loadHTML(`
     <template id='template'>
     <style>div {
@@ -23,7 +28,7 @@
     </template>
   `);
 
-  var sourcesNavigator = new Sources.NetworkNavigatorView();
+  var sourcesNavigator = new SourcesModule.SourcesNavigator.NetworkNavigatorView();
   sourcesNavigator.show(UI.inspectorView.element);
 
   TestRunner.markStep('dumpInitialNavigator');

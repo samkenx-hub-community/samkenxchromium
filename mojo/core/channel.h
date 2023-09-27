@@ -22,9 +22,7 @@
 #include "mojo/core/connection_params.h"
 #include "mojo/core/platform_handle_in_transit.h"
 #include "mojo/public/cpp/platform/platform_channel_endpoint.h"
-#include "mojo/public/cpp/platform/platform_channel_server_endpoint.h"
 #include "mojo/public/cpp/platform/platform_handle.h"
-#include "third_party/abseil-cpp/absl/types/variant.h"
 
 namespace mojo::core {
 
@@ -318,11 +316,9 @@ class MOJO_SYSTEM_IMPL_EXPORT Channel
   // header, and the Channel is no longer responsible for encoding or decoding
   // any metadata about transmitted PlatformHandles, since the ipcz driver takes
   // care of that.
-  using Endpoint =
-      absl::variant<PlatformChannelEndpoint, PlatformChannelServerEndpoint>;
   static scoped_refptr<Channel> CreateForIpczDriver(
       Delegate* delegate,
-      Endpoint endpoint,
+      PlatformChannelEndpoint endpoint,
       scoped_refptr<base::SingleThreadTaskRunner> io_task_runner);
 
   Channel(const Channel&) = delete;
@@ -476,15 +472,18 @@ class MOJO_SYSTEM_IMPL_EXPORT Channel
                                 size_t payload_size,
                                 std::vector<PlatformHandle> handles);
 
+ protected:
   enum class MessageType {
     kSent,
     kReceive,
   };
 
-  // Calculates if the next sample should be recorded to an histogram
-  // sub-sampled for counting IPC metrics and records histograms for Sent
-  // and Receive message types. Records histogram randomly for ~1/1000 calls.
-  void MaybeLogHistogramForIPCMetrics(MessageType type);
+  // Records histograms that count sent/received messages per process type.
+  // Must be guarded by a call to ShouldRecordSubsampledHistograms().
+  static void LogHistogramForIPCMetrics(MessageType type);
+
+  // Returns true for ~1/1000 calls. Used to reduce reporting overhead.
+  bool ShouldRecordSubsampledHistograms();
 
  private:
   friend class base::RefCountedThreadSafe<Channel>;
@@ -492,7 +491,7 @@ class MOJO_SYSTEM_IMPL_EXPORT Channel
   class ReadBuffer;
 
   const bool is_for_ipcz_;
-  raw_ptr<Delegate, DanglingUntriaged> delegate_;
+  raw_ptr<Delegate, AcrossTasksDanglingUntriaged> delegate_;
   HandlePolicy handle_policy_;
   const std::unique_ptr<ReadBuffer> read_buffer_;
 

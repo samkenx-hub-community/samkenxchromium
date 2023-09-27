@@ -41,6 +41,12 @@ class CORE_EXPORT CSSTokenizer {
   std::pair<Vector<CSSParserToken, 32>, Vector<wtf_size_t, 32>>
   TokenizeToEOFWithOffsets();
 
+  // The unicode-range descriptor invokes a special tokenizer
+  // to solve a design mistake in CSS.
+  //
+  // https://drafts.csswg.org/css-syntax/#consume-unicode-range-value
+  Vector<CSSParserToken, 32> TokenizeToEOFWithUnicodeRanges();
+
   wtf_size_t Offset() const { return input_.Offset(); }
   wtf_size_t PreviousOffset() const { return prev_offset_; }
   StringView StringRangeAt(wtf_size_t start, wtf_size_t length) const;
@@ -55,6 +61,23 @@ class CORE_EXPORT CSSTokenizer {
   // (*this, not the destination) is in an undefined state after this;
   // all you can do is destroy it.
   void PersistStrings(CSSTokenizer& destination);
+
+  // See documentation near CSSParserTokenStream.
+  CSSParserToken Restore(const CSSParserToken& next, wtf_size_t offset) {
+    // Undo block stack mutation.
+    if (next.GetBlockType() == CSSParserToken::BlockType::kBlockStart) {
+      block_stack_.pop_back();
+    } else if (next.GetBlockType() == CSSParserToken::BlockType::kBlockEnd) {
+      static_assert(kLeftParenthesisToken == (kRightParenthesisToken - 1));
+      static_assert(kLeftBracketToken == (kRightBracketToken - 1));
+      static_assert(kLeftBraceToken == (kRightBraceToken - 1));
+      block_stack_.push_back(
+          static_cast<CSSParserTokenType>(next.GetType() - 1));
+    }
+    input_.Restore(offset);
+    // Produce the post-restore lookahead token.
+    return TokenizeSingle();
+  }
 
  private:
   template <bool SkipComments, bool StoreOffset>
@@ -129,6 +152,8 @@ class CORE_EXPORT CSSTokenizer {
 
   wtf_size_t prev_offset_ = 0;
   wtf_size_t token_count_ = 0;
+
+  bool unicode_ranges_allowed_ = false;
 };
 }  // namespace blink
 

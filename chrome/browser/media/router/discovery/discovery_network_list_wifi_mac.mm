@@ -26,7 +26,7 @@ bool GetWifiSSID(NSString* ns_ifname, std::string* ssid_out) {
   if (interface == nil) {
     return false;
   }
-  std::string ssid(base::SysNSStringToUTF8([interface ssid]));
+  std::string ssid(base::SysNSStringToUTF8(interface.ssid));
   if (ssid.empty()) {
     return false;
   }

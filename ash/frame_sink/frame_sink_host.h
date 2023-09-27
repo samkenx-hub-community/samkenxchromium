@@ -10,11 +10,16 @@
 #include "ash/ash_export.h"
 #include "ash/frame_sink/ui_resource_manager.h"
 #include "base/memory/raw_ptr.h"
+#include "base/scoped_observation.h"
 #include "components/viz/common/quads/compositor_frame.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_observer.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/presentation_feedback.h"
+
+namespace cc {
+class LayerTreeFrameSink;
+}  // namespace cc
 
 namespace ash {
 
@@ -45,7 +50,11 @@ class ASH_EXPORT FrameSinkHost : public aura::WindowObserver {
   void SetPresentationCallback(PresentationCallback callback);
 
   // Initializes the FrameSinkHost on the host_window.
-  void Init(aura::Window* host_window);
+  virtual void Init(aura::Window* host_window);
+
+  virtual void InitForTesting(
+      aura::Window* host_window,
+      std::unique_ptr<cc::LayerTreeFrameSink> layer_tree_frame_sink);
 
   // Updates the surface by submitting a compositor frame. With
   // synchronous_draw as true, we send a compositor frame as soon as we call the
@@ -99,8 +108,22 @@ class ASH_EXPORT FrameSinkHost : public aura::WindowObserver {
   const gfx::Rect& GetContentRect() const { return content_rect_; }
 
  private:
+  void InitFrameSinkHolder(
+      aura::Window* host_window,
+      std::unique_ptr<cc::LayerTreeFrameSink> layer_tree_frame_sink);
+
+  void SetHostWindow(aura::Window* host_window);
+
+  void InitInternal(
+      aura::Window* host_window,
+      std::unique_ptr<cc::LayerTreeFrameSink> layer_tree_frame_sink);
+
+  // Observation to track the lifetime of `host_window_`.
+  base::ScopedObservation<aura::Window, aura::WindowObserver>
+      host_window_observation_{this};
+
   // The window on which LayerTreeFrameSink is created on.
-  base::raw_ptr<aura::Window> host_window_;
+  raw_ptr<aura::Window> host_window_ = nullptr;
 
   // The bounds of the content to be displayed in host window coordinates.
   gfx::Rect content_rect_;

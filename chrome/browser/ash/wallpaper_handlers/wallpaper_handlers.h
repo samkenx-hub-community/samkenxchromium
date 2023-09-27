@@ -11,8 +11,10 @@
 
 #include "ash/webui/personalization_app/mojom/personalization_app.mojom-forward.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/values.h"
+#include "chrome/browser/ash/wallpaper_handlers/wallpaper_fetcher_delegate.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "url/gurl.h"
 
@@ -57,13 +59,13 @@ class BackdropCollectionInfoFetcher {
   virtual void Start(OnCollectionsInfoFetched callback);
 
  protected:
-  // Protected constructor forces creation via `BackdropFetcherDelegate` to
+  // Protected constructor forces creation via `WallpaperFetcherDelegate` to
   // allow mocking in test code.
   BackdropCollectionInfoFetcher();
 
  private:
   // Allow delegate to view the constructor.
-  friend class BackdropFetcherDelegateImpl;
+  friend class WallpaperFetcherDelegateImpl;
 
   // Called when the collections info download completes.
   void OnResponseFetched(const std::string& response);
@@ -93,13 +95,13 @@ class BackdropImageInfoFetcher {
   virtual void Start(OnImagesInfoFetched callback);
 
  protected:
-  // Protected constructor forces creation via `BackdropFetcherDelegate` to
+  // Protected constructor forces creation via `WallpaperFetcherDelegate` to
   // allow mocking in test code.
   explicit BackdropImageInfoFetcher(const std::string& collection_id);
 
  private:
   // Allow delegate to view the constructor.
-  friend class BackdropFetcherDelegateImpl;
+  friend class WallpaperFetcherDelegateImpl;
 
   // Called when the images info download completes.
   void OnResponseFetched(const std::string& response);
@@ -123,20 +125,26 @@ class BackdropSurpriseMeImageFetcher {
                               const backdrop::Image& image,
                               const std::string& new_resume_token)>;
 
-  BackdropSurpriseMeImageFetcher(const std::string& collection_id,
-                                 const std::string& resume_token);
-
   BackdropSurpriseMeImageFetcher(const BackdropSurpriseMeImageFetcher&) =
       delete;
   BackdropSurpriseMeImageFetcher& operator=(
       const BackdropSurpriseMeImageFetcher&) = delete;
 
-  ~BackdropSurpriseMeImageFetcher();
+  virtual ~BackdropSurpriseMeImageFetcher();
 
   // Starts the fetcher.
-  void Start(OnSurpriseMeImageFetched callback);
+  virtual void Start(OnSurpriseMeImageFetched callback);
+
+ protected:
+  // Protected constructor forces creation via `WallpaperFetcherDelegate` to
+  // allow mocking in test code.
+  BackdropSurpriseMeImageFetcher(const std::string& collection_id,
+                                 const std::string& resume_token);
 
  private:
+  // Allow delegate to view the constructor.
+  friend class WallpaperFetcherDelegateImpl;
+
   // Called when the surprise me image info download completes.
   void OnResponseFetched(const std::string& response);
 
@@ -147,7 +155,8 @@ class BackdropSurpriseMeImageFetcher {
   const std::string collection_id_;
 
   // An opaque token returned by a previous image info fetch request. It is used
-  // to prevent duplicate images from being returned.
+  // to prevent duplicate images from being returned. It's intentional
+  // that this field is always empty. See (https://crbug.com/843537#c13).
   const std::string resume_token_;
 
   // The callback upon completion of downloading and deserializing the surprise
@@ -212,10 +221,10 @@ class GooglePhotosFetcher : public signin::IdentityManager::Observer {
                        absl::optional<base::Value> response);
 
   // Profile associated with the Google Photos account that will be queried.
-  Profile* const profile_;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
 
   // Supplies `token_fetcher_` with `profile_`'s GAIA account information.
-  signin::IdentityManager* const identity_manager_;
+  const raw_ptr<signin::IdentityManager, ExperimentalAsh> identity_manager_;
   base::ScopedObservation<signin::IdentityManager,
                           signin::IdentityManager::Observer>
       identity_manager_observation_{this};
@@ -237,8 +246,6 @@ using GooglePhotosAlbumsCbkArgs =
 class GooglePhotosAlbumsFetcher
     : public GooglePhotosFetcher<GooglePhotosAlbumsCbkArgs> {
  public:
-  explicit GooglePhotosAlbumsFetcher(Profile* profile);
-
   GooglePhotosAlbumsFetcher(const GooglePhotosAlbumsFetcher&) = delete;
   GooglePhotosAlbumsFetcher& operator=(const GooglePhotosAlbumsFetcher&) =
       delete;
@@ -250,6 +257,10 @@ class GooglePhotosAlbumsFetcher
       base::OnceCallback<void(GooglePhotosAlbumsCbkArgs)> callback);
 
  protected:
+  // Protected constructor forces creation via `WallpaperFetcherDelegate` to
+  // allow mocking in test code.
+  explicit GooglePhotosAlbumsFetcher(Profile* profile);
+
   // GooglePhotosFetcher:
   GooglePhotosAlbumsCbkArgs ParseResponse(
       const base::Value::Dict* response) override;
@@ -257,6 +268,10 @@ class GooglePhotosAlbumsFetcher
       const GooglePhotosAlbumsCbkArgs& result) override;
 
  private:
+  // Allow delegate to see the constructor.
+  friend class WallpaperFetcherDelegateImpl;
+  friend class GooglePhotosAlbumsFetcherTest;
+
   int albums_api_refresh_counter_ = 0;
 };
 
@@ -266,8 +281,6 @@ using GooglePhotosAlbumsCbkArgs =
 class GooglePhotosSharedAlbumsFetcher
     : public GooglePhotosFetcher<GooglePhotosAlbumsCbkArgs> {
  public:
-  explicit GooglePhotosSharedAlbumsFetcher(Profile* profile);
-
   GooglePhotosSharedAlbumsFetcher(const GooglePhotosSharedAlbumsFetcher&) =
       delete;
   GooglePhotosSharedAlbumsFetcher& operator=(
@@ -280,6 +293,10 @@ class GooglePhotosSharedAlbumsFetcher
       base::OnceCallback<void(GooglePhotosAlbumsCbkArgs)> callback);
 
  protected:
+  // Protected constructor forces creation via `WallpaperFetcherDelegate` to
+  // allow mocking in test code.
+  explicit GooglePhotosSharedAlbumsFetcher(Profile* profile);
+
   // GooglePhotosFetcher:
   GooglePhotosAlbumsCbkArgs ParseResponse(
       const base::Value::Dict* response) override;
@@ -287,6 +304,8 @@ class GooglePhotosSharedAlbumsFetcher
       const GooglePhotosAlbumsCbkArgs& result) override;
 
  private:
+  friend class WallpaperFetcherDelegateImpl;
+
   int shared_albums_api_refresh_counter_ = 0;
 };
 
@@ -295,8 +314,6 @@ using ash::personalization_app::mojom::GooglePhotosEnablementState;
 class GooglePhotosEnabledFetcher
     : public GooglePhotosFetcher<GooglePhotosEnablementState> {
  public:
-  explicit GooglePhotosEnabledFetcher(Profile* profile);
-
   GooglePhotosEnabledFetcher(const GooglePhotosEnabledFetcher&) = delete;
   GooglePhotosEnabledFetcher& operator=(const GooglePhotosEnabledFetcher&) =
       delete;
@@ -307,11 +324,19 @@ class GooglePhotosEnabledFetcher
       base::OnceCallback<void(GooglePhotosEnablementState)> callback);
 
  protected:
+  // Protected constructor forces creation via `WallpaperFetcherDelegate` to
+  // allow mocking in test code.
+  explicit GooglePhotosEnabledFetcher(Profile* profile);
+
   // GooglePhotosFetcher:
   GooglePhotosEnablementState ParseResponse(
       const base::Value::Dict* response) override;
   absl::optional<size_t> GetResultCount(
       const GooglePhotosEnablementState& result) override;
+
+ private:
+  friend class WallpaperFetcherDelegateImpl;
+  friend class GooglePhotosEnabledFetcherTest;
 };
 
 using GooglePhotosPhotosCbkArgs =
@@ -320,8 +345,6 @@ using GooglePhotosPhotosCbkArgs =
 class GooglePhotosPhotosFetcher
     : public GooglePhotosFetcher<GooglePhotosPhotosCbkArgs> {
  public:
-  explicit GooglePhotosPhotosFetcher(Profile* profile);
-
   GooglePhotosPhotosFetcher(const GooglePhotosPhotosFetcher&) = delete;
   GooglePhotosPhotosFetcher& operator=(const GooglePhotosPhotosFetcher&) =
       delete;
@@ -336,6 +359,10 @@ class GooglePhotosPhotosFetcher
       base::OnceCallback<void(GooglePhotosPhotosCbkArgs)> callback);
 
  protected:
+  // Protected constructor forces creation via `WallpaperFetcherDelegate` to
+  // allow mocking in test code.
+  explicit GooglePhotosPhotosFetcher(Profile* profile);
+
   // GooglePhotosFetcher:
   absl::optional<base::Value> CreateErrorResponse(int error_code) override;
   GooglePhotosPhotosCbkArgs ParseResponse(
@@ -344,6 +371,9 @@ class GooglePhotosPhotosFetcher
       const GooglePhotosPhotosCbkArgs& result) override;
 
  private:
+  friend class WallpaperFetcherDelegateImpl;
+  friend class GooglePhotosPhotosFetcherTest;
+
   int photos_api_refresh_counter_ = 0;
 };
 

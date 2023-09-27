@@ -8,12 +8,12 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
-import android.support.annotation.DrawableRes;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.core.widget.ImageViewCompat;
@@ -81,9 +81,21 @@ class HistoryClusterView extends SelectableItemView<HistoryCluster> {
     protected void onClick() {}
 
     @Override
-    protected @Nullable ColorStateList getDefaultStartIconTint() {
+    protected @Nullable ColorStateList getDefaultIconTint() {
         return ColorStateList.valueOf(
                 SemanticColorUtils.getDefaultIconColorSecondary(getContext()));
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        Drawable iconViewBackground = getIconView().getBackground();
+        int level = iconViewBackground.getLevel();
+        // Work around a race condition that puts the icon view background gets into a bad state.
+        // Changing the level and changing it back guarantees a call to
+        // initializeDrawableForDisplay(), which resets it into a good state.
+        iconViewBackground.setLevel(level + 1);
+        iconViewBackground.setLevel(level);
     }
 
     void setTitle(CharSequence text) {
@@ -94,13 +106,9 @@ class HistoryClusterView extends SelectableItemView<HistoryCluster> {
         mDescriptionView.setText(text);
     }
 
-    void setIconDrawable(Drawable drawable) {
-        super.setStartIconDrawable(drawable);
-    }
-
     public void setStartIconBackgroundRes(@DrawableRes int resId) {
         mStartIconView.setBackgroundResource(resId);
-        ImageViewCompat.setImageTintList(mStartIconView, getDefaultStartIconTint());
+        ImageViewCompat.setImageTintList(mStartIconView, getDefaultIconTint());
     }
 
     void setEndButtonDrawable(Drawable drawable) {

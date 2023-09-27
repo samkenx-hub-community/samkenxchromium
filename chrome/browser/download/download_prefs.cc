@@ -6,17 +6,16 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
 #include "base/check.h"
-#include "base/cxx17_backports.h"
 #include "base/feature_list.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/no_destructor.h"
-#include "base/notreached.h"
 #include "base/path_service.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
@@ -87,7 +86,6 @@ bool DownloadPathIsDangerous(const base::FilePath& download_path) {
 #else
   base::FilePath desktop_dir;
   if (!base::PathService::Get(base::DIR_USER_DESKTOP, &desktop_dir)) {
-    NOTREACHED();
     return false;
   }
   return (download_path == desktop_dir);
@@ -111,14 +109,12 @@ class DefaultDownloadDirectory {
 
   void Initialize() {
     if (!base::PathService::Get(chrome::DIR_DEFAULT_DOWNLOADS, &path_)) {
-      NOTREACHED();
+      base::GetTempDir(&path_);
     }
     if (DownloadPathIsDangerous(path_)) {
       // This is only useful on platforms that support
       // DIR_DEFAULT_DOWNLOADS_SAFE.
-      if (!base::PathService::Get(chrome::DIR_DEFAULT_DOWNLOADS_SAFE, &path_)) {
-        NOTREACHED();
-      }
+      base::PathService::Get(chrome::DIR_DEFAULT_DOWNLOADS_SAFE, &path_);
     }
   }
 
@@ -223,7 +219,6 @@ DownloadPrefs::DownloadPrefs(Profile* profile) : profile_(profile) {
   safebrowsing_for_trusted_sources_enabled_.Init(
       prefs::kSafeBrowsingForTrustedSourcesEnabled, prefs);
   download_restriction_.Init(prefs::kDownloadRestrictions, prefs);
-  download_bubble_enabled_.Init(prefs::kDownloadBubbleEnabled, prefs);
   prompt_for_duplicate_file_.Init(prefs::kDownloadDuplicateFilePromptEnabled,
                                   prefs);
 
@@ -295,7 +290,12 @@ void DownloadPrefs::RegisterProfilePrefs(
   registry->RegisterIntegerPref(prefs::kSaveFileType,
                                 content::SAVE_PAGE_TYPE_AS_COMPLETE_HTML);
   registry->RegisterIntegerPref(prefs::kDownloadRestrictions, 0);
-  registry->RegisterBooleanPref(prefs::kDownloadBubbleEnabled, true);
+  // The following two prefs are ignored on ChromeOS Lacros if SysUI integration
+  // is enabled.
+  // TODO(chlily): Clean them up once SysUI integration is enabled by default.
+  registry->RegisterBooleanPref(prefs::kDownloadBubblePartialViewEnabled, true);
+  registry->RegisterIntegerPref(prefs::kDownloadBubblePartialViewImpressions,
+                                0);
   registry->RegisterBooleanPref(
       prefs::kDownloadBubbleIphSuppression, false,
       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);

@@ -53,7 +53,8 @@ enum class AppListShowSource {
   kAssistantEntryPoint = 6,
   kScrollFromShelf = 7,
   kBrowser = 8,
-  kMaxValue = kBrowser,
+  kWelcomeTour = 9,
+  kMaxValue = kWelcomeTour,
 };
 
 // Tracks the conclusion of each search session starting from the search box.
@@ -182,9 +183,15 @@ enum SearchResultType {
   SYSTEM_INFO,
   // A local image search result.
   IMAGE_SEARCH,
+  // A zero-state result representing a admin template.
+  DESKS_ADMIN_TEMPLATE,
   // Boundary is always last.
   SEARCH_RESULT_TYPE_BOUNDARY
 };
+
+// Returns true if the `show_source` is one that a user directly triggers.
+ASH_PUBLIC_EXPORT bool IsAppListShowSourceUserTriggered(
+    AppListShowSource show_source);
 
 ASH_PUBLIC_EXPORT void RecordSearchResultOpenTypeHistogram(
     AppListLaunchedFrom launch_location,

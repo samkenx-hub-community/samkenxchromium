@@ -5,17 +5,13 @@
 #import "ios/chrome/browser/ui/omnibox/popup/omnibox_icon_view.h"
 
 #import "ios/chrome/browser/net/crurl.h"
-#import "ios/chrome/browser/ui/icons/colorful_background_symbol_view.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
+#import "ios/chrome/browser/shared/ui/symbols/colorful_background_symbol_view.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/ui/omnibox/omnibox_ui_features.h"
 #import "ios/chrome/browser/ui/omnibox/popup/favicon_retriever.h"
 #import "ios/chrome/browser/ui/omnibox/popup/image_retriever.h"
 #import "ios/chrome/browser/ui/omnibox/popup/omnibox_icon.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @implementation OmniboxIconView {
   id<OmniboxIcon> _omniboxIcon;

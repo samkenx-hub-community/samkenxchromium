@@ -56,7 +56,7 @@ void DeviceCloudPolicyInitializer::Init() {
   state_keys_update_subscription_ = state_keys_broker_->RegisterUpdateCallback(
       base::BindRepeating(&DeviceCloudPolicyInitializer::TryToStartConnection,
                           base::Unretained(this)));
-  policy_manager_observer_.Observe(policy_manager_);
+  policy_manager_observer_.Observe(policy_manager_.get());
 
   TryToStartConnection();
 }
@@ -102,11 +102,6 @@ std::unique_ptr<CloudPolicyClient> DeviceCloudPolicyInitializer::CreateClient(
 }
 
 void DeviceCloudPolicyInitializer::TryToStartConnection() {
-  if (install_attributes_->IsActiveDirectoryManaged()) {
-    // This will go away once ChromeAd deprecation is completed.
-    return;
-  }
-
   if (!policy_store_->is_initialized() || !policy_store_->has_policy()) {
     return;
   }
@@ -127,7 +122,7 @@ void DeviceCloudPolicyInitializer::TryToStartConnection() {
     return;
   }
 
-  // Currently reven devices don't support sever-backed state keys, but they
+  // Currently reven devices don't support server-backed state keys, but they
   // also don't support FRE/AutoRE so don't block initialization of device
   // policy on state keys being available on reven.
   // TODO(b/208705225): Remove this special case when reven supports state keys.

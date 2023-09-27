@@ -659,7 +659,7 @@ void MediaGalleriesGetMetadataFunction::OnPreferencesInit(
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   BlobReader::Read(
-      browser_context(), blob_uuid,
+      browser_context()->GetBlobRemote(blob_uuid),
       base::BindOnce(&MediaGalleriesGetMetadataFunction::GetMetadata, this,
                      metadata_type, blob_uuid),
       0, net::kMaxBytesToSniff);
@@ -899,7 +899,7 @@ void MediaGalleriesRemoveGalleryWatchFunction::OnPreferencesInit(
 
   gallery_watch_manager()->RemoveWatch(profile, extension_id(),
                                        gallery_pref_id);
-  Respond(WithArguments());
+  Respond(NoArguments());
 }
 
 }  // namespace api

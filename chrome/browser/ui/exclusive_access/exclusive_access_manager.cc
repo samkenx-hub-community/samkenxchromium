@@ -16,7 +16,7 @@
 #include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/browser/ui/exclusive_access/mouse_lock_controller.h"
 #include "chrome/common/chrome_switches.h"
-#include "content/public/browser/native_web_keyboard_event.h"
+#include "content/public/common/input/native_web_keyboard_event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 
 using content::WebContents;
@@ -136,43 +136,4 @@ void ExclusiveAccessManager::ExitExclusiveAccess() {
   fullscreen_controller_.ExitExclusiveAccessToPreviousState();
   keyboard_lock_controller_.LostKeyboardLock();
   mouse_lock_controller_.LostMouseLock();
-}
-
-void ExclusiveAccessManager::RecordBubbleReshownUMA(
-    ExclusiveAccessBubbleType type) {
-  // Figure out whether fullscreen, mouselock, or keyboardlock is in effect.
-  bool fullscreen = false;
-  bool mouselock = false;
-  bool keyboardlock = false;
-  switch (type) {
-    case EXCLUSIVE_ACCESS_BUBBLE_TYPE_NONE:
-      // None in effect.
-      break;
-    case EXCLUSIVE_ACCESS_BUBBLE_TYPE_FULLSCREEN_EXIT_INSTRUCTION:
-    case EXCLUSIVE_ACCESS_BUBBLE_TYPE_BROWSER_FULLSCREEN_EXIT_INSTRUCTION:
-    case EXCLUSIVE_ACCESS_BUBBLE_TYPE_EXTENSION_FULLSCREEN_EXIT_INSTRUCTION:
-      // Only fullscreen in effect.
-      fullscreen = true;
-      break;
-    case EXCLUSIVE_ACCESS_BUBBLE_TYPE_KEYBOARD_LOCK_EXIT_INSTRUCTION:
-      fullscreen = true;
-      keyboardlock = true;
-      break;
-    case EXCLUSIVE_ACCESS_BUBBLE_TYPE_MOUSELOCK_EXIT_INSTRUCTION:
-      // Only mouselock in effect.
-      mouselock = true;
-      break;
-    case EXCLUSIVE_ACCESS_BUBBLE_TYPE_FULLSCREEN_MOUSELOCK_EXIT_INSTRUCTION:
-      // Both in effect.
-      fullscreen = true;
-      mouselock = true;
-      break;
-  }
-
-  if (fullscreen)
-    fullscreen_controller_.RecordBubbleReshownUMA();
-  if (mouselock)
-    mouse_lock_controller_.RecordBubbleReshownUMA();
-  if (keyboardlock)
-    keyboard_lock_controller_.RecordBubbleReshownUMA();
 }

@@ -25,7 +25,6 @@
 #include "base/strings/stringprintf.h"
 #include "base/timer/elapsed_timer.h"
 #include "components/crash/core/common/crash_key.h"
-#include "ui/accessibility/accessibility_switches.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_event.h"
 #include "ui/accessibility/ax_language_detection.h"
@@ -841,9 +840,7 @@ gfx::RectF AXTree::RelativeToTreeBoundsInternal(const AXNode* node,
     // bad state.
     if (bounds.IsEmpty() && !GetTreeUpdateInProgressState() &&
         allow_recursion) {
-      for (size_t i = 0; i < node->children().size(); i++) {
-        ui::AXNode* child = node->children()[i];
-
+      for (auto* child : node->children()) {
         bool ignore_offscreen;
         gfx::RectF child_bounds =
             RelativeToTreeBoundsInternal(child, gfx::RectF(), &ignore_offscreen,
@@ -1045,6 +1042,11 @@ bool AXTree::Unserialize(const AXTreeUpdate& update) {
   for (const auto& new_data : update.nodes)
     DCHECK(new_data.id != kInvalidAXNodeID)
         << "AXTreeUpdate contains invalid node: " << update.ToString();
+  if (update.tree_data.tree_id != AXTreeIDUnknown() &&
+      data_.tree_id != AXTreeIDUnknown()) {
+    DCHECK_EQ(update.tree_data.tree_id, data_.tree_id)
+        << "Tree id mismatch between tree update and this tree.";
+  }
 #endif
 
   event_data_ = std::make_unique<AXEvent>();
@@ -1076,10 +1078,12 @@ bool AXTree::Unserialize(const AXTreeUpdate& update) {
     const std::unique_ptr<PendingStructureChanges>& data = pair.second;
     if (data->DoesNodeExpectSubtreeOrNodeWillBeDestroyed()) {
       if (AXNode* node = GetFromId(node_id)) {
-        if (data->DoesNodeExpectSubtreeWillBeDestroyed())
+        if (data->DoesNodeExpectSubtreeWillBeDestroyed()) {
           NotifySubtreeWillBeReparentedOrDeleted(node, &update_state);
-        if (data->DoesNodeExpectNodeWillBeDestroyed())
+        }
+        if (data->DoesNodeExpectNodeWillBeDestroyed()) {
           NotifyNodeWillBeReparentedOrDeleted(node, &update_state);
+        }
       }
     }
   }
@@ -1093,12 +1097,29 @@ bool AXTree::Unserialize(const AXTreeUpdate& update) {
   for (const auto& new_data : update_state.updated_nodes) {
     const bool is_new_root =
         update_state.root_will_be_created && new_data.id == update.root_id;
-    if (is_new_root)
+    if (is_new_root) {
       continue;
+    }
 
     AXNode* node = GetFromId(new_data.id);
     if (node &&
         notified_node_attributes_will_change.insert(new_data.id).second) {
+      for (AXTreeObserver& observer : observers_) {
+        if (new_data.HasIntListAttribute(
+                ax::mojom::IntListAttribute::kTextOperationStartOffsets)) {
+          DCHECK(new_data.HasIntListAttribute(
+              ax::mojom::IntListAttribute::kTextOperationStartOffsets));
+          DCHECK(new_data.HasIntListAttribute(
+              ax::mojom::IntListAttribute::kTextOperationEndOffsets));
+          DCHECK(new_data.HasIntListAttribute(
+              ax::mojom::IntListAttribute::kTextOperationStartAnchorIds));
+          DCHECK(new_data.HasIntListAttribute(
+              ax::mojom::IntListAttribute::kTextOperationEndAnchorIds));
+          DCHECK(new_data.HasIntListAttribute(
+              ax::mojom::IntListAttribute::kTextOperations));
+          observer.OnTextDeletionOrInsertion(*node, new_data);
+        }
+      }
       NotifyNodeAttributesWillChange(
           node, update_state,
           update_state.old_tree_data ? &update_state.old_tree_data.value()
@@ -1110,12 +1131,13 @@ bool AXTree::Unserialize(const AXTreeUpdate& update) {
     }
   }
 
+  // Notify observers of nodes about to change their ignored state.
   for (AXNodeID id : update_state.ignored_state_changed_ids) {
     AXNode* node = GetFromId(id);
     if (node) {
       bool will_be_ignored = !node->IsIgnored();
-      // Don't fire ignored state change when the parent is also changing to the
-      // same ignored state.
+      // Don't fire ignored state change when the parent is also changing to
+      // the same ignored state.
       bool is_root_of_ignored_change =
           !node->parent() ||
           !base::Contains(update_state.ignored_state_changed_ids,
@@ -1341,15 +1363,17 @@ bool AXTree::Unserialize(const AXTreeUpdate& update) {
   // aware of any newly created root as soon as possible.
   for (AXNodeID node_id : update_state.new_node_ids) {
     AXNode* node = GetFromId(node_id);
-    if (node)
+    if (node) {
       NotifyNodeHasBeenReparentedOrCreated(node, &update_state);
+    }
   }
 
   // Now that the unignored cached values are up to date, notify observers of
   // the nodes that were deleted from the tree but not reparented.
   for (AXNodeID node_id : update_state.removed_node_ids) {
-    if (!update_state.IsCreatedNode(node_id))
+    if (!update_state.IsCreatedNode(node_id)) {
       NotifyNodeHasBeenDeleted(node_id);
+    }
   }
 
   // Now that the unignored cached values are up to date, notify observers of
@@ -1879,6 +1903,14 @@ void AXTree::NotifyNodeHasBeenReparentedOrCreated(
     } else {
       observer.OnNodeCreated(this, node);
     }
+  }
+}
+
+void AXTree::NotifyChildTreeConnectionChanged(AXNode* node,
+                                              AXTree* child_tree) {
+  DCHECK(node->tree() == this);
+  for (AXTreeObserver& observer : observers_) {
+    observer.OnChildTreeConnectionChanged(node);
   }
 }
 
@@ -2745,13 +2777,17 @@ void AXTree::RecordError(const AXTreeUpdateState& update_state,
     error_ = error_ + "\n";  // Add visual separation between errors.
   error_ = error_ + new_error;
 
+#if defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
+  // Suppress fatal error logging in builds that target fuzzing, as fuzzers
+  // generate invalid trees by design to shake out bugs.
+  is_fatal = false;
+#elif defined(AX_FAIL_FAST_BUILD)
   // In fast-failing-builds, crash immediately with a full message, otherwise
   // rely on AccessibilityFatalError(), which will not crash until multiple
   // errors occur.
   // TODO(accessibility) Make AXTree errors fatal in Canary and Dev builds, as
   // they indicate fundamental problems in part of the engine. They are much
   // less frequent than in the past -- it should not be highimpact on users.
-#if defined(AX_FAIL_FAST_BUILD)
   is_fatal = true;
 #endif
 
@@ -2759,13 +2795,12 @@ void AXTree::RecordError(const AXTreeUpdateState& update_state,
   verbose_error << new_error << "\n** Pending tree update **\n"
                 << update_state.pending_tree_update->ToString(
                        /*verbose*/ false)
-                << "\n** AXTreeData ** \n"
-                << data_.ToString() + "\n** AXTree **"
+                << "** Root **\n"
+                << root() << "\n** AXTreeData **\n"
+                << data_.ToString() + "\n** AXTree **\n"
                 << TreeToStringHelper(root_, 0, false).substr(0, 1000);
 
-  if (is_fatal && !disallow_fail_fast_) {
-    LOG(FATAL) << verbose_error.str();
-  }
+  LOG_IF(FATAL, is_fatal) << verbose_error.str();
 
   // If this is the first error, will dump without crashing in
   // RenderAccessibilityImpl::OnFatalError().

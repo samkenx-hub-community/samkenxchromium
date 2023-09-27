@@ -11,6 +11,7 @@
 
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/run_loop.h"
 #include "base/task/single_thread_task_runner.h"
@@ -81,7 +82,8 @@ class FakeFileStreamWriter : public storage::FileStreamWriter {
     return net::ERR_IO_PENDING;
   }
 
-  int Flush(net::CompletionOnceCallback callback) override {
+  int Flush(storage::FlushMode /*flush_mode*/,
+            net::CompletionOnceCallback callback) override {
     DCHECK(flush_log_);
     flush_log_->push_back(pending_bytes_);
     pending_bytes_ = 0;
@@ -92,9 +94,9 @@ class FakeFileStreamWriter : public storage::FileStreamWriter {
 
  private:
   int pending_bytes_;
-  std::vector<std::string>* write_log_;  // Not owned.
-  std::vector<int>* flush_log_;          // Not owned.
-  int* cancel_counter_;                  // Not owned.
+  raw_ptr<std::vector<std::string>, ExperimentalAsh> write_log_;  // Not owned.
+  raw_ptr<std::vector<int>, ExperimentalAsh> flush_log_;          // Not owned.
+  raw_ptr<int, ExperimentalAsh> cancel_counter_;                  // Not owned.
   net::Error write_error_;
 };
 
@@ -174,7 +176,8 @@ TEST_F(FileSystemProviderBufferingFileStreamWriterTest, Write) {
     inner_flush_log.clear();
 
     std::vector<int> flush_log;
-    const int result = writer.Flush(base::BindOnce(&LogValue<int>, &flush_log));
+    const int result = writer.Flush(storage::FlushMode::kEndOfFile,
+                                    base::BindOnce(&LogValue<int>, &flush_log));
     base::RunLoop().RunUntilIdle();
 
     EXPECT_EQ(net::ERR_IO_PENDING, result);
@@ -363,7 +366,8 @@ TEST_F(FileSystemProviderBufferingFileStreamWriterTest, Flush) {
   // filled out.
   std::vector<int> flush_log;
   const int flush_result =
-      writer.Flush(base::BindOnce(&LogValue<int>, &flush_log));
+      writer.Flush(storage::FlushMode::kEndOfFile,
+                   base::BindOnce(&LogValue<int>, &flush_log));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(net::ERR_IO_PENDING, flush_result);
@@ -402,7 +406,8 @@ TEST_F(FileSystemProviderBufferingFileStreamWriterTest, Flush_AfterWriteError) {
   // filled out. That should cause failing.
   std::vector<int> flush_log;
   const int flush_result =
-      writer.Flush(base::BindOnce(&LogValue<int>, &flush_log));
+      writer.Flush(storage::FlushMode::kEndOfFile,
+                   base::BindOnce(&LogValue<int>, &flush_log));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(net::ERR_IO_PENDING, flush_result);

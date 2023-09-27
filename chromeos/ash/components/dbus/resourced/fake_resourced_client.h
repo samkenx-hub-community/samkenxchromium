@@ -46,6 +46,9 @@ class COMPONENT_EXPORT(RESOURCED) FakeResourcedClient : public ResourcedClient {
 
   int get_exit_game_mode_count() const { return exit_game_mode_count_; }
 
+  uint32_t get_critical_margin_bps() const { return critical_margin_bps_; }
+  uint32_t get_moderate_margin_bps() const { return moderate_margin_bps_; }
+
   void AddObserver(Observer* observer) override;
 
   void RemoveObserver(Observer* observer) override;
@@ -55,6 +58,9 @@ class COMPONENT_EXPORT(RESOURCED) FakeResourcedClient : public ResourcedClient {
 
   void FakeArcVmMemoryPressure(PressureLevelArcVm level,
                                uint64_t reclaim_target_kb);
+
+  void AddArcContainerObserver(ArcContainerObserver* observer) override;
+  void RemoveArcContainerObserver(ArcContainerObserver* observer) override;
 
  private:
   absl::optional<GameMode> set_game_mode_response_;
@@ -69,6 +75,7 @@ class COMPONENT_EXPORT(RESOURCED) FakeResourcedClient : public ResourcedClient {
 
   base::ObserverList<Observer> observers_;
   base::ObserverList<ArcVmObserver> arcvm_observers_;
+  base::ObserverList<ArcContainerObserver> arc_container_observers_;
 };
 
 }  // namespace ash

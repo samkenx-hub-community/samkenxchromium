@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include "ash/system/unified/unified_system_tray_controller.h"
+
+#include <algorithm>
 #include <memory>
 
 #include "ash/capture_mode/capture_mode_feature_pod_controller.h"
@@ -14,7 +16,6 @@
 #include "ash/public/cpp/system_tray_client.h"
 #include "ash/public/cpp/update_types.h"
 #include "ash/session/session_controller_impl.h"
-#include "ash/shelf/shelf_party_feature_pod_controller.h"
 #include "ash/shell.h"
 #include "ash/system/accessibility/accessibility_feature_pod_controller.h"
 #include "ash/system/accessibility/unified_accessibility_detailed_view_controller.h"
@@ -28,12 +29,16 @@
 #include "ash/system/cast/cast_feature_pod_controller.h"
 #include "ash/system/cast/unified_cast_detailed_view_controller.h"
 #include "ash/system/dark_mode/dark_mode_feature_pod_controller.h"
+#include "ash/system/focus_mode/focus_mode_detailed_view_controller.h"
+#include "ash/system/focus_mode/focus_mode_feature_pod_controller.h"
+#include "ash/system/hotspot/hotspot_detailed_view_controller.h"
+#include "ash/system/hotspot/hotspot_feature_pod_controller.h"
 #include "ash/system/ime/ime_feature_pod_controller.h"
 #include "ash/system/ime/unified_ime_detailed_view_controller.h"
 #include "ash/system/locale/locale_feature_pod_controller.h"
 #include "ash/system/locale/unified_locale_detailed_view_controller.h"
 #include "ash/system/media/media_tray.h"
-#include "ash/system/media/unified_media_controls_controller.h"
+#include "ash/system/media/quick_settings_media_view_controller.h"
 #include "ash/system/media/unified_media_controls_detailed_view_controller.h"
 #include "ash/system/model/clock_model.h"
 #include "ash/system/model/system_tray_model.h"
@@ -67,7 +72,6 @@
 #include "ash/system/unified/user_chooser_detailed_view_controller.h"
 #include "ash/wm/lock_state_controller.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
-#include "base/cxx17_backports.h"
 #include "base/functional/bind.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/metrics/histogram_macros.h"
@@ -114,7 +118,10 @@ UnifiedSystemTrayController::UnifiedSystemTrayController(
       animation_(std::make_unique<gfx::SlideAnimation>(this)) {
   LoadIsExpandedPref();
 
-  animation_->Reset(model_->IsExpandedOnOpen() ? 1.0 : 0.0);
+  const float animation_value = features::IsQsRevampEnabled()
+                                    ? 1
+                                    : (model_->IsExpandedOnOpen() ? 1.0 : 0.0);
+  animation_->Reset(animation_value);
   animation_->SetSlideDuration(
       base::Milliseconds(kSystemMenuCollapseExpandAnimationDurationMs));
   animation_->SetTweenType(gfx::Tween::EASE_IN_OUT);
@@ -167,8 +174,7 @@ UnifiedSystemTrayController::CreateUnifiedQuickSettingsView() {
 
   InitFeaturePods();
 
-  if (base::FeatureList::IsEnabled(media::kGlobalMediaControlsForChromeOS) &&
-      !Shell::Get()->session_controller()->IsScreenLocked() &&
+  if (!Shell::Get()->session_controller()->IsScreenLocked() &&
       !MediaTray::IsPinnedToShelf()) {
     media_controls_controller_ =
         std::make_unique<UnifiedMediaControlsController>(this);
@@ -196,26 +202,32 @@ UnifiedSystemTrayController::CreateQuickSettingsView(int max_height) {
   auto qs_view = std::make_unique<QuickSettingsView>(this);
   quick_settings_view_ = qs_view.get();
 
-  if (base::FeatureList::IsEnabled(media::kGlobalMediaControlsForChromeOS) &&
-      !Shell::Get()->session_controller()->IsScreenLocked() &&
+  if (!Shell::Get()->session_controller()->IsScreenLocked() &&
       !MediaTray::IsPinnedToShelf()) {
-    media_controls_controller_ =
-        std::make_unique<UnifiedMediaControlsController>(this);
-    qs_view->AddMediaControlsView(media_controls_controller_->CreateView());
+    if (base::FeatureList::IsEnabled(
+            media::kGlobalMediaControlsCrOSUpdatedUI)) {
+      media_view_controller_ =
+          std::make_unique<QuickSettingsMediaViewController>(this);
+      qs_view->AddMediaView(media_view_controller_->CreateView());
+    } else {
+      media_controls_controller_ =
+          std::make_unique<UnifiedMediaControlsController>(this);
+      qs_view->AddMediaControlsView(media_controls_controller_->CreateView());
+    }
   }
 
   volume_slider_controller_ =
       std::make_unique<UnifiedVolumeSliderController>(this);
-  unified_volume_view_ = volume_slider_controller_->CreateView();
-  qs_view->AddSliderView(unified_volume_view_);
+  unified_volume_view_ =
+      qs_view->AddSliderView(volume_slider_controller_->CreateView());
 
   brightness_slider_controller_ =
       std::make_unique<UnifiedBrightnessSliderController>(
           model_, views::Button::PressedCallback(base::BindRepeating(
                       &UnifiedSystemTrayController::ShowDisplayDetailedView,
                       base::Unretained(this))));
-  unified_brightness_view_ = brightness_slider_controller_->CreateView();
-  qs_view->AddSliderView(unified_brightness_view_);
+  unified_brightness_view_ =
+      qs_view->AddSliderView(brightness_slider_controller_->CreateView());
 
   qs_view->SetMaxHeight(max_height);
 
@@ -307,6 +319,10 @@ void UnifiedSystemTrayController::HandleEnterpriseInfoAction() {
 }
 
 void UnifiedSystemTrayController::ToggleExpanded() {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   if (animation_->is_animating()) {
     return;
   }
@@ -331,6 +347,10 @@ void UnifiedSystemTrayController::ToggleExpanded() {
 }
 
 void UnifiedSystemTrayController::BeginDrag(const gfx::PointF& location) {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   UpdateDragThreshold();
   // Ignore swipe collapsing when a detailed view is shown as it's confusing.
   if (detailed_view_controller_) {
@@ -341,6 +361,10 @@ void UnifiedSystemTrayController::BeginDrag(const gfx::PointF& location) {
 }
 
 void UnifiedSystemTrayController::UpdateDrag(const gfx::PointF& location) {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   // Ignore swipe collapsing when a detailed view is shown as it's confusing.
   if (detailed_view_controller_) {
     return;
@@ -360,13 +384,7 @@ void UnifiedSystemTrayController::UpdateDrag(const gfx::PointF& location) {
 
 void UnifiedSystemTrayController::StartAnimation(bool expand) {
   // UnifiedSystemTrayControllerTest does not add `unified_view_` to a widget.
-  if (features::IsQsRevampEnabled() && quick_settings_view_->GetWidget()) {
-    animation_tracker_.emplace(quick_settings_view_->GetWidget()
-                                   ->GetCompositor()
-                                   ->RequestNewThroughputTracker());
-    animation_tracker_->Start(metrics_util::ForSmoothness(
-        expand ? base::BindRepeating(&ReportExpandAnimationSmoothness)
-               : base::BindRepeating(&ReportCollapseAnimationSmoothness)));
+  if (features::IsQsRevampEnabled()) {
     return;
   }
 
@@ -390,6 +408,10 @@ void UnifiedSystemTrayController::StartAnimation(bool expand) {
 }
 
 void UnifiedSystemTrayController::EndDrag(const gfx::PointF& location) {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   // Ignore swipe collapsing when a detailed view is shown as it's confusing.
   if (detailed_view_controller_) {
     return;
@@ -416,6 +438,10 @@ void UnifiedSystemTrayController::EndDrag(const gfx::PointF& location) {
 }
 
 void UnifiedSystemTrayController::Fling(int velocity) {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   // Ignore swipe collapsing when a detailed view is shown as it's confusing.
   if (detailed_view_controller_) {
     return;
@@ -451,8 +477,15 @@ void UnifiedSystemTrayController::ShowNetworkDetailedView(bool force) {
   ShowDetailedView(std::make_unique<NetworkDetailedViewController>(this));
 }
 
+void UnifiedSystemTrayController::ShowHotspotDetailedView() {
+  DCHECK(features::IsQsRevampEnabled());
+
+  ShowDetailedView(std::make_unique<HotspotDetailedViewController>(this));
+}
+
 void UnifiedSystemTrayController::ShowBluetoothDetailedView() {
-  if (!IsExpanded()) {
+  // QSRevamp does not allow expand/collapse of the System Tray.
+  if (!IsExpanded() && !features::IsQsRevampEnabled()) {
     return;
   }
 
@@ -470,6 +503,11 @@ void UnifiedSystemTrayController::ShowAccessibilityDetailedView() {
       base::UserMetricsAction("StatusArea_Accessability_DetailedView"));
   ShowDetailedView(
       std::make_unique<UnifiedAccessibilityDetailedViewController>(this));
+}
+
+void UnifiedSystemTrayController::ShowFocusModeDetailedView() {
+  base::RecordAction(base::UserMetricsAction("StatusArea_FocusMode_Detailed"));
+  ShowDetailedView(std::make_unique<FocusModeDetailedViewController>(this));
 }
 
 void UnifiedSystemTrayController::ShowVPNDetailedView() {
@@ -521,9 +559,10 @@ void UnifiedSystemTrayController::ShowCalendarView(
   }
 }
 
-void UnifiedSystemTrayController::ShowMediaControlsDetailedView() {
-  ShowDetailedView(
-      std::make_unique<UnifiedMediaControlsDetailedViewController>(this));
+void UnifiedSystemTrayController::ShowMediaControlsDetailedView(
+    const std::string& show_devices_for_item_id) {
+  ShowDetailedView(std::make_unique<UnifiedMediaControlsDetailedViewController>(
+      this, show_devices_for_item_id));
 }
 
 void UnifiedSystemTrayController::TransitionToMainView(bool restore_focus) {
@@ -575,6 +614,10 @@ bool UnifiedSystemTrayController::FocusOut(bool reverse) {
 }
 
 void UnifiedSystemTrayController::EnsureCollapsed() {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   if (IsExpanded()) {
     animation_->Hide();
   }
@@ -594,6 +637,10 @@ void UnifiedSystemTrayController::EnsureExpanded() {
 
 void UnifiedSystemTrayController::AnimationEnded(
     const gfx::Animation* animation) {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   if (animation_tracker_) {
     animation_tracker_->Stop();
     animation_tracker_.reset();
@@ -604,11 +651,19 @@ void UnifiedSystemTrayController::AnimationEnded(
 
 void UnifiedSystemTrayController::AnimationProgressed(
     const gfx::Animation* animation) {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   UpdateExpandedAmount();
 }
 
 void UnifiedSystemTrayController::AnimationCanceled(
     const gfx::Animation* animation) {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   animation_->Reset(std::round(animation_->GetCurrentValue()));
   UpdateExpandedAmount();
 }
@@ -627,6 +682,10 @@ void UnifiedSystemTrayController::ShowMediaControls() {
 
 void UnifiedSystemTrayController::OnMediaControlsViewClicked() {
   ShowMediaControlsDetailedView();
+}
+
+void UnifiedSystemTrayController::SetShowMediaView(bool show_media_view) {
+  quick_settings_view_->SetShowMediaView(show_media_view);
 }
 
 void UnifiedSystemTrayController::LoadIsExpandedPref() {
@@ -653,12 +712,7 @@ void UnifiedSystemTrayController::InitFeaturePods() {
   AddFeaturePodItem(std::make_unique<VPNFeaturePodController>(this));
   AddFeaturePodItem(std::make_unique<IMEFeaturePodController>(this));
   AddFeaturePodItem(std::make_unique<LocaleFeaturePodController>(this));
-  if (features::IsDarkLightModeEnabled()) {
-    AddFeaturePodItem(std::make_unique<DarkModeFeaturePodController>(this));
-  }
-  if (base::FeatureList::IsEnabled(features::kShelfParty)) {
-    AddFeaturePodItem(std::make_unique<ShelfPartyFeaturePodController>());
-  }
+  AddFeaturePodItem(std::make_unique<DarkModeFeaturePodController>(this));
   if (media::ShouldEnableAutoFraming()) {
     AddFeaturePodItem(std::make_unique<AutozoomFeaturePodController>());
   }
@@ -670,7 +724,6 @@ void UnifiedSystemTrayController::InitFeaturePods() {
 }
 
 void UnifiedSystemTrayController::InitFeatureTiles() {
-  // TODO(b/252871301): Create each feature's tile.
   std::vector<std::unique_ptr<FeatureTile>> tiles;
 
   auto create_tile =
@@ -710,6 +763,14 @@ void UnifiedSystemTrayController::InitFeatureTiles() {
               cast_and_rotation_tiles_are_compact);
   create_tile(std::make_unique<AccessibilityFeaturePodController>(this),
               feature_pod_controllers_, tiles);
+  if (features::IsHotspotEnabled()) {
+    create_tile(std::make_unique<HotspotFeaturePodController>(this),
+                feature_pod_controllers_, tiles);
+  }
+  if (base::FeatureList::IsEnabled(features::kFocusMode)) {
+    create_tile(std::make_unique<FocusModeFeaturePodController>(this),
+                feature_pod_controllers_, tiles);
+  }
   create_tile(std::make_unique<NearbyShareFeaturePodController>(this),
               feature_pod_controllers_, tiles);
   create_tile(std::make_unique<LocaleFeaturePodController>(this),
@@ -722,11 +783,6 @@ void UnifiedSystemTrayController::InitFeatureTiles() {
   }
   create_tile(std::make_unique<VPNFeaturePodController>(this),
               feature_pod_controllers_, tiles);
-
-  if (base::FeatureList::IsEnabled(features::kShelfParty)) {
-    create_tile(std::make_unique<ShelfPartyFeaturePodController>(),
-                feature_pod_controllers_, tiles);
-  }
   create_tile(std::make_unique<PrivacyScreenFeaturePodController>(),
               feature_pod_controllers_, tiles);
 
@@ -814,6 +870,10 @@ void UnifiedSystemTrayController::ResetToCollapsedIfRequired() {
 }
 
 void UnifiedSystemTrayController::CollapseWithoutAnimating() {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   unified_view_->SetExpandedAmount(0.0);
   animation_->Reset(0);
 }
@@ -829,6 +889,9 @@ bool UnifiedSystemTrayController::IsDetailedViewShown() const {
 }
 
 void UnifiedSystemTrayController::UpdateDragThreshold() {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
   UnifiedSystemTrayView* unified_view = bubble_->unified_view();
   drag_threshold_ = unified_view->GetExpandedSystemTrayHeight() -
                     unified_view->GetCollapsedSystemTrayHeight();
@@ -836,18 +899,22 @@ void UnifiedSystemTrayController::UpdateDragThreshold() {
 
 double UnifiedSystemTrayController::GetDragExpandedAmount(
     const gfx::PointF& location) const {
+  if (features::IsQsRevampEnabled()) {
+    return 1.0;
+  }
+
   double y_diff = (location - drag_init_point_).y();
   // If already expanded, only consider swiping down. Otherwise, only consider
   // swiping up.
   if (was_expanded_) {
-    return base::clamp(1.0 - std::max(0.0, y_diff) / drag_threshold_, 0.0, 1.0);
+    return std::clamp(1.0 - std::max(0.0, y_diff) / drag_threshold_, 0.0, 1.0);
   } else {
-    return base::clamp(std::max(0.0, -y_diff) / drag_threshold_, 0.0, 1.0);
+    return std::clamp(std::max(0.0, -y_diff) / drag_threshold_, 0.0, 1.0);
   }
 }
 
 bool UnifiedSystemTrayController::IsExpanded() const {
-  return animation_->IsShowing();
+  return features::IsQsRevampEnabled() || animation_->IsShowing();
 }
 
 void UnifiedSystemTrayController::UpdateBubble() {
@@ -862,12 +929,17 @@ bool UnifiedSystemTrayController::IsMessageCenterCollapseRequired() const {
     return false;
   }
 
+  if (!bubble_) {
+    return false;
+  }
+
   // Note: This calculaton should be the same as
   // UnifiedMessageCenterBubble::CalculateAvailableHeight().
-  return (bubble_ && CalculateMaxTrayBubbleHeight() -
-                             unified_view_->GetExpandedSystemTrayHeight() -
-                             kUnifiedMessageCenterBubbleSpacing <
-                         kMessageCenterCollapseThreshold);
+  auto available_height = CalculateMaxTrayBubbleHeight(
+      bubble_->GetTray()->GetBubbleWindowContainer());
+  available_height -= unified_view_->GetExpandedSystemTrayHeight();
+  available_height -= kUnifiedMessageCenterBubbleSpacing;
+  return available_height < kMessageCenterCollapseThreshold;
 }
 
 base::TimeDelta UnifiedSystemTrayController::GetAnimationDurationForReporting()

@@ -20,7 +20,8 @@ namespace {
 
 constexpr char kWindowPredictorLaunchHistogram[] = "Arc.WindowPredictorLaunch";
 
-// Reason for Window Predictor launch action enumeration; Used for UMA counter.
+// Reason for Window Predictor launch action when failed to launch App
+// enumeration; Used for UMA counter.
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
 enum class WindowPredictorLaunchType {
@@ -30,6 +31,9 @@ enum class WindowPredictorLaunchType {
   kFailedNoArcAppLaunchHandler = 3,
   kMaxValue = kFailedNoArcAppLaunchHandler,
 };
+
+constexpr char kWindowPredictorUseCaseHistogram[] =
+    "Arc.WindowPredictorUseCase";
 
 // Pre-defined screen size for ARC. See ArcLaunchParamsModifier.java in ARC
 // codebase.
@@ -90,6 +94,7 @@ bool WindowPredictor::LaunchArcAppWithGhostWindow(
     const apps::IntentPtr& intent,
     int event_flags,
     GhostWindowType window_type,
+    WindowPredictorUseCase use_case,
     const arc::mojom::WindowInfoPtr& window_info) {
   // ArcGhostWindowHandler maybe null in the test env.
   if (!ash::full_restore::ArcGhostWindowHandler::Get())
@@ -117,9 +122,7 @@ bool WindowPredictor::LaunchArcAppWithGhostWindow(
   arc::mojom::WindowInfoPtr predict_window_info =
       PredictAppWindowInfo(app_info, window_info.Clone());
 
-  // TODO(sstan): PredictAppWindowInfo should always return fulfilled info.
-  if (!predict_window_info || !predict_window_info->bounds.has_value())
-    return false;
+  DCHECK(predict_window_info);
 
   arc_task_handler->GetWindowPredictorArcAppRestoreHandler(launch_counter)
       ->LaunchGhostWindowWithApp(
@@ -128,6 +131,7 @@ bool WindowPredictor::LaunchArcAppWithGhostWindow(
 
   base::UmaHistogramEnumeration(kWindowPredictorLaunchHistogram,
                                 WindowPredictorLaunchType::kSuccess);
+  base::UmaHistogramEnumeration(kWindowPredictorUseCaseHistogram, use_case);
   return true;
 }
 
@@ -146,9 +150,9 @@ arc::mojom::WindowInfoPtr WindowPredictor::PredictAppWindowInfo(
   }
 
   if (ash::TabletMode::Get()->IsInTabletMode()) {
+    // TODO: Figure out why setting kMaximized doesn't work.
     window_info->state =
-        static_cast<int32_t>(chromeos::WindowStateType::kMaximized);
-    window_info->bounds = disp.work_area();
+        static_cast<int32_t>(chromeos::WindowStateType::kDefault);
     return window_info;
   }
 
@@ -165,10 +169,14 @@ arc::mojom::WindowInfoPtr WindowPredictor::PredictAppWindowInfo(
       window_info->bounds = GetMiddleBounds(disp, GetTabletSize());
       break;
     case arc::mojom::WindowSizeType::kPhoneSize:
+      window_info->state =
+          static_cast<int32_t>(chromeos::WindowStateType::kNormal);
+      window_info->bounds = GetMiddleBounds(disp, GetPhoneSize());
+      break;
     case arc::mojom::WindowSizeType::kUnknown:
     default:
       window_info->state =
-          static_cast<int32_t>(chromeos::WindowStateType::kNormal);
+          static_cast<int32_t>(chromeos::WindowStateType::kDefault);
       window_info->bounds = GetMiddleBounds(disp, GetPhoneSize());
   }
 

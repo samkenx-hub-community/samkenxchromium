@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,6 +6,7 @@
 #define CHROME_BROWSER_SUPERVISED_USER_CHROMEOS_SUPERVISED_USER_FAVICON_REQUEST_HANDLER_H_
 
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/cancelable_task_tracker.h"
 #include "components/favicon_base/favicon_types.h"
@@ -81,7 +82,8 @@ class SupervisedUserFaviconRequestHandler {
   // via a network request.
   base::OnceClosure on_fetched_callback_;
 
-  favicon::LargeIconService* large_icon_service_ = nullptr;
+  raw_ptr<favicon::LargeIconService, ExperimentalAsh> large_icon_service_ =
+      nullptr;
   base::CancelableTaskTracker favicon_task_tracker_;
 
   base::WeakPtrFactory<SupervisedUserFaviconRequestHandler> weak_ptr_factory_{

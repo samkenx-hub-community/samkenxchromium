@@ -7,6 +7,7 @@ package org.chromium.android_webview;
 import android.content.Context;
 import android.view.View;
 
+import org.chromium.android_webview.common.Lifetime;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.annotations.CalledByNative;
 import org.chromium.base.annotations.JNINamespace;
@@ -14,15 +15,16 @@ import org.chromium.base.annotations.NativeMethods;
 import org.chromium.components.autofill.AutofillDelegate;
 import org.chromium.components.autofill.AutofillPopup;
 import org.chromium.components.autofill.AutofillSuggestion;
+import org.chromium.components.autofill.PopupItemId;
 import org.chromium.ui.DropdownItem;
 
 /**
  * Java counterpart to the AwAutofillClient. This class is owned by AwContents and has
  * a weak reference from native side.
  */
+@Lifetime.WebView
 @JNINamespace("android_webview")
 public class AwAutofillClient {
-
     private final long mNativeAwAutofillClient;
     private AutofillPopup mAutofillPopup;
     private Context mContext;
@@ -98,9 +100,9 @@ public class AwAutofillClient {
      */
     @CalledByNative
     private static void addToAutofillSuggestionArray(AutofillSuggestion[] array, int index,
-            String name, String label, int uniqueId) {
+            String name, String label, @PopupItemId int popupItemId) {
         array[index] = new AutofillSuggestion(name, label, /* itemTag= */ "", DropdownItem.NO_ICON,
-                false /* isIconAtLeft */, uniqueId, false /* isDeletable */,
+                false /* isIconAtLeft */, popupItemId, false /* isDeletable */,
                 false /* isMultilineLabel */, false /* isBoldLabel */, /* featureForIPH= */ "");
     }
 

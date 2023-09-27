@@ -96,8 +96,9 @@ static_assert((kFilterableDataTypes &
 uint64_t MaskForKey(const char* key) {
   if (strcmp(key, extension_browsing_data_api_constants::kCacheKey) == 0)
     return content::BrowsingDataRemover::DATA_TYPE_CACHE;
-  if (strcmp(key, extension_browsing_data_api_constants::kCookiesKey) == 0)
+  if (strcmp(key, extension_browsing_data_api_constants::kCookiesKey) == 0) {
     return content::BrowsingDataRemover::DATA_TYPE_COOKIES;
+  }
   if (strcmp(key, extension_browsing_data_api_constants::kDownloadsKey) == 0)
     return content::BrowsingDataRemover::DATA_TYPE_DOWNLOADS;
   if (strcmp(key, extension_browsing_data_api_constants::kFileSystemsKey) == 0)
@@ -137,6 +138,9 @@ bool IsRemovalPermitted(uint64_t removal_mask, PrefService* prefs) {
 
 // Returns true if Sync is currently running (i.e. enabled and not in error).
 bool IsSyncRunning(Profile* profile) {
+  if (profile->IsOffTheRecord()) {
+    return false;
+  }
   return GetSyncStatusMessageType(profile) == SyncStatusMessageType::kSynced;
 }
 }  // namespace
@@ -267,7 +271,7 @@ void BrowsingDataRemoverFunction::OnTaskFinished() {
     return;
   synced_data_deletion_.reset();
   observation_.Reset();
-  Respond(WithArguments());
+  Respond(NoArguments());
   Release();  // Balanced in StartRemoving.
 }
 
@@ -308,23 +312,19 @@ ExtensionFunction::ResponseAction BrowsingDataRemoverFunction::Run() {
 
   if (origins) {
     OriginParsingResult result = ParseOrigins(*origins);
-    if (result.has_value()) {
-      origins_ = std::move(*result);
-    } else {
+    if (!result.has_value()) {
       return RespondNow(std::move(result.error()));
     }
-    mode_ = content::BrowsingDataFilterBuilder::Mode::kDelete;
-  } else {
-    if (exclude_origins) {
-      OriginParsingResult result = ParseOrigins(*exclude_origins);
-      if (result.has_value()) {
-        origins_ = std::move(*result);
-      } else {
-        return RespondNow(std::move(result.error()));
-      }
+    origins_ = std::move(*result);
+  } else if (exclude_origins) {
+    OriginParsingResult result = ParseOrigins(*exclude_origins);
+    if (!result.has_value()) {
+      return RespondNow(std::move(result.error()));
     }
-    mode_ = content::BrowsingDataFilterBuilder::Mode::kPreserve;
+    origins_ = std::move(*result);
   }
+  mode_ = origins ? content::BrowsingDataFilterBuilder::Mode::kDelete
+                  : content::BrowsingDataFilterBuilder::Mode::kPreserve;
 
   // Check if a filter is set but non-filterable types are selected.
   if ((!origins_.empty() && (removal_mask_ & ~kFilterableDataTypes) != 0)) {

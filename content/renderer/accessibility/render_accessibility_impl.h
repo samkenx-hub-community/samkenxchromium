@@ -102,6 +102,7 @@ class CONTENT_EXPORT RenderAccessibilityImpl : public RenderAccessibility,
   void SetPluginTreeSource(PluginAXTreeSource* source) override;
   void OnPluginRootNodeUpdated() override;
   void ShowPluginContextMenu() override;
+  void RecordInaccessiblePdfUkm() override;
 
   // RenderFrameObserver implementation.
   void DidCreateNewDocument() override;
@@ -113,7 +114,11 @@ class CONTENT_EXPORT RenderAccessibilityImpl : public RenderAccessibility,
                int request_id,
                blink::mojom::RenderAccessibility::HitTestCallback callback);
   void PerformAction(const ui::AXActionData& data);
-  void Reset(int32_t reset_token);
+  void Reset(uint32_t reset_token);
+
+  // Called when accessibility mode changes so that any obsolete accessibility
+  // bundles for the old mode can be ignored.
+  void set_reset_token(uint32_t reset_token);
 
   // Called when an accessibility notification occurs in Blink.
   void HandleAXEvent(const ui::AXEvent& event);
@@ -261,16 +266,10 @@ class CONTENT_EXPORT RenderAccessibilityImpl : public RenderAccessibility,
                                  bool mark_plugin_subtree_dirty);
 
   void AddImageAnnotations(const blink::WebDocument& document,
-                           std::vector<ui::AXNodeData>&);
+                           std::vector<ui::AXNodeData*>&);
   void AddImageAnnotationsForNode(blink::WebAXObject& src, ui::AXNodeData* dst);
 
   static void IgnoreProtocolChecksForTesting();
-
-  // After a serialization is sent to the browser process, this function will
-  // return true until the "ack" message is received, indicating the browser got
-  // the serialization message.
-  // No new serializations are sent until this message is received.
-  bool IsWaitingForAck() const;
 
   // The RenderAccessibilityManager that owns us.
   RenderAccessibilityManager* render_accessibility_manager_;
@@ -284,13 +283,14 @@ class CONTENT_EXPORT RenderAccessibilityImpl : public RenderAccessibility,
   // Manages the automatic image annotations, if enabled.
   std::unique_ptr<AXImageAnnotator> ax_image_annotator_;
 
-  using PluginAXTreeSerializer = ui::AXTreeSerializer<const ui::AXNode*>;
+  using PluginAXTreeSerializer =
+      ui::AXTreeSerializer<const ui::AXNode*, std::vector<const ui::AXNode*>>;
   std::unique_ptr<PluginAXTreeSerializer> plugin_serializer_;
   PluginAXTreeSource* plugin_tree_source_;
 
-  // Nonzero if the browser requested we reset the accessibility state.
-  // We need to return this token in the next IPC.
-  int reset_token_;
+  // Token to return this token in the next IPC, so that RenderFrameHostImpl
+  // can discard stale data, when the token does not match the expected token.
+  absl::optional<uint32_t> reset_token_;
 
   // Whether or not we've injected a stylesheet in this document
   // (only when debugging flags are enabled, never under normal circumstances).
@@ -344,6 +344,16 @@ class CONTENT_EXPORT RenderAccessibilityImpl : public RenderAccessibility,
 
   // A set of IDs for which we should always load inline text boxes.
   std::set<int32_t> load_inline_text_boxes_ids_;
+
+  // This will flip to true when we initiate the process of sending AX data to
+  // the browser, and will flip back to false once we receive back an ACK.
+  bool serialization_in_flight_ = false;
+
+  // This flips to true if a request for an immediate update was not honored
+  // because serialization_in_flight_ was true. It flips back to false once
+  // serialization_in_flight_ has flipped to false and an immediate update has
+  // been requested.
+  bool immediate_update_required_after_ack_ = false;
 
   // Controls whether serialization should be run synchronously at the end of a
   // main frame update, or scheduled as an asynchronous task.

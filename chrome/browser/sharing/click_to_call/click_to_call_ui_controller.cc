@@ -15,7 +15,8 @@
 #include "chrome/browser/sharing/sharing_dialog.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
+#include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/sync_device_info/device_info.h"
 #include "components/vector_icons/vector_icons.h"
 #include "content/public/browser/weak_document_ptr.h"
@@ -124,8 +125,8 @@ void ClickToCallUiController::DoUpdateApps(UpdateAppsCallback callback) {
   }
 
   if (!default_program_name_.empty()) {
-    apps.emplace_back(&vector_icons::kOpenInNewIcon, gfx::Image(),
-                      default_program_name_, std::string());
+    apps.emplace_back(&kOpenInNewIcon, gfx::Image(), default_program_name_,
+                      std::string());
   }
   std::move(callback).Run(std::move(apps));
 }
@@ -174,7 +175,9 @@ std::u16string ClickToCallUiController::GetContentType() const {
 }
 
 const gfx::VectorIcon& ClickToCallUiController::GetVectorIcon() const {
-  return vector_icons::kCallIcon;
+  return OmniboxFieldTrial::IsChromeRefreshIconsEnabled()
+             ? vector_icons::kCallRefreshIcon
+             : vector_icons::kCallIcon;
 }
 
 std::u16string ClickToCallUiController::GetTextForTooltipAndAccessibleName()

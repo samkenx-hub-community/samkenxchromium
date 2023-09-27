@@ -41,6 +41,15 @@ const systemInfoObserverRouter =
 // Set up a message pipe to the browser process to monitor screen state.
 systemInfo.setSystemInfoObserver(
     systemInfoObserverRouter.$.bindNewPipeAndPassRemote());
+// Returns the remote for AccessibilityProvider.
+const accessibility = ash.echeApp.mojom.AccessibilityProvider.getRemote();
+// An object that receives requests for the AccessibilityObserver mojom
+// interface and dispatches them as callbacks. Setup the message
+const accessibilityObserverRouter =
+    new ash.echeApp.mojom.AccessibilityObserverCallbackRouter();
+// Set up a message pipe to the browser process to accessibility actions.
+accessibility.setAccessibilityObserver(
+    accessibilityObserverRouter.$.bindNewPipeAndPassRemote());
 
 const notificationGenerator =
     ash.echeApp.mojom.NotificationGenerator.getRemote();
@@ -53,11 +62,21 @@ const streamOrientationObserver =
 const connectionStatusObserver =
     ash.echeApp.mojom.ConnectionStatusObserver.getRemote();
 
+const keyboardLayoutHandler =
+    ash.echeApp.mojom.KeyboardLayoutHandler.getRemote();
+
 const streamActionObserverRouter =
     new ash.echeApp.mojom.StreamActionObserverCallbackRouter();
 // Set up a message pipe to the browser process to monitor stream action.
 displayStreamHandler.setStreamActionObserver(
     streamActionObserverRouter.$.bindNewPipeAndPassRemote());
+
+const keyboardLayoutObserverRouter =
+    new ash.echeApp.mojom.KeyboardLayoutObserverCallbackRouter();
+// Set up a message pipe to the browser process to monitor keyboard layout
+// changes.
+keyboardLayoutHandler.setKeyboardLayoutObserver(
+    keyboardLayoutObserverRouter.$.bindNewPipeAndPassRemote());
 
 /**
  * A pipe through which we can send messages to the guest frame.
@@ -77,6 +96,12 @@ guestMessagePipe.registerHandler(Message.SEND_SIGNAL, async (signal) => {
   console.log('echeapi browser_proxy.js sendSignalingMessage');
   signalMessageExchanger.sendSignalingMessage(signal);
 });
+
+guestMessagePipe.registerHandler(
+    Message.ACCESSIBILITY_EVENT_DATA, async (event_data) => {
+      console.log('echeapi browser_proxy.js handleAccessibilityEventReceived');
+      accessibility.handleAccessibilityEventReceived(event_data);
+    });
 
 signalingMessageObserverRouter.onReceivedSignalingMessage.addListener(
     (signal) => {
@@ -139,6 +164,25 @@ systemInfoObserverRouter.onAndroidDeviceNetworkInfoChanged.addListener(
         /** @type {boolean} */ androidDeviceOnCellular,
       });
     });
+accessibilityObserverRouter.performAction.addListener((action) => {
+  return new Promise(async (resolve) => {
+    const result = await guestMessagePipe.sendMessage(
+        Message.ACCESSIBILITY_PERFORM_ACTION, action);
+    // It appears as though false is sent as an empty object. Likely due to
+    // proto omitting the value when it is false.
+    const payload = typeof result == 'boolean' ? result : false;
+    // For mojom to understand what to do, a result key is required.
+    resolve({result: payload});
+  });
+});
+
+accessibilityObserverRouter.refreshWithExtraData.addListener((action) => {
+  return new Promise(async (resolve) => {
+    const result = await guestMessagePipe.sendMessage(
+        Message.ACCESSIBILITY_REFRESH_WITH_EXTRA_DATA, action);
+    resolve({result});
+  });
+});
 
 // Add stream action listener and send result via pipes.
 streamActionObserverRouter.onStreamAction.addListener((action) => {
@@ -147,6 +191,18 @@ streamActionObserverRouter.onStreamAction.addListener((action) => {
     /** @type {number} */ action,
   });
 });
+
+// Add keyboard listener and send result via pipes.
+keyboardLayoutObserverRouter.onKeyboardLayoutChanged.addListener(
+    (id, longName, shortName, layoutTag) => {
+      console.log('echeapi browser_proxy.js onKeyboardLayoutChanged');
+      guestMessagePipe.sendMessage(Message.KEYBOARD_LAYOUT_INFO, {
+        /** @type {string} */ id,
+        /** @type {string} */ longName,
+        /** @type {string} */ shortName,
+        /** @type {string} */ layoutTag,
+      });
+    });
 
 guestMessagePipe.registerHandler(Message.SHOW_NOTIFICATION, async (message) => {
   // The C++ layer uses std::u16string, which use 16 bit characters. JS
@@ -202,6 +258,7 @@ guestMessagePipe.registerHandler(
           `echeapi browser_proxy.js ` +
           `onStreamOrientationChanged ${message.isLandscape}`);
       streamOrientationObserver.onStreamOrientationChanged(message.isLandscape);
+      accessibility.onStreamOrientationChanged(message.isLandscape);
     });
 
 // Register CONNECTION_STATUS_CHANGED.
@@ -213,6 +270,12 @@ guestMessagePipe.registerHandler(
       connectionStatusObserver.onConnectionStatusChanged(
           message.connectionStatus);
     });
+
+// Register KEYBOARD_LAYOUT_REQUEST pipes.
+guestMessagePipe.registerHandler(Message.KEYBOARD_LAYOUT_REQUEST, async () => {
+  console.log('echeapi browser_proxy.js requestCurrentKeyboardLayout');
+  keyboardLayoutHandler.requestCurrentKeyboardLayout();
+});
 
 // We can't access hash change event inside iframe so parse the notification
 // info from the anchor part of the url when hash is changed and send them to

@@ -46,13 +46,20 @@
           "builder": "lacros-amd64-generic-rel-skylab",
           "project": "chromium"
         }
+      ],
+      "mirroring_builder_group_and_names": [
+        {
+          "builder": "lacros-amd64-generic-rel-skylab",
+          "group": "tryserver.chromium.chromiumos"
+        }
       ]
     }
   },
   "$build/reclient": {
     "instance": "rbe-chromium-trusted",
     "jobs": 500,
-    "metrics_project": "chromium-reclient-metrics"
+    "metrics_project": "chromium-reclient-metrics",
+    "scandeps_server": true
   },
   "$recipe_engine/resultdb/test_presentation": {
     "column_keys": [],
@@ -62,5 +69,8 @@
     ]
   },
   "builder_group": "chromium.chromiumos",
-  "recipe": "chromium"
+  "recipe": "chromium",
+  "sheriff_rotations": [
+    "chromium"
+  ]
 }

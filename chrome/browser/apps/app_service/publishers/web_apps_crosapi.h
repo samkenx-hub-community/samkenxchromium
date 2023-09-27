@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/apps/app_service/app_icon/app_icon_factory.h"
 #include "chrome/browser/apps/app_service/app_icon/icon_key_util.h"
@@ -71,14 +73,10 @@ class WebAppsCrosapi : public KeyedService,
                            WebAppsNotInitializedIfRegisterFirst);
   FRIEND_TEST_ALL_PREFIXES(StandaloneBrowserPublisherTest,
                            WebAppsInitializedForEmptyList);
+  FRIEND_TEST_ALL_PREFIXES(StandaloneBrowserPublisherTest,
+                           WebAppsCrosapiCapabilityReset);
 
   // apps::AppPublisher overrides.
-  void LoadIcon(const std::string& app_id,
-                const IconKey& icon_key,
-                IconType icon_type,
-                int32_t size_hint_in_dip,
-                bool allow_placeholder_icon,
-                apps::LoadIconCallback callback) override;
   void GetCompressedIconData(const std::string& app_id,
                              int32_t size_in_dip,
                              ui::ResourceScaleFactor scale_factor,
@@ -141,14 +139,6 @@ class WebAppsCrosapi : public KeyedService,
       base::OnceCallback<void(MenuItems)> callback,
       crosapi::mojom::MenuItemsPtr crosapi_menu_items);
 
-  void OnLoadIcon(IconType icon_type,
-                  int size_hint_in_dip,
-                  apps::IconEffects icon_effects,
-                  apps::LoadIconCallback callback,
-                  IconValuePtr icon_value);
-  void OnApplyIconEffects(IconType icon_type,
-                          apps::LoadIconCallback callback,
-                          IconValuePtr icon_value);
   void PublishImpl(std::vector<AppPtr> deltas);
   void PublishCapabilityAccessesImpl(std::vector<CapabilityAccessPtr> deltas);
 
@@ -171,7 +161,7 @@ class WebAppsCrosapi : public KeyedService,
 
   mojo::Receiver<crosapi::mojom::AppPublisher> receiver_{this};
   mojo::Remote<crosapi::mojom::AppController> controller_;
-  AppServiceProxy* const proxy_;
+  const raw_ptr<AppServiceProxy, ExperimentalAsh> proxy_;
   bool should_notify_initialized_ = true;
 
   base::WeakPtrFactory<WebAppsCrosapi> weak_factory_{this};

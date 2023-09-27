@@ -10,6 +10,8 @@
 #include "ash/ash_export.h"
 #include "ash/system/tray/tray_constants.h"
 #include "ash/system/tray/view_click_listener.h"
+#include "base/memory/raw_ptr.h"
+#include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/view.h"
 
@@ -20,8 +22,6 @@ struct VectorIcon;
 namespace views {
 class BoxLayout;
 class Button;
-class ImageView;
-class Label;
 class ProgressBar;
 class ScrollView;
 class Separator;
@@ -36,6 +36,7 @@ class TriView;
 class ASH_EXPORT TrayDetailedView : public views::View,
                                     public ViewClickListener {
  public:
+  METADATA_HEADER(TrayDetailedView);
   explicit TrayDetailedView(DetailedViewDelegate* delegate);
 
   TrayDetailedView(const TrayDetailedView&) = delete;
@@ -56,14 +57,15 @@ class ASH_EXPORT TrayDetailedView : public views::View,
   // views::View:
   void Layout() override;
   int GetHeightForWidth(int width) const override;
-  const char* GetClassName() const override;
-  void OnThemeChanged() override;
 
   // Exposes the layout manager of this view to give control to subclasses.
   views::BoxLayout* box_layout() { return box_layout_; }
 
   // Creates the row containing the back button and title. Optionally omits the
-  // back button if `create_back_button` is false.
+  // back button and left aligns the label contained in the CENTER view if
+  // `create_back_button` is false.
+  // TODO(b/285280977): Remove `create_back_button` when CalendarView is out of
+  // TrayDetailedView.
   void CreateTitleRow(int string_id, bool create_back_button = true);
 
   // Creates a scrollable list. The list has a border at the bottom if there is
@@ -134,8 +136,12 @@ class ASH_EXPORT TrayDetailedView : public views::View,
   virtual void HandleViewClicked(views::View* view);
 
   // Returns the TriView used for the title row. A label with `string_id` is
-  // added to the CENTER view.
-  std::unique_ptr<TriView> CreateTitleTriView(int string_id);
+  // added to the CENTER view. Left aligns the label contained in the CENTER
+  // view and reduces padding if `create_back_button` is false.
+  // TODO(b/285280977): Remove `create_back_button` when CalendarView is out of
+  // TrayDetailedView.
+  std::unique_ptr<TriView> CreateTitleTriView(int string_id,
+                                              bool create_back_button);
 
   // Returns the separator used between the title row and the contents.
   std::unique_ptr<views::Separator> CreateTitleSeparator();
@@ -146,31 +152,22 @@ class ASH_EXPORT TrayDetailedView : public views::View,
   // Transition to main view from detailed view.
   void TransitionToMainView();
 
-  DetailedViewDelegate* const delegate_;
-  views::BoxLayout* box_layout_ = nullptr;
-  views::ScrollView* scroller_ = nullptr;
-  views::View* scroll_content_ = nullptr;
-  views::ProgressBar* progress_bar_ = nullptr;
+  const raw_ptr<DetailedViewDelegate, DanglingUntriaged | ExperimentalAsh>
+      delegate_;
+  raw_ptr<views::BoxLayout, DanglingUntriaged | ExperimentalAsh> box_layout_ =
+      nullptr;
+  raw_ptr<views::ScrollView, DanglingUntriaged | ExperimentalAsh> scroller_ =
+      nullptr;
+  raw_ptr<views::View, DanglingUntriaged | ExperimentalAsh> scroll_content_ =
+      nullptr;
+  raw_ptr<views::ProgressBar, ExperimentalAsh> progress_bar_ = nullptr;
 
   // The container view for the top-most title row. Owned by views hierarchy.
-  TriView* tri_view_ = nullptr;
+  raw_ptr<TriView, DanglingUntriaged | ExperimentalAsh> tri_view_ = nullptr;
 
   // The back button that appears in the title row. Owned by views hierarchy.
-  views::Button* back_button_ = nullptr;
-
-  // The label in the title row. Owned by views hierarchy.
-  views::Label* title_label_ = nullptr;
-
-  // Owned by views hierarchy.
-  views::Label* sub_header_label_ = nullptr;
-  views::ImageView* sub_header_image_view_ = nullptr;
-
-  // Owned by vector icon cache.
-  const gfx::VectorIcon* sub_header_icon_ = nullptr;
-
-  // The separator under the title row. Not all views have a separator. Owned by
-  // views hierarchy.
-  views::Separator* title_separator_ = nullptr;
+  raw_ptr<views::Button, DanglingUntriaged | ExperimentalAsh> back_button_ =
+      nullptr;
 
   // Gets modified to false in the constructor of the view if it doesn't have a
   // separator.

@@ -8,13 +8,9 @@
 #import <vector>
 
 #import "components/optimization_guide/core/optimization_guide_features.h"
-#import "ios/chrome/browser/commerce/push_notification/commerce_push_notification_client.h"
-#import "ios/chrome/browser/commerce/push_notification/push_notification_feature.h"
+#import "ios/chrome/browser/commerce/model/push_notification/commerce_push_notification_client.h"
+#import "ios/chrome/browser/commerce/model/push_notification/push_notification_feature.h"
 #import "ios/chrome/browser/push_notification/push_notification_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 PushNotificationClientManager::PushNotificationClientManager() {
   if (IsPriceNotificationsEnabled() &&
@@ -88,6 +84,12 @@ void PushNotificationClientManager::RegisterActionableNotifications() {
 std::vector<PushNotificationClientId>
 PushNotificationClientManager::GetClients() {
   return {PushNotificationClientId::kCommerce};
+}
+
+void PushNotificationClientManager::OnSceneActiveForegroundBrowserReady() {
+  for (auto& client : clients_) {
+    client.second->OnSceneActiveForegroundBrowserReady();
+  }
 }
 
 std::string PushNotificationClientManager::PushNotificationClientIdToString(

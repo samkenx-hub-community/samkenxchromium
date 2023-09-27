@@ -73,48 +73,26 @@ chrome.runtime.onMessageExternal.addListener(function(
     } else if (method === 'logging.stop') {
       chrome.webrtcLoggingPrivate.stop(requestInfo, origin, doSendResponse);
       return true;
-    } else if (method === 'logging.upload') {
-      chrome.webrtcLoggingPrivate.upload(requestInfo, origin, doSendResponse);
-      return true;
-    } else if (method === 'logging.uploadStored') {
-      const logId = message['logId'];
-      chrome.webrtcLoggingPrivate.uploadStored(
-          requestInfo, origin, logId, doSendResponse);
-      return true;
     } else if (method === 'logging.stopAndUpload') {
       // Stop everything and upload. This is allowed to be called even if
       // logs have already been stopped or not started. Therefore, ignore
       // any errors along the way, but store them, so that if upload fails
       // they are all reported back.
-      // Stop incoming and outgoing RTP dumps separately, otherwise
-      // stopRtpDump will fail and not stop anything if either type has not
-      // been started.
       const errors = [];
-      chrome.webrtcLoggingPrivate.stopRtpDump(
-          requestInfo, origin, true /* incoming */, false /* outgoing */,
-          function() {
-            appendLastErrorMessage(errors);
-            chrome.webrtcLoggingPrivate.stopRtpDump(
-                requestInfo, origin, false /* incoming */, true /* outgoing */,
-                function() {
-                  appendLastErrorMessage(errors);
-                  chrome.webrtcLoggingPrivate.stop(
-                      requestInfo, origin, function() {
-                        appendLastErrorMessage(errors);
-                        chrome.webrtcLoggingPrivate.upload(
-                            requestInfo, origin, function(uploadValue) {
-                              let errorMessage = null;
-                              // If upload fails, report all previous errors.
-                              // Otherwise, throw them away.
-                              if (chrome.runtime.lastError !== undefined) {
-                                appendLastErrorMessage(errors);
-                                errorMessage = errors.join('; ');
-                              }
-                              doSendResponse(uploadValue, errorMessage);
-                            });
-                      });
-                });
-          });
+      chrome.webrtcLoggingPrivate.stop(requestInfo, origin, function() {
+        appendLastErrorMessage(errors);
+        chrome.webrtcLoggingPrivate.upload(
+            requestInfo, origin, function(uploadValue) {
+              let errorMessage = null;
+              // If upload fails, report all previous errors.
+              // Otherwise, throw them away.
+              if (chrome.runtime.lastError !== undefined) {
+                appendLastErrorMessage(errors);
+                errorMessage = errors.join('; ');
+              }
+              doSendResponse(uploadValue, errorMessage);
+            });
+      });
       return true;
     } else if (method === 'logging.store') {
       const logId = message['logId'];
@@ -123,32 +101,6 @@ chrome.runtime.onMessageExternal.addListener(function(
       return true;
     } else if (method === 'logging.discard') {
       chrome.webrtcLoggingPrivate.discard(requestInfo, origin, doSendResponse);
-      return true;
-    } else if (method === 'getNaclArchitecture') {
-      chrome.runtime.getPlatformInfo(function(obj) {
-        doSendResponse(obj.nacl_arch);
-      });
-      return true;
-    } else if (method === 'logging.startRtpDump') {
-      const incoming = message['incoming'] || false;
-      const outgoing = message['outgoing'] || false;
-      chrome.webrtcLoggingPrivate.startRtpDump(
-          requestInfo, origin, incoming, outgoing, doSendResponse);
-      return true;
-    } else if (method === 'logging.stopRtpDump') {
-      const incoming = message['incoming'] || false;
-      const outgoing = message['outgoing'] || false;
-      chrome.webrtcLoggingPrivate.stopRtpDump(
-          requestInfo, origin, incoming, outgoing, doSendResponse);
-      return true;
-    } else if (method === 'logging.startAudioDebugRecordings') {
-      const seconds = message['seconds'] || 0;
-      chrome.webrtcLoggingPrivate.startAudioDebugRecordings(
-          requestInfo, origin, seconds, doSendResponse);
-      return true;
-    } else if (method === 'logging.stopAudioDebugRecordings') {
-      chrome.webrtcLoggingPrivate.stopAudioDebugRecordings(
-          requestInfo, origin, doSendResponse);
       return true;
     } else if (method === 'logging.startEventLogging') {
       const sessionId = message['sessionId'] || '';
@@ -268,8 +220,6 @@ function onProcessCpu(port) {
       'browserCpuUsage': browserProcessCpu || 0,
       'gpuCpuUsage': gpuProcessCpu || 0,
       'tabCpuUsage': tabProcess.cpu,
-      'tabNetworkUsage': tabProcess.network,
-      'tabPrivateMemory': tabProcess.privateMemory,
       'tabJsMemoryAllocated': tabProcess.jsMemoryAllocated,
       'tabJsMemoryUsed': tabProcess.jsMemoryUsed,
     });

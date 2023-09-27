@@ -6,15 +6,16 @@
 
 #import <UIKit/UIKit.h>
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/test/task_environment.h"
 #import "components/prefs/pref_service.h"
+#import "components/signin/public/base/signin_metrics.h"
 #import "components/sync/test/mock_sync_service.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
-#import "ios/chrome/browser/main/test_browser.h"
 #import "ios/chrome/browser/policy/policy_util.h"
-#import "ios/chrome/browser/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/signin/authentication_service.h"
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/fake_authentication_service_delegate.h"
@@ -31,10 +32,6 @@
 #import "third_party/ocmock/gtest_support.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "ui/strings/grit/ui_strings.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 class SignoutActionSheetCoordinatorTest : public PlatformTest {
  public:
@@ -68,6 +65,12 @@ class SignoutActionSheetCoordinatorTest : public PlatformTest {
 
     sync_service_mock_ = static_cast<syncer::MockSyncService*>(
         SyncServiceFactory::GetForBrowserState(browser_state_.get()));
+  }
+
+  void TearDown() override {
+    [signout_coordinator_ stop];
+    signout_coordinator_ = nil;
+    PlatformTest::TearDown();
   }
 
   // Identity services.
@@ -111,27 +114,31 @@ class SignoutActionSheetCoordinatorTest : public PlatformTest {
 // Tests that a signed-in user with Sync enabled will have an action sheet with
 // a sign-out title.
 TEST_F(SignoutActionSheetCoordinatorTest, SignedInUserWithSync) {
-  authentication_service()->SignIn(identity_);
-  ON_CALL(*sync_service_mock_->GetMockUserSettings(), IsFirstSetupComplete())
+  authentication_service()->SignIn(
+      identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(true));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_NE(nil, signout_coordinator.title);
+  ASSERT_NE(nil, signout_coordinator_.title);
 }
 
 // Tests that a signed-in user with Sync disabled will have an action sheet with
 // no title.
 TEST_F(SignoutActionSheetCoordinatorTest, SignedInUserWithoutSync) {
-  authentication_service()->SignIn(identity_);
-  ON_CALL(*sync_service_mock_->GetMockUserSettings(), IsFirstSetupComplete())
+  authentication_service()->SignIn(
+      identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(false));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_EQ(nil, signout_coordinator.title);
+  ASSERT_EQ(nil, signout_coordinator_.title);
 }
 
 // Tests that a signed-in user with the forced sign-in policy enabled will have
@@ -141,39 +148,45 @@ TEST_F(SignoutActionSheetCoordinatorTest, SignedInUserWithForcedSignin) {
   GetLocalState()->SetInteger(prefs::kBrowserSigninPolicy,
                               static_cast<int>(BrowserSigninMode::kForced));
 
-  authentication_service()->SignIn(identity_);
-  ON_CALL(*sync_service_mock_->GetMockUserSettings(), IsFirstSetupComplete())
+  authentication_service()->SignIn(
+      identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(false));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_NE(nil, signout_coordinator.title);
-  ASSERT_NE(nil, signout_coordinator.message);
+  ASSERT_NE(nil, signout_coordinator_.title);
+  ASSERT_NE(nil, signout_coordinator_.message);
 }
 
 // Tests that a signed-in managed user with Sync enabled will have an action
 // sheet with a sign-out title.
 TEST_F(SignoutActionSheetCoordinatorTest, SignedInManagedUserWithSync) {
-  authentication_service()->SignIn(identity_);
-  ON_CALL(*sync_service_mock_->GetMockUserSettings(), IsFirstSetupComplete())
+  authentication_service()->SignIn(
+      identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(true));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_NE(nil, signout_coordinator.title);
+  ASSERT_NE(nil, signout_coordinator_.title);
 }
 
 // Tests that a signed-in managed user with Sync disabled will have an action
 // sheet with no title.
 TEST_F(SignoutActionSheetCoordinatorTest, SignedInManagedUserWithoutSync) {
-  authentication_service()->SignIn(identity_);
-  ON_CALL(*sync_service_mock_->GetMockUserSettings(), IsFirstSetupComplete())
+  authentication_service()->SignIn(
+      identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(false));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_EQ(nil, signout_coordinator.title);
+  ASSERT_EQ(nil, signout_coordinator_.title);
 }

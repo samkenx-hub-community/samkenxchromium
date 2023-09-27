@@ -4,10 +4,9 @@
 
 package org.chromium.chrome.browser.contextualsearch;
 
-import android.support.test.InstrumentationRegistry;
-
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -567,8 +566,7 @@ class ContextualSearchFakeServer
     }
 
     @Override
-    @Nullable
-    public GURL getBasePageUrl() {
+    public @Nullable GURL getBasePageUrl() {
         GURL baseUrl = mBaseManager.getBasePageUrl();
         if (baseUrl != null) {
             // Return plain HTTP URLs so we can test that we don't give them our legacy privacy

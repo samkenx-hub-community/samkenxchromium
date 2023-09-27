@@ -112,6 +112,18 @@ public class HistogramWatcherWithoutNativeTest extends HistogramWatcherTestBase 
 
     @Test
     @MediumTest
+    public void testExpectIntRecords_success() {
+        doTestExpectIntRecords_success(TestScenario.WITHOUT_NATIVE);
+    }
+
+    @Test
+    @MediumTest
+    public void testExpectIntRecords_failure() {
+        doTestExpectIntRecords_failure(TestScenario.WITHOUT_NATIVE);
+    }
+
+    @Test
+    @MediumTest
     public void testIgnoreOtherHistograms_success() {
         doTestIgnoreOtherHistograms_success(TestScenario.WITHOUT_NATIVE);
     }
@@ -200,22 +212,11 @@ public class HistogramWatcherWithoutNativeTest extends HistogramWatcherTestBase 
 
     @Test
     @MediumTest
-    public void testNegativeValueExpectations_failure() {
-        try {
-            mWatcher = HistogramWatcher.newBuilder().expectIntRecord(TIMES_HISTOGRAM_1, -1).build();
-        } catch (IllegalArgumentException e) {
-            assertContains("negative", e.getMessage());
-            return;
-        }
-        Assert.fail("Expected IllegalArgumentException");
-    }
-
-    @Test
-    @MediumTest
     public void testZeroCountExpectations_failure() {
         try {
-            mWatcher =
-                    HistogramWatcher.newBuilder().expectIntRecords(TIMES_HISTOGRAM_1, 1, 0).build();
+            mWatcher = HistogramWatcher.newBuilder()
+                               .expectIntRecordTimes(TIMES_HISTOGRAM_1, 1, 0)
+                               .build();
         } catch (IllegalArgumentException e) {
             assertContains("zero", e.getMessage());
             return;
@@ -228,12 +229,31 @@ public class HistogramWatcherWithoutNativeTest extends HistogramWatcherTestBase 
     public void testNegativeCountExpectations_failure() {
         try {
             mWatcher = HistogramWatcher.newBuilder()
-                               .expectIntRecords(TIMES_HISTOGRAM_1, 1, -1)
+                               .expectIntRecordTimes(TIMES_HISTOGRAM_1, 1, -1)
                                .build();
         } catch (IllegalArgumentException e) {
             assertContains("negative", e.getMessage());
             return;
         }
         Assert.fail("Expected IllegalArgumentException");
+    }
+
+    @Test
+    @MediumTest
+    public void testTryWithResources_success() {
+        try (HistogramWatcher ignored = HistogramWatcher.newSingleRecordWatcher(ENUM_HISTOGRAM)) {
+            RecordHistogram.recordEnumeratedHistogram(ENUM_HISTOGRAM, 0, 10);
+        }
+    }
+
+    @Test
+    @MediumTest
+    public void testTryWithResources_failure() {
+        try (HistogramWatcher ignored = HistogramWatcher.newSingleRecordWatcher(ENUM_HISTOGRAM)) {
+        } catch (AssertionError e) {
+            assertContains(ENUM_HISTOGRAM, e.getMessage());
+            return;
+        }
+        Assert.fail("Expected AssertionError");
     }
 }

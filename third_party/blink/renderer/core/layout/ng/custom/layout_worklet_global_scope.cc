@@ -34,9 +34,10 @@ LayoutWorkletGlobalScope* LayoutWorkletGlobalScope::Create(
       frame, std::move(creation_params), reporting_proxy,
       pending_layout_registry);
   global_scope->ScriptController()->Initialize(NullURL());
-  MainThreadDebugger::Instance()->ContextCreated(
-      global_scope->ScriptController()->GetScriptState(),
-      global_scope->GetFrame(), global_scope->DocumentSecurityOrigin());
+  MainThreadDebugger::Instance(global_scope->GetIsolate())
+      ->ContextCreated(global_scope->ScriptController()->GetScriptState(),
+                       global_scope->GetFrame(),
+                       global_scope->DocumentSecurityOrigin());
   return global_scope;
 }
 
@@ -45,18 +46,14 @@ LayoutWorkletGlobalScope::LayoutWorkletGlobalScope(
     std::unique_ptr<GlobalScopeCreationParams> creation_params,
     WorkerReportingProxy& reporting_proxy,
     PendingLayoutRegistry* pending_layout_registry)
-    : WorkletGlobalScope(std::move(creation_params),
-                         reporting_proxy,
-                         frame,
-                         // Enable a separate microtask queue for LayoutWorklet.
-                         /*create_microtask_queue=*/true),
+    : WorkletGlobalScope(std::move(creation_params), reporting_proxy, frame),
       pending_layout_registry_(pending_layout_registry) {}
 
 LayoutWorkletGlobalScope::~LayoutWorkletGlobalScope() = default;
 
 void LayoutWorkletGlobalScope::Dispose() {
-  MainThreadDebugger::Instance()->ContextWillBeDestroyed(
-      ScriptController()->GetScriptState());
+  MainThreadDebugger::Instance(GetIsolate())
+      ->ContextWillBeDestroyed(ScriptController()->GetScriptState());
 
   WorkletGlobalScope::Dispose();
 
@@ -94,20 +91,22 @@ void LayoutWorkletGlobalScope::registerLayout(
 
   if (!V8ObjectParser::ParseCSSPropertyList(
           current_context, GetFrame()->DomWindow(),
-          layout_ctor->CallbackObject(), "inputProperties",
+          layout_ctor->CallbackObject(), AtomicString("inputProperties"),
           &native_invalidation_properties, &custom_invalidation_properties,
-          &exception_state))
+          &exception_state)) {
     return;
+  }
 
   Vector<CSSPropertyID> child_native_invalidation_properties;
   Vector<AtomicString> child_custom_invalidation_properties;
 
   if (!V8ObjectParser::ParseCSSPropertyList(
           current_context, GetFrame()->DomWindow(),
-          layout_ctor->CallbackObject(), "childInputProperties",
+          layout_ctor->CallbackObject(), AtomicString("childInputProperties"),
           &child_native_invalidation_properties,
-          &child_custom_invalidation_properties, &exception_state))
+          &child_custom_invalidation_properties, &exception_state)) {
     return;
+  }
 
   CallbackMethodRetriever retriever(layout_ctor);
   retriever.GetPrototypeObject(exception_state);

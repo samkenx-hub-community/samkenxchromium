@@ -27,8 +27,8 @@
 #include "url/gurl.h"
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "ash/webui/settings/public/constants/routes.mojom.h"
 #include "chrome/browser/ui/settings_window_manager_chromeos.h"
-#include "chrome/browser/ui/webui/settings/chromeos/constants/routes.mojom.h"
 #include "chrome/common/webui_url_constants.h"
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
@@ -53,10 +53,7 @@ ChromeBluetoothChooserController::ChromeBluetoothChooserController(
     : permissions::BluetoothChooserController(
           owner,
           event_handler,
-          CreateExtensionAwareChooserTitle(
-              owner,
-              IDS_BLUETOOTH_DEVICE_CHOOSER_PROMPT_ORIGIN,
-              IDS_BLUETOOTH_DEVICE_CHOOSER_PROMPT_EXTENSION_NAME)) {}
+          CreateChooserTitle(owner, IDS_BLUETOOTH_DEVICE_CHOOSER_PROMPT)) {}
 
 ChromeBluetoothChooserController::~ChromeBluetoothChooserController() = default;
 

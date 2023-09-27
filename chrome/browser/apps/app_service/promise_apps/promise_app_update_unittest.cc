@@ -5,7 +5,7 @@
 #include "chrome/browser/apps/app_service/promise_apps/promise_app_update.h"
 
 #include "chrome/browser/apps/app_service/package_id.h"
-#include "chrome/browser/apps/app_service/promise_apps/promise_apps.h"
+#include "chrome/browser/apps/app_service/promise_apps/promise_app.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace apps {
@@ -19,6 +19,7 @@ TEST_F(PromiseAppUpdateTest, StateIsNonNull) {
   PromiseApp promise_app = PromiseApp(package_id);
   promise_app.progress = 0.1;
   promise_app.status = PromiseStatus::kPending;
+  promise_app.should_show = true;
   PromiseAppUpdate u(&promise_app, nullptr);
 
   EXPECT_EQ(package_id, u.PackageId());
@@ -29,12 +30,16 @@ TEST_F(PromiseAppUpdateTest, StateIsNonNull) {
 
   EXPECT_EQ(u.Status(), PromiseStatus::kPending);
   EXPECT_EQ(u.StatusChanged(), false);
+
+  EXPECT_EQ(u.ShouldShow(), true);
+  EXPECT_EQ(u.ShouldShowChanged(), false);
 }
 
 TEST_F(PromiseAppUpdateTest, DeltaIsNonNull) {
   PromiseApp promise_app = PromiseApp(package_id);
   promise_app.progress = 0.1;
   promise_app.status = PromiseStatus::kPending;
+  promise_app.should_show = true;
   PromiseAppUpdate u(nullptr, &promise_app);
 
   EXPECT_EQ(package_id, u.PackageId());
@@ -45,16 +50,21 @@ TEST_F(PromiseAppUpdateTest, DeltaIsNonNull) {
 
   EXPECT_EQ(u.Status(), PromiseStatus::kPending);
   EXPECT_EQ(u.StatusChanged(), true);
+
+  EXPECT_EQ(u.ShouldShow(), true);
+  EXPECT_EQ(u.ShouldShowChanged(), true);
 }
 
 TEST_F(PromiseAppUpdateTest, StateAndDeltaAreNonNull) {
   PromiseApp promise_app_old = PromiseApp(package_id);
   promise_app_old.progress = 0.1;
   promise_app_old.status = PromiseStatus::kPending;
+  promise_app_old.should_show = false;
 
   PromiseApp promise_app_new = PromiseApp(package_id);
   promise_app_new.progress = 0.9;
-  promise_app_new.status = PromiseStatus::kDownloading;
+  promise_app_new.status = PromiseStatus::kInstalling;
+  promise_app_new.should_show = true;
 
   PromiseAppUpdate u(&promise_app_old, &promise_app_new);
 
@@ -64,8 +74,70 @@ TEST_F(PromiseAppUpdateTest, StateAndDeltaAreNonNull) {
   EXPECT_FLOAT_EQ(u.Progress().value(), 0.9);
   EXPECT_EQ(u.ProgressChanged(), true);
 
-  EXPECT_EQ(u.Status(), PromiseStatus::kDownloading);
+  EXPECT_EQ(u.Status(), PromiseStatus::kInstalling);
   EXPECT_EQ(u.StatusChanged(), true);
+
+  EXPECT_EQ(u.ShouldShow(), true);
+  EXPECT_EQ(u.ShouldShowChanged(), true);
+}
+
+TEST_F(PromiseAppUpdateTest, Equal) {
+  auto state_1 = std::make_unique<PromiseApp>(package_id);
+  state_1->status = PromiseStatus::kPending;
+  state_1->should_show = false;
+
+  auto state_2 = std::make_unique<PromiseApp>(package_id);
+  state_2->progress = 0.9;
+  state_2->status = PromiseStatus::kInstalling;
+  state_2->should_show = true;
+
+  auto delta_1 = std::make_unique<PromiseApp>(package_id);
+  state_1->status = PromiseStatus::kInstalling;
+  state_1->should_show = true;
+
+  auto delta_2 = std::make_unique<PromiseApp>(package_id);
+  delta_2->progress = 0.9;
+  state_2->status = PromiseStatus::kInstalling;
+
+  // Test nullptr handling.
+  EXPECT_EQ(PromiseAppUpdate(nullptr, delta_1.get()),
+            PromiseAppUpdate(nullptr, delta_1.get()));
+  EXPECT_EQ(PromiseAppUpdate(state_1.get(), nullptr),
+            PromiseAppUpdate(state_1.get(), nullptr));
+  EXPECT_NE(PromiseAppUpdate(nullptr, delta_1.get()),
+            PromiseAppUpdate(state_1.get(), nullptr));
+  EXPECT_NE(PromiseAppUpdate(state_1.get(), nullptr),
+            PromiseAppUpdate(nullptr, delta_1.get()));
+  EXPECT_NE(PromiseAppUpdate(nullptr, delta_1.get()),
+            PromiseAppUpdate(state_1.get(), delta_1.get()));
+  EXPECT_NE(PromiseAppUpdate(state_1.get(), nullptr),
+            PromiseAppUpdate(state_1.get(), delta_1.get()));
+  EXPECT_NE(PromiseAppUpdate(state_1.get(), delta_1.get()),
+            PromiseAppUpdate(nullptr, delta_1.get()));
+  EXPECT_NE(PromiseAppUpdate(state_1.get(), delta_1.get()),
+            PromiseAppUpdate(state_1.get(), nullptr));
+
+  // Test equal.
+  EXPECT_EQ(PromiseAppUpdate(state_1.get(), delta_1.get()),
+            PromiseAppUpdate(state_1.get(), delta_1.get()));
+  EXPECT_EQ(PromiseAppUpdate(state_1.get(), delta_2.get()),
+            PromiseAppUpdate(state_1.get(), delta_2.get()));
+  EXPECT_EQ(PromiseAppUpdate(state_2.get(), delta_1.get()),
+            PromiseAppUpdate(state_2.get(), delta_1.get()));
+  EXPECT_EQ(PromiseAppUpdate(state_2.get(), delta_2.get()),
+            PromiseAppUpdate(state_2.get(), delta_2.get()));
+
+  // Test deep equal.
+  EXPECT_EQ(PromiseAppUpdate(state_1.get(), delta_1.get()),
+            PromiseAppUpdate(state_1->Clone().get(), delta_1->Clone().get()));
+
+  // Test not equal.
+  EXPECT_NE(PromiseAppUpdate(state_1.get(), delta_1.get()),
+            PromiseAppUpdate(state_2.get(), delta_1.get()));
+  EXPECT_NE(PromiseAppUpdate(state_1.get(), delta_1.get()),
+            PromiseAppUpdate(state_2.get(), delta_2.get()));
+  EXPECT_NE(PromiseAppUpdate(state_1.get(), delta_1.get()),
+            PromiseAppUpdate(state_1.get(), delta_2.get()));
 }
 
 }  // namespace apps

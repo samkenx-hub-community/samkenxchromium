@@ -23,6 +23,7 @@
 #include "third_party/blink/renderer/bindings/core/v8/v8_string_resource.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_address_errors.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_android_pay_method_data.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_google_play_billing_method_data.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_payer_errors.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_payment_details_init.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_payment_details_modifier.h"
@@ -36,7 +37,6 @@
 #include "third_party/blink/renderer/core/dom/events/event_queue.h"
 #include "third_party/blink/renderer/core/event_type_names.h"
 #include "third_party/blink/renderer/core/frame/csp/content_security_policy.h"
-#include "third_party/blink/renderer/core/frame/deprecation/deprecation.h"
 #include "third_party/blink/renderer/core/frame/frame_owner.h"
 #include "third_party/blink/renderer/core/frame/local_dom_window.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
@@ -45,7 +45,6 @@
 #include "third_party/blink/renderer/core/html/html_iframe_element.h"
 #include "third_party/blink/renderer/core/inspector/console_message.h"
 #include "third_party/blink/renderer/modules/event_target_modules_names.h"
-#include "third_party/blink/renderer/modules/payments/html_iframe_element_payments.h"
 #include "third_party/blink/renderer/modules/payments/payment_address.h"
 #include "third_party/blink/renderer/modules/payments/payment_method_change_event.h"
 #include "third_party/blink/renderer/modules/payments/payment_request_update_event.h"
@@ -90,6 +89,8 @@ using ::payments::mojom::blink::PaymentValidationErrorsPtr;
 
 const char kHasEnrolledInstrumentDebugName[] = "hasEnrolledInstrument";
 const char kGooglePayMethod[] = "https://google.com/pay";
+const char kGooglePayAuthenticationMethod[] =
+    "https://pay.google.com/authentication";
 const char kAndroidPayMethod[] = "https://android.com/pay";
 const char kGooglePlayBillingMethod[] = "https://play.google.com/billing";
 const char kUnknownCurrency[] = "ZZZ";
@@ -415,6 +416,27 @@ void SetAndroidPayMethodData(v8::Isolate* isolate,
   }
 }
 
+void MeasureGooglePlayBillingPriceChangeConfirmation(
+    ExecutionContext& execution_context,
+    const ScriptValue& input,
+    ExceptionState& exception_state) {
+  DCHECK(!exception_state.HadException());
+
+  GooglePlayBillingMethodData* google_play_billing =
+      NativeValueTraits<GooglePlayBillingMethodData>::NativeValue(
+          execution_context.GetIsolate(), input.V8Value(), exception_state);
+  if (exception_state.HadException()) {
+    // No need to report this exception, because this function is
+    // only for measuring usage of a deprecated field.
+    exception_state.ClearException();
+    return;
+  }
+
+  if (google_play_billing->hasPriceChangeConfirmation()) {
+    UseCounter::Count(&execution_context, WebFeature::kPriceChangeConfirmation);
+  }
+}
+
 void StringifyAndParseMethodSpecificData(ExecutionContext& execution_context,
                                          const String& supported_method,
                                          const ScriptValue& input,
@@ -427,11 +449,17 @@ void StringifyAndParseMethodSpecificData(ExecutionContext& execution_context,
     return;
   }
 
+  if (supported_method == kGooglePlayBillingMethod) {
+    MeasureGooglePlayBillingPriceChangeConfirmation(execution_context, input,
+                                                    exception_state);
+  }
+
   // Serialize payment method specific data to be sent to the payment apps. The
   // payment apps are responsible for validating and processing their method
   // data asynchronously. Do not throw exceptions here.
   if (supported_method == kGooglePayMethod ||
-      supported_method == kAndroidPayMethod) {
+      supported_method == kAndroidPayMethod ||
+      supported_method == kGooglePayAuthenticationMethod) {
     SetAndroidPayMethodData(execution_context.GetIsolate(), input, output,
                             exception_state);
     if (exception_state.HadException()) {
@@ -655,39 +683,18 @@ void ValidateAndConvertPaymentDetailsUpdate(const PaymentDetailsUpdate* input,
   }
 }
 
-// Checks whether Content Securituy Policy (CSP) allows a connection to the
-// given `url`.
-//
-// If CSP is being enforced, then a CSP violation will be reported in the
+// Checks whether Content Security Policy (CSP) allows a connection to the
+// given `url`. If it does not, then a CSP violation will be reported in the
 // developer console.
-//
-// If CSP is not being enforced, then a CSP violation will be counted, but not
-// reported to the web developer.
 bool CSPAllowsConnectToSource(const KURL& url,
                               const KURL& url_before_redirects,
                               bool did_follow_redirect,
                               ExecutionContext& context) {
-  const bool enforce_csp =
-      !RuntimeEnabledFeatures::IgnoreCSPInWebPaymentAPIEnabled(&context);
-
-  if (context.GetContentSecurityPolicy()->AllowConnectToSource(
-          url, url_before_redirects,
-          did_follow_redirect ? RedirectStatus::kFollowedRedirect
-                              : RedirectStatus::kNoRedirect,
-          enforce_csp ? ReportingDisposition::kReport
-                      : ReportingDisposition::kSuppressReporting)) {
-    return true;  // Allow request.
-  }
-
-  if (enforce_csp) {
-    return false;  // Block request.
-  }
-
-  // CSP has been bypassed, so warn web developers that CSP bypass has been
-  // deprecated and will be removed.
-  Deprecation::CountDeprecation(&context,
-                                WebFeature::kPaymentRequestCSPViolation);
-  return true;  // Allow request.
+  return context.GetContentSecurityPolicy()->AllowConnectToSource(
+      url, url_before_redirects,
+      did_follow_redirect ? RedirectStatus::kFollowedRedirect
+                          : RedirectStatus::kNoRedirect,
+      ReportingDisposition::kReport);
 }
 
 void ValidateAndConvertPaymentMethodData(
@@ -803,6 +810,35 @@ void WarnIgnoringQueryQuotaForCanMakePayment(
       mojom::ConsoleMessageLevel::kWarning, error));
 }
 
+// Returns whether a Show() call may be allowed without a user activation,
+// based on the request method and feature state.
+bool ActivationlessShowEnabled(ExecutionContext* execution_context,
+                               const HashSet<String>& method_names) {
+  if (method_names.size() == 1 &&
+      method_names.Contains(kSecurePaymentConfirmationMethod)) {
+    return RuntimeEnabledFeatures::
+        SecurePaymentConfirmationAllowOneActivationlessShowEnabled(
+            execution_context);
+  } else {
+    return RuntimeEnabledFeatures::
+        PaymentRequestAllowOneActivationlessShowEnabled(execution_context);
+  }
+}
+
+// Records metrics for an activationless Show() call based on the request
+// method.
+void RecordActivationlessShow(ExecutionContext* execution_context,
+                              const HashSet<String>& method_names) {
+  if (method_names.size() == 1 &&
+      method_names.Contains(kSecurePaymentConfirmationMethod)) {
+    UseCounter::Count(execution_context,
+                      WebFeature::kSecurePaymentConfirmationActivationlessShow);
+  } else {
+    UseCounter::Count(execution_context,
+                      WebFeature::kPaymentRequestActivationlessShow);
+  }
+}
+
 }  // namespace
 
 PaymentRequest* PaymentRequest::Create(
@@ -860,21 +896,30 @@ ScriptPromise PaymentRequest::show(ScriptState* script_state,
 
   bool has_transient_user_activation =
       LocalFrame::HasTransientUserActivation(local_frame);
-  bool payment_request_token_active =
-      DomWindow()->IsPaymentRequestTokenActive();
+  bool has_delegated_activation = DomWindow()->IsPaymentRequestTokenActive();
+  bool has_activation =
+      has_transient_user_activation || has_delegated_activation;
 
   if (!has_transient_user_activation) {
     UseCounter::Count(GetExecutionContext(),
                       WebFeature::kPaymentRequestShowWithoutGesture);
 
-    if (!payment_request_token_active) {
+    if (!has_delegated_activation) {
       UseCounter::Count(GetExecutionContext(),
                         WebFeature::kPaymentRequestShowWithoutGestureOrToken);
     }
   }
 
+  bool activationless_payment_request =
+      ActivationlessShowEnabled(GetExecutionContext(), method_names_) &&
+      !has_activation;
+
+  if (activationless_payment_request) {
+    RecordActivationlessShow(GetExecutionContext(), method_names_);
+  }
+
   bool payment_request_allowed =
-      has_transient_user_activation || payment_request_token_active;
+      has_activation || activationless_payment_request;
   DomWindow()->ConsumePaymentRequestToken();
 
   if (payment_request_allowed) {
@@ -896,7 +941,8 @@ ScriptPromise PaymentRequest::show(ScriptState* script_state,
   UseCounter::Count(GetExecutionContext(), WebFeature::kPaymentRequestShow);
 
   is_waiting_for_show_promise_to_resolve_ = !details_promise.IsEmpty();
-  payment_provider_->Show(is_waiting_for_show_promise_to_resolve_);
+  payment_provider_->Show(is_waiting_for_show_promise_to_resolve_,
+                          has_activation);
   if (is_waiting_for_show_promise_to_resolve_) {
     // If the website does not calculate the final shopping cart contents within
     // 10 seconds, abort payment.
@@ -1157,13 +1203,13 @@ void PaymentRequest::OnUpdatePaymentDetails(
 
   update_payment_details_timer_.Stop();
 
-  ExceptionState exception_state(v8::Isolate::GetCurrent(),
-                                 ExceptionState::kConstructionContext,
-                                 "PaymentDetailsUpdate");
+  v8::Isolate* isolate = resolver->GetScriptState()->GetIsolate();
+  ExceptionState exception_state(
+      isolate, ExceptionContextType::kConstructorOperationInvoke,
+      "PaymentDetailsUpdate");
   PaymentDetailsUpdate* details =
       NativeValueTraits<PaymentDetailsUpdate>::NativeValue(
-          resolver->GetScriptState()->GetIsolate(),
-          details_script_value.V8Value(), exception_state);
+          isolate, details_script_value.V8Value(), exception_state);
   if (exception_state.HadException()) {
     resolver->Reject(exception_state.GetException());
     ClearResolversAndCloseMojoConnection();
@@ -1238,7 +1284,7 @@ void PaymentRequest::Trace(Visitor* visitor) const {
   visitor->Trace(client_receiver_);
   visitor->Trace(complete_timer_);
   visitor->Trace(update_payment_details_timer_);
-  EventTargetWithInlineData::Trace(visitor);
+  EventTarget::Trace(visitor);
   ExecutionContextLifecycleObserver::Trace(visitor);
 }
 
@@ -1267,6 +1313,7 @@ PaymentRequest::PaymentRequest(
         mock_payment_provider,
     ExceptionState& exception_state)
     : ExecutionContextLifecycleObserver(execution_context),
+      ActiveScriptWrappable<PaymentRequest>({}),
       options_(options),
       payment_provider_(execution_context),
       client_receiver_(this, execution_context),
@@ -1395,9 +1442,10 @@ void PaymentRequest::OnPaymentMethodChange(const String& method_name,
   init->setMethodName(method_name);
 
   if (!stringified_details.empty()) {
-    ExceptionState exception_state(script_state->GetIsolate(),
-                                   ExceptionState::kConstructionContext,
-                                   "PaymentMethodChangeEvent");
+    ExceptionState exception_state(
+        script_state->GetIsolate(),
+        ExceptionContextType::kConstructorOperationInvoke,
+        "PaymentMethodChangeEvent");
     v8::Local<v8::Value> parsed_value =
         FromJSONString(script_state->GetIsolate(), script_state->GetContext(),
                        stringified_details, exception_state);
@@ -1570,6 +1618,10 @@ void PaymentRequest::OnError(PaymentErrorReason error,
 
     case PaymentErrorReason::USER_OPT_OUT:
       exception_code = DOMExceptionCode::kOptOutError;
+      break;
+
+    case PaymentErrorReason::USER_ACTIVATION_REQUIRED:
+      exception_code = DOMExceptionCode::kSecurityError;
       break;
 
     case PaymentErrorReason::UNKNOWN:

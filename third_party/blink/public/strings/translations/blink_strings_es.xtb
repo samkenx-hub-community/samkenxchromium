@@ -24,9 +24,9 @@
 <translation id="1993104285338243655">Se ha cambiado a proyección</translation>
 <translation id="2031987842108996681">Canal rojo</translation>
 <translation id="2060505056492490888">El signo "<ph name="DOT" />" está colocado en una posición incorrecta en la dirección "<ph name="INVALIDDOMAIN" />".</translation>
+<translation id="2068711044993563745">El valor mínimo (<ph name="MINIMUM" />) debe ser inferior al valor máximo (<ph name="MAXIMUM" />).</translation>
 <translation id="2148716181193084225">Hoy</translation>
 <translation id="2226276347425096477">Reduce la longitud de este texto a <ph name="MAX_CHARACTERS" /> caracteres o menos (actualmente, el texto tiene <ph name="CURRENT_LENGTH" /> caracteres)</translation>
-<translation id="2246498165605549352">Archivo local</translation>
 <translation id="2247351761944213033">Semana <ph name="WEEKNUMBER" />, <ph name="YEAR" /></translation>
 <translation id="2277199496770840904">Pista <ph name="NUMBER" /></translation>
 <translation id="2393030564806080191">Valor hexadecimal del color</translation>
@@ -45,6 +45,7 @@
 <translation id="2761667185364618470">Selecciona esta casilla de verificación si quieres continuar</translation>
 <translation id="2908441821576996758">Introduce una lista de direcciones de correo electrónico separada por comas</translation>
 <translation id="3049748772180311791"><ph name="QUANTITY" /> MB</translation>
+<translation id="3053226512517284904">mostrar menú de audiodescripciones</translation>
 <translation id="3075154866155599887">Debes introducir un valor válido. El campo está incompleto o incluye una fecha no válida.</translation>
 <translation id="310520048233152454">Introduce una URL</translation>
 <translation id="3220661731597678625">paso actual</translation>
@@ -89,6 +90,7 @@
 <translation id="5425179576310518467">fecha actual</translation>
 <translation id="5466621249238537318">Selecciona uno o varios archivos</translation>
 <translation id="5468998798572797635">salir de pantalla completa</translation>
+<translation id="5514612371225420585">Archivo en tu dispositivo</translation>
 <translation id="5516235301412634559">0,75</translation>
 <translation id="5537725057119320332">Enviar</translation>
 <translation id="5546461542133609677">activar sonido</translation>
@@ -97,7 +99,7 @@
 <translation id="57838592816432529">Silenciar</translation>
 <translation id="5786442179789148008">mostrar menú de velocidad de reproducción</translation>
 <translation id="5787939484346677755">desplegado, opciones de autocompletado disponibles.</translation>
-<translation id="5860033963881614850">Desactivado</translation>
+<translation id="5860033963881614850">Desactivada</translation>
 <translation id="588258955323874662">Pantalla completa</translation>
 <translation id="5888666972993069672">Enviando a <ph name="DEVICE_FRIENDLY_NAME" /> en este momento</translation>
 <translation id="5916664084637901428">Activado</translation>
@@ -113,6 +115,7 @@
 <translation id="6398862346408813489">Mostrar panel para seleccionar el mes</translation>
 <translation id="6404546809543547843">control deslizante de duración de audio</translation>
 <translation id="6443871981718447451">mostrar menú de subtítulos</translation>
+<translation id="6484738902856791350">Dar formato al texto</translation>
 <translation id="6550675742724504774">Opciones</translation>
 <translation id="6572309429103589720">La gramática no es válida</translation>
 <translation id="658823671542763450">activar pantalla completa</translation>

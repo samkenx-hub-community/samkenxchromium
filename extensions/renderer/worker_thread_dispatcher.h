@@ -16,15 +16,19 @@
 #include "content/public/renderer/worker_thread.h"
 #include "extensions/common/extension_id.h"
 #include "extensions/common/extension_messages.h"
+#include "extensions/common/mojom/automation_registry.mojom.h"
 #include "extensions/common/mojom/event_dispatcher.mojom.h"
 #include "extensions/common/mojom/event_router.mojom.h"
 #include "extensions/common/mojom/service_worker_host.mojom.h"
 #include "ipc/ipc_sync_message_filter.h"
+#include "mojo/public/cpp/bindings/associated_receiver_set.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
+#include "services/accessibility/public/mojom/automation.mojom.h"
 
 namespace base {
 class SingleThreadTaskRunner;
 class UnguessableToken;
+class Uuid;
 }
 
 namespace content {
@@ -32,8 +36,7 @@ class RenderThread;
 }
 
 class GURL;
-struct ExtensionMsg_TabConnectionInfo;
-struct ExtensionMsg_ExternalConnectionInfo;
+struct ExtensionMsg_OnConnectData;
 
 namespace extensions {
 class NativeExtensionBindingsSystem;
@@ -91,10 +94,8 @@ class WorkerThreadDispatcher : public content::RenderThreadObserver,
   void DidStopContext(const GURL& service_worker_scope,
                       int64_t service_worker_version_id);
 
-  void IncrementServiceWorkerActivity(int64_t service_worker_version_id,
-                                      const std::string& request_uuid);
-  void DecrementServiceWorkerActivity(int64_t service_worker_version_id,
-                                      const std::string& request_uuid);
+  void RequestWorker(mojom::RequestParamsPtr params);
+  void SendResponseAck(const base::Uuid& request_uuid);
 
   // content::RenderThreadObserver:
   bool OnControlMessageReceived(const IPC::Message& message) override;
@@ -129,6 +130,11 @@ class WorkerThreadDispatcher : public content::RenderThreadObserver,
                                     base::Value::Dict filter,
                                     bool add_lazy_listener);
 
+  // Uses the RendererAutomationRegistry to connect the Automation remote. Uses
+  // the IO thread to bind the RendererAutomationRegistryRemote, if needed.
+  void SendBindAutomation(
+      mojo::PendingAssociatedRemote<ax::mojom::Automation> pending_remote);
+
   // Posts mojom::EventRouter::RemoveListenerForServiceWorker to the IO thread
   // to call it with GetEventRouterOnIO().
   void SendRemoveEventListener(const std::string& extension_id,
@@ -160,6 +166,11 @@ class WorkerThreadDispatcher : public content::RenderThreadObserver,
   // thread once `AssociatedInterfaceRegistry` for ServiceWorker is added.
   mojom::EventRouter* GetEventRouterOnIO();
   mojom::ServiceWorkerHost* GetServiceWorkerHostOnIO();
+  mojom::RendererAutomationRegistry* GetAutomationRegistryOnIO();
+
+  mojo::PendingAssociatedRemote<mojom::EventDispatcher> BindEventDispatcher(
+      int worker_thread_id);
+  void UnbindEventDispatcher(int worker_thread_id);
 
   // Mojo interface implementation, called from the main thread.
   void DispatchEvent(mojom::DispatchEventParamsPtr params,
@@ -186,10 +197,7 @@ class WorkerThreadDispatcher : public content::RenderThreadObserver,
                         const std::string& error);
   void OnValidateMessagePort(int worker_thread_id, const PortId& id);
   void OnDispatchOnConnect(int worker_thread_id,
-                           const PortId& target_port_id,
-                           const std::string& channel_name,
-                           const ExtensionMsg_TabConnectionInfo& source,
-                           const ExtensionMsg_ExternalConnectionInfo& info);
+                           const ExtensionMsg_OnConnectData& connect_data);
   void OnDeliverMessage(int worker_thread_id,
                         const PortId& target_port_id,
                         const Message& message);
@@ -209,6 +217,13 @@ class WorkerThreadDispatcher : public content::RenderThreadObserver,
   scoped_refptr<base::SingleThreadTaskRunner> io_task_runner_;
   mojo::AssociatedRemote<mojom::EventRouter> event_router_remote_;
   mojo::AssociatedRemote<mojom::ServiceWorkerHost> service_worker_host_;
+  mojo::AssociatedRemote<mojom::RendererAutomationRegistry>
+      renderer_automation_registry_remote_;
+
+  // The set of receivers for mojom::EventDispatcher. `event_dispatcher_ids`
+  // keeps track which receiver is associated to the worker thread.
+  mojo::AssociatedReceiverSet<mojom::EventDispatcher> event_dispatchers_;
+  std::map<int /*worker_thread_id*/, mojo::ReceiverId> event_dispatcher_ids_;
 };
 
 }  // namespace extensions

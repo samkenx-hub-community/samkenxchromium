@@ -54,8 +54,8 @@ class PersonalDataLoadedObserverMock
   PersonalDataLoadedObserverMock();
   ~PersonalDataLoadedObserverMock() override;
 
-  MOCK_METHOD0(OnPersonalDataChanged, void());
-  MOCK_METHOD0(OnPersonalDataFinishedProfileTasks, void());
+  MOCK_METHOD(void, OnPersonalDataChanged, (), (override));
+  MOCK_METHOD(void, OnPersonalDataFinishedProfileTasks, (), (override));
 };
 
 // Base class for any interactive PaymentRequest test that will need to open
@@ -300,7 +300,7 @@ class PaymentRequestBrowserTestBase
   // Resets the event waiter for the events that trigger when opening a dialog.
   void ResetEventWaiterForDialogOpened();
   // Wait for the event(s) passed to ResetEventWaiter*() to occur.
-  void WaitForObservedEvent();
+  [[nodiscard]] testing::AssertionResult WaitForObservedEvent();
 
   // Return a weak pointer to a Content Security Policy (CSP) checker for tests.
   base::WeakPtr<CSPChecker> GetCSPCheckerForTests();
@@ -309,8 +309,8 @@ class PaymentRequestBrowserTestBase
   std::unique_ptr<autofill::EventWaiter<DialogEvent>> event_waiter_;
   std::unique_ptr<net::EmbeddedTestServer> https_server_;
   // Weak, owned by the PaymentRequest object.
-  raw_ptr<TestChromePaymentRequestDelegate, DanglingUntriaged> delegate_ =
-      nullptr;
+  raw_ptr<TestChromePaymentRequestDelegate, AcrossTasksDanglingUntriaged>
+      delegate_ = nullptr;
   syncer::TestSyncService sync_service_;
   sync_preferences::TestingPrefServiceSyncable prefs_;
   bool is_incognito_ = false;

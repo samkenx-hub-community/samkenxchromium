@@ -5,41 +5,51 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_DOWNLOAD_BUBBLE_DOWNLOAD_BUBBLE_ROW_LIST_VIEW_H_
 #define CHROME_BROWSER_UI_VIEWS_DOWNLOAD_BUBBLE_DOWNLOAD_BUBBLE_ROW_LIST_VIEW_H_
 
+#include <map>
+#include <memory>
+
 #include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
+#include "chrome/browser/download/download_ui_model.h"
+#include "components/offline_items_collection/core/offline_item.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/layout/flex_layout_view.h"
 
-class Browser;
-namespace views {
-class ImageView;
-}  // namespace views
+class DownloadBubbleRowView;
 
 class DownloadBubbleRowListView : public views::FlexLayoutView {
  public:
   METADATA_HEADER(DownloadBubbleRowListView);
 
-  DownloadBubbleRowListView(
-      bool is_partial_view,
-      Browser* browser,
-      base::OnceClosure on_mouse_entered_closure = base::DoNothing());
+  DownloadBubbleRowListView();
   ~DownloadBubbleRowListView() override;
   DownloadBubbleRowListView(const DownloadBubbleRowListView&) = delete;
   DownloadBubbleRowListView& operator=(const DownloadBubbleRowListView&) =
       delete;
 
-  // views::FlexLayoutView
-  void OnMouseEntered(const ui::MouseEvent& event) override;
+  // TODO(crbug.com/1344515): Add functionality for adding a new download while
+  // this is already open.
+
+  // Adds a row to the bottom of the list.
+  void AddRow(std::unique_ptr<DownloadBubbleRowView> row);
+
+  // Removes a row and updates the `rows_by_id_` map. Returns ownership of the
+  // row to the caller.
+  std::unique_ptr<DownloadBubbleRowView> RemoveRow(DownloadBubbleRowView* row);
+
+  // Gets the row for the download with the given id. Returns nullptr if not
+  // found.
+  DownloadBubbleRowView* GetRow(
+      const offline_items_collection::ContentId& id) const;
+
+  // Returns the number of rows.
+  size_t NumRows() const;
 
  private:
-  bool IsIncognitoInfoRowEnabled();
-
-  bool is_partial_view_;
-  base::Time creation_time_;
-  raw_ptr<Browser> browser_ = nullptr;
-  raw_ptr<views::ImageView> info_icon_ = nullptr;
-  // Callback invoked when the user first hovers over the view.
-  base::OnceClosure on_mouse_entered_closure_;
+  // Map of download item's ID to child view in the row list.
+  std::map<offline_items_collection::ContentId, DownloadBubbleRowView*>
+      rows_by_id_;
 };
 
 #endif  // CHROME_BROWSER_UI_VIEWS_DOWNLOAD_BUBBLE_DOWNLOAD_BUBBLE_ROW_LIST_VIEW_H_

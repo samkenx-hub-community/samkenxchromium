@@ -11,11 +11,9 @@
 #import "base/strings/sys_string_conversions.h"
 #import "build/branding_buildflags.h"
 #import "ios/chrome/app/spotlight/spotlight_logger.h"
+#import "ios/chrome/grit/ios_strings.h"
+#import "ui/base/l10n/l10n_util.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 // This enum is used for Histogram. Items should not be removed or reordered and
@@ -38,36 +36,6 @@ enum Availability {
   SPOTLIGHT_AVAILABILITY_COUNT
 };
 
-// Documentation says that failed deletion should be retried. Set a maximum
-// value to avoid infinite loop.
-const int kMaxDeletionAttempts = 5;
-
-// Execute blockName block with up to retryCount retries on error. Execute
-// callback when done.
-void DoWithRetry(BlockWithError callback,
-                 NSUInteger retryCount,
-                 void (^blockName)(BlockWithError error)) {
-  BlockWithError retryCallback = ^(NSError* error) {
-    if (error && retryCount > 0) {
-      DoWithRetry(callback, retryCount - 1, blockName);
-    } else {
-      if (callback) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          callback(error);
-        });
-      }
-    }
-  };
-  blockName(retryCallback);
-}
-
-// Execute blockName block with up to kMaxDeletionAttempts retries on error.
-// Execute callback when done.
-void DoWithRetry(BlockWithError completion,
-                 void (^blockName)(BlockWithError error)) {
-  DoWithRetry(completion, kMaxDeletionAttempts, blockName);
-}
-
 // Strings corresponding to the domain/prefix for respectively bookmarks,
 // top sites and actions items for spotlight.
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
@@ -80,8 +48,11 @@ NSString* const kSpotlightTopSitesPrefix = @"com.google.chrome.topsites.";
 NSString* const kSpotlightActionsDomain = @"com.google.chrome.actions";
 NSString* const kSpotlightActionsPrefix = @"com.google.chrome.actions.";
 
-NSString* const kSpotlightReadingListDomain = @"org.chromium.readinglist";
-NSString* const kSpotlightReadingListPrefix = @"org.chromium.readinglist.";
+NSString* const kSpotlightReadingListDomain = @"com.google.readinglist";
+NSString* const kSpotlightReadingListPrefix = @"com.google.readinglist.";
+
+NSString* const kSpotlightOpenTabsDomain = @"com.google.opentabs";
+NSString* const kSpotlightOpenTabsPrefix = @"com.google.opentabs.";
 #else
 
 NSString* const kSpotlightBookmarkDomain = @"org.chromium.bookmarks";
@@ -95,6 +66,9 @@ NSString* const kSpotlightActionsPrefix = @"org.chromium.actions.";
 
 NSString* const kSpotlightReadingListDomain = @"org.chromium.readinglist";
 NSString* const kSpotlightReadingListPrefix = @"org.chromium.readinglist.";
+
+NSString* const kSpotlightOpenTabsDomain = @"org.chromium.opentabs";
+NSString* const kSpotlightOpenTabsPrefix = @"org.chromium.opentabs.";
 
 #endif
 
@@ -113,7 +87,7 @@ const char kSpotlightLastIndexingVersionKey[] = "SpotlightLastIndexingVersion";
 // Change this value if there are change int the information indexed in
 // Spotlight. This will force reindexation on next startup.
 // Value is stored in `kSpotlightLastIndexingVersionKey`.
-const int kCurrentSpotlightIndexVersion = 3;
+const int kCurrentSpotlightIndexVersion = 4;
 
 Domain SpotlightDomainFromString(NSString* domain) {
   if ([domain hasPrefix:kSpotlightBookmarkPrefix]) {
@@ -124,6 +98,8 @@ Domain SpotlightDomainFromString(NSString* domain) {
     return DOMAIN_ACTIONS;
   } else if ([domain hasPrefix:kSpotlightReadingListPrefix]) {
     return DOMAIN_READING_LIST;
+  } else if ([domain hasPrefix:kSpotlightOpenTabsPrefix]) {
+    return DOMAIN_OPEN_TABS;
   }
   // On normal flow, it is not possible to reach this point. When testing the
   // app, it may be possible though if the app is downgraded.
@@ -141,6 +117,9 @@ NSString* StringFromSpotlightDomain(Domain domain) {
       return kSpotlightActionsDomain;
     case DOMAIN_READING_LIST:
       return kSpotlightReadingListDomain;
+    case DOMAIN_OPEN_TABS:
+      return kSpotlightOpenTabsDomain;
+
     default:
       // On normal flow, it is not possible to reach this point. When testing
       // the app, it may be possible though if the app is downgraded.
@@ -149,45 +128,26 @@ NSString* StringFromSpotlightDomain(Domain domain) {
   }
 }
 
-void DeleteItemsWithIdentifiers(NSArray* items, BlockWithError callback) {
-  void (^deleteItems)(BlockWithError) = ^(BlockWithError errorBlock) {
-    [[CSSearchableIndex defaultSearchableIndex]
-        deleteSearchableItemsWithIdentifiers:items
-                           completionHandler:errorBlock];
-    [[SpotlightLogger sharedLogger] logDeletionOfItemsWithIdentifiers:items];
-  };
+NSString* SpotlightItemSourceLabelFromDomain(Domain domain) {
+  switch (domain) {
+    case DOMAIN_BOOKMARKS:
+      return l10n_util::GetNSString(IDS_IOS_TOOLS_MENU_BOOKMARKS);
+    case DOMAIN_TOPSITES:
+      return l10n_util::GetNSString(
+          IDS_IOS_CONTENT_SUGGESTIONS_MOST_VISITED_MODULE_TITLE);
+    case DOMAIN_ACTIONS:
+      return l10n_util::GetNSString(IDS_IOS_SPOTLIGHT_CHROME_ACTIONS_LABEL);
+    case DOMAIN_READING_LIST:
+      return l10n_util::GetNSString(IDS_IOS_TOOLS_MENU_READING_LIST);
+    case DOMAIN_OPEN_TABS:
+      return l10n_util::GetNSString(IDS_IOS_SPOTLIGHT_OPEN_TAB_LABEL);
 
-  DoWithRetry(callback, deleteItems);
-}
-
-void DeleteSearchableDomainItems(Domain domain, BlockWithError callback) {
-  void (^deleteItems)(BlockWithError) = ^(BlockWithError errorBlock) {
-    NSString* domainString = StringFromSpotlightDomain(domain);
-    [[CSSearchableIndex defaultSearchableIndex]
-        deleteSearchableItemsWithDomainIdentifiers:@[ domainString ]
-                                 completionHandler:errorBlock];
-    [[SpotlightLogger sharedLogger] logDeletionOfItemsInDomain:domainString];
-  };
-
-  DoWithRetry(callback, deleteItems);
-}
-
-void ClearAllSpotlightEntries(BlockWithError callback) {
-  BlockWithError augmentedCallback = ^(NSError* error) {
-    [[NSUserDefaults standardUserDefaults]
-        removeObjectForKey:@(kSpotlightLastIndexingDateKey)];
-    if (callback) {
-      callback(error);
-    }
-  };
-
-  void (^deleteItems)(BlockWithError) = ^(BlockWithError errorBlock) {
-    [[CSSearchableIndex defaultSearchableIndex]
-        deleteAllSearchableItemsWithCompletionHandler:errorBlock];
-    [[SpotlightLogger sharedLogger] logDeletionOfAllItems];
-  };
-
-  DoWithRetry(augmentedCallback, deleteItems);
+    default:
+      // On normal flow, it is not possible to reach this point. When testing
+      // the app, it may be possible though if the app is downgraded.
+      NOTREACHED();
+      return nil;
+  }
 }
 
 bool IsSpotlightAvailable() {
@@ -206,11 +166,6 @@ bool IsSpotlightAvailable() {
                               SPOTLIGHT_AVAILABILITY_COUNT);
   });
   return loaded && available;
-}
-
-void ClearSpotlightIndexWithCompletion(BlockWithError completion) {
-  DCHECK(IsSpotlightAvailable());
-  ClearAllSpotlightEntries(completion);
 }
 
 NSString* GetSpotlightCustomAttributeItemID() {

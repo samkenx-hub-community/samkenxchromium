@@ -27,7 +27,7 @@ TEST_F(ModelTypeTest, ModelTypeToValue) {
 }
 
 TEST_F(ModelTypeTest, ModelTypeSetToValue) {
-  const ModelTypeSet model_types(BOOKMARKS, APPS);
+  const ModelTypeSet model_types = {BOOKMARKS, APPS};
 
   base::Value::List value_list(ModelTypeSetToValue(model_types));
   ASSERT_EQ(2u, value_list.size());
@@ -131,24 +131,6 @@ TEST_F(ModelTypeTest, ModelTypeToProtocolRootTagValues) {
 TEST_F(ModelTypeTest, ModelTypeDebugStringIsNotEmpty) {
   for (ModelType model_type : ModelTypeSet::All()) {
     EXPECT_NE("", ModelTypeToDebugString(model_type));
-  }
-}
-
-TEST_F(ModelTypeTest, ModelTypeNotificationTypeMapping) {
-  ModelTypeSet all_types = ModelTypeSet::All();
-  for (ModelType model_type : all_types) {
-    std::string notification_type;
-    bool ret = RealModelTypeToNotificationType(model_type, &notification_type);
-    if (ret) {
-      auto notified_model_type = ModelType::UNSPECIFIED;
-      ASSERT_NE(model_type, notified_model_type);
-      EXPECT_TRUE(NotificationTypeToRealModelType(notification_type,
-                                                  &notified_model_type));
-      EXPECT_EQ(model_type, notified_model_type);
-    } else {
-      EXPECT_FALSE(ProtocolTypes().Has(model_type));
-      EXPECT_TRUE(notification_type.empty());
-    }
   }
 }
 

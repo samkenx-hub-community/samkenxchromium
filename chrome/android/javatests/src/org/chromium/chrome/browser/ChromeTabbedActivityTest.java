@@ -6,6 +6,7 @@ package org.chromium.chrome.browser;
 
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.Browser;
 
 import androidx.test.filters.MediumTest;
@@ -27,12 +28,14 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
+import org.chromium.base.test.util.MinAndroidSdkLevel;
 import org.chromium.chrome.browser.device.DeviceClassManager;
 import org.chromium.chrome.browser.document.ChromeLauncherActivity;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
+import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.tab.TabImpl;
 import org.chromium.chrome.browser.tab.TabLaunchType;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 import org.chromium.chrome.browser.tabmodel.ChromeTabCreator;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
@@ -121,6 +124,39 @@ public class ChromeTabbedActivityTest {
     }
 
     @Test
+    @SmallTest
+    @MinAndroidSdkLevel(Build.VERSION_CODES.S)
+    public void testTabModelSelectorObserverOnTabStateInitialized() {
+        // Get the original value of |mCreatedTabOnStartup|.
+        boolean createdTabOnStartup = mActivity.getCreatedTabOnStartupForTesting();
+
+        // Reset the values of |mCreatedTabOnStartup| and |MultiInstanceManager.mTabModelObserver|.
+        // This tab model selector observer should be registered in MultiInstanceManager on tab
+        // state initialization irrespective of the value of |mCreatedTabOnStartup|.
+        mActivity.setCreatedTabOnStartupForTesting(false);
+        mActivity.getMultiInstanceMangerForTesting().setTabModelObserverForTesting(null);
+
+        var tabModelSelectorObserver = mActivity.getTabModelSelectorObserverForTesting();
+        TestThreadUtils.runOnUiThreadBlocking(tabModelSelectorObserver::onTabStateInitialized);
+        Assert.assertTrue(
+                "Regular tab count should be written to SharedPreferences after tab state initialization.",
+                SharedPreferencesManager.getInstance()
+                                .readIntsWithPrefix(ChromePreferenceKeys.MULTI_INSTANCE_TAB_COUNT)
+                                .size()
+                        > 0);
+        Assert.assertTrue(
+                "Incognito tab count should be written to SharedPreferences after tab state initialization.",
+                SharedPreferencesManager.getInstance()
+                                .readIntsWithPrefix(
+                                        ChromePreferenceKeys.MULTI_INSTANCE_INCOGNITO_TAB_COUNT)
+                                .size()
+                        > 0);
+
+        // Restore the original value of |mCreatedTabOnStartup|.
+        mActivity.setCreatedTabOnStartupForTesting(createdTabOnStartup);
+    }
+
+    @Test
     @MediumTest
     @DisabledTest(message = "https://crbug.com/1347506")
     public void testMultiUrlIntent() {
@@ -160,11 +196,9 @@ public class ChromeTabbedActivityTest {
             int parentId = tabModel.getTabAt(0).getId();
             Criteria.checkThat(
                     tabModel.getTabAt(1).getUrl().getSpec(), Matchers.endsWith("second"));
-            Criteria.checkThat(CriticalPersistedTabData.from(tabModel.getTabAt(1)).getParentId(),
-                    Matchers.is(parentId));
+            Criteria.checkThat(tabModel.getTabAt(1).getParentId(), Matchers.is(parentId));
             Criteria.checkThat(tabModel.getTabAt(2).getUrl().getSpec(), Matchers.endsWith("third"));
-            Criteria.checkThat(CriticalPersistedTabData.from(tabModel.getTabAt(2)).getParentId(),
-                    Matchers.is(parentId));
+            Criteria.checkThat(tabModel.getTabAt(2).getParentId(), Matchers.is(parentId));
         });
 
         viewIntent.putExtra(IntentHandler.EXTRA_OPEN_NEW_INCOGNITO_TAB, true);

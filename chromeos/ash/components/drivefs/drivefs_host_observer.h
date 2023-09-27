@@ -7,17 +7,23 @@
 
 #include <vector>
 
+#include "base/component_export.h"
+#include "base/observer_list_types.h"
+
 namespace drivefs {
 namespace mojom {
 class DriveError;
 class FileChange;
+class ProgressEvent;
 class SyncingStatus;
 }  // namespace mojom
 
 struct SyncState;
 
-class DriveFsHostObserver {
+class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_DRIVEFS) DriveFsHostObserver
+    : public base::CheckedObserver {
  public:
+  ~DriveFsHostObserver() override;
   virtual void OnUnmounted() {}
   virtual void OnSyncingStatusUpdate(const mojom::SyncingStatus& status) {}
   virtual void OnIndividualSyncingStatusesDelta(
@@ -26,9 +32,7 @@ class DriveFsHostObserver {
   }
   virtual void OnFilesChanged(const std::vector<mojom::FileChange>& changes) {}
   virtual void OnError(const mojom::DriveError& error) {}
-
- protected:
-  virtual ~DriveFsHostObserver() = default;
+  virtual void OnItemProgress(const mojom::ProgressEvent& event) {}
 };
 
 }  // namespace drivefs

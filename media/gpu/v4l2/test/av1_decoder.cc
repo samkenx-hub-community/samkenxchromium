@@ -4,7 +4,8 @@
 
 #include "media/gpu/v4l2/test/av1_decoder.h"
 
-#include <linux/media/av1-ctrls.h>
+#include <linux/v4l2-controls.h>
+#include <linux/videodev2.h>
 
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
@@ -20,6 +21,7 @@ namespace media {
 namespace v4l2_test {
 
 namespace {
+constexpr uint32_t kDriverCodecFourcc = V4L2_PIX_FMT_AV1_FRAME;
 
 constexpr uint32_t kNumberOfBuffersInCaptureQueue = 10;
 
@@ -529,11 +531,8 @@ void FillTileGroupParams(
 
 Av1Decoder::Av1Decoder(std::unique_ptr<IvfParser> ivf_parser,
                        std::unique_ptr<V4L2IoctlShim> v4l2_ioctl,
-                       std::unique_ptr<V4L2Queue> OUTPUT_queue,
-                       std::unique_ptr<V4L2Queue> CAPTURE_queue)
-    : VideoDecoder::VideoDecoder(std::move(v4l2_ioctl),
-                                 std::move(OUTPUT_queue),
-                                 std::move(CAPTURE_queue)),
+                       gfx::Size display_resolution)
+    : VideoDecoder::VideoDecoder(std::move(v4l2_ioctl), display_resolution),
       ivf_parser_(std::move(ivf_parser)),
       buffer_pool_(std::make_unique<libgav1::BufferPool>(
           /*on_frame_buffer_size_changed=*/nullptr,
@@ -553,8 +552,6 @@ Av1Decoder::~Av1Decoder() {
 // static
 std::unique_ptr<Av1Decoder> Av1Decoder::Create(
     const base::MemoryMappedFile& stream) {
-  constexpr uint32_t kDriverCodecFourcc = V4L2_PIX_FMT_AV1_FRAME;
-
   VLOG(2) << "Attempting to create decoder with codec "
           << media::FourccToString(kDriverCodecFourcc);
 
@@ -578,44 +575,17 @@ std::unique_ptr<Av1Decoder> Av1Decoder::Create(
   }
 
   auto v4l2_ioctl = std::make_unique<V4L2IoctlShim>(kDriverCodecFourcc);
-  uint32_t uncompressed_fourcc = V4L2_PIX_FMT_NV12;
-  int num_planes = 1;
 
-  if (!v4l2_ioctl->VerifyCapabilities(kDriverCodecFourcc,
-                                      uncompressed_fourcc)) {
-    // Fall back to MM21 for MediaTek platforms
-    uncompressed_fourcc = V4L2_PIX_FMT_MM21;
-    num_planes = 2;
-
-    if (!v4l2_ioctl->VerifyCapabilities(kDriverCodecFourcc,
-                                        uncompressed_fourcc)) {
-      LOG(ERROR) << "Device doesn't support the provided FourCCs.";
-      return nullptr;
-    }
+  if (!v4l2_ioctl->VerifyCapabilities(kDriverCodecFourcc)) {
+    LOG(ERROR) << "Device doesn't support "
+               << media::FourccToString(kDriverCodecFourcc) << ".";
+    return nullptr;
   }
 
   const gfx::Size bitstream_coded_size = GetResolutionFromBitstream(stream);
 
-  // TODO(stevecho): might need to consider using more than 1 file descriptor
-  // (fd) & buffer with the output queue for 4K60 requirement.
-  // https://buganizer.corp.google.com/issues/202214561#comment31
-  auto OUTPUT_queue = std::make_unique<V4L2Queue>(
-      V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE, kDriverCodecFourcc,
-      bitstream_coded_size,
-      /*num_planes=*/1, V4L2_MEMORY_MMAP, /*num_buffers=*/1);
-
-  // TODO(stevecho): enable V4L2_MEMORY_DMABUF memory for CAPTURE queue.
-  // |num_planes| represents separate memory buffers, not planes for Y, U, V.
-  // https://www.kernel.org/doc/html/v5.16/userspace-api/media/v4l/pixfmt-v4l2-mplane.html#c.V4L.v4l2_plane_pix_format
-  auto CAPTURE_queue = std::make_unique<V4L2Queue>(
-      V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE, uncompressed_fourcc,
-      bitstream_coded_size,
-      /*num_planes=*/num_planes, V4L2_MEMORY_MMAP,
-      /*num_buffers=*/kNumberOfBuffersInCaptureQueue);
-
-  return base::WrapUnique(
-      new Av1Decoder(std::move(ivf_parser), std::move(v4l2_ioctl),
-                     std::move(OUTPUT_queue), std::move(CAPTURE_queue)));
+  return base::WrapUnique(new Av1Decoder(
+      std::move(ivf_parser), std::move(v4l2_ioctl), bitstream_coded_size));
 }
 
 Av1Decoder::ParsingResult Av1Decoder::ReadNextFrame(
@@ -726,9 +696,6 @@ void Av1Decoder::SetupFrameParams(
   conditionally_set_u32_flags(&v4l2_frame_params->flags,
                               !frm_header.enable_frame_end_update_cdf,
                               V4L2_AV1_FRAME_FLAG_DISABLE_FRAME_END_UPDATE_CDF);
-  conditionally_set_u32_flags(&v4l2_frame_params->flags,
-                              frm_header.tile_info.uniform_spacing,
-                              V4L2_AV1_FRAME_FLAG_UNIFORM_TILE_SPACING);
   conditionally_set_u32_flags(&v4l2_frame_params->flags,
                               frm_header.allow_warped_motion,
                               V4L2_AV1_FRAME_FLAG_ALLOW_WARPED_MOTION);
@@ -980,11 +947,11 @@ void Av1Decoder::QueueReusableBuffersInCaptureQueue(
   }
 }
 
-VideoDecoder::Result Av1Decoder::DecodeNextFrame(std::vector<uint8_t>& y_plane,
+VideoDecoder::Result Av1Decoder::DecodeNextFrame(const int frame_number,
+                                                 std::vector<uint8_t>& y_plane,
                                                  std::vector<uint8_t>& u_plane,
                                                  std::vector<uint8_t>& v_plane,
-                                                 gfx::Size& size,
-                                                 const int frame_number) {
+                                                 gfx::Size& size) {
   libgav1::RefCountedBufferPtr current_frame;
   const ParsingResult parser_res = ReadNextFrame(current_frame);
 
@@ -992,6 +959,11 @@ VideoDecoder::Result Av1Decoder::DecodeNextFrame(std::vector<uint8_t>& y_plane,
     LOG_ASSERT(parser_res == ParsingResult::kEOStream)
         << "Failed to parse next frame.";
     return VideoDecoder::kEOStream;
+  }
+
+  const bool is_OUTPUT_queue_new = !OUTPUT_queue_;
+  if (!OUTPUT_queue_) {
+    CreateOUTPUTQueue(kDriverCodecFourcc);
   }
 
   libgav1::ObuFrameHeader current_frame_header = obu_parser_->frame_header();
@@ -1022,10 +994,9 @@ VideoDecoder::Result Av1Decoder::DecodeNextFrame(std::vector<uint8_t>& y_plane,
     scoped_refptr<MmappedBuffer> repeated_frame_buffer =
         ref_frames_[current_frame_header.frame_to_show];
 
-    size = CAPTURE_queue_->display_size();
-    ConvertToYUV(y_plane, u_plane, v_plane, size,
+    ConvertToYUV(y_plane, u_plane, v_plane, OUTPUT_queue_->resolution(),
                  repeated_frame_buffer->mmapped_planes(),
-                 CAPTURE_queue_->coded_size(), CAPTURE_queue_->fourcc());
+                 CAPTURE_queue_->resolution(), CAPTURE_queue_->fourcc());
 
     // Repeated frames normally don't need to update reference frames. But in
     // this special case when the repeated frame is pointing to a key frame, all
@@ -1092,22 +1063,25 @@ VideoDecoder::Result Av1Decoder::DecodeNextFrame(std::vector<uint8_t>& y_plane,
   struct v4l2_ext_controls ext_ctrls = {.count = base::checked_cast<__u32>(ext_ctrl_vectors.size()),
                                         .controls = &ext_ctrl_vectors[0]};
 
-  if (!v4l2_ioctl_->SetExtCtrls(OUTPUT_queue_, &ext_ctrls))
-    LOG(FATAL) << "VIDIOC_S_EXT_CTRLS failed.";
+  // Before the CAPTURE queue is set up the first frame must be parsed by the
+  // driver. This is done so that when VIDIOC_G_FMT is called the frame
+  // dimensions and format will be ready. Specifying V4L2_CTRL_WHICH_CUR_VAL
+  // when VIDIOC_S_EXT_CTRLS processes the request immediately so that the frame
+  // is parsed by the driver and the state is readied.
+  v4l2_ioctl_->SetExtCtrls(OUTPUT_queue_, &ext_ctrls, is_OUTPUT_queue_new);
+  v4l2_ioctl_->MediaRequestIocQueue(OUTPUT_queue_);
 
-  if (!v4l2_ioctl_->MediaRequestIocQueue(OUTPUT_queue_))
-    LOG(FATAL) << "MEDIA_REQUEST_IOC_QUEUE failed.";
-
-  uint32_t buffer_id;
-
-  if (!v4l2_ioctl_->DQBuf(CAPTURE_queue_, &buffer_id)) {
-    LOG(FATAL) << "VIDIOC_DQBUF failed for CAPTURE queue.";
+  if (!CAPTURE_queue_) {
+    CreateCAPTUREQueue(kNumberOfBuffersInCaptureQueue);
   }
 
+  uint32_t buffer_id;
+  v4l2_ioctl_->DQBuf(CAPTURE_queue_, &buffer_id);
+
   scoped_refptr<MmappedBuffer> buffer = CAPTURE_queue_->GetBuffer(buffer_id);
-  size = CAPTURE_queue_->display_size();
-  ConvertToYUV(y_plane, u_plane, v_plane, size, buffer->mmapped_planes(),
-               CAPTURE_queue_->coded_size(), CAPTURE_queue_->fourcc());
+  ConvertToYUV(y_plane, u_plane, v_plane, OUTPUT_queue_->resolution(),
+               buffer->mmapped_planes(), CAPTURE_queue_->resolution(),
+               CAPTURE_queue_->fourcc());
 
   const std::set<int> reusable_buffer_ids = RefreshReferenceSlots(
       current_frame_header, current_frame, CAPTURE_queue_->GetBuffer(buffer_id),
@@ -1117,12 +1091,9 @@ VideoDecoder::Result Av1Decoder::DecodeNextFrame(std::vector<uint8_t>& y_plane,
       reusable_buffer_ids,
       !libgav1::IsIntraFrame(current_frame_header.frame_type));
 
-  if (!v4l2_ioctl_->DQBuf(OUTPUT_queue_, &buffer_id)) {
-    LOG(FATAL) << "VIDIOC_DQBUF failed for OUTPUT queue.";
-  }
+  v4l2_ioctl_->DQBuf(OUTPUT_queue_, &buffer_id);
 
-  if (!v4l2_ioctl_->MediaRequestIocReinit(OUTPUT_queue_))
-    LOG(FATAL) << "MEDIA_REQUEST_IOC_REINIT failed.";
+  v4l2_ioctl_->MediaRequestIocReinit(OUTPUT_queue_);
 
   return VideoDecoder::kOk;
 }

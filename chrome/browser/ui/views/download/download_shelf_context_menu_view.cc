@@ -28,9 +28,9 @@ DownloadShelfContextMenuView::DownloadShelfContextMenuView(
 
 DownloadShelfContextMenuView::DownloadShelfContextMenuView(
     base::WeakPtr<DownloadUIModel> download_ui_model,
-    DownloadBubbleUIController* bubble_controller)
+    base::WeakPtr<DownloadBubbleUIController> bubble_controller)
     : DownloadShelfContextMenu(download_ui_model),
-      bubble_controller_(bubble_controller) {}
+      bubble_controller_(std::move(bubble_controller)) {}
 
 DownloadShelfContextMenuView::~DownloadShelfContextMenuView() = default;
 
@@ -84,8 +84,6 @@ void DownloadShelfContextMenuView::OnMenuWillShow(ui::SimpleMenuModel* source) {
 
 void DownloadShelfContextMenuView::ExecuteCommand(int command_id,
                                                   int event_flags) {
-  DownloadShelfContextMenu::ExecuteCommand(command_id, event_flags);
-
   if (!download_commands_executed_recorded_[command_id]) {
     base::UmaHistogramEnumeration(
         "Download.ShelfContextMenuAction",
@@ -94,4 +92,7 @@ void DownloadShelfContextMenuView::ExecuteCommand(int command_id,
             /*clicked=*/true));
     download_commands_executed_recorded_[command_id] = true;
   }
+
+  DownloadShelfContextMenu::ExecuteCommand(command_id, event_flags);
+  // ExecuteCommand can delete `this`.
 }

@@ -14,6 +14,7 @@
 #include "ash/session/test_session_controller_client.h"
 #include "ash/wallpaper/test_wallpaper_controller_client.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
@@ -33,6 +34,16 @@ using testing::Lt;
 
 constexpr char kUser1[] = "user1@test.com";
 const AccountId account_id_1 = AccountId::FromUserEmailGaiaId(kUser1, kUser1);
+
+constexpr char kDummyUrl[] = "https://best_wallpaper/1";
+constexpr char kDummyUrl2[] = "https://best_wallpaper/2";
+constexpr char kDummyUrl3[] = "https://best_wallpaper/3";
+constexpr char kDummyUrl4[] = "https://best_wallpaper/4";
+
+const uint64_t kAssetId = 1;
+const uint64_t kAssetId2 = 2;
+const uint64_t kAssetId3 = 3;
+const uint64_t kAssetId4 = 4;
 
 constexpr char kFakeGooglePhotosPhotoId[] = "fake_photo";
 
@@ -158,10 +169,15 @@ class TestProfileHelper : public WallpaperProfileHelper {
   std::map<AccountId, TestingPrefServiceSimple> synced_prefs_;
 };
 
-class WallpaperPrefManagerTest : public testing::Test {
+class WallpaperPrefManagerTestBase : public testing::Test {
  public:
-  WallpaperPrefManagerTest()
-      : task_environment_(base::test::TaskEnvironment::MainThreadType::UI) {}
+  WallpaperPrefManagerTestBase() = default;
+
+  WallpaperPrefManagerTestBase(const WallpaperPrefManagerTestBase&) = delete;
+  WallpaperPrefManagerTestBase& operator=(const WallpaperPrefManagerTestBase&) =
+      delete;
+
+  ~WallpaperPrefManagerTestBase() override = default;
 
   void SetUp() override {
     local_state_ = std::make_unique<TestingPrefServiceSimple>();
@@ -172,8 +188,6 @@ class WallpaperPrefManagerTest : public testing::Test {
     pref_manager_ = WallpaperPrefManager::CreateForTesting(
         local_state_.get(), std::move(profile_helper));
   }
-
-  void TearDown() override {}
 
   PrefService* GetLocalPrefService() { return local_state_.get(); }
 
@@ -188,14 +202,26 @@ class WallpaperPrefManagerTest : public testing::Test {
   }
 
  protected:
-  base::test::SingleThreadTaskEnvironment task_environment_;
+  base::test::SingleThreadTaskEnvironment task_environment_{
+      base::test::TaskEnvironment::MainThreadType::UI};
 
-  TestProfileHelper* profile_helper_;
+  raw_ptr<TestProfileHelper, DanglingUntriaged | ExperimentalAsh>
+      profile_helper_;
 
   TestWallpaperControllerClient client_;
   std::unique_ptr<TestingPrefServiceSimple> local_state_;
 
   std::unique_ptr<WallpaperPrefManager> pref_manager_;
+};
+
+class WallpaperPrefManagerTest : public WallpaperPrefManagerTestBase {
+ public:
+  WallpaperPrefManagerTest() {
+    scoped_feature_list_.InitAndEnableFeature(chromeos::features::kJelly);
+  }
+
+ protected:
+  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 TEST_F(WallpaperPrefManagerTest, GetWallpaperInfo_Normal) {
@@ -252,7 +278,7 @@ TEST_F(WallpaperPrefManagerTest, SetWallpaperInfo_EphemeralDoesNotChangeLocal) {
 TEST_F(WallpaperPrefManagerTest, SetWallpaperInfoLocal) {
   WallpaperInfo info(
       GetDummyFileName(account_id_1), WALLPAPER_LAYOUT_CENTER_CROPPED,
-      WallpaperType::kThirdParty, base::Time::Now().LocalMidnight());
+      WallpaperType::kCustomized, base::Time::Now().LocalMidnight());
   EXPECT_TRUE(pref_manager_->SetUserWallpaperInfo(account_id_1, info));
   AssertWallpaperInfoInPrefs(local_state_.get(), prefs::kUserWallpaperInfo,
                              account_id_1, info);
@@ -435,7 +461,100 @@ TEST_F(WallpaperPrefManagerTest, RemoveCelebiColor) {
   EXPECT_FALSE(pref_manager_->GetCelebiColor(location));
 }
 
-TEST_F(WallpaperPrefManagerTest, SetCalculatedColors) {
+TEST_F(WallpaperPrefManagerTest, CalculatedColors) {
+  const char location[] = "location";
+
+  const SkColor k_mean_color = SkColorSetRGB(0xAB, 0xBC, 0xEF);
+  pref_manager_->CacheKMeanColor(location, k_mean_color);
+
+  const SkColor celebi_color = SkColorSetRGB(0xFF, 0xCC, 0x22);
+  pref_manager_->CacheCelebiColor(location, celebi_color);
+
+  // Cache prominent colors even though they should not be retrieved.
+  const std::vector<SkColor> prominent_colors = {
+      SK_ColorGREEN, SK_ColorGREEN, SK_ColorGREEN,
+      SkColorSetRGB(0xAB, 0xBC, 0xEF)};
+  pref_manager_->CacheProminentColors(location, prominent_colors);
+
+  absl::optional<WallpaperCalculatedColors> actual_colors =
+      pref_manager_->GetCachedWallpaperColors(location);
+  ASSERT_TRUE(actual_colors);
+  EXPECT_EQ(k_mean_color, actual_colors->k_mean_color);
+  EXPECT_EQ(celebi_color, actual_colors->celebi_color);
+  EXPECT_EQ(std::vector<SkColor>(), actual_colors->prominent_colors)
+      << "Prominent colors are ignored";
+}
+
+TEST_F(WallpaperPrefManagerTest, CalculatedColorsEmptyIfKMeanMissing) {
+  const char location[] = "location";
+
+  const SkColor celebi_color = SkColorSetRGB(0xFF, 0xCC, 0x22);
+  pref_manager_->CacheCelebiColor(location, celebi_color);
+
+  EXPECT_FALSE(pref_manager_->GetCachedWallpaperColors(location));
+}
+
+TEST_F(WallpaperPrefManagerTest, CalculatedColorsEmptyIfCelebiMissing) {
+  const char location[] = "location";
+
+  const SkColor k_mean_color = SkColorSetRGB(0xAB, 0xBC, 0xEF);
+  pref_manager_->CacheKMeanColor(location, k_mean_color);
+
+  EXPECT_FALSE(pref_manager_->GetCachedWallpaperColors(location));
+}
+
+TEST_F(WallpaperPrefManagerTest, ShouldSyncOut) {
+  EXPECT_TRUE(WallpaperPrefManager::ShouldSyncOut(
+      InfoWithType(WallpaperType::kOnline)));
+
+  std::vector<OnlineWallpaperVariant> variants;
+  variants.emplace_back(kAssetId, GURL(kDummyUrl),
+                        backdrop::Image::IMAGE_TYPE_LIGHT_MODE);
+  variants.emplace_back(kAssetId2, GURL(kDummyUrl2),
+                        backdrop::Image::IMAGE_TYPE_DARK_MODE);
+  variants.emplace_back(kAssetId3, GURL(kDummyUrl3),
+                        backdrop::Image::IMAGE_TYPE_MORNING_MODE);
+  variants.emplace_back(kAssetId4, GURL(kDummyUrl4),
+                        backdrop::Image::IMAGE_TYPE_LATE_AFTERNOON_MODE);
+  WallpaperInfo info = InfoWithType(WallpaperType::kOnline);
+  info.variants = variants;
+  EXPECT_FALSE(WallpaperPrefManager::ShouldSyncOut(info));
+}
+
+TEST_F(WallpaperPrefManagerTest, ShouldSyncIn) {
+  WallpaperInfo local_info = InfoWithType(WallpaperType::kOnline);
+  WallpaperInfo synced_info = InfoWithType(WallpaperType::kDaily);
+  EXPECT_TRUE(WallpaperPrefManager::ShouldSyncIn(synced_info, local_info,
+                                                 /*is_oobe=*/false));
+
+  std::vector<OnlineWallpaperVariant> variants;
+  variants.emplace_back(kAssetId, GURL(kDummyUrl),
+                        backdrop::Image::IMAGE_TYPE_LIGHT_MODE);
+  variants.emplace_back(kAssetId2, GURL(kDummyUrl2),
+                        backdrop::Image::IMAGE_TYPE_DARK_MODE);
+  variants.emplace_back(kAssetId3, GURL(kDummyUrl3),
+                        backdrop::Image::IMAGE_TYPE_MORNING_MODE);
+  variants.emplace_back(kAssetId4, GURL(kDummyUrl4),
+                        backdrop::Image::IMAGE_TYPE_LATE_AFTERNOON_MODE);
+  local_info.variants = variants;
+  EXPECT_FALSE(WallpaperPrefManager::ShouldSyncIn(synced_info, local_info,
+                                                  /*is_oobe=*/false));
+  EXPECT_TRUE(WallpaperPrefManager::ShouldSyncIn(synced_info, local_info,
+                                                 /*is_oobe=*/true));
+}
+
+class WallpaperPrefManagerJellyDisabledTest
+    : public WallpaperPrefManagerTestBase {
+ public:
+  WallpaperPrefManagerJellyDisabledTest() {
+    scoped_feature_list_.InitAndDisableFeature(chromeos::features::kJelly);
+  }
+
+ protected:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+TEST_F(WallpaperPrefManagerJellyDisabledTest, SetCalculatedColors) {
   const char location[] = "location";
 
   // Cache a prominent and KMean color entry
@@ -455,9 +574,8 @@ TEST_F(WallpaperPrefManagerTest, SetCalculatedColors) {
   EXPECT_EQ(actual_colors->k_mean_color, k_mean_color);
 }
 
-TEST_F(WallpaperPrefManagerTest, CalculatedColorsEmptyIfKMeanMissing) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndDisableFeature({chromeos::features::kJelly});
+TEST_F(WallpaperPrefManagerJellyDisabledTest,
+       CalculatedColorsEmptyIfKMeanMissing) {
   const char location[] = "location";
 
   const std::vector<SkColor> prominent_colors = {
@@ -468,26 +586,8 @@ TEST_F(WallpaperPrefManagerTest, CalculatedColorsEmptyIfKMeanMissing) {
   EXPECT_FALSE(pref_manager_->GetCachedWallpaperColors(location));
 }
 
-TEST_F(WallpaperPrefManagerTest, CalculatedColorsWhenJellyEnabled) {
-  base::test::ScopedFeatureList scoped_feature_list(chromeos::features::kJelly);
-  const char location[] = "location";
-
-  const SkColor k_mean_color = SkColorSetRGB(0xAB, 0xBC, 0xEF);
-  pref_manager_->CacheKMeanColor(location, k_mean_color);
-
-  const SkColor celebi_color = SkColorSetRGB(0xFF, 0xCC, 0x22);
-  pref_manager_->CacheCelebiColor(location, celebi_color);
-
-  absl::optional<WallpaperCalculatedColors> actual_colors =
-      pref_manager_->GetCachedWallpaperColors(location);
-  ASSERT_TRUE(actual_colors);
-  EXPECT_EQ(k_mean_color, actual_colors->k_mean_color);
-  EXPECT_EQ(celebi_color, actual_colors->celebi_color);
-}
-
-TEST_F(WallpaperPrefManagerTest,
-       CalculatedColorsEmptyIfCelebiMissingWhenJellyEnabled) {
-  base::test::ScopedFeatureList scoped_feature_list(chromeos::features::kJelly);
+TEST_F(WallpaperPrefManagerJellyDisabledTest,
+       CalculatedColorsEmptyIfProminentColorsMissing) {
   const char location[] = "location";
 
   const SkColor k_mean_color = SkColorSetRGB(0xAB, 0xBC, 0xEF);

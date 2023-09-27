@@ -7,7 +7,7 @@
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
 #include "chrome/browser/extensions/extension_service.h"
-#include "chrome/browser/web_applications/externally_managed_app_manager_impl.h"
+#include "chrome/browser/web_applications/externally_managed_app_manager.h"
 #include "chrome/browser/web_applications/test/fake_web_app_provider.h"
 #include "chrome/browser/web_applications/test/test_web_app_url_loader.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
@@ -41,13 +41,11 @@ void AppListTestBase::SetUp(bool guest_mode) {
   // - 1 dummy extension (which should not be visible in the launcher)
   // - 2 packaged extension apps
   // - 1 hosted extension app
-  base::FilePath source_install_dir =
-      data_dir().AppendASCII("app_list").AppendASCII("Extensions");
-  base::FilePath pref_path =
-      source_install_dir.DirName().Append(chrome::kPreferencesFilename);
   ExtensionServiceInitParams params;
+  ASSERT_TRUE(
+      params.ConfigureByTestDataDirectory(data_dir().AppendASCII("app_list")));
   params.profile_is_guest = guest_mode;
-  InitializeInstalledExtensionService(pref_path, source_install_dir, params);
+  InitializeExtensionService(params);
   service_->Init();
 
   ConfigureWebAppProvider();
@@ -66,8 +64,7 @@ void AppListTestBase::ConfigureWebAppProvider() {
   url_loader_ = url_loader.get();
 
   auto externally_managed_app_manager =
-      std::make_unique<web_app::ExternallyManagedAppManagerImpl>(
-          testing_profile);
+      std::make_unique<web_app::ExternallyManagedAppManager>(testing_profile);
   externally_managed_app_manager->SetUrlLoaderForTesting(std::move(url_loader));
 
   auto* const provider = web_app::FakeWebAppProvider::Get(testing_profile);
@@ -119,7 +116,9 @@ syncer::SyncData CreateAppRemoteData(
     const std::string& parent_id,
     const std::string& item_ordinal,
     const std::string& item_pin_ordinal,
-    sync_pb::AppListSpecifics_AppListItemType item_type) {
+    sync_pb::AppListSpecifics_AppListItemType item_type,
+    absl::optional<bool> is_user_pinned,
+    const std::string& promise_package_id) {
   sync_pb::EntitySpecifics specifics;
   sync_pb::AppListSpecifics* app_list = specifics.mutable_app_list();
   if (id != kUnset)
@@ -133,6 +132,12 @@ syncer::SyncData CreateAppRemoteData(
     app_list->set_item_ordinal(item_ordinal);
   if (item_pin_ordinal != kUnset)
     app_list->set_item_pin_ordinal(item_pin_ordinal);
+  if (is_user_pinned.has_value()) {
+    app_list->set_is_user_pinned(*is_user_pinned);
+  }
+  if (promise_package_id != kUnset) {
+    app_list->set_promise_package_id(promise_package_id);
+  }
 
   return syncer::SyncData::CreateRemoteData(
       specifics, syncer::ClientTagHash::FromHashed("unused"));

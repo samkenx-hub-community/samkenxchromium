@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #import "base/test/ios/wait_util.h"
-#import "components/signin/internal/identity_manager/account_capabilities_constants.h"
 #import "components/signin/public/base/signin_switches.h"
 #import "ios/chrome/browser/flags/chrome_switches.h"
 #import "ios/chrome/browser/signin/capabilities_types.h"
@@ -23,10 +22,6 @@
 #import "ios/testing/earl_grey/earl_grey_test.h"
 #import "ios/testing/earl_grey/matchers.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 
 void VerifySigninPromoSufficientlyVisible() {
@@ -41,14 +36,6 @@ void VerifySigninPromoSufficientlyVisible() {
   GREYAssert(base::test::ios::WaitUntilConditionOrTimeout(
                  base::test::ios::kWaitForUIElementTimeout, condition),
              @"Sign-in promo not visible");
-}
-
-ios::CapabilitiesDict* GetCapabilitiesDictionary(
-    SystemIdentityCapabilityResult result) {
-  return @{
-    @(kCanOfferExtendedChromeSyncPromosCapabilityName) :
-        @(static_cast<int>(result)),
-  };
 }
 
 }  // namespace
@@ -79,7 +66,8 @@ ios::CapabilitiesDict* GetCapabilitiesDictionary(
 }
 
 // Tests that the sign-in promo is not visible at start-up with no identity.
-- (void)testNoSigninPromoWithNoIdentity {
+// TODO(crbug.com/1442297): Need to enable this test.
+- (void)DISABLED_testNoSigninPromoWithNoIdentity {
   [[AppLaunchManager sharedManager] backgroundAndForegroundApp];
   base::test::ios::SpinRunLoopWithMinDelay(base::Seconds(5));
 
@@ -90,12 +78,12 @@ ios::CapabilitiesDict* GetCapabilitiesDictionary(
 
 // Tests that the sign-in promo is not visible at start-up once
 // the user has signed in to their account previously.
-- (void)testStartupSigninPromoUserSignedIn {
+// TODO(crbug.com/1442297): Need to enable this test.
+- (void)DISABLED_testStartupSigninPromoUserSignedIn {
   FakeSystemIdentity* fakeIdentity = [FakeSystemIdentity fakeIdentity1];
   [SigninEarlGreyUI signinWithFakeIdentity:fakeIdentity];
-  [SigninEarlGrey setCapabilities:GetCapabilitiesDictionary(
-                                      SystemIdentityCapabilityResult::kTrue)
-                      forIdentity:fakeIdentity];
+  [SigninEarlGrey setCanOfferExtendedChromeSyncPromos:YES
+                                          forIdentity:fakeIdentity];
 
   [[AppLaunchManager sharedManager] backgroundAndForegroundApp];
   [ChromeEarlGreyUI waitForAppToIdle];
@@ -110,9 +98,9 @@ ios::CapabilitiesDict* GetCapabilitiesDictionary(
 - (void)testStartupSigninPromoNotShownForMinor {
   FakeSystemIdentity* fakeIdentity = [FakeSystemIdentity fakeIdentity1];
   [SigninEarlGrey addFakeIdentity:fakeIdentity];
-  [SigninEarlGrey setCapabilities:GetCapabilitiesDictionary(
-                                      SystemIdentityCapabilityResult::kFalse)
-                      forIdentity:fakeIdentity];
+  [SigninEarlGrey setCanOfferExtendedChromeSyncPromos:NO
+                                          forIdentity:fakeIdentity];
+
   [[AppLaunchManager sharedManager] backgroundAndForegroundApp];
   base::test::ios::SpinRunLoopWithMinDelay(base::Seconds(5));
 
@@ -122,18 +110,42 @@ ios::CapabilitiesDict* GetCapabilitiesDictionary(
 }
 
 // Tests that the sign-in promo is visible at start-up for regular user.
-- (void)testStartupSigninPromoShownForNoneMinor {
+// TODO(crbug.com/1442297): Need to enable this test.
+- (void)DISABLED_testStartupSigninPromoShownForNoneMinor {
   FakeSystemIdentity* fakeIdentity = [FakeSystemIdentity fakeIdentity1];
   [SigninEarlGrey addFakeIdentity:fakeIdentity];
-  [SigninEarlGrey setCapabilities:GetCapabilitiesDictionary(
-                                      SystemIdentityCapabilityResult::kTrue)
-                      forIdentity:fakeIdentity];
+  [SigninEarlGrey setCanOfferExtendedChromeSyncPromos:YES
+                                          forIdentity:fakeIdentity];
+
   [[AppLaunchManager sharedManager] backgroundAndForegroundApp];
 
   VerifySigninPromoSufficientlyVisible();
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
                                           kSkipSigninAccessibilityIdentifier)]
       performAction:grey_tap()];
+}
+
+// Tests sign-in promo behavior in landscape. It should appears if and only if
+// the device is an ipad.
+// TODO(crbug.com/1442297): Need to enable this test.
+- (void)DISABLED_testNoSignInPromoInLandscapeMode {
+  [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationLandscapeLeft
+                                error:nil];
+  FakeSystemIdentity* fakeIdentity = [FakeSystemIdentity fakeIdentity1];
+  [SigninEarlGrey addFakeIdentity:fakeIdentity];
+  [SigninEarlGrey setCanOfferExtendedChromeSyncPromos:YES
+                                          forIdentity:fakeIdentity];
+
+  [[AppLaunchManager sharedManager] backgroundAndForegroundApp];
+  [ChromeEarlGreyUI waitForAppToIdle];
+
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    VerifySigninPromoSufficientlyVisible();
+  } else {
+    [[EarlGrey
+        selectElementWithMatcher:chrome_test_util::UpgradeSigninPromoMatcher()]
+        assertWithMatcher:grey_notVisible()];
+  }
 }
 
 @end

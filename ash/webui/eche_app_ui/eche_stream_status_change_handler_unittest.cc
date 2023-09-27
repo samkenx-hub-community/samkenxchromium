@@ -7,6 +7,7 @@
 
 #include "ash/webui/eche_app_ui/apps_launch_info_provider.h"
 #include "ash/webui/eche_app_ui/eche_connection_status_handler.h"
+#include "base/memory/raw_ptr.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -75,7 +76,7 @@ class FakeStreamActionObserver : public mojom::StreamActionObserver {
 
  private:
   size_t num_stream_action_state_calls_ = 0;
-  TaskRunner* task_runner_;
+  raw_ptr<TaskRunner, ExperimentalAsh> task_runner_;
   mojo::Receiver<mojom::StreamActionObserver> receiver_;
 };
 
@@ -96,16 +97,18 @@ class EcheStreamStatusChangeHandlerTest : public testing::Test {
         std::make_unique<eche_app::EcheConnectionStatusHandler>();
     apps_launch_info_provider_ = std::make_unique<AppsLaunchInfoProvider>(
         connection_status_handler_.get());
+    apps_launch_info_provider_->SetAppLaunchInfo(
+        mojom::AppStreamLaunchEntryPoint::APPS_LIST);
     handler_ = std::make_unique<EcheStreamStatusChangeHandler>(
-        apps_launch_info_provider_.get());
+        apps_launch_info_provider_.get(), connection_status_handler_.get());
     handler_->AddObserver(&fake_observer_);
   }
 
   void TearDown() override {
     apps_launch_info_provider_.reset();
-    connection_status_handler_.reset();
     handler_->RemoveObserver(&fake_observer_);
     handler_.reset();
+    connection_status_handler_.reset();
   }
 
   void StartStreaming() { handler_->StartStreaming(); }

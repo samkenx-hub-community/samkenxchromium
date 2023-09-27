@@ -10,19 +10,19 @@
 
 namespace ash {
 
-class DesksBarView;
+class DeskBarViewBase;
 
 // A button in zero state bar showing the name of the desk. Zero state is the
 // state of the desks bar when there's only a single desk available, in which
 // case the bar is shown in a minimized state. Clicking the button will switch
 // to the expanded desks bar and focus on the single desk's name view.
-// TODO(conniekxu): Remove `ZeroStateDefaultDeskButton`, replace it with this
-// class, and rename this class by removing the prefix CrOSNext.
+// TODO(http://b/291622042): Remove `ZeroStateDefaultDeskButton`, replace it
+// with this class, and rename this class by removing the prefix CrOSNext.
 class CrOSNextDefaultDeskButton : public CrOSNextDeskButtonBase {
  public:
   METADATA_HEADER(CrOSNextDefaultDeskButton);
 
-  explicit CrOSNextDefaultDeskButton(DesksBarView* bar_view);
+  explicit CrOSNextDefaultDeskButton(DeskBarViewBase* bar_view);
   CrOSNextDefaultDeskButton(const CrOSNextDefaultDeskButton&) = delete;
   CrOSNextDefaultDeskButton& operator=(const CrOSNextDefaultDeskButton&) =
       delete;
@@ -35,9 +35,6 @@ class CrOSNextDefaultDeskButton : public CrOSNextDeskButtonBase {
 
  private:
   void OnButtonPressed();
-
-  // Owned by the views hierarchy.
-  DesksBarView* const bar_view_;
 };
 
 }  // namespace ash

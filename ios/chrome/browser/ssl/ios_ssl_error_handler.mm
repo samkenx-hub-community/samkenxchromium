@@ -14,7 +14,7 @@
 #import "components/security_interstitials/core/metrics_helper.h"
 #import "components/security_interstitials/core/ssl_error_options_mask.h"
 #import "components/security_interstitials/core/ssl_error_ui.h"
-#import "ios/chrome/browser/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/ssl/captive_portal_metrics.h"
 #import "ios/chrome/browser/ssl/ios_captive_portal_blocking_page.h"
 #import "ios/chrome/browser/ssl/ios_ssl_blocking_page.h"
@@ -24,10 +24,6 @@
 #import "ios/web/public/web_state.h"
 #import "net/ssl/ssl_info.h"
 #import "net/traffic_annotation/network_traffic_annotation.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using captive_portal::CaptivePortalDetector;
 using security_interstitials::IOSBlockingPageTabHelper;

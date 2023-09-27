@@ -11,6 +11,7 @@
 #include "base/values.h"
 #include "chromeos/ash/components/multidevice/logging/logging.h"
 #include "chromeos/ash/components/proximity_auth/proximity_auth_pref_names.h"
+#include "chromeos/ash/services/multidevice_setup/public/cpp/multidevice_setup_client.h"
 #include "chromeos/ash/services/multidevice_setup/public/cpp/prefs.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/prefs/pref_service.h"
@@ -22,16 +23,9 @@ ProximityAuthProfilePrefManager::ProximityAuthProfilePrefManager(
     PrefService* pref_service,
     ash::multidevice_setup::MultiDeviceSetupClient* multidevice_setup_client)
     : pref_service_(pref_service),
-      multidevice_setup_client_(multidevice_setup_client) {
-  OnFeatureStatesChanged(multidevice_setup_client_->GetFeatureStates());
+      multidevice_setup_client_(multidevice_setup_client) {}
 
-  multidevice_setup_client_->AddObserver(this);
-}
-
-ProximityAuthProfilePrefManager::~ProximityAuthProfilePrefManager() {
-  multidevice_setup_client_->RemoveObserver(this);
-}
-
+ProximityAuthProfilePrefManager::~ProximityAuthProfilePrefManager() = default;
 // static
 void ProximityAuthProfilePrefManager::RegisterPrefs(
     user_prefs::PrefRegistrySyncable* registry) {
@@ -40,9 +34,6 @@ void ProximityAuthProfilePrefManager::RegisterPrefs(
       prefs::kProximityAuthLastPromotionCheckTimestampMs, 0L);
   registry->RegisterIntegerPref(prefs::kProximityAuthPromotionShownCount, 0);
   registry->RegisterDictionaryPref(prefs::kProximityAuthRemoteBleDevices);
-  registry->RegisterBooleanPref(
-      prefs::kProximityAuthIsChromeOSLoginEnabled, false,
-      user_prefs::PrefRegistrySyncable::SYNCABLE_OS_PREF);
 }
 
 bool ProximityAuthProfilePrefManager::IsEasyUnlockAllowed() const {
@@ -92,45 +83,6 @@ void ProximityAuthProfilePrefManager::SetPromotionShownCount(int count) {
 
 int ProximityAuthProfilePrefManager::GetPromotionShownCount() const {
   return pref_service_->GetInteger(prefs::kProximityAuthPromotionShownCount);
-}
-
-bool ProximityAuthProfilePrefManager::IsChromeOSLoginAllowed() const {
-  return pref_service_->GetBoolean(
-      ash::multidevice_setup::kSmartLockSigninAllowedPrefName);
-}
-
-void ProximityAuthProfilePrefManager::SetIsChromeOSLoginEnabled(
-    bool is_enabled) {
-  return pref_service_->SetBoolean(prefs::kProximityAuthIsChromeOSLoginEnabled,
-                                   is_enabled);
-}
-
-bool ProximityAuthProfilePrefManager::IsChromeOSLoginEnabled() const {
-  return pref_service_->GetBoolean(prefs::kProximityAuthIsChromeOSLoginEnabled);
-}
-
-void ProximityAuthProfilePrefManager::SetHasShownLoginDisabledMessage(
-    bool has_shown) {
-  // This is persisted within SyncPrefsToLocalState() instead, since the local
-  // state must act as the source of truth for this pref.
-
-  // TODO(crbug.com/1152491): Add a NOTREACHED() to ensure this method is not
-  // called. It is currently incorrectly, though harmlessly, called by virtual
-  // Chrome OS on Linux.
-}
-
-bool ProximityAuthProfilePrefManager::HasShownLoginDisabledMessage() const {
-  // This method previously depended on easy unlock local state prefs, which are
-  // now deprecated with the removal of sign in with Smart Lock.
-  // TODO(b/227674947): Delete this method.
-  return false;
-}
-
-void ProximityAuthProfilePrefManager::OnFeatureStatesChanged(
-    const ash::multidevice_setup::MultiDeviceSetupClient::FeatureStatesMap&
-        feature_states_map) {
-  // TODO(b/227674947): Delete this method. With no more need for local state
-  // prefs, there's nothing to do here.
 }
 
 }  // namespace proximity_auth

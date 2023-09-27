@@ -9,6 +9,12 @@
 #include "content/public/browser/web_contents_user_data.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 
+class PrefService;
+
+namespace segmentation_platform {
+class SegmentationPlatformService;
+}
+
 namespace webapps {
 
 // Extends the AppBannerManagerAndroid with some Chrome-specific alternative UI
@@ -34,6 +40,8 @@ class ChromeAppBannerManagerAndroid
   void RecordExtraMetricsForInstallEvent(
       AddToHomescreenInstaller::Event event,
       const AddToHomescreenParams& a2hs_params) override;
+  segmentation_platform::SegmentationPlatformService*
+  GetSegmentationPlatformService() override;
 
  private:
   friend class content::WebContentsUserData<ChromeAppBannerManagerAndroid>;
@@ -42,6 +50,10 @@ class ChromeAppBannerManagerAndroid
   // show it was made, but false if conditions (e.g. engagement score) for
   // showing where not deemed adequate.
   bool MaybeShowInProductHelp() const;
+
+  raw_ptr<segmentation_platform::SegmentationPlatformService>
+      segmentation_platform_service_;
+  raw_ptr<PrefService> pref_service_;
 
   WEB_CONTENTS_USER_DATA_KEY_DECL();
 };

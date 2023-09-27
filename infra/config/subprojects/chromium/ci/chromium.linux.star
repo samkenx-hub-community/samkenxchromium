@@ -24,6 +24,7 @@ ci.defaults.set(
     reclient_instance = reclient.instance.DEFAULT_TRUSTED,
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
     service_account = ci.DEFAULT_SERVICE_ACCOUNT,
+    shadow_service_account = ci.DEFAULT_SHADOW_SERVICE_ACCOUNT,
 )
 
 consoles.console_view(
@@ -106,7 +107,6 @@ ci.builder(
         ),
         build_gs_bucket = "chromium-linux-archive",
     ),
-    os = os.LINUX_BIONIC,
     # TODO(crbug.com/1173333): Make it tree-closing.
     tree_closing = False,
     console_view_entry = consoles.console_view_entry(
@@ -136,7 +136,6 @@ ci.builder(
         ),
         build_gs_bucket = "chromium-linux-archive",
     ),
-    os = os.LINUX_BIONIC,
     tree_closing = False,
     console_view_entry = consoles.console_view_entry(
         category = "cast",
@@ -158,6 +157,7 @@ ci.builder(
         category = "release",
         short_name = "det",
     ),
+    contact_team_email = "chrome-build-team@google.com",
     execution_timeout = 6 * time.hour,
     notifies = ["Deterministic Linux", "close-on-any-step-failure"],
     reclient_jobs = reclient.jobs.DEFAULT,
@@ -171,6 +171,7 @@ ci.builder(
         category = "debug|builder",
         short_name = "det",
     ),
+    contact_team_email = "chrome-build-team@google.com",
     execution_timeout = 7 * time.hour,
     reclient_jobs = reclient.jobs.DEFAULT,
 )
@@ -224,6 +225,7 @@ ci.builder(
         short_name = "bld",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-browser-infra-team@google.com",
 )
 
 ci.builder(
@@ -246,7 +248,8 @@ ci.builder(
         short_name = "64",
     ),
     cq_mirrors_console_view = "mirrors",
-    reclient_jobs = reclient.jobs.DEFAULT,
+    contact_team_email = "chrome-browser-infra-team@google.com",
+    reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
 ci.builder(
@@ -304,6 +307,7 @@ ci.thin_tester(
         short_name = "tst",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-browser-infra-team@google.com",
     # TODO(crbug.com/1249968): Roll this out more broadly.
     resultdb_bigquery_exports = [
         resultdb.export_text_artifacts(
@@ -339,6 +343,7 @@ ci.thin_tester(
         short_name = "64",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-browser-infra-team@google.com",
 )
 
 ci.thin_tester(
@@ -463,10 +468,38 @@ ci.builder(
         ),
         build_gs_bucket = "chromium-linux-archive",
     ),
+    # Focal is needed for better C++20 support. See crbug.com/1284275.
     os = os.LINUX_FOCAL,
     console_view_entry = consoles.console_view_entry(
         category = "release",
         short_name = "gcc",
     ),
     reclient_instance = None,
+)
+
+ci.builder(
+    name = "linux-v4l2-codec-rel",
+    branch_selector = branches.selector.MAIN,
+    builder_spec = builder_config.builder_spec(
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+            apply_configs = [
+            ],
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+        ),
+        build_gs_bucket = "chromium-linux-archive",
+    ),
+    sheriff_rotations = args.ignore_default(None),
+    tree_closing = False,
+    console_view_entry = consoles.console_view_entry(
+        category = "linux",
+    ),
+    cq_mirrors_console_view = "mirrors",
 )

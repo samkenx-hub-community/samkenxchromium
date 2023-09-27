@@ -10,10 +10,11 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
+#include "components/account_id/account_id.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/sync/base/user_selectable_type.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_user_settings.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
 
@@ -68,8 +69,8 @@ std::string SyncAppsyncOptinClient::GetActiveProfileHash(
     return "";
   }
 
-  AccountId account_id = AccountId::FromUserEmailGaiaId(sync_user_account.email,
-                                                        sync_user_account.gaia);
+  AccountId account_id = AccountId::FromNonCanonicalEmail(
+      sync_user_account.email, sync_user_account.gaia, AccountType::GOOGLE);
 
   const user_manager::User* user = user_manager_->FindUser(account_id);
 

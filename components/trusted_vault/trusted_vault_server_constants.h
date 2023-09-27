@@ -10,9 +10,11 @@
 #include <vector>
 
 #include "base/containers/span.h"
+#include "base/strings/string_piece_forward.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 
-namespace syncer {
+namespace trusted_vault {
 
 inline constexpr int kUnknownConstantKeyVersion = 0;
 
@@ -30,6 +32,15 @@ inline constexpr char kGetSecurityDomainURLPathAndQuery[] =
 inline constexpr char kQueryParameterAlternateOutputKey[] = "alt";
 inline constexpr char kQueryParameterAlternateOutputProto[] = "proto";
 
+// Identifies a particular security domain.
+//
+// Append new values at the end and update kMaxValue. Values must not be
+// persisted.
+enum class SecurityDomainId {
+  kChromeSync,
+  kMaxValue = kChromeSync,
+};
+
 std::vector<uint8_t> GetConstantTrustedVaultKey();
 std::string GetGetSecurityDomainMemberURLPathAndQuery(
     base::span<const uint8_t> public_key);
@@ -41,6 +52,10 @@ GURL GetFullGetSecurityDomainMemberURLForTesting(
     base::span<const uint8_t> public_key);
 GURL GetFullGetSecurityDomainURLForTesting(const GURL& server_url);
 
-}  // namespace syncer
+std::string GetSecurityDomainName(SecurityDomainId domain);
+absl::optional<SecurityDomainId> GetSecurityDomainByName(
+    base::StringPiece domain);
+
+}  // namespace trusted_vault
 
 #endif  // COMPONENTS_TRUSTED_VAULT_TRUSTED_VAULT_SERVER_CONSTANTS_H_

@@ -23,6 +23,7 @@
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/policy/developer_tools_policy_handler.h"
+#include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/browser_navigator.h"
@@ -37,7 +38,7 @@
 #include "components/guest_view/browser/guest_view_base.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/devtools_agent_host_client_channel.h"
 #include "content/public/browser/render_frame_host.h"
@@ -47,14 +48,14 @@
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/process_manager.h"
+#include "extensions/browser/view_type_utils.h"
 #include "extensions/common/manifest.h"
+#include "extensions/common/mojom/view_type.mojom.h"
 #include "ui/base/resource/resource_bundle.h"
+#include "ui/views/controls/webview/webview.h"
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 #include "ash/constants/ash_switches.h"
-#include "chrome/common/channel_info.h"
-#include "components/version_info/version_info.h"
-#include "third_party/cros_system_api/switches/chrome_switches.h"
 #endif
 
 using content::DevToolsAgentHost;
@@ -62,6 +63,7 @@ using content::DevToolsAgentHost;
 const char ChromeDevToolsManagerDelegate::kTypeApp[] = "app";
 const char ChromeDevToolsManagerDelegate::kTypeBackgroundPage[] =
     "background_page";
+const char ChromeDevToolsManagerDelegate::kTypePage[] = "page";
 
 namespace {
 
@@ -88,6 +90,17 @@ bool GetExtensionInfo(content::WebContents* wc,
       extension->is_platform_app()) {
     *name = extension->name();
     *type = ChromeDevToolsManagerDelegate::kTypeApp;
+    return true;
+  }
+
+  auto view_type = extensions::GetViewType(wc);
+  if (view_type == extensions::mojom::ViewType::kExtensionPopup ||
+      view_type == extensions::mojom::ViewType::kExtensionSidePanel ||
+      view_type == extensions::mojom::ViewType::kOffscreenDocument) {
+    // Note that we are intentionally not setting name here, so that we can
+    // construct a name based on the URL or page title in
+    // RenderFrameDevToolsAgentHost::GetTitle()
+    *type = ChromeDevToolsManagerDelegate::kTypePage;
     return true;
   }
   return false;
@@ -157,9 +170,15 @@ std::string ChromeDevToolsManagerDelegate::GetTargetType(
 
   std::string extension_name;
   std::string extension_type;
-  if (!GetExtensionInfo(web_contents, &extension_name, &extension_type))
-    return DevToolsAgentHost::kTypeOther;
-  return extension_type;
+  if (GetExtensionInfo(web_contents, &extension_name, &extension_type)) {
+    return extension_type;
+  }
+
+  if (views::WebView::IsWebViewContents(web_contents)) {
+    return DevToolsAgentHost::kTypePage;
+  }
+
+  return DevToolsAgentHost::kTypeOther;
 }
 
 std::string ChromeDevToolsManagerDelegate::GetTargetTitle(
@@ -185,7 +204,7 @@ bool ChromeDevToolsManagerDelegate::AllowInspectingRenderFrameHost(
 
   if (auto* web_app_provider =
           web_app::WebAppProvider::GetForWebApps(profile)) {
-    absl::optional<web_app::AppId> app_id =
+    absl::optional<webapps::AppId> app_id =
         web_app_provider->registrar_unsafe().FindAppWithUrlInScope(
             rfh->GetMainFrame()->GetLastCommittedURL());
     if (app_id) {
@@ -204,21 +223,6 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
     content::WebContents* web_contents) {
   const extensions::Extension* extension = nullptr;
   if (web_contents) {
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-    // Disable devtools for ash webui for dev, beta, stable channels unless
-    // device is in devmode, or running with `--force-devtools-available'.
-    GURL url = web_contents->GetLastCommittedURL();
-    if ((url.SchemeIs("chrome") && url.host() != "inspect") ||
-        url.SchemeIs("os")) {
-      base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-      if (chrome::GetChannel() >= version_info::Channel::DEV &&
-          !command_line->HasSwitch(chromeos::switches::kSystemInDevMode) &&
-          !command_line->HasSwitch(ash::switches::kForceDevToolsAvailable)) {
-        return false;
-      }
-    }
-#endif
-
     if (auto* process_manager = extensions::ProcessManager::Get(
             web_contents->GetBrowserContext())) {
       extension = process_manager->GetExtensionForWebContents(web_contents);
@@ -227,7 +231,7 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
       return AllowInspection(profile, extension);
     }
 
-    const web_app::AppId* app_id =
+    const webapps::AppId* app_id =
         web_app::WebAppTabHelper::GetAppId(web_contents);
     auto* web_app_provider =
         web_app::WebAppProvider::GetForWebContents(web_contents);
@@ -254,8 +258,19 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
     case Availability::kAllowed:
       return true;
     case Availability::kDisallowedForForceInstalledExtensions:
-      return !extension ||
-             !extensions::Manifest::IsPolicyLocation(extension->location());
+      if (!extension) {
+        return true;
+      }
+      if (extensions::Manifest::IsPolicyLocation(extension->location())) {
+        return false;
+      }
+      // We also disallow inspecting component extensions, but only for managed
+      // profiles.
+      if (extensions::Manifest::IsComponentLocation(extension->location()) &&
+          profile->GetProfilePolicyConnector()->IsManaged()) {
+        return false;
+      }
+      return true;
     default:
       NOTREACHED() << "Unknown developer tools policy";
       return true;
@@ -275,8 +290,7 @@ bool ChromeDevToolsManagerDelegate::AllowInspection(
     case Availability::kAllowed:
       return true;
     case Availability::kDisallowedForForceInstalledExtensions:
-      return !web_app || (!web_app->IsPolicyInstalledApp() &&
-                          !web_app->IsKioskInstalledApp());
+      return !web_app || !web_app->IsKioskInstalledApp();
     default:
       NOTREACHED() << "Unknown developer tools policy";
       return true;
@@ -296,17 +310,18 @@ void ChromeDevToolsManagerDelegate::ClientDetached(
 
 scoped_refptr<DevToolsAgentHost> ChromeDevToolsManagerDelegate::CreateNewTarget(
     const GURL& url,
-    bool for_tab) {
+    DevToolsManagerDelegate::TargetType target_type) {
   NavigateParams params(ProfileManager::GetLastUsedProfile(), url,
                         ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
   params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
   Navigate(&params);
   if (!params.navigated_or_inserted_contents)
     return nullptr;
-  return for_tab ? DevToolsAgentHost::GetOrCreateForTab(
-                       params.navigated_or_inserted_contents)
-                 : DevToolsAgentHost::GetOrCreateFor(
-                       params.navigated_or_inserted_contents);
+  return target_type == DevToolsManagerDelegate::kTab
+             ? DevToolsAgentHost::GetOrCreateForTab(
+                   params.navigated_or_inserted_contents)
+             : DevToolsAgentHost::GetOrCreateFor(
+                   params.navigated_or_inserted_contents);
 }
 
 std::vector<content::BrowserContext*>

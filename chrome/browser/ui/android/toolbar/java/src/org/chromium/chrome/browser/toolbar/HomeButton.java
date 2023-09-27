@@ -8,13 +8,12 @@ import static org.chromium.components.browser_ui.widget.listmenu.BasicListMenu.b
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.view.MenuItem;
 import android.view.View;
 
 import androidx.annotation.VisibleForTesting;
-import androidx.core.content.ContextCompat;
 
 import org.chromium.base.Callback;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.Supplier;
@@ -29,7 +28,7 @@ import org.chromium.ui.widget.RectProvider;
  * The home button.
  * TODO(crbug.com/1056422): Fix the visibility bug on NTP.
  */
-public class HomeButton extends ListMenuButton implements MenuItem.OnMenuItemClickListener {
+public class HomeButton extends ListMenuButton {
     @VisibleForTesting
     public static final int ID_SETTINGS = 0;
 
@@ -42,9 +41,6 @@ public class HomeButton extends ListMenuButton implements MenuItem.OnMenuItemCli
 
     public HomeButton(Context context, AttributeSet attrs) {
         super(context, attrs);
-
-        final int homeButtonIcon = R.drawable.btn_toolbar_home;
-        setImageDrawable(ContextCompat.getDrawable(context, homeButtonIcon));
     }
 
     /**
@@ -62,16 +58,6 @@ public class HomeButton extends ListMenuButton implements MenuItem.OnMenuItemCli
         mOnMenuClickCallback = onMenuClickCallback;
         mIsManagedByPolicySupplier = isHomepageManagedByPolicy;
         updateContextMenuListener();
-    }
-
-    @Override
-    public boolean onMenuItemClick(MenuItem item) {
-        assert !mIsManagedByPolicySupplier.get();
-        assert item.getItemId() == ID_SETTINGS;
-        assert mOnMenuClickCallback != null;
-
-        mOnMenuClickCallback.onResult(getContext());
-        return true;
     }
 
     @Override
@@ -130,15 +116,14 @@ public class HomeButton extends ListMenuButton implements MenuItem.OnMenuItemCli
     /**
      * @param saveContextMenuForTests Whether we want to store the context menu for testing
      */
-    @VisibleForTesting
     public static void setSaveContextMenuForTests(boolean saveContextMenuForTests) {
         sSaveContextMenuForTests = saveContextMenuForTests;
+        ResettersForTesting.register(() -> sSaveContextMenuForTests = false);
     }
 
     /**
      * @return Latest context menu created.
      */
-    @VisibleForTesting
     public ModelList getMenuForTests() {
         return mMenuForTests;
     }

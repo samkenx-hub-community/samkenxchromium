@@ -100,6 +100,9 @@ public class CastWebContentsActivity extends Activity {
     @Nullable
     private CastWebContentsSurfaceHelper mSurfaceHelper;
 
+    // SessionId provided in the original Intent used to start the Activity.
+    private String mRootSessionId;
+
     private boolean mAllowPictureInPicture;
     private boolean mIsInPictureInPictureMode;
 
@@ -179,6 +182,20 @@ public class CastWebContentsActivity extends Activity {
             });
         });
 
+        mCreatedState.subscribe(x -> {
+            IntentFilter filter = new IntentFilter(Intent.ACTION_USER_PRESENT);
+            return new BroadcastReceiverScope(filter, (Intent intent) -> {
+                if (DEBUG) {
+                    Log.d(TAG, "ACTION_USER_PRESENT received. canUsePictureInPicture: "
+                            + canUsePictureInPicture() + " mAllowPictureInPicture: "
+                            + mAllowPictureInPicture);
+                }
+                if (canUsePictureInPicture() && mAllowPictureInPicture) {
+                    enterPictureInPictureMode(new PictureInPictureParams.Builder().build());
+                }
+            });
+        });
+
         Observable<Unit> shouldKeepScreenOn =
                 mGotIntentState
                         .filter(intent
@@ -230,9 +247,17 @@ public class CastWebContentsActivity extends Activity {
                 .subscribe(Observer.onOpen(
                         Both.adapt(CastWebContentsSurfaceHelper::onNewStartParams)));
 
+        mGotIntentState.and(Observable.not(mIsFinishingState))
+                .map(Both::getFirst)
+                .map(CastWebContentsIntentUtils::getSessionId)
+                .subscribe(Observer.onOpen(sessionId -> {
+                    TaskRemovedMonitorService.start(mRootSessionId, sessionId);
+                }));
+
         mIsFinishingState.subscribe(Observer.onOpen((String reason) -> {
             if (DEBUG) Log.d(TAG, "Finishing activity: " + reason);
             mSurfaceHelperState.reset();
+            TaskRemovedMonitorService.stop();
             finishAndRemoveTask();
         }));
 
@@ -251,6 +276,7 @@ public class CastWebContentsActivity extends Activity {
     protected void onCreate(final Bundle savedInstanceState) {
         if (DEBUG) Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
+        mRootSessionId = CastWebContentsIntentUtils.getSessionId(getIntent());
         mCreatedState.set(Unit.unit());
         mGotIntentState.set(getIntent());
 
@@ -286,10 +312,6 @@ public class CastWebContentsActivity extends Activity {
             CastWebContentsComponent.onComponentClosed(
                     CastWebContentsIntentUtils.getSessionId(getIntent()));
             mIsFinishingState.set("User exit while in lock task mode");
-        } else if (mIsInPictureInPictureMode) {
-            CastWebContentsComponent.onComponentClosed(
-                    CastWebContentsIntentUtils.getSessionId(getIntent()));
-            mIsFinishingState.set("User exit while in picture-in-picture mode");
         }
         super.onStop();
     }

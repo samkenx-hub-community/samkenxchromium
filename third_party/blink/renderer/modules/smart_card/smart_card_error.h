@@ -12,6 +12,7 @@
 
 namespace blink {
 
+class ScriptPromiseResolver;
 class SmartCardErrorOptions;
 
 // https://w3c.github.io/webtransport/#web-transport-error-interface
@@ -22,10 +23,10 @@ class MODULES_EXPORT SmartCardError : public DOMException {
   // Constructor exposed to script. Called by the V8 bindings.
   static SmartCardError* Create(String message, const SmartCardErrorOptions*);
 
-  // Depending on the particular mojo response code, creates either a
-  // SmartCardError or a plain DOMException.
-  static DOMException* Create(
-      mojom::blink::SmartCardResponseCode mojom_response_code);
+  // Depending on the particular mojo error, rejects with a
+  // SmartCardError, a DOMException or a simple exception.
+  static void Reject(ScriptPromiseResolver* resolver,
+                     device::mojom::blink::SmartCardError mojom_error);
 
   SmartCardError(String message, V8SmartCardResponseCode::Enum);
   SmartCardError(String message, V8SmartCardResponseCode);

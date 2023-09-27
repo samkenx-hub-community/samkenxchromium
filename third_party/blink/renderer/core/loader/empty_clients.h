@@ -266,6 +266,10 @@ class EmptyWebWorkerFetchContext : public WebWorkerFetchContext {
     return nullptr;
   }
   void WillSendRequest(WebURLRequest&) override {}
+  WebVector<std::unique_ptr<URLLoaderThrottle>> CreateThrottles(
+      const WebURLRequest&) override {
+    return {};
+  }
   blink::mojom::ControllerServiceWorkerMode GetControllerServiceWorkerMode()
       const override {
     return mojom::ControllerServiceWorkerMode::kNoController;
@@ -339,7 +343,8 @@ class CORE_EXPORT EmptyLocalFrameClient : public LocalFrameClient {
       const LocalFrameToken* initiator_frame_token,
       std::unique_ptr<SourceLocation>,
       mojo::PendingRemote<mojom::blink::PolicyContainerHostKeepAliveHandle>,
-      bool is_container_initiated) override;
+      bool is_container_initiated,
+      bool is_fullscreen_requested) override;
 
   void DispatchWillSendSubmitEvent(HTMLFormElement*) override;
 
@@ -350,8 +355,6 @@ class CORE_EXPORT EmptyLocalFrameClient : public LocalFrameClient {
 
   String UserAgentOverride() override { return ""; }
   String UserAgent() override { return ""; }
-  String FullUserAgent() override { return ""; }
-  String ReducedUserAgent() override { return ""; }
   absl::optional<blink::UserAgentMetadata> UserAgentMetadata() override {
     return blink::UserAgentMetadata();
   }

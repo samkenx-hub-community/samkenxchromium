@@ -7,6 +7,7 @@
 
 #include <memory>
 
+#include "base/functional/callback.h"
 #include "base/scoped_observation.h"
 #include "ui/base/class_property.h"
 #include "ui/color/color_id.h"
@@ -35,7 +36,7 @@ class VIEWS_EXPORT FocusRing : public View, public ViewObserver {
 
   static constexpr float kDefaultCornerRadiusDp = 2.0f;
 
-  using ViewPredicate = std::function<bool(View* view)>;
+  using ViewPredicate = base::RepeatingCallback<bool(const View* view)>;
 
   // The default thickness and inset amount of focus ring halos. If you need
   // the thickness of a specific focus ring, call halo_thickness() instead.
@@ -90,8 +91,8 @@ class VIEWS_EXPORT FocusRing : public View, public ViewObserver {
 
   // Explicitly disable using style of focus ring that is drawn with a 2dp gap
   // between the focus ring and component.
-  void SetOutsetFocusRingDisabled() { outset_focus_ring_disabled_ = true; }
-  bool GetOutsetFocusRingDisabled() { return outset_focus_ring_disabled_; }
+  void SetOutsetFocusRingDisabled(bool disable);
+  bool GetOutsetFocusRingDisabled() const;
 
   bool ShouldPaintForTesting();
 
@@ -100,7 +101,6 @@ class VIEWS_EXPORT FocusRing : public View, public ViewObserver {
   void ViewHierarchyChanged(
       const ViewHierarchyChangedDetails& details) override;
   void OnPaint(gfx::Canvas* canvas) override;
-  void GetAccessibleNodeData(ui::AXNodeData* node_data) override;
   void OnThemeChanged() override;
 
   // ViewObserver:
@@ -109,6 +109,10 @@ class VIEWS_EXPORT FocusRing : public View, public ViewObserver {
 
  private:
   FocusRing();
+
+  // Outset the input bounds if conditions are met.
+  void AdjustBounds(SkRect& rect) const;
+  void AdjustBounds(SkRRect& rect) const;
 
   SkPath GetPath() const;
   SkRRect GetRingRoundRect() const;
@@ -142,7 +146,7 @@ class VIEWS_EXPORT FocusRing : public View, public ViewObserver {
   absl::optional<ui::ColorId> color_id_;
 
   // The predicate used to determine whether the parent has focus.
-  absl::optional<ViewPredicate> has_focus_predicate_;
+  ViewPredicate has_focus_predicate_;
 
   // The thickness of the focus ring halo, in DIP.
   float halo_thickness_ = kDefaultHaloThickness;

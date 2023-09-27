@@ -6,6 +6,7 @@
 #define CHROMEOS_ASH_COMPONENTS_PROXIMITY_AUTH_UNLOCK_MANAGER_IMPL_H_
 
 #include "ash/public/cpp/smartlock_state.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
@@ -92,7 +93,6 @@ class UnlockManagerImpl : public UnlockManager,
   // MessengerObserver:
   void OnUnlockEventSent(bool success) override;
   void OnRemoteStatusUpdate(const RemoteStatusUpdate& status_update) override;
-  void OnDecryptResponse(const std::string& decrypted_bytes) override;
   void OnUnlockResponse(bool success) override;
   void OnDisconnected() override;
 
@@ -201,7 +201,7 @@ class UnlockManagerImpl : public UnlockManager,
       GetRemoteStatusResultFailureReason reason);
 
   // Used to call into the embedder. Expected to outlive |this| instance.
-  ProximityAuthClient* proximity_auth_client_;
+  raw_ptr<ProximityAuthClient, ExperimentalAsh> proximity_auth_client_;
 
   // Starts running after resuming from suspension, and fires once enough time
   // has elapsed such that the BluetoothAdapter's presence and power values can
@@ -220,13 +220,9 @@ class UnlockManagerImpl : public UnlockManager,
   // update has yet been received.
   std::unique_ptr<RemoteScreenlockState> remote_screenlock_state_;
 
-  // The sign-in secret received from the remote device by decrypting the
-  // sign-in challenge.
-  std::unique_ptr<std::string> sign_in_secret_;
-
   // Controls the proximity auth flow logic for a remote device. Not owned, and
   // expcted to outlive |this| instance.
-  RemoteDeviceLifeCycle* life_cycle_ = nullptr;
+  raw_ptr<RemoteDeviceLifeCycle, ExperimentalAsh> life_cycle_ = nullptr;
 
   // True if the manager is currently processing a user-initiated authentication
   // attempt, which is initiated when the user pod is clicked.

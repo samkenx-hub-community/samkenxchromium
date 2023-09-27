@@ -11,7 +11,6 @@ import {FileType} from '../../../common/js/file_type.js';
 import {str, strf, util} from '../../../common/js/util.js';
 import {FilesAppEntry} from '../../../externs/files_app_entry_interfaces.js';
 import {VolumeManager} from '../../../externs/volume_manager.js';
-import {FilesTooltip} from '../../elements/files_tooltip.js';
 import {FileListModel, GROUP_BY_FIELD_MODIFICATION_TIME} from '../file_list_model.js';
 import {ListThumbnailLoader} from '../list_thumbnail_loader.js';
 import {MetadataModel} from '../metadata/metadata_model.js';
@@ -519,6 +518,12 @@ export class FileTable extends Table {
 
     self.list.addEventListener(
         'mouseover', self.onMouseOver_.bind(self), {passive: true});
+
+    // Update the item's inline status when it's restored from List's cache.
+    self.list.addEventListener(
+        'cachedItemRestored',
+        (e) => filelist.updateCacheItemInlineStatus(
+            e.detail, self.dataModel, self.metadataModel_));
   }
 
   onMouseOver_(event) {
@@ -823,18 +828,26 @@ export class FileTable extends Table {
     }
     icon.appendChild(this.renderCheckmark_());
     label.appendChild(icon);
-
+    if (util.isDriveShortcutsEnabled()) {
+      label.appendChild(filelist.renderIconBadge(this.ownerDocument));
+    }
     label.entry = entry;
     label.className = 'detail-name';
     label.appendChild(
         filelist.renderFileNameLabel(this.ownerDocument, entry, locationInfo));
     if (locationInfo && locationInfo.isDriveBased) {
-      label.appendChild(filelist.renderInlineStatus(this.ownerDocument));
+      const inlineStatus = this.ownerDocument.createElement('xf-inline-status');
+      inlineStatus.classList.add('tast-inline-status');
+      label.appendChild(inlineStatus);
     }
     if (!util.isJellyEnabled() && !util.isInlineSyncStatusEnabled()) {
-      const isDlpRestricted = !!metadata.isDlpRestricted;
-      if (isDlpRestricted) {
-        label.appendChild(this.renderDlpManagedIcon_());
+      const isEncrypted = FileType.isEncrypted(entry, metadata.contentMimeType);
+      if (isEncrypted) {
+        label.appendChild(this.renderEncryptedIcon_());
+      }
+      if (util.isDlpEnabled()) {
+        label.appendChild(
+            this.renderDlpManagedIcon_(!!metadata.isDlpRestricted));
       }
     }
     return label;
@@ -935,11 +948,14 @@ export class FileTable extends Table {
       div.appendChild(label);
       label.className = 'date';
       this.updateDate_(label, entry);
-      const metadata =
-          this.metadataModel_.getCache([entry], ['isDlpRestricted'])[0];
-      const isDlpRestricted = !!metadata.isDlpRestricted;
-      if (isDlpRestricted) {
-        div.appendChild(this.renderDlpManagedIcon_());
+      const metadata = this.metadataModel_.getCache(
+          [entry], ['contentMimeType', 'isDlpRestricted'])[0];
+      const isEncrypted = FileType.isEncrypted(entry, metadata.contentMimeType);
+      if (isEncrypted) {
+        div.appendChild(this.renderEncryptedIcon_());
+      }
+      if (util.isDlpEnabled()) {
+        div.appendChild(this.renderDlpManagedIcon_(!!metadata.isDlpRestricted));
       }
     } else {
       div.className = 'date';
@@ -1030,6 +1046,10 @@ export class FileTable extends Table {
                   'pinned',
                   'syncStatus',
                   'progress',
+                  'syncCompletedTime',
+                  'shortcut',
+                  'canPin',
+                  'isDlpRestricted',
                 ])[0],
             util.isTeamDriveRoot(entry));
         listItem.toggleAttribute(
@@ -1055,6 +1075,7 @@ export class FileTable extends Table {
     const typeId = item.id + '-type';
     const dateId = item.id + '-date';
     const dlpId = item.id + '-dlp-managed-icon';
+    const encryptedId = item.id + '-encrypted-icon';
     filelist.decorateListItem(
         item, entry, assert(this.metadataModel_), assert(this.volumeManager_));
     item.setAttribute('file-name', entry.name);
@@ -1069,11 +1090,15 @@ export class FileTable extends Table {
           this.ownerDocument.querySelector('files-tooltip'))
           .addTargets(item.querySelectorAll('.dlp-managed-icon'));
     }
+    const encryptedIcon = item.querySelector('.encrypted-icon');
+    if (encryptedIcon) {
+      encryptedIcon.setAttribute('id', encryptedId);
+    }
 
     item.setAttribute(
         'aria-labelledby',
         `${nameId} column-size ${sizeId} column-type ${
-            typeId} column-modificationTime ${dateId}`);
+            typeId} column-modificationTime ${dateId} ${encryptedId}`);
     return item;
   }
 
@@ -1147,20 +1172,38 @@ export class FileTable extends Table {
 
   /**
    * Renders the DLP managed icon in the detail table.
+   * @param {!boolean} isDlpRestricted Whether the icon should be shown.
    * @return {!HTMLDivElement} Created element.
    * @private
    */
-  renderDlpManagedIcon_() {
+  renderDlpManagedIcon_(isDlpRestricted) {
     const icon = /** @type {!HTMLDivElement} */
         (this.ownerDocument.createElement('div'));
     icon.className = 'dlp-managed-icon';
     icon.toggleAttribute('has-tooltip');
-    icon.dataset['tooltipLinkHref'] =
-        'https://support.google.com/chrome/a/?p=chromeos_datacontrols';
+    icon.dataset['tooltipLinkHref'] = str('DLP_HELP_URL');
     icon.dataset['tooltipLinkAriaLabel'] = str('DLP_MANAGED_ICON_TOOLTIP_DESC');
     icon.dataset['tooltipLinkText'] = str('DLP_MANAGED_ICON_TOOLTIP_LINK');
     icon.setAttribute('aria-label', str('DLP_MANAGED_ICON_TOOLTIP'));
     icon.toggleAttribute('show-card-tooltip');
+    icon.classList.toggle('is-dlp-restricted', isDlpRestricted);
+    icon.toggleAttribute('aria-hidden', isDlpRestricted);
+    return icon;
+  }
+
+  /**
+   * Renders the encrypted icon in the detail table, used to mark Google Drive
+   * CSE files.
+   * @return {!HTMLDivElement} Created element.
+   * @private
+   */
+  renderEncryptedIcon_() {
+    const icon = /** @type {!HTMLDivElement} */
+        (this.ownerDocument.createElement('div'));
+    icon.className = 'encrypted-icon';
+    icon.setAttribute('aria-label', str('ENCRYPTED_ICON_TOOLTIP'));
+    /** @type {!FilesTooltip} */ (document.querySelector('files-tooltip'))
+        .addTarget(icon);
     return icon;
   }
 

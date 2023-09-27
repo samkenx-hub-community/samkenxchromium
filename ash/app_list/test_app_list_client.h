@@ -29,6 +29,8 @@ class TestAppListClient : public AppListClient {
 
   // AppListClient:
   void OnAppListControllerDestroyed() override {}
+  std::vector<AppListSearchControlCategory> GetToggleableCategories()
+      const override;
   void StartZeroStateSearch(base::OnceClosure on_done,
                             base::TimeDelta timeout) override;
   void StartSearch(const std::u16string& trimmed_query) override;
@@ -41,8 +43,6 @@ class TestAppListClient : public AppListClient {
                         bool launch_as_default) override;
   void InvokeSearchResultAction(const std::string& result_id,
                                 SearchResultActionType action) override;
-  void ViewClosing() override {}
-  void ViewShown(int64_t display_id) override {}
   void ActivateItem(int profile_id,
                     const std::string& id,
                     int event_flags,
@@ -59,9 +59,11 @@ class TestAppListClient : public AppListClient {
       const std::string& setting_name,
       const std::map<std::string, int>& values) override {}
   AppListNotifier* GetNotifier() override;
-  void LoadIcon(int profile_id, const std::string& app_id) override {}
+  void RecalculateWouldTriggerLauncherSearchIph() override;
+  std::unique_ptr<ScopedIphSession> CreateLauncherSearchIphSession() override;
+  void OpenSearchBoxIphUrl() override;
+  void LoadIcon(int profile_id, const std::string& app_id) override;
   ash::AppListSortOrder GetPermanentSortingOrder() const override;
-  void CommitTemporarySortOrder() override;
 
   int start_zero_state_search_count() const {
     return start_zero_state_search_count_;
@@ -71,6 +73,10 @@ class TestAppListClient : public AppListClient {
   }
   int zero_state_search_done_count() const {
     return zero_state_search_done_count_;
+  }
+  void set_available_categories_for_test(
+      const std::vector<AppListSearchControlCategory>& categories) {
+    toggleable_categories_for_test_ = categories;
   }
 
   // Returns the number of AppItems that have been activated. These items could
@@ -83,6 +89,10 @@ class TestAppListClient : public AppListClient {
   // Returns the ID of the last opened SearchResult.
   std::string last_opened_search_result() const {
     return last_opened_search_result_;
+  }
+
+  std::vector<std::string> load_icon_app_ids() const {
+    return loaded_icon_app_ids_;
   }
 
   using SearchResultActionId = std::pair<std::string, int>;
@@ -114,6 +124,9 @@ class TestAppListClient : public AppListClient {
   int activate_item_count_ = 0;
   std::string activate_item_last_id_;
   std::string last_opened_search_result_;
+  std::vector<std::string> loaded_icon_app_ids_;
+
+  std::vector<AppListSearchControlCategory> toggleable_categories_for_test_;
 
   // If not null, callback that will be run on each search request. It can be
   // used by tests to inject results to search model in response to search

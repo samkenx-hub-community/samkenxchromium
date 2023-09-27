@@ -4,6 +4,7 @@
 
 package org.chromium.chrome.browser.page_info;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.drawable.BitmapDrawable;
@@ -13,7 +14,6 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 
@@ -22,6 +22,8 @@ import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.compositor.bottombar.ephemeraltab.EphemeralTabCoordinator;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
+import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncher;
+import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncherImpl;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.merchant_viewer.PageInfoStoreInfoController;
 import org.chromium.chrome.browser.merchant_viewer.PageInfoStoreInfoController.StoreInfoActionHandler;
@@ -38,6 +40,7 @@ import org.chromium.chrome.browser.settings.SettingsLauncherImpl;
 import org.chromium.chrome.browser.site_settings.ChromeSiteSettingsDelegate;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabUtils;
+import org.chromium.chrome.browser.tabmodel.TabCreator;
 import org.chromium.chrome.browser.ui.favicon.FaviconHelper;
 import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
 import org.chromium.components.browser_ui.settings.SettingsLauncher;
@@ -81,13 +84,19 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
     private final ChromePageInfoHighlight mPageInfoHighlight;
     private final OfflinePageLoadUrlDelegate mOfflinePageLoadUrlDelegate;
     private String mOfflinePageCreationDate;
+    private final TabCreator mTabCreator;
+
+    private HelpAndFeedbackLauncher mHelpAndFeedbackLauncher;
+
+    static final String FEEDBACK_REPORT_TYPE =
+            "com.google.chrome.browser.page_info.USER_INITIATED_FEEDBACK_REPORT";
 
     public ChromePageInfoControllerDelegate(Context context, WebContents webContents,
             Supplier<ModalDialogManager> modalDialogManagerSupplier,
             OfflinePageLoadUrlDelegate offlinePageLoadUrlDelegate,
             @Nullable Supplier<StoreInfoActionHandler> storeInfoActionHandlerSupplier,
             Supplier<EphemeralTabCoordinator> ephemeralTabCoordinatorSupplier,
-            ChromePageInfoHighlight pageInfoHighlight) {
+            ChromePageInfoHighlight pageInfoHighlight, TabCreator tabCreator) {
         super(new ChromeAutocompleteSchemeClassifier(Profile.fromWebContents(webContents)),
                 /** isSiteSettingsAvailable= */
                 SiteSettingsHelper.isSiteSettingsAvailable(webContents),
@@ -100,12 +109,14 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
         mProfile = Profile.fromWebContents(mWebContents);
         mStoreInfoActionHandlerSupplier = storeInfoActionHandlerSupplier;
         mPageInfoHighlight = pageInfoHighlight;
+        mTabCreator = tabCreator;
 
         initOfflinePageParams();
         mOfflinePageLoadUrlDelegate = offlinePageLoadUrlDelegate;
 
-        TrackerFactory.getTrackerForProfile(Profile.getLastUsedRegularProfile())
-                .notifyEvent(EventConstants.PAGE_INFO_OPENED);
+        TrackerFactory.getTrackerForProfile(mProfile).notifyEvent(EventConstants.PAGE_INFO_OPENED);
+
+        mHelpAndFeedbackLauncher = HelpAndFeedbackLauncherImpl.getForProfile(mProfile);
     }
 
     private void initOfflinePageParams() {
@@ -162,8 +173,7 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
      * {@inheritDoc}
      */
     @Override
-    @Nullable
-    public String getOfflinePageConnectionMessage() {
+    public @Nullable String getOfflinePageConnectionMessage() {
         if (mOfflinePageState == OfflinePageState.TRUSTED_OFFLINE_PAGE) {
             return String.format(mContext.getString(R.string.page_info_connection_offline),
                     mOfflinePageCreationDate);
@@ -193,8 +203,7 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
      * {@inheritDoc}
      */
     @Override
-    @Nullable
-    public String getPaintPreviewPageConnectionMessage() {
+    public @Nullable String getPaintPreviewPageConnectionMessage() {
         if (!isShowingPaintPreviewPage()) return null;
 
         return mContext.getString(R.string.page_info_connection_paint_preview);
@@ -202,7 +211,21 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
 
     @Override
     public void showCookieSettings() {
-        SiteSettingsHelper.showCategorySettings(mContext, SiteSettingsCategory.Type.COOKIES);
+        SiteSettingsHelper.showCategorySettings(mContext, mProfile,
+                getSiteSettingsDelegate().isPrivacySandboxSettings4Enabled()
+                        ? SiteSettingsCategory.Type.THIRD_PARTY_COOKIES
+                        : SiteSettingsCategory.Type.COOKIES);
+    }
+
+    @Override
+    public void showCookieFeedback(Activity activity) {
+        Tab tab = TabUtils.fromWebContents(mWebContents);
+
+        // FEEDBACK_REPORT_TYPE: Reports for Chrome mobile must have a contextTag of the form
+        // com.chrome.feed.USER_INITIATED_FEEDBACK_REPORT, or they will be discarded for not
+        // matching an allow list rule.
+        mHelpAndFeedbackLauncher.showFeedback(
+                activity, tab.getOriginalUrl().getHost(), FEEDBACK_REPORT_TYPE);
     }
 
     @Override
@@ -222,8 +245,7 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
             PageInfoMainController mainController, ViewGroup rowWrapper) {
         Collection<PageInfoSubpageController> controllers = new ArrayList<>();
         if (ChromeFeatureList.isEnabled(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_3)) {
-            final PageInfoRowView adPersonalizationRow =
-                    new PageInfoRowView(rowWrapper.getContext(), null);
+            var adPersonalizationRow = new PageInfoRowView(rowWrapper.getContext(), null);
             adPersonalizationRow.setId(PageInfoAdPersonalizationController.ROW_ID);
             rowWrapper.addView(adPersonalizationRow);
             controllers.add(new PageInfoAdPersonalizationController(
@@ -232,22 +254,21 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
 
         // Add history row.
         final Tab tab = TabUtils.fromWebContents(mWebContents);
-        final PageInfoRowView historyRow = new PageInfoRowView(rowWrapper.getContext(), null);
+        var historyRow = new PageInfoRowView(rowWrapper.getContext(), null);
         historyRow.setId(PageInfoHistoryController.HISTORY_ROW_ID);
         rowWrapper.addView(historyRow);
         controllers.add(new PageInfoHistoryController(
                 mainController, historyRow, this, () -> { return tab; }));
 
         if (PageInfoAboutThisSiteController.isFeatureEnabled()) {
-            final PageInfoRowView aboutThisSiteRow =
-                    new PageInfoRowView(rowWrapper.getContext(), null);
+            var aboutThisSiteRow = new PageInfoRowView(rowWrapper.getContext(), null);
             aboutThisSiteRow.setId(PageInfoAboutThisSiteController.ROW_ID);
             rowWrapper.addView(aboutThisSiteRow);
-            controllers.add(new PageInfoAboutThisSiteController(mainController,
-                    mEphemeralTabCoordinatorSupplier, aboutThisSiteRow, this, mWebContents));
+            new PageInfoAboutThisSiteController(mainController, mEphemeralTabCoordinatorSupplier,
+                    aboutThisSiteRow, this, mWebContents, mTabCreator);
         }
         if (PageInfoFeatures.PAGE_INFO_STORE_INFO.isEnabled() && !isIncognito()) {
-            final PageInfoRowView storeInfoRow = new PageInfoRowView(rowWrapper.getContext(), null);
+            var storeInfoRow = new PageInfoRowView(rowWrapper.getContext(), null);
             storeInfoRow.setId(PageInfoStoreInfoController.STORE_INFO_ROW_ID);
             rowWrapper.addView(storeInfoRow);
             controllers.add(new PageInfoStoreInfoController(mainController, storeInfoRow,
@@ -261,8 +282,8 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
      * {@inheritDoc}
      */
     @Override
-    @NonNull
-    public CookieControlsBridge createCookieControlsBridge(CookieControlsObserver observer) {
+    public @NonNull CookieControlsBridge createCookieControlsBridge(
+            CookieControlsObserver observer) {
         return new CookieControlsBridge(observer, mWebContents,
                 mProfile.isOffTheRecord() ? mProfile.getOriginalProfile() : null);
     }
@@ -271,8 +292,7 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
      * {@inheritDoc}
      */
     @Override
-    @NonNull
-    public BrowserContextHandle getBrowserContext() {
+    public @NonNull BrowserContextHandle getBrowserContext() {
         return mProfile;
     }
 
@@ -280,8 +300,7 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
      * {@inheritDoc}
      */
     @Override
-    @NonNull
-    public SiteSettingsDelegate getSiteSettingsDelegate() {
+    public @NonNull SiteSettingsDelegate getSiteSettingsDelegate() {
         return new ChromeSiteSettingsDelegate(mContext, mProfile);
     }
 
@@ -305,11 +324,6 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
     @Override
     public boolean isAccessibilityEnabled() {
         return ChromeAccessibilityUtil.get().isAccessibilityEnabled();
-    }
-
-    @VisibleForTesting
-    void setOfflinePageStateForTesting(@OfflinePageState int offlinePageState) {
-        mOfflinePageState = offlinePageState;
     }
 
     @Override

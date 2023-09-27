@@ -11,8 +11,8 @@
 #include <utility>
 #include <vector>
 
+#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
-#include "base/cxx17_backports.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/important_file_writer.h"
@@ -131,7 +131,7 @@ class VolumeControlInternal : public SystemVolumeControl::Delegate {
       return;
     }
 
-    level = base::clamp(level, 0.0f, 1.0f);
+    level = std::clamp(level, 0.0f, 1.0f);
     thread_.task_runner()->PostTask(
         FROM_HERE, base::BindOnce(&VolumeControlInternal::SetVolumeOnThread,
                                   base::Unretained(this), source, type, level,
@@ -246,7 +246,7 @@ class VolumeControlInternal : public SystemVolumeControl::Delegate {
     DCHECK(thread_.task_runner()->BelongsToCurrentThread());
     DCHECK_NE(AudioContentType::kOther, type);
     DCHECK(!from_system || type == AudioContentType::kMedia);
-    DCHECK(volume_multipliers_.find(type) != volume_multipliers_.end());
+    DCHECK(base::Contains(volume_multipliers_, type));
 
     {
       base::AutoLock lock(volume_lock_);
@@ -333,7 +333,7 @@ class VolumeControlInternal : public SystemVolumeControl::Delegate {
     }
 
 #if !BUILDFLAG(SYSTEM_OWNS_VOLUME)
-    limit = base::clamp(limit, 0.0f, 1.0f);
+    limit = std::clamp(limit, 0.0f, 1.0f);
     mixer_->SetVolumeLimit(type,
                            DbFsToScale(VolumeControl::VolumeToDbFS(limit)));
 

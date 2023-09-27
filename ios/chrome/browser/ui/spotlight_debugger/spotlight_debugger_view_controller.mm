@@ -4,24 +4,23 @@
 
 #import "ios/chrome/browser/ui/spotlight_debugger/spotlight_debugger_view_controller.h"
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/notreached.h"
 #import "base/time/time.h"
 #import "ios/chrome/app/spotlight/bookmarks_spotlight_manager.h"
+#import "ios/chrome/app/spotlight/open_tabs_spotlight_manager.h"
 #import "ios/chrome/app/spotlight/reading_list_spotlight_manager.h"
+#import "ios/chrome/app/spotlight/spotlight_interface.h"
 #import "ios/chrome/app/spotlight/spotlight_logger.h"
 #import "ios/chrome/app/spotlight/spotlight_util.h"
+#import "ios/chrome/app/spotlight/topsites_spotlight_manager.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/elements/highlight_button.h"
 #import "ios/chrome/common/ui/util/button_util.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 typedef NS_ENUM(NSUInteger, Sections) {
   StatusSection = 0,
@@ -40,12 +39,16 @@ typedef NS_ENUM(NSUInteger, DebugCommandsRows) {
   ClearAllRow = 0,
   ReindexBookmarks,
   ReindexReadingList,
+  ReindexOpenTabs,
+  ReindexTopSites,
   DebugCommandsRowsCount,
 };
 
 @interface SpotlightDebuggerViewController ()
 
 @property(nonatomic, strong) UIActivityIndicatorView* spinner;
+
+@property(nonatomic, readonly) SpotlightInterface* spotlightInterface;
 
 @end
 
@@ -57,8 +60,16 @@ typedef NS_ENUM(NSUInteger, DebugCommandsRows) {
     _spinner = [[UIActivityIndicatorView alloc]
         initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
     _spinner.translatesAutoresizingMaskIntoConstraints = NO;
+    _spotlightInterface = [SpotlightInterface defaultInterface];
   }
   return self;
+}
+
+- (void)dealloc {
+  [self.bookmarksManager shutdown];
+  [self.readingListSpotlightManager shutdown];
+  [self.openTabsSpotlightManager shutdown];
+  [self.topSitesSpotlightManager shutdown];
 }
 
 #pragma mark - Public
@@ -116,10 +127,6 @@ typedef NS_ENUM(NSUInteger, DebugCommandsRows) {
           break;
         case DonatedItemsRow:
           content.text = @"Donated items";
-          content.secondaryText =
-              [NSString stringWithFormat:@"Total count: %ld",
-                                         [SpotlightLogger sharedLogger]
-                                             .knownIndexedItems.count];
           content.image = DefaultSymbolWithPointSize(
               @"square.stack.3d.down.right", kSymbolAccessoryPointSize);
           cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -146,6 +153,18 @@ typedef NS_ENUM(NSUInteger, DebugCommandsRows) {
         }
         case ReindexReadingList: {
           content.text = @"Clear and Reindex reading list";
+          content.image = DefaultSymbolWithPointSize(@"bin.xmark",
+                                                     kSymbolAccessoryPointSize);
+          break;
+        }
+        case ReindexOpenTabs: {
+          content.text = @"Clear and Reindex open tabs";
+          content.image = DefaultSymbolWithPointSize(@"bin.xmark",
+                                                     kSymbolAccessoryPointSize);
+          break;
+        }
+        case ReindexTopSites: {
+          content.text = @"Clear and Reindex Top sites";
           content.image = DefaultSymbolWithPointSize(@"bin.xmark",
                                                      kSymbolAccessoryPointSize);
           break;
@@ -193,6 +212,12 @@ typedef NS_ENUM(NSUInteger, DebugCommandsRows) {
         case ReindexReadingList:
           [self clearAndReindexReadingList];
           break;
+        case ReindexOpenTabs:
+          [self clearAndReindexOpenTabs];
+          break;
+        case ReindexTopSites:
+          [self clearAndReindexTopSites];
+          break;
         default:
           NOTREACHED();
           break;
@@ -210,7 +235,8 @@ typedef NS_ENUM(NSUInteger, DebugCommandsRows) {
 
 - (void)clearAllSpotlightEntries {
   [self showSpinner];
-  spotlight::ClearSpotlightIndexWithCompletion(^(NSError* error) {
+  [self.spotlightInterface deleteAllSearchableItemsWithCompletionHandler:^(
+                               NSError* error) {
     dispatch_async(dispatch_get_main_queue(), ^{
       UIAlertController* controller = [UIAlertController
           alertControllerWithTitle:@"Clear Entries"
@@ -226,66 +252,27 @@ typedef NS_ENUM(NSUInteger, DebugCommandsRows) {
       [self removeSpinner];
       [self.tableView reloadData];
     });
-  });
+  }];
 }
 
 - (void)clearAndReindexBookmarks {
-  base::Time startTime = base::Time::Now();
-
-  [self.bookmarksManager
-      clearAndReindexModelWithCompletionBlock:^(NSError* error) {
-        base::Time endTime = base::Time::Now();
-        base::TimeDelta duration = endTime - startTime;
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-          UIAlertController* controller = [UIAlertController
-              alertControllerWithTitle:
-                  [NSString stringWithFormat:
-                                @"Clearing and Reindexing complete in %lld ms",
-                                duration.InMilliseconds()]
-                               message:error ? error.localizedDescription
-                                             : @"Success"
-                        preferredStyle:UIAlertControllerStyleAlert];
-          [controller
-              addAction:[UIAlertAction actionWithTitle:@"OK"
-                                                 style:UIAlertActionStyleDefault
-                                               handler:nil]];
-          [self presentViewController:controller animated:YES completion:nil];
-
-          [self removeSpinner];
-          [self.tableView reloadData];
-        });
-      }];
+  [self.bookmarksManager clearAndReindexModel];
+  [self.tableView reloadData];
 }
 
 - (void)clearAndReindexReadingList {
-  base::Time startTime = base::Time::Now();
-  [self showSpinner];
+  [self.readingListSpotlightManager clearAndReindexReadingList];
+  [self.tableView reloadData];
+}
 
-  [self.readingListSpotlightManager
-      clearAndReindexReadingListWithCompletionBlock:^(NSError* error) {
-        base::Time endTime = base::Time::Now();
-        base::TimeDelta duration = endTime - startTime;
+- (void)clearAndReindexOpenTabs {
+  [self.openTabsSpotlightManager clearAndReindexOpenTabs];
+  [self.tableView reloadData];
+}
 
-        dispatch_async(dispatch_get_main_queue(), ^{
-          UIAlertController* controller = [UIAlertController
-              alertControllerWithTitle:
-                  [NSString stringWithFormat:@"Clearing and Reindexing reading "
-                                             @"list complete in %lld ms",
-                                             duration.InMilliseconds()]
-                               message:error ? error.localizedDescription
-                                             : @"Success"
-                        preferredStyle:UIAlertControllerStyleAlert];
-          [controller
-              addAction:[UIAlertAction actionWithTitle:@"OK"
-                                                 style:UIAlertActionStyleDefault
-                                               handler:nil]];
-          [self presentViewController:controller animated:YES completion:nil];
-
-          [self removeSpinner];
-          [self.tableView reloadData];
-        });
-      }];
+- (void)clearAndReindexTopSites {
+  [self.topSitesSpotlightManager reindexTopSites];
+  [self.tableView reloadData];
 }
 
 #pragma mark - private
@@ -308,7 +295,7 @@ typedef NS_ENUM(NSUInteger, DebugCommandsRows) {
 + (NSString*)timeSinceLastReindexAsString {
   NSUserDefaults* userDefaults = [NSUserDefaults standardUserDefaults];
 
-  NSDate* date = base::mac::ObjCCast<NSDate>(
+  NSDate* date = base::apple::ObjCCast<NSDate>(
       [userDefaults objectForKey:@(spotlight::kSpotlightLastIndexingDateKey)]);
   if (!date) {
     return @"Never";

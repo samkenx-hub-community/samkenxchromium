@@ -6,8 +6,8 @@ package org.chromium.chrome.browser.webshare;
 
 import android.content.Intent;
 import android.net.Uri;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.junit.After;
@@ -51,10 +51,7 @@ public class WebShareTest {
 
     private static final String TEST_FILE = "/content/test/data/android/webshare.html";
     private static final String TEST_FILE_APK = "/content/test/data/android/webshare-apk.html";
-    private static final String TEST_FILE_BMP = "/content/test/data/android/webshare-bmp.html";
-    private static final String TEST_FILE_CSV = "/content/test/data/android/webshare-csv.html";
     private static final String TEST_FILE_DEX = "/content/test/data/android/webshare-dex.html";
-    private static final String TEST_FILE_OGG = "/content/test/data/android/webshare-ogg.html";
     private static final String TEST_FILE_MANY = "/content/test/data/android/webshare-many.html";
     private static final String TEST_FILE_LARGE = "/content/test/data/android/webshare-large.html";
     private static final String TEST_FILE_SEPARATOR =
@@ -96,7 +93,8 @@ public class WebShareTest {
     public void setUp() throws Exception {
         NativeLibraryTestUtils.loadNativeLibraryNoBrowserProcess();
 
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
 
         mTab = sActivityTestRule.getActivity().getActivityTab();
         mUpdateWaiter = new WebShareUpdateWaiter();
@@ -110,7 +108,6 @@ public class WebShareTest {
         if (mTab != null) {
             TestThreadUtils.runOnUiThreadBlocking(() -> mTab.removeObserver(mUpdateWaiter));
         }
-        if (mTestServer != null) mTestServer.stopAndDestroyServer();
     }
 
     /**
@@ -234,7 +231,8 @@ public class WebShareTest {
 
     private static String getFileContents(Uri fileUri) throws Exception {
         InputStream inputStream =
-                InstrumentationRegistry.getContext().getContentResolver().openInputStream(fileUri);
+                ApplicationProvider.getApplicationContext().getContentResolver().openInputStream(
+                        fileUri);
         byte[] buffer = new byte[1024];
         int position = 0;
         int read;

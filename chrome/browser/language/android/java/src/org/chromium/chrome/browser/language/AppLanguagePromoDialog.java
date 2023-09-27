@@ -23,12 +23,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.chromium.base.LocaleUtils;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.language.settings.LanguageItem;
 import org.chromium.chrome.browser.language.settings.LanguagesManager;
 import org.chromium.chrome.browser.translate.TranslateBridge;
 import org.chromium.components.language.AndroidLanguageMetricsBridge;
-import org.chromium.components.language.GeoLanguageProviderBridge;
 import org.chromium.net.NetworkChangeNotifier;
 import org.chromium.ui.modaldialog.DialogDismissalCause;
 import org.chromium.ui.modaldialog.ModalDialogManager;
@@ -60,7 +58,8 @@ public class AppLanguagePromoDialog {
     /** Annotation for row item type. Either a LanguageItem or separator */
     @IntDef({ItemType.LANGUAGE, ItemType.SEPARATOR, ItemType.MORE_LANGUAGES})
     @Retention(RetentionPolicy.SOURCE)
-    private @interface ItemType {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    @interface ItemType {
         int LANGUAGE = 0;
         int SEPARATOR = 1;
         int MORE_LANGUAGES = 2;
@@ -72,7 +71,8 @@ public class AppLanguagePromoDialog {
      * Keep in sync with LanguageSettingsAppLanguagePromptAction from enums.xml.
      */
     @IntDef({ActionType.DISMISSED_CANCEL_BUTTON, ActionType.DISMISSED_SYSTEM_BACK,
-            ActionType.OK_CHANGE_LANGUAGE, ActionType.OK_SAME_LANGUAGE, ActionType.OTHER})
+            ActionType.OK_CHANGE_LANGUAGE, ActionType.OK_SAME_LANGUAGE, ActionType.OTHER,
+            ActionType.NUM_ENTRIES})
     @Retention(RetentionPolicy.SOURCE)
     private @interface ActionType {
         int DISMISSED_CANCEL_BUTTON = 0;
@@ -200,21 +200,28 @@ public class AppLanguagePromoDialog {
          * Modify the LanguageItemAdapter to show the other languages in addition to the top
          * languages. Can only called once. The other languages can not be hidden once shown.
          */
+        @SuppressWarnings("NotifyDataSetChanged")
         public void showOtherLanguages() {
+            // Do nothing if other languagers are already showing.
+            if (mShowOtherLanguages) return;
             mShowOtherLanguages = true;
-            notifyItemRemoved(mTopLanguages.size()); // Remove "More languages" item.
-            // Other languages plus a horizontal separator have been added.
-            notifyItemRangeInserted(mTopLanguages.size(), mOtherLanguages.size() + 1);
+            // Showing all other items adds a large amount of languages to the list, so we use
+            // DataSetChanged instead of more specific methods.
+            notifyDataSetChanged();
         }
 
         /**
          * Set the currently selected LanguageItem based on the position.
-         * TODO(https://crbug.com/1325522) Refactor to not use notifyDataSetChanged.
          * @param position Offset of the LanguageItem to select.
          */
         public void setSelectedLanguage(int position) {
+            int oldPosition = getPositionForLanguageItem(mCurrentLanguage);
+            // Exit early if the current language was selected
+            if (oldPosition == position) return;
+
             mCurrentLanguage = getLanguageItemAt(position);
-            notifyDataSetChanged();
+            notifyItemChanged(oldPosition);
+            notifyItemChanged(position);
         }
 
         /**
@@ -243,7 +250,8 @@ public class AppLanguagePromoDialog {
             return mShowOtherLanguages;
         }
 
-        protected LanguageItem getLanguageItemAt(int position) {
+        @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+        LanguageItem getLanguageItemAt(int position) {
             if (position < mTopLanguages.size()) {
                 return mTopLanguages.get(position);
             } else if (position > mTopLanguages.size()) {
@@ -252,6 +260,19 @@ public class AppLanguagePromoDialog {
             }
             assert false : "The language item at the separator can not be accessed";
             return null;
+        }
+
+        @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+        int getPositionForLanguageItem(LanguageItem languageItem) {
+            int position = mTopLanguages.indexOf(languageItem);
+            // Return the position if |languageItem| is found in top languages.
+            if (position != -1) return position;
+
+            position = mOtherLanguages.indexOf(languageItem);
+            // If |languageItem| is in other languages add the size of the top languages
+            // plus one for the separator.
+            if (position != -1) return position + mTopLanguages.size() + 1;
+            return -1;
         }
     }
 
@@ -319,7 +340,6 @@ public class AppLanguagePromoDialog {
 
         @Override
         public void onClick(View row) {
-            // TODO(https://crbug.com/1325471) Add meteric recording action.
             LanguageItemAdapter adapter = (LanguageItemAdapter) getBindingAdapter();
             adapter.showOtherLanguages();
         }
@@ -422,11 +442,7 @@ public class AppLanguagePromoDialog {
             Collection<LanguageItem> uiLanguages, LanguageItem currentOverrideLanguage) {
         LinkedHashSet<String> topLanguageCodes = new LinkedHashSet<>();
 
-        if (ChromeFeatureList.isEnabled(ChromeFeatureList.APP_LANGUAGE_PROMPT_ULP)) {
-            topLanguageCodes.addAll(LanguageBridge.getULPFromPreference());
-        } else {
-            topLanguageCodes.addAll(GeoLanguageProviderBridge.getCurrentGeoLanguages());
-        }
+        topLanguageCodes.addAll(LanguageBridge.getULPFromPreference());
         // Add current Accept-Languages to bottom of top languages list.
         topLanguageCodes.addAll(TranslateBridge.getUserLanguageCodes());
 
@@ -586,22 +602,14 @@ public class AppLanguagePromoDialog {
      */
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     static boolean shouldShowPrompt(boolean isOnline) {
-        // Skip feature and preference checks if forced on for testing.
-        if (!ChromeFeatureList.isEnabled(ChromeFeatureList.FORCE_APP_LANGUAGE_PROMPT)) {
-            // Don't show if prompt has already been shown.
-            if (TranslateBridge.getAppLanguagePromptShown()) return false;
-            @TopULPMatchType
-            int hasULPMatch =
-                    LanguageBridge.isTopULPBaseLanguage(Locale.getDefault().toLanguageTag());
-            recordTopULPMatchStatus(hasULPMatch);
-            // Don't show if not enabled.
-            if (!ChromeFeatureList.isEnabled(ChromeFeatureList.APP_LANGUAGE_PROMPT)) return false;
-            // Don't show if ULP match is enabled and the UI language doesn't match the top ULP
-            // language.
-            if (ChromeFeatureList.isEnabled(ChromeFeatureList.APP_LANGUAGE_PROMPT_ULP)
-                    && hasULPMatch != TopULPMatchType.NO) {
-                return false;
-            }
+        // Don't show if prompt has already been shown.
+        if (TranslateBridge.getAppLanguagePromptShown()) return false;
+        @TopULPMatchType
+        int hasULPMatch = LanguageBridge.isTopULPBaseLanguage(Locale.getDefault().toLanguageTag());
+        recordTopULPMatchStatus(hasULPMatch);
+        // Don't show if UI language doesn't match the top ULP language.
+        if (hasULPMatch != TopULPMatchType.NO) {
+            return false;
         }
 
         recordOnlineStatus(isOnline);

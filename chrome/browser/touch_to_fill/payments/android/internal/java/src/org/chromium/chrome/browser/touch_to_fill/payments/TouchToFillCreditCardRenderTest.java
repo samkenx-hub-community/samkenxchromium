@@ -38,6 +38,7 @@ import org.chromium.chrome.browser.autofill.PersonalDataManager.CreditCard;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.night_mode.ChromeNightModeTestUtils;
 import org.chromium.chrome.browser.touch_to_fill.common.BottomSheetFocusHelper;
+import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
@@ -53,6 +54,7 @@ import java.util.List;
  * standard.
  */
 @RunWith(ParameterizedRunner.class)
+@ParameterAnnotations.UseRunnerDelegate(ChromeJUnit4RunnerDelegate.class)
 @Batch(Batch.PER_CLASS)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 public class TouchToFillCreditCardRenderTest {
@@ -70,7 +72,7 @@ public class TouchToFillCreditCardRenderTest {
     @Rule
     public final ChromeRenderTestRule mRenderTestRule =
             ChromeRenderTestRule.Builder.withPublicCorpus()
-                    .setRevision(11)
+                    .setRevision(13)
                     .setBugComponent(Component.UI_BROWSER_AUTOFILL)
                     .build();
 
@@ -79,24 +81,26 @@ public class TouchToFillCreditCardRenderTest {
     @Mock
     private BottomSheetFocusHelper mBottomSheetFocusHelper;
 
-    private static final CreditCard VISA = createCreditCard("Visa", "4111111111111111", "5",
-            AutofillTestHelper.nextYear(), true, "Visa", "• • • • 1111", R.drawable.visa_card);
+    private static final CreditCard VISA =
+            createCreditCard("Visa", "4111111111111111", "05", AutofillTestHelper.nextYear(), true,
+                    "Visa", "• • • • 1111", R.drawable.visa_metadata_card, "visa");
     private static final CreditCard MASTER_CARD =
-            createCreditCard("MasterCard", "5555555555554444", "8", AutofillTestHelper.nextYear(),
-                    true, "Mastercard", "• • • • 4444", R.drawable.mc_card);
-    private static final CreditCard SERVER_MASTER_CARD = createCreditCard("MasterCard-GPay",
+            createCreditCard("MasterCard", "5555555555554444", "08", AutofillTestHelper.nextYear(),
+                    true, "Mastercard", "• • • • 4444", R.drawable.mc_metadata_card, "mastercard");
+    private static final CreditCard SERVER_MASTER_CARD = createCreditCard("MasterCard",
             "5454545454545454", "11", AutofillTestHelper.nextYear(), false, "MasterCard-GPay",
-            "• • • • 5454", R.drawable.mc_card);
-    private static final CreditCard DISCOVER =
-            createCreditCard("Discover", "6011111111111117", "9", AutofillTestHelper.nextYear(),
-                    true, "Discover", "• • • • 1117", R.drawable.discover_card);
+            "• • • • 5454", R.drawable.mc_metadata_card, "mastercard");
+    private static final CreditCard DISCOVER = createCreditCard("Discover", "6011111111111117",
+            "09", AutofillTestHelper.nextYear(), true, "Discover", "• • • • 1117",
+            R.drawable.discover_metadata_card, "discover");
     private static final CreditCard AMERICAN_EXPRESS = createCreditCard("American Express",
             "378282246310005", "10", AutofillTestHelper.nextYear(), true, "American Express",
-            "• • • • 0005", R.drawable.amex_card);
+            "• • • • 0005", R.drawable.amex_metadata_card, "american express");
     private static final CreditCard MASTERCARD_VIRTUAL_CARD = createVirtualCreditCard(
             /* name= */ "MasterCard-GPay", /* number= */ "5454545454545454", /* month= */ "11",
             /* year= */ AutofillTestHelper.nextYear(), /* network= */ "Mastercard",
-            /* iconId= */ R.drawable.mc_card, /* cardNameForAutofillDisplay= */ "MasterCard-GPay",
+            /* iconId= */ R.drawable.mc_metadata_card,
+            /* cardNameForAutofillDisplay= */ "MasterCard-GPay",
             /* obfuscatedLastFourDigits= */ "• • • • 5454");
 
     private BottomSheetController mBottomSheetController;
@@ -262,5 +266,17 @@ public class TouchToFillCreditCardRenderTest {
         View bottomSheetView = mActivityTestRule.getActivity().findViewById(R.id.bottom_sheet);
         mRenderTestRule.render(bottomSheetView,
                 "touch_to_fill_credit_card_sheet_shows_local_and_server_and_virtual_cards");
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"RenderTest"})
+    public void testScanNewCardButtonIsHidden() throws IOException {
+        runOnUiThreadBlocking(() -> { mCoordinator.showSheet(new CreditCard[] {VISA}, false); });
+        BottomSheetTestSupport.waitForOpen(mBottomSheetController);
+
+        View bottomSheetView = mActivityTestRule.getActivity().findViewById(R.id.bottom_sheet);
+        mRenderTestRule.render(
+                bottomSheetView, "touch_to_fill_credit_card_sheet_scan_credit_card_hidden");
     }
 }

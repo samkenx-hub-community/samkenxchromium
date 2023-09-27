@@ -32,6 +32,7 @@ class BuiltinProvider : public AutocompleteProvider {
   typedef std::vector<std::u16string> Builtins;
 
   static const int kRelevance;
+  static const int kStarterPackRelevance;
 
   // Populates `matches_` with matching starter pack keywords such as @history,
   // and @bookmarks
@@ -53,7 +54,8 @@ class BuiltinProvider : public AutocompleteProvider {
 
   // Constructs an AutocompleteMatch for starter pack suggestions such as
   // @bookmarks, @history, etc. and adds it to `matches_`.
-  void AddStarterPackMatch(const TemplateURL& template_url);
+  void AddStarterPackMatch(const TemplateURL& template_url,
+                           const std::u16string& text);
 
   // Returns true if |matches_| contains a match that should be allowed to be
   // the default match. If true, the index of that match in |matches_| is

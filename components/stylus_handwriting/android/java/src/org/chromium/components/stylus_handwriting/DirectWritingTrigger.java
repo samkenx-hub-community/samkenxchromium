@@ -7,12 +7,13 @@ package org.chromium.components.stylus_handwriting;
 import android.content.Context;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.MotionEvent;
-import android.view.PointerIcon;
 import android.view.View;
+import android.view.inputmethod.EditorBoundsInfo;
 import android.view.inputmethod.EditorInfo;
 
 import androidx.annotation.RequiresApi;
@@ -22,15 +23,13 @@ import org.chromium.base.Log;
 import org.chromium.content_public.browser.StylusWritingHandler;
 import org.chromium.content_public.browser.StylusWritingImeCallback;
 import org.chromium.content_public.browser.WebContents;
-import org.chromium.ui.base.ViewAndroidDelegate.StylusWritingCursorHandler;
 
 /**
  * Direct writing class that manages Input events, starting and stopping of recognition. Forwards
  * calls to DW service connection handler class {@link DirectWritingServiceBinder}. Also, sets the
  * {@link StylusWritingHandler} to receive messages about stylus writing events.
  */
-class DirectWritingTrigger
-        implements StylusWritingHandler, StylusApiOption, StylusWritingCursorHandler {
+class DirectWritingTrigger implements StylusWritingHandler, StylusApiOption {
     private static final String TAG = "DWTrigger";
 
     private DirectWritingServiceBinder mBinder = new DirectWritingServiceBinder();
@@ -49,6 +48,9 @@ class DirectWritingTrigger
 
     // Track whether DW service is enabled or not.
     private boolean mDwServiceEnabled;
+
+    // Tracks whether handwriting hover icon is being shown or not.
+    private boolean mIsHandwritingIconShowing;
 
     private StylusWritingImeCallback mStylusWritingImeCallback;
     private DirectWritingServiceCallback mCallback;
@@ -74,24 +76,32 @@ class DirectWritingTrigger
     }
 
     @Override
-    public StylusWritingCursorHandler getStylusWritingCursorHandler() {
-        return this;
-    }
+    public EditorBoundsInfo onFocusedNodeChanged(Rect editableBoundsOnScreenDip, boolean isEditable,
+            View currentView, float scaleFactor, int contentOffsetY) {
+        if (!mDwServiceEnabled || !mBinder.isServiceConnected()) return null;
 
-    @Override
-    public void onFocusedNodeChanged(
-            Rect editableBoundsOnScreen, boolean isEditable, View currentView) {
-        if (!mDwServiceEnabled || !mBinder.isServiceConnected()) return;
-        mEditableNodeBounds = editableBoundsOnScreen;
-        mCallback.updateEditableBounds(editableBoundsOnScreen, /* cursorPosition */ new Point());
+        RectF bounds = new RectF(editableBoundsOnScreenDip.left * scaleFactor,
+                editableBoundsOnScreenDip.top * scaleFactor,
+                editableBoundsOnScreenDip.right * scaleFactor,
+                editableBoundsOnScreenDip.bottom * scaleFactor);
+        bounds.offset(0, contentOffsetY);
+        EditorBoundsInfo editorBoundsInfo = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            editorBoundsInfo = new EditorBoundsInfo.Builder()
+                                       .setEditorBounds(bounds)
+                                       .setHandwritingBounds(bounds)
+                                       .build();
+        }
+        Rect roundedBounds = new Rect();
+        bounds.round(roundedBounds);
 
         if (isEditable) {
             if (!mStylusWritingDetected && mNeedsFocusedNodeChangedAfterTouchUp
                     && mStylusUpEvent != null) {
-                mBinder.updateEditableBounds(editableBoundsOnScreen, currentView);
+                mBinder.updateEditableBounds(roundedBounds, currentView);
                 // Call onStopRecognition with editable bounds to show DW toolbar on Pen TAP in
                 // input field.
-                onStopRecognition(mStylusUpEvent, editableBoundsOnScreen, currentView);
+                onStopRecognition(mStylusUpEvent, roundedBounds, currentView);
                 mNeedsFocusedNodeChangedAfterTouchUp = false;
             }
         } else {
@@ -99,6 +109,10 @@ class DirectWritingTrigger
             hideDWToolbar();
             onStopRecognition(/* motionEvent */ null, /*editableBounds */ null, currentView);
         }
+
+        mEditableNodeBounds = roundedBounds;
+        mCallback.updateEditableBounds(roundedBounds, /* cursorPosition */ new Point());
+        return editorBoundsInfo;
     }
 
     @Override
@@ -157,6 +171,18 @@ class DirectWritingTrigger
         // enabled. Platform Crash occurs if it is created when DW setting is not enabled.
         if (mCallback != null) return;
         mCallback = new DirectWritingServiceCallback();
+        mCallback.setTriggerCallback(new DirectWritingServiceCallback.TriggerCallback() {
+            @Override
+            public void updateEditableBoundsToService() {
+                mBinder.updateEditableBounds(
+                        mEditableNodeBounds, mStylusWritingImeCallback.getContainerView());
+            }
+
+            @Override
+            public boolean isHandwritingIconShowing() {
+                return mIsHandwritingIconShowing;
+            }
+        });
     }
 
     @Override
@@ -214,12 +240,10 @@ class DirectWritingTrigger
         return mCallback;
     }
 
-    @VisibleForTesting
     void setServiceCallbackForTest(DirectWritingServiceCallback serviceCallback) {
         mCallback = serviceCallback;
     }
 
-    @VisibleForTesting
     void setServiceBinderForTest(DirectWritingServiceBinder serviceBinder) {
         mBinder = serviceBinder;
     }
@@ -353,6 +377,9 @@ class DirectWritingTrigger
                 }
             }
             case MotionEvent.ACTION_HOVER_EXIT: {
+                // Hover exit is not forwarded to blink, so reset hover icon showing state.
+                mIsHandwritingIconShowing = false;
+
                 if (!mRecognitionStarted) break;
                 // Post task to stop recognition and hide DW toolbar as stylus is moved away.
                 mHideDwToolbarCallbackToken = new Object();
@@ -394,17 +421,29 @@ class DirectWritingTrigger
     }
 
     @Override
-    public void onEditElementFocusedForStylusWriting(Rect focusedEditBounds, Point cursorPosition) {
+    public EditorBoundsInfo onEditElementFocusedForStylusWriting(
+            Rect focusedEditBounds, Point cursorPosition, float scaleFactor, int contentOffsetY) {
         // Don't start recognition if focused edit bounds are empty as it means stylus writable
         // element was not focused or bounds could not be obtained.
-        if (focusedEditBounds.isEmpty()) return;
+        if (focusedEditBounds.isEmpty()) return null;
 
-        if (!mStylusWritingDetected || mStylusWritingImeCallback == null) return;
+        if (!mStylusWritingDetected || mStylusWritingImeCallback == null) return null;
+
+        focusedEditBounds.offset(0, contentOffsetY);
+        RectF bounds = new RectF(focusedEditBounds);
+        EditorBoundsInfo editorBoundsInfo = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            editorBoundsInfo = new EditorBoundsInfo.Builder()
+                                       .setEditorBounds(bounds)
+                                       .setHandwritingBounds(bounds)
+                                       .build();
+        }
+        // Start recognition as stylus writable element is focused.
+        startRecognition(focusedEditBounds);
         mCallback.updateEditableBounds(focusedEditBounds, cursorPosition);
         mBinder.updateEditableBounds(
                 focusedEditBounds, mStylusWritingImeCallback.getContainerView());
-        // Start recognition as stylus writable element is focused.
-        startRecognition(focusedEditBounds);
+        return editorBoundsInfo;
     }
 
     @Override
@@ -412,6 +451,11 @@ class DirectWritingTrigger
         if (!mDwServiceEnabled || !mBinder.isServiceConnected()) return;
         mCallback.updateEditorInfo(editorInfo);
         mBinder.updateEditorInfo(editorInfo);
+    }
+
+    @Override
+    public int getStylusPointerIcon() {
+        return DirectWritingConstants.STYLUS_WRITING_ICON_VALUE;
     }
 
     private void onStopRecognition(MotionEvent me, Rect editableBounds) {
@@ -434,15 +478,5 @@ class DirectWritingTrigger
     private void hideDWToolbar() {
         if (!mDwServiceEnabled) return;
         mBinder.hideDWToolbar();
-    }
-
-    @Override
-    public boolean didHandleCursorUpdate(View currentView) {
-        // Direct writing hover cursor is supported from Android S.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false;
-        PointerIcon icon = PointerIcon.getSystemIcon(
-                currentView.getContext(), DirectWritingConstants.STYLUS_WRITING_ICON_VALUE);
-        currentView.setPointerIcon(icon);
-        return true;
     }
 }

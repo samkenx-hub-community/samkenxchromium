@@ -17,14 +17,12 @@
 #include "chrome/browser/offline_pages/android/offline_page_bridge.h"
 #include "chrome/browser/offline_pages/android/request_coordinator_bridge.h"
 #include "chrome/browser/offline_pages/offline_page_model_factory.h"
-#include "chrome/browser/offline_pages/prefetch/prefetch_service_factory.h"
 #include "chrome/browser/offline_pages/request_coordinator_factory.h"
 #include "chrome/browser/profiles/profile_android.h"
 #include "chrome/browser/profiles/profile_key.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "components/offline_pages/core/background/request_coordinator.h"
 #include "components/offline_pages/core/offline_page_model.h"
-#include "components/offline_pages/core/prefetch/prefetch_prefs.h"
 #include "content/public/browser/network_service_instance.h"
 #include "content/public/test/url_loader_interceptor.h"
 
@@ -275,25 +273,6 @@ void JNI_OfflineTestUtil_WaitForConnectivityState(
                 : network::mojom::ConnectionType::CONNECTION_NONE;
   NetworkConnectionObserver::WaitForConnectionType(
       type, base::android::ScopedJavaGlobalRef<jobject>(env, callback));
-}
-
-void JNI_OfflineTestUtil_SetPrefetchingEnabledByServer(
-    JNIEnv* env,
-    const jboolean enabled) {
-  ProfileKey* key = ::android::GetLastUsedRegularProfileKey();
-
-  prefetch_prefs::SetEnabledByServer(key->GetPrefs(), enabled);
-  if (!enabled) {
-    prefetch_prefs::ResetForbiddenStateForTesting(key->GetPrefs());
-  }
-}
-
-void JNI_OfflineTestUtil_SetGCMTokenForTesting(
-    JNIEnv* env,
-    const JavaParamRef<jstring>& gcm_token) {
-  prefetch_prefs::SetCachedPrefetchGCMToken(
-      ::android::GetLastUsedRegularProfileKey()->GetPrefs(),
-      base::android::ConvertJavaStringToUTF8(env, gcm_token));
 }
 
 }  // namespace offline_pages

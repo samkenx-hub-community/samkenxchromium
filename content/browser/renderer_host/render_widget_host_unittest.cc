@@ -826,7 +826,7 @@ class RenderWidgetHostTest : public testing::Test {
   bool handle_mouse_event_ = false;
   base::TimeTicks last_simulated_event_time_;
   base::TimeDelta simulated_event_time_delta_;
-  raw_ptr<IPC::TestSink> sink_;
+  raw_ptr<IPC::TestSink, DanglingUntriaged> sink_;
   std::unique_ptr<FakeRenderFrameMetadataObserver>
       renderer_render_frame_metadata_observer_;
   MockWidget widget_;
@@ -1133,32 +1133,9 @@ TEST_F(RenderWidgetHostTest, ResizeScreenInfo) {
   EXPECT_FALSE(host_->visual_properties_ack_pending_);
 }
 
-class RenderWidgetHostFullscreenScreenSizeTest
-    : public RenderWidgetHostTest,
-      public testing::WithParamInterface<bool> {
- public:
-  RenderWidgetHostFullscreenScreenSizeTest() {
-    scoped_feature_list_.InitWithFeatureState(
-        blink::features::kFullscreenScreenSizeMatchesDisplay,
-        FullscreenScreenSizeMatchesDisplayEnabled());
-  }
-  bool FullscreenScreenSizeMatchesDisplayEnabled() { return GetParam(); }
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
-};
-
-INSTANTIATE_TEST_SUITE_P(All,
-                         RenderWidgetHostFullscreenScreenSizeTest,
-                         testing::Bool());
-
-// Test that VisualProperties conveys a ScreenInfo size override with the view's
-// size for the current screen, when the frame is fullscreen.
-// This lets `window.screen` provide viewport dimensions while the frame is
-// fullscreen as a speculative site compatibility measure, because web authors
-// may assume that screen dimensions match window.innerWidth/innerHeight while
-// a page is fullscreen, but that is not always true. crbug.com/1367416
-TEST_P(RenderWidgetHostFullscreenScreenSizeTest, ScreenSizeInFullscreen) {
+// Ensure VisualProperties continues reporting the size of the current screen,
+// not the viewport, when the frame is fullscreen. See crbug.com/1367416.
+TEST_F(RenderWidgetHostTest, ScreenSizeInFullscreen) {
   const gfx::Rect kScreenBounds(0, 0, 800, 600);
   const gfx::Rect kViewBounds(55, 66, 600, 500);
 
@@ -1179,7 +1156,6 @@ TEST_P(RenderWidgetHostFullscreenScreenSizeTest, ScreenSizeInFullscreen) {
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(1u, widget_.ReceivedVisualProperties().size());
   blink::VisualProperties props = widget_.ReceivedVisualProperties().at(0);
-  EXPECT_EQ(absl::nullopt, props.screen_infos.current().size_override);
   EXPECT_EQ(kScreenBounds, props.screen_infos.current().rect);
   EXPECT_EQ(kScreenBounds, props.screen_infos.current().available_rect);
   EXPECT_EQ(kViewBounds.size(), props.new_size);
@@ -1191,10 +1167,6 @@ TEST_P(RenderWidgetHostFullscreenScreenSizeTest, ScreenSizeInFullscreen) {
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(2u, widget_.ReceivedVisualProperties().size());
   props = widget_.ReceivedVisualProperties().at(1);
-  if (FullscreenScreenSizeMatchesDisplayEnabled())
-    EXPECT_EQ(absl::nullopt, props.screen_infos.current().size_override);
-  else
-    EXPECT_EQ(kViewBounds.size(), props.screen_infos.current().size_override);
   EXPECT_EQ(kScreenBounds, props.screen_infos.current().rect);
   EXPECT_EQ(kScreenBounds, props.screen_infos.current().available_rect);
   EXPECT_EQ(kViewBounds.size(), props.new_size);
@@ -1206,7 +1178,6 @@ TEST_P(RenderWidgetHostFullscreenScreenSizeTest, ScreenSizeInFullscreen) {
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(3u, widget_.ReceivedVisualProperties().size());
   props = widget_.ReceivedVisualProperties().at(2);
-  EXPECT_EQ(absl::nullopt, props.screen_infos.current().size_override);
   EXPECT_EQ(kScreenBounds, props.screen_infos.current().rect);
   EXPECT_EQ(kScreenBounds, props.screen_infos.current().available_rect);
   EXPECT_EQ(kViewBounds.size(), props.new_size);
@@ -1370,7 +1341,9 @@ TEST_F(RenderWidgetHostTest, Background) {
 #if defined(USE_AURA)
   view = new RenderWidgetHostViewAura(host_.get());
 #elif BUILDFLAG(IS_ANDROID)
-  view = new RenderWidgetHostViewAndroid(host_.get(), nullptr);
+  view = new RenderWidgetHostViewAndroid(host_.get(),
+                                         /*parent_native_view=*/nullptr,
+                                         /*parent_layer=*/nullptr);
 #elif BUILDFLAG(IS_MAC)
   view = CreateRenderWidgetHostViewMacForTesting(host_.get());
 #elif BUILDFLAG(IS_IOS)
@@ -1379,7 +1352,7 @@ TEST_F(RenderWidgetHostTest, Background) {
 
 #if !BUILDFLAG(IS_ANDROID)
   // TODO(derat): Call this on all platforms: http://crbug.com/102450.
-  view->InitAsChild(nullptr);
+  view->InitAsChild(gfx::NativeView());
 #endif
   host_->SetView(view);
 
@@ -1420,6 +1393,14 @@ TEST_F(RenderWidgetHostTest, Background) {
     EXPECT_EQ(unsigned{SK_ColorBLUE}, *view->GetBackgroundColor());
   }
 
+#if BUILDFLAG(IS_ANDROID)
+  // Surface Eviction attempts to crawl the FrameTree. This makes use of
+  // RenderViewHostImpl::From which performs a static_cast on the
+  // RenderWidgetHostOwnerDelegate. Our MockRenderWidgetHostOwnerDelegate is not
+  // a RenderViewHostImpl, so it crashes. Clear this here as it is not needed
+  // for TearDown.
+  host_->set_owner_delegate(nullptr);
+#endif  // BUILDFLAG(IS_ANDROID)
   host_->SetView(nullptr);
   view->Destroy();
 }
@@ -2245,6 +2226,7 @@ TEST_F(RenderWidgetHostTest, NavigateInBackgroundShowsBlank) {
   // ClearDisplayedGraphics.
   host_->WasShown({} /* record_tab_switch_time_request */);
   host_->DidNavigate();
+  host_->StartNewContentRenderingTimeout();
   EXPECT_FALSE(host_->new_content_rendering_timeout_fired());
 
   // Hide then show. ClearDisplayedGraphics must be called.
@@ -2256,6 +2238,7 @@ TEST_F(RenderWidgetHostTest, NavigateInBackgroundShowsBlank) {
   // Hide, navigate, then show. ClearDisplayedGraphics must be called.
   host_->WasHidden();
   host_->DidNavigate();
+  host_->StartNewContentRenderingTimeout();
   host_->WasShown({} /* record_tab_switch_time_request */);
   EXPECT_TRUE(host_->new_content_rendering_timeout_fired());
 }
@@ -2351,8 +2334,10 @@ TEST_F(RenderWidgetHostTest, AddAndRemoveInputEventObserver) {
   NativeWebKeyboardEvent native_event(WebInputEvent::Type::kChar, 0,
                                       GetNextSimulatedEventTime());
   ui::LatencyInfo latency_info = ui::LatencyInfo();
+  ui::EventLatencyMetadata event_latency_metadata;
   EXPECT_CALL(observer, OnInputEvent(_)).Times(1);
-  host_->DispatchInputEventWithLatencyInfo(native_event, &latency_info);
+  host_->DispatchInputEventWithLatencyInfo(native_event, &latency_info,
+                                           &event_latency_metadata);
 
   // Remove InputEventObserver.
   host_->RemoveInputEventObserver(&observer);
@@ -2360,7 +2345,9 @@ TEST_F(RenderWidgetHostTest, AddAndRemoveInputEventObserver) {
   // Confirm InputEventObserver is removed.
   EXPECT_CALL(observer, OnInputEvent(_)).Times(0);
   latency_info = ui::LatencyInfo();
-  host_->DispatchInputEventWithLatencyInfo(native_event, &latency_info);
+  event_latency_metadata = ui::EventLatencyMetadata();
+  host_->DispatchInputEventWithLatencyInfo(native_event, &latency_info,
+                                           &event_latency_metadata);
 }
 
 #if BUILDFLAG(IS_ANDROID)

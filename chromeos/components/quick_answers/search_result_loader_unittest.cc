@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/memory/scoped_refptr.h"
+#include "base/run_loop.h"
 #include "base/test/task_environment.h"
 #include "chromeos/components/quick_answers/public/cpp/quick_answers_prefs.h"
 #include "chromeos/components/quick_answers/quick_answers_model.h"
@@ -69,7 +70,7 @@ class SearchResultLoaderTest : public testing::Test {
   void TearDown() override { loader_.reset(); }
 
  protected:
-  base::test::SingleThreadTaskEnvironment task_environment_;
+  base::test::TaskEnvironment task_environment_;
   std::unique_ptr<SearchResultLoader> loader_;
   std::unique_ptr<MockResultLoaderDelegate> mock_delegate_;
   data_decoder::test::InProcessDataDecoder in_process_data_decoder_;
@@ -79,14 +80,15 @@ class SearchResultLoaderTest : public testing::Test {
 };
 
 TEST_F(SearchResultLoaderTest, Success) {
-  std::unique_ptr<QuickAnswer> expected_quick_answer =
-      std::make_unique<QuickAnswer>();
-  expected_quick_answer->first_answer_row.push_back(
-      std::make_unique<QuickAnswerResultText>("9.055 inches"));
-
-  EXPECT_CALL(
-      *mock_delegate_,
-      OnQuickAnswerReceived(QuickAnswerEqual(expected_quick_answer.get())));
+  base::RunLoop run_loop;
+  std::unique_ptr<QuickAnswersSession> session;
+  ON_CALL(*mock_delegate_, OnQuickAnswerReceived)
+      .WillByDefault(
+          [&session, &run_loop](
+              std::unique_ptr<QuickAnswersSession> quick_answers_session) {
+            session = std::move(quick_answers_session);
+            run_loop.Quit();
+          });
   EXPECT_CALL(*mock_delegate_, OnNetworkError()).Times(0);
 
   fake_quick_answers_state_.SetConsentStatus(
@@ -96,7 +98,12 @@ TEST_F(SearchResultLoaderTest, Success) {
   test_url_loader_factory_.SimulateResponseForPendingRequest(
       chromeos::assistant::kKnowledgeApiEndpoint, kValidResponse, net::HTTP_OK,
       network::TestURLLoaderFactory::ResponseMatchFlags::kUrlMatchPrefix);
-  base::RunLoop().RunUntilIdle();
+
+  run_loop.Run();
+  ASSERT_TRUE(session);
+  ASSERT_TRUE(session->quick_answer);
+  EXPECT_EQ("9.055 inches", GetQuickAnswerTextForTesting(
+                                session->quick_answer->first_answer_row));
 }
 
 TEST_F(SearchResultLoaderTest, NetworkError) {

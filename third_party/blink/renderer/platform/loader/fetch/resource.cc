@@ -34,6 +34,7 @@
 #include "base/time/default_clock.h"
 #include "build/build_config.h"
 #include "services/network/public/mojom/fetch_api.mojom-blink.h"
+#include "third_party/blink/public/mojom/fetch/fetch_api_request.mojom-shared.h"
 #include "third_party/blink/public/platform/platform.h"
 #include "third_party/blink/public/platform/web_security_origin.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_vector.h"
@@ -924,7 +925,7 @@ void Resource::SetCachePolicyBypassingCache() {
 }
 
 void Resource::ClearRangeRequestHeader() {
-  resource_request_.ClearHttpHeaderField("range");
+  resource_request_.ClearHttpHeaderField(http_names::kLowerRange);
 }
 
 void Resource::RevalidationSucceeded(
@@ -1164,6 +1165,8 @@ const char* Resource::ResourceTypeToString(
       return "SpeculationRule";
     case ResourceType::kMock:
       return "Mock";
+    case ResourceType::kDictionary:
+      return "Dictionary";
   }
   NOTREACHED();
   return InitiatorTypeNameToString(fetch_initiator_name);
@@ -1188,6 +1191,7 @@ bool Resource::IsLoadEventBlockingResourceType() const {
     case ResourceType::kManifest:
     case ResourceType::kMock:
     case ResourceType::kSpeculationRules:
+    case ResourceType::kDictionary:
       return false;
   }
   NOTREACHED();

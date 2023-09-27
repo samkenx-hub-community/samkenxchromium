@@ -7,9 +7,10 @@ package org.chromium.chrome.test.smoke;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -34,7 +35,9 @@ import org.chromium.chrome.test.pagecontroller.utils.UiLocatorHelper;
 public class ChromeBundleSmokeTest {
     private static final String TARGET_ACTIVITY =
             "org.chromium.chrome.browser.test_dummy.TestDummyActivity";
-    private static final long STARTUP_TIMEOUT = 10000;
+    // 10s was not enough for slow & overheated test devices.
+    // https://ci.chromium.org/ui/p/chromium/builders/try/android-pie-arm64-dbg/6903/overview
+    private static final long STARTUP_TIMEOUT = 20000;
 
     public ChromeUiAutomatorTestRule mRule = new ChromeUiAutomatorTestRule();
     public ChromeUiApplicationTestRule mChromeUiRule = new ChromeUiApplicationTestRule();
@@ -49,7 +52,7 @@ public class ChromeBundleSmokeTest {
                 ChromeUiApplicationTestRule.PACKAGE_NAME_ARG);
         Assert.assertNotNull("Must specify bundle under test", mPackageName);
         try {
-            mChromeUiRule.launchIntoNewTabPageOnFirstRun();
+            UiAutomatorUtils.getInstance().launchApplication(mPackageName);
         } catch (Exception e) {
             if (NonInstrumentedCrashDetector.checkDidChromeCrash()) {
                 throw new RuntimeException(mPackageName + " should not have crashed.");
@@ -61,7 +64,7 @@ public class ChromeBundleSmokeTest {
 
     private void runTestActivity(int testCase) {
         // This intent will trigger installation of the module if not present.
-        Context context = InstrumentationRegistry.getContext();
+        Context context = ApplicationProvider.getApplicationContext();
         Intent intent = new Intent();
         intent.setComponent(new ComponentName(mPackageName, TARGET_ACTIVITY));
         intent.putExtra("test_case", testCase);

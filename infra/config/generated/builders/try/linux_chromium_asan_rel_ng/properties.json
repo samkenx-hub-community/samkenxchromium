@@ -75,11 +75,12 @@
           "builder": "Linux ASan LSan Tests (1)",
           "project": "chromium"
         }
-      ],
-      "rts_config": {
-        "condition": "QUICK_RUN_ONLY"
-      }
+      ]
     }
+  },
+  "$build/flakiness": {
+    "check_for_flakiness": true,
+    "check_for_flakiness_with_resultdb": true
   },
   "$recipe_engine/resultdb/test_presentation": {
     "column_keys": [],
@@ -89,5 +90,6 @@
     ]
   },
   "builder_group": "tryserver.chromium.linux",
+  "cq": "required",
   "recipe": "chromium/orchestrator"
 }

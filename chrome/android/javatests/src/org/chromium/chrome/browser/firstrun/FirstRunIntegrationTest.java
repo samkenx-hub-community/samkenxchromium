@@ -24,20 +24,19 @@ import android.content.Intent;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ProgressBar;
 
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
@@ -51,18 +50,17 @@ import org.chromium.base.ApplicationStatus;
 import org.chromium.base.Callback;
 import org.chromium.base.CollectionUtil;
 import org.chromium.base.Promise;
-import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
-import org.chromium.base.test.metrics.HistogramTestRule;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.DoNotBatch;
+import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.base.test.util.ScalableTimeout;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.DeferredStartupHandler;
 import org.chromium.chrome.browser.app.ChromeActivity;
@@ -74,6 +72,8 @@ import org.chromium.chrome.browser.enterprise.util.FakeEnterpriseInfo;
 import org.chromium.chrome.browser.firstrun.FirstRunActivityTestObserver.ScopedObserverData;
 import org.chromium.chrome.browser.locale.LocaleManager;
 import org.chromium.chrome.browser.locale.LocaleManagerDelegate;
+import org.chromium.chrome.browser.partnercustomizations.BasePartnerBrowserCustomizationIntegrationTestRule;
+import org.chromium.chrome.browser.partnercustomizations.PartnerBrowserCustomizations;
 import org.chromium.chrome.browser.privacy.settings.PrivacyPreferencesManagerImpl;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.search_engines.DefaultSearchEngineDialogHelperUtils;
@@ -81,6 +81,7 @@ import org.chromium.chrome.browser.search_engines.SearchEnginePromoType;
 import org.chromium.chrome.browser.search_engines.TemplateUrlServiceFactory;
 import org.chromium.chrome.browser.signin.SigninFirstRunFragment;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.components.browser_ui.styles.SemanticColorUtils;
 import org.chromium.components.externalauth.ExternalAuthUtils;
@@ -88,11 +89,10 @@ import org.chromium.components.policy.AbstractAppRestrictionsProvider;
 import org.chromium.components.search_engines.TemplateUrl;
 import org.chromium.components.signin.AccountManagerFacade;
 import org.chromium.components.signin.AccountManagerFacadeProvider;
-import org.chromium.content_public.browser.test.NativeLibraryTestUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.content_public.common.ContentUrlConstants;
+import org.chromium.ui.base.DeviceFormFactor;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -111,8 +111,6 @@ public class FirstRunIntegrationTest {
     private static final String FOO_URL = "https://foo.com";
     private static final long ACTIVITY_WAIT_LONG_MS = TimeUnit.SECONDS.toMillis(10);
     private static final String TEST_ENROLLMENT_TOKEN = "enrollment-token";
-    private static final String FRE_PROGRESS_VIEW_INTENT_HISTOGRAM =
-            "MobileFre.Progress.ViewIntent";
 
     @Rule
     public TestRule mProcessor = new Features.JUnitProcessor();
@@ -124,7 +122,8 @@ public class FirstRunIntegrationTest {
     public TestRule mCommandLineFlagsRule = CommandLineFlags.getTestRule();
 
     @Rule
-    public HistogramTestRule mHistogramTestRule = new HistogramTestRule();
+    public BasePartnerBrowserCustomizationIntegrationTestRule mCustomizationRule =
+            new BasePartnerBrowserCustomizationIntegrationTestRule();
 
     @Mock
     private ExternalAuthUtils mExternalAuthUtilsMock;
@@ -135,23 +134,16 @@ public class FirstRunIntegrationTest {
 
     private Promise<List<Account>> mAccountsPromise;
 
-    private final Set<Class> mSupportedActivities =
-            CollectionUtil.newHashSet(ChromeLauncherActivity.class, FirstRunActivity.class,
-                    ChromeTabbedActivity.class, CustomTabActivity.class);
+    private final Set<Class> mSupportedActivities = CollectionUtil.newHashSet(
+            ChromeLauncherActivity.class, FirstRunActivity.class, TabbedModeFirstRunActivity.class,
+            ChromeTabbedActivity.class, CustomTabActivity.class);
     private final Map<Class, ActivityMonitor> mMonitorMap = new HashMap<>();
     private Instrumentation mInstrumentation;
     private Context mContext;
 
     private FirstRunActivityTestObserver mTestObserver = new FirstRunActivityTestObserver();
     private Activity mLastActivity;
-
-    @BeforeClass
-    public static void setUpBeforeActivityLaunched() {
-        // Only needs to be loaded once and needs to be loaded before HistogramTestRule.
-        // TODO(https://crbug.com/1211884): Revise after HistogramTestRule is revised to not require
-        // native loading.
-        NativeLibraryTestUtils.loadNativeLibraryNoBrowserProcess();
-    }
+    private Class mFirstRunActivityClass;
 
     @Before
     public void setUp() {
@@ -161,10 +153,11 @@ public class FirstRunIntegrationTest {
         FirstRunStatus.setFirstRunSkippedByPolicy(false);
         FirstRunUtils.setDisableDelayOnExitFreForTest(true);
         FirstRunActivity.setObserverForTest(mTestObserver);
-        FirstRunActivityBase.setPolicyLoadListenerFactoryForTesting(null);
 
         mInstrumentation = InstrumentationRegistry.getInstrumentation();
         mContext = mInstrumentation.getTargetContext();
+        mFirstRunActivityClass = DeviceFormFactor.isTablet() ? TabbedModeFirstRunActivity.class
+                                                             : FirstRunActivity.class;
         for (Class clazz : mSupportedActivities) {
             ActivityMonitor monitor = new ActivityMonitor(clazz.getName(), null, false);
             mMonitorMap.put(clazz, monitor);
@@ -180,13 +173,15 @@ public class FirstRunIntegrationTest {
         if (mLastActivity != null) {
             TestThreadUtils.runOnUiThreadBlocking(() -> mLastActivity.finish());
         }
+        // Finish the rest of the running activities.
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            for (Activity runningActivity : ApplicationStatus.getRunningActivities()) {
+                runningActivity.finish();
+            }
+        });
 
         FirstRunStatus.setFirstRunSkippedByPolicy(false);
-        FirstRunUtils.setDisableDelayOnExitFreForTest(false);
-        FirstRunAppRestrictionInfo.setInitializedInstanceForTest(null);
-        EnterpriseInfo.setInstanceForTest(null);
         AccountManagerFacadeProvider.resetInstanceForTests();
-        FirstRunFlowSequencer.setDelegateForTesting(null);
     }
 
     private ActivityMonitor getMonitor(Class activityClass) {
@@ -203,7 +198,7 @@ public class FirstRunIntegrationTest {
         // Because the AsyncInitializationActivity notices that the FRE hasn't been run yet, it
         // redirects to it.  Once the user closes the FRE, the user should be kicked back into the
         // startup flow where they were interrupted.
-        return waitForActivity(FirstRunActivity.class);
+        return waitForFirstRunActivity();
     }
 
     private <T extends Activity> T waitForActivity(Class<T> activityClass) {
@@ -250,6 +245,13 @@ public class FirstRunIntegrationTest {
         mContext.startActivity(intent);
     }
 
+    private void launchMainIntent() {
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.setPackage(mContext.getPackageName());
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        mContext.startActivity(intent);
+    }
+
     private void clickThroughFirstRun(
             FirstRunActivity firstRunActivity, FirstRunPagesTestCase testCase) throws Exception {
         // Start FRE.
@@ -274,6 +276,10 @@ public class FirstRunIntegrationTest {
                 Uri.parse(expected), actual);
     }
 
+    private FirstRunActivity waitForFirstRunActivity() {
+        return (FirstRunActivity) waitForActivity(mFirstRunActivityClass);
+    }
+
     /**
      * When launching a second Chrome, the new FRE should replace the old FRE. In order to know when
      * the second FirstRunActivity is ready, use object inequality with old one.
@@ -287,7 +293,7 @@ public class FirstRunIntegrationTest {
                     for (Activity runningActivity : ApplicationStatus.getRunningActivities()) {
                         @ActivityState
                         int state = ApplicationStatus.getStateForActivity(runningActivity);
-                        if (runningActivity.getClass() == FirstRunActivity.class
+                        if (runningActivity.getClass() == mFirstRunActivityClass
                                 && runningActivity != previousFreActivity
                                 && (state == ActivityState.STARTED
                                         || state == ActivityState.RESUMED)) {
@@ -336,6 +342,22 @@ public class FirstRunIntegrationTest {
     }
 
     @Test
+    @MediumTest
+    public void startPartnerCustomizationDuringFRE() {
+        launchFirstRunActivity();
+        CriteriaHelper.pollInstrumentationThread(
+                () -> PartnerBrowserCustomizations.getInstance().isInitialized());
+    }
+
+    @Test
+    @MediumTest
+    public void startPartnerCustomizationFromMainIntent() {
+        launchMainIntent();
+        CriteriaHelper.pollInstrumentationThread(
+                () -> PartnerBrowserCustomizations.getInstance().isInitialized());
+    }
+
+    @Test
     @SmallTest
     public void testHelpPageSkipsFirstRun() {
         // Fire an Intent to load a generic URL.
@@ -346,19 +368,18 @@ public class FirstRunIntegrationTest {
         Assert.assertFalse(mLastActivity.isFinishing());
 
         // First run should be skipped for this Activity.
-        Assert.assertEquals(0, getMonitor(FirstRunActivity.class).getHits());
+        Assert.assertEquals(0, getMonitor(mFirstRunActivityClass).getHits());
     }
 
     @Test
     @SmallTest
-    @DisabledTest(message = "https://crbug.com/1295396")
     public void testAbortFirstRun() throws Exception {
         launchViewIntent(TEST_URL);
         Activity chromeLauncherActivity = waitForActivity(ChromeLauncherActivity.class);
 
         // Because the ChromeLauncherActivity notices that the FRE hasn't been run yet, it
         // redirects to it.
-        FirstRunActivity firstRunActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity firstRunActivity = waitForFirstRunActivity();
 
         // Once the user closes the FRE, the user should be kicked back into the
         // startup flow where they were interrupted.
@@ -502,9 +523,9 @@ public class FirstRunIntegrationTest {
     private void initializePreferences(FirstRunPagesTestCase testCase) {
         if (testCase.cctTosDisabled()) skipTosDialogViaPolicy();
 
-        TestFirstRunFlowSequencerDelegate delegate =
-                new TestFirstRunFlowSequencerDelegate(testCase);
-        FirstRunFlowSequencer.setDelegateForTesting(delegate);
+        FirstRunFlowSequencer.setDelegateFactoryForTesting(
+                (profileSupplier)
+                        -> new TestFirstRunFlowSequencerDelegate(testCase, profileSupplier));
 
         setUpLocaleManagerDelegate(testCase.searchPromoType());
     }
@@ -512,6 +533,14 @@ public class FirstRunIntegrationTest {
     @Test
     @MediumTest
     public void testFirstRunPages_ProgressHistogramRecordedOnlyOnce() throws Exception {
+        HistogramWatcher histograms =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("MobileFre.Progress.ViewIntent",
+                                MobileFreProgress.STARTED, MobileFreProgress.WELCOME_SHOWN,
+                                MobileFreProgress.SYNC_CONSENT_SHOWN,
+                                MobileFreProgress.SYNC_CONSENT_DISMISSED,
+                                MobileFreProgress.DEFAULT_SEARCH_ENGINE_SHOWN)
+                        .build();
         initializePreferences(new FirstRunPagesTestCase().withSearchPromo().withSigninPromo());
 
         FirstRunActivity firstRunActivity = launchFirstRunActivity();
@@ -533,15 +562,18 @@ public class FirstRunIntegrationTest {
 
         waitForActivity(ChromeTabbedActivity.class);
 
-        checkRecordedProgressSteps(Arrays.asList(MobileFreProgress.STARTED,
-                MobileFreProgress.WELCOME_SHOWN, MobileFreProgress.SYNC_CONSENT_SHOWN,
-                MobileFreProgress.SYNC_CONSENT_DISMISSED,
-                MobileFreProgress.DEFAULT_SEARCH_ENGINE_SHOWN));
+        histograms.assertExpected();
     }
 
     @Test
     @MediumTest
     public void testFirstRunPages_ProgressHistogramRecording_NoPromos() throws Exception {
+        HistogramWatcher histograms =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("MobileFre.Progress.ViewIntent",
+                                MobileFreProgress.STARTED, MobileFreProgress.WELCOME_SHOWN)
+                        .build();
+
         initializePreferences(new FirstRunPagesTestCase());
 
         FirstRunActivity firstRunActivity = launchFirstRunActivity();
@@ -552,27 +584,7 @@ public class FirstRunIntegrationTest {
 
         waitForActivity(ChromeTabbedActivity.class);
 
-        checkRecordedProgressSteps(
-                Arrays.asList(MobileFreProgress.STARTED, MobileFreProgress.WELCOME_SHOWN));
-    }
-
-    private void checkRecordedProgressSteps(List<Integer> bucketsRecorded) {
-        for (int bucket = MobileFreProgress.STARTED; bucket < MobileFreProgress.MAX; ++bucket) {
-            int recordedValue = RecordHistogram.getHistogramValueCountForTesting(
-                    FRE_PROGRESS_VIEW_INTENT_HISTOGRAM, bucket);
-            if (bucketsRecorded.contains(bucket)) {
-                Assert.assertEquals(
-                        String.format(
-                                "Histogram <%s>, bucket <%d> should be recorded exactly once.",
-                                FRE_PROGRESS_VIEW_INTENT_HISTOGRAM, bucket),
-                        1, recordedValue);
-            } else {
-                Assert.assertEquals(
-                        String.format("Histogram <%s>, bucket <%d> should not be recorded.",
-                                FRE_PROGRESS_VIEW_INTENT_HISTOGRAM, bucket),
-                        0, recordedValue);
-            }
-        }
+        histograms.assertExpected();
     }
 
     @Test
@@ -584,7 +596,7 @@ public class FirstRunIntegrationTest {
         Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(mContext, TEST_URL);
         mContext.startActivity(intent);
 
-        FirstRunActivity freActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity freActivity = waitForFirstRunActivity();
         CriteriaHelper.pollUiThread(
                 () -> freActivity.getSupportFragmentManager().getFragments().size() > 0);
         // Make sure native is initialized so that the subsequent transition is not blocked.
@@ -644,7 +656,6 @@ public class FirstRunIntegrationTest {
     @MediumTest
     // TODO(https://crbug.com/1111490): Change this test case when policy can handle cases when ToS
     // is accepted in Browser App.
-    @DisabledTest(message = "https://crbug.com/1331277")
     public void testSkipTosPage_WithCctPolicy() throws Exception {
         skipTosDialogViaPolicy();
         FirstRunStatus.setSkipWelcomePage(true);
@@ -652,7 +663,7 @@ public class FirstRunIntegrationTest {
         Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(mContext, TEST_URL);
         mContext.startActivity(intent);
 
-        FirstRunActivity freActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity freActivity = waitForFirstRunActivity();
         CriteriaHelper.pollUiThread(
                 () -> freActivity.getSupportFragmentManager().getFragments().size() > 0);
 
@@ -681,7 +692,7 @@ public class FirstRunIntegrationTest {
         initializePreferences(testCase);
 
         launchCustomTabs(TEST_URL);
-        FirstRunActivity firstFreActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity firstFreActivity = waitForFirstRunActivity();
 
         launchViewIntent(FOO_URL);
         FirstRunActivity secondFreActivity = waitForDifferentFirstRunActivity(firstFreActivity);
@@ -697,7 +708,7 @@ public class FirstRunIntegrationTest {
         initializePreferences(testCase);
 
         launchViewIntent(TEST_URL);
-        FirstRunActivity firstFreActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity firstFreActivity = waitForFirstRunActivity();
 
         launchCustomTabs(FOO_URL);
         FirstRunActivity secondFreActivity = waitForDifferentFirstRunActivity(firstFreActivity);
@@ -713,7 +724,7 @@ public class FirstRunIntegrationTest {
         initializePreferences(testCase);
 
         launchViewIntent(TEST_URL);
-        FirstRunActivity firstFreActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity firstFreActivity = waitForFirstRunActivity();
 
         launchViewIntent(FOO_URL);
         FirstRunActivity secondFreActivity = waitForDifferentFirstRunActivity(firstFreActivity);
@@ -726,7 +737,7 @@ public class FirstRunIntegrationTest {
     @MediumTest
     public void testMultipleFresBackButton() throws Exception {
         launchViewIntent(TEST_URL);
-        FirstRunActivity firstFreActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity firstFreActivity = waitForFirstRunActivity();
 
         launchViewIntent(TEST_URL);
         FirstRunActivity secondFreActivity = waitForDifferentFirstRunActivity(firstFreActivity);
@@ -753,7 +764,7 @@ public class FirstRunIntegrationTest {
         blockOnFlowIsKnown();
 
         launchViewIntent(TEST_URL);
-        FirstRunActivity firstRunActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity firstRunActivity = waitForFirstRunActivity();
         CriteriaHelper.pollUiThread(
                 (() -> firstRunActivity.getNativeInitializationPromise().isFulfilled()),
                 "native never initialized.");
@@ -779,7 +790,7 @@ public class FirstRunIntegrationTest {
                     ((SigninFirstRunFragment) firstRunActivity.getCurrentFragmentForTesting())
                             .getView()
                             .findViewById(R.id.fre_native_and_policy_load_progress_spinner);
-            // Replace the progress bar with a dummy to allow other checks. Currently the
+            // Replace the progress bar with a placeholder to allow other checks. Currently the
             // progress bar cannot be stopped otherwise due to some espresso issues (crbug/1115067).
             progressBar.setIndeterminateDrawable(
                     new ColorDrawable(SemanticColorUtils.getDefaultBgColor(firstRunActivity)));
@@ -793,6 +804,10 @@ public class FirstRunIntegrationTest {
     @Test
     @MediumTest
     public void testSigninFirstRunLoadPointHistograms() throws Exception {
+        var histograms = HistogramWatcher.newBuilder()
+                                 .expectAnyRecord("MobileFre.FromLaunch.ChildStatusAvailable")
+                                 .expectAnyRecord("MobileFre.FromLaunch.PoliciesLoaded")
+                                 .build();
         initializePreferences(new FirstRunPagesTestCase());
 
         FirstRunActivity firstRunActivity = launchFirstRunActivity();
@@ -800,11 +815,7 @@ public class FirstRunIntegrationTest {
                 .ensurePagesCreationSucceeded()
                 .ensureTermsOfServiceIsCurrentPage();
 
-        Assert.assertEquals("Child status fetch time not recorded", 1,
-                mHistogramTestRule.getHistogramTotalCount(
-                        "MobileFre.FromLaunch.ChildStatusAvailable"));
-        Assert.assertEquals("Policies fetch time not recorded", 1,
-                mHistogramTestRule.getHistogramTotalCount("MobileFre.FromLaunch.PoliciesLoaded"));
+        histograms.assertExpected("Child status or policies fetch time not recorded");
     }
 
     @Test
@@ -816,7 +827,7 @@ public class FirstRunIntegrationTest {
         blockOnFlowIsKnown();
 
         launchCustomTabs(TEST_URL);
-        FirstRunActivity firstRunActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity firstRunActivity = waitForFirstRunActivity();
         CriteriaHelper.pollUiThread(
                 (() -> firstRunActivity.getNativeInitializationPromise().isFulfilled()),
                 "native never initialized.");
@@ -835,7 +846,7 @@ public class FirstRunIntegrationTest {
         enableCloudManagementViaPolicy();
 
         launchViewIntent(TEST_URL);
-        FirstRunActivity firstRunActivity = waitForActivity(FirstRunActivity.class);
+        FirstRunActivity firstRunActivity = waitForFirstRunActivity();
         clickThroughFirstRun(firstRunActivity, testCase);
         verifyUrlEquals(TEST_URL, waitAndGetUriFromChromeActivity(ChromeTabbedActivity.class));
     }
@@ -1243,7 +1254,9 @@ public class FirstRunIntegrationTest {
             extends FirstRunFlowSequencer.FirstRunFlowSequencerDelegate {
         private FirstRunPagesTestCase mTestCase;
 
-        public TestFirstRunFlowSequencerDelegate(FirstRunPagesTestCase testCase) {
+        public TestFirstRunFlowSequencerDelegate(
+                FirstRunPagesTestCase testCase, OneshotSupplier<Profile> profileSupplier) {
+            super(profileSupplier);
             mTestCase = testCase;
         }
 

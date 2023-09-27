@@ -10,15 +10,16 @@
 #include <vector>
 
 #include "ash/public/cpp/session/user_info.h"
+#include "base/memory/raw_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "chrome/browser/ash/login/saml/password_sync_token_checkers_collection.h"
 #include "chrome/browser/ash/login/signin/token_handle_util.h"
-#include "chrome/browser/ash/login/ui/login_display.h"
 #include "chrome/browser/ash/login/user_online_signin_notifier.h"
 #include "chrome/browser/ash/system/system_clock.h"
 #include "chromeos/ash/components/dbus/cryptohome/rpc.pb.h"
+#include "chromeos/ash/components/login/auth/auth_performer.h"
 #include "chromeos/ash/components/proximity_auth/screenlock_bridge.h"
 #include "components/account_id/account_id.h"
 #include "components/session_manager/core/session_manager_observer.h"
@@ -33,6 +34,8 @@ namespace ash {
 class EasyUnlockService;
 class UserBoardView;
 struct LoginUserInfo;
+class UserContext;
+class AuthenticationError;
 
 enum class DisplayedScreen { SIGN_IN_SCREEN, USER_ADDING_SCREEN, LOCK_SCREEN };
 
@@ -64,10 +67,7 @@ class UserSelectionScreen
   void HandleNoPodFocused();
   void OnBeforeShow();
 
-  // Methods for easy unlock support.
-  void HardLockPod(const AccountId& account_id);
   void AttemptEasyUnlock(const AccountId& account_id);
-
   void InitEasyUnlock();
 
   void SetTpmLockedState(bool is_locked, base::TimeDelta time_left);
@@ -75,11 +75,6 @@ class UserSelectionScreen
   // proximity_auth::ScreenlockBridge::LockHandler implementation:
   void ShowBannerMessage(const std::u16string& message,
                          bool is_warning) override;
-  void ShowUserPodCustomIcon(
-      const AccountId& account_id,
-      const proximity_auth::ScreenlockBridge::UserPodCustomIconInfo& icon_info)
-      override;
-  void HideUserPodCustomIcon(const AccountId& account_id) override;
   void SetSmartLockState(const AccountId& account_id,
                          SmartLockState state) override;
   void NotifySmartLockAuthResult(const AccountId& account_id,
@@ -104,9 +99,6 @@ class UserSelectionScreen
   // UserOnlineSigninNotifier::Observer
   void OnOnlineSigninEnforced(const AccountId& account_id) override;
 
-  // Determines if user auth status requires online sign in.
-  static bool ShouldForceOnlineSignIn(const user_manager::User* user);
-
   // Builds a `UserAvatar` instance which contains the current image for `user`.
   static UserAvatar BuildAshUserAvatarForUser(const user_manager::User& user);
 
@@ -114,7 +106,7 @@ class UserSelectionScreen
   void SetUsersLoaded(bool loaded);
 
  protected:
-  UserBoardView* view_ = nullptr;
+  raw_ptr<UserBoardView, ExperimentalAsh> view_ = nullptr;
 
   // Map from public session account IDs to recommended locales set by policy.
   std::map<AccountId, std::vector<std::string>>
@@ -131,8 +123,13 @@ class UserSelectionScreen
       const AccountId& account_id) const;
 
   void OnUserStatusChecked(const AccountId& account_id,
-                           TokenHandleUtil::TokenHandleStatus status);
+                           const std::string& token,
+                           bool reauth_required);
   void OnAllowedInputMethodsChanged();
+
+  void OnStartAuthSession(bool user_exists,
+                          std::unique_ptr<UserContext> user_context,
+                          absl::optional<AuthenticationError> error);
 
   // Purpose of the screen.
   const DisplayedScreen display_type_;
@@ -179,6 +176,10 @@ class UserSelectionScreen
   base::ScopedObservation<UserOnlineSigninNotifier,
                           UserOnlineSigninNotifier::Observer>
       scoped_observation_{this};
+
+  AuthPerformer auth_performer_{UserDataAuthClient::Get()};
+
+  std::vector<LoginUserInfo> user_info_list_;
 
   base::WeakPtrFactory<UserSelectionScreen> weak_factory_{this};
 };

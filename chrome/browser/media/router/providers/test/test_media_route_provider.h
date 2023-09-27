@@ -38,14 +38,12 @@ class TestMediaRouteProvider : public mojom::MediaRouteProvider,
                    const url::Origin& origin,
                    int32_t frame_tree_node_id,
                    base::TimeDelta timeout,
-                   bool incognito,
                    CreateRouteCallback callback) override;
   void JoinRoute(const std::string& media_source,
                  const std::string& presentation_id,
                  const url::Origin& origin,
                  int32_t frame_tree_node_id,
                  base::TimeDelta timeout,
-                 bool incognito,
                  JoinRouteCallback callback) override;
   void TerminateRoute(const std::string& route_id,
                       TerminateRouteCallback callback) override;
@@ -67,8 +65,6 @@ class TestMediaRouteProvider : public mojom::MediaRouteProvider,
       mojo::PendingRemote<mojom::MediaStatusObserver> observer,
       CreateMediaRouteControllerCallback callback) override;
   void GetState(GetStateCallback callback) override;
-  void GetMirroringStats(const std::string& route_id,
-                         GetMirroringStatsCallback callback) override;
 
   void set_close_route_error_on_send() {
     close_route_with_error_on_send_ = true;

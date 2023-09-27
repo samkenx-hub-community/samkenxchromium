@@ -167,7 +167,7 @@ class TryChromeDialog : public views::WidgetObserver, public ui::EventHandler {
   raw_ptr<views::Widget> popup_ = nullptr;
 
   // The close button; owned by |popup_|.
-  views::View* close_button_ = nullptr;
+  raw_ptr<views::View> close_button_ = nullptr;
 
   // True when the mouse is considered to be hovering over the dialog.
   bool has_hover_ = false;

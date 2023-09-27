@@ -6,9 +6,9 @@
 #define ASH_FRAME_SINK_UI_RESOURCE_H_
 
 #include "ash/ash_export.h"
-#include "components/viz/common/gpu/context_provider.h"
-#include "components/viz/common/resources/resource_format.h"
+#include "components/viz/common/gpu/raster_context_provider.h"
 #include "components/viz/common/resources/resource_id.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "gpu/command_buffer/common/mailbox.h"
 #include "gpu/command_buffer/common/sync_token.h"
 #include "ui/gfx/geometry/size.h"
@@ -29,10 +29,10 @@ class ASH_EXPORT UiResource {
 
   virtual ~UiResource();
 
-  scoped_refptr<viz::ContextProvider> context_provider;
+  scoped_refptr<viz::RasterContextProvider> context_provider;
   gpu::Mailbox mailbox;
   gpu::SyncToken sync_token;
-  viz::ResourceFormat format;
+  viz::SharedImageFormat format;
   gfx::Size resource_size;
 
   // This id can be used to identify the resource back to the type of source

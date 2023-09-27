@@ -55,20 +55,11 @@ namespace media_router {
 namespace {
 
 std::string GetStartedConnectionId(WebContents* web_contents) {
-  std::string session_id;
-  CHECK(content::ExecuteScriptAndExtractString(
-      web_contents, "window.domAutomationController.send(startedConnection.id)",
-      &session_id));
-  return session_id;
+  return EvalJs(web_contents, "startedConnection.id").ExtractString();
 }
 
 std::string GetDefaultRequestSessionId(WebContents* web_contents) {
-  std::string session_id;
-  CHECK(content::ExecuteScriptAndExtractString(
-      web_contents,
-      "window.domAutomationController.send(defaultRequestSessionId)",
-      &session_id));
-  return session_id;
+  return EvalJs(web_contents, "defaultRequestSessionId").ExtractString();
 }
 
 // Routes observer that calls a callback once there are no routes.
@@ -140,22 +131,24 @@ void MediaRouterIntegrationBrowserTest::SetUp() {
 void MediaRouterIntegrationBrowserTest::InitTestUi() {
   auto* const web_contents = GetActiveWebContents();
   auto* const context = browser()->profile();
+  if (test_ui_) {
+    test_ui_->TearDown();
+  }
   switch (GetParam()) {
     case UiForBrowserTest::kCast:
       CHECK(!GlobalMediaControlsCastStartStopEnabled(context));
-      test_ui_ =
-          MediaRouterCastUiForTest::GetOrCreateForWebContents(web_contents);
+      test_ui_ = std::make_unique<MediaRouterCastUiForTest>(web_contents);
       break;
     case UiForBrowserTest::kGmc:
       CHECK(GlobalMediaControlsCastStartStopEnabled(context));
-      test_ui_ =
-          MediaRouterGmcUiForTest::GetOrCreateForWebContents(web_contents);
+      test_ui_ = std::make_unique<MediaRouterGmcUiForTest>(web_contents);
       break;
   }
 }
 
 void MediaRouterIntegrationBrowserTest::TearDownOnMainThread() {
   test_ui_->TearDown();
+  test_ui_.reset();
   test_provider_->TearDown();
   InProcessBrowserTest::TearDownOnMainThread();
   test_navigation_observer_.reset();
@@ -171,7 +164,7 @@ void MediaRouterIntegrationBrowserTest::SetUpInProcessBrowserTestFixture() {
 }
 
 void MediaRouterIntegrationBrowserTest::SetUpOnMainThread() {
-  MediaRouterMojoImpl* router = static_cast<MediaRouterMojoImpl*>(
+  MediaRouterDesktop* router = static_cast<MediaRouterDesktop*>(
       MediaRouterFactory::GetApiForBrowserContext(browser()->profile()));
   mojo::PendingRemote<mojom::MediaRouter> media_router_remote;
   mojo::PendingRemote<mojom::MediaRouteProvider> provider_remote;
@@ -232,7 +225,7 @@ void MediaRouterIntegrationBrowserTest::WaitUntilNoRoutes(
 void MediaRouterIntegrationBrowserTest::ExecuteJavaScriptAPI(
     WebContents* web_contents,
     const std::string& script) {
-  std::string result(ExecuteScriptAndExtractString(web_contents, script));
+  std::string result(EvalJs(web_contents, script).ExtractString());
 
   // Read the test result, the test result set by javascript is a
   // JSON string with the following format:
@@ -321,7 +314,7 @@ void MediaRouterIntegrationBrowserTest::CheckStartFailed(
 base::FilePath MediaRouterIntegrationBrowserTest::GetResourceFile(
     base::FilePath::StringPieceType relative_path) const {
   const base::FilePath full_path =
-      base::PathService::CheckedGet(base::DIR_GEN_TEST_DATA_ROOT)
+      base::PathService::CheckedGet(base::DIR_OUT_TEST_DATA_ROOT)
           .Append(FILE_PATH_LITERAL("media_router/browser_test_resources/"))
           .Append(relative_path);
   {
@@ -332,34 +325,10 @@ base::FilePath MediaRouterIntegrationBrowserTest::GetResourceFile(
   return full_path;
 }
 
-int MediaRouterIntegrationBrowserTest::ExecuteScriptAndExtractInt(
-    const content::ToRenderFrameHost& adapter,
-    const std::string& script) {
-  int result;
-  CHECK(content::ExecuteScriptAndExtractInt(adapter, script, &result));
-  return result;
-}
-
-std::string MediaRouterIntegrationBrowserTest::ExecuteScriptAndExtractString(
-    const content::ToRenderFrameHost& adapter,
-    const std::string& script) {
-  std::string result;
-  CHECK(content::ExecuteScriptAndExtractString(adapter, script, &result));
-  return result;
-}
-
-bool MediaRouterIntegrationBrowserTest::ExecuteScriptAndExtractBool(
-    const content::ToRenderFrameHost& adapter,
-    const std::string& script) {
-  bool result;
-  CHECK(content::ExecuteScriptAndExtractBool(adapter, script, &result));
-  return result;
-}
-
 void MediaRouterIntegrationBrowserTest::ExecuteScript(
     const content::ToRenderFrameHost& adapter,
     const std::string& script) {
-  ASSERT_TRUE(content::ExecuteScript(adapter, script));
+  ASSERT_TRUE(content::ExecJs(adapter, script));
 }
 
 bool MediaRouterIntegrationBrowserTest::IsRouteCreatedOnUI() {
@@ -428,12 +397,8 @@ void MediaRouterIntegrationBrowserTest::RunReconnectSessionTest() {
   ExecuteJavaScriptAPI(
       new_web_contents,
       base::StringPrintf("reconnectSession('%s');", session_id.c_str()));
-  std::string reconnected_session_id;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractString(
-      new_web_contents,
-      "window.domAutomationController.send(reconnectedSession.id)",
-      &reconnected_session_id));
-  ASSERT_EQ(session_id, reconnected_session_id);
+  ASSERT_EQ(session_id,
+            content::EvalJs(new_web_contents, "reconnectedSession.id"));
 
   ExecuteJavaScriptAPI(web_contents,
                        "terminateSessionAndWaitForStateChange();");
@@ -476,12 +441,7 @@ void MediaRouterIntegrationBrowserTest::RunReconnectSessionSameTabTest() {
   ExecuteJavaScriptAPI(
       web_contents,
       base::StringPrintf("reconnectSession('%s');", session_id.c_str()));
-  std::string reconnected_session_id;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractString(
-      web_contents,
-      "window.domAutomationController.send(reconnectedSession.id)",
-      &reconnected_session_id));
-  ASSERT_EQ(session_id, reconnected_session_id);
+  ASSERT_EQ(session_id, content::EvalJs(web_contents, "reconnectedSession.id"));
 }
 
 bool MediaRouterIntegrationBrowserTest::RequiresMediaRouteProviders() const {
@@ -561,32 +521,7 @@ IN_PROC_BROWSER_TEST_P(MediaRouterIntegrationBrowserTest,
   StartSessionAndAssertNotFoundError();
 }
 
-Browser* MediaRouterIntegrationIncognitoBrowserTest::browser() {
-  if (!incognito_browser_)
-    incognito_browser_ = CreateIncognitoBrowser();
-  return incognito_browser_;
-}
-
-IN_PROC_BROWSER_TEST_P(MediaRouterIntegrationIncognitoBrowserTest, Basic) {
-  RunBasicTest();
-  // If we tear down before route observers are notified of route termination,
-  // MediaRouter will create another TerminateRoute() request which will have a
-  // dangling Mojo callback at shutdown. So we must wait for the update.
-  WaitUntilNoRoutes(GetActiveWebContents());
-}
-
-IN_PROC_BROWSER_TEST_P(MediaRouterIntegrationIncognitoBrowserTest,
-                       ReconnectSession) {
-  RunReconnectSessionTest();
-  // If we tear down before route observers are notified of route termination,
-  // MediaRouter will create another TerminateRoute() request which will have a
-  // dangling Mojo callback at shutdown. So we must wait for the update.
-  WaitUntilNoRoutes(GetActiveWebContents());
-}
-
 INSTANTIATE_MEDIA_ROUTER_INTEGRATION_BROWER_TEST_SUITE(
     MediaRouterIntegrationBrowserTest);
-INSTANTIATE_MEDIA_ROUTER_INTEGRATION_BROWER_TEST_SUITE(
-    MediaRouterIntegrationIncognitoBrowserTest);
 
 }  // namespace media_router

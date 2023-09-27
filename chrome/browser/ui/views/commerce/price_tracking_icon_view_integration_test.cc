@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -111,11 +111,11 @@ class PriceTrackingIconViewIntegrationTest : public TestWithBrowserView {
 
   void SimulateSubscriptionChangeEvent(bool is_subscribed) {
     if (is_subscribed) {
-      GetTabHelper()->OnSubscribe({commerce::CreateUserTrackedSubscription(0L)},
+      GetTabHelper()->OnSubscribe(commerce::CreateUserTrackedSubscription(0L),
                                   true);
     } else {
-      GetTabHelper()->OnUnsubscribe(
-          {commerce::CreateUserTrackedSubscription(0L)}, true);
+      GetTabHelper()->OnUnsubscribe(commerce::CreateUserTrackedSubscription(0L),
+                                    true);
     }
   }
 
@@ -142,7 +142,7 @@ class PriceTrackingIconViewIntegrationTest : public TestWithBrowserView {
   MockShoppingListUiTabHelper* GetTabHelper() { return mock_tab_helper_.get(); }
 
  protected:
-  raw_ptr<MockShoppingListUiTabHelper> mock_tab_helper_;
+  raw_ptr<MockShoppingListUiTabHelper, DanglingUntriaged> mock_tab_helper_;
   base::UserActionTester user_action_tester_;
 
  private:

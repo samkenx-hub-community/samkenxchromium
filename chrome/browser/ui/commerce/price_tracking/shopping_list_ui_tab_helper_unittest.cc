@@ -7,10 +7,15 @@
 
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "chrome/browser/ui/commerce/price_tracking/shopping_list_ui_tab_helper.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_entry.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_registry.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_util.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/test/test_bookmark_client.h"
+#include "components/commerce/core/commerce_feature_list.h"
 #include "components/commerce/core/mock_shopping_service.h"
 #include "components/commerce/core/shopping_service.h"
 #include "components/commerce/core/subscriptions/commerce_subscription.h"
@@ -19,6 +24,7 @@
 #include "content/public/browser/navigation_details.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_task_environment.h"
+#include "content/public/test/navigation_simulator.h"
 #include "content/public/test/test_web_contents_factory.h"
 #include "content/public/test/web_contents_tester.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -35,16 +41,25 @@ namespace {
 const char kProductUrl[] = "http://example.com";
 const char kProductImageUrl[] = "http://example.com/image.png";
 const uint64_t kClusterId = 12345L;
+const char kProductClusterTitle[] = "Product Cluster Title";
 
-// Build a ProductInfo with the specified cluster ID and image URL. If the image
-// URL is not specified, it is left empty in the info object.
-absl::optional<ProductInfo> CreateProductInfo(uint64_t cluster_id,
-                                              const GURL& url = GURL()) {
+// Build a ProductInfo with the specified cluster ID, image URL and cluster
+// title.
+//   * If the image URL is not specified, it is left empty in the info object.
+//   * If the cluster_title is not specified, it is left empty in the info
+//   object.
+absl::optional<ProductInfo> CreateProductInfo(
+    uint64_t cluster_id,
+    const GURL& url = GURL(),
+    const std::string cluster_title = std::string()) {
   absl::optional<ProductInfo> info;
   info.emplace();
   info->product_cluster_id = cluster_id;
   if (!url.is_empty()) {
     info->image_url = url;
+  }
+  if (!cluster_title.empty()) {
+    info->product_cluster_title = cluster_title;
   }
   return info;
 }
@@ -75,6 +90,7 @@ class ShoppingListUiTabHelperTest : public testing::Test {
 
   void TearDown() override {
     // Make sure the tab helper id destroyed before any of its dependencies are.
+    tab_helper_ = nullptr;
     web_contents_->RemoveUserData(ShoppingListUiTabHelper::UserDataKey());
   }
 
@@ -96,12 +112,12 @@ class ShoppingListUiTabHelperTest : public testing::Test {
   }
 
   void SimulateNavigationCommitted(const GURL& url) {
-    content::WebContentsTester::For(web_contents_.get())
-        ->SetLastCommittedURL(url);
+    auto* web_content_tester =
+        content::WebContentsTester::For(web_contents_.get());
+    web_content_tester->SetLastCommittedURL(url);
+    web_content_tester->NavigateAndCommit(url);
+    web_content_tester->TestDidFinishLoad(url);
 
-    content::LoadCommittedDetails details;
-    details.is_in_active_page = true;
-    tab_helper_->NavigationEntryCommitted(details);
     base::RunLoop().RunUntilIdle();
   }
 
@@ -116,17 +132,36 @@ class ShoppingListUiTabHelperTest : public testing::Test {
     return tab_helper_->GetPendingTrackingStateForTesting();
   }
 
+  void EnableChipExperimentVariation(
+      base::test::ScopedFeatureList& feature_list,
+      commerce::PriceTrackingChipExperimentVariation variation) {
+    int variation_num = static_cast<int>(variation);
+    std::vector<base::test::FeatureRefAndParams> enabled_features;
+    base::FieldTrialParams chip_experiment_param;
+    chip_experiment_param
+        [commerce::kCommercePriceTrackingChipExperimentVariationParam] =
+            base::NumberToString(variation_num);
+    enabled_features.emplace_back(
+        commerce::kCommercePriceTrackingChipExperiment, chip_experiment_param);
+    feature_list.InitWithFeaturesAndParameters(enabled_features,
+                                               /*disabled_features*/ {});
+  }
+
  protected:
-  base::raw_ptr<ShoppingListUiTabHelper> tab_helper_;
+  raw_ptr<ShoppingListUiTabHelper> tab_helper_;
   std::unique_ptr<MockShoppingService> shopping_service_;
   std::unique_ptr<bookmarks::BookmarkModel> bookmark_model_;
   std::unique_ptr<image_fetcher::MockImageFetcher> image_fetcher_;
-  base::raw_ptr<content::WebContents> web_contents_;
 
  private:
   content::BrowserTaskEnvironment task_environment_;
   TestingProfile profile_;
+
+  // Must outlive `web_contents_`.
   content::TestWebContentsFactory test_web_contents_factory_;
+
+ protected:
+  raw_ptr<content::WebContents> web_contents_;
 };
 
 TEST_F(ShoppingListUiTabHelperTest, TestSubscriptionEventsUpdateState) {
@@ -140,18 +175,20 @@ TEST_F(ShoppingListUiTabHelperTest, TestSubscriptionEventsUpdateState) {
 
   shopping_service_->SetResponseForGetProductInfoForUrl(info);
   shopping_service_->SetIsSubscribedCallbackValue(true);
+  shopping_service_->SetIsClusterIdTrackedByUserResponse(true);
 
   SimulateNavigationCommitted(GURL(kProductUrl));
 
   // First ensure that subscribe is successful.
-  tab_helper_->OnSubscribe({CreateUserTrackedSubscription(kClusterId)}, true);
+  tab_helper_->OnSubscribe(CreateUserTrackedSubscription(kClusterId), true);
   base::RunLoop().RunUntilIdle();
 
   ASSERT_TRUE(tab_helper_->IsPriceTracking());
 
   // Now assume the user has unsubscribed again.
   shopping_service_->SetIsSubscribedCallbackValue(false);
-  tab_helper_->OnUnsubscribe({CreateUserTrackedSubscription(kClusterId)}, true);
+  shopping_service_->SetIsClusterIdTrackedByUserResponse(false);
+  tab_helper_->OnUnsubscribe(CreateUserTrackedSubscription(kClusterId), true);
   base::RunLoop().RunUntilIdle();
 
   ASSERT_FALSE(tab_helper_->IsPriceTracking());
@@ -159,7 +196,8 @@ TEST_F(ShoppingListUiTabHelperTest, TestSubscriptionEventsUpdateState) {
 
 // The price tracking icon shouldn't be available if no image URL was provided
 // by the shopping service.
-TEST_F(ShoppingListUiTabHelperTest, TestIconAvailabilityIfNoImage) {
+TEST_F(ShoppingListUiTabHelperTest,
+       TestPriceTrackingIconAvailabilityIfNoImage) {
   ASSERT_FALSE(tab_helper_->IsPriceTracking());
 
   AddProductBookmark(bookmark_model_.get(), u"title", GURL(kProductUrl),
@@ -184,7 +222,8 @@ TEST_F(ShoppingListUiTabHelperTest, TestIconAvailabilityIfNoImage) {
 
 // The price tracking state should not update in the helper if there is no image
 // returbed by the shopping service.
-TEST_F(ShoppingListUiTabHelperTest, TestIconAvailabilityWithImage) {
+TEST_F(ShoppingListUiTabHelperTest,
+       TestPriceTrackingIconAvailabilityWithImage) {
   ASSERT_FALSE(tab_helper_->IsPriceTracking());
 
   AddProductBookmark(bookmark_model_.get(), u"title", GURL(kProductUrl),
@@ -217,6 +256,7 @@ TEST_F(ShoppingListUiTabHelperTest,
 
   shopping_service_->SetResponseForGetProductInfoForUrl(info);
   shopping_service_->SetIsSubscribedCallbackValue(false);
+  shopping_service_->SetIsClusterIdTrackedByUserResponse(false);
   shopping_service_->SetSubscribeCallbackValue(true);
 
   SimulateNavigationCommitted(GURL(kProductUrl));
@@ -230,6 +270,7 @@ TEST_F(ShoppingListUiTabHelperTest,
                 testing::_))
       .Times(1);
 
+  shopping_service_->SetIsClusterIdTrackedByUserResponse(true);
   tab_helper_->SetPriceTrackingState(true, true, base::DoNothing());
   ASSERT_TRUE(GetPendingTrackingStateForTesting().has_value());
   ASSERT_TRUE(GetPendingTrackingStateForTesting().value());
@@ -271,6 +312,186 @@ TEST_F(ShoppingListUiTabHelperTest, TestSubscriptionChangeNoBookmark) {
   // We should still be price tracking, but there should no longer be a pending
   // value.
   ASSERT_FALSE(tab_helper_->IsPriceTracking());
+}
+
+// The following tests are for the chip experiment - chip delay variation.
+TEST_F(ShoppingListUiTabHelperTest,
+       TestPriceTrackingIconAvailableAfterLoading) {
+  base::test::ScopedFeatureList feature_list;
+  EnableChipExperimentVariation(
+      feature_list, commerce::PriceTrackingChipExperimentVariation::kDelayChip);
+  ASSERT_FALSE(tab_helper_->IsPriceTracking());
+
+  AddProductBookmark(bookmark_model_.get(), u"title", GURL(kProductUrl),
+                     kClusterId, true);
+
+  absl::optional<ProductInfo> info =
+      CreateProductInfo(kClusterId, GURL(kProductImageUrl));
+  SetupImageFetcherForSimpleImage();
+
+  shopping_service_->SetIsShoppingListEligible(true);
+  shopping_service_->SetResponseForGetProductInfoForUrl(info);
+  // Simulate the navigation is committed and has stopped loading.
+  auto simulator = content::NavigationSimulator::CreateBrowserInitiated(
+      GURL(kProductUrl), web_contents_);
+  simulator->SetKeepLoading(false);
+  simulator->Start();
+  simulator->Commit();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(tab_helper_->GetProductImage().IsEmpty());
+  EXPECT_TRUE(tab_helper_->ShouldShowPriceTrackingIconView());
+}
+
+TEST_F(ShoppingListUiTabHelperTest,
+       TestPriceTrackingIconNotAvailableDuringLoading) {
+  base::test::ScopedFeatureList feature_list;
+  EnableChipExperimentVariation(
+      feature_list, commerce::PriceTrackingChipExperimentVariation::kDelayChip);
+  ASSERT_FALSE(tab_helper_->IsPriceTracking());
+
+  AddProductBookmark(bookmark_model_.get(), u"title", GURL(kProductUrl),
+                     kClusterId, true);
+
+  absl::optional<ProductInfo> info =
+      CreateProductInfo(kClusterId, GURL(kProductImageUrl));
+  SetupImageFetcherForSimpleImage();
+
+  shopping_service_->SetIsShoppingListEligible(true);
+  shopping_service_->SetResponseForGetProductInfoForUrl(info);
+
+  // Simulate the navigation is committed but has not stopped loading.
+  auto simulator = content::NavigationSimulator::CreateBrowserInitiated(
+      GURL(kProductUrl), web_contents_);
+  simulator->SetKeepLoading(true);
+  simulator->Start();
+  simulator->Commit();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(tab_helper_->GetProductImage().IsEmpty());
+  EXPECT_FALSE(tab_helper_->ShouldShowPriceTrackingIconView());
+}
+
+TEST_F(ShoppingListUiTabHelperTest, TestShoppingInsightsSidePanelAvailable) {
+  ASSERT_FALSE(SidePanelRegistry::Get(web_contents_.get())
+                   ->GetEntryForKey(SidePanelEntry::Key(
+                       SidePanelEntry::Id::kShoppingInsights)));
+
+  shopping_service_->SetIsPriceInsightsEligible(true);
+
+  absl::optional<ProductInfo> product_info = CreateProductInfo(
+      kClusterId, GURL(kProductImageUrl), kProductClusterTitle);
+  shopping_service_->SetResponseForGetProductInfoForUrl(product_info);
+
+  absl::optional<PriceInsightsInfo> price_insights_info =
+      CreateValidPriceInsightsInfo(true, true, PriceBucket::kLowPrice);
+  shopping_service_->SetResponseForGetPriceInsightsInfoForUrl(
+      price_insights_info);
+
+  SimulateNavigationCommitted(GURL(kProductUrl));
+
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_TRUE(SidePanelRegistry::Get(web_contents_.get())
+                  ->GetEntryForKey(SidePanelEntry::Key(
+                      SidePanelEntry::Id::kShoppingInsights)));
+}
+
+TEST_F(ShoppingListUiTabHelperTest, TestShoppingInsightsSidePanelUnavailable) {
+  ASSERT_FALSE(SidePanelRegistry::Get(web_contents_.get())
+                   ->GetEntryForKey(SidePanelEntry::Key(
+                       SidePanelEntry::Id::kShoppingInsights)));
+
+  shopping_service_->SetResponseForGetProductInfoForUrl(absl::nullopt);
+  shopping_service_->SetIsPriceInsightsEligible(true);
+
+  SimulateNavigationCommitted(GURL(kProductUrl));
+
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_FALSE(SidePanelRegistry::Get(web_contents_.get())
+                   ->GetEntryForKey(SidePanelEntry::Key(
+                       SidePanelEntry::Id::kShoppingInsights)));
+}
+
+TEST_F(ShoppingListUiTabHelperTest,
+       TestPriceInsightsIconNotAvailableIfEmptyProductInfo) {
+  shopping_service_->SetIsPriceInsightsEligible(true);
+  shopping_service_->SetResponseForGetProductInfoForUrl(absl::nullopt);
+
+  SimulateNavigationCommitted(GURL(kProductUrl));
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_FALSE(tab_helper_->ShouldShowPriceInsightsIconView());
+}
+
+TEST_F(ShoppingListUiTabHelperTest,
+       TestPriceInsightsIconNotAvailableIfNoProductClusterTitle) {
+  shopping_service_->SetIsPriceInsightsEligible(true);
+
+  absl::optional<ProductInfo> info =
+      CreateProductInfo(kClusterId, GURL(kProductImageUrl));
+  shopping_service_->SetResponseForGetProductInfoForUrl(info);
+
+  SimulateNavigationCommitted(GURL(kProductUrl));
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_FALSE(tab_helper_->ShouldShowPriceInsightsIconView());
+}
+
+TEST_F(ShoppingListUiTabHelperTest,
+       TestPriceInsightsIconAvailableAfterLoading) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeaturesAndParameters(
+      {{commerce::kPriceInsights,
+        {{commerce::kPriceInsightsDelayChipParam, "true"}}}},
+      {});
+
+  shopping_service_->SetIsPriceInsightsEligible(true);
+
+  absl::optional<ProductInfo> product_info = CreateProductInfo(
+      kClusterId, GURL(kProductImageUrl), kProductClusterTitle);
+  shopping_service_->SetResponseForGetProductInfoForUrl(product_info);
+
+  absl::optional<PriceInsightsInfo> price_insights_info =
+      CreateValidPriceInsightsInfo(true, true, PriceBucket::kLowPrice);
+  shopping_service_->SetResponseForGetPriceInsightsInfoForUrl(
+      price_insights_info);
+  // Simulate the navigation is committed and has stopped loading.
+  auto simulator = content::NavigationSimulator::CreateBrowserInitiated(
+      GURL(kProductUrl), web_contents_);
+  simulator->SetKeepLoading(false);
+  simulator->Start();
+  simulator->Commit();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(tab_helper_->ShouldShowPriceInsightsIconView());
+}
+
+TEST_F(ShoppingListUiTabHelperTest,
+       TestPriceInsightsIconNotAvailableDuringLoading) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeaturesAndParameters(
+      {{commerce::kPriceInsights,
+        {{commerce::kPriceInsightsDelayChipParam, "true"}}}},
+      {});
+
+  shopping_service_->SetIsPriceInsightsEligible(true);
+
+  absl::optional<ProductInfo> product_info = CreateProductInfo(
+      kClusterId, GURL(kProductImageUrl), kProductClusterTitle);
+  shopping_service_->SetResponseForGetProductInfoForUrl(product_info);
+
+  absl::optional<PriceInsightsInfo> price_insights_info =
+      CreateValidPriceInsightsInfo(true, true, PriceBucket::kLowPrice);
+  shopping_service_->SetResponseForGetPriceInsightsInfoForUrl(
+      price_insights_info);
+
+  // Simulate the navigation is committed but has not stopped loading.
+  auto simulator = content::NavigationSimulator::CreateBrowserInitiated(
+      GURL(kProductUrl), web_contents_);
+  simulator->SetKeepLoading(true);
+  simulator->Start();
+  simulator->Commit();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(tab_helper_->ShouldShowPriceInsightsIconView());
 }
 
 }  // namespace commerce

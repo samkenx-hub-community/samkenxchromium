@@ -2,10 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+import {NetworkTestRunner} from 'network_test_runner';
+
+import * as Common from 'devtools/core/common/common.js';
+
 (async function() {
   TestRunner.addResult(`Tests that XMLHttpRequest Logging works when Enabled and doesn't show logs when Disabled.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
-  await TestRunner.loadTestModule('network_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.evaluateInPagePromise(`
       function requestHelper(method, url)
       {
@@ -14,8 +19,8 @@
           makeSimpleXHR(method, url, false);
       }
   `);
-  Common.settingForTest('consoleGroupSimilar').set(false);
-  Common.settingForTest('monitoringXHREnabled').set(true);
+  Common.Settings.settingForTest('consoleGroupSimilar').set(false);
+  Common.Settings.settingForTest('monitoringXHREnabled').set(true);
 
   TestRunner.evaluateInPage(`requestHelper('GET', 'resources/xhr-exists.html')`);
   await ConsoleTestRunner.waitForConsoleMessagesPromise(2);
@@ -41,7 +46,7 @@
   SDK.ConsoleModel.requestClearMessages();
   TestRunner.addResult('');
 
-  Common.settingForTest('monitoringXHREnabled').set(false);
+  Common.Settings.settingForTest('monitoringXHREnabled').set(false);
 
   TestRunner.evaluateInPageAsync(`requestHelper('GET', 'resources/xhr-exists.html')`);
   await ConsoleTestRunner.waitForConsoleMessagesPromise(1);

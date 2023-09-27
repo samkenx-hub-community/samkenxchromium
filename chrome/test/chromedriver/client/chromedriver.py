@@ -103,7 +103,7 @@ class ChromeDriver(object):
             for p in processes:
               p.terminate()
 
-            gone, alive = psutil.wait_procs(processes, timeout=3)
+            _, alive = psutil.wait_procs(processes, timeout=3)
             if len(alive):
               print('Killing', len(alive), 'processes')
               for p in alive:
@@ -136,6 +136,7 @@ class ChromeDriver(object):
     self._executor = command_executor.CommandExecutor(server_url)
     self._server_url = server_url
     self.w3c_compliant = False
+    self.debuggerAddress = None
 
     options = {}
 
@@ -208,7 +209,6 @@ class ChromeDriver(object):
       assert type(devtools_events_to_log) is list
       options['devToolsEventsToLog'] = devtools_events_to_log
 
-    download_prefs = {}
     if download_dir:
       if 'prefs' not in options:
         options['prefs'] = {}
@@ -262,8 +262,10 @@ class ChromeDriver(object):
       self.w3c_compliant = True
       self._session_id = response['value']['sessionId']
       self.capabilities = self._UnwrapValue(response['value']['capabilities'])
-      self.debuggerAddress = str(
-          self.capabilities['goog:chromeOptions']['debuggerAddress'])
+      if ('goog:chromeOptions' in self.capabilities
+          and 'debuggerAddress' in self.capabilities['goog:chromeOptions']):
+          self.debuggerAddress = str(
+              self.capabilities['goog:chromeOptions']['debuggerAddress'])
     elif isinstance(response['status'], int):
       self.w3c_compliant = False
       self._session_id = response['sessionId']
@@ -442,7 +444,8 @@ class ChromeDriver(object):
     # make sure that we have ms on the both sides of inequality
     if (self._executor.HttpTimeout() * 500 < max_kv[1]):
       raise ChromeDriverException(
-        'Timeout "%s" for ChromeDriver exceeds 50%% of the HTTP connection timeout'
+        'Timeout "%s" for ChromeDriver exceeds 50%% of the '
+            'HTTP connection timeout'
          % max_kv[0])
     return self.ExecuteCommand(Command.SET_TIMEOUTS, params)
 
@@ -735,6 +738,33 @@ class ChromeDriver(object):
   def SetRPHRegistrationMode(self, mode):
     params = {'mode': mode}
     return self.ExecuteCommand(Command.SET_RPH_REGISTRATION_MODE, params)
+
+  def CancelFedCmDialog(self):
+    return self.ExecuteCommand(Command.CANCEL_FEDCM_DIALOG, {})
+
+  def SelectAccount(self, index):
+    params = {'accountIndex': index}
+    return self.ExecuteCommand(Command.SELECT_ACCOUNT, params)
+
+  def ConfirmIdpSignin(self, vendorId):
+    params = {'vendorId': vendorId}
+    return self.ExecuteCommand(Command.CONFIRM_IDP_SIGNIN, params)
+
+  def GetAccounts(self):
+    return self.ExecuteCommand(Command.GET_ACCOUNTS, {})
+
+  def GetFedCmTitle(self):
+    return self.ExecuteCommand(Command.GET_FEDCM_TITLE, {})
+
+  def GetDialogType(self):
+    return self.ExecuteCommand(Command.GET_DIALOG_TYPE, {})
+
+  def SetDelayEnabled(self, enabled):
+    params = {'enabled': enabled}
+    return self.ExecuteCommand(Command.SET_DELAY_ENABLED, params)
+
+  def ResetCooldown(self):
+    return self.ExecuteCommand(Command.RESET_COOLDOWN, {})
 
   def GetSessionId(self):
     if not hasattr(self, '_session_id'):

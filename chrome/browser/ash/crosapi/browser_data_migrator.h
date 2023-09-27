@@ -11,6 +11,7 @@
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
 #include "chrome/browser/ash/crosapi/browser_data_migrator_util.h"
@@ -31,16 +32,6 @@ namespace ash {
 // 3. Restart ash to run migration.
 // 4. Restart ash again to show the home screen.
 constexpr char kMigrationStep[] = "ash.browser_data_migrator.migration_step";
-
-// Local state pref name to keep track of the number of migration attempts a
-// user has gone through before. It is a dictionary of the form
-// `{<user_id_hash>: <count>}`.
-constexpr char kMigrationAttemptCountPref[] =
-    "ash.browser_data_migrator.migration_attempt_count";
-
-// Maximum number of migration attempts. Migration will be skipped for the user
-// after
-constexpr int kMaxMigrationAttemptCount = 3;
 
 // Injects the restart function called from
 // `BrowserDataMigratorImpl::AttemptRestart()` in RAII manner.
@@ -76,11 +67,9 @@ class BrowserDataMigrator {
 
   virtual ~BrowserDataMigrator() = default;
 
-  // Carries out the migration with the mode specified by `MigrationMode`. It
-  // needs to be called on UI thread. |callback| will be called on the end of
-  // the migration procedure.
-  virtual void Migrate(crosapi::browser_util::MigrationMode mode,
-                       MigrateCallback callback) = 0;
+  // Carries out the migration. It needs to be called on UI thread. |callback|
+  // will be called at the end of the migration procedure.
+  virtual void Migrate(MigrateCallback callback) = 0;
 
   // Cancels the migration. This should be called on UI thread.
   // If this is called during the migration, it is expected that |callback|
@@ -179,8 +168,7 @@ class BrowserDataMigratorImpl : public BrowserDataMigrator {
       base::OnceCallback<void(bool, const absl::optional<uint64_t>&)> callback);
 
   // `BrowserDataMigrator` methods.
-  void Migrate(crosapi::browser_util::MigrationMode mode,
-               MigrateCallback callback) override;
+  void Migrate(MigrateCallback callback) override;
   void Cancel() override;
 
   // Registers boolean pref `kCheckForMigrationOnRestart` with default as false.
@@ -189,15 +177,7 @@ class BrowserDataMigratorImpl : public BrowserDataMigrator {
   // Clears the value of `kMigrationStep` in Local State.
   static void ClearMigrationStep(PrefService* local_state);
 
-  // Resets the number of migration attempts for the user stored in
-  // `kMigrationAttemptCountPref.
-  static void ClearMigrationAttemptCountForUser(
-      PrefService* local_state,
-      const std::string& user_id_hash);
-
  private:
-  FRIEND_TEST_ALL_PREFIXES(BrowserDataMigratorImplTest,
-                           ManipulateMigrationAttemptCount);
   FRIEND_TEST_ALL_PREFIXES(BrowserDataMigratorImplTest, Migrate);
   FRIEND_TEST_ALL_PREFIXES(BrowserDataMigratorImplTest, MigrateCancelled);
   FRIEND_TEST_ALL_PREFIXES(BrowserDataMigratorImplTest, MigrateOutOfDisk);
@@ -205,6 +185,10 @@ class BrowserDataMigratorImpl : public BrowserDataMigrator {
                            MaybeRestartToMigrateWithMigrationStep);
   FRIEND_TEST_ALL_PREFIXES(BrowserDataMigratorRestartTest,
                            MaybeRestartToMigrateMoveAfterCopy);
+  FRIEND_TEST_ALL_PREFIXES(BrowserDataMigratorRestartTest,
+                           MaybeRestartToMigrateSecondaryUser);
+  FRIEND_TEST_ALL_PREFIXES(BrowserDataMigratorRestartTest,
+                           MaybeRestartToMigrateWithMaximumRetryAttempts);
 
   // The common implementation of `MaybeRestartToMigrate` and
   // `MaybeRestartToMigrateWithDiskCheck`.
@@ -226,18 +210,6 @@ class BrowserDataMigratorImpl : public BrowserDataMigrator {
   // Gets the value of `kMigrationStep` in Local State.
   static MigrationStep GetMigrationStep(PrefService* local_state);
 
-  // Increments the migration attempt count stored in
-  // `kMigrationAttemptCountPref` by 1 for the user identified by
-  // `user_id_hash`.
-  static void UpdateMigrationAttemptCountForUser(
-      PrefService* local_state,
-      const std::string& user_id_hash);
-
-  // Gets the number of migration attempts for the user stored in
-  // `kMigrationAttemptCountPref.
-  static int GetMigrationAttemptCountForUser(PrefService* local_state,
-                                             const std::string& user_id_hash);
-
   // Called from `MaybeRestartToMigrate()` to proceed with restarting to start
   // the migration. It returns true if D-Bus call was successful.
   static bool RestartToMigrate(
@@ -247,9 +219,7 @@ class BrowserDataMigratorImpl : public BrowserDataMigrator {
       crosapi::browser_util::PolicyInitState policy_init_state);
 
   // Called on UI thread once migration is finished.
-  void MigrateInternalFinishedUIThread(
-      crosapi::browser_util::MigrationMode mode,
-      MigrationResult result);
+  void MigrateInternalFinishedUIThread(MigrationResult result);
 
   // Path to the original profile data directory, which is directly under the
   // user data directory.
@@ -265,7 +235,7 @@ class BrowserDataMigratorImpl : public BrowserDataMigrator {
   // can check if migration is cancelled or not.
   scoped_refptr<browser_data_migrator_util::CancelFlag> cancel_flag_;
   // Local state prefs, not owned.
-  PrefService* local_state_ = nullptr;
+  raw_ptr<PrefService, ExperimentalAsh> local_state_ = nullptr;
   std::unique_ptr<MigratorDelegate> migrator_delegate_;
 
   SEQUENCE_CHECKER(sequence_checker_);

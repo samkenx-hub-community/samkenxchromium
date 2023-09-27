@@ -11,13 +11,16 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
+#include "cc/paint/filter_operations.h"
 #include "cc/slim/filter.h"
 #include "cc/slim/frame_data.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/gfx/geometry/linear_gradient.h"
 #include "ui/gfx/geometry/point3_f.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
 
@@ -191,9 +194,30 @@ class COMPONENT_EXPORT(CC_SLIM) Layer : public base::RefCounted<Layer> {
   // opacity blending, so always prefer to use additional layers if possible.
   void SetFilters(std::vector<Filter> filters);
 
+  // Set the rounded corner radii in layer space (same as `SetBounds`). It
+  // is applied to the layer and its subtree. Setting this to non-empty also has
+  // similar effect as `SetMasksToBounds(true)` that the subtree is clipped to
+  // its bounds (with rounded corner).
+  // This is stored in the same structure as `SetGradientMask`. It is more
+  // efficient to avoid setting multiple rounded corner or linear gradient in
+  // the same subtree.
+  void SetRoundedCorner(const gfx::RoundedCornersF& corner_radii);
+  const gfx::RoundedCornersF& corner_radii() const;
+
+  // Set the linear gradient mask, applied to this layer's bounds. It is applied
+  // to the layer and its subtree. Setting this to non-empty also has similar
+  // effect as `SetMasksToBounds(true)` that the subtree is clipped to its
+  // bounds.
+  // This is stored in the same structure as `SetRoundedCorner`. It is more
+  // efficient to avoid setting multiple rounded corner or linear gradient in
+  // the same subtree.
+  void SetGradientMask(const gfx::LinearGradient& gradient_mask);
+  const gfx::LinearGradient& gradient_mask() const;
+
  protected:
   friend class LayerTreeCcWrapper;
   friend class LayerTreeImpl;
+  friend class SlimLayerTest;
 
   explicit Layer(scoped_refptr<cc::Layer> cc_layer);
   virtual ~Layer();
@@ -202,9 +226,17 @@ class COMPONENT_EXPORT(CC_SLIM) Layer : public base::RefCounted<Layer> {
   gfx::Transform ComputeTransformToParent() const;
   absl::optional<gfx::Transform> ComputeTransformFromParent() const;
   bool HasFilters() const;
+  cc::FilterOperations GetFilters() const;
+  bool HasNonTrivialMaskFilterInfo() const;
   // This method counts this layer, This is different from
   // `NumDescendantsThatDrawContent` which counts descendent layers only.
   int GetNumDrawingLayersInSubtree() const;
+  // Note these `GetAndReset` methods may be skipped by LayerTree if LayerTree
+  // skips processing an entire subtree that includes this layer. If this layer
+  // is processed for a subsequent frame, an ancestor layer must have
+  // `subtree_property_changed_` that applies to this layer.
+  bool GetAndResetPropertyChanged();
+  bool GetAndResetSubtreePropertyChanged();
 
   void UpdateDrawsContent();
   virtual bool HasDrawableContent() const;
@@ -225,12 +257,17 @@ class COMPONENT_EXPORT(CC_SLIM) Layer : public base::RefCounted<Layer> {
                            float opacity);
   virtual viz::SharedQuadState* CreateAndAppendSharedQuadState(
       viz::CompositorRenderPass& render_pass,
+      FrameData& data,
       const gfx::Transform& transform_to_target,
       const gfx::Rect* clip_in_target,
       const gfx::Rect& visible_rect,
       float opacity);
 
-  void NotifyTreeChanged();
+  // Use `NotifyPropertyChanged` for a change that can only affect the contents
+  // of this layer, but not the contents of any layer in the parent or subtree.
+  // Otherwise use `NotifySubtreeChanged` which is applied recursively to the
+  // whole subtree at draw time.
+  void NotifySubtreeChanged();
   void NotifyPropertyChanged();
 
   const scoped_refptr<cc::Layer> cc_layer_;
@@ -260,6 +297,8 @@ class COMPONENT_EXPORT(CC_SLIM) Layer : public base::RefCounted<Layer> {
   gfx::Point3F transform_origin_;
 
   std::vector<Filter> filters_;
+  gfx::RoundedCornersF rounded_corners_;
+  gfx::LinearGradient gradient_mask_;
 
   SkColor4f background_color_ = SkColors::kTransparent;
   float opacity_ = 1.0f;
@@ -268,6 +307,13 @@ class COMPONENT_EXPORT(CC_SLIM) Layer : public base::RefCounted<Layer> {
   bool draws_content_ : 1;
   bool hide_layer_and_subtree_ : 1;
   bool masks_to_bounds_ : 1;
+
+  // Indicates there is damage for this layer.
+  bool property_changed_ : 1;
+  // Indicates there is damage for the entire subtree. This is tracked
+  // only at the root of the subtree, and is applied recursively to the entire
+  // subtree at draw time.
+  bool subtree_property_changed_ : 1;
 };
 
 }  // namespace cc::slim

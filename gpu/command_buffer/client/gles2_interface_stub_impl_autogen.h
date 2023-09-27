@@ -1174,6 +1174,25 @@ void GLES2InterfaceStub::ReadbackARGBImagePixelsINTERNAL(
     GLint /* src_y */,
     GLint /* plane_index */,
     void* /* pixels */) {}
+void GLES2InterfaceStub::WritePixelsYUVINTERNAL(
+    const GLbyte* /* mailbox */,
+    GLuint /* src_size_plane1 */,
+    GLuint /* src_size_plane2 */,
+    GLuint /* src_size_plane3 */,
+    GLuint /* src_size_plane4 */,
+    GLuint /* src_width */,
+    GLuint /* src_height */,
+    GLuint /* src_plane_config */,
+    GLuint /* src_subsampling */,
+    GLuint /* src_datatype */,
+    GLuint /* src_row_bytes_plane1 */,
+    GLuint /* src_row_bytes_plane2 */,
+    GLuint /* src_row_bytes_plane3 */,
+    GLuint /* src_row_bytes_plane4 */,
+    const void* /* src_pixels_plane1 */,
+    const void* /* src_pixels_plane2 */,
+    const void* /* src_pixels_plane3 */,
+    const void* /* src_pixels_plane4 */) {}
 void GLES2InterfaceStub::EnableiOES(GLenum /* target */, GLuint /* index */) {}
 void GLES2InterfaceStub::DisableiOES(GLenum /* target */, GLuint /* index */) {}
 void GLES2InterfaceStub::BlendEquationiOES(GLuint /* buf */,
@@ -1223,6 +1242,8 @@ void GLES2InterfaceStub::EndPixelLocalStorageANGLE(
     GLsizei /* count */,
     const GLenum* /* storeops */) {}
 void GLES2InterfaceStub::PixelLocalStorageBarrierANGLE() {}
+void GLES2InterfaceStub::FramebufferPixelLocalStorageInterruptANGLE() {}
+void GLES2InterfaceStub::FramebufferPixelLocalStorageRestoreANGLE() {}
 void GLES2InterfaceStub::GetFramebufferPixelLocalStorageParameterfvANGLE(
     GLint /* plane */,
     GLenum /* pname */,
@@ -1231,4 +1252,11 @@ void GLES2InterfaceStub::GetFramebufferPixelLocalStorageParameterivANGLE(
     GLint /* plane */,
     GLenum /* pname */,
     GLint* /* params */) {}
+void GLES2InterfaceStub::ClipControlEXT(GLenum /* origin */,
+                                        GLenum /* depth */) {}
+void GLES2InterfaceStub::PolygonModeANGLE(GLenum /* face */,
+                                          GLenum /* mode */) {}
+void GLES2InterfaceStub::PolygonOffsetClampEXT(GLfloat /* factor */,
+                                               GLfloat /* units */,
+                                               GLfloat /* clamp */) {}
 #endif  // GPU_COMMAND_BUFFER_CLIENT_GLES2_INTERFACE_STUB_IMPL_AUTOGEN_H_

@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "base/functional/bind.h"
 #include "base/location.h"
@@ -15,11 +16,17 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chromeos/reporting/device_reporting_settings_lacros.h"
 #include "chrome/browser/chromeos/reporting/metric_default_utils.h"
+#include "chrome/browser/chromeos/reporting/metric_reporting_prefs.h"
 #include "chrome/browser/chromeos/reporting/network/network_bandwidth_sampler.h"
+#include "chrome/browser/chromeos/reporting/user_reporting_settings.h"
+#include "chrome/browser/chromeos/reporting/websites/website_events_observer.h"
+#include "chrome/browser/chromeos/reporting/websites/website_metrics_retriever_lacros.h"
 #include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "chrome/browser/profiles/profile_keyed_service_factory.h"
 #include "chromeos/lacros/lacros_service.h"
 #include "components/policy/policy_constants.h"
+#include "components/reporting/proto/synced/record.pb.h"
+#include "components/version_info/version_info.h"
 
 namespace reporting::metrics {
 namespace {
@@ -133,8 +140,11 @@ MetricReportingManagerLacros::MetricReportingManagerLacros(
     : profile_(profile),
       delegate_(std::move(delegate)),
       device_reporting_settings_(delegate_->CreateDeviceReportingSettings()),
+      user_reporting_settings_(
+          std::make_unique<UserReportingSettings>(profile_->GetWeakPtr())),
       is_device_deprovisioned_(false) {
-  if (!delegate_->IsAffiliated(profile_)) {
+  CHECK_NE(profile, nullptr);
+  if (!delegate_->IsUserAffiliated(*profile_)) {
     // We only report data for affiliated users on managed devices as of today.
     return;
   }
@@ -154,15 +164,26 @@ MetricReportingManagerLacros::MetricReportingManagerLacros(
           return;
         }
 
+        SourceInfo source_info;
+        source_info.set_source(SourceInfo::LACROS);
+        source_info.set_source_version(
+            std::string(::version_info::GetVersionNumber()));
         instance->telemetry_report_queue_ =
             instance->delegate_->CreatePeriodicUploadReportQueue(
                 EventType::kUser, Destination::TELEMETRY_METRIC,
                 Priority::MANUAL_BATCH_LACROS,
                 instance->device_reporting_settings_.get(),
                 ::policy::key::kReportUploadFrequency,
-                GetDefaultReportUploadFrequency());
+                GetDefaultReportUploadFrequency(),
+                /*rate_unit_to_ms=*/1, source_info);
+        instance->event_report_queue_ =
+            instance->delegate_->CreateMetricReportQueue(
+                EventType::kUser, Destination::EVENT_METRIC,
+                Priority::SLOW_BATCH, /*rate_limiter=*/nullptr,
+                std::move(source_info));
 
         instance->delegate_->RegisterObserverWithCrosApiClient(instance.get());
+        instance->Init();
         instance->delayed_init_timer_.Start(
             FROM_HERE, instance->delegate_->GetInitDelay(),
             base::BindOnce(&MetricReportingManagerLacros::DelayedInit,
@@ -196,8 +217,18 @@ void MetricReportingManagerLacros::OnDeviceSettingsUpdated() {
 void MetricReportingManagerLacros::Shutdown() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   samplers_.clear();
+  event_observer_managers_.clear();
   periodic_collectors_.clear();
+  event_report_queue_.reset();
   telemetry_report_queue_.reset();
+}
+
+void MetricReportingManagerLacros::Init() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (is_device_deprovisioned_) {
+    return;
+  }
+  InitWebsiteMetricCollectors();
 }
 
 void MetricReportingManagerLacros::DelayedInit() {
@@ -215,7 +246,7 @@ void MetricReportingManagerLacros::DelayedInit() {
 void MetricReportingManagerLacros::InitNetworkCollectors() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   auto network_bandwidth_sampler = std::make_unique<NetworkBandwidthSampler>(
-      g_browser_process->network_quality_tracker(), profile_);
+      g_browser_process->network_quality_tracker(), profile_->GetWeakPtr());
 
   // Network bandwidth telemetry.
   InitPeriodicCollector(
@@ -224,6 +255,21 @@ void MetricReportingManagerLacros::InitNetworkCollectors() {
       kReportDeviceNetworkStatusDefaultValue,
       ::policy::key::kReportDeviceNetworkTelemetryCollectionRateMs,
       GetDefaultCollectionRate(kDefaultNetworkTelemetryCollectionRate));
+}
+
+void MetricReportingManagerLacros::InitWebsiteMetricCollectors() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  auto website_metrics_retriever =
+      std::make_unique<WebsiteMetricsRetrieverLacros>(profile_->GetWeakPtr());
+  auto website_events_observer = std::make_unique<WebsiteEventsObserver>(
+      std::move(website_metrics_retriever), user_reporting_settings_.get());
+
+  // Website events observer.
+  InitEventObserverManager(
+      std::move(website_events_observer), event_report_queue_.get(),
+      user_reporting_settings_.get(), kReportWebsiteActivityAllowlist,
+      kReportWebsiteActivityEnabledDefaultValue,
+      /*init_delay=*/base::TimeDelta());
 }
 
 void MetricReportingManagerLacros::InitPeriodicCollector(
@@ -244,6 +290,23 @@ void MetricReportingManagerLacros::InitPeriodicCollector(
       sampler_ptr, metric_report_queue, device_reporting_settings_.get(),
       enable_setting_path, setting_enabled_default_value, rate_setting_path,
       default_rate, rate_unit_to_ms));
+}
+
+void MetricReportingManagerLacros::InitEventObserverManager(
+    std::unique_ptr<MetricEventObserver> event_observer,
+    MetricReportQueue* metric_report_queue,
+    ReportingSettings* reporting_settings,
+    const std::string& enable_setting_path,
+    bool setting_enabled_default_value,
+    base::TimeDelta init_delay) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!metric_report_queue) {
+    return;
+  }
+  event_observer_managers_.emplace_back(delegate_->CreateEventObserverManager(
+      std::move(event_observer), metric_report_queue, reporting_settings,
+      enable_setting_path, setting_enabled_default_value,
+      /*collector_pool=*/nullptr, init_delay));
 }
 
 void MetricReportingManagerLacros::UploadTelemetry() {

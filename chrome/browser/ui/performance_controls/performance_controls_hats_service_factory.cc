@@ -26,7 +26,8 @@ PerformanceControlsHatsServiceFactory::PerformanceControlsHatsServiceFactory()
 
 PerformanceControlsHatsServiceFactory*
 PerformanceControlsHatsServiceFactory::GetInstance() {
-  return base::Singleton<PerformanceControlsHatsServiceFactory>::get();
+  static base::NoDestructor<PerformanceControlsHatsServiceFactory> instance;
+  return instance.get();
 }
 
 PerformanceControlsHatsService*
@@ -35,7 +36,8 @@ PerformanceControlsHatsServiceFactory::GetForProfile(Profile* profile) {
       GetInstance()->GetServiceForBrowserContext(profile, /*create=*/true));
 }
 
-KeyedService* PerformanceControlsHatsServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+PerformanceControlsHatsServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
   if (context->IsOffTheRecord() ||
       (!base::FeatureList::IsEnabled(
@@ -53,11 +55,6 @@ KeyedService* PerformanceControlsHatsServiceFactory::BuildServiceInstanceFor(
     return nullptr;
   }
 
-  // Restrict these surveys to users who have HighEfficiency mode available.
-  if (!base::FeatureList::IsEnabled(
-          performance_manager::features::kHighEfficiencyModeAvailable)) {
-    return nullptr;
-  }
   Profile* profile = Profile::FromBrowserContext(context);
 
   // If there is no HaTS service, or the HaTS service reports the user is not
@@ -72,5 +69,5 @@ KeyedService* PerformanceControlsHatsServiceFactory::BuildServiceInstanceFor(
     return nullptr;
   }
 
-  return new PerformanceControlsHatsService(profile);
+  return std::make_unique<PerformanceControlsHatsService>(profile);
 }

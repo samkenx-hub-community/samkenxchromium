@@ -13,9 +13,9 @@ import static org.junit.Assert.assertTrue;
 import android.app.NotificationChannel;
 import android.content.Context;
 import android.os.Build;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.annotation.RequiresApi;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
 
@@ -67,7 +67,7 @@ public class SiteChannelsManagerTest {
     public void setUp() {
         NativeLibraryTestUtils.loadNativeLibraryAndInitBrowserProcess();
 
-        Context mContext = InstrumentationRegistry.getTargetContext();
+        Context mContext = ApplicationProvider.getApplicationContext();
         NotificationManagerProxy notificationManagerProxy =
                 new NotificationManagerProxyImpl(mContext);
         clearExistingSiteChannels(notificationManagerProxy);

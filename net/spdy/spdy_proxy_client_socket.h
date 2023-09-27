@@ -100,8 +100,7 @@ class NET_EXPORT_PRIVATE SpdyProxyClientSocket : public ProxyClientSocket,
   void OnHeadersSent() override;
   void OnEarlyHintsReceived(const spdy::Http2HeaderBlock& headers) override;
   void OnHeadersReceived(
-      const spdy::Http2HeaderBlock& response_headers,
-      const spdy::Http2HeaderBlock* pushed_request_headers) override;
+      const spdy::Http2HeaderBlock& response_headers) override;
   void OnDataReceived(std::unique_ptr<SpdyBuffer> buffer) override;
   void OnDataSent() override;
   void OnTrailers(const spdy::Http2HeaderBlock& trailers) override;
@@ -121,9 +120,9 @@ class NET_EXPORT_PRIVATE SpdyProxyClientSocket : public ProxyClientSocket,
     STATE_CLOSED
   };
 
-  // Calls |callback.Run(result)|. Used to run a callback posted to the
+  // Calls `write_callback_(result)`. Used to run a callback posted to the
   // message loop.
-  void RunWriteCallback(CompletionOnceCallback callback, int result) const;
+  void RunWriteCallback(int result);
 
   void OnIOComplete(int result);
 
@@ -195,13 +194,7 @@ class NET_EXPORT_PRIVATE SpdyProxyClientSocket : public ProxyClientSocket,
   };
   EndStreamState end_stream_state_ = EndStreamState::kNone;
 
-  // The default weak pointer factory.
   base::WeakPtrFactory<SpdyProxyClientSocket> weak_factory_{this};
-
-  // Only used for posting write callbacks. Weak pointers created by this
-  // factory are invalidated in Disconnect().
-  base::WeakPtrFactory<SpdyProxyClientSocket> write_callback_weak_factory_{
-      this};
 };
 
 }  // namespace net

@@ -24,6 +24,8 @@
 #include "ash/strings/grit/ash_strings.h"
 #include "base/check.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/strings/string_util.h"
 #include "extensions/common/constants.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -57,8 +59,12 @@ struct RecentAppInfo {
   RecentAppInfo& operator=(RecentAppInfo&) = default;
   ~RecentAppInfo() = default;
 
-  AppListItem* item;
-  SearchResult* result;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter
+  // for: #constexpr-ctor-field-initializer
+  RAW_PTR_EXCLUSION AppListItem* item;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter
+  // for: #constexpr-ctor-field-initializer
+  RAW_PTR_EXCLUSION SearchResult* result;
 };
 
 // Returns a list of recent apps by filtering zero-state suggestion data.
@@ -146,8 +152,9 @@ class RecentAppsView::GridDelegateImpl : public AppListItemView::GridDelegate {
   }
 
  private:
-  AppListViewDelegate* const view_delegate_;
-  AppListItemView* selected_view_ = nullptr;
+  const raw_ptr<AppListViewDelegate, ExperimentalAsh> view_delegate_;
+  raw_ptr<AppListItemView, DanglingUntriaged | ExperimentalAsh> selected_view_ =
+      nullptr;
 };
 
 RecentAppsView::RecentAppsView(AppListKeyboardController* keyboard_controller,

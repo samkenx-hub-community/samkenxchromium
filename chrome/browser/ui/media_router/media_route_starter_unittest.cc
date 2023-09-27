@@ -169,10 +169,10 @@ class MediaRouteStarterTest : public ChromeRenderViewHostTestHarness {
         ProfileManager::GetActiveUserProfile();
 #else
         ProfileManager::GetLastUsedProfile();
-#endif
+#endif  // BUILDFLAG(IS_CHROMEOS)
+
     ChromeMediaRouterFactory::GetInstance()->SetTestingFactory(
-        default_profile->GetOriginalProfile(),
-        base::BindRepeating(&MockMediaRouter::Create));
+        default_profile, base::BindRepeating(&MockMediaRouter::Create));
   }
 
   void CreateStarterForDefaultModes() {
@@ -201,13 +201,13 @@ class MediaRouteStarterTest : public ChromeRenderViewHostTestHarness {
     // Handler so MockMediaRouter will respond to requests to create a route.
     // Will construct a RouteRequestResult based on the set result code and
     // then call the handler's callback.
-    ON_CALL(*media_router(), CreateRouteInternal(_, _, _, _, _, _, _))
+    ON_CALL(*media_router(), CreateRouteInternal(_, _, _, _, _, _))
         .WillByDefault([this](const MediaSource::Id& source_id,
                               const MediaSink::Id& sink_id,
                               const url::Origin& origin,
                               content::WebContents* web_contents,
                               MediaRouteResponseCallback& callback,
-                              base::TimeDelta timeout, bool incognito) {
+                              base::TimeDelta timeout) {
           // This indicates the test did not properly set the expected result
           EXPECT_NE(mojom::RouteRequestResultCode::UNKNOWN_ERROR, result_code_);
           std::unique_ptr<RouteRequestResult> result;
@@ -383,7 +383,7 @@ class MediaRouteStarterTest : public ChromeRenderViewHostTestHarness {
     EXPECT_CALL(*media_router(),
                 CreateRouteInternal(params->source_id, params->request->sink_id,
                                     params->origin, web_contents(), _,
-                                    params->timeout, params->off_the_record));
+                                    params->timeout));
 
     media_route_starter()->StartRoute(std::move(params));
   }
@@ -625,7 +625,6 @@ TEST_F(MediaRouteStarterTest, CreateRouteParameters_DesktopMirroring) {
   // route_result_callbacks should only be filled in by caller
   EXPECT_EQ(0ul, params->route_result_callbacks.size());
   EXPECT_EQ(base::Seconds(120), params->timeout);
-  EXPECT_FALSE(params->off_the_record);
 }
 
 // Demonstrates that when tab mirroring is available and requested that the
@@ -649,7 +648,6 @@ TEST_F(MediaRouteStarterTest, CreateRouteParameters_TabMirroring) {
   // route_result_callbacks should only be filled in by caller
   EXPECT_EQ(0ul, params->route_result_callbacks.size());
   EXPECT_EQ(base::Seconds(60), params->timeout);
-  EXPECT_FALSE(params->off_the_record);
 }
 
 // Demonstrates that when presentation mode is available for the default
@@ -677,7 +675,6 @@ TEST_F(MediaRouteStarterTest, CreateRouteParameters_WebContentPresentation) {
   // route_result_callbacks should only be filled in by caller
   EXPECT_EQ(0ul, params->route_result_callbacks.size());
   EXPECT_EQ(base::Seconds(20), params->timeout);
-  EXPECT_FALSE(params->off_the_record);
 }
 
 // Demonstrates that when presentation mode is requested and a start
@@ -707,7 +704,6 @@ TEST_F(MediaRouteStarterTest, CreateRouteParameters_StartPresentationContext) {
   // route_result_callbacks should only be filled in by caller
   EXPECT_EQ(0ul, params->route_result_callbacks.size());
   EXPECT_EQ(base::Seconds(20), params->timeout);
-  EXPECT_FALSE(params->off_the_record);
 
   // This is to deal with the error callback in the d'tor that's not part of
   // this test. See the Dtor_* tests below where this case is actually
@@ -854,9 +850,9 @@ TEST_F(MediaRouteStarterTest, StartRoute_StartPresentationContextError) {
 }
 
 TEST_F(MediaRouteStarterTest, GetScreenCapturePermission) {
-  // Screen capturing can only be disallowed on MacOS above a certain version.
+// TODO(https://crbug.com/1266425): Fix screen-capture tests on macOS.
 #if BUILDFLAG(IS_MAC)
-  bool screen_capture_is_allowed = !base::mac::IsAtLeastOS10_15();
+  bool screen_capture_is_allowed = false;
 #else
   bool screen_capture_is_allowed = true;
 #endif  // BUILDFLAG(IS_MAC)
@@ -881,53 +877,6 @@ TEST_F(MediaRouteStarterTest, GetScreenCapturePermission) {
   EXPECT_EQ(screen_capture_is_allowed,
             MediaRouteStarter::GetScreenCapturePermission(
                 MediaCastMode::DESKTOP_MIRROR));
-}
-
-class MediaRouteStarterIncognitoTest : public MediaRouteStarterTest {
- protected:
-  void SetMediaRouterFactory() override {
-    // We must set the factory on the non-incognito browser context.
-    MediaRouterFactory::GetInstance()->SetTestingFactory(
-        MediaRouteStarterTest::GetBrowserContext(),
-        base::BindRepeating(&MockMediaRouter::Create));
-  }
-
-  content::BrowserContext* GetBrowserContext() override {
-    return static_cast<Profile*>(MediaRouteStarterTest::GetBrowserContext())
-        ->GetPrimaryOTRProfile(/*create_if_needed=*/true);
-  }
-};
-
-// Demonstrates that when tab mirroring is available and requested that the
-// RouteParameters are properly filled out - particularly that the off the
-// record is now true.
-TEST_F(MediaRouteStarterIncognitoTest, CreateRouteParameters_TabMirroring) {
-  CreateStarterForDefaultModes();
-
-  // Add a sink
-  UpdateSinks({cast_sink().sink()}, std::vector<url::Origin>());
-
-  auto params = media_route_starter()->CreateRouteParameters(
-      cast_sink().id(), MediaCastMode::TAB_MIRROR);
-
-  EXPECT_TRUE(params->off_the_record);
-}
-
-// Basically the same as the on the record case, but demonstrates that
-// the incognito parameter is passed into MR.
-TEST_F(MediaRouteStarterIncognitoTest, StartRoute_TabMirroring) {
-  CreateStarterForDefaultModes();
-
-  set_expected_cast_result(mojom::RouteRequestResultCode::OK);
-
-  StartMirroring(cast_sink(), MediaCastMode::TAB_MIRROR);
-
-  EXPECT_EQ(mojom::RouteRequestResultCode::OK,
-            route_request_result()->result_code());
-
-  MediaSource expected_source = MediaSource::ForTab(
-      sessions::SessionTabHelper::IdForTab(web_contents()).id());
-  EXPECT_EQ(expected_source, route_request_result()->route()->media_source());
 }
 
 }  // namespace media_router

@@ -9,6 +9,7 @@
 #include "third_party/blink/renderer/core/layout/ng/grid/ng_grid_track_collection.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_baseline_utils.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_block_node.h"
+#include "third_party/blink/renderer/core/layout/ng/ng_constraint_space.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
 
 namespace blink {
@@ -31,9 +32,12 @@ struct CORE_EXPORT GridItemData {
 
  public:
   GridItemData() = delete;
+  GridItemData(const GridItemData&) = default;
+  GridItemData& operator=(const GridItemData&) = default;
 
   GridItemData(NGBlockNode node,
                const ComputedStyle& root_grid_style,
+               FontBaseline parent_grid_font_baseline,
                bool parent_must_consider_grid_items_for_column_sizing = false,
                bool parent_must_consider_grid_items_for_row_sizing = false);
 
@@ -56,26 +60,37 @@ struct CORE_EXPORT GridItemData {
         is_block_axis_overflow_safe);
   }
 
-  bool IsBaselineAlignedForDirection(
-      GridTrackSizingDirection track_direction) const {
-    return (track_direction == kForColumns)
-               ? (InlineAxisAlignment() == AxisEdge::kFirstBaseline ||
-                  InlineAxisAlignment() == AxisEdge::kLastBaseline)
-               : (BlockAxisAlignment() == AxisEdge::kFirstBaseline ||
-                  BlockAxisAlignment() == AxisEdge::kLastBaseline);
+  bool IsBaselineAligned(GridTrackSizingDirection track_direction) const {
+    const bool is_for_columns = track_direction == kForColumns;
+    const bool has_subgridded_axis =
+        is_for_columns ? has_subgridded_columns : has_subgridded_rows;
+
+    if (has_subgridded_axis) {
+      return false;
+    }
+
+    const auto axis_alignment =
+        is_for_columns ? InlineAxisAlignment() : BlockAxisAlignment();
+    return (axis_alignment == AxisEdge::kFirstBaseline ||
+            axis_alignment == AxisEdge::kLastBaseline);
   }
 
-  bool IsBaselineSpecifiedForDirection(
-      GridTrackSizingDirection track_direction) const {
-    return (track_direction == kForColumns)
-               ? (inline_axis_alignment == AxisEdge::kFirstBaseline ||
-                  inline_axis_alignment == AxisEdge::kLastBaseline)
-               : (block_axis_alignment == AxisEdge::kFirstBaseline ||
-                  block_axis_alignment == AxisEdge::kLastBaseline);
+  bool IsBaselineSpecified(GridTrackSizingDirection track_direction) const {
+    const bool is_for_columns = track_direction == kForColumns;
+    const bool has_subgridded_axis =
+        is_for_columns ? has_subgridded_columns : has_subgridded_rows;
+
+    if (has_subgridded_axis) {
+      return false;
+    }
+
+    const auto axis_alignment =
+        is_for_columns ? inline_axis_alignment : block_axis_alignment;
+    return (axis_alignment == AxisEdge::kFirstBaseline ||
+            axis_alignment == AxisEdge::kLastBaseline);
   }
 
-  bool IsLastBaselineSpecifiedForDirection(
-      GridTrackSizingDirection track_direction) const {
+  bool IsLastBaselineSpecified(GridTrackSizingDirection track_direction) const {
     return (track_direction == kForColumns)
                ? inline_axis_alignment == AxisEdge::kLastBaseline
                : block_axis_alignment == AxisEdge::kLastBaseline;
@@ -138,13 +153,8 @@ struct CORE_EXPORT GridItemData {
     return resolved_position.SpanSize(track_direction);
   }
 
-  // This item is considered a subgrid if it has at least one subgridded axis.
-  // However, for the purpose of iterating over the subgrids of a grid we don't
-  // want to consider subgridded items since they should be iterated over by
-  // their parent grid, otherwise they'll appear twice in the sizing tree.
   bool IsSubgrid() const {
-    return !is_subgridded_to_parent_grid &&
-           (has_subgridded_columns || has_subgridded_rows);
+    return has_subgridded_columns || has_subgridded_rows;
   }
 
   bool IsConsideredForSizing(GridTrackSizingDirection track_direction) const {
@@ -152,7 +162,27 @@ struct CORE_EXPORT GridItemData {
                                             : is_considered_for_row_sizing;
   }
 
-  bool IsGridContainingBlock() const { return node.IsContainingBlockNGGrid(); }
+  bool IsOppositeDirectionInRootGrid(
+      GridTrackSizingDirection track_direction) const {
+    return (track_direction == kForColumns)
+               ? is_opposite_direction_in_root_grid_columns
+               : is_opposite_direction_in_root_grid_rows;
+  }
+
+  bool MustCachePlacementIndices(
+      GridTrackSizingDirection track_direction) const {
+    return !is_subgridded_to_parent_grid ||
+           IsConsideredForSizing(track_direction) ||
+           MustConsiderGridItemsForSizing(track_direction);
+  }
+
+  bool MustConsiderGridItemsForSizing(
+      GridTrackSizingDirection track_direction) const {
+    return (track_direction == kForColumns)
+               ? must_consider_grid_items_for_column_sizing
+               : must_consider_grid_items_for_row_sizing;
+  }
+
   bool IsOutOfFlow() const { return node.IsOutOfFlowPositioned(); }
 
   const TrackSpanProperties& GetTrackSpanProperties(
@@ -196,7 +226,7 @@ struct CORE_EXPORT GridItemData {
 
   void Trace(Visitor* visitor) const { visitor->Trace(node); }
 
-  const NGBlockNode node;
+  NGBlockNode node;
   GridArea resolved_position;
 
   bool has_subgridded_columns : 1;
@@ -208,8 +238,12 @@ struct CORE_EXPORT GridItemData {
   bool is_parallel_with_root_grid : 1;
   bool is_sizing_dependent_on_block_size : 1;
   bool is_subgridded_to_parent_grid : 1;
+  bool is_opposite_direction_in_root_grid_columns : 1;
+  bool is_opposite_direction_in_root_grid_rows : 1;
   bool must_consider_grid_items_for_column_sizing : 1;
   bool must_consider_grid_items_for_row_sizing : 1;
+
+  FontBaseline parent_grid_font_baseline;
 
   AxisEdge inline_axis_alignment;
   AxisEdge block_axis_alignment;
@@ -300,6 +334,16 @@ class CORE_EXPORT GridItems {
 
   typedef IteratorBase<false> Iterator;
   typedef IteratorBase<true> ConstIterator;
+
+  GridItems() = default;
+  GridItems(GridItems&&) = default;
+  GridItems& operator=(GridItems&&) = default;
+
+  GridItems(const GridItems& other);
+
+  GridItems& operator=(const GridItems& other) {
+    return *this = GridItems(other);
+  }
 
   Iterator begin() { return {&item_data_, 0}; }
   Iterator end() { return {&item_data_, item_data_.size()}; }

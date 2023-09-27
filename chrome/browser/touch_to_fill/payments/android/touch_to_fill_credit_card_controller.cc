@@ -7,10 +7,11 @@
 #include <memory>
 
 #include "base/android/jni_string.h"
-#include "chrome/browser/touch_to_fill/payments/android/jni_headers/TouchToFillCreditCardControllerBridge_jni.h"
+#include "chrome/browser/touch_to_fill/payments/android/internal/jni/TouchToFillCreditCardControllerBridge_jni.h"
 #include "chrome/browser/touch_to_fill/payments/android/touch_to_fill_credit_card_view.h"
 #include "chrome/browser/touch_to_fill/payments/android/touch_to_fill_delegate_android_impl.h"
 #include "components/autofill/content/browser/content_autofill_client.h"
+#include "components/autofill/content/browser/content_autofill_driver.h"
 #include "components/autofill/core/browser/autofill_manager.h"
 #include "components/autofill/core/browser/browser_autofill_manager.h"
 #include "components/autofill/core/browser/ui/touch_to_fill_delegate.h"
@@ -18,9 +19,10 @@
 namespace autofill {
 
 namespace {
-TouchToFillDelegateImpl* GetDelegate(AutofillManager& manager) {
+TouchToFillDelegateAndroidImpl* GetDelegate(AutofillManager& manager) {
   auto& bam = static_cast<BrowserAutofillManager&>(manager);
-  return static_cast<TouchToFillDelegateImpl*>(bam.touch_to_fill_delegate());
+  return static_cast<TouchToFillDelegateAndroidImpl*>(
+      bam.touch_to_fill_delegate());
 }
 }  // namespace
 
@@ -58,11 +60,10 @@ void TouchToFillCreditCardController::OnContentAutofillDriverFactoryDestroyed(
 void TouchToFillCreditCardController::OnContentAutofillDriverCreated(
     ContentAutofillDriverFactory& factory,
     ContentAutofillDriver& driver) {
-  auto* manager =
-      static_cast<BrowserAutofillManager*>(driver.autofill_manager());
-  manager->set_touch_to_fill_delegate(std::make_unique<TouchToFillDelegateImpl>(
-      manager,
-      FastCheckoutClient::GetOrCreateForWebContents(factory.web_contents())));
+  auto& manager =
+      static_cast<BrowserAutofillManager&>(driver.GetAutofillManager());
+  manager.set_touch_to_fill_delegate(
+      std::make_unique<TouchToFillDelegateAndroidImpl>(&manager));
 }
 
 bool TouchToFillCreditCardController::Show(

@@ -8,6 +8,7 @@
 #include "base/time/time.h"
 #include "chrome/browser/download/download_ui_model.h"
 #include "components/offline_items_collection/core/offline_item.h"
+#include "components/webapps/common/web_app_id.h"
 
 base::Time GetItemStartTime(const download::DownloadItem* item);
 base::Time GetItemStartTime(const offline_items_collection::OfflineItem& item);
@@ -29,9 +30,7 @@ bool IsPendingDeepScanning(const DownloadUIModel* model);
 
 // Whether the download is considered in-progress from the UI's point of view.
 // Consider dangerous downloads as completed, because we don't want to encourage
-// users to interact with them. However, consider downloads pending scanning as
-// in progress, because we do want users to scan potential dangerous downloads.
-// Items that are paused count as in-progress.
+// users to interact with them. Items that are paused count as in-progress.
 bool IsItemInProgress(const download::DownloadItem* item);
 bool IsItemInProgress(const offline_items_collection::OfflineItem& item);
 bool IsModelInProgress(const DownloadUIModel* model);
@@ -44,5 +43,9 @@ bool IsItemPaused(const offline_items_collection::OfflineItem& item);
 // in.
 Browser* FindBrowserToShowAnimation(download::DownloadItem* item,
                                     Profile* profile);
+
+// Gets a pointer to the web app id, if the browser is for a web app, otherwise
+// nullptr.
+const webapps::AppId* GetWebAppIdForBrowser(const Browser* browser);
 
 #endif  // CHROME_BROWSER_DOWNLOAD_BUBBLE_DOWNLOAD_BUBBLE_UTILS_H_

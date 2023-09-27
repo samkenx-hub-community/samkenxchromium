@@ -9,6 +9,7 @@
 #include "ash/public/cpp/shelf_types.h"
 #include "ash/shelf/shelf_button.h"
 #include "ash/shelf/shelf_button_delegate.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/timer/timer.h"
 #include "ui/compositor/layer_animation_observer.h"
@@ -23,6 +24,7 @@ class ImageView;
 namespace ash {
 struct ShelfItem;
 class DotIndicator;
+class ProgressIndicator;
 class ShelfView;
 
 // Button used for app shortcuts on the shelf.
@@ -134,6 +136,12 @@ class ASH_EXPORT ShelfAppButton : public ShelfButton,
 
   void SetNotificationBadgeColor(SkColor color);
 
+  float progress() { return progress_; }
+
+  AppStatus app_status() { return app_status_; }
+
+  ProgressIndicator* GetProgressIndicatorForTest() const;
+
  protected:
   // ui::EventHandler:
   void OnGestureEvent(ui::GestureEvent* event) override;
@@ -189,19 +197,27 @@ class ASH_EXPORT ShelfAppButton : public ShelfButton,
   // Maybe hides the ink drop at the end of gesture handling.
   void MaybeHideInkDropWhenGestureEnds();
 
+  // Updates the layer bounds for the `progress_indicator_` if any is currently
+  // active.
+  void UpdateProgressRingBounds();
+
+  // Returns the icon scale adjusted to fit for the `progress_indicator_` if any
+  // is currently active.
+  float GetAdjustedIconScaleForProgressRing() const;
+
   // The icon part of a button can be animated independently of the rest.
-  views::ImageView* const icon_view_;
+  const raw_ptr<views::ImageView, ExperimentalAsh> icon_view_;
 
   // The ShelfView showing this ShelfAppButton. Owned by RootWindowController.
-  ShelfView* const shelf_view_;
+  const raw_ptr<ShelfView, ExperimentalAsh> shelf_view_;
 
   // Draws an indicator underneath the image to represent the state of the
   // application.
-  AppStatusIndicatorView* const indicator_;
+  const raw_ptr<AppStatusIndicatorView, ExperimentalAsh> indicator_;
 
   // Draws an indicator in the top right corner of the image to represent an
   // active notification.
-  DotIndicator* notification_indicator_ = nullptr;
+  raw_ptr<DotIndicator, ExperimentalAsh> notification_indicator_ = nullptr;
 
   // The current application state, a bitfield of State enum values.
   int state_ = STATE_NORMAL;
@@ -217,6 +233,9 @@ class ASH_EXPORT ShelfAppButton : public ShelfButton,
   // App status.
   AppStatus app_status_ = AppStatus::kReady;
 
+  // Item progress. Only applicable if `is_promise_app_` is true.
+  float progress_ = -1.0f;
+
   // Indicates whether the ink drop animation starts.
   bool ink_drop_animation_started_ = false;
 
@@ -231,8 +250,16 @@ class ASH_EXPORT ShelfAppButton : public ShelfButton,
   // not show yet due to the async request for the menu model.
   bool context_menu_target_visibility_ = false;
 
+  // An object that draws and updates the progress ring around promise app
+  // icons.
+  std::unique_ptr<ProgressIndicator> progress_indicator_;
+
   std::unique_ptr<ShelfButtonDelegate::ScopedActiveInkDropCount>
       ink_drop_count_;
+
+  // Whether the app is a promise app  (i.e. an app with pending or installing
+  // app status).
+  bool is_promise_app_ = false;
 
   // Used to track whether the menu was deleted while running. Must be last.
   base::WeakPtrFactory<ShelfAppButton> weak_factory_{this};

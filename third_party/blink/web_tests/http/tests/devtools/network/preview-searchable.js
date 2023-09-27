@@ -2,9 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {NetworkTestRunner} from 'network_test_runner';
+
+import * as Common from 'devtools/core/common/common.js';
+import * as Network from 'devtools/panels/network/network.js';
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
   TestRunner.addResult(`Tests that resources with JSON MIME types are previewed with the JSON viewer.\n`);
-  await TestRunner.loadTestModule('network_test_runner');
   await TestRunner.loadLegacyModule('source_frame');
   await TestRunner.showPanel('network');
 
@@ -31,7 +37,7 @@
   }
 
   async function previewViewHandled(searches, callback, view) {
-    var isSearchable = (view instanceof UI.SearchableView);
+    var isSearchable = (view instanceof UIModule.SearchableView.SearchableView);
     var compontentView = view;
     var typeName = 'unknown';
     var searchableView = view;
@@ -55,11 +61,11 @@
       typeName = 'XMLView';
     } else if (compontentView instanceof SourceFrame.JSONView) {
       typeName = 'JSONView';
-    } else if (compontentView instanceof Network.RequestHTMLView) {
+    } else if (compontentView instanceof Network.RequestHTMLView.RequestHTMLView) {
       typeName = 'RequestHTMLView';
-    } else if (compontentView instanceof UI.EmptyWidget) {
+    } else if (compontentView instanceof UIModule.EmptyWidget.EmptyWidget) {
       typeName = 'EmptyWidget';
-    } else if (compontentView instanceof Network.RequestHTMLView) {
+    } else if (compontentView instanceof Network.RequestHTMLView.RequestHTMLView) {
       typeName = 'RequestHTMLView';
     }
 
@@ -75,7 +81,7 @@
 
   function trySearches(request, searches, callback) {
     var networkPanel = UI.panels.network;
-    TestRunner.addSniffer(Network.RequestPreviewView.prototype, 'doShowPreview', async function() {
+    TestRunner.addSniffer(Network.RequestPreviewView.RequestPreviewView.prototype, 'doShowPreview', async function() {
       previewViewHandled(searches, callback, await this.contentViewPromise);
       networkPanel.hideRequestPanel();
     });
@@ -89,7 +95,7 @@
     var url = 'data:' + contentType + ',' + encodeURIComponent(content);
     NetworkTestRunner.makeSimpleXHR('GET', url, true, function() {
       var request = NetworkTestRunner.findRequestsByURLPattern(new RegExp(Platform.StringUtilities.escapeForRegExp(url)))[0];
-      request.setResourceType(Common.resourceTypes.Document);
+      request.setResourceType(Common.ResourceType.resourceTypes.Document);
       trySearches(request, searches, callback);
     });
   }

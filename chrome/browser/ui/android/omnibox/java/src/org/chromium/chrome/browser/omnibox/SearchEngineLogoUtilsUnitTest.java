@@ -41,10 +41,10 @@ import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.UmaRecorderHolder;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.JniMocker;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.locale.LocaleManager;
 import org.chromium.chrome.browser.locale.LocaleManagerDelegate;
 import org.chromium.chrome.browser.omnibox.status.StatusProperties.StatusIconResource;
+import org.chromium.chrome.browser.omnibox.test.R;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.theme.ThemeUtils;
 import org.chromium.chrome.browser.ui.favicon.FaviconHelper;
@@ -52,16 +52,16 @@ import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.components.browser_ui.widget.RoundedIconGenerator;
 import org.chromium.components.search_engines.TemplateUrlService;
+import org.chromium.url.GURL;
 import org.chromium.url.JUnitTestGURLs;
-import org.chromium.url.ShadowGURL;
 
 /**
  * Tests for SearchEngineLogoUtils.
  */
 @RunWith(BaseRobolectricTestRunner.class)
-@Config(manifest = Config.NONE, shadows = {ShadowGURL.class})
+@Config(manifest = Config.NONE)
 public class SearchEngineLogoUtilsUnitTest {
-    private static final String LOGO_URL = JUnitTestGURLs.URL_1;
+    private static final String LOGO_URL = JUnitTestGURLs.URL_1.getSpec();
     private static final String EVENTS_HISTOGRAM = "AndroidSearchEngineLogo.Events";
 
     @Rule
@@ -82,7 +82,7 @@ public class SearchEngineLogoUtilsUnitTest {
     @Mock
     LocaleManagerDelegate mLocaleManagerDelegate;
     @Mock
-    Resources mResource;
+    Resources mResources;
 
     SearchEngineLogoUtils mSearchEngineLogoUtils;
     Bitmap mBitmap;
@@ -102,7 +102,7 @@ public class SearchEngineLogoUtilsUnitTest {
         LocaleManager.getInstance().setDelegateForTest(mLocaleManagerDelegate);
 
         // Used when creating bitmaps, needs to be greater than 0.
-        doReturn(1).when(mResource).getDimensionPixelSize(anyInt());
+        doReturn(1).when(mResources).getDimensionPixelSize(anyInt());
 
         mSearchEngineLogoUtils = new SearchEngineLogoUtils();
         mSearchEngineLogoUtils.setFaviconHelperForTesting(mFaviconHelper);
@@ -135,12 +135,12 @@ public class SearchEngineLogoUtilsUnitTest {
     public void getSearchEngineLogo() {
         StatusIconResource expected = new StatusIconResource(LOGO_URL, mBitmap, 0);
 
-        Promise<StatusIconResource> promise = mSearchEngineLogoUtils.getSearchEngineLogo(mResource,
+        Promise<StatusIconResource> promise = mSearchEngineLogoUtils.getSearchEngineLogo(mResources,
                 BrandedColorScheme.APP_DEFAULT, Mockito.mock(Profile.class), mTemplateUrlService);
         verify(mFaviconHelper)
                 .getLocalFaviconImageForURL(any(), any(), anyInt(), mCallbackCaptor.capture());
         FaviconHelper.FaviconImageCallback faviconCallback = mCallbackCaptor.getValue();
-        faviconCallback.onFaviconAvailable(mBitmap, JUnitTestGURLs.getGURL(LOGO_URL));
+        faviconCallback.onFaviconAvailable(mBitmap, new GURL(LOGO_URL));
 
         assertTrue(promise.isFulfilled());
         assertEquals(promise.getResult(), expected);
@@ -183,12 +183,12 @@ public class SearchEngineLogoUtilsUnitTest {
     public void getSearchEngineLogo_faviconCached() {
         StatusIconResource expected = new StatusIconResource(LOGO_URL, mBitmap, 0);
 
-        Promise<StatusIconResource> promise = mSearchEngineLogoUtils.getSearchEngineLogo(mResource,
+        Promise<StatusIconResource> promise = mSearchEngineLogoUtils.getSearchEngineLogo(mResources,
                 BrandedColorScheme.APP_DEFAULT, Mockito.mock(Profile.class), mTemplateUrlService);
         verify(mFaviconHelper)
                 .getLocalFaviconImageForURL(any(), any(), anyInt(), mCallbackCaptor.capture());
         FaviconHelper.FaviconImageCallback faviconCallback = mCallbackCaptor.getValue();
-        faviconCallback.onFaviconAvailable(mBitmap, JUnitTestGURLs.getGURL(LOGO_URL));
+        faviconCallback.onFaviconAvailable(mBitmap, new GURL(LOGO_URL));
         assertEquals(promise.getResult(), expected);
 
         Promise<StatusIconResource> promise2 = mSearchEngineLogoUtils.getSearchEngineLogo(
@@ -259,7 +259,7 @@ public class SearchEngineLogoUtilsUnitTest {
         verify(mFaviconHelper)
                 .getLocalFaviconImageForURL(any(), any(), anyInt(), mCallbackCaptor.capture());
         FaviconHelper.FaviconImageCallback faviconCallback = mCallbackCaptor.getValue();
-        faviconCallback.onFaviconAvailable(null, JUnitTestGURLs.getGURL(LOGO_URL));
+        faviconCallback.onFaviconAvailable(null, new GURL(LOGO_URL));
 
         assertEquals(promise.getResult(), expected);
         assertEquals(1,

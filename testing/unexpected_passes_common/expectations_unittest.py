@@ -86,15 +86,18 @@ class CreateTestExpectationMapUnittest(unittest.TestCase):
   def testExclusiveOr(self) -> None:
     """Tests that only one input can be specified."""
     with self.assertRaises(AssertionError):
-      self.instance.CreateTestExpectationMap(None, None, 0)
+      self.instance.CreateTestExpectationMap(None, None,
+                                             datetime.timedelta(days=0))
     with self.assertRaises(AssertionError):
-      self.instance.CreateTestExpectationMap('foo', ['bar'], 0)
+      self.instance.CreateTestExpectationMap('foo', ['bar'],
+                                             datetime.timedelta(days=0))
 
   def testExpectationFile(self) -> None:
     """Tests reading expectations from an expectation file."""
     filename = '/tmp/foo'
     self._expectation_content[filename] = FAKE_EXPECTATION_FILE_CONTENTS
-    expectation_map = self.instance.CreateTestExpectationMap(filename, None, 0)
+    expectation_map = self.instance.CreateTestExpectationMap(
+        filename, None, datetime.timedelta(days=0))
     # Skip expectations should be omitted, but everything else should be
     # present.
     # yapf: disable
@@ -124,7 +127,7 @@ class CreateTestExpectationMapUnittest(unittest.TestCase):
         filename2] = SECONDARY_FAKE_EXPECTATION_FILE_CONTENTS
 
     expectation_map = self.instance.CreateTestExpectationMap(
-        expectation_files, None, 0)
+        expectation_files, None, datetime.timedelta(days=0))
     # yapf: disable
     expected_expectation_map = {
       expectation_files[0]: {
@@ -149,7 +152,7 @@ class CreateTestExpectationMapUnittest(unittest.TestCase):
   def testIndividualTests(self) -> None:
     """Tests reading expectations from a list of tests."""
     expectation_map = self.instance.CreateTestExpectationMap(
-        None, ['foo/test', 'bar/*'], 0)
+        None, ['foo/test', 'bar/*'], datetime.timedelta(days=0))
     expected_expectation_map = {
         '': {
             data_types.Expectation('foo/test', [], ['RetryOnFailure']): {},
@@ -200,8 +203,9 @@ class GetNonRecentExpectationContentUnittest(unittest.TestCase):
 
 [ tag1 ] othertest [ Failure ]
 crbug.com/3456 othertest [ Failure ]"""
-    self.assertEqual(self.instance._GetNonRecentExpectationContent('', 1),
-                     expected_content)
+    self.assertEqual(
+        self.instance._GetNonRecentExpectationContent(
+            '', datetime.timedelta(days=1)), expected_content)
 
   def testNegativeGracePeriod(self) -> None:
     """Tests that setting a negative grace period disables filtering."""
@@ -234,8 +238,9 @@ crbug.com/3456 othertest [ Failure ]"""
 crbug.com/1234 [ tag1 ] testname [ Failure ]
 [ tag2 ] testname [ Failure ] # Comment
 [ tag1 ] othertest [ Failure ]"""
-    self.assertEqual(self.instance._GetNonRecentExpectationContent('', -1),
-                     expected_content)
+    self.assertEqual(
+        self.instance._GetNonRecentExpectationContent(
+            '', datetime.timedelta(days=-1)), expected_content)
 
 
 class RemoveExpectationsFromFileUnittest(fake_filesystem_unittest.TestCase):
@@ -657,6 +662,45 @@ crbug.com/2345 [ win ] foo/test [ RetryOnFailure ]
     removed_urls = self.instance.RemoveExpectationsFromFile(
         stale_expectations, self.filename, expectations.RemovalType.STALE)
     self.assertEqual(removed_urls, set([]))
+    with open(self.filename) as f:
+      self.assertEqual(f.read(), expected_contents)
+
+  def testNestedGroupAndNarrowingAllRemovable(self):
+    """Tests that a disable block within a group can be properly removed."""
+    contents = self.header + """
+crbug.com/2345 [ win ] baz/test [ Failure ]
+
+# Description
+# finder:group-start name
+# finder:disable-narrowing
+crbug.com/1234 [ win ] foo/test [ Failure ]
+crbug.com/1234 [ win ] bar/test [ Failure ]
+# finder:enable-narrowing
+# finder:group-end
+
+crbug.com/3456 [ linux ] foo/test [ Failure ]
+"""
+
+    stale_expectations = [
+        data_types.Expectation('foo/test', ['win'], ['Failure'],
+                               'crbug.com/1234'),
+        data_types.Expectation('bar/test', ['win'], ['Failure'],
+                               'crbug.com/1234'),
+    ]
+
+    expected_contents = self.header + """
+crbug.com/2345 [ win ] baz/test [ Failure ]
+
+
+crbug.com/3456 [ linux ] foo/test [ Failure ]
+"""
+
+    with open(self.filename, 'w') as f:
+      f.write(contents)
+
+    removed_urls = self.instance.RemoveExpectationsFromFile(
+        stale_expectations, self.filename, expectations.RemovalType.STALE)
+    self.assertEqual(removed_urls, set(['crbug.com/1234']))
     with open(self.filename) as f:
       self.assertEqual(f.read(), expected_contents)
 

@@ -28,7 +28,6 @@ import org.chromium.base.test.util.Features;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.chrome.browser.compositor.layouts.content.TabContentManager;
 import org.chromium.chrome.browser.flags.ActivityType;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.homepage.HomepageManager;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.MockTab;
@@ -36,7 +35,6 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabCreationState;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab.TabSelectionType;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 
 import java.util.Arrays;
 
@@ -113,11 +111,9 @@ public class TabModelImplUnitTest {
 
     private Tab createTab(final TabModel model, long activeTimestampMillis, int parentId) {
         final int launchType = TabLaunchType.FROM_CHROME_UI;
-        MockTab tab = new MockTab(mNextTabId++, model.isIncognito());
-        CriticalPersistedTabData data = new CriticalPersistedTabData(tab);
-        data.setTimestampMillis(activeTimestampMillis);
-        data.setParentId(parentId);
-        tab = (MockTab) MockTab.initializeWithCriticalPersistedTabData(tab, data);
+        MockTab tab = (MockTab) MockTab.createAndInitialize(mNextTabId++, model.isIncognito());
+        tab.setTimestampMillis(activeTimestampMillis);
+        tab.setParentId(parentId);
         tab.setIsInitialized(true);
         model.addTab(tab, -1, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
         return tab;
@@ -283,7 +279,6 @@ public class TabModelImplUnitTest {
 
     @Test
     @SmallTest
-    @Features.EnableFeatures(ChromeFeatureList.TAB_STATE_V1_OPTIMIZATIONS)
     public void testDontSwitchModelsIfIncognitoGroupClosed() {
         TabModel activeIncognito = createTabModel(true, true);
         TabModel inactiveNormal = createTabModel(false, false);

@@ -167,7 +167,7 @@ enum class NotificationCatalogName {
   kArcLowDiskSpacePostStop = 152,
   kMultiCapture = 153,
   kPrivacyHubCamera = 154,
-  kPrivacyHubHWCameraSwitchOffSWCameraSwitchOn = 155,
+  // [Deprecated] kPrivacyHubHWCameraSwitchOffSWCameraSwitchOn = 155,
   kEcheAppNetworkSetting = 156,
   kPrivacyHubMicAndCamera = 157,
   kArcVmDataMigration = 158,
@@ -182,7 +182,13 @@ enum class NotificationCatalogName {
   kWebAppSettings = 167,
   kEOLIncentive = 168,
   kHotspot = 169,
-  kMaxValue = kHotspot
+  kGeolocationSwitch = 170,
+  kMultiCaptureOnLogin = 171,
+  kFloatingWorkspace = 172,
+  kScalableIphNotification = 173,
+  kUpdateNotification = 174,
+  kSubAppsUninstall = 175,
+  kMaxValue = kSubAppsUninstall
 };
 
 // A living catalog that registers system nudges.
@@ -201,7 +207,20 @@ enum class NudgeCatalogName {
   kPhoneHub = 6,
   kClipboardHistoryZeroState = 7,
   kClipboardHistoryOnboarding = 8,
-  kMaxValue = kClipboardHistoryOnboarding,
+  kDisableDiacritics = 9,
+  kClipboardHistoryDuplicateCopy = 10,
+  kVideoConferenceTraySpeakOnMuteDetected = 11,
+  kVideoConferenceTrayMicrophoneUseWhileHWDisabled = 12,
+  kVideoConferenceTrayMicrophoneUseWhileSWDisabled = 13,
+  kVideoConferenceTrayCameraUseWhileHWDisabled = 14,
+  kVideoConferenceTrayCameraUseWhileSWDisabled = 15,
+  kVideoConferenceTraySpeakOnMuteOptIn = 16,
+  // [Deprecated] kVideoConferenceTraySpeakOnMuteOptInConfirmation = 17,
+  kScalableIphBubble = 18,
+  kVideoConferenceTrayCameraMicrophoneUseWhileDisabled = 19,
+  kMultitaskMenuClamshell = 20,
+  kMultitaskMenuTablet = 21,
+  kMaxValue = kMultitaskMenuTablet
 };
 
 // A living catalog that registers toasts.
@@ -249,11 +268,16 @@ enum class ToastCatalogName {
   kEcheTrayCopyPasteNotImplemented = 37,
   kEcheTrayTabletModeNotSupported = 38,
   kNotificationCenterTrayNoNotifications = 39,
-  kCopyToClipboardAction = 40,
-  kVideoConferenceTraySpeakOnMuteDetected = 41,
+  // [Deprecated] kCopyToClipboardAction = 40,
+  // [Deprecated] kVideoConferenceTraySpeakOnMuteDetected = 41,
   kCopyGifToClipboardAction = 42,
-  kVideoConferenceTrayUseWhileDisabled = 43,
-  kMaxValue = kVideoConferenceTrayUseWhileDisabled,
+  // [Deprecated] kVideoConferenceTrayUseWhileDisabled = 43,
+  kBatterySaverDisabled = 44,
+  kDictationNoFocusedTextField = 45,
+  kBatterySaverEnabled = 46,
+  kDictationMicMuted = 47,
+  kVideoConferenceTraySpeakOnMuteOptInConfirmation = 48,
+  kMaxValue = kVideoConferenceTraySpeakOnMuteOptInConfirmation
 };
 
 }  // namespace ash

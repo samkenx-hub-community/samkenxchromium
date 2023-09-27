@@ -20,10 +20,6 @@
 #import "third_party/ocmock/gtest_support.h"
 #import "ui/base/page_transition_types.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 // Class which conforms to CRWWebStateDelegate protocol, but does not implement
 // any optional methods.
 @interface TestEmptyWebStateDelegate : NSObject<CRWWebStateDelegate>
@@ -134,6 +130,42 @@ TEST_F(WebStateDelegateBridgeTest, GetJavaScriptDialogPresenter) {
   EXPECT_FALSE([delegate_ javaScriptDialogPresenterRequested]);
   bridge_->GetJavaScriptDialogPresenter(nullptr);
   EXPECT_TRUE([delegate_ javaScriptDialogPresenterRequested]);
+}
+
+// Tests `HandlePermissionsDecisionRequest` forwarding.
+TEST_F(WebStateDelegateBridgeTest, HandlePermissionsDecisionRequest) {
+  if (@available(iOS 15.0, *)) {
+    __block bool callback_called = false;
+    EXPECT_FALSE([delegate_ permissionsRequestHandled]);
+    EXPECT_FALSE([delegate_ webState]);
+    bridge_->HandlePermissionsDecisionRequest(
+        &fake_web_state_, @[], ^(PermissionDecision decision) {
+          EXPECT_EQ(decision, PermissionDecisionGrant);
+          callback_called = true;
+        });
+    EXPECT_TRUE([delegate_ permissionsRequestHandled]);
+    EXPECT_EQ(&fake_web_state_, [delegate_ webState]);
+    EXPECT_TRUE(callback_called);
+  }
+}
+
+// Tests `HandlePermissionsDecisionRequest` forwarding to delegate which does
+// not implement `webState:handlePermissions:decisionHandler:` method.
+TEST_F(WebStateDelegateBridgeTest,
+       HandlePermissionsDecisionRequestWithNoDelegateMethod) {
+  if (@available(iOS 15.0, *)) {
+    __block bool callback_called = false;
+    empty_delegate_bridge_->HandlePermissionsDecisionRequest(
+        nullptr, @[], ^(PermissionDecision decision) {
+          // Default decision `PermissionDecisionShowDefaultPrompt` will be used
+          // when delegate doesn't implement
+          // `webState:handlePermissions:decisionHandler:` method to handle the
+          // permissions.
+          EXPECT_EQ(decision, PermissionDecisionShowDefaultPrompt);
+          callback_called = true;
+        });
+    EXPECT_TRUE(callback_called);
+  }
 }
 
 // Tests `OnAuthRequired` forwarding.

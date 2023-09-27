@@ -12,6 +12,7 @@
 #include "base/component_export.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "chromeos/ash/components/network/client_cert_util.h"
@@ -20,6 +21,7 @@
 #include "chromeos/ash/components/network/network_profile_observer.h"
 #include "chromeos/ash/components/network/policy_applicator.h"
 #include "chromeos/ash/components/network/profile_policies.h"
+#include "chromeos/ash/components/network/text_message_suppression_state.h"
 
 namespace base {
 class Value;
@@ -33,6 +35,7 @@ class NetworkConfigurationHandler;
 struct NetworkProfile;
 class NetworkProfileHandler;
 class NetworkStateHandler;
+class HotspotController;
 
 class COMPONENT_EXPORT(CHROMEOS_NETWORK) ManagedNetworkConfigurationHandlerImpl
     : public ManagedNetworkConfigurationHandler,
@@ -64,6 +67,12 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) ManagedNetworkConfigurationHandlerImpl
                      const base::Value::Dict& user_settings,
                      base::OnceClosure callback,
                      network_handler::ErrorCallback error_callback) override;
+
+  void ClearShillProperties(
+      const std::string& service_path,
+      const std::vector<std::string>& names,
+      base::OnceClosure callback,
+      network_handler::ErrorCallback error_callback) override;
 
   void CreateConfiguration(
       const std::string& userhash,
@@ -136,7 +145,9 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) ManagedNetworkConfigurationHandlerImpl
       const base::flat_set<std::string>& new_cellular_policy_guids);
   void OnCellularPoliciesApplied(const NetworkProfile& profile) override;
 
+  PolicyTextMessageSuppressionState GetAllowTextMessages() const override;
   bool AllowCellularSimLock() const override;
+  bool AllowCellularHotspot() const override;
   bool AllowOnlyPolicyCellularNetworks() const override;
   bool AllowOnlyPolicyWiFiToConnect() const override;
   bool AllowOnlyPolicyWiFiToConnectIfAvailable() const override;
@@ -155,6 +166,8 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) ManagedNetworkConfigurationHandlerImpl
       const base::Value::Dict& existing_properties,
       const base::Value::Dict& new_properties,
       base::OnceClosure callback) override;
+
+  void OnEnterpriseMonitoredWebPoliciesApplied() const override;
 
   void OnPoliciesApplied(
       const NetworkProfile& profile,
@@ -232,7 +245,8 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) ManagedNetworkConfigurationHandlerImpl
             NetworkProfileHandler* network_profile_handler,
             NetworkConfigurationHandler* network_configuration_handler,
             NetworkDeviceHandler* network_device_handler,
-            ProhibitedTechnologiesHandler* prohibited_technologies_handler);
+            ProhibitedTechnologiesHandler* prohibited_technologies_handler,
+            HotspotController* hotspot_controller);
 
   // Returns the ProfilePolicies for the given |userhash|, or the device
   // policies if |userhash| is empty. Creates the ProfilePolicies entry if it
@@ -318,14 +332,24 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) ManagedNetworkConfigurationHandlerImpl
   UserToPoliciesMap policies_by_user_;
 
   // Local references to the associated handler instances.
-  CellularPolicyHandler* cellular_policy_handler_ = nullptr;
-  ManagedCellularPrefHandler* managed_cellular_pref_handler_ = nullptr;
-  NetworkStateHandler* network_state_handler_ = nullptr;
-  NetworkProfileHandler* network_profile_handler_ = nullptr;
-  NetworkConfigurationHandler* network_configuration_handler_ = nullptr;
-  NetworkDeviceHandler* network_device_handler_ = nullptr;
-  ProhibitedTechnologiesHandler* prohibited_technologies_handler_ = nullptr;
-  UIProxyConfigService* ui_proxy_config_service_ = nullptr;
+  raw_ptr<CellularPolicyHandler, DanglingUntriaged | ExperimentalAsh>
+      cellular_policy_handler_ = nullptr;
+  raw_ptr<ManagedCellularPrefHandler, DanglingUntriaged | ExperimentalAsh>
+      managed_cellular_pref_handler_ = nullptr;
+  raw_ptr<NetworkStateHandler, DanglingUntriaged | ExperimentalAsh>
+      network_state_handler_ = nullptr;
+  raw_ptr<NetworkProfileHandler, ExperimentalAsh> network_profile_handler_ =
+      nullptr;
+  raw_ptr<NetworkConfigurationHandler, DanglingUntriaged | ExperimentalAsh>
+      network_configuration_handler_ = nullptr;
+  raw_ptr<NetworkDeviceHandler, DanglingUntriaged | ExperimentalAsh>
+      network_device_handler_ = nullptr;
+  raw_ptr<ProhibitedTechnologiesHandler, DanglingUntriaged | ExperimentalAsh>
+      prohibited_technologies_handler_ = nullptr;
+  raw_ptr<UIProxyConfigService, DanglingUntriaged | ExperimentalAsh>
+      ui_proxy_config_service_ = nullptr;
+  raw_ptr<HotspotController, DanglingUntriaged | ExperimentalAsh>
+      hotspot_controller_ = nullptr;
 
   UserToPolicyApplicationInfo policy_application_info_map_;
 

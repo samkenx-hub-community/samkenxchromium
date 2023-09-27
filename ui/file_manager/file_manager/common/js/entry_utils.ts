@@ -4,7 +4,7 @@
 
 import {FilesAppEntry} from '../../externs/files_app_entry_interfaces.js';
 import {EntryType, FileData} from '../../externs/ts/state.js';
-import {driveRootEntryListKey, myFilesEntryListKey} from '../../state/reducers/volumes.js';
+import {driveRootEntryListKey, myFilesEntryListKey, trashRootKey} from '../../state/ducks/volumes.js';
 
 import {EntryList, FakeEntryImpl, VolumeEntry} from './files_app_entry_types.js';
 import {util} from './util.js';
@@ -49,6 +49,11 @@ export function getNativeEntry(fileData: FileData): Entry|null {
 export function isVolumeEntry(entry: Entry|
                               FilesAppEntry): entry is VolumeEntry {
   return 'volumeInfo' in entry;
+}
+
+/** Check if a entry is a trash entry or not. */
+export function isTrashEntry(entry: Entry|FilesAppEntry) {
+  return entry.toURL() === trashRootKey;
 }
 
 /**
@@ -111,6 +116,40 @@ export function isFakeEntryInDrives(entry: Entry|
 
   return rootType === VolumeManagerCommon.RootType.DRIVE_SHARED_WITH_ME ||
       rootType === VolumeManagerCommon.RootType.DRIVE_OFFLINE;
+}
+
+/**
+ * Returns true if fileData's entry is inside any part of Drive 'My Drive'.
+ */
+export function isEntryInsideMyDrive(fileData: FileData): boolean {
+  const {rootType} = fileData;
+  return !!rootType && rootType === VolumeManagerCommon.RootType.DRIVE;
+}
+
+/**
+ * Returns true if fileData's entry is inside any part of Drive 'Computers'.
+ */
+export function isEntryInsideComputers(fileData: FileData): boolean {
+  const {rootType} = fileData;
+  return !!rootType &&
+      (rootType === VolumeManagerCommon.RootType.COMPUTERS_GRAND_ROOT ||
+       rootType === VolumeManagerCommon.RootType.COMPUTER);
+}
+
+/**
+ * Returns true if fileData's entry is inside any part of Drive.
+ */
+export function isEntryInsideDrive(fileData: FileData): boolean {
+  const {rootType} = fileData;
+  return !!rootType &&
+      (rootType === VolumeManagerCommon.RootType.DRIVE ||
+       rootType === VolumeManagerCommon.RootType.SHARED_DRIVES_GRAND_ROOT ||
+       rootType === VolumeManagerCommon.RootType.SHARED_DRIVE ||
+       rootType === VolumeManagerCommon.RootType.COMPUTERS_GRAND_ROOT ||
+       rootType === VolumeManagerCommon.RootType.COMPUTER ||
+       rootType === VolumeManagerCommon.RootType.DRIVE_OFFLINE ||
+       rootType === VolumeManagerCommon.RootType.DRIVE_SHARED_WITH_ME ||
+       rootType === VolumeManagerCommon.RootType.DRIVE_FAKE_ROOT);
 }
 
 /** Sort the entries based on the filter and the names. */

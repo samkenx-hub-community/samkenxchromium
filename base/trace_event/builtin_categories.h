@@ -32,7 +32,9 @@
   /* The rest of the list is in alphabetical order */                    \
   X("accessibility")                                                     \
   X("AccountFetcherService")                                             \
+  X("android.ui.jank")                                                   \
   X("android_webview")                                                   \
+  X("android_webview.timeline")                                          \
   /* Actions on Google Hardware, used in Google-internal code. */        \
   X("aogh")                                                              \
   X("audio")                                                             \
@@ -79,10 +81,8 @@
   X("drm")                                                               \
   X("drmcursor")                                                         \
   X("dwrite")                                                            \
-  X("DXVA_Decoding")                                                     \
   X("evdev")                                                             \
   X("event")                                                             \
-  X("event_latency")                                                     \
   X("exo")                                                               \
   X("extensions")                                                        \
   X("explore_sites")                                                     \
@@ -93,7 +93,9 @@
   X("GAMEPAD")                                                           \
   X("gpu")                                                               \
   X("gpu.angle")                                                         \
+  X("gpu.angle.texture_metrics")                                         \
   X("gpu.capture")                                                       \
+  X("graphics.pipeline")                                                 \
   X("headless")                                                          \
   /* Traces for //components/history. */                                 \
   X("history")                                                           \
@@ -102,6 +104,7 @@
   X("ime")                                                               \
   X("IndexedDB")                                                         \
   X("input")                                                             \
+  X("input.scrolling")                                                   \
   X("io")                                                                \
   X("ipc")                                                               \
   X("Java")                                                              \
@@ -121,7 +124,9 @@
   X("mus")                                                               \
   X("native")                                                            \
   X("navigation")                                                        \
+  X("navigation.debug")                                                  \
   X("net")                                                               \
+  X("network.scheduler")                                                 \
   X("netlog")                                                            \
   X("offline_pages")                                                     \
   X("omnibox")                                                           \
@@ -196,7 +201,6 @@
   X(TRACE_DISABLED_BY_DEFAULT("blink.debug"))                            \
   X(TRACE_DISABLED_BY_DEFAULT("blink.debug.display_lock"))               \
   X(TRACE_DISABLED_BY_DEFAULT("blink.debug.layout"))                     \
-  X(TRACE_DISABLED_BY_DEFAULT("blink.debug.layout.scrollbars"))          \
   X(TRACE_DISABLED_BY_DEFAULT("blink.debug.layout.trees"))               \
   X(TRACE_DISABLED_BY_DEFAULT("blink.feature_usage"))                    \
   X(TRACE_DISABLED_BY_DEFAULT("blink.image_decoding"))                   \
@@ -231,6 +235,7 @@
   X(TRACE_DISABLED_BY_DEFAULT("gpu.debug"))                              \
   X(TRACE_DISABLED_BY_DEFAULT("gpu.decoder"))                            \
   X(TRACE_DISABLED_BY_DEFAULT("gpu.device"))                             \
+  X(TRACE_DISABLED_BY_DEFAULT("gpu.graphite.dawn"))                      \
   X(TRACE_DISABLED_BY_DEFAULT("gpu.service"))                            \
   X(TRACE_DISABLED_BY_DEFAULT("gpu.vulkan.vma"))                         \
   X(TRACE_DISABLED_BY_DEFAULT("histogram_samples"))                      \
@@ -256,7 +261,9 @@
   X(TRACE_DISABLED_BY_DEFAULT("skia.gpu"))                               \
   X(TRACE_DISABLED_BY_DEFAULT("skia.gpu.cache"))                         \
   X(TRACE_DISABLED_BY_DEFAULT("skia.shaders"))                           \
+  X(TRACE_DISABLED_BY_DEFAULT("skottie"))                                \
   X(TRACE_DISABLED_BY_DEFAULT("SyncFileSystem"))                         \
+  X(TRACE_DISABLED_BY_DEFAULT("system_power"))                           \
   X(TRACE_DISABLED_BY_DEFAULT("system_stats"))                           \
   X(TRACE_DISABLED_BY_DEFAULT("thread_pool_diagnostics"))                \
   X(TRACE_DISABLED_BY_DEFAULT("toplevel.ipc"))                           \
@@ -283,6 +290,7 @@
   X(TRACE_DISABLED_BY_DEFAULT("viz.surface_id_flow"))                    \
   X(TRACE_DISABLED_BY_DEFAULT("viz.surface_lifetime"))                   \
   X(TRACE_DISABLED_BY_DEFAULT("viz.triangles"))                          \
+  X(TRACE_DISABLED_BY_DEFAULT("viz.visual_debugger"))                    \
   X(TRACE_DISABLED_BY_DEFAULT("webaudio.audionode"))                     \
   X(TRACE_DISABLED_BY_DEFAULT("webgpu"))                                 \
   X(TRACE_DISABLED_BY_DEFAULT("webrtc"))                                 \
@@ -291,9 +299,11 @@
 
 #define INTERNAL_TRACE_LIST_BUILTIN_CATEGORY_GROUPS(X)                        \
   X("android_webview,toplevel")                                               \
+  X("android_webview.timeline,android.ui.jank")                               \
   X("base,toplevel")                                                          \
   X("benchmark,drm")                                                          \
   X("benchmark,latencyInfo,rail")                                             \
+  X("benchmark,latencyInfo,rail,input.scrolling")                             \
   X("benchmark,loading")                                                      \
   X("benchmark,rail")                                                         \
   X("benchmark,uma")                                                          \
@@ -307,14 +317,13 @@
   X("blink,rail")                                                             \
   X("blink.animations,devtools.timeline,benchmark,rail")                      \
   X("blink.user_timing,rail")                                                 \
-  X("blink_gc,devtools.timeline")                                             \
   X("browser,content,navigation")                                             \
   X("browser,navigation")                                                     \
   X("browser,navigation,benchmark")                                           \
   X("browser,startup")                                                        \
   X("category1,category2")                                                    \
   X("cc,benchmark")                                                           \
-  X("cc,benchmark,input,event_latency")                                       \
+  X("cc,benchmark,input,input.scrolling")                                     \
   X("cc,benchmark," TRACE_DISABLED_BY_DEFAULT("devtools.timeline.frame"))     \
   X("cc,input")                                                               \
   X("cc,raf_investigation")                                                   \
@@ -328,6 +337,7 @@
   X("gpu,benchmark")                                                          \
   X("gpu,benchmark,android_webview")                                          \
   X("gpu,benchmark,webview")                                                  \
+  X("gpu,login")                                                              \
   X("gpu,startup")                                                            \
   X("gpu,toplevel.flow")                                                      \
   X("gpu.angle,startup")                                                      \
@@ -339,6 +349,7 @@
   X("input,benchmark,latencyInfo")                                            \
   X("input,latency")                                                          \
   X("input,rail")                                                             \
+  X("input,input.scrolling")                                                  \
   X("input,views")                                                            \
   X("ipc,security")                                                           \
   X("ipc,toplevel")                                                           \
@@ -353,6 +364,7 @@
   X("renderer,webkit")                                                        \
   X("renderer_host,navigation")                                               \
   X("renderer_host," TRACE_DISABLED_BY_DEFAULT("viz.surface_id_flow"))        \
+  X("scheduler,devtools.timeline,loading")                                    \
   X("shutdown,viz")                                                           \
   X("startup,benchmark,rail")                                                 \
   X("startup,rail")                                                           \
@@ -365,6 +377,7 @@
   X("v8,devtools.timeline")                                                   \
   X("v8,devtools.timeline," TRACE_DISABLED_BY_DEFAULT("v8.compile"))          \
   X("viz,benchmark")                                                          \
+  X("viz,benchmark,graphics.pipeline")                                        \
   X("WebCore,benchmark,rail")                                                 \
   X(TRACE_DISABLED_BY_DEFAULT("cc.debug") "," TRACE_DISABLED_BY_DEFAULT(      \
       "viz.quads") "," TRACE_DISABLED_BY_DEFAULT("devtools.timeline.layers")) \

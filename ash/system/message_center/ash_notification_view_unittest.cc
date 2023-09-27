@@ -4,6 +4,7 @@
 
 #include "ash/system/message_center/ash_notification_view.h"
 
+#include <memory>
 #include <string>
 
 #include "ash/capture_mode/capture_mode_controller.h"
@@ -24,6 +25,7 @@
 #include "ash/system/message_center/metrics_utils.h"
 #include "ash/system/message_center/unified_message_center_bubble.h"
 #include "ash/system/notification_center/notification_center_test_api.h"
+#include "ash/system/notification_center/notification_center_tray.h"
 #include "ash/system/notification_center/notification_center_view.h"
 #include "ash/system/notification_center/notification_list_view.h"
 #include "ash/system/unified/unified_system_tray.h"
@@ -33,6 +35,7 @@
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "ui/base/data_transfer_policy/mock_data_transfer_policy_controller.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/layer.h"
@@ -170,9 +173,9 @@ class MockAshNotificationDragDropDelegate
       if (data->HasHtml()) {
         HandleHtmlData();
       } else {
-        base::FilePath file_path;
-        data->GetFilename(&file_path);
-        HandleFilePathData(file_path);
+        std::vector<ui::FileInfo> files;
+        data->GetFilenames(&files);
+        HandleFilePathData(files[0].path);
       }
     }
   }
@@ -189,10 +192,7 @@ class AshNotificationViewTestBase : public AshTestBase,
  public:
   template <typename... TaskEnvironmentTraits>
   explicit AshNotificationViewTestBase(TaskEnvironmentTraits&&... traits)
-      : AshTestBase(traits...) {
-    scoped_feature_list_ = std::make_unique<base::test::ScopedFeatureList>();
-    scoped_feature_list_->InitAndEnableFeature(features::kNotificationsRefresh);
-  }
+      : AshTestBase(traits...) {}
   AshNotificationViewTestBase(const AshNotificationViewTestBase&) = delete;
   AshNotificationViewTestBase& operator=(const AshNotificationViewTestBase&) =
       delete;
@@ -202,6 +202,10 @@ class AshNotificationViewTestBase : public AshTestBase,
   void SetUp() override {
     AshTestBase::SetUp();
     delegate_ = new NotificationTestDelegate();
+    notification_center_test_api_ = std::make_unique<NotificationCenterTestApi>(
+        /*tray=*/features::IsQsRevampEnabled()
+            ? GetPrimaryNotificationCenterTray()
+            : nullptr);
   }
 
   // Create a test notification that is used in the view.
@@ -278,11 +282,7 @@ class AshNotificationViewTestBase : public AshTestBase,
   // which we don't have in the customed made `notification_view_`.
   AshNotificationView* GetNotificationViewFromMessageCenter(std::string id) {
     return static_cast<AshNotificationView*>(
-        GetPrimaryUnifiedSystemTray()
-            ->message_center_bubble()
-            ->notification_center_view()
-            ->notification_list_view()
-            ->GetMessageViewForNotificationId(std::string(id)));
+        notification_center_test_api_->GetNotificationViewForId(id));
   }
 
   void UpdateTimestampForNotification(AshNotificationView* notification_view,
@@ -428,9 +428,13 @@ class AshNotificationViewTestBase : public AshTestBase,
 
   scoped_refptr<NotificationTestDelegate> delegate() { return delegate_; }
 
+  NotificationCenterTestApi* notification_center_test_api() {
+    return notification_center_test_api_.get();
+  }
+
  private:
   scoped_refptr<NotificationTestDelegate> delegate_;
-  std::unique_ptr<base::test::ScopedFeatureList> scoped_feature_list_;
+  std::unique_ptr<NotificationCenterTestApi> notification_center_test_api_;
 
   // Used to create test notification. This represents the current available
   // number that we can use to create the next test notification. This id will
@@ -443,7 +447,11 @@ class AshNotificationViewTest : public AshNotificationViewTestBase {
  public:
   AshNotificationViewTest()
       : AshNotificationViewTestBase(
-            base::test::TaskEnvironment::TimeSource::MOCK_TIME) {}
+            base::test::TaskEnvironment::TimeSource::MOCK_TIME) {
+    // TODO(b/293647571): Remove this feature disablement when the crash has
+    // been fixed.
+    scoped_features_.InitAndDisableFeature(chromeos::features::kJelly);
+  }
 
   // AshNotificationViewTestBase:
   void SetUp() override {
@@ -468,6 +476,7 @@ class AshNotificationViewTest : public AshNotificationViewTestBase {
   AshNotificationView* notification_view() { return notification_view_.get(); }
 
  private:
+  base::test::ScopedFeatureList scoped_features_;
   std::unique_ptr<AshNotificationView> notification_view_;
 };
 
@@ -834,7 +843,7 @@ TEST_F(AshNotificationViewTest, ExpandCollapseAnimationsRecordSmoothness) {
       /*by_user=*/true, message_center::MessageCenter::RemoveType::ALL);
   auto notification =
       CreateTestNotification(/*has_image=*/true, /*show_snooze_button=*/true);
-  GetPrimaryUnifiedSystemTray()->ShowBubble();
+  notification_center_test_api()->ToggleBubble();
   auto* notification_view =
       GetNotificationViewFromMessageCenter(notification->id());
 
@@ -894,7 +903,7 @@ TEST_F(AshNotificationViewTest, ImageExpandCollapseAnimationsRecordSmoothness) {
       /*by_user=*/true, message_center::MessageCenter::RemoveType::ALL);
   auto notification = CreateTestNotification(/*has_image=*/true,
                                              /*show_snooze_button=*/true);
-  GetPrimaryUnifiedSystemTray()->ShowBubble();
+  notification_center_test_api()->ToggleBubble();
   auto* notification_view =
       GetNotificationViewFromMessageCenter(notification->id());
 
@@ -960,7 +969,7 @@ TEST_F(AshNotificationViewTest, GroupExpandCollapseAnimationsRecordSmoothness) {
   message_center::MessageCenter::Get()->RemoveAllNotifications(
       /*by_user=*/true, message_center::MessageCenter::RemoveType::ALL);
   auto notification = CreateTestNotification();
-  GetPrimaryUnifiedSystemTray()->ShowBubble();
+  notification_center_test_api()->ToggleBubble();
   auto* notification_view =
       GetNotificationViewFromMessageCenter(notification->id());
   MakeNotificationGroupParent(
@@ -1024,7 +1033,8 @@ TEST_F(AshNotificationViewTest, SingleToGroupAnimationsRecordSmoothness) {
 
   message_center::MessageCenter::Get()->RemoveAllNotifications(
       /*by_user=*/true, message_center::MessageCenter::RemoveType::ALL);
-  GetPrimaryUnifiedSystemTray()->ShowBubble();
+  auto notification = CreateTestNotification();
+  notification_center_test_api()->ToggleBubble();
 
   auto notification1 = CreateTestNotificationInAGroup();
 
@@ -1059,7 +1069,7 @@ TEST_F(AshNotificationViewTest, InlineReplyAnimationsRecordSmoothness) {
       /*by_user=*/true, message_center::MessageCenter::RemoveType::ALL);
   auto notification =
       CreateTestNotification(/*has_image=*/true, /*show_snooze_button=*/true);
-  GetPrimaryUnifiedSystemTray()->ShowBubble();
+  notification_center_test_api()->ToggleBubble();
   auto* notification_view =
       GetNotificationViewFromMessageCenter(notification->id());
 
@@ -1101,7 +1111,7 @@ TEST_F(AshNotificationViewTest, InlineSettingsAnimationsRecordSmoothness) {
       /*by_user=*/true, message_center::MessageCenter::RemoveType::ALL);
   auto notification =
       CreateTestNotification(/*has_image=*/true, /*show_snooze_button=*/true);
-  GetPrimaryUnifiedSystemTray()->ShowBubble();
+  notification_center_test_api()->ToggleBubble();
   auto* notification_view =
       GetNotificationViewFromMessageCenter(notification->id());
 
@@ -1150,7 +1160,7 @@ TEST_F(AshNotificationViewTest,
 
   auto notification = CreateTestNotification();
 
-  GetPrimaryUnifiedSystemTray()->ShowBubble();
+  notification_center_test_api()->ToggleBubble();
   auto* notification_view =
       GetNotificationViewFromMessageCenter(notification->id());
   MakeNotificationGroupParent(
@@ -1232,7 +1242,7 @@ TEST_F(AshNotificationViewTest, DuplicateGroupChildRemovalWithAnimation) {
 
   auto notification = CreateTestNotification();
 
-  GetPrimaryUnifiedSystemTray()->ShowBubble();
+  notification_center_test_api()->ToggleBubble();
   auto* notification_view =
       GetNotificationViewFromMessageCenter(notification->id());
   MakeNotificationGroupParent(
@@ -1265,7 +1275,7 @@ TEST_F(AshNotificationViewTest, CollapseProgressNotificationWithImage) {
 
 TEST_F(AshNotificationViewTest, ButtonStateUpdated) {
   auto notification = CreateTestNotification();
-  GetPrimaryUnifiedSystemTray()->ShowBubble();
+  notification_center_test_api()->ToggleBubble();
 
   notification_view()->UpdateWithNotification(*notification);
 
@@ -1311,15 +1321,9 @@ class AshNotificationViewDragTestBase : public AshNotificationViewTestBase {
  public:
   // AshNotificationViewTestBase:
   void SetUp() override {
-    std::vector<base::test::FeatureRef> enabled_features{
-        features::kNotificationImageDrag};
-    std::vector<base::test::FeatureRef> disabled_features;
-    if (DoesUseQsRevamp()) {
-      enabled_features.push_back(features::kQsRevamp);
-    } else {
-      disabled_features.push_back(features::kQsRevamp);
-    }
-    scoped_feature_list_.InitWithFeatures(enabled_features, disabled_features);
+    scoped_feature_list_.InitWithFeatureStates(
+        {{features::kNotificationImageDrag, true},
+         {features::kQsRevamp, DoesUseQsRevamp()}});
 
     AshNotificationViewTestBase::SetUp();
     notification_test_api_ =
@@ -1363,17 +1367,21 @@ class AshNotificationViewDragTestBase : public AshNotificationViewTestBase {
         }),
         run_loop.QuitClosure());
 
+    StartDragAt(start_point);
+    run_loop.Run();
+  }
+
+  // Starts drag at the specified location.
+  void StartDragAt(const gfx::Point& point_in_screen) {
     if (DoesUseGesture()) {
       // Press touch to trigger notification drag.
-      GetEventGenerator()->PressTouch(start_point);
+      GetEventGenerator()->PressTouch(point_in_screen);
     } else {
       // Press the mouse then move to trigger notification drag.
-      GetEventGenerator()->MoveMouseTo(start_point);
+      GetEventGenerator()->MoveMouseTo(point_in_screen);
       GetEventGenerator()->PressLeftButton();
       MoveDragByOneStep();
     }
-
-    run_loop.Run();
   }
 
   // Drags and drops `notification_view`. If `drag_to_widget` is true,
@@ -1880,6 +1888,52 @@ TEST_P(ScreenCaptureNotificationViewDragTest, Basics) {
   // Check the notification catalog name.
   tester.ExpectBucketCount("Ash.NotificationView.ImageDrag.Start",
                            ash::NotificationCatalogName::kScreenCapture, 1);
+}
+
+class DragAfterNotificationRemovalTest : public AshNotificationViewDragTestBase,
+                                         public testing::WithParamInterface<
+                                             /*use_revamp_feature=*/bool> {
+ private:
+  // AshNotificationViewDragTestBase:
+  bool DoesUseGesture() const override { return false; }
+  bool IsPopupNotification() const override { return true; }
+  bool DoesUseQsRevamp() const override { return GetParam(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         DragAfterNotificationRemovalTest,
+                         /*use_revamp_feature=*/testing::Bool());
+
+// Verifies that removing a notification then dragging its corresponding view
+// shortly after removal works as expected.
+TEST_P(DragAfterNotificationRemovalTest, Basics) {
+  std::unique_ptr<Notification> notification = CreateTestNotification(
+      /*has_image=*/true, /*show_snooze_button=*/false, /*has_message=*/false,
+      message_center::NOTIFICATION_TYPE_SIMPLE,
+      absl::make_optional<base::FilePath>("dummy_file_path"));
+
+  // Wait until the notification popup shows.
+  MessagePopupAnimationWaiter(
+      GetPrimaryUnifiedSystemTray()->GetMessagePopupCollection())
+      .Wait();
+  EXPECT_FALSE(
+      message_center::MessageCenter::Get()->GetPopupNotifications().empty());
+
+  // Remove `notification` from the message center.
+  message_center::MessageCenter::Get()->RemoveNotification(notification->id(),
+                                                           /*by_user=*/true);
+  EXPECT_TRUE(
+      message_center::MessageCenter::Get()->GetPopupNotifications().empty());
+
+  // Drag the view corresponding to `notification`. Note that at this moment
+  // `notification_view` still exists due to the fade-out animation.
+  const AshNotificationView* const notification_view =
+      GetViewForNotificationId(notification->id());
+  ASSERT_TRUE(notification_view);
+  StartDragAt(GetDragAreaCenterInScreen(*notification_view));
+
+  // Drag should NOT start.
+  EXPECT_FALSE(notification_view->GetWidget()->dragged_view());
 }
 
 }  // namespace ash

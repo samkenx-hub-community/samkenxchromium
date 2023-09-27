@@ -178,10 +178,6 @@ IN_PROC_BROWSER_TEST_F(WebUITabStripInteractiveTest, CanUseInImmersiveMode) {
   WebUITabStripContainerView* const container = browser_view->webui_tab_strip();
   ASSERT_NE(nullptr, container);
 
-  // IPH may cause a reveal. Stop it.
-  auto lock =
-      browser_view->GetFeaturePromoController()->BlockPromosForTesting();
-
   EXPECT_FALSE(immersive_mode_controller->IsRevealed());
 
   // Try opening the tab strip.
@@ -218,7 +214,9 @@ IN_PROC_BROWSER_TEST_F(WebUITabStripInteractiveTest, CanUseInImmersiveMode) {
 }
 
 // Test fixture with additional logic for drag/drop.
-class WebUITabStripDragInteractiveTest : public InteractiveBrowserTest {
+class WebUITabStripDragInteractiveTest
+    : public InteractiveBrowserTest,
+      public testing::WithParamInterface<bool> {
  public:
   WebUITabStripDragInteractiveTest() = default;
   ~WebUITabStripDragInteractiveTest() override = default;
@@ -226,6 +224,17 @@ class WebUITabStripDragInteractiveTest : public InteractiveBrowserTest {
  private:
   WebUITabStripTestHelper helper_;
 };
+
+// Touch mode parameter, only supported by the test framework on Ash.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+INSTANTIATE_TEST_SUITE_P(/* no prefix */,
+                         WebUITabStripDragInteractiveTest,
+                         testing::Bool());
+#else
+INSTANTIATE_TEST_SUITE_P(/* no prefix */,
+                         WebUITabStripDragInteractiveTest,
+                         testing::Values(false));
+#endif
 
 // Regression test for crbug.com/1286203.
 //
@@ -256,10 +265,17 @@ class WebUITabStripDragInteractiveTest : public InteractiveBrowserTest {
 //
 // This sequence of events would crash without the associated bugfix. More
 // detail is provided in the actual test sequence.
-//
-// Note: if this test flakes, please reopen https://crbug.com/1399655.
-IN_PROC_BROWSER_TEST_F(WebUITabStripDragInteractiveTest,
-                       CloseTabDuringDragDoesNotCrash) {
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+// TODO(https://crbug.com/1399655): Flaky on linux-chromeos-chrome. Reenable
+// this test when the flakiness will be resolved.
+#define MAYBE_CloseTabDuringDragDoesNotCrash \
+  DISABLED_CloseTabDuringDragDoesNotCrash
+#else
+#define MAYBE_CloseTabDuringDragDoesNotCrash CloseTabDuringDragDoesNotCrash
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+IN_PROC_BROWSER_TEST_P(WebUITabStripDragInteractiveTest,
+                       MAYBE_CloseTabDuringDragDoesNotCrash) {
   DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kSecondTabElementId);
   DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebUiTabStripElementId);
 
@@ -305,16 +321,17 @@ IN_PROC_BROWSER_TEST_F(WebUITabStripDragInteractiveTest,
       });
 
   RunTestSequence(
+      // Toggle touch mode to send either mouse or touch events.
+      Check([this]() { return mouse_util().SetTouchMode(GetParam()); }),
       AddInstrumentedTab(kSecondTabElementId, GURL("about:blank")),
       // Click the counter button and then wait for the WebUI tabstrip to
       // appear.
-      PressButton(kTabCounterButtonElementId),
+      PressButton(kToolbarTabCounterButtonElementId),
       InstrumentNonTabWebView(kWebUiTabStripElementId, get_tabstrip_webview),
       // Verify there are two tabs.
       CheckResult(get_tab_count, 2),
       // Wait for the WebUI tabstrip contents to populate.
-      WaitForStateChange(kWebUiTabStripElementId,
-                         std::move(tab_populated_change)),
+      WaitForStateChange(kWebUiTabStripElementId, tab_populated_change),
       // Now that the tab is properly rendered, drag it out of the tabstrip.
       MoveMouseTo(kWebUiTabStripElementId, kSecondTabQuery),
       // Drag to the center of the main web contents pane, which should be

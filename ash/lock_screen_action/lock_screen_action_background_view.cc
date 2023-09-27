@@ -10,6 +10,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/i18n/rtl.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
@@ -65,11 +66,12 @@ class LockScreenActionBackgroundView::NoteBackground : public views::View {
   ~NoteBackground() override = default;
 
  private:
-  views::InkDropObserver* observer_;
+  raw_ptr<views::InkDropObserver, ExperimentalAsh> observer_;
 };
 
 LockScreenActionBackgroundView::LockScreenActionBackgroundView() {
   SetCanMaximize(true);
+  SetCanFullscreen(true);
 
   auto layout_manager = std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kVertical);
@@ -78,7 +80,7 @@ LockScreenActionBackgroundView::LockScreenActionBackgroundView() {
   auto* layout_ptr = SetLayoutManager(std::move(layout_manager));
 
   background_ = new NoteBackground(this);
-  AddChildView(background_);
+  AddChildView(background_.get());
   // Make background view flexible - the constant does not really matter given
   // that |background_| is the only child, as long as it's greater than 0.
   layout_ptr->SetFlexForView(background_, 1 /*flex_weight*/);

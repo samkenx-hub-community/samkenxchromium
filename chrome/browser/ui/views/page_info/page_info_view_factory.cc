@@ -19,7 +19,6 @@
 #include "chrome/browser/ui/page_info/chrome_page_info_ui_delegate.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
-#include "chrome/browser/ui/views/page_info/page_info_about_this_site_content_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_ad_personalization_content_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_cookies_content_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_main_view.h"
@@ -34,6 +33,7 @@
 #include "components/strings/grit/components_strings.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/color/color_id.h"
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/views/bubble/bubble_frame_view.h"
@@ -81,15 +81,19 @@ int GetIconSize() {
 }  // namespace
 
 // static
-std::unique_ptr<views::View> PageInfoViewFactory::CreateSeparator() {
-  // Distance for multi content list is used, but split in half, since there is
-  // a separator in the middle of it.
-  const int separator_spacing = ChromeLayoutProvider::Get()->GetDistanceMetric(
-                                    DISTANCE_CONTENT_LIST_VERTICAL_MULTI) /
-                                2;
+std::unique_ptr<views::View> PageInfoViewFactory::CreateSeparator(
+    int horizontal_inset) {
+  int separator_spacing = ChromeLayoutProvider::Get()->GetDistanceMetric(
+      DISTANCE_CONTENT_LIST_VERTICAL_MULTI);
+  if (!features::IsChromeRefresh2023()) {
+    // Distance for multi content list is used, but split in half, since there
+    // is a separator in the middle of it. For ChromeRefresh2023, the separator
+    // spacing is larger hence no need to split in half.
+    separator_spacing /= 2;
+  }
   auto separator = std::make_unique<views::Separator>();
   separator->SetProperty(views::kMarginsKey,
-                         gfx::Insets::VH(separator_spacing, 0));
+                         gfx::Insets::VH(separator_spacing, horizontal_inset));
   return separator;
 }
 
@@ -134,7 +138,7 @@ std::unique_ptr<views::View> PageInfoViewFactory::CreateSecurityPageView() {
   return std::make_unique<PageInfoSubpageView>(
       CreateSubpageHeader(
           l10n_util::GetStringUTF16(IDS_PAGE_INFO_SECURITY_SUBPAGE_HEADER),
-          presenter_->GetSiteNameOrAppNameToDisplay()),
+          presenter_->GetSubjectNameForDisplay()),
       std::make_unique<PageInfoSecurityContentView>(
           presenter_, /*is_standalone_page=*/true));
 }
@@ -143,19 +147,9 @@ std::unique_ptr<views::View> PageInfoViewFactory::CreatePermissionPageView(
     ContentSettingsType type) {
   return std::make_unique<PageInfoSubpageView>(
       CreateSubpageHeader(PageInfoUI::PermissionTypeToUIString(type),
-                          presenter_->GetSiteNameOrAppNameToDisplay()),
+                          presenter_->GetSubjectNameForDisplay()),
       std::make_unique<PageInfoPermissionContentView>(presenter_, ui_delegate_,
                                                       type));
-}
-
-std::unique_ptr<views::View> PageInfoViewFactory::CreateAboutThisSitePageView(
-    const page_info::proto::SiteInfo& info) {
-  return std::make_unique<PageInfoSubpageView>(
-      CreateSubpageHeader(
-          l10n_util::GetStringUTF16(IDS_PAGE_INFO_ABOUT_THIS_SITE_HEADER),
-          presenter_->GetSiteNameOrAppNameToDisplay()),
-      std::make_unique<PageInfoAboutThisSiteContentView>(presenter_,
-                                                         ui_delegate_, info));
 }
 
 std::unique_ptr<views::View>
@@ -166,7 +160,7 @@ PageInfoViewFactory::CreateAdPersonalizationPageView() {
           : IDS_PAGE_INFO_AD_PERSONALIZATION_HEADER;
   return std::make_unique<PageInfoSubpageView>(
       CreateSubpageHeader(l10n_util::GetStringUTF16(header_id),
-                          presenter_->GetSiteNameOrAppNameToDisplay()),
+                          presenter_->GetSubjectNameForDisplay()),
       std::make_unique<PageInfoAdPersonalizationContentView>(presenter_,
                                                              ui_delegate_));
 }
@@ -176,7 +170,7 @@ std::unique_ptr<views::View> PageInfoViewFactory::CreateCookiesPageView() {
   return std::make_unique<PageInfoSubpageView>(
       CreateSubpageHeader(
           l10n_util::GetStringUTF16(IDS_PAGE_INFO_COOKIES_HEADER),
-          presenter_->GetSiteNameOrAppNameToDisplay()),
+          presenter_->GetSubjectNameForDisplay()),
       std::make_unique<PageInfoCookiesContentView>(presenter_));
 }
 
@@ -210,18 +204,23 @@ std::unique_ptr<views::View> PageInfoViewFactory::CreateSubpageHeader(
       base::BindRepeating(&PageInfoNavigationHandler::OpenMainPage,
                           base::Unretained(navigation_handler_),
                           base::DoNothing()),
-      vector_icons::kArrowBackIcon);
+      features::IsChromeRefresh2023()
+          ? vector_icons::kArrowBackChromeRefreshIcon
+          : vector_icons::kArrowBackIcon,
+      GetIconSize());
   views::InstallCircleHighlightPathGenerator(back_button.get());
   back_button->SetID(VIEW_ID_PAGE_INFO_BACK_BUTTON);
   back_button->SetTooltipText(l10n_util::GetStringUTF16(IDS_ACCNAME_BACK));
   back_button->SetProperty(views::kInternalPaddingKey,
                            back_button->GetInsets());
   header->AddChildView(std::move(back_button));
-
   auto* label_wrapper = header->AddChildView(CreateLabelWrapper());
   auto* title_label = label_wrapper->AddChildView(
       std::make_unique<views::Label>(title, views::style::CONTEXT_DIALOG_TITLE,
                                      views::style::STYLE_SECONDARY));
+  if (features::IsChromeRefresh2023()) {
+    title_label->SetTextStyle(views::style::STYLE_HEADLINE_4);
+  }
   title_label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
 
   if (!subtitle.empty()) {
@@ -251,6 +250,163 @@ std::unique_ptr<views::View> PageInfoViewFactory::CreateSubpageHeader(
 // static
 const ui::ImageModel PageInfoViewFactory::GetPermissionIcon(
     const PageInfo::PermissionInfo& info) {
+  ContentSetting setting = info.setting == CONTENT_SETTING_DEFAULT
+                               ? info.default_setting
+                               : info.setting;
+  const bool show_blocked_badge =
+      !permissions::PermissionUtil::IsGuardContentSetting(info.type)
+          ? setting == CONTENT_SETTING_BLOCK || setting == CONTENT_SETTING_ASK
+          : setting == CONTENT_SETTING_BLOCK;
+
+  if (features::IsChromeRefresh2023()) {
+    // Cr2023 does not add an additional blocked badge for block states,
+    // instead it uses a completely different icon. This icon usually has the
+    // word `Off` in the icon name.
+    const gfx::VectorIcon* icon = nullptr;
+    switch (info.type) {
+      case ContentSettingsType::COOKIES:
+        icon = show_blocked_badge ? &vector_icons::kCookieOffChromeRefreshIcon
+                                  : &vector_icons::kCookieChromeRefreshIcon;
+        break;
+      case ContentSettingsType::FEDERATED_IDENTITY_API:
+        icon = show_blocked_badge
+                   ? &vector_icons::kAccountCircleOffChromeRefreshIcon
+                   : &vector_icons::kAccountCircleChromeRefreshIcon;
+        break;
+      case ContentSettingsType::IMAGES:
+        icon = show_blocked_badge ? &vector_icons::kPhotoOffChromeRefreshIcon
+                                  : &vector_icons::kPhotoChromeRefreshIcon;
+        break;
+      case ContentSettingsType::JAVASCRIPT:
+        icon = show_blocked_badge ? &vector_icons::kCodeOffChromeRefreshIcon
+                                  : &vector_icons::kCodeChromeRefreshIcon;
+        break;
+      case ContentSettingsType::POPUPS:
+        icon = show_blocked_badge ? &vector_icons::kLaunchOffChromeRefreshIcon
+                                  : &vector_icons::kLaunchChromeRefreshIcon;
+        break;
+      case ContentSettingsType::GEOLOCATION:
+        icon = show_blocked_badge ? &vector_icons::kLocationOffChromeRefreshIcon
+                                  : &vector_icons::kLocationOnChromeRefreshIcon;
+        break;
+      case ContentSettingsType::NOTIFICATIONS:
+        icon = show_blocked_badge
+                   ? &vector_icons::kNotificationsOffChromeRefreshIcon
+                   : &vector_icons::kNotificationsChromeRefreshIcon;
+        break;
+      case ContentSettingsType::MEDIASTREAM_MIC:
+        icon = show_blocked_badge ? &vector_icons::kMicOffChromeRefreshIcon
+                                  : &vector_icons::kMicChromeRefreshIcon;
+        break;
+      case ContentSettingsType::MEDIASTREAM_CAMERA:
+      case ContentSettingsType::CAMERA_PAN_TILT_ZOOM:
+        icon = show_blocked_badge ? &vector_icons::kVideocamOffChromeRefreshIcon
+                                  : &vector_icons::kVideocamChromeRefreshIcon;
+        break;
+      case ContentSettingsType::AUTOMATIC_DOWNLOADS:
+        icon = show_blocked_badge
+                   ? &vector_icons::kFileDownloadOffChromeRefreshIcon
+                   : &vector_icons::kFileDownloadChromeRefreshIcon;
+        break;
+#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN)
+      case ContentSettingsType::PROTECTED_MEDIA_IDENTIFIER:
+        icon = show_blocked_badge
+                   ? &vector_icons::kCertificateOffChromeRefreshIcon
+                   : &vector_icons::kCertificateChromeRefreshIcon;
+        break;
+#endif
+      case ContentSettingsType::MIDI_SYSEX:
+        icon = show_blocked_badge ? &vector_icons::kMidiOffChromeRefreshIcon
+                                  : &vector_icons::kMidiChromeRefreshIcon;
+        break;
+      case ContentSettingsType::BACKGROUND_SYNC:
+        icon = show_blocked_badge ? &vector_icons::kSyncOffChromeRefreshIcon
+                                  : &vector_icons::kSyncChromeRefreshIcon;
+        break;
+      case ContentSettingsType::ADS:
+        icon = show_blocked_badge ? &vector_icons::kAdsOffChromeRefreshIcon
+                                  : &vector_icons::kAdsChromeRefreshIcon;
+        break;
+      case ContentSettingsType::SOUND:
+        icon = show_blocked_badge ? &vector_icons::kVolumeOffChromeRefreshIcon
+                                  : &vector_icons::kVolumeUpChromeRefreshIcon;
+        break;
+      case ContentSettingsType::CLIPBOARD_READ_WRITE:
+        icon = show_blocked_badge
+                   ? &vector_icons::kPageInfoContentPasteOffChromeRefreshIcon
+                   : &vector_icons::kPageInfoContentPasteChromeRefreshIcon;
+        break;
+      case ContentSettingsType::SENSORS:
+        icon = show_blocked_badge ? &vector_icons::kSensorsOffChromeRefreshIcon
+                                  : &vector_icons::kSensorsChromeRefreshIcon;
+        break;
+      case ContentSettingsType::USB_GUARD:
+        icon = show_blocked_badge ? &vector_icons::kUsbOffChromeRefreshIcon
+                                  : &vector_icons::kUsbChromeRefreshIcon;
+        break;
+      case ContentSettingsType::SERIAL_GUARD:
+        icon = show_blocked_badge
+                   ? &vector_icons::kSerialPortOffChromeRefreshIcon
+                   : &vector_icons::kSerialPortChromeRefreshIcon;
+        break;
+      case ContentSettingsType::BLUETOOTH_GUARD:
+        icon = show_blocked_badge
+                   ? &vector_icons::kBluetoothOffChromeRefreshIcon
+                   : &vector_icons::kBluetoothChromeRefreshIcon;
+        break;
+      case ContentSettingsType::BLUETOOTH_SCANNING:
+        icon = show_blocked_badge
+                   ? &vector_icons::kBluetoothOffChromeRefreshIcon
+                   : &vector_icons::kBluetoothScanningChromeRefreshIcon;
+        break;
+      case ContentSettingsType::FILE_SYSTEM_WRITE_GUARD:
+        icon = show_blocked_badge ? &kFileSaveOffChromeRefreshIcon
+                                  : &kFileSaveChromeRefreshIcon;
+        break;
+      case ContentSettingsType::VR:
+        icon = show_blocked_badge
+                   ? &vector_icons::kVrHeadsetOffChromeRefreshIcon
+                   : &vector_icons::kVrHeadsetChromeRefreshIcon;
+        break;
+      case ContentSettingsType::AR:
+        icon = show_blocked_badge ? &vector_icons::kViewInArOffChromeRefreshIcon
+                                  : &vector_icons::kViewInArChromeRefreshIcon;
+        break;
+      case ContentSettingsType::WINDOW_MANAGEMENT:
+        icon = show_blocked_badge
+                   ? &vector_icons::kSelectWindowOffChromeRefreshIcon
+                   : &vector_icons::kSelectWindowChromeRefreshIcon;
+        break;
+      case ContentSettingsType::LOCAL_FONTS:
+        icon = show_blocked_badge
+                   ? &vector_icons::kFontDownloadOffChromeRefreshIcon
+                   : &vector_icons::kFontDownloadChromeRefreshIcon;
+        break;
+      case ContentSettingsType::HID_GUARD:
+        icon = show_blocked_badge
+                   ? &vector_icons::kVideogameAssetOffChromeRefreshIcon
+                   : &vector_icons::kVideogameAssetChromeRefreshIcon;
+        break;
+      case ContentSettingsType::IDLE_DETECTION:
+        icon = show_blocked_badge ? &vector_icons::kDevicesOffChromeRefreshIcon
+                                  : &vector_icons::kDevicesChromeRefreshIcon;
+        break;
+      case ContentSettingsType::STORAGE_ACCESS:
+        icon = show_blocked_badge ? &vector_icons::kStorageAccessOffIcon
+                                  : &vector_icons::kStorageAccessIcon;
+        break;
+      default:
+        break;
+    }
+
+    // If there is no ChromeRefreshIcon currently defined, continue to the rest
+    // of the function.
+    if (icon != nullptr) {
+      return ui::ImageModel::FromVectorIcon(*icon, ui::kColorIcon,
+                                            GetIconSize());
+    }
+  }
+
   const gfx::VectorIcon* icon = &gfx::kNoneIcon;
   switch (info.type) {
     case ContentSettingsType::COOKIES:
@@ -320,7 +476,7 @@ const ui::ImageModel PageInfoViewFactory::GetPermissionIcon(
       icon = &vector_icons::kBluetoothScanningIcon;
       break;
     case ContentSettingsType::FILE_SYSTEM_WRITE_GUARD:
-      icon = &vector_icons::kSaveOriginalFileIcon;
+      icon = &kFileSaveIcon;
       break;
     case ContentSettingsType::VR:
     case ContentSettingsType::AR:
@@ -338,19 +494,19 @@ const ui::ImageModel PageInfoViewFactory::GetPermissionIcon(
     case ContentSettingsType::IDLE_DETECTION:
       icon = &vector_icons::kDevicesIcon;
       break;
+    case ContentSettingsType::STORAGE_ACCESS:
+      icon = &vector_icons::kStorageAccessIcon;
+      break;
+    case ContentSettingsType::AUTO_PICTURE_IN_PICTURE:
+      // TODO(https://crbug.com/1471051): Use real icon.
+      icon = &vector_icons::kSelectWindowIcon;
+      break;
     default:
       // All other |ContentSettingsType|s do not have icons on desktop or are
       // not shown in the Page Info bubble.
       NOTREACHED_NORETURN();
   }
 
-  ContentSetting setting = info.setting == CONTENT_SETTING_DEFAULT
-                               ? info.default_setting
-                               : info.setting;
-  const bool show_blocked_badge =
-      !permissions::PermissionUtil::IsGuardContentSetting(info.type)
-          ? setting == CONTENT_SETTING_BLOCK || setting == CONTENT_SETTING_ASK
-          : setting == CONTENT_SETTING_BLOCK;
   return ui::ImageModel::FromVectorIcon(
       *icon, ui::kColorIcon, GetIconSize(),
       show_blocked_badge ? &vector_icons::kBlockedBadgeIcon : nullptr);
@@ -391,12 +547,18 @@ const ui::ImageModel PageInfoViewFactory::GetChosenObjectIcon(
 
 // static
 const ui::ImageModel PageInfoViewFactory::GetValidCertificateIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kCertificateIcon,
-                                        ui::kColorIcon, GetIconSize());
+  return GetImageModel(features::IsChromeRefresh2023()
+                           ? vector_icons::kCertificateChromeRefreshIcon
+                           : vector_icons::kCertificateIcon);
 }
 
 // static
 const ui::ImageModel PageInfoViewFactory::GetInvalidCertificateIcon() {
+  if (features::IsChromeRefresh2023()) {
+    return ui::ImageModel::FromVectorIcon(
+        vector_icons::kCertificateOffChromeRefreshIcon, ui::kColorIcon,
+        GetIconSize());
+  }
   return ui::ImageModel::FromVectorIcon(vector_icons::kCertificateIcon,
                                         ui::kColorIcon, GetIconSize(),
                                         &vector_icons::kBlockedBadgeIcon);
@@ -404,8 +566,9 @@ const ui::ImageModel PageInfoViewFactory::GetInvalidCertificateIcon() {
 
 // static
 const ui::ImageModel PageInfoViewFactory::GetSiteSettingsIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kSettingsIcon,
-                                        ui::kColorIcon);
+  return GetImageModel(features::IsChromeRefresh2023()
+                           ? vector_icons::kSettingsChromeRefreshIcon
+                           : vector_icons::kSettingsIcon);
 }
 
 // static
@@ -416,60 +579,78 @@ const ui::ImageModel PageInfoViewFactory::GetVrSettingsIcon() {
 
 // static
 const ui::ImageModel PageInfoViewFactory::GetLaunchIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kLaunchIcon,
-                                        ui::kColorIconSecondary, GetIconSize());
-}
-
-// static
-const ui::ImageModel PageInfoViewFactory::GetSidePanelIcon() {
-  return ui::ImageModel::FromVectorIcon(kSidePanelIcon, ui::kColorIconSecondary,
-                                        GetIconSize());
+  return ui::ImageModel::FromVectorIcon(
+      features::IsChromeRefresh2023() ? vector_icons::kLaunchChromeRefreshIcon
+                                      : vector_icons::kLaunchIcon,
+      features::IsChromeRefresh2023() ? ui::kColorIcon
+                                      : ui::kColorIconSecondary,
+      GetIconSize());
 }
 
 // static
 const ui::ImageModel PageInfoViewFactory::GetConnectionNotSecureIcon() {
   return ui::ImageModel::FromVectorIcon(vector_icons::kNotSecureWarningIcon,
-                                        ui::kColorAlertHighSeverity);
+                                        ui::kColorAlertHighSeverity,
+                                        GetIconSize());
+}
+
+// static
+const ui::ImageModel PageInfoViewFactory::GetConnectionDangerousIcon() {
+  return ui::ImageModel::FromVectorIcon(
+      vector_icons::kDangerousIcon, ui::kColorAlertHighSeverity, GetIconSize());
 }
 
 // static
 const ui::ImageModel PageInfoViewFactory::GetConnectionSecureIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kHttpsValidIcon,
-                                        ui::kColorIcon);
+  return GetImageModel(features::IsChromeRefresh2023()
+                           ? vector_icons::kHttpsValidChromeRefreshIcon
+                           : vector_icons::kHttpsValidIcon);
 }
 
 // static
 const ui::ImageModel PageInfoViewFactory::GetOpenSubpageIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kSubmenuArrowIcon,
-                                        ui::kColorIcon);
+  // GetIconSize() does not work for subpage icons because the default size of
+  // kSubmenuArrowIcon is 8 rather than 16.
+  const int icon_size = features::IsChromeRefresh2023() ? 20 : 8;
+  return ui::ImageModel::FromVectorIcon(
+      features::IsChromeRefresh2023()
+          ? vector_icons::kSubmenuArrowChromeRefreshIcon
+          : vector_icons::kSubmenuArrowIcon,
+      ui::kColorIcon, icon_size);
 }
 
 // static
 const ui::ImageModel PageInfoViewFactory::GetAboutThisSiteIcon() {
-  return ui::ImageModel::FromVectorIcon(GetAboutThisSiteVectorIcon(),
-                                        ui::kColorIcon, GetIconSize());
+  return GetImageModel(GetAboutThisSiteVectorIcon());
+}
+
+// static
+const gfx::VectorIcon& PageInfoViewFactory::GetAboutThisSiteColorVectorIcon() {
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+  return vector_icons::kPageInsightsColorIcon;
+#else
+  return features::IsChromeRefresh2023() ? views::kInfoChromeRefreshIcon
+                                         : views::kInfoIcon;
+#endif  // !BUILDFLAG(GOOGLE_CHROME_BRANDING)
 }
 
 // static
 const gfx::VectorIcon& PageInfoViewFactory::GetAboutThisSiteVectorIcon() {
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  if (page_info::IsAboutThisSiteNewIconFeatureEnabled()) {
-    return vector_icons::kPageInsightsIcon;
-  }
+  return vector_icons::kPageInsightsIcon;
+#else
+  return features::IsChromeRefresh2023() ? views::kInfoChromeRefreshIcon
+                                         : views::kInfoIcon;
 #endif  // !BUILDFLAG(GOOGLE_CHROME_BRANDING)
-
-  return views::kInfoIcon;
 }
 // static
 const ui::ImageModel PageInfoViewFactory::GetHistoryIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kHistoryIcon,
-                                        ui::kColorIcon, GetIconSize());
+  return GetImageModel(vector_icons::kHistoryIcon);
 }
 
 // static
 const ui::ImageModel PageInfoViewFactory::GetAdPersonalizationIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kAdsClickIcon,
-                                        ui::kColorIcon, GetIconSize());
+  return GetImageModel(vector_icons::kAdsClickIcon);
 }
 
 // static
@@ -479,51 +660,40 @@ const ui::ImageModel PageInfoViewFactory::GetManagedPermissionIcon(
       info.source == content_settings::SETTING_SOURCE_EXTENSION
           ? vector_icons::kExtensionIcon
           : vector_icons::kBusinessIcon;
-  return ui::ImageModel::FromVectorIcon(managed_vector_icon, ui::kColorIcon,
-                                        GetIconSize());
+  return GetImageModel(managed_vector_icon);
 }
 
 // static
-const ui::ImageModel PageInfoViewFactory::GetBlockingThirdPartyCookiesIcon() {
-  return ui::ImageModel::FromVectorIcon(views::kEyeCrossedIcon, ui::kColorIcon,
-                                        GetIconSize());
-}
-
-// static
-const ui::ImageModel PageInfoViewFactory::GetFpsIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kTenancyIcon,
-                                        ui::kColorIcon, GetIconSize());
-}
-
-// static
-const ui::ImageModel PageInfoViewFactory::GetEnforcedCookieControlsIcon(
-    CookieControlsEnforcement enforcement) {
-  switch (enforcement) {
-    case CookieControlsEnforcement::kEnforcedByExtension:
-      return GetEnforcedByExtensionIcon();
-    case CookieControlsEnforcement::kEnforcedByPolicy:
-      return GetEnforcedByPolicyIcon();
-    case CookieControlsEnforcement::kEnforcedByCookieSetting:
-      return GetEnforcedBySettingsIcon();
-    case CookieControlsEnforcement::kNoEnforcement:
-      NOTREACHED_NORETURN();
+const ui::ImageModel PageInfoViewFactory::GetThirdPartyCookiesIcon(
+    bool third_party_cookies_enabled) {
+  if (third_party_cookies_enabled) {
+    return GetImageModel(features::IsChromeRefresh2023()
+                             ? views::kEyeRefreshIcon
+                             : views::kEyeIcon);
+  } else {
+    return GetBlockingThirdPartyCookiesIcon();
   }
 }
 
 // static
+const ui::ImageModel PageInfoViewFactory::GetBlockingThirdPartyCookiesIcon() {
+  return GetImageModel(features::IsChromeRefresh2023()
+                           ? views::kEyeCrossedRefreshIcon
+                           : views::kEyeCrossedIcon);
+}
+
+// static
+const ui::ImageModel PageInfoViewFactory::GetFpsIcon() {
+  return GetImageModel(vector_icons::kTenancyIcon);
+}
+
+// static
 const ui::ImageModel PageInfoViewFactory::GetEnforcedByPolicyIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kBusinessIcon,
-                                        ui::kColorIcon, GetIconSize());
+  return GetImageModel(vector_icons::kBusinessIcon);
 }
 
 // static
-const ui::ImageModel PageInfoViewFactory::GetEnforcedByExtensionIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kExtensionIcon,
-                                        ui::kColorIcon, GetIconSize());
-}
-
-// static
-const ui::ImageModel PageInfoViewFactory::GetEnforcedBySettingsIcon() {
-  return ui::ImageModel::FromVectorIcon(vector_icons::kSettingsIcon,
-                                        ui::kColorIcon, GetIconSize());
+const ui::ImageModel PageInfoViewFactory::GetImageModel(
+    const gfx::VectorIcon& icon) {
+  return ui::ImageModel::FromVectorIcon(icon, ui::kColorIcon, GetIconSize());
 }

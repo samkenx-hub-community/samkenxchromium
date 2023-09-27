@@ -30,12 +30,15 @@ ClosedTabCacheService* ClosedTabCacheServiceFactory::GetForProfile(
 }
 
 ClosedTabCacheServiceFactory* ClosedTabCacheServiceFactory::GetInstance() {
-  return base::Singleton<ClosedTabCacheServiceFactory>::get();
+  static base::NoDestructor<ClosedTabCacheServiceFactory> instance;
+  return instance.get();
 }
 
-KeyedService* ClosedTabCacheServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+ClosedTabCacheServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
-  return new ClosedTabCacheService(static_cast<Profile*>(context));
+  return std::make_unique<ClosedTabCacheService>(
+      Profile::FromBrowserContext(context));
 }
 
 bool ClosedTabCacheServiceFactory::ServiceIsCreatedWithBrowserContext() const {

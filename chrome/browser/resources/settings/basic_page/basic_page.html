@@ -38,13 +38,23 @@
               prefs="{{prefs}}">
           </settings-privacy-guide-promo>
         </settings-section>
-        <template is="dom-if" if="[[showPage_(pageVisibility.safetyCheck)]]"
-            restamp>
+        <!-- TODO(crbug/1469277): Remove after SafetyHub launched. -->
+        <template is="dom-if"
+              if="[[showSafetyCheckPage_(pageVisibility.safetyCheck)]]" restamp>
           <settings-section page-title="$i18n{safetyCheckSectionTitle}"
               section="safetyCheck" nest-under-section="privacy"
               id="safetyCheckSettingsSection">
             <settings-safety-check-page prefs="{{prefs}}">
             </settings-safety-check-page>
+          </settings-section>
+        </template>
+        <template is="dom-if"
+            if="[[showSafetyHubEntryPointPage_(pageVisibility.privacy)]]"
+            restamp>
+          <settings-section page-title="$i18n{safetyHub}"
+              section="safetyHubEntryPoint" nest-under-section="privacy"
+              id="safetyHubEntryPointSection">
+            <settings-safety-hub-entry-point></settings-safety-hub-entry-point>
           </settings-section>
         </template>
         <template is="dom-if" if="[[showPage_(pageVisibility.privacy)]]"
@@ -59,7 +69,7 @@
         <template is="dom-if"
             if="[[showPerformancePage_(pageVisibility.performance)]]"
             restamp>
-          <settings-section page-title="$i18n{performancePageTitle}"
+          <settings-section page-title="[[getPerformancePageTitle_()]]"
 <if expr="_google_chrome">
               show-send-feedback-button
               on-send-feedback="onSendHighEfficiencyFeedbackClick_"
@@ -81,6 +91,26 @@
               id="batterySettingsSection" hidden="[[!showBatterySettings_]]">
             <settings-battery-page prefs="{{prefs}}">
             </settings-battery-page>
+          </settings-section>
+        </template>
+        <template is="dom-if"
+            if="[[showSpeedPage_(pageVisibility.performance)]]"
+            restamp>
+          <settings-section page-title="$i18n{speedPageTitle}"
+              section="speed" nest-under-section="performance"
+<if expr="_google_chrome">
+              show-send-feedback-button
+              on-send-feedback="onSendSpeedFeedbackClick_"
+</if>
+              id="speedSettingsSection">
+            <template is="dom-if" if="[[showSpeedPageV2_]]">
+              <settings-speed-page prefs="{{prefs}}">
+              </settings-speed-page>
+            </template>
+            <template is="dom-if" if="[[!showSpeedPageV2_]]">
+              <settings-preloading-page prefs="{{prefs}}">
+              </settings-preloading-page>
+            </template>
           </settings-section>
         </template>
         <template is="dom-if" if="[[showPage_(pageVisibility.appearance)]]"
@@ -139,7 +169,6 @@
 <if expr="chromeos_ash">
                 <cr-link-row id="openChromeOSLanguagesSettings"
                     on-click="onOpenChromeOsLanguagesSettingsClick_"
-                    button-aria-description="$i18n{opensInNewTab}"
                     label="$i18n{openChromeOSLanguagesSettingsLabel}" external>
                 </cr-link-row>
 </if>
@@ -163,16 +192,13 @@
                 </settings-spell-check-page>
               </settings-section>
             </template>
-            <template is="dom-if"
-                if="[[enableDesktopDetailedLanguageSettings_]]" restamp>
-              <settings-section page-title="$i18n{translatePageTitle}"
-                  section="translate" nest-under-section="languages">
-                <settings-translate-page prefs="{{prefs}}"
-                    languages="{{languages}}"
-                    language-helper="{{languageHelper}}">
-                </settings-translate-page>
-              </settings-section>
-            </template>
+            <settings-section page-title="$i18n{translatePageTitle}"
+                section="translate" nest-under-section="languages">
+              <settings-translate-page prefs="{{prefs}}"
+                  languages="{{languages}}"
+                  language-helper="{{languageHelper}}">
+              </settings-translate-page>
+            </settings-section>
 </if>
             <template is="dom-if" if="[[showPage_(pageVisibility.downloads)]]"
                 restamp>
@@ -186,7 +212,10 @@
                 restamp>
               <settings-section page-title="$i18n{a11yPageTitle}"
                   section="a11y">
-                <settings-a11y-page prefs="{{prefs}}"></settings-a11y-page>
+                <settings-a11y-page prefs="{{prefs}}"
+                    languages="{{languages}}"
+                    language-helper="{{languageHelper}}">
+                </settings-a11y-page>
               </settings-section>
             </template>
 <if expr="not chromeos_ash">
@@ -202,6 +231,16 @@
                 <settings-reset-page prefs="{{prefs}}"></settings-reset-page>
               </settings-section>
             </template>
+<if expr="_google_chrome">
+            <template is="dom-if"
+                if="[[showGetMostChrome_(pageVisibility.getMostChrome)]]"
+                restamp>
+              <settings-section page-title="$i18n{getTheMostOutOfChrome}"
+                  section="getMostChrome" no-search>
+                <settings-get-most-chrome-page></settings-get-most-chrome-page>
+              </settings-section>
+            </template>
+</if>
           </div>
         </template>
       </settings-idle-load>

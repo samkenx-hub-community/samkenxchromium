@@ -15,8 +15,7 @@
               "execution_mode": "COMPILE_AND_TEST",
               "legacy_chromium_config": {
                 "apply_configs": [
-                  "mb",
-                  "goma_use_local"
+                  "mb"
                 ],
                 "build_config": "Release",
                 "config": "chromium",
@@ -43,8 +42,7 @@
               "execution_mode": "COMPILE_AND_TEST",
               "legacy_chromium_config": {
                 "apply_configs": [
-                  "mb",
-                  "goma_use_local"
+                  "mb"
                 ],
                 "build_config": "Release",
                 "config": "chromium",
@@ -71,8 +69,7 @@
               "execution_mode": "TEST",
               "legacy_chromium_config": {
                 "apply_configs": [
-                  "mb",
-                  "goma_use_local"
+                  "mb"
                 ],
                 "build_config": "Release",
                 "config": "chromium",
@@ -101,8 +98,7 @@
               "execution_mode": "TEST",
               "legacy_chromium_config": {
                 "apply_configs": [
-                  "mb",
-                  "goma_use_local"
+                  "mb"
                 ],
                 "build_config": "Release",
                 "config": "chromium",
@@ -122,7 +118,7 @@
           {
             "builder_id": {
               "bucket": "ci",
-              "builder": "Mac12 Tests",
+              "builder": "Mac13 Tests",
               "project": "chromium"
             },
             "builder_spec": {
@@ -130,8 +126,7 @@
               "execution_mode": "TEST",
               "legacy_chromium_config": {
                 "apply_configs": [
-                  "mb",
-                  "goma_use_local"
+                  "mb"
                 ],
                 "build_config": "Release",
                 "config": "chromium",
@@ -175,7 +170,7 @@
         },
         {
           "bucket": "ci",
-          "builder": "Mac12 Tests",
+          "builder": "Mac13 Tests",
           "project": "chromium"
         }
       ]

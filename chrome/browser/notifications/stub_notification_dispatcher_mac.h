@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "base/memory/weak_ptr.h"
 #include "chrome/browser/notifications/notification_dispatcher_mac.h"
 #include "chrome/services/mac_notifications/public/mojom/mac_notifications.mojom.h"
 
@@ -32,6 +33,11 @@ class StubNotificationDispatcherMac : public NotificationDispatcherMac {
       const std::string& profile_id,
       bool incognito,
       GetDisplayedNotificationsCallback callback) override;
+  void GetDisplayedNotificationsForProfileIdAndOrigin(
+      const std::string& profile_id,
+      bool incognito,
+      const GURL& origin,
+      GetDisplayedNotificationsCallback callback) override;
   void GetAllDisplayedNotifications(
       GetAllDisplayedNotificationsCallback callback) override;
 
@@ -40,8 +46,14 @@ class StubNotificationDispatcherMac : public NotificationDispatcherMac {
     return notifications_;
   }
 
+  base::WeakPtr<StubNotificationDispatcherMac> AsWeakPtr() {
+    return weak_factory_.GetWeakPtr();
+  }
+
  private:
   std::vector<mac_notifications::mojom::NotificationPtr> notifications_;
+
+  base::WeakPtrFactory<StubNotificationDispatcherMac> weak_factory_{this};
 };
 
 #endif  // CHROME_BROWSER_NOTIFICATIONS_STUB_NOTIFICATION_DISPATCHER_MAC_H_

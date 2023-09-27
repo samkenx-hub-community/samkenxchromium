@@ -39,6 +39,7 @@ def main(argv):
   parser.add_argument('--path_mappings', nargs='*')
 
   parser.add_argument('--root_gen_dir', required=True)
+  parser.add_argument('--root_src_dir', required=True)
 
   parser.add_argument('--root_dir', required=True)
   parser.add_argument('--out_dir', required=True)
@@ -160,8 +161,11 @@ def main(argv):
     tsconfig['references'] = [{'path': dep} for dep in args.deps]
 
     assert args.raw_deps is not None
-    dep_to_path_mappings = GetDepToPathMappings(args.root_gen_dir,
-                                                args.platform)
+    dep_to_path_mappings = GetDepToPathMappings(
+        args.root_gen_dir,
+        # Sometimes root_src_dir has trailing slashes. Remove them if necessary.
+        args.root_src_dir.rstrip('/'),
+        args.platform)
 
     for dep in args.raw_deps:
       if dep not in dep_to_path_mappings:
@@ -251,7 +255,8 @@ def main(argv):
 
   if args.in_files is not None:
 
-    manifest_path = os.path.join(args.gen_dir, f'{args.output_suffix}.manifest')
+    manifest_path = os.path.join(args.gen_dir,
+                                 f'{args.output_suffix}_manifest.json')
     with open(manifest_path, 'w', encoding='utf-8') as manifest_file:
       manifest_data = {}
       manifest_data['base_dir'] = args.out_dir

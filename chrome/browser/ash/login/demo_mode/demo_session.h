@@ -44,7 +44,6 @@ class DemoComponents;
 class DemoSession : public session_manager::SessionManagerObserver,
                     public user_manager::UserManager::UserSessionStateObserver,
                     public extensions::AppWindowRegistry::Observer,
-                    public apps::AppRegistryCache::Observer,
                     public chromeos::PowerManagerClient::Observer {
  public:
   // Type of demo mode configuration.
@@ -120,9 +119,6 @@ class DemoSession : public session_manager::SessionManagerObserver,
   // instance has not yet been initialized (either by calling
   // StartIfInDemoMode() or PreloadOfflineResourcesIfInDemoMode()).
   static DemoSession* Get();
-
-  // Returns an additional comma-separated language list for demo mode.
-  static std::string GetAdditionalLanguageList();
 
   // Returns the id of the screensaver app based on the board name.
   static std::string GetScreensaverAppId();
@@ -202,10 +198,6 @@ class DemoSession : public session_manager::SessionManagerObserver,
   // as apps and media.
   void InstallDemoResources();
 
-  // Installs the CRX file from an update URL. Observes `AppRegistryCache` to
-  // launch the app upon installation.
-  void InstallAppFromUpdateUrl(const std::string& id);
-
   // Find image path then show the splash screen.
   void ConfigureAndStartSplashScreen();
 
@@ -222,11 +214,6 @@ class DemoSession : public session_manager::SessionManagerObserver,
 
   // session_manager::SessionManagerObserver:
   void OnSessionStateChanged() override;
-
-  // apps::AppRegistryCache::Observer:
-  void OnAppUpdate(const apps::AppUpdate& update) override;
-  void OnAppRegistryCacheWillBeDestroyed(
-      apps::AppRegistryCache* cache) override;
 
   // Once received the keyboard brightness percentage, increase the keyboard
   // brightness to the max level.
@@ -253,10 +240,6 @@ class DemoSession : public session_manager::SessionManagerObserver,
   base::ScopedMultiSourceObservation<extensions::AppWindowRegistry,
                                      extensions::AppWindowRegistry::Observer>
       app_window_registry_observations_{this};
-
-  base::ScopedMultiSourceObservation<apps::AppRegistryCache,
-                                     apps::AppRegistryCache::Observer>
-      app_registry_cache_observation_{this};
 
   scoped_refptr<DemoExtensionsExternalLoader> extensions_external_loader_;
 

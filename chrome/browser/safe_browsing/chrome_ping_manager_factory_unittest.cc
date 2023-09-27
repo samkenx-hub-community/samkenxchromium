@@ -38,19 +38,16 @@ class ChromePingManagerFactoryTest : public testing::Test {
  protected:
   void SetUp() override;
   void TearDown() override;
-  void RunReportThreatDetailsTest(bool is_csbrr_page_load_token_enabled);
+  void RunReportThreatDetailsTest();
   void RunShouldFetchAccessTokenForReportTest(bool is_enhanced_protection,
                                               bool is_signed_in,
                                               bool expect_should_fetch);
-  raw_ptr<TestingProfile> SetUpProfile(bool is_enhanced_protection,
-                                       bool is_signed_in);
+  TestingProfile* SetUpProfile(bool is_enhanced_protection, bool is_signed_in);
 
   content::BrowserTaskEnvironment task_environment_;
   std::unique_ptr<TestingProfileManager> profile_manager_;
 
  private:
-  void SetUpFeatureList(bool should_enable_csbrr_page_load_token);
-
   scoped_refptr<safe_browsing::SafeBrowsingService> sb_service_;
   base::test::ScopedFeatureList feature_list_;
 };
@@ -77,22 +74,10 @@ void ChromePingManagerFactoryTest::TearDown() {
   feature_list_.Reset();
 }
 
-void ChromePingManagerFactoryTest::SetUpFeatureList(
-    bool should_enable_csbrr_page_load_token) {
-  std::vector<base::test::FeatureRef> enabled_features = {};
-  std::vector<base::test::FeatureRef> disabled_features = {};
-  if (should_enable_csbrr_page_load_token) {
-    enabled_features.push_back(kAddPageLoadTokenToClientSafeBrowsingReport);
-  } else {
-    disabled_features.push_back(kAddPageLoadTokenToClientSafeBrowsingReport);
-  }
-  feature_list_.InitWithFeatures(enabled_features, disabled_features);
-}
-
-raw_ptr<TestingProfile> ChromePingManagerFactoryTest::SetUpProfile(
+TestingProfile* ChromePingManagerFactoryTest::SetUpProfile(
     bool is_enhanced_protection,
     bool is_signed_in) {
-  raw_ptr<TestingProfile> profile = profile_manager_->CreateTestingProfile(
+  TestingProfile* profile = profile_manager_->CreateTestingProfile(
       "testing_profile", IdentityTestEnvironmentProfileAdaptor::
                              GetIdentityTestEnvironmentFactories());
   if (is_enhanced_protection) {
@@ -111,16 +96,13 @@ void ChromePingManagerFactoryTest::RunShouldFetchAccessTokenForReportTest(
     bool is_enhanced_protection,
     bool is_signed_in,
     bool expect_should_fetch) {
-  raw_ptr<TestingProfile> profile =
-      SetUpProfile(is_enhanced_protection, is_signed_in);
+  TestingProfile* profile = SetUpProfile(is_enhanced_protection, is_signed_in);
   EXPECT_EQ(ChromePingManagerFactory::ShouldFetchAccessTokenForReport(profile),
             expect_should_fetch);
 }
 
-void ChromePingManagerFactoryTest::RunReportThreatDetailsTest(
-    bool is_csbrr_page_load_token_enabled) {
-  SetUpFeatureList(is_csbrr_page_load_token_enabled);
-  raw_ptr<TestingProfile> profile =
+void ChromePingManagerFactoryTest::RunReportThreatDetailsTest() {
+  TestingProfile* profile =
       SetUpProfile(/*is_enhanced_protection=*/false, /*is_signed_in=*/false);
   auto* ping_manager = ChromePingManagerFactory::GetForBrowserContext(profile);
 
@@ -134,14 +116,10 @@ void ChromePingManagerFactoryTest::RunReportThreatDetailsTest(
   expected_report.ParseFromString(input_report_content);
   *expected_report.mutable_population() =
       safe_browsing::GetUserPopulationForProfile(profile);
-  if (is_csbrr_page_load_token_enabled) {
-    ChromeUserPopulation::PageLoadToken token =
-        safe_browsing::GetPageLoadTokenForURL(profile, GURL(""));
-    expected_report.mutable_population()
-        ->mutable_page_load_tokens()
-        ->Add()
-        ->Swap(&token);
-  }
+  ChromeUserPopulation::PageLoadToken token =
+      safe_browsing::GetPageLoadTokenForURL(profile, GURL(""));
+  expected_report.mutable_population()->mutable_page_load_tokens()->Add()->Swap(
+      &token);
   std::string expected_report_content;
   EXPECT_TRUE(expected_report.SerializeToString(&expected_report_content));
 
@@ -159,7 +137,7 @@ void ChromePingManagerFactoryTest::RunReportThreatDetailsTest(
 }
 
 TEST_F(ChromePingManagerFactoryTest, ReportThreatDetails) {
-  RunReportThreatDetailsTest(/*is_csbrr_page_load_token_enabled=*/true);
+  RunReportThreatDetailsTest();
 }
 TEST_F(ChromePingManagerFactoryTest, ShouldFetchAccessTokenForReport_Yes) {
   RunShouldFetchAccessTokenForReportTest(/*is_enhanced_protection=*/true,
@@ -179,15 +157,9 @@ TEST_F(ChromePingManagerFactoryTest,
                                          /*expect_should_fetch=*/false);
 }
 TEST_F(ChromePingManagerFactoryTest, NoPingManagerForIncognito) {
-  raw_ptr<TestingProfile> profile = TestingProfile::Builder().BuildIncognito(
+  TestingProfile* profile = TestingProfile::Builder().BuildIncognito(
       profile_manager_->CreateTestingProfile("testing_profile"));
   EXPECT_EQ(ChromePingManagerFactory::GetForBrowserContext(profile), nullptr);
-}
-// TODO(crbug.com/1413210): remove test case when deprecating
-// kAddPageLoadTokenToClientSafeBrowsingReport feature
-TEST_F(ChromePingManagerFactoryTest,
-       ReportThreatDetails_PageLoadTokenFeatureDisabled) {
-  RunReportThreatDetailsTest(/*is_csbrr_page_load_token_enabled=*/false);
 }
 
 }  // namespace safe_browsing

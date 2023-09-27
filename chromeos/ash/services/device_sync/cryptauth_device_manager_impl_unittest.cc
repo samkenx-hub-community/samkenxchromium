@@ -12,6 +12,7 @@
 #include "base/base64url.h"
 #include "base/containers/contains.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
@@ -410,8 +411,8 @@ class TestCryptAuthDeviceManager : public CryptAuthDeviceManagerImpl {
                                    gcm_manager,
                                    pref_service),
         scoped_sync_scheduler_(new NiceMock<MockSyncScheduler>()),
-        weak_sync_scheduler_factory_(scoped_sync_scheduler_) {
-    SetSyncSchedulerForTest(base::WrapUnique(scoped_sync_scheduler_));
+        weak_sync_scheduler_factory_(scoped_sync_scheduler_.get()) {
+    SetSyncSchedulerForTest(base::WrapUnique(scoped_sync_scheduler_.get()));
   }
 
   TestCryptAuthDeviceManager(const TestCryptAuthDeviceManager&) = delete;
@@ -427,7 +428,7 @@ class TestCryptAuthDeviceManager : public CryptAuthDeviceManagerImpl {
  private:
   // Ownership is passed to |CryptAuthDeviceManager| super class when
   // SetSyncSchedulerForTest() is called.
-  MockSyncScheduler* scoped_sync_scheduler_;
+  raw_ptr<MockSyncScheduler, ExperimentalAsh> scoped_sync_scheduler_;
 
   // Stores the pointer of |scoped_sync_scheduler_| after ownership is passed to
   // the super class.
@@ -528,8 +529,6 @@ class DeviceSyncCryptAuthDeviceManagerImplTest
         prefs::kCryptAuthDeviceSyncReason,
         std::make_unique<base::Value>(cryptauth::INVOCATION_REASON_UNKNOWN));
 
-    base::Value::Dict device_dictionary;
-
     std::string public_key_b64, device_name_b64, bluetooth_address_b64;
     base::Base64UrlEncode(kStoredPublicKey,
                           base::Base64UrlEncodePolicy::INCLUDE_PADDING,
@@ -541,17 +540,16 @@ class DeviceSyncCryptAuthDeviceManagerImplTest
                           base::Base64UrlEncodePolicy::INCLUDE_PADDING,
                           &bluetooth_address_b64);
 
-    device_dictionary.Set("public_key", public_key_b64);
-    device_dictionary.Set("device_name", device_name_b64);
-    device_dictionary.Set("bluetooth_address", bluetooth_address_b64);
-    device_dictionary.Set("unlockable", kStoredUnlockable);
-    device_dictionary.Set("beacon_seeds", base::Value::List());
-    device_dictionary.Set("software_features", base::Value::Dict());
-
     {
       ScopedListPrefUpdate update(&pref_service_,
                                   prefs::kCryptAuthDeviceSyncUnlockKeys);
-      update->Append(std::move(device_dictionary));
+      update->Append(base::Value::Dict()
+                         .Set("public_key", public_key_b64)
+                         .Set("device_name", device_name_b64)
+                         .Set("bluetooth_address", bluetooth_address_b64)
+                         .Set("unlockable", kStoredUnlockable)
+                         .Set("beacon_seeds", base::Value::List())
+                         .Set("software_features", base::Value::Dict()));
     }
 
     device_manager_ = std::make_unique<TestCryptAuthDeviceManager>(
@@ -726,19 +724,18 @@ TEST_F(
   update_clear->clear();
 
   // Simulate a deprecated device being persisted to prefs.
-  base::Value::Dict device_dictionary;
   std::string public_key_b64;
   base::Base64UrlEncode(kStoredPublicKey,
                         base::Base64UrlEncodePolicy::INCLUDE_PADDING,
                         &public_key_b64);
-  device_dictionary.Set("public_key", public_key_b64);
-  device_dictionary.Set("unlock_key", true);
-  device_dictionary.Set("mobile_hotspot_supported", true);
-  device_dictionary.Set("software_features", base::Value::Dict());
 
   ScopedListPrefUpdate update(&pref_service_,
                               prefs::kCryptAuthDeviceSyncUnlockKeys);
-  update->Append(std::move(device_dictionary));
+  update->Append(base::Value::Dict()
+                     .Set("public_key", public_key_b64)
+                     .Set("unlock_key", true)
+                     .Set("mobile_hotspot_supported", true)
+                     .Set("software_features", base::Value::Dict()));
 
   device_manager_ = std::make_unique<TestCryptAuthDeviceManager>(
       &clock_, client_factory_.get(), &gcm_manager_, &pref_service_);

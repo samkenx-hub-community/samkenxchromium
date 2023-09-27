@@ -27,7 +27,6 @@ import android.widget.TextView;
 import androidx.test.ext.junit.rules.ActivityScenarioRule;
 import androidx.test.filters.SmallTest;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -53,6 +52,7 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuHandler;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.browser_ui.widget.chips.ChipView;
 import org.chromium.components.embedder_support.util.ShadowUrlUtilities;
 import org.chromium.components.url_formatter.UrlFormatter;
@@ -71,11 +71,10 @@ import java.util.ArrayList;
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE, shadows = {ShadowUrlUtilities.class})
 @LooperMode(LooperMode.Mode.LEGACY)
-@Features.EnableFeatures({ChromeFeatureList.CORMORANT})
+@EnableFeatures({ChromeFeatureList.CORMORANT})
 @SmallTest
 public final class WebFeedMainMenuItemTest {
-    private static final GURL TEST_URL = JUnitTestGURLs.getGURL(JUnitTestGURLs.EXAMPLE_URL);
-    private static final GURL FAVICON_URL = JUnitTestGURLs.getGURL(JUnitTestGURLs.RED_1);
+    private static final GURL TEST_URL = JUnitTestGURLs.EXAMPLE_URL;
 
     @Rule
     public JniMocker mJniMocker = new JniMocker();
@@ -153,11 +152,6 @@ public final class WebFeedMainMenuItemTest {
         LoadingView.setDisableAnimationForTest(true);
     }
 
-    @After
-    public void tearDown() {
-        LoadingView.setDisableAnimationForTest(false);
-    }
-
     @Test
     @UiThreadTest
     public void initialize_hasFavicon_displaysFavicon() {
@@ -211,7 +205,7 @@ public final class WebFeedMainMenuItemTest {
         verify(mContext).startActivity(mIntentCaptor.capture());
         Intent intent = mIntentCaptor.getValue();
         assertNotNull(intent);
-        assertEquals(3, intent.getExtras().size());
+        assertEquals(4, intent.getExtras().size());
         assertTrue(intent.hasExtra(CreatorIntentConstants.CREATOR_URL));
         assertNotNull(intent.getExtras().getString(CreatorIntentConstants.CREATOR_URL));
         assertTrue(intent.hasExtra(CreatorIntentConstants.CREATOR_ENTRY_POINT));
@@ -219,6 +213,8 @@ public final class WebFeedMainMenuItemTest {
         assertTrue(intent.hasExtra(CreatorIntentConstants.CREATOR_FOLLOWING));
         assertNotNull(
                 intent.getExtras().getBoolean(CreatorIntentConstants.CREATOR_FOLLOWING, false));
+        assertTrue(intent.hasExtra(CreatorIntentConstants.CREATOR_TAB_ID));
+        assertNotNull(intent.getExtras().getInt(CreatorIntentConstants.CREATOR_TAB_ID));
     }
 
     @Test

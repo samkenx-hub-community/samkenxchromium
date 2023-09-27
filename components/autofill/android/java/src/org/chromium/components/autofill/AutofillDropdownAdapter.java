@@ -5,7 +5,6 @@
 package org.chromium.components.autofill;
 
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.text.TextUtils;
@@ -20,7 +19,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.view.MarginLayoutParamsCompat;
 import androidx.core.view.ViewCompat;
 
@@ -104,6 +102,7 @@ public class AutofillDropdownAdapter extends ArrayAdapter<DropdownItem> {
         if (itemTagView != null) {
             itemTagView.setTextSize(TypedValue.COMPLEX_UNIT_PX,
                     mContext.getResources().getDimension(item.getSublabelFontSizeResId()));
+            itemTagView.setTextColor(mContext.getColor(item.getSublabelFontColorResId()));
             height += mContext.getResources().getDimensionPixelSize(
                     R.dimen.autofill_dropdown_item_tag_height);
         }
@@ -144,14 +143,14 @@ public class AutofillDropdownAdapter extends ArrayAdapter<DropdownItem> {
             }
         }
 
-        labelView.setTextColor(mContext.getColor(item.getLabelFontColorResId()));
         labelView.setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                mContext.getResources().getDimension(R.dimen.text_size_large));
+                mContext.getResources().getDimension(item.getLabelFontSizeResId()));
+        labelView.setTextColor(mContext.getColor(item.getLabelFontColorResId()));
 
         if (secondaryLabelView != null) {
-            secondaryLabelView.setTextColor(mContext.getColor(item.getLabelFontColorResId()));
             secondaryLabelView.setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                    mContext.getResources().getDimension(R.dimen.text_size_large));
+                    mContext.getResources().getDimension(item.getLabelFontSizeResId()));
+            secondaryLabelView.setTextColor(mContext.getColor(item.getLabelFontColorResId()));
         }
 
         // Layout of the sublabel view, which has a smaller font and usually sits below the main
@@ -161,6 +160,7 @@ public class AutofillDropdownAdapter extends ArrayAdapter<DropdownItem> {
         if (sublabelView != null) {
             sublabelView.setTextSize(TypedValue.COMPLEX_UNIT_PX,
                     mContext.getResources().getDimension(item.getSublabelFontSizeResId()));
+            sublabelView.setTextColor(mContext.getColor(item.getSublabelFontColorResId()));
         }
 
         TextView secondarySublabelView = populateLabelView(
@@ -168,6 +168,7 @@ public class AutofillDropdownAdapter extends ArrayAdapter<DropdownItem> {
         if (secondarySublabelView != null) {
             secondarySublabelView.setTextSize(TypedValue.COMPLEX_UNIT_PX,
                     mContext.getResources().getDimension(item.getSublabelFontSizeResId()));
+            secondarySublabelView.setTextColor(mContext.getColor(item.getSublabelFontColorResId()));
         }
 
         ImageView iconViewStart = (ImageView) layout.findViewById(R.id.start_dropdown_icon);
@@ -232,30 +233,12 @@ public class AutofillDropdownAdapter extends ArrayAdapter<DropdownItem> {
      */
     @Nullable
     private ImageView populateIconView(ImageView iconView, DropdownItem item) {
-        // If neither the iconId nor the customIcon are provided, return null as we have nothing to
-        // display for the item.
-        if (item.getIconId() == DropdownItem.NO_ICON && item.getCustomIcon() == null) {
+        // If there is no icon, remove the icon view.
+        if (item.getIconDrawable() == null) {
             iconView.setVisibility(View.GONE);
             return null;
         }
-        // If a customIcon is provided we prefer to use it over the iconId of the item.
-        if (item.getCustomIcon() != null) {
-            // TODO(crbug.com/1381189): We need to scale the bitmap because we show custom icons to
-            // highlight certain credit card features (like virtual cards), which are available in a
-            // fixed size. In future, if we show only the card art for all cards, there is no need
-            // to scale the bitmap as we can directly fetch the icon in the required size.
-            // Scale the bitmap to match the dimensions of the default resources used for other
-            // items.
-            Bitmap scaledBitmap = Bitmap.createScaledBitmap(item.getCustomIcon(),
-                    mContext.getResources().getDimensionPixelSize(
-                            R.dimen.autofill_dropdown_icon_width),
-                    mContext.getResources().getDimensionPixelSize(
-                            R.dimen.autofill_dropdown_icon_height),
-                    true);
-            iconView.setImageBitmap(scaledBitmap);
-        } else {
-            iconView.setImageDrawable(AppCompatResources.getDrawable(mContext, item.getIconId()));
-        }
+        iconView.setImageDrawable(item.getIconDrawable());
         iconView.setVisibility(View.VISIBLE);
         // TODO(crbug.com/874077): Add accessible text for this icon.
         return iconView;

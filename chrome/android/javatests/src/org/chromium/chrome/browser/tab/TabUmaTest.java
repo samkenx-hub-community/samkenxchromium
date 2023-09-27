@@ -15,7 +15,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.StrictModeContext;
-import org.chromium.base.jank_tracker.DummyJankTracker;
+import org.chromium.base.jank_tracker.PlaceholderJankTracker;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.util.Batch;
@@ -88,9 +88,8 @@ public class TabUmaTest {
                 cta::getTabModelSelector, cta.getCompositorViewHolderSupplier(),
                 cta.getModalDialogManagerSupplier(), cta::getSnackbarManager,
                 cta.getBrowserControlsManager(), cta.getActivityTabProvider(),
-                cta.getLifecycleDispatcher(), cta.getWindowAndroid(),
-                cta::getLastUserInteractionTime, cta::hadWarmStart, new DummyJankTracker(),
-                rootUiCoordinator.getToolbarManager()::getToolbar);
+                cta.getLifecycleDispatcher(), cta.getWindowAndroid(), new PlaceholderJankTracker(),
+                rootUiCoordinator.getToolbarManager()::getToolbar, null, null);
         // clang-format on
     }
 
@@ -159,12 +158,7 @@ public class TabUmaTest {
     public void testNoCreationStateNoTabUma() throws Exception {
         String switchFgStatus = "Tab.StatusWhenSwitchedBackToForeground";
 
-        String ageStartup = "Tabs.ForegroundTabAgeAtStartup";
-        String ageRestore = "Tab.AgeUponRestoreFromColdStart";
         int switchFgStatusOffset = getHistogram(switchFgStatus);
-        int ageStartupOffset = getHistogram(ageStartup);
-        int ageRestoreOffset = getHistogram(ageRestore);
-
         // Test a normal tab without an explicit creation state. UMA task doesn't start.
         Tab tab = TestThreadUtils.runOnUiThreadBlocking(() -> {
             return new TabBuilder()
@@ -180,56 +174,6 @@ public class TabUmaTest {
 
         // There should be no histogram changes.
         Assert.assertEquals(switchFgStatusOffset, getHistogram(switchFgStatus));
-        Assert.assertEquals(ageStartupOffset, getHistogram(ageStartup));
-        Assert.assertEquals(ageRestoreOffset, getHistogram(ageRestore));
-    }
-
-    /**
-     * Verify that Tab state transitions are correctly recorded.
-     */
-    @Test
-    @MediumTest
-    @Feature({"Uma"})
-    public void testTabStateTransition() throws Exception {
-        String transitionToInactive = "Tabs.StateTransfer.Time_Active_Inactive";
-        String transitionToClosed = "Tabs.StateTransfer.Time_Active_Closed";
-
-        Assert.assertEquals(0, getHistogram(transitionToInactive));
-        Assert.assertEquals(0, getHistogram(transitionToClosed));
-
-        createLiveTab(/* foreground= */ false, /* kill= */ false);
-        Assert.assertEquals(0, getHistogram(transitionToInactive));
-        Assert.assertEquals(0, getHistogram(transitionToClosed));
-
-        // Test a live tab killed in background before shown.
-        createLiveTab(/* foreground= */ false, /* kill= */ true);
-        Assert.assertEquals(0, getHistogram(transitionToInactive));
-        Assert.assertEquals(0, getHistogram(transitionToClosed));
-
-        // Test a tab created in background but not loaded eagerly.
-        final Tab frozenBgTab = createLazilyLoadedTab(/* show= */ true);
-        Assert.assertEquals(0, getHistogram(transitionToInactive));
-        Assert.assertEquals(0, getHistogram(transitionToClosed));
-
-        // Test a tab whose contents was to be restored from frozen state but failed
-        // at Tab#show(), so created anew.
-        TestThreadUtils.runOnUiThreadBlocking(() -> {
-            Tab tab = TabBuilder.createFromFrozenState()
-                              .setWindow(sActivityTestRule.getActivity().getWindowAndroid())
-                              .setDelegateFactory(createTabDelegateFactory())
-                              .setTabState(createTabState())
-                              .build();
-            tab.show(TabSelectionType.FROM_USER, LoadIfNeededCaller.OTHER);
-            return tab;
-        });
-
-        Assert.assertEquals(0, getHistogram(transitionToInactive));
-        Assert.assertEquals(0, getHistogram(transitionToClosed));
-
-        // Test a foreground tab.
-        createLiveTab(/* foreground= */ true, /* kill= */ false);
-        Assert.assertEquals(0, getHistogram(transitionToInactive));
-        Assert.assertEquals(0, getHistogram(transitionToClosed));
     }
 
     private static int getHistogram(String histogram) {

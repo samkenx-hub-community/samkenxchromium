@@ -20,6 +20,7 @@
 #include "ash/shell.h"
 #include "base/feature_list.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
@@ -113,9 +114,6 @@ class LoginAuthUserViewTestBase : public LoginTestBase {
     user_ = user;
     LoginAuthUserView::Callbacks auth_callbacks;
     auth_callbacks.on_auth = base::DoNothing();
-    auth_callbacks.on_easy_unlock_icon_hovered = base::DoNothing();
-    auth_callbacks.on_easy_unlock_icon_tapped =
-        views::Button::PressedCallback();
     auth_callbacks.on_tap = base::DoNothing();
     auth_callbacks.on_remove_warning_shown = base::DoNothing();
     auth_callbacks.on_remove = base::DoNothing();
@@ -127,14 +125,16 @@ class LoginAuthUserViewTestBase : public LoginTestBase {
     container_ = new views::View();
     container_->SetLayoutManager(std::make_unique<views::BoxLayout>(
         views::BoxLayout::Orientation::kVertical));
-    container_->AddChildView(view_);
+    container_->AddChildView(view_.get());
     SetWidget(CreateWidgetWithContent(container_));
   }
 
   base::test::ScopedFeatureList feature_list_;
   LoginUserInfo user_;
-  views::View* container_ = nullptr;   // Owned by test widget view hierarchy.
-  LoginAuthUserView* view_ = nullptr;  // Owned by test widget view hierarchy.
+  raw_ptr<views::View, DanglingUntriaged | ExperimentalAsh> container_ =
+      nullptr;  // Owned by test widget view hierarchy.
+  raw_ptr<LoginAuthUserView, DanglingUntriaged | ExperimentalAsh> view_ =
+      nullptr;  // Owned by test widget view hierarchy.
 };
 
 class LoginAuthUserViewUnittest : public LoginAuthUserViewTestBase,
@@ -157,21 +157,10 @@ class LoginAuthUserViewUnittest : public LoginAuthUserViewTestBase,
   // LoginTestBase:
   void SetUp() override {
     LoginAuthUserViewTestBase::SetUp();
-    SetUpFeatures();
+    feature_list_.InitWithFeatureState(features::kQuickUnlockPinAutosubmit,
+                                       GetParam());
     InitializeViewForUser(CreateUser("user@domain.com"));
   }
-
-  void SetUpFeatures() {
-    autosubmit_feature_enabled_ = GetParam();
-    if (autosubmit_feature_enabled_) {
-      feature_list_.InitWithFeatures({features::kQuickUnlockPinAutosubmit}, {});
-    } else {
-      feature_list_.InitWithFeatures({}, {features::kQuickUnlockPinAutosubmit});
-    }
-  }
-
-  // Initialized by test parameter in `SetUpFeatures`
-  bool autosubmit_feature_enabled_ = false;
 };
 
 class LoginAuthUserViewAutosumbitUnittest : public LoginAuthUserViewTestBase {
@@ -225,63 +214,6 @@ TEST_P(LoginAuthUserViewUnittest, ShowingPasswordForcesOpaque) {
   EXPECT_TRUE(user_test.is_opaque());
 }
 
-// Verifies that pressing return with an empty password field when tap-to-unlock
-// is enabled attempts unlock.
-TEST_P(LoginAuthUserViewUnittest, PressReturnWithTapToUnlockEnabled) {
-  auto client = std::make_unique<MockLoginScreenClient>();
-
-  ui::test::EventGenerator* generator = GetEventGenerator();
-
-  LoginAuthUserView::TestApi auth_test(view_);
-  LoginPasswordView* password_view(auth_test.password_view());
-  LoginUserView* user_view(auth_test.user_view());
-
-  SetUserCount(1);
-
-  EXPECT_CALL(*client,
-              AuthenticateUserWithEasyUnlock(
-                  user_view->current_user().basic_user_info.account_id));
-  SetAuthMethods(LoginAuthUserView::AUTH_PASSWORD |
-                 LoginAuthUserView::AUTH_TAP);
-  password_view->Reset();
-
-  generator->PressKey(ui::KeyboardCode::VKEY_RETURN, 0);
-  base::RunLoop().RunUntilIdle();
-}
-
-// Verifies that pressing return on the pin input field when tap-to-unlock
-// is enabled attempts unlock.
-TEST_P(LoginAuthUserViewUnittest, PressReturnOnPinWithTapToUnlockEnabled) {
-  auto client = std::make_unique<MockLoginScreenClient>();
-
-  ui::test::EventGenerator* generator = GetEventGenerator();
-  LoginAuthUserView::TestApi auth_test(view_);
-  LoginUserView* user_view(auth_test.user_view());
-  LoginPinInputView* pin_input(auth_test.pin_input_view());
-
-  SetUserCount(1);
-
-  // One call using focus, and one direct call to the view.
-  EXPECT_CALL(*client,
-              AuthenticateUserWithEasyUnlock(
-                  user_view->current_user().basic_user_info.account_id))
-      .Times(2);
-  SetAuthMethods(LoginAuthUserView::AUTH_PASSWORD |
-                     LoginAuthUserView::AUTH_PIN | LoginAuthUserView::AUTH_TAP,
-                 /*show_pinpad_for_pw=*/false,
-                 /*virtual_keyboard_visible=*/false,
-                 /*autosubmit_pin_length=*/6);
-
-  // Call through correct focus.
-  pin_input->RequestFocus();
-  generator->PressKey(ui::KeyboardCode::VKEY_RETURN, ui::EF_NONE);
-
-  // Call the view directly as well.
-  pin_input->OnKeyPressed(ui::KeyEvent(
-      ui::ET_KEY_PRESSED, ui::KeyboardCode::VKEY_RETURN, ui::EF_NONE));
-  base::RunLoop().RunUntilIdle();
-}
-
 TEST_P(LoginAuthUserViewUnittest, OnlineSignInMessage) {
   auto client = std::make_unique<MockLoginScreenClient>();
   LoginAuthUserView::TestApi auth_test(view_);
@@ -309,8 +241,6 @@ TEST_P(LoginAuthUserViewUnittest, OnlineSignInMessage) {
   SetAuthMethods(LoginAuthUserView::AUTH_PASSWORD);
   EXPECT_FALSE(online_sign_in_message->GetVisible());
   SetAuthMethods(LoginAuthUserView::AUTH_PIN);
-  EXPECT_FALSE(online_sign_in_message->GetVisible());
-  SetAuthMethods(LoginAuthUserView::AUTH_TAP);
   EXPECT_FALSE(online_sign_in_message->GetVisible());
 }
 
@@ -592,6 +522,11 @@ class LoginAuthUserViewAuthFactorsUnittest : public LoginAuthUserViewUnittest {
         std::make_unique<FakeSmartLockAuthFactorModelFactory>();
     SmartLockAuthFactorModel::Factory::SetFactoryForTesting(
         fake_smart_lock_auth_factor_model_factory_.get());
+  }
+
+  void TearDown() override {
+    SmartLockAuthFactorModel::Factory::SetFactoryForTesting(nullptr);
+    LoginAuthUserViewUnittest::TearDown();
   }
 
   std::unique_ptr<FakeSmartLockAuthFactorModelFactory>

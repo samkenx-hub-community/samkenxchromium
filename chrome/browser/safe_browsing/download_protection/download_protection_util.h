@@ -53,7 +53,7 @@ enum DownloadCheckResultReason {
   REASON_SENSITIVE_CONTENT_WARNING = 31,
   REASON_SENSITIVE_CONTENT_BLOCK = 32,
   REASON_DEEP_SCANNED_SAFE = 33,
-  REASON_ADVANCED_PROTECTION_PROMPT = 34,
+  REASON_DEEP_SCAN_PROMPT = 34,
   REASON_BLOCKED_UNSUPPORTED_FILE_TYPE = 35,
   REASON_DOWNLOAD_DANGEROUS_ACCOUNT_COMPROMISE = 36,
   REASON_MAX  // Always add new values before this one.
@@ -81,6 +81,20 @@ enum AllowlistType {
   SIGNATURE_ALLOWLIST,
   ALLOWLIST_TYPE_MAX
 };
+
+// Enum for events related to the deep scanning of a download. These values
+// are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+enum class DeepScanEvent {
+  kPromptShown = 0,
+  kPromptBypassed = 1,
+  kPromptAccepted = 2,
+  kScanCanceled = 3,
+  kScanCompleted = 4,
+  kScanFailed = 5,
+  kMaxValue = kScanFailed,
+};
+void LogDeepScanEvent(download::DownloadItem* item, DeepScanEvent event);
 
 // Callback type which is invoked once the download request is done.
 typedef base::OnceCallback<void(DownloadCheckResult)> CheckDownloadCallback;

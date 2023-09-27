@@ -31,6 +31,12 @@ TEST_F(ExternalConstantsOverriderTest, TestEmptyDictValue) {
   EXPECT_EQ(urls[0], GURL(UPDATE_CHECK_URL));
   EXPECT_TRUE(urls[0].is_valid());
 
+  EXPECT_EQ(overrider->CrashUploadURL(), GURL(CRASH_UPLOAD_URL));
+  EXPECT_TRUE(overrider->CrashUploadURL().is_valid());
+  EXPECT_EQ(overrider->DeviceManagementURL(),
+            GURL(DEVICE_MANAGEMENT_SERVER_URL));
+  EXPECT_TRUE(overrider->DeviceManagementURL().is_valid());
+
   EXPECT_EQ(overrider->InitialDelay(), kInitialDelay);
   EXPECT_EQ(overrider->ServerKeepAliveTime(), kServerKeepAliveTime);
   EXPECT_EQ(overrider->GroupPolicies().size(), 0U);
@@ -47,9 +53,13 @@ TEST_F(ExternalConstantsOverriderTest, TestFullOverrides) {
 
   overrides.Set(kDevOverrideKeyUseCUP, false);
   overrides.Set(kDevOverrideKeyUrl, std::move(url_list));
+  overrides.Set(kDevOverrideKeyCrashUploadUrl, "https://crash_test.google.com");
+  overrides.Set(kDevOverrideKeyDeviceManagementUrl, "https://dm.google.com");
   overrides.Set(kDevOverrideKeyInitialDelay, 137.1);
   overrides.Set(kDevOverrideKeyServerKeepAliveSeconds, 1);
   overrides.Set(kDevOverrideKeyGroupPolicies, std::move(group_policies));
+  overrides.Set(kDevOverrideKeyOverinstallTimeout, 3);
+  overrides.Set(kDevOverrideKeyIdleCheckPeriodSeconds, 4);
   auto overrider = base::MakeRefCounted<ExternalConstantsOverrider>(
       std::move(overrides), CreateDefaultExternalConstants());
 
@@ -62,9 +72,16 @@ TEST_F(ExternalConstantsOverriderTest, TestFullOverrides) {
   EXPECT_EQ(urls[1], GURL("https://www.google.com"));
   EXPECT_TRUE(urls[1].is_valid());
 
+  EXPECT_EQ(overrider->CrashUploadURL(), GURL("https://crash_test.google.com"));
+  EXPECT_TRUE(overrider->CrashUploadURL().is_valid());
+  EXPECT_EQ(overrider->DeviceManagementURL(), GURL("https://dm.google.com"));
+  EXPECT_TRUE(overrider->DeviceManagementURL().is_valid());
+
   EXPECT_EQ(overrider->InitialDelay(), base::Seconds(137.1));
   EXPECT_EQ(overrider->ServerKeepAliveTime(), base::Seconds(1));
   EXPECT_EQ(overrider->GroupPolicies().size(), 2U);
+  EXPECT_EQ(overrider->OverinstallTimeout(), base::Seconds(3));
+  EXPECT_EQ(overrider->IdleCheckPeriod(), base::Seconds(4));
 }
 
 TEST_F(ExternalConstantsOverriderTest, TestOverrideUnwrappedURL) {

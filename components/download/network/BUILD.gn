@@ -5,6 +5,7 @@
 if (is_android) {
   import("//build/config/android/config.gni")
   import("//build/config/android/rules.gni")
+  import("//third_party/jni_zero/jni_zero.gni")
 }
 
 static_library("network") {
@@ -46,6 +47,7 @@ source_set("unit_tests") {
 
 if (is_android) {
   android_library("network_java") {
+    srcjar_deps = [ ":jni_headers" ]
     sources = [
       "android/java/src/org/chromium/components/download/BackgroundNetworkStatusListener.java",
       "android/java/src/org/chromium/components/download/NetworkStatusListenerAndroid.java",
@@ -58,7 +60,6 @@ if (is_android) {
       "//net/android:net_java",
       "//third_party/androidx:androidx_annotation_annotation_java",
     ]
-    annotation_processor_deps = [ "//base/android/jni_generator:jni_processor" ]
   }
 
   generate_jni("jni_headers") {
@@ -76,6 +77,7 @@ if (is_android) {
       "//base:base_java",
       "//base:base_java_test_support",
       "//base:base_junit_test_support",
+      "//base:jni_java",
       "//net/android:net_java",
       "//third_party/androidx:androidx_test_runner_java",
       "//third_party/junit",

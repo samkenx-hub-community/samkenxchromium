@@ -4,8 +4,7 @@
 
 package org.chromium.chrome.browser;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.hamcrest.Matchers;
@@ -23,7 +22,7 @@ import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.components.safe_browsing.SafeBrowsingApiBridge;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.WebContents;
@@ -32,11 +31,11 @@ import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.ui.base.PageTransition;
 
 /**
- * Test integration with the SafeBrowsingApiHandler.
+ * Test integration with the SafetyNetApiHandler.
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
-@Features.DisableFeatures({ChromeFeatureList.SAFE_BROWSING_DELAYED_WARNINGS})
+@DisableFeatures({ChromeFeatureList.SAFE_BROWSING_DELAYED_WARNINGS})
 public final class SafeBrowsingTest {
     @Rule
     public ChromeTabbedActivityTestRule mActivityTestRule = new ChromeTabbedActivityTestRule();
@@ -80,21 +79,19 @@ public final class SafeBrowsingTest {
 
     @Before
     public void setUp() {
-        SafeBrowsingApiBridge.setHandler(new MockSafeBrowsingApiHandler());
+        SafeBrowsingApiBridge.setSafetyNetApiHandler(new MockSafetyNetApiHandler());
     }
 
     @After
     public void tearDown() {
-        if (mTestServer != null) {
-            mTestServer.stopAndDestroyServer();
-        }
-        MockSafeBrowsingApiHandler.clearMockResponses();
+        MockSafetyNetApiHandler.clearMockResponses();
     }
 
     @Test
     @MediumTest
     public void noInterstitialPage() throws Exception {
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         mActivityTestRule.startMainActivityOnBlankPage();
 
         String url = mTestServer.getURL("/chrome/test/data/android/about.html");
@@ -105,9 +102,10 @@ public final class SafeBrowsingTest {
     @Test
     @MediumTest
     public void interstitialPage() throws Exception {
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         String url = mTestServer.getURL("/chrome/test/data/android/about.html");
-        MockSafeBrowsingApiHandler.addMockResponse(url, "{\"matches\":[{\"threat_type\":\"5\"}]}");
+        MockSafetyNetApiHandler.addMockResponse(url, "{\"matches\":[{\"threat_type\":\"5\"}]}");
         mActivityTestRule.startMainActivityOnBlankPage();
 
         loadUrlNonBlocking(url);

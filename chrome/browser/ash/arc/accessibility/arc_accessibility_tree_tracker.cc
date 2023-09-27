@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ash/arc/accessibility/arc_accessibility_tree_tracker.h"
 
+#include <memory>
 #include <utility>
 
 #include "ash/accessibility/accessibility_controller_impl.h"
@@ -20,13 +21,15 @@
 #include "ash/shell.h"
 #include "base/containers/cxx20_erase.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/notreached.h"
 #include "base/scoped_multi_source_observation.h"
 #include "base/time/time.h"
 #include "chrome/browser/ash/accessibility/accessibility_manager.h"
 #include "chrome/browser/ash/accessibility/magnification_manager.h"
 #include "chrome/browser/ash/arc/accessibility/arc_accessibility_util.h"
-#include "chrome/browser/ash/arc/accessibility/ax_tree_source_arc.h"
+#include "chrome/browser/ash/arc/accessibility/arc_serialization_delegate.h"
 #include "chrome/browser/ash/arc/input_method_manager/arc_input_method_manager_service.h"
 #include "chrome/common/extensions/api/accessibility_private.h"
 #include "components/exo/input_method_surface.h"
@@ -35,6 +38,8 @@
 #include "components/exo/surface.h"
 #include "components/exo/window_properties.h"
 #include "extensions/browser/event_router.h"
+#include "services/accessibility/android/android_accessibility_util.h"
+#include "services/accessibility/android/ax_tree_source_android.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_tracker.h"
@@ -117,21 +122,25 @@ absl::optional<int32_t> FindAccessibilityWindowIdRecursive(
 
 extensions::api::accessibility_private::SetNativeChromeVoxResponse
 FromMojomResponseToAutomationResponse(
-    arc::mojom::SetNativeChromeVoxResponse response) {
+    ax::android::mojom::SetNativeChromeVoxResponse response) {
   switch (response) {
-    case arc::mojom::SetNativeChromeVoxResponse::SUCCESS:
+    case ax::android::mojom::SetNativeChromeVoxResponse::SUCCESS:
       return SetNativeChromeVoxResponse::SET_NATIVE_CHROME_VOX_RESPONSE_SUCCESS;
-    case arc::mojom::SetNativeChromeVoxResponse::TALKBACK_NOT_INSTALLED:
+    case ax::android::mojom::SetNativeChromeVoxResponse::TALKBACK_NOT_INSTALLED:
       return SetNativeChromeVoxResponse::
           SET_NATIVE_CHROME_VOX_RESPONSE_TALKBACKNOTINSTALLED;
-    case arc::mojom::SetNativeChromeVoxResponse::WINDOW_NOT_FOUND:
+    case ax::android::mojom::SetNativeChromeVoxResponse::WINDOW_NOT_FOUND:
       return SetNativeChromeVoxResponse::
           SET_NATIVE_CHROME_VOX_RESPONSE_WINDOWNOTFOUND;
-    case arc::mojom::SetNativeChromeVoxResponse::FAILURE:
+    case ax::android::mojom::SetNativeChromeVoxResponse::FAILURE:
       return SetNativeChromeVoxResponse::SET_NATIVE_CHROME_VOX_RESPONSE_FAILURE;
-    case arc::mojom::SetNativeChromeVoxResponse::NEED_DEPRECATION_CONFIRMATION:
+    case ax::android::mojom::SetNativeChromeVoxResponse::
+        NEED_DEPRECATION_CONFIRMATION:
       return SetNativeChromeVoxResponse::
           SET_NATIVE_CHROME_VOX_RESPONSE_NEEDDEPRECATIONCONFIRMATION;
+    case ax::android::mojom::SetNativeChromeVoxResponse::INVALID_ENUM_VALUE:
+      NOTREACHED();
+      return SetNativeChromeVoxResponse::SET_NATIVE_CHROME_VOX_RESPONSE_FAILURE;
   }
 }
 
@@ -161,7 +170,7 @@ class ArcAccessibilityTreeTracker::FocusChangeObserver
   }
 
  private:
-  ArcAccessibilityTreeTracker* owner_;
+  raw_ptr<ArcAccessibilityTreeTracker, ExperimentalAsh> owner_;
   // Different from other inner classes, this doesn't use ScopedObservation
   // because exo::WMHelper can be destroyed earlier than this class.
 };
@@ -185,10 +194,7 @@ class ArcAccessibilityTreeTracker::WindowsObserver
   void OnWindowPropertyChanged(aura::Window* window,
                                const void* key,
                                intptr_t old) override {
-    // TODO(b/270904414): remove kClientAccessibilityIdKey once sending a11y id
-    // is fully migrated to per-window level.
-    if (key != exo::kApplicationIdKey &&
-        key != ash::kClientAccessibilityIdKey) {
+    if (key != exo::kApplicationIdKey) {
       return;
     }
     owner_->UpdateTopWindowIds(window);
@@ -209,7 +215,7 @@ class ArcAccessibilityTreeTracker::WindowsObserver
   }
 
  private:
-  ArcAccessibilityTreeTracker* owner_;
+  raw_ptr<ArcAccessibilityTreeTracker, ExperimentalAsh> owner_;
   base::ScopedMultiSourceObservation<aura::Window, aura::WindowObserver>
       window_observations_{this};
 };
@@ -256,7 +262,7 @@ class ArcAccessibilityTreeTracker::ChildWindowsObserver
   }
 
  private:
-  ArcAccessibilityTreeTracker* owner_;
+  raw_ptr<ArcAccessibilityTreeTracker, ExperimentalAsh> owner_;
   base::ScopedMultiSourceObservation<aura::Window, aura::WindowObserver>
       window_observations_{this};
 };
@@ -285,11 +291,12 @@ class ArcAccessibilityTreeTracker::ArcInputMethodManagerServiceObserver
   base::ScopedObservation<ArcInputMethodManagerService,
                           ArcInputMethodManagerService::Observer>
       arc_imms_observation_{this};
-  ArcAccessibilityTreeTracker* owner_;
+  raw_ptr<ArcAccessibilityTreeTracker, ExperimentalAsh> owner_;
 };
 
 class ArcAccessibilityTreeTracker::MojoConnectionObserver
-    : public ConnectionObserver<mojom::AccessibilityHelperInstance> {
+    : public ConnectionObserver<
+          ax::android::mojom::AccessibilityHelperInstance> {
  public:
   MojoConnectionObserver(ArcAccessibilityTreeTracker* owner,
                          ArcBridgeService* const arc_bridge_service)
@@ -299,37 +306,44 @@ class ArcAccessibilityTreeTracker::MojoConnectionObserver
   }
 
   void OnConnectionReady() override {
-    owner_->notification_surface_observer_ =
-        std::make_unique<ArcNotificationSurfaceManagerObserver>(owner_);
+    owner_->notification_observer_ =
+        std::make_unique<NotificationObserver>(owner_);
   }
 
-  void OnConnectionClosed() override {
-    owner_->notification_surface_observer_.reset();
-  }
+  void OnConnectionClosed() override { owner_->notification_observer_.reset(); }
 
  private:
   base::ScopedObservation<
-      ConnectionHolder<mojom::AccessibilityHelperInstance,
-                       mojom::AccessibilityHelperHost>,
-      ConnectionObserver<mojom::AccessibilityHelperInstance>>
+      ConnectionHolder<ax::android::mojom::AccessibilityHelperInstance,
+                       ax::android::mojom::AccessibilityHelperHost>,
+      ConnectionObserver<ax::android::mojom::AccessibilityHelperInstance>>
       helper_instance_connection_observation_{this};
-  ArcAccessibilityTreeTracker* owner_;
+  raw_ptr<ArcAccessibilityTreeTracker, ExperimentalAsh> owner_;
 };
 
-class ArcAccessibilityTreeTracker::ArcNotificationSurfaceManagerObserver
-    : public ash::ArcNotificationSurfaceManager::Observer {
+// Observes (1) Addition and removal of ArcNotificationSurface, and
+// (2) Removal of aura::Window corresponds to ARC notification.
+class ArcAccessibilityTreeTracker::NotificationObserver
+    : public ash::ArcNotificationSurfaceManager::Observer,
+      public aura::WindowObserver {
  public:
-  explicit ArcNotificationSurfaceManagerObserver(
-      ArcAccessibilityTreeTracker* owner)
+  explicit NotificationObserver(ArcAccessibilityTreeTracker* owner)
       : owner_(owner) {
     auto* surface_manager = ash::ArcNotificationSurfaceManager::Get();
-    if (surface_manager)
+    if (surface_manager) {
       arc_notification_observation_.Observe(surface_manager);
+    }
   }
 
+  // ash::ArcNotificationSurfaceManager::Observer overrides:
   void OnNotificationSurfaceAdded(
       ash::ArcNotificationSurface* surface) override {
     owner_->OnNotificationSurfaceAdded(surface);
+
+    aura::Window* window = surface->GetWindow();
+    if (window && !window_observations_.IsObservingSource(window)) {
+      window_observations_.AddObservation(window);
+    }
   }
 
   void OnNotificationSurfaceRemoved(
@@ -337,11 +351,21 @@ class ArcAccessibilityTreeTracker::ArcNotificationSurfaceManagerObserver
     owner_->OnNotificationSurfaceRemoved(surface);
   }
 
+  // aura::WindowObserver overrides:
+  void OnWindowDestroying(aura::Window* window) override {
+    if (window_observations_.IsObservingSource(window)) {
+      window_observations_.RemoveObservation(window);
+    }
+    owner_->OnNotificationWindowRemoved(window);
+  }
+
  private:
   base::ScopedObservation<ash::ArcNotificationSurfaceManager,
                           ash::ArcNotificationSurfaceManager::Observer>
       arc_notification_observation_{this};
-  ArcAccessibilityTreeTracker* owner_;
+  base::ScopedMultiSourceObservation<aura::Window, aura::WindowObserver>
+      window_observations_{this};
+  raw_ptr<ArcAccessibilityTreeTracker, ExperimentalAsh> owner_;
 };
 
 class ArcAccessibilityTreeTracker::UmaRecorder {
@@ -471,11 +495,11 @@ class ArcAccessibilityTreeTracker::UmaRecorder {
 
   base::flat_map<ArcAccessibilityFeature, base::TimeTicks> start_time_;
   std::set<ArcAccessibilityFeature> enabled_features_;
-  const ArcAccessibilityTreeTracker* tree_tracker_;
+  raw_ptr<const ArcAccessibilityTreeTracker, ExperimentalAsh> tree_tracker_;
 };
 
 ArcAccessibilityTreeTracker::ArcAccessibilityTreeTracker(
-    AXTreeSourceArc::Delegate* tree_source_delegate,
+    ax::android::AXTreeSourceAndroid::Delegate* tree_source_delegate,
     Profile* const profile,
     const AccessibilityHelperInstanceRemoteProxy& accessibility_helper_instance,
     ArcBridgeService* const arc_bridge_service)
@@ -536,7 +560,7 @@ void ArcAccessibilityTreeTracker::Shutdown() {
 }
 
 void ArcAccessibilityTreeTracker::OnEnabledFeatureChanged(
-    arc::mojom::AccessibilityFilterType filter_type) {
+    ax::android::mojom::AccessibilityFilterType filter_type) {
   uma_recorder_->OnEnabledFeatureChanged();
 
   if (filter_type_ == filter_type)
@@ -544,7 +568,7 @@ void ArcAccessibilityTreeTracker::OnEnabledFeatureChanged(
 
   filter_type_ = filter_type;
 
-  if (filter_type_ == arc::mojom::AccessibilityFilterType::ALL) {
+  if (filter_type_ == ax::android::mojom::AccessibilityFilterType::ALL) {
     focus_change_observer_ = std::make_unique<FocusChangeObserver>(this);
     StartTrackingWindows();
   } else {
@@ -561,28 +585,30 @@ void ArcAccessibilityTreeTracker::OnEnabledFeatureChanged(
 }
 
 bool ArcAccessibilityTreeTracker::EnableTree(const ui::AXTreeID& tree_id) {
-  AXTreeSourceArc* tree_source = GetFromTreeId(tree_id);
+  ax::android::AXTreeSourceAndroid* tree_source = GetFromTreeId(tree_id);
   if (!tree_source || !tree_source->window())
     return false;
 
-  arc::mojom::AccessibilityWindowKeyPtr window_key;
+  ax::android::mojom::AccessibilityWindowKeyPtr window_key;
   if (const absl::optional<int32_t> window_id_opt =
           FindAccessibilityWindowIdRecursive(tree_source->window())) {
-    window_key =
-        arc::mojom::AccessibilityWindowKey::NewWindowId(window_id_opt.value());
+    window_key = ax::android::mojom::AccessibilityWindowKey::NewWindowId(
+        window_id_opt.value());
   } else if (const absl::optional<int32_t> task_id =
                  GetWindowTaskId(tree_source->window())) {
-    window_key = arc::mojom::AccessibilityWindowKey::NewTaskId(task_id.value());
+    window_key =
+        ax::android::mojom::AccessibilityWindowKey::NewTaskId(task_id.value());
   } else {
     return false;
   }
 
-  return accessibility_helper_instance_.RequestSendAccessibilityTree(
+  return accessibility_helper_instance_->RequestSendAccessibilityTree(
       std::move(window_key));
 }
 
-AXTreeSourceArc* ArcAccessibilityTreeTracker::OnAccessibilityEvent(
-    const mojom::AccessibilityEventData* const event_data) {
+ax::android::AXTreeSourceAndroid*
+ArcAccessibilityTreeTracker::OnAccessibilityEvent(
+    const ax::android::mojom::AccessibilityEventData* const event_data) {
   DCHECK(event_data);
   bool is_notification_event = event_data->notification_key.has_value();
   if (is_notification_event) {
@@ -606,7 +632,7 @@ AXTreeSourceArc* ArcAccessibilityTreeTracker::OnAccessibilityEvent(
       tree = CreateFromKey(key, input_method_surface->host_window());
       input_method_surface->SetChildAxTreeId(tree->ax_tree_id());
     }
-    DCHECK(tree->window() == input_method_surface->host_window());
+    CHECK(tree->window() == input_method_surface->host_window());
 
     return tree;
   } else {
@@ -627,7 +653,7 @@ AXTreeSourceArc* ArcAccessibilityTreeTracker::OnAccessibilityEvent(
     aura::Window* window = window_itr->second;
 
     const auto key = KeyForTaskId(task_id);
-    AXTreeSourceArc* tree_source = GetFromKey(key);
+    ax::android::AXTreeSourceAndroid* tree_source = GetFromKey(key);
     if (!tree_source) {
       tree_source = CreateFromKey(key, window);
       SetChildAxTreeIDForWindow(window, tree_source->ax_tree_id());
@@ -673,13 +699,24 @@ void ArcAccessibilityTreeTracker::OnNotificationSurfaceRemoved(
   tree->set_window(nullptr);
 }
 
+void ArcAccessibilityTreeTracker::OnNotificationWindowRemoved(
+    aura::Window* window) {
+  for (auto& [treeKey, tree] : trees_) {
+    if (tree->window() == window) {
+      // Actual clean-up is done in OnNotificationStateChanged.
+      tree->set_window(nullptr);
+    }
+  }
+}
+
 void ArcAccessibilityTreeTracker::OnNotificationStateChanged(
     const std::string& notification_key,
-    const arc::mojom::AccessibilityNotificationStateType& state) {
+    const ax::android::mojom::AccessibilityNotificationStateType& state) {
   auto key = KeyForNotification(notification_key);
   switch (state) {
-    case arc::mojom::AccessibilityNotificationStateType::SURFACE_CREATED: {
-      AXTreeSourceArc* tree_source = GetFromKey(key);
+    case ax::android::mojom::AccessibilityNotificationStateType::
+        SURFACE_CREATED: {
+      ax::android::AXTreeSourceAndroid* tree_source = GetFromKey(key);
       if (tree_source)
         return;
 
@@ -696,20 +733,25 @@ void ArcAccessibilityTreeTracker::OnNotificationStateChanged(
                                         tree_source->ax_tree_id());
       break;
     }
-    case arc::mojom::AccessibilityNotificationStateType::SURFACE_REMOVED:
+    case ax::android::mojom::AccessibilityNotificationStateType::
+        SURFACE_REMOVED:
       trees_.erase(key);
       UpdateTreeIdOfNotificationSurface(notification_key,
                                         ui::AXTreeIDUnknown());
+      break;
+    case ax::android::mojom::AccessibilityNotificationStateType::
+        INVALID_ENUM_VALUE:
+      NOTREACHED();
       break;
   }
 }
 
 void ArcAccessibilityTreeTracker::OnAndroidVirtualKeyboardVisibilityChanged(
     bool visible) {
-  // The lifetime of AXTreeSourceArc should be bounded by the corresponding exo
-  // window. Always using OnWindowDestroying is ideal.
-  // But it seems that OnWindowDestroying sometimes not called when visually VK
-  // is made invisible. We're using this callback here to destroy the tree.
+  // The lifetime of ax::android::AXTreeSourceAndroid should be bounded by the
+  // corresponding exo window. Always using OnWindowDestroying is ideal. But it
+  // seems that OnWindowDestroying sometimes not called when visually VK is made
+  // invisible. We're using this callback here to destroy the tree.
   if (!visible)
     trees_.erase(KeyForInputMethod());
 }
@@ -746,7 +788,7 @@ void ArcAccessibilityTreeTracker::SetNativeChromeVoxArcSupport(
       std::make_unique<aura::WindowTracker>();
   window_tracker->Add(window);
 
-  accessibility_helper_instance_.SetNativeChromeVoxArcSupportForFocusedWindow(
+  accessibility_helper_instance_->SetNativeChromeVoxArcSupportForFocusedWindow(
       enabled,
       base::BindOnce(
           &ArcAccessibilityTreeTracker::OnSetNativeChromeVoxArcSupportProcessed,
@@ -758,10 +800,10 @@ void ArcAccessibilityTreeTracker::OnSetNativeChromeVoxArcSupportProcessed(
     std::unique_ptr<aura::WindowTracker> window_tracker,
     bool enabled,
     SetNativeChromeVoxCallback callback,
-    arc::mojom::SetNativeChromeVoxResponse response) {
+    ax::android::mojom::SetNativeChromeVoxResponse response) {
   std::move(callback).Run(FromMojomResponseToAutomationResponse(response));
 
-  if (response != arc::mojom::SetNativeChromeVoxResponse::SUCCESS ||
+  if (response != ax::android::mojom::SetNativeChromeVoxResponse::SUCCESS ||
       window_tracker->windows().size() != 1) {
     return;
   }
@@ -780,7 +822,7 @@ void ArcAccessibilityTreeTracker::OnSetNativeChromeVoxArcSupportProcessed(
   UpdateWindowProperties(window);
 }
 
-AXTreeSourceArc* ArcAccessibilityTreeTracker::GetFromTreeId(
+ax::android::AXTreeSourceAndroid* ArcAccessibilityTreeTracker::GetFromTreeId(
     const ui::AXTreeID& tree_id) const {
   for (auto it = trees_.begin(); it != trees_.end(); ++it) {
     if (it->second->ax_tree_id() == tree_id)
@@ -789,7 +831,8 @@ AXTreeSourceArc* ArcAccessibilityTreeTracker::GetFromTreeId(
   return nullptr;
 }
 
-AXTreeSourceArc* ArcAccessibilityTreeTracker::GetFromKey(const TreeKey& key) {
+ax::android::AXTreeSourceAndroid* ArcAccessibilityTreeTracker::GetFromKey(
+    const TreeKey& key) {
   auto tree_it = trees_.find(key);
   if (tree_it == trees_.end())
     return nullptr;
@@ -797,10 +840,12 @@ AXTreeSourceArc* ArcAccessibilityTreeTracker::GetFromKey(const TreeKey& key) {
   return tree_it->second.get();
 }
 
-AXTreeSourceArc* ArcAccessibilityTreeTracker::CreateFromKey(
+ax::android::AXTreeSourceAndroid* ArcAccessibilityTreeTracker::CreateFromKey(
     TreeKey key,
     aura::Window* window) {
-  auto tree = std::make_unique<AXTreeSourceArc>(tree_source_delegate_, window);
+  auto tree = std::make_unique<ax::android::AXTreeSourceAndroid>(
+      tree_source_delegate_, std::make_unique<ArcSerializationDelegate>(),
+      window);
   auto [itr, inserted] = trees_.try_emplace(std::move(key), std::move(tree));
   DCHECK(inserted);
   return itr->second.get();
@@ -840,29 +885,26 @@ void ArcAccessibilityTreeTracker::UpdateTopWindowIds(aura::Window* window) {
   if (!task_id.has_value())
     return;
 
-  if (task_id_to_window_.count(task_id.value()) == 0) {
-    task_id_to_window_.emplace(task_id.value(), window);
-
-    // Force re-evaluate children so that window_id and task_id are correctly
-    // mapped.
-    for (aura::Window* child : window->children()) {
-      TrackChildWindow(child);
-    }
-  }
-
-  // TODO(b/270904414): remove a11y window id check on top window once sending
-  // a11y id is fully migrated to per-window level.
-  const auto window_id = exo::GetShellClientAccessibilityId(window);
-  if (!window_id.has_value()) {
+  if (task_id_to_window_.count(task_id.value()) > 0) {
+    // We already know this task id.
     return;
   }
+  task_id_to_window_.emplace(task_id.value(), window);
 
-  UpdateWindowIdAndTaskId(window_id.value(), task_id.value());
+  // Force re-evaluate children so that window_id and task_id are correctly
+  // mapped.
+  for (aura::Window* child : window->children()) {
+    TrackChildWindow(child);
+  }
 }
 
 void ArcAccessibilityTreeTracker::UpdateChildWindowIds(aura::Window* window) {
   const auto window_id = exo::GetShellClientAccessibilityId(window);
   if (!window_id.has_value()) {
+    return;
+  }
+  if (window_id_to_task_id_.find(*window_id) != window_id_to_task_id_.end()) {
+    // We already know this window ID.
     return;
   }
 
@@ -872,22 +914,12 @@ void ArcAccessibilityTreeTracker::UpdateChildWindowIds(aura::Window* window) {
     return;
   }
 
-  UpdateWindowIdAndTaskId(window_id.value(), task_id.value());
-}
-
-void ArcAccessibilityTreeTracker::UpdateWindowIdAndTaskId(int32_t window_id,
-                                                          int32_t task_id) {
-  if (window_id_to_task_id_.find(window_id) != window_id_to_task_id_.end()) {
-    // We already know this window ID.
-    return;
-  }
-
-  window_id_to_task_id_[window_id] = task_id;
+  window_id_to_task_id_[*window_id] = *task_id;
 
   // The window ID is new to us. Request the entire tree.
-  arc::mojom::AccessibilityWindowKeyPtr window_key =
-      arc::mojom::AccessibilityWindowKey::NewWindowId(window_id);
-  accessibility_helper_instance_.RequestSendAccessibilityTree(
+  ax::android::mojom::AccessibilityWindowKeyPtr window_key =
+      ax::android::mojom::AccessibilityWindowKey::NewWindowId(*window_id);
+  accessibility_helper_instance_->RequestSendAccessibilityTree(
       std::move(window_key));
 }
 
@@ -907,9 +939,9 @@ void ArcAccessibilityTreeTracker::UpdateWindowProperties(aura::Window* window) {
 
   if (use_talkback) {
     SetChildAxTreeIDForWindow(window, ui::AXTreeIDUnknown());
-  } else if (filter_type_ == arc::mojom::AccessibilityFilterType::ALL) {
+  } else if (filter_type_ == ax::android::mojom::AccessibilityFilterType::ALL) {
     auto key = KeyForTaskId(*task_id);
-    AXTreeSourceArc* tree = GetFromKey(key);
+    ax::android::AXTreeSourceAndroid* tree = GetFromKey(key);
     if (!tree)
       tree = CreateFromKey(std::move(key), window);
 

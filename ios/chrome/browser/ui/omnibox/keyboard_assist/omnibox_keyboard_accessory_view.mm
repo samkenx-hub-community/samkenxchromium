@@ -4,23 +4,22 @@
 
 #import "ios/chrome/browser/ui/omnibox/keyboard_assist/omnibox_keyboard_accessory_view.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/ios/ios_util.h"
-#import "base/mac/foundation_util.h"
-#import "ios/chrome/browser/flags/system_flags.h"
 #import "ios/chrome/browser/search_engines/search_engine_observer_bridge.h"
 #import "ios/chrome/browser/search_engines/search_engines_util.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/public/features/system_flags.h"
+#import "ios/chrome/browser/shared/ui/elements/extended_touch_target_button.h"
 #import "ios/chrome/browser/shared/ui/util/rtl_geometry.h"
+#import "ios/chrome/browser/ui/lens/lens_availability.h"
+#import "ios/chrome/browser/ui/lens/lens_entrypoint.h"
 #import "ios/chrome/browser/ui/omnibox/keyboard_assist/omnibox_assistive_keyboard_views.h"
 #import "ios/chrome/browser/ui/omnibox/keyboard_assist/omnibox_assistive_keyboard_views_utils.h"
 #import "ios/chrome/common/button_configuration_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/public/provider/chrome/browser/lens/lens_api.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface OmniboxKeyboardAccessoryView () <SearchEngineObserving>
 
@@ -33,6 +32,9 @@
 
 // The search stack view that is displayed by this view.
 @property(nonatomic, weak) UIStackView* searchStackView;
+
+// The text field that this view is an accessory to.
+@property(nonatomic, weak) UITextField* textField;
 
 // Called when a keyboard shortcut button is pressed.
 - (void)keyboardButtonPressed:(NSString*)title;
@@ -51,19 +53,31 @@
 - (instancetype)initWithButtons:(NSArray<NSString*>*)buttonTitles
                        delegate:(id<OmniboxAssistiveKeyboardDelegate>)delegate
                     pasteTarget:(id<UIPasteConfigurationSupporting>)pasteTarget
-             templateURLService:(TemplateURLService*)templateURLService {
+             templateURLService:(TemplateURLService*)templateURLService
+                      textField:(UITextField*)textField {
   self = [super initWithFrame:CGRectZero
                inputViewStyle:UIInputViewStyleKeyboard];
   if (self) {
     _buttonTitles = buttonTitles;
     _delegate = delegate;
     _pasteTarget = pasteTarget;
+    _textField = textField;
     self.translatesAutoresizingMaskIntoConstraints = NO;
     self.allowsSelfSizing = YES;
     self.templateURLService = templateURLService;
     [self addSubviews];
   }
   return self;
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+  [super traitCollectionDidChange:previousTraitCollection];
+  // The Lens button needs to be updated when the device goes from light to dark
+  // mode or vice versa.
+  UIButton* lensButton = _delegate.lensButton;
+  if (lensButton) {
+    UpdateLensButtonAppearance(lensButton);
+  }
 }
 
 - (void)addSubviews {
@@ -143,33 +157,53 @@
   UIColor* kTitleColorStateNormal = [UIColor colorWithWhite:0.0 alpha:1.0];
   UIColor* kTitleColorStateHighlighted = [UIColor colorWithWhite:0.0 alpha:0.3];
 
-  UIButton* button = [UIButton buttonWithType:UIButtonTypeCustom];
-  [button setTitleColor:kTitleColorStateNormal forState:UIControlStateNormal];
-  [button setTitleColor:kTitleColorStateHighlighted
-               forState:UIControlStateHighlighted];
+  UIButton* button =
+      [ExtendedTouchTargetButton buttonWithType:UIButtonTypeCustom];
 
-  [button setTitle:title forState:UIControlStateNormal];
-  [button setTitleColor:[UIColor colorNamed:kTextPrimaryColor]
-               forState:UIControlStateNormal];
-  // TODO(crbug.com/1418068): Simplify after minimum version required is >=
-  // iOS 15.
-  if (base::ios::IsRunningOnIOS15OrLater() &&
-      IsUIButtonConfigurationEnabled()) {
-    if (@available(iOS 15, *)) {
-      UIButtonConfiguration* buttonConfiguration =
-          [UIButtonConfiguration plainButtonConfiguration];
-      buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
-          0, kHorizontalEdgeInset, 0, kHorizontalEdgeInset);
-      button.configuration = buttonConfiguration;
-    }
+  if (IsUIButtonConfigurationEnabled()) {
+    UIButtonConfiguration* buttonConfiguration =
+        [UIButtonConfiguration plainButtonConfiguration];
+    buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
+        0, kHorizontalEdgeInset, 0, kHorizontalEdgeInset);
+    UIFont* font = [UIFont systemFontOfSize:kButtonTitleFontSize
+                                     weight:UIFontWeightMedium];
+    NSAttributedString* attributedTitle = [[NSAttributedString alloc]
+        initWithString:title
+            attributes:@{NSFontAttributeName : font}];
+    buttonConfiguration.attributedTitle = attributedTitle;
+    buttonConfiguration.baseForegroundColor =
+        [UIColor colorNamed:kTextPrimaryColor];
+    button.configuration = buttonConfiguration;
+    button.configurationUpdateHandler = ^(UIButton* incomingButton) {
+      UIButtonConfiguration* updatedConfig = incomingButton.configuration;
+      switch (incomingButton.state) {
+        case UIControlStateHighlighted:
+          updatedConfig.baseForegroundColor = kTitleColorStateHighlighted;
+          break;
+        case UIControlStateNormal:
+          updatedConfig.baseForegroundColor =
+              [UIColor colorNamed:kTextPrimaryColor];
+          break;
+        default:
+          break;
+      }
+      incomingButton.configuration = updatedConfig;
+    };
   } else {
+    [button setTitleColor:kTitleColorStateNormal forState:UIControlStateNormal];
+    [button setTitleColor:kTitleColorStateHighlighted
+                 forState:UIControlStateHighlighted];
+
+    [button setTitle:title forState:UIControlStateNormal];
+    [button setTitleColor:[UIColor colorNamed:kTextPrimaryColor]
+                 forState:UIControlStateNormal];
     UIEdgeInsets contentEdgeInsets =
         UIEdgeInsetsMake(0, kHorizontalEdgeInset, 0, kHorizontalEdgeInset);
     SetContentEdgeInsets(button, contentEdgeInsets);
+    [button.titleLabel setFont:[UIFont systemFontOfSize:kButtonTitleFontSize
+                                                 weight:UIFontWeightMedium]];
   }
   button.clipsToBounds = YES;
-  [button.titleLabel setFont:[UIFont systemFontOfSize:kButtonTitleFontSize
-                                               weight:UIFontWeightMedium]];
 
   [button addTarget:self
                 action:@selector(keyboardButtonPressed:)
@@ -184,9 +218,24 @@
 }
 
 - (void)keyboardButtonPressed:(id)sender {
-  UIButton* button = base::mac::ObjCCastStrict<UIButton>(sender);
+  UIButton* button = base::apple::ObjCCastStrict<UIButton>(sender);
   [[UIDevice currentDevice] playInputClick];
-  [_delegate keyPressed:[button currentTitle]];
+  if (IsUIButtonConfigurationEnabled()) {
+    [_delegate keyPressed:button.configuration.title];
+  } else {
+    [_delegate keyPressed:[button currentTitle]];
+  }
+}
+
+- (void)didMoveToWindow {
+  [super didMoveToWindow];
+  if (!self.window || ![self.textField isFirstResponder]) {
+    return;
+  }
+  // Log the Lens support status when the keyboard is opened.
+  lens_availability::CheckAndLogAvailabilityForLensEntryPoint(
+      LensEntrypoint::Keyboard,
+      [self isGoogleSearchEngine:self.templateURLService]);
 }
 
 #pragma mark - Setters

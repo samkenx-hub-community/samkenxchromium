@@ -124,30 +124,48 @@ constants.FSP_ACTION_HIDDEN_ONEDRIVE_URL = 'HIDDEN_ONEDRIVE_URL';
 constants.FSP_ACTION_HIDDEN_ONEDRIVE_USER_EMAIL = 'HIDDEN_ONEDRIVE_USER_EMAIL';
 
 /**
+ * ID of the fake fileSystemProvider custom action containing OneDrive document
+ * Reauthentication Required state.
+ * @const {string}
+ */
+constants.FSP_ACTION_HIDDEN_ONEDRIVE_REAUTHENTICATION_REQUIRED =
+    'HIDDEN_ONEDRIVE_REAUTHENTICATION_REQUIRED';
+
+/**
  * All icon types.
  */
 constants.ICON_TYPES = {
   ANDROID_FILES: 'android_files',
   ARCHIVE: 'archive',
   AUDIO: 'audio',
+  // Explicitly request the icon to be 0x0. Used to avoid the scenario where a
+  // `type` is not specifically supplied vs. actually wanting a blank icon.
+  BLANK: 'blank',
   BRUSCHETTA: 'bruschetta',
+  BULK_PINNING_BATTERY_SAVER: 'bulk_pinning_battery_saver',
+  BULK_PINNING_DONE: 'bulk_pinning_done',
+  BULK_PINNING_OFFLINE: 'bulk_pinning_offline',
   CAMERA_FOLDER: 'camera-folder',
+  CANT_PIN: 'cant-pin',
   CHECK: 'check',
   CLOUD_DONE: 'cloud_done',
   CLOUD_ERROR: 'cloud_error',
   CLOUD_OFFLINE: 'cloud_offline',
+  CLOUD_PAUSED: 'cloud_paused',
   CLOUD_SYNC: 'cloud_sync',
   CLOUD: 'cloud',
   COMPUTER: 'computer',
   COMPUTERS_GRAND_ROOT: 'computers_grand_root',
   CROSTINI: 'crostini',
   DOWNLOADS: 'downloads',
+  DRIVE_BULK_PINNING: 'drive_bulk_pinning',
   DRIVE_LOGO: 'drive_logo',
   DRIVE_OFFLINE: 'drive_offline',
   DRIVE_RECENT: 'drive_recent',
   DRIVE_SHARED_WITH_ME: 'drive_shared_with_me',
   DRIVE: 'drive',
   ERROR: 'error',
+  ERROR_BANNER: 'error_banner',
   EXCEL: 'excel',
   EXTERNAL_MEDIA: 'external_media',
   FOLDER: 'folder',
@@ -190,3 +208,10 @@ constants.ICON_TYPES = {
   VIDEO: 'video',
   WORD: 'word',
 };
+
+/**
+ * Extension ID for OneDrive FSP, also used as ProviderId.
+ * @const
+ * @type {string}
+ */
+constants.ODFS_EXTENSION_ID = 'gnnndjlaomemikopnjhhnoombakkkkdg';

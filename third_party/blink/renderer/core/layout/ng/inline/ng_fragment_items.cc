@@ -42,26 +42,19 @@ void CheckIsLast(const NGFragmentItem& item) {
 
 NGFragmentItems::NGFragmentItems(NGFragmentItemsBuilder* builder)
     : text_content_(std::move(builder->text_content_)),
-      first_line_text_content_(std::move(builder->first_line_text_content_)),
-      size_(builder->items_.size()),
-      size_of_earlier_fragments_(0) {
-  NGFragmentItemsBuilder::ItemWithOffsetList& source_items = builder->items_;
-  for (wtf_size_t i = 0; i < size_; ++i) {
-    // Call the move constructor to move without |AddRef|. Items in
-    // |NGFragmentItemsBuilder| are not used after |this| was constructed.
-    new (&items_[i]) NGFragmentItem(std::move(source_items[i].item));
-  }
+      first_line_text_content_(std::move(builder->first_line_text_content_)) {
+  items_.ReserveInitialCapacity(builder->items_.size());
+  std::transform(builder->items_.begin(), builder->items_.end(),
+                 std::back_inserter(items_),
+                 [](auto& item) { return std::move(item.item); });
 }
 
 NGFragmentItems::NGFragmentItems(const NGFragmentItems& other)
     : text_content_(other.text_content_),
       first_line_text_content_(other.first_line_text_content_),
-      size_(other.size_),
-      size_of_earlier_fragments_(other.size_of_earlier_fragments_) {
-  for (wtf_size_t i = 0; i < size_; ++i) {
-    const auto& other_item = other.items_[i];
-    new (&items_[i]) NGFragmentItem(other_item);
-
+      size_of_earlier_fragments_(other.size_of_earlier_fragments_),
+      items_(other.items_) {
+  for (const auto& other_item : other.items_) {
     // The |other| object is likely going to be freed after this copy. Detach
     // any |AbstractInlineTextBox|, as they store a pointer to an individual
     // |NGFragmentItem|.
@@ -69,11 +62,6 @@ NGFragmentItems::NGFragmentItems(const NGFragmentItems& other)
             DynamicTo<LayoutText>(other_item.GetMutableLayoutObject()))
       layout_text->DetachAbstractInlineTextBoxesIfNeeded();
   }
-}
-
-NGFragmentItems::~NGFragmentItems() {
-  for (wtf_size_t i = 0; i < size_; ++i)
-    items_[i].~NGFragmentItem();
 }
 
 bool NGFragmentItems::IsSubSpan(const Span& span) const {
@@ -264,13 +252,15 @@ const NGFragmentItem* NGFragmentItems::EndOfReusableItems(
 bool NGFragmentItems::IsContainerForCulledInline(
     const LayoutInline& layout_inline,
     bool* is_first_container,
-    bool* is_last_container) const {
+    bool* is_last_container,
+    bool* child_has_any_child_items) const {
   DCHECK(!layout_inline.HasInlineFragments());
   const wtf_size_t start_idx = size_of_earlier_fragments_;
   const wtf_size_t end_idx = EndItemIndex();
   const LayoutObject* next_descendant;
   bool found_item = false;
   *is_first_container = true;
+  *child_has_any_child_items = false;
   for (const LayoutObject* descendant = layout_inline.FirstChild(); descendant;
        descendant = next_descendant) {
     wtf_size_t item_idx = descendant->FirstInlineFragmentItemIndex();
@@ -280,6 +270,7 @@ bool NGFragmentItems::IsContainerForCulledInline(
       next_descendant = descendant->NextInPreOrder(&layout_inline);
     if (!item_idx)
       continue;
+    *child_has_any_child_items = true;
 
     // |FirstInlineFragmentItemIndex| is 1-based. Convert to 0-based index.
     item_idx--;
@@ -288,6 +279,13 @@ bool NGFragmentItems::IsContainerForCulledInline(
       // This descendant starts in a later container. So this isn't the last
       // container for the culled inline.
       *is_last_container = false;
+      if (!found_item && descendant->IsFloating()) {
+        // Keep looking if we haven't found anything here. Even if this float
+        // starts in a later container, there may still be something to be found
+        // in this container. A float may be pushed to the next fragmentainer,
+        // while subsequent in-flow content may still fit in this container.
+        continue;
+      }
       return found_item;
     }
 
@@ -495,8 +493,7 @@ void NGFragmentItems::CheckAllItemsAreValid() const {
 #endif
 
 void NGFragmentItems::Trace(Visitor* visitor) const {
-  for (const NGFragmentItem& item : Items())
-    visitor->Trace(item);
+  visitor->Trace(items_);
 }
 
 }  // namespace blink

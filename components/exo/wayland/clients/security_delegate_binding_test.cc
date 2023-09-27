@@ -7,7 +7,9 @@
 #include <wayland-client.h>
 #include <wayland-server.h>
 #include <xdg-shell-client-protocol.h>
+#include <xdg-shell-unstable-v6-client-protocol.h>
 
+#include "base/memory/raw_ptr.h"
 #include "components/exo/client_controlled_shell_surface.h"
 #include "components/exo/shell_surface.h"
 #include "components/exo/wayland/clients/client_helper.h"
@@ -28,11 +30,12 @@ class SecurityDelegateBindingTest : public test::WaylandServerTest {
   void SetUp() override {
     WaylandServerTest::SetUp();
     server_security_delegate_ =
-        GetSecurityDelegate(server_->GetWaylandDisplayForTesting());
+        GetSecurityDelegate(server_->GetWaylandDisplay());
     ASSERT_NE(server_security_delegate_, nullptr);
   }
 
-  SecurityDelegate* server_security_delegate_ = nullptr;
+  raw_ptr<SecurityDelegate, DanglingUntriaged | ExperimentalAsh>
+      server_security_delegate_ = nullptr;
 };
 
 TEST_F(SecurityDelegateBindingTest, ShellSurfaceHasSecurityDelegate) {

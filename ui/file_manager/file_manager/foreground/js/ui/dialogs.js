@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 import {isRTL} from 'chrome://resources/ash/common/util.js';
+import {sanitizeInnerHtml} from 'chrome://resources/js/parse_html_subset.js';
+
+import {util} from '../../../common/js/util.js';
 
 export class BaseDialog {
   constructor(parentNode) {
@@ -98,7 +101,15 @@ export class BaseDialog {
     this.title.className = 'cr-dialog-title';
     this.frame.appendChild(this.title);
 
-    this.closeButton = doc.createElement('div');
+    // Use cr-button as close button for refresh23 style.
+    if (util.isJellyEnabled()) {
+      this.closeButton = doc.createElement('cr-button');
+      const icon = doc.createElement('div');
+      icon.className = 'icon';
+      this.closeButton.appendChild(icon);
+    } else {
+      this.closeButton = doc.createElement('div');
+    }
     this.closeButton.className = 'cr-dialog-close';
     this.closeButton.addEventListener('click', this.onCancelClick_.bind(this));
     this.frame.appendChild(this.closeButton);
@@ -115,6 +126,13 @@ export class BaseDialog {
     this.okButton.setAttribute('tabindex', 0);
     this.okButton.className = 'cr-dialog-ok';
     this.okButton.textContent = BaseDialog.OK_LABEL;
+    // Add hover/ripple layer for button in FilesRefresh.
+    if (util.isJellyEnabled()) {
+      const hoverLayer = doc.createElement('div');
+      hoverLayer.className = 'hover-layer';
+      this.okButton.appendChild(hoverLayer);
+      this.okButton.appendChild(doc.createElement('paper-ripple'));
+    }
     this.okButton.addEventListener('click', this.onOkClick_.bind(this));
     this.buttons.appendChild(this.okButton);
 
@@ -122,6 +140,13 @@ export class BaseDialog {
     this.cancelButton.setAttribute('tabindex', 1);
     this.cancelButton.className = 'cr-dialog-cancel';
     this.cancelButton.textContent = BaseDialog.CANCEL_LABEL;
+    // Add hover/ripple layer for button in FilesRefresh.
+    if (util.isJellyEnabled()) {
+      const hoverLayer = doc.createElement('div');
+      hoverLayer.className = 'hover-layer';
+      this.cancelButton.appendChild(hoverLayer);
+      this.cancelButton.appendChild(doc.createElement('paper-ripple'));
+    }
     this.cancelButton.addEventListener('click', this.onCancelClick_.bind(this));
     this.buttons.appendChild(this.cancelButton);
 
@@ -177,12 +202,24 @@ export class BaseDialog {
 
   /** @param {string} label */
   setOkLabel(label) {
-    this.okButton.textContent = label;
+    if (util.isJellyEnabled()) {
+      // When Jelly is on, we have child elements inside the button, setting
+      // textContent of the button will remove all children.
+      this.okButton.childNodes[0].textContent = label;
+    } else {
+      this.okButton.textContent = label;
+    }
   }
 
   /** @param {string} label */
   setCancelLabel(label) {
-    this.cancelButton.textContent = label;
+    if (util.isJellyEnabled()) {
+      // When Jelly is on, we have child elements inside the button, setting
+      // textContent of the button will remove all children.
+      this.cancelButton.childNodes[0].textContent = label;
+    } else {
+      this.cancelButton.textContent = label;
+    }
   }
 
   setInitialFocusOnCancel() {
@@ -201,13 +238,13 @@ export class BaseDialog {
 
   /**
    * @param {string} title
-   * @param {string} message
+   * @param {string} messageHtml a message that may contain HTML tags.
    * @param {Function=} opt_onOk
    * @param {Function=} opt_onCancel
    * @param {Function=} opt_onShow
    */
-  showHtml(title, message, opt_onOk, opt_onCancel, opt_onShow) {
-    this.text.innerHTML = message;
+  showHtml(title, messageHtml, opt_onOk, opt_onCancel, opt_onShow) {
+    this.text.innerHTML = sanitizeInnerHtml(messageHtml);
     this.show_(title, opt_onOk, opt_onCancel, opt_onShow);
   }
 

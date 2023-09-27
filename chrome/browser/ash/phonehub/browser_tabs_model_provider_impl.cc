@@ -11,7 +11,7 @@
 #include "chromeos/ash/components/phonehub/browser_tabs_model.h"
 #include "components/sync/base/features.h"
 #include "components/sync/base/model_type.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
 #include "components/sync_sessions/open_tabs_ui_delegate.h"
 #include "components/sync_sessions/session_sync_service.h"
 
@@ -214,7 +214,7 @@ void BrowserTabsModelProviderImpl::OnForeignSyncedPhoneSessionsUpdated(
     return;
   }
   browser_tabs_metadata_fetcher_->FetchForeignSyncedPhoneSessionMetadata(
-      host_phone_session.value(),
+      host_phone_session.value(), synced_session_client_ash_,
       base::BindOnce(&BrowserTabsModelProviderImpl::OnMetadataFetched,
                      weak_ptr_factory_.GetWeakPtr()));
 }

@@ -8,8 +8,8 @@
 
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/download/download_manager_tab_helper.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/snapshots/fake_snapshot_generator_delegate.h"
 #import "ios/chrome/browser/snapshots/snapshot_tab_helper.h"
 #import "ios/chrome/browser/ui/sharing/activity_services/data/share_to_data.h"
@@ -23,10 +23,6 @@
 #import "third_party/ocmock/OCMock/OCMock.h"
 #import "ui/base/test/ios/ui_image_test_utils.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using ui::test::uiimage_utils::UIImagesAreEqual;
 using ui::test::uiimage_utils::UIImageWithSizeAndSolidColorAndScale;

@@ -33,8 +33,10 @@ std::string SerializeMessage(proto::MessageType message_type,
 }  // namespace
 
 MessageSenderImpl::MessageSenderImpl(
-    secure_channel::ConnectionManager* connection_manager)
-    : connection_manager_(connection_manager) {
+    secure_channel::ConnectionManager* connection_manager,
+    PhoneHubUiReadinessRecorder* phone_hub_ui_readiness_recorder)
+    : connection_manager_(connection_manager),
+      phone_hub_ui_readiness_recorder_(phone_hub_ui_readiness_recorder) {
   DCHECK(connection_manager_);
 }
 
@@ -66,6 +68,7 @@ void MessageSenderImpl::SendCrosState(
   }
 
   SendMessage(proto::MessageType::PROVIDE_CROS_STATE, &request);
+  phone_hub_ui_readiness_recorder_->RecordCrosStateMessageSent();
 }
 
 void MessageSenderImpl::SendUpdateNotificationModeRequest(

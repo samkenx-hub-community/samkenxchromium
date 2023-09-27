@@ -4,9 +4,8 @@
 
 package org.chromium.chrome.browser.webauth;
 
-import android.support.test.InstrumentationRegistry;
-
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -91,7 +90,6 @@ public class AuthenticatorTest {
     @After
     public void tearDown() {
         TestThreadUtils.runOnUiThreadBlocking(() -> mTab.removeObserver(mUpdateWaiter));
-        mTestServer.stopAndDestroyServer();
     }
 
     /**

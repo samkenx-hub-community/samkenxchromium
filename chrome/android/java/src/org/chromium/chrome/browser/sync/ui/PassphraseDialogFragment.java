@@ -35,10 +35,13 @@ import org.chromium.base.IntentUtils;
 import org.chromium.base.Log;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeStringConstants;
-import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncherImpl;
+import org.chromium.chrome.browser.feedback.FragmentHelpAndFeedbackLauncher;
+import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncher;
 import org.chromium.chrome.browser.profiles.Profile;
-import org.chromium.chrome.browser.sync.SyncService;
+import org.chromium.chrome.browser.settings.ProfileDependentSetting;
+import org.chromium.chrome.browser.sync.SyncServiceFactory;
 import org.chromium.components.sync.PassphraseType;
+import org.chromium.components.sync.SyncService;
 import org.chromium.ui.text.SpanApplier;
 import org.chromium.ui.text.SpanApplier.SpanInfo;
 
@@ -48,7 +51,8 @@ import java.util.Date;
 /**
  * Dialog to ask to user to enter their sync passphrase.
  */
-public class PassphraseDialogFragment extends DialogFragment implements OnClickListener {
+public class PassphraseDialogFragment extends DialogFragment
+        implements OnClickListener, ProfileDependentSetting, FragmentHelpAndFeedbackLauncher {
     private static final String TAG = "Sync_UI";
 
     /**
@@ -63,11 +67,8 @@ public class PassphraseDialogFragment extends DialogFragment implements OnClickL
         void onPassphraseCanceled();
     }
 
-    private static final int PASSPHRASE_DIALOG_OK = 0;
-    private static final int PASSPHRASE_DIALOG_ERROR = 1;
-    private static final int PASSPHRASE_DIALOG_CANCEL = 2;
-    private static final int PASSPHRASE_DIALOG_RESET_LINK = 3;
-    private static final int PASSPHRASE_DIALOG_LIMIT = 4;
+    private Profile mProfile;
+    private HelpAndFeedbackLauncher mHelpAndFeedbackLauncher;
 
     private EditText mPassphraseEditText;
     private TextView mVerifyingTextView;
@@ -79,7 +80,6 @@ public class PassphraseDialogFragment extends DialogFragment implements OnClickL
      * Create a new instanceof of {@link PassphraseDialogFragment} and set its arguments.
      */
     public static PassphraseDialogFragment newInstance(Fragment target) {
-        assert SyncService.get() != null;
         PassphraseDialogFragment dialog = new PassphraseDialogFragment();
         if (target != null) {
             dialog.setTargetFragment(target, -1);
@@ -88,7 +88,19 @@ public class PassphraseDialogFragment extends DialogFragment implements OnClickL
     }
 
     @Override
+    public void setProfile(Profile profile) {
+        mProfile = profile;
+    }
+
+    @Override
+    public void setHelpAndFeedbackLauncher(HelpAndFeedbackLauncher helpAndFeedbackLauncher) {
+        mHelpAndFeedbackLauncher = helpAndFeedbackLauncher;
+    }
+
+    @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
+        assert SyncServiceFactory.getForProfile(mProfile) != null;
+
         LayoutInflater inflater = getActivity().getLayoutInflater();
         View v = inflater.inflate(R.layout.sync_enter_passphrase, null);
 
@@ -174,15 +186,13 @@ public class PassphraseDialogFragment extends DialogFragment implements OnClickL
                 new SpanInfo("<learnmore>", "</learnmore>", new ClickableSpan() {
                     @Override
                     public void onClick(View view) {
-                        HelpAndFeedbackLauncherImpl
-                                .getForProfile(Profile.getLastUsedRegularProfile())
-                                .show(getActivity(), helpContext, null);
+                        mHelpAndFeedbackLauncher.show(getActivity(), helpContext, null);
                     }
                 }));
     }
 
     private SpannableString getPromptText() {
-        SyncService syncService = SyncService.get();
+        SyncService syncService = SyncServiceFactory.getForProfile(mProfile);
         String accountName =
                 getString(R.string.sync_account_info, syncService.getAccountInfo().getEmail())
                 + "\n\n";
@@ -230,20 +240,7 @@ public class PassphraseDialogFragment extends DialogFragment implements OnClickL
                 }));
     }
 
-    /**
-     * @return whether the incorrect passphrase text is currently visible.
-     */
-    private boolean isIncorrectPassphraseVisible() {
-        // Check if the verifying TextView is currently showing the incorrect passphrase text.
-        String incorrectPassphraseMessage =
-                getResources().getString(R.string.sync_passphrase_incorrect);
-        String verifyMessage = mVerifyingTextView.getText().toString();
-        return verifyMessage.equals(incorrectPassphraseMessage);
-    }
-
     private void handleCancel() {
-        int cancelReason =
-                isIncorrectPassphraseVisible() ? PASSPHRASE_DIALOG_ERROR : PASSPHRASE_DIALOG_CANCEL;
         getListener().onPassphraseCanceled();
     }
 

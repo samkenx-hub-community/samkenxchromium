@@ -7,6 +7,7 @@
 
 #include <memory>
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/ash/guest_os/guest_os_security_delegate.h"
 
 class Profile;
@@ -28,8 +29,7 @@ class BorealisSecurityDelegate : public guest_os::GuestOsSecurityDelegate {
   // exo::SecurityDelegate overrides:
   bool CanSelfActivate(aura::Window* window) const override;
   bool CanLockPointer(aura::Window* window) const override;
-  bool CanSetBoundsWithServerSideDecoration(
-      aura::Window* window) const override;
+  SetBoundsPolicy CanSetBounds(aura::Window* window) const override;
 
   // Used in tests to avoid the async Build() call.
   static std::unique_ptr<BorealisSecurityDelegate> MakeForTesting(
@@ -39,7 +39,7 @@ class BorealisSecurityDelegate : public guest_os::GuestOsSecurityDelegate {
   // Private constructor, use Build().
   explicit BorealisSecurityDelegate(Profile* profile);
 
-  Profile* const profile_;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
 };
 
 }  // namespace borealis

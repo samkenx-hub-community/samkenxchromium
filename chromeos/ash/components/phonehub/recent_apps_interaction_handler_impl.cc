@@ -108,10 +108,17 @@ void RecentAppsInteractionHandlerImpl::NotifyRecentAppAddedOrUpdated(
 
 void RecentAppsInteractionHandlerImpl::SetConnectionStatusHandler(
     eche_app::EcheConnectionStatusHandler* eche_connection_status_handler) {
+  if (!features::IsEcheNetworkConnectionStateEnabled()) {
+    return;
+  }
+
+  if (eche_connection_status_handler_) {
+    eche_connection_status_handler_->RemoveObserver(this);
+  }
+
   eche_connection_status_handler_ = eche_connection_status_handler;
 
-  if (features::IsEcheNetworkConnectionStateEnabled() &&
-      eche_connection_status_handler_) {
+  if (eche_connection_status_handler_) {
     eche_connection_status_handler_->AddObserver(this);
   }
 }
@@ -230,14 +237,10 @@ void RecentAppsInteractionHandlerImpl::SetStreamableApps(
 
 void RecentAppsInteractionHandlerImpl::RemoveStreamableApp(
     const proto::App app_to_remove) {
-  recent_app_metadata_list_.erase(
-      std::remove_if(
-          recent_app_metadata_list_.begin(), recent_app_metadata_list_.end(),
-          [&app_to_remove](
+  base::EraseIf(recent_app_metadata_list_, [&app_to_remove](
               const std::pair<Notification::AppMetadata, base::Time>& app) {
-            return app.first.package_name == app_to_remove.package_name();
-          }),
-      recent_app_metadata_list_.end());
+    return app.first.package_name == app_to_remove.package_name();
+  });
 
   SaveRecentAppMetadataListToPref();
   ComputeAndUpdateUiState();
@@ -271,6 +274,13 @@ void RecentAppsInteractionHandlerImpl::ComputeAndUpdateUiState() {
     NotifyRecentAppsViewUiStateUpdated();
     return;
   }
+
+  if (features::IsEcheNetworkConnectionStateEnabled()) {
+    ui_state_ = GetUiStateFromConnectionStatus();
+    NotifyRecentAppsViewUiStateUpdated();
+    return;
+  }
+
   if (recent_app_metadata_list_.empty()) {
     bool notifications_enabled =
         multidevice_setup_client_->GetFeatureState(
@@ -282,11 +292,6 @@ void RecentAppsInteractionHandlerImpl::ComputeAndUpdateUiState() {
       ui_state_ = RecentAppsUiState::PLACEHOLDER_VIEW;
     }
   } else {
-    if (features::IsEcheNetworkConnectionStateEnabled()) {
-      ui_state_ = GetUiStateFromConnectionStatus();
-      NotifyRecentAppsViewUiStateUpdated();
-      return;
-    }
     ui_state_ = RecentAppsUiState::ITEMS_VISIBLE;
   }
   NotifyRecentAppsViewUiStateUpdated();

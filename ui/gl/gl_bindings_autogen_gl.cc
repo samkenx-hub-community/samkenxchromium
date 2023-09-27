@@ -297,8 +297,12 @@ void DriverGL::InitializeDynamicBindings(const GLVersionInfo* ver,
       gfx::HasExtension(extensions, "GL_ANGLE_memory_object_fuchsia");
   ext.b_GL_ANGLE_multi_draw =
       gfx::HasExtension(extensions, "GL_ANGLE_multi_draw");
+  ext.b_GL_ANGLE_polygon_mode =
+      gfx::HasExtension(extensions, "GL_ANGLE_polygon_mode");
   ext.b_GL_ANGLE_provoking_vertex =
       gfx::HasExtension(extensions, "GL_ANGLE_provoking_vertex");
+  ext.b_GL_ANGLE_renderability_validation =
+      gfx::HasExtension(extensions, "GL_ANGLE_renderability_validation");
   ext.b_GL_ANGLE_request_extension =
       gfx::HasExtension(extensions, "GL_ANGLE_request_extension");
   ext.b_GL_ANGLE_robust_client_memory =
@@ -383,6 +387,8 @@ void DriverGL::InitializeDynamicBindings(const GLVersionInfo* ver,
       gfx::HasExtension(extensions, "GL_EXT_blend_func_extended");
   ext.b_GL_EXT_clear_texture =
       gfx::HasExtension(extensions, "GL_EXT_clear_texture");
+  ext.b_GL_EXT_clip_control =
+      gfx::HasExtension(extensions, "GL_EXT_clip_control");
   ext.b_GL_EXT_debug_marker =
       gfx::HasExtension(extensions, "GL_EXT_debug_marker");
   ext.b_GL_EXT_direct_state_access =
@@ -415,6 +421,8 @@ void DriverGL::InitializeDynamicBindings(const GLVersionInfo* ver,
       gfx::HasExtension(extensions, "GL_EXT_multisampled_render_to_texture");
   ext.b_GL_EXT_occlusion_query_boolean =
       gfx::HasExtension(extensions, "GL_EXT_occlusion_query_boolean");
+  ext.b_GL_EXT_polygon_offset_clamp =
+      gfx::HasExtension(extensions, "GL_EXT_polygon_offset_clamp");
   ext.b_GL_EXT_robustness = gfx::HasExtension(extensions, "GL_EXT_robustness");
   ext.b_GL_EXT_semaphore = gfx::HasExtension(extensions, "GL_EXT_semaphore");
   ext.b_GL_EXT_semaphore_fd =
@@ -740,6 +748,11 @@ void DriverGL::InitializeDynamicBindings(const GLVersionInfo* ver,
   if (ext.b_GL_APPLE_sync) {
     fn.glClientWaitSyncAPPLEFn = reinterpret_cast<glClientWaitSyncAPPLEProc>(
         GetGLProcAddress("glClientWaitSyncAPPLE"));
+  }
+
+  if (ext.b_GL_EXT_clip_control) {
+    fn.glClipControlEXTFn = reinterpret_cast<glClipControlEXTProc>(
+        GetGLProcAddress("glClipControlEXT"));
   }
 
   if (ver->IsAtLeastGL(3u, 0u) || ver->IsAtLeastGLES(3u, 2u)) {
@@ -1221,6 +1234,18 @@ void DriverGL::InitializeDynamicBindings(const GLVersionInfo* ver,
     fn.glFramebufferPixelLocalClearValueuivANGLEFn =
         reinterpret_cast<glFramebufferPixelLocalClearValueuivANGLEProc>(
             GetGLProcAddress("glFramebufferPixelLocalClearValueuivANGLE"));
+  }
+
+  if (ext.b_GL_ANGLE_shader_pixel_local_storage) {
+    fn.glFramebufferPixelLocalStorageInterruptANGLEFn =
+        reinterpret_cast<glFramebufferPixelLocalStorageInterruptANGLEProc>(
+            GetGLProcAddress("glFramebufferPixelLocalStorageInterruptANGLE"));
+  }
+
+  if (ext.b_GL_ANGLE_shader_pixel_local_storage) {
+    fn.glFramebufferPixelLocalStorageRestoreANGLEFn =
+        reinterpret_cast<glFramebufferPixelLocalStorageRestoreANGLEProc>(
+            GetGLProcAddress("glFramebufferPixelLocalStorageRestoreANGLE"));
   }
 
   if (ver->IsAtLeastGL(3u, 0u) || ver->is_es) {
@@ -2335,6 +2360,17 @@ void DriverGL::InitializeDynamicBindings(const GLVersionInfo* ver,
         reinterpret_cast<glPolygonModeProc>(GetGLProcAddress("glPolygonMode"));
   }
 
+  if (ext.b_GL_ANGLE_polygon_mode) {
+    fn.glPolygonModeANGLEFn = reinterpret_cast<glPolygonModeANGLEProc>(
+        GetGLProcAddress("glPolygonModeANGLE"));
+  }
+
+  if (ext.b_GL_EXT_polygon_offset_clamp) {
+    fn.glPolygonOffsetClampEXTFn =
+        reinterpret_cast<glPolygonOffsetClampEXTProc>(
+            GetGLProcAddress("glPolygonOffsetClampEXT"));
+  }
+
   if (ver->IsAtLeastGL(4u, 3u) || ver->IsAtLeastGLES(3u, 2u)) {
     fn.glPopDebugGroupFn = reinterpret_cast<glPopDebugGroupProc>(
         GetGLProcAddress("glPopDebugGroup"));
@@ -3430,6 +3466,10 @@ GLenum GLApiBase::glClientWaitSyncAPPLEFn(GLsync sync,
   return driver_->fn.glClientWaitSyncAPPLEFn(sync, flags, timeout);
 }
 
+void GLApiBase::glClipControlEXTFn(GLenum origin, GLenum depth) {
+  driver_->fn.glClipControlEXTFn(origin, depth);
+}
+
 void GLApiBase::glColorMaskFn(GLboolean red,
                               GLboolean green,
                               GLboolean blue,
@@ -4022,6 +4062,14 @@ void GLApiBase::glFramebufferPixelLocalClearValueuivANGLEFn(
     GLint plane,
     const GLuint* value) {
   driver_->fn.glFramebufferPixelLocalClearValueuivANGLEFn(plane, value);
+}
+
+void GLApiBase::glFramebufferPixelLocalStorageInterruptANGLEFn() {
+  driver_->fn.glFramebufferPixelLocalStorageInterruptANGLEFn();
+}
+
+void GLApiBase::glFramebufferPixelLocalStorageRestoreANGLEFn() {
+  driver_->fn.glFramebufferPixelLocalStorageRestoreANGLEFn();
 }
 
 void GLApiBase::glFramebufferRenderbufferEXTFn(GLenum target,
@@ -5342,8 +5390,18 @@ void GLApiBase::glPolygonModeFn(GLenum face, GLenum mode) {
   driver_->fn.glPolygonModeFn(face, mode);
 }
 
+void GLApiBase::glPolygonModeANGLEFn(GLenum face, GLenum mode) {
+  driver_->fn.glPolygonModeANGLEFn(face, mode);
+}
+
 void GLApiBase::glPolygonOffsetFn(GLfloat factor, GLfloat units) {
   driver_->fn.glPolygonOffsetFn(factor, units);
+}
+
+void GLApiBase::glPolygonOffsetClampEXTFn(GLfloat factor,
+                                          GLfloat units,
+                                          GLfloat clamp) {
+  driver_->fn.glPolygonOffsetClampEXTFn(factor, units, clamp);
 }
 
 void GLApiBase::glPopDebugGroupFn() {
@@ -6944,6 +7002,11 @@ GLenum TraceGLApi::glClientWaitSyncAPPLEFn(GLsync sync,
   return gl_api_->glClientWaitSyncAPPLEFn(sync, flags, timeout);
 }
 
+void TraceGLApi::glClipControlEXTFn(GLenum origin, GLenum depth) {
+  TRACE_EVENT_BINARY_EFFICIENT0("gpu", "TraceGLAPI::glClipControlEXT");
+  gl_api_->glClipControlEXTFn(origin, depth);
+}
+
 void TraceGLApi::glColorMaskFn(GLboolean red,
                                GLboolean green,
                                GLboolean blue,
@@ -7648,6 +7711,18 @@ void TraceGLApi::glFramebufferPixelLocalClearValueuivANGLEFn(
   TRACE_EVENT_BINARY_EFFICIENT0(
       "gpu", "TraceGLAPI::glFramebufferPixelLocalClearValueuivANGLE");
   gl_api_->glFramebufferPixelLocalClearValueuivANGLEFn(plane, value);
+}
+
+void TraceGLApi::glFramebufferPixelLocalStorageInterruptANGLEFn() {
+  TRACE_EVENT_BINARY_EFFICIENT0(
+      "gpu", "TraceGLAPI::glFramebufferPixelLocalStorageInterruptANGLE");
+  gl_api_->glFramebufferPixelLocalStorageInterruptANGLEFn();
+}
+
+void TraceGLApi::glFramebufferPixelLocalStorageRestoreANGLEFn() {
+  TRACE_EVENT_BINARY_EFFICIENT0(
+      "gpu", "TraceGLAPI::glFramebufferPixelLocalStorageRestoreANGLE");
+  gl_api_->glFramebufferPixelLocalStorageRestoreANGLEFn();
 }
 
 void TraceGLApi::glFramebufferRenderbufferEXTFn(GLenum target,
@@ -9230,9 +9305,21 @@ void TraceGLApi::glPolygonModeFn(GLenum face, GLenum mode) {
   gl_api_->glPolygonModeFn(face, mode);
 }
 
+void TraceGLApi::glPolygonModeANGLEFn(GLenum face, GLenum mode) {
+  TRACE_EVENT_BINARY_EFFICIENT0("gpu", "TraceGLAPI::glPolygonModeANGLE");
+  gl_api_->glPolygonModeANGLEFn(face, mode);
+}
+
 void TraceGLApi::glPolygonOffsetFn(GLfloat factor, GLfloat units) {
   TRACE_EVENT_BINARY_EFFICIENT0("gpu", "TraceGLAPI::glPolygonOffset");
   gl_api_->glPolygonOffsetFn(factor, units);
+}
+
+void TraceGLApi::glPolygonOffsetClampEXTFn(GLfloat factor,
+                                           GLfloat units,
+                                           GLfloat clamp) {
+  TRACE_EVENT_BINARY_EFFICIENT0("gpu", "TraceGLAPI::glPolygonOffsetClampEXT");
+  gl_api_->glPolygonOffsetClampEXTFn(factor, units, clamp);
 }
 
 void TraceGLApi::glPopDebugGroupFn() {
@@ -11134,6 +11221,13 @@ GLenum LogGLApi::glClientWaitSyncAPPLEFn(GLsync sync,
   return result;
 }
 
+void LogGLApi::glClipControlEXTFn(GLenum origin, GLenum depth) {
+  GL_SERVICE_LOG("glClipControlEXT"
+                 << "(" << GLEnums::GetStringEnum(origin) << ", "
+                 << GLEnums::GetStringEnum(depth) << ")");
+  gl_api_->glClipControlEXTFn(origin, depth);
+}
+
 void LogGLApi::glColorMaskFn(GLboolean red,
                              GLboolean green,
                              GLboolean blue,
@@ -12044,6 +12138,20 @@ void LogGLApi::glFramebufferPixelLocalClearValueuivANGLEFn(
                  << "(" << plane << ", " << static_cast<const void*>(value)
                  << ")");
   gl_api_->glFramebufferPixelLocalClearValueuivANGLEFn(plane, value);
+}
+
+void LogGLApi::glFramebufferPixelLocalStorageInterruptANGLEFn() {
+  GL_SERVICE_LOG("glFramebufferPixelLocalStorageInterruptANGLE"
+                 << "("
+                 << ")");
+  gl_api_->glFramebufferPixelLocalStorageInterruptANGLEFn();
+}
+
+void LogGLApi::glFramebufferPixelLocalStorageRestoreANGLEFn() {
+  GL_SERVICE_LOG("glFramebufferPixelLocalStorageRestoreANGLE"
+                 << "("
+                 << ")");
+  gl_api_->glFramebufferPixelLocalStorageRestoreANGLEFn();
 }
 
 void LogGLApi::glFramebufferRenderbufferEXTFn(GLenum target,
@@ -14128,10 +14236,25 @@ void LogGLApi::glPolygonModeFn(GLenum face, GLenum mode) {
   gl_api_->glPolygonModeFn(face, mode);
 }
 
+void LogGLApi::glPolygonModeANGLEFn(GLenum face, GLenum mode) {
+  GL_SERVICE_LOG("glPolygonModeANGLE"
+                 << "(" << GLEnums::GetStringEnum(face) << ", "
+                 << GLEnums::GetStringEnum(mode) << ")");
+  gl_api_->glPolygonModeANGLEFn(face, mode);
+}
+
 void LogGLApi::glPolygonOffsetFn(GLfloat factor, GLfloat units) {
   GL_SERVICE_LOG("glPolygonOffset"
                  << "(" << factor << ", " << units << ")");
   gl_api_->glPolygonOffsetFn(factor, units);
+}
+
+void LogGLApi::glPolygonOffsetClampEXTFn(GLfloat factor,
+                                         GLfloat units,
+                                         GLfloat clamp) {
+  GL_SERVICE_LOG("glPolygonOffsetClampEXT"
+                 << "(" << factor << ", " << units << ", " << clamp << ")");
+  gl_api_->glPolygonOffsetClampEXTFn(factor, units, clamp);
 }
 
 void LogGLApi::glPopDebugGroupFn() {
@@ -16301,6 +16424,10 @@ GLenum NoContextGLApi::glClientWaitSyncAPPLEFn(GLsync sync,
   return static_cast<GLenum>(0);
 }
 
+void NoContextGLApi::glClipControlEXTFn(GLenum origin, GLenum depth) {
+  NoContextHelper("glClipControlEXT");
+}
+
 void NoContextGLApi::glColorMaskFn(GLboolean red,
                                    GLboolean green,
                                    GLboolean blue,
@@ -16878,6 +17005,14 @@ void NoContextGLApi::glFramebufferPixelLocalClearValueuivANGLEFn(
     GLint plane,
     const GLuint* value) {
   NoContextHelper("glFramebufferPixelLocalClearValueuivANGLE");
+}
+
+void NoContextGLApi::glFramebufferPixelLocalStorageInterruptANGLEFn() {
+  NoContextHelper("glFramebufferPixelLocalStorageInterruptANGLE");
+}
+
+void NoContextGLApi::glFramebufferPixelLocalStorageRestoreANGLEFn() {
+  NoContextHelper("glFramebufferPixelLocalStorageRestoreANGLE");
 }
 
 void NoContextGLApi::glFramebufferRenderbufferEXTFn(GLenum target,
@@ -18179,8 +18314,18 @@ void NoContextGLApi::glPolygonModeFn(GLenum face, GLenum mode) {
   NoContextHelper("glPolygonMode");
 }
 
+void NoContextGLApi::glPolygonModeANGLEFn(GLenum face, GLenum mode) {
+  NoContextHelper("glPolygonModeANGLE");
+}
+
 void NoContextGLApi::glPolygonOffsetFn(GLfloat factor, GLfloat units) {
   NoContextHelper("glPolygonOffset");
+}
+
+void NoContextGLApi::glPolygonOffsetClampEXTFn(GLfloat factor,
+                                               GLfloat units,
+                                               GLfloat clamp) {
+  NoContextHelper("glPolygonOffsetClampEXT");
 }
 
 void NoContextGLApi::glPopDebugGroupFn() {

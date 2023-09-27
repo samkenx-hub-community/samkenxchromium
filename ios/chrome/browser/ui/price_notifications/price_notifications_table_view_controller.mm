@@ -6,7 +6,7 @@
 
 #import <MaterialComponents/MaterialSnackbar.h>
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "ios/chrome/browser/net/crurl.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/ui/list_model/list_item+Controller.h"
@@ -15,6 +15,7 @@
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_header_footer_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_link_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_model.h"
+#import "ios/chrome/browser/ui/price_notifications/cells/price_notifications_image_container_view.h"
 #import "ios/chrome/browser/ui/price_notifications/cells/price_notifications_table_view_item.h"
 #import "ios/chrome/browser/ui/price_notifications/price_notifications_constants.h"
 #import "ios/chrome/browser/ui/price_notifications/price_notifications_consumer.h"
@@ -27,10 +28,6 @@
 #import "net/base/mac/url_conversions.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -91,6 +88,11 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
   self.tableView.accessibilityIdentifier =
       kPriceNotificationsTableViewIdentifier;
   self.tableView.estimatedRowHeight = 100;
+  NSUInteger imageWidthWithPadding =
+      PriceNotificationsImageView::kPriceNotificationsImageLength +
+      kTableViewHorizontalSpacing * 2;
+  self.tableView.separatorInset =
+      UIEdgeInsetsMake(0, imageWidthWithPadding, 0, 0);
 
   self.title =
       l10n_util::GetNSString(IDS_IOS_PRICE_NOTIFICATIONS_PRICE_TRACK_TITLE);
@@ -110,12 +112,8 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
 
 - (NSIndexPath*)tableView:(UITableView*)tableView
     willSelectRowAtIndexPath:(NSIndexPath*)indexPath {
-  if (@available(iOS 16.0, *)) {
-    return [super tableView:tableView willSelectRowAtIndexPath:indexPath];
-  }
-
   PriceNotificationsTableViewItem* item =
-      base::mac::ObjCCastStrict<PriceNotificationsTableViewItem>(
+      base::apple::ObjCCastStrict<PriceNotificationsTableViewItem>(
           [self.tableViewModel itemAtIndexPath:indexPath]);
 
   if (!item.tracking) {
@@ -132,7 +130,7 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
   }
 
   PriceNotificationsTableViewItem* item =
-      base::mac::ObjCCastStrict<PriceNotificationsTableViewItem>(
+      base::apple::ObjCCastStrict<PriceNotificationsTableViewItem>(
           [self.tableViewModel itemAtIndexPath:indexPath]);
   [self.mutator navigateToWebpageForItem:item];
 }
@@ -140,7 +138,7 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
 - (BOOL)tableView:(UITableView*)tableView
     canPerformPrimaryActionForRowAtIndexPath:(NSIndexPath*)indexPath {
   PriceNotificationsTableViewItem* item =
-      base::mac::ObjCCastStrict<PriceNotificationsTableViewItem>(
+      base::apple::ObjCCastStrict<PriceNotificationsTableViewItem>(
           [self.tableViewModel itemAtIndexPath:indexPath]);
 
   return item.tracking;
@@ -149,7 +147,7 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
 - (void)tableView:(UITableView*)tableView
     performPrimaryActionForRowAtIndexPath:(NSIndexPath*)indexPath {
   PriceNotificationsTableViewItem* item =
-      base::mac::ObjCCastStrict<PriceNotificationsTableViewItem>(
+      base::apple::ObjCCastStrict<PriceNotificationsTableViewItem>(
           [self.tableViewModel itemAtIndexPath:indexPath]);
   [self.mutator navigateToWebpageForItem:item];
 }
@@ -158,7 +156,7 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
     viewForHeaderInSection:(NSInteger)section {
   UIView* header = [super tableView:tableView viewForHeaderInSection:section];
   TableViewTextHeaderFooterView* link =
-      base::mac::ObjCCast<TableViewTextHeaderFooterView>(header);
+      base::apple::ObjCCast<TableViewTextHeaderFooterView>(header);
   if (link) {
     link.delegate = self;
   }
@@ -191,8 +189,9 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
 
   if (trackableItem && !currentlyTracking) {
     [self addItem:trackableItem
-        toBeginning:YES
-          ofSection:SectionIdentifierTrackableItemsOnCurrentSite];
+             toBeginning:YES
+               ofSection:SectionIdentifierTrackableItemsOnCurrentSite
+        withRowAnimation:UITableViewRowAnimationAutomatic];
   }
 
   if (!self.viewIfLoaded.window) {
@@ -210,32 +209,38 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
   _shouldHideLoadingState = YES;
   [self initializeTableViewModelIfNeeded];
   [self removeLoadingState];
-  BOOL shouldReloadSection = NO;
   TableViewModel* model = self.tableViewModel;
-
   if (!_hasTrackedItems) {
     [model setHeader:
                [self createHeaderForSectionIndex:SectionIdentifierTrackedItems
                                          isEmpty:NO]
         forSectionWithIdentifier:SectionIdentifierTrackedItems];
-    [model setHeader:[self createHeaderForSectionIndex:
-                               SectionIdentifierTableViewHeader
-                                               isEmpty:NO]
-        forSectionWithIdentifier:SectionIdentifierTableViewHeader];
-    shouldReloadSection = YES;
-  }
-  _hasTrackedItems = YES;
-  [self addItem:trackedItem
-      toBeginning:beginning
-        ofSection:SectionIdentifierTrackedItems];
 
-  if (!self.viewIfLoaded.window || !shouldReloadSection) {
+    trackedItem.type = ItemTypeListItem;
+    trackedItem.delegate = self;
+    if (beginning) {
+      [self.tableViewModel insertItem:trackedItem
+              inSectionWithIdentifier:SectionIdentifierTrackedItems
+                              atIndex:0];
+    } else {
+      [self.tableViewModel addItem:trackedItem
+           toSectionWithIdentifier:SectionIdentifierTrackedItems];
+    }
+
+    if (self.viewIfLoaded.window) {
+      [self.tableView reloadSections:[self createIndexSetForSectionIdentifiers:
+                                               {SectionIdentifierTrackedItems}]
+                    withRowAnimation:UITableViewRowAnimationFade];
+    }
+    _hasTrackedItems = YES;
     return;
   }
-  [self.tableView reloadSections:[self createIndexSetForSectionIdentifiers:
-                                           {SectionIdentifierTrackedItems,
-                                            SectionIdentifierTableViewHeader}]
-                withRowAnimation:UITableViewRowAnimationAutomatic];
+
+  _hasTrackedItems = YES;
+  [self addItem:trackedItem
+           toBeginning:beginning
+             ofSection:SectionIdentifierTrackedItems
+      withRowAnimation:UITableViewRowAnimationTop];
 }
 
 - (void)didStopPriceTrackingItem:(PriceNotificationsTableViewItem*)trackedItem
@@ -244,7 +249,6 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
   SectionIdentifier trackedSection = SectionIdentifierTrackedItems;
   SectionIdentifier trackableSection =
       SectionIdentifierTrackableItemsOnCurrentSite;
-  std::vector<SectionIdentifier> sectionsToReload;
   BOOL addItemToTrackableSection =
       isViewingProductSite && ![model hasItemForItemType:ItemTypeListItem
                                        sectionIdentifier:trackableSection];
@@ -254,15 +258,15 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
   [model removeItemWithType:ItemTypeListItem
       fromSectionWithIdentifier:trackedSection
                         atIndex:index.item];
+  BOOL reloadTrackedSection = ![model hasItemForItemType:ItemTypeListItem
+                                       sectionIdentifier:trackedSection];
 
-  if (![model hasItemForItemType:ItemTypeListItem
-               sectionIdentifier:trackedSection]) {
+  if (reloadTrackedSection) {
     _hasTrackedItems = NO;
     [model setHeader:
                [self createHeaderForSectionIndex:SectionIdentifierTrackedItems
                                          isEmpty:YES]
         forSectionWithIdentifier:trackedSection];
-    sectionsToReload.push_back(trackedSection);
   }
 
   if (addItemToTrackableSection) {
@@ -273,7 +277,6 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
     [model insertItem:trackedItem
         inSectionWithIdentifier:trackableSection
                         atIndex:0];
-    sectionsToReload.push_back(trackableSection);
   }
 
   NSString* messageText = l10n_util::GetNSString(
@@ -288,22 +291,30 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
     return;
   }
 
-  if (addItemToTrackableSection) {
-    NSIndexPath* trackableSectionIndex =
-        [model indexPathForItemType:ItemTypeListItem
-                  sectionIdentifier:trackableSection];
-    [self.tableView moveRowAtIndexPath:index toIndexPath:trackableSectionIndex];
-  }
+  [self.tableView
+      performBatchUpdates:^{
+        UITableViewRowAnimation animation = UITableViewRowAnimationMiddle;
+        if (addItemToTrackableSection) {
+          [self.tableView
+                reloadSections:[self createIndexSetForSectionIdentifiers:
+                                         {trackableSection}]
+              withRowAnimation:UITableViewRowAnimationFade];
+          animation = UITableViewRowAnimationFade;
+        }
 
-  if (sectionsToReload.size()) {
-    [self.tableView reloadSections:[self createIndexSetForSectionIdentifiers:
-                                             sectionsToReload]
-                  withRowAnimation:UITableViewRowAnimationAutomatic];
-    return;
-  }
+        if (reloadTrackedSection) {
+          [self.tableView
+                reloadSections:
+                    [self createIndexSetForSectionIdentifiers:{trackedSection}]
+              withRowAnimation:UITableViewRowAnimationFade];
+          return;
+        }
 
-  [self.tableView deleteRowsAtIndexPaths:@[ index ]
-                        withRowAnimation:UITableViewRowAnimationAutomatic];
+        [self.tableView deleteRowsAtIndexPaths:@[ index ]
+                              withRowAnimation:animation];
+      }
+               completion:^(BOOL completion){
+               }];
 }
 
 - (void)didStartPriceTrackingForItem:
@@ -326,9 +337,8 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
 
   [self.tableView
         reloadSections:[self createIndexSetForSectionIdentifiers:
-                                 {SectionIdentifierTableViewHeader,
-                                  SectionIdentifierTrackableItemsOnCurrentSite}]
-      withRowAnimation:UITableViewRowAnimationAutomatic];
+                                 {SectionIdentifierTrackableItemsOnCurrentSite}]
+      withRowAnimation:UITableViewRowAnimationFade];
 
   [self addTrackedItem:trackableItem toBeginning:YES];
 }
@@ -344,7 +354,7 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
 - (void)trackItemForCell:(PriceNotificationsTableViewCell*)cell {
   NSIndexPath* indexPath = [self.tableView indexPathForCell:cell];
   PriceNotificationsTableViewItem* item =
-      base::mac::ObjCCastStrict<PriceNotificationsTableViewItem>(
+      base::apple::ObjCCastStrict<PriceNotificationsTableViewItem>(
           [self.tableViewModel itemAtIndexPath:indexPath]);
   [self.mutator trackItem:item];
 }
@@ -352,7 +362,7 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
 - (void)stopTrackingItemForCell:(PriceNotificationsTableViewCell*)cell {
   NSIndexPath* indexPath = [self.tableView indexPathForCell:cell];
   PriceNotificationsTableViewItem* item =
-      base::mac::ObjCCastStrict<PriceNotificationsTableViewItem>(
+      base::apple::ObjCCastStrict<PriceNotificationsTableViewItem>(
           [self.tableViewModel itemAtIndexPath:indexPath]);
   [self.mutator stopTrackingItem:item];
 }
@@ -361,8 +371,9 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
 
 // Adds an item to `sectionID` and displays it to the UI.
 - (void)addItem:(PriceNotificationsTableViewItem*)item
-    toBeginning:(BOOL)toBeginning
-      ofSection:(SectionIdentifier)sectionID {
+         toBeginning:(BOOL)toBeginning
+           ofSection:(SectionIdentifier)sectionID
+    withRowAnimation:(UITableViewRowAnimation)animation {
   if (sectionID == SectionIdentifierTrackableItemsOnCurrentSite &&
       [self.tableViewModel
           hasItemForItemType:ItemTypeListItem
@@ -387,7 +398,7 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
 
   [self.tableView
       insertRowsAtIndexPaths:@[ [self.tableViewModel indexPathForItem:item] ]
-            withRowAnimation:UITableViewRowAnimationAutomatic];
+            withRowAnimation:animation];
 }
 
 // Returns a TableViewHeaderFooterItem that displays the title for the section
@@ -460,14 +471,17 @@ const char kBookmarksSettingsURL[] = "settings://open_bookmarks";
   emptyTrackedItem.loading = YES;
   emptyTrackedItem.tracking = YES;
   [self addItem:emptyTrackableItem
-      toBeginning:YES
-        ofSection:SectionIdentifierTrackableItemsOnCurrentSite];
+           toBeginning:YES
+             ofSection:SectionIdentifierTrackableItemsOnCurrentSite
+      withRowAnimation:UITableViewRowAnimationAutomatic];
   [self addItem:emptyTrackedItem
-      toBeginning:YES
-        ofSection:SectionIdentifierTrackedItems];
+           toBeginning:YES
+             ofSection:SectionIdentifierTrackedItems
+      withRowAnimation:UITableViewRowAnimationAutomatic];
   [self addItem:emptyTrackedItem
-      toBeginning:YES
-        ofSection:SectionIdentifierTrackedItems];
+           toBeginning:YES
+             ofSection:SectionIdentifierTrackedItems
+      withRowAnimation:UITableViewRowAnimationAutomatic];
   _displayedLoadingState = YES;
 }
 

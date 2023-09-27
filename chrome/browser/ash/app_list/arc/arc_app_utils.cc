@@ -38,6 +38,7 @@
 #include "chrome/browser/ash/arc/boot_phase_monitor/arc_boot_phase_monitor_bridge.h"
 #include "chrome/browser/ash/arc/notification/arc_management_transition_notification.h"
 #include "chrome/browser/ash/arc/session/arc_session_manager.h"
+#include "chrome/browser/ash/arc/vmm/arc_vmm_manager.h"
 #include "chrome/browser/ash/arc/window_predictor/window_predictor.h"
 #include "chrome/browser/ash/arc/window_predictor/window_predictor_utils.h"
 #include "chrome/browser/ash/login/login_pref_names.h"
@@ -228,12 +229,14 @@ std::string ConstructArcAppShortcutUrl(const std::string& app_id,
   return "appshortcutsearch://" + app_id + "/" + shortcut_id;
 }
 
-bool IsFixupWindowEnabled() {
-  return base::FeatureList::IsEnabled(arc::kFixupWindowFeature);
-}
-
 bool IsInstantResponseOpenEnabled() {
   return base::FeatureList::IsEnabled(arc::kInstantResponseWindowOpen);
+}
+
+bool IsArcVmAndSwappedOut(content::BrowserContext* context) {
+  return IsArcVmEnabled() &&
+         base::FeatureList::IsEnabled(arc::kVmmSwapoutGhostWindow) &&
+         ArcVmmManager::GetForBrowserContext(context)->IsSwapped();
 }
 
 }  // namespace
@@ -337,10 +340,14 @@ bool LaunchAppWithIntent(content::BrowserContext* context,
   std::unique_ptr<ArcAppListPrefs::AppInfo> app_info = prefs->GetApp(app_id);
   apps::IntentPtr launch_intent_to_send = std::move(launch_intent);
 
+  if (!app_info) {
+    LOG(WARNING) << "Ignore invalid app launch quest, id = " << app_id;
+    return false;
+  }
+
   // Some apps need fixup when ARC version upgrade e.g. from ARC P to ARC R.
   // Before fixup finishes, the |app_info->ready| is true but not launchable.
-  if (app_info &&
-      ((IsFixupWindowEnabled() && app_info->need_fixup) || !app_info->ready)) {
+  if (app_info->need_fixup || !app_info->ready) {
     if (!IsArcPlayStoreEnabledForProfile(profile)) {
       if (prefs->IsDefault(app_id)) {
         // The setting can fail if the preference is managed.  However, the
@@ -387,11 +394,12 @@ bool LaunchAppWithIntent(content::BrowserContext* context,
       arc::ArcBootPhaseMonitorBridge::RecordFirstAppLaunchDelayUMA(context);
     }
 
-    if (IsFixupWindowEnabled() && app_info->need_fixup) {
+    if (app_info->need_fixup) {
       // TODO(sstan): Use different UI after UX design finalized.
       if (WindowPredictor::GetInstance()->LaunchArcAppWithGhostWindow(
               profile, app_id, *app_info, launch_intent_to_send, event_flags,
-              GhostWindowType::kFixup, window_info)) {
+              GhostWindowType::kFixup, WindowPredictorUseCase::kArcNotReady,
+              window_info)) {
         prefs->SetLastLaunchTime(app_id);
         return true;
       }
@@ -401,7 +409,8 @@ bool LaunchAppWithIntent(content::BrowserContext* context,
                arc::GetArcAndroidSdkVersionAsInt() >= arc::kArcVersionR) {
       if (WindowPredictor::GetInstance()->LaunchArcAppWithGhostWindow(
               profile, app_id, *app_info, launch_intent_to_send, event_flags,
-              GhostWindowType::kAppLaunch, window_info)) {
+              GhostWindowType::kAppLaunch, WindowPredictorUseCase::kArcNotReady,
+              window_info)) {
         prefs->SetLastLaunchTime(app_id);
         return true;
       }
@@ -425,6 +434,19 @@ bool LaunchAppWithIntent(content::BrowserContext* context,
     }
     prefs->SetLastLaunchTime(app_id);
     return true;
+  } else if (IsArcVmAndSwappedOut(context) &&
+             !WindowPredictor::GetInstance()->IsAppPendingLaunch(profile,
+                                                                 app_id)) {
+    // Assume this condition branch will never be triggered in ARCVM launch (ARC
+    // booting) stage. It should be trigger after ARCVM idle for a while.
+    if (WindowPredictor::GetInstance()->LaunchArcAppWithGhostWindow(
+            profile, app_id, *app_info, launch_intent_to_send, event_flags,
+            GhostWindowType::kAppLaunch, WindowPredictorUseCase::kArcVmmSwapped,
+            window_info)) {
+      return true;
+    }
+    VLOG(2) << "Failed to launch ghost window for swapped state, fallback to "
+               "launch directly.";
   } else if (app_id == kPlayStoreAppId) {
     // Record launch request time in order to track Play Store default launch
     // performance.
@@ -443,7 +465,8 @@ bool LaunchAppWithIntent(content::BrowserContext* context,
     // For some devices, launch ghost window and app at the same time.
     if (WindowPredictor::GetInstance()->LaunchArcAppWithGhostWindow(
             profile, app_id, *app_info, launch_intent_to_send, event_flags,
-            GhostWindowType::kAppLaunch, window_info)) {
+            GhostWindowType::kAppLaunch,
+            WindowPredictorUseCase::kInstanceResponse, window_info)) {
       return true;
     }
     VLOG(2) << "Failed to launch ghost window, fallback to launch directly.";

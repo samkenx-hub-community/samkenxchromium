@@ -2,10 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {PerformanceTestRunner} from 'performance_test_runner';
+
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+import * as TimelineModule from 'devtools/panels/timeline/timeline.js';
+
 (async function() {
   TestRunner.addResult(
       `Tests that inspector doesn't force styles recalc on operations with inline element styles that result in no changes.\n`);
-  await TestRunner.loadLegacyModule('timeline'); await TestRunner.loadTestModule('performance_test_runner');
+  await TestRunner.loadLegacyModule('timeline');
   await TestRunner.showPanel('timeline');
   await TestRunner.showPanel('elements');
   await TestRunner.loadHTML(`
@@ -20,6 +26,6 @@
       }
   `);
 
-  UI.context.setFlavor(Timeline.TimelinePanel, UI.panels.timeline);
+  UIModule.Context.Context.instance().setFlavor(TimelineModule.TimelinePanel.TimelinePanel, UI.panels.timeline);
   PerformanceTestRunner.performActionsAndPrint('performActions()', 'RecalculateStyles');
 })();

@@ -7,12 +7,11 @@ package org.chromium.chrome.browser.media.ui;
 import static org.chromium.base.test.util.Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE;
 
 import android.os.Build;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.annotation.RequiresApi;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -27,6 +26,7 @@ import org.chromium.base.test.util.MinAndroidSdkLevel;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
+import org.chromium.chrome.browser.init.AsyncInitializationActivity;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
@@ -39,6 +39,7 @@ import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.content_public.browser.test.util.WebContentsUtils;
 import org.chromium.media.MediaSwitches;
 import org.chromium.net.test.EmbeddedTestServer;
+import org.chromium.ui.test.util.DeviceRestriction;
 
 /**
  * Tests for FullscreenVideoPictureInPictureController and related methods.
@@ -47,7 +48,10 @@ import org.chromium.net.test.EmbeddedTestServer;
 @Batch(Batch.PER_CLASS)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE,
         MediaSwitches.AUTOPLAY_NO_GESTURE_REQUIRED_POLICY})
-@Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
+@Restriction({
+        RESTRICTION_TYPE_NON_LOW_END_DEVICE,
+        DeviceRestriction.RESTRICTION_TYPE_NON_AUTO // PiP not supported on AAOS.
+})
 @RequiresApi(Build.VERSION_CODES.O)
 public class FullscreenVideoPictureInPictureControllerTest {
     // TODO(peconn): Add a test for exit on Tab Reparenting.
@@ -66,11 +70,6 @@ public class FullscreenVideoPictureInPictureControllerTest {
                 InstrumentationRegistry.getInstrumentation().getContext());
         mActivityTestRule.startMainActivityWithURL(mTestServer.getURL(TEST_PATH));
         mActivity = mActivityTestRule.getActivity();
-    }
-
-    @After
-    public void tearDown() {
-        mTestServer.stopAndDestroyServer();
     }
 
     /** Tests that we can detect when a video is playing fullscreen, a prerequisite for PiP. */
@@ -99,6 +98,13 @@ public class FullscreenVideoPictureInPictureControllerTest {
     public void testEnterPip() throws Throwable {
         enterFullscreen();
         triggerAutoPiPAndWait();
+
+        // Exit Picture in Picture.
+        AsyncInitializationActivity.interceptMoveTaskToBackForTesting();
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> InstrumentationRegistry.getInstrumentation().callActivityOnStop(mActivity));
+        CriteriaHelper.pollUiThread(
+                AsyncInitializationActivity::wasMoveTaskToBackInterceptedForTesting);
     }
 
     /** Tests that PiP is left when we navigate the main page. */
@@ -153,6 +159,7 @@ public class FullscreenVideoPictureInPictureControllerTest {
     @Test
     @MediumTest
     @MinAndroidSdkLevel(Build.VERSION_CODES.O)
+    @DisabledTest(message = "https://crbug.com/1429112")
     public void testExitOnNewForegroundTab() throws Throwable {
         testExitOn(new Runnable() {
             @Override
@@ -202,6 +209,7 @@ public class FullscreenVideoPictureInPictureControllerTest {
     @Test
     @MediumTest
     @MinAndroidSdkLevel(Build.VERSION_CODES.O)
+    @DisabledTest(message = "https://crbug.com/1429112")
     public void testReenterPip() throws Throwable {
         enterFullscreen();
         triggerAutoPiPAndWait();
@@ -244,12 +252,18 @@ public class FullscreenVideoPictureInPictureControllerTest {
     }
 
     private void testExitOn(Runnable runnable) throws Throwable {
+        AsyncInitializationActivity.interceptMoveTaskToBackForTesting();
+
         enterFullscreen();
         triggerAutoPiPAndWait();
 
         runnable.run();
 
-        CriteriaHelper.pollUiThread(() -> !mActivity.getLastPictureInPictureModeForTesting());
+        CriteriaHelper.pollUiThread(
+                AsyncInitializationActivity::wasMoveTaskToBackInterceptedForTesting);
+        // This logic would run if we hadn't intercepted moveTaskToBack (which is how PiP gets
+        // exited), so run it now just in case.
+        mActivity.onPictureInPictureModeChanged(false, mActivity.getResources().getConfiguration());
     }
 
     /** A TabObserver that tracks whether a navigation has occurred. */
@@ -264,5 +278,30 @@ public class FullscreenVideoPictureInPictureControllerTest {
         public void onDidFinishNavigationInPrimaryMainFrame(Tab tab, NavigationHandle navigation) {
             mNavigationOccurred = true;
         }
+    }
+
+    /** Tests that we exit PiP whe device is locked. */
+    @Test
+    @MediumTest
+    @MinAndroidSdkLevel(Build.VERSION_CODES.O)
+    public void testExitPipWhenDeviceLocked() throws Throwable {
+        AsyncInitializationActivity.interceptMoveTaskToBackForTesting();
+        enterFullscreen();
+        triggerAutoPiPAndWait();
+
+        // Ensure that we entered Picture in Picture.
+        Assert.assertTrue(
+                TestThreadUtils.runOnUiThreadBlocking(mActivity::isInPictureInPictureMode));
+
+        // Call activity OnStop. This simulates user locking the device.
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> InstrumentationRegistry.getInstrumentation().callActivityOnStop(mActivity));
+
+        CriteriaHelper.pollUiThread(
+                AsyncInitializationActivity::wasMoveTaskToBackInterceptedForTesting);
+        // This logic would run if we hadn't intercepted moveTaskToBack (which is how PiP gets
+        // exited), we run it now for completion and proceed to ensure we exited Picture in Picture.
+        mActivity.onPictureInPictureModeChanged(false, mActivity.getResources().getConfiguration());
+        CriteriaHelper.pollUiThread(() -> !mActivity.getLastPictureInPictureModeForTesting());
     }
 }

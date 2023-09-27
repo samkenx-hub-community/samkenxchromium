@@ -4,8 +4,6 @@
 
 package org.chromium.chrome.browser.touch_to_fill;
 
-import static org.chromium.chrome.browser.password_manager.PasswordManagerHelper.usesUnifiedPasswordManagerBranding;
-
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,9 +23,6 @@ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
  * Android Views.
  */
 class TouchToFillView extends TouchToFillViewBase {
-    private final BottomSheetController mBottomSheetController;
-    private final RecyclerView mSheetItemListView;
-
     private static class HorizontalDividerItemDecoration extends ItemDividerBase {
         HorizontalDividerItemDecoration(Context context) {
             super(context);
@@ -36,9 +31,6 @@ class TouchToFillView extends TouchToFillViewBase {
         @Override
         protected int selectBackgroundDrawable(
                 int position, boolean containsFillButton, int itemCount) {
-            if (!usesUnifiedPasswordManagerBranding()) {
-                return R.drawable.touch_to_fill_credential_background;
-            }
             return super.selectBackgroundDrawable(position, containsFillButton, itemCount);
         }
 
@@ -51,6 +43,7 @@ class TouchToFillView extends TouchToFillViewBase {
                     return true;
                 case ItemType.CREDENTIAL: // Fallthrough.
                 case ItemType.WEBAUTHN_CREDENTIAL:
+                case ItemType.MORE_PASSKEYS:
                     return false;
             }
             assert false : "Undefined whether to skip setting background for item of type: " + type;
@@ -75,18 +68,15 @@ class TouchToFillView extends TouchToFillViewBase {
     TouchToFillView(Context context, BottomSheetController bottomSheetController) {
         super(bottomSheetController,
                 (RelativeLayout) LayoutInflater.from(context).inflate(
-                        R.layout.touch_to_fill_sheet, null));
-        mBottomSheetController = bottomSheetController;
-        mSheetItemListView = getItemList();
+                        R.layout.touch_to_fill_sheet, null),
+                true);
 
-        if (usesUnifiedPasswordManagerBranding()) {
-            mSheetItemListView.addItemDecoration(new HorizontalDividerItemDecoration(context));
-        }
+        getSheetItemListView().addItemDecoration(new HorizontalDividerItemDecoration(context));
     }
 
     @Override
     public int getVerticalScrollOffset() {
-        return mSheetItemListView.computeVerticalScrollOffset();
+        return getSheetItemListView().computeVerticalScrollOffset();
     }
 
     @Override
@@ -115,23 +105,15 @@ class TouchToFillView extends TouchToFillViewBase {
     }
 
     @Override
-    protected RecyclerView getItemList() {
-        return getContentView().findViewById(R.id.sheet_item_list);
-    }
-
-    @Override
     protected @Px int getConclusiveMarginHeightPx() {
         return getContentView().getResources().getDimensionPixelSize(
-                usesUnifiedPasswordManagerBranding()
-                        ? R.dimen.touch_to_fill_sheet_bottom_padding_button_modern
-                        : R.dimen.touch_to_fill_sheet_bottom_padding_button);
+                R.dimen.touch_to_fill_sheet_bottom_padding_button);
     }
 
     @Override
     protected @Px int getSideMarginPx() {
         return getContentView().getResources().getDimensionPixelSize(
-                usesUnifiedPasswordManagerBranding() ? R.dimen.touch_to_fill_sheet_margin_modern
-                                                     : R.dimen.touch_to_fill_sheet_margin);
+                R.dimen.touch_to_fill_sheet_margin);
     }
 
     @Override

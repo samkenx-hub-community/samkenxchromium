@@ -4,8 +4,6 @@
 
 package org.chromium.chrome.browser.supervised_user;
 
-import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.matcher.ViewMatchers.isRoot;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -15,9 +13,7 @@ import static org.mockito.Mockito.verify;
 
 import androidx.test.filters.MediumTest;
 
-import org.junit.Assert;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
@@ -28,29 +24,25 @@ import org.mockito.junit.MockitoRule;
 import org.mockito.quality.Strictness;
 
 import org.chromium.base.Callback;
-import org.chromium.base.test.metrics.HistogramTestRule;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DoNotBatch;
+import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.supervised_user.android.AndroidLocalWebApprovalFlowOutcome;
 import org.chromium.chrome.browser.superviseduser.FilteringBehavior;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
-import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.chrome.test.util.browser.signin.SigninTestRule;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetTestSupport;
 import org.chromium.content_public.browser.WebContents;
-import org.chromium.content_public.browser.test.NativeLibraryTestUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.ui.base.WindowAndroid;
-import org.chromium.ui.test.util.DisableAnimationsTestRule;
 import org.chromium.ui.test.util.ViewUtils;
 import org.chromium.url.GURL;
 
@@ -68,8 +60,6 @@ import java.util.concurrent.TimeoutException;
                 + "The code under tests involes setting static methods and features, "
                 + "which must remain unchanged for the duration of the test.")
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
-@EnableFeatures(
-        {ChromeFeatureList.LOCAL_WEB_APPROVALS, ChromeFeatureList.WEB_FILTER_INTERSTITIAL_REFRESH})
 public class WebsiteParentApprovalTest {
     public ChromeTabbedActivityTestRule mTabbedActivityTestRule =
             new ChromeTabbedActivityTestRule();
@@ -84,10 +74,6 @@ public class WebsiteParentApprovalTest {
     public final JniMocker mocker = new JniMocker();
     @Rule
     public final MockitoRule mMockitoRule = MockitoJUnit.rule().strictness(Strictness.STRICT_STUBS);
-    @Rule
-    public final DisableAnimationsTestRule sDisableAnimationsRule = new DisableAnimationsTestRule();
-    @Rule
-    public final HistogramTestRule mHistogramTester = new HistogramTestRule();
 
     private static final String TEST_PAGE = "/chrome/test/data/android/about.html";
 
@@ -101,12 +87,6 @@ public class WebsiteParentApprovalTest {
     private WebsiteParentApproval.Natives mWebsiteParentApprovalNativesMock;
     @Mock
     private ParentAuthDelegate mParentAuthDelegateMock;
-
-    @BeforeClass
-    public static void setUpClass() {
-        // Load natives needed for HistogramTestRule.
-        NativeLibraryTestUtils.loadNativeLibraryNoBrowserProcess();
-    }
 
     @Before
     public void setUp() throws TimeoutException {
@@ -148,8 +128,8 @@ public class WebsiteParentApprovalTest {
         // Ensure all animations have ended. Otherwise the following check may fail.
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> { mBottomSheetTestSupport.endAllAnimations(); });
-        onView(isRoot()).check(ViewUtils.waitForView(withId(R.id.local_parent_approval_layout),
-                ViewUtils.VIEW_INVISIBLE | ViewUtils.VIEW_GONE | ViewUtils.VIEW_NULL));
+        ViewUtils.waitForViewCheckingState(withId(R.id.local_parent_approval_layout),
+                ViewUtils.VIEW_INVISIBLE | ViewUtils.VIEW_GONE | ViewUtils.VIEW_NULL);
     }
 
     @Test
@@ -182,16 +162,17 @@ public class WebsiteParentApprovalTest {
         mockParentAuthDelegateRequestLocalAuthResponse(true);
         mTabbedActivityTestRule.loadUrl(mBlockedUrl);
 
+        // Verify only histograms recorded in Java.
+        var histogram = HistogramWatcher.newSingleRecordWatcher(
+                "FamilyLinkUser.LocalWebApprovalOutcome", /* APPROVED_BY_PARENT=*/0);
+
         WebsiteParentApprovalTestUtils.clickAskInPerson(mWebContents);
         WebsiteParentApprovalTestUtils.clickApprove(mBottomSheetTestSupport);
 
         verify(mWebsiteParentApprovalNativesMock,
                 timeout(CriteriaHelper.DEFAULT_MAX_TIME_TO_POLL).times(1))
                 .onCompletion(AndroidLocalWebApprovalFlowOutcome.APPROVED);
-        // Verify only histograms recorded in Java.
-        Assert.assertEquals(1,
-                mHistogramTester.getHistogramValueCount("FamilyLinkUser.LocalWebApprovalOutcome",
-                        /* APPROVED_BY_PARENT=*/0));
+        histogram.assertExpected();
     }
 
     @Test
@@ -200,16 +181,17 @@ public class WebsiteParentApprovalTest {
         mockParentAuthDelegateRequestLocalAuthResponse(true);
         mTabbedActivityTestRule.loadUrl(mBlockedUrl);
 
+        // Verify only histograms recorded in Java.
+        var histogram = HistogramWatcher.newSingleRecordWatcher(
+                "FamilyLinkUser.LocalWebApprovalOutcome", /* DENIED_BY_PARENT=*/1);
+
         WebsiteParentApprovalTestUtils.clickAskInPerson(mWebContents);
         WebsiteParentApprovalTestUtils.clickDoNotApprove(mBottomSheetTestSupport);
 
         verify(mWebsiteParentApprovalNativesMock,
                 timeout(CriteriaHelper.DEFAULT_MAX_TIME_TO_POLL).times(1))
                 .onCompletion(AndroidLocalWebApprovalFlowOutcome.REJECTED);
-        // Verify only histograms recorded in Java.
-        Assert.assertEquals(1,
-                mHistogramTester.getHistogramValueCount("FamilyLinkUser.LocalWebApprovalOutcome",
-                        /*DENIED_BY_PARENT=*/1));
+        histogram.assertExpected();
     }
 
     @Test

@@ -16,11 +16,8 @@ import java.util.Map;
 public enum PersistedTabDataConfiguration {
     // TODO(crbug.com/1059650) investigate should this go in the app code?
     // Also investigate if the storage instance should be shared.
-    CRITICAL_PERSISTED_TAB_DATA("CPTDFB"),
-    ENCRYPTED_CRITICAL_PERSISTED_TAB_DATA("ECPTDFB"),
     MOCK_PERSISTED_TAB_DATA("MPTD"),
     ENCRYPTED_MOCK_PERSISTED_TAB_DATA("EMPTD"),
-    COUPON_PERSISTED_TAB_DATA("COPTD"),
     SHOPPING_PERSISTED_TAB_DATA("SPTD"),
     EMPTY_BYTE_BUFFER_TEST_CONFIG("EBBTC"),
     // TODO(crbug.com/1113828) investigate separating test from prod test implementations
@@ -34,8 +31,6 @@ public enum PersistedTabDataConfiguration {
     /**
      * Ensure lazy initialization of singleton storage
      */
-    private static FilePersistedTabDataStorage sFilePersistedTabDataStorage;
-    private static EncryptedFilePersistedTabDataStorage sEncrpytedFilePersistedTabDataStorage;
     private static MockPersistedTabDataStorage sMockPersistedTabDataStorage;
     private static EmptyByteBufferPersistedTabDataStorage sEmptyByteBufferPersistedTabDataStorage;
     private static boolean sUseEmptyByteBufferTestConfig;
@@ -46,20 +41,6 @@ public enum PersistedTabDataConfiguration {
             sEmptyByteBufferPersistedTabDataStorage = new EmptyByteBufferPersistedTabDataStorage();
         }
         return sEmptyByteBufferPersistedTabDataStorage;
-    }
-
-    static FilePersistedTabDataStorage getFilePersistedTabDataStorage() {
-        if (sFilePersistedTabDataStorage == null) {
-            sFilePersistedTabDataStorage = new FilePersistedTabDataStorage();
-        }
-        return sFilePersistedTabDataStorage;
-    }
-
-    static EncryptedFilePersistedTabDataStorage getEncryptedFilePersistedTabDataStorage() {
-        if (sEncrpytedFilePersistedTabDataStorage == null) {
-            sEncrpytedFilePersistedTabDataStorage = new EncryptedFilePersistedTabDataStorage();
-        }
-        return sEncrpytedFilePersistedTabDataStorage;
     }
 
     private static MockPersistedTabDataStorage getMockPersistedTabDataStorage() {
@@ -73,28 +54,15 @@ public enum PersistedTabDataConfiguration {
 
     static {
         // TODO(crbug.com/1060187) remove static initializer and initialization lazy
-        sLookup.put(CouponPersistedTabData.class, COUPON_PERSISTED_TAB_DATA);
-        sEncryptedLookup.put(CouponPersistedTabData.class, COUPON_PERSISTED_TAB_DATA);
-        sLookup.put(CriticalPersistedTabData.class, CRITICAL_PERSISTED_TAB_DATA);
-        sEncryptedLookup.put(CriticalPersistedTabData.class, ENCRYPTED_CRITICAL_PERSISTED_TAB_DATA);
         sLookup.put(MockPersistedTabData.class, MOCK_PERSISTED_TAB_DATA);
         sEncryptedLookup.put(MockPersistedTabData.class, ENCRYPTED_MOCK_PERSISTED_TAB_DATA);
         sLookup.put(ShoppingPersistedTabData.class, SHOPPING_PERSISTED_TAB_DATA);
         sEncryptedLookup.put(ShoppingPersistedTabData.class, SHOPPING_PERSISTED_TAB_DATA);
-
-        COUPON_PERSISTED_TAB_DATA.mStorageFactory = new LevelDBPersistedTabDataStorageFactory();
-
-        CRITICAL_PERSISTED_TAB_DATA.mStorageFactory = () -> {
-            return getFilePersistedTabDataStorage();
-        };
-        ENCRYPTED_CRITICAL_PERSISTED_TAB_DATA.mStorageFactory = () -> {
-            return getEncryptedFilePersistedTabDataStorage();
-        };
         MOCK_PERSISTED_TAB_DATA.mStorageFactory = () -> {
-            return getFilePersistedTabDataStorage();
+            return getMockPersistedTabDataStorage();
         };
         ENCRYPTED_MOCK_PERSISTED_TAB_DATA.mStorageFactory = () -> {
-            return getEncryptedFilePersistedTabDataStorage();
+            return getMockPersistedTabDataStorage();
         };
         SHOPPING_PERSISTED_TAB_DATA.mStorageFactory = new LevelDBPersistedTabDataStorageFactory();
 

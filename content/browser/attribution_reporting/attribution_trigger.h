@@ -5,11 +5,12 @@
 #ifndef CONTENT_BROWSER_ATTRIBUTION_REPORTING_ATTRIBUTION_TRIGGER_H_
 #define CONTENT_BROWSER_ATTRIBUTION_REPORTING_ATTRIBUTION_TRIGGER_H_
 
+#include <vector>
+
 #include "components/attribution_reporting/suitable_origin.h"
 #include "components/attribution_reporting/trigger_registration.h"
 #include "content/common/content_export.h"
-#include "services/network/public/cpp/trigger_attestation.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
+#include "services/network/public/cpp/trigger_verification.h"
 
 namespace content {
 
@@ -33,7 +34,8 @@ class CONTENT_EXPORT AttributionTrigger {
     kDeduplicated = 5,
     kExcessiveAttributions = 6,
     kPriorityTooLow = 7,
-    kDroppedForNoise = 8,
+    // Equivalent to the "noised" trigger result described in the spec.
+    kNeverAttributedSource = 8,
     kExcessiveReportingOrigins = 9,
     kNoMatchingSourceFilterData = 10,
     kProhibitedByBrowserPolicy = 11,
@@ -42,7 +44,8 @@ class CONTENT_EXPORT AttributionTrigger {
     kFalselyAttributedSource = 14,
     kReportWindowPassed = 15,
     kNotRegistered = 16,
-    kMaxValue = kNotRegistered,
+    kReportWindowNotStarted = 17,
+    kMaxValue = kReportWindowNotStarted,
   };
 
   // Represents the potential aggregatable outcomes from attempting to register
@@ -64,13 +67,14 @@ class CONTENT_EXPORT AttributionTrigger {
     kProhibitedByBrowserPolicy = 10,
     kDeduplicated = 11,
     kReportWindowPassed = 12,
-    kMaxValue = kReportWindowPassed,
+    kExcessiveReports = 13,
+    kMaxValue = kExcessiveReports,
   };
 
   AttributionTrigger(attribution_reporting::SuitableOrigin reporting_origin,
                      attribution_reporting::TriggerRegistration registration,
                      attribution_reporting::SuitableOrigin destination_origin,
-                     absl::optional<network::TriggerAttestation> attestation,
+                     std::vector<network::TriggerVerification> verifications,
                      bool is_within_fenced_frame);
 
   AttributionTrigger(const AttributionTrigger&);
@@ -97,8 +101,8 @@ class CONTENT_EXPORT AttributionTrigger {
 
   bool is_within_fenced_frame() const { return is_within_fenced_frame_; }
 
-  const absl::optional<network::TriggerAttestation>& attestation() const {
-    return attestation_;
+  const std::vector<network::TriggerVerification>& verifications() const {
+    return verifications_;
   }
 
  private:
@@ -109,8 +113,8 @@ class CONTENT_EXPORT AttributionTrigger {
   // Origin on which this trigger was registered.
   attribution_reporting::SuitableOrigin destination_origin_;
 
-  // Optional token attesting to the veracity of the trigger.
-  absl::optional<network::TriggerAttestation> attestation_;
+  // Optional tokens attesting to the veracity of the trigger.
+  std::vector<network::TriggerVerification> verifications_;
 
   // Whether the trigger is registered within a fenced frame tree.
   bool is_within_fenced_frame_;

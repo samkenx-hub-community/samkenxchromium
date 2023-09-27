@@ -13,13 +13,21 @@
 #include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/feature_list.h"
+#include "base/files/file_path.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/numerics/clamped_math.h"
 #include "base/time/time.h"
 #include "base/values.h"
+#include "build/chromeos_buildflags.h"
+#include "chrome/browser/browser_process.h"
+#include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_attributes_entry.h"
 // TODO(crbug.com/1402146): Allow web apps to depend on app service.
 #include "chrome/browser/apps/app_service/metrics/app_service_metrics.h"  // nogncheck
+#include "chrome/browser/profiles/profile_attributes_storage.h"
+#include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/profiles/profiles_state.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom-shared.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
@@ -30,6 +38,10 @@
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "content/public/browser/browser_thread.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "chrome/browser/ash/profiles/profile_helper.h"
+#endif
 
 namespace web_app::preinstalled_web_app_window_experiment_utils {
 
@@ -164,8 +176,8 @@ constexpr base::Time kOldestAllowedInstallTime =
 bool AllWebAppsInstalledRecently(WebAppRegistrar& registrar) {
   for (const WebApp& web_app : registrar.GetApps()) {
     // Some old web apps may not have an install_time set.
-    if (web_app.install_time().is_null() ||
-        web_app.install_time() < kOldestAllowedInstallTime) {
+    if (web_app.first_install_time().is_null() ||
+        web_app.first_install_time() < kOldestAllowedInstallTime) {
       return false;
     }
   }
@@ -193,17 +205,46 @@ bool AppsAreInstallingFromSync(WebAppRegistrar& registrar) {
   return false;
 }
 
-bool DetermineEligibility(WebAppRegistrar& registrar) {
+bool AnyWebAppsInstalledByPolicy(WebAppRegistrar& registrar) {
+  for (const WebApp& web_app : registrar.GetAppsIncludingStubs()) {
+    if (web_app.IsPolicyInstalledApp()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Managed Guest Sessions and ephemeral profiles are not eligible.
+bool ProfileIsEligible(Profile* profile) {
+  if (profiles::IsManagedGuestSession()) {
+    return false;
+  }
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  if (ash::ProfileHelper::IsEphemeralUserProfile(profile)) {
+    return false;
+  }
+#endif
+
+  ProfileAttributesStorage& storage =
+      g_browser_process->profile_manager()->GetProfileAttributesStorage();
+  ProfileAttributesEntry* entry =
+      storage.GetProfileAttributesWithPath(profile->GetPath());
+  return entry && !entry->IsEphemeral();
+}
+
+bool DetermineEligibility(Profile* profile, WebAppRegistrar& registrar) {
   return AllWebAppsInstalledRecently(registrar) &&
          AllWebAppsHaveNonSyncInstallSurface(registrar) &&
-         !AppsAreInstallingFromSync(registrar);
+         !AppsAreInstallingFromSync(registrar) &&
+         !AnyWebAppsInstalledByPolicy(registrar) && ProfileIsEligible(profile);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Apps launched before experiment:
 ///////////////////////////////////////////////////////////////////////////////
 
-bool HasLaunchedAppBeforeExperiment(const AppId& app_id,
+bool HasLaunchedAppBeforeExperiment(const webapps::AppId& app_id,
                                     PrefService* pref_service) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
@@ -215,12 +256,12 @@ bool HasLaunchedAppBeforeExperiment(const AppId& app_id,
 
 void SetHasLaunchedAppsBeforePref(
     PrefService* pref_service,
-    const base::flat_set<AppId>& preinstalled_apps_launched_before) {
+    const base::flat_set<webapps::AppId>& preinstalled_apps_launched_before) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   ScopedListPrefUpdate update(pref_service, kAppIdsLaunchedBeforePrefKey);
   update->clear();
-  for (const AppId& app_id : preinstalled_apps_launched_before) {
+  for (const webapps::AppId& app_id : preinstalled_apps_launched_before) {
     update->Append(app_id);
   }
 }
@@ -229,14 +270,14 @@ void SetHasLaunchedAppsBeforePref(
 // Display mode:
 ///////////////////////////////////////////////////////////////////////////////
 
-base::flat_set<AppId> GetAppIdsWithUserOverridenDisplayModePref(
+base::flat_set<webapps::AppId> GetAppIdsWithUserOverridenDisplayModePref(
     PrefService* pref_service) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   const base::Value::List& user_overridden_app_ids =
       pref_service->GetList(kAppIdsWithUserOverriddenDisplayModePrefKey);
 
-  std::vector<AppId> app_ids;
+  std::vector<webapps::AppId> app_ids;
   for (auto& app_id_value : user_overridden_app_ids) {
     if (app_id_value.is_string()) {
       app_ids.push_back(app_id_value.GetString());
@@ -247,7 +288,7 @@ base::flat_set<AppId> GetAppIdsWithUserOverridenDisplayModePref(
 
 // Add `app_id` to list of apps with user-overridden display mode.
 void SetUserOverridenDisplayModePref(PrefService* pref_service,
-                                     const AppId& app_id) {
+                                     const webapps::AppId& app_id) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   ScopedListPrefUpdate update(pref_service,

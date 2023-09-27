@@ -22,10 +22,13 @@
 #include "ash/wm/overview/overview_controller.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/timer/timer.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/scoped_layer_animation_settings.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -87,7 +90,7 @@ class HideNudgeObserver : public ui::ImplicitAnimationObserver {
   }
 
  private:
-  ContextualNudge* const drag_handle_nudge_;
+  const raw_ptr<ContextualNudge, ExperimentalAsh> drag_handle_nudge_;
 };
 
 }  // namespace
@@ -239,7 +242,12 @@ void DragHandle::SetWindowDragFromShelfInProgress(bool gesture_in_progress) {
 }
 
 void DragHandle::UpdateColor() {
-  layer()->SetColor(GetColorProvider()->GetColor(kColorAshShelfHandleColor));
+  if (chromeos::features::IsJellyEnabled()) {
+    layer()->SetColor(
+        GetColorProvider()->GetColor(cros_tokens::kCrosSysOnSurface));
+  } else {
+    layer()->SetColor(GetColorProvider()->GetColor(kColorAshShelfHandleColor));
+  }
 }
 
 void DragHandle::OnGestureEvent(ui::GestureEvent* event) {
@@ -441,8 +449,9 @@ void DragHandle::HideDragHandleNudgeHelper(bool hidden_by_tap, bool animate) {
     ScheduleDragHandleTranslationAnimation(
         0, base::TimeDelta(), gfx::Tween::ZERO,
         ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET);
-    drag_handle_nudge_->GetWidget()->CloseWithReason(
-        views::Widget::ClosedReason::kUnspecified);
+    views::Widget* nudge_widget = drag_handle_nudge_->GetWidget();
+    drag_handle_nudge_ = nullptr;
+    nudge_widget->CloseWithReason(views::Widget::ClosedReason::kUnspecified);
     return;
   }
   ScheduleDragHandleTranslationAnimation(

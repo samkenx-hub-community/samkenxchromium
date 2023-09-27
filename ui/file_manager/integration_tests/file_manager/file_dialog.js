@@ -5,7 +5,8 @@
 import {addEntries, ENTRIES, getCaller, pending, repeatUntil, sendBrowserTestCommand, sendTestMessage, TestEntryInfo} from '../test_util.js';
 import {testcase} from '../testcase.js';
 
-import {navigateWithDirectoryTree, openAndWaitForClosingDialog, openEntryChoosingWindow, pollForChosenEntry, remoteCall} from './background.js';
+import {openAndWaitForClosingDialog, openEntryChoosingWindow, pollForChosenEntry, remoteCall} from './background.js';
+import {DirectoryTreePageObject} from './page_objects/directory_tree.js';
 import {BASIC_LOCAL_ENTRY_SET} from './test_data.js';
 
 /**
@@ -211,7 +212,19 @@ async function openFileDialogExpectEntryDimmed(volume, name) {
   const fileEntry = `#file-list [file-name="${name}"]`;
   const closer = async (dialog) => {
     const element = await remoteCall.waitForElement(dialog, fileEntry);
-    chrome.test.assertTrue(element.attributes['class'].includes('dim'));
+    let dimmed = false;
+    for (const className of element.attributes['class'].split(' ')) {
+      if (className === 'dim-offline') {
+        // The 'dim-offline' class dims an element only if the connection
+        // status is 'OFFLINE', which is not something this test is verifying.
+        continue;
+      }
+      if (className.startsWith('dim')) {
+        dimmed = true;
+        break;
+      }
+    }
+    chrome.test.assertTrue(dimmed, 'The file entry should be dimmed');
     clickOpenFileDialogButton(name, cancelButton, dialog);
   };
 
@@ -266,7 +279,7 @@ async function openFileDialogSendEscapeKey(volume, name) {
  * @returns {!Promise<string>} dialog's id.
  */
 export async function waitForDialog() {
-  const dialog = await remoteCall.waitForWindow('dialog#');
+  const dialog = await remoteCall.waitForWindow();
 
   // Wait for Files app to finish loading.
   await remoteCall.waitFor('isFileManagerLoaded', dialog, true);
@@ -543,7 +556,8 @@ testcase.openMultiFileDialogDriveOfficeFile = async () => {
   // Wait for initial load to finish.
   await remoteCall.waitFor('isFileManagerLoaded', appId, true);
 
-  await navigateWithDirectoryTree(appId, '/My Drive');
+  const directoryTree = await DirectoryTreePageObject.create(appId, remoteCall);
+  await directoryTree.navigateToPath('/My Drive');
 
   // Sort the file names so we can compare the array directly with the entries
   // returned from pollForChosenEntry() without worrying about order.
@@ -897,16 +911,13 @@ testcase.openFileDialogFileListShowContextMenu = async () => {
     ['Play files', '--', 'Folder'],
     ['Downloads', '--', 'Folder'],
     ['Linux files', '--', 'Folder'],
-    ['Trash', '--', 'Folder'],
   ];
-  if (await sendTestMessage({name: 'isTrashEnabled'}) !== 'true') {
-    expectedRows.pop();
-  }
   await remoteCall.waitForFiles(
       appId, expectedRows, {ignoreLastModifiedTime: true});
 
   // Navigate to Downloads folder.
-  await navigateWithDirectoryTree(appId, '/My files/Downloads');
+  const directoryTree = await DirectoryTreePageObject.create(appId, remoteCall);
+  await directoryTree.navigateToPath('/My files/Downloads');
 
   // Right-click "photos" folder to show context menu.
   await remoteCall.waitAndRightClick(appId, '#file-list [file-name="photos"]');
@@ -920,13 +931,8 @@ testcase.openFileDialogFileListShowContextMenu = async () => {
   await remoteCall.fakeKeyDown(appId, menuVisible, ...escKey);
   await remoteCall.waitForElementLost(appId, menuVisible);
 
-  // Right-click 100px inside of #file-list (in an empty space).
-  const offsetBottom = -100;
-  const offsetRight = -100;
-  chrome.test.assertTrue(
-      await remoteCall.callRemoteTestUtil(
-          'rightClickOffset', appId, ['#file-list', offsetBottom, offsetRight]),
-      'right click failed');
+  // Right-click inside of #file-list (in an empty space).
+  await remoteCall.rightClickFileListBlankSpace(appId);
 
   // Check that context menu is NOT displayed because there is no visible menu
   // items.
@@ -993,7 +999,7 @@ testcase.openMultiFileDialogSelectAllEnabled = async () => {
  */
 testcase.openFileDialogGuestOs = async () => {
   // Register a fake GuestOs guest.
-  const _ = await sendTestMessage({
+  await sendTestMessage({
     name: 'registerMountableGuest',
     displayName: 'Bluejohn',
     canMount: true,
@@ -1004,17 +1010,16 @@ testcase.openFileDialogGuestOs = async () => {
   await openEntryChoosingWindow({type: 'openFile'});
 
   // Wait for the dialog to be fully loaded.
-  const appId = await remoteCall.waitForWindow('dialog#');
+  const appId = await remoteCall.waitForWindow();
   await remoteCall.waitForElement(appId, '#file-list');
   await remoteCall.waitFor('isFileManagerLoaded', appId, true);
 
   // Click the Guest OS placeholder.
-  await remoteCall.waitAndClickElement(
-      appId, `#directory-tree [root-type-icon="bruschetta"]`);
+  const directoryTree = await DirectoryTreePageObject.create(appId, remoteCall);
+  await directoryTree.selectPlaceholderItemByType('bruschetta');
 
   // Wait for the actual volume to appear.
-  await remoteCall.waitForElement(
-      appId, '#directory-tree [volume-type-icon=bruschetta]');
+  await directoryTree.waitForItemByType('bruschetta');
 };
 
 /**
@@ -1025,7 +1030,7 @@ testcase.openFileDialogGuestOs = async () => {
  */
 testcase.saveFileDialogGuestOs = async () => {
   // Register a fake GuestOs guest.
-  const _ = await sendTestMessage({
+  await sendTestMessage({
     name: 'registerMountableGuest',
     displayName: 'Bluejohn',
     canMount: true,
@@ -1036,15 +1041,14 @@ testcase.saveFileDialogGuestOs = async () => {
   await openEntryChoosingWindow({type: 'saveFile'});
 
   // Wait for the dialog to be fully loaded.
-  const appId = await remoteCall.waitForWindow('dialog#');
+  const appId = await remoteCall.waitForWindow();
   await remoteCall.waitForElement(appId, '#file-list');
   await remoteCall.waitFor('isFileManagerLoaded', appId, true);
 
   // Click the Guest OS placeholder.
-  await remoteCall.waitAndClickElement(
-      appId, `#directory-tree [root-type-icon="bruschetta"]`);
+  const directoryTree = await DirectoryTreePageObject.create(appId, remoteCall);
+  await directoryTree.selectPlaceholderItemByType('bruschetta');
 
   // Wait for the actual volume to appear.
-  await remoteCall.waitForElement(
-      appId, '#directory-tree [volume-type-icon=bruschetta]');
+  await directoryTree.waitForItemByType('bruschetta');
 };

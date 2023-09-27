@@ -4,10 +4,12 @@
 
 #include "chrome/test/interaction/webcontents_interaction_test_util.h"
 
+#include <initializer_list>
 #include <set>
 #include <sstream>
 #include <string>
 
+#include "base/callback_list.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
@@ -17,6 +19,7 @@
 #include "base/memory/weak_auto_reset.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/time/time.h"
 #include "base/timer/elapsed_timer.h"
@@ -61,17 +64,17 @@ content::WebContents* GetWebContents(Browser* browser,
   return model->GetWebContentsAt(tab_index.value_or(model->active_index()));
 }
 
-// Provides a template function for "does this element exist" queries.
-// Will return on_missing_selector if 'err?.selector' is valid.
-// Will return on_found if el is valid.
-std::string GetExistsQuery(const char* on_missing_selector,
-                           const char* on_found) {
+// Provides a JavaScript skeleton for "does this element exist" queries.
+//
+// Will evaluate and return `on_not_found` if 'err?.selector' is valid.
+// Will evaluate and return `on_found` if 'el' is valid.
+std::string GetExistsQuery(const char* on_not_found, const char* on_found) {
   return base::StringPrintf(R"((el, err) => {
         if (err?.selector) return %s;
         if (err) throw err;
         return %s;
       })",
-                            on_missing_selector, on_found);
+                            on_not_found, on_found);
 }
 
 // Common execution code for `EvalJsLocal()` and `ExecuteJsLocal()`.
@@ -87,10 +90,8 @@ void ExecuteScript(content::RenderFrameHost* host, const std::string& script) {
   }
 }
 
-// Our replacement for content::EvalJs() that uses the same underlying logic as
-// ExecuteScriptAndExtract*(), because EvalJs() is not compatible with Content
-// Security Policy of many internal pages we want to test :(
-// TODO(dfried): migrate when this is not a problem.
+// TODO(dfried): migrate to EvalJs, now that it supports Content Security
+// Policy.
 content::EvalJsResult EvalJsLocal(
     const content::ToRenderFrameHost& execution_target,
     const std::string& function) {
@@ -102,19 +103,29 @@ content::EvalJsResult EvalJsLocal(
   //   [ <token>, [<result>, <error>] ]
   // The values <token> and <error> will be strings, while <result> can be any
   // type.
-  std::string token = "EvalJsLocal-" + base::GenerateGUID();
+  std::string token =
+      "EvalJsLocal-" + base::Uuid::GenerateRandomV4().AsLowercaseString();
   std::string runner_script = base::StringPrintf(
-      R"(Promise.resolve(%s)
-         .then(func => [func()])
-         .then((result) => Promise.all(result))
-         .then((result) => [result[0], ''],
-               (error) => [undefined,
-                           error && error.stack ?
-                               '\n' + error.stack :
-                               'Error: "' + error + '"'])
-         .then((reply) => window.domAutomationController.send(['%s', reply]));
-      //# sourceURL=EvalJs-runner.js)",
-      function.c_str(), token.c_str());
+      R"(
+        (() => {
+          const replyFunc =
+              (reply) => window.domAutomationController.send(['%s', reply]);
+          const errorReply =
+              (error) => [undefined,
+                        error && error.stack ?
+                            '\n' + error.stack :
+                            'Error: "' + error + '"'];
+          try {
+            Promise.resolve((%s)())
+              .then((result) => [result, ''],
+                    (error) => errorReply(error))
+              .then((result) => replyFunc(result));
+          } catch (err) {
+            replyFunc(errorReply(err));
+          }
+        })(); //# sourceURL=EvalJs-runner.js
+      )",
+      token.c_str(), function.c_str());
 
   if (!host->IsRenderFrameLive())
     return content::EvalJsResult(base::Value(), "Error: frame has crashed.");
@@ -129,10 +140,10 @@ content::EvalJsResult EvalJsLocal(
 
   auto parsed_json = base::JSONReader::ReadAndReturnValueWithError(
       json, base::JSON_ALLOW_TRAILING_COMMAS);
-
-  if (!parsed_json.has_value())
+  if (!parsed_json.has_value()) {
     return content::EvalJsResult(
         base::Value(), "JSON parse error: " + parsed_json.error().message);
+  }
 
   if (!parsed_json->is_list() || parsed_json->GetList().size() != 2U ||
       !parsed_json->GetList()[1].is_list() ||
@@ -206,12 +217,29 @@ std::string CreateDeepQuery(
 
 }  // namespace
 
+WebContentsInteractionTestUtil::DeepQuery::DeepQuery() = default;
+WebContentsInteractionTestUtil::DeepQuery::DeepQuery(
+    std::initializer_list<std::string> segments)
+    : segments_(segments) {}
+WebContentsInteractionTestUtil::DeepQuery::DeepQuery(
+    const WebContentsInteractionTestUtil::DeepQuery& other) = default;
+WebContentsInteractionTestUtil::DeepQuery&
+WebContentsInteractionTestUtil::DeepQuery::operator=(
+    const WebContentsInteractionTestUtil::DeepQuery& other) = default;
+WebContentsInteractionTestUtil::DeepQuery&
+WebContentsInteractionTestUtil::DeepQuery::operator=(
+    std::initializer_list<std::string> segments) {
+  segments_ = segments;
+  return *this;
+}
+WebContentsInteractionTestUtil::DeepQuery::~DeepQuery() = default;
+
 WebContentsInteractionTestUtil::StateChange::StateChange() = default;
 WebContentsInteractionTestUtil::StateChange::StateChange(
-    WebContentsInteractionTestUtil::StateChange&& other) = default;
+    const WebContentsInteractionTestUtil::StateChange& other) = default;
 WebContentsInteractionTestUtil::StateChange&
 WebContentsInteractionTestUtil::StateChange::operator=(
-    WebContentsInteractionTestUtil::StateChange&& other) = default;
+    const WebContentsInteractionTestUtil::StateChange& other) = default;
 WebContentsInteractionTestUtil::StateChange::~StateChange() = default;
 
 class WebContentsInteractionTestUtil::NewTabWatcher
@@ -259,8 +287,8 @@ class WebContentsInteractionTestUtil::NewTabWatcher
     owner_->StartWatchingWebContents(web_contents);
   }
 
-  const base::raw_ptr<WebContentsInteractionTestUtil> owner_;
-  const base::raw_ptr<Browser> browser_;
+  const raw_ptr<WebContentsInteractionTestUtil> owner_;
+  const raw_ptr<Browser> browser_;
 };
 
 class WebContentsInteractionTestUtil::Poller {
@@ -322,7 +350,7 @@ class WebContentsInteractionTestUtil::Poller {
   const DeepQuery where_;
   const base::TimeDelta interval_;
   const absl::optional<base::TimeDelta> timeout_;
-  const base::raw_ptr<WebContentsInteractionTestUtil> owner_;
+  const raw_ptr<WebContentsInteractionTestUtil> owner_;
   base::RepeatingTimer timer_;
   bool is_polling_ = false;
   base::WeakPtrFactory<Poller> weak_factory_{this};
@@ -351,6 +379,9 @@ class WebContentsInteractionTestUtil::WebViewData : public views::ViewObserver {
   // object are performed.
   void Init() {
     scoped_observation_.Observe(web_view_);
+    web_contents_attached_subscription_ =
+        web_view_->AddWebContentsAttachedCallback(base::BindRepeating(
+            &WebViewData::OnWebContentsAttached, base::Unretained(this)));
     ui::ElementIdentifier id =
         web_view_->GetProperty(views::kElementIdentifierKey);
     if (!id) {
@@ -453,6 +484,18 @@ class WebContentsInteractionTestUtil::WebViewData : public views::ViewObserver {
       QueueMinimumSizeEvent();
   }
 
+  void OnWebContentsAttached(views::WebView* observed_view) {
+    CHECK_EQ(web_view_.get(), observed_view);
+    content::WebContents* const to_observe =
+        visible_ ? observed_view->web_contents() : nullptr;
+    if (owner_->web_contents() == to_observe) {
+      return;
+    }
+    owner_->Observe(to_observe);
+    owner_->DiscardCurrentElement();
+    owner_->MaybeCreateElement();
+  }
+
   void QueueMinimumSizeEvent() {
     if (!owner_->current_element_)
       return;
@@ -474,7 +517,7 @@ class WebContentsInteractionTestUtil::WebViewData : public views::ViewObserver {
   }
 
   const raw_ptr<WebContentsInteractionTestUtil> owner_;
-  base::raw_ptr<views::WebView> web_view_;
+  raw_ptr<views::WebView> web_view_;
   bool visible_ = false;
   ui::ElementContext context_;
   ui::ElementTracker::Subscription shown_subscription_;
@@ -482,6 +525,7 @@ class WebContentsInteractionTestUtil::WebViewData : public views::ViewObserver {
   std::unique_ptr<MinimumSizeData> minimum_size_data_;
   base::ScopedObservation<views::View, views::ViewObserver> scoped_observation_{
       this};
+  base::CallbackListSubscription web_contents_attached_subscription_;
   base::WeakPtrFactory<WebViewData> weak_factory_{this};
 };
 
@@ -618,9 +662,23 @@ void WebContentsInteractionTestUtil::LoadPage(const GURL& url) {
     CHECK(web_contents()->GetController().LoadURLWithParams(params));
   } else {
     // Regular web pages can be navigated directly.
-    const bool result =
-        content::BeginNavigateToURLFromRenderer(web_contents(), url);
-    CHECK(result);
+    //
+    // In an ideal world, this should use `BeginNavigateToURLFromRenderer()`,
+    // which verifies that the navigation successfully starts. However,
+    // `BeginNavigateToURLFromRenderer()` itself uses a RunLoop to listen for
+    // the navigation starting.
+    //
+    // For reasons that are not well understood, this is problematic when used
+    // in conjunction with the interaction sequence test utils, which often
+    // run the entire test inside a top-level RunLoop; the now nested RunLoop
+    // inside `BeginNavigateToURLFromRenderer()` never receives the
+    // `DidStartNavigation()` callback, and the test just ends up hanging.
+    //
+    // Use Execute() as a workaround this hang. Note that unlike the
+    // similarly-named `content::ExecJs()`, this helper does not actually
+    // validate or wait for the script to execute; hopefully, errors from
+    // navigation failures will be obvious enough in subsequent steps.
+    ExecuteJsLocal(web_contents(), content::JsReplace("location = $1", url));
   }
 }
 
@@ -641,10 +699,18 @@ void WebContentsInteractionTestUtil::LoadPageInNewTab(const GURL& url,
 }
 
 base::Value WebContentsInteractionTestUtil::Evaluate(
-    const std::string& function) {
+    const std::string& function,
+    std::string* error_message) {
   CHECK(is_page_loaded());
   auto result = EvalJsLocal(web_contents(), function);
-  CHECK(result.error.empty()) << result.error;
+  if (!result.error.empty()) {
+    if (error_message) {
+      *error_message = result.error;
+      return base::Value();
+    } else {
+      NOTREACHED_NORETURN() << "Uncaught JS exception: " << result.error;
+    }
+  }
 
   // Despite the fact that EvalJsResult::value is const, base::Value in general
   // is moveable and nothing special is done on EvalJsResult destructor, which
@@ -696,14 +762,22 @@ void WebContentsInteractionTestUtil::SendEventOnStateChange(
   switch (configuration.type) {
     case StateChange::Type::kExists:
       DCHECK(configuration.test_function.empty());
-      actual_func = GetExistsQuery("false", "true");
+      actual_func = GetExistsQuery(
+          /* on_not_found = */ "false",
+          /* on_found = */ "true");
+      break;
+    case StateChange::Type::kDoesNotExist:
+      actual_func = GetExistsQuery(
+          /* on_not_found = */ "true",
+          /* on_found = */ "false");
       break;
     case StateChange::Type::kConditionTrue:
       actual_func = configuration.test_function;
       break;
     case StateChange::Type::kExistsAndConditionTrue:
       const std::string on_found = "(" + configuration.test_function + ")(el)";
-      actual_func = GetExistsQuery("false", on_found.c_str());
+      actual_func = GetExistsQuery(
+          /* on_not_found = */ "false", on_found.c_str());
       break;
   }
 
@@ -729,9 +803,10 @@ bool WebContentsInteractionTestUtil::Exists(const DeepQuery& query,
 
 base::Value WebContentsInteractionTestUtil::EvaluateAt(
     const DeepQuery& where,
-    const std::string& function) {
+    const std::string& function,
+    std::string* error_message) {
   const std::string full_query = CreateDeepQuery(where, function);
-  return Evaluate(full_query);
+  return Evaluate(full_query, error_message);
 }
 
 void WebContentsInteractionTestUtil::ExecuteAt(const DeepQuery& where,
@@ -981,4 +1056,16 @@ void WebContentsInteractionTestUtil::StartWatchingWebContents(
     Observe(web_contents);
   }
   MaybeCreateElement();
+}
+
+void PrintTo(const WebContentsInteractionTestUtil::DeepQuery& deep_query,
+             std::ostream* os) {
+  *os << "{ \"" << base::JoinString(deep_query.segments_, "\", \"") << "\" }";
+}
+
+extern std::ostream& operator<<(
+    std::ostream& os,
+    const WebContentsInteractionTestUtil::DeepQuery& deep_query) {
+  PrintTo(deep_query, &os);
+  return os;
 }

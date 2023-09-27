@@ -5,8 +5,8 @@
 package org.chromium.chrome.browser;
 
 import android.app.Activity;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Assert;
@@ -18,7 +18,6 @@ import org.junit.runner.RunWith;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
@@ -102,7 +101,6 @@ public class TabTest {
     @Test
     @SmallTest
     @Feature({"Tab"})
-    @DisabledTest(message = "https://crbug.com/1090378")
     public void testTabRestoredIfKilledWhileActivityStopped() throws Exception {
         // Ensure the tab is showing before stopping the activity.
         TestThreadUtils.runOnUiThreadBlocking(
@@ -113,7 +111,8 @@ public class TabTest {
         Assert.assertFalse(isShowingSadTab());
 
         // Stop the activity and simulate a killed renderer.
-        ChromeApplicationTestUtils.fireHomeScreenIntent(InstrumentationRegistry.getTargetContext());
+        ChromeApplicationTestUtils.fireHomeScreenIntent(
+                ApplicationProvider.getApplicationContext());
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> ChromeTabUtils.simulateRendererKilledForTesting(mTab));
 
@@ -121,7 +120,7 @@ public class TabTest {
         Assert.assertTrue(mTab.needsReload());
         Assert.assertFalse(isShowingSadTab());
 
-        ChromeApplicationTestUtils.launchChrome(InstrumentationRegistry.getTargetContext());
+        ChromeApplicationTestUtils.launchChrome(ApplicationProvider.getApplicationContext());
 
         // The tab should be restored and visible.
         CriteriaHelper.pollUiThread(() -> !mTab.isHidden());

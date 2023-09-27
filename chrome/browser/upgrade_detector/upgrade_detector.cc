@@ -308,15 +308,17 @@ UpgradeDetector::GetRelaunchWindowPolicyValue() {
   const base::Value* policy_value = preference->GetValue();
   DCHECK(policy_value->is_dict());
 
-  const base::Value* entries = policy_value->FindListKey("entries");
-  if (!entries || entries->GetList().empty())
+  const base::Value::List* entries =
+      policy_value->GetDict().FindList("entries");
+  if (!entries || entries->empty()) {
     return absl::nullopt;
+  }
 
   // Currently only single daily window is supported.
-  const auto& window = entries->GetList().front();
-  const absl::optional<int> hour = window.FindIntPath("start.hour");
-  const absl::optional<int> minute = window.FindIntPath("start.minute");
-  const absl::optional<int> duration_mins = window.FindIntKey("duration_mins");
+  const auto& window = entries->front().GetDict();
+  const absl::optional<int> hour = window.FindIntByDottedPath("start.hour");
+  const absl::optional<int> minute = window.FindIntByDottedPath("start.minute");
+  const absl::optional<int> duration_mins = window.FindInt("duration_mins");
 
   if (!hour || !minute || !duration_mins)
     return absl::nullopt;

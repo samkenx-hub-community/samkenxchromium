@@ -22,6 +22,7 @@
 #include "components/viz/common/resources/bitmap_allocation.h"
 #include "components/viz/common/resources/resource_sizes.h"
 #include "components/viz/common/resources/shared_bitmap.h"
+#include "components/viz/common/resources/shared_image_format_utils.h"
 #include "content/public/renderer/ppapi_gfx_conversion.h"
 #include "content/public/renderer/render_thread.h"
 #include "content/public/renderer/renderer_ppapi_host.h"
@@ -60,7 +61,7 @@
 #include "ui/gfx/scoped_ns_graphics_context_save_gstate_mac.h"
 
 #if BUILDFLAG(IS_MAC)
-#include "base/mac/scoped_cftyperef.h"
+#include "base/apple/scoped_cftyperef.h"
 #endif
 
 using ppapi::thunk::EnterResourceNoLock;
@@ -656,14 +657,15 @@ bool PepperGraphics2DHost::PrepareTransferableResource(
         upload_bgra ? viz::SinglePlaneFormat::kBGRA_8888
                     : viz::SinglePlaneFormat::kRGBA_8888;
 
-    bool overlays_supported =
-        enable_gpu_memory_buffer_ && main_thread_context_->ContextCapabilities()
-                                         .supports_scanout_shared_images;
+    bool overlays_supported = enable_gpu_memory_buffer_ &&
+                              main_thread_context_->SharedImageInterface()
+                                  ->GetCapabilities()
+                                  .supports_scanout_shared_images;
     uint32_t texture_target = GL_TEXTURE_2D;
     if (overlays_supported) {
       texture_target = gpu::GetBufferTextureTarget(
           gfx::BufferUsage::SCANOUT,
-          viz::BufferFormat(format.resource_format()),
+          viz::SinglePlaneSharedImageFormatToBufferFormat(format),
           main_thread_context_->ContextCapabilities());
     }
 
@@ -690,7 +692,8 @@ bool PepperGraphics2DHost::PrepareTransferableResource(
         usage |= gpu::SHARED_IMAGE_USAGE_SCANOUT;
       gpu_mailbox = sii->CreateSharedImage(
           format, size, gfx::ColorSpace(), kTopLeft_GrSurfaceOrigin,
-          kPremul_SkAlphaType, usage, gpu::kNullSurfaceHandle);
+          kPremul_SkAlphaType, usage, "PepperGraphics2DHost",
+          gpu::kNullSurfaceHandle);
       in_sync_token = sii->GenUnverifiedSyncToken();
     }
 
@@ -711,8 +714,9 @@ bool PepperGraphics2DHost::PrepareTransferableResource(
         size.width(), size.height(), viz::ToClosestSkColorType(true, format),
         kUnknown_SkAlphaType);
     ri->WaitSyncTokenCHROMIUM(in_sync_token.GetConstData());
-    ri->WritePixels(gpu_mailbox, 0, 0, texture_target, src_info.minRowBytes(),
-                    src_info, src);
+    ri->WritePixels(gpu_mailbox, /*dst_x_offset=*/0, /*dst_y_offset=*/0,
+                    /*dst_plane_index=*/0, texture_target,
+                    SkPixmap(src_info, src, src_info.minRowBytes()));
 
     gpu::SyncToken out_sync_token;
     ri->GenUnverifiedSyncTokenCHROMIUM(out_sync_token.GetData());
@@ -724,8 +728,8 @@ bool PepperGraphics2DHost::PrepareTransferableResource(
         base::BindOnce(&ReleaseTextureCallback, this->AsWeakPtr(),
                        main_thread_context_, size, gpu_mailbox);
     *transferable_resource = viz::TransferableResource::MakeGpu(
-        std::move(gpu_mailbox), GL_LINEAR, texture_target,
-        std::move(out_sync_token), size, format, overlays_supported);
+        std::move(gpu_mailbox), texture_target, std::move(out_sync_token), size,
+        format, overlays_supported);
     composited_output_modified_ = false;
     return true;
   }
@@ -745,8 +749,8 @@ bool PepperGraphics2DHost::PrepareTransferableResource(
   if (!shared_bitmap) {
     viz::SharedBitmapId id = viz::SharedBitmap::GenerateId();
     base::MappedReadOnlyRegion shm =
-        viz::bitmap_allocation::AllocateSharedBitmap(pixel_image_size,
-                                                     viz::RGBA_8888);
+        viz::bitmap_allocation::AllocateSharedBitmap(
+            pixel_image_size, viz::SinglePlaneFormat::kRGBA_8888);
     shared_bitmap = base::MakeRefCounted<cc::CrossThreadSharedBitmap>(
         id, std::move(shm), pixel_image_size,
         viz::SinglePlaneFormat::kRGBA_8888);
@@ -754,12 +758,13 @@ bool PepperGraphics2DHost::PrepareTransferableResource(
   }
   void* src = image_data_->Map();
   memcpy(shared_bitmap->memory(), src,
-         viz::ResourceSizes::CheckedSizeInBytes<size_t>(pixel_image_size,
-                                                        viz::RGBA_8888));
+         viz::ResourceSizes::CheckedSizeInBytes<size_t>(
+             pixel_image_size, viz::SinglePlaneFormat::kRGBA_8888));
   image_data_->Unmap();
 
   *transferable_resource = viz::TransferableResource::MakeSoftware(
-      shared_bitmap->id(), pixel_image_size, viz::RGBA_8888);
+      shared_bitmap->id(), pixel_image_size,
+      viz::SinglePlaneFormat::kRGBA_8888);
   *release_callback = base::BindOnce(
       &PepperGraphics2DHost::ReleaseSoftwareCallback, this->AsWeakPtr(),
       std::move(shared_bitmap), std::move(registration));

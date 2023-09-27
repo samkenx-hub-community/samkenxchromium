@@ -15,9 +15,6 @@
 #import "ios/chrome/app/tests_hook.h"
 #import "ios/chrome/browser/crash_report/crash_helper.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 namespace {
 // The info contains a dictionary with info about the freeze report.
 // See description at `_lastSessionFreezeInfo`.
@@ -57,9 +54,12 @@ enum class IOSMainThreadFreezeDetectionNotRunningAfterReportBlock {
 
 // Only MetricKit reports currently use attachements.
 bool IsMetricKitReport(crash_reporter::Report report) {
-  return base::ComputeDirectorySize(crash_reporter::GetCrashpadDatabasePath()
-                                        .Append("attachments")
-                                        .Append(report.local_id)) > 0;
+  auto crashpad_path = crash_reporter::GetCrashpadDatabasePath();
+  if (!crashpad_path) {
+    return false;
+  }
+  return base::ComputeDirectorySize(
+             crashpad_path->Append("attachments").Append(report.local_id)) > 0;
 }
 
 }  // namespace

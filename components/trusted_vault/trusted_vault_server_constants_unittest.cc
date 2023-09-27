@@ -11,7 +11,7 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
-namespace syncer {
+namespace trusted_vault {
 
 namespace {
 
@@ -29,7 +29,7 @@ TEST(TrustedVaultServerConstantsTest,
       0x30, 0xF9, 0xBA, 0x3B, 0xB1, 0x83, 0xCF, 0x1B, 0x5D, 0xE8};
 
   // Guard against future code changes, in case the key length changes.
-  ASSERT_THAT(kPublicKey.size(), Eq(syncer::SecureBoxKeyPair::GenerateRandom()
+  ASSERT_THAT(kPublicKey.size(), Eq(SecureBoxKeyPair::GenerateRandom()
                                         ->public_key()
                                         .ExportToBytes()
                                         .size()));
@@ -44,6 +44,17 @@ TEST(TrustedVaultServerConstantsTest,
                  "&request_header.force_master_read=true"));
 }
 
+TEST(TrustedVaultServerConstantsTest, GetSecurityDomainByName) {
+  EXPECT_THAT(GetSecurityDomainByName("users/me/securitydomains/chromesync"),
+              Eq(SecurityDomainId::kChromeSync));
+  EXPECT_THAT(GetSecurityDomainByName("users/me/securitydomains/hw_protected"),
+              Eq(absl::nullopt));
+  EXPECT_THAT(GetSecurityDomainByName("users/me/securitydomains/example"),
+              Eq(absl::nullopt));
+  EXPECT_THAT(GetSecurityDomainByName("chromesync"), Eq(absl::nullopt));
+  EXPECT_THAT(GetSecurityDomainByName(""), Eq(absl::nullopt));
+}
+
 }  // namespace
 
-}  // namespace syncer
+}  // namespace trusted_vault

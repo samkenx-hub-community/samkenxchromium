@@ -7,14 +7,16 @@
 #include "ash/style/ash_color_provider.h"
 #include "ash/style/color_util.h"
 #include "ash/style/style_util.h"
+#include "ash/wm/desks/desk_bar_view_base.h"
 #include "ash/wm/overview/overview_utils.h"
-#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/text_constants.h"
 #include "ui/views/border.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
+#include "ui/views/view.h"
+#include "ui/views/view_utils.h"
 
 namespace ash {
 
@@ -22,9 +24,11 @@ constexpr int kFocusRingRadius = 8;
 
 DeskButtonBase::DeskButtonBase(const std::u16string& text,
                                bool set_text,
+                               DeskBarViewBase* bar_view,
                                base::RepeatingClosure pressed_callback,
                                int corner_radius)
     : LabelButton(pressed_callback, std::u16string()),
+      bar_view_(bar_view),
       corner_radius_(corner_radius),
       pressed_callback_(pressed_callback) {
   DCHECK(!text.empty());
@@ -52,15 +56,25 @@ DeskButtonBase::DeskButtonBase(const std::u16string& text,
   views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
                                                 kFocusRingRadius);
   views::FocusRing* focus_ring = views::FocusRing::Get(this);
+  focus_ring->SetOutsetFocusRingDisabled(true);
   focus_ring->SetColorId(ui::kColorAshFocusRing);
-  focus_ring->SetHasFocusPredicate(
-      [&](views::View* view) { return IsViewHighlighted(); });
+  if (bar_view_->type() == DeskBarViewBase::Type::kOverview) {
+    focus_ring->SetHasFocusPredicate(
+        base::BindRepeating([](const views::View* view) {
+          const auto* v = views::AsViewClass<DeskButtonBase>(view);
+          CHECK(v);
+          return v->is_focused();
+        }));
+  }
 }
 
 DeskButtonBase::~DeskButtonBase() = default;
 
 void DeskButtonBase::OnFocus() {
-  UpdateOverviewHighlightForFocusAndSpokenFeedback(this);
+  if (bar_view_->type() == DeskBarViewBase::Type::kOverview) {
+    MoveFocusToView(this);
+  }
+
   UpdateFocusState();
   View::OnFocus();
 }
@@ -93,19 +107,28 @@ views::View* DeskButtonBase::GetView() {
   return this;
 }
 
-void DeskButtonBase::MaybeActivateHighlightedView() {
+void DeskButtonBase::MaybeActivateFocusedView() {
   pressed_callback_.Run();
 }
 
-void DeskButtonBase::MaybeCloseHighlightedView(bool primary_action) {}
+void DeskButtonBase::MaybeCloseFocusedView(bool primary_action) {}
 
-void DeskButtonBase::MaybeSwapHighlightedView(bool right) {}
+void DeskButtonBase::MaybeSwapFocusedView(bool right) {}
 
-void DeskButtonBase::OnViewHighlighted() {
+void DeskButtonBase::OnFocusableViewFocused() {
   UpdateFocusState();
+
+  views::View* view = this;
+  while (view->parent()) {
+    if (view->parent() == bar_view_->scroll_view_contents()) {
+      bar_view_->ScrollToShowViewIfNecessary(view);
+      break;
+    }
+    view = view->parent();
+  }
 }
 
-void DeskButtonBase::OnViewUnhighlighted() {
+void DeskButtonBase::OnFocusableViewBlurred() {
   UpdateFocusState();
 }
 

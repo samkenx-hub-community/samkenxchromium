@@ -6,9 +6,11 @@
 
 #include "base/bit_cast.h"
 #include "base/metrics/field_trial_params.h"
+#include "base/rand_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/time/clock.h"
+#include "base/time/time.h"
 #include "components/segmentation_platform/internal/constants.h"
 #include "components/segmentation_platform/internal/selection/segmentation_result_prefs.h"
 #include "components/segmentation_platform/internal/stats.h"
@@ -24,6 +26,8 @@
 using segmentation_platform::SegmentationUkmHelper;
 using segmentation_platform::proto::SegmentId;
 using ukm::builders::Segmentation_ModelExecution;
+
+namespace segmentation_platform {
 
 namespace {
 using UkmMemberFn =
@@ -100,7 +104,17 @@ const UkmMemberFn kSegmentationUkmOutputMethods[] = {
     &Segmentation_ModelExecution::SetActualResult4,
     &Segmentation_ModelExecution::SetActualResult5,
     &Segmentation_ModelExecution::SetActualResult6};
-}  // namespace
+
+// 1 out of 100 model execution will be reported.
+const int kDefaultModelExecutionSamplingRate = 100;
+
+int GetModelExecutionSamplingRate() {
+  return base::GetFieldTrialParamByFeatureAsInt(
+      segmentation_platform::features::
+          kSegmentationPlatformModelExecutionSampling,
+      segmentation_platform::kModelExecutionSamplingRateKey,
+      kDefaultModelExecutionSamplingRate);
+}
 
 // Helper method to add model prediction results to UKM log.
 void AddPredictionResultToUkmModelExecution(
@@ -113,7 +127,23 @@ void AddPredictionResultToUkmModelExecution(
   }
 }
 
-namespace segmentation_platform {
+std::string GetDebugString(const ModelProvider::Request& input_tensor,
+                           const ModelProvider::Response& outputs) {
+  std::stringstream out;
+  out << "Inputs: ";
+  int j = 0;
+  for (const auto& i : input_tensor) {
+    out << j++ << ":" << i << " ";
+  }
+  out << " Outputs: ";
+  j = 0;
+  for (const auto& i : outputs) {
+    out << j++ << ":" << i << " ";
+  }
+  return out.str();
+}
+
+}  // namespace
 
 SegmentationUkmHelper::SegmentationUkmHelper() {
   Initialize();
@@ -140,9 +170,10 @@ void SegmentationUkmHelper::Initialize() {
         SegmentId::OPTIMIZATION_TARGET_SEGMENTATION_DUMMY,
         SegmentId::OPTIMIZATION_TARGET_SEGMENTATION_CHROME_START_ANDROID,
         SegmentId::OPTIMIZATION_TARGET_SEGMENTATION_QUERY_TILES,
-        SegmentId::OPTIMIZATION_TARGET_SEGMENTATION_CHROME_LOW_USER_ENGAGEMENT,
         SegmentId::OPTIMIZATION_TARGET_SEGMENTATION_CHROME_START_ANDROID_V2};
   }
+  sampling_rate_ = GetModelExecutionSamplingRate();
+  DCHECK_GE(sampling_rate_, 0);
 }
 
 ukm::SourceId SegmentationUkmHelper::RecordModelExecutionResult(
@@ -151,6 +182,14 @@ ukm::SourceId SegmentationUkmHelper::RecordModelExecutionResult(
     const ModelProvider::Request& input_tensor,
     const std::vector<float>& results) {
   ukm::SourceId source_id = ukm::NoURLSourceId();
+  // Do some sampling before sending out UKM.
+  if (sampling_rate_ == 0) {
+    return source_id;
+  }
+
+  if (base::RandInt(1, sampling_rate_) > 1) {
+    return source_id;
+  }
   ukm::builders::Segmentation_ModelExecution execution_result(source_id);
 
   // Add inputs to ukm message.
@@ -187,12 +226,19 @@ ukm::SourceId SegmentationUkmHelper::RecordTrainingData(
     std::vector<float> results(prediction_result->result().begin(),
                                prediction_result->result().end());
     AddPredictionResultToUkmModelExecution(&execution_result, results);
+    base::Time prediction_time = base::Time::FromDeltaSinceWindowsEpoch(
+        base::Microseconds(prediction_result->timestamp_us()));
+    execution_result.SetOutputDelaySec(
+        (base::Time::Now() - prediction_time).InSeconds());
   }
   if (selected_segment.has_value()) {
     execution_result.SetSelectionResult(selected_segment->segment_id);
     execution_result.SetOutputDelaySec(
         (base::Time::Now() - selected_segment->selection_time).InSeconds());
   }
+
+  VLOG(1) << "Recording training data " << proto::SegmentId_Name(segment_id)
+          << " " << GetDebugString(input_tensor, outputs);
 
   execution_result.Record(ukm::UkmRecorder::Get());
   return source_id;
@@ -240,7 +286,7 @@ bool SegmentationUkmHelper::AddOutputsToUkm(
   return true;
 }
 
-bool SegmentationUkmHelper::CanUploadTensors(
+bool SegmentationUkmHelper::IsUploadRequested(
     const proto::SegmentInfo& segment_info) const {
   return segment_info.model_metadata().upload_tensors() ||
          allowed_segment_ids_.contains(segment_info.segment_id());
@@ -261,9 +307,19 @@ bool SegmentationUkmHelper::AllowedToUploadData(
   // If the local state is never set, return false.
   if (most_recent_allowed.is_null() ||
       most_recent_allowed == base::Time::Max()) {
+    VLOG(1) << "UKM consent not granted";
     return false;
   }
-  return most_recent_allowed + signal_storage_length < clock->Now();
+
+  if (most_recent_allowed + signal_storage_length < clock->Now()) {
+    return true;
+  } else {
+    VLOG(1) << "UKM consent granted on: " << most_recent_allowed
+            << ". Waiting for the model's storage period ("
+            << most_recent_allowed + signal_storage_length
+            << ") to avoid uploading data collected pre-consent";
+    return false;
+  }
 }
 
 }  // namespace segmentation_platform

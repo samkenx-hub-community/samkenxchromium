@@ -58,19 +58,18 @@ class LayoutCounter : public LayoutText {
   ~LayoutCounter() override;
   void Trace(Visitor*) const override;
 
-  // These functions are static so that any LayoutObject can call them.
-  // The reason is that any LayoutObject in the tree can have a CounterNode
-  // without a LayoutCounter (e.g. by specifying 'counter-increment' without
-  // a "content: counter(a)" directive)).
-  static void DestroyCounterNodes(LayoutObject&);
-  static void DestroyCounterNode(LayoutObject&, const AtomicString& identifier);
-  static void LayoutObjectSubtreeAttached(LayoutObject*);
-  static void LayoutObjectSubtreeWillBeDetached(LayoutObject*);
-  static void LayoutObjectStyleChanged(LayoutObject&,
-                                       const ComputedStyle* old_style,
-                                       const ComputedStyle& new_style);
-
-  static CounterMap* GetCounterMap(LayoutObject*);
+  const AtomicString& Identifier() const {
+    NOT_DESTROYED();
+    return counter_->Identifier();
+  }
+  void SetCounterNode(CounterNode* counter_node) {
+    NOT_DESTROYED();
+    counter_node_ = counter_node;
+  }
+  CounterNode* GetCounterNode() const {
+    NOT_DESTROYED();
+    return counter_node_;
+  }
 
   void UpdateCounter();
 
@@ -99,19 +98,12 @@ class LayoutCounter : public LayoutText {
     NOT_DESTROYED();
     return type == kLayoutObjectCounter || LayoutText::IsOfType(type);
   }
-  scoped_refptr<StringImpl> OriginalText() const override;
-
-  // Removes the reference to the CounterNode associated with this layoutObject.
-  // This is used to cause a counter display update when the CounterNode tree
-  // changes.
-  void Invalidate();
+  String OriginalText() const override;
 
   const CounterStyle* NullableCounterStyle() const;
 
   Member<const CounterContentData> counter_;
   Member<CounterNode> counter_node_;
-  Member<LayoutCounter> next_for_same_counter_;
-  friend class CounterNode;
 };
 
 template <>
@@ -122,10 +114,5 @@ struct DowncastTraits<LayoutCounter> {
 };
 
 }  // namespace blink
-
-#if DCHECK_IS_ON()
-// Outside the blink namespace for ease of invocation from gdb.
-void ShowCounterLayoutTree(const blink::LayoutObject*, const char* counterName);
-#endif
 
 #endif  // THIRD_PARTY_BLINK_RENDERER_CORE_LAYOUT_LAYOUT_COUNTER_H_

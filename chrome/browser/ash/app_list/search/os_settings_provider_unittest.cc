@@ -6,12 +6,13 @@
 
 #include <memory>
 
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
 #include "chrome/browser/ash/app_list/search/test/test_search_controller.h"
+#include "chrome/browser/ui/webui/ash/settings/search/search_handler.h"
 #include "chrome/browser/ui/webui/settings/ash/fake_hierarchy.h"
 #include "chrome/browser/ui/webui/settings/ash/fake_os_settings_sections.h"
-#include "chrome/browser/ui/webui/settings/ash/search/search_handler.h"
 #include "chrome/browser/web_applications/web_app_id_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -125,9 +126,10 @@ class MockSearchHandler : public ash::settings::SearchHandler {
     results_ = std::move(results);
   }
 
-  ash::settings::SearchTagRegistry* search_tag_registry_;
-  ash::settings::OsSettingsSections* sections_;
-  ash::settings::Hierarchy* hierarchy_;
+  raw_ptr<ash::settings::SearchTagRegistry, ExperimentalAsh>
+      search_tag_registry_;
+  raw_ptr<ash::settings::OsSettingsSections, ExperimentalAsh> sections_;
+  raw_ptr<ash::settings::Hierarchy, ExperimentalAsh> hierarchy_;
   std::vector<SettingsResultPtr> results_;
 };
 
@@ -156,10 +158,10 @@ class OsSettingsProviderTest : public testing::Test {
         TestingBrowserProcess::GetGlobal());
     ASSERT_TRUE(profile_manager_->SetUp());
     profile_ = profile_manager_->CreateTestingProfile("name");
-    proxy_ = apps::AppServiceProxyFactory::GetForProfile(profile_);
 
     apps::StubIconLoader stub_icon_loader;
-    proxy_->OverrideInnerIconLoaderForTesting(&stub_icon_loader);
+    apps::AppServiceProxyFactory::GetForProfile(profile_)
+        ->OverrideInnerIconLoaderForTesting(&stub_icon_loader);
 
     // Insert dummy map values so that the stub_icon_loader knows of the app.
     stub_icon_loader.timelines_by_app_id_[web_app::kOsSettingsAppId] = 1;
@@ -183,7 +185,7 @@ class OsSettingsProviderTest : public testing::Test {
         absl::make_optional(mojom::Subpage::kBluetoothSavedDevices));
 
     provider_ = std::make_unique<OsSettingsProvider>(profile_, &mock_handler_,
-                                                     &fake_hierarchy_, proxy_);
+                                                     &fake_hierarchy_);
     provider_->set_controller(search_controller_.get());
     task_environment_.RunUntilIdle();
   }
@@ -192,7 +194,6 @@ class OsSettingsProviderTest : public testing::Test {
     provider_.reset();
     search_controller_.reset();
     profile_ = nullptr;
-    proxy_ = nullptr;
     profile_manager_->DeleteTestingProfile("name");
   }
 
@@ -219,8 +220,7 @@ class OsSettingsProviderTest : public testing::Test {
 
  private:
   std::unique_ptr<TestingProfileManager> profile_manager_;
-  TestingProfile* profile_;
-  apps::AppServiceProxy* proxy_;
+  raw_ptr<TestingProfile, ExperimentalAsh> profile_;
   std::unique_ptr<OsSettingsProvider> provider_;
 };
 

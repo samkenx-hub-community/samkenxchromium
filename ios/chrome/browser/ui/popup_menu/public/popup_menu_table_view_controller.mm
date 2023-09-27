@@ -17,10 +17,6 @@
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/pointer_interaction_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 const CGFloat kFooterHeight = 21;
 const CGFloat kPopupMenuVerticalInsets = 7;
@@ -54,45 +50,6 @@ const CGFloat kScrollIndicatorVerticalInsets = 11;
     self.cachedBounds = CGRectZero;
   }
   return self;
-}
-
-- (void)selectRowAtPoint:(CGPoint)point {
-  NSIndexPath* rowIndexPath = [self indexPathForInnerRowAtPoint:point];
-  if (!rowIndexPath)
-    return;
-
-  UITableViewCell* cell = [self.tableView cellForRowAtIndexPath:rowIndexPath];
-  if (!cell.userInteractionEnabled)
-    return;
-
-  base::RecordAction(base::UserMetricsAction("MobilePopupMenuSwipeToSelect"));
-  [self.delegate popupMenuTableViewController:self
-                                didSelectItem:[self.tableViewModel
-                                                  itemAtIndexPath:rowIndexPath]
-                                       origin:[cell convertPoint:cell.center
-                                                          toView:nil]];
-}
-
-- (void)focusRowAtPoint:(CGPoint)point {
-  NSIndexPath* rowIndexPath = [self indexPathForInnerRowAtPoint:point];
-
-  BOOL rowAlreadySelected = NO;
-  NSArray<NSIndexPath*>* selectedRows =
-      [self.tableView indexPathsForSelectedRows];
-  for (NSIndexPath* selectedIndexPath in selectedRows) {
-    if (selectedIndexPath == rowIndexPath) {
-      rowAlreadySelected = YES;
-      continue;
-    }
-    [self.tableView deselectRowAtIndexPath:selectedIndexPath animated:NO];
-  }
-
-  if (!rowAlreadySelected && rowIndexPath) {
-    [self.tableView selectRowAtIndexPath:rowIndexPath
-                                animated:NO
-                          scrollPosition:UITableViewScrollPositionNone];
-    TriggerHapticFeedbackForSelectionChange();
-  }
 }
 
 #pragma mark - PopupMenuConsumer

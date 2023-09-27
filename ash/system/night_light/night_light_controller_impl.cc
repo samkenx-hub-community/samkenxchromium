@@ -4,6 +4,7 @@
 
 #include "ash/system/night_light/night_light_controller_impl.h"
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 
@@ -19,7 +20,6 @@
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/system/model/system_tray_model.h"
-#include "base/cxx17_backports.h"
 #include "base/functional/bind.h"
 #include "base/i18n/time_formatting.h"
 #include "base/logging.h"
@@ -138,8 +138,15 @@ class NightLightControllerDelegateImpl
     if (!HasGeoposition()) {
       LOG(ERROR) << "Invalid geoposition. Using default time for "
                  << (sunrise ? "sunrise." : "sunset.");
-      return sunrise ? TimeOfDay(kDefaultEndTimeOffsetMinutes).ToTimeToday()
-                     : TimeOfDay(kDefaultStartTimeOffsetMinutes).ToTimeToday();
+      return sunrise ? TimeOfDay(kDefaultEndTimeOffsetMinutes)
+                           .ToTimeToday()
+                           // TODO(b/289276024): `ToTimeToday()` failures will
+                           // be handled properly when night light has migrated
+                           // to use `GeolocationController`.
+                           .value_or(base::Time())
+                     : TimeOfDay(kDefaultStartTimeOffsetMinutes)
+                           .ToTimeToday()
+                           .value_or(base::Time());
     }
 
     icu::CalendarAstronomer astro(geoposition_->longitude,
@@ -151,7 +158,7 @@ class NightLightControllerDelegateImpl
     // Note that the icu calendar works with milliseconds since epoch, and
     // base::Time::FromDoubleT() / ToDoubleT() work with seconds since epoch.
     const double midday_today_sec =
-        TimeOfDay(12 * 60).ToTimeToday().ToDoubleT();
+        TimeOfDay(12 * 60).ToTimeToday().value_or(base::Time()).ToDoubleT();
     astro.setTime(midday_today_sec * 1000.0);
     const double sun_rise_set_ms = astro.getSunRiseSet(sunrise);
     return base::Time::FromDoubleT(sun_rise_set_ms / 1000.0);
@@ -168,7 +175,7 @@ class NightLightControllerDelegateImpl
 // 3 => Range [60 : 80).
 // 4 => Range [80 : 100] (most warm).
 int GetTemperatureRange(float temperature) {
-  return base::clamp(std::floor(5 * temperature), 0.0f, 4.0f);
+  return std::clamp(std::floor(5 * temperature), 0.0f, 4.0f);
 }
 
 // Returns the color matrix that corresponds to the given |temperature|.
@@ -356,7 +363,7 @@ class ColorTemperatureAnimation : public gfx::LinearAnimation,
     }
 
     start_temperature_ = current_temperature_;
-    target_temperature_ = base::clamp(new_target_temperature, 0.0f, 1.0f);
+    target_temperature_ = std::clamp(new_target_temperature, 0.0f, 1.0f);
 
     if (ui::ScopedAnimationDurationScaleMode::duration_multiplier() ==
         ui::ScopedAnimationDurationScaleMode::ZERO_DURATION) {
@@ -375,7 +382,7 @@ class ColorTemperatureAnimation : public gfx::LinearAnimation,
  private:
   // gfx::Animation:
   void AnimateToState(double state) override {
-    state = base::clamp(state, 0.0, 1.0);
+    state = std::clamp(state, 0.0, 1.0);
     current_temperature_ =
         start_temperature_ + (target_temperature_ - start_temperature_) * state;
   }
@@ -483,8 +490,8 @@ float NightLightControllerImpl::RemapAmbientColorTemperature(
   // kTable[i+1].input_temperature exclude the upper bound, we clamp it to the
   // last input_temperature element of the table minus 1.
   const float temperature =
-      base::clamp<float>(temperature_in_kelvin, kTable[0].input_temperature,
-                         kTable[kTableSize - 1].input_temperature - 1);
+      std::clamp<float>(temperature_in_kelvin, kTable[0].input_temperature,
+                        kTable[kTableSize - 1].input_temperature - 1);
   for (size_t i = 0; i < kTableSize - 1; i++) {
     if (temperature >= kTable[i].input_temperature &&
         temperature < kTable[i + 1].input_temperature) {
@@ -547,8 +554,7 @@ void NightLightControllerImpl::UpdateAmbientRgbScalingFactors() {
           ambient_temperature_);
 }
 
-NightLightController::ScheduleType NightLightControllerImpl::GetScheduleType()
-    const {
+ScheduleType NightLightControllerImpl::GetScheduleType() const {
   if (active_user_pref_service_) {
     return static_cast<ScheduleType>(
         active_user_pref_service_->GetInteger(prefs::kNightLightScheduleType));
@@ -583,12 +589,6 @@ void NightLightControllerImpl::SetAmbientColorEnabled(bool enabled) {
 bool NightLightControllerImpl::GetAmbientColorEnabled() const {
   return features::IsAllowAmbientEQEnabled() && active_user_pref_service_ &&
          active_user_pref_service_->GetBoolean(prefs::kAmbientColorEnabled);
-}
-
-bool NightLightControllerImpl::IsNowWithinSunsetSunrise() const {
-  // The times below are all on the same calendar day.
-  const base::Time now = delegate_->GetNow();
-  return now < delegate_->GetSunriseTime() || now > delegate_->GetSunsetTime();
 }
 
 void NightLightControllerImpl::SetEnabled(bool enabled,
@@ -1070,7 +1070,8 @@ void NightLightControllerImpl::Refresh(
 
     case ScheduleType::kCustom:
       RefreshScheduleTimer(
-          GetCustomStartTime().ToTimeToday(), GetCustomEndTime().ToTimeToday(),
+          GetCustomStartTime().ToTimeToday().value_or(base::Time()),
+          GetCustomEndTime().ToTimeToday().value_or(base::Time()),
           did_schedule_change, keep_manual_toggles_during_schedules);
       return;
   }

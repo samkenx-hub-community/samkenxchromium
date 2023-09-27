@@ -16007,6 +16007,139 @@ static_assert(
     offsetof(ReadbackARGBImagePixelsINTERNAL, mailbox_offset) == 52,
     "offset of ReadbackARGBImagePixelsINTERNAL mailbox_offset should be 52");
 
+struct WritePixelsYUVINTERNAL {
+  typedef WritePixelsYUVINTERNAL ValueType;
+  static const CommandId kCmdId = kWritePixelsYUVINTERNAL;
+  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
+  static const uint8_t cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(2);
+
+  static uint32_t ComputeSize() {
+    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
+  }
+
+  void SetHeader() { header.SetCmd<ValueType>(); }
+
+  void Init(GLuint _src_width,
+            GLuint _src_height,
+            GLuint _src_row_bytes_plane1,
+            GLuint _src_row_bytes_plane2,
+            GLuint _src_row_bytes_plane3,
+            GLuint _src_row_bytes_plane4,
+            GLuint _src_yuv_plane_config,
+            GLuint _src_yuv_subsampling,
+            GLuint _src_yuv_datatype,
+            GLint _shm_id,
+            GLuint _shm_offset,
+            GLuint _pixels_offset_plane1,
+            GLuint _pixels_offset_plane2,
+            GLuint _pixels_offset_plane3,
+            GLuint _pixels_offset_plane4) {
+    SetHeader();
+    src_width = _src_width;
+    src_height = _src_height;
+    src_row_bytes_plane1 = _src_row_bytes_plane1;
+    src_row_bytes_plane2 = _src_row_bytes_plane2;
+    src_row_bytes_plane3 = _src_row_bytes_plane3;
+    src_row_bytes_plane4 = _src_row_bytes_plane4;
+    src_yuv_plane_config = _src_yuv_plane_config;
+    src_yuv_subsampling = _src_yuv_subsampling;
+    src_yuv_datatype = _src_yuv_datatype;
+    shm_id = _shm_id;
+    shm_offset = _shm_offset;
+    pixels_offset_plane1 = _pixels_offset_plane1;
+    pixels_offset_plane2 = _pixels_offset_plane2;
+    pixels_offset_plane3 = _pixels_offset_plane3;
+    pixels_offset_plane4 = _pixels_offset_plane4;
+  }
+
+  void* Set(void* cmd,
+            GLuint _src_width,
+            GLuint _src_height,
+            GLuint _src_row_bytes_plane1,
+            GLuint _src_row_bytes_plane2,
+            GLuint _src_row_bytes_plane3,
+            GLuint _src_row_bytes_plane4,
+            GLuint _src_yuv_plane_config,
+            GLuint _src_yuv_subsampling,
+            GLuint _src_yuv_datatype,
+            GLint _shm_id,
+            GLuint _shm_offset,
+            GLuint _pixels_offset_plane1,
+            GLuint _pixels_offset_plane2,
+            GLuint _pixels_offset_plane3,
+            GLuint _pixels_offset_plane4) {
+    static_cast<ValueType*>(cmd)->Init(
+        _src_width, _src_height, _src_row_bytes_plane1, _src_row_bytes_plane2,
+        _src_row_bytes_plane3, _src_row_bytes_plane4, _src_yuv_plane_config,
+        _src_yuv_subsampling, _src_yuv_datatype, _shm_id, _shm_offset,
+        _pixels_offset_plane1, _pixels_offset_plane2, _pixels_offset_plane3,
+        _pixels_offset_plane4);
+    return NextCmdAddress<ValueType>(cmd);
+  }
+
+  gpu::CommandHeader header;
+  uint32_t src_width;
+  uint32_t src_height;
+  uint32_t src_row_bytes_plane1;
+  uint32_t src_row_bytes_plane2;
+  uint32_t src_row_bytes_plane3;
+  uint32_t src_row_bytes_plane4;
+  uint32_t src_yuv_plane_config;
+  uint32_t src_yuv_subsampling;
+  uint32_t src_yuv_datatype;
+  int32_t shm_id;
+  uint32_t shm_offset;
+  uint32_t pixels_offset_plane1;
+  uint32_t pixels_offset_plane2;
+  uint32_t pixels_offset_plane3;
+  uint32_t pixels_offset_plane4;
+};
+
+static_assert(sizeof(WritePixelsYUVINTERNAL) == 64,
+              "size of WritePixelsYUVINTERNAL should be 64");
+static_assert(offsetof(WritePixelsYUVINTERNAL, header) == 0,
+              "offset of WritePixelsYUVINTERNAL header should be 0");
+static_assert(offsetof(WritePixelsYUVINTERNAL, src_width) == 4,
+              "offset of WritePixelsYUVINTERNAL src_width should be 4");
+static_assert(offsetof(WritePixelsYUVINTERNAL, src_height) == 8,
+              "offset of WritePixelsYUVINTERNAL src_height should be 8");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, src_row_bytes_plane1) == 12,
+    "offset of WritePixelsYUVINTERNAL src_row_bytes_plane1 should be 12");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, src_row_bytes_plane2) == 16,
+    "offset of WritePixelsYUVINTERNAL src_row_bytes_plane2 should be 16");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, src_row_bytes_plane3) == 20,
+    "offset of WritePixelsYUVINTERNAL src_row_bytes_plane3 should be 20");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, src_row_bytes_plane4) == 24,
+    "offset of WritePixelsYUVINTERNAL src_row_bytes_plane4 should be 24");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, src_yuv_plane_config) == 28,
+    "offset of WritePixelsYUVINTERNAL src_yuv_plane_config should be 28");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, src_yuv_subsampling) == 32,
+    "offset of WritePixelsYUVINTERNAL src_yuv_subsampling should be 32");
+static_assert(offsetof(WritePixelsYUVINTERNAL, src_yuv_datatype) == 36,
+              "offset of WritePixelsYUVINTERNAL src_yuv_datatype should be 36");
+static_assert(offsetof(WritePixelsYUVINTERNAL, shm_id) == 40,
+              "offset of WritePixelsYUVINTERNAL shm_id should be 40");
+static_assert(offsetof(WritePixelsYUVINTERNAL, shm_offset) == 44,
+              "offset of WritePixelsYUVINTERNAL shm_offset should be 44");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, pixels_offset_plane1) == 48,
+    "offset of WritePixelsYUVINTERNAL pixels_offset_plane1 should be 48");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, pixels_offset_plane2) == 52,
+    "offset of WritePixelsYUVINTERNAL pixels_offset_plane2 should be 52");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, pixels_offset_plane3) == 56,
+    "offset of WritePixelsYUVINTERNAL pixels_offset_plane3 should be 56");
+static_assert(
+    offsetof(WritePixelsYUVINTERNAL, pixels_offset_plane4) == 60,
+    "offset of WritePixelsYUVINTERNAL pixels_offset_plane4 should be 60");
+
 struct EnableiOES {
   typedef EnableiOES ValueType;
   static const CommandId kCmdId = kEnableiOES;
@@ -16759,6 +16892,62 @@ static_assert(sizeof(PixelLocalStorageBarrierANGLE) == 4,
 static_assert(offsetof(PixelLocalStorageBarrierANGLE, header) == 0,
               "offset of PixelLocalStorageBarrierANGLE header should be 0");
 
+struct FramebufferPixelLocalStorageInterruptANGLE {
+  typedef FramebufferPixelLocalStorageInterruptANGLE ValueType;
+  static const CommandId kCmdId = kFramebufferPixelLocalStorageInterruptANGLE;
+  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
+  static const uint8_t cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(3);
+
+  static uint32_t ComputeSize() {
+    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
+  }
+
+  void SetHeader() { header.SetCmd<ValueType>(); }
+
+  void Init() { SetHeader(); }
+
+  void* Set(void* cmd) {
+    static_cast<ValueType*>(cmd)->Init();
+    return NextCmdAddress<ValueType>(cmd);
+  }
+
+  gpu::CommandHeader header;
+};
+
+static_assert(sizeof(FramebufferPixelLocalStorageInterruptANGLE) == 4,
+              "size of FramebufferPixelLocalStorageInterruptANGLE should be 4");
+static_assert(
+    offsetof(FramebufferPixelLocalStorageInterruptANGLE, header) == 0,
+    "offset of FramebufferPixelLocalStorageInterruptANGLE header should be 0");
+
+struct FramebufferPixelLocalStorageRestoreANGLE {
+  typedef FramebufferPixelLocalStorageRestoreANGLE ValueType;
+  static const CommandId kCmdId = kFramebufferPixelLocalStorageRestoreANGLE;
+  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
+  static const uint8_t cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(3);
+
+  static uint32_t ComputeSize() {
+    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
+  }
+
+  void SetHeader() { header.SetCmd<ValueType>(); }
+
+  void Init() { SetHeader(); }
+
+  void* Set(void* cmd) {
+    static_cast<ValueType*>(cmd)->Init();
+    return NextCmdAddress<ValueType>(cmd);
+  }
+
+  gpu::CommandHeader header;
+};
+
+static_assert(sizeof(FramebufferPixelLocalStorageRestoreANGLE) == 4,
+              "size of FramebufferPixelLocalStorageRestoreANGLE should be 4");
+static_assert(
+    offsetof(FramebufferPixelLocalStorageRestoreANGLE, header) == 0,
+    "offset of FramebufferPixelLocalStorageRestoreANGLE header should be 0");
+
 struct GetFramebufferPixelLocalStorageParameterfvANGLE {
   typedef GetFramebufferPixelLocalStorageParameterfvANGLE ValueType;
   static const CommandId kCmdId =
@@ -16892,5 +17081,120 @@ static_assert(offsetof(GetFramebufferPixelLocalStorageParameterivANGLE,
                        params_shm_offset) == 16,
               "offset of GetFramebufferPixelLocalStorageParameterivANGLE "
               "params_shm_offset should be 16");
+
+struct ClipControlEXT {
+  typedef ClipControlEXT ValueType;
+  static const CommandId kCmdId = kClipControlEXT;
+  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
+  static const uint8_t cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(3);
+
+  static uint32_t ComputeSize() {
+    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
+  }
+
+  void SetHeader() { header.SetCmd<ValueType>(); }
+
+  void Init(GLenum _origin, GLenum _depth) {
+    SetHeader();
+    origin = _origin;
+    depth = _depth;
+  }
+
+  void* Set(void* cmd, GLenum _origin, GLenum _depth) {
+    static_cast<ValueType*>(cmd)->Init(_origin, _depth);
+    return NextCmdAddress<ValueType>(cmd);
+  }
+
+  gpu::CommandHeader header;
+  uint32_t origin;
+  uint32_t depth;
+};
+
+static_assert(sizeof(ClipControlEXT) == 12,
+              "size of ClipControlEXT should be 12");
+static_assert(offsetof(ClipControlEXT, header) == 0,
+              "offset of ClipControlEXT header should be 0");
+static_assert(offsetof(ClipControlEXT, origin) == 4,
+              "offset of ClipControlEXT origin should be 4");
+static_assert(offsetof(ClipControlEXT, depth) == 8,
+              "offset of ClipControlEXT depth should be 8");
+
+struct PolygonModeANGLE {
+  typedef PolygonModeANGLE ValueType;
+  static const CommandId kCmdId = kPolygonModeANGLE;
+  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
+  static const uint8_t cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(3);
+
+  static uint32_t ComputeSize() {
+    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
+  }
+
+  void SetHeader() { header.SetCmd<ValueType>(); }
+
+  void Init(GLenum _face, GLenum _mode) {
+    SetHeader();
+    face = _face;
+    mode = _mode;
+  }
+
+  void* Set(void* cmd, GLenum _face, GLenum _mode) {
+    static_cast<ValueType*>(cmd)->Init(_face, _mode);
+    return NextCmdAddress<ValueType>(cmd);
+  }
+
+  gpu::CommandHeader header;
+  uint32_t face;
+  uint32_t mode;
+};
+
+static_assert(sizeof(PolygonModeANGLE) == 12,
+              "size of PolygonModeANGLE should be 12");
+static_assert(offsetof(PolygonModeANGLE, header) == 0,
+              "offset of PolygonModeANGLE header should be 0");
+static_assert(offsetof(PolygonModeANGLE, face) == 4,
+              "offset of PolygonModeANGLE face should be 4");
+static_assert(offsetof(PolygonModeANGLE, mode) == 8,
+              "offset of PolygonModeANGLE mode should be 8");
+
+struct PolygonOffsetClampEXT {
+  typedef PolygonOffsetClampEXT ValueType;
+  static const CommandId kCmdId = kPolygonOffsetClampEXT;
+  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
+  static const uint8_t cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(3);
+
+  static uint32_t ComputeSize() {
+    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
+  }
+
+  void SetHeader() { header.SetCmd<ValueType>(); }
+
+  void Init(GLfloat _factor, GLfloat _units, GLfloat _clamp) {
+    SetHeader();
+    factor = _factor;
+    units = _units;
+    clamp = _clamp;
+  }
+
+  void* Set(void* cmd, GLfloat _factor, GLfloat _units, GLfloat _clamp) {
+    static_cast<ValueType*>(cmd)->Init(_factor, _units, _clamp);
+    return NextCmdAddress<ValueType>(cmd);
+  }
+
+  gpu::CommandHeader header;
+  float factor;
+  float units;
+  float clamp;
+};
+
+static_assert(sizeof(PolygonOffsetClampEXT) == 16,
+              "size of PolygonOffsetClampEXT should be 16");
+static_assert(offsetof(PolygonOffsetClampEXT, header) == 0,
+              "offset of PolygonOffsetClampEXT header should be 0");
+static_assert(offsetof(PolygonOffsetClampEXT, factor) == 4,
+              "offset of PolygonOffsetClampEXT factor should be 4");
+static_assert(offsetof(PolygonOffsetClampEXT, units) == 8,
+              "offset of PolygonOffsetClampEXT units should be 8");
+static_assert(offsetof(PolygonOffsetClampEXT, clamp) == 12,
+              "offset of PolygonOffsetClampEXT clamp should be 12");
 
 #endif  // GPU_COMMAND_BUFFER_COMMON_GLES2_CMD_FORMAT_AUTOGEN_H_

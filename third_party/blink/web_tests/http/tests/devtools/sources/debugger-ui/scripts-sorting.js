@@ -2,11 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+import {SDKTestRunner} from 'sdk_test_runner';
+
+import * as SourcesModule from 'devtools/panels/sources/sources.js';
+
 (async function() {
   'use strict';
   TestRunner.addResult(`Tests scripts sorting in the scripts panel.\n`);
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
-  await TestRunner.loadTestModule('sdk_test_runner');
+  await TestRunner.loadLegacyModule('sources');
   await TestRunner.showPanel('sources');
 
   function createNavigatorView(constructor) {
@@ -16,9 +21,9 @@
   }
 
   const sourcesNavigatorView =
-      createNavigatorView(Sources.NetworkNavigatorView);
+      createNavigatorView(SourcesModule.SourcesNavigator.NetworkNavigatorView);
   const contentScriptsNavigatorView =
-      createNavigatorView(Sources.ContentScriptsNavigatorView);
+      createNavigatorView(SourcesModule.SourcesNavigator.ContentScriptsNavigatorView);
 
   var pageMock = new SDKTestRunner.PageMock('http://example.com');
   pageMock.turnIntoWorker();

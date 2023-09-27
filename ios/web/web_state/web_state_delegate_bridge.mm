@@ -6,10 +6,6 @@
 
 #import "ios/web/public/ui/context_menu_params.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace web {
 
 WebStateDelegateBridge::WebStateDelegateBridge(id<CRWWebStateDelegate> delegate)
@@ -51,11 +47,9 @@ void WebStateDelegateBridge::ShowRepostFormWarningDialog(
     base::OnceCallback<void(bool)> callback) {
   SEL selector = @selector(webState:runRepostFormDialogWithCompletionHandler:);
   if ([delegate_ respondsToSelector:selector]) {
-    __block base::OnceCallback<void(bool)> block_callback = std::move(callback);
     [delegate_ webState:source
-        runRepostFormDialogWithCompletionHandler:^(BOOL should_continue) {
-          std::move(block_callback).Run(should_continue);
-        }];
+        runRepostFormDialogWithCompletionHandler:base::CallbackToBlock(
+                                                     std::move(callback))];
   } else {
     std::move(callback).Run(true);
   }
@@ -68,6 +62,20 @@ JavaScriptDialogPresenter* WebStateDelegateBridge::GetJavaScriptDialogPresenter(
     return [delegate_ javaScriptDialogPresenterForWebState:source];
   }
   return nullptr;
+}
+
+void WebStateDelegateBridge::HandlePermissionsDecisionRequest(
+    WebState* source,
+    NSArray<NSNumber*>* permissions,
+    WebStatePermissionDecisionHandler handler) API_AVAILABLE(ios(15.0)) {
+  if ([delegate_ respondsToSelector:@selector(webState:
+                                        handlePermissions:decisionHandler:)]) {
+    [delegate_ webState:source
+        handlePermissions:permissions
+          decisionHandler:handler];
+  } else {
+    handler(PermissionDecisionShowDefaultPrompt);
+  }
 }
 
 void WebStateDelegateBridge::OnAuthRequired(

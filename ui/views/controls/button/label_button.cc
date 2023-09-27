@@ -31,6 +31,8 @@
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/painter.h"
 #include "ui/views/style/platform_style.h"
+#include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/window/dialog_delegate.h"
 
@@ -46,9 +48,11 @@ LabelButton::LabelButton(PressedCallback callback,
                          int button_context)
     : Button(std::move(callback)),
       cached_normal_font_list_(
-          style::GetFont(button_context, style::STYLE_PRIMARY)),
-      cached_default_button_font_list_(
-          style::GetFont(button_context, style::STYLE_DIALOG_BUTTON_DEFAULT)) {
+          TypographyProvider::Get().GetFont(button_context,
+                                            style::STYLE_PRIMARY)),
+      cached_default_button_font_list_(TypographyProvider::Get().GetFont(
+          button_context,
+          style::STYLE_DIALOG_BUTTON_DEFAULT)) {
   ink_drop_container_ = AddChildView(std::make_unique<InkDropContainerView>());
   ink_drop_container_->SetVisible(false);
 
@@ -73,11 +77,15 @@ LabelButton::~LabelButton() {
 
 gfx::ImageSkia LabelButton::GetImage(ButtonState for_state) const {
   for_state = ImageStateForState(for_state);
-  return button_state_image_models_[for_state].Rasterize(GetColorProvider());
+  return GetImageModel(for_state).Rasterize(GetColorProvider());
 }
 
 void LabelButton::SetImage(ButtonState for_state, const gfx::ImageSkia& image) {
   SetImageModel(for_state, ui::ImageModel::FromImageSkia(image));
+}
+
+const ui::ImageModel& LabelButton::GetImageModel(ButtonState for_state) const {
+  return button_state_image_models_[for_state];
 }
 
 void LabelButton::SetImageModel(ButtonState for_state,
@@ -104,6 +112,10 @@ const std::u16string& LabelButton::GetText() const {
 
 void LabelButton::SetText(const std::u16string& text) {
   SetTextInternal(text);
+}
+
+void LabelButton::SetLabelStyle(views::style::TextStyle text_style) {
+  label_->SetTextStyle(text_style);
 }
 
 void LabelButton::ShrinkDownThenClearText() {
@@ -420,9 +432,10 @@ void LabelButton::Layout() {
 }
 
 void LabelButton::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  if (GetIsDefault())
-    node_data->AddState(ax::mojom::State::kDefault);
   Button::GetAccessibleNodeData(node_data);
+  if (GetIsDefault()) {
+    node_data->AddState(ax::mojom::State::kDefault);
+  }
 }
 
 ui::NativeTheme::Part LabelButton::GetThemePart() const {
@@ -487,13 +500,14 @@ void LabelButton::RemoveLayerFromRegions(ui::Layer* old_layer) {
 }
 
 void LabelButton::GetExtraParams(ui::NativeTheme::ExtraParams* params) const {
-  params->button.checked = false;
-  params->button.indeterminate = false;
-  params->button.is_default = GetIsDefault();
-  params->button.is_focused = HasFocus() && IsAccessibilityFocusable();
-  params->button.has_border = false;
-  params->button.classic_state = 0;
-  params->button.background_color = label_->GetBackgroundColor();
+  auto& button = absl::get<ui::NativeTheme::ButtonExtraParams>(*params);
+  button.checked = false;
+  button.indeterminate = false;
+  button.is_default = GetIsDefault();
+  button.is_focused = HasFocus() && IsAccessibilityFocusable();
+  button.has_border = false;
+  button.classic_state = 0;
+  button.background_color = label_->GetBackgroundColor();
 }
 
 PropertyEffects LabelButton::UpdateStyleToIndicateDefaultStatus() {
@@ -501,9 +515,9 @@ PropertyEffects LabelButton::UpdateStyleToIndicateDefaultStatus() {
   // never be given default status.
   DCHECK_EQ(cached_normal_font_list_.GetFontSize(),
             label()->font_list().GetFontSize());
-  // TODO(tapted): This should use style::GetFont(), but this part can just be
-  // deleted when default buttons no longer go bold. Colors will need updating
-  // still.
+  // TODO(tapted): This should use TypographyProvider::Get().GetFont(), but this
+  // part can just be deleted when default buttons no longer go bold. Colors
+  // will need updating still.
   label_->SetFontList(GetIsDefault() ? cached_default_button_font_list_
                                      : cached_normal_font_list_);
   ResetLabelEnabledColor();

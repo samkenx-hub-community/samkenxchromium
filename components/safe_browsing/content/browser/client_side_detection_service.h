@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/containers/flat_map.h"
 #include "base/containers/queue.h"
 #include "base/functional/callback_forward.h"
 #include "base/gtest_prod_util.h"
@@ -31,7 +32,6 @@
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/safe_browsing/content/browser/client_side_phishing_model.h"
-#include "components/safe_browsing/content/browser/client_side_phishing_model_optimization_guide.h"
 #include "components/safe_browsing/core/common/proto/csd.pb.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_observer.h"
@@ -56,7 +56,8 @@ class ClientSideDetectionHost;
 enum class SBClientDetectionClassifyThresholdsResult {
   kSuccess = 0,
   kModelSizeMismatch = 1,
-  kMaxValue = kModelSizeMismatch,
+  kModelLabelNotFound = 2,
+  kMaxValue = kModelLabelNotFound,
 };
 
 // Main service which pushes models to the renderers, responds to classification
@@ -145,10 +146,6 @@ class ClientSideDetectionService
   // Sends a model to each renderer.
   virtual void SendModelToRenderers();
 
-  // Returns the model string. Used only for protobuf model. Virtual so that
-  // mock implementation can override it.
-  virtual const std::string& GetModelStr();
-
   // Returns the model type (protobuf or flatbuffer). Virtual so that mock
   // implementation can override it.
   virtual CSDModelType GetModelType();
@@ -161,9 +158,14 @@ class ClientSideDetectionService
   // override it.
   virtual const base::File& GetVisualTfLiteModel();
 
+  // Returns the Image Embedding model file. Virtual so that mock implementation
+  // can override it.
+  virtual const base::File& GetImageEmbeddingModel();
+
+  virtual bool IsModelMetadataImageEmbeddingVersionMatching();
+
   // Returns the visual TFLite model thresholds from the model class
-  virtual const google::protobuf::RepeatedPtrField<
-      TfLiteModelMetadata::Threshold>&
+  virtual const base::flat_map<std::string, TfLiteModelMetadata::Threshold>&
   GetVisualTfLiteModelThresholds();
 
   // Compare the scores from classification to TFLite model thresholds
@@ -179,11 +181,20 @@ class ClientSideDetectionService
   // Returns a WeakPtr for this service.
   base::WeakPtr<ClientSideDetectionService> GetWeakPtr();
 
-  bool IsModelAvailable();
+  // Checks whether the model class has a model available or not. Virtual so
+  // that mock classes can override it.
+  virtual bool IsModelAvailable();
 
-  // For testing the model in browser test
+  // Checks whether the model class has an image embedding model available or
+  // not.
+  bool HasImageEmbeddingModel();
+
+  // For testing the model in browser test.
   void SetModelAndVisualTfLiteForTesting(const base::FilePath& model,
                                          const base::FilePath& visual_tf_lite);
+
+  bool IsSubscribedToImageEmbeddingModelUpdates();
+  bool ShouldSendImageEmbeddingModelToRenderer();
 
  private:
   friend class ClientSideDetectionServiceTest;
@@ -263,6 +274,12 @@ class ClientSideDetectionService
   // choice of model.
   bool extended_reporting_ = false;
 
+  // Whether the trigger models have been sent or not. This is used to determine
+  // whether an empty model in the model class determines whether the models
+  // haven't been sent or we should clear the models in the scorer because they
+  // have been sent.
+  bool sent_trigger_models_ = false;
+
   // Map of client report phishing request to the corresponding callback that
   // has to be invoked when the request is done.
   struct ClientPhishingReportInfo;
@@ -292,8 +309,7 @@ class ClientSideDetectionService
 
   base::CallbackListSubscription update_model_subscription_;
 
-  std::unique_ptr<ClientSidePhishingModelOptimizationGuide>
-      client_side_phishing_model_optimization_guide_;
+  std::unique_ptr<ClientSidePhishingModel> client_side_phishing_model_;
 
   SEQUENCE_CHECKER(sequence_checker_);
 

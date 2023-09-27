@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ash/smb_client/discovery/host_locator.h"
 #include "chrome/browser/ash/smb_client/discovery/network_scanner.h"
@@ -96,7 +97,8 @@ class SmbShareFinder : public base::SupportsWeakPtr<SmbShareFinder> {
 
   NetworkScanner scanner_;
 
-  SmbProviderClient* client_;  // Not owned.
+  raw_ptr<SmbProviderClient, DanglingUntriaged | ExperimentalAsh>
+      client_;  // Not owned.
 
   uint32_t host_counter_ = 0u;
 

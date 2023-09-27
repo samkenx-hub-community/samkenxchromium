@@ -217,12 +217,16 @@ extern const char kUninstallScript[];
 
 // Developer override keys.
 extern const char kDevOverrideKeyUrl[];
+extern const char kDevOverrideKeyCrashUploadUrl[];
+extern const char kDevOverrideKeyDeviceManagementUrl[];
 extern const char kDevOverrideKeyUseCUP[];
 extern const char kDevOverrideKeyInitialDelay[];
 extern const char kDevOverrideKeyServerKeepAliveSeconds[];
 extern const char kDevOverrideKeyCrxVerifierFormat[];
 extern const char kDevOverrideKeyGroupPolicies[];
 extern const char kDevOverrideKeyOverinstallTimeout[];
+extern const char kDevOverrideKeyIdleCheckPeriodSeconds[];
+extern const char kDevOverrideKeyManagedDevice[];
 
 // Timing constants.
 // How long to wait for an application installer (such as chrome_installer.exe)
@@ -363,19 +367,19 @@ inline constexpr int kErrorDMRegistrationFailed = 33;
 inline constexpr int kErrorFailedToInstallLegacyUpdater = 34;
 
 // A Mojo remote was unexpectedly disconnected.
-inline constexpr int kErrorMojoDisconnect = 35;
+inline constexpr int kErrorIpcDisconnect = 35;
 
 // Failed to copy the updater binary.
 inline constexpr int kErrorFailedToCopyBinary = 36;
 
-// Failed to delete a socket file
+// Failed to delete a socket file.
 inline constexpr int kErrorFailedToDeleteSocket = 37;
 
-// Failed to create a hard link to the launcher.
-inline constexpr int kErrorFailedToLinkLauncher = 38;
+// Failed to create a symlink to the current version.
+inline constexpr int kErrorFailedToLinkCurrent = 38;
 
-// Failed to rename the old launcher to the new one during activation.
-inline constexpr int kErrorFailedToRenameLauncher = 39;
+// Failed to rename the current symlink during activation.
+inline constexpr int kErrorFailedToRenameCurrent = 39;
 
 // Failed to install one or more Systemd units.
 inline constexpr int kErrorFailedToInstallSystemdUnit = 40;
@@ -386,11 +390,21 @@ inline constexpr int kErrorFailedToRemoveSystemdUnit = 41;
 // Running as the wrong user for the provided UpdaterScope.
 inline constexpr int kErrorWrongUser = 42;
 
+// Failed to get the setup files.
+inline constexpr int kErrorFailedToGetSetupFiles = 43;
+
+// Failed to run install list.
+inline constexpr int kErrorFailedToRunInstallList = 44;
+
+// The server was running but had no tasks to do.
+inline constexpr int kErrorIdle = 45;
+
 inline constexpr int kErrorTagParsing = 50;
 
 // Metainstaller errors.
 inline constexpr int kErrorCreatingTempDir = 60;
 inline constexpr int kErrorUnpackingResource = 61;
+inline constexpr int kErrorInitializingBackupDir = 62;
 
 // Launcher errors.
 constexpr int kErrorGettingUpdaterPath = 71;
@@ -444,6 +458,8 @@ extern const char kSetupMutex[];
 
 inline constexpr int kUninstallPingReasonUninstalled = 0;
 inline constexpr int kUninstallPingReasonUserNotAnOwner = 1;
+inline constexpr int kUninstallPingReasonNoAppsRemain = 2;
+inline constexpr int kUninstallPingReasonNeverHadApps = 3;
 
 // The file downloaded to a temporary location could not be moved.
 inline constexpr int kErrorFailedToMoveDownloadedFile = 5;

@@ -76,6 +76,10 @@
         {
           "builder": "linux-lacros-rel",
           "group": "tryserver.chromium.chromiumos"
+        },
+        {
+          "builder": "linux-lacros-siso-rel",
+          "group": "tryserver.chromium.chromiumos"
         }
       ]
     }

@@ -12,15 +12,14 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 
+import androidx.annotation.VisibleForTesting;
 import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
 
 import org.chromium.base.ContextUtils;
 import org.chromium.chrome.browser.notifications.channels.ChromeChannelDefinitions;
 import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.preferences.PrefChangeRegistrar;
-import org.chromium.chrome.browser.profiles.Profile;
-import org.chromium.chrome.browser.settings.ProfileDependentSetting;
+import org.chromium.chrome.browser.settings.ChromeBaseSettingsFragment;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.components.browser_ui.notifications.NotificationManagerProxy;
 import org.chromium.components.browser_ui.notifications.NotificationManagerProxyImpl;
@@ -28,28 +27,30 @@ import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
 import org.chromium.components.browser_ui.settings.SettingsUtils;
 import org.chromium.components.browser_ui.settings.TextMessagePreference;
 import org.chromium.components.prefs.PrefService;
+import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
 import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.ui.text.NoUnderlineClickableSpan;
 import org.chromium.ui.text.SpanApplier;
 
 /** Preferences for features related to price tracking. */
-public class PriceNotificationPreferenceFragment
-        extends PreferenceFragmentCompat implements ProfileDependentSetting {
-    private static final String PREF_MOBILE_NOTIFICATIONS = "mobile_notifications_text";
-    private static final String PREF_EMAIL_NOTIFICATIONS = "send_email_switch";
+public class PriceNotificationPreferenceFragment extends ChromeBaseSettingsFragment {
+    @VisibleForTesting
+    static final String PREF_MOBILE_NOTIFICATIONS = "mobile_notifications_text";
+
+    @VisibleForTesting
+    static final String PREF_EMAIL_NOTIFICATIONS = "send_email_switch";
 
     private final PrefChangeRegistrar mPrefChangeRegistrar = new PrefChangeRegistrar();
 
     private PrefService mPrefService;
-    private Profile mProfile;
     private TextMessagePreference mMobileNotificationsText;
     private ChromeSwitchPreference mEmailNotificationsSwitch;
     private NotificationManagerProxy mNotificationManagerProxy;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
-        mPrefService = UserPrefs.get(mProfile);
+        mPrefService = UserPrefs.get(getProfile());
         mNotificationManagerProxy =
                 new NotificationManagerProxyImpl(ContextUtils.getApplicationContext());
 
@@ -69,15 +70,19 @@ public class PriceNotificationPreferenceFragment
         mEmailNotificationsSwitch =
                 (ChromeSwitchPreference) findPreference(PREF_EMAIL_NOTIFICATIONS);
         mEmailNotificationsSwitch.setOnPreferenceChangeListener(this::onPreferenceChange);
-        String email = IdentityServicesProvider.get()
-                               .getIdentityManager(mProfile)
-                               .getPrimaryAccountInfo(ConsentLevel.SYNC)
-                               .getEmail();
-        mEmailNotificationsSwitch.setSummary(
-                getString(R.string.price_notifications_settings_email_description, email));
-        mPrefChangeRegistrar.addObserver(
-                Pref.PRICE_EMAIL_NOTIFICATIONS_ENABLED, this::updateEmailNotificationSwitch);
-        updateEmailNotificationSwitch();
+        CoreAccountInfo info = IdentityServicesProvider.get()
+                                       .getIdentityManager(getProfile())
+                                       .getPrimaryAccountInfo(ConsentLevel.SYNC);
+        if (info != null) {
+            String email = info.getEmail();
+            mEmailNotificationsSwitch.setSummary(
+                    getString(R.string.price_notifications_settings_email_description, email));
+            mPrefChangeRegistrar.addObserver(
+                    Pref.PRICE_EMAIL_NOTIFICATIONS_ENABLED, this::updateEmailNotificationSwitch);
+            updateEmailNotificationSwitch();
+        } else {
+            mEmailNotificationsSwitch.setVisible(false);
+        }
     }
 
     @Override
@@ -85,12 +90,7 @@ public class PriceNotificationPreferenceFragment
         super.onStart();
         updateMobileNotificationsText();
 
-        ShoppingServiceFactory.getForProfile(mProfile).fetchPriceEmailPref();
-    }
-
-    @Override
-    public void setProfile(Profile profile) {
-        mProfile = profile;
+        ShoppingServiceFactory.getForProfile(getProfile()).fetchPriceEmailPref();
     }
 
     /** Handle preference changes from any of the toggles in this UI. */
@@ -158,5 +158,9 @@ public class PriceNotificationPreferenceFragment
         if (notificationsPrefIntent.resolveActivity(pm) != null) {
             startActivity(notificationsPrefIntent);
         }
+    }
+
+    void setPrefServiceForTesting(PrefService prefs) {
+        mPrefService = prefs;
     }
 }

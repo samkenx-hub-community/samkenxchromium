@@ -12,6 +12,7 @@
 #include "chrome/browser/web_applications/web_app_constants.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
+#include "chrome/browser/web_applications/web_app_registrar.h"
 #include "components/services/app_service/public/cpp/app_types.h"
 #include "components/services/app_service/public/cpp/app_update.h"
 
@@ -67,18 +68,16 @@ void WebKioskAppUpdateObserver::OnAppRegistryCacheWillBeDestroyed(
 void WebKioskAppUpdateObserver::UpdateWebAppFromAppService(
     const std::string& app_id,
     bool icon_updated) {
-  // |apps::AppUpdate| passed to |OnAppUpdate()| only contains updated info. To
-  // get all info we have to use |AppRegistryCache::ForOneApp()|.
+  // `apps::AppUpdate` passed to `OnAppUpdate()` only contains updated info. To
+  // get all info we have to use `AppRegistryCache::ForOneApp()`.
   app_service_->AppRegistryCache().ForOneApp(
       app_id, [this, &icon_updated](const apps::AppUpdate& app_info) {
         GURL start_url = GURL(app_info.PublisherId());
 
         if (icon_updated && app_info.IconKey()) {
-          auto icon_key = app_info.IconKey().value();
-          // Remove web app icon effects for Kiosk apps menu.
-          icon_key.icon_effects = apps::IconEffects::kNone;
-          app_service_->LoadIconFromIconKey(
-              apps::AppType::kWeb, app_info.AppId(), icon_key,
+          app_service_->LoadIconWithIconEffects(
+              // Remove web app icon effects for Kiosk apps menu.
+              apps::AppType::kWeb, app_info.AppId(), apps::IconEffects::kNone,
               apps::IconType::kUncompressed, kWebKioskIconSize,
               /*allow_placeholder_icon=*/true,
               base::BindOnce(&WebKioskAppUpdateObserver::OnAppServiceIconLoaded,

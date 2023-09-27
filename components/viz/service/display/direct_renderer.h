@@ -13,6 +13,7 @@
 #include "base/containers/flat_map.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "components/viz/common/quads/aggregated_render_pass.h"
@@ -78,6 +79,7 @@ class VIZ_SERVICE_EXPORT DirectRenderer {
 
   bool use_partial_swap() const { return use_partial_swap_; }
 
+  void SetOutputSurfaceClipRect(const gfx::Rect& clip_rect);
   void SetVisible(bool visible);
   void ReallocatedFrameBuffers();
   void DecideRenderPassAllocationsForFrame(
@@ -128,7 +130,9 @@ class VIZ_SERVICE_EXPORT DirectRenderer {
     raw_ptr<const AggregatedRenderPassList> render_passes_in_draw_order =
         nullptr;
     raw_ptr<const AggregatedRenderPass> root_render_pass = nullptr;
-    const AggregatedRenderPass* current_render_pass = nullptr;
+    // This field is not a raw_ptr<> because of a reference to raw_ptr in
+    // not-rewritten platform specific code and #addr-of.
+    RAW_PTR_EXCLUSION const AggregatedRenderPass* current_render_pass = nullptr;
 
     gfx::Rect root_damage_rect;
     std::vector<gfx::Rect> root_content_bounds;
@@ -202,7 +206,7 @@ class VIZ_SERVICE_EXPORT DirectRenderer {
   struct RenderPassRequirements {
     gfx::Size size;
     bool generate_mipmap = false;
-    ResourceFormat format;
+    SharedImageFormat format;
     gfx::ColorSpace color_space;
     // Render pass wants scanout
     bool is_scanout = false;
@@ -305,6 +309,7 @@ class VIZ_SERVICE_EXPORT DirectRenderer {
       const copy_output::RenderPassGeometry& geometry,
       std::unique_ptr<CopyOutputRequest> request) = 0;
   virtual void GenerateMipmap() = 0;
+  virtual bool SupportsBGRA() const;
 
   gfx::Size surface_size_for_swap_buffers() const {
     return reshape_params_ ? reshape_params_->size : gfx::Size();
@@ -321,7 +326,8 @@ class VIZ_SERVICE_EXPORT DirectRenderer {
   gfx::ColorSpace CurrentRenderPassColorSpace() const;
   gfx::ColorSpace RenderPassColorSpace(
       const AggregatedRenderPass* render_pass) const;
-  ResourceFormat GetColorSpaceResourceFormat(gfx::ColorSpace color_space) const;
+  SharedImageFormat GetColorSpaceSharedImageFormat(
+      gfx::ColorSpace color_space) const;
   // Return the SkColorSpace for rendering to the current render pass. Unlike
   // CurrentRenderPassColorSpace, this color space has the value of
   // CurrentFrameSDRWhiteLevel incorporated into it.
@@ -430,6 +436,10 @@ class VIZ_SERVICE_EXPORT DirectRenderer {
   // to prevent use of uninitialized values. The size in these parameters
   // may be larger than the `device_viewport_size_` that users see.
   absl::optional<OutputSurface::ReshapeParams> reshape_params_;
+
+  // If present additionally restricts drawing to the OutputSurface. WebView
+  // gets this rect from the HWUI.
+  absl::optional<gfx::Rect> output_surface_clip_rect_;
   gfx::Size device_viewport_size_;
   gfx::OverlayTransform reshape_display_transform_ =
       gfx::OVERLAY_TRANSFORM_INVALID;

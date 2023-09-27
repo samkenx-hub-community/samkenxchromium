@@ -7,15 +7,20 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
 #include "base/android/scoped_java_ref.h"
+#include "cc/slim/features.h"
 #include "content/browser/android/selection/composited_touch_handle_drawable.h"
+#include "content/browser/gpu/gpu_data_manager_impl.h"
 #include "content/browser/renderer_host/render_widget_host_view_android.h"
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/browser/web_contents/web_contents_view_android.h"
+#include "content/common/features.h"
 #include "content/public/android/content_jni_headers/SelectionPopupControllerImpl_jni.h"
 #include "content/public/browser/context_menu_params.h"
+#include "content/public/common/content_features.h"
 #include "third_party/blink/public/common/context_menu_data/edit_flags.h"
 #include "third_party/blink/public/mojom/context_menu/context_menu.mojom.h"
 #include "third_party/blink/public/mojom/input/input_handler.mojom-blink.h"
+#include "ui/gfx/android/android_surface_control_compat.h"
 #include "ui/gfx/geometry/point_conversions.h"
 
 using base::android::AttachCurrentThread;
@@ -25,6 +30,29 @@ using base::android::JavaParamRef;
 using base::android::ScopedJavaLocalRef;
 
 namespace content {
+
+namespace {
+
+bool IsAndroidSurfaceControlMagnifierEnabled() {
+  static bool enabled =
+      gfx::SurfaceControl::SupportsSurfacelessControl() &&
+      features::IsSlimCompositorEnabled() &&
+      base::FeatureList::IsEnabled(features::kAndroidSurfaceControlMagnifier);
+  return enabled;
+}
+
+}  // namespace
+
+static jboolean
+JNI_SelectionPopupControllerImpl_IsMagnifierWithSurfaceControlSupported(
+    JNIEnv* env) {
+  GpuDataManagerImpl* manager = GpuDataManagerImpl::GetInstance();
+  return manager->IsGpuFeatureInfoAvailable() &&
+         manager->GetFeatureStatus(
+             gpu::GpuFeatureType::GPU_FEATURE_TYPE_ANDROID_SURFACE_CONTROL) ==
+             gpu::kGpuFeatureStatusEnabled &&
+         IsAndroidSurfaceControlMagnifierEnabled();
+}
 
 jlong JNI_SelectionPopupControllerImpl_Init(
     JNIEnv* env,
@@ -69,6 +97,15 @@ ScopedJavaLocalRef<jobject> SelectionPopupController::GetContext() const {
   return Java_SelectionPopupControllerImpl_getContext(env, obj);
 }
 
+void SelectionPopupController::SetTextHandlesHiddenForDropdownMenu(
+    JNIEnv* env,
+    const JavaParamRef<jobject>& obj,
+    jboolean hidden) {
+  if (rwhva_) {
+    rwhva_->SetTextHandlesHiddenForDropdownMenu(hidden);
+  }
+}
+
 void SelectionPopupController::SetTextHandlesTemporarilyHidden(
     JNIEnv* env,
     const JavaParamRef<jobject>& obj,
@@ -78,13 +115,14 @@ void SelectionPopupController::SetTextHandlesTemporarilyHidden(
 }
 
 std::unique_ptr<ui::TouchHandleDrawable>
-SelectionPopupController::CreateTouchHandleDrawable() {
+SelectionPopupController::CreateTouchHandleDrawable(
+    gfx::NativeView parent_native_view,
+    cc::slim::Layer* parent_layer) {
   ScopedJavaLocalRef<jobject> activityContext = GetContext();
   // If activityContext is null then Application context is used instead on
   // the java side in CompositedTouchHandleDrawable.
-  auto* view = web_contents()->GetNativeView();
-  return std::unique_ptr<ui::TouchHandleDrawable>(
-      new CompositedTouchHandleDrawable(view, activityContext));
+  return std::make_unique<CompositedTouchHandleDrawable>(
+      parent_native_view, parent_layer, activityContext);
 }
 
 void SelectionPopupController::MoveRangeSelectionExtent(
@@ -181,8 +219,9 @@ bool SelectionPopupController::ShowSelectionMenu(
     return false;
 
   // Don't show paste pop-up for non-editable textarea.
-  if (!params.is_editable && params.selection_text.empty())
+  if (!params.is_editable && params.selection_text.empty()) {
     return false;
+  }
 
   const bool can_select_all =
       !!(params.edit_flags & blink::ContextMenuDataEditFlags::kCanSelectAll);
@@ -197,11 +236,11 @@ bool SelectionPopupController::ShowSelectionMenu(
                               params.source_type == ui::MENU_SOURCE_LONG_PRESS;
 
   Java_SelectionPopupControllerImpl_showSelectionMenu(
-      env, obj, params.selection_rect.x(), params.selection_rect.y(),
-      params.selection_rect.right(), params.selection_rect.bottom(),
-      handle_height, params.is_editable, is_password_type, jselected_text,
-      params.selection_start_offset, can_select_all, can_edit_richly,
-      should_suggest, params.source_type,
+      env, obj, params.x, params.y, params.selection_rect.x(),
+      params.selection_rect.y(), params.selection_rect.right(),
+      params.selection_rect.bottom(), handle_height, params.is_editable,
+      is_password_type, jselected_text, params.selection_start_offset,
+      can_select_all, can_edit_richly, should_suggest, params.source_type,
       render_frame_host->GetJavaRenderFrameHost());
   return true;
 }

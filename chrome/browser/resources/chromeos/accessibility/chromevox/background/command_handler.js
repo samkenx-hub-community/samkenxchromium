@@ -18,7 +18,7 @@ import {RectUtil} from '../../common/rect_util.js';
 import {NavBraille} from '../common/braille/nav_braille.js';
 import {BridgeConstants} from '../common/bridge_constants.js';
 import {BridgeHelper} from '../common/bridge_helper.js';
-import {Command, CommandStore} from '../common/command_store.js';
+import {Command} from '../common/command.js';
 import {ChromeVoxEvent, CustomAutomationEvent} from '../common/custom_automation_event.js';
 import {EarconId} from '../common/earcon_id.js';
 import {EventSourceType} from '../common/event_source_type.js';
@@ -27,7 +27,6 @@ import {ChromeVoxKbHandler} from '../common/keyboard_handler.js';
 import {Msgs} from '../common/msgs.js';
 import {PanelCommand, PanelCommandType} from '../common/panel_command.js';
 import {PermissionChecker} from '../common/permission_checker.js';
-import {SettingsManager} from '../common/settings_manager.js';
 import {Personality, QueueMode, TtsSettings, TtsSpeechProperties} from '../common/tts_types.js';
 
 import {AutoScrollHandler} from './auto_scroll_handler.js';
@@ -36,12 +35,11 @@ import {BrailleTranslatorManager} from './braille/braille_translator_manager.js'
 import {ChromeVox} from './chromevox.js';
 import {ChromeVoxRange} from './chromevox_range.js';
 import {ChromeVoxState} from './chromevox_state.js';
-import {ChromeVoxBackground} from './classic_background.js';
 import {ClipboardHandler} from './clipboard_handler.js';
 import {Color} from './color.js';
 import {CommandHandlerInterface} from './command_handler_interface.js';
-import {DesktopAutomationInterface} from './desktop_automation_interface.js';
-import {TypingEcho} from './editing/editable_text_base.js';
+import {TypingEcho, TypingEchoState} from './editing/typing_echo.js';
+import {DesktopAutomationInterface} from './event/desktop_automation_interface.js';
 import {EventSource} from './event_source.js';
 import {GestureInterface} from './gesture_interface.js';
 import {BackgroundKeyboardHandler} from './keyboard_handler.js';
@@ -67,16 +65,25 @@ const SetNativeChromeVoxResponse =
  */
 let NewRangeData;
 
+/**
+ * Maps a Command to the method that will perform that action.
+ *
+ * To streamline this class, the goal is to move the logic for each command out
+ * of this file.
+ *
+ * When adding new commands, please put the logic in a more relevant spot.
+ */
 export class CommandHandler extends CommandHandlerInterface {
   /** @private */
   constructor() {
     super();
 
     /**
-     * To support viewGraphicAsBraille_(), the current image node.
-     * @private {?AutomationNode}
+     * To support Command.SHOW_OPTIONS_PAGE, the state of the ChromeVox Page
+     * Migration Flag. (If enabled, should open in Chrome OS Settings App)
+     * @private {boolean|undefined}
      */
-    this.imageNode_;
+    this.isChromeVoxSettingsMigrationEnabled_;
   }
 
   /** @override */
@@ -94,7 +101,7 @@ export class CommandHandler extends CommandHandlerInterface {
         this.speakTimeAndDate_();
         return false;
       case Command.SHOW_OPTIONS_PAGE:
-        chrome.runtime.openOptionsPage();
+        this.showOptionsPage_();
         break;
       case Command.TOGGLE_STICKY_MODE:
         SmartStickyMode.instance.toggle();
@@ -167,8 +174,7 @@ export class CommandHandler extends CommandHandlerInterface {
         this.toggleScreen_();
         return false;
       case Command.TOGGLE_SPEECH_ON_OR_OFF:
-        const state = ChromeVox.tts.toggleSpeechOnOrOff();
-        new Output().format(state ? '@speech_on' : '@speech_off').go();
+        TtsBackground.toggleSpeechWithAnnouncement();
         return false;
       case Command.ENABLE_CHROMEVOX_ARC_SUPPORT_FOR_CURRENT_APP:
         this.enableChromeVoxArcSupportForCurrentApp_();
@@ -461,7 +467,7 @@ export class CommandHandler extends CommandHandlerInterface {
       case Command.PREVIOUS_OBJECT:
         skipSettingSelection = true;
         dir = Dir.BACKWARD;
-        // Falls through.
+      // Falls through.
       case Command.RIGHT:
       case Command.NEXT_OBJECT:
         skipSettingSelection = true;
@@ -487,14 +493,14 @@ export class CommandHandler extends CommandHandlerInterface {
         return false;
       case Command.PREVIOUS_SIMILAR_ITEM:
         dir = Dir.BACKWARD;
-        // Falls through.
+      // Falls through.
       case Command.NEXT_SIMILAR_ITEM:
         skipSync = true;
         pred = this.getPredicateForNextOrPreviousSimilarItem_(node);
         break;
       case Command.PREVIOUS_INVALID_ITEM:
         dir = Dir.BACKWARD;
-        // Falls through.
+      // Falls through.
       case Command.NEXT_INVALID_ITEM:
         pred = AutomationPredicate.isInvalid;
         rootPred = AutomationPredicate.root;
@@ -711,9 +717,23 @@ export class CommandHandler extends CommandHandlerInterface {
               bound, dir, pred, {skipInitialAncestry, root: rootPred});
         }
 
+        // Scroll here for table navigation with arrow keys where some nodes may
+        // be hidden. The scroll must happen here because |node| will remain
+        // undefined, causing this command to return before the next autoscroll
+        // check.
+        if (!node &&
+            !AutoScrollHandler.instance.scrollToFindNodes(
+                bound, command, currentRange, dir, () => {
+                  this.onCommand(command);
+                  this.onFinishCommand();
+                })) {
+          this.onFinishCommand();
+          return false;
+        }
+
         if (node && !skipSync) {
           node = AutomationUtil.findNodePre(
-                     node, Dir.FORWARD, AutomationPredicate.object) ||
+                     node, Dir.FORWARD, AutomationPredicate.object) ??
               node;
         }
 
@@ -805,57 +825,17 @@ export class CommandHandler extends CommandHandlerInterface {
   }
 
   /**
-   * Called when an image frame is received on a node.
-   * @param {!ChromeVoxEvent} event The event.
-   * @private
-   */
-  onImageFrameUpdated_(event) {
-    const target = event.target;
-    if (target !== this.imageNode_) {
-      return;
-    }
-
-    if (!AutomationUtil.isDescendantOf(
-            ChromeVoxRange.current.start.node, this.imageNode_)) {
-      this.imageNode_.removeEventListener(
-          EventType.IMAGE_FRAME_UPDATED, this.onImageFrameUpdated_, false);
-      this.imageNode_ = null;
-      return;
-    }
-
-    if (target.imageDataUrl) {
-      ChromeVox.braille.writeRawImage(target.imageDataUrl);
-      ChromeVox.braille.freeze();
-    }
-  }
-
-  /**
    * Handle the command to view the first graphic within the current range
    * as braille.
    * @param {!CursorRange} currentRange The current range.
    * @private
    */
   viewGraphicAsBraille_(currentRange) {
-    this.imageNode_?.removeEventListener(
-        EventType.IMAGE_FRAME_UPDATED, this.onImageFrameUpdated_, false);
-    this.imageNode_ = null;
-
     // Find the first node within the current range that supports image data.
     const imageNode = AutomationUtil.findNodePost(
         currentRange.start.node, Dir.FORWARD,
         AutomationPredicate.supportsImageData);
-    if (!imageNode) {
-      return;
-    }
-
-    imageNode.addEventListener(
-        EventType.IMAGE_FRAME_UPDATED, this.onImageFrameUpdated_, false);
-    this.imageNode_ = imageNode;
-    if (imageNode.imageDataUrl) {
-      const event = new CustomAutomationEvent(
-          EventType.IMAGE_FRAME_UPDATED, imageNode, {eventFrom: 'page'});
-      this.onImageFrameUpdated_(event);
-    } else {
+    if (imageNode) {
       imageNode.getImageData(0, 0);
     }
   }
@@ -1040,16 +1020,16 @@ export class CommandHandler extends CommandHandlerInterface {
         'typingEcho', TypingEcho.cycle(LocalStorage.getNumber('typingEcho')));
     let announce = '';
     switch (LocalStorage.get('typingEcho')) {
-      case TypingEcho.CHARACTER:
+      case TypingEchoState.CHARACTER:
         announce = Msgs.getMsg('character_echo');
         break;
-      case TypingEcho.WORD:
+      case TypingEchoState.WORD:
         announce = Msgs.getMsg('word_echo');
         break;
-      case TypingEcho.CHARACTER_AND_WORD:
+      case TypingEchoState.CHARACTER_AND_WORD:
         announce = Msgs.getMsg('character_and_word_echo');
         break;
-      case TypingEcho.NONE:
+      case TypingEchoState.NONE:
         announce = Msgs.getMsg('none_echo');
         break;
     }
@@ -1606,6 +1586,30 @@ export class CommandHandler extends CommandHandlerInterface {
   }
 
   /**
+   * Launch ChromeVox options page. If migration enabled, launch settings app.
+   * TODO(268196299): Add test for showing options page.
+   * @private
+   */
+  async showOptionsPage_() {
+    if (this.isChromeVoxSettingsMigrationEnabled_ === undefined) {
+      this.isChromeVoxSettingsMigrationEnabled_ = await new Promise(resolve => {
+        chrome.accessibilityPrivate.isFeatureEnabled(
+            chrome.accessibilityPrivate.AccessibilityFeature
+                .CHROMEVOX_SETTINGS_MIGRATION,
+            resolve);
+      });
+    }
+
+    if (!this.isChromeVoxSettingsMigrationEnabled_) {
+      chrome.runtime.openOptionsPage();
+      return;
+    }
+
+    // Launch new ChromeVox settings (inside ChromeOS Settings App).
+    chrome.accessibilityPrivate.openSettingsSubpage('textToSpeech/chromeVox');
+  }
+
+  /**
    * @param {boolean} isPrevious
    * @private
    */
@@ -1648,7 +1652,8 @@ export class CommandHandler extends CommandHandlerInterface {
       // If this is the first time, show a confirmation dialog.
       chrome.accessibilityPrivate.showConfirmationDialog(
           Msgs.getMsg('toggle_screen_title'),
-          Msgs.getMsg('toggle_screen_description'), confirmed => {
+          Msgs.getMsg('toggle_screen_description'), /*cancelName=*/ null,
+          confirmed => {
             if (confirmed) {
               ChromeVoxPrefs.darkScreen = true;
               LocalStorage.set('acceptToggleScreen', true);
@@ -1671,6 +1676,7 @@ export class CommandHandler extends CommandHandlerInterface {
    */
   toggleSelection_() {
     if (!ChromeVoxState.instance.pageSel) {
+      ChromeVox.earcons.playEarcon(EarconId.SELECTION);
       ChromeVoxState.instance.pageSel = ChromeVoxRange.current;
       DesktopAutomationInterface.instance.ignoreDocumentSelectionFromAction(
           true);
@@ -1679,6 +1685,7 @@ export class CommandHandler extends CommandHandlerInterface {
       if (root && root.selectionStartObject && root.selectionEndObject &&
           !isNaN(Number(root.selectionStartOffset)) &&
           !isNaN(Number(root.selectionEndOffset))) {
+        ChromeVox.earcons.playEarcon(EarconId.SELECTION_REVERSE);
         const sel = new CursorRange(
             new Cursor(
                 root.selectionStartObject,

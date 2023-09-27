@@ -262,6 +262,8 @@ HEADLESS_PROTOCOL_TEST(VirtualTimeFetchStream,
                        "emulation/virtual-time-fetch-stream.js")
 HEADLESS_PROTOCOL_TEST(VirtualTimeFetchReadBody,
                        "emulation/virtual-time-fetch-read-body.js")
+HEADLESS_PROTOCOL_TEST(VirtualTimeFetchBlobReadBodyBlob,
+                       "emulation/virtual-time-fetch-read-body-blob.js")
 HEADLESS_PROTOCOL_TEST(VirtualTimeDialogWhileLoading,
                        "emulation/virtual-time-dialog-while-loading.js")
 HEADLESS_PROTOCOL_TEST(VirtualTimeHistoryNavigation,
@@ -289,6 +291,8 @@ HEADLESS_PROTOCOL_TEST(VirtualTimeWorkerLockstep,
 #endif
 HEADLESS_PROTOCOL_TEST(MAYBE_VirtualTimeWorkerFetch,
                        "emulation/virtual-time-worker-fetch.js")
+HEADLESS_PROTOCOL_TEST(VirtualTimeWorkerTerminate,
+                       "emulation/virtual-time-worker-terminate.js")
 
 // Flaky on Mac. TODO(crbug.com/1164173): Re-enable.
 #if BUILDFLAG(IS_MAC)
@@ -325,7 +329,7 @@ HEADLESS_PROTOCOL_TEST(Geolocation, "emulation/geolocation-crash.js")
 HEADLESS_PROTOCOL_TEST(DragStarted, "input/dragIntercepted.js")
 
 // https://crbug.com/1414190
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
 #define MAYBE_InputClipboardOps DISABLED_InputClipboardOps
 #else
 #define MAYBE_InputClipboardOps InputClipboardOps
@@ -357,6 +361,9 @@ HEADLESS_PROTOCOL_TEST(ShowFilePickerInterception,
                        "sanity/show-file-picker-interception.js")
 
 HEADLESS_PROTOCOL_TEST(WindowSizeOnStart, "sanity/window-size-on-start.js")
+
+HEADLESS_PROTOCOL_TEST(LargeBrowserWindowSize,
+                       "sanity/large-browser-window-size.js")
 
 HEADLESS_PROTOCOL_TEST(ScreencastBasics, "sanity/screencast-basics.js")
 

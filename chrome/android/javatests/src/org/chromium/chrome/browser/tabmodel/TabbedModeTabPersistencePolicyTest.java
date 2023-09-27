@@ -4,10 +4,12 @@
 
 package org.chromium.chrome.browser.tabmodel;
 
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
+
 import android.app.Activity;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.After;
@@ -18,14 +20,12 @@ import org.junit.runner.RunWith;
 
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ContextUtils;
-import org.chromium.base.FeatureList;
 import org.chromium.base.test.util.AdvancedMockContext;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.app.tabmodel.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.app.tabmodel.TabbedModeTabModelOrchestrator;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.tab.MockTab;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabState;
@@ -43,7 +43,6 @@ import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.url.GURL;
 
 import java.nio.ByteBuffer;
-import java.util.Collections;
 
 /**
  * Tests for the tabbed-mode persisitence policy.
@@ -78,8 +77,6 @@ public class TabbedModeTabPersistencePolicyTest {
         mMockDirectory = new TestTabModelDirectory(mAppContext,
                 "TabbedModeTabPersistencePolicyTest", TabStateDirectory.TABBED_MODE_DIRECTORY);
         TabStateDirectory.setBaseStateDirectoryForTests(mMockDirectory.getBaseDirectory());
-        FeatureList.setTestFeatures(
-                Collections.singletonMap(ChromeFeatureList.TAB_STATE_V1_OPTIMIZATIONS, true));
     }
 
     @After
@@ -91,7 +88,6 @@ public class TabbedModeTabPersistencePolicyTest {
         }
 
         TabWindowManagerSingleton.resetTabModelSelectorFactoryForTesting();
-        FeatureList.setTestFeatures(null);
     }
 
     private TabbedModeTabModelOrchestrator buildTestTabModelSelector(
@@ -109,7 +105,7 @@ public class TabbedModeTabPersistencePolicyTest {
                                 return new GURL("https://www.google.com");
                             }
                         };
-                        tab.initialize(null, null, null, null, null, false, null);
+                        tab.initialize(null, null, null, null, null, false, null, false);
                         return tab;
                     }
                 };
@@ -185,7 +181,7 @@ public class TabbedModeTabPersistencePolicyTest {
         final CallbackHelper callbackSignal = new CallbackHelper();
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             policy.cleanupInstanceState(id, (result) -> {
-                Assert.assertThat(result,
+                assertThat(result,
                         Matchers.containsInAnyOrder(
                                 TabStateFileManager.getTabStateFilename(4, false),
                                 TabStateFileManager.getTabStateFilename(12, true),

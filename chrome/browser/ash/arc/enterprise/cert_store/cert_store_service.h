@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "base/containers/queue.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ash/arc/enterprise/cert_store/arc_cert_installer.h"
 #include "chrome/services/keymanagement/public/mojom/cert_store_types.mojom.h"
@@ -48,7 +49,7 @@ class CertStoreService : public KeyedService,
   CertStoreService& operator=(const CertStoreService&) = delete;
 
   // CertDatabase::Observer overrides.
-  void OnCertDBChanged() override;
+  void OnClientCertStoreChanged() override;
 
   std::vector<std::string> get_required_cert_names() const {
     return certificate_cache_.get_required_cert_names();
@@ -134,6 +135,21 @@ class CertStoreService : public KeyedService,
   void OnBuiltAllowedCertDescriptions(
       keymanagement::mojom::ChapsSlot slot,
       std::vector<CertDescription> cert_descriptions) const;
+  void OnBuiltAllowedCertDescriptionsForKeymaster(
+      keymanagement::mojom::ChapsSlot slot,
+      std::vector<CertDescription> cert_descriptions) const;
+  void OnBuiltAllowedCertDescriptionsForKeyMint(
+      keymanagement::mojom::ChapsSlot slot,
+      std::vector<CertDescription> cert_descriptions) const;
+
+  // Done with the user slot, so try to process additional certs in the system
+  // slot. If there is no system slot (e.g. the user is not allowed to access
+  // it), this call won't mutate |cert_descriptions|, and only return the user
+  // slot certificates. However, it's necessary to perform this check
+  // asynchronously on the IO thread (through ListCerts), because that's the
+  // only thread that knows if the system slot is enabled.
+  void ListCertsInSystemSlot(
+      std::vector<CertDescription> cert_descriptions) const;
 
   // Processes metadata from |allowed_certs| stored in the given |slot| and
   // appends them to |certificates|.
@@ -141,11 +157,10 @@ class CertStoreService : public KeyedService,
       keymanagement::mojom::ChapsSlot slot,
       std::vector<CertDescription> certificates,
       net::ScopedCERTCertificateList allowed_certs);
-  void OnUpdatedKeymasterKeys(std::vector<CertDescription> certificates,
-                              bool success);
+  void OnUpdatedKeys(std::vector<CertDescription> certificates, bool success);
   void OnArcCertsInstalled(bool need_policy_update, bool success);
 
-  content::BrowserContext* const context_;
+  const raw_ptr<content::BrowserContext, ExperimentalAsh> context_;
 
   std::unique_ptr<ArcCertInstaller> installer_;
   CertificateCache certificate_cache_;

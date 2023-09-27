@@ -344,7 +344,7 @@ MediaNotificationViewModernImpl::MediaNotificationViewModernImpl(
     util_buttons_layout->set_cross_axis_alignment(
         views::BoxLayout::CrossAxisAlignment::kStretch);
 
-    if (item_->SourceType() != SourceType::kCast) {
+    if (item_->GetSourceType() != SourceType::kCast) {
       // The picture-in-picture button appears directly under the media
       // labels.
       auto picture_in_picture_button = std::make_unique<MediaButton>(
@@ -364,7 +364,7 @@ MediaNotificationViewModernImpl::MediaNotificationViewModernImpl(
       util_buttons_layout->SetFlexForView(footer_view, 1);
     }
 
-    if (item_->SourceType() == SourceType::kCast) {
+    if (item_->GetSourceType() == SourceType::kCast) {
       auto volume_slider = std::make_unique<MediaNotificationVolumeSliderView>(
           base::BindRepeating(&MediaNotificationViewModernImpl::SetVolume,
                               base::Unretained(this)));
@@ -454,6 +454,7 @@ void MediaNotificationViewModernImpl::UpdateWithMediaSessionInfo(
 void MediaNotificationViewModernImpl::UpdateWithMediaMetadata(
     const media_session::MediaMetadata& metadata) {
   title_label_->SetText(metadata.title);
+  subtitle_label_->SetElideBehavior(gfx::ELIDE_HEAD);
   subtitle_label_->SetText(metadata.source_title);
 
   // Stores the text to be read by screen readers describing the notification.
@@ -536,12 +537,6 @@ void MediaNotificationViewModernImpl::OnThemeChanged() {
   UpdateForegroundColor();
 }
 
-void MediaNotificationViewModernImpl::UpdateDeviceSelectorAvailability(
-    bool availability) {
-  GetMediaNotificationBackground()->UpdateDeviceSelectorAvailability(
-      availability);
-}
-
 void MediaNotificationViewModernImpl::UpdateWithMuteStatus(bool mute) {
   if (mute_button_) {
     mute_button_->SetToggled(mute);
@@ -561,6 +556,11 @@ void MediaNotificationViewModernImpl::UpdateWithMuteStatus(bool mute) {
 void MediaNotificationViewModernImpl::UpdateWithVolume(float volume) {
   if (volume_slider_)
     volume_slider_->SetVolume(volume);
+}
+
+void MediaNotificationViewModernImpl::UpdateDeviceSelectorVisibility(
+    bool visible) {
+  GetMediaNotificationBackground()->UpdateDeviceSelectorAvailability(visible);
 }
 
 void MediaNotificationViewModernImpl::UpdateActionButtonsVisibility() {

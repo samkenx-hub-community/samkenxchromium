@@ -2,11 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+import {ExtensionsTestRunner} from 'extensions_test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+
 (async function() {
   TestRunner.addResult(`Tests resource-related methods of WebInspector extension API\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
-  await TestRunner.loadTestModule('extensions_test_runner');
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
+  await TestRunner.loadLegacyModule('console');
+  await TestRunner.loadLegacyModule('sources');
   await TestRunner.loadLegacyModule('components');
 
   TestRunner.clickOnURL = async function() {
@@ -28,7 +34,7 @@
   }
 
   TestRunner.waitForStyleSheetChangedEvent = function(reply) {
-    TestRunner.addSniffer(SDK.CSSModel.prototype, "fireStyleSheetChanged", reply);
+    TestRunner.addSniffer(SDK.CSSModel.CSSModel.prototype, "fireStyleSheetChanged", reply);
   }
 
   await TestRunner.evaluateInPageAnonymously(`

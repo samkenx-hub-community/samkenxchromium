@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(REPOSITORY_ROOT, 'build/android/gyp'))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, 'net/tools/net_docs'))
 # pylint: disable=wrong-import-position
 from util import build_utils
+import action_helpers  # build_utils adds //build to sys.path.
 import net_docs
 from markdown.postprocessors import Postprocessor
 from markdown.extensions import Extension
@@ -27,9 +28,9 @@ DOCLAVA_DIR = os.path.join(REPOSITORY_ROOT, 'buildtools', 'android', 'doclava')
 SDK_DIR = os.path.join(REPOSITORY_ROOT, 'third_party', 'android_sdk', 'public')
 # TODO(b/260694901) Remove this usage of Java 11 as soon as Doclava supports it.
 # Doclava support for JDK17 was actively being worked on as of Jan 2023.
-JAVADOC_PATH = os.path.join(build_utils.JAVA_11_HOME_DEPRECATED, 'bin',
-                            'javadoc')
-JAR_PATH = os.path.join(build_utils.JAVA_11_HOME_DEPRECATED, 'bin', 'jar')
+JAVA_11_HOME = os.path.join(REPOSITORY_ROOT, 'third_party', 'jdk11', 'current')
+JAVADOC_PATH = os.path.join(JAVA_11_HOME, 'bin', 'javadoc')
+JAR_PATH = os.path.join(JAVA_11_HOME, 'bin', 'jar')
 
 JAVADOC_WARNING = """\
 javadoc: warning - The old Doclet and Taglet APIs in the packages
@@ -114,7 +115,7 @@ def GenerateJavadoc(args, src_dir, output_dir):
 
 def main(argv):
   parser = argparse.ArgumentParser()
-  build_utils.AddDepfileOption(parser)
+  action_helpers.add_depfile_arg(parser)
   parser.add_argument('--output-dir', help='Directory to put javadoc')
   parser.add_argument('--input-dir', help='Root of cronet source')
   parser.add_argument('--input-src-jar', help='Cronet api source jar')
@@ -133,11 +134,8 @@ def main(argv):
   expanded_argv = build_utils.ExpandFileArgs(argv)
   args, _ = parser.parse_known_args(expanded_argv)
 
-  classpath_jars = []
-  for single_list in args.classpath_jars:
-    classpath_jars.extend(build_utils.ParseGnList(single_list))
+  args.classpath_jars = action_helpers.parse_gn_list(args.classpath_jars)
 
-  args.classpath_jars = classpath_jars
   args.support_annotations_jars = list(
       itertools.chain(*args.support_annotations_jars))
   # A temporary directory to put the output of cronet api source jar files.
@@ -173,7 +171,7 @@ def main(argv):
       deps.extend(args.support_annotations_jars)
     if args.classpath_jars:
       deps.extend(args.classpath_jars)
-    build_utils.WriteDepfile(args.depfile, args.zip_file, deps)
+    action_helpers.write_depfile(args.depfile, args.zip_file, deps)
   # Clean up temporary output directory.
   build_utils.DeleteDirectory(unzipped_jar_path)
 

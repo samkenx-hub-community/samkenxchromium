@@ -4,36 +4,27 @@
 
 #include "ash/frame/non_client_frame_view_ash.h"
 
-#include <algorithm>
 #include <memory>
-#include <vector>
 
-#include "ash/constants/ash_features.h"
 #include "ash/public/cpp/tablet_mode_observer.h"
 #include "ash/public/cpp/window_properties.h"
 #include "ash/shell.h"
-#include "ash/shell_delegate.h"
-#include "ash/wm/overview/overview_controller.h"
-#include "ash/wm/splitview/split_view_controller.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_state_observer.h"
 #include "ash/wm/window_util.h"
+#include "base/check_op.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "chromeos/ui/base/window_properties.h"
 #include "chromeos/ui/frame/caption_buttons/frame_caption_button_container_view.h"
-#include "chromeos/ui/frame/caption_buttons/frame_size_button.h"
-#include "chromeos/ui/frame/default_frame_header.h"
 #include "chromeos/ui/frame/frame_utils.h"
 #include "chromeos/ui/frame/header_view.h"
 #include "chromeos/ui/frame/immersive/immersive_fullscreen_controller.h"
 #include "chromeos/ui/frame/non_client_frame_view_base.h"
-#include "chromeos/ui/wm/features.h"
-#include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_observer.h"
 #include "ui/base/hit_test.h"
-#include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/gfx/geometry/rect.h"
@@ -148,8 +139,8 @@ class NonClientFrameViewAshImmersiveHelper : public WindowStateObserver,
     }
   }
 
-  views::Widget* widget_;
-  WindowState* window_state_;
+  raw_ptr<views::Widget, ExperimentalAsh> widget_;
+  raw_ptr<WindowState, ExperimentalAsh> window_state_;
   std::unique_ptr<ImmersiveFullscreenController>
       immersive_fullscreen_controller_;
 };
@@ -177,16 +168,12 @@ NonClientFrameViewAsh::NonClientFrameViewAsh(views::Widget* frame)
   }
 
   frame_window->SetProperty(kNonClientFrameViewAshKey, this);
+  window_observation_.Observe(frame_window);
 
   header_view_->set_context_menu_controller(
       frame_context_menu_controller_.get());
 
-  auto* size_button = header_view_->caption_button_container()->size_button();
-  if (chromeos::wm::features::IsWindowLayoutMenuEnabled() && size_button) {
-    size_button->SetFeedbackButtonCallback(
-        base::BindRepeating(&NonClientFrameViewAsh::ShowFeedbackPageForMenu,
-                            weak_factory_.GetWeakPtr()));
-  }
+  UpdateWindowRoundedCorners();
 }
 
 NonClientFrameViewAsh::~NonClientFrameViewAsh() = default;
@@ -198,7 +185,8 @@ NonClientFrameViewAsh* NonClientFrameViewAsh::Get(aura::Window* window) {
 
 void NonClientFrameViewAsh::InitImmersiveFullscreenControllerForView(
     ImmersiveFullscreenController* immersive_fullscreen_controller) {
-  immersive_fullscreen_controller->Init(header_view_, frame_, header_view_);
+  immersive_fullscreen_controller->Init(GetHeaderView(), frame_,
+                                        GetHeaderView());
 }
 
 void NonClientFrameViewAsh::SetFrameColors(SkColor active_frame_color,
@@ -230,7 +218,7 @@ bool NonClientFrameViewAsh::ShouldShowContextMenu(
     // will return HTCLIENT so manually check whether `point` lies inside
     // `header_view_`.
     gfx::Point point_in_header_coords(screen_coords_point);
-    views::View::ConvertPointToTarget(this, header_view_,
+    views::View::ConvertPointToTarget(this, GetHeaderView(),
                                       &point_in_header_coords);
     return header_view_->HitTestRect(
         gfx::Rect(point_in_header_coords, gfx::Size(1, 1)));
@@ -268,6 +256,7 @@ void NonClientFrameViewAsh::SetFrameEnabled(bool enabled) {
 
   frame_enabled_ = enabled;
   overlay_view_->SetVisible(frame_enabled_);
+  UpdateWindowRoundedCorners();
   InvalidateLayout();
 }
 
@@ -278,6 +267,21 @@ void NonClientFrameViewAsh::SetToggleResizeLockMenuCallback(
 
 void NonClientFrameViewAsh::ClearToggleResizeLockMenuCallback() {
   toggle_resize_lock_menu_callback_.Reset();
+}
+
+void NonClientFrameViewAsh::OnWindowPropertyChanged(aura::Window* window,
+                                                    const void* key,
+                                                    intptr_t old) {
+  // ChromeOS has rounded frames for certain window states. If these states
+  // changes, we need to update the rounded corners of the frame associate with
+  // the `window`accordingly.
+  if (chromeos::CanPropertyEffectFrameRadius(key)) {
+    UpdateWindowRoundedCorners();
+  }
+}
+
+void NonClientFrameViewAsh::OnWindowDestroying(aura::Window* window) {
+  window_observation_.Reset();
 }
 
 base::RepeatingCallback<void()>
@@ -291,15 +295,12 @@ void NonClientFrameViewAsh::OnDidSchedulePaint(const gfx::Rect& r) {
     // The HeaderView is not a child of NonClientFrameViewAsh. Redirect the
     // paint to HeaderView instead.
     gfx::RectF to_paint(r);
-    views::View::ConvertRectToTarget(this, header_view_, &to_paint);
+    views::View::ConvertRectToTarget(this, GetHeaderView(), &to_paint);
     header_view_->SchedulePaintInRect(gfx::ToEnclosingRect(to_paint));
   }
 }
 
 void NonClientFrameViewAsh::AddedToWidget() {
-  if (!features::IsDarkLightModeEnabled())
-    return;
-
   if (highlight_border_overlay_ ||
       !GetWidget()->GetNativeWindow()->GetProperty(
           chromeos::kShouldHaveHighlightBorderOverlay)) {
@@ -320,24 +321,12 @@ void NonClientFrameViewAsh::UpdateDefaultFrameColors() {
   if (!frame_window->GetProperty(kTrackDefaultFrameColors))
     return;
 
-  // Use the light mode colors when the DarkLightMode feature is disabled. Do
-  // this because we use dark mode colors by default when the feature is
-  // disabled currently (see crbug.com/1291354).
-  const bool is_dark_light_enabled = features::IsDarkLightModeEnabled();
   auto* color_provider = frame_->GetColorProvider();
   const SkColor dialog_title_bar_color =
-      is_dark_light_enabled
-          ? color_provider->GetColor(cros_tokens::kDialogTitleBarColor)
-          : color_provider->GetColor(cros_tokens::kDialogTitleBarColorLight);
+      color_provider->GetColor(cros_tokens::kDialogTitleBarColor);
 
   frame_window->SetProperty(kFrameActiveColorKey, dialog_title_bar_color);
   frame_window->SetProperty(kFrameInactiveColorKey, dialog_title_bar_color);
-}
-
-void NonClientFrameViewAsh::ShowFeedbackPageForMenu() {
-  Shell::Get()->shell_delegate()->OpenFeedbackDialog(
-      ShellDelegate::FeedbackSource::kWindowLayoutMenu,
-      /*description_template=*/"#WindowLayoutMenu");
 }
 
 BEGIN_METADATA(NonClientFrameViewAsh, views::NonClientFrameView)

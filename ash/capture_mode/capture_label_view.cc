@@ -17,9 +17,11 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/i18n/number_formatting.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/task_runner.h"
 #include "base/time/time.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/compositor/layer.h"
@@ -165,7 +167,7 @@ CaptureLabelView::CaptureLabelView(
   capture_button_container_ = AddChildView(std::make_unique<CaptureButtonView>(
       std::move(on_capture_button_pressed),
       std::move(on_drop_down_button_pressed),
-      capture_mode_session_->is_in_projector_mode()));
+      capture_mode_session_->active_behavior()));
   capture_button_container_->SetPaintToLayer();
   capture_button_container_->layer()->SetFillsBoundsOpaquely(false);
   capture_button_container_->SetNotifyEnterExitOnChild(true);
@@ -176,11 +178,9 @@ CaptureLabelView::CaptureLabelView(
   label_->SetEnabledColorId(kColorAshTextColorPrimary);
   label_->SetBackgroundColor(SK_ColorTRANSPARENT);
 
-  if (features::IsDarkLightModeEnabled()) {
-    SetBorder(std::make_unique<views::HighlightBorder>(
-        kCaptureLabelRadius, views::HighlightBorder::Type::kHighlightBorder2,
-        /*use_light_colors=*/false));
-  }
+  capture_mode_util::SetHighlightBorder(
+      this, kCaptureLabelRadius,
+      views::HighlightBorder::Type::kHighlightBorderNoShadow);
 
   shadow_->SetRoundedCornerRadius(kCaptureLabelRadius);
 }
@@ -229,7 +229,10 @@ void CaptureLabelView::UpdateIconAndText() {
                      : IDS_ASH_SCREEN_CAPTURE_LABEL_FULLSCREEN_VIDEO_RECORD_CLAMSHELL));
       break;
     case CaptureModeSource::kWindow: {
-      if (in_tablet_mode) {
+      // If the bar is anchored to the window, then we already have a pre-
+      // selected game window for the game dashboard, and there is no need to
+      // show the label.
+      if (in_tablet_mode && !capture_mode_session_->IsBarAnchoredToWindow()) {
         text = l10n_util::GetStringUTF16(
             is_capturing_image
                 ? IDS_ASH_SCREEN_CAPTURE_LABEL_WINDOW_IMAGE_CAPTURE
@@ -261,8 +264,10 @@ void CaptureLabelView::UpdateIconAndText() {
 
   const bool label_visibility = !text.empty();
   label_->SetVisible(label_visibility);
-  if (label_visibility)
+  if (label_visibility && (label_->GetText() != text)) {
     label_->SetText(text);
+    capture_mode_util::TriggerAccessibilityAlertSoon(base::UTF16ToUTF8(text));
+  }
 }
 
 bool CaptureLabelView::ShouldHandleEvent() {
@@ -309,6 +314,16 @@ void CaptureLabelView::AddedToWidget() {
   auto* parent = layer()->parent();
   parent->Add(shadow_->GetLayer());
   parent->StackAtBottom(shadow_->GetLayer());
+
+  // Make the shadow observe the color provider source change to update the
+  // colors.
+  shadow_->ObserveColorProviderSource(GetWidget());
+}
+
+void CaptureLabelView::OnBoundsChanged(const gfx::Rect& previous_bounds) {
+  // The shadow layer is a sibling of this view's layer, and should have the
+  // same bounds.
+  shadow_->SetContentBounds(layer()->bounds());
 }
 
 void CaptureLabelView::Layout() {
@@ -321,10 +336,6 @@ void CaptureLabelView::Layout() {
   // This is necessary to update the focus ring, which is a child view of
   // `this`.
   views::View::Layout();
-
-  // The shadow layer is a sibling of this view's layer, and should have the
-  // same bounds.
-  shadow_->SetContentBounds(layer()->bounds());
 }
 
 gfx::Size CaptureLabelView::CalculatePreferredSize() const {

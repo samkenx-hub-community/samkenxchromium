@@ -9,19 +9,15 @@
 #import "components/search_engines/template_url.h"
 #import "components/search_engines/template_url_fetcher.h"
 #import "components/search_engines/template_url_service.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/search_engines/template_url_fetcher_factory.h"
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/web/public/favicon/favicon_status.h"
 #import "ios/web/public/navigation/navigation_context.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ui/base/page_transition_types.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 

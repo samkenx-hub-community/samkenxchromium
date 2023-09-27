@@ -77,8 +77,7 @@ TEST(IntentHandlingMetricsTest, TestRecordIntentPickerMetrics) {
     base::HistogramTester histogram_tester;
 
     IntentHandlingMetrics::RecordIntentPickerMetrics(
-        test.entry_type, test.close_reason, test.should_persist,
-        PickerShowState::kOmnibox);
+        test.entry_type, test.close_reason, test.should_persist);
 
     histogram_tester.ExpectBucketCount("ChromeOS.Intents.IntentPickerAction",
                                        test.expected_action, 1);
@@ -86,36 +85,6 @@ TEST(IntentHandlingMetricsTest, TestRecordIntentPickerMetrics) {
         "ChromeOS.Apps.IntentPickerDestinationPlatform", test.expected_platform,
         1);
   }
-}
-
-TEST(IntentHandlingMetricsTest, TestRecordIntentPickerMetricsWithSource) {
-  base::HistogramTester histogram_tester;
-
-  IntentHandlingMetrics::RecordIntentPickerMetrics(
-      PickerEntryType::kArc, IntentPickerCloseReason::OPEN_APP, true,
-      PickerShowState::kOmnibox);
-
-  histogram_tester.ExpectBucketCount(
-      "ChromeOS.Intents.IntentPickerAction",
-      IntentHandlingMetrics::IntentPickerAction::kArcAppSelectedAndPreferred,
-      1);
-  histogram_tester.ExpectBucketCount(
-      "ChromeOS.Intents.IntentPickerAction.FromOmniboxIcon",
-      IntentHandlingMetrics::IntentPickerAction::kArcAppSelectedAndPreferred,
-      1);
-
-  IntentHandlingMetrics::RecordIntentPickerMetrics(
-      PickerEntryType::kArc, IntentPickerCloseReason::OPEN_APP, true,
-      PickerShowState::kPopOut);
-
-  histogram_tester.ExpectBucketCount(
-      "ChromeOS.Intents.IntentPickerAction",
-      IntentHandlingMetrics::IntentPickerAction::kArcAppSelectedAndPreferred,
-      2);
-  histogram_tester.ExpectBucketCount(
-      "ChromeOS.Intents.IntentPickerAction.FromAutoPopOut",
-      IntentHandlingMetrics::IntentPickerAction::kArcAppSelectedAndPreferred,
-      1);
 }
 
 TEST(IntentHandlingMetricsTest, TestRecordPreferredAppLinkClickMetrics) {
@@ -129,23 +98,12 @@ TEST(IntentHandlingMetricsTest, TestRecordPreferredAppLinkClickMetrics) {
       IntentHandlingMetrics::Platform::ARC, 1);
 }
 
-TEST(IntentHandlingMetricsTest, TestRecordOpenBrowserMetrics) {
-  base::HistogramTester histogram_tester;
-
-  IntentHandlingMetrics test;
-  test.RecordOpenBrowserMetrics(IntentHandlingMetrics::AppType::kArc);
-
-  histogram_tester.ExpectBucketCount("ChromeOS.Apps.OpenBrowser",
-                                     IntentHandlingMetrics::AppType::kArc, 1);
-}
-
 TEST(IntentHandlingMetricsTest, TestRecordLinkCapturingEntryPointShown) {
   base::HistogramTester histogram_tester;
   IntentHandlingMetrics test;
 
-  std::vector<apps::IntentPickerAppInfo> app_info;
-  app_info.emplace_back(apps::PickerEntryType::kDevice, ui::ImageModel(),
-                        "test", "test");
+  std::vector<apps::IntentPickerAppInfo> app_info = {
+      {apps::PickerEntryType::kDevice, ui::ImageModel(), "test", "test"}};
 
   // Link capturing entry point shown for unknown app type.
   test.RecordLinkCapturingEntryPointShown(app_info);
@@ -160,9 +118,7 @@ TEST(IntentHandlingMetricsTest, TestRecordLinkCapturingEntryPointShown) {
       IntentHandlingMetrics::LinkCapturingEvent::kEntryPointShown, 1);
 
   // Prepare the app info for next testcase.
-  app_info.clear();
-  app_info.emplace_back(apps::PickerEntryType::kWeb, ui::ImageModel(), "test",
-                        "test");
+  app_info = {{apps::PickerEntryType::kWeb, ui::ImageModel(), "test", "test"}};
 
   // Link capturing entry point shown for web app type.
   test.RecordLinkCapturingEntryPointShown(app_info);
@@ -177,13 +133,9 @@ TEST(IntentHandlingMetricsTest, TestRecordLinkCapturingEntryPointShown) {
       IntentHandlingMetrics::LinkCapturingEvent::kEntryPointShown, 2);
 
   // Prepare the app info for next testcase.
-  app_info.clear();
-  app_info.emplace_back(apps::PickerEntryType::kArc, ui::ImageModel(), "test",
-                        "test");
-  app_info.emplace_back(apps::PickerEntryType::kWeb, ui::ImageModel(), "test",
-                        "test");
-  app_info.emplace_back(apps::PickerEntryType::kWeb, ui::ImageModel(), "test",
-                        "test");
+  app_info = {{apps::PickerEntryType::kArc, ui::ImageModel(), "test", "test"},
+              {apps::PickerEntryType::kWeb, ui::ImageModel(), "test", "test"},
+              {apps::PickerEntryType::kWeb, ui::ImageModel(), "test", "test"}};
 
   // Link capturing entry point shown for 2 web apps and 1 ARC app.
   test.RecordLinkCapturingEntryPointShown(app_info);
@@ -308,23 +260,9 @@ TEST_F(IntentHandlingMetricsTestWithMetricsService,
     histogram_tester.ExpectBucketCount(
         "Arc.UserInteraction", arc::UserInteractionType::APP_STARTED_FROM_LINK,
         test.expected_link_click);
-
-    histogram_tester.ExpectBucketCount("ChromeOS.Apps.ExternalProtocolDialog",
-                                       test.expected_action, 1);
   }
 }
 
-TEST(IntentHandlingMetricsTest, TestRecordExternalProtocolMetrics) {
-  base::HistogramTester histogram_tester;
-
-  IntentHandlingMetrics test = IntentHandlingMetrics();
-  test.RecordExternalProtocolMetrics(arc::Scheme::IRC, PickerEntryType::kArc,
-                                     /*accepted=*/true, /*persisted=*/true);
-
-  histogram_tester.ExpectBucketCount(
-      "ChromeOS.Apps.ExternalProtocolDialog.Accepted",
-      arc::ProtocolAction::IRC_ACCEPTED_PERSISTED, 1);
-}
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 }  // namespace apps

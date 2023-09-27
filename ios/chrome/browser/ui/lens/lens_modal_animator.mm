@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 #import "ios/chrome/browser/ui/lens/lens_modal_animator.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "ios/chrome/browser/shared/public/commands/open_lens_input_selection_command.h"
 
 // The time it takes for the presenting animation to complete.
 static const CGFloat kPresentingTransitionAnimationDuration = .4;
@@ -84,7 +81,13 @@ static const CGFloat kPresentationAnimationCurve3 = 1.;
   [containerView addSubview:lensView];
   [containerView bringSubviewToFront:lensView];
   CGRect startingFrame = containerView.bounds;
-  startingFrame.origin.x = containerView.bounds.size.width;
+  if (self.presentationStyle ==
+      LensInputSelectionPresentationStyle::SlideFromLeft) {
+    startingFrame.origin.x = -startingFrame.size.width;
+  } else {
+    startingFrame.origin.x = containerView.bounds.size.width;
+  }
+
   lensView.frame = startingFrame;
 
   UIViewPropertyAnimator* animator = [[UIViewPropertyAnimator alloc]
@@ -97,8 +100,20 @@ static const CGFloat kPresentationAnimationCurve3 = 1.;
               lensView.frame = [transitionContext
                   finalFrameForViewController:lensViewController];
             }];
+
+  // Completions should only be run once.
+  const ProceduralBlock presentationCompletion = _presentationCompletion;
+  _presentationCompletion = nil;
+
   [animator addCompletion:^(UIViewAnimatingPosition finalPosition) {
     BOOL success = ![transitionContext transitionWasCancelled];
+
+    if (success && presentationCompletion) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        presentationCompletion();
+      });
+    }
+
     [transitionContext completeTransition:success];
   }];
   [animator startAnimation];

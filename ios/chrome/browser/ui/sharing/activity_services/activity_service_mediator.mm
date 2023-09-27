@@ -6,19 +6,19 @@
 
 #import <MobileCoreServices/MobileCoreServices.h>
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/metrics/user_metrics.h"
 #import "base/metrics/user_metrics_action.h"
 #import "base/strings/string_number_conversions.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/bookmarks/browser/bookmark_model.h"
 #import "components/prefs/pref_service.h"
-#import "ios/chrome/browser/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/coordinator/default_browser_promo/non_modal_default_browser_promo_scheduler_scene_agent.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/public/commands/bookmarks_commands.h"
 #import "ios/chrome/browser/shared/public/commands/qr_generation_commands.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/sync/send_tab_to_self_sync_service_factory.h"
-#import "ios/chrome/browser/ui/default_promo/default_browser_promo_non_modal_scheduler.h"
 #import "ios/chrome/browser/ui/sharing/activity_services/activities/bookmark_activity.h"
 #import "ios/chrome/browser/ui/sharing/activity_services/activities/copy_activity.h"
 #import "ios/chrome/browser/ui/sharing/activity_services/activities/find_in_page_activity.h"
@@ -39,15 +39,10 @@
 #import "ios/chrome/browser/ui/sharing/activity_services/data/share_to_data.h"
 #import "ios/chrome/browser/ui/sharing/sharing_positioner.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 @interface ActivityServiceMediator ()
 
-@property(nonatomic, weak)
-    id<BrowserCommands, BrowserCoordinatorCommands, FindInPageCommands>
-        handler;
+@property(nonatomic, weak) id<BrowserCoordinatorCommands, FindInPageCommands>
+    handler;
 
 @property(nonatomic, weak) id<BookmarksCommands> bookmarksHandler;
 
@@ -62,21 +57,24 @@
 // The navigation agent.
 @property(nonatomic, readonly) WebNavigationBrowserAgent* navigationAgent;
 
+@property(nonatomic, readonly) ReadingListBrowserAgent* readingListBrowserAgent;
+
 @end
 
 @implementation ActivityServiceMediator
 
 #pragma mark - Public
 
-- (instancetype)initWithHandler:(id<BrowserCommands,
-                                    BrowserCoordinatorCommands,
-                                    FindInPageCommands>)handler
+- (instancetype)initWithHandler:
+                    (id<BrowserCoordinatorCommands, FindInPageCommands>)handler
                bookmarksHandler:(id<BookmarksCommands>)bookmarksHandler
             qrGenerationHandler:(id<QRGenerationCommands>)qrGenerationHandler
                     prefService:(PrefService*)prefService
                   bookmarkModel:(bookmarks::BookmarkModel*)bookmarkModel
              baseViewController:(UIViewController*)baseViewController
-                navigationAgent:(WebNavigationBrowserAgent*)navigationAgent {
+                navigationAgent:(WebNavigationBrowserAgent*)navigationAgent
+        readingListBrowserAgent:
+            (ReadingListBrowserAgent*)readingListBrowserAgent {
   if (self = [super init]) {
     _handler = handler;
     _bookmarksHandler = bookmarksHandler;
@@ -85,6 +83,7 @@
     _bookmarkModel = bookmarkModel;
     _baseViewController = baseViewController;
     _navigationAgent = navigationAgent;
+    _readingListBrowserAgent = readingListBrowserAgent;
   }
   return self;
 }
@@ -135,7 +134,7 @@
     ReadingListActivity* readingListActivity =
         [[ReadingListActivity alloc] initWithURL:data.shareURL
                                            title:data.title
-                                      dispatcher:self.handler];
+                         readingListBrowserAgent:self.readingListBrowserAgent];
     [applicationActivities addObject:readingListActivity];
 
     BookmarkActivity* bookmarkActivity =

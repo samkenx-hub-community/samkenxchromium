@@ -11,6 +11,7 @@
 #include "ash/shell.h"
 #include "ash/test/ash_test_base.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "components/prefs/pref_notifier_impl.h"
 #include "components/prefs/testing_pref_store.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
@@ -46,14 +47,15 @@ class PolicyRecommendationRestorerTest : public NoSessionAshTestBase {
 
     // Register sigin prefs but not connected to pref service yet. This allows
     // us set pref values before ash connects to pref service for testing.
-    RegisterSigninProfilePrefs(prefs_->registry(), true /* for_test */);
+    RegisterSigninProfilePrefs(prefs_->registry(), /*country=*/"",
+                               /*for_test=*/true);
 
     restorer_ = Shell::Get()->policy_recommendation_restorer();
   }
 
   void ConnectToSigninPrefService() {
     GetSessionControllerClient()->SetSigninScreenPrefService(
-        base::WrapUnique(prefs_));
+        base::WrapUnique(prefs_.get()));
     ASSERT_EQ(Shell::Get()->session_controller()->GetSigninScreenPrefService(),
               prefs_);
     // Manually trigger a user activity, so that the delay is not skipped due to
@@ -147,11 +149,15 @@ class PolicyRecommendationRestorerTest : public NoSessionAshTestBase {
     return true;
   }
 
-  PolicyRecommendationRestorer* restorer_ = nullptr;
+  raw_ptr<PolicyRecommendationRestorer, DanglingUntriaged | ExperimentalAsh>
+      restorer_ = nullptr;
 
   // Ownerships are passed to SessionController.
-  TestingPrefStore* recommended_prefs_;
-  sync_preferences::TestingPrefServiceSyncable* prefs_;
+  raw_ptr<TestingPrefStore, DanglingUntriaged | ExperimentalAsh>
+      recommended_prefs_;
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable,
+          DanglingUntriaged | ExperimentalAsh>
+      prefs_;
 };
 
 // Verifies that when no recommended values have been set, |restorer_| does not

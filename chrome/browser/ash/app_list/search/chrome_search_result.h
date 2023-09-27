@@ -11,6 +11,7 @@
 
 #include "ash/public/cpp/app_list/app_list_metrics.h"
 #include "ash/public/cpp/app_list/app_list_types.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ash/app_list/app_list_model_updater.h"
 #include "chrome/browser/ash/app_list/search/scoring.h"
@@ -43,6 +44,9 @@ class ChromeSearchResult {
   using TextItem = ash::SearchResultTextItem;
   using TextVector = std::vector<TextItem>;
   using TextType = ash::SearchResultTextItemType;
+
+  using MetadataLoaderCallback =
+      ash::FileMetadataLoader::MetadataLoaderCallback;
 
   ChromeSearchResult();
 
@@ -105,6 +109,9 @@ class ChromeSearchResult {
   system_info_answer_card_data() const {
     return metadata_->system_info_answer_card_data;
   }
+  ash::FileMetadataLoader* file_metadata_loader() {
+    return &metadata_->file_metadata_loader;
+  }
 
   // The following methods set Chrome side data here, and call model updater
   // interface to update Ash.
@@ -131,7 +138,6 @@ class ChromeSearchResult {
   void SetMetricsType(MetricsType metrics_type);
   void SetDisplayScore(double display_score);
   void SetActions(const Actions& actions);
-  void SetIsOmniboxSearch(bool is_omnibox_search);
   void SetIsRecommendation(bool is_recommendation);
   void SetSkipUpdateAnimation(bool skip_update_animation);
   void SetIcon(const IconInfo& icon);
@@ -141,6 +147,8 @@ class ChromeSearchResult {
   void SetUseBadgeIconBackground(bool use_badge_icon_background);
   void SetSystemInfoAnswerCardData(
       ash::SystemInfoAnswerCardData answer_card_info);
+  void SetFilePath(base::FilePath file_path);
+  void SetMetadataLoaderCallback(MetadataLoaderCallback callback);
 
   void SetSearchResultMetadata();
 
@@ -240,7 +248,7 @@ class ChromeSearchResult {
 
   std::unique_ptr<ash::SearchResultMetadata> metadata_;
 
-  AppListModelUpdater* model_updater_ = nullptr;
+  raw_ptr<AppListModelUpdater, ExperimentalAsh> model_updater_ = nullptr;
 
   base::WeakPtrFactory<ChromeSearchResult> weak_ptr_factory_{this};
 };

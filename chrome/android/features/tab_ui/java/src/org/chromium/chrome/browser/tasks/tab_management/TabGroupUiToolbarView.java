@@ -85,7 +85,6 @@ public class TabGroupUiToolbarView extends FrameLayout {
     }
 
     void updateTitleTextFocus(boolean shouldFocus) {
-        if (!TabUiFeatureUtilities.isTabGroupsAndroidContinuationEnabled(getContext())) return;
         if (mTitleTextView.isFocused() == shouldFocus) return;
         if (shouldFocus) {
             mTitleTextView.requestFocus();
@@ -95,7 +94,6 @@ public class TabGroupUiToolbarView extends FrameLayout {
     }
 
     void updateKeyboardVisibility(boolean shouldShow) {
-        if (!TabUiFeatureUtilities.isTabGroupsAndroidContinuationEnabled(getContext())) return;
         // This is equal to the animation duration of toolbar menu hiding.
         int showKeyboardDelay = 150;
         if (shouldShow) {
@@ -188,14 +186,13 @@ public class TabGroupUiToolbarView extends FrameLayout {
      */
     void setupDialogToolbarLayout() {
         Context context = getContext();
-        mLeftButton.setImageResource(org.chromium.chrome.R.drawable.ic_arrow_back_24dp);
+        mLeftButton.setImageResource(R.drawable.ic_arrow_back_24dp);
         int topicMargin =
                 (int) context.getResources().getDimension(R.dimen.tab_group_toolbar_topic_margin);
         MarginLayoutParams params = (MarginLayoutParams) mTitleTextView.getLayoutParams();
         params.setMarginStart(topicMargin);
         mTitleTextView.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        mTitleTextView.setTextAppearance(
-                org.chromium.chrome.R.style.TextAppearance_Headline_Primary);
+        mTitleTextView.setTextAppearance(R.style.TextAppearance_Headline_Primary);
     }
 
     /**

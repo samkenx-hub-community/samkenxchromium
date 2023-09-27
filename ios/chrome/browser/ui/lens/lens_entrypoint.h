@@ -17,7 +17,11 @@ enum class LensEntrypoint {
   OmniboxPostCapture = 5,
   ImageShareMenu = 6,
   AppIconLongPress = 7,
-  kMaxValue = AppIconLongPress,
+  PlusButton = 8,
+  WebSearchBar = 9,
+  TranslateOnebox = 10,
+  Intents = 11,
+  kMaxValue = Intents,
 };
 
 extern const char kIOSLensEntrypoint[];

@@ -51,8 +51,7 @@ class ImageInputType final : public BaseButtonInputType {
   String ResultForDialogSubmit() const override;
   bool SupportsValidation() const override;
   ControlPart AutoAppearance() const override;
-  LayoutObject* CreateLayoutObject(const ComputedStyle&,
-                                   LegacyLayout) const override;
+  LayoutObject* CreateLayoutObject(const ComputedStyle&) const override;
   void HandleDOMActivateEvent(Event&) override;
   void AltAttributeChanged() override;
   void SrcAttributeChanged() override;
@@ -65,7 +64,6 @@ class ImageInputType final : public BaseButtonInputType {
   unsigned Height() const override;
   unsigned Width() const override;
   bool HasLegalLinkAttribute(const QualifiedName&) const override;
-  const QualifiedName& SubResourceAttributeName() const override;
   void EnsureFallbackContent() override;
   void EnsurePrimaryContent() override;
   void CreateShadowSubtree() override;

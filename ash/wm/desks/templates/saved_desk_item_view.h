@@ -7,7 +7,8 @@
 
 #include "ash/ash_export.h"
 #include "ash/public/cpp/desk_template.h"
-#include "ash/wm/overview/overview_highlightable_view.h"
+#include "ash/wm/overview/overview_focusable_view.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "ui/accessibility/ax_node_data.h"
@@ -28,6 +29,7 @@ class IconButton;
 class PillButton;
 class SavedDeskIconContainer;
 class SavedDeskNameView;
+class SystemShadow;
 
 // A view that represents each individual saved desk item in the saved desk
 // grid. The view has different shown contents depending on whether the mouse is
@@ -62,7 +64,7 @@ class SavedDeskNameView;
 // The whole view is also a button which does the same thing as `launch_button_`
 // when clicked.
 class ASH_EXPORT SavedDeskItemView : public views::Button,
-                                     public OverviewHighlightableView,
+                                     public OverviewFocusableView,
                                      public views::ViewTargeterDelegate,
                                      public views::TextfieldController {
  public:
@@ -78,7 +80,7 @@ class ASH_EXPORT SavedDeskItemView : public views::Button,
 
   const DeskTemplate& saved_desk() const { return *saved_desk_; }
   SavedDeskNameView* name_view() const { return name_view_; }
-  const base::GUID& uuid() const { return saved_desk_->uuid(); }
+  const base::Uuid& uuid() const { return saved_desk_->uuid(); }
 
   // Updates the visibility state of the delete and launch buttons depending on
   // the current mouse or touch event location, or if switch access is enabled.
@@ -97,10 +99,10 @@ class ASH_EXPORT SavedDeskItemView : public views::Button,
 
   // Show replace dialog when found a name duplication.
   void MaybeShowReplaceDialog(ash::DeskTemplateType type,
-                              const base::GUID& uuid);
+                              const base::Uuid& uuid);
   // Rename current saved desk with new name, delete old saved desk with same
   // name by uuid. Used for callback functions for Replace Dialog.
-  void ReplaceSavedDesk(const base::GUID& uuid);
+  void ReplaceSavedDesk(const base::Uuid& uuid);
   void RevertSavedDeskName();
 
   // This allows us to update an existing saved desk view. Currently, this
@@ -133,7 +135,6 @@ class ASH_EXPORT SavedDeskItemView : public views::Button,
  private:
   friend class SavedDeskItemViewTestApi;
 
-  void OnHoverAnimationEnded();
   void AnimateHover(ui::Layer* layer_to_show, ui::Layer* layer_to_hide);
 
   void OnDeleteSavedDesk();
@@ -152,27 +153,30 @@ class ASH_EXPORT SavedDeskItemView : public views::Button,
   // Update saved desk name based on `name_view_` string.
   void UpdateSavedDeskName();
 
-  // OverviewHighlightableView:
+  // OverviewFocusableView:
   views::View* GetView() override;
-  void MaybeActivateHighlightedView() override;
-  void MaybeCloseHighlightedView(bool primary_action) override;
-  void MaybeSwapHighlightedView(bool right) override;
-  void OnViewHighlighted() override;
-  void OnViewUnhighlighted() override;
+  void MaybeActivateFocusedView() override;
+  void MaybeCloseFocusedView(bool primary_action) override;
+  void MaybeSwapFocusedView(bool right) override;
+  void OnFocusableViewFocused() override;
+  void OnFocusableViewBlurred() override;
 
   // A copy of the associated saved desk.
   std::unique_ptr<DeskTemplate> saved_desk_;
 
   // Owned by the views hierarchy.
-  SavedDeskNameView* name_view_ = nullptr;
+  raw_ptr<SavedDeskNameView, ExperimentalAsh> name_view_ = nullptr;
   // When template is managed by admin, `time_view_` will display management
   // description instead.
-  views::Label* time_view_ = nullptr;
-  SavedDeskIconContainer* icon_container_view_ = nullptr;
-  IconButton* delete_button_ = nullptr;
-  PillButton* launch_button_ = nullptr;
+  raw_ptr<views::Label, ExperimentalAsh> time_view_ = nullptr;
+  raw_ptr<SavedDeskIconContainer, ExperimentalAsh> icon_container_view_ =
+      nullptr;
+  raw_ptr<IconButton, ExperimentalAsh> delete_button_ = nullptr;
+  raw_ptr<PillButton, ExperimentalAsh> launch_button_ = nullptr;
   // Container used for holding all the views that appear on hover.
-  views::View* hover_container_ = nullptr;
+  raw_ptr<views::View, ExperimentalAsh> hover_container_ = nullptr;
+
+  std::unique_ptr<SystemShadow> shadow_;
 
   // When the `name_view_` is focused, we select all its text. However, if it is
   // focused via a mouse press event, on mouse release will clear the selection.

@@ -6,7 +6,6 @@
 
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
-#include "chrome/browser/ash/android_sms/android_sms_service_factory.h"
 #include "chrome/browser/ash/app_list/arc/arc_app_list_prefs_factory.h"
 #include "chrome/browser/ash/eche_app/eche_app_manager_factory.h"
 #include "chrome/browser/ash/kerberos/kerberos_credentials_manager_factory.h"
@@ -15,7 +14,6 @@
 #include "chrome/browser/ash/printing/cups_printers_manager_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
-#include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/browser/ui/webui/settings/ash/os_settings_manager.h"
 #include "chromeos/ash/components/local_search_service/public/cpp/local_search_service_proxy_factory.h"
 
@@ -30,22 +28,26 @@ OsSettingsManager* OsSettingsManagerFactory::GetForProfile(Profile* profile) {
 
 // static
 OsSettingsManagerFactory* OsSettingsManagerFactory::GetInstance() {
-  return base::Singleton<OsSettingsManagerFactory>::get();
+  static base::NoDestructor<OsSettingsManagerFactory> instance;
+  return instance.get();
 }
 
 OsSettingsManagerFactory::OsSettingsManagerFactory()
     : ProfileKeyedServiceFactory(
           "OsSettingsManager",
-          ProfileSelections::BuildForRegularAndIncognito()) {
+          ProfileSelections::Builder()
+              .WithRegular(ProfileSelection::kOwnInstance)
+              // TODO(crbug.com/1418376): Check if this service is needed in
+              // Guest mode.
+              .WithGuest(ProfileSelection::kOwnInstance)
+              .Build()) {
   DependsOn(
       local_search_service::LocalSearchServiceProxyFactory::GetInstance());
   DependsOn(multidevice_setup::MultiDeviceSetupClientFactory::GetInstance());
   DependsOn(phonehub::PhoneHubManagerFactory::GetInstance());
-  DependsOn(SyncServiceFactory::GetInstance());
   DependsOn(KerberosCredentialsManagerFactory::GetInstance());
   DependsOn(ArcAppListPrefsFactory::GetInstance());
   DependsOn(IdentityManagerFactory::GetInstance());
-  DependsOn(android_sms::AndroidSmsServiceFactory::GetInstance());
   DependsOn(CupsPrintersManagerFactory::GetInstance());
   DependsOn(apps::AppServiceProxyFactory::GetInstance());
   DependsOn(eche_app::EcheAppManagerFactory::GetInstance());
@@ -53,21 +55,20 @@ OsSettingsManagerFactory::OsSettingsManagerFactory()
 
 OsSettingsManagerFactory::~OsSettingsManagerFactory() = default;
 
-KeyedService* OsSettingsManagerFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+OsSettingsManagerFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
   Profile* profile = Profile::FromBrowserContext(context);
 
-  return new OsSettingsManager(
+  return std::make_unique<OsSettingsManager>(
       profile,
       local_search_service::LocalSearchServiceProxyFactory::
           GetForBrowserContext(context),
       multidevice_setup::MultiDeviceSetupClientFactory::GetForProfile(profile),
       phonehub::PhoneHubManagerFactory::GetForProfile(profile),
-      SyncServiceFactory::GetForProfile(profile),
       KerberosCredentialsManagerFactory::Get(profile),
       ArcAppListPrefsFactory::GetForBrowserContext(profile),
       IdentityManagerFactory::GetForProfile(profile),
-      android_sms::AndroidSmsServiceFactory::GetForBrowserContext(profile),
       CupsPrintersManagerFactory::GetForBrowserContext(profile),
       apps::AppServiceProxyFactory::GetForProfile(profile),
       eche_app::EcheAppManagerFactory::GetForProfile(profile));

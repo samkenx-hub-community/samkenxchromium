@@ -6,7 +6,6 @@ package org.chromium.components.browser_ui.site_settings;
 
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.View;
 import android.widget.RadioGroup;
@@ -16,9 +15,6 @@ import androidx.annotation.VisibleForTesting;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceViewHolder;
 
-import org.chromium.base.ApiCompatibilityUtils;
-import org.chromium.components.browser_ui.settings.ManagedPreferencesUtils;
-import org.chromium.components.browser_ui.settings.SettingsFeatureList;
 import org.chromium.components.browser_ui.widget.RadioButtonWithDescription;
 import org.chromium.components.browser_ui.widget.RadioButtonWithDescriptionAndAuxButton;
 import org.chromium.components.browser_ui.widget.text.TextViewWithCompoundDrawables;
@@ -136,19 +132,8 @@ public class TriStateCookieSettingsPreference extends Preference
         mRadioGroup = (RadioGroup) holder.findViewById(R.id.radio_button_layout);
         mRadioGroup.setOnCheckedChangeListener(this);
 
-        if (SettingsFeatureList.isEnabled(
-                    SettingsFeatureList.HIGHLIGHT_MANAGED_PREF_DISCLAIMER_ANDROID)) {
-            mManagedView = (TextViewWithCompoundDrawables) holder.findViewById(
-                    R.id.managed_disclaimer_text);
-        } else {
-            mManagedView =
-                    (TextViewWithCompoundDrawables) holder.findViewById(R.id.managed_view_legacy);
-            Drawable[] drawables = mManagedView.getCompoundDrawablesRelative();
-            Drawable managedIcon = ApiCompatibilityUtils.getDrawable(
-                    getResources(), ManagedPreferencesUtils.getManagedByEnterpriseIconId());
-            mManagedView.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                    managedIcon, drawables[1], drawables[2], drawables[3]);
-        }
+        mManagedView =
+                (TextViewWithCompoundDrawables) holder.findViewById(R.id.managed_disclaimer_text);
 
         if (mInitializationParams != null) {
             setRadioButtonsVisibility(mInitializationParams);
@@ -175,19 +160,7 @@ public class TriStateCookieSettingsPreference extends Preference
                     (RadioButtonWithDescriptionAndAuxButton) mViewHolder.findViewById(
                             R.id.block_third_party_with_aux);
 
-            String blockTPIncognitoCtxDescription = getResources().getString(
-                    R.string.website_settings_category_cookie_block_third_party_incognito_title);
-            blockTPIncognitoBtnWithDescAndAux.setAuxButtonContentDescription(
-                    getResources().getString(
-                            R.string.accessibility_expand_button_with_target_description,
-                            blockTPIncognitoCtxDescription));
             blockTPIncognitoBtnWithDescAndAux.setVisibility(View.VISIBLE);
-
-            String blockTPCtxDescription = getResources().getString(
-                    R.string.website_settings_category_cookie_block_third_party_title);
-            blockTPButtonWithDescAndAux.setAuxButtonContentDescription(getResources().getString(
-                    R.string.accessibility_expand_button_with_target_description,
-                    blockTPCtxDescription));
             blockTPButtonWithDescAndAux.setVisibility(View.VISIBLE);
 
             blockTPIncognitoBtnWithDescAndAux.setAuxButtonClickedListener(this);
@@ -291,13 +264,11 @@ public class TriStateCookieSettingsPreference extends Preference
         return buttons(mAllowButton, mBlockThirdPartyIncognitoButton, mBlockThirdPartyButton);
     }
 
-    @VisibleForTesting
     public boolean isButtonEnabledForTesting(@CookieControlsMode int state) {
         assert getButton(state) != null;
         return getButton(state).isEnabled();
     }
 
-    @VisibleForTesting
     public boolean isButtonCheckedForTesting(@CookieControlsMode int state) {
         assert getButton(state) != null;
         return getButton(state).isChecked();

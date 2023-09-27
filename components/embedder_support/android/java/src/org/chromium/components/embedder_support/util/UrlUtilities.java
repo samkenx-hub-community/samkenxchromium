@@ -16,7 +16,6 @@ import org.chromium.base.annotations.NativeMethods;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.components.url_formatter.UrlFormatter;
 import org.chromium.content_public.common.ContentUrlConstants;
-import org.chromium.net.GURLUtils;
 import org.chromium.url.GURL;
 
 import java.util.ArrayList;
@@ -35,8 +34,6 @@ import java.util.regex.Pattern;
  */
 @JNINamespace("embedder_support")
 public class UrlUtilities {
-    private static final String TAG = "UrlUtilities";
-
     /** Regular expression for prefixes to strip from publisher hostnames. */
     private static final Pattern HOSTNAME_PREFIX_PATTERN =
             Pattern.compile("^(www[0-9]*|web|ftp|wap|home|mobile|amp)\\.");
@@ -307,9 +304,9 @@ public class UrlUtilities {
                 || TextUtils.equals(url, UrlConstants.NTP_ABOUT_URL);
     }
 
-    public static String extractPublisherFromPublisherUrl(String publisherUrl) {
+    public static String extractPublisherFromPublisherUrl(GURL publisherUrl) {
         String publisher =
-                UrlFormatter.formatUrlForDisplayOmitScheme(GURLUtils.getOrigin(publisherUrl));
+                UrlFormatter.formatUrlForDisplayOmitScheme(publisherUrl.getOrigin().getSpec());
 
         String trimmedPublisher = HOSTNAME_PREFIX_PATTERN.matcher(publisher).replaceFirst("");
         return BidiFormatter.getInstance().unicodeWrap(trimmedPublisher);

@@ -7,6 +7,7 @@ import("//build/apple/tweak_info_plist.gni")
 import("//build/config/ios/ios_sdk.gni")
 import("//build/config/ios/rules.gni")
 import("//ios/build/chrome_build.gni")
+import("//ios/chrome/app/chrome_app.gni")
 import("//ios/public/provider/chrome/browser/build_config.gni")
 import("//ios/third_party/earl_grey2/ios_eg2_test.gni")
 
@@ -68,19 +69,18 @@ template("chrome_ios_eg2_test_app_host") {
   ios_eg2_test_app_host(target_name) {
     forward_variables_from(invoker,
                            [
+                             "bundle_deps",
                              "entitlements_path",
                              "entitlements_target",
                              "eg_main_application_delegate",
                              "info_plist",
                              "info_plist_target",
                              "output_name",
-                           ],
-                           [
-                             "deps",
-                             "public_deps",
                            ])
 
     testonly = true
+    target_type = "chrome_app"
+
     _output_name = target_name
     if (defined(output_name)) {
       _output_name = output_name

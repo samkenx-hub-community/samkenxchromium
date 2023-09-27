@@ -9,7 +9,6 @@ import androidx.test.filters.LargeTest;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.test.util.CommandLineFlags;
@@ -23,7 +22,6 @@ import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
-import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.chrome.test.util.browser.sync.SyncTestUtil;
 import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
@@ -42,10 +40,6 @@ import java.util.HashSet;
 public class SyncTest {
     @Rule
     public SyncTestRule mSyncTestRule = new SyncTestRule();
-    @Rule
-    public TestRule mProcessorRule = new Features.JUnitProcessor();
-
-    private static final String TAG = "SyncTest";
 
     /**
      * Waits until {@link SyncService#isSyncingUnencryptedUrls} returns desired value.
@@ -105,12 +99,17 @@ public class SyncTest {
     @Feature({"Sync"})
     public void testStopAndStartSync() {
         CoreAccountInfo accountInfo = mSyncTestRule.setUpAccountAndEnableSyncForTesting();
-
-        mSyncTestRule.stopSync();
         Assert.assertEquals(accountInfo, mSyncTestRule.getPrimaryAccount(ConsentLevel.SYNC));
-        Assert.assertFalse(SyncTestUtil.isSyncFeatureEnabled());
 
-        mSyncTestRule.startSyncAndWait();
+        // Signing out should disable sync.
+        mSyncTestRule.signOut();
+        Assert.assertFalse(SyncTestUtil.isSyncFeatureEnabled());
+        Assert.assertNull(mSyncTestRule.getPrimaryAccount(ConsentLevel.SYNC));
+
+        accountInfo = mSyncTestRule.setUpAccountAndEnableSyncForTesting();
+
+        Assert.assertTrue(SyncTestUtil.isSyncFeatureEnabled());
+        Assert.assertEquals(accountInfo, mSyncTestRule.getPrimaryAccount(ConsentLevel.SYNC));
     }
 
     @Test

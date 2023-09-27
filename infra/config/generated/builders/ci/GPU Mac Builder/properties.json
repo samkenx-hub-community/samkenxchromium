@@ -15,8 +15,7 @@
               "execution_mode": "COMPILE_AND_TEST",
               "legacy_chromium_config": {
                 "apply_configs": [
-                  "mb",
-                  "goma_use_local"
+                  "mb"
                 ],
                 "build_config": "Release",
                 "config": "chromium",
@@ -43,8 +42,7 @@
               "execution_mode": "TEST",
               "legacy_chromium_config": {
                 "apply_configs": [
-                  "mb",
-                  "goma_use_local"
+                  "mb"
                 ],
                 "build_config": "Release",
                 "config": "chromium",
@@ -73,8 +71,7 @@
               "execution_mode": "TEST",
               "legacy_chromium_config": {
                 "apply_configs": [
-                  "mb",
-                  "goma_use_local"
+                  "mb"
                 ],
                 "build_config": "Release",
                 "config": "chromium",
@@ -119,6 +116,10 @@
         },
         {
           "builder": "mac-rel",
+          "group": "tryserver.chromium.mac"
+        },
+        {
+          "builder": "mac-siso-rel",
           "group": "tryserver.chromium.mac"
         }
       ]

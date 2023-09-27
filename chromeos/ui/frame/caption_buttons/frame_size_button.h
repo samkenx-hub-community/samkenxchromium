@@ -58,10 +58,6 @@ class COMPONENT_EXPORT(CHROMEOS_UI_FRAME) FrameSizeButton
   // preview will be deleted and the button will be set back to its normal mode.
   void CancelSnap();
 
-  // Stores the callback in member variable `feedback_callback_` for when
-  // `multitask_menu_` is initialized.
-  void SetFeedbackButtonCallback(PressedCallback callback);
-
   // views::FrameCaptionButton:
   bool OnMousePressed(const ui::MouseEvent& event) override;
   bool OnMouseDragged(const ui::MouseEvent& event) override;
@@ -130,6 +126,7 @@ class COMPONENT_EXPORT(CHROMEOS_UI_FRAME) FrameSizeButton
   // Not owned.
   raw_ptr<FrameSizeButtonDelegate> delegate_;
   views::UniqueWidgetPtr multitask_menu_widget_;
+  base::WeakPtr<MultitaskMenu> multitask_menu_;
 
   // The window observer to observe the to-be-snapped window.
   std::unique_ptr<SnappingWindowObserver> snapping_window_observer_;
@@ -157,10 +154,6 @@ class COMPONENT_EXPORT(CHROMEOS_UI_FRAME) FrameSizeButton
   bool in_snap_mode_ = false;
 
   absl::optional<display::ScopedDisplayObserver> display_observer_;
-
-  // The callback set on the `MultitaskMenuView` feedback button when it
-  // is created.
-  PressedCallback feedback_callback_;
 
   base::WeakPtrFactory<FrameSizeButton> weak_factory_{this};
 };

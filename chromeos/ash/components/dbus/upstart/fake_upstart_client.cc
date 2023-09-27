@@ -7,7 +7,6 @@
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/task/single_thread_task_runner.h"
-#include "chromeos/ash/components/dbus/authpolicy/fake_authpolicy_client.h"
 #include "chromeos/ash/components/dbus/kerberos/fake_kerberos_client.h"
 #include "chromeos/ash/components/dbus/kerberos/kerberos_client.h"
 #include "chromeos/ash/components/dbus/media_analytics/fake_media_analytics_client.h"
@@ -34,11 +33,21 @@ FakeUpstartClient* FakeUpstartClient::Get() {
   return g_instance;
 }
 
+FakeUpstartClient::StartJobResult::StartJobResult(
+    bool success,
+    absl::optional<std::string> error_name,
+    absl::optional<std::string> error_message)
+    : success(success),
+      error_name(std::move(error_name)),
+      error_message(std::move(error_message)) {}
+
+FakeUpstartClient::StartJobResult::~StartJobResult() = default;
+
 void FakeUpstartClient::StartJob(const std::string& job,
                                  const std::vector<std::string>& upstart_env,
                                  chromeos::VoidDBusMethodCallback callback) {
   const bool result =
-      start_job_cb_ ? start_job_cb_.Run(job, upstart_env) : true;
+      start_job_cb_ ? start_job_cb_.Run(job, upstart_env).success : true;
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(std::move(callback), result));
 }
@@ -47,11 +56,12 @@ void FakeUpstartClient::StartJobWithErrorDetails(
     const std::string& job,
     const std::vector<std::string>& upstart_env,
     StartJobWithErrorDetailsCallback callback) {
-  const bool result =
-      start_job_cb_ ? start_job_cb_.Run(job, upstart_env) : true;
+  const StartJobResult result = start_job_cb_
+                                    ? start_job_cb_.Run(job, upstart_env)
+                                    : StartJobResult(true /* success */);
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-      FROM_HERE, base::BindOnce(std::move(callback), result, absl::nullopt,
-                                absl::nullopt));
+      FROM_HERE, base::BindOnce(std::move(callback), result.success,
+                                result.error_name, result.error_message));
 }
 
 void FakeUpstartClient::StopJob(const std::string& job,
@@ -61,19 +71,6 @@ void FakeUpstartClient::StopJob(const std::string& job,
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(std::move(callback), result));
 }
-
-void FakeUpstartClient::StartAuthPolicyService() {
-  FakeAuthPolicyClient::Get()->SetStarted(true);
-}
-
-void FakeUpstartClient::RestartAuthPolicyService() {
-  DLOG_IF(WARNING, !FakeAuthPolicyClient::Get()->started())
-      << "Trying to restart authpolicyd which is not started";
-  FakeAuthPolicyClient::Get()->SetStarted(true);
-}
-
-void FakeUpstartClient::StartLacrosChrome(
-    const std::vector<std::string>& upstart_env) {}
 
 void FakeUpstartClient::StartMediaAnalytics(
     const std::vector<std::string>& /* upstart_env */,

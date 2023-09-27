@@ -7,12 +7,15 @@
 #include <utility>
 
 #include "chrome/browser/command_updater.h"
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/omnibox/omnibox_theme.h"
+#include "chrome/browser/ui/views/location_bar/icon_label_bubble_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_bubble_delegate_view.h"
+#include "chrome/browser/ui/views/location_bar/location_bar_util.h"
 #include "chrome/browser/ui/views/page_action/page_action_icon_loading_indicator_view.h"
 #include "chrome/browser/ui/views/page_action/page_action_icon_view_observer.h"
+#include "components/omnibox/browser/omnibox_field_trial.h"
 #include "ui/accessibility/ax_enums.mojom.h"
-#include "ui/accessibility/ax_node_data.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -23,8 +26,9 @@
 #include "ui/views/animation/flood_fill_ink_drop_ripple.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_highlight.h"
+#include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/animation/ink_drop_impl.h"
-#include "ui/views/animation/ink_drop_mask.h"
+#include "ui/views/animation/ink_drop_ripple.h"
 #include "ui/views/border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/cascading_property.h"
@@ -37,12 +41,14 @@ float PageActionIconView::Delegate::GetPageActionInkDropVisibleOpacity() const {
 }
 
 int PageActionIconView::Delegate::GetPageActionIconSize() const {
-  return GetLayoutConstant(LOCATION_BAR_ICON_SIZE);
+  return GetLayoutConstant(LOCATION_BAR_TRAILING_ICON_SIZE);
 }
 
 gfx::Insets PageActionIconView::Delegate::GetPageActionIconInsets(
     const PageActionIconView* icon_view) const {
-  return GetLayoutInsets(LOCATION_BAR_ICON_INTERIOR_PADDING);
+  return OmniboxFieldTrial::IsChromeRefreshIconsEnabled()
+             ? GetLayoutInsets(LOCATION_BAR_PAGE_ACTION_ICON_PADDING)
+             : GetLayoutInsets(LOCATION_BAR_ICON_INTERIOR_PADDING);
 }
 
 bool PageActionIconView::Delegate::ShouldHidePageActionIcons() const {
@@ -72,6 +78,7 @@ PageActionIconView::PageActionIconView(
 
   image()->SetFlipCanvasOnPaintForRTLUI(true);
   views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
+
   SetFocusBehavior(views::PlatformStyle::kDefaultFocusBehavior);
   // Only shows bubble after mouse is released.
   button_controller()->set_notify_action(
@@ -116,10 +123,8 @@ void PageActionIconView::InstallLoadingIndicatorForTesting() {
   InstallLoadingIndicator();
 }
 
-void PageActionIconView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  node_data->role = ax::mojom::Role::kButton;
-  const std::u16string name_text = GetTextForTooltipAndAccessibleName();
-  node_data->SetName(name_text);
+std::u16string PageActionIconView::GetTextForTooltipAndAccessibleName() const {
+  return GetAccessibleName();
 }
 
 std::u16string PageActionIconView::GetTooltipText(const gfx::Point& p) const {
@@ -242,6 +247,7 @@ void PageActionIconView::Update() {
   } else {
     UpdateImpl();
   }
+  UpdateBorder();
 }
 
 void PageActionIconView::UpdateIconImage() {
@@ -281,7 +287,13 @@ content::WebContents* PageActionIconView::GetWebContents() const {
 }
 
 void PageActionIconView::UpdateBorder() {
-  const gfx::Insets new_insets = delegate_->GetPageActionIconInsets(this);
+  gfx::Insets new_insets = delegate_->GetPageActionIconInsets(this);
+  if (ShouldShowLabel() && OmniboxFieldTrial::IsChromeRefreshIconsEnabled()) {
+    // TODO(crbug.com/1447066): Figure out what these values should be. For
+    // bonus point also try to move parts of this into the parent class. This is
+    // too bespoke.
+    new_insets += gfx::Insets::TLBR(0, 4, 0, 8);
+  }
   if (new_insets != GetInsets())
     SetBorder(views::CreateEmptyBorder(new_insets));
 }

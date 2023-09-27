@@ -10,6 +10,7 @@
 
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
 #include "chrome/browser/ash/printing/cups_print_job.h"
 #include "chrome/browser/ash/printing/cups_print_job_manager.h"
 #include "chrome/browser/ash/printing/print_servers_manager.h"
@@ -23,7 +24,6 @@ class Profile;
 class ProfileManager;
 
 namespace ash {
-class PrinterConfigurer;
 struct PrintServersConfig;
 
 namespace printing {
@@ -133,11 +133,10 @@ class LocalPrinterAsh : public mojom::LocalPrinter,
   virtual Profile* GetProfile();
   virtual scoped_refptr<chromeos::PpdProvider> CreatePpdProvider(
       Profile* profile);
-  virtual std::unique_ptr<ash::PrinterConfigurer> CreatePrinterConfigurer(
-      Profile* profile);
   virtual ash::printing::IppClientInfoCalculator* GetIppClientInfoCalculator();
 
-  ProfileManager* profile_manager_ = nullptr;
+  base::ScopedObservation<ProfileManager, LocalPrinterAsh>
+      profile_manager_observer_{this};
 
   bool observers_registered_ = false;
 

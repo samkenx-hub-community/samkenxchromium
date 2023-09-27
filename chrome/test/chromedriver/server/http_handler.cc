@@ -31,6 +31,7 @@
 #include "chrome/test/chromedriver/chrome/device_manager.h"
 #include "chrome/test/chromedriver/chrome/status.h"
 #include "chrome/test/chromedriver/constants/version.h"
+#include "chrome/test/chromedriver/fedcm_commands.h"
 #include "chrome/test/chromedriver/net/url_request_context_getter.h"
 #include "chrome/test/chromedriver/server/http_server.h"
 #include "chrome/test/chromedriver/session.h"
@@ -48,7 +49,7 @@
 #include "url/url_util.h"
 
 #if BUILDFLAG(IS_MAC)
-#include "base/mac/scoped_nsautorelease_pool.h"
+#include "base/apple/scoped_nsautorelease_pool.h"
 #endif
 
 const char kCreateWebSocketPath[] =
@@ -228,7 +229,7 @@ HttpHandler::HttpHandler(
       url_base_(url_base),
       received_shutdown_(false) {
 #if BUILDFLAG(IS_MAC)
-  base::mac::ScopedNSAutoreleasePool autorelease_pool;
+  base::apple::ScopedNSAutoreleasePool autorelease_pool;
 #endif
   context_getter_ = new URLRequestContextGetter(io_task_runner_);
   socket_factory_ = CreateSyncWebSocketFactory(context_getter_.get());
@@ -936,6 +937,44 @@ HttpHandler::HttpHandler(
           WrapToCommand("SetSPCTransactionMode",
                         base::BindRepeating(&ExecuteSetSPCTransactionMode))),
 
+      // Extensions for the Federated Credential Management API:
+      // https://fedidcg.github.io/FedCM/#automation
+      CommandMapping(kPost, "session/:sessionId/fedcm/canceldialog",
+                     WrapToCommand("CancelDialog",
+                                   base::BindRepeating(&ExecuteCancelDialog))),
+
+      CommandMapping(kPost, "session/:sessionId/fedcm/selectaccount",
+                     WrapToCommand("SelectAccount",
+                                   base::BindRepeating(&ExecuteSelectAccount))),
+
+      // This command is prefixed because standardization is still pending:
+      // https://github.com/fedidcg/FedCM/pull/436/files
+      VendorPrefixedCommandMapping(
+          kPost, "session/:sessionId/%s/fedcm/confirmidpsignin",
+          WrapToCommand("ConfirmIdpSignin",
+                        base::BindRepeating(&ExecuteConfirmIdpSignin))),
+
+      CommandMapping(kGet, "session/:sessionId/fedcm/accountlist",
+                     WrapToCommand("GetAccounts",
+                                   base::BindRepeating(&ExecuteGetAccounts))),
+
+      CommandMapping(kGet, "session/:sessionId/fedcm/gettitle",
+                     WrapToCommand("GetFedCmTitle",
+                                   base::BindRepeating(&ExecuteGetFedCmTitle))),
+
+      CommandMapping(kGet, "session/:sessionId/fedcm/getdialogtype",
+                     WrapToCommand("GetDialogType",
+                                   base::BindRepeating(&ExecuteGetDialogType))),
+
+      CommandMapping(
+          kPost, "session/:sessionId/fedcm/setdelayenabled",
+          WrapToCommand("SetDelayEnabled",
+                        base::BindRepeating(&ExecuteSetDelayEnabled))),
+
+      CommandMapping(kPost, "session/:sessionId/fedcm/resetcooldown",
+                     WrapToCommand("ResetCooldown",
+                                   base::BindRepeating(&ExecuteResetCooldown))),
+
       // Extensions for Custom Handlers API:
       // https://html.spec.whatwg.org/multipage/system-state.html#rph-automation
       CommandMapping(
@@ -1409,11 +1448,10 @@ HttpHandler::PrepareStandardResponse(
 
   base::Value::Dict body_params;
   if (status.IsError()){
-    base::Value* inner_params =
-        body_params.Set("value", base::Value(base::Value::Type::DICT));
-    inner_params->SetStringKey("error", StatusCodeToString(status.code()));
-    inner_params->SetStringKey("message", status.message());
-    inner_params->SetStringKey("stacktrace", status.stack_trace());
+    base::Value::Dict* inner_params = body_params.EnsureDict("value");
+    inner_params->Set("error", StatusCodeToString(status.code()));
+    inner_params->Set("message", status.message());
+    inner_params->Set("stacktrace", status.stack_trace());
     // According to
     // https://www.w3.org/TR/2018/REC-webdriver1-20180605/#dfn-annotated-unexpected-alert-open-error
     // error UnexpectedAlertOpen should contain 'data.text' with alert text
@@ -1422,13 +1460,13 @@ HttpHandler::PrepareStandardResponse(
       auto first = message.find("{");
       auto last = message.find_last_of("}");
       if (first == std::string::npos || last == std::string::npos) {
-        inner_params->SetStringPath("data.text", "");
+        inner_params->SetByDottedPath("data.text", "");
       } else {
         std::string alert_text = message.substr(first, last - first);
         auto colon = alert_text.find(":");
         if (colon != std::string::npos && alert_text.size() > (colon + 2))
           alert_text = alert_text.substr(colon + 2);
-        inner_params->SetStringPath("data.text", alert_text);
+        inner_params->SetByDottedPath("data.text", alert_text);
       }
     }
   } else {

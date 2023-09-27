@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <ostream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -98,6 +99,8 @@ struct SpecifiedFlagsCompare {
 ABSL_NAMESPACE_END
 }  // namespace absl
 
+// These flags influence how command line flags are parsed and are only intended
+// to be set on the command line.  Avoid reading or setting them from C++ code.
 ABSL_FLAG(std::vector<std::string>, flagfile, {},
           "comma-separated list of files to load flags from")
     .OnUpdate([]() {
@@ -147,6 +150,8 @@ ABSL_FLAG(std::vector<std::string>, tryfromenv, {},
       absl::flags_internal::tryfromenv_needs_processing = true;
     });
 
+// Rather than reading or setting --undefok from C++ code, please consider using
+// ABSL_RETIRED_FLAG instead.
 ABSL_FLAG(std::vector<std::string>, undefok, {},
           "comma-separated list of flag names that it is okay to specify "
           "on the command line even if the program does not define a flag "
@@ -416,7 +421,7 @@ bool HandleGeneratorFlags(std::vector<ArgsList>& input_args,
   // programmatically before invoking ParseCommandLine. Note that we do not
   // actually process arguments specified in the flagfile, but instead
   // create a secondary arguments list to be processed along with the rest
-  // of the comamnd line arguments. Since we always the process most recently
+  // of the command line arguments. Since we always the process most recently
   // created list of arguments first, this will result in flagfile argument
   // being processed before any other argument in the command line. If
   // FLAGS_flagfile contains more than one file name we create multiple new
@@ -632,7 +637,7 @@ void ReportUnrecognizedFlags(
 // --------------------------------------------------------------------
 
 bool WasPresentOnCommandLine(absl::string_view flag_name) {
-  absl::MutexLock l(&specified_flags_guard);
+  absl::ReaderMutexLock l(&specified_flags_guard);
   ABSL_INTERNAL_CHECK(specified_flags != nullptr,
                       "ParseCommandLine is not invoked yet");
 
@@ -693,7 +698,8 @@ std::vector<std::string> GetMisspellingHints(const absl::string_view flag) {
 
 std::vector<char*> ParseCommandLineImpl(int argc, char* argv[],
                                         UsageFlagsAction usage_flag_action,
-                                        OnUndefinedFlag undef_flag_action) {
+                                        OnUndefinedFlag undef_flag_action,
+                                        std::ostream& error_help_output) {
   std::vector<char*> positional_args;
   std::vector<UnrecognizedFlag> unrecognized_flags;
 
@@ -706,7 +712,10 @@ std::vector<char*> ParseCommandLineImpl(int argc, char* argv[],
         (undef_flag_action == OnUndefinedFlag::kAbortIfUndefined));
 
     if (undef_flag_action == OnUndefinedFlag::kAbortIfUndefined) {
-      if (!unrecognized_flags.empty()) { std::exit(1); }
+      if (!unrecognized_flags.empty()) {
+        flags_internal::HandleUsageFlags(error_help_output,
+        ProgramUsageMessage()); std::exit(1);
+      }
     }
   }
 
@@ -891,7 +900,7 @@ HelpMode ParseAbseilFlagsOnlyImpl(
     flags_internal::ReportUsageError(
         "NOTE: command line flags are disabled in this build", true);
 #else
-    flags_internal::HandleUsageFlags(std::cout, ProgramUsageMessage());
+    flags_internal::HandleUsageFlags(std::cerr, ProgramUsageMessage());
 #endif
     return HelpMode::kFull;  // We just need to make sure the exit with
                              // code 1.

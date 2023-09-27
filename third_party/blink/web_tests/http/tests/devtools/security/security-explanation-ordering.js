@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SecurityTestRunner} from 'security_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+
 (async function() {
   TestRunner.addResult(`Tests that info explanations are placed after regular explanations.\n`);
-  await TestRunner.loadTestModule('security_test_runner');
   await TestRunner.showPanel('security');
 
   const pageVisibleSecurityState = new Security.PageVisibleSecurityState(
@@ -38,7 +42,7 @@
         Security.SecurityModel.Events.VisibleSecurityStateChanged,
         pageVisibleSecurityState);
 
-  var request = SDK.NetworkRequest.create(
+  var request = SDK.NetworkRequest.NetworkRequest.create(
       0, 'http://foo.test', 'https://foo.test', 0, 0, null);
   SecurityTestRunner.dispatchRequestFinished(request);
 

@@ -7,8 +7,8 @@ package org.chromium.chrome.browser.customtabs;
 import static org.junit.Assert.assertEquals;
 
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.junit.Before;
@@ -25,6 +25,7 @@ import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.incognito.IncognitoDataTestUtils;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.net.test.EmbeddedTestServerRule;
 
 import java.util.concurrent.TimeoutException;
@@ -61,12 +62,12 @@ public class CustomTabActivityIncognitoMetricTest {
 
     private Intent createMinimalIncognitoCustomTabIntent() {
         return CustomTabsIntentTestUtils.createMinimalIncognitoCustomTabIntent(
-                InstrumentationRegistry.getContext(), mTestPage);
+                ApplicationProvider.getApplicationContext(), mTestPage);
     }
 
     @Test
     @MediumTest
-    @Features.EnableFeatures({ChromeFeatureList.CCT_INCOGNITO})
+    @EnableFeatures({ChromeFeatureList.CCT_INCOGNITO})
     public void recordsHistogram_1P() {
         assertEquals(0, RecordHistogram.getHistogramTotalCountForTesting(UMA_KEY));
         Intent intent = createMinimalIncognitoCustomTabIntent();
@@ -80,7 +81,7 @@ public class CustomTabActivityIncognitoMetricTest {
 
     @Test
     @MediumTest
-    @Features.EnableFeatures({ChromeFeatureList.CCT_INCOGNITO})
+    @EnableFeatures({ChromeFeatureList.CCT_INCOGNITO})
     public void recordsHistogram_ReaderMode_WithExtra() {
         assertEquals(0, RecordHistogram.getHistogramTotalCountForTesting(UMA_KEY));
         Intent intent = createMinimalIncognitoCustomTabIntent();
@@ -97,7 +98,7 @@ public class CustomTabActivityIncognitoMetricTest {
 
     @Test
     @MediumTest
-    @Features.EnableFeatures({ChromeFeatureList.CCT_INCOGNITO,
+    @EnableFeatures({ChromeFeatureList.CCT_INCOGNITO,
             ChromeFeatureList.CCT_INCOGNITO_AVAILABLE_TO_THIRD_PARTY})
     public void
     recordsHistogram_Other() {
@@ -115,7 +116,7 @@ public class CustomTabActivityIncognitoMetricTest {
 
     @Test
     @MediumTest
-    @Features.EnableFeatures({ChromeFeatureList.CCT_INCOGNITO,
+    @EnableFeatures({ChromeFeatureList.CCT_INCOGNITO,
             ChromeFeatureList.CCT_INCOGNITO_AVAILABLE_TO_THIRD_PARTY})
     public void
     doesNotRecordThirdPartySpecificHistogram() {

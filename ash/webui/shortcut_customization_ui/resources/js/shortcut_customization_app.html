@@ -1,11 +1,36 @@
 <style include="shortcut-customization-shared">
   :host {
+    --cr-toolbar-field-width: 620px;
+
     font-family: var(--shortcuts-font-family-default);
     font-size: var(--shortcuts-font-size-default);
     font-weight: var(--shortcuts-font-weight-regular);
+    height: 100%;
+  }
+
+  :host-context(body.jelly-enabled) navigation-view-panel {
+    --navigation-view-panel-bg-color: var(--cros-sys-app_base_shaded);
+  }
+
+  /**
+   * This breakpoint is when the NavigationViewPanel side nav shrinks to a
+   * smaller width.
+   */
+  @media (max-width: 960px) {
+    :host {
+      --cr-toolbar-field-width: 480px;
+    }
+  }
+
+  /* This breakpoint is when the NavigationViewPanel side nav collapses. */
+  @media (max-width: 768px) {
+    :host {
+      --cr-toolbar-field-width: 80vw;
+    }
   }
 
   #navigationPanel::part(title) {
+    color: var(--cros-text-color-secondary);
     padding-inline-start: 8px;
   }
 
@@ -17,57 +42,70 @@
     height: 20px;
   }
 
-  #restoreAllButton {
-    border-radius: 999px;
+  #navigationPanel::part(side-nav) {
+    min-width: 216px;
   }
 
-  #keyboardSettingsLinkContainer {
-    margin-top: 12px;
+  #navigationPanel::part(top-nav) {
+    height: 72px;
   }
 
-  #keyboardSettingsLinkContainer a {
-    align-items: center;
-    color: var(--cros-link-color);
-    display: flex;
-    font-weight: var(--shortcuts-font-weight-medium);
-    text-decoration: none;
-  }
-
-  #keyboardSettingsLinkContainer a iron-icon {
-    fill: var(--cros-link-color);
-    margin-inline-start: 4px;
-  }
-
+  #bottomNavContentDrawer,
   #bottomNavContentPanel {
     margin-inline-start: 12px;
   }
 
   #searchBoxWrapper {
+    display: flex;
     font-size: var(--shortcuts-font-size-default);
+    justify-content: center;
     padding-inline: var(--container-padding-nav);
-    padding-top: 8px;
   }
 
-  :host search-box {
-    --cr-toolbar-field-width: 680px;
+  #restoreDialog::part(dialog) {
+    width: 320px;
+  }
+
+  #restoreTitle {
+    color: var(--cros-text-color-secondary);
+    display: flex;
+    font: var(--cros-body-1-font);
+    margin-block-end: 32px;
+    padding-inline: 32px;
+  }
+
+  #buttonContainer {
+    margin-block-end: 28px;
+    margin-inline-end: 32px;
+    padding: 0;
+  }
+
+  #cancelButton, #confirmButton {
+    border-radius: 999px;
+  }
+
+  #cancelButton {
+    margin-inline-end: 8px;
   }
 </style>
 <navigation-view-panel id="navigationPanel" title="[[i18n('appTitle')]]"
-    show-tool-bar>
+    show-tool-bar has-search>
   <div slot="toolbar-main" id="searchBoxWrapper">
-    <search-box hidden="[[shouldHideSearchBox()]]"></search-box>
+    <search-box></search-box>
   </div>
   <div slot="bottom-nav-content-panel" id="bottomNavContentPanel">
-    <cr-button id="restoreAllButton" on-click="onRestoreAllDefaultClicked"
-      hidden="[[shouldHideRestoreAllButton()]]">
-      [[i18n('resetAllShortcuts')]]
-    </cr-button>
-    <div id="keyboardSettingsLinkContainer">
-      <a href="chrome://os-settings/keyboard-overlay">
-        <span>[[i18n('keyboardSettings')]]</span>
-        <iron-icon icon="shortcut-customization:open-in-new"></iron-icon>
-      </a>
-    </div>
+    <shortcuts-bottom-nav-content
+        keyboard-settings-link="[[keyboardSettingsLink]]"
+        restore-all-button-hidden="[[shouldHideRestoreAllButton()]]"
+        on-restore-all-default="onRestoreAllDefaultClicked">
+    </shortcuts-bottom-nav-content>
+  </div>
+  <div slot="bottom-nav-content-drawer" id="bottomNavContentDrawer">
+    <shortcuts-bottom-nav-content
+      keyboard-settings-link="[[keyboardSettingsLink]]"
+      restore-all-button-hidden="[[shouldHideRestoreAllButton()]]"
+      on-restore-all-default="onRestoreAllDefaultClicked">
+    </shortcuts-bottom-nav-content>
   </div>
 </navigation-view-panel>
 
@@ -83,10 +121,10 @@
 <template is="dom-if" if="[[showRestoreAllDialog]]" restamp>
   <cr-dialog id="restoreDialog" show-on-attach
       on-close="closeRestoreAllDialog">
-    <div slot="body">
+    <div id="restoreTitle" slot="body">
       [[i18n('confirmResetAllShortcutsTitle')]]
     </div>
-    <div slot="button-container">
+    <div id="buttonContainer" slot="button-container">
       <cr-button id="cancelButton" on-click="onCancelRestoreButtonClicked">
         [[i18n('cancel')]]
       </cr-button>

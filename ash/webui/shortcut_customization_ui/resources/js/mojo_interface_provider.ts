@@ -4,13 +4,11 @@
 
 import {assert} from 'chrome://resources/js/assert_ts.js';
 
-import {AcceleratorConfigurationProvider, AcceleratorConfigurationProviderRemote, AcceleratorResultData, AcceleratorsUpdatedObserverRemote} from '../mojom-webui/ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom-webui.js';
+import {AcceleratorConfigurationProvider, AcceleratorConfigurationProviderRemote, AcceleratorResultData, AcceleratorsUpdatedObserverRemote, PolicyUpdatedObserverRemote, UserAction} from '../mojom-webui/ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom-webui.js';
 
 import {fakeAcceleratorConfig, fakeLayoutInfo} from './fake_data.js';
 import {FakeShortcutProvider} from './fake_shortcut_provider.js';
-import {Accelerator, AcceleratorConfigResult, AcceleratorSource, MojoAcceleratorConfig, MojoLayoutInfo, ShortcutProviderInterface} from './shortcut_types.js';
-
-
+import {Accelerator, AcceleratorSource, MojoAcceleratorConfig, MojoLayoutInfo, ShortcutProviderInterface} from './shortcut_types.js';
 
 /**
  * @fileoverview
@@ -86,6 +84,12 @@ export class ShortcutProviderWrapper implements ShortcutProviderInterface {
     return this.remote.hasLauncherButton();
   }
 
+  addAccelerator(
+      source: AcceleratorSource, action: number,
+      accelerator: Accelerator): Promise<{result: AcceleratorResultData}> {
+    return this.remote.addAccelerator(source, action, accelerator);
+  }
+
   removeAccelerator(
       source: AcceleratorSource, action: number,
       accelerator: Accelerator): Promise<{result: AcceleratorResultData}> {
@@ -94,21 +98,17 @@ export class ShortcutProviderWrapper implements ShortcutProviderInterface {
 
   replaceAccelerator(
       source: AcceleratorSource, action: number, oldAccelerator: Accelerator,
-      newAccelerator: Accelerator): Promise<AcceleratorConfigResult> {
-    // TODO(cambickel) Replace with real mojo method.
-    return this.fakeProvider.replaceAccelerator(
+      newAccelerator: Accelerator): Promise<{result: AcceleratorResultData}> {
+    return this.remote.replaceAccelerator(
         source, action, oldAccelerator, newAccelerator);
-  }
-
-  addUserAccelerator(
-      source: AcceleratorSource, action: number,
-      accelerator: Accelerator): Promise<AcceleratorConfigResult> {
-    // TODO(cambickel) Replace with real mojo method.
-    return this.fakeProvider.addUserAccelerator(source, action, accelerator);
   }
 
   addObserver(observer: AcceleratorsUpdatedObserverRemote): void {
     return this.remote.addObserver(observer);
+  }
+
+  addPolicyObserver(observer: PolicyUpdatedObserverRemote): void {
+    return this.remote.addPolicyObserver(observer);
   }
 
   restoreDefault(source: AcceleratorSource, actionId: number):
@@ -118,6 +118,27 @@ export class ShortcutProviderWrapper implements ShortcutProviderInterface {
 
   restoreAllDefaults(): Promise<{result: AcceleratorResultData}> {
     return this.remote.restoreAllDefaults();
+  }
+
+  preventProcessingAccelerators(preventProcessingAccelerators: boolean):
+      Promise<void> {
+    return this.remote.preventProcessingAccelerators(
+        preventProcessingAccelerators);
+  }
+
+  getConflictAccelerator(
+      source: AcceleratorSource, action: number,
+      accelerator: Accelerator): Promise<{result: AcceleratorResultData}> {
+    return this.remote.getConflictAccelerator(source, action, accelerator);
+  }
+
+  getDefaultAcceleratorsForId(action: number):
+      Promise<{accelerators: Accelerator[]}> {
+    return this.remote.getDefaultAcceleratorsForId(action);
+  }
+
+  recordUserAction(userAction: UserAction): void {
+    this.remote.recordUserAction(userAction);
   }
 }
 

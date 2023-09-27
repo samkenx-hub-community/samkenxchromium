@@ -8,6 +8,7 @@
 
 #include "base/feature_list.h"
 #include "base/json/json_reader.h"
+#include "base/test/gmock_expected_support.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/values.h"
 #include "components/invalidation/impl/fake_invalidation_handler.h"
@@ -50,7 +51,7 @@ TEST(InvalidatorRegistrarWithMemoryTest, Basic) {
   InvalidatorRegistrarWithMemory::RegisterProfilePrefs(pref_service.registry());
 
   auto invalidator = std::make_unique<InvalidatorRegistrarWithMemory>(
-      &pref_service, "sender_id", /*migrate_old_prefs=*/false);
+      &pref_service, "sender_id");
 
   FakeInvalidationHandler handler("owner");
   invalidator->RegisterHandler(&handler);
@@ -119,7 +120,7 @@ TEST(InvalidatorRegistrarWithMemoryTest, MultipleHandlers) {
   InvalidatorRegistrarWithMemory::RegisterProfilePrefs(pref_service.registry());
 
   auto invalidator = std::make_unique<InvalidatorRegistrarWithMemory>(
-      &pref_service, "sender_id", /*migrate_old_prefs=*/false);
+      &pref_service, "sender_id");
 
   FakeInvalidationHandler handler1("owner_1");
   FakeInvalidationHandler handler2("owner_2");
@@ -189,7 +190,7 @@ TEST(InvalidatorRegistrarWithMemoryTest, MultipleRegistrations) {
   InvalidatorRegistrarWithMemory::RegisterProfilePrefs(pref_service.registry());
 
   auto invalidator = std::make_unique<InvalidatorRegistrarWithMemory>(
-      &pref_service, "sender_id", /*migrate_old_prefs=*/false);
+      &pref_service, "sender_id");
 
   FakeInvalidationHandler handler1("owner1");
   FakeInvalidationHandler handler2("owner2");
@@ -222,7 +223,7 @@ TEST(InvalidatorRegistrarWithMemoryTest, EmptySetUnregisters) {
   InvalidatorRegistrarWithMemory::RegisterProfilePrefs(pref_service.registry());
 
   auto invalidator = std::make_unique<InvalidatorRegistrarWithMemory>(
-      &pref_service, "sender_id", /*migrate_old_prefs=*/false);
+      &pref_service, "sender_id");
 
   FakeInvalidationHandler handler1("owner_1");
 
@@ -280,15 +281,15 @@ TEST(InvalidatorRegistrarWithMemoryTest, RestoresInterestingTopics) {
             "topic_4_3": {"handler": "handler_4", "is_public": false}
       }})";
 
-  auto stored_topics =
-      base::JSONReader::ReadAndReturnValueWithError(kStoredTopicsJson);
-  ASSERT_TRUE(stored_topics.has_value()) << stored_topics.error().message;
-  pref_service.Set(kTopicsToHandler, std::move(*stored_topics));
+  ASSERT_OK_AND_ASSIGN(
+      auto stored_topics,
+      base::JSONReader::ReadAndReturnValueWithError(kStoredTopicsJson));
+  pref_service.Set(kTopicsToHandler, std::move(stored_topics));
 
   // Create an invalidator and make sure it correctly restored state from the
   // pref.
   auto invalidator = std::make_unique<InvalidatorRegistrarWithMemory>(
-      &pref_service, "sender_id", /*migrate_old_prefs=*/false);
+      &pref_service, "sender_id");
 
   std::map<std::string, TopicMetadata> expected_subscribed_topics{
       {"topic_1", TopicMetadata{true}},    {"topic_2", TopicMetadata{true}},
@@ -297,72 +298,6 @@ TEST(InvalidatorRegistrarWithMemoryTest, RestoresInterestingTopics) {
   };
 
   EXPECT_EQ(expected_subscribed_topics, invalidator->GetAllSubscribedTopics());
-}
-
-TEST(InvalidatorRegistrarWithMemoryTest,
-     ClearsTopicsWithObsoleteOwnerNamesWhenPrefIsEmpty) {
-  TestingPrefServiceSimple pref_service;
-  InvalidatorRegistrarWithMemory::RegisterProfilePrefs(pref_service.registry());
-  ASSERT_TRUE(pref_service.GetDict(kTopicsToHandler).empty());
-
-  InvalidatorRegistrarWithMemory::ClearTopicsWithObsoleteOwnerNames(
-      &pref_service);
-
-  ASSERT_TRUE(pref_service.GetDict(kTopicsToHandler).empty());
-}
-
-TEST(InvalidatorRegistrarWithMemoryTest, ClearsTopicsWithObsoleteOwnerNames) {
-  TestingPrefServiceSimple pref_service;
-  InvalidatorRegistrarWithMemory::RegisterProfilePrefs(pref_service.registry());
-
-  // Set up some previously-registered topics in the pref.
-  constexpr char kInitialStoredTopics[] =
-      R"({"sender_without_cloud": {
-            "topic_1": {"handler": "NonCloud_1", "is_public": true},
-            "topic_2": {"handler": "NonCloud_2", "is_public": true},
-            "topic_3": {"handler": "NonCloud_3", "is_public": true}
-          },
-          "sender_with_cloud": {
-            "topic_4": {"handler": "NonCloud_4", "is_public": true},
-            "topic_5": {"handler": "Cloud", "is_public": true},
-            "topic_6": "NonCloud_5",
-            "topic_7": "RemoteCommand"
-          },
-          "sender_full_of_cloud": {
-            "topic_8": {"handler": "Cloud", "is_public": true},
-            "topic_9": {"handler": "RemoteCommand", "is_public": true},
-            "topic_10": {"handler": "Cloud", "is_public": true}
-        }})";
-  auto initial_stored_topics =
-      base::JSONReader::ReadAndReturnValueWithError(kInitialStoredTopics);
-  ASSERT_TRUE(initial_stored_topics.has_value())
-      << initial_stored_topics.error().message;
-
-  pref_service.Set(kTopicsToHandler, initial_stored_topics->Clone());
-
-  ASSERT_EQ(*initial_stored_topics, pref_service.GetDict(kTopicsToHandler));
-
-  InvalidatorRegistrarWithMemory::ClearTopicsWithObsoleteOwnerNames(
-      &pref_service);
-
-  // Topics 5, 7, 8, 9 and 10 are expected to be gone.
-  constexpr char kExpectedStoredTopics[] =
-      R"({"sender_without_cloud": {
-            "topic_1": {"handler": "NonCloud_1", "is_public": true},
-            "topic_2": {"handler": "NonCloud_2", "is_public": true},
-            "topic_3": {"handler": "NonCloud_3", "is_public": true}
-          },
-          "sender_with_cloud": {
-            "topic_4": {"handler": "NonCloud_4", "is_public": true},
-            "topic_6": "NonCloud_5"
-          },
-          "sender_full_of_cloud": {}})";
-  auto expected_stored_topics =
-      base::JSONReader::ReadAndReturnValueWithError(kExpectedStoredTopics);
-  ASSERT_TRUE(expected_stored_topics.has_value())
-      << expected_stored_topics.error().message;
-
-  EXPECT_EQ(*expected_stored_topics, pref_service.GetDict(kTopicsToHandler));
 }
 
 // This test verifies that topics are not unsubscribed after browser restart
@@ -387,13 +322,13 @@ TEST(InvalidatorRegistrarWithMemoryTest, ShouldKeepSubscriptionsAfterRestart) {
             "topic_2": {"handler": "handler", "is_public": true}
       }})";
 
-  auto stored_topics =
-      base::JSONReader::ReadAndReturnValueWithError(kStoredTopicsJson);
-  ASSERT_TRUE(stored_topics.has_value()) << stored_topics.error().message;
-  pref_service.Set(kTopicsToHandler, std::move(*stored_topics));
+  ASSERT_OK_AND_ASSIGN(
+      auto stored_topics,
+      base::JSONReader::ReadAndReturnValueWithError(kStoredTopicsJson));
+  pref_service.Set(kTopicsToHandler, std::move(stored_topics));
 
   auto invalidator = std::make_unique<InvalidatorRegistrarWithMemory>(
-      &pref_service, "sender_id", /*migrate_old_prefs=*/false);
+      &pref_service, "sender_id");
   FakeInvalidationHandler handler("handler");
   invalidator->RegisterHandler(&handler);
 
@@ -454,7 +389,7 @@ TEST(InvalidatorRegistrarWithMemoryTest, ShouldRemoveAllTopics) {
   pref_service.Set(kTopicsToHandler, base::Value(std::move(stored_topics)));
 
   auto invalidator = std::make_unique<InvalidatorRegistrarWithMemory>(
-      &pref_service, kSenderId, /*migrate_old_prefs=*/false);
+      &pref_service, kSenderId);
   invalidator->RegisterHandler(&handler);
 
   // Verify that all topics are successfully subscribed but not registered by
@@ -495,7 +430,7 @@ TEST(InvalidatorRegistrarWithMemoryTest, ShouldRemoveUnregisteredTopics) {
   pref_service.Set(kTopicsToHandler, base::Value(std::move(stored_topics)));
 
   auto invalidator = std::make_unique<InvalidatorRegistrarWithMemory>(
-      &pref_service, kSenderId, /*migrate_old_prefs=*/false);
+      &pref_service, kSenderId);
   invalidator->RegisterHandler(&handler);
 
   // Verify that all topics are successfully subscribed but not registered by

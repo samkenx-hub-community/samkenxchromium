@@ -181,6 +181,7 @@ def GetManualSequences(dep_graph):
   c.RecordInterfaceCreated('wl_data_offer')
 
   e = SequenceBuilder('empty', dep_graph)
+
   return [c, e]
 
 

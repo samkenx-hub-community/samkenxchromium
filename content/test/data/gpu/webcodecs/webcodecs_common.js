@@ -10,6 +10,7 @@ class TestHarness {
   skipped = false;
   message = 'ok';
   logs = [];
+  logWindow = null;
 
   constructor() {}
 
@@ -17,6 +18,7 @@ class TestHarness {
     this.skipped = true;
     this.finished = true;
     this.message = message;
+    this.log('Test skipped: ' + message);
   }
 
   reportSuccess() {
@@ -50,6 +52,10 @@ class TestHarness {
   log(msg) {
     this.logs.push(msg);
     console.log(msg);
+    if (this.logWindow === null)
+      this.logWindow = document.querySelector('textarea');
+    if (this.logWindow)
+      this.logWindow.value += msg + '\n';
   }
 
   run(arg) {
@@ -155,7 +161,7 @@ function validateBlackDots(frame, count) {
   const width = frame.displayWidth;
   const height = frame.displayHeight;
   let cnv = new OffscreenCanvas(width, height);
-  var ctx = cnv.getContext('2d');
+  var ctx = cnv.getContext('2d', { willReadFrequently : true });
   ctx.drawImage(frame, 0, 0);
   const dot_size = 10;
   const step = dot_size * 3;
@@ -345,8 +351,11 @@ async function prepareDecoderSource(
     framerate: 24
   };
 
-  if (codec.startsWith('avc1'))
+  if (codec.startsWith('avc1')) {
     encoder_config.avc = {format: 'annexb'};
+  } else if (codec.startsWith('hvc1')) {
+    encoder_config.hevc = {format: 'annexb'};
+  }
 
   let decoder_config = {
     codec: codec,
@@ -426,6 +435,9 @@ async function createFrameSource(type, width, height) {
           40, width, height, 'avc1.42001E', 'prefer-hardware');
       if (!src)
         src = await prepareDecoderSource(
+            40, width, height, 'hvc1.1.6.L123.00', 'prefer-hardware');
+      if (!src)
+        src = await prepareDecoderSource(
             40, width, height, 'vp8', 'prefer-hardware');
       if (!src) {
         src = await prepareDecoderSource(
@@ -444,4 +456,20 @@ async function createFrameSource(type, width, height) {
       return new ArrayBufferSource(width, height);
     }
   }
+}
+
+function addManualTestButton(configs) {
+  document.addEventListener('DOMContentLoaded', _ => {
+    configs.forEach(config => {
+      const btn = document.createElement('button');
+      const label = document.createTextNode(
+          'Run test with config: ' + JSON.stringify(config));
+      btn.onclick = function() {
+        main(config);
+      };
+      btn.appendChild(label);
+      btn.style.margin = '5px';
+      document.body.appendChild(btn);
+    });
+  }, true);
 }

@@ -7,12 +7,13 @@ package org.chromium.chrome.browser.portals;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.service.notification.StatusBarNotification;
-import android.support.test.InstrumentationRegistry;
 import android.text.TextUtils;
 import android.view.View;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject;
 import androidx.test.uiautomator.UiSelector;
@@ -34,7 +35,6 @@ import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -47,6 +47,7 @@ import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.chrome.test.util.browser.webapps.WebappTestPage;
 import org.chromium.components.location.LocationUtils;
@@ -80,7 +81,8 @@ public class PortalsTest {
 
     @Before
     public void setUp() {
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         // Some devices have geolocation disabled, so override LocationUtils to always show
         // geolocation as enabled to prevent flakes in the permissions tests.
         LocationUtils.setFactory(() -> new LocationUtils() {
@@ -93,7 +95,6 @@ public class PortalsTest {
 
     @After
     public void tearDown() {
-        mTestServer.stopAndDestroyServer();
         LocationUtils.setFactory(null);
     }
 
@@ -457,7 +458,7 @@ public class PortalsTest {
     @Feature({"Portals"})
     // See https://crbug.com/1278223#c19. Remove this feature flag once
     // portals are migrated off the multiple webcontents architecture.
-    @DisableFeatures({ChromeFeatureList.MESSAGES_FOR_ANDROID_INFRASTRUCTURE})
+    @DisableFeatures(ChromeFeatureList.MESSAGES_FOR_ANDROID_INFRASTRUCTURE)
     public void testHttpBasicAuthenticationInPortal() throws Exception {
         mActivityTestRule.startMainActivityWithURL(
                 mTestServer.getURL("/chrome/test/data/android/about.html"));

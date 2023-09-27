@@ -27,9 +27,8 @@ class RenderFrameProxyHost;
 class WebContentsImpl;
 
 // This is the browser-side host object for the <fencedframe> element
-// implemented in Blink. This is only used for the MPArch version of fenced
-// frames, not the ShadowDOM implementation. It is owned by and stored directly
-// on `RenderFrameHostImpl`.
+// implemented in Blink. It is owned by and stored directly on
+// `RenderFrameHostImpl`.
 class CONTENT_EXPORT FencedFrame : public blink::mojom::FencedFrameOwnerHost,
                                    public FrameTree::Delegate,
                                    public NavigationControllerDelegate {
@@ -61,8 +60,8 @@ class CONTENT_EXPORT FencedFrame : public blink::mojom::FencedFrameOwnerHost,
   void DidChangeFramePolicy(const blink::FramePolicy& frame_policy) override;
 
   // FrameTree::Delegate.
-  void DidStartLoading(FrameTreeNode* frame_tree_node,
-                       bool should_show_loading_ui) override {}
+  void LoadingStateChanged(LoadingState new_state) override {}
+  void DidStartLoading(FrameTreeNode* frame_tree_node) override {}
   void DidStopLoading() override {}
   bool IsHidden() override;
   int GetOuterDelegateFrameTreeNodeId() override;

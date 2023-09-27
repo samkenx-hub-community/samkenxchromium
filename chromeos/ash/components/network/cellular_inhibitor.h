@@ -8,6 +8,7 @@
 #include "base/component_export.h"
 #include "base/containers/queue.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/observer_list_types.h"
@@ -74,6 +75,7 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularInhibitor
     kRefreshingProfileList,
     kResettingEuiccMemory,
     kDisablingProfile,
+    kRequestingAvailableProfiles,
   };
   friend std::ostream& operator<<(std::ostream& stream,
                                   const InhibitReason& state);
@@ -83,9 +85,11 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularInhibitor
   using InhibitCallback =
       base::OnceCallback<void(std::unique_ptr<InhibitLock>)>;
 
-  // Puts the Cellular device in Inhibited state and returns an InhibitLock
-  // object which when destroyed automatically uninhibits the Cellular device. A
-  // call to this method will block until the last issues lock is deleted.
+  // This function attempts to put the cellular device into an inhibited state.
+  // On success, this method will provide a lock to |callback| that will prevent
+  // the cellular device from becoming uninhibited until the lock is freed. On
+  // failure, e.g. this function fails to set the corresponding Shill device
+  // property, |nullptr| is provided to |callback|.
   void InhibitCellularScanning(InhibitReason reason, InhibitCallback callback);
 
   // Returns the reason that cellular scanning is currently inhibited, or null
@@ -180,11 +184,13 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularInhibitor
       bool success,
       absl::optional<InhibitOperationResult> result);
 
-  NetworkStateHandler* network_state_handler_ = nullptr;
+  raw_ptr<NetworkStateHandler, ExperimentalAsh> network_state_handler_ =
+      nullptr;
   base::ScopedObservation<NetworkStateHandler, NetworkStateHandlerObserver>
       network_state_handler_observer_{this};
 
-  NetworkDeviceHandler* network_device_handler_ = nullptr;
+  raw_ptr<NetworkDeviceHandler, ExperimentalAsh> network_device_handler_ =
+      nullptr;
 
   State state_ = State::kIdle;
   base::queue<std::unique_ptr<InhibitRequest>> inhibit_requests_;

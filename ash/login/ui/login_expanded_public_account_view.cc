@@ -21,16 +21,20 @@
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/style/ash_color_id.h"
 #include "ash/style/ash_color_provider.h"
+#include "ash/style/system_shadow.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/image_model.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/text_constants.h"
@@ -38,6 +42,7 @@
 #include "ui/views/border.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/highlight_border.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/fill_layout.h"
 #include "ui/views/layout/layout_provider.h"
@@ -68,11 +73,14 @@ constexpr int kPortraitPaneSpacing = 24;
 
 constexpr int kTextLineHeightDp = 16;
 constexpr int kRoundRectCornerRadiusDp = 2;
+constexpr int kJellyRoundRectCornerRadiusDp = 8;
 
 constexpr int kDropDownIconSizeDp = 16;
+constexpr int kJellyDropDownIconSizeDp = 20;
 constexpr int kArrowButtonSizeDp = 48;
 constexpr int kAdvancedViewButtonWidthDp = 190;
 constexpr int kAdvancedViewButtonHeightDp = 16;
+constexpr int kJellyAdvancedViewButtonHeightDp = 20;
 constexpr int kSpacingBetweenSelectionTitleAndButtonDp = 4;
 
 constexpr int kNonEmptyWidth = 1;
@@ -128,7 +136,7 @@ class LoginExpandedPublicAccountEventHandler : public ui::EventHandler {
   }
   void OnKeyEvent(ui::KeyEvent* event) override { view_->OnKeyEvent(event); }
 
-  LoginExpandedPublicAccountView* view_;
+  raw_ptr<LoginExpandedPublicAccountView, ExperimentalAsh> view_;
 };
 
 }  // namespace
@@ -162,9 +170,12 @@ class SelectionButtonView : public LoginButton {
         views::BoxLayout::MainAxisAlignment::kStart);
     AddChildView(label_container);
 
-    label_ = CreateLabel(text, kColorAshTextColorPrimary);
+    const bool is_jelly = chromeos::features::IsJellyrollEnabled();
+    label_ = CreateLabel(text, is_jelly ? static_cast<ui::ColorId>(
+                                              cros_tokens::kCrosSysOnSurface)
+                                        : kColorAshTextColorPrimary);
     left_margin_view_ = add_horizontal_margin(left_margin_, label_container);
-    label_container->AddChildView(label_);
+    label_container->AddChildView(label_.get());
 
     auto* icon_container = new NonAccessibleView();
     icon_container->SetCanProcessEventsWithinSubtree(false);
@@ -177,10 +188,10 @@ class SelectionButtonView : public LoginButton {
 
     icon_ = new views::ImageView;
     icon_->SetVerticalAlignment(views::ImageView::Alignment::kCenter);
-    icon_->SetPreferredSize(
-        gfx::Size(kDropDownIconSizeDp, kDropDownIconSizeDp));
+    int icon_size = is_jelly ? kJellyDropDownIconSizeDp : kDropDownIconSizeDp;
+    icon_->SetPreferredSize(gfx::Size(icon_size, icon_size));
 
-    icon_container->AddChildView(icon_);
+    icon_container->AddChildView(icon_.get());
     right_margin_view_ = add_horizontal_margin(right_margin_, icon_container);
   }
 
@@ -230,10 +241,10 @@ class SelectionButtonView : public LoginButton {
  private:
   int left_margin_ = 0;
   int right_margin_ = 0;
-  views::Label* label_ = nullptr;
-  views::ImageView* icon_ = nullptr;
-  views::View* left_margin_view_ = nullptr;
-  views::View* right_margin_view_ = nullptr;
+  raw_ptr<views::Label, ExperimentalAsh> label_ = nullptr;
+  raw_ptr<views::ImageView, ExperimentalAsh> icon_ = nullptr;
+  raw_ptr<views::View, ExperimentalAsh> left_margin_view_ = nullptr;
+  raw_ptr<views::View, ExperimentalAsh> right_margin_view_ = nullptr;
 };
 
 // Container for the device monitoring warning. Composed of an optional warning
@@ -243,19 +254,25 @@ class MonitoringWarningView : public NonAccessibleView {
   MonitoringWarningView()
       : NonAccessibleView(kMonitoringWarningClassName),
         warning_type_(WarningType::kNone) {
+    const bool is_jelly = chromeos::features::IsJellyrollEnabled();
     image_ = new views::ImageView();
     image_->SetImage(ui::ImageModel::FromVectorIcon(
-        vector_icons::kWarningIcon, kColorAshIconColorWarning,
+        vector_icons::kWarningIcon,
+        is_jelly ? static_cast<ui::ColorId>(cros_tokens::kCrosSysOnSurface)
+                 : kColorAshIconColorWarning,
         kMonitoringWarningIconSizeDp));
     image_->SetVisible(false);
-    AddChildView(image_);
+    AddChildView(image_.get());
 
     const std::u16string label_text = l10n_util::GetStringUTF16(
         IDS_ASH_LOGIN_PUBLIC_ACCOUNT_MONITORING_WARNING);
-    label_ = CreateLabel(label_text, kColorAshTextColorPrimary);
+    label_ = CreateLabel(
+        label_text,
+        is_jelly ? static_cast<ui::ColorId>(cros_tokens::kCrosSysOnSurface)
+                 : kColorAshTextColorPrimary);
     label_->SetMultiLine(true);
     label_->SetLineHeight(kTextLineHeightDp);
-    AddChildView(label_);
+    AddChildView(label_.get());
   }
 
   enum class WarningType { kNone, kSoftWarning, kFullWarning };
@@ -330,8 +347,8 @@ class MonitoringWarningView : public NonAccessibleView {
 
   WarningType warning_type_;
   absl::optional<std::string> device_manager_;
-  views::ImageView* image_;
-  views::Label* label_;
+  raw_ptr<views::ImageView, ExperimentalAsh> image_;
+  raw_ptr<views::Label, ExperimentalAsh> label_;
 };
 
 // Implements the right part of the expanded public session view.
@@ -352,18 +369,21 @@ class RightPaneView : public NonAccessibleView {
     learn_more_label_ = AddChildView(std::make_unique<views::StyledLabel>());
     learn_more_label_->SetText(text);
 
+    const bool is_jelly = chromeos::features::IsJellyrollEnabled();
+
     views::StyledLabel::RangeStyleInfo style;
     style.custom_font = learn_more_label_->GetFontList().Derive(
         0, gfx::Font::FontStyle::NORMAL, gfx::Font::Weight::NORMAL);
-    style.override_color = AshColorProvider::Get()->GetContentLayerColor(
-        AshColorProvider::ContentLayerType::kTextColorPrimary);
+    style.override_color_id =
+        is_jelly ? static_cast<ui::ColorId>(cros_tokens::kCrosSysOnSurface)
+                 : kColorAshTextColorPrimary;
     learn_more_label_->AddStyleRange(gfx::Range(0, offset), style);
 
     views::StyledLabel::RangeStyleInfo link_style =
         views::StyledLabel::RangeStyleInfo::CreateForLink(on_learn_more_tapped);
-    const SkColor blue = AshColorProvider::Get()->GetContentLayerColor(
-        AshColorProvider::ContentLayerType::kButtonLabelColorBlue);
-    link_style.override_color = blue;
+    link_style.override_color_id =
+        is_jelly ? static_cast<ui::ColorId>(cros_tokens::kCrosSysPrimary)
+                 : kColorAshButtonLabelColorBlue;
     learn_more_label_->AddStyleRange(gfx::Range(offset, offset + link.length()),
                                      link_style);
     learn_more_label_->SetAutoColorReadabilityEnabled(false);
@@ -380,12 +400,19 @@ class RightPaneView : public NonAccessibleView {
                             base::Unretained(this)),
         l10n_util::GetStringUTF16(
             IDS_ASH_LOGIN_PUBLIC_SESSION_LANGUAGE_AND_INPUT));
-    advanced_view_button_->SetTextColorId(kColorAshButtonLabelColorBlue);
+    ui::ColorId advanced_view_button_color_id =
+        is_jelly ? static_cast<ui::ColorId>(cros_tokens::kCrosSysPrimary)
+                 : kColorAshButtonLabelColorBlue;
+    int advanced_view_button_icon_size = is_jelly
+                                             ? kJellyAdvancedViewButtonHeightDp
+                                             : kAdvancedViewButtonHeightDp;
+    advanced_view_button_->SetTextColorId(advanced_view_button_color_id);
     advanced_view_button_->SetIcon(kLoginScreenButtonDropdownIcon,
-                                   kColorAshButtonLabelColorBlue);
+                                   advanced_view_button_color_id);
+
     advanced_view_button_->SetPreferredSize(
-        gfx::Size(kAdvancedViewButtonWidthDp, kAdvancedViewButtonHeightDp));
-    AddChildView(advanced_view_button_);
+        gfx::Size(kAdvancedViewButtonWidthDp, advanced_view_button_icon_size));
+    AddChildView(advanced_view_button_.get());
 
     advanced_view_button_->SetProperty(
         views::kMarginsKey, gfx::Insets().set_bottom(
@@ -397,12 +424,12 @@ class RightPaneView : public NonAccessibleView {
     advanced_view_->SetLayoutManager(std::make_unique<views::BoxLayout>(
         views::BoxLayout::Orientation::kVertical));
     advanced_view_->SetVisible(false);
-    AddChildView(advanced_view_);
+    AddChildView(advanced_view_.get());
 
     language_title_ = CreateLabel(
         l10n_util::GetStringUTF16(IDS_ASH_LOGIN_LANGUAGE_SELECTION_SELECT),
         kColorAshTextColorSecondary);
-    advanced_view_->AddChildView(language_title_);
+    advanced_view_->AddChildView(language_title_.get());
     language_title_->SetProperty(
         views::kMarginsKey,
         gfx::Insets().set_bottom(kSpacingBetweenSelectionTitleAndButtonDp));
@@ -410,7 +437,7 @@ class RightPaneView : public NonAccessibleView {
     keyboard_title_ = CreateLabel(
         l10n_util::GetStringUTF16(IDS_ASH_LOGIN_KEYBOARD_SELECTION_SELECT),
         kColorAshTextColorSecondary);
-    advanced_view_->AddChildView(keyboard_title_);
+    advanced_view_->AddChildView(keyboard_title_.get());
     keyboard_title_->SetProperty(
         views::kMarginsKey,
         gfx::Insets()
@@ -482,7 +509,7 @@ class RightPaneView : public NonAccessibleView {
     }
 
     if (language_menu_view_) {
-      advanced_view_->RemoveChildViewT(language_menu_view_);
+      advanced_view_->RemoveChildViewT(language_menu_view_.get());
       language_menu_view_ = nullptr;
     }
     auto language_menu_view = std::make_unique<PublicAccountMenuView>(
@@ -517,7 +544,7 @@ class RightPaneView : public NonAccessibleView {
     }
 
     if (keyboard_menu_view_) {
-      advanced_view_->RemoveChildViewT(keyboard_menu_view_);
+      advanced_view_->RemoveChildViewT(keyboard_menu_view_.get());
       keyboard_menu_view_ = nullptr;
     }
     auto keyboard_menu_view = std::make_unique<PublicAccountMenuView>(
@@ -568,14 +595,16 @@ class RightPaneView : public NonAccessibleView {
 
   LoginUserInfo current_user_;
 
-  SelectionButtonView* advanced_view_button_ = nullptr;
-  views::View* advanced_view_ = nullptr;
-  views::View* language_title_ = nullptr;
-  views::View* keyboard_title_ = nullptr;
-  views::StyledLabel* learn_more_label_ = nullptr;
+  raw_ptr<SelectionButtonView, ExperimentalAsh> advanced_view_button_ = nullptr;
+  raw_ptr<views::View, ExperimentalAsh> advanced_view_ = nullptr;
+  raw_ptr<views::View, ExperimentalAsh> language_title_ = nullptr;
+  raw_ptr<views::View, ExperimentalAsh> keyboard_title_ = nullptr;
+  raw_ptr<views::StyledLabel, ExperimentalAsh> learn_more_label_ = nullptr;
 
-  PublicAccountMenuView* language_menu_view_ = nullptr;
-  PublicAccountMenuView* keyboard_menu_view_ = nullptr;
+  raw_ptr<PublicAccountMenuView, DanglingUntriaged | ExperimentalAsh>
+      language_menu_view_ = nullptr;
+  raw_ptr<PublicAccountMenuView, DanglingUntriaged | ExperimentalAsh>
+      keyboard_menu_view_ = nullptr;
 
   std::string selected_language_item_value_;
   std::string selected_keyboard_item_value_;
@@ -707,21 +736,36 @@ LoginExpandedPublicAccountView::LoginExpandedPublicAccountView(
       on_dismissed_(on_dismissed),
       event_handler_(
           std::make_unique<LoginExpandedPublicAccountEventHandler>(this)) {
+  if (chromeos::features::IsJellyrollEnabled()) {
+    SetBackground(views::CreateThemedRoundedRectBackground(
+        cros_tokens::kCrosSysSystemBaseElevated,
+        kJellyRoundRectCornerRadiusDp));
+    SetBorder(std::make_unique<views::HighlightBorder>(
+        kJellyRoundRectCornerRadiusDp,
+        views::HighlightBorder::Type::kHighlightBorderOnShadow));
+    shadow_ = SystemShadow::CreateShadowOnNinePatchLayerForView(
+        this, SystemShadow::Type::kElevation12);
+    shadow_->SetRoundedCornerRadius(kJellyRoundRectCornerRadiusDp);
+  } else {
+    SetBackground(views::CreateThemedRoundedRectBackground(
+        kColorAshShieldAndBase80, kRoundRectCornerRadiusDp));
+  }
+
   SetPreferredSize(GetPreferredSizeLandscape());
   layout_ = SetLayoutManager(std::make_unique<views::BoxLayout>());
 
-  user_view_ = new LoginUserView(
-      LoginDisplayStyle::kExtraSmall, false /*show_dropdown*/,
-      base::DoNothing(), base::RepeatingClosure(), base::RepeatingClosure());
+  user_view_ =
+      new LoginUserView(LoginDisplayStyle::kExtraSmall, false /*show_dropdown*/,
+                        base::DoNothing(), base::RepeatingClosure());
   user_view_->SetForceOpaque(true);
   user_view_->SetTapEnabled(false);
 
   left_pane_ = new NonAccessibleView();
-  AddChildView(left_pane_);
+  AddChildView(left_pane_.get());
   left_pane_->SetLayoutManager(std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kVertical));
 
-  left_pane_->AddChildView(user_view_);
+  left_pane_->AddChildView(user_view_.get());
 
   const bool enable_warning = Shell::Get()->local_state()->GetBoolean(
       prefs::kManagedGuestSessionPrivacyWarningsEnabled);
@@ -734,19 +778,27 @@ LoginExpandedPublicAccountView::LoginExpandedPublicAccountView(
   }
 
   separator_ = AddChildView(std::make_unique<views::View>());
+  ui::ColorId separator_color_id =
+      chromeos::features::IsJellyrollEnabled()
+          ? static_cast<ui::ColorId>(cros_tokens::kCrosSysSeparator)
+          : kColorAshSeparatorColor;
   separator_->SetBackground(
-      views::CreateThemedSolidBackground(kColorAshSeparatorColor));
+      views::CreateThemedSolidBackground(separator_color_id));
 
   right_pane_ = new RightPaneView(
       base::BindRepeating(&LoginExpandedPublicAccountView::ShowWarningDialog,
                           base::Unretained(this)));
-  AddChildView(right_pane_);
+  AddChildView(right_pane_.get());
 
   submit_button_ = AddChildView(std::make_unique<ArrowButtonView>(
       base::BindRepeating(&RightPaneView::Login, base::Unretained(right_pane_)),
       kArrowButtonSizeDp));
   submit_button_->SetAccessibleName(l10n_util::GetStringUTF16(
       IDS_ASH_LOGIN_PUBLIC_ACCOUNT_LOG_IN_BUTTON_ACCESSIBLE_NAME));
+  if (chromeos::features::IsJellyrollEnabled()) {
+    submit_button_->SetBackgroundColorId(
+        cros_tokens::kCrosSysSystemPrimaryContainer);
+  }
   // `submit_button_` has absolute position and is laid out in our `Layout()`
   // override.
   submit_button_->SetProperty(views::kViewIgnoredByLayoutKey, true);
@@ -814,6 +866,7 @@ const LoginUserInfo& LoginExpandedPublicAccountView::current_user() const {
 }
 
 void LoginExpandedPublicAccountView::Hide() {
+  shadow_.reset();
   SetVisible(false);
   right_pane_->Reset();
   on_dismissed_.Run();
@@ -872,16 +925,6 @@ void LoginExpandedPublicAccountView::Layout() {
   const int submit_button_y =
       size().height() - kPaddingDp - submit_button_->size().height();
   submit_button_->SetPosition(gfx::Point{submit_button_x, submit_button_y});
-}
-
-void LoginExpandedPublicAccountView::OnPaint(gfx::Canvas* canvas) {
-  views::View::OnPaint(canvas);
-
-  cc::PaintFlags flags;
-  flags.setStyle(cc::PaintFlags::kFill_Style);
-  flags.setColor(GetColorProvider()->GetColor(kColorAshShieldAndBase80));
-  flags.setAntiAlias(true);
-  canvas->DrawRoundRect(GetContentsBounds(), kRoundRectCornerRadiusDp, flags);
 }
 
 void LoginExpandedPublicAccountView::OnKeyEvent(ui::KeyEvent* event) {

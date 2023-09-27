@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+
 (async function() {
   TestRunner.addResult(
       `Ensures the icon is properly displayed when network request blocking setting is enabled/disabled.\n`);
@@ -17,7 +19,7 @@
   dumpIconResult();
 
   TestRunner.addResult('Loading Network Module');
-  await TestRunner.loadLegacyModule('network');
+  await import('devtools/panels/network/network.js');
   TestRunner.addResult('Network Module Loaded');
 
   SDK.multitargetNetworkManager.setBlockingEnabled(false);
@@ -32,9 +34,10 @@
   TestRunner.completeTest();
 
   function dumpIconResult() {
-    var hasIcon = !!UI.inspectorView.tabbedPane.tabsElement.getElementsByClassName('smallicon-warning').length;
+    const icons = UI.inspectorView.tabbedPane.tabsElement.getElementsByTagName('devtools-icon');
+    const warnings = [...icons].filter(icon => icon.data.iconName === 'warning-filled');
     TestRunner.addResult('Is blocking: ' + SDK.multitargetNetworkManager.isBlocking());
-    TestRunner.addResult(hasIcon ? 'Has Icon' : 'Does Not Have Icon');
+    TestRunner.addResult(Boolean(warnings.length) ? 'Has Icon' : 'Does Not Have Icon');
     TestRunner.addResult('');
   }
 })();

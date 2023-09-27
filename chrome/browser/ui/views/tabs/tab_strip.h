@@ -44,6 +44,7 @@ class Tab;
 class TabHoverCardController;
 class TabStripController;
 class TabStripObserver;
+class TabStyle;
 
 namespace gfx {
 class Rect;
@@ -277,7 +278,8 @@ class TabStrip : public views::View,
       TabSlotView* source,
       const ui::LocatedEvent& event,
       const ui::ListSelectionModel& original_selection) override;
-  void ContinueDrag(views::View* view, const ui::LocatedEvent& event) override;
+  [[nodiscard]] Liveness ContinueDrag(views::View* view,
+                                      const ui::LocatedEvent& event) override;
   bool EndDrag(EndDragReason reason) override;
   Tab* GetTabAt(const gfx::Point& point) override;
   const Tab* GetAdjacentTab(const Tab* tab, int offset) override;
@@ -290,11 +292,7 @@ class TabStrip : public views::View,
   int GetStrokeThickness() const override;
   bool CanPaintThrobberToLayer() const override;
   bool HasVisibleBackgroundTabShapes() const override;
-  bool ShouldPaintAsActiveFrame() const override;
   SkColor GetTabSeparatorColor() const override;
-  SkColor GetTabBackgroundColor(
-      TabActive active,
-      BrowserFrameActiveState active_state) const override;
   SkColor GetTabForegroundColor(TabActive active) const override;
   std::u16string GetAccessibleTabName(const Tab* tab) const override;
   absl::optional<int> GetCustomBackgroundId(
@@ -424,10 +422,10 @@ class TabStrip : public views::View,
 
   std::unique_ptr<TabHoverCardController> hover_card_controller_;
 
-  raw_ref<TabDragContextImpl, DanglingUntriaged> drag_context_;
+  raw_ref<TabDragContextImpl, AcrossTasksDanglingUntriaged> drag_context_;
 
   // The View parent for the tabs and the various group views.
-  raw_ref<TabContainer, DanglingUntriaged> tab_container_;
+  raw_ref<TabContainer, AcrossTasksDanglingUntriaged> tab_container_;
 
   // The background offset used by inactive tabs to match the frame image.
   int background_offset_ = 0;
@@ -440,6 +438,8 @@ class TabStrip : public views::View,
 
   // Used for seek time metrics from the time the mouse enters the tabstrip.
   absl::optional<base::TimeTicks> mouse_entered_tabstrip_time_;
+
+  const raw_ptr<const TabStyle> style_;
 
   // Number of mouse moves.
   int mouse_move_count_ = 0;

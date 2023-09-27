@@ -12,8 +12,10 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/ntp/features.h"
+#import "ios/chrome/browser/ntp/new_tab_page_state.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper_delegate.h"
-#import "ios/chrome/browser/url/chrome_url_constants.h"
+#import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
+#import "ios/chrome/browser/shared/model/url/url_util.h"
 #import "ios/web/common/features.h"
 #import "ios/web/public/navigation/navigation_context.h"
 #import "ios/web/public/navigation/navigation_item.h"
@@ -21,25 +23,13 @@
 #import "ios/web/public/web_state.h"
 #import "ui/base/l10n/l10n_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
-namespace {
-// Internally the NTP URL is about://newtab/.  However, with
-// `url::kAboutScheme`, there's no host value, only a path.  Use this value for
-// matching the NTP.
-const char kAboutNewTabPath[] = "//newtab/";
-
-}  // namespace
-
 NewTabPageTabHelper::~NewTabPageTabHelper() = default;
 
 NewTabPageTabHelper::NewTabPageTabHelper(web::WebState* web_state)
     : web_state_(web_state) {
   web_state->AddObserver(this);
-  active_ = IsNTPURL(web_state_->GetVisibleURL());
-  next_ntp_feed_type_ = DefaultFeedType();
+  active_ = IsUrlNtp(web_state_->GetVisibleURL());
+  ntp_state_ = [[NewTabPageState alloc] init];
 }
 
 #pragma mark - Static
@@ -51,18 +41,16 @@ void NewTabPageTabHelper::UpdateItem(web::NavigationItem* item) {
   }
 }
 
-FeedType NewTabPageTabHelper::DefaultFeedType() {
-  return FeedTypeDiscover;
-}
-
 #pragma mark - Public
 
 void NewTabPageTabHelper::SetDelegate(
     id<NewTabPageTabHelperDelegate> delegate) {
   delegate_ = delegate;
-  active_ = IsNTPURL(web_state_->GetVisibleURL());
-  if (active_) {
-    UpdateItem(web_state_->GetNavigationManager()->GetPendingItem());
+  if (delegate_) {
+    active_ = IsUrlNtp(web_state_->GetVisibleURL());
+    if (active_) {
+      UpdateItem(web_state_->GetNavigationManager()->GetPendingItem());
+    }
   }
 }
 
@@ -78,43 +66,13 @@ bool NewTabPageTabHelper::IsActive() const {
   return active_;
 }
 
-bool NewTabPageTabHelper::IsNTPURL(const GURL& url) {
-  // `url` can be chrome://newtab/ or about://newtab/ depending on where `url`
-  // comes from (the VisibleURL chrome:// from a navigation item or the actual
-  // webView url about://).  If the url is about://newtab/, there is no origin
-  // to match, so instead check the scheme and the path.
-  return url.DeprecatedGetOriginAsURL() == kChromeUINewTabURL ||
-         (url.SchemeIs(url::kAboutScheme) && url.path() == kAboutNewTabPath);
+void NewTabPageTabHelper::SetNTPState(NewTabPageState* ntpState) {
+  ntp_state_.scrollPosition = ntpState.scrollPosition;
+  ntp_state_.selectedFeed = ntpState.selectedFeed;
 }
 
-FeedType NewTabPageTabHelper::GetNextNTPFeedType() {
-  return next_ntp_feed_type_;
-}
-
-void NewTabPageTabHelper::SetNextNTPFeedType(FeedType feed_type) {
-  next_ntp_feed_type_ = feed_type;
-}
-
-bool NewTabPageTabHelper::GetNextNTPScrolledToFeed() {
-  bool scrolled_ = next_ntp_scrolled_to_feed_;
-  // Resets next_ntp_scrolled_to_feed_ in case it was overriden by
-  // SetNextNTPScrolledToFeed.
-  next_ntp_scrolled_to_feed_ = NO;
-  return scrolled_;
-}
-
-void NewTabPageTabHelper::SetNextNTPScrolledToFeed(bool scrolled_to_feed) {
-  next_ntp_scrolled_to_feed_ = scrolled_to_feed;
-}
-
-void NewTabPageTabHelper::SaveNTPState(CGFloat scroll_position,
-                                       FeedType feed_type) {
-  saved_scroll_position_ = scroll_position;
-  SetNextNTPFeedType(feed_type);
-}
-
-CGFloat NewTabPageTabHelper::ScrollPositionFromSavedState() {
-  return saved_scroll_position_;
+NewTabPageState* NewTabPageTabHelper::GetNTPState() {
+  return ntp_state_;
 }
 
 #pragma mark - WebStateObserver
@@ -127,7 +85,7 @@ void NewTabPageTabHelper::WebStateDestroyed(web::WebState* web_state) {
 void NewTabPageTabHelper::DidStartNavigation(
     web::WebState* web_state,
     web::NavigationContext* navigation_context) {
-  if (IsNTPURL(navigation_context->GetUrl())) {
+  if (IsUrlNtp(navigation_context->GetUrl())) {
     UpdateItem(web_state_->GetNavigationManager()->GetPendingItem());
   } else {
     SetActive(false);
@@ -150,7 +108,7 @@ void NewTabPageTabHelper::PageLoaded(
     web::WebState* web_state,
     web::PageLoadCompletionStatus load_completion_status) {
   if (load_completion_status == web::PageLoadCompletionStatus::SUCCESS) {
-    if (IsNTPURL(web_state->GetVisibleURL())) {
+    if (IsUrlNtp(web_state->GetVisibleURL())) {
       SetActive(true);
     }
   }

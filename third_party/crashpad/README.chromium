@@ -1,11 +1,12 @@
 Name: Crashpad
 Short Name: crashpad
 URL: https://crashpad.chromium.org/
-Version: unknown
-Revision: c21292dd71ee69c1a0756e5ef8474b621996be06
+Version: N/A
+Revision: 8da335ffad361191fa467de56a30715223f04014
 License: Apache 2.0
 License File: crashpad/LICENSE
 Security Critical: yes
+Shipped: yes
 
 Description:
 Crashpad is a crash-reporting system. It’s the successor to Breakpad.

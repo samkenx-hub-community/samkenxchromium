@@ -39,6 +39,7 @@
 #include <functional>
 #include <type_traits>
 
+#include "absl/base/attributes.h"
 #include "absl/base/config.h"
 
 // Defines the default alignment. `__STDCPP_DEFAULT_NEW_ALIGNMENT__` is a C++17
@@ -229,14 +230,6 @@ template <typename T>
 using remove_cvref_t = typename remove_cvref<T>::type;
 #endif
 
-namespace type_traits_internal {
-// An implementation of std::is_trivially_copyable was once provided for
-// internal use within absl.
-// TODO(absl-team): Replace absl::type_traits_internal::is_trivially_copyable
-// with std::is_trivially_copyable and delete this using declaration.
-using std::is_trivially_copyable;
-}  // namespace type_traits_internal
-
 // -----------------------------------------------------------------------------
 // C++14 "_t" trait aliases
 // -----------------------------------------------------------------------------
@@ -286,6 +279,7 @@ using remove_extent_t = typename std::remove_extent<T>::type;
 template <typename T>
 using remove_all_extents_t = typename std::remove_all_extents<T>::type;
 
+ABSL_INTERNAL_DISABLE_DEPRECATED_DECLARATION_WARNING
 namespace type_traits_internal {
 // This trick to retrieve a default alignment is necessary for our
 // implementation of aligned_storage_t to be consistent with any
@@ -304,6 +298,7 @@ struct default_alignment_of_aligned_storage<
 template <size_t Len, size_t Align = type_traits_internal::
                           default_alignment_of_aligned_storage<Len>::value>
 using aligned_storage_t = typename std::aligned_storage<Len, Align>::type;
+ABSL_INTERNAL_RESTORE_DEPRECATED_DECLARATION_WARNING
 
 template <typename T>
 using decay_t = typename std::decay<T>::type;
@@ -474,9 +469,14 @@ using swap_internal::StdSwapIsUnconstrained;
 }  // namespace type_traits_internal
 
 // absl::is_trivially_relocatable<T>
-// Detects whether a type is "trivially relocatable" -- meaning it can be
-// relocated without invoking the constructor/destructor, using a form of move
-// elision.
+//
+// Detects whether a type is known to be "trivially relocatable" -- meaning it
+// can be relocated without invoking the constructor/destructor, using a form of
+// move elision.
+//
+// This trait is conservative, for backwards compatibility. If it's true then
+// the type is definitely trivially relocatable, but if it's false then the type
+// may or may not be.
 //
 // Example:
 //
@@ -490,14 +490,33 @@ using swap_internal::StdSwapIsUnconstrained;
 // Upstream documentation:
 //
 // https://clang.llvm.org/docs/LanguageExtensions.html#:~:text=__is_trivially_relocatable
+
+// If the compiler offers a builtin that tells us the answer, we can use that.
+// This covers all of the cases in the fallback below, plus types that opt in
+// using e.g. [[clang::trivial_abi]].
 //
-#if ABSL_HAVE_BUILTIN(__is_trivially_relocatable)
+// Clang on Windows has the builtin, but it falsely claims types with a
+// user-provided destructor are trivial (http://b/275003464). So we opt out
+// there.
+//
+// TODO(b/275003464): remove the opt-out once the bug is fixed.
+//
+// According to https://github.com/abseil/abseil-cpp/issues/1479, this does not
+// work with NVCC either.
+#if ABSL_HAVE_BUILTIN(__is_trivially_relocatable) &&                 \
+    !(defined(__clang__) && (defined(_WIN32) || defined(_WIN64))) && \
+    !defined(__NVCC__)
 template <class T>
 struct is_trivially_relocatable
     : std::integral_constant<bool, __is_trivially_relocatable(T)> {};
 #else
+// Otherwise we use a fallback that detects only those types we can feasibly
+// detect. Any time that has trivial move-construction and destruction
+// operations is by definition trivially relocatable.
 template <class T>
-struct is_trivially_relocatable : std::integral_constant<bool, false> {};
+struct is_trivially_relocatable
+    : absl::conjunction<absl::is_trivially_move_constructible<T>,
+                        absl::is_trivially_destructible<T>> {};
 #endif
 
 // absl::is_constant_evaluated()

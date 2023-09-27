@@ -8,6 +8,7 @@ import android.accounts.Account;
 import android.accounts.AuthenticatorDescription;
 import android.app.Activity;
 import android.content.Intent;
+import android.os.Bundle;
 
 import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
@@ -75,7 +76,7 @@ public class FakeAccountManagerDelegate implements AccountManagerDelegate {
             boolean added = mAccounts.add(accountHolder);
             assert added : "Account already added";
         }
-        ThreadUtils.runOnUiThreadBlocking(mObserver::onAccountsChanged);
+        ThreadUtils.runOnUiThreadBlocking(mObserver::onCoreAccountInfosChanged);
     }
 
     /**
@@ -86,7 +87,7 @@ public class FakeAccountManagerDelegate implements AccountManagerDelegate {
             boolean removed = mAccounts.remove(accountHolder);
             assert removed : "Can't find account";
         }
-        ThreadUtils.runOnUiThreadBlocking(mObserver::onAccountsChanged);
+        ThreadUtils.runOnUiThreadBlocking(mObserver::onCoreAccountInfosChanged);
     }
 
     @Override
@@ -150,6 +151,11 @@ public class FakeAccountManagerDelegate implements AccountManagerDelegate {
         if (callback != null) {
             ThreadUtils.postOnUiThread(callback.bind(true));
         }
+    }
+
+    @Override
+    public void confirmCredentials(Account account, Activity activity, Callback<Bundle> callback) {
+        callback.onResult(null);
     }
 
     private AccountHolder tryGetAccountHolder(Account account) {

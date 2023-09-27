@@ -102,9 +102,11 @@ export class AmbientPreviewBase extends WithPersonalizationStore {
   }
 
   private computeLoading_(): boolean {
-    return this.isAmbientModeAllowed_ &&
-        (this.ambientModeEnabled_ === null || this.albums_ === null ||
-         this.topicSource_ === null || this.previewImages_ === null);
+    if (!this.isAmbientModeAllowed_ || this.ambientModeEnabled_ === false) {
+      return false;
+    }
+    return this.ambientModeEnabled_ === null || this.albums_ === null ||
+        this.topicSource_ === null || this.previewImages_ === null;
   }
 
   private onLoadingChanged_(value: boolean) {
@@ -139,18 +141,13 @@ export class AmbientPreviewBase extends WithPersonalizationStore {
     const classes = [];
 
     if (this.ambientModeEnabled_ || this.loading_) {
-      classes.push('zero-state-disabled');
+      classes.push('ambient-mode-enabled');
     }
 
     if (!this.ambientModeEnabled_) {
       classes.push('ambient-mode-disabled');
     }
 
-    /* TODO(b/253470553): Remove this condition after Ambient subpage UI change
-     * is released. */
-    if (!this.isPersonalizationJellyEnabled_) {
-      classes.push('jelly-disabled');
-    }
     return classes.join(' ');
   }
 
@@ -182,11 +179,16 @@ export class AmbientPreviewBase extends WithPersonalizationStore {
         // and number of photos in the album (only applicable for Google
         // Photos).
         const topicSourceDesc = getTopicSourceName(this.topicSource_);
-        // TODO(b/223834394): replace dot separator symbol • with an icon/image.
-        return this.topicSource_ === TopicSource.kArtGallery ?
-            topicSourceDesc :
-            `${topicSourceDesc} • ${
-                getPhotoCount(this.previewAlbums_[0].numberOfPhotos)}`;
+        if (this.topicSource_ === TopicSource.kArtGallery) {
+          return topicSourceDesc;
+        } else if (this.topicSource_ === TopicSource.kVideo) {
+          return this.previewAlbums_[0].description;
+        } else {
+          // TODO(b/223834394): replace dot separator symbol • with an
+          // icon/image.
+          return `${topicSourceDesc} • ${
+              getPhotoCount(this.previewAlbums_[0].numberOfPhotos)}`;
+        }
       case 2:
       case 3:
         // For 2-3 selected albums, album description includes the titles of all

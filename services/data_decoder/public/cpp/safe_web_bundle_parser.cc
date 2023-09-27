@@ -21,18 +21,15 @@ SafeWebBundleParser::SafeWebBundleParser(const absl::optional<GURL>& base_url)
 SafeWebBundleParser::~SafeWebBundleParser() = default;
 
 base::File::Error SafeWebBundleParser::OpenFile(base::File file) {
-  DCHECK(disconnected_);
-
   if (!file.IsValid())
     return file.error_details();
 
-  GetFactory()->GetParserForFile(parser_.BindNewPipeAndPassReceiver(),
-                                 base_url_, std::move(file));
-  parser_.set_disconnect_handler(base::BindOnce(
-      &SafeWebBundleParser::OnDisconnect, base::Unretained(this)));
-
-  disconnected_ = false;
-
+  mojo::PendingRemote<web_package::mojom::BundleDataSource>
+      file_data_source_pending_remote;
+  GetFactory()->BindFileDataSource(
+      file_data_source_pending_remote.InitWithNewPipeAndPassReceiver(),
+      std::move(file));
+  OpenDataSource(std::move(file_data_source_pending_remote));
   return base::File::FILE_OK;
 }
 
@@ -65,7 +62,7 @@ void SafeWebBundleParser::ParseIntegrityBlock(
 }
 
 void SafeWebBundleParser::ParseMetadata(
-    int64_t offset,
+    absl::optional<uint64_t> offset,
     web_package::mojom::WebBundleParser::ParseMetadataCallback callback) {
   // This method is designed to be called once. So, allowing only once
   // simultaneous request is fine enough.
@@ -78,7 +75,7 @@ void SafeWebBundleParser::ParseMetadata(
     return;
   }
   metadata_callback_ = std::move(callback);
-  parser_->ParseMetadata(offset,
+  parser_->ParseMetadata(std::move(offset),
                          base::BindOnce(&SafeWebBundleParser::OnMetadataParsed,
                                         base::Unretained(this)));
 }
@@ -118,6 +115,11 @@ web_package::mojom::WebBundleParserFactory* SafeWebBundleParser::GetFactory() {
 void SafeWebBundleParser::SetDisconnectCallback(base::OnceClosure callback) {
   DCHECK(!disconnect_callback_);
   disconnect_callback_ = std::move(callback);
+}
+
+void SafeWebBundleParser::Close(base::OnceClosure callback) {
+  parser_->Close(base::BindOnce(&SafeWebBundleParser::OnParserClosed,
+                                base::Unretained(this), std::move(callback)));
 }
 
 void SafeWebBundleParser::OnDisconnect() {
@@ -178,6 +180,10 @@ void SafeWebBundleParser::OnResponseParsed(
   auto callback = std::move(it->second);
   response_callbacks_.erase(it);
   std::move(callback).Run(std::move(response), std::move(error));
+}
+
+void SafeWebBundleParser::OnParserClosed(base::OnceClosure callback) const {
+  std::move(callback).Run();
 }
 
 }  // namespace data_decoder

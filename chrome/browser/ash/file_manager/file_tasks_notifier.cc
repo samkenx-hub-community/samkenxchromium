@@ -10,6 +10,7 @@
 #include "base/barrier_closure.h"
 #include "base/files/file_util.h"
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "chrome/browser/ash/drive/drive_integration_service.h"
@@ -35,7 +36,6 @@ namespace {
 bool IsSupportedFileSystemType(storage::FileSystemType type) {
   switch (type) {
     case storage::kFileSystemTypeLocal:
-    case storage::kFileSystemTypeRestrictedLocal:
     case storage::kFileSystemTypeDriveFs:
       return true;
     default:
@@ -54,7 +54,9 @@ void ReturnQueryResults(
 
 struct FileTasksNotifier::PendingFileAvailabilityTask {
   storage::FileSystemURL url;
-  FileTasksNotifier::FileAvailability* output;
+  raw_ptr<FileTasksNotifier::FileAvailability,
+          DanglingUntriaged | ExperimentalAsh>
+      output;
   base::OnceClosure done;
 };
 

@@ -78,6 +78,8 @@ public class DisplayAndroid {
     private float mRefreshRate;
     private Display.Mode mCurrentDisplayMode;
     private List<Display.Mode> mDisplayModes;
+    private boolean mIsHdr;
+    private float mHdrMaxLuminanceRatio = 1.0f;
     protected boolean mIsDisplayWideColorGamut;
     protected boolean mIsDisplayServerWideColorGamut;
 
@@ -221,6 +223,24 @@ public class DisplayAndroid {
     }
 
     /**
+     * Whether or not the display is HDR capable. If false then getHdrMaxLuminanceRatio will
+     * always return 1.0.
+     */
+    // Package private only because no client needs to access this from java.
+    boolean getIsHdr() {
+        return mIsHdr;
+    }
+
+    /**
+     * Max luminance HDR content can display, represented as a multiple of the SDR white luminance
+     * (so a display that is incapable of HDR would have a value of 1.0).
+     */
+    // Package private only because no client needs to access this from java.
+    float getHdrMaxLuminanceRatio() {
+        return mHdrMaxLuminanceRatio;
+    }
+
+    /**
      * Return window context for display android. Implemented by @{@link PhysicalDisplayAndroid}
      * @return window context.
      */
@@ -256,7 +276,7 @@ public class DisplayAndroid {
 
     public void updateIsDisplayServerWideColorGamut(Boolean isDisplayServerWideColorGamut) {
         update(null, null, null, null, null, null, null, null, isDisplayServerWideColorGamut, null,
-                null, null);
+                null, null, /*isHdr=*/null, /*hdrMaxLuminanceRatio=*/null);
     }
 
     /**
@@ -269,7 +289,7 @@ public class DisplayAndroid {
             List<Display.Mode> supportedModes) {
         update(size, dipScale, null, null, bitsPerPixel, bitsPerComponent, rotation,
                 isDisplayWideColorGamut, isDisplayServerWideColorGamut, refreshRate, currentMode,
-                supportedModes);
+                supportedModes, /*isHdr=*/null, /*hdrMaxLuminanceRatio=*/null);
     }
 
     /**
@@ -279,7 +299,7 @@ public class DisplayAndroid {
     protected void update(Point size, Float dipScale, Float xdpi, Float ydpi, Integer bitsPerPixel,
             Integer bitsPerComponent, Integer rotation, Boolean isDisplayWideColorGamut,
             Boolean isDisplayServerWideColorGamut, Float refreshRate, Display.Mode currentMode,
-            List<Display.Mode> supportedModes) {
+            List<Display.Mode> supportedModes, Boolean isHdr, Float hdrMaxLuminanceRatio) {
         boolean sizeChanged = size != null && !mSize.equals(size);
         // Intentional comparison of floats: we assume that if scales differ, they differ
         // significantly.
@@ -299,10 +319,14 @@ public class DisplayAndroid {
                 && (mDisplayModes == null ? true : mDisplayModes.equals(supportedModes));
         boolean currentModeChanged =
                 currentMode != null && !currentMode.equals(mCurrentDisplayMode);
+        boolean isHdrChanged = isHdr != null && isHdr != mIsHdr;
+        boolean hdrMaxLuninanceRatioChanged =
+                hdrMaxLuminanceRatio != null && hdrMaxLuminanceRatio != mHdrMaxLuminanceRatio;
         boolean changed = sizeChanged || dipScaleChanged || bitsPerPixelChanged
                 || bitsPerComponentChanged || rotationChanged || isDisplayWideColorGamutChanged
                 || isDisplayServerWideColorGamutChanged || isRefreshRateChanged
-                || displayModesChanged || currentModeChanged;
+                || displayModesChanged || currentModeChanged || isHdrChanged
+                || hdrMaxLuninanceRatioChanged;
         if (!changed) return;
 
         if (sizeChanged) mSize = size;
@@ -315,6 +339,10 @@ public class DisplayAndroid {
         if (isDisplayWideColorGamutChanged) mIsDisplayWideColorGamut = isDisplayWideColorGamut;
         if (isDisplayServerWideColorGamutChanged) {
             mIsDisplayServerWideColorGamut = isDisplayServerWideColorGamut;
+        }
+        if (isHdrChanged) mIsHdr = isHdr;
+        if (hdrMaxLuninanceRatioChanged) {
+            mHdrMaxLuminanceRatio = hdrMaxLuminanceRatio;
         }
         if (isRefreshRateChanged) mRefreshRate = refreshRate;
         if (displayModesChanged) mDisplayModes = supportedModes;

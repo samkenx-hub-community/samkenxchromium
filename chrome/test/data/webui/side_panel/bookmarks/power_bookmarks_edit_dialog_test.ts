@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'chrome://webui-test/mojo_webui_test_support.js';
 import 'chrome://bookmarks-side-panel.top-chrome/power_bookmarks_edit_dialog.js';
 
 import {BookmarksApiProxyImpl} from 'chrome://bookmarks-side-panel.top-chrome/bookmarks_api_proxy.js';
@@ -56,6 +55,13 @@ suite('SidePanelPowerBookmarksEditDialogTest', () => {
             },
           ],
         },
+        {
+          id: '6',
+          parentId: '2',
+          title: 'Child folder 2',
+          dateAdded: 1,
+          children: [],
+        },
       ],
     },
   ];
@@ -94,7 +100,7 @@ suite('SidePanelPowerBookmarksEditDialogTest', () => {
     const ironList =
         powerBookmarksEditDialog.shadowRoot!.querySelector('iron-list');
     const rows = ironList!.items!;
-
+    // Shows folders apart from itself/descendants
     assertEquals(rows.length, 1);
   });
 
@@ -137,7 +143,7 @@ suite('SidePanelPowerBookmarksEditDialogTest', () => {
     powerBookmarksEditDialog.showDialog(
         [],
         topLevelBookmarks,
-        [topLevelBookmarks[2]!],
+        [topLevelBookmarks[3]!],
         false,
     );
 

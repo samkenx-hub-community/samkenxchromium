@@ -9,20 +9,25 @@
 
 #include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
+#include "base/time/time.h"
 #include "base/values.h"
 #include "chrome/browser/web_applications/commands/web_app_command.h"
 #include "chrome/browser/web_applications/locks/app_lock.h"
 #include "chrome/browser/web_applications/manifest_update_utils.h"
+#include "chrome/browser/web_applications/scope_extension_info.h"
 #include "chrome/browser/web_applications/web_app_callback_app_identity.h"
 #include "chrome/browser/web_applications/web_app_icon_manager.h"
 #include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "chrome/browser/web_applications/web_contents/web_app_data_retriever.h"
 #include "chrome/browser/web_applications/web_contents/web_app_icon_downloader.h"
+#include "components/webapps/common/web_app_id.h"
+#include "content/public/browser/web_contents_observer.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace content {
 class WebContents;
+class NavigationHandle;
 }
 
 class GURL;
@@ -42,7 +47,8 @@ namespace web_app {
 // - Resolve any changes to app identity by confirming the change with the user,
 //   silently allowing them, or reverting them.
 // - Return back to the caller to schedule applying the changes back to disk.
-class ManifestUpdateCheckCommand : public WebAppCommandTemplate<AppLock> {
+class ManifestUpdateCheckCommand : public WebAppCommandTemplate<AppLock>,
+                                   public content::WebContentsObserver {
  public:
   // TODO(crbug.com/1409710): Merge ManifestUpdateDataFetchCommand and
   // ManifestUpdateFinalizeCommand into one so we don't have to return optional
@@ -53,21 +59,25 @@ class ManifestUpdateCheckCommand : public WebAppCommandTemplate<AppLock> {
 
   ManifestUpdateCheckCommand(
       const GURL& url,
-      const AppId& app_id,
+      const webapps::AppId& app_id,
+      base::Time check_time,
       base::WeakPtr<content::WebContents> web_contents,
       CompletedCallback callback,
-      std::unique_ptr<WebAppDataRetriever> data_retriever);
+      std::unique_ptr<WebAppDataRetriever> data_retriever,
+      std::unique_ptr<WebAppIconDownloader> icon_downloader);
 
   ~ManifestUpdateCheckCommand() override;
 
   // WebAppCommandTemplate<AppLock>:
   const LockDescription& lock_description() const override;
-  void OnSyncSourceRemoved() override {}
   void OnShutdown() override;
   base::Value ToDebugValue() const override;
   void StartWithLock(std::unique_ptr<AppLock> lock) override;
 
  private:
+  void DidFinishNavigation(
+      content::NavigationHandle* navigation_handle) override;
+
   // Stage: Download the new manifest data
   // (ManifestUpdateCheckStage::kDownloadingNewManifestData).
   void DownloadNewManifestData(base::OnceClosure next_step_callback);
@@ -84,6 +94,12 @@ class ManifestUpdateCheckCommand : public WebAppCommandTemplate<AppLock> {
                            IconsDownloadedResult result,
                            IconsMap icons_map,
                            DownloadedIconsHttpResults icons_http_results);
+
+  void ValidateNewScopeExtensions(
+      OnDidGetWebAppOriginAssociations next_step_callback);
+  void StashValidatedScopeExtensions(
+      base::OnceClosure next_step_callback,
+      ScopeExtensions validated_scope_extensions);
 
   // Stage: Loading existing manifest data from disk.
   // (ManifestUpdateCheckStage::kLoadingExistingManifestData)
@@ -119,7 +135,8 @@ class ManifestUpdateCheckCommand : public WebAppCommandTemplate<AppLock> {
   void CheckComplete();
 
   const WebApp& GetWebApp() const;
-  bool IsWebContentsDestroyed() const;
+
+  bool IsWebContentsDestroyed();
   void CompleteCommandAndSelfDestruct(ManifestUpdateCheckResult check_result);
 
   base::WeakPtr<ManifestUpdateCheckCommand> GetWeakPtr() {
@@ -128,7 +145,8 @@ class ManifestUpdateCheckCommand : public WebAppCommandTemplate<AppLock> {
 
   // Manifest update check request parameters.
   const GURL url_;
-  const AppId app_id_;
+  const webapps::AppId app_id_;
+  base::Time check_time_;
   CompletedCallback completed_callback_;
 
   // Resources and helpers used to fetch manifest data.
@@ -136,11 +154,11 @@ class ManifestUpdateCheckCommand : public WebAppCommandTemplate<AppLock> {
   std::unique_ptr<AppLock> lock_;
   base::WeakPtr<content::WebContents> web_contents_;
   std::unique_ptr<WebAppDataRetriever> data_retriever_;
-  absl::optional<WebAppIconDownloader> icon_downloader_;
+  std::unique_ptr<WebAppIconDownloader> icon_downloader_;
 
   // Temporary variables stored here while the update check progresses
   // asynchronously.
-  WebAppInstallInfo new_install_info_;
+  std::unique_ptr<WebAppInstallInfo> new_install_info_;
   IconBitmaps existing_app_icon_bitmaps_;
   ShortcutsMenuIconBitmaps existing_shortcuts_menu_icon_bitmaps_;
   ManifestDataChanges manifest_data_changes_;

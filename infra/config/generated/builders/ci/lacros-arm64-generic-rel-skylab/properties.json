@@ -23,7 +23,7 @@
                 "target_arch": "arm",
                 "target_bits": 64,
                 "target_cros_boards": [
-                  "kevin:arm64-generic"
+                  "arm64-generic"
                 ],
                 "target_platform": "chromeos"
               },
@@ -53,7 +53,8 @@
   "$build/reclient": {
     "instance": "rbe-chromium-trusted",
     "jobs": 500,
-    "metrics_project": "chromium-reclient-metrics"
+    "metrics_project": "chromium-reclient-metrics",
+    "scandeps_server": true
   },
   "$recipe_engine/resultdb/test_presentation": {
     "column_keys": [],

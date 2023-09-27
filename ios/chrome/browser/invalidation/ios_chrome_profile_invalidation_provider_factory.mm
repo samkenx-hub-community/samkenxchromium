@@ -19,15 +19,11 @@
 #import "components/keyed_service/ios/browser_state_dependency_manager.h"
 #import "components/pref_registry/pref_registry_syncable.h"
 #import "components/prefs/pref_registry.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/gcm/instance_id/ios_chrome_instance_id_profile_service_factory.h"
 #import "ios/chrome/browser/gcm/ios_chrome_gcm_profile_service_factory.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/signin/identity_manager_factory.h"
 #import "services/network/public/cpp/shared_url_loader_factory.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using invalidation::ProfileInvalidationProvider;
 
@@ -70,29 +66,8 @@ IOSChromeProfileInvalidationProviderFactory::BuildServiceInstanceFor(
       std::make_unique<invalidation::ProfileIdentityProvider>(
           IdentityManagerFactory::GetForBrowserState(browser_state));
 
-  std::unique_ptr<invalidation::FCMInvalidationService> service =
-      std::make_unique<invalidation::FCMInvalidationService>(
-          identity_provider.get(),
-          base::BindRepeating(
-              &invalidation::FCMNetworkHandler::Create,
-              IOSChromeGCMProfileServiceFactory::GetForBrowserState(
-                  browser_state)
-                  ->driver(),
-              IOSChromeInstanceIDProfileServiceFactory::GetForBrowserState(
-                  browser_state)
-                  ->driver()),
-          base::BindRepeating(
-              &invalidation::PerUserTopicSubscriptionManager::Create,
-              identity_provider.get(), browser_state->GetPrefs(),
-              browser_state->GetURLLoaderFactory()),
-          IOSChromeInstanceIDProfileServiceFactory::GetForBrowserState(
-              browser_state)
-              ->driver(),
-          browser_state->GetPrefs());
-  service->Init();
-
   return std::make_unique<ProfileInvalidationProvider>(
-      std::move(service), std::move(identity_provider));
+      std::move(identity_provider));
 }
 
 void IOSChromeProfileInvalidationProviderFactory::RegisterBrowserStatePrefs(

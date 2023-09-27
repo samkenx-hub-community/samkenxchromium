@@ -19,6 +19,7 @@
 #include "base/feature_list.h"
 #include "base/files/file.h"
 #include "base/files/file_util.h"
+#include "base/functional/callback_helpers.h"
 #include "base/logging.h"
 #include "base/no_destructor.h"
 #include "base/path_service.h"
@@ -120,6 +121,16 @@
 #include "services/network/public/mojom/ct_log_info.mojom.h"
 #endif
 
+#if BUILDFLAG(IS_IOS)
+#include "components/permissions/bluetooth_delegate_impl.h"
+#include "content/shell/browser/bluetooth/shell_bluetooth_delegate_impl_client.h"
+#endif
+
+#if BUILDFLAG(IS_WIN)
+#include "media/mojo/mojom/media_foundation_preferences.mojom.h"
+#include "media/mojo/services/media_foundation_preferences.h"
+#endif  // BUILDFLAG(IS_WIN)
+
 namespace content {
 
 namespace {
@@ -199,23 +210,6 @@ class ShellVariationsServiceClient
       PrefService* local_state) override {}
 };
 
-// Returns the full user agent string for the content shell.
-std::string GetShellFullUserAgent() {
-  std::string product = "Chrome/" CONTENT_SHELL_VERSION;
-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  if (command_line->HasSwitch(switches::kUseMobileUserAgent))
-    product += " Mobile";
-  return BuildUserAgentFromProduct(product);
-}
-
-// Returns the reduced user agent string for the content shell.
-std::string GetShellReducedUserAgent() {
-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  return content::GetReducedUserAgent(
-      command_line->HasSwitch(switches::kUseMobileUserAgent),
-      CONTENT_SHELL_MAJOR_VERSION);
-}
-
 void BindNetworkHintsHandler(
     content::RenderFrameHost* frame_host,
     mojo::PendingReceiver<network_hints::mojom::NetworkHintsHandler> receiver) {
@@ -223,6 +217,18 @@ void BindNetworkHintsHandler(
   network_hints::SimpleNetworkHintsHandlerImpl::Create(frame_host,
                                                        std::move(receiver));
 }
+
+#if BUILDFLAG(IS_WIN)
+void BindMediaFoundationPreferences(
+    content::RenderFrameHost* frame_host,
+    mojo::PendingReceiver<media::mojom::MediaFoundationPreferences> receiver) {
+  // Passing in a NullCallback since we don't have MediaFoundationServiceMonitor
+  // in content.
+  MediaFoundationPreferencesImpl::Create(
+      frame_host->GetSiteInstance()->GetSiteURL(), base::NullCallback(),
+      std::move(receiver));
+}
+#endif  // BUILDFLAG(IS_WIN)
 
 base::flat_set<url::Origin> GetIsolatedContextOriginSetFromFlag() {
   std::string cmdline_origins(
@@ -294,16 +300,6 @@ std::unique_ptr<PrefService> CreateLocalState() {
 
 }  // namespace
 
-std::string GetShellUserAgent() {
-  if (base::FeatureList::IsEnabled(blink::features::kFullUserAgent))
-    return GetShellFullUserAgent();
-
-  if (base::FeatureList::IsEnabled(blink::features::kReduceUserAgent))
-    return GetShellReducedUserAgent();
-
-  return GetShellFullUserAgent();
-}
-
 std::string GetShellLanguage() {
   return "en-us,en";
 }
@@ -322,6 +318,7 @@ blink::UserAgentMetadata GetShellUserAgentMetadata() {
 
   metadata.bitness = GetCpuBitness();
   metadata.wow64 = content::IsWoW64();
+  metadata.form_factor = "";  // Empty value signifies desktop.
 
   return metadata;
 }
@@ -402,7 +399,7 @@ bool ShellContentBrowserClient::IsHandledURL(const GURL& url) {
 void ShellContentBrowserClient::AppendExtraCommandLineSwitches(
     base::CommandLine* command_line,
     int child_process_id) {
-  static const char* kForwardSwitches[] = {
+  static const char* const kForwardSwitches[] = {
 #if BUILDFLAG(IS_MAC)
     // Needed since on Mac, content_browsertests doesn't use
     // content_test_launcher.cc and instead uses shell_main.cc. So give a signal
@@ -413,10 +410,11 @@ void ShellContentBrowserClient::AppendExtraCommandLineSwitches(
     switches::kEnableCrashReporter,
     switches::kExposeInternalsForTesting,
     switches::kRunWebTests,
+    switches::kTestRegisterStandardScheme,
   };
 
   command_line->CopySwitchesFrom(*base::CommandLine::ForCurrentProcess(),
-                                 kForwardSwitches, std::size(kForwardSwitches));
+                                 kForwardSwitches);
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -435,6 +433,10 @@ void ShellContentBrowserClient::AppendExtraCommandLineSwitches(
 device::GeolocationManager* ShellContentBrowserClient::GetGeolocationManager() {
 #if BUILDFLAG(IS_MAC)
   return GetSharedState().location_manager.get();
+#elif BUILDFLAG(IS_IOS)
+  // TODO(crbug.com/1431447, 1411704): Unify this to FakeGeolocationManager once
+  // exploring browser features in ContentShell on iOS is done.
+  return GetSharedState().shell_browser_main_parts->GetGeolocationManager();
 #else
   return nullptr;
 #endif
@@ -479,6 +481,18 @@ bool ShellContentBrowserClient::IsSharedStorageSelectURLAllowed(
   return true;
 }
 
+bool ShellContentBrowserClient::IsCookieDeprecationLabelAllowed(
+    content::BrowserContext* browser_context) {
+  return true;
+}
+
+bool ShellContentBrowserClient::IsCookieDeprecationLabelAllowedForContext(
+    content::BrowserContext* browser_context,
+    const url::Origin& top_frame_origin,
+    const url::Origin& context_origin) {
+  return true;
+}
+
 GeneratedCodeCacheSettings
 ShellContentBrowserClient::GetGeneratedCodeCacheSettings(
     content::BrowserContext* context) {
@@ -489,14 +503,16 @@ ShellContentBrowserClient::GetGeneratedCodeCacheSettings(
 }
 
 base::OnceClosure ShellContentBrowserClient::SelectClientCertificate(
+    BrowserContext* browser_context,
     WebContents* web_contents,
     net::SSLCertRequestInfo* cert_request_info,
     net::ClientCertIdentityList client_certs,
     std::unique_ptr<ClientCertificateDelegate> delegate) {
-  if (select_client_certificate_callback_)
+  if (select_client_certificate_callback_ && web_contents) {
     return std::move(select_client_certificate_callback_)
         .Run(web_contents, cert_request_info, std::move(client_certs),
              std::move(delegate));
+  }
   return base::OnceClosure();
 }
 
@@ -559,6 +575,10 @@ void ShellContentBrowserClient::RegisterBrowserInterfaceBindersForFrame(
       ->ExposeInterfacesToRenderFrame(map);
   map->Add<network_hints::mojom::NetworkHintsHandler>(
       base::BindRepeating(&BindNetworkHintsHandler));
+#if BUILDFLAG(IS_WIN)
+  map->Add<media::mojom::MediaFoundationPreferences>(
+      base::BindRepeating(&BindMediaFoundationPreferences));
+#endif  // BUILDFLAG(IS_WIN)
 }
 
 void ShellContentBrowserClient::OpenURL(
@@ -619,16 +639,16 @@ base::FilePath ShellContentBrowserClient::GetFirstPartySetsDirectory() {
   return browser_context()->GetPath();
 }
 
+absl::optional<base::FilePath>
+ShellContentBrowserClient::GetLocalTracesDirectory() {
+  return browser_context()->GetPath();
+}
+
 std::string ShellContentBrowserClient::GetUserAgent() {
-  return GetShellUserAgent();
-}
-
-std::string ShellContentBrowserClient::GetFullUserAgent() {
-  return GetShellFullUserAgent();
-}
-
-std::string ShellContentBrowserClient::GetReducedUserAgent() {
-  return GetShellReducedUserAgent();
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  return content::GetReducedUserAgent(
+      command_line->HasSwitch(switches::kUseMobileUserAgent),
+      CONTENT_SHELL_MAJOR_VERSION);
 }
 
 blink::UserAgentMetadata ShellContentBrowserClient::GetUserAgentMetadata() {
@@ -681,6 +701,16 @@ ShellContentBrowserClient::GetNetworkContextsParentDirectory() {
   return {browser_context()->GetPath()};
 }
 
+#if BUILDFLAG(IS_IOS)
+BluetoothDelegate* ShellContentBrowserClient::GetBluetoothDelegate() {
+  if (!bluetooth_delegate_) {
+    bluetooth_delegate_ = std::make_unique<permissions::BluetoothDelegateImpl>(
+        std::make_unique<ShellBluetoothDelegateImplClient>());
+  }
+  return bluetooth_delegate_.get();
+}
+#endif
+
 void ShellContentBrowserClient::BindBrowserControlInterface(
     mojo::ScopedMessagePipeHandle pipe) {
   if (!pipe.is_valid())
@@ -718,6 +748,7 @@ void ShellContentBrowserClient::ConfigureNetworkContextParamsForShell(
       allow_any_cors_exempt_header_for_browser_;
   context_params->user_agent = GetUserAgent();
   context_params->accept_language = GetAcceptLangs(context);
+  context_params->enable_zstd = true;
   auto exempt_header =
       base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
           "cors_exempt_header_list");
@@ -827,13 +858,17 @@ absl::optional<blink::ParsedPermissionsPolicy>
 ShellContentBrowserClient::GetPermissionsPolicyForIsolatedWebApp(
     content::BrowserContext* browser_context,
     const url::Origin& app_origin) {
-  blink::ParsedPermissionsPolicyDeclaration decl(
-      blink::mojom::PermissionsPolicyFeature::kDirectSockets,
-      {blink::OriginWithPossibleWildcards(app_origin,
-                                          /*has_subdomain_wildcard=*/false)},
+  blink::ParsedPermissionsPolicyDeclaration coi_decl(
+      blink::mojom::PermissionsPolicyFeature::kCrossOriginIsolated,
+      /*allowed_origins=*/{},
       /*self_if_matches=*/absl::nullopt,
+      /*matches_all_origins=*/true, /*matches_opaque_src=*/false);
+
+  blink::ParsedPermissionsPolicyDeclaration socket_decl(
+      blink::mojom::PermissionsPolicyFeature::kDirectSockets,
+      /*allowed_origins=*/{}, app_origin,
       /*matches_all_origins=*/false, /*matches_opaque_src=*/false);
-  return {{decl}};
+  return {{coi_decl, socket_decl}};
 }
 
 // Tests may install their own ShellContentBrowserClient, track the list here.

@@ -8,6 +8,7 @@
 #include <set>
 
 #include "ash/public/cpp/holding_space/holding_space_constants.h"
+#include "ash/public/cpp/holding_space/holding_space_file.h"
 #include "ash/public/cpp/holding_space/holding_space_image.h"
 #include "ash/public/cpp/holding_space/holding_space_item.h"
 #include "ash/public/cpp/holding_space/holding_space_section.h"
@@ -36,7 +37,7 @@ std::set<HoldingSpaceItem::Type> GetHoldingSpaceItemScreenCaptureTypes() {
           GetHoldingSpaceSection(HoldingSpaceSectionId::kScreenCaptures)) {
     for (const HoldingSpaceItem::Type& supported_type :
          section->supported_types) {
-      DCHECK(HoldingSpaceItem::IsScreenCapture(supported_type));
+      DCHECK(HoldingSpaceItem::IsScreenCaptureType(supported_type));
       types.insert(supported_type);
     }
   }
@@ -62,10 +63,13 @@ class HoldingSpaceItemScreenCaptureViewTest
     HoldingSpaceAshTestBase::SetUp();
 
     HoldingSpaceItem::Type type = GetParam();
-    ASSERT_TRUE(HoldingSpaceItem::IsScreenCapture(type));
+    ASSERT_TRUE(HoldingSpaceItem::IsScreenCaptureType(type));
 
     item_ = HoldingSpaceItem::CreateFileBackedItem(
-        type, base::FilePath("file_path"), GURL("filesystem:file_system_url"),
+        type,
+        HoldingSpaceFile(base::FilePath("file_path"),
+                         HoldingSpaceFile::FileSystemType::kTest,
+                         GURL("filesystem:file_system_url")),
         base::BindOnce(
             [](HoldingSpaceItem::Type type, const base::FilePath& file_path)
                 -> std::unique_ptr<HoldingSpaceImage> {

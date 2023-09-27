@@ -7,6 +7,7 @@ package org.chromium.chrome.browser.bookmarks;
 import androidx.annotation.NonNull;
 
 import org.chromium.base.ObserverList;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.ThreadUtils;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.components.bookmarks.BookmarkId;
@@ -14,7 +15,9 @@ import org.chromium.components.bookmarks.BookmarkItem;
 import org.chromium.components.bookmarks.BookmarkType;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A class that encapsulates {@link BookmarkBridge} and provides extra features such as undo, large
@@ -27,6 +30,7 @@ public class BookmarkModel extends BookmarkBridge {
     /** Set an instance for testing. */
     public static void setInstanceForTesting(BookmarkModel bookmarkModel) {
         sInstanceForTesting = bookmarkModel;
+        ResettersForTesting.register(() -> sInstanceForTesting = null);
     }
 
     /**
@@ -115,9 +119,12 @@ public class BookmarkModel extends BookmarkBridge {
      * bookmark list. The bookmarks are appended at the end.
      */
     public void moveBookmarks(List<BookmarkId> bookmarkIds, BookmarkId newParentId) {
+        Set<BookmarkId> existingChildren = new HashSet<>(getChildIds(newParentId));
         int appendIndex = getChildCount(newParentId);
-        for (int i = 0; i < bookmarkIds.size(); ++i) {
-            moveBookmark(bookmarkIds.get(i), newParentId, appendIndex + i);
+        for (BookmarkId child : bookmarkIds) {
+            if (!existingChildren.contains(child)) {
+                moveBookmark(child, newParentId, appendIndex++);
+            }
         }
     }
 
@@ -128,22 +135,6 @@ public class BookmarkModel extends BookmarkBridge {
         BookmarkItem bookmarkItem = getBookmarkById(bookmarkId);
         if (bookmarkItem == null) return "";
         return bookmarkItem.getTitle();
-    }
-
-    /**
-     * @param bookmarkId The {@link BookmarkId} for the reading list folder.
-     * @return The total number of unread reading list articles.
-     */
-    public int getUnreadCount(@NonNull BookmarkId bookmarkId) {
-        assert bookmarkId.getType() == BookmarkType.READING_LIST;
-        List<BookmarkId> children = getChildIDs(bookmarkId);
-        int unreadCount = 0;
-        for (BookmarkId child : children) {
-            BookmarkItem childItem = getBookmarkById(child);
-            if (!childItem.isRead()) unreadCount++;
-        }
-
-        return unreadCount;
     }
 
     /**

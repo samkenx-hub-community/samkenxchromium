@@ -103,6 +103,11 @@ AppStreamManager* FakePhoneHubManager::GetAppStreamManager() {
   return &app_stream_manager_;
 }
 
+PhoneHubUiReadinessRecorder*
+FakePhoneHubManager::GetPhoneHubUiReadinessRecorder() {
+  return phone_hub_ui_readiness_recorder_;
+}
+
 eche_app::EcheConnectionStatusHandler*
 FakePhoneHubManager::GetEcheConnectionStatusHandler() {
   return eche_connection_status_handler_;
@@ -111,6 +116,15 @@ FakePhoneHubManager::GetEcheConnectionStatusHandler() {
 void FakePhoneHubManager::SetEcheConnectionStatusHandler(
     eche_app::EcheConnectionStatusHandler* eche_connection_status_handler) {
   eche_connection_status_handler_ = eche_connection_status_handler;
+}
+
+void FakePhoneHubManager::SetSystemInfoProvider(
+    eche_app::SystemInfoProvider* system_info_provider) {
+  system_info_provider_ = system_info_provider;
+}
+
+eche_app::SystemInfoProvider* FakePhoneHubManager::GetSystemInfoProvider() {
+  return system_info_provider_;
 }
 
 }  // namespace phonehub

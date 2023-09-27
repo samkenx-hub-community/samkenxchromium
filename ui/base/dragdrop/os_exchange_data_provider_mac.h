@@ -8,7 +8,6 @@
 #include <memory>
 
 #include "base/component_export.h"
-#include "base/mac/scoped_nsobject.h"
 #import "ui/base/clipboard/clipboard_util_mac.h"
 #include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/dragdrop/os_exchange_data_provider.h"
@@ -52,7 +51,6 @@ class COMPONENT_EXPORT(UI_BASE) OSExchangeDataProviderMac
   bool GetURLAndTitle(FilenameToURLPolicy policy,
                       GURL* url,
                       std::u16string* title) const override;
-  bool GetFilename(base::FilePath* path) const override;
   bool GetFilenames(std::vector<FileInfo>* filenames) const override;
   bool GetPickledData(const ClipboardFormatType& format,
                       base::Pickle* data) const override;

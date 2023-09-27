@@ -11,6 +11,7 @@
 #include "base/json/json_string_value_serializer.h"
 #include "base/json/json_writer.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/values.h"
@@ -199,12 +200,14 @@ class ShillToONCTranslator {
   // for debugging.
   std::string GetName();
 
-  const base::Value::Dict* shill_dictionary_;
+  raw_ptr<const base::Value::Dict, ExperimentalAsh> shill_dictionary_;
   ::onc::ONCSource onc_source_;
-  const chromeos::onc::OncValueSignature* onc_signature_;
-  const FieldTranslationEntry* field_translation_table_;
+  raw_ptr<const chromeos::onc::OncValueSignature, ExperimentalAsh>
+      onc_signature_;
+  raw_ptr<const FieldTranslationEntry, ExperimentalAsh>
+      field_translation_table_;
   base::Value::Dict onc_object_;
-  const NetworkState* network_state_;
+  raw_ptr<const NetworkState, ExperimentalAsh> network_state_;
 };
 
 base::Value::Dict ShillToONCTranslator::CreateTranslatedONCObject() {
@@ -794,7 +797,8 @@ void ShillToONCTranslator::TranslateIPConfig() {
       shill_ip_method == shill::kTypeDHCP) {
     type = ::onc::ipconfig::kIPv4;
   } else if (shill_ip_method == shill::kTypeIPv6 ||
-             shill_ip_method == shill::kTypeDHCP6) {
+             shill_ip_method == shill::kTypeDHCP6 ||
+             shill_ip_method == shill::kTypeSLAAC) {
     type = ::onc::ipconfig::kIPv6;
   } else {
     return;  // Ignore unhandled IPConfig types, e.g. bootp, zeroconf, ppp

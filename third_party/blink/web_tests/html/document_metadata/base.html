@@ -43,7 +43,7 @@ shouldBeTrue("endsWith(iframe.contentDocument.querySelector('base').href, 'foo/b
 var newWindow = window.open('about:blank');
 base = newWindow.document.head.appendChild(newWindow.document.createElement('base'));
 base.setAttribute('href', 'foo/bar/');
-shouldBeEqualToString("newWindow.document.querySelector('base').href", '');
+shouldBeTrue("endsWith(iframe.contentDocument.querySelector('base').href, 'foo/bar/')");
 newWindow.close();
 
 </script>

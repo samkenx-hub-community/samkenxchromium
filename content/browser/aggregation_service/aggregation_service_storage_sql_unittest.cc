@@ -15,8 +15,9 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/callback_helpers.h"
 #include "base/path_service.h"
+#include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_piece.h"
-#include "base/strings/stringprintf.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/simple_test_clock.h"
@@ -692,7 +693,7 @@ TEST_F(AggregationServiceStorageSqlTest,
        MultipleRequests_ReturnValuesAlignsWithReportTime) {
   OpenDatabase();
 
-  const base::Time kExampleTime = base::Time::FromJavaTime(1652984901234);
+  constexpr base::Time kExampleTime = base::Time::FromJavaTime(1652984901234);
 
   std::vector<base::Time> scheduled_report_times = {
       kExampleTime, kExampleTime, kExampleTime + base::Hours(1)};
@@ -777,7 +778,7 @@ TEST_F(AggregationServiceStorageSqlTest,
        ClearDataBetween_RequestsTimeRangeDeleted) {
   OpenDatabase();
 
-  const base::Time kExampleTime = base::Time::FromJavaTime(1652984901234);
+  constexpr base::Time kExampleTime = base::Time::FromJavaTime(1652984901234);
 
   clock_.SetNow(kExampleTime);
   storage_->StoreRequest(aggregation_service::CreateExampleRequest());
@@ -841,6 +842,32 @@ TEST_F(AggregationServiceStorageSqlTest,
 
   // Only the last request should be left. Request IDs start from 1.
   EXPECT_EQ(stored_reports[0].id, RequestId(3));
+}
+
+TEST_F(AggregationServiceStorageSqlTest, GetReportRequestReportingOrigins) {
+  const url::Origin origins[] = {
+      url::Origin::Create(GURL("https://a.example")),
+      url::Origin::Create(GURL("https://b.example")),
+      url::Origin::Create(GURL("https://c.example"))};
+
+  OpenDatabase();
+
+  for (const url::Origin& origin : origins) {
+    AggregatableReportRequest example_request =
+        aggregation_service::CreateExampleRequest();
+    AggregatableReportSharedInfo shared_info =
+        example_request.shared_info().Clone();
+    shared_info.reporting_origin = origin;
+    storage_->StoreRequest(
+        AggregatableReportRequest::Create(example_request.payload_contents(),
+                                          std::move(shared_info))
+            .value());
+  }
+
+  ASSERT_EQ(storage_->GetReportRequestReportingOrigins().size(), 3u);
+  EXPECT_THAT(
+      storage_->GetReportRequestReportingOrigins(),
+      testing::UnorderedElementsAre(origins[0], origins[1], origins[2]));
 }
 
 TEST_F(AggregationServiceStorageSqlTest,
@@ -934,7 +961,7 @@ TEST_F(AggregationServiceStorageSqlTest,
        AdjustOfflineReportTimes_MultipleReports) {
   OpenDatabase();
 
-  const base::Time kExampleTime = base::Time::FromJavaTime(1652984901234);
+  constexpr base::Time kExampleTime = base::Time::FromJavaTime(1652984901234);
 
   std::vector<base::Time> scheduled_report_times = {
       kExampleTime, kExampleTime + base::Hours(1),
@@ -1104,6 +1131,36 @@ TEST_F(AggregationServiceStorageSqlTest,
       stored_requests_and_ids[0].request, request));
 }
 
+TEST_F(AggregationServiceStorageSqlTest,
+       StoreRequestWithAdditionalFields_DeserializedWithFields) {
+  OpenDatabase();
+
+  EXPECT_FALSE(storage_->NextReportTimeAfter(base::Time::Min()).has_value());
+  EXPECT_TRUE(
+      storage_->GetRequestsReportingOnOrBefore(base::Time::Max()).empty());
+
+  AggregatableReportRequest example_request =
+      aggregation_service::CreateExampleRequest();
+
+  AggregatableReportRequest request =
+      AggregatableReportRequest::Create(
+          example_request.payload_contents(),
+          example_request.shared_info().Clone(),
+          /*reporting_path=*/std::string(),
+          /*debug_key=*/absl::nullopt,
+          /*additional_fields=*/{{"additional_key", "example_value"}})
+          .value();
+
+  storage_->StoreRequest(aggregation_service::CloneReportRequest(request));
+
+  std::vector<AggregationServiceStorage::RequestAndId> stored_requests_and_ids =
+      storage_->GetRequestsReportingOnOrBefore(base::Time::Max());
+
+  ASSERT_EQ(stored_requests_and_ids.size(), 1u);
+  EXPECT_TRUE(aggregation_service::ReportRequestsEqual(
+      stored_requests_and_ids[0].request, request));
+}
+
 TEST_F(AggregationServiceStorageSqlInMemoryTest,
        DatabaseInMemoryReopened_RequestsNotPersisted) {
   OpenDatabase();
@@ -1170,11 +1227,9 @@ class AggregationServiceStorageSqlMigrationsTest
   std::string GetDatabaseData(int version_id) {
     base::FilePath source_path;
     base::PathService::Get(content::DIR_TEST_DATA, &source_path);
-    // Should be safe cross platform because StringPrintf has overloads for wide
-    // strings.
-    source_path = source_path.Append(base::FilePath(base::StringPrintf(
-        FILE_PATH_LITERAL("aggregation_service/databases/version_%d.sql"),
-        version_id)));
+    source_path = source_path.Append(base::FilePath::FromASCII(
+        base::StrCat({"aggregation_service/databases/version_",
+                      base::NumberToString(version_id), ".sql"})));
 
     if (!base::PathExists(source_path))
       return std::string();

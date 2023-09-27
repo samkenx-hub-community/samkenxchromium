@@ -6,16 +6,21 @@ import './input_key.js';
 import 'chrome://resources/cr_elements/cr_input/cr_input.js';
 
 import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
+import {assert, assertNotReached} from 'chrome://resources/js/assert_ts.js';
+import {EventTracker} from 'chrome://resources/js/event_tracker.js';
+import {mojoString16ToString} from 'chrome://resources/js/mojo_type_util.js';
+import {String16} from 'chrome://resources/mojo/mojo/public/mojom/base/string16.mojom-webui.js';
 import {PolymerElementProperties} from 'chrome://resources/polymer/v3_0/polymer/interfaces.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+
+import {AcceleratorResultData, UserAction} from '../mojom-webui/ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom-webui.js';
 
 import {AcceleratorLookupManager} from './accelerator_lookup_manager.js';
 import {getTemplate} from './accelerator_view.html.js';
 import {getShortcutProvider} from './mojo_interface_provider.js';
 import {ModifierKeyCodes} from './shortcut_input.js';
-import {Accelerator, AcceleratorConfigResult, AcceleratorSource, Modifier, ShortcutProviderInterface, StandardAcceleratorInfo} from './shortcut_types.js';
-import {areAcceleratorsEqual, createEmptyAcceleratorInfo, getAccelerator, isCustomizationDisabled} from './shortcut_utils.js';
-
+import {Accelerator, AcceleratorConfigResult, AcceleratorKeyState, AcceleratorSource, AcceleratorState, Modifier, ShortcutProviderInterface, StandardAcceleratorInfo} from './shortcut_types.js';
+import {createEmptyAcceleratorInfo, getAccelerator, getKeyDisplay, getModifiersForAcceleratorInfo, isCustomizationAllowed, isFunctionKey, isStandardAcceleratorInfo, keyCodeToModifier, keyToIconNameMap, LWIN_KEY, META_KEY, unidentifiedKeyCodeToKey} from './shortcut_utils.js';
 export interface AcceleratorViewElement {
   $: {
     container: HTMLDivElement,
@@ -34,24 +39,12 @@ export enum ViewState {
   EDIT,
 }
 
-/**
- * Returns the converted modifier flag as a readable string.
- * TODO(jimmyxgong): Localize, replace with icon, or update strings.
- */
-function getModifierString(modifier: Modifier): string {
-  switch (modifier) {
-    case Modifier.SHIFT:
-      return 'shift';
-    case Modifier.CONTROL:
-      return 'ctrl';
-    case Modifier.ALT:
-      return 'alt';
-    case Modifier.COMMAND:
-      return 'meta';
-    default:
-      return '';
-  }
-}
+// This delay should match the animation timing in `input_key.html`. Matching
+// the delay allows the user to see the full animation before requesting a
+// change to the backend.
+const kAnimationTimeoutMs: number = 300;
+
+const kEscapeKey: number = 27;  // Keycode for VKEY_ESCAPE
 
 /**
  * @fileoverview
@@ -74,11 +67,6 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
 
       pendingAcceleratorInfo: {
         type: Object,
-      },
-
-      acceleratorOnHold: {
-        type: String,
-        value: '',
       },
 
       viewState: {
@@ -124,6 +112,31 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
         type: Boolean,
         value: false,
       },
+
+      /**
+       * Conditionally show the edit-icon-container in `accelerator-view`, true
+       * for `accelerator-row`, false for `accelerator-edit-view`.
+       */
+      showEditIcon: {
+        type: Boolean,
+        value: false,
+      },
+
+      /** Only show the edit button in the first row. */
+      isFirstAccelerator: {
+        type: Boolean,
+      },
+
+      isDisabled: {
+        type: Boolean,
+        computed: 'computeIsDisabled(acceleratorInfo.*)',
+        reflectToAttribute: true,
+      },
+
+      highlighted: {
+        type: Boolean,
+        reflectToAttribute: true,
+      },
     };
   }
 
@@ -134,28 +147,33 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
   action: number;
   source: AcceleratorSource;
   sourceIsLocked: boolean;
+  showEditIcon: boolean;
+  categoryIsLocked: boolean;
+  isFirstAccelerator: boolean;
+  isDisabled: boolean;
+  highlighted: boolean;
   protected pendingAcceleratorInfo: StandardAcceleratorInfo;
+  protected isCapturing: boolean;
   private modifiers: string[];
-  private acceleratorOnHold: string;
-  private isCapturing: boolean;
   private shortcutProvider: ShortcutProviderInterface = getShortcutProvider();
   private lookupManager: AcceleratorLookupManager =
       AcceleratorLookupManager.getInstance();
+  private eventTracker: EventTracker = new EventTracker();
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+
+    this.categoryIsLocked = this.lookupManager.isCategoryLocked(
+        this.lookupManager.getAcceleratorCategory(this.source, this.action));
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.eventTracker.removeAll();
+  }
 
   private getModifiers(): string[] {
-    const modifiers: Modifier[] = [
-      Modifier.SHIFT,
-      Modifier.CONTROL,
-      Modifier.ALT,
-      Modifier.COMMAND,
-    ];
-    const modifierStrings: string[] = [];
-    for (const modifier of modifiers) {
-      if ((getAccelerator(this.acceleratorInfo)).modifiers & modifier) {
-        modifierStrings.push(getModifierString(modifier));
-      }
-    }
-    return modifierStrings;
+    return getModifiersForAcceleratorInfo(this.acceleratorInfo);
   }
 
   protected onViewStateChanged(): void {
@@ -167,24 +185,22 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
   }
 
   private registerKeyEventListeners(): void {
-    this.addEventListener('keydown', (e) => this.onKeyDown(e));
-    this.addEventListener('keyup', (e) => this.onKeyUp(e));
-    this.addEventListener('focus', () => this.startCapture());
-    this.addEventListener('mouseup', () => this.startCapture());
-    this.addEventListener('blur', () => this.endCapture());
+    this.eventTracker.add(
+        this, 'keydown', (e: KeyboardEvent) => this.onKeyDown(e));
+    this.eventTracker.add(this, 'keyup', (e: KeyboardEvent) => this.onKeyUp(e));
+    this.eventTracker.add(this, 'focus', () => this.startCapture());
+    this.eventTracker.add(this, 'mouseup', () => this.startCapture());
+    this.eventTracker.add(
+        this, 'blur', () => this.endCapture(/*should_delay=*/ false));
     this.$.container.focus();
   }
 
   private unregisterKeyEventListeners(): void {
-    this.removeEventListener('keydown', (e) => this.onKeyDown(e));
-    this.removeEventListener('keyup', (e) => this.onKeyUp(e));
-    this.removeEventListener('focus', () => this.startCapture());
-    this.removeEventListener('mouseup', () => this.startCapture());
-    this.removeEventListener('blur', () => this.endCapture());
+    this.eventTracker.removeAll();
   }
 
 
-  private startCapture(): void {
+  private async startCapture(): Promise<void> {
     if (this.isCapturing) {
       return;
     }
@@ -196,50 +212,73 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
       bubbles: true,
       composed: true,
     }));
+
+    // Block processing accelerators.
+    await this.shortcutProvider.preventProcessingAccelerators(true);
   }
 
-  private endCapture(): void {
+  private async endCapture(shouldDelay: boolean): Promise<void> {
     if (!this.isCapturing) {
       return;
     }
+    await this.shortcutProvider.preventProcessingAccelerators(false);
 
-    this.viewState = ViewState.VIEW;
-    this.statusMessage = '';
-    this.hasError = false;
     this.isCapturing = false;
-    this.pendingAcceleratorInfo = createEmptyAcceleratorInfo();
-
     this.dispatchEvent(new CustomEvent('accelerator-capturing-ended', {
       bubbles: true,
       composed: true,
     }));
+
+    // Delay if an update event is fired.
+    if (shouldDelay) {
+      await new Promise(resolve => setTimeout(resolve, kAnimationTimeoutMs));
+    }
+
+    this.viewState = ViewState.VIEW;
+    // Should always set `hasError` before `statusMessage` since `statusMessage`
+    // is dependent on `hasError`'s state.
+    this.hasError = false;
+    this.statusMessage = '';
+    this.pendingAcceleratorInfo = createEmptyAcceleratorInfo();
   }
 
   private onKeyDown(e: KeyboardEvent): void {
-    this.handleKey(e);
+    if (!this.isCapturing) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    this.handleKeyDown(e);
   }
 
   private onKeyUp(e: KeyboardEvent): void {
-    e.preventDefault();
-    e.stopPropagation();
-    // TODO(jimmyxgong): Check for errors e.g. accelerator conflicts.
-  }
-
-  private handleKey(e: KeyboardEvent): void {
-    // While capturing, we prevent all events from bubbling, to prevent
-    // shortcuts from executing and interrupting the input capture.
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!this.hasValidModifiers(e)) {
-      // TODO(jimmyxgong): Fire events for error handling, e.g. Shift cannot be
-      // the only modifier.
-      this.pendingAcceleratorInfo = createEmptyAcceleratorInfo();
+    if (!this.isCapturing || this.hasError) {
       return;
     }
+    e.preventDefault();
+    e.stopPropagation();
+    this.handleKeyUp(e);
+  }
+
+  private handleKeyDown(e: KeyboardEvent): void {
+    if (this.hasError) {
+      // Reset status state when pressing the a new key.
+      this.statusMessage = '';
+      this.hasError = false;
+    }
+
+    const pendingAccelerator = this.keystrokeToAccelerator(e);
+    // Alt + Esc will exit input handling immediately.
+    if (pendingAccelerator.modifiers === Modifier.ALT &&
+        pendingAccelerator.keyCode === kEscapeKey) {
+      this.endCapture(/*shouldDelay=*/ false);
+      return;
+    }
+
+    // Add the key pressed to pendingAccelerator.
     this.set(
         'pendingAcceleratorInfo.layoutProperties.standardAccelerator.accelerator',
-        this.keystrokeToAccelerator(e));
+        pendingAccelerator);
 
     if (this.isModifierKey(e)) {
       // Reset the keyDisplay property if the key is a modifier.
@@ -247,18 +286,10 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
           'pendingAcceleratorInfo.layoutProperties.standardAccelerator.keyDisplay',
           '');
     } else {
+      // Set keyDisplay property.
       this.set(
           'pendingAcceleratorInfo.layoutProperties.standardAccelerator.keyDisplay',
-          e.key);
-    }
-
-    // New shortcut matches the current shortcut, end capture.
-    if (areAcceleratorsEqual(
-            getAccelerator(this.pendingAcceleratorInfo),
-            this.acceleratorInfo.layoutProperties.standardAccelerator
-                .accelerator)) {
-      this.endCapture();
-      return;
+          this.getKeyDisplay(e));
     }
 
     // Only process valid accelerators.
@@ -267,73 +298,148 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
     }
   }
 
-  /**
-   * Checks that |pendingAccelerator| is not a pre-existing shortcut. Sets the
-   * error message if there is a conflict.
-   */
-  private processPendingAccelerator(pendingAccelInfo: StandardAcceleratorInfo):
-      void {
+  private handleKeyUp(e: KeyboardEvent): void {
+    const pendingAccelerator = this.pendingAcceleratorInfo.layoutProperties
+                                   .standardAccelerator.accelerator;
+    // Remove the modifier that was just released.
+    if (this.isModifierKey(e)) {
+      const modifier = keyCodeToModifier[e.keyCode];
+      const pendingModifiers = pendingAccelerator.modifiers;
+      // Assert that the released modifier is present in the pending
+      // accelerator.
+      assert(pendingModifiers & modifier);
+      // Remove the released modifier.
+      const updatedModifiers = pendingModifiers - modifier;
+      this.set(
+          'pendingAcceleratorInfo.layoutProperties.standardAccelerator.' +
+              'accelerator.modifiers',
+          updatedModifiers);
+    } else {
+      // Remove the key that was just released.
+      const updatedAccelerator = pendingAccelerator;
+      updatedAccelerator.keyCode = 0;
+      this.set(
+          'pendingAcceleratorInfo.layoutProperties.standardAccelerator.' +
+              'accelerator',
+          updatedAccelerator);
+      this.set(
+          'pendingAcceleratorInfo.layoutProperties.standardAccelerator' +
+              '.keyDisplay',
+          '');
+    }
+  }
+
+  private async processPendingAccelerator(
+      pendingAccelInfo: StandardAcceleratorInfo): Promise<void> {
     // Reset status state when processing the new accelerator.
     this.statusMessage = '';
     this.hasError = false;
 
-    // If |acceleratorOnHold| is not empty then the user has attempted to
-    // replace a pre-existing accelerator. Check that the new accelerator
-    // matches the |acceleratorOnHold|, otherwise reset its value.
-    if (this.acceleratorOnHold !== '') {
-      if (this.acceleratorOnHold ===
-          JSON.stringify(getAccelerator(pendingAccelInfo))) {
-        // User re-pressed the shortcut, send a request to replace the
-        // accelerator.
-        this.requestUpdateAccelerator(pendingAccelInfo);
-        return;
-      }
-      this.acceleratorOnHold = '';
+    let result: {result: AcceleratorResultData};
+    assert(this.viewState !== ViewState.VIEW);
+
+    // If the accelerator is disabled, we should only add the new accelerator.
+    const isDisabledAccelerator =
+        this.acceleratorInfo.state === AcceleratorState.kDisabledByUser;
+
+    if (this.viewState === ViewState.ADD || isDisabledAccelerator) {
+      result = await this.shortcutProvider.addAccelerator(
+          this.source, this.action, getAccelerator(pendingAccelInfo));
     }
 
-    const foundId = this.lookupManager.getAcceleratorIdFromReverseLookup(
-        getAccelerator(pendingAccelInfo));
+    if (this.viewState === ViewState.EDIT && !isDisabledAccelerator) {
+      const originalAccelerator: Accelerator|undefined =
+          this.acceleratorInfo.layoutProperties.standardAccelerator
+              ?.originalAccelerator;
+      const acceleratorToEdit =
+          originalAccelerator || getAccelerator(this.acceleratorInfo);
+      result = await this.shortcutProvider.replaceAccelerator(
+          this.source, this.action, acceleratorToEdit,
+          getAccelerator(pendingAccelInfo));
+    }
+    this.handleAcceleratorResultData(result!.result);
+  }
 
-    // Pre-existing shortcut, update the error message.
-    if (foundId !== undefined) {
-      // TODO(jimmyxgong): Fetch name of accelerator with real implementation.
-      const uuidParams = foundId.split('-');
-      const conflictSource: AcceleratorSource = parseInt(uuidParams[0], 10);
-      const conflictAction = parseInt(uuidParams[1], 10);
-      const conflictAccelName =
-          this.lookupManager.getAcceleratorName(conflictSource, conflictAction);
-
-      // Cannot override a locked action.
-      if (!this.shortcutProvider.isMutable(conflictSource) ||
-          this.lookupManager.isAcceleratorLocked(
-              conflictSource, conflictAction,
-              getAccelerator(pendingAccelInfo))) {
-        this.statusMessage =
-            this.i18n('lockedShortcutStatusMessage', conflictAccelName);
+  // TODO(longbowei): Finalize and localize these messages.
+  private handleAcceleratorResultData(result: AcceleratorResultData): void {
+    switch (result.result) {
+      // Shift is the only modifier.
+      case AcceleratorConfigResult.kShiftOnlyNotAllowed: {
+        this.statusMessage = this.i18n('shiftOnlyNotAllowedStatusMessage');
         this.hasError = true;
         return;
       }
-
-      this.statusMessage =
-          this.i18n('shortcutWithConflictStatusMessage', conflictAccelName);
-      this.hasError = true;
-
-      // Store the pending accelerator.
-      this.acceleratorOnHold =
-          JSON.stringify(this.pendingAcceleratorInfo.layoutProperties
-                             .standardAccelerator.accelerator);
-      return;
+      // No modifiers is pressed before primary key.
+      case AcceleratorConfigResult.kMissingModifier: {
+        // This is a backup check, since only valid accelerators are processed
+        // and a valid accelerator will have modifier(s) and a key or is
+        // function key.
+        this.statusMessage = this.i18n('missingModifierStatusMessage');
+        this.hasError = true;
+        return;
+      }
+      // Top row key used as activation keys(no search key pressed).
+      case AcceleratorConfigResult.kKeyNotAllowed: {
+        this.statusMessage = this.i18n('keyNotAllowedStatusMessage');
+        this.hasError = true;
+        return;
+      }
+      // Search with function keys are not allowed.
+      // TODO(b/286268215): localize string.
+      case AcceleratorConfigResult.kSearchWithFunctionKeyNotAllowed: {
+        this.statusMessage =
+            this.i18n('searchWithFunctionKeyNotAllowedStatusMessage');
+        this.hasError = true;
+        return;
+      }
+      // Conflict with a locked accelerator.
+      case AcceleratorConfigResult.kConflict:
+      case AcceleratorConfigResult.kActionLocked: {
+        this.statusMessage = this.i18n(
+            'lockedShortcutStatusMessage',
+            mojoString16ToString(result.shortcutName as String16));
+        this.hasError = true;
+        return;
+      }
+      // Conflict with an editable shortcut.
+      case AcceleratorConfigResult.kConflictCanOverride: {
+        this.statusMessage = this.i18n(
+            'shortcutWithConflictStatusMessage',
+            mojoString16ToString(result.shortcutName as String16));
+        this.hasError = true;
+        return;
+      }
+      // Limit to only 5 accelerators allowed.
+      case AcceleratorConfigResult.kMaximumAcceleratorsReached: {
+        this.statusMessage = this.i18n('maxAcceleratorsReachedHint');
+        this.hasError = true;
+        return;
+      }
+      case AcceleratorConfigResult.kNonSearchAcceleratorWarning: {
+        // TODO(jimmyxgong): Add the "Learn More" link when available.
+        this.statusMessage = this.i18n('warningSearchNotIncluded');
+        this.hasError = true;
+        return;
+      }
+      case AcceleratorConfigResult.kSuccess: {
+        this.fireUpdateEvent();
+        getShortcutProvider().recordUserAction(
+            UserAction.kSuccessfulModification);
+        return;
+      }
     }
-
-    // No conflicts, request replacement.
-    this.requestUpdateAccelerator(pendingAccelInfo);
+    assertNotReached();
   }
 
   /**
    * Converts a keystroke event to an Accelerator Object.
    */
   private keystrokeToAccelerator(e: KeyboardEvent): Accelerator {
-    const output: Accelerator = {modifiers: 0, keyCode: 0};
+    const output: Accelerator = {
+      modifiers: 0,
+      keyCode: 0,
+      keyState: AcceleratorKeyState.PRESSED,
+    };
     if (e.metaKey) {
       output.modifiers = output.modifiers | Modifier.COMMAND;
     }
@@ -349,12 +455,31 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
       output.modifiers = output.modifiers | Modifier.SHIFT;
     }
 
-    // Only add non-modifier keys as the pending key.
-    if (!this.isModifierKey(e)) {
+    // Only add non-modifier or function keys as the pending key.
+    if (!this.isModifierKey(e) || isFunctionKey(e.keyCode)) {
       output.keyCode = e.keyCode;
     }
 
     return output;
+  }
+
+  private getKeyDisplay(e: KeyboardEvent): string {
+    switch (e.code) {
+      case 'Space':  // Space key: e.key: ' ', e.code: 'Space', set keyDisplay
+                     // to be 'space' text.
+        return 'space';
+      case 'ShowAllWindows':  // Overview key: e.key: 'F4', e.code:
+                              // 'ShowAllWindows', set keyDisplay to be
+                              // 'LaunchApplication1' and will display as
+                              // 'overview' icon.
+        return 'LaunchApplication1';
+      case '':
+        // If there is no `code`, check the `key`. If the `key` is
+        // `unidentified`, we need to manually lookup the key.
+        return unidentifiedKeyCodeToKey[e.keyCode] || e.key;
+      default:  // All other keys: Use the original e.key as keyDisplay.
+        return e.key;
+    }
   }
 
   private isModifierKey(e: KeyboardEvent): boolean {
@@ -393,6 +518,12 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
    * Returns the specified CSS state of the modifier key element.
    */
   private getModifierState(modifier: Modifier): KeyState {
+    // If the accelerator is disabled, we default to the `NOT_SELECTED` state if
+    // the user is not editing the accelerator.
+    if (this.isDisabled && this.viewState !== ViewState.EDIT) {
+      return KeyState.NOT_SELECTED;
+    }
+
     if ((getAccelerator(this.pendingAcceleratorInfo)).modifiers & modifier) {
       return KeyState.MODIFIER;
     }
@@ -416,8 +547,13 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
   protected getPendingKey(): string {
     if (this.pendingAcceleratorInfo.layoutProperties.standardAccelerator
             .keyDisplay != '') {
-      return this.pendingAcceleratorInfo.layoutProperties.standardAccelerator
-          .keyDisplay.toLowerCase();
+      const keyDisplay = this.pendingAcceleratorInfo.layoutProperties
+                             .standardAccelerator.keyDisplay;
+      // Display as icon if it exists in the map.
+      if (keyDisplay in keyToIconNameMap) {
+        return keyDisplay;
+      }
+      return keyDisplay.toLowerCase();
     }
     // TODO(jimmyxgong): Reset to a localized default empty state.
     return 'key';
@@ -434,81 +570,97 @@ export class AcceleratorViewElement extends AcceleratorViewElementBase {
 
   private isValidDefaultAccelerator(accelInfo: StandardAcceleratorInfo):
       boolean {
-    // A valid default accelerator is on that has modifier(s) and a key.
-    return accelInfo.layoutProperties.standardAccelerator.accelerator
-               .modifiers > 0 &&
-        accelInfo.layoutProperties.standardAccelerator.keyDisplay !== '';
+    // A valid default accelerator is one that has modifier(s) and a key or
+    // is function key.
+    const accelerator =
+        accelInfo.layoutProperties.standardAccelerator.accelerator;
+    return (accelerator.modifiers > 0 &&
+            accelInfo.layoutProperties.standardAccelerator.keyDisplay !== '') ||
+        isFunctionKey(accelerator.keyCode);
   }
 
   private showEditView(): boolean {
     return this.viewState !== ViewState.VIEW;
   }
 
-  private requestUpdateAccelerator(newAcceleratorInfo: StandardAcceleratorInfo):
-      void {
-    if (this.viewState === ViewState.EDIT) {
-      this.shortcutProvider
-          .replaceAccelerator(
-              this.source, this.action, (getAccelerator(this.acceleratorInfo)),
-              (getAccelerator(newAcceleratorInfo)))
-          .then((result: AcceleratorConfigResult) => {
-            // TODO(jimmyxgong): Handle other error cases.
-            if (result === AcceleratorConfigResult.kSuccess) {
-              this.lookupManager.replaceAccelerator(
-                  this.source, this.action,
-                  this.acceleratorInfo.layoutProperties.standardAccelerator
-                      .accelerator,
-                  newAcceleratorInfo);
-              this.fireUpdateEvent();
-            }
-          });
-    }
-
-    if (this.viewState === ViewState.ADD) {
-      this.shortcutProvider
-          .addUserAccelerator(
-              this.source, this.action, getAccelerator(newAcceleratorInfo))
-          .then((result: AcceleratorConfigResult) => {
-            // TODO(jimmyxgong): Handle other error cases.
-            if (result === AcceleratorConfigResult.kSuccess) {
-              this.lookupManager.addAccelerator(
-                  this.source, this.action, newAcceleratorInfo);
-              this.fireUpdateEvent();
-            }
-          });
-    }
-  }
-
   private fireUpdateEvent(): void {
-    this.dispatchEvent(new CustomEvent('request-update-accelerator', {
-      bubbles: true,
-      composed: true,
-      detail: {source: this.source, action: this.action},
-    }));
+    if (this.acceleratorInfo.state === AcceleratorState.kDisabledByUser &&
+        isStandardAcceleratorInfo(this.acceleratorInfo)) {
+      this.dispatchEvent(new CustomEvent('default-conflict-resolved', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          stringifiedAccelerator:
+              JSON.stringify(getAccelerator(this.acceleratorInfo)),
+        },
+      }));
+    }
 
     // Always end input capturing if an update event was fired.
-    this.endCapture();
+    this.endCapture(/*should_delay=*/ true);
+
+    setTimeout(() => {
+      this.dispatchEvent(new CustomEvent('request-update-accelerator', {
+        bubbles: true,
+        composed: true,
+        detail: {source: this.source, action: this.action},
+      }));
+    }, kAnimationTimeoutMs);
   }
 
   private shouldShowLockIcon(): boolean {
-    if (isCustomizationDisabled()) {
+    // Do not show lock icon in each row if customization is disabled or its
+    // category is locked.
+    if (!isCustomizationAllowed() || this.categoryIsLocked) {
       return false;
     }
-
+    // Show lock icon if accelerator is locked.
     return (this.acceleratorInfo && this.acceleratorInfo.locked) ||
         this.sourceIsLocked;
   }
 
-  /**
-   * Determines whether accelerator items should be tab-focusable.
-   */
-  private getTabIndex(): number {
-    // If customization is disabled, this element should not be tab-focusable.
-    return isCustomizationDisabled() ? -1 : 0;
+  private shouldShowEditIcon(): boolean {
+    // Do not show edit icon in each row if customization is disabled, the row
+    // is displayed in edit-dialog(!showEditIcon) or category is locked.
+    if (!isCustomizationAllowed() || !this.showEditIcon ||
+        this.categoryIsLocked) {
+      return false;
+    }
+    // Show edit icon if accelerator is not locked.
+    return !(this.acceleratorInfo && this.acceleratorInfo.locked) &&
+        !this.sourceIsLocked && this.isFirstAccelerator;
+  }
+
+  private onEditIconClicked(): void {
+    this.dispatchEvent(
+        new CustomEvent('edit-icon-clicked', {bubbles: true, composed: true}));
+  }
+
+  private getAriaLabel(): string {
+    let keyOrIcon =
+        this.acceleratorInfo.layoutProperties.standardAccelerator.keyDisplay;
+    const metaKeyAriaLabel = this.lookupManager.getHasLauncherButton() ?
+        this.i18n('iconLabelOpenLauncher') :
+        this.i18n('iconLabelOpenSearch');
+    // LWIN_KEY is not a modifier, but it is displayed as a meta icon.
+    keyOrIcon = keyOrIcon === LWIN_KEY ? metaKeyAriaLabel : keyOrIcon;
+    const modifiers =
+        getModifiersForAcceleratorInfo(this.acceleratorInfo)
+            .map(
+                // Update modifiers if it includes META_KEY.
+                modifier =>
+                    modifier === META_KEY ? metaKeyAriaLabel : modifier);
+
+    return [...modifiers, getKeyDisplay(keyOrIcon)].join(' ');
   }
 
   static get template(): HTMLTemplateElement {
     return getTemplate();
+  }
+
+  private computeIsDisabled(): boolean {
+    return this.acceleratorInfo.state === AcceleratorState.kDisabledByUser ||
+        this.acceleratorInfo.state === AcceleratorState.kDisabledByConflict;
   }
 }
 

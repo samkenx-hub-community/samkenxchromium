@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "base/files/file_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
@@ -14,12 +15,12 @@
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
-#include "chrome/browser/web_applications/os_integration/os_integration_test_override.h"
 #include "chrome/browser/web_applications/os_integration/web_app_file_handler_manager.h"
 #include "chrome/browser/web_applications/os_integration/web_app_protocol_handler_manager.h"
 #include "chrome/browser/web_applications/os_integration/web_app_shortcut_manager.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.pb.h"
 #include "chrome/browser/web_applications/test/fake_web_app_provider.h"
+#include "chrome/browser/web_applications/test/os_integration_test_override_impl.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/test/web_app_test.h"
 #include "chrome/browser/web_applications/test/web_app_test_utils.h"
@@ -60,7 +61,7 @@ class ProtocolHandlingSubManagerTestBase : public WebAppTest {
     {
       base::ScopedAllowBlockingForTesting allow_blocking;
       test_override_ =
-          OsIntegrationTestOverride::OverrideForTesting(base::GetHomeDir());
+          OsIntegrationTestOverrideImpl::OverrideForTesting(base::GetHomeDir());
     }
     provider_ = FakeWebAppProvider::Get(profile());
 
@@ -69,8 +70,7 @@ class ProtocolHandlingSubManagerTestBase : public WebAppTest {
     auto protocol_handler_manager =
         std::make_unique<WebAppProtocolHandlerManager>(profile());
     auto shortcut_manager = std::make_unique<WebAppShortcutManager>(
-        profile(), /*icon_manager=*/nullptr, file_handler_manager.get(),
-        protocol_handler_manager.get());
+        profile(), file_handler_manager.get(), protocol_handler_manager.get());
     auto os_integration_manager = std::make_unique<OsIntegrationManager>(
         profile(), std::move(shortcut_manager), std::move(file_handler_manager),
         std::move(protocol_handler_manager), /*url_handler_manager=*/nullptr);
@@ -90,7 +90,7 @@ class ProtocolHandlingSubManagerTestBase : public WebAppTest {
     WebAppTest::TearDown();
   }
 
-  web_app::AppId InstallWebAppWithProtocolHandlers(
+  webapps::AppId InstallWebAppWithProtocolHandlers(
       const std::vector<apps::ProtocolHandlerInfo>& protocol_handlers) {
     std::unique_ptr<WebAppInstallInfo> info =
         std::make_unique<WebAppInstallInfo>();
@@ -98,7 +98,8 @@ class ProtocolHandlingSubManagerTestBase : public WebAppTest {
     info->title = u"Test App";
     info->user_display_mode = web_app::mojom::UserDisplayMode::kStandalone;
     info->protocol_handlers = protocol_handlers;
-    base::test::TestFuture<const AppId&, webapps::InstallResultCode> result;
+    base::test::TestFuture<const webapps::AppId&, webapps::InstallResultCode>
+        result;
     // InstallFromInfoWithParams is used instead of InstallFromInfo, because
     // InstallFromInfo doesn't register OS integration.
     provider().scheduler().InstallFromInfoWithParams(
@@ -108,28 +109,28 @@ class ProtocolHandlingSubManagerTestBase : public WebAppTest {
     bool success = result.Wait();
     EXPECT_TRUE(success);
     if (!success)
-      return AppId();
+      return webapps::AppId();
     EXPECT_EQ(result.Get<webapps::InstallResultCode>(),
               webapps::InstallResultCode::kSuccessNewInstall);
-    return result.Get<AppId>();
+    return result.Get<webapps::AppId>();
   }
 
  protected:
   WebAppProvider& provider() { return *provider_; }
 
  private:
-  raw_ptr<FakeWebAppProvider> provider_;
-  std::unique_ptr<OsIntegrationTestOverride::BlockingRegistration>
+  raw_ptr<FakeWebAppProvider, DanglingUntriaged> provider_ = nullptr;
+  std::unique_ptr<OsIntegrationTestOverrideImpl::BlockingRegistration>
       test_override_;
 };
 
 // Synchronize tests only. Tests here should only verify DB updates.
-class ProtocolHandlingSynchronizeTest
+class ProtocolHandlingConfigureTest
     : public ProtocolHandlingSubManagerTestBase,
       public ::testing::WithParamInterface<OsIntegrationSubManagersState> {
  public:
-  ProtocolHandlingSynchronizeTest() = default;
-  ~ProtocolHandlingSynchronizeTest() override = default;
+  ProtocolHandlingConfigureTest() = default;
+  ~ProtocolHandlingConfigureTest() override = default;
 
   void SetUp() override {
     if (GetParam() == OsIntegrationSubManagersState::kSaveStateToDB) {
@@ -147,14 +148,15 @@ class ProtocolHandlingSynchronizeTest
   base::test::ScopedFeatureList scoped_feature_list_;
 };
 
-TEST_P(ProtocolHandlingSynchronizeTest, ConfigureOnlyProtocolHandler) {
+TEST_P(ProtocolHandlingConfigureTest, ConfigureOnlyProtocolHandler) {
   apps::ProtocolHandlerInfo protocol_handler;
   const std::string handler_url =
       std::string(kWebAppUrl.spec()) + "/testing=%s";
   protocol_handler.url = GURL(handler_url);
   protocol_handler.protocol = "web+test";
 
-  const AppId app_id = InstallWebAppWithProtocolHandlers({protocol_handler});
+  const webapps::AppId app_id =
+      InstallWebAppWithProtocolHandlers({protocol_handler});
 
   auto state =
       provider().registrar_unsafe().GetAppCurrentOsIntegrationState(app_id);
@@ -175,14 +177,15 @@ TEST_P(ProtocolHandlingSynchronizeTest, ConfigureOnlyProtocolHandler) {
   }
 }
 
-TEST_P(ProtocolHandlingSynchronizeTest, UninstalledAppDoesNotConfigure) {
+TEST_P(ProtocolHandlingConfigureTest, UninstalledAppDoesNotConfigure) {
   apps::ProtocolHandlerInfo protocol_handler;
   const std::string handler_url =
       std::string(kWebAppUrl.spec()) + "/testing=%s";
   protocol_handler.url = GURL(handler_url);
   protocol_handler.protocol = "web+test";
 
-  const AppId app_id = InstallWebAppWithProtocolHandlers({protocol_handler});
+  const webapps::AppId app_id =
+      InstallWebAppWithProtocolHandlers({protocol_handler});
   test::UninstallAllWebApps(profile());
 
   auto state =
@@ -190,7 +193,7 @@ TEST_P(ProtocolHandlingSynchronizeTest, UninstalledAppDoesNotConfigure) {
   ASSERT_FALSE(state.has_value());
 }
 
-TEST_P(ProtocolHandlingSynchronizeTest, ConfigureProtocolHandlerDisallowed) {
+TEST_P(ProtocolHandlingConfigureTest, ConfigureProtocolHandlerDisallowed) {
   apps::ProtocolHandlerInfo protocol_handler1;
   const std::string handler_url1 =
       std::string(kWebAppUrl.spec()) + "/testing=%s";
@@ -203,7 +206,7 @@ TEST_P(ProtocolHandlingSynchronizeTest, ConfigureProtocolHandlerDisallowed) {
   protocol_handler2.url = GURL(handler_url2);
   protocol_handler2.protocol = "web+test+protocol";
 
-  const AppId app_id =
+  const webapps::AppId app_id =
       InstallWebAppWithProtocolHandlers({protocol_handler1, protocol_handler2});
   {
     base::test::TestFuture<void> disallowed_future;
@@ -234,19 +237,19 @@ TEST_P(ProtocolHandlingSynchronizeTest, ConfigureProtocolHandlerDisallowed) {
 
 INSTANTIATE_TEST_SUITE_P(
     All,
-    ProtocolHandlingSynchronizeTest,
+    ProtocolHandlingConfigureTest,
     ::testing::Values(OsIntegrationSubManagersState::kSaveStateToDB,
                       OsIntegrationSubManagersState::kDisabled),
     test::GetOsIntegrationSubManagersTestName);
 
 // Synchronize and Execute tests from here onwards. Tests here should
 // verify both DB updates as well as OS registrations/unregistrations.
-class ProtocolHandlingSynchronizeAndExecuteTest
+class ProtocolHandlingExecuteTest
     : public ProtocolHandlingSubManagerTestBase,
       public ::testing::WithParamInterface<OsIntegrationSubManagersState> {
  public:
-  ProtocolHandlingSynchronizeAndExecuteTest() = default;
-  ~ProtocolHandlingSynchronizeAndExecuteTest() override = default;
+  ProtocolHandlingExecuteTest() = default;
+  ~ProtocolHandlingExecuteTest() override = default;
 
   void SetUp() override {
     if (GetParam() == OsIntegrationSubManagersState::kSaveStateAndExecute) {
@@ -263,7 +266,7 @@ class ProtocolHandlingSynchronizeAndExecuteTest
 
 #if BUILDFLAG(IS_MAC)
   std::vector<std::string> GetAppShimRegisteredProtocolHandlers(
-      const AppId& app_id) {
+      const webapps::AppId& app_id) {
     std::vector<std::string> protocol_schemes;
     for (const auto& [file_path, handler] :
          AppShimRegistry::Get()->GetHandlersForApp(app_id)) {
@@ -287,13 +290,14 @@ class ProtocolHandlingSynchronizeAndExecuteTest
   base::test::ScopedFeatureList scoped_feature_list_;
 };
 
-TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, Register) {
+TEST_P(ProtocolHandlingExecuteTest, Register) {
   apps::ProtocolHandlerInfo protocol_handler;
   const std::string handler_url =
       std::string(kWebAppUrl.spec()) + "/testing=%s";
   protocol_handler.url = GURL(handler_url);
   protocol_handler.protocol = "web+test";
-  const AppId app_id = InstallWebAppWithProtocolHandlers({protocol_handler});
+  const webapps::AppId app_id =
+      InstallWebAppWithProtocolHandlers({protocol_handler});
 
   auto state =
       provider().registrar_unsafe().GetAppCurrentOsIntegrationState(app_id);
@@ -318,7 +322,7 @@ TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, Register) {
     if (AreProtocolsRegisteredWithOs()) {
       // Installation registers the protocol handlers.
       EXPECT_THAT(
-          GetOsIntegrationTestOverride()->protocol_scheme_registrations(),
+          OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
           testing::ElementsAre(std::make_tuple(
               app_id, std::vector({protocol_handler.protocol}))));
     }
@@ -327,13 +331,14 @@ TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, Register) {
   }
 }
 
-TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, Unregister) {
+TEST_P(ProtocolHandlingExecuteTest, Unregister) {
   apps::ProtocolHandlerInfo protocol_handler;
   const std::string handler_url =
       std::string(kWebAppUrl.spec()) + "/testing=%s";
   protocol_handler.url = GURL(handler_url);
   protocol_handler.protocol = "web+test";
-  const AppId app_id = InstallWebAppWithProtocolHandlers({protocol_handler});
+  const webapps::AppId app_id =
+      InstallWebAppWithProtocolHandlers({protocol_handler});
   test::UninstallAllWebApps(profile());
 
   auto state =
@@ -345,17 +350,18 @@ TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, Unregister) {
 #endif
 
   if (AreProtocolsRegisteredWithOs()) {
-    // TODO(crbug.com/1404819): Update tests to verify protocol handling
-    // unregistration as part of update.
-    // There should only be a single value for registration, as unregistration
-    // is a no-op for GetOsIntegrationTestOverride().
-    ASSERT_THAT(GetOsIntegrationTestOverride()->protocol_scheme_registrations(),
-                testing::ElementsAre(std::make_tuple(
-                    app_id, std::vector({protocol_handler.protocol}))));
+    ASSERT_THAT(
+        OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
+        testing::ElementsAre(
+            std::make_tuple(app_id, std::vector({protocol_handler.protocol})),
+            std::make_tuple(app_id, std::vector<std::string>())));
   }
 }
 
-TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, UpdateHandlers) {
+// This test has extra assertions since Windows registers protocol handlers
+// differently than Mac/Linux where protocol handlers are bundled as part
+// of the shortcuts OS integration process.
+TEST_P(ProtocolHandlingExecuteTest, UpdateHandlers) {
   apps::ProtocolHandlerInfo protocol_handler_approved;
   const std::string handler_url1 =
       std::string(kWebAppUrl.spec()) + "/testing=%s";
@@ -368,7 +374,7 @@ TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, UpdateHandlers) {
   protocol_handler_disapproved.url = GURL(handler_url2);
   protocol_handler_disapproved.protocol = "web+test+protocol";
 
-  const AppId app_id = InstallWebAppWithProtocolHandlers(
+  const webapps::AppId app_id = InstallWebAppWithProtocolHandlers(
       {protocol_handler_approved, protocol_handler_disapproved});
   {
     base::test::TestFuture<void> disallowed_future;
@@ -399,30 +405,41 @@ TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, UpdateHandlers) {
                 testing::ElementsAre(protocol_handler_approved.protocol));
 #endif
     if (AreProtocolsRegisteredWithOs()) {
-      // TODO(crbug.com/1404819): Update tests to verify protocol handling
-      // unregistration as part of update.
+#if BUILDFLAG(IS_WIN)
       ASSERT_THAT(
-          GetOsIntegrationTestOverride()->protocol_scheme_registrations(),
+          OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
+          testing::ElementsAre(
+              std::make_tuple(
+                  app_id, std::vector({protocol_handler_approved.protocol,
+                                       protocol_handler_disapproved.protocol})),
+              std::make_tuple(app_id, std::vector<std::string>()),
+              std::make_tuple(
+                  app_id, std::vector({protocol_handler_approved.protocol}))));
+#else
+      ASSERT_THAT(
+          OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
           testing::ElementsAre(
               std::make_tuple(
                   app_id, std::vector({protocol_handler_approved.protocol,
                                        protocol_handler_disapproved.protocol})),
               std::make_tuple(
                   app_id, std::vector({protocol_handler_approved.protocol}))));
+#endif  // BUILDFLAG(IS_WIN)
     }
   } else {
     ASSERT_FALSE(os_integration_state.has_protocols_handled());
   }
 }
 
-TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, DataEqualNoOp) {
+TEST_P(ProtocolHandlingExecuteTest, DataEqualNoOp) {
   apps::ProtocolHandlerInfo protocol_handler;
   const std::string handler_url =
       std::string(kWebAppUrl.spec()) + "/testing=%s";
   protocol_handler.url = GURL(handler_url);
   protocol_handler.protocol = "web+test";
 
-  const AppId app_id = InstallWebAppWithProtocolHandlers({protocol_handler});
+  const webapps::AppId app_id =
+      InstallWebAppWithProtocolHandlers({protocol_handler});
   {
     base::test::TestFuture<void> future;
     provider().scheduler().UpdateProtocolHandlerUserApproval(
@@ -453,7 +470,7 @@ TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, DataEqualNoOp) {
 #endif
     if (AreProtocolsRegisteredWithOs()) {
       ASSERT_THAT(
-          GetOsIntegrationTestOverride()->protocol_scheme_registrations(),
+          OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
           testing::ElementsAre(std::make_tuple(
               app_id, std::vector({protocol_handler.protocol}))));
     }
@@ -462,11 +479,10 @@ TEST_P(ProtocolHandlingSynchronizeAndExecuteTest, DataEqualNoOp) {
   }
 }
 
-TEST_P(ProtocolHandlingSynchronizeAndExecuteTest,
-       MultipleSynchronizeEmptyData) {
-  const AppId app_id1 = InstallWebAppWithProtocolHandlers(
+TEST_P(ProtocolHandlingExecuteTest, MultipleSynchronizeEmptyData) {
+  const webapps::AppId app_id1 = InstallWebAppWithProtocolHandlers(
       std::vector<apps::ProtocolHandlerInfo>());
-  const AppId app_id2 = InstallWebAppWithProtocolHandlers(
+  const webapps::AppId app_id2 = InstallWebAppWithProtocolHandlers(
       std::vector<apps::ProtocolHandlerInfo>());
   ASSERT_THAT(app_id1, testing::Eq(app_id2));
 
@@ -483,29 +499,125 @@ TEST_P(ProtocolHandlingSynchronizeAndExecuteTest,
                 testing::IsEmpty());
 #endif
     if (AreProtocolsRegisteredWithOs()) {
-      // TODO(crbug.com/1404819): Update tests to streamline proper
-      // representation of protocols registered, independent of OSes.
-      // These values are set by the ShortcutHandlingSubManager.
-#if BUILDFLAG(IS_WIN)
       ASSERT_THAT(
-          GetOsIntegrationTestOverride()->protocol_scheme_registrations(),
+          OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
           testing::IsEmpty());
-#else
-      ASSERT_THAT(
-          GetOsIntegrationTestOverride()->protocol_scheme_registrations(),
-          testing::ElementsAre(
-              std::make_tuple(app_id1, std::vector<std::string>()),
-              std::make_tuple(app_id1, std::vector<std::string>())));
-#endif
     }
   } else {
     ASSERT_FALSE(os_integration_state.has_protocols_handled());
   }
 }
 
+TEST_P(ProtocolHandlingExecuteTest, ForceUnregisterAppInRegistry) {
+  if (!AreSubManagersExecuteEnabled()) {
+    GTEST_SKIP()
+        << "Force unregistration is only for sub managers that are enabled";
+  }
+  apps::ProtocolHandlerInfo protocol_handler;
+  const std::string handler_url =
+      std::string(kWebAppUrl.spec()) + "/testing=%s";
+  protocol_handler.url = GURL(handler_url);
+  protocol_handler.protocol = "web+test";
+  const webapps::AppId app_id =
+      InstallWebAppWithProtocolHandlers({protocol_handler});
+
+  auto state =
+      provider().registrar_unsafe().GetAppCurrentOsIntegrationState(app_id);
+  ASSERT_TRUE(state.has_value());
+
+#if BUILDFLAG(IS_MAC)
+  EXPECT_THAT(GetAppShimRegisteredProtocolHandlers(app_id),
+              testing::ElementsAre(protocol_handler.protocol));
+#endif
+  if (AreProtocolsRegisteredWithOs()) {
+    EXPECT_THAT(
+        OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
+        testing::ElementsAre(
+            std::make_tuple(app_id, std::vector({protocol_handler.protocol}))));
+  }
+
+  SynchronizeOsOptions options;
+  options.force_unregister_os_integration = true;
+  test::SynchronizeOsIntegration(profile(), app_id, options);
+
+#if BUILDFLAG(IS_MAC)
+  ASSERT_THAT(GetAppShimRegisteredProtocolHandlers(app_id), testing::IsEmpty());
+#endif
+  if (AreProtocolsRegisteredWithOs()) {
+    EXPECT_THAT(
+        OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
+        testing::ElementsAre(
+            std::make_tuple(app_id, std::vector({protocol_handler.protocol})),
+            std::make_tuple(app_id, std::vector<std::string>())));
+  }
+}
+
+TEST_P(ProtocolHandlingExecuteTest, ForceUnregisterAppNotInRegistry) {
+  if (!AreSubManagersExecuteEnabled()) {
+    GTEST_SKIP()
+        << "Force unregistration is only for sub managers that are enabled";
+  }
+  apps::ProtocolHandlerInfo protocol_handler;
+  const std::string handler_url =
+      std::string(kWebAppUrl.spec()) + "/testing=%s";
+  protocol_handler.url = GURL(handler_url);
+  protocol_handler.protocol = "web+test";
+  const webapps::AppId app_id =
+      InstallWebAppWithProtocolHandlers({protocol_handler});
+
+  auto state =
+      provider().registrar_unsafe().GetAppCurrentOsIntegrationState(app_id);
+  ASSERT_TRUE(state.has_value());
+
+#if BUILDFLAG(IS_MAC)
+  EXPECT_THAT(GetAppShimRegisteredProtocolHandlers(app_id),
+              testing::ElementsAre(protocol_handler.protocol));
+#endif
+  if (AreProtocolsRegisteredWithOs()) {
+    EXPECT_THAT(
+        OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
+        testing::ElementsAre(
+            std::make_tuple(app_id, std::vector({protocol_handler.protocol}))));
+  }
+
+  absl::optional<OsIntegrationManager::ScopedSuppressForTesting>
+      scoped_supress = absl::nullopt;
+  scoped_supress.emplace();
+  test::UninstallAllWebApps(profile());
+  // Protocol Handlers should still be registered with the OS, even though the
+  // app has been uninstalled.
+#if BUILDFLAG(IS_MAC)
+  EXPECT_THAT(GetAppShimRegisteredProtocolHandlers(app_id),
+              testing::ElementsAre(protocol_handler.protocol));
+#endif
+  if (AreProtocolsRegisteredWithOs()) {
+    EXPECT_THAT(
+        OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
+        testing::ElementsAre(
+            std::make_tuple(app_id, std::vector({protocol_handler.protocol}))));
+  }
+  EXPECT_FALSE(provider().registrar_unsafe().IsInstalled(app_id));
+
+  SynchronizeOsOptions options;
+  options.force_unregister_os_integration = true;
+  test::SynchronizeOsIntegration(profile(), app_id, options);
+
+#if BUILDFLAG(IS_MAC)
+  ASSERT_THAT(GetAppShimRegisteredProtocolHandlers(app_id), testing::IsEmpty());
+#endif
+  if (AreProtocolsRegisteredWithOs()) {
+    EXPECT_THAT(
+        OsIntegrationTestOverrideImpl::Get()->protocol_scheme_registrations(),
+        testing::ElementsAre(
+            std::make_tuple(app_id, std::vector({protocol_handler.protocol})),
+            std::make_tuple(app_id, std::vector<std::string>())));
+  }
+  scoped_supress.reset();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     All,
-    ProtocolHandlingSynchronizeAndExecuteTest,
+    ProtocolHandlingExecuteTest,
     ::testing::Values(OsIntegrationSubManagersState::kSaveStateAndExecute,
                       OsIntegrationSubManagersState::kDisabled),
     test::GetOsIntegrationSubManagersTestName);

@@ -5,12 +5,12 @@
 package org.chromium.chrome.browser.infobar;
 
 import android.Manifest;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -51,7 +51,7 @@ import java.util.concurrent.TimeoutException;
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
-@DisableFeatures({ChromeFeatureList.MESSAGES_FOR_ANDROID_PERMISSION_UPDATE})
+@DisableFeatures(ChromeFeatureList.MESSAGES_FOR_ANDROID_PERMISSION_UPDATE)
 public class PermissionUpdateInfobarTest {
     @Rule
     public ChromeTabbedActivityTestRule mActivityTestRule = new ChromeTabbedActivityTestRule();
@@ -67,12 +67,8 @@ public class PermissionUpdateInfobarTest {
     @Before
     public void setUp() throws Exception {
         mActivityTestRule.startMainActivityOnBlankPage();
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-    }
-
-    @After
-    public void tearDown() {
-        mTestServer.stopAndDestroyServer();
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
     }
 
     // Ensure destroying the permission update infobar does not crash when handling geolocation

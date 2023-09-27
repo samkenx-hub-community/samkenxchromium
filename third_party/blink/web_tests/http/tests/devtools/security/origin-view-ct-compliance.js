@@ -2,13 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SecurityTestRunner} from 'security_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+
 (async function() {
   TestRunner.addResult(
       `Tests that the panel includes Certificate Transparency compliance status\n`);
-  await TestRunner.loadTestModule('security_test_runner');
   await TestRunner.showPanel('security');
 
-  var request1 = SDK.NetworkRequest.create(
+  var request1 = SDK.NetworkRequest.NetworkRequest.create(
       0, 'https://foo.test/', 'https://foo.test', 0, 0, null);
   request1.setSecurityState(Protocol.Security.SecurityState.Secure);
   let securityDetails = {};

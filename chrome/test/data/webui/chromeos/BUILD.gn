@@ -57,7 +57,6 @@ group("closure_compile") {
     "firmware_update:closure_compile",
     "gaia_action_buttons:closure_compile",
     "os_feedback_ui:closure_compile",
-    "scanning:closure_compile",
     "shimless_rma:closure_compile",
   ]
 }
@@ -72,11 +71,11 @@ ts_library("build_ts") {
     "ash_common/i18n_behavior_test.js",
     "chai_assert.js",
     "fake_network_config_mojom.js",
+    "fake_passpoint_service_mojom.ts",
     "mock_controller.js",
     "mock_controller.m.js",
     "set_time_dialog_test.js",
     "test_browser_proxy.js",
-    "test_store.js",
     "test_util.js",
   ]
 
@@ -96,6 +95,6 @@ generate_grd("build_grdp") {
   deps = [ ":build_ts" ]
 
   manifest_files =
-      filter_include(get_target_outputs(":build_ts"), [ "*.manifest" ])
+      filter_include(get_target_outputs(":build_ts"), [ "*_manifest.json" ])
   resource_path_prefix = "chromeos"
 }

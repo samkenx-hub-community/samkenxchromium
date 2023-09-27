@@ -17,6 +17,7 @@
 #include "cc/paint/scoped_raster_flags.h"
 #include "skia/ext/legacy_display_globals.h"
 #include "third_party/skia/include/core/SkColorSpace.h"
+#include "third_party/skia/include/utils/SkNoDrawCanvas.h"
 #include "ui/gfx/geometry/skia_conversions.h"
 
 namespace cc {
@@ -50,8 +51,11 @@ std::unique_ptr<SkCanvas> MakeAnalysisCanvas(
 
 PaintOpBufferSerializer::PaintOpBufferSerializer(
     SerializeCallback serialize_cb,
+    void* callback_data,
     const PaintOp::SerializeOptions& options)
-    : serialize_cb_(std::move(serialize_cb)), options_(options) {
+    : serialize_cb_(serialize_cb),
+      callback_data_(callback_data),
+      options_(options) {
   DCHECK(serialize_cb_);
 }
 
@@ -200,11 +204,11 @@ bool PaintOpBufferSerializer::WillSerializeNextOp(const PaintOp& op,
                  PaintOp::QuickRejectDraw(op, canvas);
   // Skip text ops if there is no SkStrikeServer.
   skip_op |=
-      op.GetType() == PaintOpType::DrawTextBlob && !options_.strike_server;
+      op.GetType() == PaintOpType::kDrawtextblob && !options_.strike_server;
   if (skip_op)
     return true;
 
-  if (op.GetType() == PaintOpType::DrawRecord) {
+  if (op.GetType() == PaintOpType::kDrawrecord) {
     int save_count = canvas->getSaveCount();
     Save(canvas, params);
     SerializeBuffer(
@@ -213,7 +217,7 @@ bool PaintOpBufferSerializer::WillSerializeNextOp(const PaintOp& op,
     return true;
   }
 
-  if (op.GetType() == PaintOpType::DrawImageRect &&
+  if (op.GetType() == PaintOpType::kDrawimagerect &&
       static_cast<const DrawImageRectOp&>(op).image.IsPaintWorklet()) {
     DCHECK(options_.image_provider);
     const DrawImageRectOp& draw_op = static_cast<const DrawImageRectOp&>(op);
@@ -308,9 +312,8 @@ bool PaintOpBufferSerializer::SerializeOp(SkCanvas* canvas,
   // correctly for analysis of records in filters.
   PlaybackOnAnalysisCanvas(canvas, op, flags_to_serialize, params);
 
-  size_t bytes =
-      serialize_cb_.Run(op, options_, flags_to_serialize,
-                        canvas->getLocalToDevice(), params.original_ctm);
+  size_t bytes = serialize_cb_(callback_data_, op, options_, flags_to_serialize,
+                               canvas->getLocalToDevice(), params.original_ctm);
   if (!bytes) {
     valid_ = false;
     return false;
@@ -331,10 +334,12 @@ void PaintOpBufferSerializer::PlaybackOnAnalysisCanvas(
   //    we need the correct ctm at which text and images will be rasterized, and
   //    the clip rect so we can skip sending data for ops which will not be
   //    rasterized.
-  // 2) DrawTextBlob ops since they need to be analyzed by the cache diff canvas
+  // 2) kDrawtextblob ops since they need to be analyzed by the cache diff
+  // canvas
   //    to serialize/lock the requisite glyphs for this op.
-  if (op.IsDrawOp() && op.GetType() != PaintOpType::DrawTextBlob)
+  if (op.IsDrawOp() && op.GetType() != PaintOpType::kDrawtextblob) {
     return;
+  }
 
   if (op.IsPaintOpWithFlags() && flags_to_serialize) {
     static_cast<const PaintOpWithFlags&>(op).RasterWithFlags(
@@ -364,16 +369,15 @@ SimpleBufferSerializer::SimpleBufferSerializer(
     void* memory,
     size_t size,
     const PaintOp::SerializeOptions& options)
-    : PaintOpBufferSerializer(
-          base::BindRepeating(&SimpleBufferSerializer::SerializeToMemory,
-                              base::Unretained(this)),
-          options),
+    : PaintOpBufferSerializer(&SimpleBufferSerializer::SerializeToMemory,
+                              this,
+                              options),
       memory_(memory),
       total_(size) {}
 
 SimpleBufferSerializer::~SimpleBufferSerializer() = default;
 
-size_t SimpleBufferSerializer::SerializeToMemory(
+size_t SimpleBufferSerializer::SerializeToMemoryImpl(
     const PaintOp& op,
     const PaintOp::SerializeOptions& options,
     const PaintFlags* flags_to_serialize,

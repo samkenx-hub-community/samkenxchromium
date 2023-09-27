@@ -8,17 +8,18 @@
 
 #import "base/feature_list.h"
 #import "base/functional/callback_helpers.h"
+#import "base/run_loop.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/consent_auditor/fake_consent_auditor.h"
 #import "components/password_manager/core/common/password_manager_features.h"
 #import "components/sync/test/mock_sync_service.h"
 #import "components/sync_preferences/pref_service_mock_factory.h"
 #import "components/sync_preferences/pref_service_syncable.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
-#import "ios/chrome/browser/consent_auditor/consent_auditor_factory.h"
-#import "ios/chrome/browser/consent_auditor/consent_auditor_test_utils.h"
-#import "ios/chrome/browser/main/test_browser.h"
+#import "ios/chrome/browser/consent_auditor/model/consent_auditor_factory.h"
+#import "ios/chrome/browser/consent_auditor/model/consent_auditor_test_utils.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/signin/authentication_service.h"
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/chrome_account_manager_service_factory.h"
@@ -41,10 +42,6 @@
 #import "third_party/ocmock/OCMock/OCMock.h"
 #import "third_party/ocmock/gtest_support.h"
 #import "third_party/ocmock/ocmock_extensions.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 class UserSigninMediatorTest : public PlatformTest {
  public:
@@ -110,6 +107,8 @@ class UserSigninMediatorTest : public PlatformTest {
     authentication_flow_ = [[AuthenticationFlow alloc]
                  initWithBrowser:browser_.get()
                         identity:identity_
+                     accessPoint:signin_metrics::AccessPoint::
+                                     ACCESS_POINT_UNKNOWN
                 postSignInAction:postSignInAction
         presentingViewController:presenting_view_controller_mock_];
     [authentication_flow_ setPerformerForTesting:performer_mock_];
@@ -120,25 +119,24 @@ class UserSigninMediatorTest : public PlatformTest {
     OCMExpect([performer_mock_ fetchManagedStatus:browser_state_.get()
                                       forIdentity:identity_])
         .andDo(^(NSInvocation*) {
-          NSLog(@" fetchManagedStatus ");
           [authentication_flow_ didFetchManagedStatus:nil];
         });
-    OCMExpect([performer_mock_ signInIdentity:identity_
-                             withHostedDomain:nil
-                               toBrowserState:browser_state_.get()])
+    OCMExpect(
+        [performer_mock_
+              signInIdentity:identity_
+               atAccessPoint:signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN
+            withHostedDomain:nil
+              toBrowserState:browser_state_.get()])
         .andDo(^(NSInvocation* invocation) {
-          NSLog(@" signInIdentity ");
-          authentication_service()->SignIn(identity_);
+          authentication_service()->SignIn(
+              identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
         });
-    if (postSignInAction == POST_SIGNIN_ACTION_COMMIT_SYNC) {
+    if (postSignInAction == PostSignInAction::kCommitSync) {
       OCMExpect(
           [performer_mock_
               shouldHandleMergeCaseForIdentity:identity_
                              browserStatePrefs:browser_state_->GetPrefs()])
           .andReturn(NO);
-      NSLog(@" shouldHandleMergeCaseForIdentity ");
-      OCMExpect(
-          [performer_mock_ commitSyncForBrowserState:browser_state_.get()]);
     }
   }
 
@@ -176,9 +174,11 @@ class UserSigninMediatorTest : public PlatformTest {
         });
   }
 
-  // Sets up the expectations for cancelAndDismissAnimated in the
+  // Sets up the expectations for `interruptWithAction:completion:` in the
   // AuthenticationFlowPerformer.
-  void SetPerformerCancelAndDismissExpectations(BOOL animated) {
+  void SetPerformerInterruptWithDismissExpectations(
+      SigninCoordinatorInterrupt interruptAction) {
+    CHECK_NE(nil, performer_mock_);
     OCMExpect([performer_mock_ fetchManagedStatus:browser_state_.get()
                                       forIdentity:identity_])
         .andDo(^(NSInvocation*) {
@@ -192,7 +192,14 @@ class UserSigninMediatorTest : public PlatformTest {
         promptMergeCaseForIdentity:identity_
                            browser:browser_.get()
                     viewController:presenting_view_controller_mock_]);
-    OCMExpect([performer_mock_ cancelAndDismissAnimated:animated]);
+    OCMExpect([performer_mock_
+        interruptWithAction:interruptAction
+                 completion:[OCMArg
+                                checkWithBlock:^BOOL(ProceduralBlock block) {
+                                  EXPECT_EQ(nil, interrupted_completion_block_);
+                                  interrupted_completion_block_ = block;
+                                  return YES;
+                                }]]);
   }
 
   void ExpectNoConsent() {
@@ -220,14 +227,9 @@ class UserSigninMediatorTest : public PlatformTest {
   // then the consent is given. The list is ordered according to the position
   // on the screen.
   const std::vector<int> ExpectedConsentStringIds() const {
-    const int sync_dialog_title =
-        base::FeatureList::IsEnabled(
-            password_manager::features::kEnablePasswordsAccountStorage)
-            ? IDS_IOS_ACCOUNT_UNIFIED_CONSENT_SYNC_TITLE_WITHOUT_PASSWORDS
-            : IDS_IOS_ACCOUNT_UNIFIED_CONSENT_SYNC_TITLE;
     return {
         IDS_IOS_ACCOUNT_UNIFIED_CONSENT_TITLE,
-        sync_dialog_title,
+        IDS_IOS_ACCOUNT_UNIFIED_CONSENT_SYNC_TITLE_WITHOUT_PASSWORDS,
         IDS_IOS_ACCOUNT_UNIFIED_CONSENT_SYNC_SUBTITLE,
         IDS_IOS_ACCOUNT_UNIFIED_CONSENT_SETTINGS,
     };
@@ -289,12 +291,13 @@ class UserSigninMediatorTest : public PlatformTest {
   UIViewController* presenting_view_controller_mock_ = nil;
   SyncSetupServiceMock* sync_setup_service_mock_ = nullptr;
   syncer::MockSyncService* sync_service_mock_ = nullptr;
+  ProceduralBlock interrupted_completion_block_ = nil;
 };
 
 // Tests a successful authentication for a given identity.
 TEST_F(UserSigninMediatorTest, AuthenticateWithIdentitySuccess) {
-  CreateAuthenticationFlow(POST_SIGNIN_ACTION_COMMIT_SYNC);
-  SetPerformerSigninExpectations(POST_SIGNIN_ACTION_COMMIT_SYNC);
+  CreateAuthenticationFlow(PostSignInAction::kCommitSync);
+  SetPerformerSigninExpectations(PostSignInAction::kCommitSync);
 
   // Retrieving coordinator data for the mediator delegate.
   OCMExpect(
@@ -309,9 +312,9 @@ TEST_F(UserSigninMediatorTest, AuthenticateWithIdentitySuccess) {
   // Sign-in result successful.
   OCMExpect([mediator_delegate_mock_ userSigninMediatorSigninFinishedWithResult:
                                          SigninCoordinatorResultSuccess]);
-  EXPECT_CALL(
-      *sync_setup_service_mock_,
-      SetFirstSetupComplete(syncer::SyncFirstSetupCompleteSource::BASIC_FLOW));
+  EXPECT_CALL(*sync_setup_service_mock_,
+              SetInitialSyncFeatureSetupComplete(
+                  syncer::SyncFirstSetupCompleteSource::BASIC_FLOW));
 
   [mediator_ authenticateWithIdentity:identity_
                    authenticationFlow:authentication_flow_];
@@ -321,8 +324,8 @@ TEST_F(UserSigninMediatorTest, AuthenticateWithIdentitySuccess) {
 
 // Tests authenticating the identity when the settings link has been tapped.
 TEST_F(UserSigninMediatorTest, AuthenticateWithSettingsLinkTapped) {
-  CreateAuthenticationFlow(POST_SIGNIN_ACTION_COMMIT_SYNC);
-  SetPerformerSigninExpectations(POST_SIGNIN_ACTION_COMMIT_SYNC);
+  CreateAuthenticationFlow(PostSignInAction::kCommitSync);
+  SetPerformerSigninExpectations(PostSignInAction::kCommitSync);
 
   OCMExpect(
       [mediator_delegate_mock_ userSigninMediatorGetSettingsLinkWasTapped])
@@ -331,9 +334,9 @@ TEST_F(UserSigninMediatorTest, AuthenticateWithSettingsLinkTapped) {
   // Sign-in result successful.
   OCMExpect([mediator_delegate_mock_ userSigninMediatorSigninFinishedWithResult:
                                          SigninCoordinatorResultSuccess]);
-  EXPECT_CALL(
-      *sync_setup_service_mock_,
-      SetFirstSetupComplete(syncer::SyncFirstSetupCompleteSource::BASIC_FLOW))
+  EXPECT_CALL(*sync_setup_service_mock_,
+              SetInitialSyncFeatureSetupComplete(
+                  syncer::SyncFirstSetupCompleteSource::BASIC_FLOW))
       .Times(0);
 
   [mediator_ authenticateWithIdentity:identity_
@@ -343,7 +346,7 @@ TEST_F(UserSigninMediatorTest, AuthenticateWithSettingsLinkTapped) {
 
 // Tests authentication failure for a given identity.
 TEST_F(UserSigninMediatorTest, AuthenticateWithIdentityError) {
-  CreateAuthenticationFlow(POST_SIGNIN_ACTION_COMMIT_SYNC);
+  CreateAuthenticationFlow(PostSignInAction::kCommitSync);
   SetPerformerFailureExpectations();
 
   OCMExpect(
@@ -368,6 +371,7 @@ TEST_F(UserSigninMediatorTest, CancelAuthenticationNotInProgress) {
       .andReturn(IdentitySigninStateSignedOut);
 
   [mediator_ cancelSignin];
+  base::RunLoop().RunUntilIdle();
   ExpectNoConsent();
   EXPECT_FALSE(authentication_service()->HasPrimaryIdentity(
       signin::ConsentLevel::kSignin));
@@ -375,8 +379,6 @@ TEST_F(UserSigninMediatorTest, CancelAuthenticationNotInProgress) {
 
 // Tests a user sign-in operation cancel when authentication is in progress.
 TEST_F(UserSigninMediatorTest, CancelWithAuthenticationInProgress) {
-  SetPerformerCancelAndDismissExpectations(/*animated=*/NO);
-
   OCMExpect(
       [mediator_delegate_mock_ userSigninMediatorGetSettingsLinkWasTapped])
       .andReturn(NO);
@@ -402,10 +404,11 @@ TEST_F(UserSigninMediatorTest, CancelAndDismissAuthenticationNotInProgress) {
   OCMExpect([mediator_delegate_mock_ signinStateOnStart])
       .andReturn(IdentitySigninStateSignedOut);
   __block bool completion_called = false;
-  [mediator_ cancelAndDismissAuthenticationFlowAnimated:NO
-                                             completion:^() {
-                                               completion_called = true;
-                                             }];
+  [mediator_
+      interruptWithAction:SigninCoordinatorInterrupt::DismissWithoutAnimation
+               completion:^() {
+                 completion_called = true;
+               }];
   base::RunLoop().RunUntilIdle();
   ExpectNoConsent();
   EXPECT_TRUE(completion_called);
@@ -416,9 +419,10 @@ TEST_F(UserSigninMediatorTest, CancelAndDismissAuthenticationNotInProgress) {
 // Tests a user sign-in operation cancel and dismiss with animation when
 // authentication is in progress.
 TEST_F(UserSigninMediatorTest,
-       CancelAndDismissAuthenticationInProgressWithAnimation) {
-  CreateAuthenticationFlow(POST_SIGNIN_ACTION_COMMIT_SYNC);
-  SetPerformerCancelAndDismissExpectations(/*animated=*/YES);
+       InterruptWithDismissAuthenticationInProgressWithAnimation) {
+  CreateAuthenticationFlow(PostSignInAction::kCommitSync);
+  SetPerformerInterruptWithDismissExpectations(
+      SigninCoordinatorInterrupt::DismissWithAnimation);
 
   OCMExpect(
       [mediator_delegate_mock_ userSigninMediatorGetSettingsLinkWasTapped])
@@ -430,12 +434,15 @@ TEST_F(UserSigninMediatorTest,
 
   [mediator_ authenticateWithIdentity:identity_
                    authenticationFlow:authentication_flow_];
-  __block bool completion_called = false;
-  [mediator_ cancelAndDismissAuthenticationFlowAnimated:YES
-                                             completion:^() {
-                                               completion_called = true;
-                                             }];
   base::RunLoop().RunUntilIdle();
+  __block bool completion_called = false;
+  [mediator_
+      interruptWithAction:SigninCoordinatorInterrupt::DismissWithAnimation
+               completion:^() {
+                 completion_called = true;
+               }];
+  base::RunLoop().RunUntilIdle();
+  interrupted_completion_block_();
   ExpectNoConsent();
   EXPECT_TRUE(completion_called);
   EXPECT_FALSE(authentication_service()->HasPrimaryIdentity(
@@ -445,9 +452,10 @@ TEST_F(UserSigninMediatorTest,
 // Tests a user sign-in operation cancel and dismiss without animation when
 // authentication is in progress.
 TEST_F(UserSigninMediatorTest,
-       CancelAndDismissAuthenticationInProgressWithoutAnimation) {
-  CreateAuthenticationFlow(POST_SIGNIN_ACTION_COMMIT_SYNC);
-  SetPerformerCancelAndDismissExpectations(/*animated=*/NO);
+       InterruptWithDismissAuthenticationInProgressWithoutAnimation) {
+  CreateAuthenticationFlow(PostSignInAction::kCommitSync);
+  SetPerformerInterruptWithDismissExpectations(
+      SigninCoordinatorInterrupt::DismissWithoutAnimation);
 
   OCMExpect(
       [mediator_delegate_mock_ userSigninMediatorGetSettingsLinkWasTapped])
@@ -459,12 +467,15 @@ TEST_F(UserSigninMediatorTest,
 
   [mediator_ authenticateWithIdentity:identity_
                    authenticationFlow:authentication_flow_];
-  __block bool completion_called = false;
-  [mediator_ cancelAndDismissAuthenticationFlowAnimated:NO
-                                             completion:^() {
-                                               completion_called = true;
-                                             }];
   base::RunLoop().RunUntilIdle();
+  __block bool completion_called = false;
+  [mediator_
+      interruptWithAction:SigninCoordinatorInterrupt::DismissWithoutAnimation
+               completion:^() {
+                 completion_called = true;
+               }];
+  base::RunLoop().RunUntilIdle();
+  interrupted_completion_block_();
   ExpectNoConsent();
   EXPECT_TRUE(completion_called);
   EXPECT_FALSE(authentication_service()->HasPrimaryIdentity(
@@ -474,8 +485,10 @@ TEST_F(UserSigninMediatorTest,
 // Tests a user sign-in operation cancel and dismiss without animation when
 // authentication is in progress.
 TEST_F(UserSigninMediatorTest, CancelSyncAndStaySignin) {
-  CreateAuthenticationFlow(POST_SIGNIN_ACTION_COMMIT_SYNC);
-  SetPerformerSigninExpectations(POST_SIGNIN_ACTION_COMMIT_SYNC);
+  EXPECT_CALL(*sync_service_mock_, StopAndClear()).Times(0);
+
+  CreateAuthenticationFlow(PostSignInAction::kCommitSync);
+  SetPerformerSigninExpectations(PostSignInAction::kCommitSync);
 
   OCMExpect(
       [mediator_delegate_mock_ userSigninMediatorGetSettingsLinkWasTapped])
@@ -484,9 +497,9 @@ TEST_F(UserSigninMediatorTest, CancelSyncAndStaySignin) {
   // Sign-in result successful.
   OCMExpect([mediator_delegate_mock_ userSigninMediatorSigninFinishedWithResult:
                                          SigninCoordinatorResultSuccess]);
-  EXPECT_CALL(
-      *sync_setup_service_mock_,
-      SetFirstSetupComplete(syncer::SyncFirstSetupCompleteSource::BASIC_FLOW))
+  EXPECT_CALL(*sync_setup_service_mock_,
+              SetInitialSyncFeatureSetupComplete(
+                  syncer::SyncFirstSetupCompleteSource::BASIC_FLOW))
       .Times(0);
 
   [mediator_ authenticateWithIdentity:identity_
@@ -496,10 +509,11 @@ TEST_F(UserSigninMediatorTest, CancelSyncAndStaySignin) {
       .andReturn(IdentitySigninStateSignedInWithSyncDisabled);
   OCMStub([mediator_delegate_mock_ signinIdentityOnStart]).andReturn(identity_);
   __block bool completion_called = false;
-  [mediator_ cancelAndDismissAuthenticationFlowAnimated:YES
-                                             completion:^() {
-                                               completion_called = true;
-                                             }];
+  [mediator_
+      interruptWithAction:SigninCoordinatorInterrupt::DismissWithAnimation
+               completion:^() {
+                 completion_called = true;
+               }];
   base::RunLoop().RunUntilIdle();
   EXPECT_TRUE(completion_called);
   EXPECT_TRUE(authentication_service()->HasPrimaryIdentity(
@@ -515,20 +529,21 @@ TEST_F(UserSigninMediatorTest, OpenSettingsLinkWithDifferentIdentityAndCancel) {
   // Signs in with identity 2.
   id<SystemIdentity> identity2 = [FakeSystemIdentity fakeIdentity2];
   fake_system_identity_manager()->AddIdentity(identity2);
-  authentication_service()->SignIn(identity2);
+  authentication_service()->SignIn(
+      identity2, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
 
   // Opens the settings link with identity 1.
-  CreateAuthenticationFlow(POST_SIGNIN_ACTION_NONE);
+  CreateAuthenticationFlow(PostSignInAction::kNone);
   SetPerformerSignoutExpectations();
-  SetPerformerSigninExpectations(POST_SIGNIN_ACTION_NONE);
+  SetPerformerSigninExpectations(PostSignInAction::kNone);
   OCMExpect(
       [mediator_delegate_mock_ userSigninMediatorGetSettingsLinkWasTapped])
       .andReturn(YES);
   OCMExpect([mediator_delegate_mock_ userSigninMediatorSigninFinishedWithResult:
                                          SigninCoordinatorResultSuccess]);
-  EXPECT_CALL(
-      *sync_setup_service_mock_,
-      SetFirstSetupComplete(syncer::SyncFirstSetupCompleteSource::BASIC_FLOW))
+  EXPECT_CALL(*sync_setup_service_mock_,
+              SetInitialSyncFeatureSetupComplete(
+                  syncer::SyncFirstSetupCompleteSource::BASIC_FLOW))
       .Times(0);
   [mediator_ authenticateWithIdentity:identity_
                    authenticationFlow:authentication_flow_];
@@ -539,10 +554,11 @@ TEST_F(UserSigninMediatorTest, OpenSettingsLinkWithDifferentIdentityAndCancel) {
       .andReturn(IdentitySigninStateSignedInWithSyncDisabled);
   OCMStub([mediator_delegate_mock_ signinIdentityOnStart]).andReturn(identity2);
   __block bool completion_called = false;
-  [mediator_ cancelAndDismissAuthenticationFlowAnimated:YES
-                                             completion:^() {
-                                               completion_called = true;
-                                             }];
+  [mediator_
+      interruptWithAction:SigninCoordinatorInterrupt::DismissWithAnimation
+               completion:^() {
+                 completion_called = true;
+               }];
   base::RunLoop().RunUntilIdle();
 
   // Expects to be signed in with identity 2.
@@ -567,21 +583,22 @@ TEST_F(UserSigninMediatorTest,
                                      gaiaID:@"foo2ID"
                                        name:@"Fake Foo 2"];
   fake_system_identity_manager()->AddIdentity(identity2);
-  authentication_service()->SignIn(identity2);
+  authentication_service()->SignIn(
+      identity2, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
 
   // Opens the settings link with identity 1.
-  CreateAuthenticationFlow(POST_SIGNIN_ACTION_NONE);
+  CreateAuthenticationFlow(PostSignInAction::kNone);
   SetPerformerSignoutExpectations();
-  SetPerformerSigninExpectations(POST_SIGNIN_ACTION_NONE);
+  SetPerformerSigninExpectations(PostSignInAction::kNone);
 
   OCMExpect(
       [mediator_delegate_mock_ userSigninMediatorGetSettingsLinkWasTapped])
       .andReturn(YES);
   OCMExpect([mediator_delegate_mock_ userSigninMediatorSigninFinishedWithResult:
                                          SigninCoordinatorResultSuccess]);
-  EXPECT_CALL(
-      *sync_setup_service_mock_,
-      SetFirstSetupComplete(syncer::SyncFirstSetupCompleteSource::BASIC_FLOW))
+  EXPECT_CALL(*sync_setup_service_mock_,
+              SetInitialSyncFeatureSetupComplete(
+                  syncer::SyncFirstSetupCompleteSource::BASIC_FLOW))
       .Times(0);
   [mediator_ authenticateWithIdentity:identity_
                    authenticationFlow:authentication_flow_];
@@ -595,10 +612,11 @@ TEST_F(UserSigninMediatorTest,
       .andReturn(IdentitySigninStateSignedInWithSyncDisabled);
   OCMStub([mediator_delegate_mock_ signinIdentityOnStart]).andReturn(identity2);
   __block bool completion_called = false;
-  [mediator_ cancelAndDismissAuthenticationFlowAnimated:YES
-                                             completion:^() {
-                                               completion_called = true;
-                                             }];
+  [mediator_
+      interruptWithAction:SigninCoordinatorInterrupt::DismissWithAnimation
+               completion:^() {
+                 completion_called = true;
+               }];
   base::RunLoop().RunUntilIdle();
 
   // Expects to be signed out.
@@ -620,10 +638,11 @@ TEST_F(UserSigninMediatorTest, ForgetSignedInIdentityWhileTurnOnSyncIsOpened) {
       .andReturn(IdentitySigninStateSignedInWithSyncDisabled);
   OCMStub([mediator_delegate_mock_ signinIdentityOnStart])
       .andReturn(static_cast<id>(nil));
-  [mediator_ cancelAndDismissAuthenticationFlowAnimated:YES
-                                             completion:^() {
-                                               completion_called = true;
-                                             }];
+  [mediator_
+      interruptWithAction:SigninCoordinatorInterrupt::DismissWithAnimation
+               completion:^() {
+                 completion_called = true;
+               }];
   base::RunLoop().RunUntilIdle();
 
   // Expects to be signed out.

@@ -15,6 +15,7 @@
 @protocol LocationBarAnimatee;
 @protocol OmniboxPopupPresenterDelegate;
 @protocol OmniboxFocusDelegate;
+@protocol ToolbarOmniboxConsumer;
 
 // Location bar coordinator.
 @interface LocationBarCoordinator
@@ -29,6 +30,13 @@
 
 @property(nonatomic, weak) id<OmniboxPopupPresenterDelegate>
     popupPresenterDelegate;
+
+// Initializes this Coordinator with its `browser` and a nil base view
+// controller.
+- (instancetype)initWithBrowser:(Browser*)browser NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)initWithBaseViewController:(UIViewController*)viewController
+                                   browser:(Browser*)browser NS_UNAVAILABLE;
 
 // Indicates whether the popup has results to show or not.
 - (BOOL)omniboxPopupHasAutocompleteResults;
@@ -47,6 +55,9 @@
 
 // Target to forward omnibox-related scribble events to.
 - (UIResponder<UITextInput>*)omniboxScribbleForwardingTarget;
+
+// Returns the toolbar omnibox consumer.
+- (id<ToolbarOmniboxConsumer>)toolbarOmniboxConsumer;
 
 @end
 

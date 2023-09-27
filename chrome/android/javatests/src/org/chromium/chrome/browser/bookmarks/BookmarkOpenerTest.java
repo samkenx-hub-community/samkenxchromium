@@ -8,10 +8,9 @@ import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
-import android.support.test.InstrumentationRegistry;
-
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -26,13 +25,13 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.UserActionTester;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.app.bookmarks.BookmarkActivity;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.ui.signin.SyncPromoController.SyncPromoState;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ActivityTestUtils;
 import org.chromium.chrome.test.util.BookmarkTestUtil;
 import org.chromium.chrome.test.util.MenuUtils;
@@ -40,6 +39,7 @@ import org.chromium.components.bookmarks.BookmarkId;
 import org.chromium.components.browser_ui.widget.RecyclerViewTestUtils;
 import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
+import org.chromium.ui.accessibility.AccessibilityState;
 import org.chromium.url.GURL;
 
 import java.util.ArrayList;
@@ -104,7 +104,7 @@ public class BookmarkOpenerTest {
         }
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            getBookmarkDelegate().getDragStateDelegate().setA11yStateForTesting(false);
+            AccessibilityState.setIsAnyAccessibilityServiceEnabledForTesting(false);
             mBookmarkOpener = mBookmarkManagerCoordinator.getBookmarkOpenerForTesting();
         });
     }
@@ -118,7 +118,10 @@ public class BookmarkOpenerTest {
     void openMobileBookmarks() {
         openRootFolder();
 
-        onView(withText("Mobile bookmarks")).perform(click());
+        // Mobile bookmarks is merged into all bookmarks when improved bookmark is enabled.
+        if (!BookmarkFeatures.isAndroidImprovedBookmarksEnabled()) {
+            onView(withText("Mobile bookmarks")).perform(click());
+        }
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
     }
 

@@ -1,6 +1,9 @@
 // META: script=/resources/testdriver.js
 // META: script=/common/utils.js
 // META: script=resources/fledge-util.js
+// META: timeout=long
+
+"use strict;"
 
 // The tests in this file focus on simple auctions (one bidder, one seller, one
 // origin, one frame) which have no winning bid, either due to errors or due to
@@ -10,6 +13,7 @@
 // appended to script URLs to make the python scripts that generate bidding
 // logic and decision logic scripts with errors.
 const COMMON_SCRIPT_ERRORS = [
+  'error=close-connection',
   'error=http-error',
   'error=no-content-type',
   'error=wrong-content-type',
@@ -29,13 +33,13 @@ const BIDDING_LOGIC_SCRIPT_ERRORS = [
   // Bad return values:
   'generateBid=return 5;',
   'generateBid=return "Foo";',
-  'generateBid=return interestGroup.ads[0].renderUrl;',
+  'generateBid=return interestGroup.ads[0].renderURL;',
   'generateBid=return {bid: 1, render: "https://not-in-ads-array.test/"};',
   'generateBid=return {bid: 1};',
-  'generateBid=return {render: interestGroup.ads[0].renderUrl};',
+  'generateBid=return {render: interestGroup.ads[0].renderURL};',
   // These are not bidding rather than errors.
-  'generateBid=return {bid:0, render: interestGroup.ads[0].renderUrl};',
-  'generateBid=return {bid:-1, render: interestGroup.ads[0].renderUrl};',
+  'generateBid=return {bid:0, render: interestGroup.ads[0].renderURL};',
+  'generateBid=return {bid:-1, render: interestGroup.ads[0].renderURL};',
 ];
 
 const DECISION_LOGIC_SCRIPT_ERRORS = [
@@ -57,20 +61,20 @@ const DECISION_LOGIC_SCRIPT_ERRORS = [
 
 for (error of BIDDING_LOGIC_SCRIPT_ERRORS) {
   promise_test((async (error, test) => {
-    let biddingLogicUrl = `${BASE_URL}resources/bidding-logic.sub.py?${error}`;
-    await runBasicFledgeTestExpectingNoWinner(
+    let biddingLogicURL = `${BASE_URL}resources/bidding-logic.sub.py?${error}`;
+    await joinGroupAndRunBasicFledgeTestExpectingNoWinner(
       test,
-      {interestGroupOverrides: {biddingLogicUrl: biddingLogicUrl}}
+      {interestGroupOverrides: {biddingLogicURL: biddingLogicURL}}
     );
   }).bind(undefined, error), `Bidding logic script: ${error}`);
 }
 
 for (error of DECISION_LOGIC_SCRIPT_ERRORS) {
   promise_test((async (error, test) => {
-    let decisionLogicUrl =
+    let decisionLogicURL =
         `${BASE_URL}resources/decision-logic.sub.py?${error}`;
-    await runBasicFledgeTestExpectingNoWinner(
-      test, {auctionConfigOverrides: {decisionLogicUrl: decisionLogicUrl}}
+    await joinGroupAndRunBasicFledgeTestExpectingNoWinner(
+      test, { auctionConfigOverrides: { decisionLogicURL: decisionLogicURL } }
     );
   }).bind(undefined, error), `Decision logic script: ${error}`);
 }

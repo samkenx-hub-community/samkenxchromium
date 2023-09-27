@@ -42,12 +42,12 @@ void FocusCycler::RemoveWidget(views::Widget* widget) {
     widgets_.erase(iter);
 }
 
-void FocusCycler::RotateFocus(Direction direction) {
+void FocusCycler::RotateFocus(Direction direction, bool move_onto_next_widget) {
   if (aura::Window* window = window_util::GetActiveWindow(); window) {
     views::Widget* widget = views::Widget::GetWidgetForNativeView(window);
     // First try to rotate focus within the active widget. If that succeeds,
     // we're done.
-    if (widget &&
+    if (widget && !move_onto_next_widget &&
         widget->GetFocusManager()->RotatePaneFocus(
             direction == BACKWARD ? views::FocusManager::Direction::kBackward
                                   : views::FocusManager::Direction::kForward,
@@ -115,7 +115,7 @@ bool FocusCycler::FocusWidget(views::Widget* widget) {
   // will be taken care of by the widget activation.
   widget_activating_ = widget;
   widget->Activate();
-  widget_activating_ = NULL;
+  widget_activating_ = nullptr;
   return widget->IsActive();
 }
 

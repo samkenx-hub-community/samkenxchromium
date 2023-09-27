@@ -112,6 +112,9 @@
   <message name="IDS_DESKTOP_SITE_TITLE" desc="Title of the permission to request the desktop view of a site by default [CHAR_LIMIT=32]">
     Desktop site
   </message>
+  <message name="IDS_STORAGE_ACCESS_PERMISSION_TITLE" desc="Title of the permission to allow embedded content to access cookies and site data [CHAR_LIMIT=32]">
+    Embedded content
+  </message>
 
   <!-- Site settings global toggles -->
 
@@ -152,6 +155,9 @@
   </message>
   <message name="IDS_ENABLE_DESKTOP_SITE_EXTERNAL_DISPLAY_SUMMARY" translateable="false" desc="Summary for the preference to enable display setting for request desktop site">
     Always request desktop site if a monitor is connected
+  </message>
+  <message name="IDS_ENABLE_DESKTOP_SITE_WINDOW_SETTING_TITLE" desc="Title for the preference to enable window setting for request desktop site">
+    When the window is narrow, request mobile view
   </message>
 
   <!-- Site settings: general category strings -->
@@ -236,6 +242,15 @@
   <message name="IDS_WEBSITE_SETTINGS_DOMAIN_EXCEPTION_LABEL" desc="The label for site exceptions that apply to the entire domain.">
     All sites under <ph name="DOMAIN">%1$s<ex>google.com</ex></ph>
   </message>
+  <message name="IDS_SITE_SETTINGS_EXPIRES_TODAY_LABEL" desc="Third party cookies exception label, shown in the Third-Party cookies site settings exceptions list. Shown when an exceptions expires today.">
+    Expires today
+  </message>
+  <message name="IDS_SITE_SETTINGS_EXPIRES_LABEL" desc="Third party cookies exception label, shown in the Third-Party cookies site settings exception list.">
+    {COUNT, plural, 
+      =1 {Expires tomorrow} 
+      other {Expires in # days}
+    }
+  </message>
 
   <!-- Site settings Add Exception dialog -->
 
@@ -311,23 +326,33 @@
   <message name="IDS_STORAGE_CLEAR_SITE_STORAGE_TITLE" desc="Title of clear storage dialogs used in a couple different places to confirm clearing site storage data. [CHAR_LIMIT=24]">
     Clear site data?
   </message>
+  <!-- TODO(crbug.com/1459631): Add proper strings and make them translateable. -->
+  <message name="IDS_ZOOM_CLEAR_ALL_ZOOMS_DIALOG_TITLE" translateable="false" desc="Title of clear all zoom dialog used when a user decides to clear all zooms. [CHAR_LIMIT=24]">
+    Clear all zoom levels?
+  </message>
   <message name="IDS_STORAGE_CLEAR_DIALOG_CLEAR_STORAGE_OPTION" desc="Text of the button that will clear website storage.">
     Clear
   </message>
   <message name="IDS_STORAGE_CLEAR_DIALOG_TEXT" desc="Text of the clear storage dialog which give the user a choice to reset the app or delete site storage data.">
     This will clear all <ph name="SIZE_IN_KB">%1$s<ex>101kb</ex></ph> of website storage.
   </message>
-  <message name="IDS_WEBSITE_RESET" desc="The label for the button allowing users to clear all data and reset the permissions for a website.">
-    Clear &amp; reset
+  <message name="IDS_WEBSITE_RESET" desc="The label for the button allowing users to delete all data and reset the permissions for a website.">
+    Delete &amp; reset
   </message>
-  <message name="IDS_WEBSITE_RESET_FULL" desc="The label for the button allowing users to clear all data and reset the permissions for a website.">
-    Clear data &amp; reset permissions
+  <message name="IDS_WEBSITE_RESET_FULL" desc="The label for the button allowing users to delete all data and reset the permissions for a website.">
+    Delete data &amp; reset permissions
   </message>
-  <message name="IDS_WEBSITE_RESET_CONFIRMATION_TITLE" desc="The title of the confirmation dialog for clearing all site data and resetting the permissions.">
-    Clear &amp; reset?
+  <message name="IDS_WEBSITE_RESET_CONFIRMATION_TITLE" desc="The title of the confirmation dialog for deleting all site data and resetting the permissions.">
+    Delete &amp; reset?
   </message>
-  <message name="IDS_WEBSITE_RESET_CONFIRMATION" desc="The confirmation text asking if the user is sure about clearing all data and reset the permissions for a site.">
-    Are you sure you want to clear all local data, including cookies, and reset all permissions for this website?
+  <message name="IDS_WEBSITE_RESET_CONFIRMATION" desc="The confirmation text asking if the user is sure about deleting all data and resetting the permissions for a site.">
+    Are you sure you want to delete all local data, including cookies, and reset all permissions for this website?
+  </message>
+  <message name="IDS_WEBSITE_SINGLE_RESET_CONFIRMATION" desc="The confirmation text asking if the user is sure about deleting all data and resetting the permissions for a single origin.">
+    This action will delete all local data, including cookies, and reset all permissions for <ph name="ORIGIN">%1$s<ex>mail.google.com</ex></ph>
+  </message>
+  <message name="IDS_WEBSITE_GROUP_RESET_CONFIRMATION" desc="The confirmation text asking if the user is sure about deleting all data and resetting the permissions for a group of sites.">
+    This action will delete all local data, including cookies, and reset all permissions for <ph name="DOMAIN">%1$s<ex>google.com</ex></ph> and all sites under it
   </message>
   <message name="IDS_CHOSEN_OBJECT_WEBSITE_RESET_CONFIRMATION_FOR" desc="The confirmation asking if the user is sure about clearing all site permissions for the chosen object">
     Are you sure you want to reset all site permissions for <ph name="CHOSEN_OBJECT_NAME">%1$s<ex>Weblight</ex></ph>?
@@ -366,20 +391,24 @@
     When on
   </message>
 
-  <message name="IDS_ANTI_ABUSE_WHEN_ON_SECTION_ONE" desc="Summary text explaining that browsing is smoother when the 'anti-abuse' setting is enabled.">
-    Browsing is faster because a site is less likely to ask you to verify you're a real person
+  <message name="IDS_ANTI_ABUSE_WHEN_ON_SECTION_ONE" desc="Summary text explaining that Chrome saves a small amount of data when the anti-abuse features are enabled.">
+    A site you visit can save a small amount of info with Chrome, mainly to validate you're not a bot
   </message>
 
-  <message name="IDS_ANTI_ABUSE_WHEN_ON_SECTION_TWO" desc="Summary text explaining that the anti-abuse features do not reveal your browsing history.">
-    This setting works without identifying you or allowing sites to see your browsing history
+  <message name="IDS_ANTI_ABUSE_WHEN_ON_SECTION_TWO" desc="Summary text explaining how the anti-abuse features work.">
+    As you keep browsing, sites can check with Chrome and verify with a previous site you've visited that you're likely a real person
+  </message>
+
+  <message name="IDS_ANTI_ABUSE_WHEN_ON_SECTION_THREE" desc="Summary text explaining that browsing could be helped by the anti-abuse features.">
+    Browsing is faster because a site is less likely to ask you to verify you're a real person
   </message>
 
   <message name="IDS_ANTI_ABUSE_THINGS_TO_CONSIDER_HEADER" desc="Header text for the section explaining additional things to consider when the 'anti-abuse' setting is enabled.">
     Things to consider
   </message>
 
-  <message name="IDS_ANTI_ABUSE_THINGS_TO_CONSIDER_SECTION_ONE" desc="Summary text explaining that sites can save info with Chrome when the 'anti-abuse' setting is enabled.">
-    A site you visit can save info with Chrome that validates you're not a bot. As you keep browsing, sites can check with Chrome and verify with a previous site you've visited that you're likely a real person
+  <message name="IDS_ANTI_ABUSE_THINGS_TO_CONSIDER_SECTION_ONE" desc="Summary text explaining that the anti-abuse features do not reveal a user's browsing history.">
+    This setting works without identifying you or allowing sites to see your browsing history, though sites can share a small amount of info as part of the verification
   </message>
 
   <!-- Augmented reality -->
@@ -586,8 +615,8 @@
   <message name="IDS_WEBSITE_SETTINGS_CATEGORY_DESKTOP_SITE_ALLOWED" desc="Summary text explaining that desktop view of sites will be requested by default.">
     Request desktop view
   </message>
-  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_DESKTOP_SITE_BLOCKED" desc="Summary text explaining that mobile view of sites will be requested by default and that it is the recommended setting.">
-    Request mobile view (recommended)
+  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_DESKTOP_SITE_BLOCKED" desc="Summary text explaining that mobile view of sites will be requested by default.">
+    Request mobile view
   </message>
   <message name="IDS_WEBSITE_SETTINGS_CATEGORY_DESKTOP_SITE_ALLOWED_LIST" desc="Summary text explaining that desktop view of sites will be requested by default. To be shown in the list of permission categories.">
     On
@@ -769,6 +798,19 @@
   </message>
   <message name="IDS_STORAGE_CLEAR_BUTTON_TITLE" desc="Title of a button in the storage UI used to clear all storage data. [CHAR_LIMIT=24]">
     Clear all data
+  </message>
+
+  <!-- ZOOM -->
+
+  <!-- TODO(crbug.com/1459631): Add proper strings and make them translateable. -->
+  <message name="IDS_SITE_SETTINGS_EMPTY_ZOOM_LEVELS_MESSAGE" translateable="false" desc="Text to display when there are no saved zooms">
+    Websites with a saved zoom appear here
+  </message>
+  <message name="IDS_SITE_SETTINGS_CLEAR_ALL_ZOOM_LEVELS_BUTTON_TEXT" translateable="false" desc="Title of a button in the storage UI used to clear all zoom data. [CHAR_LIMIT=24]">
+    Clear all zooms
+  </message>
+  <message name="IDS_SITE_SETTINGS_CLEAR_ALL_ZOOM_LEVELS_WARNING" translateable="false" desc="Explanation of the sites that zoom is being cleared for">
+    This will clear all the zoom levels listed on this page.
   </message>
 
   <!-- USB -->

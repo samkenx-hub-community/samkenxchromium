@@ -24,9 +24,9 @@
 <translation id="1993104285338243655">ወደ ማንጸባረቅ ተቀይሯል</translation>
 <translation id="2031987842108996681">ቀይ ሰርጥ</translation>
 <translation id="2060505056492490888">«<ph name="DOT" />» በ«<ph name="INVALIDDOMAIN" />» ውስጥ በተሳሳተ ቦታ ላይ ነው የገባው።</translation>
+<translation id="2068711044993563745">ትንሹ እሴት (<ph name="MINIMUM" />) ከከፍተኛው እሴት (<ph name="MAXIMUM" />) ማነስ አለበት።</translation>
 <translation id="2148716181193084225">ዛሬ</translation>
 <translation id="2226276347425096477">እባክዎ ይህ ጽሁፍ ወደ <ph name="MAX_CHARACTERS" /> ወይም ከዚያ በታች ቁምፊዎች ያሳጥሩት (በአሁኑ ጊዜ <ph name="CURRENT_LENGTH" /> ቁምፊዎችን እየተጠቀሙ ነዎት)።</translation>
-<translation id="2246498165605549352">አካባቢያዊ ፋይል</translation>
 <translation id="2247351761944213033">ሳምንት <ph name="WEEKNUMBER" />፣ <ph name="YEAR" /></translation>
 <translation id="2277199496770840904">ትራክ <ph name="NUMBER" /></translation>
 <translation id="2393030564806080191">ባለአስራስድስትዮሽ የቀለም እሴት</translation>
@@ -45,6 +45,7 @@
 <translation id="2761667185364618470">ለመቀጠል ከፈለጉ እባክዎ ይህ ሳጥን ላይ ምልክት ያድርጉ።</translation>
 <translation id="2908441821576996758">እባክዎ በኮማ የተለዩ የኢሜይል አድራሻዎች ዝርዝር ያስገቡ።</translation>
 <translation id="3049748772180311791"><ph name="QUANTITY" /> ሜባ</translation>
+<translation id="3053226512517284904">የኦዲዮ ማብራሪያዎች ምናሌን አሳይ</translation>
 <translation id="3075154866155599887">እባክዎ የሚሰራ ዋጋ ያስገቡ። መስኩ ያልተጠናቀቀ ነው ወይም ልክ ያልሆነ ቀን አለው።</translation>
 <translation id="310520048233152454">እባክዎ አንድ ዩአርኤል ያስገቡ።</translation>
 <translation id="3220661731597678625">የአሁኑ ደረጃ</translation>
@@ -88,7 +89,8 @@
 <translation id="5378437566635403538">ተዘርግቷል፣ መገናኛ ተከፍቷል።</translation>
 <translation id="5425179576310518467">የአሁኑ ቀን</translation>
 <translation id="5466621249238537318">እባክዎ አንድ ወይም ተጨማሪ ፋይሎችን ይምረጡ።</translation>
-<translation id="5468998798572797635">ከሙሉ ማያ ገጽ ውጣ</translation>
+<translation id="5468998798572797635">ከሙሉ ማያ ገፅ ውጣ</translation>
+<translation id="5514612371225420585">በመሣሪያዎ ላይ ያለ ፋይል</translation>
 <translation id="5516235301412634559">0.75</translation>
 <translation id="5537725057119320332">Cast</translation>
 <translation id="5546461542133609677">ድምፅ-ከልን አንሳ</translation>
@@ -98,7 +100,7 @@
 <translation id="5786442179789148008">የመልሶ ማጫወት ፍጥነት ምናሌን አሳይ</translation>
 <translation id="5787939484346677755">ተዘርግቷል፣ የራስ-ማጠናቀቅ አማራጮች አሉ።</translation>
 <translation id="5860033963881614850">አጥፋ</translation>
-<translation id="588258955323874662">ሙሉ ገጽ ዕይታ</translation>
+<translation id="588258955323874662">ሙሉ ገፅ ዕይታ</translation>
 <translation id="5888666972993069672">አሁን ወደ <ph name="DEVICE_FRIENDLY_NAME" /> cast በማድረግ ላይ</translation>
 <translation id="5916664084637901428">በርቷል</translation>
 <translation id="5939518447894949180">ዳግም አስጀምር</translation>
@@ -107,15 +109,16 @@
 <translation id="6011459053400940133">የድምጽ ተንሸራታች</translation>
 <translation id="6015796118275082299">ዓመት</translation>
 <translation id="6165053282446038410">ተዘርግቷል፣ <ph name="COUNT" /> የራስ-ማጠናቀቅ አማራጮች አሉ።</translation>
-<translation id="6212595056017402527">የአሁኑ ገጽ</translation>
+<translation id="6212595056017402527">የአሁኑ ገፅ</translation>
 <translation id="6281588256137006900">ፍካት</translation>
 <translation id="6310801910862476708">ከሥዕል-ውስጥ-ሥዕል ውጣ</translation>
 <translation id="6398862346408813489">የወር መምረጫ ፓነል አሳይ</translation>
 <translation id="6404546809543547843">የኦዲዮ ሰዓት አንፏቃቂ</translation>
 <translation id="6443871981718447451">የተዘጉ የመግለጫ ጽሁፎችን ምናሌ አሳይ</translation>
+<translation id="6484738902856791350">የሚያምር አትም</translation>
 <translation id="6550675742724504774">አማራጮች</translation>
 <translation id="6572309429103589720">ልክ ያልኾነ ሰዋሰው</translation>
-<translation id="658823671542763450">ወደ ሙሉ ገጽ ዕይታ ግባ</translation>
+<translation id="658823671542763450">ወደ ሙሉ ገፅ ዕይታ ግባ</translation>
 <translation id="6606094904835912297">የስርዓት ቀለሞች</translation>
 <translation id="6643016212128521049">አጽዳ</translation>
 <translation id="668171684555832681">ሌላ…</translation>

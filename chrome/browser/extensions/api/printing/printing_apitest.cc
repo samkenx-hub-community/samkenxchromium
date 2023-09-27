@@ -9,10 +9,8 @@
 #include "chrome/browser/ash/crosapi/crosapi_manager.h"
 #include "chrome/browser/ash/printing/cups_print_job_manager_factory.h"
 #include "chrome/browser/ash/printing/cups_printers_manager_factory.h"
-#include "chrome/browser/ash/printing/printer_configurer.h"
+#include "chrome/browser/ash/printing/fake_cups_printers_manager.h"
 #include "chrome/browser/ash/printing/test_cups_print_job_manager.h"
-#include "chrome/browser/ash/printing/test_cups_printers_manager.h"
-#include "chrome/browser/ash/printing/test_printer_configurer.h"
 #include "chrome/browser/extensions/api/printing/fake_print_job_controller_ash.h"
 #include "chrome/browser/extensions/api/printing/print_job_submitter.h"
 #include "chrome/browser/extensions/api/printing/printing_api.h"
@@ -50,9 +48,9 @@ std::unique_ptr<KeyedService> BuildTestCupsPrintJobManager(
       Profile::FromBrowserContext(context));
 }
 
-std::unique_ptr<KeyedService> BuildTestCupsPrintersManager(
+std::unique_ptr<KeyedService> BuildFakeCupsPrintersManager(
     content::BrowserContext* context) {
-  return std::make_unique<ash::TestCupsPrintersManager>();
+  return std::make_unique<ash::FakeCupsPrintersManager>();
 }
 
 std::unique_ptr<printing::PrinterSemanticCapsAndDefaults>
@@ -63,10 +61,10 @@ ConstructPrinterCapabilities() {
   capabilities->duplex_modes.push_back(printing::mojom::DuplexMode::kSimplex);
   capabilities->copies_max = 2;
   capabilities->dpis.emplace_back(kHorizontalDpi, kVerticalDpi);
-  printing::PrinterSemanticCapsAndDefaults::Paper paper;
-  paper.vendor_id = kMediaSizeVendorId;
-  paper.size_um = gfx::Size(kMediaSizeWidth, kMediaSizeHeight);
-  capabilities->papers.push_back(paper);
+  printing::PrinterSemanticCapsAndDefaults::Paper paper(
+      /*display_name=*/"", kMediaSizeVendorId,
+      {kMediaSizeWidth, kMediaSizeHeight});
+  capabilities->papers.push_back(std::move(paper));
   capabilities->collate_capable = true;
   return capabilities;
 }
@@ -89,8 +87,6 @@ class PrintingApiTest : public ExtensionApiTest,
             ->RegisterCreateServicesCallbackForTesting(base::BindRepeating(
                 &PrintingApiTest::OnWillCreateBrowserContextServices,
                 base::Unretained(this)));
-    ash::PrinterConfigurer::SetPrinterConfigurerForTesting(
-        std::make_unique<ash::TestPrinterConfigurer>());
     test_print_backend_ = base::MakeRefCounted<printing::TestPrintBackend>();
     printing::PrintBackend::SetPrintBackendForTesting(
         test_print_backend_.get());
@@ -103,8 +99,8 @@ class PrintingApiTest : public ExtensionApiTest,
             browser()->profile()));
   }
 
-  ash::TestCupsPrintersManager* GetPrintersManager() {
-    return static_cast<ash::TestCupsPrintersManager*>(
+  ash::FakeCupsPrintersManager* GetPrintersManager() {
+    return static_cast<ash::FakeCupsPrintersManager*>(
         ash::CupsPrintersManagerFactory::GetForBrowserContext(
             browser()->profile()));
   }
@@ -112,7 +108,9 @@ class PrintingApiTest : public ExtensionApiTest,
   void AddAvailablePrinter(
       const std::string& printer_id,
       std::unique_ptr<printing::PrinterSemanticCapsAndDefaults> capabilities) {
-    GetPrintersManager()->AddPrinter(chromeos::Printer(printer_id),
+    auto printer = chromeos::Printer(printer_id);
+    printer.SetUri("ipp://192.168.1.0");
+    GetPrintersManager()->AddPrinter(printer,
                                      chromeos::PrinterClass::kEnterprise);
     chromeos::CupsPrinterStatus status(printer_id);
     status.AddStatusReason(
@@ -153,7 +151,7 @@ class PrintingApiTest : public ExtensionApiTest,
     ash::CupsPrintJobManagerFactory::GetInstance()->SetTestingFactory(
         context, base::BindRepeating(&BuildTestCupsPrintJobManager));
     ash::CupsPrintersManagerFactory::GetInstance()->SetTestingFactory(
-        context, base::BindRepeating(&BuildTestCupsPrintersManager));
+        context, base::BindRepeating(&BuildFakeCupsPrintersManager));
   }
 
   base::CallbackListSubscription create_services_subscription_;

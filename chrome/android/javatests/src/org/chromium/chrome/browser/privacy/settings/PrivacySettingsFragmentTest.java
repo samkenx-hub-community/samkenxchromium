@@ -13,10 +13,8 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-
-import static org.chromium.base.test.util.Batch.PER_CLASS;
 
 import android.text.TextUtils;
 import android.view.View;
@@ -29,43 +27,50 @@ import androidx.test.filters.LargeTest;
 import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.test.metrics.HistogramTestRule;
-import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
+import org.chromium.base.test.util.DisabledTest;
+import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.Feature;
+import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.base.test.util.UserActionTester;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.incognito.reauth.IncognitoReauthManager;
 import org.chromium.chrome.browser.incognito.reauth.IncognitoReauthSettingUtils;
+import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.privacy_guide.PrivacyGuideInteractions;
 import org.chromium.chrome.browser.privacy_sandbox.FakePrivacySandboxBridge;
 import org.chromium.chrome.browser.privacy_sandbox.PrivacySandboxBridgeJni;
+import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.SettingsActivityTestRule;
+import org.chromium.chrome.browser.signin.SigninCheckerProvider;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
-import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
+import org.chromium.chrome.test.util.browser.signin.SigninTestRule;
+import org.chromium.components.policy.test.annotations.Policies;
+import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.content_public.browser.test.NativeLibraryTestUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Tests for {@link PrivacySettings}.
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
-@Batch(PER_CLASS)
+@DoNotBatch(reason = "Child account can leak to other tests in the suite.")
 public class PrivacySettingsFragmentTest {
     // Index of the Privacy Sandbox row entry in the settings list when PRIVACY_SANDBOX_SETTINGS_4
     // is enabled.
@@ -73,13 +78,14 @@ public class PrivacySettingsFragmentTest {
     // Name of the histogram to record the entry on Privacy Guide via the S&P link-row.
     public static final String ENTRY_EXIT_HISTOGRAM = "Settings.PrivacyGuide.EntryExit";
 
-    @ClassRule
-    public static final ChromeTabbedActivityTestRule sActivityTestRule =
-            new ChromeTabbedActivityTestRule();
-
-    @Rule
     public final SettingsActivityTestRule<PrivacySettings> mSettingsActivityTestRule =
             new SettingsActivityTestRule<>(PrivacySettings.class);
+
+    public final SigninTestRule mSigninTestRule = new SigninTestRule();
+
+    @Rule
+    public final RuleChain mRuleChain =
+            RuleChain.outerRule(mSigninTestRule).around(mSettingsActivityTestRule);
 
     @Rule
     public ChromeRenderTestRule mRenderTestRule =
@@ -89,9 +95,6 @@ public class PrivacySettingsFragmentTest {
 
     @Rule
     public JniMocker mocker = new JniMocker();
-
-    @Rule
-    public HistogramTestRule mHistogramTestRule = new HistogramTestRule();
 
     private FakePrivacySandboxBridge mFakePrivacySandboxBridge;
     private UserActionTester mActionTester;
@@ -128,14 +131,30 @@ public class PrivacySettingsFragmentTest {
         return null;
     }
 
-    @BeforeClass
-    public static void setUpBeforeActivityLaunched() {
-        // Only needs to be loaded once and needs to be loaded before HistogramTestRule.
-        NativeLibraryTestUtils.loadNativeLibraryNoBrowserProcess();
+    private void setPrivacyGuideViewed(boolean isViewed) {
+        TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> UserPrefs.get(Profile.getLastUsedRegularProfile())
+                                   .setBoolean(Pref.PRIVACY_GUIDE_VIEWED, isViewed));
+    }
+
+    private boolean isPrivacyGuideViewed() throws ExecutionException {
+        return TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> UserPrefs.get(Profile.getLastUsedRegularProfile())
+                                   .getBoolean(Pref.PRIVACY_GUIDE_VIEWED));
+    }
+
+    private void setShowTrackingProtection(boolean show) {
+        TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> UserPrefs.get(Profile.getLastUsedRegularProfile())
+                                   .setBoolean(Pref.TRACKING_PROTECTION3PCD_ENABLED, show));
     }
 
     @Before
     public void setUp() {
+        NativeLibraryTestUtils.loadNativeLibraryAndInitBrowserProcess();
         mFakePrivacySandboxBridge = new FakePrivacySandboxBridge();
         mocker.mock(PrivacySandboxBridgeJni.TEST_HOOKS, mFakePrivacySandboxBridge);
     }
@@ -176,10 +195,37 @@ public class PrivacySettingsFragmentTest {
 
     @Test
     @LargeTest
-    @Features.DisableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    @Feature({"RenderTest"})
+    @EnableFeatures(ChromeFeatureList.PRIVACY_GUIDE)
+    public void testRenderWhenPrivacyGuideViewed() throws IOException {
+        setPrivacyGuideViewed(true);
+        mSettingsActivityTestRule.startSettingsActivity();
+        waitForOptionsMenu();
+        View view = mSettingsActivityTestRule.getActivity()
+                            .findViewById(android.R.id.content)
+                            .getRootView();
+        mRenderTestRule.render(view, "privacy_and_security_privacy_guide_label_without_new");
+    }
+
+    @Test
+    @LargeTest
+    @Feature({"RenderTest"})
+    @EnableFeatures(ChromeFeatureList.PRIVACY_GUIDE)
+    public void testRenderWhenPrivacyGuideNotViewed() throws IOException {
+        setPrivacyGuideViewed(false);
+        mSettingsActivityTestRule.startSettingsActivity();
+        waitForOptionsMenu();
+        View view = mSettingsActivityTestRule.getActivity()
+                            .findViewById(android.R.id.content)
+                            .getRootView();
+        mRenderTestRule.render(view, "privacy_and_security_privacy_guide_label_with_new");
+    }
+
+    @Test
+    @LargeTest
+    @DisableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
     public void testPrivacySandboxV3View() throws IOException {
         mSettingsActivityTestRule.startSettingsActivity();
-        PrivacySettings fragment = mSettingsActivityTestRule.getFragment();
         // Scroll down and open Privacy Sandbox page.
         scrollToSetting(withText(R.string.prefs_privacy_sandbox));
         onView(withText(R.string.prefs_privacy_sandbox)).perform(click());
@@ -190,10 +236,9 @@ public class PrivacySettingsFragmentTest {
 
     @Test
     @LargeTest
-    @Features.EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    @EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
     public void testPrivacySandboxV4View() throws IOException {
         mSettingsActivityTestRule.startSettingsActivity();
-        PrivacySettings fragment = mSettingsActivityTestRule.getFragment();
         // Scroll down and open Privacy Sandbox page.
         scrollToSetting(withText(R.string.ad_privacy_link_row_label));
         onView(withText(R.string.ad_privacy_link_row_label)).perform(click());
@@ -203,7 +248,42 @@ public class PrivacySettingsFragmentTest {
 
     @Test
     @LargeTest
-    @Features.DisableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    @EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    public void testPrivacySandboxV4RestrictedWithRestrictedNoticeEnabled() throws IOException {
+        mFakePrivacySandboxBridge.setRestrictedNoticeEnabled(true);
+        mFakePrivacySandboxBridge.setPrivacySandboxRestricted(true);
+
+        mSettingsActivityTestRule.startSettingsActivity();
+        // Scroll down and open Privacy Sandbox page.
+        scrollToSetting(withText(R.string.ad_privacy_link_row_label));
+        // Verify that the right subtitle is shown.
+        onView(withText(R.string.settings_ad_privacy_restricted_link_row_sub_label))
+                .check(matches(isDisplayed()));
+        onView(withText(R.string.ad_privacy_link_row_label)).perform(click());
+        // Verify that the right view is shown depending on feature state.
+        onView(withText(R.string.settings_ad_measurement_page_title)).check(matches(isDisplayed()));
+    }
+
+    @Test
+    @LargeTest
+    @EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    public void testPrivacySandboxV4NotRestrictedWithRestrictedNoticeEnabled() throws IOException {
+        mFakePrivacySandboxBridge.setRestrictedNoticeEnabled(true);
+        mFakePrivacySandboxBridge.setPrivacySandboxRestricted(false);
+
+        mSettingsActivityTestRule.startSettingsActivity();
+        // Scroll down and open Privacy Sandbox page.
+        scrollToSetting(withText(R.string.ad_privacy_link_row_label));
+        // Verify that the right subtitle is shown.
+        onView(withText(R.string.ad_privacy_link_row_sub_label)).check(matches(isDisplayed()));
+        onView(withText(R.string.ad_privacy_link_row_label)).perform(click());
+        // Verify that the right view is shown depending on feature state.
+        onView(withText(R.string.settings_ad_measurement_page_title)).check(matches(isDisplayed()));
+    }
+
+    @Test
+    @LargeTest
+    @DisableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
     public void testPrivacySandboxV3ViewRestricted() throws IOException {
         mFakePrivacySandboxBridge.setPrivacySandboxRestricted(true);
         mSettingsActivityTestRule.startSettingsActivity();
@@ -218,7 +298,7 @@ public class PrivacySettingsFragmentTest {
 
     @Test
     @LargeTest
-    @Features.EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    @EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
     public void testPrivacySandboxV4ViewRestricted() throws IOException {
         mFakePrivacySandboxBridge.setPrivacySandboxRestricted(true);
         mSettingsActivityTestRule.startSettingsActivity();
@@ -233,10 +313,20 @@ public class PrivacySettingsFragmentTest {
 
     @Test
     @LargeTest
+    @EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    public void testTrackingProtectionWithSandboxV4() throws IOException {
+        setShowTrackingProtection(true);
+        mSettingsActivityTestRule.startSettingsActivity();
+        // Verify that the Tracking Protection row is shown and 3PC is not.
+        onView(withText(R.string.tracking_protection_title)).check(matches(isDisplayed()));
+        onView(withText(R.string.third_party_cookies_link_row_label)).check(doesNotExist());
+    }
+
+    @Test
+    @LargeTest
     @Feature({"RenderTest"})
     public void testRenderIncognitoLockView_DeviceScreenLockDisabled() throws IOException {
         IncognitoReauthManager.setIsIncognitoReauthFeatureAvailableForTesting(true);
-        IncognitoReauthSettingUtils.setIsDeviceScreenLockEnabledForTesting(false);
 
         mSettingsActivityTestRule.startSettingsActivity();
         waitForOptionsMenu();
@@ -263,14 +353,13 @@ public class PrivacySettingsFragmentTest {
 
     @Test
     @LargeTest
-    @Features.EnableFeatures(ChromeFeatureList.PRIVACY_GUIDE)
+    @EnableFeatures(ChromeFeatureList.PRIVACY_GUIDE)
     public void testPrivacyGuideLinkRowEntryPointUserAction() throws IOException {
         mSettingsActivityTestRule.startSettingsActivity();
         mActionTester = new UserActionTester();
-        PrivacySettings fragment = mSettingsActivityTestRule.getFragment();
         // Scroll down and open Privacy Guide page.
-        scrollToSetting(withText(R.string.prefs_privacy_guide_title));
-        onView(withText(R.string.prefs_privacy_guide_title)).perform(click());
+        scrollToSetting(withText(R.string.privacy_guide_pref_summary));
+        onView(withText(R.string.privacy_guide_pref_summary)).perform(click());
         // Verify that the user action is emitted when privacy guide is clicked
         assertTrue(
                 mActionTester.getActions().contains("Settings.PrivacyGuide.StartPrivacySettings"));
@@ -278,21 +367,53 @@ public class PrivacySettingsFragmentTest {
 
     @Test
     @LargeTest
-    @Features.EnableFeatures(ChromeFeatureList.PRIVACY_GUIDE)
+    @EnableFeatures(ChromeFeatureList.PRIVACY_GUIDE)
     public void testPrivacyGuideLinkRowEntryExitHistogram() throws IOException {
         mSettingsActivityTestRule.startSettingsActivity();
-        PrivacySettings fragment = mSettingsActivityTestRule.getFragment();
 
-        assertEquals(0,
-                mHistogramTestRule.getHistogramValueCount(
-                        ENTRY_EXIT_HISTOGRAM, PrivacyGuideInteractions.SETTINGS_LINK_ROW_ENTRY));
+        var histogram = HistogramWatcher.newSingleRecordWatcher(
+                ENTRY_EXIT_HISTOGRAM, PrivacyGuideInteractions.SETTINGS_LINK_ROW_ENTRY);
 
         // Scroll down and open Privacy Guide page.
-        scrollToSetting(withText(R.string.prefs_privacy_guide_title));
-        onView(withText(R.string.prefs_privacy_guide_title)).perform(click());
+        scrollToSetting(withText(R.string.privacy_guide_pref_summary));
+        onView(withText(R.string.privacy_guide_pref_summary)).perform(click());
 
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        ENTRY_EXIT_HISTOGRAM, PrivacyGuideInteractions.SETTINGS_LINK_ROW_ENTRY));
+        histogram.assertExpected();
+    }
+
+    @Test
+    @LargeTest
+    @EnableFeatures(ChromeFeatureList.PRIVACY_GUIDE)
+    public void testPrivacyGuideNewLabelVisibility() throws ExecutionException {
+        setPrivacyGuideViewed(false);
+        mSettingsActivityTestRule.startSettingsActivity();
+        assertFalse(isPrivacyGuideViewed());
+
+        // Open the privacy guide
+        onView(withText(R.string.privacy_guide_pref_summary)).perform(click());
+        // Tapping on the privacy guide row should mark the privacy guide as viewed
+        assertTrue(isPrivacyGuideViewed());
+    }
+
+    @Test
+    @LargeTest
+    @EnableFeatures(ChromeFeatureList.PRIVACY_GUIDE)
+    // A random policy is required to make the device managed
+    @Policies.Add({ @Policies.Item(key = "RandomPolicy", string = "true") })
+    public void testPrivacyGuideNotDisplayedWhenDeviceIsManaged() {
+        mSettingsActivityTestRule.startSettingsActivity();
+        onView(withText(R.string.privacy_guide_pref_summary)).check(doesNotExist());
+    }
+
+    @Test
+    @LargeTest
+    @EnableFeatures(ChromeFeatureList.PRIVACY_GUIDE)
+    @DisabledTest(message = "crbug.com/1437093")
+    public void testPrivacyGuideNotDisplayedWhenUserIsChild() {
+        // TODO(crbug.com/1433652): Remove once SigninChecker is automatically created.
+        TestThreadUtils.runOnUiThreadBlockingNoException(SigninCheckerProvider::get);
+        mSigninTestRule.addChildTestAccountThenWaitForSignin();
+        mSettingsActivityTestRule.startSettingsActivity();
+        onView(withText(R.string.privacy_guide_pref_summary)).check(doesNotExist());
     }
 }

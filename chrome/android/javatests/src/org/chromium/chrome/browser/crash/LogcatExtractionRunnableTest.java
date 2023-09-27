@@ -9,8 +9,8 @@ import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
 import android.app.job.JobWorkItem;
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.junit.Assert;
@@ -167,7 +167,7 @@ public class LogcatExtractionRunnableTest {
     @MediumTest
     public void testSimpleExtraction() throws IOException {
         final File minidump = createMinidump("test.dmp");
-        Context testContext = new TestContext(InstrumentationRegistry.getTargetContext());
+        Context testContext = new TestContext(ApplicationProvider.getApplicationContext());
 
         LogcatExtractionRunnable runnable =
                 new LogcatExtractionRunnable(minidump, new TestLogcatCrashExtractor());

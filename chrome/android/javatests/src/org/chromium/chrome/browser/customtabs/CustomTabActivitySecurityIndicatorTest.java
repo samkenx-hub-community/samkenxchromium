@@ -10,13 +10,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.BitmapDrawable;
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 import android.widget.ImageView;
 
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.widget.ImageViewCompat;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -28,13 +29,14 @@ import org.junit.runner.RunWith;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.firstrun.FirstRunStatus;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeTabUtils;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.net.test.ServerCertificate;
@@ -66,7 +68,6 @@ public class CustomTabActivitySecurityIndicatorTest {
     @After
     public void tearDown() {
         TestThreadUtils.runOnUiThreadBlocking(() -> FirstRunStatus.setFirstRunFlowComplete(false));
-        mTestServer.stopAndDestroyServer();
     }
 
     private CustomTabActivity getActivity() {
@@ -75,7 +76,7 @@ public class CustomTabActivitySecurityIndicatorTest {
 
     @Test
     @MediumTest
-    @Features.DisableFeatures({ChromeFeatureList.OMNIBOX_UPDATED_CONNECTION_SECURITY_INDICATORS})
+    @DisableFeatures({ChromeFeatureList.OMNIBOX_UPDATED_CONNECTION_SECURITY_INDICATORS})
     public void testCustomTabSecurityIndicators() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation()
                                   .getTargetContext()
@@ -90,16 +91,16 @@ public class CustomTabActivitySecurityIndicatorTest {
         });
 
         // Test that the security indicator is the lock icon.
-        final int expectedSecurityIcon = org.chromium.chrome.R.drawable.omnibox_https_valid;
+        final int expectedSecurityIcon = R.drawable.omnibox_https_valid;
         ImageView securityButton =
                 mCustomTabActivityTestRule.getActivity().findViewById(R.id.security_button);
         Assert.assertEquals(View.VISIBLE, securityButton.getVisibility());
 
         ColorStateList colorStateList =
-                AppCompatResources.getColorStateList(InstrumentationRegistry.getTargetContext(),
+                AppCompatResources.getColorStateList(ApplicationProvider.getApplicationContext(),
                         R.color.default_icon_color_light_tint_list);
         ImageView expectedSecurityButton =
-                new ImageView(InstrumentationRegistry.getTargetContext());
+                new ImageView(ApplicationProvider.getApplicationContext());
         expectedSecurityButton.setImageResource(expectedSecurityIcon);
         ImageViewCompat.setImageTintList(expectedSecurityButton, colorStateList);
 
@@ -113,7 +114,7 @@ public class CustomTabActivitySecurityIndicatorTest {
     // Regression test for crbug.com/1245733.
     @Test
     @MediumTest
-    @Features.EnableFeatures({ChromeFeatureList.OMNIBOX_UPDATED_CONNECTION_SECURITY_INDICATORS})
+    @EnableFeatures({ChromeFeatureList.OMNIBOX_UPDATED_CONNECTION_SECURITY_INDICATORS})
     public void testCustomTabSecurityIndicator_UpdateEnabled() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation()
                                   .getTargetContext()
@@ -128,16 +129,16 @@ public class CustomTabActivitySecurityIndicatorTest {
         });
 
         // Test that the security indicator is the lock icon.
-        final int expectedSecurityIcon = org.chromium.chrome.R.drawable.omnibox_https_valid;
+        final int expectedSecurityIcon = R.drawable.omnibox_https_valid;
         ImageView securityButton =
                 mCustomTabActivityTestRule.getActivity().findViewById(R.id.security_button);
         Assert.assertEquals(View.VISIBLE, securityButton.getVisibility());
 
         ColorStateList colorStateList =
-                AppCompatResources.getColorStateList(InstrumentationRegistry.getTargetContext(),
+                AppCompatResources.getColorStateList(ApplicationProvider.getApplicationContext(),
                         R.color.default_icon_color_light_tint_list);
         ImageView expectedSecurityButton =
-                new ImageView(InstrumentationRegistry.getTargetContext());
+                new ImageView(ApplicationProvider.getApplicationContext());
         expectedSecurityButton.setImageResource(expectedSecurityIcon);
         ImageViewCompat.setImageTintList(expectedSecurityButton, colorStateList);
 

@@ -36,6 +36,7 @@
 #include "remoting/protocol/errors.h"
 #include "remoting/protocol/ice_config.h"
 #include "remoting/signaling/log_to_server.h"
+#include "services/network/test/test_shared_url_loader_factory.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace remoting {
@@ -247,8 +248,14 @@ class It2MeNativeMessagingHostTest : public testing::Test {
                       bool expect_error_response);
   void TestConnect();
 
+  const absl::optional<ChromeOsEnterpriseParams>
+  get_chrome_os_enterprise_params() {
+    return factory_raw_ptr_->host->chrome_os_enterprise_params_;
+  }
+
   // Raw pointer to host factory (owned by It2MeNativeMessagingHost).
-  raw_ptr<MockIt2MeHostFactory> factory_raw_ptr_ = nullptr;
+  raw_ptr<MockIt2MeHostFactory, AcrossTasksDanglingUntriaged> factory_raw_ptr_ =
+      nullptr;
 
  private:
   void StartHost();
@@ -274,11 +281,14 @@ class It2MeNativeMessagingHostTest : public testing::Test {
 
   // Retain a raw pointer to |policy_loader_| in order to control the policy
   // contents.
-  raw_ptr<policy::FakeAsyncPolicyLoader> policy_loader_ = nullptr;
+  raw_ptr<policy::FakeAsyncPolicyLoader, AcrossTasksDanglingUntriaged>
+      policy_loader_ = nullptr;
 
   // Task runner of the host thread.
   scoped_refptr<AutoThreadTaskRunner> host_task_runner_;
   std::unique_ptr<remoting::NativeMessagingPipe> pipe_;
+
+  scoped_refptr<network::TestSharedURLLoaderFactory> test_url_loader_factory_;
 };
 
 void It2MeNativeMessagingHostTest::SetUp() {
@@ -293,6 +303,10 @@ void It2MeNativeMessagingHostTest::SetUp() {
       host_thread_->task_runner(),
       base::BindOnce(&It2MeNativeMessagingHostTest::ExitTest,
                      base::Unretained(this)));
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  test_url_loader_factory_ = new network::TestSharedURLLoaderFactory();
+#endif
 
   host_task_runner_->PostTask(
       FROM_HERE, base::BindOnce(&It2MeNativeMessagingHostTest::StartHost,
@@ -552,7 +566,8 @@ void It2MeNativeMessagingHostTest::StartHost() {
   // Creating a native messaging host with a mock It2MeHostFactory and policy
   // loader.
   std::unique_ptr<ChromotingHostContext> context =
-      ChromotingHostContext::Create(host_task_runner_);
+      ChromotingHostContext::CreateForTesting(host_task_runner_,
+                                              test_url_loader_factory_);
   auto policy_loader =
       std::make_unique<policy::FakeAsyncPolicyLoader>(host_task_runner_);
   policy_loader_ = policy_loader.get();
@@ -649,13 +664,15 @@ TEST_F(It2MeNativeMessagingHostTest,
        ConnectRespectsSuppressUserDialogsParameterOnChromeOsOnly) {
   int next_id = 1;
   base::Value::Dict connect_message = CreateConnectMessage(next_id);
+  connect_message.Set(kIsEnterpriseAdminUser, true);
   connect_message.Set(kSuppressUserDialogs, true);
   WriteMessageToInputPipe(connect_message);
   VerifyConnectResponses(next_id);
 #if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
-  EXPECT_FALSE(factory_raw_ptr_->host->enable_dialogs());
+  ASSERT_TRUE(get_chrome_os_enterprise_params().has_value());
+  ASSERT_TRUE(get_chrome_os_enterprise_params()->suppress_user_dialogs);
 #else
-  EXPECT_TRUE(factory_raw_ptr_->host->enable_dialogs());
+  ASSERT_FALSE(get_chrome_os_enterprise_params().has_value());
 #endif
   ++next_id;
   WriteMessageToInputPipe(CreateDisconnectMessage(next_id));
@@ -666,13 +683,15 @@ TEST_F(It2MeNativeMessagingHostTest,
        ConnectRespectsSuppressNotificationsParameterOnChromeOsOnly) {
   int next_id = 1;
   base::Value::Dict connect_message = CreateConnectMessage(next_id);
+  connect_message.Set(kIsEnterpriseAdminUser, true);
   connect_message.Set(kSuppressNotifications, true);
   WriteMessageToInputPipe(connect_message);
   VerifyConnectResponses(next_id);
 #if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
-  EXPECT_FALSE(factory_raw_ptr_->host->enable_notifications());
+  ASSERT_TRUE(get_chrome_os_enterprise_params().has_value());
+  ASSERT_TRUE(get_chrome_os_enterprise_params()->suppress_notifications);
 #else
-  EXPECT_TRUE(factory_raw_ptr_->host->enable_notifications());
+  ASSERT_FALSE(get_chrome_os_enterprise_params().has_value());
 #endif
   ++next_id;
   WriteMessageToInputPipe(CreateDisconnectMessage(next_id));
@@ -683,13 +702,15 @@ TEST_F(It2MeNativeMessagingHostTest,
        ConnectRespectsTerminateUponInputParameterOnChromeOsOnly) {
   int next_id = 1;
   base::Value::Dict connect_message = CreateConnectMessage(next_id);
+  connect_message.Set(kIsEnterpriseAdminUser, true);
   connect_message.Set(kTerminateUponInput, true);
   WriteMessageToInputPipe(connect_message);
   VerifyConnectResponses(next_id);
 #if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
-  EXPECT_TRUE(factory_raw_ptr_->host->terminate_upon_input());
+  ASSERT_TRUE(get_chrome_os_enterprise_params().has_value());
+  ASSERT_TRUE(get_chrome_os_enterprise_params()->terminate_upon_input);
 #else
-  EXPECT_FALSE(factory_raw_ptr_->host->terminate_upon_input());
+  ASSERT_FALSE(get_chrome_os_enterprise_params().has_value());
 #endif
   ++next_id;
   WriteMessageToInputPipe(CreateDisconnectMessage(next_id));
@@ -717,13 +738,15 @@ TEST_F(It2MeNativeMessagingHostTest,
        ConnectRespectsCurtainLocalUserSessionParameterOnChromeOsOnly) {
   int next_id = 1;
   base::Value::Dict connect_message = CreateConnectMessage(next_id);
+  connect_message.Set(kIsEnterpriseAdminUser, true);
   connect_message.Set(kCurtainLocalUserSession, true);
   WriteMessageToInputPipe(connect_message);
   VerifyConnectResponses(next_id);
 #if BUILDFLAG(IS_CHROMEOS_ASH) || !defined(NDEBUG)
-  EXPECT_TRUE(factory_raw_ptr_->host->enable_curtaining());
+  ASSERT_TRUE(get_chrome_os_enterprise_params().has_value());
+  ASSERT_TRUE(get_chrome_os_enterprise_params()->curtain_local_user_session);
 #else
-  EXPECT_FALSE(factory_raw_ptr_->host->enable_curtaining());
+  ASSERT_FALSE(get_chrome_os_enterprise_params().has_value());
 #endif
   ++next_id;
   WriteMessageToInputPipe(CreateDisconnectMessage(next_id));

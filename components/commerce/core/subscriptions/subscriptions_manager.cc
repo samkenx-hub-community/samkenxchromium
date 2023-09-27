@@ -436,7 +436,9 @@ void SubscriptionsManager::OnSubscribe(
     const std::vector<CommerceSubscription>& subscriptions,
     bool succeeded) {
   for (SubscriptionsObserver& observer : observers_) {
-    observer.OnSubscribe(subscriptions, succeeded);
+    for (auto& sub : subscriptions) {
+      observer.OnSubscribe(sub, succeeded);
+    }
   }
 }
 
@@ -444,14 +446,15 @@ void SubscriptionsManager::OnUnsubscribe(
     const std::vector<CommerceSubscription>& subscriptions,
     bool succeeded) {
   for (SubscriptionsObserver& observer : observers_) {
-    observer.OnUnsubscribe(subscriptions, succeeded);
+    for (auto& sub : subscriptions) {
+      observer.OnUnsubscribe(sub, succeeded);
+    }
   }
 }
 
 void SubscriptionsManager::OnPrimaryAccountChanged(
     const signin::PrimaryAccountChangeEvent& event_details) {
-  storage_->DeleteAll();
-  SyncSubscriptions();
+  WipeStorageAndSyncSubscriptions();
 }
 
 bool SubscriptionsManager::HasRequestRunning() {
@@ -480,6 +483,11 @@ void SubscriptionsManager::AddObserver(SubscriptionsObserver* observer) {
 
 void SubscriptionsManager::RemoveObserver(SubscriptionsObserver* observer) {
   observers_.RemoveObserver(observer);
+}
+
+void SubscriptionsManager::WipeStorageAndSyncSubscriptions() {
+  storage_->DeleteAll();
+  SyncSubscriptions();
 }
 
 bool SubscriptionsManager::GetLastSyncSucceededForTesting() {

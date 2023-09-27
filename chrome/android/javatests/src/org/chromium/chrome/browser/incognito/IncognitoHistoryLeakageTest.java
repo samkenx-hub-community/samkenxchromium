@@ -8,8 +8,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
 
 import org.hamcrest.Matchers;
@@ -56,7 +56,7 @@ import java.util.concurrent.TimeoutException;
  */
 @RunWith(ParameterizedRunner.class)
 @UseRunnerDelegate(ChromeJUnit4RunnerDelegate.class)
-@EnableFeatures({ChromeFeatureList.CCT_INCOGNITO})
+@EnableFeatures(ChromeFeatureList.CCT_INCOGNITO)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 public class IncognitoHistoryLeakageTest {
     private static final String TEST_PAGE_1 = "/chrome/test/data/android/google.html";
@@ -76,7 +76,8 @@ public class IncognitoHistoryLeakageTest {
 
     @Before
     public void setUp() throws TimeoutException {
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         mTestPage1 = mTestServer.getURL(TEST_PAGE_1);
         mTestPage2 = mTestServer.getURL(TEST_PAGE_2);
 
@@ -89,7 +90,6 @@ public class IncognitoHistoryLeakageTest {
     public void tearDown() {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> IncognitoDataTestUtils.closeTabs(mChromeActivityTestRule));
-        mTestServer.stopAndDestroyServer();
     }
 
     /**
@@ -110,6 +110,10 @@ public class IncognitoHistoryLeakageTest {
         return historyObserver.getHistoryQueryResults();
     }
 
+    /**
+     * A general class providing test parameters encapsulating different Activity type pairs
+     * spliced on Regular and Incognito mode between whom we want to test leakage.
+     */
     public static class AllTypesToAllTypes implements ParameterProvider {
         @Override
         public List<ParameterSet> getParameters() {
@@ -137,7 +141,7 @@ public class IncognitoHistoryLeakageTest {
     public void testBrowsingHistoryDoNotLeakFromIncognitoCustomTabActivity()
             throws TimeoutException {
         Intent intent = CustomTabsIntentTestUtils.createMinimalIncognitoCustomTabIntent(
-                InstrumentationRegistry.getContext(), mTestPage1);
+                ApplicationProvider.getApplicationContext(), mTestPage1);
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(intent);
         List<HistoryItem> historyEntriesOfIncognitoMode =
                 getBrowsingHistory(mCustomTabActivityTestRule.getActivity().getActivityTab());

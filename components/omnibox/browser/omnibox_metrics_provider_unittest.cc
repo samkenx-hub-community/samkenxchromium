@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -15,10 +15,13 @@
 #include "components/omnibox/browser/match_compare.h"
 #include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/omnibox/browser/omnibox_log.h"
+#include "components/omnibox/browser/omnibox_popup_selection.h"
 #include "components/omnibox/common/omnibox_features.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/metrics_proto/omnibox_event.pb.h"
 #include "ui/base/window_open_disposition.h"
+
+using ScoringSignals = ::metrics::OmniboxEventProto::Suggestion::ScoringSignals;
 
 class OmniboxMetricsProviderTest : public testing::Test {
  public:
@@ -37,7 +40,8 @@ class OmniboxMetricsProviderTest : public testing::Test {
         u"my text", /*just_deleted_text=*/false, metrics::OmniboxInputType::URL,
         /*in_keyword_mode=*/false,
         metrics::OmniboxEventProto_KeywordModeEntryMethod_INVALID,
-        /*is_popup_open=*/false, /*selected_index=*/selected_index,
+        /*is_popup_open=*/false,
+        /*selection=*/OmniboxPopupSelection(selected_index),
         WindowOpenDisposition::CURRENT_TAB, /*is_paste_and_go=*/false,
         SessionID::NewUnique(),
         metrics::OmniboxEventProto::PageClassification::
@@ -64,8 +68,7 @@ class OmniboxMetricsProviderTest : public testing::Test {
 
   void RecordLogAndVerifyScoringSignals(
       const OmniboxLog& log,
-      metrics::OmniboxEventProto::Suggestion::ScoringSignals&
-          expected_scoring_signals) {
+      ScoringSignals& expected_scoring_signals) {
     // Clear the event cache so we start with a clean slate.
     provider_->omnibox_events_cache.clear_omnibox_event();
 
@@ -151,8 +154,7 @@ TEST_F(OmniboxMetricsProviderTest, LogScoringSignals) {
 
   // Populate a set of scoring signals with some test values. This will be used
   // to ensure the scoring signals are being propagated correctly.
-  metrics::OmniboxEventProto::Suggestion::ScoringSignals
-      expected_scoring_signals;
+  ScoringSignals expected_scoring_signals;
   expected_scoring_signals.set_first_bookmark_title_match_position(3);
   expected_scoring_signals.set_allowed_to_be_default_match(true);
   expected_scoring_signals.set_length_of_url(20);
@@ -162,7 +164,7 @@ TEST_F(OmniboxMetricsProviderTest, LogScoringSignals) {
   ACMatches matches = {
       BuildMatch(AutocompleteMatchType::Type::BOOKMARK_TITLE),
       BuildMatch(AutocompleteMatchType::Type::SEARCH_WHAT_YOU_TYPED)};
-  for (auto match : matches) {
+  for (auto& match : matches) {
     match.scoring_signals = expected_scoring_signals;
   }
   AutocompleteResult result;
@@ -170,10 +172,10 @@ TEST_F(OmniboxMetricsProviderTest, LogScoringSignals) {
 
   // Create the log and call simulate logging.
   OmniboxLog log = BuildOmniboxLog(result, /*selected_index=*/1);
-  RecordLogAndVerifyScoringSignals(log, matches[0].scoring_signals);
+  RecordLogAndVerifyScoringSignals(log, *matches[0].scoring_signals);
 
   // Now, "turn on" incognito mode, scoring signals should not be logged.
   log.is_incognito = true;
-  RecordLogAndVerifyScoringSignals(log, matches[0].scoring_signals);
+  RecordLogAndVerifyScoringSignals(log, *matches[0].scoring_signals);
 }
 #endif  // !(BUILDFLAG(IS_IOS) || BUILDFLAG(IS_ANDROID))

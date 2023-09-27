@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_PEERCONNECTION_PEER_CONNECTION_DEPENDENCY_FACTORY_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_PEERCONNECTION_PEER_CONNECTION_DEPENDENCY_FACTORY_H_
 
+#include "base/feature_list.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/threading/thread.h"
@@ -21,6 +22,7 @@
 #include "third_party/blink/renderer/platform/wtf/gc_plugin.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
+#include "third_party/webrtc/api/async_dns_resolver.h"
 #include "third_party/webrtc/api/peer_connection_interface.h"
 #include "third_party/webrtc_overrides/metronome_source.h"
 
@@ -35,6 +37,7 @@ class PortAllocator;
 namespace media {
 class DecoderFactory;
 class GpuVideoAcceleratorFactories;
+class MojoVideoEncoderMetricsProviderFactory;
 }
 
 namespace rtc {
@@ -102,7 +105,8 @@ class MODULES_EXPORT PeerConnectionDependencyFactory
   // Asks the libjingle PeerConnection factory to create a libjingle
   // PeerConnection object.
   // The PeerConnection object is owned by PeerConnectionHandler.
-  virtual scoped_refptr<webrtc::PeerConnectionInterface> CreatePeerConnection(
+  virtual rtc::scoped_refptr<webrtc::PeerConnectionInterface>
+  CreatePeerConnection(
       const webrtc::PeerConnectionInterface::RTCConfiguration& config,
       blink::WebLocalFrame* web_frame,
       webrtc::PeerConnectionObserver* observer,
@@ -113,9 +117,9 @@ class MODULES_EXPORT PeerConnectionDependencyFactory
   virtual std::unique_ptr<cricket::PortAllocator> CreatePortAllocator(
       blink::WebLocalFrame* web_frame);
 
-  // Creates an AsyncResolverFactory that uses the networking Mojo service.
-  virtual std::unique_ptr<webrtc::AsyncResolverFactory>
-  CreateAsyncResolverFactory();
+  // Creates an AsyncDnsResolverFactory that uses the networking Mojo service.
+  virtual std::unique_ptr<webrtc::AsyncDnsResolverFactoryInterface>
+  CreateAsyncDnsResolverFactory();
 
   // Creates a libjingle representation of an ice candidate.
   virtual webrtc::IceCandidateInterface* CreateIceCandidate(
@@ -176,6 +180,8 @@ class MODULES_EXPORT PeerConnectionDependencyFactory
       scoped_refptr<base::SequencedTaskRunner> media_task_runner,
       media::GpuVideoAcceleratorFactories* gpu_factories,
       base::WeakPtr<media::DecoderFactory> media_decoder_factory,
+      scoped_refptr<media::MojoVideoEncoderMetricsProviderFactory>
+          video_encoder_metrics_provider_factory,
       base::WaitableEvent* event);
 
   void CreateIpcNetworkManagerOnNetworkThread(

@@ -4,10 +4,10 @@
 
 #include "chrome/browser/notifications/notification_platform_bridge_lacros.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "base/check.h"
-#include "base/cxx17_backports.h"
 #include "base/memory/raw_ptr.h"
 #include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
@@ -19,6 +19,7 @@
 #include "chromeos/crosapi/mojom/notification.mojom.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "ui/color/color_provider_manager.h"
 #include "ui/message_center/public/cpp/notification.h"
 #include "ui/message_center/public/cpp/notification_types.h"
 #include "ui/native_theme/native_theme.h"
@@ -82,7 +83,7 @@ crosapi::mojom::NotificationPtr ToMojo(
   mojo_note->origin_url = notification.origin_url();
   if (!notification.icon().IsEmpty())
     mojo_note->icon = notification.icon().Rasterize(color_provider);
-  mojo_note->priority = base::clamp(notification.priority(), -2, 2);
+  mojo_note->priority = std::clamp(notification.priority(), -2, 2);
   mojo_note->require_interaction = notification.never_timeout();
   mojo_note->timestamp = notification.timestamp();
   if (!notification.image().IsEmpty())
@@ -99,7 +100,7 @@ crosapi::mojom::NotificationPtr ToMojo(
     mojo_item->message = item.message;
     mojo_note->items.push_back(std::move(mojo_item));
   }
-  mojo_note->progress = base::clamp(notification.progress(), -1, 100);
+  mojo_note->progress = std::clamp(notification.progress(), -1, 100);
   mojo_note->progress_status = notification.progress_status();
   for (const auto& button : notification.buttons()) {
     auto mojo_button = crosapi::mojom::ButtonInfo::New();
@@ -238,6 +239,14 @@ void NotificationPlatformBridgeLacros::Close(
 
 void NotificationPlatformBridgeLacros::GetDisplayed(
     Profile* profile,
+    GetDisplayedNotificationsCallback callback) const {
+  NOTIMPLEMENTED();
+  std::move(callback).Run(/*notification_ids=*/{}, /*supports_sync=*/false);
+}
+
+void NotificationPlatformBridgeLacros::GetDisplayedForOrigin(
+    Profile* profile,
+    const GURL& origin,
     GetDisplayedNotificationsCallback callback) const {
   NOTIMPLEMENTED();
   std::move(callback).Run(/*notification_ids=*/{}, /*supports_sync=*/false);

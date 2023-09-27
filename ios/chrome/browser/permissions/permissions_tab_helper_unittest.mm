@@ -4,7 +4,6 @@
 
 #import "ios/chrome/browser/permissions/permissions_tab_helper.h"
 
-#import "base/test/scoped_feature_list.h"
 #import "base/test/task_environment.h"
 #import "base/threading/platform_thread.h"
 #import "base/time/time.h"
@@ -14,16 +13,11 @@
 #import "ios/chrome/browser/infobars/overlays/default_infobar_overlay_request_factory.h"
 #import "ios/chrome/browser/infobars/overlays/infobar_overlay_request_inserter.h"
 #import "ios/chrome/browser/permissions/permissions_infobar_delegate.h"
-#import "ios/web/common/features.h"
 #import "ios/web/public/permissions/permissions.h"
 #import "ios/web/public/test/fakes/fake_navigation_manager.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
 #import "testing/gtest/include/gtest/gtest.h"
 #import "testing/platform_test.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 constexpr base::TimeDelta kTimeoutDelay = base::Milliseconds(251);
@@ -34,9 +28,6 @@ class PermissionsTabHelperTest : public PlatformTest {
  public:
   PermissionsTabHelperTest()
       : task_environment_(base::test::TaskEnvironment::TimeSource::MOCK_TIME) {
-    scoped_feature_list_.InitWithFeatures(
-        {web::features::kMediaPermissionsControl}, {});
-
     web_state_.SetNavigationManager(
         std::make_unique<web::FakeNavigationManager>());
     InfoBarManagerImpl::CreateForWebState(&web_state_);
@@ -47,7 +38,6 @@ class PermissionsTabHelperTest : public PlatformTest {
 
   ~PermissionsTabHelperTest() override {
     InfoBarManagerImpl::FromWebState(&web_state_)->ShutDown();
-    // Observer should be removed before `scoped_feature_list_` is reset.
     web_state_.RemoveObserver(PermissionsTabHelper::FromWebState(&web_state_));
   }
 
@@ -76,7 +66,6 @@ class PermissionsTabHelperTest : public PlatformTest {
   }
 
   base::test::TaskEnvironment task_environment_;
-  base::test::ScopedFeatureList scoped_feature_list_;
   web::FakeWebState web_state_;
 };
 

@@ -9,11 +9,15 @@
 #include "ash/constants/ash_pref_names.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
+#include "ash/system/privacy_hub/sensor_disabled_notification_delegate.h"
 #include "base/check.h"
 #include "base/functional/callback_helpers.h"
+#include "chrome/browser/ash/privacy_hub/privacy_hub_util.h"
+#include "chrome/grit/branded_strings.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
 #include "services/device/public/cpp/geolocation/geolocation_manager.h"
+#include "ui/base/l10n/l10n_util.h"
 
 namespace ash {
 
@@ -46,6 +50,18 @@ void SystemGeolocationSource::RegisterPermissionUpdateCallback(
   }
 }
 
+void SystemGeolocationSource::TrackGeolocationAttempted() {
+  // Use the default name for the browser.
+  ash::privacy_hub_util::TrackGeolocationAttempted(
+      l10n_util::GetStringUTF8(IDS_SHORT_PRODUCT_NAME));
+}
+
+void SystemGeolocationSource::TrackGeolocationRelinquished() {
+  // Use the default name for the browser.
+  ash::privacy_hub_util::TrackGeolocationRelinquished(
+      l10n_util::GetStringUTF8(IDS_SHORT_PRODUCT_NAME));
+}
+
 void SystemGeolocationSource::OnActiveUserPrefServiceChanged(
     PrefService* pref_service) {
   // Subscribing to pref changes.
@@ -67,12 +83,19 @@ void SystemGeolocationSource::OnPrefChanged(const std::string& pref_name) {
   device::LocationSystemPermissionStatus status =
       device::LocationSystemPermissionStatus::kNotDetermined;
 
-  PrefService* pref_service = pref_change_registrar_->prefs();
-  if (pref_service) {
-    status = pref_service->GetBoolean(prefs::kUserGeolocationAllowed)
-                 ? device::LocationSystemPermissionStatus::kAllowed
-                 : device::LocationSystemPermissionStatus::kDenied;
+  if (ash::features::IsCrosPrivacyHubLocationEnabled()) {
+    PrefService* pref_service = pref_change_registrar_->prefs();
+    if (pref_service) {
+      status = pref_service->GetBoolean(prefs::kUserGeolocationAllowed)
+                   ? device::LocationSystemPermissionStatus::kAllowed
+                   : device::LocationSystemPermissionStatus::kDenied;
+    }
+  } else {
+    // If the global switch feature is not enabled, we allow explicitly to be
+    // backward compatible.
+    status = device::LocationSystemPermissionStatus::kAllowed;
   }
   permission_update_callback_.Run(status);
 }
+
 }  // namespace ash

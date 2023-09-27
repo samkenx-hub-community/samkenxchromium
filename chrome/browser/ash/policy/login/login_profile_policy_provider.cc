@@ -73,8 +73,22 @@ const DevicePolicyToUserPolicyMapEntry kDevicePoliciesWithPolicyOptionsMap[] = {
      key::kExtensionManifestV2Availability},
     {key::kDeviceLoginScreenPromptOnMultipleMatchingCertificates,
      key::kPromptOnMultipleMatchingCertificates},
+
+    // TODO(b:283960562): Remove the mapping to
+    // kContextAwareAccessSignalsAllowlist as part of the deprecation and
+    // cleanup of that policy.
     {key::kDeviceLoginScreenContextAwareAccessSignalsAllowlist,
      key::kContextAwareAccessSignalsAllowlist},
+    {key::kDeviceLoginScreenContextAwareAccessSignalsAllowlist,
+     key::kUserContextAwareAccessSignalsAllowlist},
+
+    // The authentication URL blocklist and allowlist policies implement content
+    // control for authentication flows, including in the login screen and lock
+    // screen.  Since these use the SigninProfile and LockScreenProfile, content
+    // control is already possible there through the URLBlocklist/URLAllowlist
+    // user policies.
+    {key::kDeviceAuthenticationURLBlocklist, key::kURLBlocklist},
+    {key::kDeviceAuthenticationURLAllowlist, key::kURLAllowlist},
 
     // key::kDeviceLoginScreenLocales maps to the ash::kDeviceLoginScreenLocales
     // CrosSetting elsewhere. Also map it to the key::kForcedLanguages policy in

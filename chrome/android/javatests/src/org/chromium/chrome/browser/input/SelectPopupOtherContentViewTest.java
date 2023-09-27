@@ -4,9 +4,8 @@
 
 package org.chromium.chrome.browser.input;
 
-import android.support.test.InstrumentationRegistry;
-
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Assert;
 import org.junit.Rule;
@@ -86,7 +85,7 @@ public class SelectPopupOtherContentViewTest {
         // Now create and destroy a different WebContents.
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             WebContents webContents = WebContentsFactory.createWebContents(
-                    Profile.getLastUsedRegularProfile(), false);
+                    Profile.getLastUsedRegularProfile(), false, false);
             ChromeActivity activity = mActivityTestRule.getActivity();
 
             ContentView cv = ContentView.createContentView(

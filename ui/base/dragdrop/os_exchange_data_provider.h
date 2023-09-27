@@ -65,7 +65,6 @@ class COMPONENT_EXPORT(UI_BASE_DATA_EXCHANGE) OSExchangeDataProvider {
   virtual bool GetURLAndTitle(FilenameToURLPolicy policy,
                               GURL* url,
                               std::u16string* title) const = 0;
-  virtual bool GetFilename(base::FilePath* path) const = 0;
   virtual bool GetFilenames(std::vector<FileInfo>* file_names) const = 0;
   virtual bool GetPickledData(const ClipboardFormatType& format,
                               base::Pickle* data) const = 0;
@@ -83,7 +82,7 @@ class COMPONENT_EXPORT(UI_BASE_DATA_EXCHANGE) OSExchangeDataProvider {
 #if BUILDFLAG(IS_WIN)
   virtual bool HasVirtualFilenames() const = 0;
   virtual bool GetVirtualFilenames(std::vector<FileInfo>* file_names) const = 0;
-  virtual bool GetVirtualFilesAsTempFiles(
+  virtual void GetVirtualFilesAsTempFiles(
       base::OnceCallback<
           void(const std::vector<std::pair</*temp path*/ base::FilePath,
                                            /*display name*/ base::FilePath>>&)>

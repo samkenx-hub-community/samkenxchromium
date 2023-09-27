@@ -17,6 +17,7 @@
 #include "ash/components/arc/session/connection_observer.h"
 #include "base/files/scoped_file.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/threading/thread_checker.h"
 #include "base/values.h"
@@ -26,6 +27,7 @@
 #include "chromeos/ash/components/network/network_profile_handler.h"
 #include "chromeos/ash/components/network/network_state_handler_observer.h"
 #include "components/keyed_service/core/keyed_service.h"
+#include "ui/aura/window.h"
 
 namespace content {
 class BrowserContext;
@@ -98,6 +100,9 @@ class ArcNetHostImpl : public KeyedService,
   void RequestPasspointAppApproval(
       mojom::PasspointApprovalRequestPtr request,
       RequestPasspointAppApprovalCallback callback) override;
+  void NotifyAndroidWifiMulticastLockChange(bool is_held) override;
+  void NotifySocketConnectionEvent(
+      mojom::SocketConnectionEventPtr msg) override;
 
   // Overridden from ash::NetworkStateHandlerObserver.
   void ScanCompleted(const ash::DeviceState* /*unused*/) override;
@@ -172,14 +177,35 @@ class ArcNetHostImpl : public KeyedService,
       mojom::EapCredentialsPtr cred,
       base::OnceCallback<void(base::Value::Dict)> callback);
 
-  // Synchronously translate EAP credentials to base::Value::Dict with
-  // empty or imported certificate and slot ID. |callback| is then run with
-  // the translated values.
-  void TranslateEapCredentialsToDictWithCertID(
+  // Synchronously translate EAP credentials to shill constants mapped
+  // base::Value dictionary with with empty or imported certificate and slot
+  // ID. |callback| is then run with the translated values. Could be used to
+  // translate passpoint EAP credentials.
+  void TranslateEapCredentialsToShillDictWithCertID(
       mojom::EapCredentialsPtr cred,
       base::OnceCallback<void(base::Value::Dict)> callback,
       const absl::optional<std::string>& cert_id,
       const absl::optional<int>& slot_id);
+
+  // Synchronously translate EAP credentials to base::Value dictionary in ONC
+  // with empty or imported certificate and slot ID. |callback| is then run
+  // with the translated values. Could be used to translate WiFi EAP
+  // credentials.
+  void TranslateEapCredentialsToOncDictWithCertID(
+      const mojom::EapCredentialsPtr& eap,
+      base::OnceCallback<void(base::Value::Dict)> callback,
+      const absl::optional<std::string>& cert_id,
+      const absl::optional<int>& slot_id);
+
+  // Translate EAP credentials to base::Value dictionary. If it is
+  // necessary to import certificates this method will asynchronously
+  // import them and run |callback| afterwards.. |is_onc| flag is used
+  // to indicate whether EAP credentials will be translated directly to
+  // shill properties or to ONC properties.
+  void TranslateEapCredentialsToDict(
+      mojom::EapCredentialsPtr cred,
+      bool is_onc,
+      base::OnceCallback<void(base::Value::Dict)> callback);
 
   // Translate passpoint credentials to base::Value::Dict and run
   // |callback|. If it is necessary to import certificates this method will
@@ -203,7 +229,15 @@ class ArcNetHostImpl : public KeyedService,
   // the properties values translated taken from mojo.
   void AddPasspointCredentialsWithProperties(base::Value::Dict properties);
 
-  // Pass any Chrome flags into ARC.
+  // Get the app window with |package_name|. This is necessary to start the
+  // user approval Passpoint dialog above the app. The app window is fetched by
+  // doing BFS over the device's root windows and its children.
+  aura::Window* GetAppWindow(const std::string& package_name);
+
+  // Pass any Chrome flags into ARC. This function may be empty depending on the
+  // current state of flags, i.e. if all Chrome->ARC flags have been launched
+  // and cleaned up, this method may not do anything. But we keep this around to
+  // keep the mojo file stable and decrease churn.
   void SetUpFlags();
 
   void CreateNetworkSuccessCallback(
@@ -223,7 +257,14 @@ class ArcNetHostImpl : public KeyedService,
   // PatchPanelClient::Observer implementation:
   void NetworkConfigurationChanged() override;
 
-  ArcBridgeService* const arc_bridge_service_;  // Owned by ArcServiceManager.
+  // Synchronously translate WiFi Configuration to shill configuration
+  // and create network in shill.
+  void CreateNetworkWithEapTranslated(mojom::WifiConfigurationPtr cfg,
+                                      CreateNetworkCallback callback,
+                                      base::Value::Dict eap_dict);
+
+  const raw_ptr<ArcBridgeService, ExperimentalAsh>
+      arc_bridge_service_;  // Owned by ArcServiceManager.
 
   // True if the chrome::NetworkStateHandler is currently being observed for
   // state changes.
@@ -235,8 +276,9 @@ class ArcNetHostImpl : public KeyedService,
   std::string cached_guid_;
   std::string arc_vpn_service_path_;
   // Owned by the user profile whose context was used to initialize |this|.
-  PrefService* pref_service_ = nullptr;
-  ArcAppMetadataProvider* app_metadata_provider_ = nullptr;
+  raw_ptr<PrefService, ExperimentalAsh> pref_service_ = nullptr;
+  raw_ptr<ArcAppMetadataProvider, DanglingUntriaged | ExperimentalAsh>
+      app_metadata_provider_ = nullptr;
 
   std::unique_ptr<CertManager> cert_manager_;
 

@@ -9,9 +9,9 @@
 
 #include "ash/constants/app_types.h"
 #include "ash/public/cpp/app_types_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted_memory.h"
 #include "base/memory/scoped_refptr.h"
-#include "base/pickle.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
@@ -19,7 +19,6 @@
 #include "chrome/browser/ash/crostini/crostini_manager.h"
 #include "chrome/browser/ash/crostini/crostini_test_helper.h"
 #include "chrome/browser/ash/crostini/crostini_util.h"
-#include "chrome/browser/ash/file_manager/fileapi_util.h"
 #include "chrome/browser/ash/file_manager/path_util.h"
 #include "chrome/browser/ash/guest_os/guest_os_share_path.h"
 #include "chrome/browser/ash/plugin_vm/plugin_vm_util.h"
@@ -41,8 +40,6 @@
 #include "ui/aura/window.h"
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/clipboard/clipboard_buffer.h"
-#include "ui/base/clipboard/clipboard_format_type.h"
-#include "ui/base/clipboard/custom_data_helper.h"
 #include "ui/base/clipboard/file_info.h"
 #include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/data_transfer_policy/data_transfer_endpoint.h"
@@ -93,15 +90,19 @@ class ChromeDataExchangeDelegateTest : public testing::Test {
 
     // Register my files and crostini.
     mount_points_ = storage::ExternalMountPoints::GetSystemInstance();
+    // For example, "Downloads-test%40example.com-hash"
     myfiles_mount_name_ =
         file_manager::util::GetDownloadsMountPointName(profile_.get());
+    // For example, "$HOME/Downloads"
     myfiles_dir_ =
         file_manager::util::GetMyFilesFolderForProfile(profile_.get());
     mount_points_->RegisterFileSystem(
         myfiles_mount_name_, storage::kFileSystemTypeLocal,
         storage::FileSystemMountOption(), myfiles_dir_);
+    // For example, "crostini_test_termina_penguin"
     crostini_mount_name_ =
         file_manager::util::GetCrostiniMountPointName(profile_.get());
+    // For example, "/media/fuse/crostini_test_termina_penguin"
     crostini_dir_ =
         file_manager::util::GetCrostiniMountDirectory(profile_.get());
     mount_points_->RegisterFileSystem(
@@ -132,13 +133,14 @@ class ChromeDataExchangeDelegateTest : public testing::Test {
 
   aura::test::TestWindowDelegate delegate_;
 
-  storage::ExternalMountPoints* mount_points_;
+  raw_ptr<storage::ExternalMountPoints, ExperimentalAsh> mount_points_;
   std::string myfiles_mount_name_;
   base::FilePath myfiles_dir_;
   std::string crostini_mount_name_;
   base::FilePath crostini_dir_;
 
-  FakeSeneschalClient* fake_seneschal_client_ = nullptr;
+  raw_ptr<FakeSeneschalClient, DanglingUntriaged | ExperimentalAsh>
+      fake_seneschal_client_ = nullptr;
 };
 
 TEST_F(ChromeDataExchangeDelegateTest, GetDataTransferEndpointType) {
@@ -467,47 +469,6 @@ TEST_F(ChromeDataExchangeDelegateTest, HasUrlsInPickle) {
   content::DropData::FileSystemFileInfo::WriteFileSystemFilesToPickle(
       {file_info}, &valid);
   EXPECT_EQ(true, data_exchange_delegate.HasUrlsInPickle(valid));
-}
-
-TEST_F(ChromeDataExchangeDelegateTest, ParseFileSystemSources) {
-  ChromeDataExchangeDelegate data_exchange_delegate;
-  base::FilePath shared_path = myfiles_dir_.Append("shared");
-  auto* guest_os_share_path =
-      guest_os::GuestOsSharePath::GetForProfile(profile());
-  guest_os_share_path->RegisterSharedPath(crostini::kCrostiniDefaultVmName,
-                                          shared_path);
-  const GURL file_manager_url = file_manager::util::GetFileManagerURL();
-  std::vector<std::string> file_names = {
-      "external/Downloads-test%2540example.com-hash/shared/file1",
-      "external/Downloads-test%2540example.com-hash/shared/file2",
-  };
-  std::vector<std::string> file_urls;
-  base::ranges::transform(
-      file_names, std::back_inserter(file_urls),
-      [&file_manager_url](const std::string& name) {
-        return base::StrCat({url::kFileSystemScheme, ":",
-                             file_manager_url.Resolve(name).spec()});
-      });
-  std::u16string urls(base::ASCIIToUTF16(base::JoinString(file_urls, "\n")));
-  base::Pickle pickle;
-  ui::WriteCustomDataToPickle(
-      std::unordered_map<std::u16string, std::u16string>(
-          {{u"fs/tag", u"exo"}, {u"fs/sources", urls}}),
-      &pickle);
-
-  ui::DataTransferEndpoint files_app(file_manager_url.Resolve("main.html"));
-  std::vector<ui::FileInfo> file_info =
-      data_exchange_delegate.ParseFileSystemSources(&files_app, pickle);
-  EXPECT_EQ(2u, file_info.size());
-  EXPECT_EQ(shared_path.Append("file1"), file_info[0].path);
-  EXPECT_EQ(shared_path.Append("file2"), file_info[1].path);
-  EXPECT_EQ(base::FilePath(), file_info[0].display_name);
-  EXPECT_EQ(base::FilePath(), file_info[1].display_name);
-
-  // Should return empty if source is not FilesApp.
-  ui::DataTransferEndpoint crostini(ui::EndpointType::kCrostini);
-  file_info = data_exchange_delegate.ParseFileSystemSources(&crostini, pickle);
-  EXPECT_TRUE(file_info.empty());
 }
 
 }  // namespace ash

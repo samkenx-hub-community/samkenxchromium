@@ -9,6 +9,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chromeos/ash/components/dbus/upstart/fake_upstart_client.h"
 #include "dbus/bus.h"
@@ -26,7 +27,6 @@ constexpr char kRestartMethod[] = "Restart";
 constexpr char kStopMethod[] = "Stop";
 
 constexpr char kUpstartJobsPath[] = "/com/ubuntu/Upstart/jobs/";
-constexpr char kAuthPolicyJob[] = "authpolicyd";
 constexpr char kMediaAnalyticsJob[] = "rtanalytics";
 // "wilco_5fdtc_5fdispatcher" below refers to the "wilco_dtc_dispatcher" upstart
 // job. Upstart escapes characters that aren't valid in D-Bus object paths
@@ -72,22 +72,6 @@ class UpstartClientImpl : public UpstartClient {
                   base::BindOnce(&UpstartClientImpl::OnVoidMethod,
                                  weak_ptr_factory_.GetWeakPtr(), job, "stop",
                                  std::move(callback)));
-  }
-
-  void StartAuthPolicyService() override {
-    StartJob(kAuthPolicyJob, {}, base::DoNothing());
-  }
-
-  void RestartAuthPolicyService() override {
-    CallJobMethod(kAuthPolicyJob, kRestartMethod, {}, base::DoNothing());
-  }
-
-  void StartLacrosChrome(const std::vector<std::string>& upstart_env) override {
-    // TODO(lacros): Remove logging.
-    StartJob("lacros_2dchrome", upstart_env, base::BindOnce([](bool result) {
-               LOG(WARNING) << (result ? "success" : "fail")
-                            << " starting lacros-chrome";
-             }));
   }
 
   void StartMediaAnalytics(const std::vector<std::string>& upstart_env,
@@ -185,7 +169,7 @@ class UpstartClientImpl : public UpstartClient {
                << ": " << error_name << ": " << error_message;
   }
 
-  dbus::Bus* bus_ = nullptr;
+  raw_ptr<dbus::Bus, ExperimentalAsh> bus_ = nullptr;
 
   // Note: This should remain the last member so it'll be destroyed and
   // invalidate its weak pointers before any other members are destroyed.

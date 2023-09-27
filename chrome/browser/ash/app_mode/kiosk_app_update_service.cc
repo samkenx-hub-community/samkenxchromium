@@ -108,22 +108,22 @@ void KioskAppUpdateService::OnAppUpdateAvailable(
 
   extensions::RuntimeEventRouter::DispatchOnRestartRequiredEvent(
       profile_, app_id_,
-      extensions::api::runtime::ON_RESTART_REQUIRED_REASON_APP_UPDATE);
+      extensions::api::runtime::OnRestartRequiredReason::kAppUpdate);
 
   StartAppUpdateRestartTimer();
 }
 
 void KioskAppUpdateService::OnRebootRequested(Reason reason) {
   extensions::api::runtime::OnRestartRequiredReason restart_reason =
-      extensions::api::runtime::ON_RESTART_REQUIRED_REASON_NONE;
+      extensions::api::runtime::OnRestartRequiredReason::kNone;
   switch (reason) {
     case REBOOT_REASON_OS_UPDATE:
       restart_reason =
-          extensions::api::runtime::ON_RESTART_REQUIRED_REASON_OS_UPDATE;
+          extensions::api::runtime::OnRestartRequiredReason::kOsUpdate;
       break;
     case REBOOT_REASON_PERIODIC:
       restart_reason =
-          extensions::api::runtime::ON_RESTART_REQUIRED_REASON_PERIODIC;
+          extensions::api::runtime::OnRestartRequiredReason::kPeriodic;
       break;
     default:
       NOTREACHED() << "Unknown reboot reason=" << reason;
@@ -146,7 +146,7 @@ void KioskAppUpdateService::OnKioskAppCacheUpdated(const std::string& app_id) {
 
   extensions::RuntimeEventRouter::DispatchOnRestartRequiredEvent(
       profile_, app_id_,
-      extensions::api::runtime::ON_RESTART_REQUIRED_REASON_APP_UPDATE);
+      extensions::api::runtime::OnRestartRequiredReason::kAppUpdate);
 
   StartAppUpdateRestartTimer();
 }
@@ -184,9 +184,10 @@ KioskAppUpdateServiceFactory* KioskAppUpdateServiceFactory::GetInstance() {
   return base::Singleton<KioskAppUpdateServiceFactory>::get();
 }
 
-KeyedService* KioskAppUpdateServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+KioskAppUpdateServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
-  return new KioskAppUpdateService(
+  return std::make_unique<KioskAppUpdateService>(
       Profile::FromBrowserContext(context),
       g_browser_process->platform_part()->automatic_reboot_manager());
 }

@@ -18,10 +18,10 @@
 #import "components/password_manager/core/browser/password_form_manager_for_ui.h"
 #import "components/password_manager/core/common/password_manager_pref_names.h"
 #import "components/prefs/testing_pref_service.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/credential_provider_promo/features.h"
-#import "ios/chrome/browser/main/test_browser.h"
 #import "ios/chrome/browser/passwords/password_controller.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/credential_provider_promo_commands.h"
 #import "ios/chrome/browser/web/chrome_web_client.h"
@@ -33,10 +33,6 @@
 #import "testing/platform_test.h"
 #import "third_party/ocmock/OCMock/OCMock.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using password_manager::MockPasswordFormManagerForUI;
 using password_manager::PasswordFormManager;
@@ -123,11 +119,6 @@ TEST_F(IOSChromePasswordManagerClientTest, PasswordManagerEnabledPolicyTest) {
 // `CredentialProviderPromoCommands`.
 TEST_F(IOSChromePasswordManagerClientTest,
        NotifySuccessfulLoginWithExistingPasswordTest) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeatureWithParameters(
-      kCredentialProviderExtensionPromo,
-      {{"enable_promo_on_login_with_autofill", "true"}});
-
   // Create a dispatcher for the client, register the command handler for
   // `CredentialProviderPromoCommands`
   id credential_provider_promo_commands_handler_mock =

@@ -212,7 +212,7 @@ class ContentVerifierTest : public ExtensionBrowserTest {
     ui_test_utils::NavigateToURLWithDisposition(
         browser(), extension_resource,
         WindowOpenDisposition::NEW_FOREGROUND_TAB,
-        ui_test_utils::BROWSER_TEST_NONE);
+        ui_test_utils::BROWSER_TEST_NO_WAIT);
     EXPECT_TRUE(unload_observer.WaitForExtensionUnloaded());
     ExtensionPrefs* prefs = ExtensionPrefs::Get(profile());
     int reasons = prefs->GetDisableReasons(extension_id);
@@ -547,12 +547,12 @@ IN_PROC_BROWSER_TEST_F(UserInstalledContentVerifierTest,
   EXPECT_EQ("Test", ExecuteScriptInBackgroundPage(
                         kStoragePermissionExtensionId,
                         R"(chrome.storage.local.set({key: "Test"}, () =>
-             domAutomationController.send("Test")))"));
+             chrome.test.sendScriptResult("Test")))"));
 
   EXPECT_EQ("Test", ExecuteScriptInBackgroundPage(
                         kStoragePermissionExtensionId,
                         R"(chrome.storage.local.get(['key'], ({key}) =>
-             domAutomationController.send(key)))"));
+             chrome.test.sendScriptResult(key)))"));
   // Corrupt the extension
   {
     base::FilePath resource_path = extension->path().Append(kResourcePath);
@@ -626,7 +626,7 @@ IN_PROC_BROWSER_TEST_F(UserInstalledContentVerifierTest,
   EXPECT_EQ("Test", ExecuteScriptInBackgroundPage(
                         kStoragePermissionExtensionId,
                         R"(chrome.storage.local.get(['key'], ({key}) =>
-             domAutomationController.send(key)))"));
+             chrome.test.sendScriptResult(key)))"));
 }
 
 // Tests that verification failure during navigating to an extension resource
@@ -793,7 +793,7 @@ IN_PROC_BROWSER_TEST_F(ContentVerifierTest,
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), extension->GetResourceURL(kLargeResource),
       WindowOpenDisposition::NEW_FOREGROUND_TAB,
-      ui_test_utils::BROWSER_TEST_NONE);
+      ui_test_utils::BROWSER_TEST_NO_WAIT);
 }
 
 IN_PROC_BROWSER_TEST_F(ContentVerifierTest,

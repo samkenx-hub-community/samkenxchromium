@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <va/va.h>
 #include <va/va_backend.h>
+#include <va/va_drmcommon.h>
 
 #include <set>
 
@@ -415,6 +416,9 @@ VAStatus FakeCreateBuffer(VADriverContextP ctx,
 
   CHECK(fdrv->ContextExists(context));
 
+  *buf_id = fdrv->CreateBuffer(context, type, /*size_per_element=*/size,
+                               num_elements, data);
+
   return VA_STATUS_SUCCESS;
 }
 
@@ -425,6 +429,9 @@ VAStatus FakeBufferSetNumElements(VADriverContextP ctx,
 }
 
 VAStatus FakeMapBuffer(VADriverContextP ctx, VABufferID buf_id, void** pbuf) {
+  media::internal::FakeDriver* fdrv =
+      static_cast<media::internal::FakeDriver*>(ctx->pDriverData);
+  *pbuf = fdrv->GetBuffer(buf_id).GetData();
   return VA_STATUS_SUCCESS;
 }
 
@@ -433,6 +440,11 @@ VAStatus FakeUnmapBuffer(VADriverContextP ctx, VABufferID buf_id) {
 }
 
 VAStatus FakeDestroyBuffer(VADriverContextP ctx, VABufferID buffer_id) {
+  media::internal::FakeDriver* fdrv =
+      static_cast<media::internal::FakeDriver*>(ctx->pDriverData);
+
+  fdrv->DestroyBuffer(buffer_id);
+
   return VA_STATUS_SUCCESS;
 }
 
@@ -766,8 +778,11 @@ extern "C" VAStatus DLL_EXPORT __vaDriverInit_1_0(VADriverContextP ctx) {
 
   ctx->version_major = VA_MAJOR_VERSION;
   ctx->version_minor = VA_MINOR_VERSION;
-  ctx->str_vendor = "libfake";
-  ctx->pDriverData = new media::internal::FakeDriver();
+  ctx->str_vendor = "Chromium fake libva driver";
+  CHECK(ctx->drm_state);
+
+  ctx->pDriverData = new media::internal::FakeDriver(
+      (static_cast<drm_state*>(ctx->drm_state))->fd);
 
   ctx->max_profiles = MAX_PROFILES;
   ctx->max_entrypoints = MAX_ENTRYPOINTS;

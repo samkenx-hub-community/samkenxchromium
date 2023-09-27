@@ -17,11 +17,12 @@ import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.content.res.AppCompatResources;
 
 import org.chromium.base.Callback;
 import org.chromium.base.Log;
+import org.chromium.base.task.PostTask;
+import org.chromium.base.task.TaskTraits;
 import org.chromium.chrome.browser.feed.FeedFeatures;
 import org.chromium.chrome.browser.feed.FeedServiceBridge;
 import org.chromium.chrome.browser.feed.R;
@@ -148,7 +149,6 @@ public class WebFeedMainMenuItem extends FrameLayout {
                 this::onFaviconFetched);
     }
 
-    @VisibleForTesting
     public void setContextForTest(Context newContext) {
         mContext = newContext;
     }
@@ -163,7 +163,9 @@ public class WebFeedMainMenuItem extends FrameLayout {
         if (ChromeFeatureList.isEnabled(ChromeFeatureList.CORMORANT)) {
             mItemText.setContentDescription(
                     mContext.getString(R.string.cormorant_creator_preview, mTitle));
-            mItemText.setOnClickListener((view) -> { launchCreatorActivity(); });
+            mItemText.setOnClickListener((view) -> {
+                PostTask.postTask(TaskTraits.UI_DEFAULT, this::launchCreatorActivity);
+            });
         }
     }
 
@@ -294,7 +296,9 @@ public class WebFeedMainMenuItem extends FrameLayout {
             mIcon.setVisibility(View.GONE);
         }
         if (ChromeFeatureList.isEnabled(ChromeFeatureList.CORMORANT)) {
-            mIcon.setOnClickListener((view) -> { launchCreatorActivity(); });
+            mIcon.setOnClickListener((view) -> {
+                PostTask.postTask(TaskTraits.UI_DEFAULT, this::launchCreatorActivity);
+            });
         }
     }
 
@@ -311,6 +315,7 @@ public class WebFeedMainMenuItem extends FrameLayout {
                     CreatorIntentConstants.CREATOR_ENTRY_POINT, SingleWebFeedEntryPoint.MENU);
             intent.putExtra(
                     CreatorIntentConstants.CREATOR_FOLLOWING, mChipView == mFollowingChipView);
+            intent.putExtra(CreatorIntentConstants.CREATOR_TAB_ID, mTab.getId());
             mContext.startActivity(intent);
         } catch (Exception e) {
             Log.d(TAG, "Failed to launch CreatorActivity " + e);

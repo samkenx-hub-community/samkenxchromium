@@ -39,7 +39,7 @@ NonMainThreadTaskQueue::NonMainThreadTaskQueue(
   // Throttling needs |should_notify_observers| to get task timing.
   DCHECK(!params.can_be_throttled || spec.should_notify_observers)
       << "Throttled queue is not supported with |!should_notify_observers|";
-  if (task_queue_->HasImpl() && spec.should_notify_observers) {
+  if (spec.should_notify_observers) {
     if (params.can_be_throttled) {
       throttler_.emplace(task_queue_.get(),
                          non_main_thread_scheduler->GetTickClock());
@@ -60,7 +60,7 @@ NonMainThreadTaskQueue::~NonMainThreadTaskQueue() = default;
 void NonMainThreadTaskQueue::ShutdownTaskQueue() {
   non_main_thread_scheduler_ = nullptr;
   throttler_.reset();
-  task_queue_->ShutdownTaskQueue();
+  task_queue_.reset();
 }
 
 void NonMainThreadTaskQueue::OnTaskCompleted(
@@ -69,6 +69,10 @@ void NonMainThreadTaskQueue::OnTaskCompleted(
     base::LazyNow* lazy_now) {
   // |non_main_thread_scheduler_| can be nullptr in tests.
   if (non_main_thread_scheduler_) {
+    // The last ref to `non_main_thread_scheduler_` might be released as part of
+    // this task's cleanup microtasks, make sure it lives through its own
+    // cleanup: crbug.com/1464113.
+    auto self_ref = WrapRefCounted(this);
     non_main_thread_scheduler_->OnTaskCompleted(this, task, task_timing,
                                                 lazy_now);
   }

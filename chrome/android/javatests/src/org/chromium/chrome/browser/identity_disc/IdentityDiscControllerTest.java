@@ -16,17 +16,15 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import static org.chromium.ui.test.util.ViewUtils.waitForView;
-
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 
 import androidx.test.espresso.matcher.ViewMatchers;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.Assert;
@@ -40,24 +38,24 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.mockito.quality.Strictness;
 
+import org.chromium.base.Callback;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.test.util.CommandLineFlags;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
-import org.chromium.chrome.browser.lifecycle.LifecycleObserver;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.SettingsActivity;
 import org.chromium.chrome.browser.signin.SyncConsentActivity;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.signin.services.SigninManager;
-import org.chromium.chrome.browser.sync.SyncService;
+import org.chromium.chrome.browser.sync.SyncServiceFactory;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.toolbar.ButtonDataProvider;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ActivityTestUtils;
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.NewTabPageTestUtils;
@@ -73,6 +71,7 @@ import org.chromium.components.signin.identitymanager.IdentityManager;
 import org.chromium.components.signin.identitymanager.PrimaryAccountChangeEvent;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.content_public.common.ContentUrlConstants;
+import org.chromium.ui.test.util.ViewUtils;
 
 /**
  * Instrumentation test for Identity Disc.
@@ -83,27 +82,19 @@ public class IdentityDiscControllerTest {
     private static final String EMAIL = "email@gmail.com";
     private static final String NAME = "Email Emailson";
     private static final String FULL_NAME = NAME + ".full";
-    private static final ActivityLifecycleDispatcher EMPTY_DISPATCHER =
-            new ActivityLifecycleDispatcher() {
+    private static final ObservableSupplier<Profile> EMPTY_PROFILE_SUPPLIER =
+            new ObservableSupplier<>() {
                 @Override
-                public void register(LifecycleObserver observer) {}
-
-                @Override
-                public void unregister(LifecycleObserver observer) {}
-
-                @Override
-                public int getCurrentActivityState() {
-                    return 0;
+                public Profile addObserver(Callback<Profile> obs) {
+                    return null;
                 }
 
                 @Override
-                public boolean isNativeInitializationFinished() {
-                    return false;
-                }
+                public void removeObserver(Callback<Profile> obs) {}
 
                 @Override
-                public boolean isActivityFinishingOrDestroyed() {
-                    return false;
+                public Profile get() {
+                    return null;
                 }
             };
 
@@ -134,6 +125,8 @@ public class IdentityDiscControllerTest {
     private ButtonDataProvider.ButtonDataObserver mButtonDataObserver;
     @Mock
     private Tracker mTracker;
+    @Mock
+    private ActivityLifecycleDispatcher mDispatcher;
 
     @Before
     public void setUp() {
@@ -147,7 +140,7 @@ public class IdentityDiscControllerTest {
     public void testIdentityDiscWithNavigation() {
         // User is signed in.
         mSigninTestRule.addTestAccountThenSigninAndEnableSync();
-        waitForView(allOf(withId(R.id.optional_toolbar_button), isDisplayed()));
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.optional_toolbar_button), isDisplayed()));
 
         // Identity Disc should be hidden on navigation away from NTP.
         leaveNTP();
@@ -159,7 +152,8 @@ public class IdentityDiscControllerTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY})
+    @DisableFeatures(ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY)
+    @SuppressWarnings("CheckReturnValue")
     public void testIdentityDiscWithSignin() {
         // When user is signed out and IdentityStatusConsistency is disabled, Identity Disc should
         // not be visible on the NTP.
@@ -175,20 +169,22 @@ public class IdentityDiscControllerTest {
         // TODO(https://crbug.com/1132291): Remove the reload once the sign-in without sync observer
         //  is implemented.
         TestThreadUtils.runOnUiThreadBlocking(mTab::reload);
-        waitForView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
                 withContentDescription(R.string.accessibility_toolbar_btn_identity_disc)));
 
         mSigninTestRule.signOut();
-        waitForView(allOf(withId(R.id.optional_toolbar_button),
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(allOf(withId(R.id.optional_toolbar_button),
                 withEffectiveVisibility(ViewMatchers.Visibility.GONE)));
     }
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY})
+    @EnableFeatures(ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY)
     public void testIdentityDiscSignedOut_identityStatusConsistencyEnabled() {
         // When user is signed out, a signed-out avatar should be visible on the NTP.
-        waitForView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
                 withContentDescription(
                         R.string.accessibility_toolbar_btn_signed_out_identity_disc)));
 
@@ -200,7 +196,7 @@ public class IdentityDiscControllerTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY})
+    @EnableFeatures(ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY)
     public void
     testIdentityDiscSignedOut_signinDisabledByPolicy_identityStatusConsistencyEnabled() {
         IdentityServicesProvider.setInstanceForTests(mIdentityServicesProviderMock);
@@ -216,7 +212,7 @@ public class IdentityDiscControllerTest {
         when(mSigninManagerMock.isSigninDisabledByPolicy()).thenReturn(true);
 
         // When user is signed out, a signed-out avatar should be visible on the NTP.
-        waitForView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
                 withContentDescription(
                         R.string.accessibility_toolbar_btn_signed_out_identity_disc)));
 
@@ -228,7 +224,7 @@ public class IdentityDiscControllerTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY})
+    @EnableFeatures(ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY)
     public void testIdentityDiscWithSignin_identityStatusConsistencyEnabled() {
         // Identity Disc should be shown on sign-in state change with a NTP refresh.
         mSigninTestRule.addAccountThenSignin(EMAIL, NAME);
@@ -238,17 +234,17 @@ public class IdentityDiscControllerTest {
         String expectedContentDescription = mActivityTestRule.getActivity().getString(
                 R.string.accessibility_toolbar_btn_identity_disc_with_name_and_email, FULL_NAME,
                 EMAIL);
-        waitForView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
                 withContentDescription(expectedContentDescription)));
         mSigninTestRule.signOut();
-        waitForView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
                 withContentDescription(
                         R.string.accessibility_toolbar_btn_signed_out_identity_disc)));
     }
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY})
+    @EnableFeatures(ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY)
     public void testIdentityDiscWithSignin_nonDisplayableEmail_identityStatusConsistencyEnabled() {
         // Identity Disc should be shown on sign-in state change with a NTP refresh.
         CoreAccountInfo coreAccountInfo = addAccountWithNonDisplayableEmail(NAME);
@@ -258,18 +254,19 @@ public class IdentityDiscControllerTest {
         TestThreadUtils.runOnUiThreadBlocking(mTab::reload);
         String expectedContentDescription = mActivityTestRule.getActivity().getString(
                 R.string.accessibility_toolbar_btn_identity_disc_with_name, FULL_NAME);
-        waitForView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
                 withContentDescription(expectedContentDescription)));
 
         mSigninTestRule.signOut();
-        waitForView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.optional_toolbar_button), isDisplayed(),
                 withContentDescription(
                         R.string.accessibility_toolbar_btn_signed_out_identity_disc)));
     }
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY})
+    @DisableFeatures(ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY)
+    @SuppressWarnings("CheckReturnValue")
     public void testIdentityDiscWithSigninAndEnableSync() {
         // When user is signed out and IdentityStatusConsistency is disabled, Identity Disc should
         // not be visible on the NTP.
@@ -282,62 +279,70 @@ public class IdentityDiscControllerTest {
 
         // Identity Disc should be shown on sign-in state change without NTP refresh.
         mSigninTestRule.addTestAccountThenSigninAndEnableSync();
-        waitForView(allOf(withId(R.id.optional_toolbar_button),
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(allOf(withId(R.id.optional_toolbar_button),
                 withContentDescription(R.string.accessibility_toolbar_btn_identity_disc),
                 isDisplayed()));
 
         mSigninTestRule.signOut();
-        waitForView(allOf(withId(R.id.optional_toolbar_button),
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(allOf(withId(R.id.optional_toolbar_button),
                 withEffectiveVisibility(ViewMatchers.Visibility.GONE)));
     }
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY})
+    @EnableFeatures(ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY)
+    @SuppressWarnings("CheckReturnValue")
     public void testIdentityDiscWithSigninAndEnableSync_identityStatusConsistencyEnabled() {
         // Identity Disc should be shown on sign-in state change without NTP refresh.
         mSigninTestRule.addAccountThenSigninAndEnableSync(EMAIL, NAME);
         String expectedContentDescription = mActivityTestRule.getActivity().getString(
                 R.string.accessibility_toolbar_btn_identity_disc_with_name_and_email, FULL_NAME,
                 EMAIL);
-        waitForView(allOf(withId(R.id.optional_toolbar_button),
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(allOf(withId(R.id.optional_toolbar_button),
                 withContentDescription(expectedContentDescription), isDisplayed()));
 
         mSigninTestRule.signOut();
-        waitForView(allOf(withId(R.id.optional_toolbar_button),
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(allOf(withId(R.id.optional_toolbar_button),
                 withContentDescription(R.string.accessibility_toolbar_btn_signed_out_identity_disc),
                 isDisplayed()));
     }
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY})
+    @EnableFeatures(ChromeFeatureList.IDENTITY_STATUS_CONSISTENCY)
     public void
     testIdentityDiscWithSigninAndEnableSync_nonDisplayableEmail_identityStatusConsistencyEnabled() {
         // Identity Disc should be shown on sign-in state change without NTP refresh.
         CoreAccountInfo coreAccountInfo = addAccountWithNonDisplayableEmail(NAME);
         SigninTestUtil.signinAndEnableSync(coreAccountInfo,
-                TestThreadUtils.runOnUiThreadBlockingNoException(SyncService::get));
+                TestThreadUtils.runOnUiThreadBlockingNoException(SyncServiceFactory::get));
         String expectedContentDescription = mActivityTestRule.getActivity().getString(
                 R.string.accessibility_toolbar_btn_identity_disc_with_name, FULL_NAME);
-        waitForView(allOf(withId(R.id.optional_toolbar_button),
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.optional_toolbar_button),
                 withContentDescription(expectedContentDescription), isDisplayed()));
 
         mSigninTestRule.signOut();
-        waitForView(allOf(withId(R.id.optional_toolbar_button),
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.optional_toolbar_button),
                 withContentDescription(R.string.accessibility_toolbar_btn_signed_out_identity_disc),
                 isDisplayed()));
     }
 
     @Test
     @MediumTest
+    @SuppressWarnings("CheckReturnValue")
     public void testIdentityDiscWithSwitchToIncognito() {
         mSigninTestRule.addTestAccountThenSigninAndEnableSync();
-        waitForView(allOf(withId(R.id.optional_toolbar_button), isDisplayed()));
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(allOf(withId(R.id.optional_toolbar_button), isDisplayed()));
 
         // Identity Disc should not be visible, when switched from sign in state to incognito NTP.
         mActivityTestRule.newIncognitoTabFromMenu();
-        waitForView(allOf(withId(R.id.optional_toolbar_button),
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(allOf(withId(R.id.optional_toolbar_button),
                 withEffectiveVisibility(ViewMatchers.Visibility.GONE)));
     }
 
@@ -361,7 +366,6 @@ public class IdentityDiscControllerTest {
                 buildControllerWithObserver(mButtonDataObserver);
         PrimaryAccountChangeEvent accountClearedEvent =
                 newSigninEvent(PrimaryAccountChangeEvent.Type.CLEARED);
-
         identityDiscController.onPrimaryAccountChanged(accountClearedEvent);
 
         verify(mButtonDataObserver).buttonDataChanged(false);
@@ -370,14 +374,26 @@ public class IdentityDiscControllerTest {
 
     @Test
     @MediumTest
-    public void onClick_nativeNotYetInitialized_doesNothing() {
+    public void onClick_profileSupplierNotYetInitialized_doesNothing() {
         TrackerFactory.setTrackerForTests(mTracker);
         IdentityDiscController identityDiscController = new IdentityDiscController(
-                mActivityTestRule.getActivity(), EMPTY_DISPATCHER, mProfileSupplier);
+                mActivityTestRule.getActivity(), mDispatcher, /*profileSupplier=*/null);
 
-        // If the button is tapped before native is initialized, the click shouldn't be recorded.
+        // If the button is tapped before the profile is set, the click shouldn't be recorded.
         identityDiscController.onClick();
-        verifyZeroInteractions(mTracker);
+        verifyNoMoreInteractions(mTracker);
+    }
+
+    @Test
+    @MediumTest
+    public void onClick_profileNotYetInitialized_doesNothing() {
+        TrackerFactory.setTrackerForTests(mTracker);
+        IdentityDiscController identityDiscController = new IdentityDiscController(
+                mActivityTestRule.getActivity(), mDispatcher, EMPTY_PROFILE_SUPPLIER);
+
+        // If the button is tapped before the profile is set, the click shouldn't be recorded.
+        identityDiscController.onClick();
+        verifyNoMoreInteractions(mTracker);
     }
 
     private void leaveNTP() {
@@ -395,7 +411,7 @@ public class IdentityDiscControllerTest {
     private IdentityDiscController buildControllerWithObserver(
             ButtonDataProvider.ButtonDataObserver observer) {
         IdentityDiscController controller = new IdentityDiscController(
-                mActivityTestRule.getActivity(), EMPTY_DISPATCHER, mProfileSupplier);
+                mActivityTestRule.getActivity(), mDispatcher, EMPTY_PROFILE_SUPPLIER);
         controller.addObserver(observer);
 
         return controller;

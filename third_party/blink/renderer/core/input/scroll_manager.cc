@@ -15,10 +15,12 @@
 #include "third_party/blink/renderer/core/frame/browser_controls.h"
 #include "third_party/blink/renderer/core/frame/local_dom_window.h"
 #include "third_party/blink/renderer/core/frame/local_frame_view.h"
+#include "third_party/blink/renderer/core/frame/root_frame_viewport.h"
 #include "third_party/blink/renderer/core/frame/visual_viewport.h"
 #include "third_party/blink/renderer/core/html/html_frame_owner_element.h"
 #include "third_party/blink/renderer/core/input/event_handler.h"
 #include "third_party/blink/renderer/core/input/event_handling_util.h"
+#include "third_party/blink/renderer/core/input/keyboard_event_manager.h"
 #include "third_party/blink/renderer/core/layout/layout_block.h"
 #include "third_party/blink/renderer/core/layout/layout_embedded_content.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
@@ -33,6 +35,7 @@
 #include "third_party/blink/renderer/core/paint/paint_layer_scrollable_area.h"
 #include "third_party/blink/renderer/core/scroll/scroll_animator_base.h"
 #include "third_party/blink/renderer/core/scroll/scroll_customization.h"
+#include "third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/instrumentation/tracing/trace_event.h"
 #include "third_party/blink/renderer/platform/widget/input/input_metrics.h"
@@ -76,7 +79,7 @@ ScrollManager::ScrollManager(LocalFrame& frame) : frame_(frame) {
 void ScrollManager::Clear() {
   scrollbar_handling_scroll_gesture_ = nullptr;
   resize_scrollable_area_ = nullptr;
-  offset_from_resize_corner_ = LayoutSize();
+  offset_from_resize_corner_ = {};
   ClearGestureScrollState();
 }
 
@@ -215,7 +218,7 @@ void ScrollManager::RecomputeScrollChain(const Node& start_node,
         if (new_autoscrollable)
           cur_node = new_autoscrollable->GetNode();
       }
-      scroll_chain.push_front(DOMNodeIds::IdForNode(cur_node));
+      scroll_chain.push_front(cur_node->GetDomNodeId());
     }
   } else {
     LayoutBox* cur_box = start_node.GetLayoutObject()->EnclosingBox();
@@ -229,7 +232,7 @@ void ScrollManager::RecomputeScrollChain(const Node& start_node,
 
       if (cur_node) {
         if (CanScroll(scroll_state, *cur_node, /* for_autoscroll */ false))
-          scroll_chain.push_front(DOMNodeIds::IdForNode(cur_node));
+          scroll_chain.push_front(cur_node->GetDomNodeId());
 
         if (cur_node->IsEffectiveRootScroller())
           break;
@@ -241,8 +244,8 @@ void ScrollManager::RecomputeScrollChain(const Node& start_node,
           // the scroll chain regardlessly, as it's the only node we can latch
           // to.
           if (scroll_chain.empty() ||
-              scroll_chain.front() != DOMNodeIds::IdForNode(cur_node)) {
-            scroll_chain.push_front(DOMNodeIds::IdForNode(cur_node));
+              scroll_chain.front() != cur_node->GetDomNodeId()) {
+            scroll_chain.push_front(cur_node->GetDomNodeId());
           }
           break;
         }
@@ -318,7 +321,8 @@ bool ScrollManager::CanScroll(const ScrollState& scroll_state,
 bool ScrollManager::LogicalScroll(mojom::blink::ScrollDirection direction,
                                   ui::ScrollGranularity granularity,
                                   Node* start_node,
-                                  Node* mouse_press_node) {
+                                  Node* mouse_press_node,
+                                  bool scrolling_via_key) {
   Node* node = start_node;
 
   if (!node)
@@ -400,14 +404,41 @@ bool ScrollManager::LogicalScroll(mojom::blink::ScrollDirection direction,
 
     ScrollableArea::ScrollCallback callback(WTF::BindOnce(
         [](WeakPersistent<ScrollableArea> area,
+           WeakPersistent<KeyboardEventManager> keyboard_event_manager,
+           bool is_key_scroll,
            ScrollableArea::ScrollCompletionMode completion_mode) {
           if (area) {
-            area->OnScrollFinished(
-                /*enqueue_scrollend=*/completion_mode ==
-                ScrollableArea::ScrollCompletionMode::kFinished);
+            bool enqueue_scrollend =
+                completion_mode ==
+                ScrollableArea::ScrollCompletionMode::kFinished;
+
+            // Viewport scrolls should only fire scrollend if the
+            // LayoutViewport was scrolled.
+            if (enqueue_scrollend && IsA<RootFrameViewport>(area.Get())) {
+              auto* root_frame_viewport = To<RootFrameViewport>(area.Get());
+              if (!root_frame_viewport->ScrollAffectsLayoutViewport()) {
+                enqueue_scrollend = false;
+              }
+            }
+
+            // For key-triggered scrolls, we defer firing scrollend till the
+            // accompanying keyup fires, unless the keyup happens before the
+            // scroll finishes. (Instant scrolls always finish before the
+            // keyup event.)
+            if (is_key_scroll && enqueue_scrollend && keyboard_event_manager) {
+              if (keyboard_event_manager->HasPendingScrollendOnKeyUp() ||
+                  !area->ScrollAnimatorEnabled()) {
+                keyboard_event_manager->SetScrollendEventTarget(area);
+                enqueue_scrollend = false;
+              }
+            }
+            area->OnScrollFinished(enqueue_scrollend);
           }
         },
-        WrapWeakPersistent(scrollable_area)));
+        WrapWeakPersistent(scrollable_area),
+        WrapWeakPersistent(
+            &(frame_->GetEventHandler().GetKeyboardEventManager())),
+        scrolling_via_key));
     ScrollResult result = scrollable_area->UserScroll(
         granularity,
         ToScrollDelta(physical_direction,
@@ -424,13 +455,16 @@ bool ScrollManager::LogicalScroll(mojom::blink::ScrollDirection direction,
 bool ScrollManager::BubblingScroll(mojom::blink::ScrollDirection direction,
                                    ui::ScrollGranularity granularity,
                                    Node* starting_node,
-                                   Node* mouse_press_node) {
+                                   Node* mouse_press_node,
+                                   bool scrolling_via_key) {
   // The layout needs to be up to date to determine if we can scroll. We may be
   // here because of an onLoad event, in which case the final layout hasn't been
   // performed yet.
   frame_->GetDocument()->UpdateStyleAndLayout(DocumentUpdateReason::kScroll);
-  if (LogicalScroll(direction, granularity, starting_node, mouse_press_node))
+  if (LogicalScroll(direction, granularity, starting_node, mouse_press_node,
+                    scrolling_via_key)) {
     return true;
+  }
 
   return frame_->BubbleLogicalScrollInParentFrame(direction, granularity);
 }
@@ -469,11 +503,13 @@ uint32_t ScrollManager::GetNonCompositedMainThreadScrollingReasons() const {
     if (!scrollable_area || !scrollable_area->ScrollsOverflow())
       continue;
 
-    // TODO(bokan): This DCHECK is occasionally tripped. See crbug.com/944706.
-    // DCHECK(!scrollable_area->UsesCompositedScrolling() ||
-    //        !scrollable_area->GetNonCompositedMainThreadScrollingReasons());
-    non_composited_main_thread_scrolling_reasons |=
-        scrollable_area->GetNonCompositedMainThreadScrollingReasons();
+    if (auto* compositor =
+            cur_box->GetFrameView()->GetPaintArtifactCompositor()) {
+      non_composited_main_thread_scrolling_reasons |=
+          (compositor->GetMainThreadScrollingReasons(
+               *cur_box->FirstFragment().PaintProperties()->Scroll()) &
+           cc::MainThreadScrollingReason::kNonCompositedReasons);
+    }
   }
   return non_composited_main_thread_scrolling_reasons;
 }
@@ -885,6 +921,7 @@ bool ScrollManager::SnapAtGestureScrollEnd(
 }
 
 bool ScrollManager::GetSnapFlingInfoAndSetAnimatingSnapTarget(
+    const gfx::Vector2dF& current_delta,
     const gfx::Vector2dF& natural_displacement,
     gfx::PointF* out_initial_position,
     gfx::PointF* out_target_position) const {
@@ -1187,7 +1224,7 @@ bool ScrollManager::HandleScrollGestureOnResizer(
       resize_scrollable_area_ = layer->GetScrollableArea();
       resize_scrollable_area_->SetInResizeMode(true);
       offset_from_resize_corner_ =
-          LayoutSize(resize_scrollable_area_->OffsetFromResizeCorner(p));
+          resize_scrollable_area_->OffsetFromResizeCorner(p);
       return true;
     }
   } else if (gesture_event.GetType() ==
@@ -1238,7 +1275,7 @@ void ScrollManager::SetResizeScrollableArea(PaintLayer* layer, gfx::Point p) {
   resize_scrollable_area_ = layer->GetScrollableArea();
   resize_scrollable_area_->SetInResizeMode(true);
   offset_from_resize_corner_ =
-      LayoutSize(resize_scrollable_area_->OffsetFromResizeCorner(p));
+      resize_scrollable_area_->OffsetFromResizeCorner(p);
 }
 
 bool ScrollManager::CanHandleGestureEvent(

@@ -5,6 +5,7 @@
 #include "chrome/browser/ui/ash/device_scheduled_reboot/reboot_notification_controller.h"
 
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/time/time.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
 #include "chrome/browser/notifications/notification_display_service_tester.h"
@@ -25,26 +26,18 @@ constexpr char kEmailId[] = "test@example.com";
 constexpr char kGaiaId[] = "12345";
 constexpr char kKioskEmailId[] = "test-kiosk@example.com";
 constexpr char kKioskGaiaId[] = "6789";
-const base::Time::Exploded kRebootTime2022Feb2At1520 = {
-    2022,  // year
-    2,     // month
-    4,     // day_of_week
-    2,     // day_of_month
-    15,    // hour
-    20,    // minute
-    0,     // second
-    0      // millisecond
-};
-const base::Time::Exploded kRebootTime2023May15At1115 = {
-    2023,  // year
-    5,     // month
-    4,     // day_of_week
-    15,    // day_of_month
-    11,    // hour
-    15,    // minute
-    0,     // second
-    0      // millisecond
-};
+constexpr base::Time::Exploded kRebootTime2022Feb2At1520 = {.year = 2022,
+                                                            .month = 2,
+                                                            .day_of_week = 4,
+                                                            .day_of_month = 2,
+                                                            .hour = 15,
+                                                            .minute = 20};
+constexpr base::Time::Exploded kRebootTime2023May15At1115 = {.year = 2023,
+                                                             .month = 5,
+                                                             .day_of_week = 4,
+                                                             .day_of_month = 15,
+                                                             .hour = 11,
+                                                             .minute = 15};
 
 class ClickCounter {
  public:
@@ -112,9 +105,10 @@ class RebootNotificationControllerTest : public testing::Test {
   content::BrowserTaskEnvironment test_environment_{
       base::test::TaskEnvironment::MainThreadType::UI};
   TestingProfileManager profile_manager_{TestingBrowserProcess::GetGlobal()};
-  TestingProfile* profile_ = nullptr;
+  raw_ptr<TestingProfile, ExperimentalAsh> profile_ = nullptr;
 
-  ash::FakeChromeUserManager* fake_user_manager_ = nullptr;
+  raw_ptr<ash::FakeChromeUserManager, DanglingUntriaged | ExperimentalAsh>
+      fake_user_manager_ = nullptr;
   std::unique_ptr<user_manager::ScopedUserManager> scoped_user_manager_;
   std::unique_ptr<NotificationDisplayServiceTester> display_service_tester_;
   RebootNotificationController notification_controller_;

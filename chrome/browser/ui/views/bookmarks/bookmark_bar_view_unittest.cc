@@ -7,12 +7,12 @@
 #include <memory>
 
 #include "base/functional/bind.h"
-#include "base/guid.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/uuid.h"
 #include "base/values.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
@@ -61,6 +61,8 @@ namespace {
 class BookmarkBarViewBaseTest : public ChromeViewsTestBase {
  public:
   BookmarkBarViewBaseTest() {
+    feature_list_.InitAndEnableFeature(features::kTabGroupsSave);
+
     TestingProfile::Builder profile_builder;
     profile_builder.AddTestingFactory(
         TemplateURLServiceFactory::GetInstance(),
@@ -218,7 +220,7 @@ class BookmarkBarViewInWidgetTest : public BookmarkBarViewBaseTest {
 
  private:
   std::unique_ptr<views::Widget> widget_;
-  raw_ptr<BookmarkBarView> bookmark_bar_view_ = nullptr;
+  raw_ptr<BookmarkBarView, DanglingUntriaged> bookmark_bar_view_ = nullptr;
 };
 
 // Verify that in instant extended mode the visibility of the apps shortcut
@@ -542,16 +544,18 @@ TEST_F(BookmarkBarViewTest, OnSavedTabGroupUpdateBookmarkBarCallsLayout) {
   ASSERT_TRUE(keyed_service->model());
 
   // Add 3 saved tab groups.
-  keyed_service->model()->Add(SavedTabGroup(
-      std::u16string(u"tab group 1"), tab_groups::TabGroupColorId::kGrey, {}));
+  keyed_service->model()->Add(SavedTabGroup(std::u16string(u"tab group 1"),
+                                            tab_groups::TabGroupColorId::kGrey,
+                                            {}, absl::nullopt));
 
-  base::GUID button_2_id = base::GUID::GenerateRandomV4();
+  base::Uuid button_2_id = base::Uuid::GenerateRandomV4();
   keyed_service->model()->Add(SavedTabGroup(std::u16string(u"tab group 2"),
                                             tab_groups::TabGroupColorId::kGrey,
-                                            {}, button_2_id));
+                                            {}, absl::nullopt, button_2_id));
 
-  keyed_service->model()->Add(SavedTabGroup(
-      std::u16string(u"tab group 3"), tab_groups::TabGroupColorId::kGrey, {}));
+  keyed_service->model()->Add(SavedTabGroup(std::u16string(u"tab group 3"),
+                                            tab_groups::TabGroupColorId::kGrey,
+                                            {}, absl::nullopt));
 
   // Save the position of the 3rd button. The 4th button is an overflow menu
   // that is only visible when there are more than 4 groups saved.

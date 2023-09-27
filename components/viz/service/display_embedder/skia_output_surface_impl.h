@@ -6,12 +6,14 @@
 #define COMPONENTS_VIZ_SERVICE_DISPLAY_EMBEDDER_SKIA_OUTPUT_SURFACE_IMPL_H_
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "base/containers/circular_deque.h"
 #include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/observer_list.h"
 #include "base/threading/thread_checker.h"
 #include "base/timer/timer.h"
@@ -26,9 +28,9 @@
 #include "gpu/ipc/common/vulkan_ycbcr_info.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-#include "third_party/skia/include/core/SkDeferredDisplayListRecorder.h"
 #include "third_party/skia/include/core/SkOverdrawCanvas.h"
-#include "third_party/skia/include/core/SkSurfaceCharacterization.h"
+#include "third_party/skia/include/private/chromium/GrDeferredDisplayListRecorder.h"
+#include "third_party/skia/include/private/chromium/GrSurfaceCharacterization.h"
 #include "ui/gfx/presentation_feedback.h"
 
 namespace gfx {
@@ -42,6 +44,15 @@ class SharedImageRepresentationFactory;
 struct SwapBuffersCompleteParams;
 }  // namespace gpu
 
+namespace gpu::raster {
+class GraphiteCacheController;
+}  // namespace gpu::raster
+
+namespace skgpu::graphite {
+class Recorder;
+class Recording;
+}  // namespace skgpu::graphite
+
 namespace viz {
 
 class ImageContextImpl;
@@ -53,9 +64,9 @@ class SkiaOutputSurfaceImplOnGpu;
 // to the GPU thread for initializing. Currently, SkiaOutputSurfaceImpl
 // create a SkiaOutputSurfaceImplOnGpu on the GPU thread. It will be used
 // for creating a SkSurface from the default framebuffer and providing the
-// SkSurfaceCharacterization for the SkSurface. And then SkiaOutputSurfaceImpl
-// will create SkDeferredDisplayListRecorder and SkCanvas for SkiaRenderer to
-// render into. In SwapBuffers, it detaches a SkDeferredDisplayList from the
+// GrSurfaceCharacterization for the SkSurface. And then SkiaOutputSurfaceImpl
+// will create GrDeferredDisplayListRecorder and SkCanvas for SkiaRenderer to
+// render into. In SwapBuffers, it detaches a GrDeferredDisplayList from the
 // recorder and plays it back on the framebuffer SkSurface on the GPU thread
 // through SkiaOutputSurfaceImpleOnGpu.
 class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
@@ -114,7 +125,7 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
 
   SkCanvas* BeginPaintRenderPass(const AggregatedRenderPassId& id,
                                  const gfx::Size& surface_size,
-                                 ResourceFormat format,
+                                 SharedImageFormat format,
                                  bool mipmap,
                                  bool scanout_dcomp_surface,
                                  sk_sp<SkColorSpace> color_space,
@@ -131,7 +142,7 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
   sk_sp<SkImage> MakePromiseSkImageFromRenderPass(
       const AggregatedRenderPassId& id,
       const gfx::Size& size,
-      ResourceFormat format,
+      SharedImageFormat format,
       bool mipmap,
       sk_sp<SkColorSpace> color_space,
       const gpu::Mailbox& mailbox) override;
@@ -150,15 +161,17 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
   void PreserveChildSurfaceControls() override;
   gpu::SyncToken Flush() override;
   bool EnsureMinNumberOfBuffers(int n) override;
-  gpu::Mailbox CreateSharedImage(ResourceFormat format,
+  gpu::Mailbox CreateSharedImage(SharedImageFormat format,
                                  const gfx::Size& size,
                                  const gfx::ColorSpace& color_space,
                                  uint32_t usage,
+                                 base::StringPiece debug_label,
                                  gpu::SurfaceHandle surface_handle) override;
   gpu::Mailbox CreateSolidColorSharedImage(
       const SkColor4f& color,
       const gfx::ColorSpace& color_space) override;
   void DestroySharedImage(const gpu::Mailbox& mailbox) override;
+  bool SupportsBGRA() const override;
 
   // ExternalUseClient implementation:
   gpu::SyncToken ReleaseImageContexts(
@@ -184,12 +197,13 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
   void ScheduleGpuTaskForTesting(
       base::OnceClosure callback,
       std::vector<gpu::SyncToken> sync_tokens) override;
+  void CheckAsyncWorkCompletionForTesting() override;
 
  private:
   bool Initialize();
   void InitializeOnGpuThread(GpuVSyncCallback vsync_callback_runner,
                              bool* result);
-  SkSurfaceCharacterization CreateSkSurfaceCharacterizationRenderPass(
+  GrSurfaceCharacterization CreateGrSurfaceCharacterizationRenderPass(
       const gfx::Size& surface_size,
       SkColorType color_type,
       SkAlphaType alpha_type,
@@ -197,7 +211,7 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
       sk_sp<SkColorSpace> color_space,
       bool is_overlay,
       bool scanout_dcomp_surface) const;
-  SkSurfaceCharacterization CreateSkSurfaceCharacterizationCurrentFrame(
+  GrSurfaceCharacterization CreateGrSurfaceCharacterizationCurrentFrame(
       const gfx::Size& surface_size,
       SkColorType color_type,
       SkAlphaType alpha_type,
@@ -235,10 +249,15 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
       SharedImageFormat si_format,
       int plane_index,
       uint32_t gl_texture_target,
-      const absl::optional<gpu::VulkanYCbCrInfo>& ycbcr_info);
+      const absl::optional<gpu::VulkanYCbCrInfo>& ycbcr_info,
+      const gfx::ColorSpace& yuv_color_space);
+  void MakePromiseSkImageSinglePlane(ImageContextImpl* image_context,
+                                     bool mipmapped,
+                                     const gfx::ColorSpace& yuv_color_space);
+  void MakePromiseSkImageMultiPlane(ImageContextImpl* image_context,
+                                    const gfx::ColorSpace& yuv_color_space);
   void ContextLost();
-
-  void RecreateRootRecorder();
+  void RecreateRootDDLRecorder();
 
   raw_ptr<OutputSurfaceClient> client_ = nullptr;
   bool needs_swap_size_notifications_ = false;
@@ -259,29 +278,53 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
   gpu::Mailbox last_swapped_mailbox_;
 
   gfx::Size size_;
-  gfx::BufferFormat format_;
+  SharedImageFormat format_;
   int sample_count_ = 1;
-  SkSurfaceCharacterization characterization_;
-  bool reset_recorder_on_swap_ = false;
-  absl::optional<SkDeferredDisplayListRecorder> root_recorder_;
+  SkColorType color_type_ = kUnknown_SkColorType;
+  SkAlphaType alpha_type_ = kUnknown_SkAlphaType;
+  sk_sp<SkColorSpace> sk_color_space_;
+  bool reset_ddl_recorder_on_swap_ = false;
+  absl::optional<GrDeferredDisplayListRecorder> root_ddl_recorder_;
 
   class ScopedPaint {
    public:
-    explicit ScopedPaint(SkDeferredDisplayListRecorder* root_recorder);
-    explicit ScopedPaint(SkSurfaceCharacterization characterization);
-    ScopedPaint(SkSurfaceCharacterization characterization,
-                gpu::Mailbox mailbox);
+    // Ganesh root surface
+    explicit ScopedPaint(GrDeferredDisplayListRecorder* root_ddl_recorder);
+    // Ganesh render pass (root or non-root)
+    ScopedPaint(const GrSurfaceCharacterization& characterization,
+                const gpu::Mailbox& mailbox);
+    // Graphite (root or non-root)
+    ScopedPaint(skgpu::graphite::Recorder* recorder,
+                const SkImageInfo& image_info,
+                skgpu::graphite::TextureInfo texture_info,
+                const gpu::Mailbox& mailbox = gpu::Mailbox());
     ~ScopedPaint();
 
-    SkDeferredDisplayListRecorder* recorder() { return recorder_; }
-    gpu::Mailbox mailbox() { return mailbox_; }
+    // SkCanvas for the current paint, retrieved from the DDL recorder for
+    // Ganesh, or from the Graphite recorder.
+    SkCanvas* canvas() const { return canvas_; }
+
+    // Mailbox for the render pass for the current paint (if present).
+    const gpu::Mailbox& mailbox() const { return mailbox_; }
+
+    // Detach DDL and reset the SkCanvas pointer.
+    sk_sp<GrDeferredDisplayList> DetachDDL();
+
+    // Snap Graphite recording and reset the SkCanvas pointer.
+    std::unique_ptr<skgpu::graphite::Recording> SnapRecording();
 
    private:
-    // This is recorder being used for current paint
-    SkDeferredDisplayListRecorder* recorder_;
+    // This is the DDL recorder being used for current paint when using Ganesh.
+    raw_ptr<GrDeferredDisplayListRecorder> ddl_recorder_ = nullptr;
     // If we need new recorder for this Paint (i.e. it's not root render pass),
     // it's stored here
-    absl::optional<SkDeferredDisplayListRecorder> recorder_storage_;
+    absl::optional<GrDeferredDisplayListRecorder> ddl_recorder_storage_;
+    // Graphite recorder used for current paint.
+    raw_ptr<skgpu::graphite::Recorder> graphite_recorder_ = nullptr;
+    // SkCanvas for the current paint, retrieved from the DDL recorder for
+    // Ganesh, or from the Graphite recorder.
+    raw_ptr<SkCanvas> canvas_ = nullptr;
+    // Mailbox for the render pass for the current paint (if present).
     const gpu::Mailbox mailbox_;
   };
 
@@ -319,7 +362,7 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
   // The SkDDL recorder is used for overdraw feedback. It is created by
   // BeginPaintOverdraw, and FinishPaintCurrentFrame will turn it into a SkDDL
   // and play the SkDDL back on the GPU thread.
-  absl::optional<SkDeferredDisplayListRecorder> overdraw_surface_recorder_;
+  absl::optional<GrDeferredDisplayListRecorder> overdraw_surface_ddl_recorder_;
 
   // |overdraw_canvas_| is used to record draw counts.
   absl::optional<SkOverdrawCanvas> overdraw_canvas_;
@@ -372,7 +415,11 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
   // SkiaOutputSurfaceImpl.
   std::unique_ptr<SkiaOutputSurfaceImplOnGpu> impl_on_gpu_;
 
+  gpu::GrContextType gr_context_type_ = gpu::GrContextType::kGL;
   sk_sp<GrContextThreadSafeProxy> gr_context_thread_safe_;
+  raw_ptr<skgpu::graphite::Recorder> graphite_recorder_ = nullptr;
+  scoped_refptr<gpu::raster::GraphiteCacheController>
+      graphite_cache_controller_;
 
   bool has_set_draw_rectangle_for_frame_ = false;
   absl::optional<gfx::Rect> draw_rectangle_;

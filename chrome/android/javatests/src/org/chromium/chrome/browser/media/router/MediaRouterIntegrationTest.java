@@ -7,14 +7,14 @@ package org.chromium.chrome.browser.media.router;
 import static org.chromium.base.test.util.Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE;
 
 import android.app.Dialog;
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.json.JSONObject;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -83,12 +83,8 @@ public class MediaRouterIntegrationTest {
     public void setUp() throws Exception {
         BrowserMediaRouter.setRouteProviderFactoryForTest(new MockMediaRouteProvider.Factory());
         mActivityTestRule.startMainActivityOnBlankPage();
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-    }
-
-    @After
-    public void tearDown() {
-        mTestServer.stopAndDestroyServer();
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
     }
 
     // TODO(zqzhang): Move this to a util class?

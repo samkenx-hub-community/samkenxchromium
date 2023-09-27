@@ -10,7 +10,9 @@
 #include "base/memory/raw_ptr.h"
 #include "base/path_service.h"
 #include "base/scoped_observation.h"
+#include "base/strings/strcat.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/test_timeouts.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/chrome_content_browser_client.h"
@@ -59,7 +61,9 @@
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/test/draw_waiter_for_test.h"
+#include "ui/display/display.h"
 #include "ui/display/display_switches.h"
+#include "ui/display/screen.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/gfx/codec/png_codec.h"
 #include "ui/views/controls/button/image_button.h"
@@ -68,7 +72,10 @@
 #include "ui/views/widget/widget_observer.h"
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "chromeos/ui/base/chromeos_ui_constants.h"
+#include "ui/aura/window.h"
 #include "ui/base/hit_test.h"
+#include "ui/events/test/event_generator.h"
 #endif
 
 using content::EvalJs;
@@ -81,7 +88,8 @@ const base::FilePath::CharType kPictureInPictureDocumentPipPage[] =
     FILE_PATH_LITERAL("media/picture-in-picture/document-pip.html");
 
 class DocumentPictureInPictureWindowControllerBrowserTest
-    : public InProcessBrowserTest {
+    : public InProcessBrowserTest,
+      public testing::WithParamInterface<gfx::Size> {
  public:
   DocumentPictureInPictureWindowControllerBrowserTest() = default;
 
@@ -127,7 +135,9 @@ class DocumentPictureInPictureWindowControllerBrowserTest
     return nullptr;
   }
 
-  void LoadTabAndEnterPictureInPicture(Browser* browser) {
+  void LoadTabAndEnterPictureInPicture(
+      Browser* browser,
+      const gfx::Size& window_size = gfx::Size(500, 500)) {
     GURL test_page_url = ui_test_utils::GetTestUrl(
         base::FilePath(base::FilePath::kCurrentDirectory),
         base::FilePath(kPictureInPictureDocumentPipPage));
@@ -139,7 +149,11 @@ class DocumentPictureInPictureWindowControllerBrowserTest
 
     SetUpWindowController(active_web_contents);
 
-    ASSERT_EQ(true, EvalJs(active_web_contents, "createDocumentPipWindow()"));
+    const std::string script = base::StrCat(
+        {"createDocumentPipWindow({width:",
+         base::NumberToString(window_size.width()),
+         ",height:", base::NumberToString(window_size.height()), "})"});
+    ASSERT_EQ(true, EvalJs(active_web_contents, script));
     ASSERT_TRUE(window_controller() != nullptr);
     ASSERT_TRUE(GetRenderWidgetHostView()->IsShowing());
   }
@@ -148,6 +162,28 @@ class DocumentPictureInPictureWindowControllerBrowserTest
     const ui::MouseEvent event(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
                                ui::EventTimeForNow(), 0, 0);
     views::test::ButtonTestApi(button).NotifyClick(event);
+  }
+
+  void WaitForPageLoad(content::WebContents* contents) {
+    EXPECT_TRUE(WaitForLoadStop(contents));
+    EXPECT_TRUE(WaitForRenderFrameReady(contents->GetPrimaryMainFrame()));
+  }
+
+  bool IsOriginSet(BrowserView* browser_view) {
+    // Document Picture In Picture windows are always positioned relative to the
+    // bottom-right corner. Therefore we can assert that the origin is set
+    // whenever it is not located at the top-left corner.
+    return browser_view->GetBounds().origin() != gfx::Point(0, 0);
+  }
+
+  void CheckOriginSet(BrowserView* browser_view) {
+    ui_test_utils::CheckWaiter(
+        base::BindRepeating(
+            &DocumentPictureInPictureWindowControllerBrowserTest::IsOriginSet,
+            base::Unretained(this), browser_view),
+        true, base::Minutes(1))
+        .Wait();
+    EXPECT_NE(browser_view->GetBounds().origin(), gfx::Point(0, 0));
   }
 
   // Watch for destruction of a WebContents. `is_destroyed()` will report if the
@@ -164,7 +200,8 @@ class DocumentPictureInPictureWindowControllerBrowserTest
   };
 
  private:
-  raw_ptr<content::DocumentPictureInPictureWindowController, DanglingUntriaged>
+  raw_ptr<content::DocumentPictureInPictureWindowController,
+          AcrossTasksDanglingUntriaged>
       pip_window_controller_ = nullptr;
   base::test::ScopedFeatureList scoped_feature_list_;
 };
@@ -403,4 +440,165 @@ IN_PROC_BROWSER_TEST_F(DocumentPictureInPictureWindowControllerBrowserTest,
   static_cast<content::WebContentsDelegate*>(browser_view->browser())
       ->SetContentsBounds(pip_web_contents, different_bounds);
   EXPECT_EQ(bounds, browser_view->GetBounds());
+}
+
+// Make sure that inner bounds of document PiP windows are not smaller than the
+// allowed minimum size.
+IN_PROC_BROWSER_TEST_F(DocumentPictureInPictureWindowControllerBrowserTest,
+                       MinimumWindowInnerBounds) {
+  LoadTabAndEnterPictureInPicture(browser(), gfx::Size(100, 20));
+
+  auto* pip_web_contents = window_controller()->GetChildWebContents();
+  ASSERT_NE(nullptr, pip_web_contents);
+  WaitForPageLoad(pip_web_contents);
+
+  auto* browser_view = static_cast<BrowserView*>(
+      BrowserWindow::FindBrowserWindowWithWebContents(pip_web_contents));
+  EXPECT_EQ(PictureInPictureWindowManager::GetMinimumInnerWindowSize(),
+            browser_view->GetContentsSize());
+}
+
+// Make sure that outer bounds of document PiP windows do not exceed the allowed
+// maximum size.
+IN_PROC_BROWSER_TEST_F(DocumentPictureInPictureWindowControllerBrowserTest,
+                       MaximumWindowOuterBounds) {
+  const BrowserWindow* const browser_window = browser()->window();
+  const gfx::NativeWindow native_window = browser_window->GetNativeWindow();
+  const display::Screen* const screen = display::Screen::GetScreen();
+  const display::Display display =
+      screen->GetDisplayNearestWindow(native_window);
+  const gfx::Size maximum_window_size =
+      PictureInPictureWindowManager::GetMaximumWindowSize(display);
+
+  // Attempt to create a Document PiP window with size greater than the maximum
+  // window size.
+  LoadTabAndEnterPictureInPicture(browser(),
+                                  maximum_window_size + gfx::Size(1000, 2000));
+
+  // Confirm that the size of the outer window bounds are equal to the maximum
+  // window size.
+  auto* pip_web_contents = window_controller()->GetChildWebContents();
+  ASSERT_NE(nullptr, pip_web_contents);
+  WaitForPageLoad(pip_web_contents);
+
+  auto* browser_view = static_cast<BrowserView*>(
+      BrowserWindow::FindBrowserWindowWithWebContents(pip_web_contents));
+  ASSERT_EQ(maximum_window_size, browser_view->GetBounds().size());
+}
+
+// Context menu should not be shown when right clicking on a document picture in
+// picture window title.
+IN_PROC_BROWSER_TEST_F(DocumentPictureInPictureWindowControllerBrowserTest,
+                       ContextMenuIsDisabled) {
+  LoadTabAndEnterPictureInPicture(browser());
+  auto* pip_web_contents = window_controller()->GetChildWebContents();
+  ASSERT_NE(nullptr, pip_web_contents);
+  WaitForPageLoad(pip_web_contents);
+
+  auto* browser_view = static_cast<BrowserView*>(
+      BrowserWindow::FindBrowserWindowWithWebContents(pip_web_contents));
+  auto* pip_frame_view = static_cast<PictureInPictureBrowserFrameView*>(
+      browser_view->frame()->GetFrameView());
+
+  // Get the document picture in picture window title and the location to be
+  // clicked.
+  views::Label* window_title = pip_frame_view->GetWindowTitleForTesting();
+  const gfx::Point click_location =
+      window_title->GetBoundsInScreen().CenterPoint();
+
+  // Simulate a click on the document picture in picture window title, and
+  // verify that the context menu is not shown.
+  pip_frame_view->frame()->ShowContextMenuForViewImpl(
+      window_title, click_location, ui::MenuSourceType::MENU_SOURCE_MOUSE);
+
+  EXPECT_EQ(false, pip_frame_view->frame()->IsMenuRunnerRunningForTesting());
+}
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+// Verify that it is possible to resize a document picture in picture window
+// using the resize outside bound in ChromeOS ASH.
+IN_PROC_BROWSER_TEST_F(DocumentPictureInPictureWindowControllerBrowserTest,
+                       CanResizeUsingOutsideBounds) {
+  // Attempt to create a Document PiP window with the minimum window size.
+  LoadTabAndEnterPictureInPicture(
+      browser(), PictureInPictureWindowManager::GetMinimumInnerWindowSize());
+  auto* pip_web_contents = window_controller()->GetChildWebContents();
+  ASSERT_NE(nullptr, pip_web_contents);
+  WaitForPageLoad(pip_web_contents);
+
+  // Get a point within the resize outside bounds.
+  auto* browser_view = static_cast<BrowserView*>(
+      BrowserWindow::FindBrowserWindowWithWebContents(pip_web_contents));
+  const auto left_center_point = browser_view->GetBounds().left_center();
+  const auto resize_outside_bound_point =
+      gfx::Point(left_center_point.x() - chromeos::kResizeInsideBoundsSize -
+                     chromeos::kResizeOutsideBoundsSize / 2,
+                 left_center_point.y());
+
+  // Perform a click on the left resize outside bound, followed by a drag to the
+  // left.
+  aura::Window* window = browser_view->GetNativeWindow();
+  const auto initial_window_size = window->GetBoundsInScreen().size();
+  ui::test::EventGenerator event_generator(window->GetRootWindow());
+  event_generator.set_current_screen_location(resize_outside_bound_point);
+  const int drag_distance = 10;
+  event_generator.DragMouseBy(-drag_distance, 0);
+
+  // Verify that the rezise took place.
+  const auto expected_size = initial_window_size + gfx::Size(drag_distance, 0);
+  ASSERT_EQ(expected_size, window->GetBoundsInScreen().size());
+}
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+INSTANTIATE_TEST_SUITE_P(WindowSizes,
+                         DocumentPictureInPictureWindowControllerBrowserTest,
+                         testing::Values(gfx::Size(1, 1),
+                                         gfx::Size(22, 22),
+                                         gfx::Size(300, 300),
+                                         gfx::Size(500, 500),
+                                         gfx::Size(250, 670)));
+
+#if BUILDFLAG(IS_LINUX)
+// TODO(crbug.com/1465020): Fix and re-enable this test for Linux.
+// This test is flaky on Linux, sometimes the window origin is not updated
+// before the test harness timeout.
+#define MAYBE_VerifyWindowMargins DISABLED_VerifyWindowMargins
+#else
+#define MAYBE_VerifyWindowMargins VerifyWindowMargins
+#endif
+// Test that the document PiP window margins are correct.
+IN_PROC_BROWSER_TEST_P(DocumentPictureInPictureWindowControllerBrowserTest,
+                       MAYBE_VerifyWindowMargins) {
+  const BrowserWindow* const browser_window = browser()->window();
+  const gfx::NativeWindow native_window = browser_window->GetNativeWindow();
+  const display::Screen* const screen = display::Screen::GetScreen();
+  const display::Display display =
+      screen->GetDisplayNearestWindow(native_window);
+
+  // Create a Document PiP window with the given size.
+  LoadTabAndEnterPictureInPicture(browser(), GetParam());
+  auto* pip_web_contents = window_controller()->GetChildWebContents();
+  ASSERT_NE(nullptr, pip_web_contents);
+  WaitForPageLoad(pip_web_contents);
+  auto* browser_view = static_cast<BrowserView*>(
+      BrowserWindow::FindBrowserWindowWithWebContents(pip_web_contents));
+
+  // Wait for the window origin location to be set. This is needed to eliminate
+  // test flakiness.
+  CheckOriginSet(browser_view);
+
+  // Make sure that the right and bottom window margins are equal.
+  gfx::Rect window_bounds = browser_view->GetBounds();
+  gfx::Rect work_area = display.work_area();
+  int window_diff_width = work_area.right() - window_bounds.width();
+  int window_diff_height = work_area.bottom() - window_bounds.height();
+  ASSERT_EQ(work_area.right() - window_bounds.right(),
+            work_area.bottom() - window_bounds.bottom());
+
+  // Make sure that the right and bottom window margins have distance of 2% the
+  // average of the two window size differences.
+  int buffer = (window_diff_width + window_diff_height) / 2 * 0.02;
+  gfx::Point expected_origin =
+      gfx::Point(window_diff_width - buffer, window_diff_height - buffer);
+  ASSERT_EQ(window_bounds.origin(), expected_origin);
 }

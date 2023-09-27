@@ -1,5 +1,10 @@
 <style include="cr-hidden-style cr-icons">
   :host {
+    --cr-url-list-item-image-container-border_: 2px solid white;
+    /* Intentionally 1px higher than the inherited border radius to avoid
+     * anti-aliasing issues.
+     */
+     --cr-url-list-item-image-container-border-radius_: 5px;
     align-items: center;
     box-sizing: border-box;
     cursor: default;
@@ -9,9 +14,20 @@
     width: 100%;
   }
 
+  @media (prefers-color-scheme: dark) {
+    :host {
+      --cr-url-list-item-image-container-border_: 2px solid black;
+    }
+  }
+
   :host-context([chrome-refresh-2023]):host {
     height: 48px;
     padding: 4px 16px;
+  }
+
+  :host-context([chrome-refresh-2023]):host([size=medium]),
+  :host-context([chrome-refresh-2023]):host([size=large]) {
+    --cr-url-list-item-image-container-border-radius_: 9px;
   }
 
   :host([size=compact]) {
@@ -37,7 +53,8 @@
     height: 68px;
   }
 
-  :host(.hovered) {
+  :host(.hovered),
+  :host([force-hover]) {
     background: var(--cr-hover-background-color);
   }
 
@@ -66,7 +83,7 @@
   @media (prefers-color-scheme: dark) {
     #iconContainer {
       --cr-icon-color: var(--google-grey-100);
-      background: rgba(var(--google-grey-200-rgb), .11);
+      background: var(--google-grey-800);
     }
   }
 
@@ -106,6 +123,10 @@
     border-radius: 8px;
   }
 
+  #folder-icon {
+    display: flex;
+  }
+
   .favicon {
     background-position: center center;
     background-repeat: no-repeat;
@@ -124,8 +145,17 @@
   }
 
   .folder-and-count .image-container {
+    border-bottom: var(--cr-url-list-item-image-container-border_);
+    border-radius: 0 var(--cr-url-list-item-image-container-border-radius_)
+        0 0;
+    box-sizing: border-box;
     height: 100%;
     width: 100%;
+  }
+
+  :host-context([dir=rtl]) .folder-and-count .image-container {
+    border-radius: var(--cr-url-list-item-image-container-border-radius_)
+        0 0 0;
   }
 
   .folder-and-count .image-container img {
@@ -135,32 +165,65 @@
     width: 100%;
   }
 
+  /* If there is only 2 imgs, span the 1st image across both rows. */
+  .folder-and-count:not(:has(div:nth-child(3)))
+  .image-container:first-of-type {
+    border-bottom: none;
+    border-inline-end: var(--cr-url-list-item-image-container-border_);
+    border-radius: var(--cr-url-list-item-image-container-border-radius_) 0 0
+        var(--cr-url-list-item-image-container-border-radius_);
+    grid-row: 1 / span 2;
+  }
+
+  :host-context([dir=rtl]) .folder-and-count:not(:has(div:nth-child(3)))
+  .image-container:first-of-type {
+    border-radius: 0 var(--cr-url-list-item-image-container-border-radius_)
+        var(--cr-url-list-item-image-container-border-radius_) 0;
+  }
+
   /* If there is only 1 img, span the entire grid. */
-  .folder-and-count .image-container:first-of-type:not(:has(~ .image-container:nth-child(2))) {
+  .folder-and-count:not(:has(div:nth-child(2))) .image-container:first-of-type {
+    border: none;
+    border-radius: var(--cr-url-list-item-image-container-border-radius_);
     grid-column: 1 / span 2;
     grid-row: 1 / span 2;
   }
 
-  /* If there is only 2 imgs, span the 1st image across both rows. */
-  .folder-and-count .image-container:first-of-type:not(:has(~ .image-container:nth-of-type(3))) {
-    grid-row: 1 / span 2;
-  }
-
   .folder {
-    --cr-icon-color: currentColor;
+    --cr-icon-color: var(--google-grey-700);
+    --cr-icon-size: 16px;
     height: 16px;
     margin: 0;
     width: 16px;
   }
 
+  @media (prefers-color-scheme: dark) {
+    .folder {
+      --cr-icon-color: var(--google-grey-100);
+    }
+  }
+
+  :host-context([chrome-refresh-2023]) .folder {
+    --cr-icon-color: currentColor;
+    --cr-icon-size: 20px;
+    height: var(--cr-icon-size);
+    width: var(--cr-icon-size);
+  }
+
+  :host-context([chrome-refresh-2023]):host([size=compact]) .folder {
+    --cr-icon-size: 16px;
+  }
+
   .count {
+    --cr-url-list-item-count-border-radius: 4px;
     display: none;
   }
 
   :host([size=large]) .count {
     align-items: center;
     background: var(--google-grey-50);
-    border-radius: 4px 0 0 0;
+    border-radius: var(--cr-url-list-item-count-border-radius) 0 0 0;
+    color: var(--google-grey-700);
     display: flex;
     grid-column: 2;
     grid-row: 2;
@@ -170,15 +233,34 @@
     z-index: 1;
   }
 
+  :host-context([dir=rtl]):host([size=large]) .count {
+    border-radius: 0 var(--cr-url-list-item-count-border-radius) 0 0;
+  }
+
+  .folder-and-count:has(div:nth-child(2)) .count {
+    border-radius: 0;
+  }
+
+  :host([size=large])
+      .folder-and-count:not(:has(div:nth-child(2))):has(.image-container)
+      .count {
+    border-inline-start: var(--cr-url-list-item-image-container-border_);
+    border-top: var(--cr-url-list-item-image-container-border_);
+  }
+
   @media (prefers-color-scheme: dark) {
     :host([size=large]) .count {
-      background: rgba(var(--google-grey-200-rgb), .11);
+      background: var(--google-grey-800);
+      color: var(--google-grey-500);
     }
   }
 
   :host-context([chrome-refresh-2023]):host([size=large]) .count {
     background: var(--color-list-item-folder-icon-background,
         var(--cr-fallback-color-primary-container));
+    color: var(--color-list-item-folder-icon-foreground,
+        var(--cr-fallback-color-on-primary-container));
+    font-weight: 500;
   }
 
   .image-container {
@@ -187,10 +269,7 @@
      * against the row background.
      */
     background: black;
-    /* Intentionally 1px higher than the inherited border radius to avoid
-     * anti-aliasing issues.
-     */
-    border-radius: 5px;
+    border-radius: var(--cr-url-list-item-image-container-border-radius_);
     height: 100%;
     width: 100%;
   }
@@ -201,22 +280,25 @@
     }
   }
 
-  :host-context([chrome-refresh-2023]):host([size=medium]) .image-container,
-  :host-context([chrome-refresh-2023]):host([size=large]) .image-container {
-    border-radius: 9px;
-  }
-
   .metadata {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 8px;
     min-width: 0;
     width: 100%;
+  }
+
+  :host([has-slotted-content_]) .metadata {
+    display: none;
   }
 
   :host([size=compact]) .metadata {
     align-items: center;
     flex-direction: row;
+  }
+
+  :host([size=medium]) .metadata {
+    gap: 3px;
   }
 
   :host-context([chrome-refresh-2023]):host([size=compact]) .metadata,
@@ -238,6 +320,7 @@
     border: 0;
     color: var(--cr-primary-text-color);
     display: inline;
+    font-family: inherit;
     font-size: 13px;
     font-weight: 400;
     padding: 0;
@@ -277,8 +360,20 @@
 
   .description {
     color: var(--cr-secondary-text-color);
+    display: flex;
     font-size: 13px;
     font-weight: 400;
+    max-width: 100%;
+  }
+
+  .description-text:has(+ .description-meta:not([hidden])) {
+    /* Prioritize description meta and let description shrink. */
+    flex-shrink: 1;
+  }
+
+  :host([reverse-elide-description]) .description-text {
+    /* Flip so the ellipsis appears at the front, typically for URLs. */
+    direction: rtl;
   }
 
   :host-context([chrome-refresh-2023]) .description {
@@ -286,12 +381,22 @@
     font-weight: 400;
   }
 
+  :host-context([chrome-refresh-2023]):host([size=compact]) .description {
+    font-size: 12px;
+  }
+
   .title,
-  .description {
+  .description-text,
+  .description-meta {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .description-meta {
+    flex-shrink: 0;
+    padding-inline-start: 4px;
   }
 
   .badges {
@@ -305,10 +410,16 @@
     display: none;
   }
 
+  :host-context([chrome-refresh-2023]):host([has-badges_]) .badges {
+    margin-inline-start: 4px;
+  }
+
   .suffix-icons {
     align-items: center;
+    color: var(--cr-secondary-text-color);
     display: flex;
     flex-shrink: 0;
+    margin-inline-end: -4px;
     margin-inline-start: auto;
   }
 
@@ -342,14 +453,20 @@
   <div class="favicon" hidden$="[[!shouldShowFavicon_(url, size, imageUrls)]]"
       style$="background-image: [[getFavicon_(url)]];">
   </div>
-  <div class="image-container" hidden$="[[!shouldShowUrlImage_(url, size, imageUrls)]]">
-    <img class="url-image" is="cr-auto-img" auto-src="[[imageUrls.0]]">
+  <div class="image-container"
+      hidden$="[[!shouldShowUrlImage_(
+          url, size, imageUrls, firstImageLoaded_)]]">
+    <img class="url-image" is="cr-auto-img" auto-src="[[imageUrls.0]]"
+        draggable="false">
   </div>
-  <div class="folder-and-count" hidden$="[[!shouldShowFolderCount_(url, count)]]">
+  <div class="folder-and-count"
+      hidden$="[[!shouldShowFolderCount_(url, count)]]">
     <template is="dom-if" if="[[shouldShowFolderImages_(size)]]" restamp>
-      <template is="dom-repeat" items="[[imageUrls]]" filter="shouldShowImageUrl_">
-        <div class="image-container">
-          <img is="cr-auto-img" auto-src="[[item]]">
+      <template is="dom-repeat" items="[[imageUrls]]"
+          filter="shouldShowImageUrl_">
+        <div class="image-container" hidden$="[[!firstImageLoaded_]]">
+          <img class="folder-image" is="cr-auto-img" auto-src="[[item]]"
+              draggable="false">
         </div>
       </template>
     </template>
@@ -360,23 +477,27 @@
     <div class="count">[[getDisplayedCount_(count)]]</div>
   </div>
 </div>
-<slot name="content">
-  <div id="metadata" class="metadata">
-    <button class="title"
-        aria-label="[[getButtonAriaLabel_(title, buttonAriaLabel)]]"
-        aria-description="[[
-            getButtonAriaDescription_(description, buttonAriaDescription)]]">
-      [[title]]
-    </button>
-    <div class="descriptions">
-      <div class="description" hidden$="[[!description]]">[[description]]</div>
-      <div class="badges">
-        <slot id="badges" name="badges" on-slotchange="onBadgesSlotChange_">
-        </slot>
-      </div>
+<slot id="content" name="content" on-slotchange="onContentSlotChange_"></slot>
+<div id="metadata" class="metadata">
+  <button id="title" class="title"
+      aria-label="[[getButtonAriaLabel_(title, buttonAriaLabel)]]"
+      aria-description="[[
+          getButtonAriaDescription_(description, buttonAriaDescription)]]">
+    [[title]]
+  </button>
+  <div class="descriptions">
+    <div class="description" hidden$="[[!description]]">
+      <span class="description-text">[[description]]</span>
+      <span class="description-meta" hidden$="[[!descriptionMeta]]">
+        &middot; [[descriptionMeta]]
+      </span>
+    </div>
+    <div class="badges">
+      <slot id="badges" name="badges" on-slotchange="onBadgesSlotChange_">
+      </slot>
     </div>
   </div>
-</slot>
+</div>
 <div class="suffix-icons">
   <slot name="suffix-icon"></slot>
 </div>

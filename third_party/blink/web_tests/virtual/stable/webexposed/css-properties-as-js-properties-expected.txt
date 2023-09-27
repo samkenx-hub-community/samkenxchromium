@@ -17,6 +17,10 @@ animationFillMode
 animationIterationCount
 animationName
 animationPlayState
+animationRange
+animationRangeEnd
+animationRangeStart
+animationTimeline
 animationTimingFunction
 appRegion
 appearance
@@ -191,6 +195,7 @@ fontVariantCaps
 fontVariantEastAsian
 fontVariantLigatures
 fontVariantNumeric
+fontVariantPosition
 fontVariationSettings
 fontWeight
 forcedColorAdjust
@@ -282,8 +287,10 @@ objectFit
 objectPosition
 objectViewBox
 offset
+offsetAnchor
 offsetDistance
 offsetPath
+offsetPosition
 offsetRotate
 opacity
 order
@@ -299,6 +306,7 @@ overflowClipMargin
 overflowWrap
 overflowX
 overflowY
+overlay
 overrideColors
 overscrollBehavior
 overscrollBehaviorBlock
@@ -370,6 +378,9 @@ scrollPaddingTop
 scrollSnapAlign
 scrollSnapStop
 scrollSnapType
+scrollTimeline
+scrollTimelineAxis
+scrollTimelineName
 scrollbarGutter
 setProperty
 shapeImageThreshold
@@ -420,6 +431,8 @@ textSizeAdjust
 textTransform
 textUnderlineOffset
 textUnderlinePosition
+textWrap
+timelineScope
 top
 touchAction
 transform
@@ -427,6 +440,7 @@ transformBox
 transformOrigin
 transformStyle
 transition
+transitionBehavior
 transitionDelay
 transitionDuration
 transitionProperty
@@ -437,6 +451,10 @@ unicodeRange
 userSelect
 vectorEffect
 verticalAlign
+viewTimeline
+viewTimelineAxis
+viewTimelineInset
+viewTimelineName
 viewTransitionName
 visibility
 webkitAlignContent
@@ -514,7 +532,6 @@ webkitFlexShrink
 webkitFlexWrap
 webkitFontFeatureSettings
 webkitFontSmoothing
-webkitHighlight
 webkitHyphenateCharacter
 webkitJustifyContent
 webkitLineBreak
@@ -594,6 +611,7 @@ webkitUserModify
 webkitUserSelect
 webkitWritingMode
 whiteSpace
+whiteSpaceCollapse
 widows
 width
 willChange

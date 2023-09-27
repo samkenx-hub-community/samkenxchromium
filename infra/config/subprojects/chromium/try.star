@@ -38,16 +38,17 @@ luci.bucket(
                 "service-account-cq",
             ],
             users = [
+                "dawn-automated-expectations@chops-service-accounts.iam.gserviceaccount.com",
                 "findit-for-me@appspot.gserviceaccount.com",
                 "tricium-prod@appspot.gserviceaccount.com",
             ],
-            projects = [
-                "angle",
-                "dawn",
-                "skia",
-                "swiftshader",
-                "v8",
-            ] if settings.is_main else None,
+            projects = [p for p in [
+                branches.value(branch_selector = branches.selector.MAIN, value = "angle"),
+                branches.value(branch_selector = branches.selector.DESKTOP_BRANCHES, value = "dawn"),
+                branches.value(branch_selector = branches.selector.MAIN, value = "skia"),
+                branches.value(branch_selector = branches.selector.MAIN, value = "swiftshader"),
+                branches.value(branch_selector = branches.selector.MAIN, value = "v8"),
+            ] if p != None],
         ),
         acl.entry(
             roles = acl.BUILDBUCKET_OWNER,
@@ -81,6 +82,14 @@ luci.bucket(
                 "infra-try-recipes-tester@chops-service-accounts.iam.gserviceaccount.com",
             ],
         ),
+        # Allow try builders to create invocations in their own builds.
+        luci.binding(
+            roles = "role/resultdb.invocationCreator",
+            groups = [
+                "project-chromium-try-task-accounts",
+                "project-chromium-tryjob-access",
+            ],
+        ),
     ],
     dynamic = True,
 )
@@ -104,9 +113,6 @@ luci.cq_group(
             acl.CQ_DRY_RUNNER,
             groups = "project-chromium-tryjob-access",
         ),
-    ],
-    additional_modes = [
-        cq.run_mode(cq.MODE_QUICK_DRY_RUN, 1, "Quick-Run", 1),
     ],
     tree_status_host = "chromium-status.appspot.com" if settings.is_main else None,
 )
@@ -161,9 +167,10 @@ exec("./try/tryserver.chromium.chromiumos.star")
 exec("./try/tryserver.chromium.cft.star")
 exec("./try/tryserver.chromium.dawn.star")
 exec("./try/tryserver.chromium.fuchsia.star")
+exec("./try/tryserver.chromium.fuzz.star")
+exec("./try/tryserver.chromium.infra.star")
 exec("./try/tryserver.chromium.linux.star")
 exec("./try/tryserver.chromium.mac.star")
-exec("./try/tryserver.chromium.packager.star")
 exec("./try/tryserver.chromium.rust.star")
 exec("./try/tryserver.chromium.tricium.star")
 exec("./try/tryserver.chromium.updater.star")

@@ -5,11 +5,7 @@
 #import "ios/chrome/browser/sync/sync_observer_bridge.h"
 
 #import "base/check.h"
-#import "components/sync/driver/sync_service.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "components/sync/service/sync_service.h"
 
 SyncObserverBridge::SyncObserverBridge(id<SyncObserverModelBridge> delegate,
                                        syncer::SyncService* sync_service)
@@ -29,4 +25,8 @@ void SyncObserverBridge::OnSyncConfigurationCompleted(
     syncer::SyncService* sync) {
   if ([delegate_ respondsToSelector:@selector(onSyncConfigurationCompleted)])
     [delegate_ onSyncConfigurationCompleted];
+}
+
+void SyncObserverBridge::OnSyncShutdown(syncer::SyncService* sync) {
+  scoped_observation_.Reset();
 }

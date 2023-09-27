@@ -4,10 +4,10 @@
 
 #import "ios/chrome/browser/ui/popup_menu/popup_menu_mediator.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/check_op.h"
 #import "base/feature_list.h"
 #import "base/ios/ios_util.h"
-#import "base/mac/foundation_util.h"
 #import "base/metrics/histogram_functions.h"
 #import "base/metrics/histogram_macros.h"
 #import "base/metrics/user_metrics.h"
@@ -24,11 +24,11 @@
 #import "components/prefs/pref_change_registrar.h"
 #import "components/prefs/pref_service.h"
 #import "components/profile_metrics/browser_profile_type.h"
+#import "components/reading_list/core/reading_list_model.h"
 #import "components/translate/core/browser/translate_manager.h"
 #import "components/translate/core/browser/translate_prefs.h"
-#import "ios/chrome/browser/bookmarks/bookmark_model_bridge_observer.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/commerce/push_notification/push_notification_feature.h"
+#import "ios/chrome/browser/bookmarks/model/bookmark_model_bridge_observer.h"
+#import "ios/chrome/browser/commerce/model/push_notification/push_notification_feature.h"
 #import "ios/chrome/browser/find_in_page/abstract_find_tab_helper.h"
 #import "ios/chrome/browser/follow/follow_browser_agent.h"
 #import "ios/chrome/browser/follow/follow_menu_updater.h"
@@ -44,18 +44,20 @@
 #import "ios/chrome/browser/policy/policy_util.h"
 #import "ios/chrome/browser/search_engines/search_engines_util.h"
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
-#import "ios/chrome/browser/shared/public/commands/browser_commands.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list_observer_bridge.h"
 #import "ios/chrome/browser/shared/public/commands/lens_commands.h"
 #import "ios/chrome/browser/shared/public/commands/reading_list_add_command.h"
 #import "ios/chrome/browser/shared/public/commands/search_image_with_lens_command.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/list_model/list_model.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/translate/chrome_ios_translate_client.h"
 #import "ios/chrome/browser/ui/content_suggestions/cells/content_suggestions_tile_constants.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/lens/lens_entrypoint.h"
-#import "ios/chrome/browser/ui/popup_menu/cells/popup_menu_navigation_item.h"
 #import "ios/chrome/browser/ui/popup_menu/cells/popup_menu_text_item.h"
 #import "ios/chrome/browser/ui/popup_menu/cells/popup_menu_tools_item.h"
 #import "ios/chrome/browser/ui/popup_menu/popup_menu_constants.h"
@@ -64,13 +66,10 @@
 #import "ios/chrome/browser/ui/reading_list/reading_list_menu_notification_delegate.h"
 #import "ios/chrome/browser/ui/reading_list/reading_list_menu_notifier.h"
 #import "ios/chrome/browser/ui/reading_list/reading_list_utils.h"
-#import "ios/chrome/browser/url/chrome_url_constants.h"
 #import "ios/chrome/browser/url_loading/image_search_param_generator.h"
 #import "ios/chrome/browser/url_loading/url_loading_browser_agent.h"
 #import "ios/chrome/browser/url_loading/url_loading_params.h"
 #import "ios/chrome/browser/web/font_size/font_size_tab_helper.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/web_state_list/web_state_list_observer_bridge.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/components/webui/web_ui_url_constants.h"
@@ -87,10 +86,6 @@
 #import "ios/web/public/web_state_observer_bridge.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "ui/gfx/image/image.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using base::RecordAction;
 using base::UserMetricsAction;
@@ -172,9 +167,6 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
 @property(nonatomic, strong)
     NSArray<NSArray<TableViewItem<PopupMenuItem>*>*>* items;
 
-// Type of this mediator.
-@property(nonatomic, assign) PopupMenuType type;
-
 // The current web state associated with the toolbar.
 @property(nonatomic, assign) web::WebState* webState;
 
@@ -203,6 +195,9 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
 // YES if the current website has been followed.
 @property(nonatomic, assign) BOOL followed;
 
+// State of reading list model loading.
+@property(nonatomic, assign) BOOL readingListModelLoaded;
+
 #pragma mark*** Specific Items ***
 
 @property(nonatomic, strong) PopupMenuToolsItem* openNewIncognitoTabItem;
@@ -228,18 +223,17 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
 
 #pragma mark - Public
 
-- (instancetype)initWithType:(PopupMenuType)type
-                  isIncognito:(BOOL)isIncognito
-             readingListModel:(ReadingListModel*)readingListModel
-    triggerNewIncognitoTabTip:(BOOL)triggerNewIncognitoTabTip
-       browserPolicyConnector:
-           (BrowserPolicyConnectorIOS*)browserPolicyConnector {
+- (instancetype)initWithIsIncognito:(BOOL)isIncognito
+                   readingListModel:(ReadingListModel*)readingListModel
+          triggerNewIncognitoTabTip:(BOOL)triggerNewIncognitoTabTip
+             browserPolicyConnector:
+                 (BrowserPolicyConnectorIOS*)browserPolicyConnector {
   self = [super init];
   if (self) {
     _isIncognito = isIncognito;
-    _type = type;
     _readingListMenuNotifier =
         [[ReadingListMenuNotifier alloc] initWithReadingList:readingListModel];
+    _readingListModelLoaded = readingListModel->loaded();
     _webStateObserver = std::make_unique<web::WebStateObserverBridge>(self);
     _webStateListObserver = std::make_unique<WebStateListObserverBridge>(self);
     _overlayPresenterObserver =
@@ -350,47 +344,51 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
   self.webState = nullptr;
 }
 
-#pragma mark - WebStateListObserver
+#pragma mark - WebStateListObserving
 
-- (void)webStateList:(WebStateList*)webStateList
-    didChangeActiveWebState:(web::WebState*)newWebState
-                oldWebState:(web::WebState*)oldWebState
-                    atIndex:(int)atIndex
-                     reason:(ActiveWebStateChangeReason)reason {
+- (void)didChangeWebStateList:(WebStateList*)webStateList
+                       change:(const WebStateListChange&)change
+                       status:(const WebStateListStatus&)status {
   DCHECK_EQ(_webStateList, webStateList);
-  self.webState = newWebState;
+  if (status.active_web_state_change()) {
+    self.webState = status.new_active_web_state;
+  }
 }
 
 #pragma mark - BookmarkModelBridgeObserver
 
 // If an added or removed bookmark is the same as the current url, update the
 // toolbar so the star highlight is kept in sync.
-- (void)bookmarkNodeChildrenChanged:
-    (const bookmarks::BookmarkNode*)bookmarkNode {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+    didChangeChildrenForNode:(const bookmarks::BookmarkNode*)bookmarkNode {
   [self updateBookmarkItem];
 }
 
 // If all bookmarks are removed, update the toolbar so the star highlight is
 // kept in sync.
-- (void)bookmarkModelRemovedAllNodes {
+- (void)bookmarkModelRemovedAllNodes:(bookmarks::BookmarkModel*)model {
   [self updateBookmarkItem];
 }
 
 // In case we are on a bookmarked page before the model is loaded.
-- (void)bookmarkModelLoaded {
+- (void)bookmarkModelLoaded:(bookmarks::BookmarkModel*)model {
   [self updateBookmarkItem];
 }
 
-- (void)bookmarkNodeChanged:(const bookmarks::BookmarkNode*)bookmarkNode {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+        didChangeNode:(const bookmarks::BookmarkNode*)bookmarkNode {
   [self updateBookmarkItem];
 }
-- (void)bookmarkNode:(const bookmarks::BookmarkNode*)bookmarkNode
-     movedFromParent:(const bookmarks::BookmarkNode*)oldParent
-            toParent:(const bookmarks::BookmarkNode*)newParent {
+
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+          didMoveNode:(const bookmarks::BookmarkNode*)bookmarkNode
+           fromParent:(const bookmarks::BookmarkNode*)oldParent
+             toParent:(const bookmarks::BookmarkNode*)newParent {
   // No-op -- required by BookmarkModelBridgeObserver but not used.
 }
-- (void)bookmarkNodeDeleted:(const bookmarks::BookmarkNode*)node
-                 fromFolder:(const bookmarks::BookmarkNode*)folder {
+- (void)bookmarkModel:(bookmarks::BookmarkModel*)model
+        didDeleteNode:(const bookmarks::BookmarkNode*)node
+           fromFolder:(const bookmarks::BookmarkNode*)folder {
   [self updateBookmarkItem];
 }
 
@@ -522,37 +520,13 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
 
 - (NSArray<NSArray<TableViewItem<PopupMenuItem>*>*>*)items {
   if (!_items) {
-    switch (self.type) {
-      case PopupMenuTypeToolsMenu:
-        [self createToolsMenuItems];
-        if (self.webState && self.followItem) {
-          FollowTabHelper* followTabHelper =
-              FollowTabHelper::FromWebState(self.webState);
-          if (followTabHelper) {
-            followTabHelper->SetFollowMenuUpdater(self);
-          }
-        }
-        break;
-      case PopupMenuTypeNavigationForward:
-        DCHECK(!UseSymbols());
-        [self createNavigationItemsForType:PopupMenuTypeNavigationForward];
-        break;
-      case PopupMenuTypeNavigationBackward:
-        DCHECK(!UseSymbols());
-        [self createNavigationItemsForType:PopupMenuTypeNavigationBackward];
-        break;
-      case PopupMenuTypeTabGrid:
-        DCHECK(!UseSymbols());
-        [self createTabGridMenuItems];
-        break;
-      case PopupMenuTypeTabStripTabGrid:
-        DCHECK(!UseSymbols());
-        [self createTabGridMenuItems];
-        break;
-      case PopupMenuTypeNewTab:
-        DCHECK(!UseSymbols());
-        [self createSearchMenuItems];
-        break;
+    [self createToolsMenuItems];
+    if (self.webState && self.followItem) {
+      FollowTabHelper* followTabHelper =
+          FollowTabHelper::FromWebState(self.webState);
+      if (followTabHelper) {
+        followTabHelper->SetFollowMenuUpdater(self);
+      }
     }
     NSMutableArray* specificItems = [NSMutableArray array];
     if (self.reloadStopItem)
@@ -605,20 +579,8 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
   if (!webState)
     return;
 
-  reading_list::AddToReadingListUsingCanonicalUrl(self.browserCommandsHandler,
+  reading_list::AddToReadingListUsingCanonicalUrl(self.readingListBrowserAgent,
                                                   webState);
-}
-
-- (void)navigateToPageForItem:(TableViewItem<PopupMenuItem>*)item {
-  if (!self.webState)
-    return;
-
-  web::NavigationItem* navigationItem =
-      base::mac::ObjCCastStrict<PopupMenuNavigationItem>(item).navigationItem;
-  int index =
-      self.webState->GetNavigationManager()->GetIndexOfItem(navigationItem);
-  DCHECK_NE(index, -1);
-  self.webState->GetNavigationManager()->GoToIndex(index);
 }
 
 - (void)recordSettingsMetricsPerProfile {
@@ -908,148 +870,6 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
 
 #pragma mark - Item creation (Private)
 
-- (void)setPopupMenuItemsOnClipboardItemsReceived:
-    (const std::set<ClipboardContentType>&)types {
-  NSMutableArray* items = [NSMutableArray array];
-  // The consumer is expecting an array of arrays of items. Each sub array
-  // represent a section in the popup menu. Having one sub array means
-  // having all the items in the same section.
-  PopupMenuToolsItem* copiedContentItem = nil;
-  if (search_engines::SupportsSearchImageWithLens(self.templateURLService) &&
-      ios::provider::IsLensSupported() &&
-      base::FeatureList::IsEnabled(kEnableLensInOmniboxCopiedImage) &&
-      base::Contains(types, ClipboardContentType::Image)) {
-    copiedContentItem = CreateTableViewItem(
-        IDS_IOS_TOOLS_MENU_LENS_COPIED_IMAGE, PopupMenuActionLensCopiedImage,
-        @"popup_menu_paste_and_go", kToolsMenuLensCopiedImage);
-  } else if (search_engines::SupportsSearchByImage(self.templateURLService) &&
-             base::Contains(types, ClipboardContentType::Image)) {
-    copiedContentItem = CreateTableViewItem(
-        IDS_IOS_TOOLS_MENU_SEARCH_COPIED_IMAGE,
-        PopupMenuActionSearchCopiedImage, @"popup_menu_paste_and_go",
-        kToolsMenuCopiedImageSearch);
-  } else if (base::Contains(types, ClipboardContentType::URL)) {
-    copiedContentItem = CreateTableViewItem(
-        IDS_IOS_TOOLS_MENU_VISIT_COPIED_LINK, PopupMenuActionVisitCopiedLink,
-        @"popup_menu_paste_and_go", kToolsMenuPasteAndGo);
-  } else if (base::Contains(types, ClipboardContentType::Text)) {
-    copiedContentItem = CreateTableViewItem(
-        IDS_IOS_TOOLS_MENU_SEARCH_COPIED_TEXT, PopupMenuActionSearchCopiedText,
-        @"popup_menu_paste_and_go", kToolsMenuPasteAndGo);
-  }
-  if (copiedContentItem) {
-    [items addObject:@[ copiedContentItem ]];
-  }
-
-  [items addObject:[self searchMenuStaticItems]];
-  self.items = items;
-  [self.popupMenu setPopupMenuItems:self.items];
-}
-
-- (void)createNavigationItemsForType:(PopupMenuType)type {
-  DCHECK(type == PopupMenuTypeNavigationForward ||
-         type == PopupMenuTypeNavigationBackward);
-  if (!self.webState)
-    return;
-
-  web::NavigationManager* navigationManager =
-      self.webState->GetNavigationManager();
-  std::vector<web::NavigationItem*> navigationItems;
-  if (type == PopupMenuTypeNavigationForward) {
-    navigationItems = navigationManager->GetForwardItems();
-  } else {
-    navigationItems = navigationManager->GetBackwardItems();
-  }
-  NSMutableArray* items = [NSMutableArray array];
-  for (web::NavigationItem* navigationItem : navigationItems) {
-    PopupMenuNavigationItem* item =
-        [[PopupMenuNavigationItem alloc] initWithType:kItemTypeEnumZero];
-    if ([self shouldUseIncognitoNTPResourcesForURL:navigationItem
-                                                       ->GetVirtualURL()]) {
-      item.title = l10n_util::GetNSStringWithFixup(IDS_IOS_NEW_INCOGNITO_TAB);
-      UIImage* image;
-      if (@available(iOS 15, *)) {
-        image = SymbolWithPalette(
-            CustomSymbolWithPointSize(kIncognitoCircleFillSymbol,
-                                      kSymbolActionPointSize),
-            SmallIncognitoPalette());
-      } else {
-        image = [UIImage imageNamed:@"incognito_badge_ios14"];
-      }
-      item.favicon = image;
-    } else {
-      item.title =
-          base::SysUTF16ToNSString(navigationItem->GetTitleForDisplay());
-      const gfx::Image& image = navigationItem->GetFaviconStatus().image;
-      if (!image.IsEmpty())
-        item.favicon = image.ToUIImage();
-    }
-    item.actionIdentifier = PopupMenuActionNavigate;
-    item.navigationItem = navigationItem;
-    [items addObject:item];
-  }
-
-  self.items = @[ items ];
-}
-
-// Creates the menu items for the tab grid menu.
-- (void)createTabGridMenuItems {
-  PopupMenuToolsItem* closeTab =
-      CreateTableViewItem(IDS_IOS_TOOLS_MENU_CLOSE_TAB, PopupMenuActionCloseTab,
-                          @"popup_menu_close_tab", kToolsMenuCloseTabId);
-  closeTab.destructiveAction = YES;
-  self.items = @[ [self itemsForNewTab], @[ closeTab ] ];
-}
-
-// Creates the menu items for the search menu.
-- (void)createSearchMenuItems {
-  self.items = @[ [self searchMenuStaticItems] ];
-
-  ClipboardRecentContent* clipboardRecentContent =
-      ClipboardRecentContent::GetInstance();
-
-  std::set<ClipboardContentType> clipboard_types;
-  clipboard_types.insert(ClipboardContentType::URL);
-  clipboard_types.insert(ClipboardContentType::Text);
-  clipboard_types.insert(ClipboardContentType::Image);
-
-  __weak PopupMenuMediator* weakSelf = self;
-  clipboardRecentContent->HasRecentContentFromClipboard(
-      clipboard_types,
-      base::BindOnce(^(std::set<ClipboardContentType> matched_types) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          [weakSelf setPopupMenuItemsOnClipboardItemsReceived:matched_types];
-        });
-      }));
-}
-
-// Creates and returns the search menu items that are static (i.e. always in
-// the search menu).
-- (NSArray<TableViewItem<PopupMenuItem>*>*)searchMenuStaticItems {
-  PopupMenuToolsItem* QRCodeSearch = CreateTableViewItem(
-      IDS_IOS_TOOLS_MENU_QR_SCANNER, PopupMenuActionQRCodeSearch,
-      @"popup_menu_qr_scanner", kToolsMenuQRCodeSearch);
-  PopupMenuToolsItem* voiceSearch = CreateTableViewItem(
-      IDS_IOS_TOOLS_MENU_VOICE_SEARCH, PopupMenuActionVoiceSearch,
-      @"popup_menu_voice_search", kToolsMenuVoiceSearch);
-
-  PopupMenuToolsItem* newSearch =
-      CreateTableViewItem(IDS_IOS_TOOLS_MENU_NEW_SEARCH, PopupMenuActionSearch,
-                          @"popup_menu_search", kToolsMenuSearch);
-  // Disable the new search if the incognito mode is forced by enterprise
-  // policy.
-  newSearch.enabled = !IsIncognitoModeForced(self.prefService);
-
-  PopupMenuToolsItem* newIncognitoSearch = CreateTableViewItem(
-      IDS_IOS_TOOLS_MENU_NEW_INCOGNITO_SEARCH, PopupMenuActionIncognitoSearch,
-      @"popup_menu_new_incognito_tab", kToolsMenuIncognitoSearch);
-  // Disable the new incognito search if the incognito mode is disabled by
-  // enterprise policy.
-  newIncognitoSearch.enabled = !IsIncognitoModeDisabled(self.prefService);
-
-  return @[ newSearch, newIncognitoSearch, voiceSearch, QRCodeSearch ];
-}
-
 // Creates the menu items for the tools menu.
 - (void)createToolsMenuItems {
   // Reload or stop page action, created as reload.
@@ -1237,21 +1057,23 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
       @"popup_menu_bookmarks", kToolsMenuBookmarksId);
 
   // Reading List.
-  self.readingListItem = CreateTableViewItem(
-      IDS_IOS_TOOLS_MENU_READING_LIST, PopupMenuActionReadingList,
-      @"popup_menu_reading_list", kToolsMenuReadingListId);
-  NSInteger numberOfUnreadArticles =
-      [self.readingListMenuNotifier readingListUnreadCount];
-  self.readingListItem.badgeNumber = numberOfUnreadArticles;
-  if (numberOfUnreadArticles) {
-    self.readingListItem.additionalAccessibilityLabel =
-        AccessibilityLabelForReadingListCellWithCount(numberOfUnreadArticles);
-  }
-  if (self.engagementTracker &&
-      self.engagementTracker->ShouldTriggerHelpUI(
-          feature_engagement::kIPHBadgedReadingListFeature)) {
-    self.readingListItem.badgeText = l10n_util::GetNSStringWithFixup(
-        IDS_IOS_TOOLS_MENU_CELL_NEW_FEATURE_BADGE);
+  if (self.readingListModelLoaded) {
+    self.readingListItem = CreateTableViewItem(
+        IDS_IOS_TOOLS_MENU_READING_LIST, PopupMenuActionReadingList,
+        @"popup_menu_reading_list", kToolsMenuReadingListId);
+    NSInteger numberOfUnreadArticles =
+        [self.readingListMenuNotifier readingListUnreadCount];
+    self.readingListItem.badgeNumber = numberOfUnreadArticles;
+    if (numberOfUnreadArticles) {
+      self.readingListItem.additionalAccessibilityLabel =
+          AccessibilityLabelForReadingListCellWithCount(numberOfUnreadArticles);
+    }
+    if (self.engagementTracker &&
+        self.engagementTracker->ShouldTriggerHelpUI(
+            feature_engagement::kIPHBadgedReadingListFeature)) {
+      self.readingListItem.badgeText = l10n_util::GetNSStringWithFixup(
+          IDS_IOS_TOOLS_MENU_CELL_NEW_FEATURE_BADGE);
+    }
   }
 
   // Recent Tabs.
@@ -1276,14 +1098,18 @@ PopupMenuTextItem* CreateEnterpriseInfoItem(NSString* imageName,
       CreateTableViewItem(IDS_IOS_TOOLS_MENU_SETTINGS, PopupMenuActionSettings,
                           @"popup_menu_settings", kToolsMenuSettingsActionId);
 
-  if (self.isIncognito) {
-    return @[ bookmarks, self.readingListItem, downloadsFolder, settings ];
+  NSMutableArray* items = [[NSMutableArray alloc] init];
+  [items addObject:bookmarks];
+  if (self.readingListItem) {
+    [items addObject:self.readingListItem];
   }
-
-  return @[
-    bookmarks, self.readingListItem, recentTabs, history, downloadsFolder,
-    settings
-  ];
+  if (!self.isIncognito) {
+    [items addObject:recentTabs];
+    [items addObject:history];
+  }
+  [items addObject:downloadsFolder];
+  [items addObject:settings];
+  return items;
 }
 
 // Creates the section for enterprise info.

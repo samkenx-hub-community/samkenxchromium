@@ -9,6 +9,7 @@
 #include "base/compiler_specific.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/mock_callback.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
@@ -97,8 +98,10 @@ class VersionUpdaterCrosTest : public ::testing::Test {
   content::BrowserTaskEnvironment task_environment_;
   std::unique_ptr<ash::NetworkHandlerTestHelper> network_handler_test_helper_;
   std::unique_ptr<VersionUpdater> version_updater_;
-  VersionUpdaterCros* version_updater_cros_ptr_;
-  ash::FakeUpdateEngineClient* fake_update_engine_client_;  // Not owned.
+  raw_ptr<VersionUpdaterCros, DanglingUntriaged | ExperimentalAsh>
+      version_updater_cros_ptr_;
+  raw_ptr<ash::FakeUpdateEngineClient, DanglingUntriaged | ExperimentalAsh>
+      fake_update_engine_client_;  // Not owned.
 
   user_manager::ScopedUserManager user_manager_enabler_;
   ash::ScopedCrosSettingsTestHelper cros_settings_test_helper_;
@@ -256,6 +259,26 @@ TEST_F(VersionUpdaterCrosTest, GetUpdateStatus_UpdatedNeedReboot) {
   StrictMock<base::MockCallback<VersionUpdater::StatusCallback>> mock_callback;
   EXPECT_CALL(mock_callback,
               Run(VersionUpdater::NEARLY_UPDATED, _, _, _, _, _, _))
+      .Times(1);
+  version_updater_cros_ptr_->GetUpdateStatus(mock_callback.Get());
+}
+
+TEST_F(VersionUpdaterCrosTest,
+       GetUpdateStatus_UpdateToRollbackVersionDisallowed) {
+  SetEthernetService();
+  update_engine::StatusResult status;
+  status.set_is_interactive(true);
+  status.set_current_operation(update_engine::Operation::DISABLED);
+  int32_t error_code = static_cast<int32_t>(
+      update_engine::ErrorCode::kOmahaUpdateIgnoredPerPolicy);
+  status.set_last_attempt_error(error_code);
+  fake_update_engine_client_->set_default_status(status);
+
+  // Expect the status to be `UPDATE_TO_ROLLBACK_VERSION_DISALLOWED`.
+  StrictMock<base::MockCallback<VersionUpdater::StatusCallback>> mock_callback;
+  EXPECT_CALL(mock_callback,
+              Run(VersionUpdater::UPDATE_TO_ROLLBACK_VERSION_DISALLOWED, _, _,
+                  _, _, _, _))
       .Times(1);
   version_updater_cros_ptr_->GetUpdateStatus(mock_callback.Get());
 }

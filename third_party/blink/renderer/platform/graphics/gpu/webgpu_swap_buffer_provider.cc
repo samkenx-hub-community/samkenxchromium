@@ -38,8 +38,7 @@ WebGPUSwapBufferProvider::WebGPUSwapBufferProvider(
     WGPUTextureUsage usage,
     WGPUTextureFormat format,
     PredefinedColorSpace color_space,
-    gfx::HDRMode hdr_mode,
-    absl::optional<gfx::HDRMetadata> hdr_metadata)
+    const gfx::HDRMetadata& hdr_metadata)
     : dawn_control_client_(dawn_control_client),
       client_(client),
       device_(device),
@@ -59,7 +58,7 @@ WebGPUSwapBufferProvider::WebGPUSwapBufferProvider(
   // paths to keep the rendering correct in that cases.
   layer_->SetContentsOpaque(true);
   layer_->SetPremultipliedAlpha(true);
-  layer_->SetHDRConfiguration(hdr_mode, hdr_metadata);
+  layer_->SetHdrMetadata(hdr_metadata);
 
   dawn_control_client_->GetProcs().deviceReference(device_);
 }
@@ -179,7 +178,8 @@ WebGPUSwapBufferProvider::NewOrRecycledSwapBuffer(
     }
     gpu::Mailbox mailbox = sii->CreateSharedImage(
         Format(), size, PredefinedColorSpaceToGfxColorSpace(color_space_),
-        kTopLeft_GrSurfaceOrigin, alpha_mode, usage, gpu::kNullSurfaceHandle);
+        kTopLeft_GrSurfaceOrigin, alpha_mode, usage, "WebGPUSwapBufferProvider",
+        gpu::kNullSurfaceHandle);
     gpu::SyncToken creation_token = sii->GenUnverifiedSyncToken();
 
     unused_swap_buffers_.push_back(base::MakeRefCounted<SwapBuffer>(
@@ -289,7 +289,7 @@ bool WebGPUSwapBufferProvider::PrepareTransferableResource(
 
   // Populate the output resource
   *out_resource = viz::TransferableResource::MakeGpu(
-      current_swap_buffer_->mailbox, GL_LINEAR, GetTextureTarget(),
+      current_swap_buffer_->mailbox, GetTextureTarget(),
       current_swap_buffer_->access_finished_token, current_swap_buffer_->size,
       Format(), IsOverlayCandidate());
   out_resource->color_space = PredefinedColorSpaceToGfxColorSpace(color_space_);
@@ -332,7 +332,7 @@ bool WebGPUSwapBufferProvider::CopyToVideoFrame(
                                     GetTextureTarget());
 
   auto success = frame_pool->CopyRGBATextureToVideoFrame(
-      Format().resource_format(), current_swap_buffer_->size,
+      Format(), current_swap_buffer_->size,
       PredefinedColorSpaceToGfxColorSpace(color_space_),
       kTopLeft_GrSurfaceOrigin, mailbox_holder, dst_color_space,
       std::move(callback));

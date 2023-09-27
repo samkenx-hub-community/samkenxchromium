@@ -4,10 +4,11 @@
 
 package org.chromium.chrome.browser.browsing_data;
 
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import androidx.test.filters.MediumTest;
@@ -241,7 +242,7 @@ public class BrowsingDataBridgeTest {
             TabState state = TabStateExtractor.from(tab);
             sActivityTestRule.getActivity().getCurrentTabModel().closeTab(tab);
             frozen[0] = sActivityTestRule.getActivity().getCurrentTabCreator().createFrozenTab(
-                    state, null, tab.getId(), tab.isIncognito(), 1);
+                    state, tab.getId(), tab.isIncognito(), 1);
             restored[0] = WebContentsStateBridge.restoreContentsFromByteBuffer(
                     TabStateExtractor.from(frozen[0]).contentsState, false);
         });
@@ -339,7 +340,7 @@ public class BrowsingDataBridgeTest {
                     new int[] {
                             org.chromium.chrome.browser.browsing_data.BrowsingDataType.COOKIES,
                     },
-                    TimePeriod.LAST_15_MINUTES);
+                    TimePeriod.LAST_WEEK);
         });
 
         Assert.assertTrue(WebappRegistry.getRegisteredWebappIdsForTesting().isEmpty());

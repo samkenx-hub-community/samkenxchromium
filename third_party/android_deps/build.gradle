@@ -74,7 +74,6 @@ dependencies {
     compile 'com.google.android.gms:play-services-location:19.0.1'
     compile 'com.google.android.gms:play-services-vision-common:19.1.3'
     compile 'com.google.android.gms:play-services-vision:20.1.3'
-    compile 'com.google.android.gms:play-services-fido:19.0.0-beta'
 
     // TODO (bjoyce): Remove after androidx migration crbug.com/896775
     // Support v4 libraries
@@ -118,10 +117,11 @@ dependencies {
 
     // Needed by androidx and by doubledown targets.
     // Note: These have version overrides set in ChromiumDepGraph.groovy.
-    compile "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.1"
-    compile "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.1"
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0"
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0"
+    compile "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4"
+    compile "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4"
+    compile "org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.6.4"
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.20"
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.20"
 
     // Needed by androidx.macrobenchmarks
     androidTestCompile "com.squareup.wire:wire-runtime-jvm:4.4.3"
@@ -185,25 +185,20 @@ dependencies {
     // Version 1.2 is needed by espresso-web, but we'll newer 1.2.1.
     androidTestCompile 'org.ccil.cowan.tagsoup:tagsoup:1.2.1'
 
-    String mockitoVersion = '5.1.1'
+    String mockitoVersion = '5.4.0'
     androidTestCompile "org.mockito:mockito-android:${mockitoVersion}"
     androidTestCompile "org.mockito:mockito-core:${mockitoVersion}"
     androidTestCompile "org.mockito:mockito-subclass:${mockitoVersion}"
     // Depended on by downstream guava_java rewrite.
     androidTestCompile "org.checkerframework:checker-qual:3.25.0"
 
-    String robolectricVersion = '4.8.1'
+    String robolectricVersion = '4.10.3'
     // Use testCompile to avoid having support_android = true set on
     // robolectric dependencies.
     testCompile "org.robolectric:robolectric:${robolectricVersion}"
     testCompile "org.robolectric:shadows-multidex:${robolectricVersion}"
     testCompile "org.robolectric:shadows-playservices:${robolectricVersion}"
     testCompile "org.robolectric:utils:${robolectricVersion}"
-
-    // TODO(1404995): Remove after robolectric is update to 4.9.2 as nothing
-    // else depends on this, so we want it removed when robolectric doesn't
-    //need it anymore.
-    testCompile "org.conscrypt:conscrypt-openjdk-uber:2.5.2"
 }
 
 task setUpRepository(type: BuildConfigGenerator) {

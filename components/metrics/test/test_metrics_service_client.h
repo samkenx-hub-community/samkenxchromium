@@ -16,6 +16,10 @@
 #include "components/metrics/metrics_service_client.h"
 #include "components/metrics/test/test_metrics_log_uploader.h"
 
+namespace variations {
+class SyntheticTrialRegistry;
+}
+
 namespace metrics {
 
 // A simple concrete implementation of the MetricsServiceClient interface, for
@@ -77,14 +81,18 @@ class TestMetricsServiceClient : public MetricsServiceClient {
   void set_should_reset_client_ids_on_cloned_install(bool state) {
     should_reset_client_ids_on_cloned_install_ = state;
   }
-  void set_max_ongoing_log_size(size_t bytes) {
-    storage_limits_.max_ongoing_log_size = bytes;
+  void set_max_ongoing_log_size_bytes(size_t bytes) {
+    storage_limits_.ongoing_log_queue_limits.max_log_size_bytes = bytes;
   }
   void set_min_ongoing_log_queue_count(size_t log_count) {
-    storage_limits_.min_ongoing_log_queue_count = log_count;
+    storage_limits_.ongoing_log_queue_limits.min_log_count = log_count;
   }
-  void set_min_ongoing_log_queue_size(size_t bytes) {
-    storage_limits_.min_ongoing_log_queue_size = bytes;
+  void set_min_ongoing_log_queue_size_bytes(size_t bytes) {
+    storage_limits_.ongoing_log_queue_limits.min_queue_size_bytes = bytes;
+  }
+  void set_synthetic_trial_registry(
+      variations::SyntheticTrialRegistry* registry) {
+    synthetic_trial_registry_ = registry;
   }
 
  private:
@@ -98,6 +106,9 @@ class TestMetricsServiceClient : public MetricsServiceClient {
   MetricsLogStore::StorageLimits storage_limits_ =
       MetricsServiceClient::GetStorageLimits();
   std::set<uint64_t> allowed_user_ids_;
+
+  raw_ptr<variations::SyntheticTrialRegistry> synthetic_trial_registry_ =
+      nullptr;
 
   // A weak ref to the last created TestMetricsLogUploader.
   base::WeakPtr<TestMetricsLogUploader> uploader_ = nullptr;

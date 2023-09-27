@@ -1,10 +1,12 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 package org.chromium.chrome.browser.tasks.tab_management;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
@@ -15,7 +17,6 @@ import android.graphics.drawable.Drawable;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.test.filters.SmallTest;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -30,11 +31,12 @@ import org.robolectric.annotation.Config;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.JniMocker;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.tab.MockTab;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModelFilterProvider;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
+import org.chromium.chrome.browser.tabmodel.TabModelUtils;
+import org.chromium.chrome.browser.tasks.tab_groups.TabGroupModelFilter;
 import org.chromium.chrome.browser.tasks.tab_management.TabSelectionEditorAction.ActionDelegate;
 import org.chromium.chrome.browser.tasks.tab_management.TabSelectionEditorAction.ActionObserver;
 import org.chromium.chrome.browser.tasks.tab_management.TabSelectionEditorAction.ButtonType;
@@ -42,7 +44,6 @@ import org.chromium.chrome.browser.tasks.tab_management.TabSelectionEditorAction
 import org.chromium.chrome.browser.tasks.tab_management.TabSelectionEditorAction.ShowMode;
 import org.chromium.chrome.tab_ui.R;
 import org.chromium.chrome.test.util.browser.Features;
-import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.chrome.test.util.browser.tabmodel.MockTabModel;
 import org.chromium.components.browser_ui.share.ShareParams;
 import org.chromium.components.browser_ui.widget.selectable_list.SelectionDelegate;
@@ -51,6 +52,7 @@ import org.chromium.url.GURL;
 import org.chromium.url.JUnitTestGURLs;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +63,6 @@ import java.util.Set;
  */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-@EnableFeatures({ChromeFeatureList.TAB_SELECTION_EDITOR_V2})
 public class TabSelectionEditorShareActionUnitTest {
     @Rule
     public JniMocker mJniMocker = new JniMocker();
@@ -70,6 +71,10 @@ public class TabSelectionEditorShareActionUnitTest {
 
     @Mock
     private TabModelSelector mTabModelSelector;
+    @Mock
+    private TabModelFilterProvider mTabModelFilterProvider;
+    @Mock
+    private TabGroupModelFilter mTabModelFilter;
     @Mock
     private SelectionDelegate<Integer> mSelectionDelegate;
     @Mock
@@ -80,11 +85,8 @@ public class TabSelectionEditorShareActionUnitTest {
     private MockTabModel mTabModel;
     private TabSelectionEditorShareAction mAction;
 
-    Map<Integer, GURL> mIdUrlMap = Map.of(1, JUnitTestGURLs.getGURL(JUnitTestGURLs.URL_1), 2,
-            JUnitTestGURLs.getGURL(JUnitTestGURLs.URL_2), 3,
-            JUnitTestGURLs.getGURL(JUnitTestGURLs.URL_3), 4,
-            JUnitTestGURLs.getGURL(JUnitTestGURLs.NTP_URL), 5,
-            JUnitTestGURLs.getGURL(JUnitTestGURLs.ABOUT_BLANK));
+    Map<Integer, GURL> mIdUrlMap = Map.of(1, JUnitTestGURLs.URL_1, 2, JUnitTestGURLs.URL_2, 3,
+            JUnitTestGURLs.URL_3, 4, JUnitTestGURLs.NTP_URL, 5, JUnitTestGURLs.ABOUT_BLANK);
 
     @Before
     public void setUp() {
@@ -101,15 +103,17 @@ public class TabSelectionEditorShareActionUnitTest {
             }
         }));
         when(mTabModelSelector.getCurrentModel()).thenReturn(mTabModel);
-        when(mTabModelSelector.getTabModelFilterProvider())
-                .thenReturn(new TabModelFilterProvider());
+        when(mTabModelSelector.getTabModelFilterProvider()).thenReturn(mTabModelFilterProvider);
+        when(mTabModelFilterProvider.getTabModelFilter(false)).thenReturn(mTabModelFilter);
+        when(mTabModelFilterProvider.getCurrentTabModelFilter()).thenReturn(mTabModelFilter);
+        doAnswer(invocation -> {
+            return Collections.singletonList(
+                    TabModelUtils.getTabById(mTabModel, invocation.getArgument(0)));
+        })
+                .when(mTabModelFilter)
+                .getRelatedTabList(anyInt());
         mJniMocker.mock(DomDistillerUrlUtilsJni.TEST_HOOKS, mDomDistillerUrlUtilsJni);
         mAction.configure(mTabModelSelector, mSelectionDelegate, mDelegate, false);
-    }
-
-    @After
-    public void tearDown() {
-        TabSelectionEditorShareAction.setIntentCallbackForTesting(null);
     }
 
     @Test
@@ -159,7 +163,7 @@ public class TabSelectionEditorShareActionUnitTest {
         Set<Integer> tabIdsSet = new LinkedHashSet<>(tabIds);
         when(mSelectionDelegate.getSelectedItems()).thenReturn(tabIdsSet);
         when(mDomDistillerUrlUtilsJni.getOriginalUrlFromDistillerUrl(any(String.class)))
-                .thenReturn(JUnitTestGURLs.getGURL(JUnitTestGURLs.URL_1));
+                .thenReturn(JUnitTestGURLs.URL_1);
 
         mAction.onSelectionStateChange(tabIds);
         Assert.assertEquals(

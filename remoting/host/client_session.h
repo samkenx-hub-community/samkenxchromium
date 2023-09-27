@@ -18,6 +18,7 @@
 #include "base/task/sequenced_task_runner_helpers.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "build/build_config.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver_set.h"
 #include "remoting/host/base/desktop_environment_options.h"
@@ -56,6 +57,7 @@
 
 namespace remoting {
 
+class ActiveDisplayMonitor;
 class AudioStream;
 class DesktopEnvironment;
 class DesktopEnvironmentFactory;
@@ -189,6 +191,10 @@ class ClientSession : public protocol::HostStub,
       mojo::PendingReceiver<mojom::WebAuthnProxy> receiver) override;
   void BindRemoteUrlOpener(
       mojo::PendingReceiver<mojom::RemoteUrlOpener> receiver) override;
+#if BUILDFLAG(IS_WIN)
+  void BindSecurityKeyForwarder(
+      mojo::PendingReceiver<mojom::SecurityKeyForwarder> receiver) override;
+#endif
 
   void BindReceiver(
       mojo::PendingReceiver<mojom::ChromotingSessionServices> receiver);
@@ -263,6 +269,10 @@ class ClientSession : public protocol::HostStub,
                              base::TimeDelta boost_duration,
                              bool& mouse_button_down,
                              protocol::ObservingInputFilter::Event event);
+
+  // Sends the new active display to the client. Called by ActiveDisplayMonitor
+  // whenever the screen id associated with the active window changes.
+  void OnActiveDisplayChanged(webrtc::ScreenId display);
 
   raw_ptr<EventHandler> event_handler_;
 
@@ -381,8 +391,11 @@ class ClientSession : public protocol::HostStub,
   // Set to true after all data channels have been connected.
   bool channels_connected_ = false;
 
-  // Used to store video channel pause parameter.
+  // Used to store the video channel pause parameter.
   bool pause_video_ = false;
+
+  // Used to store the target framerate control parameter.
+  int target_framerate_ = kTargetFrameRate;
 
   // VideoLayout is sent only after the control channel is connected. Until
   // then it's stored in |pending_video_layout_message_|.
@@ -410,6 +423,8 @@ class ClientSession : public protocol::HostStub,
 
   mojo::ReceiverSet<mojom::ChromotingSessionServices>
       session_services_receivers_;
+
+  std::unique_ptr<ActiveDisplayMonitor> active_display_monitor_;
 
   SEQUENCE_CHECKER(sequence_checker_);
 

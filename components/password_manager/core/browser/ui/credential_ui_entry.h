@@ -11,7 +11,9 @@
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
 #include "components/password_manager/core/browser/import/csv_password.h"
+#include "components/password_manager/core/browser/passkey_credential.h"
 #include "components/password_manager/core/browser/password_form.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace password_manager {
 
@@ -81,6 +83,7 @@ struct CredentialUIEntry {
   CredentialUIEntry();
   explicit CredentialUIEntry(const PasswordForm& form);
   explicit CredentialUIEntry(const std::vector<PasswordForm>& forms);
+  explicit CredentialUIEntry(const PasskeyCredential& passkey);
   explicit CredentialUIEntry(
       const CSVPassword& csv_password,
       PasswordForm::Store to_store = PasswordForm::Store::kProfileStore);
@@ -91,12 +94,20 @@ struct CredentialUIEntry {
   CredentialUIEntry& operator=(const CredentialUIEntry& other);
   CredentialUIEntry& operator=(CredentialUIEntry&& other);
 
+  // If this is a passkey, a non empty credential id as a byte string. Empty
+  // otherwise.
+  // https://w3c.github.io/webauthn/#credential-id
+  std::vector<uint8_t> passkey_credential_id;
+
   // List of facets represented by this entry which contains the display name,
   // url and sign-on realm of a credential.
   std::vector<CredentialFacet> facets;
 
   // The current username.
   std::u16string username;
+
+  // The user's display name, if this is a passkey. Always empty otherwise.
+  std::u16string user_display_name;
 
   // The current password.
   std::u16string password;
@@ -148,6 +159,10 @@ struct CredentialUIEntry {
   // Returns the first URL among all the URLs in the facets associated with this
   // entry.
   GURL GetURL() const;
+
+  // Returns the URL which allows to change the password of compromised
+  // credentials. Can be null for Android credentials.
+  absl::optional<GURL> GetChangePasswordURL() const;
 
   // Returns a vector of pairs, where the first element is formatted string
   // representing website or an Android application and a second parameter is a

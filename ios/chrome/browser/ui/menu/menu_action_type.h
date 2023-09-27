@@ -44,13 +44,15 @@ enum class MenuActionType {
   ShowQRScanner = 32,
   StartVoiceSearch = 33,
   StartNewSearch = 34,
-  StartNewIcognitoSearch = 35,
+  StartNewIncognitoSearch = 35,
   SearchCopiedImage = 36,
   VisitCopiedLink = 37,
   SearchCopiedText = 38,
   PinTab = 39,
   UnpinTab = 40,
-  kMaxValue = UnpinTab
+  LensCameraSearch = 41,
+  SaveImageToGooglePhotos = 42,
+  kMaxValue = SaveImageToGooglePhotos
 };
 
 #endif  // IOS_CHROME_BROWSER_UI_MENU_MENU_ACTION_TYPE_H_

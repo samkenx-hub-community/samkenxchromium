@@ -4,8 +4,12 @@
 
 #include "chromeos/ui/frame/multitask_menu/multitask_menu_nudge_controller.h"
 
+#include "ash/constants/notifier_catalogs.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/metrics/user_metrics.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
+#include "chromeos/ui/base/nudge_util.h"
 #include "chromeos/ui/base/tablet_state.h"
 #include "chromeos/ui/wm/features.h"
 #include "components/prefs/pref_registry_simple.h"
@@ -24,6 +28,9 @@
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 #include "ash/constants/ash_pref_names.h"
+#include "ash/constants/ash_switches.h"
+#include "base/command_line.h"
+#include "components/user_manager/user_manager.h"
 #endif
 
 namespace chromeos {
@@ -96,8 +103,10 @@ std::unique_ptr<views::Widget> CreateWidget(aura::Window* window) {
   contents_view->SetBackground(views::CreateThemedRoundedRectBackground(
       ui::kColorSysSurface3, corner_radius));
   contents_view->SetBorder(std::make_unique<views::HighlightBorder>(
-      corner_radius, views::HighlightBorder::Type::kHighlightBorder1,
-      /*use_light_colors=*/false));
+      corner_radius,
+      chromeos::features::IsJellyrollEnabled()
+          ? views::HighlightBorder::Type::kHighlightBorderOnShadow
+          : views::HighlightBorder::Type::kHighlightBorder1));
 
   widget->SetContentsView(std::move(contents_view));
   return widget;
@@ -106,13 +115,23 @@ std::unique_ptr<views::Widget> CreateWidget(aura::Window* window) {
 }  // namespace
 
 MultitaskMenuNudgeController::Delegate::~Delegate() {
-  DCHECK_EQ(this, g_delegate_instance);
+  CHECK_EQ(this, g_delegate_instance);
   g_delegate_instance = nullptr;
 }
 
 MultitaskMenuNudgeController::Delegate::Delegate() {
-  DCHECK_EQ(nullptr, g_delegate_instance);
+  CHECK_EQ(nullptr, g_delegate_instance);
   g_delegate_instance = this;
+}
+
+bool MultitaskMenuNudgeController::Delegate::IsUserNew() const {
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  return user_manager::UserManager::IsInitialized()
+             ? user_manager::UserManager::Get()->IsCurrentUserNew()
+             : false;
+#else
+  return false;
+#endif
 }
 
 MultitaskMenuNudgeController::MultitaskMenuNudgeController() {
@@ -145,12 +164,22 @@ void MultitaskMenuNudgeController::MaybeShowNudge(aura::Window* window) {
 
 void MultitaskMenuNudgeController::MaybeShowNudge(aura::Window* window,
                                                   views::View* anchor_view) {
+  // Delegate could be null if the associated window was created during OOBE.
+  if (!g_delegate_instance || g_delegate_instance->IsUserNew()) {
+    return;
+  }
+
   if (!chromeos::wm::features::IsWindowLayoutMenuEnabled() ||
       g_suppress_nudge_for_testing || nudge_widget_) {
     return;
   }
 
-  DCHECK(g_delegate_instance);
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          ash::switches::kAshNoNudges)) {
+    return;
+  }
+#endif
 
   // If the window is not visible, do not show the nudge.
   if (!window->IsVisible()) {
@@ -182,9 +211,17 @@ void MultitaskMenuNudgeController::DismissNudge() {
 }
 
 void MultitaskMenuNudgeController::OnMenuOpened(bool tablet_mode) {
+  if (!nudge_shown_time_.is_null()) {
+    base::UmaHistogramEnumeration(
+        GetNudgeTimeToActionHistogramName(GetTime() - nudge_shown_time_),
+        tablet_mode ? ash::NudgeCatalogName::kMultitaskMenuTablet
+                    : ash::NudgeCatalogName::kMultitaskMenuClamshell);
+    nudge_shown_time_ = base::Time();
+  }
+
   // Avoid sending prefs through the cros API or recording user actions if the
   // nudge isn't shown.
-  if (nudge_widget_ && !nudge_widget_->IsClosed()) {
+  if (!nudge_widget_ || nudge_widget_->IsClosed()) {
     return;
   }
 
@@ -203,8 +240,16 @@ void MultitaskMenuNudgeController::OnWindowParentChanged(aura::Window* window,
   if (!parent) {
     return;
   }
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
   UpdateWidgetAndPulse();
+}
+
+void MultitaskMenuNudgeController::OnWindowVisibilityChanged(
+    aura::Window* window,
+    bool visible) {
+  if (window == window_ && !visible) {
+    DismissNudge();
+  }
 }
 
 void MultitaskMenuNudgeController::OnWindowBoundsChanged(
@@ -212,14 +257,14 @@ void MultitaskMenuNudgeController::OnWindowBoundsChanged(
     const gfx::Rect& old_bounds,
     const gfx::Rect& new_bounds,
     ui::PropertyChangeReason reason) {
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
   UpdateWidgetAndPulse();
 }
 
 void MultitaskMenuNudgeController::OnWindowTargetTransformChanging(
     aura::Window* window,
     const gfx::Transform& new_transform) {
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
   // Prevent unintended behaviour in situations that use transforms such as
   // overview mode.
   // TODO(hewer): Decide how the cue behaves when adjusting the split view
@@ -229,7 +274,7 @@ void MultitaskMenuNudgeController::OnWindowTargetTransformChanging(
 
 void MultitaskMenuNudgeController::OnWindowStackingChanged(
     aura::Window* window) {
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
 
   // Stacking may change during the construction of the widget, at which
   // `nudge_widget_` would still be null.
@@ -239,12 +284,18 @@ void MultitaskMenuNudgeController::OnWindowStackingChanged(
 
   // Ensure the `nudge_widget_` is always above `window_`. We dont worry about
   // the pulse layer since it is not a window, and won't get stacked on top of
-  // during window activation for example.
-  window_->parent()->StackChildAbove(nudge_widget_->GetNativeWindow(), window);
+  // during window activation for example. When moving across displays, it is
+  // possible the window parent differs for a bit. In this case we cannot
+  // restack and we need to wait for `UpdateWidgetAndPulse` to place the nudge
+  // in the correct spot.
+  if (window_->parent() == nudge_widget_->GetNativeWindow()->parent()) {
+    window_->parent()->StackChildAbove(nudge_widget_->GetNativeWindow(),
+                                       window);
+  }
 }
 
 void MultitaskMenuNudgeController::OnWindowDestroying(aura::Window* window) {
-  DCHECK_EQ(window_, window);
+  CHECK_EQ(window_, window);
   DismissNudge();
 }
 
@@ -258,7 +309,7 @@ void MultitaskMenuNudgeController::OnDisplayTabletStateChanged(
       DismissNudge();
       break;
     case display::TabletState::kInTabletMode:
-      // Entering tablet mode will call the `TabletModeMultitaskCue`
+      // Entering tablet mode will call the `TabletModeMultitaskCueController`
       // constructor so no work needed.
       // TODO(b/267648014): Combine cue and nudge logic so both are activated in
       // the same place when switching modes.
@@ -301,18 +352,33 @@ void MultitaskMenuNudgeController::OnGetPreferences(
     return;
   }
 
-  // If the anchor is passed and hidden, we cannot show the nudge.
-  if (anchor_view && !anchor_view->IsDrawn()) {
-    return;
+  // If the anchor is passed and hidden or offscreen, we cannot show the nudge.
+  if (anchor_view) {
+    if (!anchor_view->IsDrawn() ||
+        !display::Screen::GetScreen()
+             ->GetDisplayNearestWindow(window)
+             .bounds()
+             .Contains(anchor_view->GetBoundsInScreen())) {
+      return;
+    }
   }
 
   window_ = window;
-  window_observation_.Observe(window_);
 
   nudge_widget_ = CreateWidget(window_);
+  anchor_view_ = anchor_view;
+
   nudge_widget_->Show();
 
-  anchor_view_ = anchor_view;
+  base::UmaHistogramEnumeration(
+      kNotifierFrameworkNudgeShownCountHistogram,
+      tablet_mode ? ash::NudgeCatalogName::kMultitaskMenuTablet
+                  : ash::NudgeCatalogName::kMultitaskMenuClamshell);
+  nudge_shown_time_ = GetTime();
+
+  // Note that order matters because in some cases, creating the widget may
+  // trigger some window observations.
+  window_observation_.Observe(window_.get());
 
   if (!tablet_mode) {
     // Create the layer which pulses on the maximize/restore button.
@@ -323,7 +389,13 @@ void MultitaskMenuNudgeController::OnGetPreferences(
   }
 
   UpdateWidgetAndPulse();
-  DCHECK(nudge_widget_);
+
+  // It is possible `UpdateWidgetAndPulse` could not find a good bounds to place
+  // the nudge. In that case the widget and pulse and observations would have
+  // been cleaned up.
+  if (!nudge_widget_) {
+    return;
+  }
 
   // Fade the education nudge in.
   ui::Layer* layer = nudge_widget_->GetLayer();
@@ -367,13 +439,13 @@ void MultitaskMenuNudgeController::OnDismissTimerEnded() {
 }
 
 void MultitaskMenuNudgeController::UpdateWidgetAndPulse() {
-  DCHECK(window_);
-  DCHECK(nudge_widget_);
+  CHECK(window_);
+  CHECK(nudge_widget_);
 
   const bool tablet_mode = TabletState::Get()->InTabletMode();
   if (!tablet_mode) {
-    DCHECK(pulse_layer_);
-    DCHECK(anchor_view_);
+    CHECK(pulse_layer_);
+    CHECK(anchor_view_);
   }
 
   // Dismiss the nudge if the window (or anchor in clamshell mode) is not
@@ -457,7 +529,7 @@ void MultitaskMenuNudgeController::PerformPulseAnimation(int pulse_count) {
     return;
   }
 
-  DCHECK(pulse_layer_);
+  CHECK(pulse_layer_);
 
   // The pulse animation scales up and fades out on top of the maximize/restore
   // button until the nudge disappears.

@@ -38,7 +38,6 @@
 #include "chrome/browser/profiles/profile_window.h"
 #include "chrome/browser/resource_coordinator/session_restore_policy.h"
 #include "chrome/browser/resource_coordinator/tab_manager_features.h"
-#include "chrome/browser/scoped_disable_client_side_decorations_for_test.h"
 #include "chrome/browser/sessions/app_session_service.h"
 #include "chrome/browser/sessions/app_session_service_factory.h"
 #include "chrome/browser/sessions/app_session_service_test_helper.h"
@@ -51,6 +50,7 @@
 #include "chrome/browser/sessions/session_service_test_helper.h"
 #include "chrome/browser/sessions/tab_loader_delegate.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
+#include "chrome/browser/tab_contents/web_contents_collection.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -95,8 +95,6 @@
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
-#include "content/public/browser/notification_service.h"
-#include "content/public/browser/notification_types.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
@@ -120,7 +118,7 @@
 #include "ui/gfx/color_palette.h"
 
 #if BUILDFLAG(IS_MAC)
-#include "base/mac/scoped_nsautorelease_pool.h"
+#include "base/apple/scoped_nsautorelease_pool.h"
 #endif
 
 #if defined(USE_AURA)
@@ -361,56 +359,19 @@ class SessionRestoreTest : public InProcessBrowserTest {
       fake_memory_pressure_monitor_;
 };
 
-// Activates the smart restore behaviour and tracks the loading of tabs.
-class SmartSessionRestoreTest : public SessionRestoreTest,
-                                public content::NotificationObserver {
+// Activates the smart restore behaviour.
+class SmartSessionRestoreTest : public SessionRestoreTest {
  public:
   SmartSessionRestoreTest() = default;
 
   SmartSessionRestoreTest(const SmartSessionRestoreTest&) = delete;
   SmartSessionRestoreTest& operator=(const SmartSessionRestoreTest&) = delete;
 
-  void StartObserving(size_t num_tabs) {
-    // Start by clearing everything so it can be reused in the same test.
-    web_contents_.clear();
-    registrar_.RemoveAll();
-    num_tabs_ = num_tabs;
-    registrar_.Add(this, content::NOTIFICATION_LOAD_START,
-                   content::NotificationService::AllSources());
-  }
-  void Observe(int type,
-               const content::NotificationSource& source,
-               const content::NotificationDetails& details) override {
-    switch (type) {
-      case content::NOTIFICATION_LOAD_START: {
-        content::NavigationController* controller =
-            content::Source<content::NavigationController>(source).ptr();
-        web_contents_.push_back(controller->DeprecatedGetWebContents());
-        if (web_contents_.size() == num_tabs_)
-          message_loop_runner_->Quit();
-        break;
-      }
-    }
-  }
-  const std::vector<content::WebContents*>& web_contents() const {
-    return web_contents_;
-  }
-
-  void WaitForAllTabsToStartLoading() {
-    message_loop_runner_ = new content::MessageLoopRunner;
-    message_loop_runner_->Run();
-  }
-
  protected:
   static const size_t kExpectedNumTabs;
   static const char* const kUrls[];
 
  private:
-  content::NotificationRegistrar registrar_;
-  // Ordered by load start order.
-  std::vector<content::WebContents*> web_contents_;
-  scoped_refptr<content::MessageLoopRunner> message_loop_runner_;
-  size_t num_tabs_;
   testing::ScopedAlwaysLoadSessionRestoreTestPolicy test_policy_;
 };
 
@@ -502,12 +463,9 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreTest,
   // The middle tab only should have visible disposition.
   for (int i = 0; i < tab_strip_model->count(); ++i) {
     content::WebContents* contents = tab_strip_model->GetWebContentsAt(i);
-    std::string document_visibility_state;
-    const char kGetStateJS[] =
-        "window.domAutomationController.send("
-        "window.document.visibilityState);";
-    EXPECT_TRUE(content::ExecuteScriptAndExtractString(
-        contents, kGetStateJS, &document_visibility_state));
+    const char kGetStateJS[] = "window.document.visibilityState;";
+    std::string document_visibility_state =
+        content::EvalJs(contents, kGetStateJS).ExtractString();
     if (i == 1) {
       EXPECT_EQ("visible", document_visibility_state);
     } else {
@@ -517,11 +475,6 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreTest,
 }
 
 IN_PROC_BROWSER_TEST_F(SessionRestoreTest, RestoredTabsHaveCorrectInitialSize) {
-  // TODO(crbug.com/1240482): the test expectations fail if the window gets CSD
-  // and becomes smaller because of that.  Investigate this and remove the line
-  // below if possible.
-  ui::ScopedDisableClientSideDecorationsForTest scoped_disabled_csd;
-
   // Create tabs.
   GURL test_page(ui_test_utils::GetTestUrl(
       base::FilePath(),
@@ -543,18 +496,10 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreTest, RestoredTabsHaveCorrectInitialSize) {
   const gfx::Size contents_size = restored->window()->GetContentsSize();
   for (int i = 0; i < tab_strip_model->count(); ++i) {
     content::WebContents* contents = tab_strip_model->GetWebContentsAt(i);
-    int width = 0;
-    const char kGetWidthJS[] =
-        "window.domAutomationController.send("
-        "window.innerWidth);";
-    EXPECT_TRUE(
-        content::ExecuteScriptAndExtractInt(contents, kGetWidthJS, &width));
-    int height = 0;
-    const char kGetHeigthJS[] =
-        "window.domAutomationController.send("
-        "window.innerHeight);";
-    EXPECT_TRUE(
-        content::ExecuteScriptAndExtractInt(contents, kGetHeigthJS, &height));
+    const char kGetWidthJS[] = "window.innerWidth;";
+    int width = content::EvalJs(contents, kGetWidthJS).ExtractInt();
+    const char kGetHeigthJS[] = "window.innerHeight;";
+    int height = content::EvalJs(contents, kGetHeigthJS).ExtractInt();
     const gfx::Size tab_size(width, height);
     EXPECT_EQ(contents_size, tab_size);
   }
@@ -694,6 +639,8 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreTest,
   // there is no guarantee that the SessionID for the tab has remained the same.
   base::Time timestamp;
   int http_status_code = 0;
+  ui_test_utils::BrowserChangeObserver browser_change_observer(
+      nullptr, ui_test_utils::BrowserChangeObserver::ChangeType::kAdded);
   for (const auto& tab_ptr : window->tabs) {
     const sessions::TabRestoreService::Tab& tab = *tab_ptr;
     // If this tab held url2, then restore this single tab.
@@ -721,10 +668,11 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreTest,
       service->entries().front().get());
   EXPECT_EQ(2U, window->tabs.size());
 
+  Browser* restored_browser = browser_change_observer.Wait();
   // Make sure that the restored tab was restored with the correct
   // timestamp and status code.
   content::WebContents* contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
+      restored_browser->tab_strip_model()->GetActiveWebContents();
   ASSERT_TRUE(contents);
   content::NavigationEntry* entry =
       contents->GetController().GetLastCommittedEntry();
@@ -2136,7 +2084,16 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreTest, SessionStorageAfterTabReplace) {
   EXPECT_EQ(1, new_browser->tab_strip_model()->count());
 }
 
-IN_PROC_BROWSER_TEST_F(SessionRestoreTest, TabWithDownloadDoesNotGetRestored) {
+// Failing on Mac. See https://crbug.com/1484860
+#if BUILDFLAG(IS_MAC)
+#define MAYBE_TabWithDownloadDoesNotGetRestored \
+  DISABLED_TabWithDownloadDoesNotGetRestored
+#else
+#define MAYBE_TabWithDownloadDoesNotGetRestored \
+  TabWithDownloadDoesNotGetRestored
+#endif
+IN_PROC_BROWSER_TEST_F(SessionRestoreTest,
+                       MAYBE_TabWithDownloadDoesNotGetRestored) {
   ASSERT_TRUE(embedded_test_server()->Start());
   ASSERT_TRUE(browser()->is_type_normal());
 
@@ -2179,7 +2136,7 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreTest, TabWithDownloadDoesNotGetRestored) {
     ui_test_utils::NavigateToURLWithDisposition(
         new_browser, second_download_url,
         WindowOpenDisposition::NEW_FOREGROUND_TAB,
-        ui_test_utils::BROWSER_TEST_NONE);
+        ui_test_utils::BROWSER_TEST_NO_WAIT);
     ASSERT_EQ(2, new_browser->tab_strip_model()->count());
 
     observer.WaitForFinished();
@@ -2332,6 +2289,68 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreTest, RestoreAllBrowsers) {
 }
 #endif  // !BUILDFLAG(IS_CHROMEOS_ASH)
 
+// Tracks the load order of tabs in a new browser.
+class LoadOrderObserver : public BrowserListObserver,
+                          public TabStripModelObserver,
+                          public WebContentsCollection::Observer {
+ public:
+  explicit LoadOrderObserver(int expected_tabs)
+      : expected_tabs_(expected_tabs) {
+    BrowserList::AddObserver(this);
+  }
+
+  ~LoadOrderObserver() override {
+    browser_->tab_strip_model()->RemoveObserver(this);
+    BrowserList::RemoveObserver(this);
+  }
+
+  void WaitForAllTabsToStartLoading() { run_loop_.Run(); }
+
+  const std::vector<content::WebContents*>& web_contents() const {
+    return web_contents_;
+  }
+
+  // BrowserListObserver:
+  void OnBrowserAdded(Browser* browser) override {
+    ASSERT_EQ(browser_, nullptr);
+    browser_ = browser;
+    EXPECT_TRUE(browser_->tab_strip_model()->empty());
+    browser_->tab_strip_model()->AddObserver(this);
+  }
+
+  // TabStripModelObserver:
+  void OnTabStripModelChanged(
+      TabStripModel* tab_strip_model,
+      const TabStripModelChange& change,
+      const TabStripSelectionChange& selection) override {
+    if (change.type() != TabStripModelChange::kInserted) {
+      return;
+    }
+
+    for (auto& contents : change.GetInsert()->contents) {
+      content::WebContents* new_contents = contents.contents;
+      EXPECT_FALSE(new_contents->IsLoading());
+      web_contents_collection_.StartObserving(contents.contents);
+    }
+  }
+
+  // WebContentsCollection::Observer:
+  void DidStartLoading(content::WebContents* web_contents) override {
+    web_contents_.push_back(web_contents);
+    if (web_contents_.size() == expected_tabs_) {
+      run_loop_.Quit();
+    }
+  }
+
+ private:
+  const size_t expected_tabs_;
+  raw_ptr<Browser> browser_ = nullptr;
+  base::RunLoop run_loop_;
+  WebContentsCollection web_contents_collection_{this};
+  // Ordered by load start order.
+  std::vector<content::WebContents*> web_contents_;
+};
+
 // PRE_CorrectLoadingOrder is flaky on ChromeOS MSAN and Mac.
 // See http://crbug.com/493167.
 #if (BUILDFLAG(IS_CHROMEOS_ASH) && defined(MEMORY_SANITIZER)) || \
@@ -2371,26 +2390,28 @@ IN_PROC_BROWSER_TEST_F(SmartSessionRestoreTest, MAYBE_PRE_CorrectLoadingOrder) {
       profile, ProfileKeepAliveOrigin::kBrowserWindow);
   CloseBrowserSynchronously(browser());
 
-  StartObserving(kExpectedNumTabs);
+  LoadOrderObserver load_order_observer(kExpectedNumTabs);
 
   // Create a new window, which should trigger session restore.
   chrome::NewEmptyWindow(profile);
   Browser* new_browser = ui_test_utils::WaitForBrowserToOpen();
   ASSERT_TRUE(new_browser);
-  WaitForAllTabsToStartLoading();
+  load_order_observer.WaitForAllTabsToStartLoading();
   keep_alive.reset();
   profile_keep_alive.reset();
 
-  ASSERT_EQ(kExpectedNumTabs, web_contents().size());
+  const auto& web_contents = load_order_observer.web_contents();
+
+  ASSERT_EQ(kExpectedNumTabs, web_contents.size());
   // Test that we have observed the tabs being loaded in the inverse order of
   // their activation (MRU). Also validate that their last active time is in the
   // correct order.
-  for (size_t i = 0; i < web_contents().size(); i++) {
+  for (size_t i = 0; i < web_contents.size(); i++) {
     GURL expected_url = GURL(kUrls[activation_order[kExpectedNumTabs - i - 1]]);
-    ASSERT_EQ(expected_url, web_contents()[i]->GetLastCommittedURL());
+    ASSERT_EQ(expected_url, web_contents[i]->GetLastCommittedURL());
     if (i > 0) {
-      ASSERT_GT(web_contents()[i - 1]->GetLastActiveTime(),
-                web_contents()[i]->GetLastActiveTime());
+      ASSERT_GT(web_contents[i - 1]->GetLastActiveTime(),
+                web_contents[i]->GetLastActiveTime());
     }
   }
 
@@ -2414,17 +2435,19 @@ IN_PROC_BROWSER_TEST_F(SmartSessionRestoreTest, MAYBE_CorrectLoadingOrder) {
   CloseBrowserSynchronously(browser());
   // We have an extra tab that is added when the test starts, which gets ignored
   // later when we test for proper order.
-  StartObserving(kExpectedNumTabs + 1);
+  LoadOrderObserver load_order_observer(kExpectedNumTabs + 1);
 
   // Create a new window, which should trigger session restore.
   chrome::NewEmptyWindow(profile);
   Browser* new_browser = ui_test_utils::WaitForBrowserToOpen();
   ASSERT_TRUE(new_browser);
-  WaitForAllTabsToStartLoading();
+  load_order_observer.WaitForAllTabsToStartLoading();
   keep_alive.reset();
   profile_keep_alive.reset();
 
-  ASSERT_EQ(kExpectedNumTabs + 1, web_contents().size());
+  const auto& web_contents = load_order_observer.web_contents();
+
+  ASSERT_EQ(kExpectedNumTabs + 1, web_contents.size());
 
   // Test that we have observed the tabs being loaded in the inverse order of
   // their activation (MRU). Also validate that their last active time is in the
@@ -2432,12 +2455,12 @@ IN_PROC_BROWSER_TEST_F(SmartSessionRestoreTest, MAYBE_CorrectLoadingOrder) {
   //
   // Note that we ignore the first tab as it's an empty one that is added
   // automatically at the start of the test.
-  for (size_t i = 1; i < web_contents().size(); i++) {
+  for (size_t i = 1; i < web_contents.size(); i++) {
     GURL expected_url = GURL(kUrls[activation_order[kExpectedNumTabs - i]]);
-    ASSERT_EQ(expected_url, web_contents()[i]->GetLastCommittedURL());
+    ASSERT_EQ(expected_url, web_contents[i]->GetLastCommittedURL());
     if (i > 0) {
-      ASSERT_GT(web_contents()[i - 1]->GetLastActiveTime(),
-                web_contents()[i]->GetLastActiveTime());
+      ASSERT_GT(web_contents[i - 1]->GetLastActiveTime(),
+                web_contents[i]->GetLastActiveTime());
     }
   }
 }
@@ -2819,7 +2842,7 @@ IN_PROC_BROWSER_TEST_F(MultiOriginSessionRestoreTest,
         content::ExecJs(old_tab, "window.open('about:blank', 'subframe');"));
     nav_observer.Wait();
   }
-  EXPECT_EQ(subframe, ChildFrameAt(old_tab_main_frame.get(), 0));
+  subframe = ChildFrameAt(old_tab_main_frame.get(), 0);
   EXPECT_EQ(GURL(url::kAboutBlankURL), subframe->GetLastCommittedURL());
   EXPECT_EQ(a_origin, subframe->GetLastCommittedOrigin());
 
@@ -3358,7 +3381,7 @@ class AppSessionRestoreTest : public SessionRestoreTest {
   }
 
   web_app::AppId InstallPWA(Profile* profile, const GURL& start_url) {
-    auto web_app_info = std::make_unique<WebAppInstallInfo>();
+    auto web_app_info = std::make_unique<web_app::WebAppInstallInfo>();
     web_app_info->start_url = start_url;
     web_app_info->scope = start_url.GetWithoutFilename();
     web_app_info->user_display_mode =
@@ -3371,7 +3394,7 @@ class AppSessionRestoreTest : public SessionRestoreTest {
     blink::Manifest::TabStrip tab_strip;
     tab_strip.home_tab = blink::Manifest::HomeTabParams();
 
-    auto web_app_info = std::make_unique<WebAppInstallInfo>();
+    auto web_app_info = std::make_unique<web_app::WebAppInstallInfo>();
     web_app_info->start_url = start_url;
     web_app_info->scope = start_url.GetWithoutFilename();
     web_app_info->user_display_mode =
@@ -4009,7 +4032,7 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreNavigationApiTest,
       "meta.name = 'referrer';"
       "meta.content = 'no-referrer';"
       "document.head.appendChild(meta)";
-  EXPECT_TRUE(content::ExecuteScript(contents, kNoReferrerJS));
+  EXPECT_TRUE(content::ExecJs(contents, kNoReferrerJS));
 
   // Navigate the tab to url 3.
   ui_test_utils::NavigateToURLWithDisposition(
@@ -4020,20 +4043,10 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreNavigationApiTest,
 
   // Ensure that url2 is censored in navigation due to the no-referrer policy,
   // but url1 isn't.
-  bool url1_is_censored = false;
-  bool url2_is_censored = false;
-  const char kCheckEntry1Js[] =
-      "window.domAutomationController.send("
-      "navigation.entries()[0].url == null);";
-  const char kCheckEntry2Js[] =
-      "window.domAutomationController.send("
-      "navigation.entries()[1].url == null);";
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(contents, kCheckEntry1Js,
-                                                   &url1_is_censored));
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(contents, kCheckEntry2Js,
-                                                   &url2_is_censored));
-  EXPECT_FALSE(url1_is_censored);
-  EXPECT_TRUE(url2_is_censored);
+  const char kCheckEntry1Js[] = "navigation.entries()[0].url == null;";
+  const char kCheckEntry2Js[] = "navigation.entries()[1].url == null;";
+  EXPECT_EQ(false, content::EvalJs(contents, kCheckEntry1Js));
+  EXPECT_EQ(true, content::EvalJs(contents, kCheckEntry2Js));
 
   // Simulate an exit by shutting down the session service. If we don't do this
   // the first window close is treated as though the user closed the window
@@ -4048,19 +4061,12 @@ IN_PROC_BROWSER_TEST_F(SessionRestoreNavigationApiTest,
   content::WebContents* restored_contents =
       active_browser_list_->get(0)->tab_strip_model()->GetWebContentsAt(0);
   EXPECT_EQ(GetUrl3(), restored_contents->GetLastCommittedURL());
-  int entries_length = 0;
-  const char kCheckEntriesLength[] =
-      "window.domAutomationController.send("
-      "navigation.entries().length);";
-  EXPECT_TRUE(content::ExecuteScriptAndExtractInt(
-      restored_contents, kCheckEntriesLength, &entries_length));
+  const char kCheckEntriesLength[] = "navigation.entries().length;";
+  int entries_length =
+      content::EvalJs(restored_contents, kCheckEntriesLength).ExtractInt();
   EXPECT_EQ(entries_length, 3);
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      restored_contents, kCheckEntry1Js, &url1_is_censored));
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      restored_contents, kCheckEntry2Js, &url2_is_censored));
-  EXPECT_FALSE(url1_is_censored);
-  EXPECT_TRUE(url2_is_censored);
+  EXPECT_EQ(false, content::EvalJs(restored_contents, kCheckEntry1Js));
+  EXPECT_EQ(true, content::EvalJs(restored_contents, kCheckEntry2Js));
 }
 
 class TabbedAppSessionRestoreTest : public AppSessionRestoreTest {
@@ -4069,7 +4075,7 @@ class TabbedAppSessionRestoreTest : public AppSessionRestoreTest {
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_{
-      features::kDesktopPWAsTabStrip};
+      blink::features::kDesktopPWAsTabStrip};
 };
 
 IN_PROC_BROWSER_TEST_F(TabbedAppSessionRestoreTest, RestorePinnedAppTab) {

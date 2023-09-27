@@ -391,8 +391,10 @@ void SpellChecker::RemoveSpellingAndGrammarMarkers(const HTMLElement& element,
                                                    ElementsType elements_type) {
   // TODO(editing-dev): The use of updateStyleAndLayoutIgnorePendingStylesheets
   // needs to be audited.  See http://crbug.com/590369 for more details.
-  if (elements_type == ElementsType::kOnlyNonEditable)
-    GetFrame().GetDocument()->UpdateStyleAndLayoutTreeForNode(&element);
+  if (elements_type == ElementsType::kOnlyNonEditable) {
+    GetFrame().GetDocument()->UpdateStyleAndLayoutTreeForNode(
+        &element, DocumentUpdateReason::kSpellCheck);
+  }
 
   for (Node& node : NodeTraversal::InclusiveDescendantsOf(element)) {
     auto* text_node = DynamicTo<Text>(node);
@@ -534,7 +536,7 @@ static Node* FindFirstMarkable(Node* node) {
       return nullptr;
     if (layout_object->IsText())
       return node;
-    if (layout_object->IsTextControlIncludingNG()) {
+    if (layout_object->IsTextControl()) {
       node = To<TextControlElement>(node)
                  ->VisiblePositionForIndex(1)
                  .DeepEquivalent()

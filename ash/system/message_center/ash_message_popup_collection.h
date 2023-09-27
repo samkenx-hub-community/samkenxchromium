@@ -6,13 +6,17 @@
 #define ASH_SYSTEM_MESSAGE_CENTER_ASH_MESSAGE_POPUP_COLLECTION_H_
 
 #include <stdint.h>
+#include <memory>
 
 #include "ash/ash_export.h"
 #include "ash/public/cpp/shelf_types.h"
 #include "ash/public/cpp/tablet_mode_observer.h"
 #include "ash/shelf/shelf_observer.h"
 #include "ash/shell_observer.h"
+#include "ash/system/tray/system_tray_observer.h"
+#include "ash/system/tray/tray_event_filter.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/compositor/throughput_tracker.h"
 #include "ui/display/display_observer.h"
 #include "ui/gfx/geometry/rect.h"
@@ -24,20 +28,26 @@ namespace display {
 class Screen;
 }
 
+namespace views {
+class Widget;
+}  // namespace views
+
 namespace ash {
 
 class AshMessagePopupCollectionTest;
 class Shelf;
+class TrayBubbleView;
+class TrayEventFilterTest;
 
 // The MessagePopupCollection subclass for Ash. It needs to handle alignment of
 // the shelf and its autohide state.
 class ASH_EXPORT AshMessagePopupCollection
-    : public message_center::MessagePopupCollection,
+    : public display::DisplayObserver,
+      public message_center::MessagePopupCollection,
+      public message_center::MessageView::Observer,
       public ShelfObserver,
       public TabletModeObserver,
-      public display::DisplayObserver,
-      public views::WidgetObserver,
-      public message_center::MessageView::Observer {
+      public views::WidgetObserver {
  public:
   // The name that will set for the message popup widget in
   // ConfigureWidgetInitParamsForContainer(), and that can be used to identify a
@@ -55,12 +65,8 @@ class ASH_EXPORT AshMessagePopupCollection
   // Start observing the system.
   void StartObserving(display::Screen* screen, const display::Display& display);
 
-  // Sets the current height of the system tray bubble (or legacy notification
-  // bubble) so that notification toasts can avoid it.
-  void SetTrayBubbleHeight(int height);
-
   // message_center::MessagePopupCollection:
-  int GetToastOriginX(const gfx::Rect& toast_bounds) const override;
+  int GetPopupOriginX(const gfx::Rect& popup_bounds) const override;
   int GetBaseline() const override;
   gfx::Rect GetWorkArea() const override;
   bool IsTopDown() const override;
@@ -74,26 +80,76 @@ class ASH_EXPORT AshMessagePopupCollection
       const message_center::Notification& notification) const override;
   void NotifyPopupAdded(message_center::MessagePopupView* popup) override;
   void NotifyPopupClosed(message_center::MessagePopupView* popup) override;
+  void NotifyPopupCollectionHeightChanged() override;
   void AnimationStarted() override;
   void AnimationFinished() override;
   message_center::MessagePopupView* CreatePopup(
       const message_center::Notification& notification) override;
+  void ClosePopupItem(const PopupItem& item) override;
 
   // TabletModeObserver:
   void OnTabletModeStarted() override;
   void OnTabletModeEnded() override;
 
+  // Returns true if `widget` is a popup widget belongs to this popup
+  // collection.
+  bool IsWidgetAPopupNotification(views::Widget* widget);
+
   // Sets `animation_idle_closure_`.
   void SetAnimationIdleClosureForTest(base::OnceClosure closure);
-
-  // Returns the current tray bubble height or 0 if there is no bubble.
-  int tray_bubble_height_for_test() const { return tray_bubble_height_; }
 
   int popups_animating_for_test() const { return popups_animating_; }
 
  private:
   friend class AshMessagePopupCollectionTest;
   friend class NotificationGroupingControllerTest;
+  friend class TrayEventFilterTest;
+
+  // Handles the collision of popup notifications with corner anchored shelf pod
+  // bubbles, sliders and the extended hotseat by updating the popup baseline.
+  class NotifierCollisionHandler : public SystemTrayObserver {
+   public:
+    NotifierCollisionHandler(AshMessagePopupCollection* popup_collection);
+
+    NotifierCollisionHandler(const NotifierCollisionHandler&) = delete;
+    NotifierCollisionHandler& operator=(const NotifierCollisionHandler&) =
+        delete;
+
+    ~NotifierCollisionHandler() override;
+
+    // Triggered whenever the height of the popup collection changes.
+    void OnPopupCollectionHeightChanged();
+
+    // Calculates the offset that is applied to the popup collection's baseline.
+    // It considers the extended hotseat, corner anchored shelf pod bubbles and
+    // slider bubbles.
+    int CalculateBaselineOffset() const;
+
+    // SystemTrayObserver:
+    void OnFocusLeavingSystemTray(bool reverse) override {}
+    void OnStatusAreaAnchoredBubbleVisibilityChanged(
+        TrayBubbleView* tray_bubble,
+        bool visible) override;
+    void OnTrayBubbleBoundsChanged(TrayBubbleView* tray_bubble) override;
+
+   private:
+    // Handles bubble visibility or bounds changes.
+    void HandleBubbleVisibilityOrBoundsChanged();
+
+    // Calculates the baseline offset applied when the hotseat is extended in
+    // tablet mode and a corner anchored shelf pod bubble is not open.
+    int CalculateExtendedHotseatOffset() const;
+
+    // Calculates the baseline offset applied when a slider is visible and a
+    // corner anchored shelf pod bubble is not open.
+    int CalculateSliderOffset() const;
+
+    // Records the number of popups whose baseline was shifted up every time
+    // every time a baseline offset is applied.
+    void RecordBaselineShiftedUp(int popup_count);
+
+    raw_ptr<AshMessagePopupCollection> const popup_collection_;
+  };
 
   // message_center::MessageView::Observer:
   void OnSlideOut(const std::string& notification_id) override;
@@ -101,13 +157,13 @@ class ASH_EXPORT AshMessagePopupCollection
   void OnSettingsButtonPressed(const std::string& notification_id) override;
   void OnSnoozeButtonPressed(const std::string& notification_id) override;
 
-  // Get the current alignment of the shelf.
+  // Gets the current alignment of the shelf.
   ShelfAlignment GetAlignment() const;
 
   // Utility function to get the display which should be care about.
   display::Display GetCurrentDisplay() const;
 
-  // Compute the new work area.
+  // Computes the new work area.
   void UpdateWorkArea();
 
   // ShelfObserver:
@@ -123,12 +179,13 @@ class ASH_EXPORT AshMessagePopupCollection
   void OnWidgetClosing(views::Widget* widget) override;
   void OnWidgetActivationChanged(views::Widget* widget, bool active) override;
 
+  std::unique_ptr<NotifierCollisionHandler> notifier_collision_handler_;
+
   absl::optional<display::ScopedDisplayObserver> display_observer_;
 
-  display::Screen* screen_;
+  raw_ptr<display::Screen, ExperimentalAsh> screen_;
   gfx::Rect work_area_;
-  Shelf* shelf_;
-  int tray_bubble_height_;
+  raw_ptr<Shelf, ExperimentalAsh> shelf_;
 
   std::set<views::Widget*> tracked_widgets_;
 
@@ -146,7 +203,8 @@ class ASH_EXPORT AshMessagePopupCollection
 
   // Keeps track the last pop up added, used by throughout tracker. We only
   // record smoothness when this variable is in scope.
-  message_center::MessagePopupView* last_pop_up_added_ = nullptr;
+  raw_ptr<message_center::MessagePopupView, ExperimentalAsh>
+      last_pop_up_added_ = nullptr;
 };
 
 }  // namespace ash

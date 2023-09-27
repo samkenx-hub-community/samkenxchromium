@@ -4,7 +4,7 @@
 
 #include "chrome/browser/enterprise/connectors/device_trust/device_trust_connector_service_factory.h"
 
-#include "base/memory/singleton.h"
+#include "base/no_destructor.h"
 #include "build/build_config.h"
 #include "chrome/browser/enterprise/connectors/device_trust/device_trust_connector_service.h"
 #include "chrome/browser/enterprise/connectors/device_trust/device_trust_features.h"
@@ -13,7 +13,7 @@
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/enterprise/connectors/device_trust/browser/browser_device_trust_connector_service.h"
+#include "chrome/browser/enterprise/connectors/device_trust/browser/signing_key_policy_observer.h"
 #include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "components/enterprise/browser/controller/chrome_browser_cloud_management_controller.h"
 #include "components/enterprise/browser/device_trust/device_trust_key_manager.h"
@@ -29,7 +29,8 @@ namespace enterprise_connectors {
 // static
 DeviceTrustConnectorServiceFactory*
 DeviceTrustConnectorServiceFactory::GetInstance() {
-  return base::Singleton<DeviceTrustConnectorServiceFactory>::get();
+  static base::NoDestructor<DeviceTrustConnectorServiceFactory> instance;
+  return instance.get();
 }
 
 // static
@@ -55,12 +56,13 @@ bool DeviceTrustConnectorServiceFactory::ServiceIsNULLWhileTesting() const {
 DeviceTrustConnectorServiceFactory::DeviceTrustConnectorServiceFactory()
     : ProfileKeyedServiceFactory(
           "DeviceTrustConnectorService",
-          ProfileSelections::BuildForRegularAndIncognitoNonExperimental()) {}
+          ProfileSelections::BuildForRegularAndIncognito()) {}
 
 DeviceTrustConnectorServiceFactory::~DeviceTrustConnectorServiceFactory() =
     default;
 
-KeyedService* DeviceTrustConnectorServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+DeviceTrustConnectorServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
   auto* profile = Profile::FromBrowserContext(context);
   // Disallow service for Incognito except for the sign-in profile of ChromeOS
@@ -75,23 +77,18 @@ KeyedService* DeviceTrustConnectorServiceFactory::BuildServiceInstanceFor(
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
   }
 
-  DeviceTrustConnectorService* service = nullptr;
+  std::unique_ptr<DeviceTrustConnectorService> service =
+      std::make_unique<DeviceTrustConnectorService>(profile->GetPrefs());
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   if (IsDeviceTrustConnectorFeatureEnabled()) {
     auto* key_manager = g_browser_process->browser_policy_connector()
                             ->chrome_browser_cloud_management_controller()
                             ->GetDeviceTrustKeyManager();
-    service = new BrowserDeviceTrustConnectorService(key_manager,
-                                                     profile->GetPrefs());
+    service->AddObserver(
+        std::make_unique<SigningKeyPolicyObserver>(key_manager));
   }
-#else
-  service = new DeviceTrustConnectorService(profile->GetPrefs());
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
-
-  if (service) {
-    service->Initialize();
-  }
 
   return service;
 }

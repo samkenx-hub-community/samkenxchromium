@@ -107,14 +107,26 @@ export class PeerConnectionUpdateTable {
         update.type === 'createAnswerOnSuccess') {
       this.setLastOfferAnswer_(tableElement, update);
     } else if (update.type === 'setLocalDescription') {
+      const lastOfferAnswer = this.getLastOfferAnswer_(tableElement);
       if (update.value.startsWith('type: rollback')) {
         this.setLastOfferAnswer_(tableElement, {value: undefined})
-      } else if (update.value !== this.getLastOfferAnswer_(tableElement)) {
+      } else if (lastOfferAnswer && update.value !== lastOfferAnswer) {
         type += ' (munged)';
       }
     } else if (update.type === 'setConfiguration') {
       // Update the configuration that is displayed at the top.
       peerConnectionElement.firstChild.children[2].textContent = update.value;
+    } else if (['transceiverAdded',
+        'transceiverModified'].includes(update.type)) {
+      // Show the transceiver index.
+      const indexLine = update.value.split('\n', 3)[2];
+      if (indexLine.startsWith('getTransceivers()[')) {
+        type += ' ' + indexLine.substring(17, indexLine.length - 2);
+      }
+      const kindLine = update.value.split('\n', 5)[4].trim();
+      if (kindLine.startsWith('kind:')) {
+        type += ', ' + kindLine.substring(6, kindLine.length - 2);
+      }
     } else if (['iceconnectionstatechange', 'connectionstatechange',
         'signalingstatechange'].includes(update.type)) {
       const fieldName = {

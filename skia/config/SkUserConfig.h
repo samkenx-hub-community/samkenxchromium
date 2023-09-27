@@ -197,14 +197,20 @@ SK_API void SkDebugf_FileLine(const char* file,
 
 #endif
 
+#if defined(__has_attribute)
+#if __has_attribute(trivial_abi)
 #define SK_TRIVIAL_ABI [[clang::trivial_abi]]
+#else
+#define SK_TRIVIAL_ABI
+#endif
+#else
+#define SK_TRIVIAL_ABI
+#endif
 
 // These flags are no longer defined in Skia, but we have them (temporarily)
 // until we update our call-sites (typically these are for API changes).
 //
 // Remove these as we update our sites.
-
-#define SK_LEGACY_LAYER_BOUNDS_EXPANSION  // skbug.com/12083, skbug.com/12303
 
 // Workaround for poor anisotropic mipmap quality,
 // pending Skia ripmap support.
@@ -214,20 +220,18 @@ SK_API void SkDebugf_FileLine(const char* file,
 // Temporarily insulate Chrome pixel tests from Skia LOD bias change on GPU.
 #define SK_USE_LEGACY_MIPMAP_LOD_BIAS
 
-// Temporarily insulate Chrome pixel tests from Skia luminance changes in RP.
-#define SK_USE_LEGACY_RP_LUMINANCE
-
 // Max. verb count for paths rendered by the edge-AA tessellating path renderer.
 #define GR_AA_TESSELLATOR_MAX_VERB_COUNT 100
 
-#define SK_SUPPORT_LEGACY_AAA_CHOICE
+#define SK_FORCE_AAA
 
 #define SK_SUPPORT_LEGACY_DRAWLOOPER
 
 #define SK_USE_LEGACY_MIPMAP_BUILDER
 
-// Use the original std::vector based serializer
-#define SK_SUPPORT_LEGACY_STRIKE_SERIALIZATION
+#define SK_SUPPORT_LEGACY_CONIC_CHOP
+
+#define SK_ENABLE_SKSL_IN_RASTER_PIPELINE
 
 ///////////////////////// Imported from BUILD.gn and skia_common.gypi
 
@@ -238,6 +242,9 @@ SK_API void SkDebugf_FileLine(const char* file,
 
 /* Restrict formats for Skia font matching to SFNT type fonts. */
 #define SK_FONT_CONFIG_INTERFACE_ONLY_ALLOW_SFNT_FONTS
+
+// Temporarily enable new strike cache pinning logic, for staging.
+#define SK_STRIKE_CACHE_DOESNT_AUTO_CHECK_PINNERS
 
 #define SK_IGNORE_BLURRED_RRECT_OPT
 #define SK_USE_DISCARDABLE_SCALEDIMAGECACHE

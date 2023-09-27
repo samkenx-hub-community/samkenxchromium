@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/base64.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/span.h"
 #include "base/functional/bind.h"
@@ -26,6 +27,7 @@
 #include "content/browser/interest_group/interest_group_storage.h"
 #include "content/browser/interest_group/interest_group_update.h"
 #include "content/browser/interest_group/storage_interest_group.h"
+#include "content/services/auction_worklet/public/cpp/auction_downloader.h"
 #include "net/base/isolation_info.h"
 #include "net/base/net_errors.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
@@ -34,9 +36,11 @@
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
 #include "services/network/public/mojom/client_security_state.mojom.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/interest_group/ad_display_size_utils.h"
 #include "third_party/blink/public/common/interest_group/interest_group.h"
 #include "third_party/blink/public/mojom/interest_group/interest_group_types.mojom.h"
+#include "third_party/boringssl/src/include/openssl/curve25519.h"
 #include "url/gurl.h"
 #include "url/origin.h"
 
@@ -44,9 +48,9 @@ namespace content {
 
 namespace {
 
-// 10 kb update size limit. We are potentially fetching many interest group
+// 1 MB update size limit. We are potentially fetching many interest group
 // updates, so don't let this get too large.
-constexpr size_t kMaxUpdateSize = 10 * 1024;
+constexpr size_t kMaxUpdateSize = 1 * 1024 * 1024;
 
 // The maximum amount of time that the update process can run before it gets
 // cancelled for taking too long.
@@ -259,13 +263,25 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
 
 // Helper for TryToCopyAds() and TryToCopyAdComponents().
 [[nodiscard]] absl::optional<std::vector<blink::InterestGroup::Ad>> ExtractAds(
-    const base::Value::List& ads_list) {
+    const base::Value::List& ads_list,
+    bool for_components) {
   std::vector<blink::InterestGroup::Ad> ads;
   for (const base::Value& ads_value : ads_list) {
     const base::Value::Dict* ads_dict = ads_value.GetIfDict();
     if (!ads_dict)
       return absl::nullopt;
-    const std::string* maybe_render_url = ads_dict->FindString("renderUrl");
+    const std::string* maybe_render_url = ads_dict->FindString("renderURL");
+    const std::string* maybe_render_url_deprecated =
+        ads_dict->FindString("renderUrl");
+    if (maybe_render_url_deprecated) {
+      if (maybe_render_url) {
+        if (*maybe_render_url != *maybe_render_url_deprecated) {
+          return absl::nullopt;
+        }
+      } else {
+        maybe_render_url = maybe_render_url_deprecated;
+      }
+    }
     if (!maybe_render_url)
       return absl::nullopt;
     blink::InterestGroup::Ad ad;
@@ -273,6 +289,30 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
     const std::string* maybe_size_group = ads_dict->FindString("sizeGroup");
     if (maybe_size_group) {
       ad.size_group = *maybe_size_group;
+    }
+    if (!for_components) {
+      const std::string* maybe_buyer_reporting_id =
+          ads_dict->FindString("buyerReportingId");
+      if (maybe_buyer_reporting_id) {
+        ad.buyer_reporting_id = *maybe_buyer_reporting_id;
+      }
+      const std::string* maybe_buyer_and_seller_reporting_id =
+          ads_dict->FindString("buyerAndSellerReportingId");
+      if (maybe_buyer_and_seller_reporting_id) {
+        ad.buyer_and_seller_reporting_id = *maybe_buyer_and_seller_reporting_id;
+      }
+      const base::Value::List* maybe_allowed_reporting_origins =
+          ads_dict->FindList("allowedReportingOrigins");
+      if (maybe_allowed_reporting_origins) {
+        ad.allowed_reporting_origins.emplace();
+        for (const auto& maybe_origin : *maybe_allowed_reporting_origins) {
+          const std::string* origin_string = maybe_origin.GetIfString();
+          if (origin_string) {
+            ad.allowed_reporting_origins->emplace_back(
+                url::Origin::Create(GURL(*origin_string)));
+          }
+        }
+      }
     }
     const base::Value* maybe_metadata = ads_dict->Find("metadata");
     if (maybe_metadata) {
@@ -284,6 +324,10 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
         return absl::nullopt;
       }
       ad.metadata = std::move(metadata);
+    }
+    const std::string* maybe_ad_render_id = ads_dict->FindString("adRenderId");
+    if (maybe_ad_render_id) {
+      ad.ad_render_id = *maybe_ad_render_id;
     }
     ads.push_back(std::move(ad));
   }
@@ -298,7 +342,7 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
   if (!maybe_ads)
     return true;
   absl::optional<std::vector<blink::InterestGroup::Ad>> maybe_extracted_ads =
-      ExtractAds(*maybe_ads);
+      ExtractAds(*maybe_ads, /*for_components=*/false);
   if (!maybe_extracted_ads)
     return false;
   interest_group_update.ads = std::move(*maybe_extracted_ads);
@@ -314,7 +358,7 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
   if (!maybe_ads)
     return true;
   absl::optional<std::vector<blink::InterestGroup::Ad>> maybe_extracted_ads =
-      ExtractAds(*maybe_ads);
+      ExtractAds(*maybe_ads, /*for_components=*/true);
   if (!maybe_extracted_ads)
     return false;
   interest_group_update.ad_components = std::move(*maybe_extracted_ads);
@@ -377,6 +421,58 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
   return true;
 }
 
+[[nodiscard]] bool TryToCopyAuctionServerRequestFlags(
+    const base::Value::Dict& dict,
+    InterestGroupUpdate& interest_group_update) {
+  const base::Value::List* maybe_flags =
+      dict.FindList("auctionServerRequestFlags");
+  if (!maybe_flags) {
+    return true;
+  }
+  blink::AuctionServerRequestFlags auction_server_request_flags;
+  for (const base::Value& maybe_flag : *maybe_flags) {
+    if (!maybe_flag.is_string()) {
+      return false;
+    }
+    const std::string& flag = maybe_flag.GetString();
+    if (flag == "omit-ads") {
+      auction_server_request_flags.Put(
+          blink::AuctionServerRequestFlagsEnum::kOmitAds);
+    } else if (flag == "include-full-ads") {
+      auction_server_request_flags.Put(
+          blink::AuctionServerRequestFlagsEnum::kIncludeFullAds);
+    }
+  }
+  interest_group_update.auction_server_request_flags =
+      auction_server_request_flags;
+  return true;
+}
+
+[[nodiscard]] bool TryToCopyAdditionalBidKey(
+    const base::Value::Dict& dict,
+    InterestGroupUpdate& interest_group_update) {
+  const std::string* maybe_additional_bid_key =
+      dict.FindString("additionalBidKey");
+  if (!maybe_additional_bid_key) {
+    return true;
+  }
+  std::string decoded_additional_bid_key;
+  if (!base::Base64Decode(*maybe_additional_bid_key,
+                          &decoded_additional_bid_key,
+                          base::Base64DecodePolicy::kForgiving)) {
+    // Failed to base64 decode the additional bid key.
+    return false;
+  }
+  if (decoded_additional_bid_key.size() != ED25519_PUBLIC_KEY_LEN) {
+    return false;
+  }
+  interest_group_update.additional_bid_key.emplace();
+  std::copy(decoded_additional_bid_key.begin(),
+            decoded_additional_bid_key.end(),
+            interest_group_update.additional_bid_key->data());
+  return true;
+}
+
 absl::optional<InterestGroupUpdate> ParseUpdateJson(
     const blink::InterestGroupKey& group_key,
     const data_decoder::DataDecoder::ValueOrError& result) {
@@ -395,8 +491,9 @@ absl::optional<InterestGroupUpdate> ParseUpdateJson(
   const base::Value* maybe_priority_value = dict->Find("priority");
   if (maybe_priority_value) {
     // If the field is specified, it must be an integer or a double.
-    if (!maybe_priority_value->is_int() && !maybe_priority_value->is_double())
+    if (!maybe_priority_value->is_int() && !maybe_priority_value->is_double()) {
       return absl::nullopt;
+    }
     interest_group_update.priority = maybe_priority_value->GetDouble();
   }
   const base::Value* maybe_enable_bidding_signals_prioritization =
@@ -417,20 +514,62 @@ absl::optional<InterestGroupUpdate> ParseUpdateJson(
   if (!TryToCopySellerCapabilities(*dict, interest_group_update)) {
     return absl::nullopt;
   }
-  const std::string* maybe_bidding_url = dict->FindString("biddingLogicUrl");
-  if (maybe_bidding_url)
+  const std::string* maybe_bidding_url = dict->FindString("biddingLogicURL");
+  const std::string* maybe_bidding_url_deprecated =
+      dict->FindString("biddingLogicUrl");
+  if (maybe_bidding_url_deprecated) {
+    if (maybe_bidding_url) {
+      if (*maybe_bidding_url_deprecated != *maybe_bidding_url) {
+        return absl::nullopt;
+      }
+    } else {
+      maybe_bidding_url = maybe_bidding_url_deprecated;
+    }
+  }
+  if (maybe_bidding_url) {
     interest_group_update.bidding_url = GURL(*maybe_bidding_url);
+  }
   const std::string* maybe_bidding_wasm_helper_url =
+      dict->FindString("biddingWasmHelperURL");
+  const std::string* maybe_bidding_wasm_helper_url_deprecated =
       dict->FindString("biddingWasmHelperUrl");
+  if (maybe_bidding_wasm_helper_url_deprecated) {
+    if (maybe_bidding_wasm_helper_url) {
+      if (*maybe_bidding_wasm_helper_url !=
+          *maybe_bidding_wasm_helper_url_deprecated) {
+        return absl::nullopt;
+      }
+    } else {
+      maybe_bidding_wasm_helper_url = maybe_bidding_wasm_helper_url_deprecated;
+    }
+  }
   if (maybe_bidding_wasm_helper_url) {
     interest_group_update.bidding_wasm_helper_url =
         GURL(*maybe_bidding_wasm_helper_url);
   }
-  const std::string* maybe_update_trusted_bidding_signals_url =
+  const std::string* maybe_update_url =
+      dict->FindString("updateURL");  // TODO check if we use this or updateURL
+  if (maybe_update_url) {
+    interest_group_update.daily_update_url = GURL(*maybe_update_url);
+  }
+  const std::string* maybe_trusted_bidding_signals_url =
+      dict->FindString("trustedBiddingSignalsURL");
+  const std::string* maybe_trusted_bidding_signals_url_deprecated =
       dict->FindString("trustedBiddingSignalsUrl");
-  if (maybe_update_trusted_bidding_signals_url) {
+  if (maybe_trusted_bidding_signals_url_deprecated) {
+    if (maybe_trusted_bidding_signals_url) {
+      if (*maybe_trusted_bidding_signals_url !=
+          *maybe_trusted_bidding_signals_url_deprecated) {
+        return absl::nullopt;
+      }
+    } else {
+      maybe_trusted_bidding_signals_url =
+          maybe_trusted_bidding_signals_url_deprecated;
+    }
+  }
+  if (maybe_trusted_bidding_signals_url) {
     interest_group_update.trusted_bidding_signals_url =
-        GURL(*maybe_update_trusted_bidding_signals_url);
+        GURL(*maybe_trusted_bidding_signals_url);
   }
   if (!TryToCopyTrustedBiddingSignalsKeys(*dict, interest_group_update)) {
     return absl::nullopt;
@@ -445,6 +584,12 @@ absl::optional<InterestGroupUpdate> ParseUpdateJson(
     return absl::nullopt;
   }
   if (!TryToCopySizeGroups(*dict, interest_group_update)) {
+    return absl::nullopt;
+  }
+  if (!TryToCopyAuctionServerRequestFlags(*dict, interest_group_update)) {
+    return absl::nullopt;
+  }
+  if (!TryToCopyAdditionalBidKey(*dict, interest_group_update)) {
     return absl::nullopt;
   }
   return interest_group_update;
@@ -464,18 +609,21 @@ InterestGroupUpdateManager::~InterestGroupUpdateManager() = default;
 
 void InterestGroupUpdateManager::UpdateInterestGroupsOfOwner(
     const url::Origin& owner,
-    network::mojom::ClientSecurityStatePtr client_security_state) {
+    network::mojom::ClientSecurityStatePtr client_security_state,
+    AreReportingOriginsAttestedCallback callback) {
+  attestation_callback_ = std::move(callback);
   owners_to_update_.Enqueue(owner, std::move(client_security_state));
   MaybeContinueUpdatingCurrentOwner();
 }
 
 void InterestGroupUpdateManager::UpdateInterestGroupsOfOwners(
     base::span<url::Origin> owners,
-    network::mojom::ClientSecurityStatePtr client_security_state) {
+    network::mojom::ClientSecurityStatePtr client_security_state,
+    AreReportingOriginsAttestedCallback callback) {
   // Shuffle the list of interest group owners for fairness.
   base::RandomShuffle(owners.begin(), owners.end());
   for (const url::Origin& owner : owners) {
-    UpdateInterestGroupsOfOwner(owner, client_security_state.Clone());
+    UpdateInterestGroupsOfOwner(owner, client_security_state.Clone(), callback);
   }
 }
 
@@ -559,7 +707,8 @@ void InterestGroupUpdateManager::MaybeContinueUpdatingCurrentOwner() {
 
 void InterestGroupUpdateManager::GetInterestGroupsForUpdate(
     const url::Origin& owner,
-    base::OnceCallback<void(std::vector<StorageInterestGroup>)> callback) {
+    base::OnceCallback<
+        void(std::vector<std::pair<blink::InterestGroupKey, GURL>>)> callback) {
   DCHECK_EQ(num_in_flight_updates_, 0);
   DCHECK(!waiting_on_db_read_);
   waiting_on_db_read_ = true;
@@ -569,14 +718,14 @@ void InterestGroupUpdateManager::GetInterestGroupsForUpdate(
 
 void InterestGroupUpdateManager::DidUpdateInterestGroupsOfOwnerDbLoad(
     url::Origin owner,
-    std::vector<StorageInterestGroup> storage_groups) {
+    std::vector<std::pair<blink::InterestGroupKey, GURL>> ig_to_update_urls) {
   DCHECK_EQ(owner, owners_to_update_.FrontOwner());
   DCHECK_EQ(num_in_flight_updates_, 0);
   DCHECK(waiting_on_db_read_);
-  DCHECK_LE(storage_groups.size(),
+  DCHECK_LE(ig_to_update_urls.size(),
             static_cast<unsigned int>(max_parallel_updates_));
   waiting_on_db_read_ = false;
-  if (storage_groups.empty()) {
+  if (ig_to_update_urls.empty()) {
     // All interest groups for `owner` are up to date, so we can pop it off the
     // queue.
     owners_to_update_.PopFront();
@@ -586,19 +735,15 @@ void InterestGroupUpdateManager::DidUpdateInterestGroupsOfOwnerDbLoad(
   net::IsolationInfo per_update_isolation_info =
       net::IsolationInfo::CreateTransient();
 
-  for (auto& storage_group : storage_groups) {
-    manager_->QueueKAnonymityUpdateForInterestGroup(storage_group);
-    if (!storage_group.interest_group.update_url) {
-      continue;
-    }
+  for (auto& [interest_group_key, update_url] : ig_to_update_urls) {
+    manager_->QueueKAnonymityUpdateForInterestGroup(interest_group_key);
     // TODO(behamilton): Don't update unless daily update url is k-anonymous
     ++num_in_flight_updates_;
     base::UmaHistogramCounts100000(
         "Ads.InterestGroup.Net.RequestUrlSizeBytes.Update",
-        storage_group.interest_group.update_url->spec().size());
+        update_url.spec().size());
     auto resource_request = std::make_unique<network::ResourceRequest>();
-    resource_request->url =
-        std::move(storage_group.interest_group.update_url).value();
+    resource_request->url = std::move(update_url);
     resource_request->redirect_mode = network::mojom::RedirectMode::kError;
     resource_request->credentials_mode = network::mojom::CredentialsMode::kOmit;
     resource_request->request_initiator = owner;
@@ -619,9 +764,7 @@ void InterestGroupUpdateManager::DidUpdateInterestGroupsOfOwnerDbLoad(
             base::BindOnce(&InterestGroupUpdateManager::
                                DidUpdateInterestGroupsOfOwnerNetFetch,
                            weak_factory_.GetWeakPtr(), simple_url_loader_it,
-                           blink::InterestGroupKey(
-                               std::move(storage_group.interest_group.owner),
-                               std::move(storage_group.interest_group.name))),
+                           interest_group_key),
             kMaxUpdateSize);
   }
 }
@@ -665,6 +808,24 @@ void InterestGroupUpdateManager::DidUpdateInterestGroupsOfOwnerJsonParse(
   if (!interest_group_update) {
     ReportUpdateFailed(group_key, UpdateDelayType::kParseFailure);
     return;
+  }
+  // All ads' allowed reporting origins must be attested. Otherwise don't update
+  // the interest group.
+  if (interest_group_update->ads) {
+    for (auto& ad : *interest_group_update->ads) {
+      if (ad.allowed_reporting_origins) {
+        // Sort and de-duplicate by passing it through a flat_set.
+        ad.allowed_reporting_origins =
+            base::flat_set<url::Origin>(
+                std::move(ad.allowed_reporting_origins.value()))
+                .extract();
+        if (!attestation_callback_.Run(ad.allowed_reporting_origins.value())) {
+          // Treat this the same way as a parse failure.
+          ReportUpdateFailed(group_key, UpdateDelayType::kParseFailure);
+          return;
+        }
+      }
+    }
   }
   UpdateInterestGroup(group_key, std::move(*interest_group_update));
 }

@@ -26,10 +26,6 @@
 #import "ios/web/public/test/http_server/http_server.h"
 #import "ios/web/public/test/http_server/http_server_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 using base::test::ios::kWaitForActionTimeout;
 using chrome_test_util::ButtonWithAccessibilityLabelId;
 using chrome_test_util::OmniboxText;
@@ -172,25 +168,6 @@ id<GREYMatcher> GoButtonMatcher() {
 id<GREYMatcher> ResendPostButtonMatcher() {
   return chrome_test_util::ButtonWithAccessibilityLabelId(
       IDS_HTTP_POST_WARNING_RESEND);
-}
-
-// Waits for view with Tab History accessibility ID.
-- (void)waitForTabHistoryView {
-  GREYCondition* condition = [GREYCondition
-      conditionWithName:@"Waiting for Tab History to display."
-                  block:^BOOL {
-                    NSError* error = nil;
-                    id<GREYMatcher> tabHistory =
-                        grey_accessibilityID(kPopupMenuNavigationTableViewId);
-                    [[EarlGrey selectElementWithMatcher:tabHistory]
-                        assertWithMatcher:grey_notNil()
-                                    error:&error];
-                    return error == nil;
-                  }];
-  GREYAssert(
-      [condition waitWithTimeout:base::test::ios::kWaitForUIElementTimeout
-                                     .InSecondsF()],
-      @"Tab History View not displayed.");
 }
 
 // Open back navigation history.
@@ -361,16 +338,10 @@ id<GREYMatcher> ResendPostButtonMatcher() {
   // internally. It can't be called directly from the EarlGrey 2 test process.
   NSString* title =
       base::SysUTF16ToNSString(url_formatter::FormatUrl(destinationURL));
-  id<GREYMatcher> historyItem;
-
-  if ([ChromeEarlGrey isSFSymbolEnabled]) {
-    historyItem = chrome_test_util::ButtonWithAccessibilityLabel(title);
-    [[EarlGrey selectElementWithMatcher:historyItem]
-        assertWithMatcher:grey_sufficientlyVisible()];
-  } else {
-    historyItem = grey_text(title);
-    [self waitForTabHistoryView];
-  }
+  id<GREYMatcher> historyItem =
+      chrome_test_util::ContextMenuItemWithAccessibilityLabel(title);
+  [[EarlGrey selectElementWithMatcher:historyItem]
+      assertWithMatcher:grey_sufficientlyVisible()];
 
   [[EarlGrey selectElementWithMatcher:historyItem] performAction:grey_tap()];
   [ChromeEarlGrey waitForPageToFinishLoading];

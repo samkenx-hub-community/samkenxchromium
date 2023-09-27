@@ -4,9 +4,9 @@
 
 package org.chromium.chrome.browser;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Assert;
 import org.junit.Rule;
@@ -43,19 +43,15 @@ public class MainActivityWithURLTest {
     @SmallTest
     @Feature({"Navigation"})
     public void testLaunchActivityWithURL() {
-        EmbeddedTestServer testServer =
-                EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-        try {
-            // Launch chrome
-            mActivityTestRule.startMainActivityWithURL(
-                    testServer.getURL("/chrome/test/data/android/simple.html"));
-            String expectedTitle = "Activity test page";
-            TabModel model = mActivityTestRule.getActivity().getCurrentTabModel();
-            String title = ChromeTabUtils.getTitleOnUiThread(model.getTabAt(model.index()));
-            Assert.assertEquals(expectedTitle, title);
-        } finally {
-            testServer.stopAndDestroyServer();
-        }
+        EmbeddedTestServer testServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
+        // Launch chrome
+        mActivityTestRule.startMainActivityWithURL(
+                testServer.getURL("/chrome/test/data/android/simple.html"));
+        String expectedTitle = "Activity test page";
+        TabModel model = mActivityTestRule.getActivity().getCurrentTabModel();
+        String title = ChromeTabUtils.getTitleOnUiThread(model.getTabAt(model.index()));
+        Assert.assertEquals(expectedTitle, title);
     }
 
     /**

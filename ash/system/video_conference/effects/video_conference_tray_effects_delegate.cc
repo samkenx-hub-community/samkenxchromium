@@ -5,6 +5,8 @@
 #include "ash/system/video_conference/effects/video_conference_tray_effects_delegate.h"
 #include "ash/system/video_conference/effects/video_conference_tray_effects_manager_types.h"
 #include "ash/system/video_conference/video_conference_tray_controller.h"
+#include "ash/system/video_conference/video_conference_utils.h"
+#include "base/metrics/histogram_functions.h"
 
 namespace ash {
 
@@ -42,22 +44,31 @@ VcEffectsDelegate::VcEffectsDelegate() = default;
 VcEffectsDelegate::~VcEffectsDelegate() = default;
 
 void VcEffectsDelegate::AddEffect(std::unique_ptr<VcHostedEffect> effect) {
-  effects_.push_back(std::move(effect));
+  const auto& id = effect->id();
+  if (!effects_.contains(id)) {
+    effects_[id] = std::move(effect);
+  }
+}
+
+void VcEffectsDelegate::RemoveEffect(VcEffectId effect_id) {
+  effects_.erase(effect_id);
 }
 
 int VcEffectsDelegate::GetNumEffects() {
   return effects_.size();
 }
 
-const VcHostedEffect* VcEffectsDelegate::GetEffect(int index) {
-  DCHECK(index >= 0 && index < GetNumEffects());
-  return effects_[index].get();
+const VcHostedEffect* VcEffectsDelegate::GetEffectById(VcEffectId effect_id) {
+  if (effects_.contains(effect_id)) {
+    return effects_[effect_id].get();
+  }
+  return nullptr;
 }
 
 std::vector<VcHostedEffect*> VcEffectsDelegate::GetEffects(VcEffectType type) {
   std::vector<VcHostedEffect*> effects_of_type;
 
-  for (auto& effect : effects_) {
+  for (const auto& [effect_id, effect] : effects_) {
     if (!DependenciesSatisfied(effect.get())) {
       // `effect` has at least one resource dependency that is not satisfied,
       // and is therefore not inserted in the output vector.
@@ -70,6 +81,31 @@ std::vector<VcHostedEffect*> VcEffectsDelegate::GetEffects(VcEffectType type) {
   }
 
   return effects_of_type;
+}
+
+void VcEffectsDelegate::RecordInitialStates() {
+  for (auto& [effect_id, effect] : effects_) {
+    // Only record supported effects, because if an effect does not apply to the
+    // current session the current state is not relevant.
+    if (!DependenciesSatisfied(effect.get())) {
+      continue;
+    }
+
+    auto current_state = effect->get_state_callback().Run();
+    if (!current_state.has_value()) {
+      return;
+    }
+
+    if (effect->type() == VcEffectType::kToggle) {
+      CHECK_EQ(effect->GetNumStates(), 1);
+      base::UmaHistogramBoolean(
+          video_conference_utils::GetEffectHistogramNameForInitialState(
+              effect_id),
+          current_state.value());
+    } else {
+      RecordMetricsForSetValueEffectOnStartup(effect_id, current_state.value());
+    }
+  }
 }
 
 }  // namespace ash

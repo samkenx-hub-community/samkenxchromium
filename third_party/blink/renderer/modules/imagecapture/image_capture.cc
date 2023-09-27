@@ -134,33 +134,6 @@ class AllConstraintSets {
   Persistent<const MediaTrackConstraints> constraints_;
 };
 
-// This adapter simplifies iteration over supported basic and advanced
-// MediaTrackConstraintSets in a MediaTrackConstraints.
-// A MediaTrackConstraints is itself a (basic) MediaTrackConstraintSet and it
-// may contain advanced MediaTrackConstraintSets. So far, only the basic
-// MediaTrackConstraintSet and the first advanced MediaTrackConstraintSet are
-// supported by this implementation.
-// TODO(crbug.com/1408091): Add support for advanced constraint sets beyond
-// the first one and remove this helper class.
-class AllSupportedConstraintSets {
- public:
-  using ForwardIterator = AllConstraintSets::ForwardIterator;
-
-  explicit AllSupportedConstraintSets(const MediaTrackConstraints* constraints)
-      : all_constraint_sets_(constraints) {}
-  ForwardIterator begin() const { return all_constraint_sets_.begin(); }
-  ForwardIterator end() const {
-    const auto* constraints = all_constraint_sets_.GetConstraints();
-    return ForwardIterator(constraints, constraints->hasAdvanced() &&
-                                                !constraints->advanced().empty()
-                                            ? 2u
-                                            : 1u);
-  }
-
- private:
-  AllConstraintSets all_constraint_sets_;
-};
-
 using CopyPanTiltZoom = base::StrongAlias<class CopyPanTiltZoomTag, bool>;
 
 template <typename T>
@@ -247,7 +220,10 @@ void CopyConstraintSet(const MediaTrackConstraintSet* source,
 void CopyConstraints(const MediaTrackConstraints* source,
                      MediaTrackConstraints* destination) {
   HeapVector<Member<MediaTrackConstraintSet>> destination_constraint_sets;
-  for (const auto* source_constraint_set : AllSupportedConstraintSets(source)) {
+  if (source->hasAdvanced() && !source->advanced().empty()) {
+    destination_constraint_sets.reserve(source->advanced().size());
+  }
+  for (const auto* source_constraint_set : AllConstraintSets(source)) {
     if (source_constraint_set == source) {
       CopyConstraintSet(source_constraint_set, destination);
     } else {
@@ -1484,8 +1460,8 @@ ScriptPromise ImageCapture::getPhotoSettings(ScriptState* script_state) {
 
 ScriptPromise ImageCapture::takePhoto(ScriptState* script_state,
                                       const PhotoSettings* photo_settings) {
-  TRACE_EVENT_INSTANT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
-                       "ImageCapture::takePhoto", TRACE_EVENT_SCOPE_PROCESS);
+  TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
+               "ImageCapture::takePhoto");
 
   auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
   ScriptPromise promise = resolver->Promise();
@@ -1599,6 +1575,8 @@ ScriptPromise ImageCapture::grabFrame(ScriptState* script_state) {
 
 void ImageCapture::UpdateAndCheckMediaTrackSettingsAndCapabilities(
     base::OnceCallback<void(bool)> callback) {
+  TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
+               "ImageCapture::UpdateAndCheckMediaTrackSettingsAndCapabilities");
   service_->GetPhotoState(
       stream_track_->Component()->Source()->Id(),
       WTF::BindOnce(&ImageCapture::GotPhotoState, WrapPersistent(this),
@@ -1639,7 +1617,7 @@ bool ImageCapture::CheckAndApplyMediaTrackConstraintsToSettings(
     ScriptPromiseResolver* resolver) const {
   if (!IsPageVisible()) {
     for (const MediaTrackConstraintSet* constraint_set :
-         AllSupportedConstraintSets(constraints)) {
+         AllConstraintSets(constraints)) {
       if ((constraint_set->hasPan() &&
            !IsBooleanFalseConstraint(constraint_set->pan())) ||
           (constraint_set->hasTilt() &&
@@ -1674,7 +1652,7 @@ bool ImageCapture::CheckAndApplyMediaTrackConstraintsToSettings(
   auto* effective_settings = MediaTrackSettings::Create();
 
   for (const MediaTrackConstraintSet* constraint_set :
-       AllSupportedConstraintSets(constraints)) {
+       AllConstraintSets(constraints)) {
     const MediaTrackConstraintSetType constraint_set_type =
         GetMediaTrackConstraintSetType(constraint_set, constraints);
     const bool may_reject =
@@ -1709,7 +1687,7 @@ void ImageCapture::SetMediaTrackConstraints(
 
   ExecutionContext* context = GetExecutionContext();
   for (const MediaTrackConstraintSet* constraint_set :
-       AllSupportedConstraintSets(constraints)) {
+       AllConstraintSets(constraints)) {
     if (constraint_set->hasWhiteBalanceMode()) {
       UseCounter::Count(context, WebFeature::kImageCaptureWhiteBalanceMode);
     }
@@ -1761,8 +1739,10 @@ void ImageCapture::SetMediaTrackConstraints(
     if (constraint_set->hasTorch()) {
       UseCounter::Count(context, WebFeature::kImageCaptureTorch);
     }
-    // TODO(eero.hakkinen@intel.com): count how many times backgroundBlur is
-    // used.
+    if (RuntimeEnabledFeatures::MediaCaptureBackgroundBlurEnabled(context) &&
+        constraint_set->hasBackgroundBlur()) {
+      UseCounter::Count(context, WebFeature::kImageCaptureBackgroundBlur);
+    }
   }
 
   if (!service_.is_bound()) {
@@ -1860,6 +1840,8 @@ void ImageCapture::SetPanTiltZoomSettingsFromTrack(
 void ImageCapture::OnSetPanTiltZoomSettingsFromTrack(
     base::OnceClosure done_callback,
     bool result) {
+  TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
+               "ImageCapture::OnSetPanTiltZoomSettingsFromTrack");
   service_->GetPhotoState(
       SourceId(),
       WTF::BindOnce(&ImageCapture::UpdateMediaTrackSettingsAndCapabilities,
@@ -1899,6 +1881,8 @@ ImageCapture::ImageCapture(ExecutionContext* context,
       capabilities_(MediaTrackCapabilities::Create()),
       settings_(MediaTrackSettings::Create()),
       photo_settings_(PhotoSettings::Create()) {
+  TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
+               "ImageCapture::CreateImageCapture");
   DCHECK(stream_track_);
   DCHECK(!service_.is_bound());
   DCHECK(!permission_service_.is_bound());
@@ -2273,6 +2257,8 @@ bool ImageCapture::HasPanTiltZoomPermissionGranted() const {
 ScriptPromise ImageCapture::GetMojoPhotoState(
     ScriptState* script_state,
     PromiseResolverFunction resolver_cb) {
+  TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
+               "ImageCapture::GetMojoPhotoState");
   auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
   ScriptPromise promise = resolver->Promise();
 
@@ -2302,6 +2288,8 @@ void ImageCapture::OnMojoGetPhotoState(
     PromiseResolverFunction resolve_function,
     bool trigger_take_photo,
     media::mojom::blink::PhotoStatePtr photo_state) {
+  TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
+               "ImageCapture::OnMojoGetPhotoState");
   DCHECK(service_requests_.Contains(resolver));
 
   if (photo_state.is_null()) {
@@ -2362,9 +2350,8 @@ void ImageCapture::OnMojoSetPhotoOptions(ScriptPromiseResolver* resolver,
                                          bool trigger_take_photo,
                                          bool result) {
   DCHECK(service_requests_.Contains(resolver));
-  TRACE_EVENT_INSTANT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
-                       "ImageCapture::OnMojoSetPhotoOptions",
-                       TRACE_EVENT_SCOPE_PROCESS);
+  TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
+               "ImageCapture::OnMojoSetPhotoOptions");
 
   if (!result) {
     resolver->Reject(MakeGarbageCollected<DOMException>(
@@ -2386,9 +2373,8 @@ void ImageCapture::OnMojoSetPhotoOptions(ScriptPromiseResolver* resolver,
 void ImageCapture::OnMojoTakePhoto(ScriptPromiseResolver* resolver,
                                    media::mojom::blink::BlobPtr blob) {
   DCHECK(service_requests_.Contains(resolver));
-  TRACE_EVENT_INSTANT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
-                       "ImageCapture::OnMojoTakePhoto",
-                       TRACE_EVENT_SCOPE_PROCESS);
+  TRACE_EVENT1(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
+               "ImageCapture::OnMojoTakePhoto", "blob_size", blob->data.size());
 
   // TODO(mcasas): Should be using a mojo::StructTraits.
   if (blob->data.empty()) {

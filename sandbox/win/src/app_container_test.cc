@@ -10,6 +10,7 @@
 
 #include "base/command_line.h"
 #include "base/files/file_path.h"
+#include "base/format_macros.h"
 #include "base/hash/sha1.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
@@ -42,8 +43,8 @@ const wchar_t kAppContainerSid[] =
     L"924012148-2839372144";
 
 std::wstring GenerateRandomPackageName() {
-  return base::StringPrintf(L"%016lX%016lX", base::RandUint64(),
-                            base::RandUint64());
+  return base::ASCIIToWide(base::StringPrintf(
+      "%016" PRIX64 "%016" PRIX64, base::RandUint64(), base::RandUint64()));
 }
 
 const char* TokenTypeToName(bool impersonation) {
@@ -293,7 +294,8 @@ TEST_F(AppContainerTest, NoCapabilities) {
 
   EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetTokenLevel(USER_UNPROTECTED,
                                                              USER_UNPROTECTED));
-  EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetJobLevel(JobLevel::kNone, 0));
+  EXPECT_EQ(SBOX_ALL_OK,
+            policy_->GetConfig()->SetJobLevel(JobLevel::kUnprotected, 0));
 
   CreateProcess();
   auto security_capabilities = container_->GetSecurityCapabilities();
@@ -310,7 +312,8 @@ TEST_F(AppContainerTest, NoCapabilitiesRestricted) {
 
   EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetTokenLevel(
                              USER_RESTRICTED_SAME_ACCESS, USER_LOCKDOWN));
-  EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetJobLevel(JobLevel::kNone, 0));
+  EXPECT_EQ(SBOX_ALL_OK,
+            policy_->GetConfig()->SetJobLevel(JobLevel::kUnprotected, 0));
 
   CreateProcess();
   auto security_capabilities = container_->GetSecurityCapabilities();
@@ -330,7 +333,8 @@ TEST_F(AppContainerTest, WithCapabilities) {
       base::win::WellKnownCapability::kInternetClientServer);
   EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetTokenLevel(USER_UNPROTECTED,
                                                              USER_UNPROTECTED));
-  EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetJobLevel(JobLevel::kNone, 0));
+  EXPECT_EQ(SBOX_ALL_OK,
+            policy_->GetConfig()->SetJobLevel(JobLevel::kUnprotected, 0));
 
   CreateProcess();
   auto security_capabilities = container_->GetSecurityCapabilities();
@@ -350,7 +354,8 @@ TEST_F(AppContainerTest, WithCapabilitiesRestricted) {
       base::win::WellKnownCapability::kInternetClientServer);
   EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetTokenLevel(
                              USER_RESTRICTED_SAME_ACCESS, USER_LOCKDOWN));
-  EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetJobLevel(JobLevel::kNone, 0));
+  EXPECT_EQ(SBOX_ALL_OK,
+            policy_->GetConfig()->SetJobLevel(JobLevel::kUnprotected, 0));
 
   CreateProcess();
   auto security_capabilities = container_->GetSecurityCapabilities();
@@ -374,7 +379,8 @@ TEST_F(AppContainerTest, WithImpersonationCapabilities) {
       base::win::WellKnownCapability::kPicturesLibrary);
   EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetTokenLevel(USER_UNPROTECTED,
                                                              USER_UNPROTECTED));
-  EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetJobLevel(JobLevel::kNone, 0));
+  EXPECT_EQ(SBOX_ALL_OK,
+            policy_->GetConfig()->SetJobLevel(JobLevel::kUnprotected, 0));
 
   CreateProcess();
   auto security_capabilities = container_->GetSecurityCapabilities();
@@ -394,7 +400,8 @@ TEST_F(AppContainerTest, NoCapabilitiesLPAC) {
   container_->SetEnableLowPrivilegeAppContainer(true);
   EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetTokenLevel(USER_UNPROTECTED,
                                                              USER_UNPROTECTED));
-  EXPECT_EQ(SBOX_ALL_OK, policy_->GetConfig()->SetJobLevel(JobLevel::kNone, 0));
+  EXPECT_EQ(SBOX_ALL_OK,
+            policy_->GetConfig()->SetJobLevel(JobLevel::kUnprotected, 0));
 
   CreateProcess();
   auto security_capabilities = container_->GetSecurityCapabilities();

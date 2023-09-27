@@ -33,6 +33,7 @@ class ChromeDevToolsManagerDelegate : public content::DevToolsManagerDelegate {
  public:
   static const char kTypeApp[];
   static const char kTypeBackgroundPage[];
+  static const char kTypePage[];
 
   ChromeDevToolsManagerDelegate();
 
@@ -90,7 +91,7 @@ class ChromeDevToolsManagerDelegate : public content::DevToolsManagerDelegate {
       content::DevToolsAgentHostClientChannel* channel) override;
   scoped_refptr<content::DevToolsAgentHost> CreateNewTarget(
       const GURL& url,
-      bool for_tab) override;
+      TargetType target_type) override;
   bool HasBundledFrontendResources() override;
 
   void DevicesAvailable(

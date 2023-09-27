@@ -21,15 +21,14 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisableIf;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
+import org.chromium.base.test.util.MinAndroidSdkLevel;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.base.test.util.UrlUtils;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ShortcutHelper;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.banners.AppMenuVerbiage;
@@ -40,6 +39,7 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.TabLoadObserver;
 import org.chromium.chrome.test.util.browser.TabTitleObserver;
 import org.chromium.chrome.test.util.browser.webapps.WebappTestPage;
@@ -53,13 +53,16 @@ import org.chromium.content_public.common.ContentSwitches;
 import org.chromium.net.test.EmbeddedTestServerRule;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.modaldialog.ModalDialogManager;
+import org.chromium.ui.test.util.DeviceRestriction;
 
 /**
  * Tests org.chromium.chrome.browser.webapps.addtohomescreen.AddToHomescreenManager and its C++
  * counterpart.
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
+@Batch(Batch.PER_CLASS)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
+@Restriction(DeviceRestriction.RESTRICTION_TYPE_NON_AUTO)
 public class AddToHomescreenTest {
     @Rule
     public ChromeTabbedActivityTestRule mActivityTestRule = new ChromeTabbedActivityTestRule();
@@ -229,7 +232,7 @@ public class AddToHomescreenTest {
     @Test
     @SmallTest
     @Feature("{Webapp}")
-    @DisableIf.Build(sdk_is_less_than = Build.VERSION_CODES.O)
+    @MinAndroidSdkLevel(Build.VERSION_CODES.O)
     public void testAddAdaptableShortcut() throws Exception {
         // Test the baseline of no adaptive icon.
         loadUrl(mTestServerRule.getServer().getURL(NON_MASKABLE_MANIFEST_TEST_PAGE_PATH),
@@ -313,7 +316,6 @@ public class AddToHomescreenTest {
     @Feature("{Webapp}")
     @Restriction(Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     @CommandLineFlags.Add(ContentSwitches.DISABLE_POPUP_BLOCKING)
-    @DisabledTest(message = "https://crbug.com/1269022")
     public void testAddWebappShortcutWithEmptyPage() {
         Tab spawnedPopup = spawnPopupInBackground("");
         addShortcutToTab(spawnedPopup, "", true /* expectAdded */);
@@ -364,9 +366,10 @@ public class AddToHomescreenTest {
     @SmallTest
     @Feature("{Webapp}")
     public void testAddWebappShortcutAppInstalledEvent() throws Exception {
-        loadUrl(WebappTestPage.getServiceWorkerUrlWithAction(
-                        mTestServerRule.getServer(), "verify_appinstalled"),
+        loadUrl(WebappTestPage.getServiceWorkerUrlWithManifestAndAction(mTestServerRule.getServer(),
+                        "manifest_empty_name_short_name.json", "verify_appinstalled"),
                 WebappTestPage.PAGE_TITLE);
+
         addShortcutToTab(mTab, "", true);
 
         // Wait for the tab title to change. This will happen (due to the JavaScript that runs
@@ -374,7 +377,7 @@ public class AddToHomescreenTest {
         // addEventListener('appinstalled'), once to test onappinstalled attribute.
         new TabTitleObserver(mTab, "Got appinstalled: listener, attr").waitForTitleUpdate(3);
 
-        Assert.assertEquals(1,
+        Assert.assertEquals(0,
                 RecordHistogram.getHistogramValueCountForTesting(
                         INSTALL_PATH_HISTOGRAM_NAME, /* kAppMenuInstall= */ 2));
     }

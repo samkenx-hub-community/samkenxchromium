@@ -18,6 +18,7 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/json/json_writer.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/ref_counted_memory.h"
 #include "base/path_service.h"
@@ -76,7 +77,6 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/skia/include/core/SkBitmap.h"
-#include "ui/base/layout.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/image/image_skia.h"
 #include "url/gurl.h"
@@ -119,8 +119,9 @@ class UserImageChangeWaiter : public user_manager::UserManager::Observer {
 
   // user_manager::UserManager::Observer:
   void OnUserImageChanged(const user_manager::User& user) override {
-    if (run_loop_)
+    if (run_loop_) {
       run_loop_->Quit();
+    }
   }
 
  private:
@@ -137,8 +138,9 @@ class UserImageManagerTestBase : public LoginManagerTest,
 
   std::unique_ptr<net::test_server::BasicHttpResponse> HandleRequest(
       const net::test_server::HttpRequest& request) {
-    if (request.relative_url.find("/avatar.jpg") == std::string::npos)
+    if (request.relative_url.find("/avatar.jpg") == std::string::npos) {
       return nullptr;
+    }
 
     // Check whether the token string is the same.
     EXPECT_TRUE(request.headers.find(net::HttpRequestHeaders::kAuthorization) !=
@@ -155,9 +157,10 @@ class UserImageManagerTestBase : public LoginManagerTest,
     EXPECT_TRUE(base::PathService::Get(chrome::DIR_TEST_DATA, &test_data_dir));
     {
       base::ScopedAllowBlockingForTesting allow_io;
-      EXPECT_TRUE(ReadFileToString(
-          test_data_dir.Append("chromeos").Append("avatar1.jpg"),
-          &profile_image_data));
+      EXPECT_TRUE(ReadFileToString(test_data_dir.Append("chromeos")
+                                       .Append("avatars")
+                                       .Append("avatar1.jpg"),
+                                   &profile_image_data));
     }
     std::unique_ptr<net::test_server::BasicHttpResponse> response =
         std::make_unique<net::test_server::BasicHttpResponse>();
@@ -207,8 +210,9 @@ class UserImageManagerTestBase : public LoginManagerTest,
 
   // UserManager::Observer overrides:
   void LocalStateChanged(user_manager::UserManager* user_manager) override {
-    if (run_loop_)
+    if (run_loop_) {
       run_loop_->Quit();
+    }
   }
 
   // Logs in `account_id`.
@@ -295,7 +299,7 @@ class UserImageManagerTestBase : public LoginManagerTest,
   base::FilePath test_data_dir_;
   base::FilePath user_data_dir_;
 
-  PrefService* local_state_;
+  raw_ptr<PrefService, DanglingUntriaged | ExperimentalAsh> local_state_;
 
   gfx::ImageSkia decoded_image_;
 
@@ -337,6 +341,7 @@ class UserImageManagerTest : public UserImageManagerTestBase {
 
 IN_PROC_BROWSER_TEST_F(UserImageManagerTest, PRE_SaveAndLoadUserImage) {
   // Setup a user with JPEG image.
+  LoginUser(test_account_id1_);
   run_loop_ = std::make_unique<base::RunLoop>();
   const gfx::ImageSkia& image = default_user_image::GetStubDefaultImage();
   UserImageManager* user_image_manager =
@@ -353,8 +358,9 @@ IN_PROC_BROWSER_TEST_F(UserImageManagerTest, SaveAndLoadUserImage) {
       user_manager::UserManager::Get()->FindUser(test_account_id1_);
   ASSERT_TRUE(user);
   // Wait for image load.
-  if (user->image_index() == user_manager::User::USER_IMAGE_INVALID)
+  if (user->image_index() == user_manager::User::USER_IMAGE_INVALID) {
     UserImageChangeWaiter().Wait();
+  }
   // Check image dimensions. Images can't be compared since JPEG is lossy.
   const gfx::ImageSkia& saved_image = default_user_image::GetStubDefaultImage();
   EXPECT_EQ(saved_image.width(), user->GetImage().width());
@@ -385,6 +391,7 @@ IN_PROC_BROWSER_TEST_F(UserImageManagerTest, SaveUserDefaultImageIndex) {
 // Verifies that SaveUserImage() correctly sets and persists the chosen user
 // image.
 IN_PROC_BROWSER_TEST_F(UserImageManagerTest, SaveUserImage) {
+  LoginUser(test_account_id1_);
   const user_manager::User* user =
       user_manager::UserManager::Get()->FindUser(test_account_id1_);
   ASSERT_TRUE(user);
@@ -422,6 +429,7 @@ IN_PROC_BROWSER_TEST_F(UserImageManagerTest, SaveUserImage) {
 // Verifies that SaveUserImageFromFile() correctly sets and persists the chosen
 // user image.
 IN_PROC_BROWSER_TEST_F(UserImageManagerTest, SaveUserImageFromFile) {
+  LoginUser(test_account_id1_);
   const user_manager::User* user =
       user_manager::UserManager::Get()->FindUser(test_account_id1_);
   ASSERT_TRUE(user);
@@ -580,13 +588,15 @@ class UserImageManagerPolicyTest : public UserImageManagerTestBase,
 
   // policy::CloudPolicyStore::Observer overrides:
   void OnStoreLoaded(policy::CloudPolicyStore* store) override {
-    if (run_loop_)
+    if (run_loop_) {
       run_loop_->Quit();
+    }
   }
 
   void OnStoreError(policy::CloudPolicyStore* store) override {
-    if (run_loop_)
+    if (run_loop_) {
       run_loop_->Quit();
+    }
   }
 
   std::string ConstructPolicy(const std::string& relative_path) {

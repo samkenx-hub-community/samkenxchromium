@@ -14,7 +14,7 @@
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/time/time.h"
-#include "chrome/browser/ash/login/oobe_quick_start/connectivity/random_session_id.h"
+#include "chrome/browser/ash/login/oobe_quick_start/connectivity/advertising_id.h"
 #include "device/bluetooth/test/mock_bluetooth_adapter.h"
 #include "device/bluetooth/test/mock_bluetooth_advertisement.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -96,8 +96,9 @@ class FakeBluetoothAdvertisement : public device::BluetoothAdvertisement {
   }
 
   void ReleaseAdvertisement() {
-    for (auto& observer : observers_)
+    for (auto& observer : observers_) {
       observer.AdvertisementReleased(this);
+    }
   }
 
   bool called_unregister_success_callback() {
@@ -130,26 +131,6 @@ class FastPairAdvertiserTest : public testing::Test {
  protected:
   FastPairAdvertiserTest() = default;
 
-  void TestExpectedMetrics(bool should_succeed) {
-    if (should_succeed) {
-      expected_success_count_++;
-      histograms_.ExpectBucketCount(
-          "OOBE.QuickStart.FastPair.AdvertisingStart.Result", true,
-          expected_success_count_);
-      return;
-    }
-
-    expected_failure_count_++;
-    histograms_.ExpectBucketCount(
-        "OOBE.QuickStart.FastPair.AdvertisingStart.Result", false,
-        expected_failure_count_);
-    histograms_.ExpectBucketCount(
-        "OOBE.QuickStart.FastPair.AdvertisingStart.ErrorCode",
-        device::BluetoothAdvertisement::ErrorCode::
-            INVALID_ADVERTISEMENT_ERROR_CODE,
-        expected_failure_count_);
-  }
-
   void SetUp() override {
     mock_adapter_ = base::MakeRefCounted<
         NiceMock<MockBluetoothAdapterWithAdvertisements>>();
@@ -162,6 +143,37 @@ class FastPairAdvertiserTest : public testing::Test {
     fast_pair_advertiser_ = std::make_unique<FastPairAdvertiser>(mock_adapter_);
   }
 
+  void TestExpectedMetrics(
+      bool should_succeed,
+      absl::optional<device::BluetoothAdvertisement::ErrorCode> error_code) {
+    expected_total_count_++;
+    histograms_.ExpectTotalCount(
+        "QuickStart.FastPairAdvertisementEnded.Duration",
+        expected_total_count_);
+    histograms_.ExpectBucketCount(
+        "QuickStart.FastPairAdvertisementEnded.AdvertisingMethod",
+        fast_pair_advertiser_->advertising_method_, expected_total_count_);
+    histograms_.ExpectBucketCount(
+        "QuickStart.FastPairAdvertisementStarted.AdvertisingMethod",
+        fast_pair_advertiser_->advertising_method_, expected_total_count_);
+    if (should_succeed) {
+      expected_success_count_++;
+      histograms_.ExpectBucketCount(
+          "QuickStart.FastPairAdvertisementEnded.Succeeded", true,
+          expected_success_count_);
+      return;
+    }
+
+    expected_failure_count_++;
+    expected_error_bucket_count_++;
+    histograms_.ExpectBucketCount(
+        "QuickStart.FastPairAdvertisementEnded.Succeeded", false,
+        expected_failure_count_);
+    histograms_.ExpectBucketCount(
+        "QuickStart.FastPairAdvertisementEnded.ErrorCode", error_code.value(),
+        expected_error_bucket_count_);
+  }
+
   void OnAdapterRegisterAdvertisement(RegisterAdvertisementArgs* args) {
     register_args_ = base::WrapUnique(args);
   }
@@ -172,7 +184,7 @@ class FastPairAdvertiserTest : public testing::Test {
                        base::Unretained(this)),
         base::BindOnce(&FastPairAdvertiserTest::OnStartAdvertisingError,
                        base::Unretained(this)),
-        RandomSessionId());
+        AdvertisingId(), /*use_pin_authentication=*/false);
     auto service_uuid_list =
         std::make_unique<device::BluetoothAdvertisement::UUIDList>();
     service_uuid_list->push_back(kFastPairServiceUuid);
@@ -202,8 +214,20 @@ class FastPairAdvertiserTest : public testing::Test {
   bool called_on_stop_advertising() { return called_on_stop_advertising_; }
 
   std::vector<uint8_t> GetManufacturerMetadata(
-      const RandomSessionId& random_id) {
-    return fast_pair_advertiser_->GenerateManufacturerMetadata(random_id);
+      const AdvertisingId& advertising_id) {
+    return fast_pair_advertiser_->GenerateManufacturerMetadata(advertising_id);
+  }
+
+  void ResetExpectedErrorBucketCount() { expected_error_bucket_count_ = 0; }
+
+  void SetAdvertisementErrorsForMetricsTesting(
+      device::BluetoothAdvertisement::ErrorCode error_code) {
+    StartAdvertising();
+    std::move(register_args_->error_callback).Run(error_code);
+
+    EXPECT_FALSE(called_on_start_advertising());
+    EXPECT_TRUE(called_on_start_advertising_error());
+    TestExpectedMetrics(/*should_succeed=*/false, error_code);
   }
 
   scoped_refptr<NiceMock<MockBluetoothAdapterWithAdvertisements>> mock_adapter_;
@@ -215,6 +239,8 @@ class FastPairAdvertiserTest : public testing::Test {
   bool called_on_stop_advertising_ = false;
   base::HistogramBase::Count expected_success_count_ = 0;
   base::HistogramBase::Count expected_failure_count_ = 0;
+  base::HistogramBase::Count expected_error_bucket_count_ = 0;
+  base::HistogramBase::Count expected_total_count_ = 0;
 };
 
 TEST_F(FastPairAdvertiserTest, TestStartAdvertising_Success) {
@@ -226,7 +252,6 @@ TEST_F(FastPairAdvertiserTest, TestStartAdvertising_Success) {
   EXPECT_FALSE(called_on_start_advertising_error());
   EXPECT_FALSE(called_on_stop_advertising());
   EXPECT_TRUE(fake_advertisement->HasObserver(fast_pair_advertiser_.get()));
-  TestExpectedMetrics(/*should_succeed=*/true);
 }
 
 TEST_F(FastPairAdvertiserTest, TestStartAdvertising_Error) {
@@ -238,22 +263,9 @@ TEST_F(FastPairAdvertiserTest, TestStartAdvertising_Error) {
   EXPECT_FALSE(called_on_start_advertising());
   EXPECT_TRUE(called_on_start_advertising_error());
   EXPECT_FALSE(called_on_stop_advertising());
-  TestExpectedMetrics(/*should_succeed=*/false);
-}
-
-// Regression test for crbug.com/1109581.
-TEST_F(FastPairAdvertiserTest, TestStartAdvertising_DeleteInErrorCallback) {
-  fast_pair_advertiser_->StartAdvertising(
-      base::DoNothing(),
-      base::BindLambdaForTesting([&]() { fast_pair_advertiser_.reset(); }),
-      RandomSessionId());
-
-  std::move(register_args_->error_callback)
-      .Run(device::BluetoothAdvertisement::ErrorCode::
-               INVALID_ADVERTISEMENT_ERROR_CODE);
-
-  EXPECT_FALSE(fast_pair_advertiser_);
-  TestExpectedMetrics(/*should_succeed=*/false);
+  TestExpectedMetrics(/*should_succeed=*/false,
+                      /*error_code=*/device::BluetoothAdvertisement::ErrorCode::
+                          INVALID_ADVERTISEMENT_ERROR_CODE);
 }
 
 TEST_F(FastPairAdvertiserTest, TestStopAdvertising_Success) {
@@ -269,6 +281,7 @@ TEST_F(FastPairAdvertiserTest, TestStopAdvertising_Success) {
   EXPECT_TRUE(called_on_start_advertising());
   EXPECT_FALSE(called_on_start_advertising_error());
   EXPECT_TRUE(called_on_stop_advertising());
+  TestExpectedMetrics(/*should_succeed=*/true, /*error_code=*/absl::nullopt);
 }
 
 TEST_F(FastPairAdvertiserTest, TestStopAdvertising_Error) {
@@ -302,16 +315,105 @@ TEST_F(FastPairAdvertiserTest, TestAdvertisementReleased) {
 }
 
 TEST_F(FastPairAdvertiserTest, TestGenerateManufacturerMetadata) {
-  RandomSessionId random_id;
-  base::span<const uint8_t, RandomSessionId::kLength> random_id_bytes =
-      random_id.AsBytes();
+  AdvertisingId advertising_id;
+  base::span<const uint8_t, AdvertisingId::kLength> advertising_id_bytes =
+      advertising_id.AsBytes();
   std::vector<uint8_t> manufacturer_metadata =
-      GetManufacturerMetadata(random_id);
+      GetManufacturerMetadata(advertising_id);
 
-  EXPECT_EQ(random_id_bytes.size(), manufacturer_metadata.size());
-  for (size_t i = 0; i < random_id_bytes.size(); i++) {
-    EXPECT_EQ(random_id_bytes[i], manufacturer_metadata[i]);
+  EXPECT_EQ(advertising_id_bytes.size(), manufacturer_metadata.size());
+  for (size_t i = 0; i < advertising_id_bytes.size(); i++) {
+    EXPECT_EQ(advertising_id_bytes[i], manufacturer_metadata[i]);
   }
+}
+
+TEST_F(FastPairAdvertiserTest, TestFastPairAdvertisingRegisteringErrors) {
+  SetAdvertisementErrorsForMetricsTesting(
+      device::BluetoothAdvertisement::ErrorCode::ERROR_UNSUPPORTED_PLATFORM);
+  // Reset bucket count because we are checking for a different advertising
+  // error bucket.
+  ResetExpectedErrorBucketCount();
+  SetAdvertisementErrorsForMetricsTesting(
+      device::BluetoothAdvertisement::ErrorCode::
+          ERROR_ADVERTISEMENT_ALREADY_EXISTS);
+
+  ResetExpectedErrorBucketCount();
+  SetAdvertisementErrorsForMetricsTesting(
+      device::BluetoothAdvertisement::ErrorCode::
+          ERROR_ADVERTISEMENT_INVALID_LENGTH);
+
+  ResetExpectedErrorBucketCount();
+  SetAdvertisementErrorsForMetricsTesting(
+      device::BluetoothAdvertisement::ErrorCode::ERROR_STARTING_ADVERTISEMENT);
+
+  ResetExpectedErrorBucketCount();
+  SetAdvertisementErrorsForMetricsTesting(
+      device::BluetoothAdvertisement::ErrorCode::ERROR_ADAPTER_POWERED_OFF);
+
+  ResetExpectedErrorBucketCount();
+  SetAdvertisementErrorsForMetricsTesting(
+      device::BluetoothAdvertisement::ErrorCode::
+          ERROR_INVALID_ADVERTISEMENT_INTERVAL);
+}
+
+// Regression tests for crashes when accessing member variables after
+// destruction, e.g. crbug.com/1109581.
+TEST_F(FastPairAdvertiserTest, TestStartAdvertising_DeleteInErrorCallback) {
+  fast_pair_advertiser_->StartAdvertising(
+      base::DoNothing(),
+      base::BindLambdaForTesting([&]() { fast_pair_advertiser_.reset(); }),
+      AdvertisingId(), /*use_pin_authentication=*/false);
+
+  std::move(register_args_->error_callback)
+      .Run(device::BluetoothAdvertisement::ErrorCode::
+               INVALID_ADVERTISEMENT_ERROR_CODE);
+
+  EXPECT_FALSE(fast_pair_advertiser_);
+  expected_failure_count_++;
+  histograms_.ExpectBucketCount(
+      "QuickStart.FastPairAdvertisementStarted.AdvertisingMethod",
+      quick_start_metrics::AdvertisingMethod::kQrCode, expected_failure_count_);
+  histograms_.ExpectBucketCount(
+      "QuickStart.FastPairAdvertisementEnded.AdvertisingMethod",
+      quick_start_metrics::AdvertisingMethod::kQrCode, expected_failure_count_);
+  histograms_.ExpectBucketCount(
+      "QuickStart.FastPairAdvertisementEnded.Succeeded", false,
+      expected_failure_count_);
+  histograms_.ExpectBucketCount(
+      "QuickStart.FastPairAdvertisementEnded.ErrorCode",
+      device::BluetoothAdvertisement::ErrorCode::
+          INVALID_ADVERTISEMENT_ERROR_CODE,
+      expected_failure_count_);
+}
+
+TEST_F(FastPairAdvertiserTest, TestStopAdvertisingSuccess_DeleteInCallback) {
+  StartAdvertising();
+  auto fake_advertisement = base::MakeRefCounted<FakeBluetoothAdvertisement>();
+  std::move(register_args_->callback).Run(fake_advertisement);
+
+  fake_advertisement->set_should_unregister_succeed(true);
+  fast_pair_advertiser_->StopAdvertising(
+      base::BindLambdaForTesting([&]() { fast_pair_advertiser_.reset(); }));
+
+  EXPECT_TRUE(fake_advertisement->called_unregister_success_callback());
+  EXPECT_FALSE(fake_advertisement->called_unregister_error_callback());
+  EXPECT_TRUE(called_on_start_advertising());
+  EXPECT_FALSE(called_on_start_advertising_error());
+}
+
+TEST_F(FastPairAdvertiserTest, TestStopAdvertisingError_DeleteInCallback) {
+  StartAdvertising();
+  auto fake_advertisement = base::MakeRefCounted<FakeBluetoothAdvertisement>();
+  std::move(register_args_->callback).Run(fake_advertisement);
+
+  fake_advertisement->set_should_unregister_succeed(false);
+  fast_pair_advertiser_->StopAdvertising(
+      base::BindLambdaForTesting([&]() { fast_pair_advertiser_.reset(); }));
+
+  EXPECT_FALSE(fake_advertisement->called_unregister_success_callback());
+  EXPECT_TRUE(fake_advertisement->called_unregister_error_callback());
+  EXPECT_TRUE(called_on_start_advertising());
+  EXPECT_FALSE(called_on_start_advertising_error());
 }
 
 }  // namespace ash::quick_start

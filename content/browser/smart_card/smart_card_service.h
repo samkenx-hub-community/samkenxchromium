@@ -5,11 +5,13 @@
 #ifndef CONTENT_BROWSER_SMART_CARD_SMART_CARD_SERVICE_H_
 #define CONTENT_BROWSER_SMART_CARD_SMART_CARD_SERVICE_H_
 
+#include "base/containers/queue.h"
 #include "base/memory/raw_ref.h"
-#include "content/browser/smart_card/smart_card_reader_tracker.h"
 #include "content/common/content_export.h"
-#include "content/public/browser/smart_card_delegate.h"
+#include "mojo/public/cpp/bindings/remote.h"
 #include "mojo/public/cpp/bindings/remote_set.h"
+#include "services/device/public/mojom/smart_card.mojom.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/mojom/smart_card/smart_card.mojom.h"
 
 namespace content {
@@ -19,12 +21,11 @@ class RenderFrameHostImpl;
 // SmarCardService provides an implementation of the SmartCardService mojom
 // interface. This interface is used by Blink to implement the Web Smart Card
 // API.
-class CONTENT_EXPORT SmartCardService
-    : public blink::mojom::SmartCardService,
-      public SmartCardReaderTracker::Observer {
+class CONTENT_EXPORT SmartCardService : public blink::mojom::SmartCardService {
  public:
-  explicit SmartCardService(SmartCardDelegate& delegate,
-                            SmartCardReaderTracker& reader_tracker);
+  explicit SmartCardService(
+      mojo::PendingRemote<device::mojom::SmartCardContextFactory>
+          context_factory);
   ~SmartCardService() override;
 
   // Use this when creating from a document.
@@ -32,27 +33,11 @@ class CONTENT_EXPORT SmartCardService
                      mojo::PendingReceiver<blink::mojom::SmartCardService>);
 
   // blink::mojom::SmartCardService overrides:
-  void GetReadersAndStartTracking(
-      GetReadersAndStartTrackingCallback callback) override;
-  void RegisterClient(mojo::PendingAssociatedRemote<
-                          blink::mojom::SmartCardServiceClient> client,
-                      RegisterClientCallback callback) override;
-
-  // SmartCardReaderTracker::Observer overrides:
-  void OnReaderAdded(
-      const blink::mojom::SmartCardReaderInfo& reader_info) override;
-  void OnReaderRemoved(
-      const blink::mojom::SmartCardReaderInfo& reader_info) override;
-  void OnReaderChanged(
-      const blink::mojom::SmartCardReaderInfo& reader_info) override;
-  void OnError(blink::mojom::SmartCardResponseCode response_code) override;
+  void CreateContext(CreateContextCallback callback) override;
 
  private:
-  const raw_ref<SmartCardDelegate> delegate_;
-  const raw_ref<SmartCardReaderTracker> reader_tracker_;
-
-  // Used to bind with Blink.
-  mojo::AssociatedRemoteSet<blink::mojom::SmartCardServiceClient> clients_;
+  mojo::Remote<device::mojom::SmartCardContextFactory> context_factory_;
+  base::WeakPtrFactory<SmartCardService> weak_ptr_factory_{this};
 };
 
 }  // namespace content

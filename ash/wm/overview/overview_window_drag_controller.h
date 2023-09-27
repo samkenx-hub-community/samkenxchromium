@@ -10,6 +10,7 @@
 #include "ash/ash_export.h"
 #include "ash/wm/splitview/split_view_controller.h"
 #include "base/containers/flat_map.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/gfx/geometry/point_f.h"
 
 namespace ui {
@@ -19,7 +20,7 @@ class PresentationTimeRecorder;
 namespace ash {
 
 class OverviewGrid;
-class OverviewItem;
+class OverviewItemBase;
 class OverviewSession;
 
 // These values are persisted to logs. Entries should not be renumbered and
@@ -91,7 +92,7 @@ class ASH_EXPORT OverviewWindowDragController {
   };
 
   OverviewWindowDragController(OverviewSession* overview_session,
-                               OverviewItem* item,
+                               OverviewItemBase* item,
                                bool is_touch_dragging);
 
   OverviewWindowDragController(const OverviewWindowDragController&) = delete;
@@ -108,6 +109,9 @@ class ASH_EXPORT OverviewWindowDragController {
                    float velocity_x,
                    float velocity_y);
   void ActivateDraggedWindow();
+
+  // Called when a gesture event is reset or when the dragged window is being
+  // destroyed.
   void ResetGesture();
 
   // Resets |overview_session_| to nullptr. It's needed since we defer the
@@ -120,7 +124,7 @@ class ASH_EXPORT OverviewWindowDragController {
   // after a gesture is completed if there is an animation.
   void DestroyFloatDragHelper();
 
-  OverviewItem* item() { return item_; }
+  OverviewItemBase* item() { return item_; }
 
   bool is_touch_dragging() const { return is_touch_dragging_; }
 
@@ -193,10 +197,11 @@ class ASH_EXPORT OverviewWindowDragController {
   // `new_desk_button_scale_up_timer_` for more information.
   void MaybeScaleUpNewDeskButton();
 
-  OverviewSession* overview_session_;
+  raw_ptr<OverviewSession, ExperimentalAsh> overview_session_;
 
-  // The drag target window in the overview mode.
-  OverviewItem* item_ = nullptr;
+  // The drag target item in the overview mode.
+  raw_ptr<OverviewItemBase, DanglingUntriaged | ExperimentalAsh> item_ =
+      nullptr;
 
   DragBehavior current_drag_behavior_ = DragBehavior::kNoDrag;
 
@@ -209,15 +214,15 @@ class ASH_EXPORT OverviewWindowDragController {
 
   // The original size of the dragged item after we scale it up when we start
   // dragging it. The item is restored to this size once it no longer intersects
-  // with the DesksBarView.
+  // with the LegacyDeskBarView.
   gfx::SizeF original_scaled_size_;
 
   // Track the per-overview-grid desks bar data used to perform the window
   // sizing operations when it is moved towards or on the desks bar.
   struct GridDesksBarData {
     // The scaled-down size of the dragged item once the drag location is on the
-    // DesksBarView of the corresponding grid. We size the item down so that it
-    // fits inside the desks' preview view.
+    // LegacyDeskBarView of the corresponding grid. We size the item down so
+    // that it fits inside the desks' preview view.
     gfx::SizeF on_desks_bar_item_size;
 
     // Cached values related to dragging items while the desks bar is shown.

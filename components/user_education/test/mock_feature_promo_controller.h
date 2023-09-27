@@ -9,6 +9,7 @@
 #include "base/memory/weak_ptr.h"
 #include "components/user_education/common/feature_promo_controller.h"
 #include "components/user_education/common/feature_promo_specification.h"
+#include "components/user_education/common/feature_promo_storage_service.h"
 #include "testing/gmock/include/gmock/gmock.h"
 
 namespace user_education::test {
@@ -19,30 +20,37 @@ class MockFeaturePromoController : public FeaturePromoController {
   ~MockFeaturePromoController() override;
 
   // FeaturePromoController:
+  MOCK_METHOD(bool, CanShowPromo, (const base::Feature&), (const, override));
   MOCK_METHOD(bool,
               MaybeShowPromo,
               (const base::Feature&,
-               FeaturePromoSpecification::StringReplacements,
-               BubbleCloseCallback),
+               BubbleCloseCallback,
+               FeaturePromoSpecification::FormatParameters,
+               FeaturePromoSpecification::FormatParameters),
               (override));
   MOCK_METHOD(bool,
               MaybeShowStartupPromo,
               (const base::Feature&,
-               FeaturePromoSpecification::StringReplacements,
                StartupPromoCallback,
-               BubbleCloseCallback),
+               BubbleCloseCallback,
+               FeaturePromoSpecification::FormatParameters,
+               FeaturePromoSpecification::FormatParameters),
               (override));
   MOCK_METHOD(bool,
               MaybeShowPromoForDemoPage,
-              (const base::Feature*,
-               FeaturePromoSpecification::StringReplacements,
-               BubbleCloseCallback),
+              (const base::Feature&,
+               BubbleCloseCallback,
+               FeaturePromoSpecification::FormatParameters,
+               FeaturePromoSpecification::FormatParameters),
               (override));
   MOCK_METHOD(FeaturePromoStatus,
               GetPromoStatus,
               (const base::Feature&),
               (const, override));
-  MOCK_METHOD(bool, EndPromo, (const base::Feature&), (override));
+  MOCK_METHOD(bool,
+              EndPromo,
+              (const base::Feature&, FeaturePromoCloseReason),
+              (override));
   MOCK_METHOD(FeaturePromoHandle,
               CloseBubbleAndContinuePromo,
               (const base::Feature&),
@@ -51,6 +59,11 @@ class MockFeaturePromoController : public FeaturePromoController {
               FinishContinuedPromo,
               (const base::Feature& iph_feature),
               (override));
+  MOCK_METHOD(bool,
+              HasPromoBeenDismissed,
+              (const base::Feature& iph_feature,
+               FeaturePromoStorageService::CloseReason* close_reason),
+              (const, override));
 
   base::WeakPtr<FeaturePromoController> GetAsWeakPtr() override;
 

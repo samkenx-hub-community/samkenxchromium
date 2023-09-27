@@ -15,8 +15,6 @@
 
 namespace user_education {
 
-DECLARE_CUSTOM_ELEMENT_EVENT_TYPE(kHelpBubbleAnchorBoundsChangedEvent);
-
 // HelpBubble is an interface for the lifecycle of an IPH or tutorial bubble.
 // it is implemented by a framework's bubble. It is returned as the result of
 // HelpBubbleFactory's CreateBubble...() method.

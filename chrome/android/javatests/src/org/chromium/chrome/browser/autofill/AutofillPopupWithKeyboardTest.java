@@ -21,17 +21,17 @@ import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.UrlUtils;
-import org.chromium.chrome.browser.autofill.PersonalDataManager.AutofillProfile;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.components.autofill.AutofillProfile;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.test.util.DOMUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.ui.DropdownPopupWindowInterface;
-import org.chromium.ui.R;
 
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -80,9 +80,18 @@ public class AutofillPopupWithKeyboardTest {
                 + "</select>"
                 + "<input type=\"submit\" />"
                 + "</form></body></html>"));
-        new AutofillTestHelper().setProfile(new AutofillProfile("", "https://www.example.com",
-                "" /* honorific prefix */, "John Smith", "Acme Inc", "1 Main\nApt A", "CA",
-                "San Francisco", "", "94102", "", "US", "(415) 888-9999", "john@acme.inc", "en"));
+        new AutofillTestHelper().setProfile(AutofillProfile.builder()
+                                                    .setFullName("John Smith")
+                                                    .setCompanyName("Acme Inc")
+                                                    .setStreetAddress("1 Main\nApt A")
+                                                    .setRegion("CA")
+                                                    .setLocality("San Francisco")
+                                                    .setPostalCode("94102")
+                                                    .setCountryCode("US")
+                                                    .setPhoneNumber("(415) 888-9999")
+                                                    .setEmailAddress("john@acme.inc")
+                                                    .setLanguageCode("en")
+                                                    .build());
         final AtomicReference<WebContents> webContentsRef = new AtomicReference<WebContents>();
         final AtomicReference<ViewGroup> viewRef = new AtomicReference<ViewGroup>();
         TestThreadUtils.runOnUiThreadBlocking(() -> {

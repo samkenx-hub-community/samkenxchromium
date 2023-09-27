@@ -35,6 +35,7 @@ import org.robolectric.shadow.api.Shadow;
 import org.robolectric.shadows.ShadowDialog;
 
 import org.chromium.base.test.BaseRobolectricTestRunner;
+import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.blink_public.common.ContextMenuDataMediaType;
 import org.chromium.chrome.R;
@@ -44,6 +45,8 @@ import org.chromium.chrome.browser.contextmenu.ContextMenuCoordinator.ListItemTy
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.browser_ui.widget.ContextMenuDialog;
 import org.chromium.components.embedder_support.contextmenu.ContextMenuParams;
 import org.chromium.content_public.browser.WebContents;
@@ -55,7 +58,6 @@ import org.chromium.ui.dragdrop.DragStateTracker;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
 import org.chromium.ui.modelutil.PropertyModel;
-import org.chromium.ui.util.AccessibilityUtil;
 import org.chromium.url.GURL;
 
 import java.lang.ref.WeakReference;
@@ -66,7 +68,7 @@ import java.util.List;
  * Unit tests for the context menu. Use density=mdpi so the screen density is 1.
  */
 @RunWith(BaseRobolectricTestRunner.class)
-@Features.DisableFeatures({ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU,
+@DisableFeatures({ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU,
         ChromeFeatureList.CONTEXT_MENU_POPUP_FOR_ALL_SCREEN_SIZES})
 public class ContextMenuCoordinatorTest {
     private static final int TOP_CONTENT_OFFSET_PX = 17;
@@ -88,7 +90,7 @@ public class ContextMenuCoordinatorTest {
                 int bottomMarginPx, View layout, View contentView, boolean isPopup,
                 boolean shouldRemoveScrim, @Nullable Integer popupMargin,
                 @Nullable Integer desiredPopupContentWidth, @Nullable View touchEventDelegateView,
-                Rect rect, @Nullable AccessibilityUtil accessibilityUtil) {
+                Rect rect) {
             mShouldRemoveScrim = shouldRemoveScrim;
             mTouchEventDelegateView = touchEventDelegateView;
             mRect = rect;
@@ -153,7 +155,7 @@ public class ContextMenuCoordinatorTest {
     public void testGetItemListWithImageLink() {
         final ContextMenuParams params = new ContextMenuParams(0, ContextMenuDataMediaType.IMAGE,
                 GURL.emptyGURL(), GURL.emptyGURL(), "", GURL.emptyGURL(), GURL.emptyGURL(), "",
-                null, false, 0, 0, 0, false);
+                null, false, 0, 0, 0, false, /*additionalNavigationParams=*/null);
         List<Pair<Integer, ModelList>> rawItems = new ArrayList<>();
         // Link items
         ModelList groupOne = new ModelList();
@@ -193,7 +195,7 @@ public class ContextMenuCoordinatorTest {
         // initialized. mediaType here doesn't have any effect on what we're testing.
         final ContextMenuParams params = new ContextMenuParams(0, ContextMenuDataMediaType.IMAGE,
                 GURL.emptyGURL(), GURL.emptyGURL(), "", GURL.emptyGURL(), GURL.emptyGURL(), "",
-                null, false, 0, 0, 0, false);
+                null, false, 0, 0, 0, false, /*additionalNavigationParams=*/null);
         List<Pair<Integer, ModelList>> rawItems = new ArrayList<>();
         // Link items
         ModelList groupOne = new ModelList();
@@ -219,7 +221,7 @@ public class ContextMenuCoordinatorTest {
     public void testGetItemListWithVideo() {
         final ContextMenuParams params = new ContextMenuParams(0, ContextMenuDataMediaType.VIDEO,
                 GURL.emptyGURL(), GURL.emptyGURL(), "", GURL.emptyGURL(), GURL.emptyGURL(), "",
-                null, false, 0, 0, 0, false);
+                null, false, 0, 0, 0, false, /*additionalNavigationParams=*/null);
         List<Pair<Integer, ModelList>> rawItems = new ArrayList<>();
         // Video items
         ModelList groupOne = new ModelList();
@@ -245,7 +247,8 @@ public class ContextMenuCoordinatorTest {
     }
 
     @Test
-    @Features.EnableFeatures({ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU,
+    @DisabledTest(message = "crbug.com/1444964")
+    @EnableFeatures({ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU,
             ChromeFeatureList.CONTEXT_MENU_POPUP_FOR_ALL_SCREEN_SIZES})
     @Config(shadows = {ShadowContextMenuDialog.class}, qualifiers = "mdpi")
     public void
@@ -307,7 +310,8 @@ public class ContextMenuCoordinatorTest {
 
     // clang-format off
     @Test
-    @Features.DisableFeatures(ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU)
+    @DisabledTest(message = "crbug.com/1444964")
+    @DisableFeatures(ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU)
     @Config(shadows = {ShadowContextMenuDialog.class, ShadowContextMenuHeaderCoordinator.class,
                     ShadowProfile.class},
             qualifiers = "mdpi")
@@ -336,7 +340,8 @@ public class ContextMenuCoordinatorTest {
     }
 
     @Test
-    @Features.EnableFeatures({ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU,
+    @DisabledTest(message = "crbug.com/1444964")
+    @EnableFeatures({ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU,
             ChromeFeatureList.CONTEXT_MENU_POPUP_FOR_ALL_SCREEN_SIZES})
     @Config(shadows = {ShadowContextMenuDialog.class, ShadowContextMenuHeaderCoordinator.class,
                     ShadowProfile.class},
@@ -404,7 +409,8 @@ public class ContextMenuCoordinatorTest {
             int triggeringTouchXDp, int triggeringTouchYDp) {
         final ContextMenuParams params = new ContextMenuParams(0, ContextMenuDataMediaType.IMAGE,
                 GURL.emptyGURL(), GURL.emptyGURL(), "", GURL.emptyGURL(), GURL.emptyGURL(), "",
-                null, false, triggeringTouchXDp, triggeringTouchYDp, 0, false);
+                null, false, triggeringTouchXDp, triggeringTouchYDp, 0, false,
+                /*additionalNavigationParams=*/null);
 
         final WindowAndroid windowAndroid = Mockito.mock(WindowAndroid.class);
         doReturn(new WeakReference<Activity>(mActivity)).when(windowAndroid).getActivity();

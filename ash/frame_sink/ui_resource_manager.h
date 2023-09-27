@@ -11,7 +11,6 @@
 #include "ash/ash_export.h"
 #include "ash/frame_sink/ui_resource.h"
 #include "base/containers/flat_map.h"
-#include "components/viz/common/resources/resource_format.h"
 #include "components/viz/common/resources/resource_id.h"
 #include "components/viz/common/resources/transferable_resource.h"
 #include "ui/gfx/geometry/size.h"
@@ -37,7 +36,7 @@ class ASH_EXPORT UiResourceManager {
   // `format` and `ui_source_id`. If there is no matching resource available, we
   // return `viz::kInvalidResourceId`.
   viz::ResourceId FindResourceToReuse(const gfx::Size& size,
-                                      viz::ResourceFormat format,
+                                      viz::SharedImageFormat format,
                                       UiSourceId ui_source_id) const;
 
   const UiResource* PeekAvailableResource(viz::ResourceId resource_id) const;

@@ -9,11 +9,11 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/ranges/algorithm.h"
 #include "base/task/single_thread_task_runner.h"
-#include "base/timer/elapsed_timer.h"
 #include "build/build_config.h"
 #include "cc/animation/animation_host.h"
 #include "cc/animation/animation_id_provider.h"
 #include "cc/mojo_embedder/async_layer_tree_frame_sink.h"
+#include "cc/raster/categorized_worker_pool.h"
 #include "cc/trees/layer_tree_host.h"
 #include "cc/trees/layer_tree_settings.h"
 #include "cc/trees/paint_holding_reason.h"
@@ -22,6 +22,7 @@
 #include "gpu/command_buffer/client/shared_memory_limits.h"
 #include "gpu/command_buffer/common/context_creation_attribs.h"
 #include "gpu/ipc/client/gpu_channel_host.h"
+#include "mojo/public/cpp/bindings/direct_receiver.h"
 #include "mojo/public/cpp/bindings/pending_associated_receiver.h"
 #include "mojo/public/cpp/bindings/pending_associated_remote.h"
 #include "services/viz/public/cpp/gpu/context_provider_command_buffer.h"
@@ -42,7 +43,7 @@
 #include "third_party/blink/renderer/platform/scheduler/public/page_scheduler.h"
 #include "third_party/blink/renderer/platform/scheduler/public/thread.h"
 #include "third_party/blink/renderer/platform/scheduler/public/widget_scheduler.h"
-#include "third_party/blink/renderer/platform/widget/compositing/categorized_worker_pool.h"
+#include "third_party/blink/renderer/platform/widget/compositing/blink_categorized_worker_pool_delegate.h"
 #include "third_party/blink/renderer/platform/widget/compositing/layer_tree_settings.h"
 #include "third_party/blink/renderer/platform/widget/compositing/layer_tree_view.h"
 #include "third_party/blink/renderer/platform/widget/compositing/render_frame_metadata_observer_impl.h"
@@ -184,6 +185,8 @@ void WidgetBase::InitializeCompositing(
   main_thread_compositor_task_runner_ =
       page_scheduler.GetAgentGroupScheduler().CompositorTaskRunner();
 
+  main_thread_id_ = base::PlatformThread::CurrentId();
+
   auto* compositing_thread_scheduler =
       ThreadScheduler::CompositorThreadScheduler();
   layer_tree_view_ = std::make_unique<LayerTreeView>(this, widget_scheduler_);
@@ -203,7 +206,8 @@ void WidgetBase::InitializeCompositing(
       compositing_thread_scheduler
           ? compositing_thread_scheduler->DefaultTaskRunner()
           : nullptr,
-      CategorizedWorkerPool::GetOrCreate());
+      cc::CategorizedWorkerPool::GetOrCreate(
+          &BlinkCategorizedWorkerPoolDelegate::Get()));
 
   FrameWidget* frame_widget = client_->FrameWidget();
 
@@ -406,7 +410,6 @@ void WidgetBase::UpdateVisualProperties(
   //   See also:
   //   https://docs.google.com/document/d/1G_fR1D_0c1yke8CqDMddoKrDGr3gy5t_ImEH4hKNIII/edit#
 
-  base::ElapsedTimer update_timer;
   VisualProperties visual_properties = visual_properties_from_browser;
   auto& screen_info = visual_properties.screen_infos.mutable_current();
 
@@ -435,8 +438,6 @@ void WidgetBase::UpdateVisualProperties(
                              screen_info.device_scale_factor));
 
   client_->UpdateVisualProperties(visual_properties);
-
-  LayerTreeHost()->IncrementVisualUpdateDuration(update_timer.Elapsed());
 }
 
 void WidgetBase::UpdateScreenRects(const gfx::Rect& widget_screen_rect,
@@ -494,6 +495,13 @@ void WidgetBase::RequestSuccessfulPresentationTimeForNextFrame(
   DCHECK(visible_time_request);
   if (is_hidden_)
     return;
+
+  if (visible_time_request->show_reason_unfolding) {
+    LayerTreeHost()->RequestSuccessfulPresentationTimeForNextFrame(
+        tab_switch_time_recorder_.GetCallbackForNextFrameAfterUnfold(
+            visible_time_request->event_start_time));
+    return;
+  }
 
   // Tab was shown while widget was already painting, eg. due to being
   // captured.
@@ -604,6 +612,10 @@ void WidgetBase::RequestNewLayerTreeFrameSink(
   auto params = std::make_unique<
       cc::mojo_embedder::AsyncLayerTreeFrameSink::InitParams>();
   params->io_thread_id = Platform::Current()->GetIOThreadId();
+  if (base::FeatureList::IsEnabled(::features::kEnableADPFRendererMain)) {
+    params->main_thread_id = main_thread_id_;
+  }
+
   params->compositor_task_runner =
       Platform::Current()->CompositorThreadTaskRunner();
   if (for_web_tests && !params->compositor_task_runner) {
@@ -611,6 +623,12 @@ void WidgetBase::RequestNewLayerTreeFrameSink(
     // not have that if we're running web tests in single threaded mode.
     // Set it to be our thread's task runner instead.
     params->compositor_task_runner = main_thread_compositor_task_runner_;
+  }
+
+  if (base::FeatureList::IsEnabled(features::kDirectCompositorThreadIpc) &&
+      !for_web_tests && params->compositor_task_runner &&
+      mojo::IsDirectReceiverSupported()) {
+    params->use_direct_client_receiver = true;
   }
 
   // The renderer runs animations and layout for animate_only BeginFrames.
@@ -621,8 +639,16 @@ void WidgetBase::RequestNewLayerTreeFrameSink(
   // back begin frame source, but using a synthetic begin frame source here
   // reduces latency when in this mode (at least for frames starting--it
   // potentially increases it for input on the other hand.)
-  if (LayerTreeHost()->GetSettings().disable_frame_rate_limit)
+  // TODO(b/221220344): Support dynamically setting the BeginFrameSource per VRR
+  // state changes.
+  const cc::LayerTreeSettings& settings = LayerTreeHost()->GetSettings();
+  if (settings.disable_frame_rate_limit ||
+      settings.enable_variable_refresh_rate) {
+    params->use_begin_frame_presentation_feedback =
+        base::FeatureList::IsEnabled(
+            features::kUseBeginFramePresentationFeedback);
     params->synthetic_begin_frame_source = CreateSyntheticBeginFrameSource();
+  }
 
   mojo::PendingReceiver<viz::mojom::blink::CompositorFrameSink>
       compositor_frame_sink_receiver = CrossVariantMojoReceiver<
@@ -635,7 +661,10 @@ void WidgetBase::RequestNewLayerTreeFrameSink(
       viz::mojom::blink::CompositorFrameSinkClientInterfaceBase>(
       compositor_frame_sink_client.InitWithNewPipeAndPassReceiver());
 
-  if (Platform::Current()->IsGpuCompositingDisabled()) {
+  static const bool gpu_channel_always_allowed =
+      base::FeatureList::IsEnabled(::features::kSharedBitmapToSharedImage);
+  if (Platform::Current()->IsGpuCompositingDisabled() &&
+      !gpu_channel_always_allowed) {
     DCHECK(!for_web_tests);
     widget_host_->CreateFrameSink(std::move(compositor_frame_sink_receiver),
                                   std::move(compositor_frame_sink_client));
@@ -644,7 +673,8 @@ void WidgetBase::RequestNewLayerTreeFrameSink(
         std::move(render_frame_metadata_observer_remote));
     std::move(callback).Run(
         std::make_unique<cc::mojo_embedder::AsyncLayerTreeFrameSink>(
-            nullptr, nullptr, params.get()),
+            /*context_provider=*/nullptr, /*worker_context_provider=*/nullptr,
+            /*shared_image_interface=*/nullptr, params.get()),
         std::move(render_frame_metadata_observer));
     return;
   }
@@ -686,16 +716,33 @@ void WidgetBase::FinishRequestNewLayerTreeFrameSink(
         params,
     LayerTreeFrameSinkCallback callback,
     scoped_refptr<gpu::GpuChannelHost> gpu_channel_host) {
-  if (Platform::Current()->IsGpuCompositingDisabled()) {
-    // GPU compositing was disabled after the check in
-    // WidgetBase::RequestNewLayerTreeFrameSink(). Fail and let it retry.
+  if (!gpu_channel_host) {
+    // Wait and try again. We may hear that the compositing mode has switched
+    // to software in the meantime.
     std::move(callback).Run(nullptr, nullptr);
     return;
   }
 
-  if (!gpu_channel_host) {
-    // Wait and try again. We may hear that the compositing mode has switched
-    // to software in the meantime.
+  static const bool gpu_channel_always_allowed =
+      base::FeatureList::IsEnabled(::features::kSharedBitmapToSharedImage);
+  if (Platform::Current()->IsGpuCompositingDisabled() &&
+      gpu_channel_always_allowed) {
+    widget_host_->CreateFrameSink(std::move(compositor_frame_sink_receiver),
+                                  std::move(compositor_frame_sink_client));
+    widget_host_->RegisterRenderFrameMetadataObserver(
+        std::move(render_frame_metadata_observer_client_receiver),
+        std::move(render_frame_metadata_observer_remote));
+    std::move(callback).Run(
+        std::make_unique<cc::mojo_embedder::AsyncLayerTreeFrameSink>(
+            /*context_provider=*/nullptr, /*worker_context_provider=*/nullptr,
+            gpu_channel_host->CreateClientSharedImageInterface(), params.get()),
+        std::move(render_frame_metadata_observer));
+    return;
+  }
+
+  if (Platform::Current()->IsGpuCompositingDisabled()) {
+    // GPU compositing was disabled after the check in
+    // WidgetBase::RequestNewLayerTreeFrameSink(). Fail and let it retry.
     std::move(callback).Run(nullptr, nullptr);
     return;
   }
@@ -727,15 +774,10 @@ void WidgetBase::FinishRequestNewLayerTreeFrameSink(
   // This is for an offscreen context for the compositor. So the default
   // framebuffer doesn't need alpha, depth, stencil, antialiasing.
   gpu::ContextCreationAttribs attributes;
-  attributes.alpha_size = -1;
-  attributes.depth_size = 0;
-  attributes.stencil_size = 0;
-  attributes.samples = 0;
-  attributes.sample_buffers = 0;
   attributes.bind_generates_resource = false;
   attributes.lose_context_when_out_of_memory = true;
   attributes.enable_gles2_interface = true;
-  attributes.enable_raster_interface = false;
+  attributes.enable_raster_interface = true;
   attributes.enable_oop_rasterization = false;
 
   constexpr bool automatic_flushes = false;
@@ -746,10 +788,9 @@ void WidgetBase::FinishRequestNewLayerTreeFrameSink(
 
   auto context_provider =
       base::MakeRefCounted<viz::ContextProviderCommandBuffer>(
-          gpu_channel_host, gpu_memory_buffer_manager, kGpuStreamIdDefault,
-          kGpuStreamPriorityDefault, gpu::kNullSurfaceHandle, GURL(url),
-          automatic_flushes, support_locking, support_grcontext, limits,
-          attributes,
+          gpu_channel_host, kGpuStreamIdDefault, kGpuStreamPriorityDefault,
+          gpu::kNullSurfaceHandle, GURL(url), automatic_flushes,
+          support_locking, support_grcontext, limits, attributes,
           viz::command_buffer_metrics::ContextType::RENDER_COMPOSITOR);
 
 #if BUILDFLAG(IS_ANDROID)
@@ -791,7 +832,8 @@ void WidgetBase::FinishRequestNewLayerTreeFrameSink(
   std::move(callback).Run(
       std::make_unique<cc::mojo_embedder::AsyncLayerTreeFrameSink>(
           std::move(context_provider),
-          std::move(worker_context_provider_wrapper), params.get()),
+          std::move(worker_context_provider_wrapper),
+          gpu_channel_host->CreateClientSharedImageInterface(), params.get()),
       std::move(render_frame_metadata_observer));
 }
 
@@ -878,7 +920,6 @@ void WidgetBase::SetCompositorVisible(bool visible) {
 }
 
 void WidgetBase::UpdateVisualState() {
-  base::ElapsedTimer update_timer;
   // When recording main frame metrics set the lifecycle reason to
   // kBeginMainFrame, because this is the calller of UpdateLifecycle
   // for the main frame. Otherwise, set the reason to kTests, which is
@@ -889,7 +930,6 @@ void WidgetBase::UpdateVisualState() {
           : DocumentUpdateReason::kTest;
   client_->UpdateLifecycle(WebLifecycleUpdate::kAll, lifecycle_reason);
   client_->SetSuppressFrameRequestsWorkaroundFor704763Only(false);
-  LayerTreeHost()->IncrementVisualUpdateDuration(update_timer.Elapsed());
 }
 
 void WidgetBase::BeginMainFrame(base::TimeTicks frame_time) {
@@ -1178,10 +1218,17 @@ void WidgetBase::UpdateCompositionInfo(bool immediate_request) {
   composition_character_bounds_ = character_bounds;
   composition_range_ = range;
 
+  absl::optional<Vector<gfx::Rect>> line_bounds;
+  FrameWidget* frame_widget = client_->FrameWidget();
+  if (base::FeatureList::IsEnabled(features::kReportVisibleLineBounds) &&
+      frame_widget) {
+    line_bounds = frame_widget->GetVisibleLineBoundsOnScreen();
+  }
+
   if (mojom::blink::WidgetInputHandlerHost* host =
           widget_input_handler_manager_->GetWidgetInputHandlerHost()) {
-    host->ImeCompositionRangeChanged(composition_range_,
-                                     composition_character_bounds_);
+    host->ImeCompositionRangeChanged(
+        composition_range_, composition_character_bounds_, line_bounds);
   }
 }
 

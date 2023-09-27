@@ -25,19 +25,28 @@ class LacrosDataBackwardMigrationScreen : public BaseScreen {
   LacrosDataBackwardMigrationScreen& operator=(
       const LacrosDataBackwardMigrationScreen&) = delete;
 
+  // Set `migrator_for_testing_`.
+  static void SetMigratorForTesting(BrowserDataBackMigratorBase* migrator);
+
  private:
   // BaseScreen:
   void ShowImpl() override;
   void HideImpl() override;
+  void OnUserAction(const base::Value::List& args) override;
 
   // Updates progress during migration.
   void OnProgress(int percent);
 
   // Called when migration is completed.
-  void OnMigrated(BrowserDataBackMigrator::Result result);
+  void OnMigrated(BrowserDataBackMigratorBase::Result result);
+
+  // Called when migration is canceled by the user.
+  void OnCanceled();
 
   base::WeakPtr<LacrosDataBackwardMigrationScreenView> view_;
-  std::unique_ptr<BrowserDataBackMigrator> migrator_;
+  std::unique_ptr<BrowserDataBackMigratorBase> migrator_;
+
+  static BrowserDataBackMigratorBase* migrator_for_testing_;
 
   base::WeakPtrFactory<LacrosDataBackwardMigrationScreen> weak_factory_{this};
 };

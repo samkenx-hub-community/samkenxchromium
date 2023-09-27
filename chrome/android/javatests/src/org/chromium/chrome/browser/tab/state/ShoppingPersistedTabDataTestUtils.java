@@ -209,7 +209,7 @@ public abstract class ShoppingPersistedTabDataTestUtils {
             MockTab tab = (MockTab) MockTab.createAndInitialize(tabId, isIncognito);
             tab.setIsInitialized(true);
             tab.setGurlOverrideForTesting(DEFAULT_GURL);
-            CriticalPersistedTabData.from(tab).setTimestampMillis(System.currentTimeMillis());
+            tab.setTimestampMillis(System.currentTimeMillis());
             res.set(tab);
         });
         return res.get();
@@ -336,7 +336,7 @@ public abstract class ShoppingPersistedTabDataTestUtils {
             }
         })
                 .when(optimizationGuideJni)
-                .canApplyOptimizationAsync(
+                .canApplyOptimization(
                         anyLong(), any(GURL.class), anyInt(), any(OptimizationGuideCallback.class));
     }
 
@@ -357,7 +357,7 @@ public abstract class ShoppingPersistedTabDataTestUtils {
     static void verifyOptimizationGuideCalledWithNavigationHandle(
             OptimizationGuideBridge.Natives optimizationGuideJni, GURL gurl) {
         verify(optimizationGuideJni, times(1))
-                .canApplyOptimizationAsync(anyLong(), eq(gurl),
+                .canApplyOptimization(anyLong(), eq(gurl),
                         eq(HintsProto.OptimizationType.PRICE_TRACKING.getNumber()),
                         any(OptimizationGuideCallback.class));
     }

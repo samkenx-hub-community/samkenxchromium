@@ -16,24 +16,23 @@ import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import android.accounts.Account;
 import android.app.Activity;
 import android.os.Bundle;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.lifecycle.Stage;
 
 import androidx.fragment.app.Fragment;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.runner.lifecycle.Stage;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
@@ -43,7 +42,6 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
 import org.chromium.base.test.BaseActivityTestRule;
-import org.chromium.base.test.metrics.HistogramTestRule;
 import org.chromium.base.test.util.ApplicationTestUtils;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CommandLineFlags.Add;
@@ -51,7 +49,6 @@ import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.HistogramWatcher;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.firstrun.FirstRunPageDelegate;
 import org.chromium.chrome.browser.firstrun.SyncConsentFirstRunFragment;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -59,9 +56,11 @@ import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.signin.services.SigninMetricsUtils.State;
-import org.chromium.chrome.browser.sync.SyncService;
+import org.chromium.chrome.browser.sync.SyncServiceFactory;
+import org.chromium.chrome.test.AutomotiveContextWrapperTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ActivityTestUtils;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
@@ -74,7 +73,6 @@ import org.chromium.components.signin.identitymanager.ConsentLevel;
 import org.chromium.components.signin.identitymanager.IdentityManager;
 import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.sync.UserSelectableType;
-import org.chromium.content_public.browser.test.NativeLibraryTestUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.ui.test.util.BlankUiTestActivity;
 import org.chromium.ui.test.util.ViewUtils;
@@ -95,9 +93,9 @@ public class SyncConsentFragmentTest {
     // TODO(https://crbug.com/1414078): Use ALL_SELECTABLE_TYPES defined in {@link SyncServiceImpl}
     // here.
     private static final Set<Integer> ALL_CLANK_SYNCABLE_DATA_TYPES = Set.of(
-            UserSelectableType.AUTOFILL, UserSelectableType.BOOKMARKS, UserSelectableType.PASSWORDS,
-            UserSelectableType.PREFERENCES, UserSelectableType.TABS, UserSelectableType.HISTORY,
-            UserSelectableType.READING_LIST);
+            UserSelectableType.AUTOFILL, UserSelectableType.PAYMENTS, UserSelectableType.BOOKMARKS,
+            UserSelectableType.PASSWORDS, UserSelectableType.PREFERENCES, UserSelectableType.TABS,
+            UserSelectableType.HISTORY, UserSelectableType.READING_LIST);
     private static final Set<Integer> HISTORY_SYNC_DATA_TYPES =
             Set.of(UserSelectableType.HISTORY, UserSelectableType.TABS);
 
@@ -118,8 +116,8 @@ public class SyncConsentFragmentTest {
         }
 
         @Override
-        protected void updateAccounts(List<Account> accounts) {
-            super.updateAccounts(accounts);
+        protected void updateAccounts(List<CoreAccountInfo> coreAccountInfos) {
+            super.updateAccounts(coreAccountInfos);
             mIsUpdateAccountCalled = true;
         }
     }
@@ -134,7 +132,7 @@ public class SyncConsentFragmentTest {
     public final SigninTestRule mSigninTestRule = new SigninTestRule();
 
     @Rule
-    public final HistogramTestRule mHistogramTestRule = new HistogramTestRule();
+    public AutomotiveContextWrapperTestRule mAutoTestRule = new AutomotiveContextWrapperTestRule();
 
     @Rule
     public final ChromeTabbedActivityTestRule mChromeActivityTestRule =
@@ -160,20 +158,11 @@ public class SyncConsentFragmentTest {
 
     private SyncConsentActivity mSyncConsentActivity;
 
-    @BeforeClass
-    public static void setUpBeforeActivityLaunched() {
-        // Only needs to be loaded once and needs to be loaded before HistogramTestRule.
-        // TODO(https://crbug.com/1211884): Revise after HistogramTestRule is revised to not require
-        // native loading.
-        NativeLibraryTestUtils.loadNativeLibraryNoBrowserProcess();
-    }
-
     @Before
     public void setUp() {
         when(mExternalAuthUtilsMock.canUseGooglePlayServices(any())).thenReturn(true);
         ExternalAuthUtils.setInstanceForTesting(mExternalAuthUtilsMock);
         mActivityTestRule.setFinishActivity(true);
-        mChromeActivityTestRule.startMainActivityOnBlankPage();
     }
 
     @After
@@ -188,8 +177,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentDefaultAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -205,8 +195,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testTangibleSyncConsentFragmentDefaultAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -224,6 +215,7 @@ public class SyncConsentFragmentTest {
     @Feature("RenderTest")
     @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC + ":group_id/2"})
     public void testTangibleSyncConsentFragmentVariantBDefaultAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -241,6 +233,7 @@ public class SyncConsentFragmentTest {
     @Feature("RenderTest")
     @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC + ":group_id/3"})
     public void testTangibleSyncConsentFragmentVariantCDefaultAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -257,7 +250,9 @@ public class SyncConsentFragmentTest {
     @LargeTest
     @Feature("RenderTest")
     @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC + ":group_id/4"})
+    @DisabledTest(message = "crbug.com/1473253")
     public void testTangibleSyncConsentFragmentVariantDDefaultAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -275,6 +270,7 @@ public class SyncConsentFragmentTest {
     @Feature("RenderTest")
     @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC + ":group_id/5"})
     public void testTangibleSyncConsentFragmentVariantEDefaultAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -292,6 +288,7 @@ public class SyncConsentFragmentTest {
     @Feature("RenderTest")
     @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC + ":group_id/6"})
     public void testTangibleSyncConsentFragmentVariantFDefaultAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -307,8 +304,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentNewAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         mSigninTestRule.setResultForNextAddAccountFlow(Activity.RESULT_CANCELED, null);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
                 InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
@@ -323,8 +321,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentNotDefaultAccountWithPrimaryAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSigninTestRule.addAccount("test.second.account@gmail.com");
@@ -341,9 +340,10 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testTangibleSyncConsentFragmentNotDefaultAccountWithSecondaryAccount()
             throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         String secondAccountName = "test.second.account@gmail.com";
         mSigninTestRule.addAccount(secondAccountName);
@@ -361,8 +361,9 @@ public class SyncConsentFragmentTest {
     @LargeTest
     @Feature("RenderTest")
     @DisabledTest(message = "crbug.com/1304737")
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentWithChildAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo = mSigninTestRule.addChildTestAccountThenWaitForSignin();
         mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -377,10 +378,10 @@ public class SyncConsentFragmentTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
-    @EnableFeatures({ChromeFeatureList.HIDE_NON_DISPLAYABLE_ACCOUNT_EMAIL})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentWithChildAccountWithNonDisplayableAccountEmail()
             throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo = mSigninTestRule.addAccount(
                 SigninTestRule.generateChildEmail(AccountManagerTestRule.TEST_ACCOUNT_EMAIL),
                 SigninTestRule.NON_DISPLAYABLE_EMAIL_ACCOUNT_CAPABILITIES);
@@ -397,11 +398,11 @@ public class SyncConsentFragmentTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
-    @EnableFeatures({ChromeFeatureList.HIDE_NON_DISPLAYABLE_ACCOUNT_EMAIL})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void
     testSyncConsentFragmentWithChildAccountWithNonDisplayableAccountEmailWithEmptyDisplayName()
             throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo = mSigninTestRule.addAccount(
                 SigninTestRule.generateChildEmail(AccountManagerTestRule.TEST_ACCOUNT_EMAIL), "",
                 "", null, SigninTestRule.NON_DISPLAYABLE_EMAIL_ACCOUNT_CAPABILITIES);
@@ -420,8 +421,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testFRESyncConsentFragmentWithNoAccountsOnDevice() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         var startPageHistogram = HistogramWatcher.newSingleRecordWatcher(
                 "Signin.SigninStartedAccessPoint", SigninAccessPoint.START_PAGE);
         CustomSyncConsentFirstRunFragment fragment = new CustomSyncConsentFirstRunFragment();
@@ -439,8 +441,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testFRESyncConsentFragmentWithAdultAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         var startPageHistogram = HistogramWatcher.newSingleRecordWatcher(
                 "Signin.SigninStartedAccessPoint", SigninAccessPoint.START_PAGE);
         mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
@@ -459,8 +462,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testFRETangibleSyncConsentFragmentWithAdultAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         var startPageHistogram = HistogramWatcher.newSingleRecordWatcher(
                 "Signin.SigninStartedAccessPoint", SigninAccessPoint.START_PAGE);
         mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
@@ -479,8 +483,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testFRESyncConsentFragmentWithChildAccount() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         var startPageHistogram = HistogramWatcher.newSingleRecordWatcher(
                 "Signin.SigninStartedAccessPoint", SigninAccessPoint.START_PAGE);
         mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
@@ -504,8 +509,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testFRESyncConsentFragmentWhenSignedInWithoutSync() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         mSigninTestRule.addTestAccountThenSignin();
         CustomSyncConsentFirstRunFragment fragment = new CustomSyncConsentFirstRunFragment();
         Bundle bundle = new Bundle();
@@ -520,8 +526,10 @@ public class SyncConsentFragmentTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
+    @DisabledTest(message = "https://crbug.com/1449158")
     public void testFRESyncConsentFragmentWhenSelectedAccountIsRemoved() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         final CoreAccountInfo defaultAccount =
                 mSigninTestRule.addAccount("test.default.account@gmail.com");
         final CoreAccountInfo primaryAccount = mSigninTestRule.addTestAccountThenSignin();
@@ -543,8 +551,9 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @Feature("RenderTest")
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testFRESyncConsentFragmentWhenSignedInWithoutSyncDynamically() throws IOException {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CustomSyncConsentFirstRunFragment fragment = new CustomSyncConsentFirstRunFragment();
         Bundle bundle = new Bundle();
         bundle.putBoolean(SyncConsentFirstRunFragment.IS_CHILD_ACCOUNT, false);
@@ -565,8 +574,10 @@ public class SyncConsentFragmentTest {
 
     @Test
     @LargeTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
-    public void testClickingSettingsDoesNotSetFirstSetupComplete() {
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
+    @DisabledTest(message = "crbug.com/1462981")
+    public void testClickingSettingsDoesNotSetInitialSyncFeatureSetupComplete() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -585,10 +596,11 @@ public class SyncConsentFragmentTest {
                     .hasPrimaryAccount(ConsentLevel.SYNC);
         });
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertTrue(SyncService.get().isSyncRequested());
-            assertFalse(SyncService.get().isFirstSetupComplete());
-            assertEquals(ALL_CLANK_SYNCABLE_DATA_TYPES, SyncService.get().getSelectedTypes());
-            assertTrue(SyncService.get().hasKeepEverythingSynced());
+            assertTrue(SyncServiceFactory.get().hasSyncConsent());
+            assertFalse(SyncServiceFactory.get().isInitialSyncFeatureSetupComplete());
+            assertEquals(
+                    ALL_CLANK_SYNCABLE_DATA_TYPES, SyncServiceFactory.get().getSelectedTypes());
+            assertTrue(SyncServiceFactory.get().hasKeepEverythingSynced());
         });
         // Close the SettingsActivity.
         onView(withId(R.id.cancel_button)).perform(click());
@@ -596,8 +608,10 @@ public class SyncConsentFragmentTest {
 
     @Test
     @LargeTest
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
-    public void testClickingSettingsDoesNotSetFirstSetupCompleteWithTangibleSync() {
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
+    @DisabledTest(message = "crbug.com/1462981")
+    public void testClickingSettingsDoesNotSetInitialSyncFeatureSetupCompleteWithTangibleSync() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -616,10 +630,10 @@ public class SyncConsentFragmentTest {
                     .hasPrimaryAccount(ConsentLevel.SYNC);
         });
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertTrue(SyncService.get().isSyncRequested());
-            assertFalse(SyncService.get().isFirstSetupComplete());
-            assertEquals(HISTORY_SYNC_DATA_TYPES, SyncService.get().getSelectedTypes());
-            assertFalse(SyncService.get().hasKeepEverythingSynced());
+            assertTrue(SyncServiceFactory.get().hasSyncConsent());
+            assertFalse(SyncServiceFactory.get().isInitialSyncFeatureSetupComplete());
+            assertEquals(HISTORY_SYNC_DATA_TYPES, SyncServiceFactory.get().getSelectedTypes());
+            assertFalse(SyncServiceFactory.get().hasKeepEverythingSynced());
         });
         // Close the SettingsActivity.
         onView(withId(R.id.cancel_button)).perform(click());
@@ -628,6 +642,7 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     public void testClickingSettingsThenCancelForChildIsNoOp() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo = mSigninTestRule.addChildTestAccountThenWaitForSignin();
         // Check the user is not consented to sync.
         CriteriaHelper.pollUiThread(() -> {
@@ -651,8 +666,8 @@ public class SyncConsentFragmentTest {
                     .hasPrimaryAccount(ConsentLevel.SYNC);
         });
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertTrue(SyncService.get().isSyncRequested());
-            assertFalse(SyncService.get().isFirstSetupComplete());
+            assertTrue(SyncServiceFactory.get().hasSyncConsent());
+            assertFalse(SyncServiceFactory.get().isInitialSyncFeatureSetupComplete());
         });
         // Click the cancel button to exit the activity.
         onView(withId(R.id.cancel_button)).perform(click());
@@ -670,8 +685,9 @@ public class SyncConsentFragmentTest {
 
     @Test
     @LargeTest
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testTangibleSyncConsentFragmentWhenSelectedAccountIsRemoved() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         mSigninTestRule.addAccount("test.default.account@gmail.com");
         CoreAccountInfo selectedAccountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
@@ -689,8 +705,9 @@ public class SyncConsentFragmentTest {
 
     @Test
     @LargeTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testFRESyncConsentFragmentWithoutSelectedAccount() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CustomSyncConsentFirstRunFragment fragment = new CustomSyncConsentFirstRunFragment();
         Bundle bundle = new Bundle();
         bundle.putBoolean(SyncConsentFirstRunFragment.IS_CHILD_ACCOUNT, false);
@@ -705,8 +722,9 @@ public class SyncConsentFragmentTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentWithDefaultFlow() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         var settingsHistogram = HistogramWatcher.newSingleRecordWatcher(
                 "Signin.SigninStartedAccessPoint", SigninAccessPoint.SETTINGS);
         mSigninTestRule.setResultForNextAddAccountFlow(Activity.RESULT_CANCELED, null);
@@ -718,16 +736,19 @@ public class SyncConsentFragmentTest {
         onView(withId(R.id.button_primary)).check(matches(withText(R.string.signin_add_account)));
         onView(withId(R.id.button_secondary)).check(matches(withText(R.string.cancel)));
         settingsHistogram.assertExpected();
+        // As there is no account on the device, the set of selected types will be empty. Sync Setup
+        // UI in this case does not link to the types list.
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertEquals(ALL_CLANK_SYNCABLE_DATA_TYPES, SyncService.get().getSelectedTypes());
-            assertTrue(SyncService.get().hasKeepEverythingSynced());
+            assertEquals(Set.of(), SyncServiceFactory.get().getSelectedTypes());
+            assertTrue(SyncServiceFactory.get().hasKeepEverythingSynced());
         });
     }
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSelectNonDefaultAccountInAccountPickerDialog() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         var bookmarkHistogram = HistogramWatcher.newSingleRecordWatcher(
                 "Signin.SigninStartedAccessPoint", SigninAccessPoint.BOOKMARK_MANAGER);
         CoreAccountInfo defaultAccountInfo =
@@ -753,9 +774,15 @@ public class SyncConsentFragmentTest {
 
     @Test
     @LargeTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentAddAccountFlowSucceeded() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         mSigninTestRule.setResultForNextAddAccountFlow(Activity.RESULT_OK, NEW_ACCOUNT_NAME);
+        HistogramWatcher addAccountStateHistogram =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("Signin.AddAccountState", State.REQUESTED, State.STARTED,
+                                State.SUCCEEDED)
+                        .build();
 
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
                 InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
@@ -765,24 +792,21 @@ public class SyncConsentFragmentTest {
                 });
 
         onView(withText(NEW_ACCOUNT_NAME)).check(matches(isDisplayed()));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.REQUESTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount("Signin.AddAccountState", State.STARTED));
-        // Poll for this histogram as it's recorded asynchronously.
-        CriteriaHelper.pollUiThread(() -> {
-            return mHistogramTestRule.getHistogramValueCount(
-                           "Signin.AddAccountState", State.SUCCEEDED)
-                    == 1;
-        });
+        // Poll for these histograms as SUCCEEDED is recorded asynchronously.
+        addAccountStateHistogram.pollInstrumentationThreadUntilSatisfied();
     }
 
     @Test
     @LargeTest
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testTangibleSyncConsentFragmentAddAccountFlowSucceeded() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         mSigninTestRule.setResultForNextAddAccountFlow(Activity.RESULT_OK, NEW_ACCOUNT_NAME);
+        HistogramWatcher addAccountStateHistogram =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("Signin.AddAccountState", State.REQUESTED, State.STARTED,
+                                State.SUCCEEDED)
+                        .build();
 
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
                 InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
@@ -794,21 +818,14 @@ public class SyncConsentFragmentTest {
 
         // Wait for the added account to be visible.
         onView(withId(R.id.sync_consent_title)).check(matches(isDisplayed()));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.REQUESTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount("Signin.AddAccountState", State.STARTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.SUCCEEDED));
-        assertEquals(3, mHistogramTestRule.getHistogramTotalCount("Signin.AddAccountState"));
+        addAccountStateHistogram.assertExpected();
     }
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testTangibleSyncConsentFragmentOnlyEnablesSpecificDataTypes() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -827,8 +844,8 @@ public class SyncConsentFragmentTest {
         });
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertEquals(HISTORY_SYNC_DATA_TYPES, SyncService.get().getSelectedTypes());
-            assertFalse(SyncService.get().hasKeepEverythingSynced());
+            assertEquals(HISTORY_SYNC_DATA_TYPES, SyncServiceFactory.get().getSelectedTypes());
+            assertFalse(SyncServiceFactory.get().hasKeepEverythingSynced());
         });
     }
 
@@ -836,6 +853,7 @@ public class SyncConsentFragmentTest {
     @MediumTest
     @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC + ":group_id/6"})
     public void testTangibleSyncConsentFragmentGroupFEnablesAllDataTypes() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -854,16 +872,23 @@ public class SyncConsentFragmentTest {
         });
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertEquals(ALL_CLANK_SYNCABLE_DATA_TYPES, SyncService.get().getSelectedTypes());
-            assertTrue(SyncService.get().hasKeepEverythingSynced());
+            assertEquals(
+                    ALL_CLANK_SYNCABLE_DATA_TYPES, SyncServiceFactory.get().getSelectedTypes());
+            assertTrue(SyncServiceFactory.get().hasKeepEverythingSynced());
         });
     }
 
     @Test
     @LargeTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentAddAccountFlowCancelled() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         mSigninTestRule.setResultForNextAddAccountFlow(Activity.RESULT_CANCELED, null);
+        HistogramWatcher addAccountStateHistogram =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("Signin.AddAccountState", State.REQUESTED, State.STARTED,
+                                State.CANCELLED)
+                        .build();
 
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
                 InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
@@ -873,22 +898,20 @@ public class SyncConsentFragmentTest {
                 });
 
         onView(withText(R.string.signin_add_account)).check(matches(isDisplayed()));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.REQUESTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount("Signin.AddAccountState", State.STARTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.CANCELLED));
-        assertEquals(3, mHistogramTestRule.getHistogramTotalCount("Signin.AddAccountState"));
+        addAccountStateHistogram.assertExpected();
     }
 
     @Test
     @LargeTest
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testTangibleSyncConsentFragmentAddAccountFlowCancelled() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         mSigninTestRule.setResultForNextAddAccountFlow(Activity.RESULT_CANCELED, null);
+        HistogramWatcher addAccountStateHistogram =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("Signin.AddAccountState", State.REQUESTED, State.STARTED,
+                                State.CANCELLED)
+                        .build();
 
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
                 InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
@@ -900,21 +923,19 @@ public class SyncConsentFragmentTest {
 
         // SyncConsentActivity is destroyed if add account flow is cancelled.
         ApplicationTestUtils.waitForActivityState(mSyncConsentActivity, Stage.DESTROYED);
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.REQUESTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount("Signin.AddAccountState", State.STARTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.CANCELLED));
-        assertEquals(3, mHistogramTestRule.getHistogramTotalCount("Signin.AddAccountState"));
+        addAccountStateHistogram.assertExpected();
     }
 
     @Test
     @LargeTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentAddAccountFlowFailed() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
+        HistogramWatcher addAccountStateHistogram =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("Signin.AddAccountState", State.REQUESTED, State.FAILED)
+                        .build();
+
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
                 InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
                     SyncConsentActivityLauncherImpl.get().launchActivityForPromoAddAccountFlow(
@@ -925,18 +946,19 @@ public class SyncConsentFragmentTest {
         // In this case the sync consent activity will be backgrounded and android settings page
         // will be shown.
         ApplicationTestUtils.waitForActivityState(mSyncConsentActivity, Stage.STOPPED);
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.REQUESTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount("Signin.AddAccountState", State.FAILED));
-        assertEquals(2, mHistogramTestRule.getHistogramTotalCount("Signin.AddAccountState"));
+        addAccountStateHistogram.assertExpected();
     }
 
     @Test
     @LargeTest
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testTangibleSyncConsentFragmentAddAccountFlowFailed() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
+        HistogramWatcher addAccountStateHistogram =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("Signin.AddAccountState", State.REQUESTED, State.FAILED)
+                        .build();
+
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
                 InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
                     SyncConsentActivityLauncherImpl.get()
@@ -947,19 +969,20 @@ public class SyncConsentFragmentTest {
 
         // SyncConsentActivity is destroyed if add account flow fails.
         ApplicationTestUtils.waitForActivityState(mSyncConsentActivity, Stage.DESTROYED);
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.REQUESTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount("Signin.AddAccountState", State.FAILED));
-        assertEquals(2, mHistogramTestRule.getHistogramTotalCount("Signin.AddAccountState"));
+        addAccountStateHistogram.assertExpected();
     }
 
     @Test
     @LargeTest
-    @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testSyncConsentFragmentAddAccountFlowReturnedNullAccountName() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
         mSigninTestRule.setResultForNextAddAccountFlow(Activity.RESULT_OK, null);
+        HistogramWatcher addAccountStateHistogram =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("Signin.AddAccountState", State.REQUESTED, State.STARTED,
+                                State.SUCCEEDED, State.NULL_ACCOUNT_NAME)
+                        .build();
 
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
                 InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
@@ -969,24 +992,19 @@ public class SyncConsentFragmentTest {
                 });
 
         onView(withText(R.string.signin_add_account)).check(matches(isDisplayed()));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.REQUESTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount("Signin.AddAccountState", State.STARTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.SUCCEEDED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.NULL_ACCOUNT_NAME));
-        assertEquals(4, mHistogramTestRule.getHistogramTotalCount("Signin.AddAccountState"));
+        addAccountStateHistogram.assertExpected();
     }
 
     @Test
     @LargeTest
-    @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
+    @EnableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
     public void testTangibleSyncConsentFragmentAddAccountFlowReturnedNullAccountName() {
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
+        HistogramWatcher addAccountStateHistogram =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords("Signin.AddAccountState", State.REQUESTED, State.STARTED,
+                                State.SUCCEEDED, State.NULL_ACCOUNT_NAME)
+                        .build();
         mSigninTestRule.setResultForNextAddAccountFlow(Activity.RESULT_OK, null);
 
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -999,18 +1017,192 @@ public class SyncConsentFragmentTest {
 
         // SyncConsentActivity is destroyed if the add account flow returns null account name.
         ApplicationTestUtils.waitForActivityState(mSyncConsentActivity, Stage.DESTROYED);
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.REQUESTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount("Signin.AddAccountState", State.STARTED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.SUCCEEDED));
-        assertEquals(1,
-                mHistogramTestRule.getHistogramValueCount(
-                        "Signin.AddAccountState", State.NULL_ACCOUNT_NAME));
-        assertEquals(4, mHistogramTestRule.getHistogramTotalCount("Signin.AddAccountState"));
+        addAccountStateHistogram.assertExpected();
+    }
+
+    @Test
+    @LargeTest
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
+    public void testAutomotiveDevice_deviceLockCreated_syncAcceptedSuccessfully()
+            throws IOException {
+        mAutoTestRule.setIsAutomotive(true);
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
+        CoreAccountInfo accountInfo =
+                mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
+        mSyncConsentActivity = ActivityTestUtils.waitForActivity(
+                InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
+                    SyncConsentActivityLauncherImpl.get().launchActivityForPromoDefaultFlow(
+                            mChromeActivityTestRule.getActivity(),
+                            SigninAccessPoint.BOOKMARK_MANAGER, accountInfo.getEmail());
+                });
+
+        // Should display the sync page, clicking the 'more' button to scroll down if needed.
+        if (mSyncConsentActivity.findViewById(R.id.more_button).isShown()) {
+            onView(withId(R.id.more_button)).perform(click());
+        }
+        onView(withText(R.string.signin_accept_button)).check(matches(isDisplayed()));
+        onView(withText(R.string.signin_accept_button)).perform(click());
+
+        // Accepting the sync on an automotive device should take the user to the device lock page.
+        onView(withId(R.id.device_lock_title)).check(matches(isDisplayed()));
+        onView(withText(R.string.signin_accept_button)).check(doesNotExist());
+
+        simulateDeviceLockReady();
+
+        // Wait for the sync consent to be set and the activity has finished.
+        CriteriaHelper.pollUiThread(() -> {
+            return IdentityServicesProvider.get()
+                    .getSigninManager(Profile.getLastUsedRegularProfile())
+                    .getIdentityManager()
+                    .hasPrimaryAccount(ConsentLevel.SYNC);
+        });
+        onView(withId(R.id.device_lock_title)).check(doesNotExist());
+        ApplicationTestUtils.waitForActivityState(mSyncConsentActivity, Stage.DESTROYED);
+    }
+
+    @Test
+    @LargeTest
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
+    public void testAutomotiveDevice_deviceLockRefused_syncRefused() throws IOException {
+        mAutoTestRule.setIsAutomotive(true);
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
+        CoreAccountInfo accountInfo =
+                mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
+        mSyncConsentActivity = ActivityTestUtils.waitForActivity(
+                InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
+                    SyncConsentActivityLauncherImpl.get().launchActivityForPromoDefaultFlow(
+                            mChromeActivityTestRule.getActivity(),
+                            SigninAccessPoint.BOOKMARK_MANAGER, accountInfo.getEmail());
+                });
+
+        // Should display the sync page, clicking the 'more' button to scroll down if needed.
+        if (mSyncConsentActivity.findViewById(R.id.more_button).isShown()) {
+            onView(withId(R.id.more_button)).perform(click());
+        }
+        onView(withText(R.string.signin_accept_button)).check(matches(isDisplayed()));
+        onView(withText(R.string.signin_accept_button)).perform(click());
+
+        // Accepting the sync on an automotive device should take the user to the device lock page.
+        onView(withId(R.id.device_lock_title)).check(matches(isDisplayed()));
+        onView(withText(R.string.signin_accept_button)).check(doesNotExist());
+
+        simulateDeviceLockRefused();
+
+        // Check that the user is not consented to sync and the activity has finished.
+        CriteriaHelper.pollUiThread(() -> {
+            return !IdentityServicesProvider.get()
+                            .getSigninManager(Profile.getLastUsedRegularProfile())
+                            .getIdentityManager()
+                            .hasPrimaryAccount(ConsentLevel.SYNC);
+        });
+        onView(withId(R.id.device_lock_title)).check(doesNotExist());
+        ApplicationTestUtils.waitForActivityState(mSyncConsentActivity, Stage.DESTROYED);
+    }
+
+    @Test
+    @LargeTest
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
+    @DisabledTest(message = "crbug.com/1462981")
+    public void testAutomotiveDevice_tryNavigateViaClickableSpan_deviceLockCreated() {
+        mAutoTestRule.setIsAutomotive(true);
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
+        CoreAccountInfo accountInfo =
+                mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
+        mSyncConsentActivity = ActivityTestUtils.waitForActivity(
+                InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
+                    SyncConsentActivityLauncherImpl.get().launchActivityForPromoDefaultFlow(
+                            mChromeActivityTestRule.getActivity(), SigninAccessPoint.SETTINGS,
+                            accountInfo.getEmail());
+                });
+
+        onView(withText(accountInfo.getEmail())).check(matches(isDisplayed()));
+
+        // Should display the sync page, clicking the 'more' button to scroll down if needed.
+        if (mSyncConsentActivity.findViewById(R.id.more_button).isShown()) {
+            onView(withId(R.id.more_button)).perform(click());
+        }
+        onView(withId(R.id.signin_details_description)).perform(ViewUtils.clickOnClickableSpan(0));
+
+        simulateDeviceLockReady();
+
+        // Wait for sync opt-in process to finish.
+        CriteriaHelper.pollUiThread(() -> {
+            return IdentityServicesProvider.get()
+                    .getSigninManager(Profile.getLastUsedRegularProfile())
+                    .getIdentityManager()
+                    .hasPrimaryAccount(ConsentLevel.SYNC);
+        });
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            assertTrue("The service should have recorded user consent for sync.",
+                    SyncServiceFactory.get().hasSyncConsent());
+            assertFalse("Sync feature setup should not be complete without the confirm button "
+                            + "being clicked.",
+                    SyncServiceFactory.get().isInitialSyncFeatureSetupComplete());
+            assertEquals("All syncable data types should be selected by default.",
+                    ALL_CLANK_SYNCABLE_DATA_TYPES, SyncServiceFactory.get().getSelectedTypes());
+            assertTrue("All data types should be enabled for sync.",
+                    SyncServiceFactory.get().hasKeepEverythingSynced());
+        });
+
+        // Close the SettingsActivity.
+        onView(withId(R.id.cancel_button)).perform(click());
+    }
+
+    @Test
+    @LargeTest
+    @DisableFeatures(ChromeFeatureList.TANGIBLE_SYNC)
+    public void testAutomotiveDevice_tryNavigateViaClickableSpan_deviceLockRefused() {
+        mAutoTestRule.setIsAutomotive(true);
+        mChromeActivityTestRule.startMainActivityOnBlankPage();
+        CoreAccountInfo accountInfo =
+                mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
+        mSyncConsentActivity = ActivityTestUtils.waitForActivity(
+                InstrumentationRegistry.getInstrumentation(), SyncConsentActivity.class, () -> {
+                    SyncConsentActivityLauncherImpl.get().launchActivityForPromoDefaultFlow(
+                            mChromeActivityTestRule.getActivity(), SigninAccessPoint.SETTINGS,
+                            accountInfo.getEmail());
+                });
+
+        onView(withText(accountInfo.getEmail())).check(matches(isDisplayed()));
+
+        // Should display the sync page, clicking the 'more' button to scroll down if needed.
+        if (mSyncConsentActivity.findViewById(R.id.more_button).isShown()) {
+            onView(withId(R.id.more_button)).perform(click());
+        }
+        onView(withId(R.id.signin_details_description)).perform(ViewUtils.clickOnClickableSpan(0));
+
+        simulateDeviceLockRefused();
+
+        // Check that the user is not consented to sync and the activity has finished.
+        CriteriaHelper.pollUiThread(() -> {
+            return !IdentityServicesProvider.get()
+                            .getSigninManager(Profile.getLastUsedRegularProfile())
+                            .getIdentityManager()
+                            .hasPrimaryAccount(ConsentLevel.SYNC);
+        });
+        onView(withId(R.id.device_lock_title)).check(doesNotExist());
+        ApplicationTestUtils.waitForActivityState(mSyncConsentActivity, Stage.DESTROYED);
+    }
+
+    private void simulateDeviceLockReady() {
+        SyncConsentFragment syncConsentFragment =
+                (SyncConsentFragment) mSyncConsentActivity.getSupportFragmentManager()
+                        .findFragmentById(R.id.fragment_container);
+        assertNotNull("The SyncConsentActivity should contain the SyncConsentFragment!",
+                syncConsentFragment);
+        TestThreadUtils.runOnUiThreadBlocking(syncConsentFragment::onDeviceLockReady);
+    }
+
+    private void simulateDeviceLockRefused() {
+        SyncConsentFragment syncConsentFragment =
+                (SyncConsentFragment) mSyncConsentActivity.getSupportFragmentManager()
+                        .findFragmentById(R.id.fragment_container);
+        assertNotNull("The SyncConsentActivity should contain the SyncConsentFragment!",
+                syncConsentFragment);
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            syncConsentFragment.onDeviceLockRefused();
+            assertFalse(syncConsentFragment.getDeviceLockReadyForTesting());
+        });
     }
 
     private void launchActivityWithFragment(Fragment fragment) {

@@ -170,7 +170,13 @@ uint64_t HardwareDisplayPlaneManagerTest::GetPlanePropertyValue(
 using HardwareDisplayPlaneManagerLegacyTest = HardwareDisplayPlaneManagerTest;
 using HardwareDisplayPlaneManagerAtomicTest = HardwareDisplayPlaneManagerTest;
 
-TEST_P(HardwareDisplayPlaneManagerTest, ResettingConnectorCache) {
+// TODO(crbug.com/1431767): Re-enable this test
+#if defined(LEAK_SANITIZER)
+#define MAYBE_ResettingConnectorCache DISABLED_ResettingConnectorCache
+#else
+#define MAYBE_ResettingConnectorCache ResettingConnectorCache
+#endif
+TEST_P(HardwareDisplayPlaneManagerTest, MAYBE_ResettingConnectorCache) {
   const int connector_and_crtc_count = 3;
   auto drm_state = MockDrmDevice::MockDrmState::CreateStateWithDefaultObjects(
       connector_and_crtc_count,
@@ -212,7 +218,8 @@ TEST_P(HardwareDisplayPlaneManagerTest, ResettingConnectorCache) {
   drm_state.connector_properties[connector_and_crtc_count - 1].id =
       kConnectorIdBase + 3;
   fake_drm_->UpdateStateBesidesPlaneManager(drm_state);
-  fake_drm_->plane_manager()->ResetConnectorsCache(fake_drm_->GetResources());
+  fake_drm_->plane_manager()->ResetConnectorsCacheAndGetValidIds(
+      fake_drm_->GetResources());
 
   {
     CommitRequest commit_request;
@@ -438,7 +445,13 @@ TEST_P(HardwareDisplayPlaneManagerLegacyTest, CheckFramebufferFormatMatch) {
       &state_, assigns, fake_drm_->crtc_property(0).id));
 }
 
-TEST_P(HardwareDisplayPlaneManagerAtomicTest, Modeset) {
+// TODO(crbug.com/1431767): Re-enable this test
+#if defined(LEAK_SANITIZER)
+#define MAYBE_Modeset DISABLED_Modeset
+#else
+#define MAYBE_Modeset Modeset
+#endif
+TEST_P(HardwareDisplayPlaneManagerAtomicTest, MAYBE_Modeset) {
   auto drm_state = MockDrmDevice::MockDrmState::CreateStateWithDefaultObjects(
       /*crtc_count=*/1, /*planes_per_crtc=*/1);
   fake_drm_->InitializeState(drm_state, /*use_atomic=*/true);
@@ -474,7 +487,13 @@ TEST_P(HardwareDisplayPlaneManagerAtomicTest, DisableModeset) {
   EXPECT_EQ(1, fake_drm_->get_commit_count());
 }
 
-TEST_P(HardwareDisplayPlaneManagerAtomicTest, CheckPropsAfterModeset) {
+// TODO(crbug.com/1431767): Re-enable this test
+#if defined(LEAK_SANITIZER)
+#define MAYBE_CheckPropsAfterModeset DISABLED_CheckPropsAfterModeset
+#else
+#define MAYBE_CheckPropsAfterModeset CheckPropsAfterModeset
+#endif
+TEST_P(HardwareDisplayPlaneManagerAtomicTest, MAYBE_CheckPropsAfterModeset) {
   auto drm_state = MockDrmDevice::MockDrmState::CreateStateWithDefaultObjects(
       /*crtc_count=*/1, /*planes_per_crtc=*/1);
   fake_drm_->InitializeState(drm_state, /*use_atomic=*/true);
@@ -511,7 +530,13 @@ TEST_P(HardwareDisplayPlaneManagerAtomicTest, CheckPropsAfterModeset) {
   EXPECT_EQ(kModePropId, crtc_prop_for_name.id);
 }
 
-TEST_P(HardwareDisplayPlaneManagerAtomicTest, CheckPropsAfterDisable) {
+// TODO(crbug.com/1431767): Re-enable this test
+#if defined(LEAK_SANITIZER)
+#define MAYBE_CheckPropsAfterDisable DISABLED_CheckPropsAfterDisable
+#else
+#define MAYBE_CheckPropsAfterDisable CheckPropsAfterDisable
+#endif
+TEST_P(HardwareDisplayPlaneManagerAtomicTest, MAYBE_CheckPropsAfterDisable) {
   auto drm_state = MockDrmDevice::MockDrmState::CreateStateWithDefaultObjects(
       /*crtc_count=*/1, /*planes_per_crtc=*/1);
   fake_drm_->InitializeState(drm_state, /*use_atomic=*/true);
@@ -548,7 +573,13 @@ TEST_P(HardwareDisplayPlaneManagerAtomicTest, CheckPropsAfterDisable) {
   EXPECT_EQ(0U, crtc_prop_for_name.value);
 }
 
-TEST_P(HardwareDisplayPlaneManagerAtomicTest, CheckVrrAfterModeset) {
+// TODO(crbug.com/1431767): Re-enable this test
+#if defined(LEAK_SANITIZER)
+#define MAYBE_CheckVrrAfterModeset DISABLED_CheckVrrAfterModeset
+#else
+#define MAYBE_CheckVrrAfterModeset CheckVrrAfterModeset
+#endif
+TEST_P(HardwareDisplayPlaneManagerAtomicTest, MAYBE_CheckVrrAfterModeset) {
   auto drm_state = MockDrmDevice::MockDrmState::CreateStateWithDefaultObjects(
       /*crtc_count=*/1, /*planes_per_crtc=*/2);
   drm_state.crtc_properties[0].properties.push_back(
@@ -1426,7 +1457,7 @@ FakeFenceFD::FakeFenceFD() {
 
 std::unique_ptr<gfx::GpuFence> FakeFenceFD::GetGpuFence() const {
   gfx::GpuFenceHandle handle;
-  handle.owned_fd = base::ScopedFD(HANDLE_EINTR(dup(read_fd.get())));
+  handle.Adopt(base::ScopedFD(HANDLE_EINTR(dup(read_fd.get()))));
   return std::make_unique<gfx::GpuFence>(std::move(handle));
 }
 
@@ -1637,9 +1668,10 @@ TEST_P(HardwareDisplayPlaneManagerAtomicTest, OverlaySourceCrop) {
 
   {
     DrmOverlayPlaneList assigns;
-    assigns.emplace_back(
-        fake_buffer_, 0, gfx::OverlayTransform::OVERLAY_TRANSFORM_NONE,
-        gfx::Rect(kDefaultBufferSize), gfx::RectF(0, 0, .5, 1), false, nullptr);
+    assigns.emplace_back(fake_buffer_, 0,
+                         gfx::OverlayTransform::OVERLAY_TRANSFORM_NONE,
+                         gfx::Rect(), gfx::Rect(kDefaultBufferSize),
+                         gfx::RectF(0, 0, .5, 1), false, nullptr);
 
     fake_drm_->plane_manager()->BeginFrame(&state_);
     EXPECT_TRUE(fake_drm_->plane_manager()->AssignOverlayPlanes(
@@ -1659,7 +1691,7 @@ TEST_P(HardwareDisplayPlaneManagerAtomicTest, OverlaySourceCrop) {
     DrmOverlayPlaneList assigns;
     assigns.emplace_back(fake_buffer_, 0,
                          gfx::OverlayTransform::OVERLAY_TRANSFORM_NONE,
-                         gfx::Rect(kDefaultBufferSize),
+                         gfx::Rect(), gfx::Rect(kDefaultBufferSize),
                          gfx::RectF(0, 0, .999, .501), false, nullptr);
 
     fake_drm_->plane_manager()->BeginFrame(&state_);
@@ -1682,10 +1714,12 @@ class HardwareDisplayPlaneAtomicMock : public HardwareDisplayPlaneAtomic {
   HardwareDisplayPlaneAtomicMock() : HardwareDisplayPlaneAtomic(1) {}
   ~HardwareDisplayPlaneAtomicMock() override = default;
 
-  bool AssignPlaneProps(uint32_t crtc_id,
+  bool AssignPlaneProps(DrmDevice* drm,
+                        uint32_t crtc_id,
                         uint32_t framebuffer,
                         const gfx::Rect& crtc_rect,
                         const gfx::Rect& src_rect,
+                        const gfx::Rect& damage_rect,
                         const gfx::OverlayTransform transform,
                         int in_fence_fd,
                         uint32_t format_fourcc,

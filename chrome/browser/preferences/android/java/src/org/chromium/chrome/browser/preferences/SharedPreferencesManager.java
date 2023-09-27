@@ -11,7 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.ContextUtils;
-import org.chromium.base.StrictModeContext;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.annotations.CalledByNative;
 import org.chromium.build.BuildConfig;
 
@@ -31,49 +31,6 @@ public class SharedPreferencesManager {
     }
 
     /**
-     * @return The SharedPreferencesManager singleton.
-     */
-    @CalledByNative
-    public static SharedPreferencesManager getInstance() {
-        return LazyHolder.INSTANCE;
-    }
-
-    private BaseChromePreferenceKeyChecker mKeyChecker;
-
-    private SharedPreferencesManager() {
-        maybeInitializeChecker();
-        // In production builds, use a dummy key checker.
-        if (mKeyChecker == null) {
-            mKeyChecker = new BaseChromePreferenceKeyChecker();
-        }
-    }
-
-    @VisibleForTesting
-    SharedPreferencesManager(BaseChromePreferenceKeyChecker keyChecker) {
-        mKeyChecker = keyChecker;
-    }
-
-    private void maybeInitializeChecker() {
-        // Create a working key checker, which does not happen in production builds.
-        if (BuildConfig.ENABLE_ASSERTS) {
-            mKeyChecker = ChromePreferenceKeyChecker.getInstance();
-        }
-    }
-
-    @VisibleForTesting
-    BaseChromePreferenceKeyChecker swapKeyCheckerForTesting(
-            BaseChromePreferenceKeyChecker newChecker) {
-        BaseChromePreferenceKeyChecker swappedOut = mKeyChecker;
-        mKeyChecker = newChecker;
-        return swappedOut;
-    }
-
-    @VisibleForTesting
-    public void disableKeyCheckerForTesting() {
-        mKeyChecker = new BaseChromePreferenceKeyChecker();
-    }
-
-    /**
      * Observes preference changes.
      */
     public interface Observer {
@@ -84,8 +41,34 @@ public class SharedPreferencesManager {
         void onPreferenceChanged(String key);
     }
 
+    private PreferenceKeyChecker mKeyChecker;
+
     private final Map<Observer, SharedPreferences.OnSharedPreferenceChangeListener> mObservers =
             new HashMap<>();
+
+    /**
+     * @return The SharedPreferencesManager singleton.
+     */
+    @CalledByNative
+    public static SharedPreferencesManager getInstance() {
+        return LazyHolder.INSTANCE;
+    }
+
+    private SharedPreferencesManager() {
+        mKeyChecker = BuildConfig.ENABLE_ASSERTS ? new StrictPreferenceKeyChecker()
+                                                 : new NoOpPreferenceKeyChecker();
+    }
+
+    @VisibleForTesting
+    SharedPreferencesManager(PreferenceKeyChecker keyChecker) {
+        mKeyChecker = keyChecker;
+    }
+
+    public void disableKeyCheckerForTesting() {
+        PreferenceKeyChecker swappedOut = mKeyChecker;
+        mKeyChecker = new NoOpPreferenceKeyChecker();
+        ResettersForTesting.register(() -> mKeyChecker = swappedOut);
+    }
 
     /**
      * @param observer The {@link Observer} to be added for observing preference changes.
@@ -210,10 +193,7 @@ public class SharedPreferencesManager {
         mKeyChecker.checkIsKeyInUse(key);
         SharedPreferences.Editor ed = ContextUtils.getAppSharedPreferences().edit();
         ed.putInt(key, value);
-
-        try (StrictModeContext ignored = StrictModeContext.allowDiskWrites()) {
-            return ed.commit();
-        }
+        return ed.commit();
     }
 
     /**
@@ -244,11 +224,10 @@ public class SharedPreferencesManager {
      * @param defaultValue The default value to return if the preference is not set.
      * @return The value of the preference.
      */
+    @CalledByNative
     public int readInt(String key, int defaultValue) {
         mKeyChecker.checkIsKeyInUse(key);
-        try (StrictModeContext ignored = StrictModeContext.allowDiskReads()) {
-            return ContextUtils.getAppSharedPreferences().getInt(key, defaultValue);
-        }
+        return ContextUtils.getAppSharedPreferences().getInt(key, defaultValue);
     }
 
     /**
@@ -297,10 +276,7 @@ public class SharedPreferencesManager {
         mKeyChecker.checkIsKeyInUse(key);
         SharedPreferences.Editor ed = ContextUtils.getAppSharedPreferences().edit();
         ed.putLong(key, value);
-
-        try (StrictModeContext ignored = StrictModeContext.allowDiskWrites()) {
-            return ed.commit();
-        }
+        return ed.commit();
     }
 
     /**
@@ -335,9 +311,7 @@ public class SharedPreferencesManager {
      */
     public long readLong(String key, long defaultValue) {
         mKeyChecker.checkIsKeyInUse(key);
-        try (StrictModeContext ignored = StrictModeContext.allowDiskReads()) {
-            return ContextUtils.getAppSharedPreferences().getLong(key, defaultValue);
-        }
+        return ContextUtils.getAppSharedPreferences().getLong(key, defaultValue);
     }
 
     /**
@@ -374,10 +348,7 @@ public class SharedPreferencesManager {
         mKeyChecker.checkIsKeyInUse(key);
         SharedPreferences.Editor ed = ContextUtils.getAppSharedPreferences().edit();
         ed.putFloat(key, value);
-
-        try (StrictModeContext ignored = StrictModeContext.allowDiskWrites()) {
-            return ed.commit();
-        }
+        return ed.commit();
     }
 
     /**
@@ -402,9 +373,7 @@ public class SharedPreferencesManager {
      */
     public float readFloat(String key, float defaultValue) {
         mKeyChecker.checkIsKeyInUse(key);
-        try (StrictModeContext ignored = StrictModeContext.allowDiskReads()) {
-            return ContextUtils.getAppSharedPreferences().getFloat(key, defaultValue);
-        }
+        return ContextUtils.getAppSharedPreferences().getFloat(key, defaultValue);
     }
 
     /**
@@ -455,13 +424,11 @@ public class SharedPreferencesManager {
     public Double readDouble(String key, double defaultValue) {
         mKeyChecker.checkIsKeyInUse(key);
         SharedPreferences prefs = ContextUtils.getAppSharedPreferences();
-        try (StrictModeContext ignored = StrictModeContext.allowDiskReads()) {
-            if (!prefs.contains(key)) {
-                return defaultValue;
-            }
-            long ieee754LongValue = prefs.getLong(key, 0L);
-            return Double.longBitsToDouble(ieee754LongValue);
+        if (!prefs.contains(key)) {
+            return defaultValue;
         }
+        long ieee754LongValue = prefs.getLong(key, 0L);
+        return Double.longBitsToDouble(ieee754LongValue);
     }
 
     /**
@@ -505,10 +472,7 @@ public class SharedPreferencesManager {
         mKeyChecker.checkIsKeyInUse(key);
         SharedPreferences.Editor ed = ContextUtils.getAppSharedPreferences().edit();
         ed.putBoolean(key, value);
-
-        try (StrictModeContext ignored = StrictModeContext.allowDiskWrites()) {
-            return ed.commit();
-        }
+        return ed.commit();
     }
 
     /**
@@ -534,9 +498,7 @@ public class SharedPreferencesManager {
     @CalledByNative
     public boolean readBoolean(String key, boolean defaultValue) {
         mKeyChecker.checkIsKeyInUse(key);
-        try (StrictModeContext ignored = StrictModeContext.allowDiskReads()) {
-            return ContextUtils.getAppSharedPreferences().getBoolean(key, defaultValue);
-        }
+        return ContextUtils.getAppSharedPreferences().getBoolean(key, defaultValue);
     }
 
     /**
@@ -555,6 +517,7 @@ public class SharedPreferencesManager {
      * @param key The name of the preference to modify.
      * @param value The new value for the preference.
      */
+    @CalledByNative
     public void writeString(String key, String value) {
         mKeyChecker.checkIsKeyInUse(key);
         SharedPreferences.Editor ed = ContextUtils.getAppSharedPreferences().edit();
@@ -572,10 +535,7 @@ public class SharedPreferencesManager {
         mKeyChecker.checkIsKeyInUse(key);
         SharedPreferences.Editor ed = ContextUtils.getAppSharedPreferences().edit();
         ed.putString(key, value);
-
-        try (StrictModeContext ignored = StrictModeContext.allowDiskWrites()) {
-            return ed.commit();
-        }
+        return ed.commit();
     }
 
     /**
@@ -599,11 +559,10 @@ public class SharedPreferencesManager {
      * @return The value of the preference if stored; defaultValue otherwise.
      */
     @Nullable
+    @CalledByNative
     public String readString(String key, @Nullable String defaultValue) {
         mKeyChecker.checkIsKeyInUse(key);
-        try (StrictModeContext ignored = StrictModeContext.allowDiskReads()) {
-            return ContextUtils.getAppSharedPreferences().getString(key, defaultValue);
-        }
+        return ContextUtils.getAppSharedPreferences().getString(key, defaultValue);
     }
 
     /**

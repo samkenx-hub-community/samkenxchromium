@@ -26,7 +26,7 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 #if BUILDFLAG(IS_IOS)
-#include "base/message_loop/message_pump_mac.h"
+#include "base/message_loop/message_pump_apple.h"
 #elif BUILDFLAG(IS_ANDROID)
 #include "base/message_loop/message_pump_android.h"
 #endif
@@ -56,52 +56,42 @@ BASE_FEATURE(kRunTasksByBatches,
 // instead of waiting for next DoIdleWork.
 BASE_FEATURE(kUseLessHighResTimers,
              "UseLessHighResTimers",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+std::atomic_bool g_use_less_high_res_timers = true;
+
+// If enabled, high resolution timer will be used all the time on Windows. This
+// is for test only.
+BASE_FEATURE(kAlwaysUseHighResTimers,
+             "AlwaysUseHighResTimers",
              base::FEATURE_DISABLED_BY_DEFAULT);
-std::atomic_bool g_use_less_high_res_timers = false;
 #endif
 
-std::atomic_bool g_align_wake_ups = false;
 std::atomic_bool g_run_tasks_by_batches = false;
-#if BUILDFLAG(IS_WIN)
-bool g_explicit_high_resolution_timer_win = false;
-#endif  // BUILDFLAG(IS_WIN)
 
-TimeTicks WakeUpRunTime(const WakeUp& wake_up) {
-  // Windows relies on the low resolution timer rather than manual wake up
-  // alignment.
-#if BUILDFLAG(IS_WIN)
-  if (g_explicit_high_resolution_timer_win)
-    return wake_up.earliest_time();
-#else  // BUILDFLAG(IS_WIN)
-  if (g_align_wake_ups.load(std::memory_order_relaxed)) {
-    TimeTicks aligned_run_time = wake_up.earliest_time().SnappedToNextTick(
-        TimeTicks(), GetTaskLeewayForCurrentThread());
-    return std::min(aligned_run_time, wake_up.latest_time());
+base::TimeDelta GetLeewayForWakeUp(absl::optional<WakeUp> wake_up) {
+  if (!wake_up || wake_up->delay_policy == subtle::DelayPolicy::kPrecise) {
+    return TimeDelta();
   }
-#endif
-  return wake_up.time;
+  return wake_up->leeway;
 }
 
 }  // namespace
 
 // static
 void ThreadControllerWithMessagePumpImpl::InitializeFeatures() {
-  g_align_wake_ups = FeatureList::IsEnabled(kAlignWakeUps);
   g_run_tasks_by_batches.store(FeatureList::IsEnabled(kRunTasksByBatches),
                                std::memory_order_relaxed);
 #if BUILDFLAG(IS_WIN)
-  g_explicit_high_resolution_timer_win =
-      FeatureList::IsEnabled(kExplicitHighResolutionTimerWin);
   g_use_less_high_res_timers.store(
       FeatureList::IsEnabled(kUseLessHighResTimers), std::memory_order_relaxed);
+  if (FeatureList::IsEnabled(kAlwaysUseHighResTimers)) {
+    Time::ActivateHighResolutionTimer(true);
+  }
 #endif
 }
 
 // static
 void ThreadControllerWithMessagePumpImpl::ResetFeatures() {
-  g_align_wake_ups.store(
-      kAlignWakeUps.default_state == FEATURE_ENABLED_BY_DEFAULT,
-      std::memory_order_relaxed);
   g_run_tasks_by_batches.store(
       kRunTasksByBatches.default_state == FEATURE_ENABLED_BY_DEFAULT,
       std::memory_order_relaxed);
@@ -176,13 +166,8 @@ void ThreadControllerWithMessagePumpImpl::BindToCurrentThread(
 void ThreadControllerWithMessagePumpImpl::SetWorkBatchSize(
     int work_batch_size) {
   DCHECK_GE(work_batch_size, 1);
+  CHECK(main_thread_only().can_change_batch_size);
   main_thread_only().work_batch_size = work_batch_size;
-}
-
-void ThreadControllerWithMessagePumpImpl::SetTimerSlack(
-    TimerSlack timer_slack) {
-  DCHECK(RunsTasksInCurrentSequence());
-  pump_->SetTimerSlack(timer_slack);
 }
 
 void ThreadControllerWithMessagePumpImpl::WillQueueTask(
@@ -207,27 +192,27 @@ void ThreadControllerWithMessagePumpImpl::SetNextDelayedDoWork(
     LazyNow* lazy_now,
     absl::optional<WakeUp> wake_up) {
   DCHECK(!wake_up || !wake_up->is_immediate());
-  TimeTicks run_time =
-      wake_up.has_value() ? WakeUpRunTime(*wake_up) : TimeTicks::Max();
-  DCHECK_LT(lazy_now->Now(), run_time);
-
-  if (main_thread_only().next_delayed_do_work == run_time)
-    return;
-  main_thread_only().next_delayed_do_work = run_time;
-
   // It's very rare for PostDelayedTask to be called outside of a DoWork in
   // production, so most of the time this does nothing.
-  if (work_deduplicator_.OnDelayedWorkRequested() ==
+  if (work_deduplicator_.OnDelayedWorkRequested() !=
       ShouldScheduleWork::kScheduleImmediate) {
-    // Cap at one day but remember the exact time for the above equality check
-    // on the next round.
-    if (!run_time.is_max())
-      run_time = CapAtOneDay(run_time, lazy_now);
-    // |pump_| can't be null as all postTasks are cross-thread before binding,
-    // and delayed cross-thread postTasks do the thread hop through an immediate
-    // task.
-    pump_->ScheduleDelayedWork({run_time, lazy_now->Now()});
+    return;
   }
+  TimeTicks run_time =
+      wake_up.has_value()
+          ? pump_->AjdustDelayedRunTime(wake_up->earliest_time(), wake_up->time,
+                                        wake_up->latest_time())
+          : TimeTicks::Max();
+  DCHECK_LT(lazy_now->Now(), run_time);
+
+  if (!run_time.is_max()) {
+    run_time = CapAtOneDay(run_time, lazy_now);
+  }
+  // |pump_| can't be null as all postTasks are cross-thread before binding,
+  // and delayed cross-thread postTasks do the thread hop through an immediate
+  // task.
+  pump_->ScheduleDelayedWork(
+      {run_time, GetLeewayForWakeUp(wake_up), lazy_now->Now()});
 }
 
 bool ThreadControllerWithMessagePumpImpl::RunsTasksInCurrentSequence() {
@@ -367,20 +352,19 @@ ThreadControllerWithMessagePumpImpl::DoWork() {
 
   // Special-casing here avoids unnecessarily sampling Now() when out of work.
   if (!next_wake_up) {
-    main_thread_only().next_delayed_do_work = TimeTicks::Max();
     next_work_info.delayed_run_time = TimeTicks::Max();
     return next_work_info;
   }
 
   // The MessagePump will schedule the wake up on our behalf, so we need to
-  // update |main_thread_only().next_delayed_do_work|.
-  main_thread_only().next_delayed_do_work = WakeUpRunTime(*next_wake_up);
+  // update |next_work_info.delayed_run_time|.
+  TimeTicks next_delayed_do_work = pump_->AjdustDelayedRunTime(
+      next_wake_up->earliest_time(), next_wake_up->time,
+      next_wake_up->latest_time());
 
   // Don't request a run time past |main_thread_only().quit_runloop_after|.
-  if (main_thread_only().next_delayed_do_work >
-      main_thread_only().quit_runloop_after) {
-    main_thread_only().next_delayed_do_work =
-        main_thread_only().quit_runloop_after;
+  if (next_delayed_do_work > main_thread_only().quit_runloop_after) {
+    next_delayed_do_work = main_thread_only().quit_runloop_after;
     // If we've passed |quit_runloop_after| there's no more work to do.
     if (continuation_lazy_now.Now() >= main_thread_only().quit_runloop_after) {
       next_work_info.delayed_run_time = TimeTicks::Max();
@@ -388,8 +372,9 @@ ThreadControllerWithMessagePumpImpl::DoWork() {
     }
   }
 
-  next_work_info.delayed_run_time = CapAtOneDay(
-      main_thread_only().next_delayed_do_work, &continuation_lazy_now);
+  next_work_info.delayed_run_time =
+      CapAtOneDay(next_delayed_do_work, &continuation_lazy_now);
+  next_work_info.leeway = GetLeewayForWakeUp(next_wake_up);
   next_work_info.recent_now = continuation_lazy_now.Now();
   return next_work_info;
 }
@@ -447,8 +432,8 @@ absl::optional<WakeUp> ThreadControllerWithMessagePumpImpl::DoWorkImpl(
                                                        select_task_option);
     LazyNow lazy_now_task_selected(time_source_);
     run_level_tracker_.OnApplicationTaskSelected(
-        (selected_task && selected_task->task->delayed_run_time.is_null())
-            ? selected_task->task->queue_time
+        (selected_task && selected_task->task.delayed_run_time.is_null())
+            ? selected_task->task.queue_time
             : TimeTicks(),
         lazy_now_task_selected);
     if (!selected_task) {
@@ -468,20 +453,25 @@ absl::optional<WakeUp> ThreadControllerWithMessagePumpImpl::DoWorkImpl(
     {
       // Always track the start of the task, as this is low-overhead.
       TaskAnnotator::LongTaskTracker long_task_tracker(
-          time_source_, *selected_task->task, &task_annotator_);
+          time_source_, selected_task->task, &task_annotator_);
 
       // Note: all arguments after task are just passed to a TRACE_EVENT for
       // logging so lambda captures are safe as lambda is executed inline.
       SequencedTaskSource* source = main_thread_only().task_source;
       task_annotator_.RunTask(
-          "ThreadControllerImpl::RunTask", *selected_task->task,
+          "ThreadControllerImpl::RunTask", selected_task->task,
           [&selected_task, &source](perfetto::EventContext& ctx) {
-            if (selected_task->task_execution_trace_logger)
+            if (selected_task->task_execution_trace_logger) {
               selected_task->task_execution_trace_logger.Run(
-                  ctx, *selected_task->task);
+                  ctx, selected_task->task);
+            }
             source->MaybeEmitTaskDetails(ctx, selected_task.value());
           });
     }
+
+    // Reset `selected_task` before the call to `DidRunTask()` below makes its
+    // `PendingTask` reference dangling.
+    selected_task.reset();
 
     LazyNow lazy_now_after_run_task(time_source_);
     main_thread_only().task_source->DidRunTask(lazy_now_after_run_task);
@@ -718,6 +708,9 @@ void ThreadControllerWithMessagePumpImpl::DetachFromMessagePump() {
 }
 #elif BUILDFLAG(IS_ANDROID)
 void ThreadControllerWithMessagePumpImpl::AttachToMessagePump() {
+  CHECK(main_thread_only().work_batch_size == 1);
+  // Aborting the message pump currently relies on the batch size being 1.
+  main_thread_only().can_change_batch_size = false;
   static_cast<MessagePumpForUI*>(pump_.get())->Attach(this);
 }
 #endif

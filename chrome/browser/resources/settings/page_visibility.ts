@@ -15,6 +15,7 @@ export interface PageVisibility {
   defaultBrowser?: boolean;
   downloads?: boolean;
   extensions?: boolean;
+  getMostChrome?: boolean;
   languages?: boolean;
   onStartup?: boolean;
   people?: boolean;
@@ -22,12 +23,14 @@ export interface PageVisibility {
   privacy?: boolean|PrivacyPageVisibility;
   reset?: boolean;
   safetyCheck?: boolean;
+  safetyHub?: boolean;
   system?: boolean;
 }
 
 export interface AppearancePageVisibility {
   bookmarksBar: boolean;
   homeButton: boolean;
+  hoverCardImages: boolean;
   pageZoom: boolean;
   setTheme: boolean;
   sidePanel: boolean;
@@ -55,6 +58,7 @@ if (loadTimeData.getBoolean('isGuest')) {
     defaultBrowser: false,
     downloads: false,
     extensions: false,
+    getMostChrome: false,
     languages: false,
     onStartup: false,
     people: false,
@@ -62,6 +66,7 @@ if (loadTimeData.getBoolean('isGuest')) {
     privacy: false,
     reset: false,
     safetyCheck: false,
+    safetyHub: false,
     system: false,
   };
   // </if>
@@ -72,9 +77,11 @@ if (loadTimeData.getBoolean('isGuest')) {
     onStartup: false,
     reset: false,
     safetyCheck: false,
+    safetyHub: false,
     appearance: {
       setTheme: false,
       homeButton: false,
+      hoverCardImages: false,
       bookmarksBar: false,
       pageZoom: false,
       sidePanel: false,
@@ -87,6 +94,7 @@ if (loadTimeData.getBoolean('isGuest')) {
     downloads: true,
     a11y: true,
     extensions: false,
+    getMostChrome: false,
     languages: true,
     performance: false,
   };

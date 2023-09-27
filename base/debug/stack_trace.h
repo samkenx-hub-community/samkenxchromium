@@ -64,6 +64,16 @@ BASE_EXPORT uintptr_t GetStackEnd();
 // can later see where the given object was created from.
 class BASE_EXPORT StackTrace {
  public:
+#if BUILDFLAG(IS_ANDROID)
+  // TODO(https://crbug.com/925525): Testing indicates that Android has issues
+  // with a larger value here, so leave Android at 62.
+  static constexpr size_t kMaxTraces = 62;
+#else
+  // For other platforms, use 250. This seems reasonable without
+  // being huge.
+  static constexpr size_t kMaxTraces = 250;
+#endif
+
   // Creates a stacktrace from the current location.
   StackTrace();
 
@@ -124,17 +134,7 @@ class BASE_EXPORT StackTrace {
   void InitTrace(const _CONTEXT* context_record);
 #endif
 
-#if BUILDFLAG(IS_ANDROID)
-  // TODO(https://crbug.com/925525): Testing indicates that Android has issues
-  // with a larger value here, so leave Android at 62.
-  static constexpr int kMaxTraces = 62;
-#else
-  // For other platforms, use 250. This seems reasonable without
-  // being huge.
-  static constexpr int kMaxTraces = 250;
-#endif
-
-  void* trace_[kMaxTraces];
+  const void* trace_[kMaxTraces];
 
   // The number of valid frames in |trace_|.
   size_t count_;
@@ -145,7 +145,7 @@ BASE_EXPORT std::ostream& operator<<(std::ostream& os, const StackTrace& s);
 
 // Record a stack trace with up to |count| frames into |trace|. Returns the
 // number of frames read.
-BASE_EXPORT size_t CollectStackTrace(void** trace, size_t count);
+BASE_EXPORT size_t CollectStackTrace(const void** trace, size_t count);
 
 #if BUILDFLAG(CAN_UNWIND_WITH_FRAME_POINTERS)
 

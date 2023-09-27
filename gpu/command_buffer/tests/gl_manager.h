@@ -71,12 +71,8 @@ class GLManager : private GpuControl {
     bool force_shader_name_hashing = false;
     // Whether the buffer is multisampled.
     bool multisampled = false;
-    // Whether the backbuffer has an alpha channel.
-    bool backbuffer_alpha = true;
     // If we should use native gmb for backbuffer.
     bool should_use_native_gmb_for_backbuffer = false;
-    // Whether to preserve the backbuffer after a call to SwapBuffers().
-    bool preserve_backbuffer = false;
     // Shared memory limits
     SharedMemoryLimits shared_memory_limits = {};
   };
@@ -104,6 +100,8 @@ class GLManager : private GpuControl {
   void SetSurface(gl::GLSurface* surface);
 
   void PerformIdleWork();
+
+  void BindOffscreenFramebuffer(GLenum target);
 
   void set_use_iosurface_memory_buffers(bool use_iosurface_memory_buffers) {
     use_iosurface_memory_buffers_ = use_iosurface_memory_buffers;
@@ -144,6 +142,7 @@ class GLManager : private GpuControl {
   void SetGpuControlClient(GpuControlClient*) override;
   const Capabilities& GetCapabilities() const override;
   void SignalQuery(uint32_t query, base::OnceClosure callback) override;
+  void CancelAllQueries() override;
   void CreateGpuFence(uint32_t gpu_fence_id, ClientGpuFence source) override;
   void GetGpuFence(uint32_t gpu_fence_id,
                    base::OnceCallback<void(std::unique_ptr<gfx::GpuFence>)>
@@ -198,7 +197,10 @@ class GLManager : private GpuControl {
 
   Capabilities capabilities_;
 
-  // Used on Android to virtualize GL for all contexts.
+  GLuint fbo_ = 0;
+
+  // Used on Android to virtualize GL for all contexts with validating command
+  // decoder.
   static int use_count_;
   static scoped_refptr<gl::GLShareGroup>* base_share_group_;
   static scoped_refptr<gl::GLSurface>* base_surface_;

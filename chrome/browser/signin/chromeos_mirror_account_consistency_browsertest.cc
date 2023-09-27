@@ -21,6 +21,7 @@
 #include "components/signin/core/browser/signin_header_helper.h"
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/signin/public/identity_manager/identity_test_utils.h"
+#include "components/supervised_user/core/common/buildflags.h"
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
 #include "content/public/test/browser_test.h"
@@ -55,10 +56,10 @@ void TestMirrorRequestForProfile(net::EmbeddedTestServer* test_server,
       browser, gaia_url, WindowOpenDisposition::SINGLETON_TAB,
       ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP);
 
-  std::string inner_text;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractString(
-      browser->tab_strip_model()->GetActiveWebContents(),
-      "domAutomationController.send(document.body.innerText);", &inner_text));
+  std::string inner_text =
+      content::EvalJs(browser->tab_strip_model()->GetActiveWebContents(),
+                      "document.body.innerText;")
+          .ExtractString();
   // /echoheader returns "None" if the header isn't set.
   inner_text = (inner_text == "None") ? "" : inner_text;
   EXPECT_EQ(expected_header_value, inner_text);
@@ -140,7 +141,7 @@ IN_PROC_BROWSER_TEST_F(ChromeOsMirrorAccountConsistencyTest,
   PrefService* prefs = profile->GetPrefs();
   prefs->SetInteger(
       policy::policy_prefs::kIncognitoModeAvailability,
-      static_cast<int>(IncognitoModePrefs::Availability::kDisabled));
+      static_cast<int>(policy::IncognitoModeAvailability::kDisabled));
   ASSERT_EQ(1, signin::PROFILE_MODE_INCOGNITO_DISABLED);
 
   // TODO(http://crbug.com/1134144): This test seems to test supervised profiles

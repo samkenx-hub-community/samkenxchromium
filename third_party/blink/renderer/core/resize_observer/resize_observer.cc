@@ -11,7 +11,6 @@
 #include "third_party/blink/renderer/core/frame/local_dom_window.h"
 #include "third_party/blink/renderer/core/frame/local_frame_view.h"
 #include "third_party/blink/renderer/core/layout/adjust_for_absolute_zoom.h"
-#include "third_party/blink/renderer/core/layout/layout_object.h"
 #include "third_party/blink/renderer/core/resize_observer/resize_observation.h"
 #include "third_party/blink/renderer/core/resize_observer/resize_observer_controller.h"
 #include "third_party/blink/renderer/core/resize_observer/resize_observer_entry.h"
@@ -36,7 +35,8 @@ ResizeObserver* ResizeObserver::Create(LocalDOMWindow* window,
 
 ResizeObserver::ResizeObserver(V8ResizeObserverCallback* callback,
                                LocalDOMWindow* window)
-    : ExecutionContextClient(window),
+    : ActiveScriptWrappable<ResizeObserver>({}),
+      ExecutionContextClient(window),
       callback_(callback),
       skipped_observations_(false) {
   DCHECK(callback_);
@@ -47,7 +47,8 @@ ResizeObserver::ResizeObserver(V8ResizeObserverCallback* callback,
 }
 
 ResizeObserver::ResizeObserver(Delegate* delegate, LocalDOMWindow* window)
-    : ExecutionContextClient(window),
+    : ActiveScriptWrappable<ResizeObserver>({}),
+      ExecutionContextClient(window),
       delegate_(delegate),
       skipped_observations_(false) {
   DCHECK(delegate_);
@@ -187,9 +188,6 @@ void ResizeObserver::DeliverObservations() {
 
   DCHECK(callback_ || delegate_);
   if (callback_) {
-    probe::UserCallback callback_probe(
-        ExecutionContext::From(callback_->CallbackRelevantScriptState()),
-        "ResizeObserver", "callback", AtomicString(), false);
     callback_->InvokeAndReportException(this, entries, this);
   }
   if (delegate_)

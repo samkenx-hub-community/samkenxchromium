@@ -7,7 +7,6 @@
 #include <memory>
 
 #include "base/environment.h"
-#include "base/functional/bind.h"
 #include "base/path_service.h"
 #include "base/power_monitor/power_monitor.h"
 #include "base/process/process_handle.h"
@@ -23,7 +22,7 @@
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "components/component_updater/component_updater_paths.h"
-#include "components/startup_metric_utils/browser/startup_metric_utils.h"
+#include "components/startup_metric_utils/common/startup_metric_utils.h"
 #include "components/update_client/update_query_params.h"
 #include "content/public/browser/webui_config_map.h"
 #include "content/public/common/content_paths.h"
@@ -50,9 +49,12 @@
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/common/initialize_extensions_client.h"
-#include "extensions/common/context_data.h"
 #include "extensions/common/extension_paths.h"
 #include "extensions/common/extensions_client.h"
+
+namespace extensions {
+class ContextData;
+}  // namespace extensions
 #endif
 
 namespace {
@@ -83,7 +85,7 @@ class ChromeUnitTestSuiteInitializer : public testing::EmptyTestEventListener {
   }
 
   void OnTestEnd(const testing::TestInfo& test_info) override {
-    TestingBrowserProcess::DeleteInstance();
+    TestingBrowserProcess::TearDownAndDeleteInstance();
     // Some tests cause ChildThreadImpl to initialize a PowerMonitor.
     base::PowerMonitor::ShutdownForTesting();
 #if BUILDFLAG(IS_WIN)
@@ -116,7 +118,7 @@ bool ControlledFrameTestAvailabilityCheck(
     extensions::Feature::Platform platform,
     int context_id,
     bool check_developer_mode,
-    std::unique_ptr<extensions::ContextData> context_data) {
+    const extensions::ContextData& context_data) {
   return false;
 }
 
@@ -165,7 +167,8 @@ void ChromeUnitTestSuite::Initialize() {
   // Since RecordApplicationStartTime() would DCHECK if it was invoked from
   // multiple tests in the same process, invoke it once in test suite
   // initialization.
-  startup_metric_utils::RecordApplicationStartTime(base::TimeTicks::Now());
+  startup_metric_utils::GetCommon().RecordApplicationStartTime(
+      base::TimeTicks::Now());
 }
 
 void ChromeUnitTestSuite::Shutdown() {

@@ -10,6 +10,7 @@
 
 #include "base/component_export.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/threading/thread_checker.h"
 #include "base/time/time.h"
@@ -34,7 +35,23 @@ class GeolocationHandler;
 class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_GEOLOCATION)
     SimpleGeolocationProvider {
  public:
+  class Delegate {
+   public:
+    Delegate() = default;
+
+    Delegate(const Delegate&) = delete;
+    Delegate& operator=(const Delegate&) = delete;
+
+    virtual ~Delegate() = default;
+
+    // Determines if the geolocation resolution is allowed by the system, based
+    // on the existing enterprise policies, device preferences and user
+    // preferences.
+    virtual bool IsSystemGeolocationAllowed() const = 0;
+  };
+
   SimpleGeolocationProvider(
+      const Delegate* delegate,
       scoped_refptr<network::SharedURLLoaderFactory> factory,
       const GURL& url);
 
@@ -52,6 +69,10 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_GEOLOCATION)
                           bool send_wifi_access_points,
                           bool send_cell_towers,
                           SimpleGeolocationRequest::ResponseCallback callback);
+
+  network::SharedURLLoaderFactory* GetSharedURLLoaderFactoryForTesting() {
+    return shared_url_loader_factory_.get();
+  }
 
   // Returns default geolocation service URL.
   static GURL DefaultGeolocationProviderURL();
@@ -73,6 +94,8 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_GEOLOCATION)
     geolocation_handler_ = geolocation_handler;
   }
 
+  const raw_ptr<const Delegate, ExperimentalAsh> delegate_;
+
   scoped_refptr<network::SharedURLLoaderFactory> shared_url_loader_factory_;
 
   // URL of the Google Maps Geolocation API.
@@ -83,7 +106,7 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_GEOLOCATION)
   // destroy.
   std::vector<std::unique_ptr<SimpleGeolocationRequest>> requests_;
 
-  GeolocationHandler* geolocation_handler_ = nullptr;
+  raw_ptr<GeolocationHandler, ExperimentalAsh> geolocation_handler_ = nullptr;
 
   // Creation and destruction should happen on the same thread.
   THREAD_CHECKER(thread_checker_);

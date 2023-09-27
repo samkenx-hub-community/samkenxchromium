@@ -40,6 +40,7 @@
 #include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_urls.h"
+#include "extensions/common/manifest_handlers/web_file_handlers_info.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/events/event_constants.h"
 
@@ -93,7 +94,8 @@ void LacrosExtensionAppsController::Uninstall(
     bool report_abuse) {
   Profile* profile = nullptr;
   const extensions::Extension* extension = nullptr;
-  bool success = lacros_extensions_util::DemuxId(app_id, &profile, &extension);
+  bool success = lacros_extensions_util::GetProfileAndExtension(
+      app_id, &profile, &extension);
   if (!success)
     return;
   DCHECK(which_type_.Matches(extension));
@@ -147,25 +149,13 @@ void LacrosExtensionAppsController::GetMenuModel(
   NOTREACHED();
 }
 
-void LacrosExtensionAppsController::LoadIcon(const std::string& app_id,
-                                             apps::IconKeyPtr icon_key,
-                                             apps::IconType icon_type,
-                                             int32_t size_hint_in_dip,
-                                             LoadIconCallback callback) {
-  Profile* profile = nullptr;
-  const extensions::Extension* extension = nullptr;
-  bool success = lacros_extensions_util::DemuxId(app_id, &profile, &extension);
-  if (success && icon_key) {
-    DCHECK(which_type_.Matches(extension));
-    LoadIconFromExtension(
-        icon_type, size_hint_in_dip, profile, extension->id(),
-        static_cast<apps::IconEffects>(icon_key->icon_effects),
-        std::move(callback));
-    return;
-  }
-
-  // On failure, we still run the callback, with the zero IconValue.
-  std::move(callback).Run(std::make_unique<apps::IconValue>());
+void LacrosExtensionAppsController::DEPRECATED_LoadIcon(
+    const std::string& app_id,
+    apps::IconKeyPtr icon_key,
+    apps::IconType icon_type,
+    int32_t size_hint_in_dip,
+    apps::LoadIconCallback callback) {
+  NOTREACHED();
 }
 
 void LacrosExtensionAppsController::GetCompressedIcon(
@@ -175,7 +165,8 @@ void LacrosExtensionAppsController::GetCompressedIcon(
     apps::LoadIconCallback callback) {
   Profile* profile = nullptr;
   const extensions::Extension* extension = nullptr;
-  bool success = lacros_extensions_util::DemuxId(app_id, &profile, &extension);
+  bool success = lacros_extensions_util::GetProfileAndExtension(
+      app_id, &profile, &extension);
   if (success) {
     GetChromeAppCompressedIconData(profile, app_id, size_in_dip, scale_factor,
                                    std::move(callback));
@@ -190,7 +181,8 @@ void LacrosExtensionAppsController::OpenNativeSettings(
     const std::string& app_id) {
   Profile* profile = nullptr;
   const extensions::Extension* extension = nullptr;
-  bool success = lacros_extensions_util::DemuxId(app_id, &profile, &extension);
+  bool success = lacros_extensions_util::GetProfileAndExtension(
+      app_id, &profile, &extension);
   if (!success)
     return;
   DCHECK(which_type_.Matches(extension));
@@ -218,8 +210,8 @@ void LacrosExtensionAppsController::Launch(
   crosapi::mojom::LaunchResultPtr result = crosapi::mojom::LaunchResult::New();
   Profile* profile = nullptr;
   const extensions::Extension* extension = nullptr;
-  bool success = lacros_extensions_util::DemuxId(launch_params->app_id,
-                                                 &profile, &extension);
+  bool success = lacros_extensions_util::GetProfileAndExtension(
+      launch_params->app_id, &profile, &extension);
   if (!success) {
     std::move(callback).Run(std::move(result));
     return;
@@ -256,7 +248,8 @@ void LacrosExtensionAppsController::StopApp(const std::string& app_id) {
   // Find the extension.
   Profile* profile = nullptr;
   const extensions::Extension* extension = nullptr;
-  bool success = lacros_extensions_util::DemuxId(app_id, &profile, &extension);
+  bool success = lacros_extensions_util::GetProfileAndExtension(
+      app_id, &profile, &extension);
   if (!success)
     return;
   DCHECK(which_type_.Matches(extension));
@@ -308,8 +301,8 @@ void LacrosExtensionAppsController::FinallyLaunch(
     crosapi::mojom::LaunchResultPtr result) {
   Profile* profile = nullptr;
   const extensions::Extension* extension = nullptr;
-  bool success = lacros_extensions_util::DemuxId(launch_params->app_id,
-                                                 &profile, &extension);
+  bool success = lacros_extensions_util::GetProfileAndExtension(
+      launch_params->app_id, &profile, &extension);
   if (!success) {
     std::move(callback).Run(std::move(result));
     return;
@@ -329,6 +322,17 @@ void LacrosExtensionAppsController::FinallyLaunch(
     std::move(callback).Run(std::move(result));
 
   } else if (which_type_.IsExtensions()) {
+    // Web File Handlers use the `file_handlers` manifest key for registration.
+    if (extensions::WebFileHandlers::SupportsWebFileHandlers(*extension)) {
+      // Launch Web File Handlers.
+      params.container = apps::LaunchContainer::kLaunchContainerTab;
+      OpenApplication(profile, std::move(params));
+      result->instance_id = base::UnguessableToken::Create();
+      result->state = crosapi::mojom::LaunchResultState::kSuccess;
+      std::move(callback).Run(std::move(result));
+      return;
+    }
+
     // This code path is used only by fileBrowserHandler to open Lacros
     // extension, and is triggered by user using a Lacros extension to handle
     // file open. Therefore we check |launch_params| first, and if that passes,

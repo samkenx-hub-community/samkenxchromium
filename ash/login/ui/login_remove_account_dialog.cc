@@ -11,11 +11,14 @@
 #include "ash/style/ash_color_id.h"
 #include "ash/style/pill_button.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/display/display.h"
 #include "ui/display/screen.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -65,7 +68,7 @@ class TrappedFocusSearch : public views::FocusSearch {
   }
 
  private:
-  views::View* const trapped_focus_;
+  const raw_ptr<views::View, ExperimentalAsh> trapped_focus_;
 };
 
 }  // namespace
@@ -107,7 +110,7 @@ class RemoveUserButton : public PillButton {
     }
   }
 
-  LoginRemoveAccountDialog* bubble_;
+  raw_ptr<LoginRemoveAccountDialog, ExperimentalAsh> bubble_;
 };
 
 LoginRemoveAccountDialog::TestApi::TestApi(LoginRemoveAccountDialog* bubble)
@@ -158,16 +161,21 @@ LoginRemoveAccountDialog::LoginRemoveAccountDialog(
         views::BoxLayout::Orientation::kVertical, gfx::Insets(),
         kVerticalMarginUsernameMailDp));
     AddChildView(container);
+    const bool is_jelly = chromeos::features::IsJellyrollEnabled();
     username_label_ =
         container->AddChildView(login_views_utils::CreateThemedBubbleLabel(
-            display_username, nullptr, kColorAshTextColorPrimary,
+            display_username, nullptr,
+            is_jelly ? static_cast<ui::ColorId>(cros_tokens::kCrosSysOnSurface)
+                     : kColorAshTextColorPrimary,
             gfx::FontList({login_views_utils::kGoogleSansFont},
                           gfx::Font::FontStyle::NORMAL, kFontSizeUsername,
                           gfx::Font::Weight::MEDIUM),
             kLineHeightUsername));
     email_label_ =
         container->AddChildView(login_views_utils::CreateThemedBubbleLabel(
-            email, nullptr, kColorAshTextColorSecondary));
+            email, nullptr,
+            is_jelly ? static_cast<ui::ColorId>(cros_tokens::kCrosSysSecondary)
+                     : kColorAshTextColorSecondary));
   }
 
   // Add a warning text if the user is managed.
@@ -218,7 +226,7 @@ LoginRemoveAccountDialog::LoginRemoveAccountDialog(
                             base::Unretained(this)),
         this);
     remove_user_button_->SetID(kRemoveUserButtonIdForTest);
-    AddChildView(remove_user_button_);
+    AddChildView(remove_user_button_.get());
 
     // Traps the focus on the remove user button.
     focus_search_ = std::make_unique<TrappedFocusSearch>(remove_user_button_);
@@ -230,20 +238,6 @@ LoginRemoveAccountDialog::LoginRemoveAccountDialog(
 }
 
 LoginRemoveAccountDialog::~LoginRemoveAccountDialog() = default;
-
-void LoginRemoveAccountDialog::ResetState() {
-  if (management_disclosure_label_) {
-    management_disclosure_label_->SetVisible(true);
-  }
-  if (remove_user_confirm_data_) {
-    remove_user_confirm_data_->SetVisible(false);
-    remove_user_button_->SetAlert(false);
-    // Reset button's description to none.
-    remove_user_button_->GetViewAccessibility().OverrideDescription(
-        std::u16string(),
-        ax::mojom::DescriptionFrom::kAttributeExplicitlyEmpty);
-  }
-}
 
 LoginButton* LoginRemoveAccountDialog::GetBubbleOpener() const {
   return bubble_opener_;

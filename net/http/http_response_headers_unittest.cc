@@ -14,13 +14,18 @@
 #include "base/pickle.h"
 #include "base/ranges/algorithm.h"
 #include "base/time/time.h"
-#include "base/trace_event/trace_event.h"
 #include "base/values.h"
+#include "net/base/cronet_buildflags.h"
+#include "net/base/tracing.h"
 #include "net/http/http_byte_range.h"
+#include "net/http/http_response_headers_test_util.h"
 #include "net/http/http_util.h"
 #include "net/log/net_log_capture_mode.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+#if !BUILDFLAG(CRONET_BUILD)
 #include "third_party/perfetto/include/perfetto/test/traced_value_test_support.h"
+#endif
 
 namespace net {
 
@@ -97,39 +102,7 @@ class CommonHttpResponseHeadersTest
       public ::testing::WithParamInterface<TestData> {
 };
 
-// Returns a simple text serialization of the given
-// |HttpResponseHeaders|. This is used by tests to verify that an
-// |HttpResponseHeaders| matches an expectation string.
-//
-//  * One line per header, written as:
-//        HEADER_NAME: HEADER_VALUE\n
-//  * The original case of header names is preserved.
-//  * Whitespace around head names/values is stripped.
-//  * Repeated headers are not aggregated.
-//  * Headers are listed in their original order.
-std::string ToSimpleString(const scoped_refptr<HttpResponseHeaders>& parsed) {
-  std::string result = parsed->GetStatusLine() + "\n";
-
-  size_t iter = 0;
-  std::string name;
-  std::string value;
-  while (parsed->EnumerateHeaderLines(&iter, &name, &value)) {
-    std::string new_line = name + ": " + value + "\n";
-
-    // Verify that |name| and |value| do not contain ':' or '\n' (if they did
-    // it would make this serialized format ambiguous).
-    if (base::ranges::count(new_line, '\n') != 1 ||
-        base::ranges::count(new_line, ':') != 1) {
-      ADD_FAILURE() << "Unexpected characters in the header name or value: "
-                    << new_line;
-      return result;
-    }
-
-    result += new_line;
-  }
-
-  return result;
-}
+constexpr auto ToSimpleString = test::HttpResponseHeadersToSimpleString;
 
 TEST_P(CommonHttpResponseHeadersTest, TestCommon) {
   const TestData test = GetParam();
@@ -459,7 +432,7 @@ const struct PersistData persistence_tests[] = {
      "HTTP/1.1 200 OK\n"
      "Set-Cookie: foo=bar\n"
      "Foo: 2\n"
-     "Clear-Site-Data: { \"types\" : [ \"cookies\" ] }\n"
+     "Clear-Site-Data: \"cookies\"\n"
      "Bar: 3\n",
 
      "HTTP/1.1 200 OK\n"
@@ -1824,6 +1797,20 @@ TEST(HttpResponseHeadersTest, SetHeader) {
       ToSimpleString(headers));
 }
 
+TEST(HttpResponseHeadersTest, TryToCreateWithNul) {
+  static constexpr char kHeadersWithNuls[] = {
+      "HTTP/1.1 200 OK\0"
+      "Content-Type: application/octet-stream\0"};
+  // The size must be specified explicitly to include the nul characters.
+  static constexpr base::StringPiece kHeadersWithNulsAsStringPiece(
+      kHeadersWithNuls, sizeof(kHeadersWithNuls));
+  scoped_refptr<HttpResponseHeaders> headers =
+      HttpResponseHeaders::TryToCreate(kHeadersWithNulsAsStringPiece);
+  EXPECT_EQ(headers, nullptr);
+}
+
+#if !BUILDFLAG(CRONET_BUILD)
+// Cronet disables tracing so this test would fail.
 TEST(HttpResponseHeadersTest, TracingSupport) {
   scoped_refptr<HttpResponseHeaders> headers = HttpResponseHeaders::TryToCreate(
       "HTTP/1.1 200 OK\n"
@@ -1833,6 +1820,7 @@ TEST(HttpResponseHeadersTest, TracingSupport) {
   EXPECT_EQ(perfetto::TracedValueToString(headers),
             "{response_code:200,headers:[{name:connection,value:keep-alive}]}");
 }
+#endif
 
 struct RemoveHeaderTestData {
   const char* orig_headers;

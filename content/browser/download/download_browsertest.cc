@@ -38,6 +38,7 @@
 #include "components/download/public/common/download_features.h"
 #include "components/download/public/common/download_file_factory.h"
 #include "components/download/public/common/download_file_impl.h"
+#include "components/download/public/common/download_item.h"
 #include "components/download/public/common/download_item_impl.h"
 #include "components/download/public/common/download_task_runner.h"
 #include "components/download/public/common/parallel_download_configs.h"
@@ -603,7 +604,8 @@ class ErrorInjectionDownloadFileFactory : public download::DownloadFileFactory {
     download_file_ = nullptr;
   }
 
-  raw_ptr<ErrorInjectionDownloadFile, DanglingUntriaged> download_file_;
+  raw_ptr<ErrorInjectionDownloadFile, AcrossTasksDanglingUntriaged>
+      download_file_;
   int64_t injected_error_offset_ = -1;
   int64_t injected_error_length_ = 0;
   base::WeakPtrFactory<ErrorInjectionDownloadFileFactory> weak_ptr_factory_{
@@ -771,6 +773,13 @@ class ErrorStreamCountingObserver : public DownloadCountingObserver {
 
  private:
   base::HistogramTester histogram_tester_;
+};
+
+class ReceivedBytesCountingObserver : public DownloadCountingObserver {
+ private:
+  bool IsCountReached(download::DownloadItem* download, int count) override {
+    return download->GetReceivedBytes() == count;
+  }
 };
 
 // Class to wait for a WebContents to kick off a specified number of
@@ -1259,22 +1268,19 @@ class DownloadContentTestWithoutStrongValidators : public DownloadContentTest {
 
     // The second request is a range request.
     std::string value;
-    ASSERT_TRUE(requests[1]->http_request.headers.find(
-                    net::HttpRequestHeaders::kIfRange) ==
-                requests[1]->http_request.headers.end());
+    ASSERT_FALSE(base::Contains(requests[1]->http_request.headers,
+                                net::HttpRequestHeaders::kIfRange));
 
-    ASSERT_TRUE(requests[1]->http_request.headers.find(
-                    net::HttpRequestHeaders::kRange) !=
-                requests[1]->http_request.headers.end());
+    ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
+                               net::HttpRequestHeaders::kRange));
     EXPECT_EQ(
         base::StringPrintf("bytes=%" PRId64 "-",
                            interruption_offset - kValidationLength),
         requests[1]->http_request.headers.at(net::HttpRequestHeaders::kRange));
     if (fail_content_validation) {
       // The third request is a restart request.
-      ASSERT_TRUE(requests[2]->http_request.headers.find(
-                      net::HttpRequestHeaders::kRange) ==
-                  requests[2]->http_request.headers.end());
+      ASSERT_FALSE(base::Contains(requests[2]->http_request.headers,
+                                  net::HttpRequestHeaders::kRange));
       EXPECT_EQ(parameters.size, requests[2]->transferred_byte_count);
     }
   }
@@ -1470,7 +1476,7 @@ class DownloadPrerenderTest : public DownloadContentTest {
   ~DownloadPrerenderTest() override = default;
 
   void SetUp() override {
-    prerender_helper_.SetUp(embedded_test_server());
+    prerender_helper_.RegisterServerRequestMonitor(embedded_test_server());
     DownloadContentTest::SetUp();
   }
 
@@ -2135,15 +2141,13 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeWithStrongValidators) {
             requests[1]->transferred_byte_count);
 
   std::string value;
-  ASSERT_TRUE(requests[1]->http_request.headers.find(
-                  net::HttpRequestHeaders::kIfRange) !=
-              requests[1]->http_request.headers.end());
+  ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
+                             net::HttpRequestHeaders::kIfRange));
   EXPECT_EQ(parameters.etag, requests[1]->http_request.headers.at(
                                  net::HttpRequestHeaders::kIfRange));
 
-  ASSERT_TRUE(
-      requests[1]->http_request.headers.find(net::HttpRequestHeaders::kRange) !=
-      requests[1]->http_request.headers.end());
+  ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
+                             net::HttpRequestHeaders::kRange));
   EXPECT_EQ(
       base::StringPrintf("bytes=%" PRId64 "-", interruption_offset),
       requests[1]->http_request.headers.at(net::HttpRequestHeaders::kRange));
@@ -2610,15 +2614,13 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RestartIfNotPartialResponse) {
   // The second request transfers the entire response.
   EXPECT_EQ(parameters.size, requests[1]->transferred_byte_count);
 
-  ASSERT_TRUE(requests[1]->http_request.headers.find(
-                  net::HttpRequestHeaders::kIfRange) !=
-              requests[1]->http_request.headers.end());
+  ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
+                             net::HttpRequestHeaders::kIfRange));
   EXPECT_EQ(parameters.etag, requests[1]->http_request.headers.at(
                                  net::HttpRequestHeaders::kIfRange));
 
-  ASSERT_TRUE(
-      requests[1]->http_request.headers.find(net::HttpRequestHeaders::kRange) !=
-      requests[1]->http_request.headers.end());
+  ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
+                             net::HttpRequestHeaders::kRange));
   EXPECT_EQ(
       base::StringPrintf("bytes=%" PRId64 "-", interruption_offset),
       requests[1]->http_request.headers.at(net::HttpRequestHeaders::kRange));
@@ -2662,12 +2664,10 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RestartIfNoETag) {
 
   // Neither If-Range nor Range headers should be present in the second request.
   ASSERT_EQ(2u, requests.size());
-  EXPECT_TRUE(requests[1]->http_request.headers.find(
-                  net::HttpRequestHeaders::kIfRange) ==
-              requests[1]->http_request.headers.end());
-  EXPECT_TRUE(
-      requests[1]->http_request.headers.find(net::HttpRequestHeaders::kRange) ==
-      requests[1]->http_request.headers.end());
+  EXPECT_FALSE(base::Contains(requests[1]->http_request.headers,
+                              net::HttpRequestHeaders::kIfRange));
+  EXPECT_FALSE(base::Contains(requests[1]->http_request.headers,
+                              net::HttpRequestHeaders::kRange));
 }
 
 // Partial file goes missing before the download is resumed. The download should
@@ -3865,8 +3865,7 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
   // if there were a top-level navigation to the final URL.
   net::IsolationInfo expected_isolation_info = net::IsolationInfo::Create(
       net::IsolationInfo::RequestType::kMainFrame, final_url_origin,
-      final_url_origin, net::SiteForCookies::FromOrigin(final_url_origin),
-      std::set<net::SchemefulSite>());
+      final_url_origin, net::SiteForCookies::FromOrigin(final_url_origin));
 
   // <origin_one>/download-attribute.html initiates a download of
   // <origin_one>/ping, which redirects to <origin_two>/download.
@@ -4470,8 +4469,7 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
   // navigation to the download.
   net::IsolationInfo expected_isolation_info = net::IsolationInfo::Create(
       net::IsolationInfo::RequestType::kSubFrame, download_origin,
-      download_origin, net::SiteForCookies::FromOrigin(download_origin),
-      std::set<net::SchemefulSite>());
+      download_origin, net::SiteForCookies::FromOrigin(download_origin));
 
   GURL frame_url = origin_one.GetURL("/download-attribute.html?target=" +
                                      download_url.spec());
@@ -4651,6 +4649,8 @@ IN_PROC_BROWSER_TEST_F(ParallelDownloadTest,
 // Verify that if the second request fails after the beginning request takes
 // over and completes its slice, download should complete.
 IN_PROC_BROWSER_TEST_F(ParallelDownloadTest, MiddleSliceDelayedError) {
+  const int64_t kFileSize = 5097152;
+
   scoped_refptr<TestFileErrorInjector> injector(
       TestFileErrorInjector::Create(DownloadManagerForShell(shell())));
 
@@ -4661,7 +4661,7 @@ IN_PROC_BROWSER_TEST_F(ParallelDownloadTest, MiddleSliceDelayedError) {
   injector->InjectError(err);
   TestDownloadHttpResponse::Parameters parameters;
   parameters.etag = "ABC";
-  parameters.size = 5097152;
+  parameters.size = kFileSize;
   parameters.connection_type = net::HttpResponseInfo::CONNECTION_INFO_HTTP1_1;
   // The 2nd response will be dalyed.
   parameters.SetResponseForRangeRequest(1699000, 2000000, k404Response,
@@ -4682,15 +4682,23 @@ IN_PROC_BROWSER_TEST_F(ParallelDownloadTest, MiddleSliceDelayedError) {
 
   // Wait for the 3rd request to complete first.
   test_response_handler()->WaitUntilCompletion(1);
-  ReceivedSlicesCountingObserver obs;
-  obs.WaitForFinished(download, 2);
+  ReceivedSlicesCountingObserver slices_counting_observer;
+  slices_counting_observer.WaitForFinished(download, 2);
   std::vector<download::DownloadItem::ReceivedSlice> received_slices =
       download->GetReceivedSlices();
   EXPECT_EQ(received_slices[1].offset + received_slices[1].received_bytes,
-            5097152);
-  // Now resume the first request and wait for it to complete.
+            kFileSize);
+
+  // Now resume the first request and wait for it to complete, including writing
+  // the whole file.
   request_pause_handler.Resume();
-  test_response_handler()->WaitUntilCompletion(2);
+  ReceivedBytesCountingObserver bytes_counting_observer;
+  bytes_counting_observer.WaitForFinished(download, kFileSize);
+  // Note that download is not yet completed even though the whole file is
+  // downloaded - second request is not yet processed.
+  EXPECT_EQ(download->GetState(),
+            download::DownloadItem::DownloadState::IN_PROGRESS);
+
   // Dispatch the delayed response, and wait for download to complete.
   test_response_handler()->DispatchDelayedResponses();
   WaitForCompletion(download);

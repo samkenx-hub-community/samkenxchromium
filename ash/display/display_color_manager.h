@@ -13,6 +13,7 @@
 #include "ash/ash_export.h"
 #include "base/containers/flat_map.h"
 #include "base/files/file_path.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "third_party/skia/include/core/SkM44.h"
@@ -121,6 +122,8 @@ class ASH_EXPORT DisplayColorManager
   bool LoadCalibrationForDisplay(const display::DisplaySnapshot* display);
 
   // Display-specific calibration methods.
+  // Look for VPD display profiles entry.
+  bool HasVpdDisplayProfilesEntry(int64_t product_code) const;
   // Look for VPD-written calibration.
   void QueryVpdForCalibration(int64_t display_id,
                               int64_t product_code,
@@ -147,7 +150,7 @@ class ASH_EXPORT DisplayColorManager
   // changes, https://crrev.com/1914343003.
   void ResetDisplayColorCalibration(int64_t display_id);
 
-  display::DisplayConfigurator* configurator_;
+  raw_ptr<display::DisplayConfigurator, ExperimentalAsh> configurator_;
 
   // This is a pre-allocated storage in order to avoid re-allocating the
   // matrix array every time when converting a skia matrix to a matrix array.

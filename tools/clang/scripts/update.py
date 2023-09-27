@@ -35,11 +35,12 @@ import zlib
 # https://chromium.googlesource.com/chromium/src/+/main/docs/updating_clang.md
 # Reverting problematic clang rolls is safe, though.
 # This is the output of `git describe` and is usable as a commit-ish.
-CLANG_REVISION = 'llvmorg-17-init-4759-g547e3456'
+CLANG_REVISION = 'llvmorg-18-init-4631-gd50b56d1'
 CLANG_SUB_REVISION = 1
 
 PACKAGE_VERSION = '%s-%s' % (CLANG_REVISION, CLANG_SUB_REVISION)
-RELEASE_VERSION = '17'
+RELEASE_VERSION = '18'
+# TODO(crbug.com/1467585): Bump to 18 in next Clang roll.
 
 CDS_URL = os.environ.get('CDS_CLANG_BUCKET_OVERRIDE',
     'https://commondatastorage.googleapis.com/chromium-browser-clang')
@@ -60,6 +61,11 @@ FORCE_HEAD_REVISION_FILE = os.path.normpath(os.path.join(LLVM_BUILD_DIR, '..',
 
 def RmTree(dir):
   """Delete dir."""
+  if sys.platform == 'win32':
+    # Avoid problems with paths longer than MAX_PATH
+    # https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation
+    dir = f'\\\\?\\{dir}'
+
   def ChmodAndRetry(func, path, _):
     # Subversion can leave read-only files around.
     if not os.access(path, os.W_OK):
@@ -95,7 +101,7 @@ def DownloadUrl(url, output_file):
 
   while True:
     try:
-      sys.stdout.write('Downloading %s ' % url)
+      sys.stdout.write(f'Downloading {url} ')
       sys.stdout.flush()
       request = urllib.request.Request(url)
       request.add_header('Accept-Encoding', 'gzip')
@@ -127,8 +133,8 @@ def DownloadUrl(url, output_file):
           sys.stdout.flush()
           dots_printed = num_dots
       if total_size is not None and bytes_done != total_size:
-        raise urllib.error.URLError("only got %d of %d bytes" %
-                                    (bytes_done, total_size))
+        raise urllib.error.URLError(
+            f'only got {bytes_done} of {total_size} bytes')
       if is_gzipped:
         output_file.write(gzip_decode.flush())
       print(' Done.')
@@ -142,7 +148,7 @@ def DownloadUrl(url, output_file):
       num_retries -= 1
       output_file.seek(0)
       output_file.truncate()
-      print('Retrying in %d s ...' % retry_wait_s)
+      print(f'Retrying in {retry_wait_s} s ...')
       sys.stdout.flush()
       time.sleep(retry_wait_s)
       retry_wait_s *= 2
@@ -245,8 +251,7 @@ def UpdatePackage(package_name, host_os, dir=LLVM_BUILD_DIR):
     package_file = 'llvm-code-coverage'
   elif package_name == 'objdump':
     package_file = 'llvmobjdump'
-  elif package_name in ['clang-libs', 'clang-tidy', 'clangd', 'libclang',
-                        'translation_unit']:
+  elif package_name in ['clang-tidy', 'clangd', 'libclang', 'translation_unit']:
     package_file = package_name
   else:
     print('Unknown package: "%s".' % package_name)
@@ -330,6 +335,11 @@ def main():
                       help='Verify that clang has the passed-in version.')
   args = parser.parse_args()
 
+  # TODO(crbug.com/1467585): Remove in next Clang roll.
+  if args.llvm_force_head_revision:
+    global RELEASE_VERSION
+    RELEASE_VERSION = '18'
+
   if args.verify_version and args.verify_version != RELEASE_VERSION:
     print('RELEASE_VERSION is %s but --verify-version argument was %s.' % (
         RELEASE_VERSION, args.verify_version))
@@ -340,10 +350,11 @@ def main():
     print(RELEASE_VERSION)
     return 0
 
+  output_dir = LLVM_BUILD_DIR
   if args.output_dir:
-    global LLVM_BUILD_DIR, STAMP_FILE
-    LLVM_BUILD_DIR = os.path.abspath(args.output_dir)
-    STAMP_FILE = os.path.join(LLVM_BUILD_DIR, 'cr_build_revision')
+    global STAMP_FILE
+    output_dir = os.path.abspath(args.output_dir)
+    STAMP_FILE = os.path.join(output_dir, 'cr_build_revision')
 
   if args.print_revision:
     if args.llvm_force_head_revision:
@@ -368,7 +379,7 @@ def main():
     print('--llvm-force-head-revision can only be used for --print-revision')
     return 1
 
-  return UpdatePackage(args.package, args.host_os)
+  return UpdatePackage(args.package, args.host_os, output_dir)
 
 
 if __name__ == '__main__':

@@ -196,13 +196,6 @@ class RecordReplayContext : public GpuControl {
     decoder_->GetLogger()->set_log_synthesized_gl_errors(false);
 
     ContextCreationAttribs attrib_helper;
-    attrib_helper.offscreen_framebuffer_size = gfx::Size(16, 16);
-    attrib_helper.red_size = 8;
-    attrib_helper.green_size = 8;
-    attrib_helper.blue_size = 8;
-    attrib_helper.alpha_size = 8;
-    attrib_helper.depth_size = 0;
-    attrib_helper.stencil_size = 0;
     attrib_helper.context_type = CONTEXT_TYPE_OPENGLES3;
 
     ContextResult result =
@@ -268,6 +261,8 @@ class RecordReplayContext : public GpuControl {
   void SignalQuery(uint32_t query, base::OnceClosure callback) override {
     NOTREACHED();
   }
+
+  void CancelAllQueries() override { NOTREACHED(); }
 
   void CreateGpuFence(uint32_t gpu_fence_id, ClientGpuFence source) override {
     NOTREACHED();

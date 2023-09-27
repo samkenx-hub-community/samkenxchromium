@@ -8,9 +8,9 @@
 
 #import <string>
 
-#import "base/guid.h"
 #import "base/strings/string_util.h"
 #import "base/strings/utf_string_conversions.h"
+#import "base/uuid.h"
 #import "chrome/app/chrome_command_ids.h"
 #import "chrome/browser/bookmarks/bookmark_model_factory.h"
 #import "chrome/browser/bookmarks/managed_bookmark_service_factory.h"
@@ -30,7 +30,7 @@ using bookmarks::BookmarkNode;
 
 class BookmarkMenuBridgeTest : public BrowserWithTestWindowTest {
  public:
-  BookmarkMenuBridgeTest() {}
+  BookmarkMenuBridgeTest() = default;
 
   BookmarkMenuBridgeTest(const BookmarkMenuBridgeTest&) = delete;
   BookmarkMenuBridgeTest& operator=(const BookmarkMenuBridgeTest&) = delete;
@@ -40,7 +40,7 @@ class BookmarkMenuBridgeTest : public BrowserWithTestWindowTest {
 
     bookmarks::test::WaitForBookmarkModelToLoad(
         BookmarkModelFactory::GetForBrowserContext(profile()));
-    menu_.reset([[NSMenu alloc] initWithTitle:@"test"]);
+    menu_ = [[NSMenu alloc] initWithTitle:@"test"];
 
     bridge_ = std::make_unique<BookmarkMenuBridge>(profile(), menu_);
   }
@@ -82,9 +82,9 @@ class BookmarkMenuBridgeTest : public BrowserWithTestWindowTest {
   }
 
   NSMenuItem* AddTestMenuItem(NSMenu *menu, NSString *title, SEL selector) {
-    NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:title
-                                                   action:nullptr
-                                            keyEquivalent:@""] autorelease];
+    NSMenuItem* item = [[NSMenuItem alloc] initWithTitle:title
+                                                  action:nullptr
+                                           keyEquivalent:@""];
     if (selector)
       [item setAction:selector];
     [menu addItem:item];
@@ -92,7 +92,7 @@ class BookmarkMenuBridgeTest : public BrowserWithTestWindowTest {
   }
 
  protected:
-  base::scoped_nsobject<NSMenu> menu_;
+  NSMenu* __strong menu_;
   std::unique_ptr<BookmarkMenuBridge> bridge_;
 
  private:
@@ -127,7 +127,7 @@ TEST_F(BookmarkMenuBridgeTest, TestClearBookmarkMenu) {
   AddTestMenuItem(menu_, @"hi mom", nil);
   AddTestMenuItem(menu_, @"not", @selector(openBookmarkMenuItem:));
   NSMenuItem* test_item = AddTestMenuItem(menu_, @"hi mom", nil);
-  [test_item setSubmenu:[[[NSMenu alloc] initWithTitle:@"bar"] autorelease]];
+  [test_item setSubmenu:[[NSMenu alloc] initWithTitle:@"bar"]];
   AddTestMenuItem(menu_, @"not", @selector(openBookmarkMenuItem:));
   AddTestMenuItem(menu_, @"zippy", @selector(length));
   [menu_ addItem:[NSMenuItem separatorItem]];
@@ -282,15 +282,14 @@ TEST_F(BookmarkMenuBridgeTest, TestGetMenuItemForNode) {
   model->AddURL(folder, 1, u"Test 2", GURL("http://second-test"));
 
   UpdateRootMenu();
-  base::scoped_nsobject<NSMenu> old_menu(
-      [[[menu_ itemAtIndex:1] submenu] retain]);
+  NSMenu* old_menu = [[menu_ itemAtIndex:1] submenu];
   EXPECT_TRUE([old_menu delegate]);
 
   // If the menu was never built, ensure UpdateRootMenu() also clears delegates
   // from unbuilt submenus, since they will no longer be reachable.
   InvalidateMenu();
   UpdateRootMenu();
-  EXPECT_NE(old_menu.get(), [[menu_ itemAtIndex:1] submenu]);
+  EXPECT_NE(old_menu, [[menu_ itemAtIndex:1] submenu]);
   EXPECT_FALSE([old_menu delegate]);
 
   bridge_->UpdateMenu([[menu_ itemAtIndex:1] submenu], folder,
@@ -319,7 +318,7 @@ TEST_F(BookmarkMenuBridgeTest, TestGetMenuItemForNode) {
   EXPECT_FALSE(MenuItemForNode(bridge_.get(), removed_node));
   EXPECT_TRUE(MenuItemForNode(bridge_.get(), folder->children()[0].get()));
 
-  const BookmarkNode empty_node(/*id=*/0, base::GUID::GenerateRandomV4(),
+  const BookmarkNode empty_node(/*id=*/0, base::Uuid::GenerateRandomV4(),
                                 GURL("http://no-where/"));
   EXPECT_FALSE(MenuItemForNode(bridge_.get(), &empty_node));
   EXPECT_FALSE(MenuItemForNode(bridge_.get(), nullptr));
@@ -397,14 +396,14 @@ TEST_F(BookmarkMenuBridgeTest, BuildMenuRecursivelyBeforeProfileDestruction) {
   //            + Item 2
   const BookmarkNode* item1 =
       model->AddURL(root, 0, u"Item 1", GURL("http://item-1/"));
-  base::GUID item1_guid = item1->guid();
+  base::Uuid item1_guid = item1->uuid();
   const BookmarkNode* folder1 = model->AddFolder(root, 1, u"Folder 1");
-  base::GUID folder1_guid = folder1->guid();
+  base::Uuid folder1_guid = folder1->uuid();
   const BookmarkNode* folder2 = model->AddFolder(folder1, 0, u"Folder 2");
-  base::GUID folder2_guid = folder2->guid();
+  base::Uuid folder2_guid = folder2->uuid();
   const BookmarkNode* item2 =
       model->AddURL(folder2, 0, u"Item 2", GURL("http://item-2/"));
-  base::GUID item2_guid = item2->guid();
+  base::Uuid item2_guid = item2->uuid();
 
   // We didn't show the menu or any submenus, so it shouldn't contain these
   // items.

@@ -2,10 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+import * as Common from 'devtools/core/common/common.js';
+
 (async function() {
   TestRunner.addResult(`Tests that inspect() command line api works while on breakpoint.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
+  await TestRunner.loadLegacyModule('console');
+  await TestRunner.loadLegacyModule('sources');
   await TestRunner.showPanel('sources');
   await TestRunner.showPanel('elements');
   await TestRunner.loadHTML(`
@@ -19,10 +26,10 @@
       }
   `);
 
-  TestRunner.addSniffer(SDK.RuntimeModel.prototype, 'inspectRequested', inspect);
+  TestRunner.addSniffer(SDK.RuntimeModel.RuntimeModel.prototype, 'inspectRequested', inspect);
   const originalReveal = Common.Revealer.reveal;
   Common.Revealer.setRevealForTest((node) => {
-    if (!(node instanceof SDK.RemoteObject)) {
+    if (!(node instanceof SDK.RemoteObject.RemoteObject)) {
       return Promise.resolve();
     }
     return originalReveal(node).then(updateFocusedNode);

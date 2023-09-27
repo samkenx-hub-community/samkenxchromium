@@ -9,10 +9,13 @@
 #include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/ranges/algorithm.h"
 #include "base/test/gtest_util.h"
 #include "base/test/task_environment.h"
+#include "base/test/to_vector.h"
 #include "base/unguessable_token.h"
+#include "chromeos/ash/services/secure_channel/client_connection_parameters.h"
 #include "chromeos/ash/services/secure_channel/connection_details.h"
 #include "chromeos/ash/services/secure_channel/fake_active_connection_manager.h"
 #include "chromeos/ash/services/secure_channel/fake_authenticated_channel.h"
@@ -80,9 +83,12 @@ class FakeMultiplexedChannelFactory : public MultiplexedChannelImpl::Factory {
     EXPECT_EQ(1u, num_deleted);
   }
 
-  const MultiplexedChannel::Delegate* expected_delegate_;
+  raw_ptr<const MultiplexedChannel::Delegate,
+          DanglingUntriaged | ExperimentalAsh>
+      expected_delegate_;
 
-  AuthenticatedChannel* next_expected_authenticated_channel_ = nullptr;
+  raw_ptr<AuthenticatedChannel, ExperimentalAsh>
+      next_expected_authenticated_channel_ = nullptr;
 
   base::flat_map<ConnectionDetails, FakeMultiplexedChannel*>
       connection_details_to_active_channel_map_;
@@ -91,10 +97,7 @@ class FakeMultiplexedChannelFactory : public MultiplexedChannelImpl::Factory {
 std::vector<base::UnguessableToken> ClientListToIdList(
     const std::vector<std::unique_ptr<ClientConnectionParameters>>&
         client_list) {
-  std::vector<base::UnguessableToken> id_list;
-  base::ranges::transform(client_list, std::back_inserter(id_list),
-                          &ClientConnectionParameters::id);
-  return id_list;
+  return base::test::ToVector(client_list, &ClientConnectionParameters::id);
 }
 
 }  // namespace

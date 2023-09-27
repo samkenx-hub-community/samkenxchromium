@@ -8,7 +8,8 @@
 #include "net/socket/datagram_client_socket.h"
 #include "net/socket/tcp_client_socket.h"
 #include "net/socket/udp_client_socket.h"
-#include "services/network/tcp_client_socket_brokered.h"
+#include "services/network/brokered_tcp_client_socket.h"
+#include "services/network/brokered_udp_client_socket.h"
 
 #if BUILDFLAG(IS_WIN)
 #include "services/network/broker_helper_win.h"
@@ -39,8 +40,8 @@ BrokeredClientSocketFactory::CreateDatagramClientSocket(
     net::DatagramSocket::BindType bind_type,
     net::NetLog* net_log,
     const net::NetLogSource& source) {
-  // TODO(liza): Call into the broker rather than directly to net.
-  return std::make_unique<net::UDPClientSocket>(bind_type, net_log, source);
+  return std::make_unique<BrokeredUdpClientSocket>(bind_type, net_log, source,
+                                                   this);
 }
 
 std::unique_ptr<net::TransportClientSocket>
@@ -51,7 +52,7 @@ BrokeredClientSocketFactory::CreateTransportClientSocket(
     net::NetLog* net_log,
     const net::NetLogSource& source) {
   if (ShouldBroker(addresses)) {
-    return std::make_unique<TCPClientSocketBrokered>(
+    return std::make_unique<BrokeredTcpClientSocket>(
         addresses, std::move(socket_performance_watcher),
         network_quality_estimator, net_log, source, this);
   }

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/auto_reset.h"
+#include "base/memory/raw_ptr.h"
 #include "chromeos/ui/base/tablet_state.h"
 #include "chromeos/ui/base/window_properties.h"
 #include "chromeos/ui/base/window_state_type.h"
@@ -15,9 +16,9 @@
 #include "chromeos/ui/frame/caption_buttons/frame_back_button.h"
 #include "chromeos/ui/frame/caption_buttons/frame_caption_button_container_view.h"
 #include "chromeos/ui/frame/default_frame_header.h"
+#include "chromeos/ui/frame/frame_utils.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
-#include "ui/base/ui_base_features.h"
 #include "ui/compositor/layer.h"
 #include "ui/display/screen.h"
 #include "ui/views/controls/image_view.h"
@@ -57,7 +58,7 @@ class HeaderView::HeaderContentView : public views::View {
   }
 
  private:
-  HeaderView* header_view_;
+  raw_ptr<HeaderView, ExperimentalAsh> header_view_;
   views::PaintInfo::ScaleType scale_type_ =
       views::PaintInfo::ScaleType::kScaleWithEdgeSnapping;
 };
@@ -134,7 +135,7 @@ void HeaderView::SetAvatarIcon(const gfx::ImageSkia& avatar) {
     DCHECK_EQ(avatar.width(), avatar.height());
     if (!avatar_icon_) {
       avatar_icon_ = new views::ImageView();
-      AddChildView(avatar_icon_);
+      AddChildView(avatar_icon_.get());
     }
     avatar_icon_->SetImage(avatar);
   }
@@ -160,6 +161,10 @@ void HeaderView::SetWidthInPixels(int width_in_pixels) {
       width_in_pixels > 0
           ? views::PaintInfo::ScaleType::kUniformScaling
           : views::PaintInfo::ScaleType::kScaleWithEdgeSnapping);
+}
+
+void HeaderView::SetHeaderCornerRadius(int radius) {
+  frame_header_->SetHeaderCornerRadius(radius);
 }
 
 void HeaderView::Layout() {
@@ -190,6 +195,7 @@ void HeaderView::OnWindowPropertyChanged(aura::Window* window,
     return;
 
   DCHECK_EQ(target_widget_->GetNativeWindow(), window);
+
   if (key == aura::client::kAvatarIconKey) {
     gfx::ImageSkia* const avatar_icon =
         window->GetProperty(aura::client::kAvatarIconKey);

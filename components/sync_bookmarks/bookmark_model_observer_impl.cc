@@ -6,8 +6,8 @@
 
 #include <utility>
 
-#include "base/guid.h"
 #include "base/no_destructor.h"
+#include "base/uuid.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_node.h"
 #include "components/sync/base/hash_util.h"
@@ -121,7 +121,7 @@ void BookmarkModelObserverImpl::BookmarkNodeMoved(
 
   // We shouldn't see changes to the top-level nodes.
   DCHECK(!model->is_permanent_node(node));
-  if (!model->client()->CanSyncNode(node)) {
+  if (model->client()->IsNodeManaged(node)) {
     return;
   }
   const SyncedBookmarkTrackerEntity* entity =
@@ -151,7 +151,7 @@ void BookmarkModelObserverImpl::BookmarkNodeAdded(
     size_t index,
     bool added_by_user) {
   const bookmarks::BookmarkNode* node = parent->children()[index].get();
-  if (!model->client()->CanSyncNode(node)) {
+  if (model->client()->IsNodeManaged(node)) {
     return;
   }
 
@@ -160,7 +160,7 @@ void BookmarkModelObserverImpl::BookmarkNodeAdded(
   DCHECK(parent_entity);
 
   const syncer::UniquePosition unique_position =
-      ComputePosition(*parent, index, node->guid().AsLowercaseString());
+      ComputePosition(*parent, index, node->uuid().AsLowercaseString());
 
   sync_pb::EntitySpecifics specifics = CreateSpecificsFromBookmarkNode(
       node, model, unique_position.ToProto(), /*force_favicon_load=*/true);
@@ -169,7 +169,7 @@ void BookmarkModelObserverImpl::BookmarkNodeAdded(
   // the tombstone was not committed yet. In that case the existing entity
   // should be updated.
   const SyncedBookmarkTrackerEntity* entity =
-      bookmark_tracker_->GetEntityForGUID(node->guid());
+      bookmark_tracker_->GetEntityForUuid(node->uuid());
   const base::Time creation_time = base::Time::Now();
   if (entity) {
     // If there is a tracked entity with the same client tag hash (effectively
@@ -180,7 +180,7 @@ void BookmarkModelObserverImpl::BookmarkNodeAdded(
     bookmark_tracker_->Update(entity, entity->metadata().server_version(),
                               creation_time, specifics);
   } else {
-    entity = bookmark_tracker_->Add(node, node->guid().AsLowercaseString(),
+    entity = bookmark_tracker_->Add(node, node->uuid().AsLowercaseString(),
                                     syncer::kUncommittedVersion, creation_time,
                                     specifics);
   }
@@ -199,7 +199,7 @@ void BookmarkModelObserverImpl::OnWillRemoveBookmarks(
     const bookmarks::BookmarkNode* parent,
     size_t old_index,
     const bookmarks::BookmarkNode* node) {
-  if (!model->client()->CanSyncNode(node)) {
+  if (model->client()->IsNodeManaged(node)) {
     return;
   }
   bookmark_tracker_->CheckAllNodesTracked(model);
@@ -224,7 +224,7 @@ void BookmarkModelObserverImpl::OnWillRemoveAllUserBookmarks(
   const bookmarks::BookmarkNode* root_node = model->root_node();
   for (const auto& permanent_node : root_node->children()) {
     for (const auto& child : permanent_node->children()) {
-      if (model->client()->CanSyncNode(child.get())) {
+      if (!model->client()->IsNodeManaged(child.get())) {
         ProcessDelete(child.get());
       }
     }
@@ -242,7 +242,7 @@ void BookmarkModelObserverImpl::BookmarkAllUserNodesRemoved(
 void BookmarkModelObserverImpl::BookmarkNodeChanged(
     bookmarks::BookmarkModel* model,
     const bookmarks::BookmarkNode* node) {
-  if (!model->client()->CanSyncNode(node)) {
+  if (model->client()->IsNodeManaged(node)) {
     return;
   }
 
@@ -282,7 +282,7 @@ void BookmarkModelObserverImpl::BookmarkMetaInfoChanged(
 void BookmarkModelObserverImpl::BookmarkNodeFaviconChanged(
     bookmarks::BookmarkModel* model,
     const bookmarks::BookmarkNode* node) {
-  if (!model->client()->CanSyncNode(node)) {
+  if (model->client()->IsNodeManaged(node)) {
     return;
   }
 
@@ -331,7 +331,7 @@ void BookmarkModelObserverImpl::BookmarkNodeFaviconChanged(
 void BookmarkModelObserverImpl::BookmarkNodeChildrenReordered(
     bookmarks::BookmarkModel* model,
     const bookmarks::BookmarkNode* node) {
-  if (!model->client()->CanSyncNode(node)) {
+  if (model->client()->IsNodeManaged(node)) {
     return;
   }
 

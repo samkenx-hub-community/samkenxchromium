@@ -5,8 +5,11 @@
 #ifndef ASH_STYLE_TAB_SLIDER_BUTTON_H_
 #define ASH_STYLE_TAB_SLIDER_BUTTON_H_
 
+#include <string>
+
 #include "ash/ash_export.h"
 #include "ash/style/tab_slider.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/color/color_id.h"
@@ -32,7 +35,7 @@ class ASH_EXPORT TabSliderButton : public views::Button {
  public:
   METADATA_HEADER(TabSliderButton);
 
-  explicit TabSliderButton(PressedCallback callback);
+  TabSliderButton(PressedCallback callback, const std::u16string& tooltip_text);
   TabSliderButton(const TabSliderButton&) = delete;
   TabSliderButton& operator=(const TabSliderButton&) = delete;
   ~TabSliderButton() override;
@@ -48,12 +51,8 @@ class ASH_EXPORT TabSliderButton : public views::Button {
   // Returns the recommended color id for the current button state.
   SkColor GetColorIdOnButtonState();
 
-  // Returns the recommended layout parameters for tab slider. Note that the
-  // recommended layout parameters are only used as a minimum spacing reference.
-  // The slider will adjust the layout based on the the current and recommended
-  // layout spacings.
-  virtual absl::optional<TabSlider::LayoutParams> GetRecommendedSliderLayout()
-      const;
+  // views::Button:
+  void GetAccessibleNodeData(ui::AXNodeData* node_data) override;
 
  private:
   // Called when the button selected state is changed.
@@ -63,7 +62,7 @@ class ASH_EXPORT TabSliderButton : public views::Button {
   void NotifyClick(const ui::Event& event) override;
 
   // Not owned by button.
-  TabSlider* tab_slider_ = nullptr;
+  raw_ptr<TabSlider, ExperimentalAsh> tab_slider_ = nullptr;
   // The selected state indicating if the button is selected.
   bool selected_ = false;
 };
@@ -77,14 +76,10 @@ class ASH_EXPORT IconSliderButton : public TabSliderButton {
 
   IconSliderButton(PressedCallback callback,
                    const gfx::VectorIcon* icon,
-                   const std::u16string& tooltip_text = u"");
+                   const std::u16string& tooltip_text_base = u"");
   IconSliderButton(const IconSliderButton&) = delete;
   IconSliderButton& operator=(const IconSliderButton&) = delete;
   ~IconSliderButton() override;
-
-  // TabSliderButton:
-  absl::optional<TabSlider::LayoutParams> GetRecommendedSliderLayout()
-      const override;
 
  private:
   // TabSliderButton:
@@ -94,7 +89,7 @@ class ASH_EXPORT IconSliderButton : public TabSliderButton {
   void OnThemeChanged() override;
   void PaintButtonContents(gfx::Canvas* canvas) override;
 
-  const gfx::VectorIcon* const icon_;
+  const raw_ptr<const gfx::VectorIcon, ExperimentalAsh> icon_;
 };
 
 // An extension of `TabSliderButton` which is rounded rect button with a label
@@ -106,14 +101,10 @@ class ASH_EXPORT LabelSliderButton : public TabSliderButton {
 
   LabelSliderButton(PressedCallback callback,
                     const std::u16string& text,
-                    const std::u16string& tooltip_text = u"");
+                    const std::u16string& tooltip_text_base = u"");
   LabelSliderButton(const LabelSliderButton&) = delete;
   LabelSliderButton& operator=(const LabelSliderButton&) = delete;
   ~LabelSliderButton() override;
-
-  // TabSliderButton:
-  absl::optional<TabSlider::LayoutParams> GetRecommendedSliderLayout()
-      const override;
 
  private:
   // Update label color according to the current button state.
@@ -128,7 +119,7 @@ class ASH_EXPORT LabelSliderButton : public TabSliderButton {
   void StateChanged(ButtonState old_state) override;
 
   // Owned by the view hierarchy.
-  views::Label* label_;
+  raw_ptr<views::Label, ExperimentalAsh> label_;
 };
 
 // A `TabSliderButton` which shows an icon above a label.
@@ -136,17 +127,20 @@ class ASH_EXPORT IconLabelSliderButton : public TabSliderButton {
  public:
   METADATA_HEADER(IconLabelSliderButton);
 
+  static constexpr TabSlider::InitParams kSliderParams{
+      /*internal_border_padding=*/4,
+      /*between_child_spacing=*/0,
+      /*has_background=*/true,
+      /*has_selector_animation=*/true,
+      /*distribute_space_evenly=*/true};
+
   IconLabelSliderButton(PressedCallback callback,
                         const gfx::VectorIcon* icon,
                         const std::u16string& text,
-                        const std::u16string& tooltip_text = u"");
+                        const std::u16string& tooltip_text_base = u"");
   IconLabelSliderButton(const IconLabelSliderButton&) = delete;
   IconLabelSliderButton& operator=(const IconLabelSliderButton&) = delete;
   ~IconLabelSliderButton() override;
-
-  // TabSliderButton:
-  absl::optional<TabSlider::LayoutParams> GetRecommendedSliderLayout()
-      const override;
 
  private:
   // Update label color according to the current button state.
@@ -156,8 +150,8 @@ class ASH_EXPORT IconLabelSliderButton : public TabSliderButton {
   void OnSelectedChanged() override;
 
   // Owned by the views hierarchy.
-  views::ImageView* const image_view_;
-  views::Label* const label_;
+  const raw_ptr<views::ImageView, ExperimentalAsh> image_view_;
+  const raw_ptr<views::Label, ExperimentalAsh> label_;
 };
 
 }  // namespace ash

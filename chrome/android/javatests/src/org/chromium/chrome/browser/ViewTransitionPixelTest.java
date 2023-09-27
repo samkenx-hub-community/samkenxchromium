@@ -7,13 +7,12 @@ package org.chromium.chrome.browser;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.support.test.InstrumentationRegistry;
 import android.text.TextUtils;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.hamcrest.Matchers;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -27,10 +26,12 @@ import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.CriteriaNotSatisfiedException;
 import org.chromium.base.test.util.Feature;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.test.util.Coordinates;
 import org.chromium.content_public.browser.test.util.DOMUtils;
@@ -79,14 +80,8 @@ public class ViewTransitionPixelTest {
 
     @Before
     public void setUp() {
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-    }
-
-    @After
-    public void tearDown() {
-        if (mTestServer != null) {
-            mTestServer.stopAndDestroyServer();
-        }
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
     }
 
     private void startKeyboardTest(@VirtualKeyboardMode.EnumType int vkMode) throws Throwable {
@@ -202,7 +197,7 @@ public class ViewTransitionPixelTest {
     }
 
     private Bitmap takeScreenshot() throws Throwable {
-        Context context = InstrumentationRegistry.getContext();
+        Context context = ApplicationProvider.getApplicationContext();
 
         final CallbackHelper ch = new CallbackHelper();
         final AtomicReference<String> screenshotOutputPath = new AtomicReference<>();
@@ -287,6 +282,8 @@ public class ViewTransitionPixelTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
+    // TODO(crbug.com/1453741): Fix test with CREATE_NEW_TAB_INITIALIZE_RENDERER.
+    @DisableFeatures(ChromeFeatureList.CREATE_NEW_TAB_INITIALIZE_RENDERER)
     public void testVirtualKeyboardResizesVisual() throws Throwable {
         startKeyboardTest(VirtualKeyboardMode.RESIZES_VISUAL);
 
@@ -329,6 +326,8 @@ public class ViewTransitionPixelTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
+    // TODO(crbug.com/1453741): Fix test with CREATE_NEW_TAB_INITIALIZE_RENDERER.
+    @DisableFeatures(ChromeFeatureList.CREATE_NEW_TAB_INITIALIZE_RENDERER)
     public void testVirtualKeyboardResizesContent() throws Throwable {
         startKeyboardTest(VirtualKeyboardMode.RESIZES_CONTENT);
 
@@ -371,6 +370,8 @@ public class ViewTransitionPixelTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
+    // TODO(crbug.com/1453741): Fix test with CREATE_NEW_TAB_INITIALIZE_RENDERER.
+    @DisableFeatures(ChromeFeatureList.CREATE_NEW_TAB_INITIALIZE_RENDERER)
     public void testDialog() throws Throwable {
         String url = "/chrome/test/data/android/view_transition_dialog.html";
         mActivityTestRule.startMainActivityWithURL(mTestServer.getURL(url));

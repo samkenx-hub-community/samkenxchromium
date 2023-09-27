@@ -59,6 +59,9 @@ class PLATFORM_EXPORT PendingLayer {
     return change_of_decomposited_transforms_;
   }
   CompositingType GetCompositingType() const { return compositing_type_; }
+  cc::HitTestOpaqueness GetHitTestOpaqueness() const {
+    return hit_test_opaqueness_;
+  }
 
   void SetCompositingType(CompositingType new_type) {
     compositing_type_ = new_type;
@@ -68,28 +71,22 @@ class PLATFORM_EXPORT PendingLayer {
     chunks_.SetPaintArtifact(std::move(paint_artifact));
   }
 
+  using IsCompositedScrollFunction =
+      PropertyTreeState::IsCompositedScrollFunction;
+
   // Merges |guest| into |this| if it can, by appending chunks of |guest|
   // after chunks of |this|, with appropriate space conversion applied to
   // both layers from their original property tree states to |merged_state|.
   // Returns whether the merge is successful.
-  bool Merge(
-      const PendingLayer& guest,
-      LCDTextPreference lcd_text_preference = LCDTextPreference::kIgnored) {
-    return MergeInternal(guest,
-                         guest.property_tree_state_.GetPropertyTreeState(),
-                         lcd_text_preference, /*dry_run*/ false);
-  }
+  bool Merge(const PendingLayer& guest,
+             LCDTextPreference lcd_text_preference,
+             IsCompositedScrollFunction);
 
-  // Returns true if |guest| can be merged into |this|.
-  // |guest_state| is for cases where we want to check if we can merge |guest|
-  // if it has |guest_state| in the future (which may be different from its
-  // current state).
-  bool CanMerge(const PendingLayer& guest,
-                const PropertyTreeState& guest_state,
-                LCDTextPreference lcd_text_preference) const {
-    return const_cast<PendingLayer*>(this)->MergeInternal(
-        guest, guest_state, lcd_text_preference, /*dry_run*/ true);
-  }
+  // Returns true if `guest` that could be upcasted with decomposited blend
+  // mode can be merged into `this`.
+  bool CanMergeWithDecompositedBlendMode(const PendingLayer& guest,
+                                         const PropertyTreeState& upcast_state,
+                                         IsCompositedScrollFunction) const;
 
   // Mutate this layer's property tree state to a more general (shallower)
   // state, thus the name "upcast". The concrete effect of this is to
@@ -144,6 +141,8 @@ class PLATFORM_EXPORT PendingLayer {
     return content_layer_client_.get();
   }
 
+  void UpdateCcLayerHitTestOpaqueness() const;
+
   // For this PendingLayer, creates a composited layer or uses the existing
   // one in |old_pending_layer|, and updates the layer according to the current
   // contents and properties of this PendingLayer.
@@ -160,17 +159,31 @@ class PLATFORM_EXPORT PendingLayer {
 
   SkColor4f ComputeBackgroundColor() const;
 
-  // True if this contains only a single solid color PaintChunk in the same
-  // property tree state (decomposited 2d translations are allowed) as this
-  // PendingLayer.
-  bool IsSolidColor() const { return is_solid_color_; }
+  // True if a solid color chunk exists that makes this entire layer
+  // draw a solid color (see comment above `solid_color_chunk_index_`).
+  bool IsSolidColor() const { return solid_color_chunk_index_ != kNotFound; }
 
  private:
-  gfx::RectF MapRectKnownToBeOpaque(const PropertyTreeState&) const;
-  bool MergeInternal(const PendingLayer& guest,
-                     const PropertyTreeState& guest_state,
-                     LCDTextPreference,
-                     bool dry_run);
+  // Checks basic merge-ability with `guest` and calls
+  // PropertyTreeState::CanUpcastWith().
+  absl::optional<PropertyTreeState> CanUpcastWith(
+      const PendingLayer& guest,
+      const PropertyTreeState& guest_state,
+      IsCompositedScrollFunction is_comosited_scroll) const;
+
+  bool CanMerge(const PendingLayer& guest,
+                LCDTextPreference lcd_text_preference,
+                IsCompositedScrollFunction,
+                gfx::RectF& merged_bounds,
+                PropertyTreeState& merged_state,
+                gfx::RectF& merged_rect_known_to_be_opaque,
+                bool& merged_text_known_to_be_on_opaque_background,
+                wtf_size_t& merged_solid_color_chunk_index,
+                cc::HitTestOpaqueness& merged_hit_test_opaqueness) const;
+
+  gfx::RectF MapRectKnownToBeOpaque(
+      const PropertyTreeState& new_state,
+      const FloatClipRect& mapped_layer_bounds) const;
 
   bool PropertyTreeStateChanged(const PendingLayer* old_pending_layer) const;
 
@@ -183,12 +196,12 @@ class PLATFORM_EXPORT PendingLayer {
                           bool tracks_raster_invalidations);
   void UpdateSolidColorLayer(PendingLayer* old_pending_layer);
 
-  void UpdateLayerProperties();
-  void UpdateLayerSelection(cc::LayerSelection&);
+  void UpdateLayerProperties(cc::LayerSelection&, bool selection_only);
 
   bool UsesSolidColorLayer() const {
-    return RuntimeEnabledFeatures::SolidColorLayersEnabled() && is_solid_color_;
+    return RuntimeEnabledFeatures::SolidColorLayersEnabled() && IsSolidColor();
   }
+  SkColor4f GetSolidColor() const;
 
   // The rects are in the space of property_tree_state.
   gfx::RectF bounds_;
@@ -197,13 +210,18 @@ class PLATFORM_EXPORT PendingLayer {
   bool draws_content_ = false;
   bool text_known_to_be_on_opaque_background_ = false;
   bool has_decomposited_blend_mode_ = false;
-  bool is_solid_color_ = false;
+  // If not kNotFound, this is the index of the chunk that makes this layer
+  // solid color. The solid color chunk must be the last drawable chunk and
+  // must draw a solid color that fully covers this pending layer.
+  wtf_size_t solid_color_chunk_index_ = kNotFound;
   PaintChunkSubset chunks_;
   RefCountedPropertyTreeState property_tree_state_;
   gfx::Vector2dF offset_of_decomposited_transforms_;
   PaintPropertyChangeType change_of_decomposited_transforms_ =
       PaintPropertyChangeType::kUnchanged;
-  CompositingType compositing_type_;
+  CompositingType compositing_type_ = kOther;
+  cc::HitTestOpaqueness hit_test_opaqueness_ =
+      cc::HitTestOpaqueness::kTransparent;
 
   // This is set to non-null after layerization if ChunkRequiresOwnLayer() or
   // UsesSolidColorLayer() is true.

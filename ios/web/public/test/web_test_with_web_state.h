@@ -74,13 +74,13 @@ class WebTestWithWebState : public WebTest {
   // calling `function` with `parameters` in the main frame of `web_state()`.
   std::unique_ptr<base::Value> CallJavaScriptFunction(
       const std::string& function,
-      const std::vector<base::Value>& parameters);
+      const base::Value::List& parameters);
   std::unique_ptr<base::Value> CallJavaScriptFunctionForFeature(
       const std::string& function,
-      const std::vector<base::Value>& parameters,
+      const base::Value::List& parameters,
       JavaScriptFeature* feature);
   // Synchronously executes JavaScript and returns result as id.
-  id ExecuteJavaScript(NSString* script);
+  virtual id ExecuteJavaScript(NSString* script);
 
   // Returns the base URL of the loaded page.
   std::string BaseUrl() const;

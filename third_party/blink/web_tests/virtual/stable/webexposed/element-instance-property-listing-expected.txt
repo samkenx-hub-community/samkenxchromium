@@ -125,6 +125,7 @@ namespace http://www.w3.org/1999/xhtml
     property hasChildNodes
     property hasPointerCapture
     property hidden
+    property hidePopover
     property id
     property inert
     property innerHTML
@@ -169,6 +170,7 @@ namespace http://www.w3.org/1999/xhtml
     property onbeforeinput
     property onbeforematch
     property onbeforepaste
+    property onbeforetoggle
     property onbeforexrselect
     property onblur
     property oncancel
@@ -237,6 +239,7 @@ namespace http://www.w3.org/1999/xhtml
     property onreset
     property onresize
     property onscroll
+    property onscrollend
     property onsearch
     property onsecuritypolicyviolation
     property onseeked
@@ -273,6 +276,7 @@ namespace http://www.w3.org/1999/xhtml
     property parentElement
     property parentNode
     property part
+    property popover
     property prefix
     property prepend
     property previousElementSibling
@@ -308,6 +312,7 @@ namespace http://www.w3.org/1999/xhtml
     property setHTML
     property setPointerCapture
     property shadowRoot
+    property showPopover
     property slot
     property spellcheck
     property style
@@ -317,6 +322,7 @@ namespace http://www.w3.org/1999/xhtml
     property title
     property toString
     property toggleAttribute
+    property togglePopover
     property translate
     property virtualKeyboardPolicy
     property webkitMatchesSelector
@@ -475,6 +481,8 @@ html element button
     property formTarget
     property labels
     property name
+    property popoverTargetAction
+    property popoverTargetElement
     property reportValidity
     property setCustomValidity
     property type
@@ -652,6 +660,7 @@ html element iframe
     property marginHeight
     property marginWidth
     property name
+    property privateToken
     property referrerPolicy
     property sandbox
     property scrolling
@@ -717,6 +726,8 @@ html element input
     property name
     property pattern
     property placeholder
+    property popoverTargetAction
+    property popoverTargetElement
     property readOnly
     property reportValidity
     property required
@@ -921,6 +932,7 @@ html element script
     property src
     property text
     property type
+html element search
 html element section
 html element select
     property add
@@ -1344,6 +1356,7 @@ namespace http://www.w3.org/2000/svg
     property onbeforeinput
     property onbeforematch
     property onbeforepaste
+    property onbeforetoggle
     property onbeforexrselect
     property onblur
     property oncancel
@@ -1412,6 +1425,7 @@ namespace http://www.w3.org/2000/svg
     property onreset
     property onresize
     property onscroll
+    property onscrollend
     property onsearch
     property onsecuritypolicyviolation
     property onseeked
@@ -1566,13 +1580,6 @@ svg element circle
     property transform
 svg element clipPath
     property clipPathUnits
-    property farthestViewportElement
-    property getBBox
-    property getCTM
-    property getScreenCTM
-    property nearestViewportElement
-    property requiredExtensions
-    property systemLanguage
     property transform
 svg element defs
     property farthestViewportElement
@@ -1924,6 +1931,7 @@ svg element g
     property systemLanguage
     property transform
 svg element image
+    property crossOrigin
     property decode
     property decoding
     property farthestViewportElement

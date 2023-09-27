@@ -5,10 +5,12 @@
 #import "ios/chrome/browser/ui/credential_provider_promo/credential_provider_promo_coordinator.h"
 
 #import "components/prefs/pref_service.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/main/browser.h"
-#import "ios/chrome/browser/prefs/pref_names.h"
+#import "ios/chrome/browser/feature_engagement/tracker_factory.h"
+#import "ios/chrome/browser/promos_manager/promos_manager_factory.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/credential_provider_promo_commands.h"
 #import "ios/chrome/browser/shared/public/commands/promos_manager_commands.h"
@@ -20,10 +22,6 @@
 #import "ios/chrome/browser/ui/promos_manager/promos_manager_ui_handler.h"
 #import "ios/chrome/common/ui/confirmation_alert/confirmation_alert_action_handler.h"
 #import "ios/public/provider/chrome/browser/password_auto_fill/password_auto_fill_api.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface CredentialProviderPromoCoordinator () <
     ConfirmationAlertActionHandler,
@@ -57,8 +55,10 @@ using credential_provider_promo::IOSCredentialProviderPromoAction;
   [self.browser->GetCommandDispatcher()
       startDispatchingToTarget:self
                    forProtocol:@protocol(CredentialProviderPromoCommands)];
+  PromosManager* promosManager =
+      PromosManagerFactory::GetForBrowserState(self.browser->GetBrowserState());
   self.mediator = [[CredentialProviderPromoMediator alloc]
-      initWithPromosManager:GetApplicationContext()->GetPromosManager()
+      initWithPromosManager:promosManager
                 prefService:self.browser->GetBrowserState()->GetPrefs()];
 }
 
@@ -88,9 +88,17 @@ using credential_provider_promo::IOSCredentialProviderPromoAction;
   }
   self.viewController = [[CredentialProviderPromoViewController alloc] init];
   self.mediator.consumer = self.viewController;
+  self.mediator.tracker =
+      feature_engagement::TrackerFactory::GetForBrowserState(
+          self.browser->GetBrowserState());
   self.viewController.actionHandler = self;
   self.viewController.presentationController.delegate = self;
-  self.promoContext = CredentialProviderPromoContext::kFirstStep;
+  if (trigger == CredentialProviderPromoTrigger::SetUpList) {
+    // If this is coming from the SetUpList, force to go directly to LearnMore.
+    self.promoContext = CredentialProviderPromoContext::kLearnMore;
+  } else {
+    self.promoContext = CredentialProviderPromoContext::kFirstStep;
+  }
   [self.mediator configureConsumerWithTrigger:trigger
                                       context:self.promoContext];
   self.trigger = trigger;
@@ -184,6 +192,9 @@ using credential_provider_promo::IOSCredentialProviderPromoAction;
   credential_provider_promo::RecordAction(
       [self.mediator promoOriginalSource],
       self.trigger == CredentialProviderPromoTrigger::RemindMeLater, action);
+  GetApplicationContext()->GetLocalState()->SetInteger(
+      prefs::kIosCredentialProviderPromoLastActionTaken,
+      static_cast<int>(action));
 }
 
 @end

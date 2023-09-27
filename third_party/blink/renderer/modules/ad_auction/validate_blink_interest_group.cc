@@ -9,11 +9,14 @@
 #include "third_party/blink/renderer/platform/weborigin/security_origin.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
+#include "third_party/boringssl/src/include/openssl/curve25519.h"
 #include "url/url_constants.h"
 
 namespace blink {
 
 namespace {
+
+const size_t kMaxAdRenderIdSize = 12;
 
 // Check if `url` can be used as an interest group's ad render URL. Ad URLs can
 // be cross origin, unlike other interest group URLs, but are still restricted
@@ -94,7 +97,15 @@ size_t EstimateBlinkInterestGroupSize(
     for (const auto& ad : group.ads.value()) {
       size += ad->render_url.GetString().length();
       size += ad->size_group.length();
+      size += ad->buyer_reporting_id.length();
+      size += ad->buyer_and_seller_reporting_id.length();
       size += ad->metadata.length();
+      size += ad->ad_render_id.length();
+      if (ad->allowed_reporting_origins) {
+        for (const auto& origin : ad->allowed_reporting_origins.value()) {
+          size += origin->ToString().length();
+        }
+      }
     }
   }
 
@@ -103,6 +114,7 @@ size_t EstimateBlinkInterestGroupSize(
       size += ad->render_url.GetString().length();
       size += ad->size_group.length();
       size += ad->metadata.length();
+      size += ad->ad_render_id.length();
     }
   }
 
@@ -123,6 +135,12 @@ size_t EstimateBlinkInterestGroupSize(
         size += size_name.length();
       }
     }
+  }
+  constexpr size_t kAuctionServerRequestFlagsSize = 4;
+  size += kAuctionServerRequestFlagsSize;
+
+  if (group.additional_bid_key) {
+    size += X25519_PUBLIC_VALUE_LEN;
   }
 
   return size;
@@ -154,7 +172,9 @@ bool ValidateBlinkInterestGroup(const mojom::blink::InterestGroup& group,
   if (group.execution_mode !=
           mojom::blink::InterestGroup::ExecutionMode::kCompatibilityMode &&
       group.execution_mode !=
-          mojom::blink::InterestGroup::ExecutionMode::kGroupedByOriginMode) {
+          mojom::blink::InterestGroup::ExecutionMode::kGroupedByOriginMode &&
+      group.execution_mode !=
+          mojom::blink::InterestGroup::ExecutionMode::kFrozenContext) {
     error_field_name = "executionMode";
     error_field_value = String::Number(static_cast<int>(group.execution_mode));
     error = "execution mode is not valid.";
@@ -174,21 +194,21 @@ bool ValidateBlinkInterestGroup(const mojom::blink::InterestGroup& group,
 
   if (group.bidding_url) {
     if (!IsUrlAllowed(*group.bidding_url, group)) {
-      error_field_name = "biddingUrl";
+      error_field_name = "biddingLogicURL";
       error_field_value = group.bidding_url->GetString();
       error =
-          "biddingUrl must have the same origin as the InterestGroup owner "
-          "and have no fragment identifier or embedded credentials.";
+          "biddingLogicURL must have the same origin as the InterestGroup "
+          "owner and have no fragment identifier or embedded credentials.";
       return false;
     }
   }
 
   if (group.bidding_wasm_helper_url) {
     if (!IsUrlAllowed(*group.bidding_wasm_helper_url, group)) {
-      error_field_name = "biddingWasmHelperUrl";
+      error_field_name = "biddingWasmHelperURL";
       error_field_value = group.bidding_wasm_helper_url->GetString();
       error =
-          "biddingWasmHelperUrl must have the same origin as the InterestGroup "
+          "biddingWasmHelperURL must have the same origin as the InterestGroup "
           "owner and have no fragment identifier or embedded credentials.";
       return false;
     }
@@ -196,10 +216,10 @@ bool ValidateBlinkInterestGroup(const mojom::blink::InterestGroup& group,
 
   if (group.update_url) {
     if (!IsUrlAllowed(*group.update_url, group)) {
-      error_field_name = "updateUrl";
+      error_field_name = "updateURL";
       error_field_value = group.update_url->GetString();
       error =
-          "updateUrl must have the same origin as the InterestGroup owner "
+          "updateURL must have the same origin as the InterestGroup owner "
           "and have no fragment identifier or embedded credentials.";
       return false;
     }
@@ -211,10 +231,10 @@ bool ValidateBlinkInterestGroup(const mojom::blink::InterestGroup& group,
     // query parameter needs to be set as part of running an auction.
     if (!IsUrlAllowed(*group.trusted_bidding_signals_url, group) ||
         !group.trusted_bidding_signals_url->Query().empty()) {
-      error_field_name = "trustedBiddingSignalsUrl";
+      error_field_name = "trustedBiddingSignalsURL";
       error_field_value = group.trusted_bidding_signals_url->GetString();
       error =
-          "trustedBiddingSignalsUrl must have the same origin as the "
+          "trustedBiddingSignalsURL must have the same origin as the "
           "InterestGroup owner and have no query string, fragment identifier "
           "or embedded credentials.";
       return false;
@@ -225,9 +245,9 @@ bool ValidateBlinkInterestGroup(const mojom::blink::InterestGroup& group,
     for (WTF::wtf_size_t i = 0; i < group.ads.value().size(); ++i) {
       const KURL& render_url = group.ads.value()[i]->render_url;
       if (!IsUrlAllowedForRenderUrls(render_url)) {
-        error_field_name = String::Format("ads[%u].renderUrl", i);
+        error_field_name = String::Format("ads[%u].renderURL", i);
         error_field_value = render_url.GetString();
-        error = "renderUrls must be HTTPS and have no embedded credentials.";
+        error = "renderURLs must be HTTPS and have no embedded credentials.";
         return false;
       }
       const WTF::String& ad_size_group = group.ads.value()[i]->size_group;
@@ -245,6 +265,38 @@ bool ValidateBlinkInterestGroup(const mojom::blink::InterestGroup& group,
           return false;
         }
       }
+      if (group.ads.value()[i]->ad_render_id.length() > kMaxAdRenderIdSize) {
+        error_field_name = String::Format("ads[%u].adRenderId", i);
+        error_field_value = group.ads.value()[i]->ad_render_id;
+        error = "The adRenderId is too long.";
+        return false;
+      }
+      auto& allowed_reporting_origins =
+          group.ads.value()[i]->allowed_reporting_origins;
+      if (allowed_reporting_origins) {
+        if (allowed_reporting_origins->size() >
+            mojom::blink::kMaxAllowedReportingOrigins) {
+          error_field_name =
+              String::Format("ads[%u].allowedReportingOrigins", i);
+          error_field_value = "";
+          error = String::Format(
+              "allowedReportingOrigins cannot have more than %hu elements.",
+              mojom::blink::kMaxAllowedReportingOrigins);
+          return false;
+        }
+        for (WTF::wtf_size_t j = 0; j < allowed_reporting_origins->size();
+             ++j) {
+          if (allowed_reporting_origins.value()[j]->Protocol() !=
+              url::kHttpsScheme) {
+            error_field_name =
+                String::Format("ads[%u].allowedReportingOrigins", i);
+            error_field_value =
+                allowed_reporting_origins.value()[j]->ToString();
+            error = "allowedReportingOrigins must all be HTTPS.";
+            return false;
+          }
+        }
+      }
     }
   }
 
@@ -252,9 +304,9 @@ bool ValidateBlinkInterestGroup(const mojom::blink::InterestGroup& group,
     for (WTF::wtf_size_t i = 0; i < group.ad_components.value().size(); ++i) {
       const KURL& render_url = group.ad_components.value()[i]->render_url;
       if (!IsUrlAllowedForRenderUrls(render_url)) {
-        error_field_name = String::Format("adComponents[%u].renderUrl", i);
+        error_field_name = String::Format("adComponents[%u].renderURL", i);
         error_field_value = render_url.GetString();
-        error = "renderUrls must be HTTPS and have no embedded credentials.";
+        error = "renderURLs must be HTTPS and have no embedded credentials.";
         return false;
       }
       const WTF::String& ad_component_size_group =
@@ -274,6 +326,20 @@ bool ValidateBlinkInterestGroup(const mojom::blink::InterestGroup& group,
           return false;
         }
       }
+      if (group.ad_components.value()[i]->ad_render_id.length() >
+          kMaxAdRenderIdSize) {
+        error_field_name = String::Format("adComponents[%u].adRenderId", i);
+        error_field_value = group.ad_components.value()[i]->ad_render_id;
+        error = "The adRenderId is too long.";
+        return false;
+      }
+
+      // The code should not be setting these for `ad_components`
+      DCHECK(group.ad_components.value()[i]->buyer_reporting_id.IsNull());
+      DCHECK(group.ad_components.value()[i]
+                 ->buyer_and_seller_reporting_id.IsNull());
+      DCHECK(!group.ad_components.value()[i]
+                  ->allowed_reporting_origins.has_value());
     }
   }
 
@@ -337,6 +403,23 @@ bool ValidateBlinkInterestGroup(const mojom::blink::InterestGroup& group,
         }
       }
     }
+  }
+
+  if (group.additional_bid_key) {
+    if (group.additional_bid_key->size() != X25519_PUBLIC_VALUE_LEN) {
+      error_field_name = "additionalBidKey";
+      error_field_value = String::Number(group.additional_bid_key->size());
+      error = String::Format("additionalBidKey must be exactly %u bytes.",
+                             X25519_PUBLIC_VALUE_LEN);
+      return false;
+    }
+  }
+
+  if (group.additional_bid_key && group.ads) {
+    error =
+        "Interest groups that provide a value of additionalBidKey "
+        "for negative targeting must not provide a value for ads.";
+    return false;
   }
 
   size_t size = EstimateBlinkInterestGroupSize(group);

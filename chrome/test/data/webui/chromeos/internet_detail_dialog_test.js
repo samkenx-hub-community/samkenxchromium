@@ -64,9 +64,22 @@ suite('internet-detail-dialog', () => {
 
   setup(async () => {
     PolymerTest.clearBody();
-    InternetDetailDialogBrowserProxyImpl.instance_ =
-        new TestInternetDetailDialogBrowserProxy();
+    InternetDetailDialogBrowserProxyImpl.setInstance(
+        new TestInternetDetailDialogBrowserProxy());
     mojoApi_.resetForTest();
+  });
+
+  teardown(function() {
+    // If a previous test was run with Jelly, the css needs to be removed.
+    const old_elements =
+        document.querySelectorAll('link[href*=\'chrome://theme/colors.css\']');
+    old_elements.forEach(function(node) {
+      node.remove();
+    });
+    assertFalse(
+        !!document.querySelector('link[href*=\'chrome://theme/colors.css\']'));
+
+    document.body.classList.remove('jelly-enabled');
   });
 
   async function init() {
@@ -76,7 +89,7 @@ suite('internet-detail-dialog', () => {
   }
 
   async function setupCellularNetwork(
-      isPrimary, isInhibited, connectedApn, customApnList) {
+      isPrimary, isInhibited, connectedApn, customApnList, errorState) {
     await mojoApi_.setNetworkTypeEnabledState(NetworkType.kCellular, true);
 
     const cellularNetwork =
@@ -90,6 +103,7 @@ suite('internet-detail-dialog', () => {
     cellularNetwork.typeProperties.cellular.supportNetworkScan = true;
     cellularNetwork.typeProperties.cellular.connectedApn = connectedApn;
     cellularNetwork.typeProperties.cellular.customApnList = customApnList;
+    cellularNetwork.errorState = errorState;
 
     mojoApi_.setManagedPropertiesForTest(cellularNetwork);
     mojoApi_.setDeviceStateForTest({
@@ -291,8 +305,11 @@ suite('internet-detail-dialog', () => {
       loadTimeData.overrideValues({
         apnRevamp: isApnRevampEnabled,
       });
+      const errorState = 'invalid-apn';
       await setupCellularNetwork(
-          /* isPrimary= */ true, /* isInhibited= */ false);
+          /* isPrimary= */ true, /* isInhibited= */ false,
+          /* connectedApn= */ undefined, /* customApnList= */ undefined,
+          errorState);
 
       await init();
       const legacyApnElement =
@@ -315,6 +332,7 @@ suite('internet-detail-dialog', () => {
             internetDetailDialog.shadowRoot.querySelector('apn-list');
         assertTrue(!!getApnList());
         assertTrue(getApnList().shouldOmitLinks);
+        assertEquals(errorState, getApnList().errorState);
         const isApnListShowing = () =>
             internetDetailDialog.shadowRoot.querySelector('iron-collapse')
                 .opened;
@@ -332,6 +350,18 @@ suite('internet-detail-dialog', () => {
         assertEquals(accessPointName, getApnSectionSublabel());
         assertFalse(isApnListShowing());
 
+        // Update the APN's name property.
+        const name = 'name';
+        await setupCellularNetwork(
+            /* isPrimary= */ true, /* isInhibited= */ false,
+            {accessPointName: accessPointName, name: name});
+
+        // Force a refresh.
+        internetDetailDialog.onDeviceStateListChanged();
+        await flushAsync();
+        assertEquals(name, getApnSectionSublabel());
+        assertFalse(isApnListShowing());
+
         // Expand the section, the sublabel should no longer show.
         apnSection.click();
         await flushAsync();
@@ -341,7 +371,7 @@ suite('internet-detail-dialog', () => {
         // Collapse the section, the sublabel should show.
         apnSection.click();
         await flushAsync();
-        assertEquals(accessPointName, getApnSectionSublabel());
+        assertEquals(name, getApnSectionSublabel());
         assertFalse(isApnListShowing());
       } else {
         assertTrue(!!legacyApnElement);
@@ -352,7 +382,7 @@ suite('internet-detail-dialog', () => {
 
   test(
       'Disable and show tooltip for New APN button when custom APNs limit is' +
-          'reached',
+          ' reached',
       async () => {
         loadTimeData.overrideValues({
           apnRevamp: true,
@@ -404,5 +434,64 @@ suite('internet-detail-dialog', () => {
         await flushAsync();
         assertTrue(!!internetDetailDialog.shadowRoot.querySelector('apn-list')
                          .shadowRoot.querySelector('apn-detail-dialog'));
+      });
+
+  [false, true].forEach(isJellyEnabled => {
+    test('Dynamic theme CSS is added when isJellyEnabled is set', async () => {
+      loadTimeData.overrideValues({
+        isJellyEnabled: isJellyEnabled,
+      });
+      await setupCellularNetwork(
+          /*isPrimary=*/ true, /*isInhibited=*/ false);
+      await init();
+
+      const linkEl =
+          document.querySelector('link[href*=\'chrome://theme/colors.css\']');
+      if (isJellyEnabled) {
+        assertTrue(!!linkEl);
+        assertTrue(document.body.classList.contains('jelly-enabled'));
+      } else {
+        assertEquals(null, linkEl);
+        assertFalse(document.body.classList.contains('jelly-enabled'));
+      }
+    });
+  });
+
+  test('Show toast on show-error-toast event', async function() {
+    loadTimeData.overrideValues({
+      apnRevamp: true,
+    });
+    await init();
+    const getErrorToast = () =>
+        internetDetailDialog.shadowRoot.querySelector('#errorToast');
+    assertFalse(getErrorToast().open);
+
+    const message = 'Toast message';
+    const event = new CustomEvent('show-error-toast', {detail: message});
+    internetDetailDialog.dispatchEvent(event);
+    await flushAsync();
+    assertTrue(getErrorToast().open);
+    assertEquals(
+        internetDetailDialog.shadowRoot.querySelector('#errorToastMessage')
+            .innerHTML,
+        message);
+  });
+
+  test(
+      'Dont show toast on show-error-toast event when ApnRevamp false',
+      async function() {
+        loadTimeData.overrideValues({
+          apnRevamp: false,
+        });
+        await init();
+        const getErrorToast = () =>
+            internetDetailDialog.shadowRoot.querySelector('#errorToast');
+        assertFalse(!!getErrorToast());
+
+        const message = 'Toast message';
+        const event = new CustomEvent('show-error-toast', {detail: message});
+        internetDetailDialog.dispatchEvent(event);
+        await flushAsync();
+        assertFalse(!!getErrorToast());
       });
 });

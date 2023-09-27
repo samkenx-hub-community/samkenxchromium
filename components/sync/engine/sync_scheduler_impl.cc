@@ -19,6 +19,7 @@
 #include "components/sync/base/features.h"
 #include "components/sync/base/model_type.h"
 #include "components/sync/engine/backoff_delay_provider.h"
+#include "components/sync/engine/sync_protocol_error.h"
 #include "components/sync/protocol/sync_enums.pb.h"
 
 using base::TimeTicks;
@@ -67,11 +68,13 @@ bool ShouldRequestEarlyExit(const SyncProtocolError& error) {
       // waiting forever. So assert we would send something.
       DCHECK_NE(error.action, UNKNOWN_ACTION);
       return true;
-    // Make UNKNOWN_ERROR a NOTREACHED. All the other error should be explicitly
-    // handled.
     case UNKNOWN_ERROR:
       // TODO(crbug.com/1081266): This NOTREACHED is questionable because the
       // sync server can cause it.
+      NOTREACHED();
+      return false;
+    case CONFLICT:
+    case INVALID_MESSAGE:
       NOTREACHED();
       return false;
   }
@@ -176,6 +179,7 @@ void SyncSchedulerImpl::Start(Mode mode, base::Time last_poll_time) {
     // actually have miss the real poll, unless the client is restarted.
     // Fixing that would require using an AlarmTimer though, which is only
     // supported on certain platforms.
+    // TODO(crbug.com/1448012): introduce a helper to deal with poll times.
     last_poll_reset_ =
         TimeTicks::Now() -
         (now - ComputeLastPollOnStart(last_poll_time, GetPollInterval(), now));
@@ -201,16 +205,14 @@ base::Time SyncSchedulerImpl::ComputeLastPollOnStart(
     base::Time last_poll,
     base::TimeDelta poll_interval,
     base::Time now) {
-  if (base::FeatureList::IsEnabled(kSyncResetPollIntervalOnStart)) {
-    return now;
-  }
   if (base::FeatureList::IsEnabled(kSyncPollImmediatelyOnEveryStartup)) {
     // Hack: Pretend the last poll happened sufficiently long ago to trigger a
     // poll.
     return now - (poll_interval + base::Seconds(1));
   }
   // Handle immediate polls on start-up separately.
-  if (last_poll + poll_interval <= now) {
+  if (last_poll + poll_interval <= now &&
+      !base::FeatureList::IsEnabled(kSyncPollWithoutDelayOnStartup)) {
     // Doing polls on start-up is generally a risk as other bugs in Chrome
     // might cause start-ups -- potentially synchronized to a specific time.
     // (think about a system timer waking up Chrome).

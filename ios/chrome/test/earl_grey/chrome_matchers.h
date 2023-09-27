@@ -39,6 +39,14 @@ id<GREYMatcher> ButtonWithAccessibilityLabelId(int message_id);
 // `label` and accessibility trait UIAccessibilityTraitButton.
 id<GREYMatcher> ButtonWithAccessibilityLabel(NSString* label);
 
+// Returns a matcher for context menu items with accessibility label
+// corresponding to `label`.
+id<GREYMatcher> ContextMenuItemWithAccessibilityLabel(NSString* label);
+
+// Returns a matcher for context menu items with accessibility label
+// corresponding to `message_id`.
+id<GREYMatcher> ContextMenuItemWithAccessibilityLabelId(int message_id);
+
 // Returns a matcher for element with an image corresponding to `image_id`.
 id<GREYMatcher> ImageViewWithImage(UIImage* image);
 
@@ -114,6 +122,9 @@ id<GREYMatcher> Omnibox();
 // Returns matcher for the omnibox popup list row views.
 id<GREYMatcher> OmniboxPopupRow();
 
+// Returns a matcher for a popup row containing `string` as accessibility label.
+id<GREYMatcher> OmniboxPopupRowWithString(NSString* string);
+
 // Returns matcher for the omnibox popup list view.
 id<GREYMatcher> OmniboxPopupList();
 
@@ -131,6 +142,9 @@ id<GREYMatcher> OmniboxText(const std::string& text);
 
 // Returns a matcher for `text` being a substring of the text in the omnibox.
 id<GREYMatcher> OmniboxContainingText(const std::string& text);
+
+// Returns a matcher for omnibox autocomplete.
+id<GREYMatcher> OmniboxAutocompleteLabel();
 
 // Returns a matcher for `text` being a substring of the text in the location
 // view.
@@ -287,7 +301,13 @@ id<GREYMatcher> SettingsPrivacyTableView();
 id<GREYMatcher> SettingsPrivacySafeBrowsingTableView();
 
 // Returns a matcher for the notifications settings table view.
-id<GREYMatcher> SettingsPriceNotificationsTableView();
+id<GREYMatcher> SettingsNotificationsTableView();
+
+// Returns a matcher for the inactive tabs settings table view.
+id<GREYMatcher> SettingsInactiveTabsTableView();
+
+// Returns a matcher for the tabs settings table view.
+id<GREYMatcher> SettingsTabsTableView();
 
 // Returns a matcher for the tracking price settings table view.
 id<GREYMatcher> SettingsTrackingPriceTableView();
@@ -303,6 +323,17 @@ id<GREYMatcher> GoogleServicesSettingsButton();
 // Returns a matcher for the Manage Sync Settings button on the main Settings
 // screen.
 id<GREYMatcher> ManageSyncSettingsButton();
+
+// Returns a matcher for the Inactive Tabs Settings button on the Tabs Settings
+// screen.
+id<GREYMatcher> InactiveTabsSettingsButton();
+
+// Returns a matcher for the Tab Pickup Settings button on the Tabs Settings
+// screen.
+id<GREYMatcher> TabPickupSettingsButton();
+
+// Returns a matcher for the Tabs Settings button on the main Settings screen.
+id<GREYMatcher> TabsSettingsButton();
 
 // Returns a matcher for the Google Services Settings view.
 id<GREYMatcher> GoogleServicesSettingsView();
@@ -320,9 +351,9 @@ id<GREYMatcher> SettingsMenuPrivacyButton();
 // Returns a matcher for the Save passwords cell on the main Settings screen.
 id<GREYMatcher> SettingsMenuPasswordsButton();
 
-// Returns a matcher for the Price Notifications cell on the main Settings
+// Returns a matcher for the Notifications cell on the main Settings
 // screen.
-id<GREYMatcher> SettingsMenuPriceNotificationsButton();
+id<GREYMatcher> SettingsMenuNotificationsButton();
 
 // Returns a matcher for the payment request collection view.
 id<GREYMatcher> PaymentRequestView();
@@ -396,6 +427,12 @@ id<GREYMatcher> SystemSelectionCalloutLinkToTextButton();
 
 // Returns a matcher for the copy button on the system selection callout.
 id<GREYMatcher> SystemSelectionCalloutCopyButton();
+
+// Returns a matcher for the cut button on the system selection callout.
+id<GREYMatcher> SystemSelectionCalloutCutButton();
+
+// Returns a matcher for the paste button on the system selection callout.
+id<GREYMatcher> SystemSelectionCalloutPasteButton();
 
 // Returns a matcher for the system selection callout overflow button to show
 // more menu items.
@@ -535,6 +572,9 @@ id<GREYMatcher> SettingsBottomToolbarDeleteButton();
 // Returns a matcher for the search engine button in the main settings view.
 id<GREYMatcher> SettingsSearchEngineButton();
 
+// Returns a matcher for the address bar button in the main settings view.
+id<GREYMatcher> SettingsAddressBarButton();
+
 // Returns a matcher for an autofill suggestion view.
 id<GREYMatcher> AutofillSuggestionViewMatcher();
 
@@ -550,6 +590,18 @@ id<GREYMatcher> SettingsToolbarAddButton();
 
 // Returns a matcher matching cells that can be swiped-to-dismiss.
 id<GREYMatcher> CellCanBeSwipedToDismissed();
+
+// Returns a matcher for passwords table view.
+id<GREYMatcher> PasswordsTableViewMatcher();
+
+// Returns a mather for default browser settings table view.
+id<GREYMatcher> DefaultBrowserSettingsTableViewMatcher();
+
+// Returns a matcher for safety check table view.
+id<GREYMatcher> SafetyCheckTableViewMatcher();
+
+// Returns a matcher for action in an AlertCoordinator.
+id<GREYMatcher> AlertAction(NSString* title);
 
 #pragma mark - Promo style view controller
 
@@ -673,6 +725,10 @@ id<GREYMatcher> ReadingListDestinationButton();
 // Returns a matcher for the passwords destination button in the overflow menu.
 id<GREYMatcher> PasswordsDestinationButton();
 
+// Returns a matchwer for the price notifications destination button in the
+// overflow menu.
+id<GREYMatcher> PriceNotificationsDestinationButton();
+
 // Returns a matcher for the downloads destination button in the overflow menu.
 id<GREYMatcher> DownloadsDestinationButton();
 
@@ -685,6 +741,9 @@ id<GREYMatcher> SiteInfoDestinationButton();
 
 // Returns a matcher for the settings destination button in the overflow menu.
 id<GREYMatcher> SettingsDestinationButton();
+
+// Returns a matcher for the What's New destination button in the overflow menu.
+id<GREYMatcher> WhatsNewDestinationButton();
 
 #pragma mark - Overflow Menu Actions
 

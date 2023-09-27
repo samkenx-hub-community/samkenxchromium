@@ -11,14 +11,13 @@
 
 @class CommandDispatcher;
 @protocol FormSuggestionProvider;
+@protocol PasswordsAccountStorageNoticeHandler;
 @class PasswordController;
 @protocol PasswordControllerDelegate;
 @protocol PasswordGenerationProvider;
 @protocol PasswordsUiDelegate;
-@class UIViewController;
 
 namespace password_manager {
-class PasswordGenerationFrameHelper;
 class PasswordManager;
 class PasswordManagerClient;
 }
@@ -34,9 +33,6 @@ class PasswordTabHelper : public web::WebStateObserver,
 
   ~PasswordTabHelper() override;
 
-  // Sets the BaseViewController from which to present UI.
-  void SetBaseViewController(UIViewController* baseViewController);
-
   // Sets the PasswordController delegate.
   void SetPasswordControllerDelegate(id<PasswordControllerDelegate> delegate);
 
@@ -47,8 +43,10 @@ class PasswordTabHelper : public web::WebStateObserver,
   // May return nil.
   id<FormSuggestionProvider> GetSuggestionProvider();
 
-  // Returns the PasswordGenerationFrameHelper owned by the PasswordController.
-  password_manager::PasswordGenerationFrameHelper* GetGenerationHelper();
+  // TODO(crbug.com/1434606): Remove this when the move to account storage
+  // notice is removed.
+  id<PasswordsAccountStorageNoticeHandler>
+  GetPasswordsAccountStorageNoticeHandler();
 
   // Returns the PasswordManager owned by the PasswordController.
   password_manager::PasswordManager* GetPasswordManager();

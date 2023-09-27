@@ -7,14 +7,21 @@
 
 #include <string>
 
+#include "base/files/file_path.h"
 #include "base/functional/callback.h"
 
 namespace content {
+class BrowserContext;
 class WebContents;
 class WebUIDataSource;
 }  // namespace content
 
+namespace media_device_salt {
+class MediaDeviceSaltService;
+}  // namespace media_device_salt
+
 namespace ash {
+class HoldingSpaceClient;
 
 // A delegate which exposes browser functionality from //chrome to the camera
 // app ui page handler.
@@ -50,6 +57,8 @@ class CameraAppUIDelegate {
   };
 
   virtual ~CameraAppUIDelegate() = default;
+
+  virtual HoldingSpaceClient* GetHoldingSpaceClient() = 0;
 
   // Sets Downloads folder as launch directory by File Handling API so that we
   // can get the handle on the app side.
@@ -95,6 +104,14 @@ class CameraAppUIDelegate {
 
   // Open "Storage management" page in system's Settings app.
   virtual void OpenStorageManagement() = 0;
+
+  // Gets the file path by given file |name|.
+  virtual base::FilePath GetFilePathByName(const std::string& name) = 0;
+
+  // Returns a service that provides persistent salts for generating media
+  // device IDs. Can be null if the embedder does not support persistent salts.
+  virtual media_device_salt::MediaDeviceSaltService* GetMediaDeviceSaltService(
+      content::BrowserContext* context) = 0;
 };
 
 }  // namespace ash

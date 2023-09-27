@@ -17,6 +17,7 @@
 #include "base/containers/flat_set.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "base/time/time.h"
@@ -35,6 +36,7 @@
 #include "chrome/browser/nearby_sharing/nearby_share_feature_usage_metrics.h"
 #include "chrome/browser/nearby_sharing/nearby_share_profile_info_provider_impl.h"
 #include "chrome/browser/nearby_sharing/nearby_share_settings.h"
+#include "chrome/browser/nearby_sharing/nearby_share_transfer_profiler.h"
 #include "chrome/browser/nearby_sharing/nearby_sharing_service.h"
 #include "chrome/browser/nearby_sharing/outgoing_share_target_info.h"
 #include "chrome/browser/nearby_sharing/power_client.h"
@@ -45,6 +47,7 @@
 #include "chrome/services/sharing/public/proto/wire_format.pb.h"
 #include "chromeos/ash/services/nearby/public/cpp/nearby_process_manager.h"
 #include "chromeos/ash/services/nearby/public/mojom/nearby_decoder_types.mojom.h"
+#include "chromeos/ash/services/nearby/public/mojom/nearby_share_settings.mojom-shared.h"
 #include "chromeos/ash/services/nearby/public/mojom/nearby_share_settings.mojom.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "device/bluetooth/bluetooth_adapter.h"
@@ -73,6 +76,7 @@ class NearbySharingServiceImpl
       public device::BluetoothAdapter::Observer,
       public NearbyConnectionsManager::IncomingConnectionListener,
       public NearbyConnectionsManager::DiscoveryListener,
+      public NearbyConnectionsManager::BandwidthUpgradeListener,
       public ash::SessionObserver,
       public PowerClient::Observer,
       public net::NetworkChangeNotifier::NetworkChangeObserver {
@@ -137,6 +141,7 @@ class NearbySharingServiceImpl
   NearbyShareLocalDeviceDataManager* GetLocalDeviceDataManager() override;
   NearbyShareContactManager* GetContactManager() override;
   NearbyShareCertificateManager* GetCertificateManager() override;
+  NearbyNotificationManager* GetNotificationManager() override;
 
   // NearbyConnectionsManager::IncomingConnectionListener:
   void OnIncomingConnectionInitiated(
@@ -183,6 +188,10 @@ class NearbySharingServiceImpl
   void OnEndpointDiscovered(const std::string& endpoint_id,
                             const std::vector<uint8_t>& endpoint_info) override;
   void OnEndpointLost(const std::string& endpoint_id) override;
+
+  // NearbyConnectionsManager::BandwidthUpgradeListener:
+  void OnBandwidthUpgrade(const std::string& endpoint_id,
+                          const Medium medium) override;
 
   // ash::SessionObserver:
   void OnLockStateChanged(bool locked) override;
@@ -428,10 +437,10 @@ class NearbySharingServiceImpl
   void OnVisibilityReminderTimerFired();
   base::TimeDelta GetTimeUntilNextVisibilityReminder();
 
-  PrefService* prefs_ = nullptr;
-  Profile* profile_;
+  raw_ptr<PrefService, ExperimentalAsh> prefs_ = nullptr;
+  raw_ptr<Profile, ExperimentalAsh> profile_;
   std::unique_ptr<NearbyConnectionsManager> nearby_connections_manager_;
-  ash::nearby::NearbyProcessManager* process_manager_;
+  raw_ptr<ash::nearby::NearbyProcessManager, ExperimentalAsh> process_manager_;
   std::unique_ptr<ash::nearby::NearbyProcessManager::NearbyProcessReference>
       process_reference_;
   std::unique_ptr<PowerClient> power_client_;
@@ -450,6 +459,7 @@ class NearbySharingServiceImpl
   std::unique_ptr<NearbyShareLocalDeviceDataManager> local_device_data_manager_;
   std::unique_ptr<NearbyShareContactManager> contact_manager_;
   std::unique_ptr<NearbyShareCertificateManager> certificate_manager_;
+  std::unique_ptr<NearbyShareTransferProfiler> transfer_profiler_;
   NearbyShareSettings settings_;
   NearbyShareFeatureUsageMetrics feature_usage_metrics_;
   std::unique_ptr<FastInitiationScannerFeatureUsageMetrics>
@@ -589,6 +599,11 @@ class NearbySharingServiceImpl
 
   // Called when cleanup for ARC is needed as part of the transfer.
   base::OnceCallback<void()> arc_transfer_cleanup_callback_;
+
+  // Stores the user's selected visibility state and allowed contacts when the
+  // screen is locked and visibility is set to kYourDevices.
+  nearby_share::mojom::Visibility user_visibility_;
+  std::set<std::string> user_allowed_contacts_ = {};
 
   SEQUENCE_CHECKER(sequence_checker_);
 

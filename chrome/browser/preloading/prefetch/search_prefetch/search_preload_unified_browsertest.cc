@@ -14,16 +14,17 @@
 #include "base/timer/elapsed_timer.h"
 #include "build/build_config.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
+#include "chrome/browser/browser_features.h"
 #include "chrome/browser/preloading/chrome_preloading.h"
 #include "chrome/browser/preloading/prefetch/search_prefetch/field_trial_settings.h"
 #include "chrome/browser/preloading/prefetch/search_prefetch/search_prefetch_request.h"
 #include "chrome/browser/preloading/prefetch/search_prefetch/search_prefetch_service.h"
 #include "chrome/browser/preloading/prefetch/search_prefetch/search_prefetch_service_factory.h"
 #include "chrome/browser/preloading/prefetch/search_prefetch/search_preload_test_response_utils.h"
+#include "chrome/browser/preloading/prefetch/search_prefetch/streaming_search_prefetch_url_loader.h"
 #include "chrome/browser/preloading/prerender/prerender_manager.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
-#include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/chrome_test_utils.h"
 #include "chrome/test/base/search_test_utils.h"
@@ -57,6 +58,7 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/omnibox/browser/autocomplete_controller.h"
+#include "components/omnibox/browser/omnibox_controller.h"
 #include "components/omnibox/browser/omnibox_edit_model.h"
 #include "components/omnibox/browser/omnibox_view.h"
 #endif  // BUILDFLAG(IS_ANDROID)
@@ -66,24 +68,9 @@ namespace {
 using UkmEntry = ukm::TestUkmRecorder::HumanReadableUkmEntry;
 using ukm::builders::Preloading_Attempt;
 using ukm::builders::Preloading_Prediction;
+using ukm::builders::PrerenderPageLoad;
 static const auto kMockElapsedTime =
     base::ScopedMockElapsedTimersForTest::kMockElapsedTime;
-
-content::PreloadingFailureReason ToPreloadingFailureReason(
-    PrerenderPredictionStatus status) {
-  return static_cast<content::PreloadingFailureReason>(
-      static_cast<int>(status) +
-      static_cast<int>(content::PreloadingFailureReason::
-                           kPreloadingFailureReasonContentEnd));
-}
-
-content::PreloadingFailureReason ToPreloadingFailureReason(
-    SearchPrefetchServingReason reason) {
-  return static_cast<content::PreloadingFailureReason>(
-      static_cast<int>(reason) +
-      static_cast<int>(content::PreloadingFailureReason::
-                           kPreloadingFailureReasonContentEnd));
-}
 
 // Sets up testing context for the search preloading features: search prefetch
 // and search prerender.
@@ -102,17 +89,20 @@ class SearchPreloadUnifiedBrowserTest : public PlatformBrowserTest,
     scoped_feature_list_.InitWithFeaturesAndParameters(
         {
             {features::kSupportSearchSuggestionForPrerender2,
-             {{"implementation_type", "use_prefetch"}}},
+             {
+                 {"implementation_type", "use_prefetch"},
+                 {"shareable_cache", "disabled"},
+             }},
             {kSearchPrefetchServicePrefetching,
              {{"max_attempts_per_caching_duration", "3"},
               {"cache_size", "1"},
               {"device_memory_threshold_MB", "0"}}},
         },
-        /*disabled_features=*/{kSearchPrefetchBlockBeforeHeaders});
+        /*disabled_features=*/{});
   }
 
   void SetUp() override {
-    prerender_helper().SetUp(&search_engine_server_);
+    prerender_helper().RegisterServerRequestMonitor(&search_engine_server_);
     PlatformBrowserTest::SetUp();
   }
 
@@ -278,6 +268,7 @@ class SearchPreloadUnifiedBrowserTest : public PlatformBrowserTest,
                             metrics::OmniboxEventProto::BLANK,
                             ChromeAutocompleteSchemeClassifier(
                                 chrome_test_utils::GetProfile(this)));
+
     AutocompleteMatch autocomplete_match = CreateSearchSuggestionMatch(
         original_query, search_terms, prerender_hint, prefetch_hint);
     AutocompleteResult autocomplete_result;
@@ -304,6 +295,14 @@ class SearchPreloadUnifiedBrowserTest : public PlatformBrowserTest,
       base::RunLoop run_loop;
       run_loop.RunUntilIdle();
     }
+  }
+
+  void SetLoaderDestructionCallbackForTesting(
+      const GURL& canonical_search_url,
+      base::OnceClosure streaming_url_loader_destruction_callback) {
+    search_prefetch_service()->SetLoaderDestructionCallbackForTesting(
+        canonical_search_url,
+        std::move(streaming_url_loader_destruction_callback));
   }
 
   // `WaitEvent::kLoadStopped` is the default value for a
@@ -364,6 +363,25 @@ class SearchPreloadUnifiedBrowserTest : public PlatformBrowserTest,
     ASSERT_TRUE(search_engine_server_.ShutdownAndWaitUntilComplete());
   }
 
+  // Similar to UkmRecorder::GetMergedEntriesByName(), but returned map is keyed
+  // by source URL.
+  std::map<GURL, ukm::mojom::UkmEntryPtr> GetMergedUkmEntries(
+      const std::string& entry_name) {
+    auto entries = test_ukm_recorder()->GetMergedEntriesByName(entry_name);
+    std::map<GURL, ukm::mojom::UkmEntryPtr> result;
+    for (auto& kv : entries) {
+      const ukm::mojom::UkmEntry* entry = kv.second.get();
+      const ukm::UkmSource* source =
+          test_ukm_recorder()->GetSourceForSourceId(entry->source_id);
+      if (!source) {
+        continue;
+      }
+      EXPECT_TRUE(source->url().is_valid());
+      result.emplace(source->url(), std::move(kv.second));
+    }
+    return result;
+  }
+
  private:
   AutocompleteMatch CreateSearchSuggestionMatch(
       const std::string& original_query,
@@ -382,14 +400,16 @@ class SearchPreloadUnifiedBrowserTest : public PlatformBrowserTest,
     if (prefetch_hint == PrefetchHint::kEnabled) {
       match.RecordAdditionalInfo("should_prefetch", "true");
     }
+    match.allowed_to_be_default_match = true;
     return match;
   }
 
   constexpr static char kSearchDomain[] = "a.test";
   constexpr static char16_t kSearchDomain16[] = u"a.test";
-  raw_ptr<PrerenderManager, DanglingUntriaged> prerender_manager_ = nullptr;
-  raw_ptr<SearchPrefetchService, DanglingUntriaged> search_prefetch_service_ =
+  raw_ptr<PrerenderManager, AcrossTasksDanglingUntriaged> prerender_manager_ =
       nullptr;
+  raw_ptr<SearchPrefetchService, AcrossTasksDanglingUntriaged>
+      search_prefetch_service_ = nullptr;
   net::test_server::EmbeddedTestServer search_engine_server_{
       net::test_server::EmbeddedTestServer::TYPE_HTTPS};
 
@@ -401,6 +421,8 @@ class SearchPreloadUnifiedBrowserTest : public PlatformBrowserTest,
 
   content::test::PrerenderTestHelper prerender_helper_;
   base::test::ScopedFeatureList scoped_feature_list_;
+  // Disable sampling of UKM preloading logs.
+  content::test::PreloadingConfigOverride preloading_config_override_;
   std::unique_ptr<base::ScopedMockElapsedTimersForTest> scoped_test_timer_;
 };
 
@@ -408,6 +430,7 @@ class SearchPreloadUnifiedBrowserTest : public PlatformBrowserTest,
 // corresponding prefetch request succeeds.
 IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
                        PrerenderHintReceivedBeforeSucceed) {
+  SearchPrefetchServiceFactory::GetForProfile(chrome_test_utils::GetProfile(this));
   base::HistogramTester histogram_tester;
   const GURL kInitialUrl = embedded_test_server()->GetURL("/empty.html");
   ASSERT_TRUE(GetActiveWebContents());
@@ -475,13 +498,18 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
         Preloading_Prediction::kEntryName,
         content::test::kPreloadingPredictionUkmMetrics);
     EXPECT_EQ(attempt_ukm_entries.size(), 2u);
-    EXPECT_EQ(prediction_ukm_entries.size(), 1u);
+    EXPECT_EQ(prediction_ukm_entries.size(), 2u);
 
     // Prerender should succeed and should be used for the next navigation.
     std::vector<UkmEntry> expected_prediction_entries = {
         prediction_entry_builder().BuildEntry(ukm_source_id,
                                               /*confidence=*/80,
                                               /*accurate_prediction=*/true),
+        std::make_unique<content::test::PreloadingPredictionUkmEntryBuilder>(
+            chrome_preloading_predictor::kOmniboxSearchSuggestDefaultMatch)
+            ->BuildEntry(ukm_source_id,
+                         /*confidence=*/80,
+                         /*accurate_prediction=*/true),
     };
     std::vector<UkmEntry> expected_attempt_entries = {
         attempt_entry_builder().BuildEntry(
@@ -514,6 +542,18 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
 
   EXPECT_EQ(1, prerender_helper().GetRequestCount(expected_prefetch_url));
   EXPECT_EQ(0, prerender_helper().GetRequestCount(expected_prerender_url));
+
+  auto entries = GetMergedUkmEntries(PrerenderPageLoad::kEntryName);
+  EXPECT_EQ(entries.size(), 1u);
+
+  const ukm::mojom::UkmEntry* prerendered_page_entry =
+      entries[expected_prerender_url].get();
+  ASSERT_TRUE(prerendered_page_entry);
+  test_ukm_recorder()->ExpectEntryMetric(
+      prerendered_page_entry, PrerenderPageLoad::kWasPrerenderedName, 1);
+  test_ukm_recorder()->ExpectEntryMetric(
+      prerendered_page_entry, PrerenderPageLoad::kNavigation_PageTransitionName,
+      ui::PAGE_TRANSITION_GENERATED | ui::PAGE_TRANSITION_FROM_ADDRESS_BAR);
 }
 
 // Tests that the SearchSuggestionService can trigger prerendering if it
@@ -615,6 +655,18 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
   // No prerender requests went through network.
   EXPECT_EQ(1, prerender_helper().GetRequestCount(expected_prefetch_url));
   EXPECT_EQ(0, prerender_helper().GetRequestCount(expected_prerender_url));
+
+  auto entries = GetMergedUkmEntries(PrerenderPageLoad::kEntryName);
+  EXPECT_EQ(entries.size(), 1u);
+
+  const ukm::mojom::UkmEntry* prerendered_page_entry =
+      entries[expected_prerender_url].get();
+  ASSERT_TRUE(prerendered_page_entry);
+  test_ukm_recorder()->ExpectEntryMetric(
+      prerendered_page_entry, PrerenderPageLoad::kWasPrerenderedName, 1);
+  test_ukm_recorder()->ExpectEntryMetric(
+      prerendered_page_entry, PrerenderPageLoad::kNavigation_PageTransitionName,
+      ui::PAGE_TRANSITION_GENERATED | ui::PAGE_TRANSITION_FROM_ADDRESS_BAR);
 }
 
 // Tests that the SearchSuggestionService will not trigger prerender if the
@@ -646,6 +698,9 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
   histogram_tester.ExpectUniqueSample(
       "Omnibox.SearchPrefetch.FetchResult.SuggestionPrefetch", false, 1);
   EXPECT_FALSE(prerender_manager()->HasSearchResultPagePrerendered());
+
+  auto entries = GetMergedUkmEntries(PrerenderPageLoad::kEntryName);
+  EXPECT_EQ(entries.size(), 0u);
 }
 
 // Tests that the SearchSuggestionService will not trigger prerender if the
@@ -675,14 +730,14 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
           GetCanonicalSearchURL(expected_prerender_url));
   EXPECT_TRUE(prefetch_status.has_value());
   WaitUntilStatusChangesTo(GetCanonicalSearchURL(expected_prerender_url),
-                           {SearchPrefetchStatus::kInFlight});
+                           {SearchPrefetchStatus::kCanBeServed});
 
   // 3. Type a different query which results in different suggestions.
   std::string search_query_2 = "pre";
   ChangeAutocompleteResult(search_query_2, search_query_2,
                            PrerenderHint::kDisabled, PrefetchHint::kEnabled);
 
-  // 4. The old prefetch should be cancelled.
+  // 4. The old prefetch should not be cancelled.
   prefetch_status =
       search_prefetch_service()->GetSearchPrefetchStatusForTesting(
           GetCanonicalSearchURL(
@@ -690,104 +745,12 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
   EXPECT_TRUE(prefetch_status.has_value());
   WaitUntilStatusChangesTo(GetCanonicalSearchURL(GetSearchUrl(
                                prerender_query_1, UrlType::kPrerender)),
-                           {SearchPrefetchStatus::kRequestCancelled});
+                           {SearchPrefetchStatus::kCanBeServed});
 
   EXPECT_FALSE(prerender_manager()->HasSearchResultPagePrerendered());
-}
 
-// Tests prerender is cancelled after SearchPrefetchService cancels prefetch
-// requests.
-IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
-                       SuggestionChangeAfterStartPrerender) {
-  base::HistogramTester histogram_tester;
-  const GURL kInitialUrl = embedded_test_server()->GetURL("/empty.html");
-  ASSERT_TRUE(GetActiveWebContents());
-  ASSERT_TRUE(content::NavigateToURL(GetActiveWebContents(), kInitialUrl));
-  SetUpContext();
-  content::test::PrerenderHostRegistryObserver registry_observer(
-      *GetActiveWebContents());
-
-  // 1. Type the first query.
-  std::string search_query_1 = "pre";
-  std::string prerender_query_1 = "prerender";
-  GURL expected_prerender_url =
-      GetSearchUrl(prerender_query_1, UrlType::kPrerender);
-  ChangeAutocompleteResult(search_query_1, prerender_query_1,
-                           PrerenderHint::kEnabled, PrefetchHint::kEnabled);
-
-  // 2. Prefetch and prerender should be triggered.
-  registry_observer.WaitForTrigger(expected_prerender_url);
-  prerender_helper().WaitForPrerenderLoadCompletion(*GetActiveWebContents(),
-                                                    expected_prerender_url);
-  EXPECT_TRUE(prerender_manager()->HasSearchResultPagePrerendered());
-  absl::optional<SearchPrefetchStatus> prefetch_status =
-      search_prefetch_service()->GetSearchPrefetchStatusForTesting(
-          GetCanonicalSearchURL(
-              GetSearchUrl(prerender_query_1, UrlType::kPrerender)));
-  EXPECT_TRUE(prefetch_status.has_value());
-  EXPECT_EQ(prefetch_status.value(), SearchPrefetchStatus::kPrerendered);
-  content::test::PrerenderHostObserver prerender_observer(
-      *GetActiveWebContents(), expected_prerender_url);
-  histogram_tester.ExpectUniqueSample(
-      "Omnibox.SearchPrefetch.PrefetchServingReason2.Prerender",
-      SearchPrefetchServingReason::kServed, 1);
-
-  // 3. Type a different query which results in different suggestions.
-  std::string search_query_2 = "pre";
-  ChangeAutocompleteResult(search_query_2, search_query_2,
-                           PrerenderHint::kDisabled, PrefetchHint::kEnabled);
-
-  // 4. The prerender will be destroyed automatically.
-  prerender_observer.WaitForDestroyed();
-  histogram_tester.ExpectUniqueSample(
-      internal::kHistogramPrerenderPredictionStatusDefaultSearchEngine,
-      PrerenderPredictionStatus::kCancelled, 1);
-
-  // Navigate away to flush the metrics.
-  ASSERT_TRUE(
-      content::NavigateToURL(GetActiveWebContents(), expected_prerender_url));
-  {
-    ukm::SourceId ukm_source_id =
-        GetActiveWebContents()->GetPrimaryMainFrame()->GetPageUkmSourceId();
-    auto ukm_entries = test_ukm_recorder()->GetEntries(
-        Preloading_Attempt::kEntryName,
-        content::test::kPreloadingAttemptUkmMetrics);
-    EXPECT_EQ(ukm_entries.size(), 3u);
-
-    // Prerender shouldn't be used for the next navigation as it will be deleted
-    // when suggestions change.
-    std::vector<UkmEntry> expected_entries = {
-        attempt_entry_builder().BuildEntry(
-            ukm_source_id, content::PreloadingType::kPrefetch,
-            content::PreloadingEligibility::kEligible,
-            content::PreloadingHoldbackStatus::kAllowed,
-            content::PreloadingTriggeringOutcome::kFailure,
-            ToPreloadingFailureReason(
-                SearchPrefetchServingReason::kRequestWasCancelled),
-            /*accurate=*/true,
-            /*ready_time=*/kMockElapsedTime),
-        attempt_entry_builder().BuildEntry(
-            ukm_source_id, content::PreloadingType::kPrerender,
-            content::PreloadingEligibility::kEligible,
-            content::PreloadingHoldbackStatus::kAllowed,
-            content::PreloadingTriggeringOutcome::kFailure,
-            ToPreloadingFailureReason(PrerenderPredictionStatus::kCancelled),
-            /*accurate=*/true,
-            /*ready_time=*/kMockElapsedTime),
-        attempt_entry_builder().BuildEntry(
-            ukm_source_id, content::PreloadingType::kPrefetch,
-            content::PreloadingEligibility::kEligible,
-            content::PreloadingHoldbackStatus::kAllowed,
-            content::PreloadingTriggeringOutcome::kReady,
-            content::PreloadingFailureReason::kUnspecified,
-            /*accurate=*/false,
-            /*ready_time=*/kMockElapsedTime),
-    };
-    EXPECT_THAT(ukm_entries,
-                testing::UnorderedElementsAreArray(expected_entries))
-        << content::test::ActualVsExpectedUkmEntriesToString(ukm_entries,
-                                                             expected_entries);
-  }
+  auto entries = GetMergedUkmEntries(PrerenderPageLoad::kEntryName);
+  EXPECT_EQ(entries.size(), 0u);
 }
 
 // Tests the activated prerendered page records navigation timings correctly.
@@ -837,24 +800,21 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
 
   // Check the response time is non-negative.
   std::string script =
-      "window.domAutomationController.send(window.performance.timing."
-      "responseEnd - window.performance.timing.responseStart)";
-  EXPECT_LE(0, content::EvalJs(GetActiveWebContents(), script,
-                               content::EXECUTE_SCRIPT_USE_MANUAL_REPLY));
+      "window.performance.timing."
+      "responseEnd - window.performance.timing.responseStart";
+  EXPECT_LE(0, content::EvalJs(GetActiveWebContents(), script));
 
   // Check the response start is after (or the same as) request start.
   script =
-      "window.domAutomationController.send(window.performance.timing."
-      "responseStart - window.performance.timing.requestStart)";
-  EXPECT_LE(0, content::EvalJs(GetActiveWebContents(), script,
-                               content::EXECUTE_SCRIPT_USE_MANUAL_REPLY));
+      "window.performance.timing."
+      "responseStart - window.performance.timing.requestStart";
+  EXPECT_LE(0, content::EvalJs(GetActiveWebContents(), script));
 
   // Check request start is after (or the same as) navigation start.
   script =
-      "window.domAutomationController.send(window.performance.timing."
-      "requestStart - window.performance.timing.navigationStart)";
-  EXPECT_LE(0, content::EvalJs(GetActiveWebContents(), script,
-                               content::EXECUTE_SCRIPT_USE_MANUAL_REPLY));
+      "window.performance.timing."
+      "requestStart - window.performance.timing.navigationStart";
+  EXPECT_LE(0, content::EvalJs(GetActiveWebContents(), script));
 }
 
 // Tests that prerender fails as well if the prefetch response that prerender
@@ -944,6 +904,9 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
   // Prerender should not retry the request.
   EXPECT_EQ(0, prerender_helper().GetRequestCount(expected_prerender_url));
   EXPECT_EQ(1, prerender_helper().GetRequestCount(expected_prefetch_url));
+
+  auto entries = GetMergedUkmEntries(PrerenderPageLoad::kEntryName);
+  EXPECT_EQ(entries.size(), 0u);
 }
 
 // Tests the prerender works well when running in the
@@ -1131,10 +1094,98 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest, DoNotRefetchSameTerms) {
       SearchPrefetchEligibilityReason::kAttemptedQueryRecently, 1);
 }
 
-class SearchPreloadUnifiedHoldbackBrowserTest
+class HoldbackSearchPreloadUnifiedBrowserTest
     : public SearchPreloadUnifiedBrowserTest {
  public:
-  SearchPreloadUnifiedHoldbackBrowserTest() {
+  void RunTest() {
+    base::HistogramTester histogram_tester;
+    const GURL kInitialUrl = embedded_test_server()->GetURL("/empty.html");
+    ASSERT_TRUE(GetActiveWebContents());
+    ASSERT_TRUE(content::NavigateToURL(GetActiveWebContents(), kInitialUrl));
+    SetUpContext();
+
+    std::string search_query_1 = "pre";
+    std::string prerender_query = "prerender";
+    GURL expected_prefetch_url =
+        GetSearchUrl(prerender_query, UrlType::kPrefetch);
+    GURL expected_prerender_url =
+        GetSearchUrl(prerender_query, UrlType::kPrerender);
+    content::test::PrerenderHostRegistryObserver registry_observer(
+        *GetActiveWebContents());
+
+    ChangeAutocompleteResult(search_query_1, prerender_query,
+                             PrerenderHint::kDisabled, PrefetchHint::kEnabled);
+
+    // Wait until prefetch request succeeds.
+    absl::optional<SearchPrefetchStatus> prefetch_status =
+        search_prefetch_service()->GetSearchPrefetchStatusForTesting(
+            GetCanonicalSearchURL(expected_prefetch_url));
+    EXPECT_TRUE(prefetch_status.has_value());
+    WaitUntilStatusChangesTo(
+        GetCanonicalSearchURL(expected_prefetch_url),
+        {SearchPrefetchStatus::kCanBeServed, SearchPrefetchStatus::kComplete});
+    std::string search_query_2 = "prer";
+    ChangeAutocompleteResult(search_query_2, prerender_query,
+                             PrerenderHint::kEnabled, PrefetchHint::kEnabled);
+
+    // The suggestion service should hint `expected_prefetch_url`, and
+    // prerendering for this url should start.
+    registry_observer.WaitForTrigger(expected_prerender_url);
+
+    // Navigate to flush the metrics.
+    content::NavigationHandleObserver activation_observer(
+        GetActiveWebContents(), expected_prerender_url);
+    ASSERT_TRUE(
+        content::NavigateToURL(GetActiveWebContents(), expected_prerender_url));
+    {
+      ukm::SourceId ukm_source_id =
+          activation_observer.next_page_ukm_source_id();
+      auto ukm_entries = test_ukm_recorder()->GetEntries(
+          Preloading_Attempt::kEntryName,
+          content::test::kPreloadingAttemptUkmMetrics);
+      EXPECT_EQ(ukm_entries.size(), 3u);
+
+      // Prerender should be under holdback and not succeed.
+      std::vector<UkmEntry> expected_entries = {
+          attempt_entry_builder().BuildEntry(
+              ukm_source_id, content::PreloadingType::kPrefetch,
+              content::PreloadingEligibility::kEligible,
+              content::PreloadingHoldbackStatus::kAllowed,
+              content::PreloadingTriggeringOutcome::kSuccess,
+              content::PreloadingFailureReason::kUnspecified,
+              /*accurate=*/true,
+              /*ready_time=*/kMockElapsedTime),
+          attempt_entry_builder().BuildEntry(
+              ukm_source_id, content::PreloadingType::kPrefetch,
+              content::PreloadingEligibility::kEligible,
+              content::PreloadingHoldbackStatus::kAllowed,
+              content::PreloadingTriggeringOutcome::kDuplicate,
+              content::PreloadingFailureReason::kUnspecified,
+              /*accurate=*/true),
+          attempt_entry_builder().BuildEntry(
+              ukm_source_id, content::PreloadingType::kPrerender,
+              content::PreloadingEligibility::kEligible,
+              content::PreloadingHoldbackStatus::kHoldback,
+              content::PreloadingTriggeringOutcome::kUnspecified,
+              content::PreloadingFailureReason::kUnspecified,
+              /*accurate=*/true),
+      };
+      EXPECT_THAT(ukm_entries,
+                  testing::UnorderedElementsAreArray(expected_entries))
+          << content::test::ActualVsExpectedUkmEntriesToString(
+                 ukm_entries, expected_entries);
+    }
+  }
+  ~HoldbackSearchPreloadUnifiedBrowserTest() override = default;
+
+ protected:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+class DSEPrerenderHoldbackSearchPreloadUnifiedBrowserTest
+    : public HoldbackSearchPreloadUnifiedBrowserTest {
+ public:
+  DSEPrerenderHoldbackSearchPreloadUnifiedBrowserTest() {
     scoped_feature_list_.InitWithFeaturesAndParameters(
         {
             {features::kSupportSearchSuggestionForPrerender2,
@@ -1143,97 +1194,48 @@ class SearchPreloadUnifiedHoldbackBrowserTest
              {{"max_attempts_per_caching_duration", "3"},
               {"cache_size", "4"},
               {"device_memory_threshold_MB", "0"}}},
-            {features::kPrerender2Holdback, {{}}},
+            {features::kPrerenderDSEHoldback, {{}}},
         },
-        /*disabled_features=*/{kSearchPrefetchBlockBeforeHeaders});
+        /*disabled_features=*/{});
   }
-  ~SearchPreloadUnifiedHoldbackBrowserTest() override = default;
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 // Tests that we log correct metrics for Prerender holdback in case of Search
 // Prerender.
-// TODO(https://crbug.com/1350776): This test is flaky on all platforms.
-IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedHoldbackBrowserTest,
-                       DISABLED_PrerenderUnifiedHoldbackTest) {
-  base::HistogramTester histogram_tester;
-  const GURL kInitialUrl = embedded_test_server()->GetURL("/empty.html");
-  ASSERT_TRUE(GetActiveWebContents());
-  ASSERT_TRUE(content::NavigateToURL(GetActiveWebContents(), kInitialUrl));
-  SetUpContext();
+IN_PROC_BROWSER_TEST_F(DSEPrerenderHoldbackSearchPreloadUnifiedBrowserTest,
+                       PrerenderDSEHoldbackTest) {
+  RunTest();
+}
 
-  std::string search_query_1 = "pre";
-  std::string prerender_query = "prerender";
-  GURL expected_prefetch_url =
-      GetSearchUrl(prerender_query, UrlType::kPrefetch);
-  GURL expected_prerender_url =
-      GetSearchUrl(prerender_query, UrlType::kPrerender);
-  content::test::PrerenderHostRegistryObserver registry_observer(
-      *GetActiveWebContents());
-
-  ChangeAutocompleteResult(search_query_1, prerender_query,
-                           PrerenderHint::kDisabled, PrefetchHint::kEnabled);
-
-  // Wait until prefetch request succeeds.
-  absl::optional<SearchPrefetchStatus> prefetch_status =
-      search_prefetch_service()->GetSearchPrefetchStatusForTesting(
-          GetCanonicalSearchURL(expected_prefetch_url));
-  EXPECT_TRUE(prefetch_status.has_value());
-  WaitUntilStatusChangesTo(
-      GetCanonicalSearchURL(expected_prefetch_url),
-      {SearchPrefetchStatus::kCanBeServed, SearchPrefetchStatus::kComplete});
-  std::string search_query_2 = "prer";
-  ChangeAutocompleteResult(search_query_2, prerender_query,
-                           PrerenderHint::kEnabled, PrefetchHint::kEnabled);
-
-  // The suggestion service should hint `expected_prefetch_url`, and
-  // prerendering for this url should start.
-  registry_observer.WaitForTrigger(expected_prerender_url);
-
-  // Navigate to flush the metrics.
-  content::NavigationHandleObserver activation_observer(GetActiveWebContents(),
-                                                        expected_prerender_url);
-  ASSERT_TRUE(
-      content::NavigateToURL(GetActiveWebContents(), expected_prerender_url));
-  {
-    ukm::SourceId ukm_source_id = activation_observer.next_page_ukm_source_id();
-    auto ukm_entries = test_ukm_recorder()->GetEntries(
-        Preloading_Attempt::kEntryName,
-        content::test::kPreloadingAttemptUkmMetrics);
-    EXPECT_EQ(ukm_entries.size(), 3u);
-
-    // Prerender should be under holdback and not succeed.
-    std::vector<UkmEntry> expected_entries = {
-        attempt_entry_builder().BuildEntry(
-            ukm_source_id, content::PreloadingType::kPrefetch,
-            content::PreloadingEligibility::kEligible,
-            content::PreloadingHoldbackStatus::kAllowed,
-            content::PreloadingTriggeringOutcome::kSuccess,
-            content::PreloadingFailureReason::kUnspecified,
-            /*accurate=*/true,
-            /*ready_time=*/kMockElapsedTime),
-        attempt_entry_builder().BuildEntry(
-            ukm_source_id, content::PreloadingType::kPrefetch,
-            content::PreloadingEligibility::kEligible,
-            content::PreloadingHoldbackStatus::kAllowed,
-            content::PreloadingTriggeringOutcome::kDuplicate,
-            content::PreloadingFailureReason::kUnspecified,
-            /*accurate=*/true),
-        attempt_entry_builder().BuildEntry(
-            ukm_source_id, content::PreloadingType::kPrerender,
-            content::PreloadingEligibility::kEligible,
-            content::PreloadingHoldbackStatus::kHoldback,
-            content::PreloadingTriggeringOutcome::kUnspecified,
-            content::PreloadingFailureReason::kUnspecified,
-            /*accurate=*/true),
-    };
-    EXPECT_THAT(ukm_entries,
-                testing::UnorderedElementsAreArray(expected_entries))
-        << content::test::ActualVsExpectedUkmEntriesToString(ukm_entries,
-                                                             expected_entries);
+class PreloadingConfigHoldbackSearchPreloadUnifiedBrowserTest
+    : public HoldbackSearchPreloadUnifiedBrowserTest {
+ public:
+  PreloadingConfigHoldbackSearchPreloadUnifiedBrowserTest() {
+    scoped_feature_list_.InitWithFeaturesAndParameters(
+        {
+            {features::kSupportSearchSuggestionForPrerender2,
+             {{"implementation_type", "use_prefetch"}}},
+            {kSearchPrefetchServicePrefetching,
+             {{"max_attempts_per_caching_duration", "3"},
+              {"cache_size", "4"},
+              {"device_memory_threshold_MB", "0"}}},
+            {features::kPrerenderDSEHoldback, {{}}},
+        },
+        {});
+    preloading_config_override_.SetHoldback(
+        content::PreloadingType::kPrerender,
+        chrome_preloading_predictor::kDefaultSearchEngine, true);
   }
+
+ private:
+  content::test::PreloadingConfigOverride preloading_config_override_;
+};
+
+// Tests that we log correct metrics for Prerender holdback in case of Search
+// Prerender.
+IN_PROC_BROWSER_TEST_F(PreloadingConfigHoldbackSearchPreloadUnifiedBrowserTest,
+                       PrerenderDSEHoldbackTest) {
+  RunTest();
 }
 
 // Disables BFCache for testing back forward navigation can reuse the HTTP
@@ -1253,8 +1255,7 @@ class HTTPCacheSearchPreloadUnifiedBrowserTest
         },
         // Disable BackForwardCache to ensure that the page is not restored from
         // the cache.
-        /*disabled_features=*/{kSearchPrefetchBlockBeforeHeaders,
-                               features::kBackForwardCache});
+        /*disabled_features=*/{features::kBackForwardCache});
   }
 
  private:
@@ -1393,7 +1394,7 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest, TriggerAndActivate) {
   LocationBar* location_bar = browser()->window()->GetLocationBar();
   OmniboxView* omnibox = location_bar->GetOmniboxView();
   AutocompleteController* autocomplete_controller =
-      omnibox->model()->autocomplete_controller();
+      omnibox->controller()->autocomplete_controller();
 
   // Prevent the stop timer from killing the hints fetch early.
   autocomplete_controller->SetStartStopTimerDurationForTesting(
@@ -1446,7 +1447,6 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
       *GetActiveWebContents());
 
   // 1. Type the first query.
-  std::string search_query_1 = "pre";
   std::string prerender_query = "prerender";
   GURL expected_prefetch_url =
       GetSearchUrl(prerender_query, UrlType::kPrefetch);
@@ -1461,7 +1461,7 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
   LocationBar* location_bar = browser()->window()->GetLocationBar();
   OmniboxView* omnibox = location_bar->GetOmniboxView();
   AutocompleteController* autocomplete_controller =
-      omnibox->model()->autocomplete_controller();
+      omnibox->controller()->autocomplete_controller();
 
   // Prevent the stop timer from killing the hints fetch early.
   autocomplete_controller->SetStartStopTimerDurationForTesting(
@@ -1470,7 +1470,7 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
   // 3. Trigger prerender and prefetch.
   autocomplete_controller->Start(input);
   ui_test_utils::WaitForAutocompleteDone(browser());
-  ChangeAutocompleteResult(search_query_1, prerender_query,
+  ChangeAutocompleteResult(prerender_query, prerender_query,
                            PrerenderHint::kEnabled, PrefetchHint::kEnabled);
   registry_observer.WaitForTrigger(expected_prerender_url);
   prerender_helper().WaitForPrerenderLoadCompletion(*GetActiveWebContents(),
@@ -1502,19 +1502,20 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedBrowserTest,
                                                       1);
   omnibox->model()->OpenSelection();
   navigation_observer.Wait();
+  histogram_tester.ExpectBucketCount(
+      "Omnibox.SearchPrefetch.PrefetchServingReason2",
+      SearchPrefetchServingReason::kPrerendered, 1);
 
   // 6. Fire the timer to make all prefetch requests expire
   search_prefetch_service()->FireAllExpiryTimerForTesting();
   histogram_tester.ExpectUniqueSample(
       "Omnibox.SearchPrefetch.PrefetchFinalStatus.SuggestionPrefetch",
       SearchPrefetchStatus::kPrerenderedAndClicked, 1);
-  histogram_tester.ExpectBucketCount(
-      "Omnibox.SearchPrefetch.PrefetchServingReason2",
-      SearchPrefetchServingReason::kPrerendered, 1);
 
   EXPECT_EQ(1, prerender_helper().GetRequestCount(expected_prefetch_url));
   EXPECT_EQ(1, prerender_helper().GetRequestCount(expected_real_url));
 }
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS_LACROS)
 
 class NoCancelSearchPreloadUnifiedBrowserTest
     : public SearchPreloadUnifiedBrowserTest {
@@ -1523,7 +1524,8 @@ class NoCancelSearchPreloadUnifiedBrowserTest
     scoped_feature_list_.InitWithFeaturesAndParameters(
         {
             {features::kSupportSearchSuggestionForPrerender2,
-             {{"implementation_type", "use_prefetch"}}},
+             {{"implementation_type", "use_prefetch"},
+              {"shareable_cache", "disabled"}}},
             {kSearchPrefetchSkipsCancel, {}},
             {kSearchPrefetchServicePrefetching,
              {{"max_attempts_per_caching_duration", "3"},
@@ -1532,8 +1534,7 @@ class NoCancelSearchPreloadUnifiedBrowserTest
         },
         // Disable BackForwardCache to ensure that the page is not restored from
         // the cache.
-        /*disabled_features=*/{kSearchPrefetchBlockBeforeHeaders,
-                               features::kBackForwardCache});
+        /*disabled_features=*/{features::kBackForwardCache});
   }
 
  private:
@@ -1622,6 +1623,28 @@ IN_PROC_BROWSER_TEST_F(NoCancelSearchPreloadUnifiedBrowserTest,
   }
 }
 
+// Used by SearchPreloadUnifiedFallbackBrowserTest and
+// NoCancelSearchPreloadUnifiedFallbackBrowserTest to check the streaming
+// loader's status. Since the result can be set upon Mojo disconnection, we have
+// to wait until it to be reported.
+void CheckCorrectForwardingResultMetric(
+    base::HistogramTester& histogram_tester,
+    StreamingSearchPrefetchURLLoader::ForwardingResult result,
+    int count) {
+  while (true) {
+    int num = histogram_tester.GetBucketCount(
+        "Omnibox.SearchPreload.ForwardingResult.WasServedToPrerender", result);
+    if (num >= count) {
+      break;
+    }
+    base::RunLoop run_loop;
+    run_loop.RunUntilIdle();
+  }
+  histogram_tester.ExpectUniqueSample(
+      "Omnibox.SearchPreload.ForwardingResult.WasServedToPrerender", result,
+      count);
+}
+
 class SearchPreloadUnifiedFallbackBrowserTest
     : public SearchPreloadUnifiedBrowserTest {
  public:
@@ -1635,7 +1658,7 @@ class SearchPreloadUnifiedFallbackBrowserTest
              {{"max_attempts_per_caching_duration", "3"},
               {"device_memory_threshold_MB", "0"}}},
         },
-        /*disabled_features=*/{kSearchPrefetchBlockBeforeHeaders});
+        /*disabled_features=*/{});
   }
   ~SearchPreloadUnifiedFallbackBrowserTest() override = default;
 
@@ -1643,10 +1666,9 @@ class SearchPreloadUnifiedFallbackBrowserTest
   base::test::ScopedFeatureList scoped_feature_list_;
 };
 
-// Tests prerender is cancelled after SearchPrefetchService cancels prefetch
-// requests.
+// Tests cancelling prerenders should not delete the prefetched responses.
 IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
-                       FetchPrerenderFetch) {
+                       PrefetchSucceedAfterPrerenderFailed) {
   base::HistogramTester histogram_tester;
   const GURL kInitialUrl = embedded_test_server()->GetURL("/empty.html");
   const GURL kNavigatedUrl = embedded_test_server()->GetURL("/title1.html");
@@ -1684,6 +1706,8 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
   int host_id = prerender_helper().GetHostForUrl(expected_prerender_url);
   content::test::PrerenderHostObserver prerender_observer(
       *GetActiveWebContents(), host_id);
+  // Ensure kCompleted is recorded.
+  prerender_helper().WaitForPrerenderLoadCompletion(host_id);
   prerender_helper().CancelPrerenderedPage(host_id);
   prerender_observer.WaitForDestroyed();
 
@@ -1693,19 +1717,30 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
           GetCanonicalSearchURL(expected_prerender_url));
   EXPECT_TRUE(prefetch_status.has_value());
 
-  // TODO: Use another metric to trigger whether prerender takes a prefetched
-  // response.
-
-  // Navigate away to flush the metrics.
+  base::RunLoop run_loop;
+  SetLoaderDestructionCallbackForTesting(
+      GetCanonicalSearchURL(expected_prerender_url), run_loop.QuitClosure());
   ASSERT_TRUE(
       content::NavigateToURL(GetActiveWebContents(), expected_prerender_url));
+  run_loop.Run();
   histogram_tester.ExpectUniqueSample(
       "Omnibox.SearchPrefetch.PrefetchFinalStatus.SuggestionPrefetch",
       SearchPrefetchStatus::kPrefetchServedForRealNavigation, 1);
+  histogram_tester.ExpectBucketCount(
+      "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender",
+      StreamingSearchPrefetchURLLoader::ResponseReader::
+          ResponseDataReaderStatus::kCompleted,
+      1);
+  CheckCorrectForwardingResultMetric(
+      histogram_tester,
+      StreamingSearchPrefetchURLLoader::ForwardingResult::kCompleted, 1);
+  histogram_tester.ExpectUniqueSample(
+      "Prerender.Experimental.Search.ResponseReuseCount",
+      /*prerender_serving_times*/ 1, 1);
 }
 
-// Tests prerender is cancelled after SearchPrefetchService cancels prefetch
-// requests.
+// Tests that prefetched response can be served to prerender client
+// successfully.
 IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
                        FetchPrerenderActivated) {
   base::HistogramTester histogram_tester;
@@ -1741,12 +1776,23 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
   EXPECT_TRUE(prefetch_status.has_value());
   EXPECT_NE(prefetch_status.value(), SearchPrefetchStatus::kPrerendered);
 
-  // TODO: Use another metric to trigger whether prerender takes a prefetched
-  // response.
   content::test::PrerenderHostObserver prerender_observer(
       *GetActiveWebContents(), expected_prerender_url);
+  base::RunLoop run_loop;
+  SetLoaderDestructionCallbackForTesting(
+      GetCanonicalSearchURL(expected_prerender_url), run_loop.QuitClosure());
   NavigateToPrerenderedResult(expected_prerender_url);
-  prerender_observer.WaitForActivation();
+  run_loop.Run();
+  WaitForActivatedPageLoaded();
+  histogram_tester.ExpectBucketCount(
+      "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender",
+      StreamingSearchPrefetchURLLoader::ResponseReader::
+          ResponseDataReaderStatus::kCompleted,
+      1);
+  histogram_tester.ExpectTotalCount(
+      "Omnibox.SearchPreload.ForwardingResult.WasServedToPrerender", 0);
+  histogram_tester.ExpectUniqueSample(
+      "Prerender.Experimental.Search.ResponseReuseCount", 1, 1);
 }
 
 // Tests that the SearchSuggestionService can trigger prerendering if it
@@ -1800,10 +1846,18 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
                                                         expected_prerender_url);
   NavigateToPrerenderedResult(expected_prerender_url);
   prerender_observer.WaitForActivation();
+  WaitForActivatedPageLoaded();
 
   // No prerender requests went through network.
   EXPECT_EQ(1, prerender_helper().GetRequestCount(expected_prefetch_url));
   EXPECT_EQ(0, prerender_helper().GetRequestCount(expected_prerender_url));
+  histogram_tester.ExpectBucketCount(
+      "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender",
+      StreamingSearchPrefetchURLLoader::ResponseReader::
+          ResponseDataReaderStatus::kCompleted,
+      1);
+  histogram_tester.ExpectTotalCount(
+      "Omnibox.SearchPreload.ForwardingResult.WasServedToPrerender", 0);
 }
 
 // Tests that once prefetch encountered error, prerender would be canceled as
@@ -1838,6 +1892,8 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
   WaitUntilStatusChangesTo(GetCanonicalSearchURL(expected_prefetch_url),
                            {SearchPrefetchStatus::kCanBeServed});
   std::string search_query_2 = "prer";
+  content::TestNavigationManager prerender_navigation_manager(
+      GetActiveWebContents(), expected_prerender_url);
   ChangeAutocompleteResult(search_query_2, prerender_query,
                            PrerenderHint::kEnabled, PrefetchHint::kEnabled);
 
@@ -1847,16 +1903,127 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
   content::test::PrerenderHostObserver prerender_observer(
       *GetActiveWebContents(), expected_prerender_url);
 
+  // Ensure prerender has started to read response body.
+  ASSERT_TRUE(prerender_navigation_manager.WaitForResponse());
+  prerender_navigation_manager.ResumeNavigation();
+
   ShutDownSearchServer();
   prerender_observer.WaitForDestroyed();
   WaitUntilStatusChangesTo(GetCanonicalSearchURL(expected_prefetch_url),
                            {SearchPrefetchStatus::kRequestFailed});
-  // TODO(crbug.com/1400881): We should have another metric to track the
-  // cancellation reason.
+  while (true) {
+    int num_count = histogram_tester.GetBucketCount(
+        "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender",
+        StreamingSearchPrefetchURLLoader::ResponseReader::
+            ResponseDataReaderStatus::kNetworkError);
+
+    if (num_count) {
+      EXPECT_EQ(num_count, 1);
+      break;
+    }
+    base::RunLoop run_loop;
+    run_loop.RunUntilIdle();
+  }
+}
+
+// Tests that if prerender is canceled by itself before the loader receives
+// response body from the internet, the correct result can be recorded.
+IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
+                       PrerenderDiscardedBeforeServingData) {
+  base::HistogramTester histogram_tester;
+  set_service_deferral_type(SearchPreloadTestResponseDeferralType::kDeferBody);
+
+  const GURL kInitialUrl = embedded_test_server()->GetURL("/empty.html");
+  ASSERT_TRUE(GetActiveWebContents());
+  ASSERT_TRUE(content::NavigateToURL(GetActiveWebContents(), kInitialUrl));
+  SetUpContext();
+
+  std::string search_query_1 = "pre";
+  std::string prerender_query = "prerender";
+  GURL expected_prefetch_url =
+      GetSearchUrl(prerender_query, UrlType::kPrefetch);
+  GURL expected_prerender_url =
+      GetSearchUrl(prerender_query, UrlType::kPrerender);
+  content::test::PrerenderHostRegistryObserver registry_observer(
+      *GetActiveWebContents());
+  content::TestNavigationManager prerender_navigation_manager(
+      GetActiveWebContents(), expected_prerender_url);
+  ChangeAutocompleteResult(search_query_1, prerender_query,
+                           PrerenderHint::kEnabled, PrefetchHint::kEnabled);
+
+  // Wait until prefetch request succeeds.
+  absl::optional<SearchPrefetchStatus> prefetch_status =
+      search_prefetch_service()->GetSearchPrefetchStatusForTesting(
+          GetCanonicalSearchURL(expected_prefetch_url));
+  EXPECT_TRUE(prefetch_status.has_value());
+  WaitUntilStatusChangesTo(GetCanonicalSearchURL(expected_prefetch_url),
+                           {SearchPrefetchStatus::kCanBeServed});
+  // The suggestion service should hint `expected_prefetch_url`, and
+  // prerendering for this url should start.
+  registry_observer.WaitForTrigger(expected_prerender_url);
+  int host_id = prerender_helper().GetHostForUrl(expected_prerender_url);
+
+  // Ensure prerender has started to read response body.
+  ASSERT_TRUE(prerender_navigation_manager.WaitForResponse());
+  prerender_navigation_manager.ResumeNavigation();
+  while (true) {
+    if (prerender_navigation_manager.was_committed()) {
+      break;
+    }
+    base::RunLoop run_loop;
+    run_loop.RunUntilIdle();
+  }
+
+  content::test::PrerenderHostObserver prerender_observer(
+      *GetActiveWebContents(), host_id);
+  prerender_helper().CancelPrerenderedPage(host_id);
+  prerender_observer.WaitForDestroyed();
+  prefetch_status =
+      search_prefetch_service()->GetSearchPrefetchStatusForTesting(
+          GetCanonicalSearchURL(expected_prerender_url));
+  EXPECT_TRUE(prefetch_status.has_value());
+  DispatchDelayedResponseTask();
+  WaitUntilStatusChangesTo(GetCanonicalSearchURL(expected_prefetch_url),
+                           {SearchPrefetchStatus::kComplete});
+
+  ASSERT_TRUE(
+      content::NavigateToURL(GetActiveWebContents(), expected_prerender_url));
+
   histogram_tester.ExpectUniqueSample(
-      "Prerender.Experimental.PrerenderHostFinalStatus.Embedder_"
-      "DefaultSearchEngine",
-      /*SearchPrefetchStatus::kPrefetchServedForRealNavigation*/ 16, 1);
+      "Omnibox.SearchPrefetch.PrefetchFinalStatus.SuggestionPrefetch",
+      SearchPrefetchStatus::kPrefetchServedForRealNavigation, 1);
+
+  CheckCorrectForwardingResultMetric(
+      histogram_tester,
+      StreamingSearchPrefetchURLLoader::ForwardingResult::kCompleted, 1);
+
+  // If the prerender is completely destroyed before the final state code
+  // arrives, `kServingError` will be recorded, otherwise `kCompleted` will be
+  // recorded. The timing issue is not controllable due to asynchronous Mojo
+  // messages and asynchronous destruction tasks, so both state are expected.
+  {
+    while (true) {
+      int num = histogram_tester.GetTotalSum(
+          "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender");
+      if (num >= 1) {
+        break;
+      }
+      base::RunLoop run_loop;
+      run_loop.RunUntilIdle();
+    }
+  }
+  histogram_tester.ExpectTotalCount(
+      "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender", 1);
+  EXPECT_EQ(
+      1,
+      histogram_tester.GetBucketCount(
+          "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender",
+          StreamingSearchPrefetchURLLoader::ResponseReader::
+              ResponseDataReaderStatus::kServingError) +
+          histogram_tester.GetBucketCount(
+              "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender",
+              StreamingSearchPrefetchURLLoader::ResponseReader::
+                  ResponseDataReaderStatus::kCompleted));
 }
 
 // Edge case: when the prerendering navigation is still reading from the cache,
@@ -1926,8 +2093,97 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
   // Prerender should not retry the request.
   EXPECT_EQ(0, prerender_helper().GetRequestCount(expected_prerender_url));
   EXPECT_EQ(1, prerender_helper().GetRequestCount(expected_prefetch_url));
+  histogram_tester.ExpectUniqueSample(
+      "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender",
+      StreamingSearchPrefetchURLLoader::ResponseReader::
+          ResponseDataReaderStatus::kCompleted,
+      1);
 }
 
+// It is possible that one prefetched response is served to multiple prerender
+// in the current design.
+IN_PROC_BROWSER_TEST_F(SearchPreloadUnifiedFallbackBrowserTest,
+                       ServingToPrerenderNavigationTwice) {
+  base::HistogramTester histogram_tester;
+  const GURL kInitialUrl = embedded_test_server()->GetURL("/empty.html");
+  const GURL kNavigatedUrl = embedded_test_server()->GetURL("/title1.html");
+  ASSERT_TRUE(GetActiveWebContents());
+  ASSERT_TRUE(content::NavigateToURL(GetActiveWebContents(), kInitialUrl));
+  SetUpContext();
+
+  // 1. Type the first query.
+  std::string search_query_1 = "pre";
+  std::string prerender_query = "prerender";
+  GURL expected_prerender_url =
+      GetSearchUrl(prerender_query, UrlType::kPrerender);
+  ChangeAutocompleteResult(search_query_1, prerender_query,
+                           PrerenderHint::kEnabled, PrefetchHint::kEnabled);
+  WaitUntilStatusChangesTo(
+      GetCanonicalSearchURL(expected_prerender_url),
+      {SearchPrefetchStatus::kCanBeServed, SearchPrefetchStatus::kComplete});
+
+  // 2. Prefetch and prerender should be triggered.
+  prerender_helper().WaitForPrerenderLoadCompletion(*GetActiveWebContents(),
+                                                    expected_prerender_url);
+
+  EXPECT_TRUE(prerender_manager()->HasSearchResultPagePrerendered());
+  absl::optional<SearchPrefetchStatus> prefetch_status =
+      search_prefetch_service()->GetSearchPrefetchStatusForTesting(
+          GetCanonicalSearchURL(expected_prerender_url));
+  EXPECT_TRUE(prefetch_status.has_value());
+  EXPECT_NE(prefetch_status.value(), SearchPrefetchStatus::kPrerendered);
+
+  // 3. Turns to another prediction.
+  {
+    int host_id = prerender_helper().GetHostForUrl(expected_prerender_url);
+    content::test::PrerenderHostObserver prerender_observer(
+        *GetActiveWebContents(), host_id);
+    ChangeAutocompleteResult("pref", "prefetch", PrerenderHint::kEnabled,
+                             PrefetchHint::kEnabled);
+    prerender_observer.WaitForDestroyed();
+    prerender_helper().WaitForPrerenderLoadCompletion(
+        *GetActiveWebContents(), GetSearchUrl("prefetch", UrlType::kPrerender));
+  }
+  // 4. The previous prefetch response should still exist.
+  prefetch_status =
+      search_prefetch_service()->GetSearchPrefetchStatusForTesting(
+          GetCanonicalSearchURL(expected_prerender_url));
+  ASSERT_EQ(SearchPrefetchStatus::kComplete, prefetch_status.value());
+
+  // 5. Prerender the page again.
+  {
+    content::test::PrerenderHostRegistryObserver registry_observer(
+        *GetActiveWebContents());
+    ChangeAutocompleteResult(search_query_1, prerender_query,
+                             PrerenderHint::kEnabled, PrefetchHint::kEnabled);
+    registry_observer.WaitForTrigger(expected_prerender_url);
+  }
+  {
+    prerender_helper().WaitForPrerenderLoadCompletion(*GetActiveWebContents(),
+                                                      expected_prerender_url);
+    content::test::PrerenderHostObserver prerender_observer(
+        *GetActiveWebContents(), expected_prerender_url);
+    base::RunLoop run_loop;
+    SetLoaderDestructionCallbackForTesting(
+        GetCanonicalSearchURL(expected_prerender_url), run_loop.QuitClosure());
+    NavigateToPrerenderedResult(expected_prerender_url);
+    prerender_observer.WaitForActivation();
+    search_prefetch_service()->FireAllExpiryTimerForTesting();
+    run_loop.Run();
+  }
+
+  // This one was recorded by the loader fetching the "prerender" search term.
+  histogram_tester.ExpectBucketCount(
+      "Prerender.Experimental.Search.ResponseReuseCount",
+      /*prerender_serving_times*/ 2, 1);
+  // This one was recorded by the loader fetching the "prefetch" search term.
+  histogram_tester.ExpectBucketCount(
+      "Prerender.Experimental.Search.ResponseReuseCount",
+      /*prerender_serving_times*/ 1, 1);
+}
+
+// We cannot open the result in another tab on Android.
+#if !BUILDFLAG(IS_ANDROID)
 class NoCancelSearchPreloadUnifiedFallbackBrowserTest
     : public SearchPreloadUnifiedBrowserTest {
  public:
@@ -1943,7 +2199,7 @@ class NoCancelSearchPreloadUnifiedFallbackBrowserTest
               {"cache_size", "4"},
               {"device_memory_threshold_MB", "0"}}},
         },
-        /*disabled_features=*/{kSearchPrefetchBlockBeforeHeaders});
+        /*disabled_features=*/{});
   }
   ~NoCancelSearchPreloadUnifiedFallbackBrowserTest() override = default;
 
@@ -1954,8 +2210,18 @@ class NoCancelSearchPreloadUnifiedFallbackBrowserTest
 // Tests that even when prerendering is not failed, users can open the
 // prefetched result in another tab and activate the prefetched response
 // successfully.
+#if (BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX)) && \
+    defined(ADDRESS_SANITIZER)
+#define MAYBE_OpenPrefetchedResponseInBackgroundedTab \
+  DISABLED_OpenPrefetchedResponseInBackgroundedTab
+#else
+#define MAYBE_OpenPrefetchedResponseInBackgroundedTab \
+  OpenPrefetchedResponseInBackgroundedTab
+#endif
+// TODO(https://crbug.com/1454675): Flaky on chromiumos ASAN LSAN and Linux
+// ASAN.
 IN_PROC_BROWSER_TEST_F(NoCancelSearchPreloadUnifiedFallbackBrowserTest,
-                       ServingToPrerenderingUntilCompletion) {
+                       MAYBE_OpenPrefetchedResponseInBackgroundedTab) {
   base::HistogramTester histogram_tester;
   set_service_deferral_type(
       SearchPreloadTestResponseDeferralType::kDeferChunkedResponseBody);
@@ -1992,6 +2258,11 @@ IN_PROC_BROWSER_TEST_F(NoCancelSearchPreloadUnifiedFallbackBrowserTest,
     ChangeAutocompleteResult(search_query, prerender_query,
                              PrerenderHint::kEnabled, PrefetchHint::kEnabled);
     registry_observer.WaitForTrigger(expected_prerender_url);
+
+    // This ensures that the request handler from
+    // SearchPrefetchURLLoaderInterceptor fully process the request.
+    base::RunLoop run_loop;
+    run_loop.RunUntilIdle();
   }
   content::test::PrerenderHostObserver prerender_observer(
       *GetActiveWebContents(), expected_prerender_url);
@@ -2007,6 +2278,7 @@ IN_PROC_BROWSER_TEST_F(NoCancelSearchPreloadUnifiedFallbackBrowserTest,
                                     ui::PAGE_TRANSITION_FROM_ADDRESS_BAR),
           /*is_renderer_initiated=*/false));
   WaitUntilStatusChangesTo(GetCanonicalSearchURL(expected_prerender_url), {});
+
   // TODO(crbug.com/1423259): Ideally we should open the tab with the
   // prerendered result.
   prerender_observer.WaitForDestroyed();
@@ -2044,8 +2316,26 @@ IN_PROC_BROWSER_TEST_F(NoCancelSearchPreloadUnifiedFallbackBrowserTest,
   EXPECT_TRUE(base::Contains(prefetch_inner_html, "PREFETCH"));
   EXPECT_EQ(0, prerender_helper().GetRequestCount(expected_prerender_url));
   EXPECT_EQ(2, prerender_helper().GetRequestCount(expected_prefetch_url));
-}
 
-#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS_LACROS)
+  // For the second response, `kCompleted` should be recorded. For the first
+  // one, if the prerender is completely destroyed before the final state code
+  // arrives, `kServingError` will be recorded, otherwise `kCompleted` will be
+  // recorded. The timing issue is not controllable due to asynchronous Mojo
+  // messages and asynchronous destruction tasks, so both state are expected.
+  EXPECT_EQ(
+      2,
+      histogram_tester.GetBucketCount(
+          "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender",
+          StreamingSearchPrefetchURLLoader::ResponseReader::
+              ResponseDataReaderStatus::kServingError) +
+          histogram_tester.GetBucketCount(
+              "Omnibox.SearchPreload.ResponseDataReaderFinalStatus.Prerender",
+              StreamingSearchPrefetchURLLoader::ResponseReader::
+                  ResponseDataReaderStatus::kCompleted));
+  CheckCorrectForwardingResultMetric(
+      histogram_tester,
+      StreamingSearchPrefetchURLLoader::ForwardingResult::kCompleted, 1);
+}
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 }  // namespace

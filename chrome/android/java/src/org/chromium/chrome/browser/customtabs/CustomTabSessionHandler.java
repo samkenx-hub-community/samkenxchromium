@@ -124,15 +124,18 @@ public class CustomTabSessionHandler implements SessionHandler, StartStopWithNat
     }
 
     @Override
-    @Nullable
-    public String getCurrentUrl() {
+    public @Nullable Tab getCurrentTab() {
+        return mTabProvider.getTab();
+    }
+
+    @Override
+    public @Nullable String getCurrentUrl() {
         Tab tab = mTabProvider.getTab();
         return tab == null ? null : tab.getUrl().getSpec();
     }
 
     @Override
-    @Nullable
-    public String getPendingUrl() {
+    public @Nullable String getPendingUrl() {
         Tab tab = mTabProvider.getTab();
         if (tab == null || tab.getWebContents() == null) return null;
 

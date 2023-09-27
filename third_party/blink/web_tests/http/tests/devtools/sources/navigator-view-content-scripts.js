@@ -2,14 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+
+import * as SourcesModule from 'devtools/panels/sources/sources.js';
+
 (async function() {
   TestRunner.addResult(
       `Verify that removal of one of the multiple projects, all of which are associated with the same frame, doesn't lead navigator to discard the frame treenode.\n`);
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
+  await TestRunner.loadLegacyModule('sources');
   await TestRunner.showPanel('sources');
 
   var rootURL = 'http://localhost:8080/LayoutTests/inspector/debugger/';
-  var sourcesNavigatorView = new Sources.NetworkNavigatorView();
+  var sourcesNavigatorView = new SourcesModule.SourcesNavigator.NetworkNavigatorView();
   sourcesNavigatorView.show(UI.inspectorView.element);
 
   TestRunner.addResult('\n\n================================================');

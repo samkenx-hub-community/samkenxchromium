@@ -53,6 +53,7 @@ import org.chromium.components.favicon.LargeIconBridge;
 import org.chromium.components.feature_engagement.EventConstants;
 import org.chromium.components.feature_engagement.FeatureConstants;
 import org.chromium.components.feature_engagement.Tracker;
+import org.chromium.components.url_formatter.SchemeDisplay;
 import org.chromium.components.url_formatter.UrlFormatter;
 import org.chromium.ui.base.ViewUtils;
 import org.chromium.ui.modelutil.LayoutViewBuilder;
@@ -245,8 +246,8 @@ class ShareSheetBottomSheetContent implements BottomSheetContent, OnItemClickLis
             ShareSheetLinkToggleCoordinator shareSheetLinkToggleCoordinator) {
         // Default preview is to show title + url.
         String title = mParams.getTitle();
-        String subtitle =
-                UrlFormatter.formatUrlForDisplayOmitSchemeOmitTrivialSubdomains(mParams.getUrl());
+        String subtitle = UrlFormatter.formatUrlForSecurityDisplay(
+                mParams.getUrl(), SchemeDisplay.OMIT_HTTP_AND_HTTPS);
 
         if (contentTypes.contains(ContentType.IMAGE)
                 || contentTypes.contains(ContentType.IMAGE_AND_LINK)) {
@@ -525,7 +526,7 @@ class ShareSheetBottomSheetContent implements BottomSheetContent, OnItemClickLis
         // If we didn't get a favicon, use the generic favicon instead.
         Bitmap scaledIcon;
         if (icon == null) {
-            scaledIcon = FaviconUtils.createGenericFaviconBitmap(mActivity, size);
+            scaledIcon = FaviconUtils.createGenericFaviconBitmap(mActivity, size, null);
             RecordUserAction.record("SharingHubAndroid.GenericFaviconShown");
         } else {
             scaledIcon = Bitmap.createScaledBitmap(icon, size, size, true);

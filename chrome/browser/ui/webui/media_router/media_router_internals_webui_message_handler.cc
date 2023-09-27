@@ -32,12 +32,12 @@ MediaRouterInternalsWebUIMessageHandler::
                                             MediaRouterDebugger& debugger)
     : router_(router), debugger_(debugger) {
   DCHECK(router_);
-  debugger_.AddObserver(*this);
+  debugger_->AddObserver(*this);
 }
 
 MediaRouterInternalsWebUIMessageHandler::
     ~MediaRouterInternalsWebUIMessageHandler() {
-  debugger_.RemoveObserver(*this);
+  debugger_->RemoveObserver(*this);
 }
 
 void MediaRouterInternalsWebUIMessageHandler::RegisterMessages() {
@@ -54,6 +54,11 @@ void MediaRouterInternalsWebUIMessageHandler::RegisterMessages() {
       "getLogs", base::BindRepeating(
                      &MediaRouterInternalsWebUIMessageHandler::HandleGetLogs,
                      base::Unretained(this)));
+  web_ui()->RegisterMessageCallback(
+      "getMirroringStats",
+      base::BindRepeating(
+          &MediaRouterInternalsWebUIMessageHandler::HandleGetMirroringStats,
+          base::Unretained(this)));
   web_ui()->RegisterMessageCallback(
       "setMirroringStatsEnabled",
       base::BindRepeating(&MediaRouterInternalsWebUIMessageHandler::
@@ -115,6 +120,13 @@ void MediaRouterInternalsWebUIMessageHandler::OnProviderState(
   }
 }
 
+void MediaRouterInternalsWebUIMessageHandler::HandleGetMirroringStats(
+    const base::Value::List& args) {
+  AllowJavascript();
+  const base::Value& callback_id = args[0];
+  ResolveJavascriptCallback(callback_id, debugger_->GetMirroringStats());
+}
+
 void MediaRouterInternalsWebUIMessageHandler::HandleSetMirroringStatsEnabled(
     const base::Value::List& args) {
   AllowJavascript();
@@ -122,13 +134,13 @@ void MediaRouterInternalsWebUIMessageHandler::HandleSetMirroringStatsEnabled(
   const bool should_enable = args[1].GetBool();
 
   if (should_enable) {
-    debugger_.EnableRtcpReports();
+    debugger_->EnableRtcpReports();
     ResolveJavascriptCallback(
         callback_id,
         base::Value("Mirroring Stats will be fetched and displayed "
                     "on your next mirroring session."));
   } else {
-    debugger_.DisableRtcpReports();
+    debugger_->DisableRtcpReports();
 
     ResolveJavascriptCallback(
         callback_id, base::Value("Mirroring Stats will not be fetched or "
@@ -141,11 +153,13 @@ void MediaRouterInternalsWebUIMessageHandler::HandleIsMirroringStatsEnabled(
   AllowJavascript();
   const base::Value& callback_id = args[0];
 
-  ResolveJavascriptCallback(callback_id, debugger_.IsRtcpReportsEnabled());
+  ResolveJavascriptCallback(callback_id,
+                            debugger_->ShouldFetchMirroringStats());
 }
 
 void MediaRouterInternalsWebUIMessageHandler::OnMirroringStatsUpdated(
     const base::Value::Dict& json_logs) {
+  AllowJavascript();
   FireWebUIListener("on-mirroring-stats-update", std::move(json_logs));
 }
 

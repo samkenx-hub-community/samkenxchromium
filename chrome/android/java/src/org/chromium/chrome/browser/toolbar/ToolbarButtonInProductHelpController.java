@@ -19,10 +19,6 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.bookmarks.PowerBookmarkUtils;
 import org.chromium.chrome.browser.commerce.ShoppingFeatures;
 import org.chromium.chrome.browser.download.DownloadUtils;
-import org.chromium.chrome.browser.feature_engagement.ScreenshotMonitor;
-import org.chromium.chrome.browser.feature_engagement.ScreenshotMonitorDelegate;
-import org.chromium.chrome.browser.feature_engagement.ScreenshotMonitorImpl;
-import org.chromium.chrome.browser.feature_engagement.ScreenshotTabObserver;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.feature_guide.notifications.FeatureNotificationUtils;
 import org.chromium.chrome.browser.feature_guide.notifications.FeatureType;
@@ -31,6 +27,10 @@ import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.lifecycle.PauseResumeWithNativeObserver;
 import org.chromium.chrome.browser.offlinepages.OfflinePageBridge;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.screenshot_monitor.ScreenshotMonitor;
+import org.chromium.chrome.browser.screenshot_monitor.ScreenshotMonitorDelegate;
+import org.chromium.chrome.browser.screenshot_monitor.ScreenshotMonitorImpl;
+import org.chromium.chrome.browser.screenshot_monitor.ScreenshotTabObserver;
 import org.chromium.chrome.browser.tab.CurrentTabObserver;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
@@ -42,8 +42,6 @@ import org.chromium.chrome.browser.ui.appmenu.AppMenuHandler;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuPropertiesDelegate;
 import org.chromium.chrome.browser.user_education.IPHCommandBuilder;
 import org.chromium.chrome.browser.user_education.UserEducationHelper;
-import org.chromium.chrome.browser.video_tutorials.VideoTutorialServiceFactory;
-import org.chromium.chrome.browser.video_tutorials.iph.VideoTutorialTryNowTracker;
 import org.chromium.components.feature_engagement.EventConstants;
 import org.chromium.components.feature_engagement.FeatureConstants;
 import org.chromium.components.feature_engagement.Tracker;
@@ -63,7 +61,6 @@ public class ToolbarButtonInProductHelpController
     private final ActivityLifecycleDispatcher mLifecycleDispatcher;
     private final AppMenuPropertiesDelegate mAppMenuPropertiesDelegate;
     private final ScreenshotMonitor mScreenshotMonitor;
-    private final Handler mHandler = new Handler();
     private final View mMenuButtonAnchorView;
     private final View mSecurityIconAnchorView;
     private final AppMenuHandler mAppMenuHandler;
@@ -95,7 +92,7 @@ public class ToolbarButtonInProductHelpController
         mMenuButtonAnchorView = menuButtonAnchorView;
         mSecurityIconAnchorView = securityIconAnchorView;
         mIsInOverviewModeSupplier = isInOverviewModeSupplier;
-        mUserEducationHelper = new UserEducationHelper(mActivity, mHandler);
+        mUserEducationHelper = new UserEducationHelper(mActivity, new Handler());
         mScreenshotMonitor = new ScreenshotMonitorImpl(this, mActivity);
         mLifecycleDispatcher = lifecycleDispatcher;
         mLifecycleDispatcher.register(this);
@@ -205,7 +202,6 @@ public class ToolbarButtonInProductHelpController
         // (e.g. tab switch or in overview mode).
         if (DeviceFormFactor.isWindowOnTablet(mWindowAndroid)) return;
         mScreenshotMonitor.startMonitoring();
-        mHandler.post(this::showVideoTutorialTryNowUIForDownload);
     }
 
     @Override
@@ -308,30 +304,6 @@ public class ToolbarButtonInProductHelpController
                         .setOnDismissCallback(this::turnOffHighlightForMenuItem)
                         .setAnchorView(mMenuButtonAnchorView)
                         .build());
-    }
-
-    /** Show the Try Now UI for video tutorial download feature. */
-    private void showVideoTutorialTryNowUIForDownload() {
-        VideoTutorialTryNowTracker tryNowTracker = VideoTutorialServiceFactory.getTryNowTracker();
-        if (!tryNowTracker.didClickTryNowButton(
-                    org.chromium.chrome.browser.video_tutorials.FeatureType.DOWNLOAD)) {
-            return;
-        }
-
-        Integer menuItemId = DownloadUtils.isAllowedToDownloadPage(mCurrentTabSupplier.get())
-                ? R.id.offline_page_id
-                : R.id.downloads_menu_id;
-
-        mUserEducationHelper.requestShowIPH(
-                new IPHCommandBuilder(mActivity.getResources(), null,
-                        R.string.video_tutorials_iph_tap_here_to_start,
-                        R.string.video_tutorials_iph_tap_here_to_start)
-                        .setAnchorView(mMenuButtonAnchorView)
-                        .setOnShowCallback(() -> turnOnHighlightForMenuItem(menuItemId))
-                        .setOnDismissCallback(this::turnOffHighlightForMenuItem)
-                        .build());
-        tryNowTracker.tryNowUIShown(
-                org.chromium.chrome.browser.video_tutorials.FeatureType.DOWNLOAD);
     }
 
     private void turnOnHighlightForMenuItem(Integer highlightMenuItemId) {

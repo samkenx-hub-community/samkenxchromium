@@ -61,6 +61,9 @@ const char kHardwareClassKey[] = "hardware_class";
 const char kIsVmKey[] = "is_vm";
 const char kIsVmValueFalse[] = "0";
 const char kIsVmValueTrue[] = "1";
+const char kIsCrosDebugKey[] = "is_cros_debug";
+const char kIsCrosDebugValueFalse[] = "0";
+const char kIsCrosDebugValueTrue[] = "1";
 const char kManufactureDateKey[] = "mfg_date";
 const char kOffersCouponCodeKey[] = "ubind_attribute";
 const char kOffersGroupCodeKey[] = "gbind_attribute";
@@ -72,6 +75,7 @@ const char kInitialTimezoneKey[] = "initial_timezone";
 const char kKeyboardLayoutKey[] = "keyboard_layout";
 const char kKeyboardMechanicalLayoutKey[] = "keyboard_mechanical_layout";
 const char kAttestedDeviceIdKey[] = "attested_device_id";
+const char kDisplayProfilesKey[] = "display_profiles";
 
 // OEM specific statistics. Must be prefixed with "oem_".
 const char kOemCanExitEnterpriseEnrollmentKey[] = "oem_can_exit_enrollment";

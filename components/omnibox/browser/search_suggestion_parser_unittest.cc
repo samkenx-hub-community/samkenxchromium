@@ -5,12 +5,14 @@
 #include "components/omnibox/browser/search_suggestion_parser.h"
 
 #include "base/base64.h"
+#include "base/feature_list.h"
 #include "base/json/json_reader.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "build/build_config.h"
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/omnibox/browser/test_scheme_classifier.h"
+#include "components/omnibox/common/omnibox_features.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -54,14 +56,14 @@ bool ProtosAreEqual(const google::protobuf::MessageLite& actual,
 
 TEST(SearchSuggestionParserTest, DeserializeNonListJsonIsInvalid) {
   std::string json_data = "{}";
-  absl::optional<base::Value> result =
+  absl::optional<base::Value::List> result =
       SearchSuggestionParser::DeserializeJsonData(json_data);
   ASSERT_FALSE(result);
 }
 
 TEST(SearchSuggestionParserTest, DeserializeMalformedJsonIsInvalid) {
   std::string json_data = "} malformed json {";
-  absl::optional<base::Value> result =
+  absl::optional<base::Value::List> result =
       SearchSuggestionParser::DeserializeJsonData(json_data);
   ASSERT_FALSE(result);
 }
@@ -71,7 +73,7 @@ TEST(SearchSuggestionParserTest, DeserializeJsonData) {
   absl::optional<base::Value> manifest_value =
       base::JSONReader::Read(json_data);
   ASSERT_TRUE(manifest_value);
-  absl::optional<base::Value> result =
+  absl::optional<base::Value::List> result =
       SearchSuggestionParser::DeserializeJsonData(json_data);
   ASSERT_TRUE(result);
   ASSERT_EQ(*manifest_value, *result);
@@ -83,7 +85,7 @@ TEST(SearchSuggestionParserTest, DeserializeWithXssiGuard) {
   std::string json_data = R"([non-json [prefix [{"one": 1}])";
   // Parsing succeeds at:                      ^
 
-  absl::optional<base::Value> result =
+  absl::optional<base::Value::List> result =
       SearchSuggestionParser::DeserializeJsonData(json_data);
   ASSERT_TRUE(result);
 
@@ -97,7 +99,7 @@ TEST(SearchSuggestionParserTest, DeserializeWithTrailingComma) {
   // The comma in this string makes this badly formed JSON, but we explicitly
   // allow for this error in the JSON data.
   std::string json_data = R"([{"one": 1},])";
-  absl::optional<base::Value> result =
+  absl::optional<base::Value::List> result =
       SearchSuggestionParser::DeserializeJsonData(json_data);
   ASSERT_TRUE(result);
 }
@@ -111,7 +113,7 @@ TEST(SearchSuggestionParserTest, DeserializeWithTrailingComma) {
 // ParseSuggestResults:
 
 TEST(SearchSuggestionParserTest, ParseEmptyValueIsInvalid) {
-  base::Value root_val;
+  base::Value::List root_val;
   AutocompleteInput input;
   TestSchemeClassifier scheme_classifier;
   int default_result_relevance = 0;
@@ -126,17 +128,26 @@ TEST(SearchSuggestionParserTest, ParseNonSuggestionValueIsInvalid) {
   std::string json_data = R"([{"one": 1}])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   AutocompleteInput input;
   TestSchemeClassifier scheme_classifier;
   int default_result_relevance = 0;
   bool is_keyword_result = false;
   SearchSuggestionParser::Results results;
   ASSERT_FALSE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, default_result_relevance,
+      root_val->GetList(), input, scheme_classifier, default_result_relevance,
       is_keyword_result, &results));
 }
 
 TEST(SearchSuggestionParserTest, ParseSuggestResults) {
+  omnibox::EntityInfo entity_info;
+  entity_info.set_annotation("American author");
+  entity_info.set_dominant_color("#424242");
+  entity_info.set_image_url("http://example.com/a.png");
+  entity_info.set_suggest_search_parameters("gs_ssp=abc");
+  entity_info.set_name("Christopher Doe");
+  entity_info.set_entity_id("/m/065xxm");
+
   std::string json_data = R"([
       "chris",
       ["christmas", "christopher doe"],
@@ -150,12 +161,9 @@ TEST(SearchSuggestionParserTest, ParseSuggestResults) {
         "google:fieldtrialtriggered": true,
         "google:suggestdetail": [{
           }, {
-            "a": "American author",
-            "dc": "#424242",
-            "i": "http://example.com/a.png",
-            "zae": "/m/065xxm",
-            "q": "gs_ssp=abc",
-            "t": "Christopher Doe"
+            "google:entityinfo": ")" +
+                          SerializeAndEncodeEntityInfo(entity_info) +
+                          R"("
           }],
         "google:suggestrelevance": [607, 606],
         "google:suggesttype": ["QUERY", "ENTITY"],
@@ -168,12 +176,14 @@ TEST(SearchSuggestionParserTest, ParseSuggestResults) {
       }])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"chris", metrics::OmniboxEventProto::NTP,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
   // We have "google:suggestrelevance".
   ASSERT_EQ(true, results.relevances_from_server);
@@ -231,12 +241,14 @@ TEST(SearchSuggestionParserTest, ParsePrerenderSuggestion) {
       }])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"pre", metrics::OmniboxEventProto::BLANK,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
   {
     const auto& suggestion_result = results.suggest_results[0];
@@ -265,12 +277,14 @@ TEST(SearchSuggestionParserTest, ParseBothPrefetchAndPrerenderSuggestion) {
       }])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"pre", metrics::OmniboxEventProto::BLANK,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
   {
     const auto& suggestion_result = results.suggest_results[0];
@@ -288,8 +302,8 @@ TEST(SearchSuggestionParserTest, ParseBothPrefetchAndPrerenderSuggestion) {
 
 TEST(SearchSuggestionParserTest, SuggestClassification) {
   SearchSuggestionParser::SuggestResult result(
-      u"foobar", AutocompleteMatchType::SEARCH_SUGGEST, {}, false, 400, true,
-      std::u16string());
+      u"foobar", AutocompleteMatchType::SEARCH_SUGGEST, omnibox::TYPE_QUERY, {},
+      false, 400, true, std::u16string());
   AutocompleteMatch::ValidateClassifications(result.match_contents(),
                                              result.match_contents_class());
 
@@ -332,8 +346,8 @@ TEST(SearchSuggestionParserTest, NavigationClassification) {
   TestSchemeClassifier scheme_classifier;
   SearchSuggestionParser::NavigationResult result(
       scheme_classifier, GURL("https://news.google.com/"),
-      AutocompleteMatchType::Type::NAVSUGGEST, {}, std::u16string(),
-      std::string(), false, 400, true, u"google");
+      AutocompleteMatchType::Type::NAVSUGGEST, omnibox::TYPE_NAVIGATION, {},
+      std::u16string(), std::string(), false, 400, true, u"google");
   AutocompleteMatch::ValidateClassifications(result.match_contents(),
                                              result.match_contents_class());
   const ACMatchClassifications kBoldMiddle = {
@@ -361,99 +375,6 @@ TEST(SearchSuggestionParserTest, NavigationClassification) {
   const ACMatchClassifications kNone = {
       {0, AutocompleteMatch::ACMatchClassification::NONE}};
   EXPECT_EQ(kNone, result.match_contents_class());
-}
-
-TEST(SearchSuggestionParserTest, ParseSuggestionEntityInfo) {
-  TestSchemeClassifier scheme_classifier;
-  AutocompleteInput input(u"the m", metrics::OmniboxEventProto::NTP_REALBOX,
-                          scheme_classifier);
-
-  std::string json_data = R"([
-    "the m",
-    ["the menu", "the menu", "the midnight club"],
-    ["", "", ""],
-    [],
-    {
-      "google:clientdata": {
-        "bpc": false,
-        "tlw": false
-      },
-      "google:suggestdetail": [
-        {},
-        {
-          "a": "2022 film",
-          "dc": "#424242",
-          "i": "https://encrypted-tbn0.gstatic.com/images?q=the+menu",
-          "q": "gs_ssp=eJzj4tVP1zc0LCwoKssryyg3YPTiKMlIVchNzSsFAGrSCGQ",
-          "t": "The Menu",
-          "zae": "/g/11qprvnvhw"
-        },
-        {
-          "a": "Thriller series",
-          "dc": "#283e75",
-          "i": "https://encrypted-tbn0.gstatic.com/images?q=the+midnight+club",
-          "q": "gs_ssp=eJzj4tVP1zc0zMqrNCvJNkwyYPQSLMlIVcjNTMnLTM8oUUjOKU0CALmyCz8",
-          "t": "The Midnight Club",
-          "zae": "/g/11jny6tk1b"
-        }
-      ],
-      "google:suggestrelevance": [701, 700, 553],
-      "google:suggestsubtypes": [
-        [512, 433, 131, 355],
-        [131, 433, 512],
-        [512, 433]
-      ],
-      "google:suggesttype": ["QUERY", "ENTITY", "ENTITY"],
-      "google:verbatimrelevance": 851
-    }])";
-
-  absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
-  ASSERT_TRUE(root_val);
-
-  SearchSuggestionParser::Results results;
-  ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
-      /*is_keyword_result=*/false, &results));
-
-  ASSERT_EQ(3U, results.suggest_results.size());
-
-  // For each suggestion, verify that the JSON fields were correctly parsed.
-  ASSERT_EQ(u"the menu", results.suggest_results[0].suggestion());
-  ASSERT_TRUE(ProtosAreEqual(results.suggest_results[0].entity_info(),
-                             omnibox::EntityInfo::default_instance()));
-  ASSERT_EQ(u"", results.suggest_results[0].annotation());
-  // Empty "t" value from server results in suggestion being used instead.
-  ASSERT_EQ(u"the menu", results.suggest_results[0].match_contents());
-
-  ASSERT_EQ(u"the menu", results.suggest_results[1].suggestion());
-  ASSERT_EQ(u"2022 film", results.suggest_results[1].annotation());
-  ASSERT_EQ("#424242",
-            results.suggest_results[1].entity_info().dominant_color());
-  ASSERT_EQ(
-      "https://encrypted-tbn0.gstatic.com/"
-      "images?q=the+menu",
-      results.suggest_results[1].entity_info().image_url());
-  ASSERT_EQ(
-      "gs_ssp=eJzj4tVP1zc0LCwoKssryyg3YPTiKMlIVchNzSsFAGrSCGQ",
-      results.suggest_results[1].entity_info().suggest_search_parameters());
-  ASSERT_EQ(u"The Menu", results.suggest_results[1].match_contents());
-  ASSERT_EQ("/g/11qprvnvhw",
-            results.suggest_results[1].entity_info().entity_id());
-
-  ASSERT_EQ(u"the midnight club", results.suggest_results[2].suggestion());
-  ASSERT_EQ(u"Thriller series", results.suggest_results[2].annotation());
-  ASSERT_EQ("#283e75",
-            results.suggest_results[2].entity_info().dominant_color());
-  ASSERT_EQ(
-      "https://encrypted-tbn0.gstatic.com/"
-      "images?q=the+midnight+club",
-      results.suggest_results[2].entity_info().image_url());
-  ASSERT_EQ(
-      "gs_ssp=eJzj4tVP1zc0zMqrNCvJNkwyYPQSLMlIVcjNTMnLTM8oUUjOKU0CALmyCz8",
-      results.suggest_results[2].entity_info().suggest_search_parameters());
-  ASSERT_EQ(u"The Midnight Club", results.suggest_results[2].match_contents());
-  ASSERT_EQ("/g/11jny6tk1b",
-            results.suggest_results[2].entity_info().entity_id());
 }
 
 TEST(SearchSuggestionParserTest, ParseSuggestionGroupInfo) {
@@ -501,10 +422,12 @@ TEST(SearchSuggestionParserTest, ParseSuggestionGroupInfo) {
       }])";
     absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
     ASSERT_TRUE(root_val);
+    ASSERT_TRUE(root_val.value().is_list());
 
     SearchSuggestionParser::Results results;
     ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-        *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+        root_val->GetList(), input, scheme_classifier,
+        /*default_result_relevance=*/400,
         /*is_keyword_result=*/false, &results));
 
     // Ensure suggestion groups are correctly parsed from the serialized proto.
@@ -595,10 +518,12 @@ TEST(SearchSuggestionParserTest, ParseSuggestionGroupInfo) {
       }])";
     absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
     ASSERT_TRUE(root_val);
+    ASSERT_TRUE(root_val.value().is_list());
 
     SearchSuggestionParser::Results results;
     ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-        *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+        root_val->GetList(), input, scheme_classifier,
+        /*default_result_relevance=*/400,
         /*is_keyword_result=*/false, &results));
 
     // Ensure group configs are correctly parsed from the serialized proto.
@@ -650,7 +575,7 @@ TEST(SearchSuggestionParserTest, ParseSuggestionGroupInfo) {
   }
 }
 
-TEST(SearchSuggestionParserTest, ParseSuggestionEntityInfo_FromProto) {
+TEST(SearchSuggestionParserTest, ParseSuggestionEntityInfo) {
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"the m", metrics::OmniboxEventProto::NTP_REALBOX,
                           scheme_classifier);
@@ -714,10 +639,12 @@ TEST(SearchSuggestionParserTest, ParseSuggestionEntityInfo_FromProto) {
 
     absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
     ASSERT_TRUE(root_val);
+    ASSERT_TRUE(root_val.value().is_list());
 
     SearchSuggestionParser::Results results;
     ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-        *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+        root_val->GetList(), input, scheme_classifier,
+        /*default_result_relevance=*/400,
         /*is_keyword_result=*/false, &results));
 
     ASSERT_EQ(3U, results.suggest_results.size());
@@ -740,8 +667,7 @@ TEST(SearchSuggestionParserTest, ParseSuggestionEntityInfo_FromProto) {
                                second_entity_info));
   }
 
-  // If possible, fall back to individual JSON fields when attempting to parse
-  // EntityInfo data from garbled proto field.
+  // Parse EntityInfo data from garbled proto field.
   {
     std::string json_data = R"([
       "the m",
@@ -756,22 +682,10 @@ TEST(SearchSuggestionParserTest, ParseSuggestionEntityInfo_FromProto) {
         "google:suggestdetail": [
           {},
           {
-            "google:entityinfo": "<< invalid format >>",
-            "a": "2022 film",
-            "dc": "#424242",
-            "i": "https://encrypted-tbn0.gstatic.com/images?q=the+menu",
-            "q": "gs_ssp=eJzj4tVP1zc0LCwoKssryyg3YPTiKMlIVchNzSsFAGrSCGQ",
-            "t": "The Menu",
-            "zae": "/g/11qprvnvhw"
+            "google:entityinfo": "<< invalid format >>"
           },
           {
-            "google:entityinfo": "<< invalid format >>",
-            "a": "Thriller series",
-            "dc": "#283e75",
-            "i": "https://encrypted-tbn0.gstatic.com/images?q=the+midnight+club",
-            "q": "gs_ssp=eJzj4tVP1zc0zMqrNCvJNkwyYPQSLMlIVcjNTMnLTM8oUUjOKU0CALmyCz8",
-            "t": "The Midnight Club",
-            "zae": "/g/11jny6tk1b"
+            "google:entityinfo": "<< invalid format >>"
           }
         ],
         "google:suggestrelevance": [701, 700, 553],
@@ -786,10 +700,12 @@ TEST(SearchSuggestionParserTest, ParseSuggestionEntityInfo_FromProto) {
 
     absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
     ASSERT_TRUE(root_val);
+    ASSERT_TRUE(root_val.value().is_list());
 
     SearchSuggestionParser::Results results;
     ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-        *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+        root_val->GetList(), input, scheme_classifier,
+        /*default_result_relevance=*/400,
         /*is_keyword_result=*/false, &results));
 
     ASSERT_EQ(3U, results.suggest_results.size());
@@ -803,35 +719,74 @@ TEST(SearchSuggestionParserTest, ParseSuggestionEntityInfo_FromProto) {
     ASSERT_EQ(u"the menu", results.suggest_results[0].match_contents());
 
     ASSERT_EQ(u"the menu", results.suggest_results[1].suggestion());
-    ASSERT_EQ(u"2022 film", results.suggest_results[1].annotation());
-    ASSERT_EQ("#424242",
-              results.suggest_results[1].entity_info().dominant_color());
-    ASSERT_EQ(
-        "https://encrypted-tbn0.gstatic.com/"
-        "images?q=the+menu",
-        results.suggest_results[1].entity_info().image_url());
-    ASSERT_EQ(
-        "gs_ssp=eJzj4tVP1zc0LCwoKssryyg3YPTiKMlIVchNzSsFAGrSCGQ",
-        results.suggest_results[1].entity_info().suggest_search_parameters());
-    ASSERT_EQ(u"The Menu", results.suggest_results[1].match_contents());
-    ASSERT_EQ("/g/11qprvnvhw",
-              results.suggest_results[1].entity_info().entity_id());
+    ASSERT_TRUE(ProtosAreEqual(results.suggest_results[1].entity_info(),
+                               omnibox::EntityInfo::default_instance()));
 
     ASSERT_EQ(u"the midnight club", results.suggest_results[2].suggestion());
-    ASSERT_EQ(u"Thriller series", results.suggest_results[2].annotation());
-    ASSERT_EQ("#283e75",
-              results.suggest_results[2].entity_info().dominant_color());
-    ASSERT_EQ(
-        "https://encrypted-tbn0.gstatic.com/"
-        "images?q=the+midnight+club",
-        results.suggest_results[2].entity_info().image_url());
-    ASSERT_EQ(
-        "gs_ssp=eJzj4tVP1zc0zMqrNCvJNkwyYPQSLMlIVcjNTMnLTM8oUUjOKU0CALmyCz8",
-        results.suggest_results[2].entity_info().suggest_search_parameters());
-    ASSERT_EQ(u"The Midnight Club",
-              results.suggest_results[2].match_contents());
-    ASSERT_EQ("/g/11jny6tk1b",
-              results.suggest_results[2].entity_info().entity_id());
+    ASSERT_TRUE(ProtosAreEqual(results.suggest_results[2].entity_info(),
+                               omnibox::EntityInfo::default_instance()));
+  }
+}
+
+TEST(SearchSuggestionParserTest, ParseValidTypes) {
+  std::string json_data = R"([
+      "",
+      ["one", "two", "three", "four", "five"],
+      ["", "", "", "", ""],
+      [],
+      {
+        "google:clientdata": { "bpc": false, "tlw": false },
+        "google:suggestsubtypes": [[], [], [], [], []],
+        "google:suggestrelevance": [607, 606, 605, 604, 603, 602],
+        "google:suggesttype": ["QUERY", "ENTITY", "CATEGORICAL_QUERY", 1, "UNKNOWN"]
+      }])";
+  absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
+  ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
+  TestSchemeClassifier scheme_classifier;
+  AutocompleteInput input(u"", metrics::OmniboxEventProto::NTP_REALBOX,
+                          scheme_classifier);
+  SearchSuggestionParser::Results results;
+  ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
+      /*is_keyword_result=*/false, &results));
+
+  ASSERT_EQ(5u, results.suggest_results.size());
+  {
+    const auto& suggestion_result = results.suggest_results[0];
+    ASSERT_EQ(u"one", suggestion_result.suggestion());
+    ASSERT_EQ(AutocompleteMatchType::SEARCH_SUGGEST, suggestion_result.type());
+    ASSERT_EQ(omnibox::TYPE_QUERY, suggestion_result.suggest_type());
+  }
+  {
+    const auto& suggestion_result = results.suggest_results[1];
+    ASSERT_EQ(u"two", suggestion_result.suggestion());
+    ASSERT_EQ(AutocompleteMatchType::SEARCH_SUGGEST_ENTITY,
+              suggestion_result.type());
+    ASSERT_EQ(omnibox::TYPE_ENTITY, suggestion_result.suggest_type());
+  }
+  {
+    const auto& suggestion_result = results.suggest_results[2];
+    ASSERT_EQ(u"three", suggestion_result.suggestion());
+    ASSERT_EQ(base::FeatureList::IsEnabled(omnibox::kCategoricalSuggestions)
+                  ? AutocompleteMatchType::SEARCH_SUGGEST_ENTITY
+                  : AutocompleteMatchType::SEARCH_SUGGEST,
+              suggestion_result.type());
+    ASSERT_EQ(omnibox::TYPE_CATEGORICAL_QUERY,
+              suggestion_result.suggest_type());
+  }
+  {
+    const auto& suggestion_result = results.suggest_results[3];
+    ASSERT_EQ(u"four", suggestion_result.suggestion());
+    ASSERT_EQ(AutocompleteMatchType::SEARCH_SUGGEST, suggestion_result.type());
+    ASSERT_EQ(omnibox::TYPE_QUERY, suggestion_result.suggest_type());
+  }
+  {
+    const auto& suggestion_result = results.suggest_results[4];
+    ASSERT_EQ(u"five", suggestion_result.suggestion());
+    ASSERT_EQ(AutocompleteMatchType::SEARCH_SUGGEST, suggestion_result.type());
+    ASSERT_EQ(omnibox::TYPE_QUERY, suggestion_result.suggest_type());
   }
 }
 
@@ -849,12 +804,14 @@ TEST(SearchSuggestionParserTest, ParseValidSubtypes) {
       }])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"", metrics::OmniboxEventProto::NTP_REALBOX,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
 
   {
@@ -894,12 +851,14 @@ TEST(SearchSuggestionParserTest, IgnoresExcessiveSubtypeEntries) {
       }])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"", metrics::OmniboxEventProto::NTP_REALBOX,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
 
   ASSERT_THAT(results.suggest_results[0].subtypes(), testing::ElementsAre(1));
@@ -921,12 +880,14 @@ TEST(SearchSuggestionParserTest, IgnoresMissingSubtypeEntries) {
       }])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"", metrics::OmniboxEventProto::NTP_REALBOX,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
 
   ASSERT_THAT(results.suggest_results[0].subtypes(),
@@ -950,12 +911,14 @@ TEST(SearchSuggestionParserTest, IgnoresUnexpectedSubtypeValues) {
       }])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"", metrics::OmniboxEventProto::NTP_REALBOX,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
 
   ASSERT_THAT(results.suggest_results[0].subtypes(), testing::ElementsAre(1));
@@ -980,12 +943,14 @@ TEST(SearchSuggestionParserTest, IgnoresSubtypesIfNotAList) {
       }])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"", metrics::OmniboxEventProto::NTP_REALBOX,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
 
   ASSERT_TRUE(results.suggest_results[0].subtypes().empty());
@@ -1007,12 +972,14 @@ TEST(SearchSuggestionParserTest, SubtypesWithEmptyArraysAreValid) {
       }])";
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"", metrics::OmniboxEventProto::NTP_REALBOX,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
 
   ASSERT_TRUE(results.suggest_results[0].subtypes().empty());
@@ -1032,12 +999,14 @@ TEST(SearchSuggestionParserTest, FuzzTestCaseFailsGracefully) {
 
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"", metrics::OmniboxEventProto::NTP_REALBOX,
                           scheme_classifier);
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
 }
 
@@ -1064,12 +1033,14 @@ TEST(SearchSuggestionParserTest, BadAnswersFailGracefully) {
   for (std::string json_data : cases) {
     absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
     ASSERT_TRUE(root_val);
+    ASSERT_TRUE(root_val.value().is_list());
     TestSchemeClassifier scheme_classifier;
     AutocompleteInput input(u"", metrics::OmniboxEventProto::NTP_REALBOX,
                             scheme_classifier);
     SearchSuggestionParser::Results results;
     ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-        *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+        root_val->GetList(), input, scheme_classifier,
+        /*default_result_relevance=*/400,
         /*is_keyword_result=*/false, &results));
   }
 }
@@ -1078,6 +1049,15 @@ TEST(SearchSuggestionParserTest, ParseCalculatorSuggestion) {
   TestSchemeClassifier scheme_classifier;
   AutocompleteInput input(u"1 + 1", metrics::OmniboxEventProto::NTP_REALBOX,
                           scheme_classifier);
+
+  omnibox::EntityInfo entity_info;
+  entity_info.set_annotation("Song");
+  entity_info.set_dominant_color("#424242");
+  entity_info.set_image_url("https://encrypted-tbn0.gstatic.com/images?q=song");
+  entity_info.set_suggest_search_parameters(
+      "gs_ssp=eJzj4tFP1zcsNjAzMykwKDZg9GI1VNBWMAQAOlEEsA");
+  entity_info.set_name("1+1");
+  entity_info.set_entity_id("/g/1s0664p0s");
 
   const std::string json_data = R"([
     "1 + 1",
@@ -1097,12 +1077,9 @@ TEST(SearchSuggestionParserTest, ParseCalculatorSuggestion) {
         {},
         {},
         {
-          "a": "Song",
-          "dc": "#424242",
-          "i": "https://encrypted-tbn0.gstatic.com/images?q=song",
-          "q": "gs_ssp=eJzj4tFP1zcsNjAzMykwKDZg9GI1VNBWMAQAOlEEsA",
-          "t": "1+1",
-          "zae": "/g/1s0664p0s"
+          "google:entityinfo": ")" +
+                                SerializeAndEncodeEntityInfo(entity_info) +
+                                R"("
         }
       ],
       "google:suggestrelevance": [1300, 1252, 1250],
@@ -1122,10 +1099,12 @@ TEST(SearchSuggestionParserTest, ParseCalculatorSuggestion) {
 
   absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
   ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
 
   SearchSuggestionParser::Results results;
   ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
-      *root_val, input, scheme_classifier, /*default_result_relevance=*/400,
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
       /*is_keyword_result=*/false, &results));
 
   ASSERT_EQ(3U, results.suggest_results.size());
@@ -1141,10 +1120,10 @@ TEST(SearchSuggestionParserTest, ParseCalculatorSuggestion) {
   // |match_contents|, and |annotation| fields.
 #if !BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_ANDROID)
   ASSERT_EQ(u"2", results.suggest_results[1].suggestion());
-  ASSERT_EQ(u"2", results.suggest_results[1].annotation());
+  ASSERT_EQ(u"", results.suggest_results[1].annotation());
   ASSERT_TRUE(ProtosAreEqual(results.suggest_results[1].entity_info(),
                              omnibox::EntityInfo::default_instance()));
-  ASSERT_EQ(u"1 + 1", results.suggest_results[1].match_contents());
+  ASSERT_EQ(u"1 + 1 = 2", results.suggest_results[1].match_contents());
 #else
   ASSERT_EQ(u"2", results.suggest_results[1].suggestion());
   ASSERT_EQ(u"", results.suggest_results[1].annotation());
@@ -1166,4 +1145,62 @@ TEST(SearchSuggestionParserTest, ParseCalculatorSuggestion) {
   ASSERT_EQ(u"1+1", results.suggest_results[2].match_contents());
   ASSERT_EQ("/g/1s0664p0s",
             results.suggest_results[2].entity_info().entity_id());
+}
+
+TEST(SearchSuggestionParserTest, ParseTailSuggestion) {
+  TestSchemeClassifier scheme_classifier;
+  AutocompleteInput input(u"hobbit hole for sale in ",
+                          metrics::OmniboxEventProto::NTP_REALBOX,
+                          scheme_classifier);
+
+  const std::string json_data = R"([
+    "hobbit hole for sale in ",
+    [
+      "hobbit hole for sale in california"
+    ],
+    [
+      ""
+    ],
+    [],
+    {
+      "google:clientdata": {
+        "bpc": false,
+        "tlw": false
+      },
+      "google:suggestdetail": [
+        {
+          "mp": "… ",
+          "t": "in california"
+        }
+      ],
+      "google:suggestrelevance": [
+        601
+      ],
+      "google:suggestsubtypes": [
+        [
+          160
+        ]
+      ],
+      "google:suggesttype": [
+        "TAIL"
+      ],
+      "google:verbatimrelevance": 851
+    }
+  ])";
+
+  absl::optional<base::Value> root_val = base::JSONReader::Read(json_data);
+  ASSERT_TRUE(root_val);
+  ASSERT_TRUE(root_val.value().is_list());
+
+  SearchSuggestionParser::Results results;
+  ASSERT_TRUE(SearchSuggestionParser::ParseSuggestResults(
+      root_val->GetList(), input, scheme_classifier,
+      /*default_result_relevance=*/400,
+      /*is_keyword_result=*/false, &results));
+
+  ASSERT_EQ(1U, results.suggest_results.size());
+  ASSERT_EQ(u"hobbit hole for sale in california",
+            results.suggest_results[0].suggestion());
+  ASSERT_EQ(u"in california", results.suggest_results[0].match_contents());
+  ASSERT_EQ(u"… ", results.suggest_results[0].match_contents_prefix());
 }

@@ -7,10 +7,10 @@
 #include <utility>
 
 #include "base/memory/ptr_util.h"
+#include "cc/slim/delayed_scheduler.h"
 #include "cc/slim/features.h"
 #include "cc/slim/frame_sink_cc_wrapper.h"
 #include "cc/slim/frame_sink_impl.h"
-#include "cc/slim/simple_scheduler.h"
 
 namespace cc::slim {
 
@@ -20,7 +20,7 @@ std::unique_ptr<FrameSink> FrameSink::Create(
         compositor_frame_sink_associated_remote,
     mojo::PendingReceiver<viz::mojom::CompositorFrameSinkClient>
         client_receiver,
-    scoped_refptr<viz::ContextProvider> context_provider,
+    scoped_refptr<viz::RasterContextProvider> context_provider,
     scoped_refptr<base::SingleThreadTaskRunner> task_runner,
     // Parameters below only used when wrapping cc.
     gpu::GpuMemoryBufferManager* gpu_memory_buffer_manager,
@@ -36,7 +36,7 @@ std::unique_ptr<FrameSink> FrameSink::Create(
       new FrameSinkImpl(std::move(task_runner),
                         std::move(compositor_frame_sink_associated_remote),
                         std::move(client_receiver), std::move(context_provider),
-                        io_thread_id, std::make_unique<SimpleScheduler>()));
+                        io_thread_id, std::make_unique<DelayedScheduler>()));
 }
 
 }  // namespace cc::slim

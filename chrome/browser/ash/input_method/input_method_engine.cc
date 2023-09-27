@@ -8,7 +8,10 @@
 #include <memory>
 #include <utility>
 
+#include "ash/constants/ash_pref_names.h"
+#include "ash/constants/notifier_catalogs.h"
 #include "ash/keyboard/ui/keyboard_ui_controller.h"
+#include "ash/system/tray/system_nudge_controller.h"
 #include "base/check.h"
 #include "base/i18n/char_iterator.h"
 #include "base/logging.h"
@@ -117,15 +120,28 @@ void InputMethodEngine::Initialize(
     profile_observation_.Observe(profile);
     input_method_settings_snapshot_ =
         profile->GetPrefs()
-            ->GetDict(prefs::kLanguageInputMethodSpecificSettings)
+            ->GetDict(::prefs::kLanguageInputMethodSpecificSettings)
             .Clone();
 
     pref_change_registrar_ = std::make_unique<PrefChangeRegistrar>();
     pref_change_registrar_->Init(profile->GetPrefs());
     pref_change_registrar_->Add(
-        prefs::kLanguageInputMethodSpecificSettings,
+        ::prefs::kLanguageInputMethodSpecificSettings,
         base::BindRepeating(&InputMethodEngine::OnInputMethodOptionsChanged,
                             base::Unretained(this)));
+    pref_change_registrar_->Add(
+        ash::prefs::kLongPressDiacriticsEnabled,
+        base::BindRepeating(&InputMethodEngine::DiacriticsSettingsChanged,
+                            base::Unretained(this)));
+  }
+}
+
+void InputMethodEngine::DiacriticsSettingsChanged() {
+  const bool new_value =
+      profile_->GetPrefs()->GetBoolean(ash::prefs::kLongPressDiacriticsEnabled);
+  if (!new_value) {
+    SystemNudgeController::MaybeRecordNudgeAction(
+        NudgeCatalogName::kDisableDiacritics);
   }
 }
 
@@ -199,6 +215,28 @@ bool InputMethodEngine::DeleteSurroundingText(int context_id,
   }
 
   return true;
+}
+
+base::expected<void, InputMethodEngine::Error>
+InputMethodEngine::ReplaceSurroundingText(
+    int context_id,
+    int length_before_selection,
+    int length_after_selection,
+    const base::StringPiece16 replacement_text) {
+  if (!IsActive()) {
+    return base::unexpected(Error::kInputMethodNotActive);
+  }
+  if (context_id != context_id_ || context_id_ == -1) {
+    return base::unexpected(Error::kIncorrectContextId);
+  }
+
+  if (TextInputTarget* input_context =
+          IMEBridge::Get()->GetInputContextHandler()) {
+    input_context->ReplaceSurroundingText(
+        length_before_selection, length_after_selection, replacement_text);
+  }
+
+  return base::ok();
 }
 
 bool InputMethodEngine::FinishComposingText(int context_id,
@@ -698,6 +736,7 @@ bool InputMethodEngine::AcceptSuggestionCandidate(
     int context_id,
     const std::u16string& suggestion,
     size_t delete_previous_utf16_len,
+    bool use_replace_surrounding_text,
     std::string* error) {
   if (!IsActive()) {
     *error = kErrorNotActive;
@@ -708,12 +747,34 @@ bool InputMethodEngine::AcceptSuggestionCandidate(
     return false;
   }
 
-  if (delete_previous_utf16_len) {
-    DeleteSurroundingText(context_id_, -delete_previous_utf16_len,
-                          delete_previous_utf16_len, error);
-  }
+  if (use_replace_surrounding_text) {
+    if (delete_previous_utf16_len) {
+      if (base::expected<void, Error> result = ReplaceSurroundingText(
+              context_id_, delete_previous_utf16_len, 0, suggestion);
+          !result.has_value()) {
+        switch (result.error()) {
+          case Error::kInputMethodNotActive:
+            *error = kErrorNotActive;
+            return false;
+          case Error::kIncorrectContextId:
+            *error = base::StringPrintf(
+                "%s request context id = %d, current context id = %d",
+                kErrorWrongContext, context_id, context_id_);
+            return false;
+        }
+      }
+    } else {
+      CommitText(context_id, suggestion, error);
+    }
+  } else {
+    if (delete_previous_utf16_len) {
+      DeleteSurroundingText(context_id_,
+                            -static_cast<int>(delete_previous_utf16_len),
+                            delete_previous_utf16_len, error);
+    }
 
-  CommitText(context_id, suggestion, error);
+    CommitText(context_id, suggestion, error);
+  }
 
   IMEAssistiveWindowHandlerInterface* aw_handler =
       IMEBridge::Get()->GetAssistiveWindowHandler();
@@ -922,8 +983,8 @@ bool InputMethodEngine::AcceptSuggestion(int context_id, std::string* error) {
     }
     size_t confirmed_length = aw_handler->GetConfirmedLength();
     if (confirmed_length > 0) {
-      DeleteSurroundingText(context_id_, -confirmed_length, confirmed_length,
-                            error);
+      DeleteSurroundingText(context_id_, -static_cast<int>(confirmed_length),
+                            confirmed_length, error);
     }
     CommitText(context_id_, suggestion_text, error);
     aw_handler->HideSuggestion();
@@ -998,7 +1059,7 @@ void InputMethodEngine::HideInputView() {
 
 void InputMethodEngine::OnInputMethodOptionsChanged() {
   const base::Value::Dict& new_settings = profile_->GetPrefs()->GetDict(
-      prefs::kLanguageInputMethodSpecificSettings);
+      ::prefs::kLanguageInputMethodSpecificSettings);
   const base::Value::Dict& old_settings = input_method_settings_snapshot_;
   for (const auto&& [path, value] : new_settings) {
     if (const base::Value* old_value = old_settings.Find(path)) {

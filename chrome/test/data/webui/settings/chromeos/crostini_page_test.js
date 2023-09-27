@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {CrostiniBrowserProxyImpl, GuestOsBrowserProxyImpl} from 'chrome://os-settings/chromeos/lazy_load.js';
-import {Router, routes} from 'chrome://os-settings/chromeos/os_settings.js';
+import {CrostiniBrowserProxyImpl, GuestOsBrowserProxyImpl} from 'chrome://os-settings/lazy_load.js';
+import {Router, routes} from 'chrome://os-settings/os_settings.js';
 import {webUIListenerCallback} from 'chrome://resources/ash/common/cr.m.js';
 import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
 import {getDeepActiveElement} from 'chrome://resources/ash/common/util.js';
 import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {flushTasks, waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
 import {eventToPromise, isVisible} from 'chrome://webui-test/test_util.js';
 
-import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
-
+import {TestGuestOsBrowserProxy} from './guest_os/test_guest_os_browser_proxy.js';
 import {TestCrostiniBrowserProxy} from './test_crostini_browser_proxy.js';
-import {TestGuestOsBrowserProxy} from './test_guest_os_browser_proxy.js';
 
 /** @type {?SettingsCrostiniPageElement} */
 let crostiniPage = null;
@@ -63,10 +62,16 @@ function setCrostiniPrefs(enabled, optional = {}) {
     forwardedPorts = [],
     micAllowed = false,
     arcEnabled = false,
+    bruschettaInstalled = false,
   } = optional;
   crostiniPage.prefs = {
     arc: {
       enabled: {value: arcEnabled},
+    },
+    bruschetta: {
+      installed: {
+        value: bruschettaInstalled,
+      },
     },
     crostini: {
       enabled: {value: enabled},
@@ -96,14 +101,16 @@ function selectContainerByIndex(select, index) {
 
 suite('CrostiniPageTests', function() {
   setup(function() {
+    loadTimeData.overrideValues({
+      isCrostiniAllowed: true,
+      isCrostiniSupported: true,
+    });
     crostiniBrowserProxy = new TestCrostiniBrowserProxy();
     CrostiniBrowserProxyImpl.setInstanceForTesting(crostiniBrowserProxy);
     guestOsBrowserProxy = new TestGuestOsBrowserProxy();
     GuestOsBrowserProxyImpl.setInstanceForTesting(guestOsBrowserProxy);
     PolymerTest.clearBody();
     crostiniPage = document.createElement('settings-crostini-page');
-    crostiniPage.showCrostini = true;
-    crostiniPage.allowCrostini = true;
     document.body.appendChild(crostiniPage);
     testing.Test.disableAnimationsAndTransitions();
   });
@@ -162,74 +169,6 @@ suite('CrostiniPageTests', function() {
     });
   });
 
-  suite('MainPage', function() {
-    setup(function() {
-      setCrostiniPrefs(false);
-    });
-
-    test('NotSupported', function() {
-      crostiniPage.showCrostini = false;
-      crostiniPage.allowCrostini = false;
-      flush();
-      assertTrue(!!crostiniPage.shadowRoot.querySelector('#enable'));
-      assertFalse(
-          !!crostiniPage.shadowRoot.querySelector('cr-policy-indicator'));
-    });
-
-    test('NotAllowed', function() {
-      crostiniPage.showCrostini = true;
-      crostiniPage.allowCrostini = false;
-      flush();
-      assertTrue(!!crostiniPage.shadowRoot.querySelector('#enable'));
-      assertTrue(
-          !!crostiniPage.shadowRoot.querySelector('cr-policy-indicator'));
-    });
-
-    test('Enable', function() {
-      const button = crostiniPage.shadowRoot.querySelector('#enable');
-      assertTrue(!!button);
-      assertFalse(!!crostiniPage.shadowRoot.querySelector('.subpage-arrow'));
-      assertFalse(button.disabled);
-
-      button.click();
-      flush();
-      assertEquals(
-          1, crostiniBrowserProxy.getCallCount('requestCrostiniInstallerView'));
-      setCrostiniPrefs(true);
-
-      assertTrue(!!crostiniPage.shadowRoot.querySelector('.subpage-arrow'));
-    });
-
-    test('ButtonDisabledDuringInstall', async function() {
-      const button = crostiniPage.shadowRoot.querySelector('#enable');
-      assertTrue(!!button);
-
-      await flushTasks();
-      assertFalse(button.disabled);
-      webUIListenerCallback('crostini-installer-status-changed', true);
-
-      await flushTasks();
-      assertTrue(button.disabled);
-      webUIListenerCallback('crostini-installer-status-changed', false);
-
-      await flushTasks();
-      assertFalse(button.disabled);
-    });
-
-    test('Deep link to setup Crostini', async () => {
-      const params = new URLSearchParams();
-      params.append('settingId', '800');
-      Router.getInstance().navigateTo(
-          routes.CROSTINI, params);
-
-      const deepLinkElement = crostiniPage.shadowRoot.querySelector('#enable');
-      await waitAfterNextRender(deepLinkElement);
-      assertEquals(
-          deepLinkElement, getDeepActiveElement(),
-          'Enable Crostini button should be focused for settingId=800.');
-    });
-  });
-
   suite('SubPageDetails', function() {
     /** @type {?SettingsCrostiniSubPageElement} */
     let subpage;
@@ -246,7 +185,9 @@ suite('CrostiniPageTests', function() {
       });
 
       Router.getInstance().navigateTo(routes.CROSTINI);
-      crostiniPage.shadowRoot.querySelector('#crostini').click();
+      const crostiniSettingsCard =
+          crostiniPage.shadowRoot.querySelector('crostini-settings-card');
+      crostiniSettingsCard.shadowRoot.querySelector('#crostini').click();
 
       await flushTasks();
       subpage =
@@ -257,28 +198,29 @@ suite('CrostiniPageTests', function() {
     suite('SubPageDefault', function() {
       test('Basic', function() {
         assertTrue(
-            !!subpage.shadowRoot.querySelector('#crostini-shared-paths'));
+            !!subpage.shadowRoot.querySelector('#crostiniSharedPathsRow'));
         assertTrue(
-            !!subpage.shadowRoot.querySelector('#crostini-shared-usb-devices'));
+            !!subpage.shadowRoot.querySelector('#crostiniSharedUsbDevicesRow'));
         assertTrue(
-            !!subpage.shadowRoot.querySelector('#crostini-export-import'));
+            !!subpage.shadowRoot.querySelector('#crostiniExportImportRow'));
         assertTrue(
-            !!subpage.shadowRoot.querySelector('#crostini-enable-arc-adb'));
+            !!subpage.shadowRoot.querySelector('#crostiniEnableArcAdbRow'));
         assertTrue(!!subpage.shadowRoot.querySelector('#remove'));
         assertTrue(!!subpage.shadowRoot.querySelector('#container-upgrade'));
         assertTrue(
-            !!subpage.shadowRoot.querySelector('#crostini-port-forwarding'));
+            !!subpage.shadowRoot.querySelector('#crostiniPortForwardingRow'));
         assertTrue(!!subpage.shadowRoot.querySelector(
             '#crostini-mic-permission-toggle'));
-        assertTrue(!!subpage.shadowRoot.querySelector('#crostini-disk-resize'));
         assertTrue(
-            !!subpage.shadowRoot.querySelector('#crostini-extra-containers'));
+            !!subpage.shadowRoot.querySelector('#crostiniDiskResizeRow'));
+        assertTrue(
+            !!subpage.shadowRoot.querySelector('#crostiniExtraContainersRow'));
       });
 
       test('SharedPaths', async function() {
         assertTrue(
-            !!subpage.shadowRoot.querySelector('#crostini-shared-paths'));
-        subpage.shadowRoot.querySelector('#crostini-shared-paths').click();
+            !!subpage.shadowRoot.querySelector('#crostiniSharedPathsRow'));
+        subpage.shadowRoot.querySelector('#crostiniSharedPathsRow').click();
 
         await flushTasks();
         subpage = crostiniPage.shadowRoot.querySelector(
@@ -418,13 +360,18 @@ suite('CrostiniPageTests', function() {
       test('Remove', async function() {
         assertTrue(!!subpage.shadowRoot.querySelector('#remove cr-button'));
         subpage.shadowRoot.querySelector('#remove cr-button').click();
+
         assertEquals(
             1, crostiniBrowserProxy.getCallCount('requestRemoveCrostini'));
         setCrostiniPrefs(false);
 
-        await eventToPromise('popstate', window);
+        await flushTasks();
         assertEquals(Router.getInstance().currentRoute, routes.CROSTINI);
-        assertTrue(!!crostiniPage.shadowRoot.querySelector('#enable'));
+
+        const crostiniSettingsCard =
+            crostiniPage.shadowRoot.querySelector('crostini-settings-card');
+        assertTrue(!!crostiniSettingsCard.shadowRoot.querySelector(
+            '#enableCrostiniButton'));
       });
 
       test('RemoveHidden', async function() {
@@ -1293,6 +1240,100 @@ suite('CrostiniPageTests', function() {
         assertFalse(!!subpage.shadowRoot.querySelector(
             'settings-crostini-disk-resize-dialog'));
       });
+    });
+  });
+
+  suite('BruschettaSubpage', function() {
+    /** @type {?BruschettaSubpageElement} */
+    let subpage;
+
+    setup(async function() {
+      Router.getInstance().navigateTo(routes.CROSTINI);
+      setCrostiniPrefs(false, {bruschettaInstalled: true});
+      flush();
+
+      const crostiniSettingsCard =
+          crostiniPage.shadowRoot.querySelector('crostini-settings-card');
+      crostiniSettingsCard.set('showBruschetta_', true);
+      await flushTasks();
+      crostiniSettingsCard.shadowRoot.querySelector('#bruschetta').click();
+
+      await flushTasks();
+      subpage =
+          crostiniPage.shadowRoot.querySelector('settings-bruschetta-subpage');
+      assertTrue(!!subpage);
+    });
+
+    test('Navigate to shared USB devices', async function() {
+      const link =
+          subpage.shadowRoot.querySelector('#bruschettaSharedUsbDevicesRow');
+      assertTrue(!!link);
+      link.click();
+      flush();
+
+      assertEquals(
+          routes.BRUSCHETTA_SHARED_USB_DEVICES,
+          Router.getInstance().currentRoute);
+
+      assertTrue(!!crostiniPage.shadowRoot.querySelector(
+          'settings-guest-os-shared-usb-devices[guest-os-type="bruschetta"]'));
+      // Functionality is tested in guest_os_shared_usb_devices_test.js
+
+      // Navigate back
+      const popStateEventPromise = eventToPromise('popstate', window);
+      Router.getInstance().navigateToPreviousRoute();
+      await popStateEventPromise;
+      await waitAfterNextRender(subpage);
+
+      assertEquals(
+          link, subpage.shadowRoot.activeElement, `${link} should be focused.`);
+    });
+
+    test('Navigate to shared paths', async function() {
+      const link =
+          subpage.shadowRoot.querySelector('#bruschettaSharedPathsRow');
+      assertTrue(!!link);
+      link.click();
+      flush();
+
+      assertEquals(
+          routes.BRUSCHETTA_SHARED_PATHS, Router.getInstance().currentRoute);
+
+      assertTrue(!!crostiniPage.shadowRoot.querySelector(
+          'settings-guest-os-shared-paths[guest-os-type="bruschetta"]'));
+      // Functionality is tested in guest_os_shared_paths_test.js
+
+      // Navigate back
+      const popStateEventPromise = eventToPromise('popstate', window);
+      Router.getInstance().navigateToPreviousRoute();
+      await popStateEventPromise;
+      await waitAfterNextRender(subpage);
+
+      assertEquals(
+          link, subpage.shadowRoot.activeElement, `${link} should be focused.`);
+    });
+
+    test('Remove bruschetta', async function() {
+      const button = subpage.shadowRoot.querySelector('#remove cr-button');
+      assertTrue(!!button);
+      assertFalse(!!button.disabled);
+      button.click();
+      flush();
+
+      assertEquals(
+          1,
+          crostiniBrowserProxy.getCallCount(
+              'requestBruschettaUninstallerView'));
+      setCrostiniPrefs(false, {bruschettaInstalled: false});
+
+      await eventToPromise('popstate', window);
+
+      assertEquals(Router.getInstance().currentRoute, routes.CROSTINI);
+
+      const crostiniSettingsCard =
+          crostiniPage.shadowRoot.querySelector('crostini-settings-card');
+      assertTrue(!!crostiniSettingsCard.shadowRoot.querySelector(
+          '#enableBruschettaButton'));
     });
   });
 

@@ -5,11 +5,11 @@
 package org.chromium.chrome.browser.omnibox;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -20,10 +20,10 @@ import org.junit.runner.RunWith;
 
 import org.chromium.base.test.UiThreadTest;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.test.ChromeBrowserTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.R;
 import org.chromium.components.omnibox.OmniboxUrlEmphasizer;
 import org.chromium.components.omnibox.OmniboxUrlEmphasizer.UrlEmphasisColorSpan;
 import org.chromium.components.omnibox.OmniboxUrlEmphasizer.UrlEmphasisSecurityErrorSpan;

@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -21,8 +21,11 @@
 #include "ash/system/holding_space/test_holding_space_item_views_section.h"
 #include "ash/system/holding_space/test_holding_space_tray_child_bubble.h"
 #include "base/files/file_path.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/compositor/layer.h"
 #include "ui/views/widget/unique_widget_ptr.h"
 
@@ -72,7 +75,8 @@ class HoldingSpaceTrayChildBubbleTestBase : public HoldingSpaceAshTestBase {
 
   views::UniqueWidgetPtr widget_;
   std::unique_ptr<HoldingSpaceViewDelegate> view_delegate_;
-  HoldingSpaceTrayChildBubble* child_bubble_ = nullptr;
+  raw_ptr<HoldingSpaceTrayChildBubble, DanglingUntriaged | ExperimentalAsh>
+      child_bubble_ = nullptr;
 };
 
 // HoldingSpaceTrayChildBubblePlaceholderTest ----------------------------------
@@ -141,8 +145,9 @@ class HoldingSpaceTrayChildBubblePlaceholderTest
   }
 
   // Owned by view hierarchy.
-  views::View* placeholder_ = nullptr;
-  views::View* section_ = nullptr;
+  raw_ptr<views::View, DanglingUntriaged | ExperimentalAsh> placeholder_ =
+      nullptr;
+  raw_ptr<views::View, DanglingUntriaged | ExperimentalAsh> section_ = nullptr;
 };
 
 INSTANTIATE_TEST_SUITE_P(All,
@@ -220,9 +225,15 @@ TEST_P(HoldingSpaceTrayChildBubbleRefreshTest, HasExpectedBubbleTreatment) {
     // Background.
     auto* background = child_bubble()->GetBackground();
     ASSERT_TRUE(background);
-    EXPECT_EQ(
-        background->get_color(),
-        child_bubble()->GetColorProvider()->GetColor(kColorAshShieldAndBase80));
+    if (chromeos::features::IsJellyEnabled()) {
+      EXPECT_EQ(background->get_color(),
+                child_bubble()->GetColorProvider()->GetColor(
+                    cros_tokens::kCrosSysSystemBaseElevated));
+    } else {
+      EXPECT_EQ(background->get_color(),
+                child_bubble()->GetColorProvider()->GetColor(
+                    kColorAshShieldAndBase80));
+    }
     EXPECT_EQ(layer->background_blur(), ColorProvider::kBackgroundBlurSigma);
 
     // Border.

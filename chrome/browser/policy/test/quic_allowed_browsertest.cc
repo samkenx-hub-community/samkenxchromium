@@ -23,8 +23,8 @@
 #include "components/policy/core/common/policy_map.h"
 #include "components/policy/policy_constants.h"
 #include "content/public/browser/network_service_instance.h"
+#include "content/public/browser/network_service_util.h"
 #include "content/public/browser/storage_partition.h"
-#include "content/public/common/network_service_util.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/content_mock_cert_verifier.h"
@@ -350,7 +350,7 @@ class QuicAllowedPolicyDynamicTest : public QuicTestBase {
         profile_manager->GenerateNextProfileDirectoryPath();
     // Create an additional profile.
     profile_2_ =
-        profiles::testing::CreateProfileSync(profile_manager, path_profile);
+        &profiles::testing::CreateProfileSync(profile_manager, path_profile);
 
     // Make sure second profile creation does what we think it does.
     EXPECT_TRUE(profile_1() != profile_2());

@@ -13,6 +13,7 @@
 #include "ash/system/accessibility/floating_menu_utils.h"
 #include "ash/system/accessibility/select_to_speak/select_to_speak_constants.h"
 #include "ash/system/accessibility/select_to_speak/select_to_speak_speed_view.h"
+#include "ash/system/tray/actionable_view.h"
 #include "ash/system/tray/tray_background_view.h"
 #include "ash/system/tray/tray_constants.h"
 #include "ash/system/unified/unified_system_tray_view.h"
@@ -57,20 +58,15 @@ void SelectToSpeakSpeedBubbleController::Show(views::View* anchor_view,
     init_params.translucent = true;
     init_params.close_on_deactivate = false;
     init_params.preferred_width = kPreferredWidth;
+    init_params.type = TrayBubbleView::TrayBubbleType::kAccessibilityBubble;
+
     bubble_view_ = new TrayBubbleView(init_params);
     bubble_view_->SetArrow(views::BubbleBorder::BOTTOM_RIGHT);
     bubble_view_->SetCanActivate(true);
     bubble_view_->SetFocusBehavior(ActionableView::FocusBehavior::ALWAYS);
 
     speed_view_ = new SelectToSpeakSpeedView(this, speech_rate);
-    bubble_view_->AddChildView(speed_view_);
-
-    // In dark light mode, we switch TrayBubbleView to use a textured layer
-    // instead of solid color layer, so no need to create an extra layer here.
-    if (!features::IsDarkLightModeEnabled()) {
-      speed_view_->SetPaintToLayer();
-      speed_view_->layer()->SetFillsBoundsOpaquely(false);
-    }
+    bubble_view_->AddChildView(speed_view_.get());
 
     bubble_widget_ =
         views::BubbleDialogDelegateView::CreateBubble(bubble_view_);

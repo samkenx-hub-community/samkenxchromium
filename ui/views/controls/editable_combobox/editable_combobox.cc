@@ -60,6 +60,7 @@
 #include "ui/views/layout/layout_provider.h"
 #include "ui/views/style/platform_style.h"
 #include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 #include "ui/views/vector_icons.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
@@ -89,6 +90,7 @@ class Arrow : public Button {
         ButtonController::NotifyAction::kOnPress);
 
     ConfigureComboboxButtonInkDrop(this);
+    SetAccessibilityProperties(ax::mojom::Role::kButton);
   }
   Arrow(const Arrow&) = delete;
   Arrow& operator=(const Arrow&) = delete;
@@ -106,15 +108,14 @@ class Arrow : public Button {
     arrow_bounds.ClampToCenteredSize(ComboboxArrowSize());
     // Make sure the arrow use the same color as the text in the combobox.
     PaintComboboxArrow(
-        GetColorProvider()->GetColor(style::GetColorId(
+        GetColorProvider()->GetColor(TypographyProvider::Get().GetColorId(
             style::CONTEXT_TEXTFIELD,
             GetEnabled() ? style::STYLE_PRIMARY : style::STYLE_DISABLED)),
         arrow_bounds, canvas);
   }
 
   void GetAccessibleNodeData(ui::AXNodeData* node_data) override {
-    node_data->role = ax::mojom::Role::kButton;
-    node_data->SetName(GetAccessibleName());
+    Button::GetAccessibleNodeData(node_data);
     node_data->SetHasPopup(ax::mojom::HasPopup::kMenu);
     if (GetEnabled()) {
       node_data->SetDefaultActionVerb(ax::mojom::DefaultActionVerb::kOpen);
@@ -227,14 +228,6 @@ class EditableCombobox::EditableComboboxMenuModel
     size_t index;
     bool enabled;
   };
-  bool HasIcons() const override {
-    for (size_t i = 0; i < GetItemCount(); ++i) {
-      if (!GetIconAt(i).IsEmpty()) {
-        return true;
-      }
-    }
-    return false;
-  }
 
   ItemType GetTypeAt(size_t index) const override {
     return UseCheckmarks() ? TYPE_CHECK : TYPE_COMMAND;
@@ -376,6 +369,7 @@ EditableCombobox::EditableCombobox(
   textfield_->set_controller(this);
   textfield_->SetFontList(GetFontList());
   AddChildView(textfield_.get());
+  views::FocusRing::Get(textfield_)->SetOutsetFocusRingDisabled(true);
 
   control_elements_container_ = AddChildView(std::make_unique<BoxLayoutView>());
   if (features::IsChromeRefresh2023()) {
@@ -390,6 +384,7 @@ EditableCombobox::EditableCombobox(
   }
 
   SetLayoutManager(std::make_unique<FillLayout>());
+  SetAccessibilityProperties(ax::mojom::Role::kComboBoxGrouping);
 }
 
 EditableCombobox::~EditableCombobox() {
@@ -423,7 +418,7 @@ void EditableCombobox::SetPlaceholderText(const std::u16string& text) {
 }
 
 const gfx::FontList& EditableCombobox::GetFontList() const {
-  return style::GetFont(text_context_, text_style_);
+  return TypographyProvider::Get().GetFont(text_context_, text_style_);
 }
 
 void EditableCombobox::SelectRange(const gfx::Range& range) {
@@ -435,10 +430,6 @@ void EditableCombobox::OnAccessibleNameChanged(const std::u16string& new_name) {
   if (arrow_) {
     arrow_->SetAccessibleName(new_name);
   }
-}
-
-void EditableCombobox::SetAssociatedLabel(View* labelling_view) {
-  textfield_->SetAssociatedLabel(labelling_view);
 }
 
 void EditableCombobox::SetMenuDecorationStrategy(
@@ -459,9 +450,7 @@ void EditableCombobox::Layout() {
 }
 
 void EditableCombobox::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  node_data->role = ax::mojom::Role::kComboBoxGrouping;
-
-  node_data->SetName(textfield_->GetAccessibleName());
+  View::GetAccessibleNodeData(node_data);
   node_data->SetValue(GetText());
 }
 

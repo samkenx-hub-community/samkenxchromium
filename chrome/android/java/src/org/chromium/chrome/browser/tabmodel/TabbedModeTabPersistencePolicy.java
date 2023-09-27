@@ -20,7 +20,9 @@ import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.Supplier;
 import org.chromium.base.task.AsyncTask;
 import org.chromium.base.task.BackgroundOnlyAsyncTask;
+import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskRunner;
+import org.chromium.base.task.TaskTraits;
 import org.chromium.chrome.browser.app.tabmodel.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.compositor.layouts.content.TabContentManager;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
@@ -33,6 +35,7 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -453,9 +456,18 @@ public class TabbedModeTabPersistencePolicy implements TabPersistencePolicy {
             mFilesToDeleteCallback.onResult(filesToDelete);
 
             if (mTabContentManager != null && mThumbnailFileNames != null) {
+                HashSet<Integer> checkedTabIds = new HashSet<>();
                 for (String fileName : mThumbnailFileNames) {
+                    // Handle *.jpeg.
+                    int lastDotIdx = fileName.lastIndexOf(".");
+                    if (lastDotIdx != -1) {
+                        fileName = fileName.substring(0, lastDotIdx);
+                    }
                     try {
                         int tabId = Integer.parseInt(fileName);
+                        // Avoid double removal which could be expensive.
+                        if (!checkedTabIds.add(tabId)) continue;
+
                         if (shouldDeleteTabFile(tabId, tabWindowManager)) {
                             mTabContentManager.removeTabThumbnail(tabId);
                         }
@@ -483,7 +495,17 @@ public class TabbedModeTabPersistencePolicy implements TabPersistencePolicy {
         }
     }
 
-    @VisibleForTesting
+    @Override
+    public void getAllTabIds(Callback<SparseBooleanArray> tabIdsCallback) {
+        PostTask.postTask(TaskTraits.USER_BLOCKING_MAY_BLOCK, () -> {
+            SparseBooleanArray tabIds = new SparseBooleanArray();
+            for (int i = 0; i < mMaxSelectors; ++i) {
+                getTabsFromStateFiles(tabIds, i);
+            }
+            PostTask.postTask(TaskTraits.UI_DEFAULT, () -> { tabIdsCallback.onResult(tabIds); });
+        });
+    }
+
     protected static void resetMigrationTaskForTesting() {
         sMigrationTask = null;
     }

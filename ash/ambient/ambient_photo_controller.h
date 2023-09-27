@@ -118,8 +118,6 @@ class ASH_EXPORT AmbientPhotoController : public AmbientViewDelegateObserver {
   ~AmbientPhotoController() override;
 
   // Start/stop updating the screen contents.
-  // We need different logics to update photos and weather info because they
-  // have different refreshing intervals.
   void StartScreenUpdate(
       std::unique_ptr<AmbientTopicQueue::Delegate> topic_queue_delegate);
   void StopScreenUpdate();
@@ -145,9 +143,6 @@ class ASH_EXPORT AmbientPhotoController : public AmbientViewDelegateObserver {
 
   // Initialize variables.
   void Init(std::unique_ptr<AmbientTopicQueue::Delegate> topic_queue_delegate);
-
-  // Requests that the weather controller fetch updated weather info.
-  void FetchWeather();
 
   void ScheduleFetchBackupImages();
 
@@ -205,9 +200,6 @@ class ASH_EXPORT AmbientPhotoController : public AmbientViewDelegateObserver {
   // The timer to refresh backup cache photos.
   base::OneShotTimer backup_photo_refresh_timer_;
 
-  // The timer to refresh weather information.
-  base::RepeatingTimer weather_refresh_timer_;
-
   State state_ = State::kInactive;
 
   // The index of a topic to download.
@@ -237,8 +229,8 @@ class ASH_EXPORT AmbientPhotoController : public AmbientViewDelegateObserver {
   // Backoff to resume fetch images.
   net::BackoffEntry resume_fetch_image_backoff_;
 
-  const base::raw_ptr<AmbientPhotoCache> photo_cache_;
-  const base::raw_ptr<AmbientPhotoCache> backup_photo_cache_;
+  const raw_ptr<AmbientPhotoCache> photo_cache_;
+  const raw_ptr<AmbientPhotoCache> backup_photo_cache_;
 
   scoped_refptr<base::SequencedTaskRunner> task_runner_;
 

@@ -14,7 +14,6 @@
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/permissions/constants.h"
 #include "components/permissions/permission_manager.h"
-#include "components/permissions/permission_result.h"
 #include "components/permissions/permission_uma_util.h"
 #include "components/permissions/permissions_client.h"
 #include "components/prefs/pref_service.h"
@@ -36,24 +35,25 @@ OriginStatus GetOriginStatus(Profile* profile, const GURL& origin) {
           ->GetSettingsMap(profile)
           ->GetWebsiteSetting(
               origin, GURL(),
-              ContentSettingsType::PERMISSION_AUTOREVOCATION_DATA, nullptr);
+              ContentSettingsType::PERMISSION_AUTOREVOCATION_DATA);
 
   OriginStatus status;
 
   if (!stored_value.is_dict())
     return status;
 
-  const base::Value* dict = stored_value.FindPath(kPermissionName);
+  const base::Value::Dict* dict =
+      stored_value.GetDict().FindDict(kPermissionName);
   if (!dict)
     return status;
 
-  if (dict->FindBoolPath(kExcludedKey).has_value()) {
+  if (dict->FindBool(kExcludedKey).has_value()) {
     status.is_exempt_from_future_revocations =
-        dict->FindBoolPath(kExcludedKey).value();
+        dict->FindBool(kExcludedKey).value();
   }
-  if (dict->FindBoolPath(permissions::kRevokedKey).has_value()) {
+  if (dict->FindBool(permissions::kRevokedKey).has_value()) {
     status.has_been_previously_revoked =
-        dict->FindBoolPath(permissions::kRevokedKey).value();
+        dict->FindBool(permissions::kRevokedKey).value();
   }
 
   return status;

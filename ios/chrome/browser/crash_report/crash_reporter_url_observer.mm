@@ -14,18 +14,14 @@
 #import "components/crash/core/common/crash_key.h"
 #import "components/previous_session_info/previous_session_info.h"
 #import "ios/chrome/browser/crash_report/crash_helper.h"
-#import "ios/chrome/browser/web_state_list/all_web_state_observation_forwarder.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/model/web_state_list/all_web_state_observation_forwarder.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/web/public/browser_state.h"
 #import "ios/web/public/navigation/navigation_context.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ios/web/public/web_state.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using crash_reporter::CrashKeyString;
 
@@ -61,20 +57,33 @@ const char kPreloadWebStateGroup[] = "PreloadGroup";
 - (void)removeReportParameter:(NSNumber*)key pending:(BOOL)pending {
   int index = key.intValue;
   DCHECK(index < kNumberOfURLsToSend);
-  if (pending)
+  if (pending) {
     pending_url_crash_keys[index].Clear();
-  else
+  } else {
     url_crash_keys[index].Clear();
+    if (index == 0) {
+      // Only sync (and clear) the first non-pending URL to PreviousSessionInfo.
+      [[PreviousSessionInfo sharedInstance]
+          removeReportParameterForKey:@"url0"];
+    }
+  }
 }
 - (void)setReportParameterURL:(const GURL&)URL
                        forKey:(NSNumber*)key
                       pending:(BOOL)pending {
   int index = key.intValue;
   DCHECK(index < kNumberOfURLsToSend);
-  if (pending)
+  if (pending) {
     pending_url_crash_keys[index].Set(URL.spec());
-  else
+  } else {
     url_crash_keys[index].Set(URL.spec());
+    if (index == 0) {
+      // Only sync (and clear) the first non-pending URL to PreviousSessionInfo.
+      [[PreviousSessionInfo sharedInstance]
+          setReportParameterValue:base::SysUTF8ToNSString(URL.spec())
+                           forKey:@"url0"];
+    }
+  }
 }
 @end
 
@@ -227,51 +236,59 @@ void CrashReporterURLObserver::StopObservingWebStateList(
 
 #pragma mark - WebStateListObserver
 
-void CrashReporterURLObserver::WebStateDetachedAt(WebStateList* web_state_list,
-                                                  web::WebState* web_state,
-                                                  int index) {
-  web_state_to_group_.erase(web_state);
-  if (web_state == current_web_states_[GroupForWebStateList(web_state_list)]) {
-    RemoveGroup(GroupForWebStateList(web_state_list));
-  }
-}
-
-void CrashReporterURLObserver::WebStateInsertedAt(WebStateList* web_state_list,
-                                                  web::WebState* web_state,
-                                                  int index,
-                                                  bool activating) {
-  web_state_to_group_[web_state] = GroupForWebStateList(web_state_list);
-  if (activating) {
-    RecordURLForWebState(web_state);
-  }
-}
-
-void CrashReporterURLObserver::WebStateReplacedAt(WebStateList* web_state_list,
-                                                  web::WebState* old_web_state,
-                                                  web::WebState* new_web_state,
-                                                  int index) {
-  if (old_web_state) {
-    web_state_to_group_.erase(old_web_state);
-  }
-  if (new_web_state) {
-    web_state_to_group_[new_web_state] = GroupForWebStateList(web_state_list);
-  }
-  if (web_state_list->GetActiveWebState() == new_web_state) {
-    RecordURLForWebState(new_web_state);
-  }
-}
-
-void CrashReporterURLObserver::WebStateActivatedAt(
+void CrashReporterURLObserver::WebStateListDidChange(
     WebStateList* web_state_list,
-    web::WebState* old_web_state,
-    web::WebState* new_web_state,
-    int active_index,
-    ActiveWebStateChangeReason reason) {
-  if (!new_web_state)
-    return;
-  // Update WebStateList map in case tabs were moved to another window.
-  web_state_to_group_[new_web_state] = GroupForWebStateList(web_state_list);
-  RecordURLForWebState(new_web_state);
+    const WebStateListChange& change,
+    const WebStateListStatus& status) {
+  switch (change.type()) {
+    case WebStateListChange::Type::kStatusOnly:
+      // The activation is handled after this switch statement.
+      break;
+    case WebStateListChange::Type::kDetach: {
+      const WebStateListChangeDetach& detach_change =
+          change.As<WebStateListChangeDetach>();
+      web::WebState* detached_web_state = detach_change.detached_web_state();
+      web_state_to_group_.erase(detached_web_state);
+      if (detached_web_state ==
+          current_web_states_[GroupForWebStateList(web_state_list)]) {
+        RemoveGroup(GroupForWebStateList(web_state_list));
+      }
+      break;
+    }
+    case WebStateListChange::Type::kMove:
+      // Do nothing when a WebState is moved.
+      break;
+    case WebStateListChange::Type::kReplace: {
+      const WebStateListChangeReplace& replace_change =
+          change.As<WebStateListChangeReplace>();
+      web_state_to_group_.erase(replace_change.replaced_web_state());
+      web::WebState* inserted_web_state = replace_change.inserted_web_state();
+      web_state_to_group_[inserted_web_state] =
+          GroupForWebStateList(web_state_list);
+      if (web_state_list->GetActiveWebState() == inserted_web_state) {
+        RecordURLForWebState(inserted_web_state);
+      }
+      break;
+    }
+    case WebStateListChange::Type::kInsert: {
+      const WebStateListChangeInsert& insert_change =
+          change.As<WebStateListChangeInsert>();
+      web::WebState* inserted_web_state = insert_change.inserted_web_state();
+      web_state_to_group_[inserted_web_state] =
+          GroupForWebStateList(web_state_list);
+      if (status.active_web_state_change()) {
+        RecordURLForWebState(inserted_web_state);
+      }
+      break;
+    }
+  }
+
+  if (status.active_web_state_change() && status.new_active_web_state) {
+    // Update WebStateList map in case tabs were moved to another window.
+    web_state_to_group_[status.new_active_web_state] =
+        GroupForWebStateList(web_state_list);
+    RecordURLForWebState(status.new_active_web_state);
+  }
 }
 
 #pragma mark - WebStateObserver

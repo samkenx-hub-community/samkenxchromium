@@ -14,6 +14,7 @@
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/web_app_id.h"
 #include "components/webapps/browser/install_result_code.h"
+#include "components/webapps/common/web_app_id.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 
@@ -21,20 +22,20 @@
 #include "ash/webui/system_apps/public/system_web_app_type.h"
 #endif
 
-struct WebAppInstallInfo;
-
 namespace content {
 class WebContents;
 }  // namespace content
 
 namespace web_app {
 
+struct WebAppInstallInfo;
+
 // |app_id| may be empty on failure.
 using OnceInstallCallback =
-    base::OnceCallback<void(const AppId& app_id,
+    base::OnceCallback<void(const webapps::AppId& app_id,
                             webapps::InstallResultCode code)>;
 using OnceUninstallCallback =
-    base::OnceCallback<void(const AppId& app_id, bool uninstalled)>;
+    base::OnceCallback<void(const webapps::AppId& app_id, bool uninstalled)>;
 
 // Callback used to indicate whether a user has accepted the installation of a
 // web app.
@@ -64,11 +65,6 @@ struct WebAppInstallParams {
 
   // URL to be used as start_url if manifest is unavailable.
   GURL fallback_start_url;
-
-  // Setting this field will force the webapp to have a manifest id, which
-  // will result in a different AppId than if it isn't set. Currently here
-  // to support forwards compatibility with future sync entities..
-  absl::optional<std::string> override_manifest_id;
 
   // App name to be used if manifest is unavailable.
   absl::optional<std::u16string> fallback_app_name;
@@ -111,6 +107,10 @@ struct WebAppInstallParams {
   // populated (especially for user installed or sync installed apps)
   // in which case the URL will not be written to the web_app DB.
   GURL install_url;
+
+  // If true, do not validate origin associations as part of the install even if
+  // app has valid scope_extensions.
+  bool skip_origin_association_validation = false;
 };
 
 // The different UI flows that exist for creating a web app.

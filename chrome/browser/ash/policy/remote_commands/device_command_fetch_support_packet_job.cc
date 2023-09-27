@@ -12,24 +12,36 @@
 #include <vector>
 
 #include "base/check.h"
+#include "base/check_is_test.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
+#include "base/metrics/histogram_functions.h"
+#include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_piece_forward.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/syslog_logging.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/values.h"
+#include "chrome/browser/policy/messaging_layer/proto/synced/log_upload_event.pb.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/support_tool/data_collection_module.pb.h"
 #include "chrome/browser/support_tool/data_collector.h"
 #include "chrome/browser/support_tool/support_tool_util.h"
 #include "chrome/browser/ui/webui/support_tool/support_tool_ui_utils.h"
 #include "chromeos/ash/components/login/login_state/login_state.h"
+#include "chromeos/components/kiosk/kiosk_utils.h"
 #include "components/feedback/redaction_tool/pii_types.h"
 #include "components/policy/core/common/remote_commands/remote_command_job.h"
 #include "components/policy/proto/device_management_backend.pb.h"
+#include "components/reporting/client/report_queue.h"
+#include "components/reporting/client/report_queue_configuration.h"
+#include "components/reporting/client/report_queue_factory.h"
+#include "components/reporting/proto/synced/record.pb.h"
+#include "components/reporting/util/status.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace {
@@ -45,6 +57,14 @@ constexpr char kIssueDescriptionKey[] = "issueDescription";
 constexpr char kRequestedDataCollectorsKey[] = "requestedDataCollectors";
 constexpr char kRequestedPiiTypesKey[] = "requestedPiiTypes";
 constexpr char kRequesterId[] = "requesterMetadata";
+
+// JSON keys and values used for creating the upload metadata to File Storage
+// Server (go/crosman_fss_action#scotty-upload-agent).
+constexpr char kFileTypeKey[] = "File-Type";
+constexpr char kSupportFileType[] = "support_file";
+constexpr char kCommandIdKey[] = "Command-ID";
+constexpr char kContentTypeJson[] = "application/json";
+constexpr char kFilenameKey[] = "Filename";
 
 std::set<support_tool::DataCollectorType> GetDataCollectorTypes(
     const base::Value::List& requested_data_collectors) {
@@ -72,8 +92,8 @@ redaction::PIIType GetPiiTypeFromProtoEnum(support_tool::PiiType pii_type) {
       return redaction::PIIType::kIPPAddress;
     case support_tool::PiiType::IP_ADDRESS:
       return redaction::PIIType::kIPAddress;
-    case support_tool::PiiType::LOCATION_INFO:
-      return redaction::PIIType::kLocationInfo;
+    case support_tool::PiiType::CELLULAR_LOCATION_INFO:
+      return redaction::PIIType::kCellularLocationInfo;
     case support_tool::PiiType::MAC_ADDRESS:
       return redaction::PIIType::kMACAddress;
     case support_tool::PiiType::UI_HIEARCHY_WINDOW_TITLE:
@@ -117,12 +137,33 @@ std::string ErrorsToString(const std::set<SupportToolError>& errors) {
   return base::JoinString(error_messages, ", ");
 }
 
+// Returns the upload_parameters string for LogUploadEvent. This will be used as
+// request metadata for the log upload request to the File Storage Server.
+// Contains File-Type, Command-ID and Filename fields.
+// The details of metadata format can be found in
+// go/crosman_fss_action#scotty-upload-agent.
+std::string GetUploadParameters(
+    const base::FilePath& filename,
+    policy::RemoteCommandJob::UniqueIDType command_id) {
+  auto upload_parameters_dict =
+      base::Value::Dict()
+          .Set(kFilenameKey, filename.BaseName().value())
+          .Set(kCommandIdKey, base::NumberToString(command_id))
+          .Set(kFileTypeKey, kSupportFileType);
+  std::string json;
+  base::JSONWriter::Write(upload_parameters_dict, &json);
+  return base::StringPrintf("%s\n%s", json.c_str(), kContentTypeJson);
+}
+
 }  // namespace
 
 namespace policy {
 
 const char kCommandNotEnabledForUserMessage[] =
     "FETCH_SUPPORT_PACKET command is not enabled for this user type.";
+
+const char kFetchSupportPacketFailureHistogramName[] =
+    "Enterprise.DeviceRemoteCommand.FetchSupportPacket.Failure";
 
 DeviceCommandFetchSupportPacketJob::DeviceCommandFetchSupportPacketJob()
     : target_dir_(kTargetDir) {}
@@ -149,6 +190,8 @@ void DeviceCommandFetchSupportPacketJob::LoginWaiter::WaitForLogin(
     std::move(on_user_logged_in_callback).Run();
     return;
   }
+  SYSLOG(INFO) << "Waiting for a user to login for executing "
+                  "FETCH_SUPPORT_PACKET command.";
   on_user_logged_in_callback_ = std::move(on_user_logged_in_callback);
 }
 
@@ -164,10 +207,19 @@ DeviceCommandFetchSupportPacketJob::GetType() const {
   return enterprise_management::RemoteCommand_Type_FETCH_SUPPORT_PACKET;
 }
 
+void DeviceCommandFetchSupportPacketJob::SetReportQueueForTesting(
+    std::unique_ptr<reporting::ReportQueue> report_queue) {
+  CHECK_IS_TEST();
+  report_queue_ = std::move(report_queue);
+}
+
 bool DeviceCommandFetchSupportPacketJob::ParseCommandPayload(
     const std::string& command_payload) {
   bool parse_success = ParseCommandPayloadImpl(command_payload);
   if (!parse_success) {
+    base::UmaHistogramEnumeration(
+        kFetchSupportPacketFailureHistogramName,
+        EnterpriseFetchSupportPacketFailureType::kFailedOnWrongCommandPayload);
     SYSLOG(ERROR) << "Can't parse command payload for FETCH_SUPPORT_PACKET "
                      "command. Payload is: "
                   << command_payload;
@@ -226,7 +278,7 @@ bool DeviceCommandFetchSupportPacketJob::ParseCommandPayloadImpl(
 
 // static
 bool DeviceCommandFetchSupportPacketJob::CommandEnabledForUser() {
-  return ash::LoginState::Get()->IsKioskSession();
+  return chromeos::IsKioskSession();
 }
 
 void DeviceCommandFetchSupportPacketJob::RunImpl(
@@ -251,6 +303,9 @@ void DeviceCommandFetchSupportPacketJob::OnUserLoggedIn() {
 void DeviceCommandFetchSupportPacketJob::StartJobExecution() {
   // Check if the command is enabled for the user type.
   if (!CommandEnabledForUser()) {
+    base::UmaHistogramEnumeration(kFetchSupportPacketFailureHistogramName,
+                                  EnterpriseFetchSupportPacketFailureType::
+                                      kFailedOnCommandEnabledForUserCheck);
     SYSLOG(ERROR) << kCommandNotEnabledForUserMessage;
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
@@ -304,10 +359,13 @@ void DeviceCommandFetchSupportPacketJob::OnDataExported(
                          &SupportToolError::error_code);
 
   if (export_error != errors.end()) {
-    std::string error_message = base::StringPrintf(
-        "The device couldn't export the collected data "
-        "into local storage: %s",
-        export_error->error_message.c_str());
+    base::UmaHistogramEnumeration(kFetchSupportPacketFailureHistogramName,
+                                  EnterpriseFetchSupportPacketFailureType::
+                                      kFailedOnExportingSupportPacket);
+    std::string error_message =
+        base::StrCat({"The device couldn't export the collected data "
+                      "into local storage: ",
+                      export_error->error_message});
     SYSLOG(ERROR) << error_message;
     std::move(result_callback_).Run(ResultType::kFailure, error_message);
     return;
@@ -315,7 +373,66 @@ void DeviceCommandFetchSupportPacketJob::OnDataExported(
 
   exported_path_ = exported_path;
 
-  std::move(result_callback_).Run(ResultType::kSuccess, absl::nullopt);
+  // No need to create a `report_queue_` if it is already initialized. Since the
+  // DeviceCommandFetchSupportPacketJob instance will be created per command,
+  // `report_queue_` will only be already initialized for tests by
+  // `SetReportQueueForTesting()` function.
+  if (report_queue_) {
+    EnqueueEvent();
+    return;
+  }
+
+  ::reporting::SourceInfo source_info;
+  source_info.set_source(::reporting::SourceInfo::ASH);
+  ::reporting::ReportQueueFactory::Create(
+      ::reporting::ReportQueueConfiguration::Create(
+          {.event_type = ::reporting::EventType::kDevice,
+           .destination = ::reporting::Destination::LOG_UPLOAD})
+          .SetSourceInfo(std::move(source_info)),
+      base::BindOnce(&DeviceCommandFetchSupportPacketJob::OnReportQueueCreated,
+                     weak_ptr_factory_.GetWeakPtr()));
+}
+
+void DeviceCommandFetchSupportPacketJob::OnReportQueueCreated(
+    std::unique_ptr<reporting::ReportQueue> report_queue) {
+  SYSLOG(INFO) << "ReportQueue is created for LogUploadEvent.";
+  report_queue_ = std::move(report_queue);
+  EnqueueEvent();
+}
+
+void DeviceCommandFetchSupportPacketJob::EnqueueEvent() {
+  auto log_upload_event = std::make_unique<ash::reporting::LogUploadEvent>();
+  log_upload_event->mutable_upload_settings()->set_origin_path(
+      exported_path_.value());
+  log_upload_event->mutable_upload_settings()->set_upload_parameters(
+      GetUploadParameters(exported_path_, unique_id()));
+  log_upload_event->set_command_id(unique_id());
+  report_queue_->Enqueue(
+      std::move(log_upload_event), reporting::Priority::SLOW_BATCH,
+      base::BindOnce(&DeviceCommandFetchSupportPacketJob::OnEventEnqueued,
+                     weak_ptr_factory_.GetWeakPtr()));
+}
+
+void DeviceCommandFetchSupportPacketJob::OnEventEnqueued(
+    reporting::Status status) {
+  if (status.ok()) {
+    base::UmaHistogramEnumeration(
+        kFetchSupportPacketFailureHistogramName,
+        EnterpriseFetchSupportPacketFailureType::kNoFailure);
+    SYSLOG(INFO) << "FETCH_SUPPORT_PACKET command job has successfully "
+                    "finished execution.";
+    std::move(result_callback_).Run(ResultType::kAcked, absl::nullopt);
+    return;
+  }
+
+  std::string error_message = base::StrCat(
+      {"Couldn't enqueue event to reporting queue:  ", status.error_message()});
+
+  base::UmaHistogramEnumeration(
+      kFetchSupportPacketFailureHistogramName,
+      EnterpriseFetchSupportPacketFailureType::kFailedOnEnqueueingEvent);
+  SYSLOG(ERROR) << error_message;
+  std::move(result_callback_).Run(ResultType::kFailure, error_message);
 }
 
 }  // namespace policy

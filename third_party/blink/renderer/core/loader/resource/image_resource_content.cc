@@ -114,6 +114,10 @@ ImageResourceContent* ImageResourceContent::Fetch(FetchParameters& params,
   ImageResource* resource = ImageResource::Fetch(params, fetcher);
   if (!resource)
     return nullptr;
+  resource->GetContent()->SetIsLoadedFromMemoryCache(
+      resource->IsLoadedFromMemoryCache());
+  resource->GetContent()->SetIsPreloadedWithEarlyHints(
+      resource->IsPreloadedByEarlyHints());
   return resource->GetContent();
 }
 
@@ -699,6 +703,14 @@ AtomicString ImageResourceContent::MediaType() const {
   if (!image_)
     return AtomicString();
   return AtomicString(image_->FilenameExtension());
+}
+
+base::TimeTicks ImageResourceContent::DiscoveryTime() const {
+  return discovery_time_;
+}
+
+void ImageResourceContent::SetDiscoveryTime(base::TimeTicks discovery_time) {
+  discovery_time_ = discovery_time;
 }
 
 base::TimeTicks ImageResourceContent::LoadStart() const {

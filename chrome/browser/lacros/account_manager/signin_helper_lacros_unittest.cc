@@ -18,8 +18,8 @@
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile_manager.h"
 #include "components/account_manager_core/account.h"
-#include "components/account_manager_core/account_addition_result.h"
 #include "components/account_manager_core/account_manager_facade.h"
+#include "components/account_manager_core/account_upsertion_result.h"
 #include "components/account_manager_core/mock_account_manager_facade.h"
 #include "components/signin/core/browser/account_reconcilor.h"
 #include "components/signin/core/browser/account_reconcilor_delegate.h"
@@ -209,8 +209,7 @@ class SigninHelperLacrosTest : public testing::Test {
   TestSigninClient signin_client_{&prefs_, &test_url_loader_factory_};
 
   signin::IdentityTestEnvironment identity_test_env_{
-      /*test_url_loader_factory=*/nullptr, &prefs_,
-      signin::AccountConsistencyMethod::kDisabled, &signin_client_};
+      /*test_url_loader_factory=*/nullptr, &prefs_, &signin_client_};
 
   TestAccountReconcilor reconcilor_{identity_test_env_.identity_manager(),
                                     &signin_client_, &mock_facade_};
@@ -257,10 +256,10 @@ TEST_F(SigninHelperLacrosTest, NoAccountAvailable) {
           [new_account](
               account_manager::AccountManagerFacade::AccountAdditionSource,
               base::OnceCallback<void(
-                  const account_manager::AccountAdditionResult& result)>
+                  const account_manager::AccountUpsertionResult& result)>
                   callback) {
             std::move(callback).Run(
-                account_manager::AccountAdditionResult::FromAccount(
+                account_manager::AccountUpsertionResult::FromAccount(
                     new_account));
           });
   ExpectCookieSet("Updating");
@@ -272,7 +271,8 @@ TEST_F(SigninHelperLacrosTest, NoAccountAvailable) {
   // Simmulate the mapper adding the account to the profile.
   identity_test_env()->MakeAccountAvailable(email);
 
-  EXPECT_CALL(helper_complete, Run(CoreAccountId(gaia_id))).Times(1);
+  EXPECT_CALL(helper_complete, Run(CoreAccountId::FromGaiaId(gaia_id)))
+      .Times(1);
 
   // `AccountProfileMapper` expects a call of `OnAccountUpserted()` before
   // completing the account addition.

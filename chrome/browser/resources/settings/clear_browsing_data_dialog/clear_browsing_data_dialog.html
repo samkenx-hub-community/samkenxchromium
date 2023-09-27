@@ -60,7 +60,7 @@
       }
 
       settings-checkbox {
-        --settings-row-two-line-min-height: 48px;
+        --cr-section-two-line-min-height: 48px;
       }
 
       #basic-tab settings-checkbox + settings-checkbox {
@@ -178,7 +178,7 @@
                     '$i18nPolymer{clearBrowsingHistorySummarySignedInNoLink}'
                     )]]"
                 disabled="[[clearingInProgress_]]"
-                hidden="[[isChildAccount_]]" no-set-pref>
+                no-set-pref>
             </settings-checkbox>
             <settings-checkbox id="cookiesCheckboxBasic"
                 class="cookies-checkbox"
@@ -187,7 +187,9 @@
                 sub-label="[[cookiesCheckboxLabel_(
                     shouldShowCookieException_,
                     '$i18nPolymer{clearCookiesSummary}',
-                    '$i18nPolymer{clearCookiesSummarySignedIn}')]]"
+                    '$i18nPolymer{clearCookiesSummarySignedIn}',
+                    '$i18nPolymer{clearCookiesSummarySignedInSupervisedProfile}'
+                    )]]"
                 disabled="[[clearingInProgress_]]" no-set-pref>
             </settings-checkbox>
             <settings-checkbox id="cacheCheckboxBasic"
@@ -234,14 +236,14 @@
                 label="$i18n{clearBrowsingHistory}"
                 sub-label="[[counters_.browsing_history]]"
                 disabled="[[clearingInProgress_]]"
-                hidden="[[isChildAccount_]]" no-set-pref>
+                no-set-pref>
             </settings-checkbox>
             <settings-checkbox id="downloadCheckbox"
                 pref="{{prefs.browser.clear_data.download_history}}"
                 label="$i18n{clearDownloadHistory}"
                 sub-label="[[counters_.download_history]]"
                 disabled="[[clearingInProgress_]]"
-                hidden="[[isChildAccount_]]" no-set-pref>
+                no-set-pref>
             </settings-checkbox>
             <settings-checkbox id="cookiesCheckbox"
                 class="cookies-checkbox"
@@ -289,7 +291,7 @@
         </paper-spinner-lite>
         <cr-button class="cancel-button" autofocus
             disabled="[[clearingInProgress_]]"
-            on-click="onCancelTap_">$i18n{cancel}</cr-button>
+            on-click="onCancelClick_">$i18n{cancel}</cr-button>
         <cr-button id="clearBrowsingDataConfirm"
             class="action-button" on-click="clearBrowsingData_"
             disabled="[[isClearButtonDisabled_(clearingInProgress_,

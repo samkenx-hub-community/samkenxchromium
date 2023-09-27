@@ -5,6 +5,7 @@
 package org.chromium.chrome.browser.identity_disc;
 
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 
 import androidx.annotation.Nullable;
@@ -38,6 +39,7 @@ import org.chromium.chrome.browser.toolbar.ButtonDataImpl;
 import org.chromium.chrome.browser.toolbar.ButtonDataProvider;
 import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarButtonVariant;
 import org.chromium.chrome.browser.user_education.IPHCommandBuilder;
+import org.chromium.chrome.browser.util.BrowserUiUtils;
 import org.chromium.chrome.features.start_surface.StartSurfaceState;
 import org.chromium.components.browser_ui.settings.SettingsLauncher;
 import org.chromium.components.feature_engagement.EventConstants;
@@ -74,6 +76,9 @@ public class IdentityDiscController implements NativeInitObserver, ProfileDataCa
     private ObserverList<ButtonDataObserver> mObservers = new ObserverList<>();
     private boolean mNativeIsInitialized;
 
+    private boolean mIsTabNtp;
+    private boolean mIsStartSurface;
+
     /**
      *
      * @param context The Context for retrieving resources, launching preference activity, etc.
@@ -97,7 +102,9 @@ public class IdentityDiscController implements NativeInitObserver, ProfileDataCa
                 new IPHCommandBuilder(mContext.getResources(),
                         FeatureConstants.IDENTITY_DISC_FEATURE, R.string.iph_identity_disc_text,
                         R.string.iph_identity_disc_accessibility_text),
-                /*isEnabled=*/true, AdaptiveToolbarButtonVariant.UNKNOWN);
+                /*isEnabled=*/true, AdaptiveToolbarButtonVariant.UNKNOWN, /*tooltipTextResId=*/
+                Resources.ID_NULL,
+                /*showHoverHighlight=*/true);
     }
 
     /**
@@ -124,8 +131,8 @@ public class IdentityDiscController implements NativeInitObserver, ProfileDataCa
 
     @Override
     public ButtonData get(Tab tab) {
-        boolean isNtp = tab != null && tab.getNativePage() instanceof NewTabPage;
-        if (!isNtp) {
+        mIsTabNtp = tab != null && tab.getNativePage() instanceof NewTabPage;
+        if (!mIsTabNtp) {
             mButtonData.setCanShow(false);
             return mButtonData;
         }
@@ -136,14 +143,15 @@ public class IdentityDiscController implements NativeInitObserver, ProfileDataCa
 
     public ButtonData getForStartSurface(
             @StartSurfaceState int overviewModeState, @LayoutType int layoutType) {
-        if (ReturnToChromeUtil.isStartSurfaceRefactorEnabled(mContext)) {
-            if (layoutType != LayoutType.START_SURFACE) {
-                mButtonData.setCanShow(false);
-                return mButtonData;
-            }
-        } else if (overviewModeState != StartSurfaceState.SHOWN_HOMEPAGE) {
+        if ((ReturnToChromeUtil.isStartSurfaceRefactorEnabled(mContext)
+                    && layoutType != LayoutType.START_SURFACE)
+                || (!ReturnToChromeUtil.isStartSurfaceRefactorEnabled(mContext)
+                        && overviewModeState != StartSurfaceState.SHOWN_HOMEPAGE)) {
+            mIsStartSurface = false;
             mButtonData.setCanShow(false);
             return mButtonData;
+        } else {
+            mIsStartSurface = true;
         }
 
         calculateButtonData();
@@ -185,7 +193,8 @@ public class IdentityDiscController implements NativeInitObserver, ProfileDataCa
         return new ButtonSpec(drawable, buttonSpec.getOnClickListener(),
                 /*onLongClickListener=*/null, contentDescription, buttonSpec.getSupportsTinting(),
                 buttonSpec.getIPHCommandBuilder(), AdaptiveToolbarButtonVariant.UNKNOWN,
-                buttonSpec.getActionChipLabelResId());
+                buttonSpec.getActionChipLabelResId(), buttonSpec.getHoverTooltipTextId(),
+                buttonSpec.getShouldShowHoverHighlight());
     }
 
     /**
@@ -298,9 +307,12 @@ public class IdentityDiscController implements NativeInitObserver, ProfileDataCa
     /**
      * Records IdentityDisc usage with feature engagement tracker. This signal can be used to decide
      * whether to show in-product help.
+     * We also record the clicking actions on the profile icon in histograms.
      */
     private void recordIdentityDiscUsed() {
-        assert mProfileSupplier != null && mProfileSupplier.get() != null;
+        BrowserUiUtils.recordIdentityDiscClicked(mIsStartSurface, mIsTabNtp);
+
+        assert isProfileInitialized();
         Tracker tracker = TrackerFactory.getTrackerForProfile(mProfileSupplier.get());
         tracker.notifyEvent(EventConstants.IDENTITY_DISC_USED);
         RecordUserAction.record("MobileToolbarIdentityDiscTap");
@@ -356,9 +368,13 @@ public class IdentityDiscController implements NativeInitObserver, ProfileDataCa
                 R.string.accessibility_toolbar_btn_identity_disc_with_name, userName);
     }
 
+    private boolean isProfileInitialized() {
+        return mProfileSupplier != null && mProfileSupplier.hasValue();
+    }
+
     @VisibleForTesting
     void onClick() {
-        if (!mNativeIsInitialized) {
+        if (!isProfileInitialized()) {
             return;
         }
         recordIdentityDiscUsed();

@@ -39,11 +39,17 @@ NGGridLineResolver::NGGridLineResolver(
       subgridded_columns_merged_explicit_grid_line_names_(
           grid_style.GridTemplateColumns().named_grid_lines),
       subgridded_rows_merged_explicit_grid_line_names_(
-          grid_style.GridTemplateRows().named_grid_lines),
-      subgridded_columns_merged_implicit_grid_line_names_(
-          grid_style.ImplicitNamedGridColumnLines()),
-      subgridded_rows_merged_implicit_grid_line_names_(
-          grid_style.ImplicitNamedGridRowLines()) {
+          grid_style.GridTemplateRows().named_grid_lines) {
+  if (const auto& grid_template_areas = grid_style.GridTemplateAreas()) {
+    subgridded_columns_merged_implicit_grid_line_names_ =
+        grid_template_areas->implicit_named_grid_column_lines;
+    subgridded_rows_merged_implicit_grid_line_names_ =
+        grid_template_areas->implicit_named_grid_row_lines;
+  } else {
+    subgridded_columns_merged_implicit_grid_line_names_.emplace();
+    subgridded_rows_merged_implicit_grid_line_names_.emplace();
+  }
+
   if (subgrid_area.columns.IsTranslatedDefinite())
     subgridded_column_span_size_ = subgrid_area.SpanSize(kForColumns);
   if (subgrid_area.rows.IsTranslatedDefinite())
@@ -122,7 +128,7 @@ NGGridLineResolver::NGGridLineResolver(
     // merging. These are positive and relative to index 0, so we only need to
     // clamp values above `subgrid_span_size`.
     for (const auto& pair : subgrid_map) {
-      WTF::Vector<wtf_size_t> clamped_list;
+      Vector<wtf_size_t> clamped_list;
       for (const auto& position : pair.value) {
         if (position > subgrid_span_size)
           clamped_list.push_back(subgrid_span_size);
@@ -136,7 +142,7 @@ NGGridLineResolver::NGGridLineResolver(
     // (`parent_map`). The map is a key-value store with keys as the implicit
     // line name and the value as an array of ascending indices.
     for (const auto& pair : parent_map) {
-      WTF::Vector<wtf_size_t> merged_list;
+      Vector<wtf_size_t> merged_list;
       for (const auto& position : pair.value) {
         auto IsGridAreaInSubgridRange = [&]() -> bool {
           // Returns true if a given position is within either the implicit
@@ -224,10 +230,10 @@ NGGridLineResolver::NGGridLineResolver(
       [](NamedGridLinesMap& subgrid_map,
          const NamedGridLinesMap& parent_auto_repeat_map,
          const blink::ComputedGridTrackList& track_list, GridSpan subgrid_span,
-         wtf_size_t auto_repetitions,
-         bool is_opposite_direction_to_parent) -> void {
+         wtf_size_t auto_repetitions, bool is_opposite_direction_to_parent,
+         bool is_nested_subgrid) -> void {
     const wtf_size_t auto_repeat_track_count =
-        track_list.TrackList().AutoRepeatTrackCount();
+        track_list.track_list.AutoRepeatTrackCount();
     const wtf_size_t auto_repeat_total_tracks =
         auto_repeat_track_count * auto_repetitions;
     if (auto_repeat_total_tracks == 0) {
@@ -238,24 +244,27 @@ NGGridLineResolver::NGGridLineResolver(
     // come after the auto repeater. This is because they were parsed without
     // knowledge of the number of repeats. Now that we know how many auto
     // repeats there are, we need to shift the existing entries by the total
-    // number of auto repeat tracks.
+    // number of auto repeat tracks. For now, skip this on nested subgrids,
+    // as it will double-shift non-auto repeat lines.
+    // TODO(kschmi): Properly shift line names after the insertion point for
+    // nested subgrids. This should happen in `MergeNamedGridLinesWithParent`.
     // TODO(kschmi): Do we also need to do this for implicit lines?
     const wtf_size_t insertion_point = track_list.auto_repeat_insertion_point;
-    const wtf_size_t last_auto_repeat_index =
-        insertion_point + auto_repeat_total_tracks;
-    for (const auto& pair : subgrid_map) {
-      WTF::Vector<wtf_size_t> shifted_list;
-      for (const auto& position : pair.value) {
-        if (position >= insertion_point) {
-          wtf_size_t expanded_position = position + last_auto_repeat_index;
-          // These have already been offset relative to index 0, so explicitly
-          // do not offset by `subgrid_span` like we do below.
-          if (subgrid_span.Contains(expanded_position)) {
-            shifted_list.push_back(expanded_position);
+    if (!is_nested_subgrid) {
+      for (const auto& pair : subgrid_map) {
+        Vector<wtf_size_t> shifted_list;
+        for (const auto& position : pair.value) {
+          if (position >= insertion_point) {
+            wtf_size_t expanded_position = position + auto_repeat_total_tracks;
+            // These have already been offset relative to index 0, so explicitly
+            // do not offset by `subgrid_span` like we do below.
+            if (subgrid_span.Contains(expanded_position)) {
+              shifted_list.push_back(expanded_position);
+            }
           }
         }
+        subgrid_map.Set(pair.key, shifted_list);
       }
-      subgrid_map.Set(pair.key, shifted_list);
     }
 
     // Now expand the auto repeaters into `subgrid_map`.
@@ -308,12 +317,15 @@ NGGridLineResolver::NGGridLineResolver(
       }
     }
   };
-
-  // TODO(kschmi) - Account for orthogonal writing modes and swap rows/columns.
   const bool is_opposite_direction_to_parent =
-      (grid_style.Direction() != parent_line_resolver.style_->Direction());
+      grid_style.Direction() != parent_line_resolver.style_->Direction();
+  const bool is_parallel_to_parent =
+      IsParallelWritingMode(grid_style.GetWritingMode(),
+                            parent_line_resolver.style_->GetWritingMode());
 
   if (subgrid_area.columns.IsTranslatedDefinite()) {
+    const auto track_direction_in_parent =
+        is_parallel_to_parent ? kForColumns : kForRows;
     MergeNamedGridLinesWithParent(
         *subgridded_columns_merged_explicit_grid_line_names_,
         parent_line_resolver.ExplicitNamedLinesMap(kForColumns),
@@ -323,29 +335,39 @@ NGGridLineResolver::NGGridLineResolver(
         parent_line_resolver.ImplicitNamedLinesMap(kForColumns),
         subgrid_area.columns);
     // Expand auto repeaters from the parent into the named line map.
+    // TODO(kschmi): Also expand the subgrid's repeaters. Otherwise, we could
+    // have issues with precedence.
     ExpandAutoRepeatTracksFromParent(
         *subgridded_columns_merged_explicit_grid_line_names_,
-        parent_line_resolver.AutoRepeatLineNamesMap(kForColumns),
-        parent_line_resolver.ComputedGridTrackList(kForColumns),
-        subgrid_area.columns, parent_line_resolver.AutoRepetitions(kForColumns),
-        is_opposite_direction_to_parent);
+        parent_line_resolver.AutoRepeatLineNamesMap(track_direction_in_parent),
+        parent_line_resolver.ComputedGridTrackList(track_direction_in_parent),
+        subgrid_area.columns,
+        parent_line_resolver.AutoRepetitions(track_direction_in_parent),
+        is_opposite_direction_to_parent,
+        parent_line_resolver.IsSubgridded(track_direction_in_parent));
   }
   if (subgrid_area.rows.IsTranslatedDefinite()) {
+    const auto track_direction_in_parent =
+        is_parallel_to_parent ? kForRows : kForColumns;
     MergeNamedGridLinesWithParent(
         *subgridded_rows_merged_explicit_grid_line_names_,
-        parent_line_resolver.ExplicitNamedLinesMap(kForRows), subgrid_area.rows,
-        is_opposite_direction_to_parent);
+        parent_line_resolver.ExplicitNamedLinesMap(track_direction_in_parent),
+        subgrid_area.rows, is_opposite_direction_to_parent);
     MergeImplicitLinesWithParent(
         *subgridded_rows_merged_implicit_grid_line_names_,
         parent_line_resolver.ImplicitNamedLinesMap(kForRows),
         subgrid_area.rows);
     // Expand auto repeaters from the parent into the named line map.
+    // TODO(kschmi): Also expand the subgrid's repeaters. Otherwise, we could
+    // have issues with precedence.
     ExpandAutoRepeatTracksFromParent(
         *subgridded_rows_merged_explicit_grid_line_names_,
-        parent_line_resolver.AutoRepeatLineNamesMap(kForRows),
-        parent_line_resolver.ComputedGridTrackList(kForRows), subgrid_area.rows,
-        parent_line_resolver.AutoRepetitions(kForRows),
-        is_opposite_direction_to_parent);
+        parent_line_resolver.AutoRepeatLineNamesMap(track_direction_in_parent),
+        parent_line_resolver.ComputedGridTrackList(track_direction_in_parent),
+        subgrid_area.rows,
+        parent_line_resolver.AutoRepetitions(track_direction_in_parent),
+        is_opposite_direction_to_parent,
+        parent_line_resolver.IsSubgridded(track_direction_in_parent));
   }
 }
 
@@ -474,24 +496,28 @@ wtf_size_t NGGridLineResolver::ExplicitGridColumnCount() const {
   if (subgridded_column_span_size_ != kNotFound)
     return subgridded_column_span_size_;
 
-  return std::min<wtf_size_t>(std::max(style_->GridTemplateColumns()
-                                               .track_sizes.NGTrackList()
-                                               .TrackCountWithoutAutoRepeat() +
-                                           AutoRepeatTrackCount(kForColumns),
-                                       style_->NamedGridAreaColumnCount()),
-                              kGridMaxTracks);
+  wtf_size_t column_count =
+      style_->GridTemplateColumns().track_list.TrackCountWithoutAutoRepeat() +
+      AutoRepeatTrackCount(kForColumns);
+  if (const auto& grid_template_areas = style_->GridTemplateAreas()) {
+    column_count = std::max(column_count, grid_template_areas->column_count);
+  }
+
+  return std::min<wtf_size_t>(column_count, kGridMaxTracks);
 }
 
 wtf_size_t NGGridLineResolver::ExplicitGridRowCount() const {
   if (subgridded_row_span_size_ != kNotFound)
     return subgridded_row_span_size_;
 
-  return std::min<wtf_size_t>(std::max(style_->GridTemplateRows()
-                                               .track_sizes.NGTrackList()
-                                               .TrackCountWithoutAutoRepeat() +
-                                           AutoRepeatTrackCount(kForRows),
-                                       style_->NamedGridAreaRowCount()),
-                              kGridMaxTracks);
+  wtf_size_t row_count =
+      style_->GridTemplateRows().track_list.TrackCountWithoutAutoRepeat() +
+      AutoRepeatTrackCount(kForRows);
+  if (const auto& grid_template_areas = style_->GridTemplateAreas()) {
+    row_count = std::max(row_count, grid_template_areas->row_count);
+  }
+
+  return std::min<wtf_size_t>(row_count, kGridMaxTracks);
 }
 
 wtf_size_t NGGridLineResolver::ExplicitGridTrackCount(
@@ -510,8 +536,7 @@ wtf_size_t NGGridLineResolver::AutoRepeatTrackCount(
     GridTrackSizingDirection track_direction) const {
   return AutoRepetitions(track_direction) *
          ComputedGridTrackList(track_direction)
-             .TrackList()
-             .AutoRepeatTrackCount();
+             .track_list.AutoRepeatTrackCount();
 }
 
 wtf_size_t NGGridLineResolver::SubgridSpanSize(
@@ -581,14 +606,18 @@ const NamedGridLinesMap& NGGridLineResolver::ImplicitNamedLinesMap(
       (track_direction == kForColumns)
           ? subgridded_columns_merged_implicit_grid_line_names_
           : subgridded_rows_merged_implicit_grid_line_names_;
+  if (subgrid_merged_implicit_grid_line_names) {
+    return *subgrid_merged_implicit_grid_line_names;
+  }
 
-  const auto& implicit_lines_map_from_style =
-      (track_direction == kForColumns) ? style_->ImplicitNamedGridColumnLines()
-                                       : style_->ImplicitNamedGridRowLines();
+  if (const auto& grid_template_areas = style_->GridTemplateAreas()) {
+    return (track_direction == kForColumns)
+               ? grid_template_areas->implicit_named_grid_column_lines
+               : grid_template_areas->implicit_named_grid_row_lines;
+  }
 
-  return subgrid_merged_implicit_grid_line_names
-             ? *subgrid_merged_implicit_grid_line_names
-             : implicit_lines_map_from_style;
+  DEFINE_STATIC_LOCAL(const NamedGridLinesMap, empty, ());
+  return empty;
 }
 
 const NamedGridLinesMap& NGGridLineResolver::ExplicitNamedLinesMap(

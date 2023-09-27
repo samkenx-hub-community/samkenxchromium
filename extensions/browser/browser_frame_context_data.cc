@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "content/public/browser/isolated_web_apps_policy.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 
@@ -22,12 +23,15 @@ BrowserFrameContextData::CloneFrameContextData() const {
 
 bool BrowserFrameContextData::IsIsolatedApplication() const {
   return frame_ &&
+         content::IsolatedWebAppsPolicy::AreIsolatedWebAppsEnabled(
+             frame_->GetBrowserContext()) &&
          frame_->GetWebExposedIsolationLevel() >=
              content::WebExposedIsolationLevel::kMaybeIsolatedApplication;
 }
 
 std::unique_ptr<FrameContextData>
 BrowserFrameContextData::GetLocalParentOrOpener() const {
+  CHECK(frame_);
   content::RenderFrameHost* parent_or_opener = frame_->GetParent();
   // Non primary pages(e.g. fenced frame, prerendered page, bfcache, and
   // portals) can't look at the opener, and WebContents::GetOpener returns the
@@ -55,6 +59,7 @@ BrowserFrameContextData::GetLocalParentOrOpener() const {
 }
 
 GURL BrowserFrameContextData::GetUrl() const {
+  CHECK(frame_);
   if (frame_->GetLastCommittedURL().is_empty()) {
     // It's possible for URL to be empty when `frame_` is on the initial empty
     // document. TODO(https://crbug.com/1197308): Consider making  `frame_`'s
@@ -65,6 +70,7 @@ GURL BrowserFrameContextData::GetUrl() const {
 }
 
 url::Origin BrowserFrameContextData::GetOrigin() const {
+  CHECK(frame_);
   return frame_->GetLastCommittedOrigin();
 }
 
@@ -81,6 +87,7 @@ bool BrowserFrameContextData::CanAccess(const FrameContextData& target) const {
 }
 
 uintptr_t BrowserFrameContextData::GetId() const {
+  CHECK(frame_);
   return frame_->GetRoutingID();
 }
 

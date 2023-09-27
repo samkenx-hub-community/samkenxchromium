@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "build/chromeos_buildflags.h"
 #include "components/services/app_service/public/cpp/icon_types.h"
 #include "extensions/grit/extensions_browser_resources.h"
@@ -51,15 +52,14 @@ class FakeIconLoader : public apps::IconLoader {
 
  private:
   std::unique_ptr<apps::IconLoader::Releaser> LoadIconFromIconKey(
-      apps::AppType app_type,
-      const std::string& app_id,
+      const std::string& id,
       const apps::IconKey& icon_key,
       apps::IconType icon_type,
       int32_t size_in_dip,
       bool allow_placeholder_icon,
       apps::LoadIconCallback callback) override;
 
-  apps::AppServiceProxy* proxy_ = nullptr;
+  raw_ptr<apps::AppServiceProxy, ExperimentalAsh> proxy_ = nullptr;
 };
 
 class FakePublisherForIconTest : public apps::AppPublisher {

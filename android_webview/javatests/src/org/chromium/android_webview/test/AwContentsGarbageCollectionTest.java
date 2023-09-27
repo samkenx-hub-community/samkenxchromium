@@ -11,12 +11,12 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.os.Build;
 import android.os.ResultReceiver;
-import android.support.test.InstrumentationRegistry;
 import android.util.Pair;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.SmallTest;
 
@@ -39,6 +39,7 @@ import org.chromium.content_public.browser.ImeAdapter;
 import org.chromium.content_public.browser.WebContentsAccessibility;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.content_public.common.ContentUrlConstants;
+import org.chromium.ui.accessibility.AccessibilityState;
 
 import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
@@ -49,7 +50,7 @@ import java.util.concurrent.Callable;
  * AwContents garbage collection tests. Most apps relies on WebView being
  * garbage collected to release memory. These tests ensure that nothing
  * accidentally prevents AwContents from garbage collected, leading to leaks.
- * See crbug.com/544098 for why @DisableHardwareAccelerationForTest is needed.
+ * See crbug.com/544098 for why @DisableHardwareAcceleration is needed.
  */
 @RunWith(AwJUnit4ClassRunner.class)
 @DoNotBatch(reason = "GC tests require full restarts")
@@ -58,19 +59,19 @@ public class AwContentsGarbageCollectionTest {
     public AwActivityTestRule mActivityTestRule = new AwActivityTestRule() {
         @Override
         public TestDependencyFactory createTestDependencyFactory() {
-            if (mOverridenFactory == null) {
+            if (mOverriddenFactory == null) {
                 return new TestDependencyFactory();
             } else {
-                return mOverridenFactory;
+                return mOverriddenFactory;
             }
         }
     };
 
-    private TestDependencyFactory mOverridenFactory;
+    private TestDependencyFactory mOverriddenFactory;
 
     @After
     public void tearDown() {
-        mOverridenFactory = null;
+        mOverriddenFactory = null;
     }
 
     private static class StrongRefTestContext extends ContextWrapper {
@@ -107,7 +108,7 @@ public class AwContentsGarbageCollectionTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @SmallTest
     @Feature({"AndroidWebView"})
     public void testCreateAndGcOneTime() throws Throwable {
@@ -123,7 +124,7 @@ public class AwContentsGarbageCollectionTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @SmallTest
     @Feature({"AndroidWebView"})
     public void testHoldKeyboardResultReceiver() throws Throwable {
@@ -149,7 +150,7 @@ public class AwContentsGarbageCollectionTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @SmallTest
     @Feature({"AndroidWebView"})
     public void testAccessibility() throws Throwable {
@@ -160,12 +161,12 @@ public class AwContentsGarbageCollectionTest {
             mActivityTestRule.loadUrlAsync(
                     containerView.getAwContents(), ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL);
             TestThreadUtils.runOnUiThreadBlocking(() -> {
-                WebContentsAccessibility webContentsA11y =
-                        WebContentsAccessibility.fromWebContents(containerView.getWebContents());
                 // Enable a11y for testing.
-                webContentsA11y.setAccessibilityEnabledForTesting();
+                AccessibilityState.setIsAnyAccessibilityServiceEnabledForTesting(true);
                 // Initialize native object.
                 containerView.getAccessibilityNodeProvider();
+                WebContentsAccessibility webContentsA11y =
+                        WebContentsAccessibility.fromWebContents(containerView.getWebContents());
                 Assert.assertTrue(webContentsA11y.isNativeInitialized());
             });
 
@@ -174,7 +175,7 @@ public class AwContentsGarbageCollectionTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @SmallTest
     @Feature({"AndroidWebView"})
     public void testReferenceFromClient() throws Throwable {
@@ -192,7 +193,7 @@ public class AwContentsGarbageCollectionTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @SmallTest
     @Feature({"AndroidWebView"})
     public void testReferenceFromContext() throws Throwable {
@@ -200,11 +201,11 @@ public class AwContentsGarbageCollectionTest {
             TestAwContentsClient client = new TestAwContentsClient();
             StrongRefTestContext context =
                     new StrongRefTestContext(mActivityTestRule.getActivity());
-            mOverridenFactory = new GcTestDependencyFactory(context);
+            mOverriddenFactory = new GcTestDependencyFactory(context);
             AwTestContainerView containerView =
                     mActivityTestRule.createAwTestContainerViewOnMainSync(client);
             context.setAwContentsStrongRef(containerView.getAwContents());
-            mOverridenFactory = null;
+            mOverriddenFactory = null;
             mActivityTestRule.loadUrlAsync(
                     containerView.getAwContents(), ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL);
 
@@ -214,7 +215,7 @@ public class AwContentsGarbageCollectionTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @LargeTest
     @Feature({"AndroidWebView"})
     public void testCreateAndGcManyTimes() throws Throwable {
@@ -227,10 +228,10 @@ public class AwContentsGarbageCollectionTest {
                     StrongRefTestAwContentsClient client = new StrongRefTestAwContentsClient();
                     StrongRefTestContext context =
                             new StrongRefTestContext(mActivityTestRule.getActivity());
-                    mOverridenFactory = new GcTestDependencyFactory(context);
+                    mOverriddenFactory = new GcTestDependencyFactory(context);
                     AwTestContainerView view =
                             mActivityTestRule.createAwTestContainerViewOnMainSync(client);
-                    mOverridenFactory = null;
+                    mOverriddenFactory = null;
                     // Embedding app can hold onto a strong ref to the WebView from either
                     // WebViewClient or WebChromeClient. That should not prevent WebView from
                     // gc-ed. We simulate that behavior by making the equivalent change here,
@@ -250,7 +251,7 @@ public class AwContentsGarbageCollectionTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @SmallTest
     @Feature({"AndroidWebView"})
     public void testGcAfterUsingJavascriptObject() throws Throwable {
@@ -291,7 +292,7 @@ public class AwContentsGarbageCollectionTest {
     }
 
     @Test
-    @DisableHardwareAccelerationForTest
+    @DisableHardwareAcceleration
     @LargeTest
     public void testActivityDoesNotLeak() throws Throwable {
         // Test that Activity should not leak if view is still attached after activity is destroyed.

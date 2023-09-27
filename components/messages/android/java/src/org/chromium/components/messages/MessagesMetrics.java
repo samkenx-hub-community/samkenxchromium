@@ -7,7 +7,6 @@ package org.chromium.components.messages;
 import android.os.SystemClock;
 
 import androidx.annotation.IntDef;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Log;
 import org.chromium.base.metrics.RecordHistogram;
@@ -28,6 +27,8 @@ public class MessagesMetrics {
     private static final String TIME_TO_ACTION_DISMISS_HISTOGRAM_PREFIX =
             "Android.Messages.TimeToAction.Dismiss.";
     static final String STACKING_HISTOGRAM_NAME = "Android.Messages.Stacking";
+    static final String STACKING_HIDDEN_NAME = "Android.Messages.Stacking.Hidden";
+    static final String STACKING_HIDING_NAME = "Android.Messages.Stacking.Hiding";
     static final String STACKING_ACTION_HISTOGRAM_PREFIX = "Android.Messages.Stacking.";
     static final String THREE_STACKED_HISTOGRAM_NAME = "Android.Messages.Stacking.ThreeStacked";
 
@@ -70,19 +71,21 @@ public class MessagesMetrics {
         int MAX_VALUE = 2;
     }
 
-    /** Records metrics when a message is enqueued. */
-    static void recordMessageEnqueuedVisible(@MessageIdentifier int messageIdentifier) {
+    /** Records metrics when a message is being enqueued. */
+    static void recordMessageEnqueued(@MessageIdentifier int messageIdentifier) {
         RecordHistogram.recordEnumeratedHistogram(
                 ENQUEUED_HISTOGRAM_NAME, messageIdentifier, MessageIdentifier.COUNT);
+    }
+
+    /** Records metrics when a message is visible after being enqueued. */
+    static void recordMessageEnqueuedVisible(@MessageIdentifier int messageIdentifier) {
         RecordHistogram.recordEnumeratedHistogram(
                 ENQUEUED_VISIBLE_HISTOGRAM_NAME, messageIdentifier, MessageIdentifier.COUNT);
     }
 
-    /** Records metrics when a message is enqueued. */
+    /** Records metrics when a message is hidden after being enqueued.*/
     static void recordMessageEnqueuedHidden(@MessageIdentifier int enqueuedMessage,
             @MessageIdentifier int currentDisplayedMessage) {
-        RecordHistogram.recordEnumeratedHistogram(
-                ENQUEUED_HISTOGRAM_NAME, enqueuedMessage, MessageIdentifier.COUNT);
         RecordHistogram.recordEnumeratedHistogram(
                 ENQUEUED_HIDDEN_HISTOGRAM_NAME, enqueuedMessage, MessageIdentifier.COUNT);
         RecordHistogram.recordEnumeratedHistogram(
@@ -111,6 +114,24 @@ public class MessagesMetrics {
             RecordHistogram.recordMediumTimesHistogram(
                     TIME_TO_ACTION_DISMISS_HISTOGRAM_PREFIX + histogramSuffix, durationMs);
         }
+    }
+
+    /**
+     * Record the id of background message when it is stacked.
+     * @param messageIdentifier The id of the background message.
+     */
+    static void recordStackingHidden(@MessageIdentifier int messageIdentifier) {
+        RecordHistogram.recordEnumeratedHistogram(
+                STACKING_HIDDEN_NAME, messageIdentifier, MessageIdentifier.COUNT);
+    }
+
+    /**
+     * Record the id of the front message when there is a background message.
+     * @param messageIdentifier The id of the foreground message.
+     */
+    static void recordStackingHiding(@MessageIdentifier int messageIdentifier) {
+        RecordHistogram.recordEnumeratedHistogram(
+                STACKING_HIDING_NAME, messageIdentifier, MessageIdentifier.COUNT);
     }
 
     static void recordStackingAnimationType(@StackingAnimationType int type) {
@@ -234,21 +255,15 @@ public class MessagesMetrics {
                 return "DesktopSiteGlobalOptIn";
             case MessageIdentifier.DOWNLOAD_INCOGNITO_WARNING:
                 return "DownloadIncognitoWarning";
-            case MessageIdentifier.RESTORE_CUSTOM_TAB:
-                return "RestoreCustomTab";
-            case MessageIdentifier.UNDO_CUSTOM_TAB_RESTORATION:
-                return "UndoCustomTabRestoration";
             default:
                 return "Unknown";
         }
     }
 
-    @VisibleForTesting
     static String getEnqueuedHistogramNameForTesting() {
         return ENQUEUED_HISTOGRAM_NAME;
     }
 
-    @VisibleForTesting
     static String getDismissHistogramNameForTesting(@MessageIdentifier int messageIdentifier) {
         return DISMISSED_HISTOGRAM_PREFIX + messageIdentifierToHistogramSuffix(messageIdentifier);
     }

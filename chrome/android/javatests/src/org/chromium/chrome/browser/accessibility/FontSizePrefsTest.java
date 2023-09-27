@@ -5,8 +5,8 @@
 package org.chromium.chrome.browser.accessibility;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Assert;
@@ -42,7 +42,7 @@ public class FontSizePrefsTest {
     @Before
     public void setUp() {
         resetSharedPrefs();
-        Context context = InstrumentationRegistry.getTargetContext();
+        Context context = ApplicationProvider.getApplicationContext();
         mFontSizePrefs = getFontSizePrefs(context);
         setSystemFontScaleForTest(1.0f);
     }

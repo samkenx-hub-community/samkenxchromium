@@ -4,6 +4,7 @@
 
 #include "gpu/ipc/client/command_buffer_proxy_impl.h"
 
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -44,6 +45,7 @@ class TestGpuChannelHost : public GpuChannelHost {
       : GpuChannelHost(0 /* channel_id */,
                        GPUInfo(),
                        GpuFeatureInfo(),
+                       SharedImageCapabilities(),
                        mojo::ScopedMessagePipeHandle(
                            mojo::MessagePipeHandle(mojo::kInvalidHandleValue))),
         gpu_channel_(gpu_channel) {}
@@ -82,7 +84,7 @@ class CommandBufferProxyImplTest : public testing::Test {
   std::unique_ptr<CommandBufferProxyImpl> CreateAndInitializeProxy(
       MockCommandBuffer* mock_command_buffer = nullptr) {
     auto proxy = std::make_unique<CommandBufferProxyImpl>(
-        channel_, nullptr /* gpu_memory_buffer_manager */, 0 /* stream_id */,
+        channel_, 0 /* stream_id */,
         base::SingleThreadTaskRunner::GetCurrentDefault());
 
     // The Initialize() call below synchronously requests a new CommandBuffer
@@ -290,7 +292,7 @@ TEST_F(CommandBufferProxyImplTest, CreateTransferBufferOOM) {
 
   int32_t id = -1;
   scoped_refptr<gpu::Buffer> transfer_buffer_oom = proxy->CreateTransferBuffer(
-      std::numeric_limits<uint32_t>::max(), &id,
+      std::numeric_limits<uint32_t>::max(), &id, 0,
       TransferBufferAllocationOption::kReturnNullOnOOM);
   if (transfer_buffer_oom) {
     // In this test, there's no guarantee allocating UINT32_MAX will definitely
@@ -315,7 +317,7 @@ TEST_F(CommandBufferProxyImplTest, CreateTransferBufferOOM) {
       .RetiresOnSaturation();
 
   transfer_buffer_oom = proxy->CreateTransferBuffer(
-      std::numeric_limits<uint32_t>::max(), &id,
+      std::numeric_limits<uint32_t>::max(), &id, 0,
       TransferBufferAllocationOption::kLoseContextOnOOM);
 
   EXPECT_CALL(mock_gpu_channel_, DestroyCommandBuffer(_))

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "base/containers/flat_map.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/metrics/user_action_tester.h"
 #include "base/test/scoped_feature_list.h"
@@ -19,8 +20,8 @@
 #include "chrome/browser/ash/login/test/logged_in_user_mixin.h"
 #include "chrome/browser/extensions/mixin_based_extension_apitest.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/test/base/devtools_listener.h"
+#include "components/webapps/common/web_app_id.h"
 #include "content/public/browser/devtools_agent_host_observer.h"
 
 class NotificationDisplayServiceTester;
@@ -48,20 +49,22 @@ enum TestAccountType {
   kNonManaged,
   // Non-managed account as a non owner profile on a device.
   kNonManagedNonOwner,
+  kGoogler,
 };
 enum DeviceMode { kDeviceModeNotSet, kConsumerOwned, kEnrolled };
 
+class AndroidFilesTestVolume;
+class CrostiniTestVolume;
+class DocumentsProviderTestVolume;
+class DownloadsTestVolume;
 class DriveFsTestVolume;
 class FakeTestVolume;
-class DownloadsTestVolume;
-class CrostiniTestVolume;
-class AndroidFilesTestVolume;
-class RemovableTestVolume;
-class DocumentsProviderTestVolume;
-class MediaViewTestVolume;
-class SmbfsTestVolume;
-class HiddenTestVolume;
+class FileSystemProviderTestVolume;
 class GuestOsTestVolume;
+class HiddenTestVolume;
+class MediaViewTestVolume;
+class RemovableTestVolume;
+class SmbfsTestVolume;
 
 ash::LoggedInUserMixin::LogInType LogInTypeFor(
     TestAccountType test_account_type);
@@ -99,6 +102,9 @@ class FileManagerBrowserTestBase
     // Whether test requires Android documents provider for Google Photos.
     bool photos_documents_provider = false;
 
+    // Whether test requires a fake file system provider.
+    bool fake_file_system_provider = false;
+
     // Whether test requires ARC++.
     bool arc = false;
 
@@ -132,6 +138,9 @@ class FileManagerBrowserTestBase
     // Whether test should enable trash.
     bool enable_trash = false;
 
+    // Whether test should enable Drive trash.
+    bool enable_drive_trash = false;
+
     // Whether test should run Files app UI as JS modules.
     bool enable_js_modules = true;
 
@@ -141,6 +150,9 @@ class FileManagerBrowserTestBase
     // Whether test should enable DLP (Data Leak Prevention) files restrictions
     // feature.
     bool enable_dlp_files_restriction = false;
+
+    // Whether test should enable Files policy new UX feature.
+    bool enable_files_policy_new_ux = false;
 
     // Whether test should run with the Upload Office to Cloud feature.
     bool enable_upload_office_to_cloud = false;
@@ -152,25 +164,41 @@ class FileManagerBrowserTestBase
     bool enable_mirrorsync = false;
 
     // Whether test should run with the FilesInlineSyncStatus flag.
-    bool enable_inline_status_sync = false;
+    bool enable_inline_sync_status = false;
+
+    // Whether test should run with the FilesInlineSyncStatusProgressEvents
+    // flag.
+    bool enable_inline_sync_status_progress_events = false;
 
     // Whether test should enable the file transfer connector.
     bool enable_file_transfer_connector = false;
 
+    // Whether test should enable the new UX for the file transfer connector.
+    bool enable_file_transfer_connector_new_ux = false;
+
     // Whether test should use report-only mode for the file transfer connector.
     bool file_transfer_connector_report_only = false;
 
-    // Whether tests should enable V2 of search.
-    bool enable_search_v2 = false;
+    // Whether tests should enable image content search.
+    bool enable_image_content_search = false;
 
-    // Whether tests should enable OS Feedback.
-    bool enable_os_feedback = false;
+    // Whether test should run with the fsps-in-recents flag.
+    bool enable_fsps_in_recents = false;
 
     // Whether tests should enable Google One offer Files banner.
     bool enable_google_one_offer_files_banner = false;
 
     // Whether tests should enable the Google Drive bulk pinning feature.
     bool enable_drive_bulk_pinning = false;
+
+    // Whether to enable Drive shortcuts showing a badge or not.
+    bool enable_drive_shortcuts = false;
+
+    // Whether to enable jellybean styles.
+    bool enable_jellybean = false;
+
+    // Whether to enable jellybean UI elements.
+    bool enable_cros_components = false;
 
     // Feature IDs associated for mapping test cases and features.
     std::vector<std::string> feature_ids;
@@ -211,6 +239,8 @@ class FileManagerBrowserTestBase
   // Returns an account id used for a test. The base class provides a default
   // implementation.
   virtual AccountId GetAccountId();
+
+  content::WebContents* GetWebContentsForId(const std::string& app_id);
 
   // Launches the test extension from GetTestExtensionManifestName() and uses
   // it to drive the testing the actual FileManager component extension under
@@ -278,9 +308,6 @@ class FileManagerBrowserTestBase
   // File Manager app.
   content::WebContents* GetLastOpenWindowWebContents();
 
-  // Loads the test utils in the WebContents.
-  void LoadSwaTestUtils(content::WebContents*);
-
   // Returns appId from its WebContents.
   std::string GetSwaAppId(content::WebContents*);
 
@@ -302,7 +329,7 @@ class FileManagerBrowserTestBase
   std::unique_ptr<CrostiniTestVolume> crostini_volume_;
   std::unique_ptr<AndroidFilesTestVolume> android_files_volume_;
   std::map<Profile*, std::unique_ptr<DriveFsTestVolume>> drive_volumes_;
-  DriveFsTestVolume* drive_volume_ = nullptr;
+  raw_ptr<DriveFsTestVolume, ExperimentalAsh> drive_volume_ = nullptr;
   std::unique_ptr<FakeTestVolume> usb_volume_;
   std::unique_ptr<FakeTestVolume> mtp_volume_;
   std::unique_ptr<RemovableTestVolume> partition_1_;
@@ -318,6 +345,7 @@ class FileManagerBrowserTestBase
   std::unique_ptr<MediaViewTestVolume> media_view_documents_;
   std::unique_ptr<SmbfsTestVolume> smbfs_volume_;
   std::unique_ptr<HiddenTestVolume> hidden_volume_;
+  std::unique_ptr<FileSystemProviderTestVolume> file_system_provider_volume_;
 
   // Map from source path (e.g. sftp://1:2) to volume.
   base::flat_map<std::string, std::unique_ptr<GuestOsTestVolume>>
@@ -332,7 +360,8 @@ class FileManagerBrowserTestBase
 
   std::unique_ptr<NotificationDisplayServiceTester> display_service_;
   std::unique_ptr<MockFileTasksObserver> file_tasks_observer_;
-  SelectFileDialogExtensionTestFactory* select_factory_;  // Not owned.
+  raw_ptr<SelectFileDialogExtensionTestFactory, ExperimentalAsh>
+      select_factory_;  // Not owned.
 
   base::HistogramTester histograms_;
   base::UserActionTester user_actions_;

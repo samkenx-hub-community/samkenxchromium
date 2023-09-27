@@ -5,6 +5,7 @@
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_shared_vars.css.js';
 import './ui_trigger_list_object.js';
+import './cross_device_internals.js';
 import './shared_style.css.js';
 
 import {WebUIListenerBehavior} from 'chrome://resources/ash/common/web_ui_listener_behavior.js';
@@ -249,6 +250,15 @@ Polymer({
   onGetStatesClicked_() {
     this.browserProxy_.getState().then(
         currentStates => this.onCurrentStatesReturned_(currentStates));
+  },
+
+  /**
+   * Triggers ShowNearbyShareReceivedNotification which displays a Nearby Share
+   * "Received" notification.
+   * @private
+   */
+  onNearbyShareReceivedNotificationClicked_() {
+    this.browserProxy_.showNearbyShareReceivedNotification();
   },
 
   /**

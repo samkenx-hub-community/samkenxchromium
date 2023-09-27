@@ -11,6 +11,7 @@
 #include "ash/ash_export.h"
 #include "ash/system/tray/tray_background_view.h"
 #include "ash/system/unified/unified_system_tray.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 
 namespace ui {
@@ -22,10 +23,13 @@ namespace ash {
 class Shelf;
 class TimeTrayItemView;
 class TrayBubbleView;
+class GlanceableTrayBubble;
 
 // This date tray is next to the `UnifiedSystemTray`. Activating this tray
 // results in the `CalendarView` showing in the `UnifiedSystemTray`'s bubble.
-// This tray doesn't have its own bubble.
+// If GlanceablesV2 feature flag is enabled, it will instead show the
+// GlanceableTrayBubble.
+// TODO(b:277268122) update documentation.
 class ASH_EXPORT DateTray : public TrayBackgroundView,
                             public UnifiedSystemTray::Observer {
  public:
@@ -42,10 +46,12 @@ class ASH_EXPORT DateTray : public TrayBackgroundView,
   void HandleLocaleChange() override;
   void UpdateLayout() override;
   void UpdateAfterLoginStatusChange() override;
-  void ShowBubble() override {}
+  void ShowBubble() override;
   void CloseBubble() override;
-  void HideBubbleWithView(const TrayBubbleView* bubble_view) override {}
-  void ClickedOutsideBubble() override {}
+  void HideBubbleWithView(const TrayBubbleView* bubble_view) override;
+  void HideBubble(const TrayBubbleView* bubble_view) override;
+  void ClickedOutsideBubble() override;
+  void UpdateTrayItemColor(bool is_active) override;
 
   // UnifiedSystemTray::Observer:
   void OnOpeningCalendarView() override;
@@ -54,14 +60,24 @@ class ASH_EXPORT DateTray : public TrayBackgroundView,
   // Callback called when this tray is pressed.
   void OnButtonPressed(const ui::Event& event);
 
+  // `from_keyboard` - whether `ShowGlanceableBubble()` is being shown in
+  // response to a keyboard event.
+  void ShowGlanceableBubble(bool from_keyboard);
+  void HideGlanceableBubble();
+
  private:
   friend class DateTrayTest;
+  friend class GlanceablesPixelTest;
+  friend class GlanceablesV2BrowserTest;
 
   // Owned by the views hierarchy.
-  TimeTrayItemView* time_view_ = nullptr;
+  raw_ptr<TimeTrayItemView, ExperimentalAsh> time_view_ = nullptr;
 
   // Owned by `StatusAreaWidget`.
-  UnifiedSystemTray* unified_system_tray_ = nullptr;
+  raw_ptr<UnifiedSystemTray, ExperimentalAsh> unified_system_tray_ = nullptr;
+
+  // Bubble container for Glanceable UI.
+  std::unique_ptr<GlanceableTrayBubble> bubble_;
 
   base::ScopedObservation<UnifiedSystemTray, UnifiedSystemTray::Observer>
       scoped_unified_system_tray_observer_{this};

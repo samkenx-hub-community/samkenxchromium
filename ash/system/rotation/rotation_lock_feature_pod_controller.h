@@ -9,6 +9,7 @@
 #include "ash/constants/quick_settings_catalogs.h"
 #include "ash/display/screen_orientation_controller.h"
 #include "ash/system/unified/feature_pod_controller_base.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 
 namespace ash {
@@ -51,8 +52,9 @@ class ASH_EXPORT RotationLockFeaturePodController
   void UpdateTile();
 
   // Owned by views hierarchy.
-  FeaturePodButton* button_ = nullptr;
-  FeatureTile* tile_ = nullptr;
+  raw_ptr<FeaturePodButton, DanglingUntriaged | ExperimentalAsh> button_ =
+      nullptr;
+  raw_ptr<FeatureTile, DanglingUntriaged | ExperimentalAsh> tile_ = nullptr;
 
   base::WeakPtrFactory<RotationLockFeaturePodController> weak_factory_{this};
 };

@@ -40,7 +40,7 @@ import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Restriction;
-import org.chromium.chrome.R;
+import org.chromium.chrome.browser.omnibox.R;
 import org.chromium.chrome.browser.omnibox.SearchEngineLogoUtils;
 import org.chromium.chrome.browser.omnibox.status.StatusProperties.StatusIconResource;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
@@ -224,8 +224,7 @@ public class StatusViewTest extends BlankUiTestActivityTestCase {
         onView(withId(R.id.location_bar_status_icon)).check((view, e) -> {
             assertEquals(expectedWidth, view.getMeasuredWidth());
         });
-        int expectedPadding = getActivity().getResources().getDimensionPixelSize(
-                R.dimen.location_bar_icon_end_padding);
+        int expectedPadding = 0;
         onView(withId(R.id.location_bar_status)).check((view, e) -> {
             assertEquals(expectedPadding, view.getPaddingEnd());
         });

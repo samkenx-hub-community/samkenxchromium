@@ -13,11 +13,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.os.Build;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -31,10 +31,9 @@ import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.base.test.util.MinAndroidSdkLevel;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.ChromeTabbedActivity2;
-import org.chromium.chrome.browser.MockSafeBrowsingApiHandler;
+import org.chromium.chrome.browser.MockSafetyNetApiHandler;
 import org.chromium.chrome.browser.customtabs.CustomTabActivityTestRule;
 import org.chromium.chrome.browser.customtabs.CustomTabsIntentTestUtils;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -46,6 +45,7 @@ import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab.TabTestUtils;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.MenuUtils;
 import org.chromium.components.safe_browsing.SafeBrowsingApiBridge;
@@ -112,7 +112,8 @@ public class TabSuspensionTest {
             mTokenTracker = new TokenTracker(mUsageStatsBridge);
             mEventTracker = new EventTracker(mUsageStatsBridge);
         });
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         mStartingUrl = mTestServer.getURLWithHostName(STARTING_FQDN, "/defaultresponse");
         mDifferentUrl = mTestServer.getURLWithHostName(DIFFERENT_FQDN, "/defaultresponse");
 
@@ -124,11 +125,6 @@ public class TabSuspensionTest {
                     mEventTracker, mTokenTracker, mSuspensionTracker,
                     mActivity.getTabContentManagerSupplier());
         });
-    }
-
-    @After
-    public void tearDown() {
-        mTestServer.stopAndDestroyServer();
     }
 
     @Test
@@ -276,7 +272,7 @@ public class TabSuspensionTest {
     @MediumTest
     public void testTabAddedFromCustomTab() {
         Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
-                InstrumentationRegistry.getTargetContext(), mStartingUrl);
+                ApplicationProvider.getApplicationContext(), mStartingUrl);
         IntentUtils.addTrustedIntentExtras(intent);
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(intent);
         doReturn(true).when(mSuspensionTracker).isWebsiteSuspended(STARTING_FQDN);
@@ -328,8 +324,8 @@ public class TabSuspensionTest {
         startLoadingUrl(mTab, mStartingUrl);
         waitForSuspendedTabToShow(mTab, STARTING_FQDN);
 
-        SafeBrowsingApiBridge.setHandler(new MockSafeBrowsingApiHandler());
-        MockSafeBrowsingApiHandler.addMockResponse(
+        SafeBrowsingApiBridge.setSafetyNetApiHandler(new MockSafetyNetApiHandler());
+        MockSafetyNetApiHandler.addMockResponse(
                 mDifferentUrl, "{\"matches\":[{\"threat_type\":\"5\"}]}");
         startLoadingUrl(mTab, mDifferentUrl);
 

@@ -6,6 +6,7 @@
 #include "chrome/browser/policy/messaging_layer/upload/file_upload_impl.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "base/files/file.h"
@@ -13,7 +14,6 @@
 #include "base/memory/ptr_util.h"
 #include "base/sequence_checker.h"
 #include "base/strings/strcat.h"
-#include "base/strings/string_piece.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/task/bind_post_task.h"
@@ -61,14 +61,6 @@ constexpr char kUploadSizeReceivedHeader[] = "X-Goog-Upload-Size-Received";
 constexpr char kUploadOffsetHeader[] = "X-Goog-Upload-Offset";
 constexpr char kUploadProtocolHeader[] = "X-Goog-Upload-Protocol";
 constexpr char kUploadIdHeader[] = "X-GUploader-UploadID";
-
-// Deletes original file (called on a thread pool upon successful upload).
-void DeleteOriginalFile(const std::string origin_path) {
-  const auto delete_result = base::DeleteFile(base::FilePath(origin_path));
-  if (!delete_result) {
-    LOG(WARNING) << "Failed to delete file=" << origin_path;
-  }
-}
 
 // Helper for network response, headers analysis and status retrieval.
 StatusOr<std::string> CheckResponseAndGetStatus(
@@ -123,7 +115,7 @@ class ActionContext {
   ActionContext& operator=(const ActionContext& other) = delete;
   virtual ~ActionContext() {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(!result_cb_) << "Destruct before callback";
+    CHECK(!result_cb_) << "Destruct before callback";
   }
 
  protected:
@@ -133,9 +125,12 @@ class ActionContext {
       : delegate_(std::move(delegate)), result_cb_(std::move(result_cb)) {}
 
   // Completes work returning result or status, and then self-destructs.
+  // This is the only way `ActionContext` ceases to exist, so any asynchronous
+  // callback in its subclasses is safe to use `base::Unretained(this)` and
+  // does not need weak pointers.
   void Complete(R result) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(result_cb_) << "Already completed";
+    CHECK(result_cb_) << "Already completed";
     std::move(result_cb_).Run(std::move(result));
     delete this;
   }
@@ -163,9 +158,12 @@ class FileUploadDelegate::AccessTokenRetriever
 
   void RequestAccessToken() {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(delegate());
+    if (!delegate()) {
+      Complete(Status(error::UNAVAILABLE, "Delegate is unavailable"));
+      return;
+    }
 
-    DCHECK(!access_token_request_);
+    CHECK(!access_token_request_);
     DVLOG(1) << "Requesting access token.";
 
     access_token_request_ = delegate()->StartOAuth2Request(this);
@@ -177,7 +175,7 @@ class FileUploadDelegate::AccessTokenRetriever
       const OAuth2AccessTokenManager::Request* request,
       const OAuth2AccessTokenConsumer::TokenResponse& token_response) override {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK_EQ(access_token_request_.get(), request);
+    CHECK_EQ(access_token_request_.get(), request);
     access_token_request_.reset();
     DVLOG(1) << "Token successfully acquired.";
     Complete(token_response.access_token);
@@ -186,7 +184,7 @@ class FileUploadDelegate::AccessTokenRetriever
   void OnGetTokenFailure(const OAuth2AccessTokenManager::Request* request,
                          const GoogleServiceAuthError& error) override {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK_EQ(access_token_request_.get(), request);
+    CHECK_EQ(access_token_request_.get(), request);
     access_token_request_.reset();
     LOG(ERROR) << "Token request failed: " << error.ToString();
     Complete(Status(error::UNAUTHENTICATED, error.ToString()));
@@ -195,10 +193,6 @@ class FileUploadDelegate::AccessTokenRetriever
   // The OAuth request to receive the access token.
   std::unique_ptr<OAuth2AccessTokenManager::Request> access_token_request_
       GUARDED_BY_CONTEXT(sequence_checker_);
-
-  // Should remain the last member so it will be destroyed first and
-  // invalidate all weak pointers.
-  base::WeakPtrFactory<AccessTokenRetriever> weak_ptr_factory_{this};
 };
 
 // Self-destructing context for FileUploadJob initiation.
@@ -207,9 +201,9 @@ class FileUploadDelegate::InitContext
           std::pair<int64_t /*total*/, std::string /*session_token*/>>> {
  public:
   InitContext(
-      base::StringPiece origin_path,
-      base::StringPiece upload_parameters,
-      base::StringPiece access_token,
+      std::string_view origin_path,
+      std::string_view upload_parameters,
+      std::string_view access_token,
       base::WeakPtr<FileUploadDelegate> delegate,
       base::OnceCallback<
           void(StatusOr<std::pair<int64_t /*total*/,
@@ -221,20 +215,25 @@ class FileUploadDelegate::InitContext
 
   void Run() {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(delegate());
+    if (!delegate()) {
+      Complete(Status(error::UNAVAILABLE, "Delegate is unavailable"));
+      return;
+    }
 
     // Perform file operation on a thread pool, then resume on the current task
     // runner.
     base::ThreadPool::PostTaskAndReplyWithResult(
         FROM_HERE, {base::TaskPriority::BEST_EFFORT, base::MayBlock()},
         base::BindOnce(&InitContext::InitFile, origin_path_),
-        base::BindOnce(&InitContext::FileOpened,
-                       weak_ptr_factory_.GetWeakPtr()));
+        base::BindOnce(&InitContext::FileOpened, base::Unretained(this)));
   }
 
   void FileOpened(StatusOr<int64_t> total_result) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(delegate());
+    if (!delegate()) {
+      Complete(Status(error::UNAVAILABLE, "Delegate is unavailable"));
+      return;
+    }
 
     if (!total_result.ok()) {
       Complete(total_result.status());
@@ -291,7 +290,7 @@ class FileUploadDelegate::InitContext
     // Make a call and get response headers.
     delegate()->SendAndGetResponse(
         url_loader_.get(), base::BindOnce(&InitContext::OnInitURLLoadComplete,
-                                          weak_ptr_factory_.GetWeakPtr()));
+                                          base::Unretained(this)));
   }
 
   void OnInitURLLoadComplete(
@@ -356,10 +355,6 @@ class FileUploadDelegate::InitContext
 
   // Total size.
   int64_t total_ GUARDED_BY_CONTEXT(sequence_checker_) = 0L;
-
-  // Should remain the last member so it will be destroyed first and
-  // invalidate all weak pointers.
-  base::WeakPtrFactory<InitContext> weak_ptr_factory_{this};
 };
 
 // Self-destructing context for FileUploadJob next step.
@@ -370,7 +365,7 @@ class FileUploadDelegate::NextStepContext
   NextStepContext(
       int64_t total,
       int64_t uploaded,
-      base::StringPiece session_token,
+      std::string_view session_token,
       ScopedReservation scoped_reservation,
       base::WeakPtr<FileUploadDelegate> delegate,
       base::OnceCallback<
@@ -384,7 +379,10 @@ class FileUploadDelegate::NextStepContext
 
   void Run() {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(delegate());
+    if (!delegate()) {
+      Complete(Status(error::UNAVAILABLE, "Delegate is unavailable"));
+      return;
+    }
 
     // Parse session token.
     const auto tokens = base::SplitStringPiece(
@@ -415,13 +413,16 @@ class FileUploadDelegate::NextStepContext
     delegate()->SendAndGetResponse(
         url_loader_.get(),
         base::BindOnce(&NextStepContext::OnQueryURLLoadComplete,
-                       weak_ptr_factory_.GetWeakPtr()));
+                       base::Unretained(this)));
   }
 
   void OnQueryURLLoadComplete(
       scoped_refptr<::net::HttpResponseHeaders> headers) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(delegate());
+    if (!delegate()) {
+      Complete(Status(error::UNAVAILABLE, "Delegate is unavailable"));
+      return;
+    }
 
     auto status_result =
         CheckResponseAndGetStatus(std::move(url_loader_), headers);
@@ -515,9 +516,8 @@ class FileUploadDelegate::NextStepContext
         base::BindOnce(&NextStepContext::LoadFileData,
                        std::string(origin_path_), total_, upload_received,
                        size),
-        base::BindOnce(&NextStepContext::PerformUpload,
-                       weak_ptr_factory_.GetWeakPtr(), upload_received, size,
-                       std::move(resource_request)));
+        base::BindOnce(&NextStepContext::PerformUpload, base::Unretained(this),
+                       upload_received, size, std::move(resource_request)));
   }
 
   void PerformUpload(
@@ -526,7 +526,10 @@ class FileUploadDelegate::NextStepContext
       std::unique_ptr<::network::ResourceRequest> resource_request,
       StatusOr<std::string> buffer_result) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(delegate());
+    if (!delegate()) {
+      Complete(Status(error::UNAVAILABLE, "Delegate is unavailable"));
+      return;
+    }
 
     if (!buffer_result.ok()) {
       Complete(buffer_result.status());
@@ -542,7 +545,7 @@ class FileUploadDelegate::NextStepContext
     delegate()->SendAndGetResponse(
         url_loader_.get(),
         base::BindOnce(&NextStepContext::OnUploadURLLoadComplete,
-                       weak_ptr_factory_.GetWeakPtr(), upload_received, size));
+                       base::Unretained(this), upload_received, size));
   }
 
   void OnUploadURLLoadComplete(
@@ -631,7 +634,7 @@ class FileUploadDelegate::NextStepContext
   const std::string session_token_;
 
   // Session token components.
-  base::StringPiece origin_path_ GUARDED_BY_CONTEXT(sequence_checker_);
+  std::string_view origin_path_ GUARDED_BY_CONTEXT(sequence_checker_);
   GURL resumable_upload_url_ GUARDED_BY_CONTEXT(sequence_checker_);
 
   // Helper to upload the data.
@@ -640,10 +643,6 @@ class FileUploadDelegate::NextStepContext
 
   // Memory usage by upload.
   ScopedReservation scoped_reservation_ GUARDED_BY_CONTEXT(sequence_checker_);
-
-  // Should remain the last member so it will be destroyed first and
-  // invalidate all weak pointers.
-  base::WeakPtrFactory<NextStepContext> weak_ptr_factory_{this};
 };
 
 // Self-destructing context for FileUploadJob finalization.
@@ -651,7 +650,7 @@ class FileUploadDelegate::FinalContext
     : public ActionContext<StatusOr<std::string /*access_parameters*/>> {
  public:
   FinalContext(
-      base::StringPiece session_token,
+      std::string_view session_token,
       base::WeakPtr<FileUploadDelegate> delegate,
       base::OnceCallback<void(StatusOr<std::string /*access_parameters*/>)>
           result_cb)
@@ -660,7 +659,10 @@ class FileUploadDelegate::FinalContext
 
   void Run() {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(delegate());
+    if (!delegate()) {
+      Complete(Status(error::UNAVAILABLE, "Delegate is unavailable"));
+      return;
+    }
 
     // Parse session token.
     const auto tokens = base::SplitStringPiece(
@@ -690,13 +692,16 @@ class FileUploadDelegate::FinalContext
     // Make a call and get response headers.
     delegate()->SendAndGetResponse(
         url_loader_.get(), base::BindOnce(&FinalContext::OnQueryURLLoadComplete,
-                                          weak_ptr_factory_.GetWeakPtr()));
+                                          base::Unretained(this)));
   }
 
   void OnQueryURLLoadComplete(
       scoped_refptr<::net::HttpResponseHeaders> headers) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(delegate());
+    if (!delegate()) {
+      Complete(Status(error::UNAVAILABLE, "Delegate is unavailable"));
+      return;
+    }
 
     auto status_result =
         CheckResponseAndGetStatus(std::move(url_loader_), headers);
@@ -747,7 +752,7 @@ class FileUploadDelegate::FinalContext
     delegate()->SendAndGetResponse(
         url_loader_.get(),
         base::BindOnce(&FinalContext::OnFinalizeURLLoadComplete,
-                       weak_ptr_factory_.GetWeakPtr()));
+                       base::Unretained(this)));
   }
 
   void OnFinalizeURLLoadComplete(
@@ -783,32 +788,27 @@ class FileUploadDelegate::FinalContext
       return;
     }
 
-    // Delete file upon success (on a thread pool, don't wait for completion).
-    base::ThreadPool::PostTask(
-        FROM_HERE, {base::TaskPriority::BEST_EFFORT, base::MayBlock()},
-        base::BindOnce(&DeleteOriginalFile, std::string(origin_path_)));
-
     Complete(base::StrCat({"Upload_id=", upload_id}));
   }
 
   const std::string session_token_;
 
   // Session token components.
-  base::StringPiece origin_path_ GUARDED_BY_CONTEXT(sequence_checker_);
+  std::string_view origin_path_ GUARDED_BY_CONTEXT(sequence_checker_);
   GURL resumable_upload_url_ GUARDED_BY_CONTEXT(sequence_checker_);
 
   // Helper to upload the data.
   std::unique_ptr<network::SimpleURLLoader> url_loader_
       GUARDED_BY_CONTEXT(sequence_checker_);
-
-  // Should remain the last member so it will be destroyed first and
-  // invalidate all weak pointers.
-  base::WeakPtrFactory<FinalContext> weak_ptr_factory_{this};
 };
 
-FileUploadDelegate::FileUploadDelegate() = default;
+FileUploadDelegate::FileUploadDelegate() {
+  DETACH_FROM_SEQUENCE(sequence_checker_);
+}
 
-FileUploadDelegate::~FileUploadDelegate() = default;
+FileUploadDelegate::~FileUploadDelegate() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+}
 
 void FileUploadDelegate::InitializeOnce() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -817,18 +817,16 @@ void FileUploadDelegate::InitializeOnce() {
     return;  // Already initialized.
   }
 
-  static constexpr char kLogUploadUrlTail[] = "/upload";
-  upload_url_ = GURL(
-      g_browser_process->browser_policy_connector()->GetDeviceManagementUrl() +
-      kLogUploadUrlTail);
-  DCHECK(upload_url_.is_valid());
+  upload_url_ = GURL(g_browser_process->browser_policy_connector()
+                         ->GetFileStorageServerUploadUrl());
+  CHECK(upload_url_.is_valid());
 
   account_id_ = DeviceOAuth2TokenServiceFactory::Get()->GetRobotAccountId();
   access_token_manager_ =
       DeviceOAuth2TokenServiceFactory::Get()->GetAccessTokenManager();
-  DCHECK(access_token_manager_);
+  CHECK(access_token_manager_);
   url_loader_factory_ = g_browser_process->shared_url_loader_factory();
-  DCHECK(url_loader_factory_);
+  CHECK(url_loader_factory_);
   traffic_annotation_ = std::make_unique<::net::NetworkTrafficAnnotationTag>(
       ::net::DefineNetworkTrafficAnnotation("chrome_support_tool_file_upload",
                                             R"(
@@ -870,7 +868,7 @@ void FileUploadDelegate::InitializeOnce() {
         }
       )"));
 
-  max_upload_buffer_size_ = 1L * 1024L * 1024L;  // 1 MiB
+  max_upload_buffer_size_ = kMaxUploadBufferSize;
 }
 
 std::unique_ptr<OAuth2AccessTokenManager::Request>
@@ -907,8 +905,8 @@ void FileUploadDelegate::SendAndGetResponse(
 
 // static
 void FileUploadDelegate::DoInitiate(
-    base::StringPiece origin_path,
-    base::StringPiece upload_parameters,
+    std::string_view origin_path,
+    std::string_view upload_parameters,
     base::OnceCallback<void(
         StatusOr<std::pair<int64_t /*total*/, std::string /*session_token*/>>)>
         result_cb) {
@@ -935,8 +933,8 @@ void FileUploadDelegate::DoInitiate(
 }
 
 void FileUploadDelegate::OnAccessTokenResult(
-    base::StringPiece origin_path,
-    base::StringPiece upload_parameters,
+    std::string_view origin_path,
+    std::string_view upload_parameters,
     base::OnceCallback<void(
         StatusOr<std::pair<int64_t /*total*/, std::string /*session_token*/>>)>
         result_cb,
@@ -957,7 +955,7 @@ void FileUploadDelegate::OnAccessTokenResult(
 void FileUploadDelegate::DoNextStep(
     int64_t total,
     int64_t uploaded,
-    base::StringPiece session_token,
+    std::string_view session_token,
     ScopedReservation scoped_reservation,
     base::OnceCallback<void(StatusOr<std::pair<int64_t /*uploaded*/,
                                                std::string /*session_token*/>>)>
@@ -980,7 +978,7 @@ void FileUploadDelegate::DoNextStep(
 }
 
 void FileUploadDelegate::DoFinalize(
-    base::StringPiece session_token,
+    std::string_view session_token,
     base::OnceCallback<void(StatusOr<std::string /*access_parameters*/>)>
         result_cb) {
   if (!::content::BrowserThread::CurrentlyOn(::content::BrowserThread::UI)) {
@@ -994,6 +992,13 @@ void FileUploadDelegate::DoFinalize(
   InitializeOnce();
 
   (new FinalContext(session_token, GetWeakPtr(), std::move(result_cb)))->Run();
+}
+
+void FileUploadDelegate::DoDeleteFile(std::string_view origin_path) {
+  const auto delete_result = base::DeleteFile(base::FilePath(origin_path));
+  if (!delete_result) {
+    LOG(WARNING) << "Failed to delete file=" << origin_path;
+  }
 }
 
 base::WeakPtr<FileUploadDelegate> FileUploadDelegate::GetWeakPtr() {

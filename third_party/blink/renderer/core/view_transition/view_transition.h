@@ -118,6 +118,13 @@ class CORE_EXPORT ViewTransition : public ScriptWrappable,
   // be a transitioning element, but require an effect node.
   bool IsRepresentedViaPseudoElements(const LayoutObject& object) const;
 
+  // Returns true if `node` participates in the transition excluding the
+  // document element. Since the root element's snapshot is hoisted up the
+  // LayoutView, this API should be used for checks which are needed to set up
+  // state for snapshotting an element. This state is set up on the LayoutView
+  // instead of the root element's LayoutView.
+  bool IsTransitionElementExcludingRoot(const Element& node) const;
+
   // Updates an effect node. This effect populates the view transition element
   // id and the shared element resource id. The return value is a result of
   // updating the effect node.
@@ -163,7 +170,7 @@ class CORE_EXPORT ViewTransition : public ScriptWrappable,
 
   // Returns the UA style sheet for the pseudo element tree generated during a
   // transition.
-  String UAStyleSheet() const;
+  CSSStyleSheet* UAStyleSheet() const;
 
   // CommitObserver overrides.
   void WillCommitCompositorFrame() override;
@@ -175,7 +182,8 @@ class CORE_EXPORT ViewTransition : public ScriptWrappable,
   }
 
   bool IsRootTransitioning() const {
-    return style_tracker_ && style_tracker_->IsRootTransitioning();
+    return style_tracker_ && document_->documentElement() &&
+           style_tracker_->IsTransitionElement(*document_->documentElement());
   }
 
   // In physical pixels. See comments on equivalent methods in
@@ -203,13 +211,19 @@ class CORE_EXPORT ViewTransition : public ScriptWrappable,
     return creation_type_ == CreationType::kFromSnapshot;
   }
 
-  // Notifies before the compositor associated with this frame will initiate a
-  // lifecycle update.
-  void NotifyRenderingHasBegun();
+  // Notifies the transition that frames are being produced and that the
+  // transition can start the animation phase (starting by capturing the
+  // incoming elements). No-op unless the transition is created from a
+  // snapshot.
+  void ActivateFromSnapshot();
 
   // Returns true if lifecycle updates should be throttled for the Document
   // associated with this transition.
   bool ShouldThrottleRendering() const;
+
+  // Ensure the LayoutViewTransitionRoot, representing the snapshot containing
+  // block concept, has up to date style.
+  void UpdateSnapshotContainingBlockStyle();
 
  private:
   friend class ViewTransitionTest;

@@ -4,8 +4,6 @@
 
 package org.chromium.chrome.browser.tasks.tab_management;
 
-import static org.chromium.chrome.browser.tasks.tab_management.TabManagementModuleProvider.SYNTHETIC_TRIAL_POSTFIX;
-
 import android.app.Activity;
 import android.content.Context;
 import android.view.ViewGroup;
@@ -13,8 +11,6 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import org.chromium.base.SysUtils;
-import org.chromium.base.jank_tracker.JankTracker;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.supplier.Supplier;
@@ -24,11 +20,9 @@ import org.chromium.chrome.browser.compositor.layouts.Layout;
 import org.chromium.chrome.browser.compositor.layouts.LayoutRenderHost;
 import org.chromium.chrome.browser.compositor.layouts.LayoutUpdateHost;
 import org.chromium.chrome.browser.compositor.layouts.content.TabContentManager;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.incognito.reauth.IncognitoReauthController;
 import org.chromium.chrome.browser.layouts.LayoutStateProvider;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
-import org.chromium.chrome.browser.metrics.UmaSessionStats;
 import org.chromium.chrome.browser.multiwindow.MultiWindowModeStateDispatcher;
 import org.chromium.chrome.browser.tabmodel.IncognitoStateProvider;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
@@ -50,10 +44,12 @@ import org.chromium.ui.resources.dynamics.DynamicResourceLoader;
 public class TabManagementDelegateImpl implements TabManagementDelegate {
     @Override
     public Layout createTabSwitcherLayout(Context context, LayoutUpdateHost updateHost,
-            LayoutRenderHost renderHost, TabSwitcher tabSwitcher, JankTracker jankTracker,
+            LayoutStateProvider layoutStateProvider, LayoutRenderHost renderHost,
+            BrowserControlsStateProvider browserControlsStateProvider, TabSwitcher tabSwitcher,
             ViewGroup tabSwitcherScrimAnchor, ScrimCoordinator scrimCoordinator) {
-        return new TabSwitcherLayout(context, updateHost, renderHost, tabSwitcher, jankTracker,
-                tabSwitcherScrimAnchor, scrimCoordinator);
+        return new TabSwitcherLayout(context, updateHost, layoutStateProvider, renderHost,
+                browserControlsStateProvider, tabSwitcher, tabSwitcherScrimAnchor,
+                scrimCoordinator);
     }
 
     @Override
@@ -71,23 +67,17 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
             @NonNull SnackbarManager snackbarManager,
             @NonNull ModalDialogManager modalDialogManager,
             @NonNull OneshotSupplier<IncognitoReauthController> incognitoReauthControllerSupplier,
-            @Nullable BackPressManager backPressManager) {
-        if (UmaSessionStats.isMetricsServiceAvailable()) {
-            UmaSessionStats.registerSyntheticFieldTrial(
-                    ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID + SYNTHETIC_TRIAL_POSTFIX,
-                    "Downloaded_Enabled");
-        }
-
+            @Nullable BackPressManager backPressManager,
+            @Nullable OneshotSupplier<LayoutStateProvider> layoutStateProviderSupplier) {
         return new TabSwitcherCoordinator(activity, activityLifecycleDispatcher, tabModelSelector,
                 tabContentManager, browserControlsStateProvider, tabCreatorManager,
                 menuOrKeyboardActionController, containerView, multiWindowModeStateDispatcher,
                 scrimCoordinator,
-                TabUiFeatureUtilities.isTabGroupsAndroidContinuationEnabled(activity)
-                                && SysUtils.isLowEndDevice()
+                TabUiFeatureUtilities.shouldUseListMode(activity)
                         ? TabListCoordinator.TabListMode.LIST
                         : TabListCoordinator.TabListMode.GRID,
                 rootView, dynamicResourceLoaderSupplier, snackbarManager, modalDialogManager,
-                incognitoReauthControllerSupplier, backPressManager);
+                incognitoReauthControllerSupplier, backPressManager, layoutStateProviderSupplier);
     }
 
     @Override
@@ -108,11 +98,13 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
                 tabContentManager, browserControls, tabCreatorManager,
                 menuOrKeyboardActionController, containerView, multiWindowModeStateDispatcher,
                 scrimCoordinator, TabListCoordinator.TabListMode.CAROUSEL, rootView,
-                dynamicResourceLoaderSupplier, snackbarManager, modalDialogManager, null, null);
+                dynamicResourceLoaderSupplier, snackbarManager, modalDialogManager, null, null,
+                null);
     }
 
     @Override
     public TabGroupUi createTabGroupUi(@NonNull Activity activity, @NonNull ViewGroup parentView,
+            @NonNull BrowserControlsStateProvider browserControlsStateProvider,
             @NonNull IncognitoStateProvider incognitoStateProvider,
             @NonNull ScrimCoordinator scrimCoordinator,
             @NonNull ObservableSupplier<Boolean> omniboxFocusStateSupplier,
@@ -124,17 +116,16 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
             @NonNull TabCreatorManager tabCreatorManager,
             @NonNull OneshotSupplier<LayoutStateProvider> layoutStateProviderSupplier,
             @NonNull SnackbarManager snackbarManager) {
-        return new TabGroupUiCoordinator(activity, parentView, incognitoStateProvider,
-                scrimCoordinator, omniboxFocusStateSupplier, bottomSheetController,
-                activityLifecycleDispatcher, isWarmOnResumeSupplier, tabModelSelector,
-                tabContentManager, rootView, dynamicResourceLoaderSupplier, tabCreatorManager,
-                layoutStateProviderSupplier, snackbarManager);
+        return new TabGroupUiCoordinator(activity, parentView, browserControlsStateProvider,
+                incognitoStateProvider, scrimCoordinator, omniboxFocusStateSupplier,
+                bottomSheetController, activityLifecycleDispatcher, isWarmOnResumeSupplier,
+                tabModelSelector, tabContentManager, rootView, dynamicResourceLoaderSupplier,
+                tabCreatorManager, layoutStateProviderSupplier, snackbarManager);
     }
 
     @Override
     public TabGroupModelFilter createTabGroupModelFilter(TabModel tabModel) {
-        return new TabGroupModelFilter(
-                tabModel, TabUiFeatureUtilities.ENABLE_TAB_GROUP_AUTO_CREATION.getValue());
+        return new TabGroupModelFilter(tabModel);
     }
 
     @Override

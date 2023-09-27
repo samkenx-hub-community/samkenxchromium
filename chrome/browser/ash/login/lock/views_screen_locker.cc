@@ -17,9 +17,9 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
-#include "chrome/browser/ash/authpolicy/authpolicy_helper.h"
 #include "chrome/browser/ash/lock_screen_apps/state_controller.h"
 #include "chrome/browser/ash/login/challenge_response_auth_keys_loader.h"
+#include "chrome/browser/ash/login/lock/screen_locker.h"
 #include "chrome/browser/ash/login/lock_screen_utils.h"
 #include "chrome/browser/ash/login/mojo_system_info_dispatcher.h"
 #include "chrome/browser/ash/login/quick_unlock/pin_backend.h"
@@ -124,9 +124,7 @@ void ViewsScreenLocker::HandleAuthenticateUserWithPasswordOrPin(
   user_context->SetSyncPasswordData(password_manager::PasswordHashData(
       account_id.GetUserEmail(), base::UTF8ToUTF16(password),
       false /*force_update*/));
-  if (account_id.GetAccountType() == AccountType::ACTIVE_DIRECTORY &&
-      (user_context->GetUserType() !=
-       user_manager::UserType::USER_TYPE_ACTIVE_DIRECTORY)) {
+  if (account_id.GetAccountType() == AccountType::ACTIVE_DIRECTORY) {
     LOG(FATAL) << "Incorrect Active Directory user type "
                << user_context->GetUserType();
   }
@@ -150,18 +148,10 @@ void ViewsScreenLocker::HandleAuthenticateUserWithChallengeResponse(
       account_id, std::move(callback));
 }
 
-void ViewsScreenLocker::HandleHardlockPod(const AccountId& account_id) {
-  user_selection_screen_->HardLockPod(account_id);
-}
-
 void ViewsScreenLocker::HandleOnFocusPod(const AccountId& account_id) {
   user_selection_screen_->HandleFocusPod(account_id);
 
   WallpaperControllerClientImpl::Get()->ShowUserWallpaper(account_id);
-}
-
-void ViewsScreenLocker::HandleOnNoPodFocused() {
-  user_selection_screen_->HandleNoPodFocused();
 }
 
 bool ViewsScreenLocker::HandleFocusLockScreenApps(bool reverse) {

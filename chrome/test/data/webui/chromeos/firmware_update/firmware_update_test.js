@@ -11,12 +11,12 @@ import {FakeUpdateProvider} from 'chrome://accessory-update/fake_update_provider
 import {FirmwareUpdateAppElement} from 'chrome://accessory-update/firmware_update_app.js';
 import {FirmwareUpdate, UpdateProviderInterface, UpdateState} from 'chrome://accessory-update/firmware_update_types.js';
 import {getUpdateProvider, setUpdateControllerForTesting, setUpdateProviderForTesting} from 'chrome://accessory-update/mojo_interface_provider.js';
-import {mojoString16ToString} from 'chrome://accessory-update/mojo_utils.js';
 import {UpdateCardElement} from 'chrome://accessory-update/update_card.js';
 import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
+import {mojoString16ToString} from 'chrome://resources/js/mojo_type_util.js';
+import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chromeos/chai_assert.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 
-import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chromeos/chai_assert.js';
 import {eventToPromise} from '../test_util.js';
 
 export function firmwareUpdateAppTest() {
@@ -30,7 +30,7 @@ export function firmwareUpdateAppTest() {
   let controller = null;
 
   setup(() => {
-    document.body.innerHTML = '';
+    document.body.innerHTML = window.trustedTypes.emptyHTML;
     controller = new FakeUpdateController();
     controller.setUpdateIntervalInMs(0);
     setUpdateControllerForTesting(controller);
@@ -259,5 +259,40 @@ export function firmwareUpdateAppTest() {
     assertEquals(UpdateState.kIdle, getUpdateState());
     const fakeUpdate = getFirmwareUpdateFromDialog();
     assertTrue(getUpdateDialog().open);
+  });
+
+  test('UpdatesCSSWhenIsJellyEnabledForFirmwareAppSet', async () => {
+    /* @type {HTMLLinkElement} */
+    const linkEl = document.createElement('link');
+    const disabledUrl = 'chrome://resources/chromeos/colors/cros_styles.css';
+    linkEl.href = disabledUrl;
+    document.head.appendChild(linkEl);
+
+    // Setup for jelly disabled.
+    loadTimeData.overrideValues({
+      isJellyEnabledForFirmwareUpdate: false,
+    });
+    initializePage();
+    await flushTasks();
+
+    assertTrue(linkEl.href.includes(disabledUrl));
+
+    // Clear app element.
+    page.remove();
+    page = null;
+    document.body.innerHTML = trustedTypes.emptyHTML;
+
+    // Setup for jelly disabled.
+    loadTimeData.overrideValues({
+      isJellyEnabledForFirmwareUpdate: true,
+    });
+    initializePage();
+    await flushTasks();
+
+    const enabledUrl = 'chrome://theme/colors.css';
+    assertTrue(linkEl.href.includes(enabledUrl));
+
+    // Clean up.
+    document.head.removeChild(linkEl);
   });
 }

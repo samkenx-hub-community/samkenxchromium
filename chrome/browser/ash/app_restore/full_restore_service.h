@@ -9,6 +9,8 @@
 
 #include "ash/public/cpp/accelerators.h"
 #include "base/callback_list.h"
+#include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "chrome/browser/sessions/exit_type_service.h"
@@ -53,9 +55,9 @@ enum class RestoreAction {
 };
 
 // Returns true if FullRestoreService can be created to restore/launch Lacros
-// during the system startup phase when below conditions are matched:
+// during the system startup phase when all of the below conditions are met:
 // 1. The FullRestoreForLacros flag is enabled.
-// 2. The WebAppsCrosapi or LacrosPrimary flag is enabled.
+// 2. Lacros is enabled.
 // 3. FullRestoreService can be created for the primary profile.
 bool MaybeCreateFullRestoreServiceForLacros();
 
@@ -135,7 +137,7 @@ class FullRestoreService : public KeyedService,
 
   void OnAppTerminating();
 
-  Profile* profile_ = nullptr;
+  raw_ptr<Profile, ExperimentalAsh> profile_ = nullptr;
   PrefChangeRegistrar pref_change_registrar_;
 
   // If the user of `profile_` is not the primary user, and hasn't been the

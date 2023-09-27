@@ -9,8 +9,12 @@
 #include <string>
 
 #include "ash/components/arc/mojom/power.mojom.h"
+#include "ash/components/arc/power/arc_power_bridge.h"
 #include "ash/components/arc/session/connection_observer.h"
+#include "base/memory/raw_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/sequence_checker.h"
+#include "base/timer/elapsed_timer.h"
 #include "chrome/browser/ash/throttle_service.h"
 #include "components/keyed_service/core/keyed_service.h"
 
@@ -20,6 +24,7 @@ class ArcBridgeService;
 // This class holds a number of observers which watch for all conditions that
 // gate the triggering of ARC's Idle (Doze) mode.
 class ArcIdleManager : public KeyedService,
+                       public ArcPowerBridge::Observer,
                        public ash::ThrottleService,
                        public ConnectionObserver<mojom::PowerInstance> {
  public:
@@ -52,12 +57,18 @@ class ArcIdleManager : public KeyedService,
   static ArcIdleManager* GetForBrowserContextForTesting(
       content::BrowserContext* context);
 
+  static void EnsureFactoryBuilt();
+
   // KeyedService:
   void Shutdown() override;
 
   // ConnectionObserver<mojom::PowerInstance>:
   void OnConnectionReady() override;
   void OnConnectionClosed() override;
+
+  // ArcPowerBridge::Observer
+  void OnVmResumed() override;
+  void OnWillDestroyArcPowerBridge() override;
 
   // Replaces the delegate so we can monitor switches without touching actual
   // power state, for unit test purposes.
@@ -68,16 +79,22 @@ class ArcIdleManager : public KeyedService,
   // ash::ThrottleService:
   // This is the main idle toggle.
   void ThrottleInstance(bool should_idle) override;
-  void RecordCpuRestrictionDisabledUMA(const std::string& observer_name,
-                                       base::TimeDelta delta) override {}
 
  private:
+  bool first_idle_happened_ = false;
   std::unique_ptr<Delegate> delegate_;
   bool is_connected_ GUARDED_BY_CONTEXT(sequence_checker_) = false;
   SEQUENCE_CHECKER(sequence_checker_);
 
+  void LogScreenOffTimer(bool toggle_timer);
+
   // Owned by ArcServiceManager.
-  ArcBridgeService* const bridge_;
+  const raw_ptr<ArcBridgeService, ExperimentalAsh> bridge_;
+
+  base::ElapsedTimer interactive_off_span_timer_;
+
+  base::ScopedObservation<ArcPowerBridge, ArcPowerBridge::Observer>
+      powerbridge_observation_{this};
 };
 
 }  // namespace arc

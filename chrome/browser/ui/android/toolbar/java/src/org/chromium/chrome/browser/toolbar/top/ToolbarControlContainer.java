@@ -30,9 +30,13 @@ import org.chromium.base.Callback;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.browser.browser_controls.BrowserStateBrowserControlsVisibilityDelegate;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
+import org.chromium.chrome.browser.fullscreen.FullscreenManager;
+import org.chromium.chrome.browser.layouts.LayoutStateProvider;
+import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiThemeUtil;
 import org.chromium.chrome.browser.toolbar.ConstraintsChecker;
@@ -48,6 +52,7 @@ import org.chromium.components.browser_ui.widget.ViewResourceFrameLayout;
 import org.chromium.components.browser_ui.widget.gesture.SwipeGestureListener;
 import org.chromium.components.browser_ui.widget.gesture.SwipeGestureListener.SwipeHandler;
 import org.chromium.ui.KeyboardVisibilityDelegate;
+import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.ViewUtils;
 import org.chromium.ui.resources.dynamics.ViewResourceAdapter;
 import org.chromium.ui.util.TokenHolder;
@@ -62,6 +67,8 @@ import java.util.function.BooleanSupplier;
  */
 public class ToolbarControlContainer extends OptimizedFrameLayout implements ControlContainer {
     private final float mTabStripHeight;
+
+    private boolean mIncognito;
 
     private Toolbar mToolbar;
     private ToolbarViewResourceFrameLayout mToolbarContainer;
@@ -122,8 +129,51 @@ public class ToolbarControlContainer extends OptimizedFrameLayout implements Con
     }
 
     @Override
+    public void onTabOrModelChanged(boolean incognito) {
+        if (!DeviceFormFactor.isNonMultiDisplayContextOnTablet(getContext())
+                || getBackground() == null) {
+            return;
+        }
+
+        if (mIncognito != incognito) {
+            setBackground(getTempTabStripDrawable(incognito));
+            mIncognito = incognito;
+        }
+    }
+
+    @Override
     public void destroy() {
         ((ToolbarViewResourceAdapter) getToolbarResourceAdapter()).destroy();
+    }
+
+    private Drawable getTempTabStripDrawable(boolean incognito) {
+        if (ChromeFeatureList.sTabStripRedesign.isEnabled()) {
+            Drawable bgdColor = new ColorDrawable(
+                    TabUiThemeUtil.getTabStripBackgroundColor(getContext(), incognito));
+            Drawable bdgTabImage = ResourcesCompat.getDrawable(getContext().getResources(),
+                    TabUiThemeUtil.getTSRTabResource(), getContext().getTheme());
+            bdgTabImage.setTint(TabUiThemeUtil.getTabStripContainerColor(
+                    getContext(), incognito, true, false, false, false));
+            LayerDrawable backgroundDrawable =
+                    new LayerDrawable(new Drawable[] {bgdColor, bdgTabImage});
+            // Set image size to match tab size.
+            backgroundDrawable.setPadding(0, 0, 0, 0);
+            backgroundDrawable.setLayerSize(1,
+                    ViewUtils.dpToPx(getContext(), TabUiThemeUtil.getMaxTabStripTabWidthDp()),
+                    mToolbar.getTabStripHeight());
+            // Tab should show up at start of layer based on layout.
+            backgroundDrawable.setLayerGravity(1, Gravity.START);
+
+            return backgroundDrawable;
+        } else {
+            final Drawable backgroundDrawable =
+                    AppCompatResources.getDrawable(getContext(), R.drawable.toolbar_background)
+                            .mutate();
+            backgroundDrawable.setTint(ChromeColors.getDefaultThemeColor(getContext(), incognito));
+            backgroundDrawable.setTintMode(PorterDuff.Mode.MULTIPLY);
+
+            return backgroundDrawable;
+        }
     }
 
     /**
@@ -135,18 +185,24 @@ public class ToolbarControlContainer extends OptimizedFrameLayout implements Con
      * @param compositorInMotionSupplier Whether there is an ongoing touch or gesture.
      * @param browserStateBrowserControlsVisibilityDelegate Used to keep controls locked when
      *        captures are stale and not able to be taken.
+     * @param layoutStateProviderSupplier Used to check the current layout type.
+     * @param fullscreenManager Used to check whether in fullscreen.
      */
     public void setPostInitializationDependencies(Toolbar toolbar, boolean isIncognito,
             ObservableSupplier<Integer> constraintsSupplier, Supplier<Tab> tabSupplier,
             ObservableSupplier<Boolean> compositorInMotionSupplier,
             BrowserStateBrowserControlsVisibilityDelegate
-                    browserStateBrowserControlsVisibilityDelegate) {
+                    browserStateBrowserControlsVisibilityDelegate,
+            OneshotSupplier<LayoutStateProvider> layoutStateProviderSupplier,
+            FullscreenManager fullscreenManager) {
         mToolbar = toolbar;
+        mIncognito = isIncognito;
 
         BooleanSupplier isVisible = () -> this.getVisibility() == View.VISIBLE;
         mToolbarContainer.setPostInitializationDependencies(mToolbar, constraintsSupplier,
                 tabSupplier, compositorInMotionSupplier,
-                browserStateBrowserControlsVisibilityDelegate, isVisible);
+                browserStateBrowserControlsVisibilityDelegate, isVisible,
+                layoutStateProviderSupplier, fullscreenManager);
 
         View toolbarView = findViewById(R.id.toolbar);
         assert toolbarView != null;
@@ -155,33 +211,7 @@ public class ToolbarControlContainer extends OptimizedFrameLayout implements Con
             // On tablet, draw a fake tab strip and toolbar until the compositor is
             // ready to draw the real tab strip. (On phone, the toolbar is made entirely
             // of Android views, which are already initialized.)
-
-            if (ChromeFeatureList.sTabStripRedesign.isEnabled()) {
-                Drawable bgdColor = new ColorDrawable(
-                        TabUiThemeUtil.getTabStripBackgroundColor(getContext(), isIncognito));
-                Drawable bdgTabImage = ResourcesCompat.getDrawable(getContext().getResources(),
-                        TabUiThemeUtil.getTSRTabResource(), getContext().getTheme());
-                bdgTabImage.setTint(
-                        TabUiThemeUtil.getTabStripContainerColor(getContext(), false, true, false));
-                LayerDrawable backgroundDrawable =
-                        new LayerDrawable(new Drawable[] {bgdColor, bdgTabImage});
-                // Set image size to match tab size.
-                backgroundDrawable.setPadding(0, 0, 0, 0);
-                backgroundDrawable.setLayerSize(1,
-                        ViewUtils.dpToPx(getContext(), TabUiThemeUtil.getMaxTabStripTabWidthDp()),
-                        mToolbar.getTabStripHeight());
-                // Tab should show up at start of layer based on layout.
-                backgroundDrawable.setLayerGravity(1, Gravity.START);
-                setBackground(backgroundDrawable);
-            } else {
-                final Drawable backgroundDrawable =
-                        AppCompatResources.getDrawable(getContext(), R.drawable.toolbar_background)
-                                .mutate();
-                backgroundDrawable.setTint(
-                        ChromeColors.getDefaultThemeColor(getContext(), isIncognito));
-                backgroundDrawable.setTintMode(PorterDuff.Mode.MULTIPLY);
-                setBackground(backgroundDrawable);
-            }
+            setBackground(getTempTabStripDrawable(isIncognito));
         }
     }
 
@@ -242,12 +272,14 @@ public class ToolbarControlContainer extends OptimizedFrameLayout implements Con
                 ObservableSupplier<Boolean> compositorInMotionSupplier,
                 BrowserStateBrowserControlsVisibilityDelegate
                         browserStateBrowserControlsVisibilityDelegate,
-                BooleanSupplier isVisible) {
+                BooleanSupplier isVisible,
+                OneshotSupplier<LayoutStateProvider> layoutStateProviderSupplier,
+                FullscreenManager fullscreenManager) {
             ToolbarViewResourceAdapter adapter =
                     ((ToolbarViewResourceAdapter) getResourceAdapter());
             adapter.setPostInitializationDependencies(toolbar, constraintsSupplier, tabSupplier,
                     compositorInMotionSupplier, browserStateBrowserControlsVisibilityDelegate,
-                    isVisible);
+                    isVisible, layoutStateProviderSupplier, fullscreenManager);
         }
 
         @Override
@@ -294,6 +326,10 @@ public class ToolbarControlContainer extends OptimizedFrameLayout implements Con
                 mBrowserStateBrowserControlsVisibilityDelegate;
         @Nullable
         private BooleanSupplier mControlContainerIsVisibleSupplier;
+        @Nullable
+        private LayoutStateProvider mLayoutStateProvider;
+        @Nullable
+        private FullscreenManager mFullscreenManager;
 
         private int mControlsToken = TokenHolder.INVALID_TOKEN;
 
@@ -312,13 +348,17 @@ public class ToolbarControlContainer extends OptimizedFrameLayout implements Con
          * @param browserStateBrowserControlsVisibilityDelegate Used to keep controls locked when
          *        captures are stale and not able to be taken.
          * @param controlContainerIsVisibleSupplier Whether the toolbar is visible.
+         * @param layoutStateProviderSupplier Used to check the current layout type.
+         * @param fullscreenManager Used to check whether in fullscreen.
          */
         public void setPostInitializationDependencies(Toolbar toolbar,
                 ObservableSupplier<Integer> constraintsSupplier, Supplier<Tab> tabSupplier,
                 ObservableSupplier<Boolean> compositorInMotionSupplier,
                 BrowserStateBrowserControlsVisibilityDelegate
                         browserStateBrowserControlsVisibilityDelegate,
-                BooleanSupplier controlContainerIsVisibleSupplier) {
+                BooleanSupplier controlContainerIsVisibleSupplier,
+                OneshotSupplier<LayoutStateProvider> layoutStateProviderSupplier,
+                FullscreenManager fullscreenManager) {
             assert mToolbar == null;
             mToolbar = toolbar;
             mTabStripHeightPx = mToolbar.getTabStripHeight();
@@ -335,6 +375,9 @@ public class ToolbarControlContainer extends OptimizedFrameLayout implements Con
             mBrowserStateBrowserControlsVisibilityDelegate =
                     browserStateBrowserControlsVisibilityDelegate;
             mControlContainerIsVisibleSupplier = controlContainerIsVisibleSupplier;
+            layoutStateProviderSupplier.onAvailable(
+                    (layoutStateProvider) -> mLayoutStateProvider = layoutStateProvider);
+            mFullscreenManager = fullscreenManager;
         }
 
         /**
@@ -354,33 +397,47 @@ public class ToolbarControlContainer extends OptimizedFrameLayout implements Con
             }
 
             if (ToolbarFeatures.shouldSuppressCaptures()) {
-                if (mConstraintsObserver != null && mTabSupplier != null) {
-                    Tab tab = mTabSupplier.get();
-
-                    // TODO(https://crbug.com/1355516): Understand and fix this for native pages. It
-                    // seems capturing is required for some part of theme observers to work
-                    // correctly, but it shouldn't be.
-                    boolean isNativePage = tab == null || tab.isNativePage();
-                    if (!isNativePage && mConstraintsObserver.areControlsLocked()) {
-                        mConstraintsObserver.scheduleRequestResourceOnUnlock();
-                        CaptureReadinessResult.logCaptureReasonFromResult(
-                                CaptureReadinessResult.notReady(
-                                        TopToolbarBlockCaptureReason.BROWSER_CONTROLS_LOCKED));
-                        return false;
-                    }
+                if (ToolbarFeatures.shouldBlockCapturesForFullscreen()
+                        && mFullscreenManager.getPersistentFullscreenMode()) {
+                    // The toolbar is never shown during fullscreen, so no point in capturing. The
+                    // dimensions are likely wrong and will only be restored after fullscreen is
+                    // exited.
+                    CaptureReadinessResult.logCaptureReasonFromResult(
+                            CaptureReadinessResult.notReady(
+                                    TopToolbarBlockCaptureReason.FULLSCREEN));
+                    return false;
                 }
 
-                // The heavy lifting is done by #onCompositorInMotionChange and the above browser
-                // controls state check. This logic only needs to guard against a capture when
-                // the controls were partially or fully scrolled off, in the middle of motion,
-                // before the view became dirty.
-                if (mCompositorInMotionSupplier != null) {
-                    Boolean compositorInMotion = mCompositorInMotionSupplier.get();
-                    if (Boolean.TRUE.equals(compositorInMotion)) {
-                        CaptureReadinessResult.logCaptureReasonFromResult(
-                                CaptureReadinessResult.notReady(
-                                        TopToolbarBlockCaptureReason.COMPOSITOR_IN_MOTION));
-                        return false;
+                final @LayoutType int layoutType = getCurrentLayoutType();
+                if (layoutType != LayoutType.TOOLBAR_SWIPE) {
+                    if (mConstraintsObserver != null && mTabSupplier != null) {
+                        Tab tab = mTabSupplier.get();
+
+                        // TODO(https://crbug.com/1355516): Understand and fix this for native
+                        // pages. It seems capturing is required for some part of theme observers to
+                        // work correctly, but it shouldn't be.
+                        boolean isNativePage = tab == null || tab.isNativePage();
+                        if (!isNativePage && mConstraintsObserver.areControlsLocked()) {
+                            mConstraintsObserver.scheduleRequestResourceOnUnlock();
+                            CaptureReadinessResult.logCaptureReasonFromResult(
+                                    CaptureReadinessResult.notReady(
+                                            TopToolbarBlockCaptureReason.BROWSER_CONTROLS_LOCKED));
+                            return false;
+                        }
+                    }
+
+                    // The heavy lifting is done by #onCompositorInMotionChange and the above
+                    // browser controls state check. This logic only needs to guard against a
+                    // capture when the controls were partially or fully scrolled off, in the middle
+                    // of motion, before the view became dirty.
+                    if (mCompositorInMotionSupplier != null) {
+                        Boolean compositorInMotion = mCompositorInMotionSupplier.get();
+                        if (Boolean.TRUE.equals(compositorInMotion)) {
+                            CaptureReadinessResult.logCaptureReasonFromResult(
+                                    CaptureReadinessResult.notReady(
+                                            TopToolbarBlockCaptureReason.COMPOSITOR_IN_MOTION));
+                            return false;
+                        }
                     }
                 }
             }
@@ -497,6 +554,11 @@ public class ToolbarControlContainer extends OptimizedFrameLayout implements Con
                                     TopToolbarBlockCaptureReason.COMPOSITOR_IN_MOTION));
                 }
             }
+        }
+
+        private @LayoutType int getCurrentLayoutType() {
+            return mLayoutStateProvider == null ? LayoutType.NONE
+                                                : mLayoutStateProvider.getActiveLayoutType();
         }
     }
 

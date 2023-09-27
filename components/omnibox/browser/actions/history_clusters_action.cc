@@ -21,14 +21,13 @@
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/omnibox/browser/autocomplete_result.h"
 #include "components/optimization_guide/core/entity_metadata.h"
-#include "components/prefs/pref_service.h"
 #include "components/strings/grit/components_strings.h"
 #include "net/base/url_util.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
-#include "components/omnibox/browser/actions/omnibox_pedal_jni_wrapper.h"
+#include "components/omnibox/browser/actions/omnibox_action_factory_android.h"
 #include "url/android/gurl_android.h"
 #endif
 
@@ -92,28 +91,22 @@ bool IsNavigationIntent(int top_search_relevance,
 }
 
 GURL GetFullJourneysUrlForQuery(const std::string& query) {
-  return net::AppendOrReplaceQueryParameter(GURL(kChromeUIHistoryClustersURL),
-                                            "q", query);
+  return net::AppendOrReplaceQueryParameter(
+      GURL(GetChromeUIHistoryClustersURL()), "q", query);
 }
 
 HistoryClustersAction::HistoryClustersAction(
     const std::string& query,
-    const history::ClusterKeywordData& matched_keyword_data,
-    bool takes_over_match)
+    const history::ClusterKeywordData& matched_keyword_data)
     : OmniboxAction(
           OmniboxAction::LabelStrings(
               IDS_OMNIBOX_ACTION_HISTORY_CLUSTERS_SEARCH_HINT,
               IDS_OMNIBOX_ACTION_HISTORY_CLUSTERS_SEARCH_SUGGESTION_CONTENTS,
               IDS_ACC_OMNIBOX_ACTION_HISTORY_CLUSTERS_SEARCH_SUFFIX,
               IDS_ACC_OMNIBOX_ACTION_HISTORY_CLUSTERS_SEARCH),
-          GetFullJourneysUrlForQuery(query),
-          takes_over_match),
+          GetFullJourneysUrlForQuery(query)),
       matched_keyword_data_(matched_keyword_data),
-      query_(query) {
-#if BUILDFLAG(IS_ANDROID)
-    CreateOrUpdateJavaObject(query);
-#endif
-}
+      query_(query) {}
 
 void HistoryClustersAction::RecordActionShown(size_t position,
                                               bool executed) const {
@@ -168,8 +161,8 @@ void HistoryClustersAction::Execute(ExecutionContext& context) const {
   OmniboxAction::Execute(context);
 }
 
-int32_t HistoryClustersAction::GetID() const {
-  return static_cast<int32_t>(OmniboxActionId::HISTORY_CLUSTERS);
+OmniboxActionId HistoryClustersAction::ActionId() const {
+  return OmniboxActionId::HISTORY_CLUSTERS;
 }
 
 #if defined(SUPPORT_PEDALS_VECTOR_ICONS)
@@ -179,15 +172,14 @@ const gfx::VectorIcon& HistoryClustersAction::GetVectorIcon() const {
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
-base::android::ScopedJavaGlobalRef<jobject>
-HistoryClustersAction::GetJavaObject() const {
-  return j_omnibox_action_;
-}
-
-void HistoryClustersAction::CreateOrUpdateJavaObject(const std::string& query) {
-  j_omnibox_action_.Reset(BuildHistoryClustersAction(
-      GetID(), strings_.hint, strings_.suggestion_contents,
-      strings_.accessibility_suffix, strings_.accessibility_hint, url_, query));
+base::android::ScopedJavaLocalRef<jobject>
+HistoryClustersAction::GetOrCreateJavaObject(JNIEnv* env) const {
+  if (!j_omnibox_action_) {
+    j_omnibox_action_.Reset(BuildHistoryClustersAction(
+        env, reinterpret_cast<intptr_t>(this), strings_.hint,
+        strings_.accessibility_hint, query_));
+  }
+  return base::android::ScopedJavaLocalRef<jobject>(j_omnibox_action_);
 }
 #endif
 
@@ -196,7 +188,6 @@ HistoryClustersAction::~HistoryClustersAction() = default;
 // Should be invoked after `AutocompleteResult::AttachPedalsToMatches()`.
 void AttachHistoryClustersActions(
     history_clusters::HistoryClustersService* service,
-    PrefService* prefs,
     AutocompleteResult& result) {
 #if BUILDFLAG(IS_IOS)
   // Compile out this method for Mobile, which doesn't omnibox actions yet.
@@ -204,8 +195,9 @@ void AttachHistoryClustersActions(
   return;
 #else
 
-  if (!IsJourneysEnabledInOmnibox(service, prefs))
+  if (!service || !service->IsJourneysEnabledAndVisible()) {
     return;
+  }
 
   if (!GetConfig().omnibox_action)
     return;
@@ -213,14 +205,11 @@ void AttachHistoryClustersActions(
   if (result.empty())
     return;
 
-  // If there's any visible action in `result`, don't add a history cluster
-  // action to avoid over-crowding.
+  // If there's any action in `result`, don't add a history cluster action to
+  // avoid over-crowding.
   if (!GetConfig().omnibox_action_with_pedals &&
-      base::ranges::any_of(result, [](const auto& match) {
-        return base::ranges::any_of(match.actions, [](const auto& action) {
-          return !action->TakesOverMatch();
-        });
-      })) {
+      base::ranges::any_of(
+          result, [](const auto& match) { return !match.actions.empty(); })) {
     return;
   }
 
@@ -255,19 +244,7 @@ void AttachHistoryClustersActions(
           service->DoesQueryMatchAnyCluster(query);
       if (matched_keyword_data) {
         match.actions.push_back(base::MakeRefCounted<HistoryClustersAction>(
-            query, std::move(matched_keyword_data.value()),
-            /*takes_over_match=*/false));
-      }
-    } else if (GetConfig().omnibox_action_on_urls) {
-      // We do the URL stripping here, because we need it to both execute the
-      // query, as well as to feed it into the action chip so the chip navigates
-      // to the right place (with the query pre-populated).
-      std::string url_keyword =
-          history_clusters::ComputeURLKeywordForLookup(match.destination_url);
-      if (service->DoesURLMatchAnyCluster(url_keyword)) {
-        match.actions.push_back(base::MakeRefCounted<HistoryClustersAction>(
-            url_keyword, history::ClusterKeywordData(),
-            /*takes_over_match=*/false));
+            query, std::move(matched_keyword_data.value())));
       }
     }
 

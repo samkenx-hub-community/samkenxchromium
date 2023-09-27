@@ -37,10 +37,12 @@ import org.chromium.base.metrics.UmaRecorderHolder;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
+import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.SettingsLauncherImpl;
 import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.browser_ui.settings.SettingsLauncher;
 import org.chromium.components.search_engines.TemplateUrl;
 import org.chromium.components.search_engines.TemplateUrlService;
@@ -51,7 +53,7 @@ import org.chromium.components.version_info.VersionInfo;
  */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-@Features.EnableFeatures({})
+@EnableFeatures({})
 public final class SearchEngineChoiceNotificationTest {
     private static final String TEST_INITIAL_ENGINE = "google.com";
     private static final String TEST_ALTERNATIVE_ENGINE = "duckduckgo.com";
@@ -69,6 +71,8 @@ public final class SearchEngineChoiceNotificationTest {
     private TemplateUrl mInitialSearchEngine;
     @Mock
     private TemplateUrl mAlternativeSearchEngine;
+    @Mock
+    private Profile mProfile;
     @Captor
     private ArgumentCaptor<Snackbar> mSnackbarArgument;
     @Mock
@@ -82,6 +86,7 @@ public final class SearchEngineChoiceNotificationTest {
         UmaRecorderHolder.resetForTesting();
 
         // Sets up appropriate responses from Template URL service.
+        Profile.setLastUsedProfileForTesting(mProfile);
         TemplateUrlServiceFactory.setInstanceForTesting(mTemplateUrlService);
         doReturn(TEST_ALTERNATIVE_ENGINE).when(mAlternativeSearchEngine).getKeyword();
         doReturn(SearchEngineType.SEARCH_ENGINE_DUCKDUCKGO)

@@ -10,7 +10,10 @@
 #include <memory>
 
 #include "base/memory/scoped_refptr.h"
+#include "base/uuid.h"
+#include "mojo/public/cpp/base/big_buffer.h"
 #include "third_party/blink/public/common/fenced_frame/redacted_fenced_frame_config.h"
+#include "third_party/blink/public/common/interest_group/auction_config.h"
 #include "third_party/blink/public/mojom/interest_group/ad_auction_service.mojom-blink.h"
 #include "third_party/blink/public/mojom/interest_group/interest_group_types.mojom-blink.h"
 #include "third_party/blink/renderer/core/frame/navigator.h"
@@ -26,12 +29,12 @@
 
 namespace blink {
 
+class AdAuctionDataConfig;
 class AdRequestConfig;
 class Ads;
 class AuctionAdInterestGroup;
 class AuctionAdInterestGroupKey;
 class AuctionAdConfig;
-class ScopedAbortState;
 class ScriptPromiseResolver;
 class V8UnionFencedFrameConfigOrUSVString;
 
@@ -48,14 +51,19 @@ class MODULES_EXPORT NavigatorAuction final
   // See platform/Supplementable.h
   static NavigatorAuction& From(ExecutionContext*, Navigator&);
 
+  // TODO(crbug.com/1441988): Make `const AuctionAdInterestGroup*` after rename.
   ScriptPromise joinAdInterestGroup(ScriptState*,
-                                    const AuctionAdInterestGroup*,
-                                    double,
+                                    AuctionAdInterestGroup*,
+                                    absl::optional<double>,
                                     ExceptionState&);
   static ScriptPromise joinAdInterestGroup(ScriptState*,
                                            Navigator&,
-                                           const AuctionAdInterestGroup*,
+                                           AuctionAdInterestGroup*,
                                            double,
+                                           ExceptionState&);
+  static ScriptPromise joinAdInterestGroup(ScriptState*,
+                                           Navigator&,
+                                           AuctionAdInterestGroup*,
                                            ExceptionState&);
   ScriptPromise leaveAdInterestGroup(ScriptState*,
                                      const AuctionAdInterestGroupKey*,
@@ -73,13 +81,17 @@ class MODULES_EXPORT NavigatorAuction final
 
   void updateAdInterestGroups();
   static void updateAdInterestGroups(ScriptState*, Navigator&, ExceptionState&);
-  ScriptPromise runAdAuction(ScriptState*,
-                             const AuctionAdConfig*,
-                             ExceptionState&);
+  // TODO(crbug.com/1441988): Make `const AuctionAdConfig*` after rename.
+  ScriptPromise runAdAuction(ScriptState*, AuctionAdConfig*, ExceptionState&);
   static ScriptPromise runAdAuction(ScriptState*,
                                     Navigator&,
-                                    const AuctionAdConfig*,
+                                    AuctionAdConfig*,
                                     ExceptionState&);
+
+  ScriptPromise createAuctionNonce(ScriptState*, ExceptionState&);
+  static ScriptPromise createAuctionNonce(ScriptState*,
+                                          Navigator&,
+                                          ExceptionState&);
 
   // If called from a FencedFrame that was navigated to the URN resulting from
   // an interest group ad auction, returns a Vector of ad component URNs
@@ -124,6 +136,15 @@ class MODULES_EXPORT NavigatorAuction final
       const Vector<std::pair<String, String>>& replacement,
       ExceptionState& exception_state);
 
+  ScriptPromise getInterestGroupAdAuctionData(ScriptState* script_state,
+                                              const AdAuctionDataConfig* config,
+                                              ExceptionState& exception_state);
+  static ScriptPromise getInterestGroupAdAuctionData(
+      ScriptState* script_state,
+      Navigator& navigator,
+      const AdAuctionDataConfig* config,
+      ExceptionState& exception_state);
+
   ScriptPromise createAdRequest(ScriptState*,
                                 const AdRequestConfig*,
                                 ExceptionState&);
@@ -152,6 +173,10 @@ class MODULES_EXPORT NavigatorAuction final
   // - No CSPEE is applied to this or an ancestor frame
   bool canLoadAdAuctionFencedFrame(ScriptState*);
   static bool canLoadAdAuctionFencedFrame(ScriptState*, Navigator&);
+
+  // Expose whether kFledgeEnforceKAnonymity feature is enabled or not.
+  static bool deprecatedRunAdAuctionEnforcesKAnonymity(ScriptState*,
+                                                       Navigator&);
 
   void Trace(Visitor* visitor) const override {
     visitor->Trace(ad_auction_service_);
@@ -190,25 +215,25 @@ class MODULES_EXPORT NavigatorAuction final
   void LeaveComplete(bool is_cross_origin,
                      ScriptPromiseResolver* resolver,
                      bool failed_well_known_check);
-
+  // Completion callback for createAuctionNonce() Mojo call.
+  void CreateAuctionNonceComplete(ScriptPromiseResolver* resolver,
+                                  const base::Uuid& nonce);
   // Completion callback for createAdRequest() Mojo call.
   void AdsRequested(ScriptPromiseResolver* resolver,
                     const WTF::String& ads_guid);
   // Completion callback for finalizeAd() Mojo call.
   void FinalizeAdComplete(ScriptPromiseResolver* resolver,
                           const absl::optional<KURL>& creative_url);
-  // Completion callback for Mojo call made by runAdAuction().
-  void AuctionComplete(
-      ScriptPromiseResolver*,
-      std::unique_ptr<ScopedAbortState>,
-      bool resolve_to_config,
-      bool manually_aborted,
-      const absl::optional<FencedFrame::RedactedFencedFrameConfig>&);
   // Completion callback for Mojo call made by deprecatedURNToURL().
   void GetURLFromURNComplete(ScriptPromiseResolver*,
                              const absl::optional<KURL>&);
   // Completion callback for Mojo call made by deprecatedReplaceInURNComplete().
   void ReplaceInURNComplete(ScriptPromiseResolver* resolver);
+
+  void GetInterestGroupAdAuctionDataComplete(
+      ScriptPromiseResolver* resolver,
+      mojo_base::BigBuffer request,
+      const absl::optional<base::Uuid>& request_id);
 
   // Manage queues of cross-site join and leave operations that have yet to be
   // sent to the browser process.

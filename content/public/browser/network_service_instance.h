@@ -5,11 +5,11 @@
 #ifndef CONTENT_PUBLIC_BROWSER_NETWORK_SERVICE_INSTANCE_H_
 #define CONTENT_PUBLIC_BROWSER_NETWORK_SERVICE_INSTANCE_H_
 
-#include "base/callback_list.h"
 #include "base/functional/callback.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "content/common/content_export.h"
+#include "mojo/public/cpp/bindings/remote.h"
 #include "services/cert_verifier/public/mojom/cert_verifier_service_factory.mojom-forward.h"
 #include "services/network/public/cpp/network_connection_tracker.h"
 #include "services/network/public/mojom/network_context.mojom-forward.h"
@@ -104,6 +104,12 @@ CONTENT_EXPORT void SetCertVerifierServiceFactoryForTesting(
 CONTENT_EXPORT cert_verifier::mojom::CertVerifierServiceFactory*
 GetCertVerifierServiceFactory();
 
+// Returns the |mojo::Remote<CertVerifierServiceFactory>|. For testing only.
+// Must only be called on the UI thread.
+CONTENT_EXPORT
+mojo::Remote<cert_verifier::mojom::CertVerifierServiceFactory>&
+GetCertVerifierServiceFactoryRemoteForTesting();
+
 // Convenience function to create a NetworkContext from the given set of
 // |params|. Any creation of network contexts should be done through this
 // function.
@@ -111,6 +117,10 @@ GetCertVerifierServiceFactory();
 CONTENT_EXPORT void CreateNetworkContextInNetworkService(
     mojo::PendingReceiver<network::mojom::NetworkContext> context,
     network::mojom::NetworkContextParamsPtr params);
+
+// Shuts down the in-process network service or disconnects from the out-of-
+// process one, allowing it to shut down. Then, restarts it.
+CONTENT_EXPORT void RestartNetworkService();
 
 }  // namespace content
 

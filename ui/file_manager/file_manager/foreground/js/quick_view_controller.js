@@ -7,6 +7,7 @@ import {LoadImageRequest, LoadImageResponse, LoadImageResponseStatus} from 'chro
 import {assert} from 'chrome://resources/ash/common/assert.js';
 
 import {DialogType, isModal} from '../../common/js/dialog_type.js';
+import {parseActionId} from '../../common/js/file_tasks.js';
 import {FileType} from '../../common/js/file_type.js';
 import {str, util} from '../../common/js/util.js';
 import {VolumeManagerCommon} from '../../common/js/volume_manager_types.js';
@@ -14,10 +15,9 @@ import {CommandHandlerDeps} from '../../externs/command_handler_deps.js';
 import {VolumeManager} from '../../externs/volume_manager.js';
 import {FilesQuickView} from '../elements/files_quick_view.js';
 
-import {constants} from './constants.js';
 import {CommandHandler} from './file_manager_commands.js';
 import {FileSelectionHandler} from './file_selection.js';
-import {FileTasks, parseActionId} from './file_tasks.js';
+import {FileTasks} from './file_tasks.js';
 import {MetadataItem} from './metadata/metadata_item.js';
 import {MetadataModel} from './metadata/metadata_model.js';
 import {MetadataBoxController} from './metadata_box_controller.js';
@@ -164,6 +164,17 @@ export class QuickViewController {
 
     document.body.addEventListener(
         'keydown', this.onQuickViewKeyDown_.bind(this));
+
+    // Prevent selected file from being copied when quick view is open and
+    // instead allow any selected "General info" text to be copied.
+    document.body.addEventListener('copy', event => {
+      if (this.quickView_.isOpened()) {
+        // Stop 'copy' event propagation to FileTransferController and allow
+        // default copy event behaviour.
+        event.stopPropagation();
+      }
+    });
+
     this.quickView_.addEventListener('close', () => {
       this.listContainer_.focus();
     });
@@ -457,7 +468,8 @@ export class QuickViewController {
 
     try {
       const values = await Promise.all([
-        this.metadataModel_.get([entry], ['thumbnailUrl', 'modificationTime']),
+        this.metadataModel_.get(
+            [entry], ['thumbnailUrl', 'modificationTime', 'contentMimeType']),
         this.taskController_.getEntryFileTasks(entry),
         this.canDeleteEntry_(entry),
       ]);
@@ -528,7 +540,7 @@ export class QuickViewController {
    * @private
    */
   async getQuickViewParameters_(entry, items, tasks, canDelete) {
-    const typeInfo = FileType.getType(entry);
+    const typeInfo = FileType.getType(entry, items[0].contentMimeType);
     const type = typeInfo.type;
     const locationInfo = this.volumeManager_.getLocationInfo(entry);
     const label = util.getEntryLabel(locationInfo, entry);
@@ -552,7 +564,8 @@ export class QuickViewController {
             assert(volumeInfo.volumeType)) >= 0;
 
     // Treat certain types on Drive as if they were local (try auto-play etc).
-    if (entryIsOnDrive && (type === 'audio' || type === 'video')) {
+    if (entryIsOnDrive && (type === 'audio' || type === 'video') &&
+        !typeInfo.encrypted) {
       localFile = true;
     }
 
@@ -584,6 +597,10 @@ export class QuickViewController {
         } else {
           console.warn(`Failed to fetch thumbnail: ${result.status}`);
         }
+      }
+      if (typeInfo.encrypted) {
+        params.type = 'encrypted';
+        return params;
       }
     }
 

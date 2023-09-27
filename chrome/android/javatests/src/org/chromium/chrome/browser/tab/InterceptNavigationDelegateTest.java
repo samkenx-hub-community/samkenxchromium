@@ -4,13 +4,11 @@
 
 package org.chromium.chrome.browser.tab;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
 
 import org.hamcrest.Matchers;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -78,8 +76,6 @@ public class InterceptNavigationDelegateTest {
             BASE_PAGE + "navigation_from_user_gesture_to_iframe_page.html";
     private static final String NAVIGATION_FROM_PRERENDERING_PAGE =
             BASE_PAGE + "navigation_from_prerender.html";
-    private static final String IFRAME_CONTAINER_PAGE = BASE_PAGE + "iframe_container_page.html";
-    private static final String HELLO_PAGE = BASE_PAGE + "hello.html";
 
     private static final long DEFAULT_MAX_TIME_TO_WAIT_IN_MS = 3000;
     private static final long LONG_MAX_TIME_TO_WAIT_IN_MS = 20000;
@@ -119,10 +115,10 @@ public class InterceptNavigationDelegateTest {
             InterceptNavigationDelegateImpl delegate = new InterceptNavigationDelegateImpl(client) {
                 @Override
                 public boolean shouldIgnoreNavigation(NavigationHandle navigationHandle,
-                        GURL escapedUrl, boolean crossFrame, boolean isSandboxedFrame) {
+                        GURL escapedUrl, boolean hiddenCrossFrame, boolean isSandboxedFrame) {
                     mNavParamHistory.add(navigationHandle);
                     return super.shouldIgnoreNavigation(
-                            navigationHandle, escapedUrl, crossFrame, isSandboxedFrame);
+                            navigationHandle, escapedUrl, hiddenCrossFrame, isSandboxedFrame);
                 }
 
                 @Override
@@ -139,12 +135,8 @@ public class InterceptNavigationDelegateTest {
             delegate.setExternalNavigationHandler(new TestExternalNavigationHandler());
             delegate.associateWithWebContents(tab.getWebContents());
         });
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-    }
-
-    @After
-    public void tearDown() {
-        mTestServer.stopAndDestroyServer();
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
     }
 
     @Test
@@ -231,7 +223,7 @@ public class InterceptNavigationDelegateTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.PRERENDER2})
+    @EnableFeatures(ChromeFeatureList.PRERENDER2)
     public void testExternalAppPrerenderingNavigation() throws TimeoutException {
         // Ensure that a prerendering main frame doesn't call into the delegate.
         sActivityTestRule.loadUrl(mTestServer.getURL(NAVIGATION_FROM_PRERENDERING_PAGE));

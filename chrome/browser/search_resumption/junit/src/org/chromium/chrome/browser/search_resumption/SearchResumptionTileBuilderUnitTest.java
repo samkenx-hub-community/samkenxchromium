@@ -22,11 +22,11 @@ import org.robolectric.annotation.Config;
 
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.JniMocker;
-import org.chromium.chrome.browser.omnibox.OmniboxSuggestionType;
 import org.chromium.chrome.browser.search_resumption.SearchResumptionTileBuilder.OnSuggestionClickCallback;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.AutocompleteResult;
+import org.chromium.components.omnibox.OmniboxSuggestionType;
 import org.chromium.content_public.browser.LoadUrlParams;
 
 import java.util.Arrays;
@@ -39,7 +39,6 @@ import java.util.List;
 @Config(manifest = Config.NONE)
 public class SearchResumptionTileBuilderUnitTest {
     // The search suggestions are meant to be shown on any website.
-    private static final String URL_TO_TRACK = "/foo.com";
 
     @Rule
     public JniMocker mJniMocker = new JniMocker();

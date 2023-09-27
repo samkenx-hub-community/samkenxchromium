@@ -24,11 +24,12 @@ namespace {
 
 bool GetNativeWindow(const Browser* browser, gfx::NativeWindow* native_window) {
   BrowserWindow* window = browser->window();
-  if (!window)
+  if (!window) {
     return false;
+  }
 
   *native_window = window->GetNativeWindow();
-  return *native_window;
+  return !!(*native_window);
 }
 
 }  // namespace
@@ -95,7 +96,7 @@ void BrowserDeactivationWaiter::OnBrowserNoLongerActive(Browser* browser) {
 }
 
 bool BringBrowserWindowToFront(const Browser* browser) {
-  gfx::NativeWindow window = nullptr;
+  gfx::NativeWindow window = gfx::NativeWindow();
   if (!GetNativeWindow(browser, &window))
     return false;
 
@@ -113,7 +114,7 @@ bool SendKeyPressSync(const Browser* browser,
                       bool shift,
                       bool alt,
                       bool command) {
-  gfx::NativeWindow window = nullptr;
+  gfx::NativeWindow window = gfx::NativeWindow();
   if (!GetNativeWindow(browser, &window))
     return false;
   return SendKeyPressToWindowSync(window, key, control, shift, alt, command);
@@ -154,22 +155,26 @@ bool SendKeyPressToWindowSync(const gfx::NativeWindow window,
   return !testing::Test::HasFatalFailure();
 }
 
-bool SendMouseMoveSync(const gfx::Point& location) {
+bool SendMouseMoveSync(const gfx::Point& location,
+                       gfx::NativeWindow window_hint) {
   scoped_refptr<content::MessageLoopRunner> runner =
       new content::MessageLoopRunner;
   if (!ui_controls::SendMouseMoveNotifyWhenDone(
-          location.x(), location.y(), runner->QuitClosure())) {
+          location.x(), location.y(), runner->QuitClosure(), window_hint)) {
     return false;
   }
   runner->Run();
   return !testing::Test::HasFatalFailure();
 }
 
-bool SendMouseEventsSync(ui_controls::MouseButton type, int button_state) {
+bool SendMouseEventsSync(ui_controls::MouseButton type,
+                         int button_state,
+                         gfx::NativeWindow window_hint) {
   scoped_refptr<content::MessageLoopRunner> runner =
       new content::MessageLoopRunner;
-  if (!ui_controls::SendMouseEventsNotifyWhenDone(type, button_state,
-                                                  runner->QuitClosure())) {
+  if (!ui_controls::SendMouseEventsNotifyWhenDone(
+          type, button_state, runner->QuitClosure(),
+          ui_controls::kNoAccelerator, window_hint)) {
     return false;
   }
   runner->Run();

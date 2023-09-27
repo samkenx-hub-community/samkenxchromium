@@ -10,6 +10,7 @@
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
+#include "chrome/browser/ash/crosapi/browser_util.h"
 #include "components/account_manager_core/account.h"
 #include "components/account_manager_core/account_manager_facade.h"
 #include "components/account_manager_core/pref_names.h"
@@ -49,20 +50,10 @@ bool IsPrimaryGaiaAccount(const std::string& gaia_id) {
          user->GetAccountId().GetGaiaId() == gaia_id;
 }
 
-bool IsActiveDirectoryUser() {
-  const user_manager::User* user =
-      user_manager::UserManager::Get()->GetPrimaryUser();
-  // GetPrimaryUser may return nullptr in tests.
-  if (!user)
-    return false;
-
-  return user->GetType() == user_manager::USER_TYPE_ACTIVE_DIRECTORY;
-}
-
 bool IsPrefInitialized(PrefService* prefs) {
   const base::Value::Dict& accounts =
       prefs->GetDict(account_manager::prefs::kAccountAppsAvailability);
-  return accounts.size() > 0 || IsActiveDirectoryUser();
+  return accounts.size() > 0;
 }
 
 void CompleteFindAccountByGaiaId(
@@ -111,8 +102,8 @@ base::flat_set<std::string> GetGaiaIdsAvailableInArc(PrefService* prefs) {
 
   // See structure of `accounts` at the top of the file.
   for (const auto dict : accounts) {
-    absl::optional<bool> is_available =
-        dict.second.FindBoolKey(account_manager::prefs::kIsAvailableInArcKey);
+    absl::optional<bool> is_available = dict.second.GetDict().FindBool(
+        account_manager::prefs::kIsAvailableInArcKey);
     if (!is_available.has_value() || !is_available.value())
       continue;
 
@@ -202,8 +193,8 @@ AccountAppsAvailability::AccountAppsAvailability(
   DCHECK(identity_manager_);
   DCHECK(prefs_);
 
-  account_manager_facade_observation_.Observe(account_manager_facade_);
-  identity_manager_observation_.Observe(identity_manager_);
+  account_manager_facade_observation_.Observe(account_manager_facade_.get());
+  identity_manager_observation_.Observe(identity_manager_.get());
 
   if (IsPrefInitialized(prefs_)) {
     is_initialized_ = true;
@@ -222,7 +213,7 @@ AccountAppsAvailability::~AccountAppsAvailability() = default;
 
 // static
 bool AccountAppsAvailability::IsArcAccountRestrictionsEnabled() {
-  return base::FeatureList::IsEnabled(features::kLacrosSupport);
+  return crosapi::browser_util::IsLacrosEnabled();
 }
 
 // static
@@ -407,11 +398,9 @@ void AccountAppsAvailability::InitAccountsAvailableInArcPref(
     update->Set(account.key.id(), std::move(account_entry));
   }
 
-  if (!IsActiveDirectoryUser()) {
-    // If user type is not active directory, we expect to have at least primary
-    // account in the list.
-    DCHECK(!update->empty());
-  }
+  // User type cannot be active directory, so we expect to have at least
+  // primary account in the list.
+  DCHECK(!update->empty());
 
   is_initialized_ = true;
 

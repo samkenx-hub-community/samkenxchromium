@@ -37,6 +37,7 @@ class ASH_EXPORT KeyboardBacklightColorController
   enum class DisplayType {
     kStatic = 0,
     kMultiZone = 1,
+    kMaxValue = kMultiZone,
   };
 
   // Default brightness to be set by the `KeyboardBacklightColorController` when
@@ -142,6 +143,9 @@ class ASH_EXPORT KeyboardBacklightColorController
 
   // Callbacks:
   void KeyboardBrightnessPercentReceived(absl::optional<double> percentage);
+
+  // Returns the current wallpaper extracted color.
+  SkColor GetCurrentWallpaperColor();
 
   SkColor displayed_color_for_testing_ = SK_ColorTRANSPARENT;
 

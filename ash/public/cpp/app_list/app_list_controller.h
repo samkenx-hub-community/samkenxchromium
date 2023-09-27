@@ -19,6 +19,7 @@ class AppListClient;
 class AppListControllerObserver;
 class AppListModel;
 class SearchModel;
+class QuickAppAccessModel;
 
 // An interface implemented in Ash to handle calls from Chrome.
 // These include:
@@ -51,7 +52,8 @@ class ASH_PUBLIC_EXPORT AppListController {
   // as a model identifier passed to various `AppListClient` methods.
   virtual void SetActiveModel(int profile_id,
                               AppListModel* model,
-                              SearchModel* search_model) = 0;
+                              SearchModel* search_model,
+                              QuickAppAccessModel* quick_app_access_model) = 0;
 
   // Clears any previously set app list or search model.
   virtual void ClearActiveModel() = 0;
@@ -86,6 +88,10 @@ class ASH_PUBLIC_EXPORT AppListController {
       const absl::optional<AppListSortOrder>& new_order,
       bool animate,
       base::OnceClosure update_position_closure) = 0;
+
+  // Returns whether the image search category is toggleable in the category
+  // filter menu.
+  virtual bool IsImageSearchToggleable() = 0;
 
  protected:
   AppListController();

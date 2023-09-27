@@ -7,11 +7,12 @@ package org.chromium.chrome.browser.hardware_acceleration;
 import static org.chromium.base.test.util.Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -27,13 +28,13 @@ import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Restriction;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.download.DownloadTestRule;
 import org.chromium.chrome.browser.download.DownloadTestRule.CustomMainActivityStart;
 import org.chromium.chrome.browser.firstrun.FirstRunStatus;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.contextmenu.ContextMenuUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.net.test.EmbeddedTestServer;
@@ -65,17 +66,16 @@ public class ToastHWATest implements CustomMainActivityStart {
         TestThreadUtils.runOnUiThreadBlocking(() -> FirstRunStatus.setFirstRunFlowComplete(true));
 
         mDownloadTestRule.deleteFilesInDownloadDirectory(TEST_FILES);
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
-        ToastManager.setEnabledForTesting(false);
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
     }
 
     @After
     public void tearDown() {
         TestThreadUtils.runOnUiThreadBlocking(() -> FirstRunStatus.setFirstRunFlowComplete(false));
 
-        mTestServer.stopAndDestroyServer();
         mDownloadTestRule.deleteFilesInDownloadDirectory(TEST_FILES);
-        ToastManager.setEnabledForTesting(null);
+        ToastManager.resetForTesting();
     }
 
     @Override
@@ -179,6 +179,7 @@ public class ToastHWATest implements CustomMainActivityStart {
         });
 
         listenerCalled.waitForCallback(0);
+        ToastManager.resetForTesting();
         return accelerated.get();
     }
 }

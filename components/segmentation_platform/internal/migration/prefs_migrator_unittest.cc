@@ -7,12 +7,13 @@
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/testing_pref_service.h"
 #include "components/segmentation_platform/internal/constants.h"
+#include "components/segmentation_platform/internal/database/client_result_prefs.h"
 #include "components/segmentation_platform/internal/metadata/metadata_utils.h"
 #include "components/segmentation_platform/internal/metadata/metadata_writer.h"
 #include "components/segmentation_platform/internal/migration/migration_test_utils.h"
-#include "components/segmentation_platform/internal/selection/client_result_prefs.h"
 #include "components/segmentation_platform/internal/selection/segmentation_result_prefs.h"
 #include "components/segmentation_platform/public/config.h"
+#include "components/segmentation_platform/public/constants.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -36,7 +37,7 @@ class PrefsMigratorTest : public testing::Test {
                                                  std::string());
     pref_service_.registry()->RegisterDictionaryPref(kSegmentationResultPref);
     configs_.push_back(migration_test_utils::GetTestConfigForBinaryClassifier(
-        kShoppingUserSegmentationKey,
+        kShoppingUserSegmentationKey, kShoppingUserUmaName,
         proto::SegmentId::OPTIMIZATION_TARGET_SEGMENTATION_SHOPPING_USER));
     configs_.push_back(migration_test_utils::GetTestConfigForAdaptiveToolbar());
   }
@@ -114,7 +115,7 @@ TEST_F(PrefsMigratorTest, PrefsMigratorForAdaptiveToolbar) {
       result_in_new_prefs.value().client_result();
   EXPECT_EQ(expected_output_config.SerializeAsString(),
             client_result.output_config().SerializeAsString());
-  EXPECT_THAT(client_result.result(), testing::ElementsAre(1, 0, 0));
+  EXPECT_THAT(client_result.result(), testing::ElementsAre(1, 0, 0, 0, 0));
 
   new_result_prefs_->SaveClientResultToPrefs(kAdaptiveToolbarSegmentationKey,
                                              result_in_new_prefs);
@@ -135,7 +136,7 @@ TEST_F(PrefsMigratorTest, PrefsMigratorForAdaptiveToolbar) {
   client_result = result_in_new_prefs.value().client_result();
   EXPECT_EQ(expected_output_config.SerializeAsString(),
             client_result.output_config().SerializeAsString());
-  EXPECT_THAT(client_result.result(), testing::ElementsAre(0, 1, 0));
+  EXPECT_THAT(client_result.result(), testing::ElementsAre(0, 1, 0, 0, 0));
 }
 
 TEST_F(PrefsMigratorTest, PrefsMigratorForOtherConfig) {

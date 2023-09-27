@@ -18,7 +18,9 @@ import android.net.Uri;
 import android.provider.Browser;
 import android.text.TextUtils;
 
+import androidx.annotation.OptIn;
 import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.core.os.BuildCompat;
 
 import org.chromium.base.ContextUtils;
 import org.chromium.base.IntentUtils;
@@ -51,14 +53,13 @@ public class MediaViewerUtils {
      * @param mimeType                 MIME type of the file.
      * @param allowExternalAppHandlers Whether the viewer should allow the user to open with another
      *                                 app.
+     * @param allowShareAction         Whether the view should allow the share action.
      * @return Intent that can be fired to open the file.
      */
     public static Intent getMediaViewerIntent(Uri displayUri, Uri contentUri, String mimeType,
-            boolean allowExternalAppHandlers, Context context) {
+            boolean allowExternalAppHandlers, boolean allowShareAction, Context context) {
         Bitmap closeIcon = BitmapFactory.decodeResource(
                 context.getResources(), R.drawable.ic_arrow_back_white_24dp);
-        Bitmap shareIcon = BitmapFactory.decodeResource(
-                context.getResources(), R.drawable.ic_share_white_24dp);
 
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
         builder.setToolbarColor(Color.BLACK);
@@ -77,22 +78,36 @@ public class MediaViewerUtils {
             Intent chooserIntent = Intent.createChooser(viewIntent, null);
             chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             String openWithStr = context.getString(R.string.download_manager_open_with);
+
+            // TODO(https://crbug.com/1428364): PendingIntents are no longer allowed to be both
+            // mutable and implicit. Since this must be mutable, we need to set a component and then
+            // remove the FLAG_ALLOW_UNSAFE_IMPLICIT_INTENT flag.
             PendingIntent pendingViewIntent = PendingIntent.getActivity(context, 0, chooserIntent,
                     PendingIntent.FLAG_CANCEL_CURRENT
-                            | IntentUtils.getPendingIntentMutabilityFlag(true));
+                            | IntentUtils.getPendingIntentMutabilityFlag(true)
+                            | getAllowUnsafeImplicitIntentFlag());
             builder.addMenuItem(openWithStr, pendingViewIntent);
         }
 
         // Create a PendingIntent that shares the file with external apps.
         // If the URI is a file URI and the Android version is N or later, this will throw a
         // FileUriExposedException. In this case, we just don't add the share button.
-        if (!willExposeFileUri(contentUri)) {
+        if (allowShareAction && !willExposeFileUri(contentUri)) {
+            Bitmap shareIcon = BitmapFactory.decodeResource(
+                    context.getResources(), R.drawable.ic_share_white_24dp);
+
+            // TODO(https://crbug.com/1428364): PendingIntents are no longer allowed to be both
+            // mutable and implicit. Since this must be mutable, we need to set a component and then
+            // remove the FLAG_ALLOW_UNSAFE_IMPLICIT_INTENT flag.
             PendingIntent pendingShareIntent =
                     PendingIntent.getActivity(context, 0, createShareIntent(contentUri, mimeType),
                             PendingIntent.FLAG_CANCEL_CURRENT
-                                    | IntentUtils.getPendingIntentMutabilityFlag(true));
+                                    | IntentUtils.getPendingIntentMutabilityFlag(true)
+                                    | getAllowUnsafeImplicitIntentFlag());
             builder.setActionButton(
                     shareIcon, context.getString(R.string.share), pendingShareIntent, true);
+        } else {
+            builder.setShareState(CustomTabsIntent.SHARE_STATE_OFF);
         }
 
         // The color of the media viewer is dependent on the file type.
@@ -274,5 +289,18 @@ public class MediaViewerUtils {
     private static boolean willExposeFileUri(Uri uri) {
         assert uri != null && !uri.equals(Uri.EMPTY) : "URI is not successfully generated.";
         return uri.getScheme().equals(ContentResolver.SCHEME_FILE);
+    }
+
+    @OptIn(markerClass = androidx.core.os.BuildCompat.PrereleaseSdkCheck.class)
+    private static int getAllowUnsafeImplicitIntentFlag() {
+        if (BuildCompat.isAtLeastU()) {
+            try {
+                return PendingIntent.class.getDeclaredField("FLAG_ALLOW_UNSAFE_IMPLICIT_INTENT")
+                        .getInt(null);
+            } catch (IllegalAccessException | NoSuchFieldException e) {
+                assert false : "Unsafe implicit PendingIntent may fail to run.";
+            }
+        }
+        return 0;
     }
 }

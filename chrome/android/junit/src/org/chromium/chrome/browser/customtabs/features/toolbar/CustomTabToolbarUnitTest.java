@@ -4,10 +4,9 @@
 
 package org.chromium.chrome.browser.customtabs.features.toolbar;
 
-import static androidx.browser.customtabs.CustomTabsIntent.CLOSE_BUTTON_POSITION_END;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -28,7 +27,9 @@ import android.os.Looper;
 import android.view.ActionMode;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.View.MeasureSpec;
 import android.widget.FrameLayout;
+import android.widget.FrameLayout.LayoutParams;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
@@ -49,6 +50,7 @@ import org.robolectric.annotation.LooperMode;
 import org.robolectric.annotation.LooperMode.Mode;
 import org.robolectric.shadows.ShadowLooper;
 
+import org.chromium.base.Callback;
 import org.chromium.base.UserDataHost;
 import org.chromium.base.task.TaskTraits;
 import org.chromium.base.task.test.ShadowPostTask;
@@ -56,9 +58,11 @@ import org.chromium.base.task.test.ShadowPostTask.TestImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.browser_controls.BrowserStateBrowserControlsVisibilityDelegate;
+import org.chromium.chrome.browser.customtabs.features.partialcustomtab.SimpleHandleStrategy;
 import org.chromium.chrome.browser.customtabs.features.toolbar.CustomTabToolbar.CustomTabLocationBar;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.omnibox.UrlBarData;
+import org.chromium.chrome.browser.omnibox.status.PageInfoIPHController;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.toolbar.LocationBarModel;
 import org.chromium.chrome.browser.toolbar.ToolbarDataProvider;
@@ -71,11 +75,11 @@ import org.chromium.chrome.browser.toolbar.top.ToolbarTablet.OfflineDownloader;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
+import org.chromium.components.content_settings.CookieControlsBreakageConfidenceLevel;
 import org.chromium.content_public.common.ContentUrlConstants;
 import org.chromium.ui.base.TestActivity;
 import org.chromium.url.GURL;
 import org.chromium.url.JUnitTestGURLs;
-import org.chromium.url.ShadowGURL;
 
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -84,12 +88,15 @@ import java.util.function.BooleanSupplier;
  * Tests AMP url handling in the CustomTab Toolbar.
  */
 @RunWith(BaseRobolectricTestRunner.class)
-@Config(manifest = Config.NONE,
-        shadows = {ShadowGURL.class, ShadowLooper.class, ShadowPostTask.class})
+@Config(manifest = Config.NONE, shadows = {ShadowLooper.class, ShadowPostTask.class})
 @LooperMode(Mode.PAUSED)
 @DisableFeatures(ChromeFeatureList.SUPPRESS_TOOLBAR_CAPTURES)
 public class CustomTabToolbarUnitTest {
-    private static final String TEST_URL = JUnitTestGURLs.INITIAL_URL;
+    private static final GURL TEST_URL = JUnitTestGURLs.INITIAL_URL;
+    private static final GURL AMP_URL =
+            new GURL("https://www.google.com/amp/www.nyt.com/ampthml/blogs.html");
+    private static final GURL AMP_CACHE_URL =
+            new GURL("https://www.google.com/amp/s/www.nyt.com/ampthml/blogs.html");
 
     @Rule
     public MockitoRule mRule = MockitoJUnit.rule();
@@ -118,6 +125,11 @@ public class CustomTabToolbarUnitTest {
     OfflineDownloader mOfflineDownloader;
     @Mock
     Tab mTab;
+    @Mock
+    Callback<Integer> mContainerVisibilityChangeObserver;
+    @Mock
+    View mParentView;
+    private @Mock PageInfoIPHController mPageInfoIPHController;
 
     private Activity mActivity;
     private CustomTabToolbar mToolbar;
@@ -149,79 +161,29 @@ public class CustomTabToolbarUnitTest {
         mToolbar.initialize(mToolbarDataProvider, mTabController, mMenuButtonCoordinator,
                 mHistoryDelegate, mPartnerHomepageEnabledSupplier, mOfflineDownloader);
         mLocationBar = (CustomTabLocationBar) mToolbar.createLocationBar(mLocationBarModel,
-                mActionModeCallback, () -> null, () -> null, mControlsVisibleDelegate);
+                mActionModeCallback, () -> null, () -> null, mControlsVisibleDelegate, null);
         mUrlBar = mToolbar.findViewById(R.id.url_bar);
         mTitleBar = mToolbar.findViewById(R.id.title_bar);
         mLocationBar.setAnimDelegateForTesting(mAnimationDelegate);
+        mLocationBar.setIPHControllerForTesting(mPageInfoIPHController);
     }
 
     @After
     public void tearDown() {
         mActivity.finish();
         ShadowPostTask.reset();
-        ChromeFeatureList.sCctBrandTransparency.setForTesting(null);
     }
 
     @Test
     public void testParsesPublisherFromAmp() {
-        assertEquals("www.nyt.com",
-                CustomTabToolbar.parsePublisherNameFromUrl(
-                        JUnitTestGURLs.getGURL(JUnitTestGURLs.AMP_URL)));
-        assertEquals("www.nyt.com",
-                CustomTabToolbar.parsePublisherNameFromUrl(
-                        JUnitTestGURLs.getGURL(JUnitTestGURLs.AMP_CACHE_URL)));
-        assertEquals(JUnitTestGURLs.EXAMPLE_URL,
-                CustomTabToolbar.parsePublisherNameFromUrl(
-                        JUnitTestGURLs.getGURL(JUnitTestGURLs.EXAMPLE_URL)));
-    }
-
-    @Test
-    public void testShowBranding_DomainOnly() {
-        assertUrlAndTitleVisible(/*titleVisible=*/false, /*urlVisible=*/true);
-        mLocationBar.showBranding();
-        ShadowLooper.idleMainLooper();
-        verify(mLocationBarModel, never()).notifyTitleChanged();
-        verify(mAnimationDelegate, never()).prepareTitleAnim(mUrlBar, mTitleBar);
-        verify(mAnimationDelegate, never()).startTitleAnimation(any());
-        assertUrlAndTitleVisible(/*titleVisible=*/false, /*urlVisible=*/true);
-        assertBrandingTextShowingOnUrlBar();
-
-        // Run all UI tasks, until the branding is finished.
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-        verify(mLocationBarModel, never()).notifyTitleChanged();
-        verify(mLocationBarModel).notifySecurityStateChanged();
-        assertUrlBarShowingText(TEST_URL);
-    }
-
-    @Test
-    public void testShowBranding_DomainAndTitle() {
-        // Set title before the branding starts, so the state is domain and title.
-        mLocationBar.setShowTitle(true);
-        ShadowLooper.idleMainLooper();
-        verify(mLocationBarModel).notifyTitleChanged();
-        verify(mAnimationDelegate).prepareTitleAnim(mUrlBar, mTitleBar);
-        // Animation not started since branding is not completed.
-        verify(mAnimationDelegate, never()).startTitleAnimation(any());
-
-        // Title should be hidden, title animation is not necessary yet.
-        mLocationBar.showBranding();
-        ShadowLooper.idleMainLooper();
-        verify(mLocationBarModel, times(2)).notifyTitleChanged();
-        assertUrlAndTitleVisible(/*titleVisible=*/false, /*urlVisible=*/true);
-        assertBrandingTextShowingOnUrlBar();
-
-        // Run all UI tasks, until the branding is finished.
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-        verify(mLocationBarModel, times(3)).notifyTitleChanged();
-        verify(mLocationBarModel).notifySecurityStateChanged();
-        verify(mAnimationDelegate, times(2)).prepareTitleAnim(mUrlBar, mTitleBar);
-        assertUrlBarShowingText(TEST_URL);
+        assertEquals("www.nyt.com", CustomTabToolbar.parsePublisherNameFromUrl(AMP_URL));
+        assertEquals("www.nyt.com", CustomTabToolbar.parsePublisherNameFromUrl(AMP_CACHE_URL));
+        assertEquals(JUnitTestGURLs.EXAMPLE_URL.getSpec(),
+                CustomTabToolbar.parsePublisherNameFromUrl(JUnitTestGURLs.EXAMPLE_URL));
     }
 
     @Test
     public void testToolbarBrandingDelegateImpl_EmptyToRegular() {
-        ChromeFeatureList.sCctBrandTransparency.setForTesting(true);
-
         assertUrlAndTitleVisible(/*titleVisible=*/false, /*urlVisible=*/true);
         mLocationBar.showEmptyLocationBar();
         assertUrlAndTitleVisible(/*titleVisible=*/false, /*urlVisible=*/false);
@@ -236,7 +198,8 @@ public class CustomTabToolbarUnitTest {
         verify(mLocationBarModel).notifyTitleChanged();
         verify(mLocationBarModel).notifySecurityStateChanged();
         verifyBrowserControlVisibleForRequiredDuration();
-        assertUrlBarShowingText(TEST_URL);
+        // URL bar truncates trailing /.
+        assertUrlBarShowingText(TEST_URL.getSpec().replaceAll("/$", ""));
     }
 
     @Test
@@ -252,8 +215,6 @@ public class CustomTabToolbarUnitTest {
     }
 
     private void doTestToolbarBrandingDelegateImpl_EmptyToBranding(boolean animateIconTransition) {
-        ChromeFeatureList.sCctBrandTransparency.setForTesting(true);
-
         assertUrlAndTitleVisible(/*titleVisible=*/false, /*urlVisible=*/true);
         mLocationBar.showEmptyLocationBar();
         assertUrlAndTitleVisible(/*titleVisible=*/false, /*urlVisible=*/false);
@@ -304,8 +265,8 @@ public class CustomTabToolbarUnitTest {
         fakeTextureCapture();
         when(mToolbarDataProvider.getTab()).thenReturn(mTab);
         when(mTab.getUserDataHost()).thenReturn(new UserDataHost());
-        when(mTab.getUrl()).thenReturn(JUnitTestGURLs.getGURL(JUnitTestGURLs.RED_1));
-        UrlBarData urlBarData = UrlBarData.forUrl(JUnitTestGURLs.RED_1);
+        when(mTab.getUrl()).thenReturn(JUnitTestGURLs.RED_1);
+        UrlBarData urlBarData = UrlBarData.forUrl(JUnitTestGURLs.RED_1.getSpec());
         when(mLocationBarModel.getUrlBarData()).thenReturn(urlBarData);
         mLocationBar.onUrlChanged();
         result = mToolbar.isReadyForTextureCapture();
@@ -328,12 +289,19 @@ public class CustomTabToolbarUnitTest {
         result = mToolbar.isReadyForTextureCapture();
         assertTrue(result.isReady);
         assertEquals(result.snapshotDifference, ToolbarSnapshotDifference.SECURITY_ICON);
-        fakeTextureCapture();
 
+        fakeTextureCapture();
         when(mAnimationDelegate.isInAnimation()).thenReturn(true);
         result = mToolbar.isReadyForTextureCapture();
         assertTrue(result.isReady);
         assertEquals(result.snapshotDifference, ToolbarSnapshotDifference.CCT_ANIMATION);
+
+        when(mAnimationDelegate.isInAnimation()).thenReturn(false);
+        fakeTextureCapture();
+        mToolbar.layout(0, 0, 100, 100);
+        result = mToolbar.isReadyForTextureCapture();
+        assertTrue(result.isReady);
+        assertEquals(result.snapshotDifference, ToolbarSnapshotDifference.LOCATION_BAR_WIDTH);
     }
 
     @Test
@@ -367,26 +335,92 @@ public class CustomTabToolbarUnitTest {
     }
 
     @Test
-    @Features.EnableFeatures({ChromeFeatureList.CCT_RESIZABLE_SIDE_SHEET})
+    @EnableFeatures({ChromeFeatureList.CCT_RESIZABLE_SIDE_SHEET})
     public void testMaximizeButton() {
+        assertFalse(mToolbar.isMaximizeButtonEnabledForTesting());
         mToolbar.initSideSheetMaximizeButton(/*maximizedOnInit=*/false, () -> true);
+        assertTrue(mToolbar.isMaximizeButtonEnabledForTesting());
         var maximizeButton =
                 (ImageButton) mToolbar.findViewById(R.id.custom_tabs_sidepanel_maximize);
+
+        mToolbar.onFinishInflate();
+        View titleUrlContainer = Mockito.mock(View.class);
+        mLocationBar.setTitleUrlContainerForTesting(titleUrlContainer);
+        int maximizeButtonWidth = mActivity.getResources().getDimensionPixelSize(
+                R.dimen.location_bar_action_icon_width);
+        int titleUrlPaddingEnd =
+                mActivity.getResources().getDimensionPixelSize(R.dimen.toolbar_edge_padding);
+        int threshold = maximizeButtonWidth * 2 - titleUrlPaddingEnd;
+
+        when(titleUrlContainer.getWidth()).thenReturn(threshold + 10);
+        when(titleUrlContainer.getLayoutParams())
+                .thenReturn(new FrameLayout.LayoutParams(
+                        LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        mToolbar.onMeasure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
         assertEquals(
                 "Maximize button should be visible", View.VISIBLE, maximizeButton.getVisibility());
 
-        // Check margin from the right end.
-        var lp = (FrameLayout.LayoutParams) maximizeButton.getLayoutParams();
-        assertEquals(0, lp.rightMargin);
-        mToolbar.setCloseButtonPosition(CLOSE_BUTTON_POSITION_END);
-        mToolbar.onMenuButtonDisabled();
-        int closeButtonWidth =
-                mToolbar.getResources().getDimensionPixelSize(R.dimen.toolbar_button_width);
-        assertEquals("Maximize button should be next to close button.", closeButtonWidth,
-                lp.rightMargin);
+        when(titleUrlContainer.getWidth()).thenReturn(threshold - 10);
+        mToolbar.onMeasure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
+        assertEquals("Maximize button should be hidden", View.GONE, maximizeButton.getVisibility());
 
         mToolbar.removeSideSheetMaximizeButton();
         assertEquals("Maximize button should be hidden", View.GONE, maximizeButton.getVisibility());
+
+        mToolbar.removeSideSheetMaximizeButton();
+        assertFalse(mToolbar.isMaximizeButtonEnabledForTesting());
+    }
+
+    @Test
+    @EnableFeatures({ChromeFeatureList.CCT_RESIZABLE_SIDE_SHEET})
+    public void testHandleStrategy_ClickCloseListener() {
+        var strategy1 = new SimpleHandleStrategy(r -> {});
+        mToolbar.setHandleStrategy(strategy1);
+
+        View.OnClickListener listener = v -> {};
+        mToolbar.setCustomTabCloseClickHandler(listener);
+        assertNotNull(strategy1.getClickCloseHandlerForTesting());
+
+        var strategy2 = new SimpleHandleStrategy(r -> {});
+        // Another call to #setHandleStrategy which can come from device rotation.
+        // HandleStrategy should be initialized properly in response.
+        mToolbar.setHandleStrategy(strategy2);
+        assertNotNull(strategy2.getClickCloseHandlerForTesting());
+    }
+
+    @Test
+    public void testContainerVisibilityChange() {
+        // Self changes should be ignored.
+        mToolbar.addContainerVisibilityChangeObserver(mContainerVisibilityChangeObserver);
+        mToolbar.onVisibilityChanged(mToolbar, View.VISIBLE);
+        verify(mContainerVisibilityChangeObserver, never()).onResult(any());
+
+        mToolbar.onVisibilityChanged(mParentView, View.VISIBLE);
+        verify(mContainerVisibilityChangeObserver, times(1)).onResult(View.VISIBLE);
+
+        // After removing, no more events.
+        reset(mContainerVisibilityChangeObserver);
+        mToolbar.removeContainerVisibilityChangeObserver(mContainerVisibilityChangeObserver);
+        mToolbar.onVisibilityChanged(mParentView, View.VISIBLE);
+        verify(mContainerVisibilityChangeObserver, never()).onResult(any());
+    }
+
+    @Test
+    public void testCookieControlsIcon_animateOnPageStoppedLoadingWithHighBreakageConfidence() {
+        verify(mAnimationDelegate, never()).updateSecurityButton(anyInt(), anyBoolean());
+
+        mLocationBar.onBreakageConfidenceLevelChanged(CookieControlsBreakageConfidenceLevel.HIGH);
+        verify(mAnimationDelegate, never()).updateSecurityButton(anyInt(), anyBoolean());
+        verify(mPageInfoIPHController, never()).showCookieControlsIPH(anyInt(), anyInt());
+
+        mLocationBar.onPageLoadStopped();
+        verify(mAnimationDelegate, times(1)).updateSecurityButton(R.drawable.ic_eye_crossed, true);
+        verify(mPageInfoIPHController, times(1)).showCookieControlsIPH(anyInt(), anyInt());
+
+        mLocationBar.onBreakageConfidenceLevelChanged(CookieControlsBreakageConfidenceLevel.LOW);
+        mLocationBar.onPageLoadStopped();
+        verify(mAnimationDelegate, times(1)).updateSecurityButton(R.drawable.ic_eye_crossed, true);
+        verify(mPageInfoIPHController, times(1)).showCookieControlsIPH(anyInt(), anyInt());
     }
 
     private void assertUrlAndTitleVisible(boolean titleVisible, boolean urlVisible) {
@@ -424,14 +458,13 @@ public class CustomTabToolbarUnitTest {
     }
 
     private void setUpForAboutBlank() {
-        UrlBarData urlBarData = UrlBarData.forUrl(JUnitTestGURLs.ABOUT_BLANK);
+        UrlBarData urlBarData = UrlBarData.forUrl(JUnitTestGURLs.ABOUT_BLANK.getSpec());
         when(mLocationBarModel.getUrlBarData()).thenReturn(urlBarData);
-        when(mTab.getUrl()).thenReturn(JUnitTestGURLs.getGURL(JUnitTestGURLs.ABOUT_BLANK));
+        when(mTab.getUrl()).thenReturn(JUnitTestGURLs.ABOUT_BLANK);
     }
 
-    private void setUpForUrl(String url) {
-        GURL currentGurl = new GURL(url);
-        Mockito.doReturn(currentGurl).when(mTab).getUrl();
-        Mockito.doReturn(UrlBarData.forUrl(url)).when(mLocationBarModel).getUrlBarData();
+    private void setUpForUrl(GURL url) {
+        Mockito.doReturn(url).when(mTab).getUrl();
+        Mockito.doReturn(UrlBarData.forUrl(url.getSpec())).when(mLocationBarModel).getUrlBarData();
     }
 }

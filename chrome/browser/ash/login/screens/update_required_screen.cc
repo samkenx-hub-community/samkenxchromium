@@ -15,7 +15,6 @@
 #include "base/time/default_clock.h"
 #include "chrome/browser/ash/login/error_screens_histogram_helper.h"
 #include "chrome/browser/ash/login/helper.h"
-#include "chrome/browser/ash/login/ui/login_display.h"
 #include "chrome/browser/ash/login/ui/login_display_host.h"
 #include "chrome/browser/ash/login/wizard_controller.h"
 #include "chrome/browser/ash/policy/core/browser_policy_connector_ash.h"
@@ -432,17 +431,15 @@ void UpdateRequiredScreen::DeleteUsersData() {
   for (user_manager::User* user : user_list) {
     user_manager->RemoveUser(user->GetAccountId(),
                              user_manager::UserRemovalReason::
-                                 LOCAL_USER_INITIATED_ON_REQUIRED_UPDATE,
-                             /*delegate=*/this);
+                                 LOCAL_USER_INITIATED_ON_REQUIRED_UPDATE);
+  }
+
+  // TODO(b/277159583): Here we check the user list, but the exact
+  // condition we should check is whether actual user data are successfully
+  // removed.
+  if (user_manager->GetUsers().empty()) {
+    view_->SetIsUserDataPresent(false);
   }
 }
-
-void UpdateRequiredScreen::OnUserRemoved(const AccountId& account_id) {
-  user_manager::UserManager* user_manager = user_manager::UserManager::Get();
-  if (user_manager->GetUsers().empty())
-    view_->SetIsUserDataPresent(false);
-}
-
-void UpdateRequiredScreen::OnBeforeUserRemoved(const AccountId& account_id) {}
 
 }  // namespace ash

@@ -6,9 +6,8 @@
 
 #import <map>
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/metrics/user_metrics.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/infobars/badge_state.h"
 #import "ios/chrome/browser/infobars/infobar_badge_tab_helper.h"
 #import "ios/chrome/browser/infobars/infobar_badge_tab_helper_delegate.h"
@@ -19,27 +18,22 @@
 #import "ios/chrome/browser/infobars/overlays/default_infobar_overlay_request_factory.h"
 #import "ios/chrome/browser/infobars/overlays/infobar_overlay_request_inserter.h"
 #import "ios/chrome/browser/infobars/overlays/infobar_overlay_util.h"
-#import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/overlays/public/overlay_presenter.h"
 #import "ios/chrome/browser/overlays/public/overlay_presenter_observer_bridge.h"
 #import "ios/chrome/browser/overlays/public/overlay_request_queue.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list_observer_bridge.h"
 #import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/shared/ui/list_model/list_model.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/ui/badges/badge_button.h"
 #import "ios/chrome/browser/ui/badges/badge_consumer.h"
 #import "ios/chrome/browser/ui/badges/badge_item.h"
 #import "ios/chrome/browser/ui/badges/badge_static_item.h"
 #import "ios/chrome/browser/ui/badges/badge_tappable_item.h"
 #import "ios/chrome/browser/ui/badges/badge_type_util.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/web_state_list/web_state_list_observer_bridge.h"
 #import "ios/web/public/permissions/permissions.h"
 #import "ios/web/public/web_state_observer_bridge.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 // Historgram name for when an overflow badge was tapped.
@@ -87,23 +81,23 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 
 @implementation BadgeMediator
 
-- (instancetype)initWithBrowser:(Browser*)browser {
+- (instancetype)initWithWebStateList:(WebStateList*)webStateList
+                    overlayPresenter:(OverlayPresenter*)overlayPresenter
+                         isIncognito:(BOOL)isIncognito {
   self = [super init];
   if (self) {
-    DCHECK(browser);
     // Create the incognito badge if `browser` is off-the-record.
-    if (browser->GetBrowserState()->IsOffTheRecord()) {
+    if (isIncognito) {
       _offTheRecordBadge =
           [[BadgeStaticItem alloc] initWithBadgeType:kBadgeTypeIncognito];
     }
     // Set up the OverlayPresenterObserver for the infobar banner presentation.
     _overlayPresenterObserver =
         std::make_unique<OverlayPresenterObserverBridge>(self);
-    _overlayPresenter =
-        OverlayPresenter::FromBrowser(browser, OverlayModality::kInfobarBanner);
+    _overlayPresenter = overlayPresenter;
     _overlayPresenter->AddObserver(_overlayPresenterObserver.get());
     // Set up the WebStateList and its observer.
-    _webStateList = browser->GetWebStateList();
+    _webStateList = webStateList;
     _webState = _webStateList->GetActiveWebState();
 
     _webStateListObserver = std::make_unique<WebStateListObserverBridge>(self);
@@ -251,7 +245,7 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 }
 
 - (void)passwordsBadgeButtonTapped:(id)sender {
-  BadgeButton* badgeButton = base::mac::ObjCCastStrict<BadgeButton>(sender);
+  BadgeButton* badgeButton = base::apple::ObjCCastStrict<BadgeButton>(sender);
   DCHECK(badgeButton.badgeType == kBadgeTypePasswordSave ||
          badgeButton.badgeType == kBadgeTypePasswordUpdate);
 
@@ -259,28 +253,28 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 }
 
 - (void)saveAddressProfileBadgeButtonTapped:(id)sender {
-  BadgeButton* badgeButton = base::mac::ObjCCastStrict<BadgeButton>(sender);
+  BadgeButton* badgeButton = base::apple::ObjCCastStrict<BadgeButton>(sender);
   DCHECK_EQ(badgeButton.badgeType, kBadgeTypeSaveAddressProfile);
 
   [self handleTappedBadgeButton:badgeButton];
 }
 
 - (void)saveCardBadgeButtonTapped:(id)sender {
-  BadgeButton* badgeButton = base::mac::ObjCCastStrict<BadgeButton>(sender);
+  BadgeButton* badgeButton = base::apple::ObjCCastStrict<BadgeButton>(sender);
   DCHECK_EQ(badgeButton.badgeType, kBadgeTypeSaveCard);
 
   [self handleTappedBadgeButton:badgeButton];
 }
 
 - (void)translateBadgeButtonTapped:(id)sender {
-  BadgeButton* badgeButton = base::mac::ObjCCastStrict<BadgeButton>(sender);
+  BadgeButton* badgeButton = base::apple::ObjCCastStrict<BadgeButton>(sender);
   DCHECK_EQ(badgeButton.badgeType, kBadgeTypeTranslate);
 
   [self handleTappedBadgeButton:badgeButton];
 }
 
 - (void)permissionsBadgeButtonTapped:(id)sender {
-  BadgeButton* badgeButton = base::mac::ObjCCastStrict<BadgeButton>(sender);
+  BadgeButton* badgeButton = base::apple::ObjCCastStrict<BadgeButton>(sender);
   DCHECK_EQ(InfobarTypeForBadgeType(badgeButton.badgeType),
             InfobarType::kInfobarTypePermissions);
 
@@ -350,8 +344,16 @@ const char kInfobarOverflowBadgeShownUserAction[] =
     base::RecordAction(
         base::UserMetricsAction(kInfobarOverflowBadgeShownUserAction));
   }
+
+  InfoBarIOS* infoBar = nullptr;
+  if (displayedBadge.badgeType == kBadgeTypeSaveAddressProfile) {
+    infoBar = [self
+        infobarWithType:InfobarTypeForBadgeType(displayedBadge.badgeType)];
+  }
+
   [self.consumer updateDisplayedBadge:displayedBadge
-                      fullScreenBadge:self.offTheRecordBadge];
+                      fullScreenBadge:self.offTheRecordBadge
+                              infoBar:infoBar];
   [self updateConsumerReadStatus];
 }
 
@@ -382,24 +384,15 @@ const char kInfobarOverflowBadgeShownUserAction[] =
   [self disconnectOverlayPresenter];
 }
 
-#pragma mark - WebStateListObserver
+#pragma mark - WebStateListObserving
 
-- (void)webStateList:(WebStateList*)webStateList
-    didReplaceWebState:(web::WebState*)oldWebState
-          withWebState:(web::WebState*)newWebState
-               atIndex:(int)atIndex {
+- (void)didChangeWebStateList:(WebStateList*)webStateList
+                       change:(const WebStateListChange&)change
+                       status:(const WebStateListStatus&)status {
   DCHECK_EQ(self.webStateList, webStateList);
-  if (atIndex == webStateList->active_index())
-    self.webState = newWebState;
-}
-
-- (void)webStateList:(WebStateList*)webStateList
-    didChangeActiveWebState:(web::WebState*)newWebState
-                oldWebState:(web::WebState*)oldWebState
-                    atIndex:(int)atIndex
-                     reason:(ActiveWebStateChangeReason)reason {
-  DCHECK_EQ(self.webStateList, webStateList);
-  self.webState = newWebState;
+  if (status.active_web_state_change()) {
+    self.webState = status.new_active_web_state;
+  }
 }
 
 #pragma mark - CRWWebStateObserver

@@ -127,7 +127,7 @@ Status VerifyElementClickable(const std::string& frame,
     return status;
   absl::optional<bool> is_clickable = absl::nullopt;
   if (result->is_dict())
-    is_clickable = result->FindBoolKey("clickable");
+    is_clickable = result->GetDict().FindBool("clickable");
   if (!is_clickable.has_value()) {
     return Status(kUnknownError,
                   "failed to parse value of IS_ELEMENT_CLICKABLE");
@@ -135,7 +135,7 @@ Status VerifyElementClickable(const std::string& frame,
 
   if (!is_clickable.value()) {
     std::string message;
-    const std::string* maybe_message = result->FindStringKey("message");
+    const std::string* maybe_message = result->GetDict().FindString("message");
     if (!maybe_message)
       message = "element click intercepted";
     else
@@ -299,9 +299,9 @@ std::string GetElementKey() {
 
 base::Value CreateElementCommon(const std::string& key,
                                 const std::string& value) {
-  base::Value element(base::Value::Type::DICT);
-  element.SetStringPath(key, value);
-  return element;
+  base::Value::Dict element;
+  element.SetByDottedPath(key, value);
+  return base::Value(std::move(element));
 }
 
 base::Value CreateElement(const std::string& element_id) {
@@ -373,11 +373,10 @@ Status FindElementCommon(int interval_ms,
     Status status = web_view->CallFunction(
         session->GetCurrentFrameId(), script, arguments, &temp);
 
-    // A "Cannot find context" error can occur due to transition from in-process
-    // iFrame to OOPIF. Retry a couple of times.
+    // A NoSuchExecutionContext error can occur due to transition from
+    // in-process iFrame to OOPIF. Retry a couple of times.
     if (status.IsError() &&
-        (status.message().find("Cannot find context") == std::string::npos ||
-         ++context_retry > 2)) {
+        (status.code() != kNoSuchExecutionContext || ++context_retry > 2)) {
       return status;
     }
 
@@ -568,7 +567,7 @@ Status GetElementClickableLocation(
       return status;
     std::string* maybe_target_element_id = nullptr;
     if (result->is_dict())
-      maybe_target_element_id = result->FindStringKey(GetElementKey());
+      maybe_target_element_id = result->GetDict().FindString(GetElementKey());
     if (!maybe_target_element_id)
       return Status(kUnknownError, "no element reference returned by script");
     target_element_id = *maybe_target_element_id;
@@ -828,7 +827,7 @@ Status ScrollElementRegionIntoView(
     if (!result->is_dict())
       return Status(kUnknownError, "no element reference returned by script");
     std::string* maybe_frame_element_id =
-        result->FindStringKey(GetElementKey());
+        result->GetDict().FindString(GetElementKey());
     if (!maybe_frame_element_id)
       return Status(kUnknownError, "failed to locate a sub frame");
     std::string frame_element_id = *maybe_frame_element_id;
@@ -875,7 +874,7 @@ Status GetElementLocationInViewCenter(Session* session,
     if (!result->is_dict())
       return Status(kUnknownError, "no element reference returned by script");
     std::string* maybe_frame_element_id =
-        result->FindStringKey(GetElementKey());
+        result->GetDict().FindString(GetElementKey());
     if (!maybe_frame_element_id)
       return Status(kUnknownError, "failed to locate a sub frame");
     std::string frame_element_id = *maybe_frame_element_id;

@@ -53,6 +53,8 @@ void SelectToSpeakMenuBubbleController::Show(const gfx::Rect& anchor,
     init_params.translucent = true;
     init_params.preferred_width = kPreferredWidth;
     init_params.close_on_deactivate = false;
+    init_params.type = TrayBubbleView::TrayBubbleType::kAccessibilityBubble;
+
     bubble_view_ = new TrayBubbleView(init_params);
     bubble_view_->SetArrow(views::BubbleBorder::TOP_LEFT);
     bubble_view_->SetCanActivate(true);
@@ -60,15 +62,8 @@ void SelectToSpeakMenuBubbleController::Show(const gfx::Rect& anchor,
     menu_view_ = new SelectToSpeakMenuView(this);
     menu_view_->SetBorder(views::CreateEmptyBorder(
         gfx::Insets::TLBR(kUnifiedTopShortcutSpacing, 0, 0, 0)));
-    bubble_view_->AddChildView(menu_view_);
+    bubble_view_->AddChildView(menu_view_.get());
     menu_view_->SetSpeedButtonToggled(false);
-
-    // In dark light mode, we switch TrayBubbleView to use a textured layer
-    // instead of solid color layer, so no need to create an extra layer here.
-    if (!features::IsDarkLightModeEnabled()) {
-      menu_view_->SetPaintToLayer();
-      menu_view_->layer()->SetFillsBoundsOpaquely(false);
-    }
 
     bubble_widget_ =
         views::BubbleDialogDelegateView::CreateBubble(bubble_view_);

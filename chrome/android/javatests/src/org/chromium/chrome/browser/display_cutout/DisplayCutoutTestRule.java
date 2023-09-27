@@ -6,10 +6,10 @@ package org.chromium.chrome.browser.display_cutout;
 
 import android.graphics.Rect;
 import android.os.Build;
-import android.support.test.InstrumentationRegistry;
 import android.view.WindowManager.LayoutParams;
 
 import androidx.annotation.RequiresApi;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.json.JSONException;
@@ -198,7 +198,6 @@ public class DisplayCutoutTestRule<T extends ChromeActivity> extends ChromeActiv
                 getActivity().getFullscreenManager().removeObserver(mListener);
             }
         });
-        mTestServer.stopAndDestroyServer();
     }
 
     /** Set a simulated dip scale for this device. */

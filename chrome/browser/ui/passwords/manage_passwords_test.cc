@@ -57,6 +57,7 @@ ManagePasswordsTest::ManagePasswordsTest() {
 ManagePasswordsTest::~ManagePasswordsTest() = default;
 
 void ManagePasswordsTest::SetUpOnMainThread() {
+  InteractiveBrowserTest::SetUpOnMainThread();
   ASSERT_TRUE(embedded_test_server()->Start());
   GURL test_url = embedded_test_server()->GetURL("/empty.html");
 
@@ -64,12 +65,13 @@ void ManagePasswordsTest::SetUpOnMainThread() {
   password_form_.url = test_url;
   password_form_.username_value = kTestUsername;
   password_form_.password_value = u"test_password";
+  password_form_.match_type = password_manager::PasswordForm::MatchType::kExact;
 
   ASSERT_TRUE(AddTabAtIndex(0, test_url, ui::PAGE_TRANSITION_TYPED));
 }
 
 void ManagePasswordsTest::SetUpInProcessBrowserTestFixture() {
-  InProcessBrowserTest::SetUpInProcessBrowserTestFixture();
+  InteractiveBrowserTest::SetUpInProcessBrowserTestFixture();
   create_services_subscription_ =
       BrowserContextDependencyManager::GetInstance()
           ->RegisterCreateServicesCallbackForTesting(
@@ -109,6 +111,7 @@ void ManagePasswordsTest::SetupManagingPasswords() {
   federated_form.federation_origin =
       url::Origin::Create(GURL("https://somelongeroriginurl.com/"));
   federated_form.username_value = u"test_federation_username";
+  federated_form.match_type = password_manager::PasswordForm::MatchType::kExact;
   std::vector<const password_manager::PasswordForm*> forms = {&password_form_,
                                                               &federated_form};
   GetController()->OnPasswordAutofilled(
@@ -209,15 +212,11 @@ void ManagePasswordsTest::ConfigurePasswordSync(bool is_enabled) {
 
   if (is_enabled) {
     sync_service->SetHasSyncConsent(true);
-    sync_service->SetDisableReasons({});
     sync_service->GetUserSettings()->SetSelectedTypes(
         /*sync_everything=*/false,
-        /*types=*/syncer::UserSelectableTypeSet(
-            syncer::UserSelectableType::kPasswords));
+        /*types=*/{syncer::UserSelectableType::kPasswords});
   } else {
     sync_service->SetHasSyncConsent(false);
-    sync_service->SetDisableReasons(
-        syncer::SyncService::DISABLE_REASON_USER_CHOICE);
     sync_service->GetUserSettings()->SetSelectedTypes(
         /*sync_everything=*/false,
         /*types=*/syncer::UserSelectableTypeSet());
@@ -256,8 +255,9 @@ std::unique_ptr<PasswordFormManager> ManagePasswordsTest::CreateFormManager() {
   insecure_credential_ = password_form_;
   insecure_credential_.password_issues.insert(
       {password_manager::InsecureType::kLeaked,
-       password_manager::InsecurityMetadata(base::Time(),
-                                            password_manager::IsMuted(false))});
+       password_manager::InsecurityMetadata(
+           base::Time(), password_manager::IsMuted(false),
+           password_manager::TriggerBackendNotification(false))});
   fetcher_.set_insecure_credentials({&insecure_credential_});
 
   fetcher_.NotifyFetchCompleted();

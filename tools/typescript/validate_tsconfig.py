@@ -38,6 +38,7 @@ _allowed_config_options = [
 # Allowed compilerOptions
 _allowed_compiler_options = [
     'allowUmdGlobalAccess',
+    'isolatedModules',
     'lib',
     'noPropertyAccessFromIndexSignature',
     'noUncheckedIndexedAccess',
@@ -110,6 +111,8 @@ def validateJavaScriptAllowed(source_dir, out_dir, is_ios):
       'ash/webui/diagnostics_ui/',
       'ash/webui/face_ml_app_ui/',
       'ash/webui/file_manager/resources/labs/',
+      # TODO(b/299520240): Migrate scanning to TypeScript and remove exception.
+      'ash/webui/scanning/',
       'ash/webui/shortcut_customization_ui/',
       'ash/webui/sample_system_web_app_ui/',
       'ui/file_manager/',
@@ -120,17 +123,25 @@ def validateJavaScriptAllowed(source_dir, out_dir, is_ios):
 
   # Specific exceptions for directories that are still migrating to TS.
   migrating_directories = [
+      # TODO(crbug.com/1337318): Migrate bluetooth-internals to TypeScript and
+      # remove exception.
       'chrome/browser/resources/bluetooth_internals',
       'chrome/browser/resources/chromeos/accessibility',
-      'chrome/browser/resources/chromeos/emoji_picker',
-      'chrome/browser/resources/nearby_share/shared',
-      'chrome/browser/resources/ntp4',
       'chrome/test/data/webui',
       'chrome/test/data/webui/chromeos',
+      'chrome/test/data/webui/cr_components/chromeos',
+      'chrome/test/data/webui/nearby_share',
       'chrome/test/data/webui/settings/chromeos',
+      # TODO(https://crbug.com/1002798): Migrate Mojo bindings to TypeScript and
+      # remove exception.
+      'content/browser/resources/gpu',
       'components/policy/resources/webui',
       'ui/webui/resources/js',
       'ui/webui/resources/mojo',
+
+      # TODO(crbug.com/1478961) : Migrate to TypeScript.
+      'chrome/test/data/webui/media_internals',
+      'content/browser/resources/media',
   ]
   for directory in migrating_directories:
     if (source_dir.endswith(directory)

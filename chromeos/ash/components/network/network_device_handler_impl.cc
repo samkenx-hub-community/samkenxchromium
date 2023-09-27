@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "ash/constants/ash_features.h"
+#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
@@ -322,7 +323,7 @@ void NetworkDeviceHandlerImpl::Init(
     NetworkStateHandler* network_state_handler) {
   DCHECK(network_state_handler);
   network_state_handler_ = network_state_handler;
-  network_state_handler_observer_.Observe(network_state_handler_);
+  network_state_handler_observer_.Observe(network_state_handler_.get());
 }
 
 void NetworkDeviceHandlerImpl::ApplyCellularAllowRoamingToShill() {
@@ -506,8 +507,8 @@ bool NetworkDeviceHandlerImpl::IsUsbEnabledDevice(
   return device_state && device_state->link_up() &&
          device_state->Matches(NetworkTypePattern::Ethernet()) &&
          device_state->device_bus_type() == shill::kDeviceBusTypeUsb &&
-         mac_address_change_not_supported_.find(device_state->mac_address()) ==
-             mac_address_change_not_supported_.end();
+         !base::Contains(mac_address_change_not_supported_,
+                         device_state->mac_address());
 }
 
 void NetworkDeviceHandlerImpl::UpdatePrimaryEnabledUsbEthernetDevice() {

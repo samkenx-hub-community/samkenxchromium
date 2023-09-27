@@ -34,16 +34,12 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
-import org.chromium.base.jank_tracker.JankMetricUMARecorder;
-import org.chromium.base.jank_tracker.JankMetricUMARecorderJni;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
@@ -69,8 +65,7 @@ import org.chromium.ui.test.util.ViewUtils;
 // clang-format off
 @CommandLineFlags.
     Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE, "force-fieldtrials=Study/Group"})
-@EnableFeatures({ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID,
-    ChromeFeatureList.START_SURFACE_RETURN_TIME + "<Study,",
+@EnableFeatures({ChromeFeatureList.START_SURFACE_RETURN_TIME + "<Study,",
     ChromeFeatureList.START_SURFACE_ANDROID + "<Study", ChromeFeatureList.INSTANT_START})
 @Restriction({Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE,
     UiRestriction.RESTRICTION_TYPE_PHONE})
@@ -87,12 +82,8 @@ public class InstantStartFeedTest {
     @Rule
     public ChromeTabbedActivityTestRule mActivityTestRule = new ChromeTabbedActivityTestRule();
 
-    @Mock
-    JankMetricUMARecorder.Natives mJankRecorderNativeMock;
-
     @Before
     public void setUp() {
-        mJniMocker.mock(JankMetricUMARecorderJni.TEST_HOOKS, mJankRecorderNativeMock);
         ReturnToChromeUtil.setSkipInitializationCheckForTesting(true);
     }
 

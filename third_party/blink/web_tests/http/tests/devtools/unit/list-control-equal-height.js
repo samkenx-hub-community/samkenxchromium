@@ -1,3 +1,7 @@
+
+import {TestRunner} from 'test_runner';
+
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
 (async function() {
   TestRunner.addResult('Test ListControl rendering and selection for equal height items case.');
 
@@ -36,8 +40,8 @@
   }
 
   var delegate = new Delegate();
-  var model = new UI.ListModel();
-  var list = new UI.ListControl(model, delegate, UI.ListMode.EqualHeightItems);
+  var model = new UIModule.ListModel.ListModel();
+  var list = new UIModule.ListControl.ListControl(model, delegate, UIModule.ListControl.ListMode.EqualHeightItems);
   list.element.style.height = '73px';
   UI.inspectorView.element.appendChild(list.element);
 
@@ -207,7 +211,7 @@
   list.onKeyDown(TestRunner.createKeyEvent('ArrowDown'));
   dumpList();
 
-  var newModel = new UI.ListModel([5, 6, 7]);
+  var newModel = new UIModule.ListModel.ListModel([5, 6, 7]);
   TestRunner.addResult('Replacing model with [5-7]');
   list.setModel(newModel);
   dumpList();

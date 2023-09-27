@@ -4,6 +4,7 @@
 
 import("//build/buildflag_header.gni")
 import("//build/config/chrome_build.gni")
+import("//build/config/chromeos/ui_mode.gni")
 
 declare_args() {
   # Set to true make a build that disables activation of field trial tests
@@ -37,10 +38,13 @@ static_library("service") {
     "google_groups_updater_service.h",
     "safe_seed_manager.cc",
     "safe_seed_manager.h",
+    "safe_seed_manager_interface.h",
     "ui_string_overrider.cc",
     "ui_string_overrider.h",
     "variations_field_trial_creator.cc",
     "variations_field_trial_creator.h",
+    "variations_field_trial_creator_base.cc",
+    "variations_field_trial_creator_base.h",
     "variations_service.cc",
     "variations_service.h",
     "variations_service_client.cc",
@@ -54,6 +58,7 @@ static_library("service") {
     "//base",
     "//build:branding_buildflags",
     "//build:chromeos_buildflags",
+    "//build/config/chromebox_for_meetings:buildflags",
     "//components/encrypted_messages",
     "//components/keyed_service/core",
     "//components/language/core/browser",
@@ -70,6 +75,13 @@ static_library("service") {
     "//services/network/public/cpp",
     "//ui/base",
   ]
+
+  if (is_chromeos_ash) {
+    deps += [
+      "//chromeos/ash/components/dbus/featured",
+      "//chromeos/ash/components/dbus/featured:proto",
+    ]
+  }
 }
 
 source_set("unit_tests") {
@@ -105,4 +117,11 @@ source_set("unit_tests") {
     "//services/network/public/cpp",
     "//testing/gtest",
   ]
+
+  if (is_chromeos_ash) {
+    deps += [
+      "//chromeos/ash/components/dbus/featured",
+      "//chromeos/ash/components/dbus/featured:proto",
+    ]
+  }
 }

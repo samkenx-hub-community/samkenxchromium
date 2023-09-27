@@ -81,10 +81,10 @@ public class ContextMenuHeaderMediatorTest {
     public void testHeaderImage_Image() {
         PropertyModel model =
                 new PropertyModel.Builder(ContextMenuHeaderProperties.ALL_KEYS).build();
-        final GURL url = JUnitTestGURLs.getGURL(JUnitTestGURLs.EXAMPLE_URL);
-        final ContextMenuParams params =
-                new ContextMenuParams(0, ContextMenuDataMediaType.IMAGE, url, GURL.emptyGURL(), "",
-                        GURL.emptyGURL(), GURL.emptyGURL(), "", null, false, 0, 0, 0, false);
+        final GURL url = JUnitTestGURLs.EXAMPLE_URL;
+        final ContextMenuParams params = new ContextMenuParams(0, ContextMenuDataMediaType.IMAGE,
+                url, GURL.emptyGURL(), "", GURL.emptyGURL(), GURL.emptyGURL(), "", null, false, 0,
+                0, 0, false, /*additionalNavigationParams=*/null);
         final ContextMenuHeaderMediator mediator =
                 new ContextMenuHeaderMediator(mActivity, model, params, mProfile, mNativeDelegate);
 
@@ -92,7 +92,7 @@ public class ContextMenuHeaderMediatorTest {
                 .retrieveImageForContextMenu(
                         anyInt(), anyInt(), mRetrieveImageCallbackCaptor.capture());
         verify(mMockLargeIconBridgeJni, times(0))
-                .getLargeIconForURL(anyLong(), any(), any(), anyInt(), any());
+                .getLargeIconForURL(anyLong(), any(), any(), anyInt(), anyInt(), any());
 
         Assert.assertNotNull(
                 "Retrieve image callback is null.", mRetrieveImageCallbackCaptor.getValue());
@@ -113,13 +113,13 @@ public class ContextMenuHeaderMediatorTest {
                 new PropertyModel.Builder(ContextMenuHeaderProperties.ALL_KEYS).build();
         final ContextMenuParams params = new ContextMenuParams(0, ContextMenuDataMediaType.VIDEO,
                 GURL.emptyGURL(), GURL.emptyGURL(), "", GURL.emptyGURL(), GURL.emptyGURL(), "",
-                null, false, 0, 0, 0, false);
+                null, false, 0, 0, 0, false, /*additionalNavigationParams=*/null);
         final ContextMenuHeaderMediator mediator =
                 new ContextMenuHeaderMediator(mActivity, model, params, mProfile, mNativeDelegate);
 
         verify(mNativeDelegate, times(0)).retrieveImageForContextMenu(anyInt(), anyInt(), any());
         verify(mMockLargeIconBridgeJni, times(0))
-                .getLargeIconForURL(anyLong(), any(), any(), anyInt(), any());
+                .getLargeIconForURL(anyLong(), any(), any(), anyInt(), anyInt(), any());
 
         Assert.assertNotNull("Header image should be set for videos directly.",
                 model.get(ContextMenuHeaderProperties.IMAGE));
@@ -133,17 +133,18 @@ public class ContextMenuHeaderMediatorTest {
                 new PropertyModel.Builder(ContextMenuHeaderProperties.ALL_KEYS).build();
         // Bitmaps created need to have a size set to more than 0.
         model.set(ContextMenuHeaderProperties.MONOGRAM_SIZE_PIXEL, 1);
-        final GURL linkUrl = JUnitTestGURLs.getGURL(JUnitTestGURLs.URL_1);
-        final ContextMenuParams params = new ContextMenuParams(0, ContextMenuDataMediaType.FILE,
-                GURL.emptyGURL(), linkUrl, JUnitTestGURLs.URL_1, GURL.emptyGURL(), GURL.emptyGURL(),
-                "", null, false, 0, 0, 0, false);
+        final GURL linkUrl = JUnitTestGURLs.URL_1;
+        final ContextMenuParams params =
+                new ContextMenuParams(0, ContextMenuDataMediaType.FILE, GURL.emptyGURL(), linkUrl,
+                        JUnitTestGURLs.URL_1.getSpec(), GURL.emptyGURL(), GURL.emptyGURL(), "",
+                        null, false, 0, 0, 0, false, /*additionalNavigationParams=*/null);
         final ContextMenuHeaderMediator mediator =
                 new ContextMenuHeaderMediator(mActivity, model, params, mProfile, mNativeDelegate);
 
         verify(mNativeDelegate, times(0)).retrieveImageForContextMenu(anyInt(), anyInt(), any());
         verify(mMockLargeIconBridgeJni)
-                .getLargeIconForURL(
-                        anyLong(), any(), any(), anyInt(), mLargeIconCallbackCaptor.capture());
+                .getLargeIconForURL(anyLong(), any(), any(), anyInt(), anyInt(),
+                        mLargeIconCallbackCaptor.capture());
 
         Assert.assertNotNull("LargeIconCallback is null.", mLargeIconCallbackCaptor.getValue());
         Assert.assertNull("Image should not be set for links before LarIconCallback triggers.",

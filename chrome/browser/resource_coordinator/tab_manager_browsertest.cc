@@ -11,7 +11,6 @@
 #include "base/memory/memory_pressure_listener.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
-#include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/simple_test_tick_clock.h"
 #include "build/build_config.h"
@@ -46,6 +45,7 @@
 #include "content/public/browser/notification_types.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -197,7 +197,10 @@ class TabManagerTest : public InProcessBrowserTest {
 
 class TabManagerTestWithTwoTabs : public TabManagerTest {
  public:
-  TabManagerTestWithTwoTabs() = default;
+  TabManagerTestWithTwoTabs() {
+    // Tests using two tabs assume that each tab has a dedicated process.
+    feature_list_.InitAndEnableFeature(features::kDisableProcessReuse);
+  }
 
   TabManagerTestWithTwoTabs(const TabManagerTestWithTwoTabs&) = delete;
   TabManagerTestWithTwoTabs& operator=(const TabManagerTestWithTwoTabs&) =
@@ -212,6 +215,9 @@ class TabManagerTestWithTwoTabs : public TabManagerTest {
     OpenTwoTabs(embedded_test_server()->GetURL("/title2.html"),
                 embedded_test_server()->GetURL("/title3.html"));
   }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
 };
 
 IN_PROC_BROWSER_TEST_F(TabManagerTest, TabManagerBasics) {
@@ -346,7 +352,7 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest, InvalidOrEmptyURL) {
 
   NavigateToURLWithDisposition(browser(), GURL(chrome::kChromeUICreditsURL),
                                WindowOpenDisposition::NEW_BACKGROUND_TAB,
-                               ui_test_utils::BROWSER_TEST_NONE);
+                               ui_test_utils::BROWSER_TEST_NO_WAIT);
 
   ASSERT_EQ(2, tsm()->count());
 
@@ -501,7 +507,16 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest, ProtectVideoTabs) {
 }
 
 // Makes sure that tabs using DevTools are protected from discarding.
-IN_PROC_BROWSER_TEST_F(TabManagerTest, ProtectDevToolsTabsFromDiscarding) {
+// TODO(crbug.com/1446876): Flaky on debug Linux.
+#if BUILDFLAG(IS_LINUX) && !defined(NDEBUG)
+#define MAYBE_ProtectDevToolsTabsFromDiscarding \
+  DISABLED_ProtectDevToolsTabsFromDiscarding
+#else
+#define MAYBE_ProtectDevToolsTabsFromDiscarding \
+  ProtectDevToolsTabsFromDiscarding
+#endif
+IN_PROC_BROWSER_TEST_F(TabManagerTest,
+                       MAYBE_ProtectDevToolsTabsFromDiscarding) {
   // Get two tabs open, the second one being the foreground tab.
   GURL test_page(ui_test_utils::GetTestUrl(
       base::FilePath(), base::FilePath(FILE_PATH_LITERAL("simple.html"))));
@@ -576,11 +591,8 @@ IN_PROC_BROWSER_TEST_F(TabManagerTestWithTwoTabs,
       content::NotificationService::AllSources());
   // Advance time so everything is urgent discardable.
   test_clock_.Advance(kBackgroundUrgentProtectionTime);
-  base::HistogramTester tester;
   EXPECT_TRUE(
       tab_manager()->DiscardTabImpl(LifecycleUnitDiscardReason::URGENT));
-  tester.ExpectUniqueSample(
-      "TabManager.Discarding.DiscardedTabCouldFastShutdown", true, 1);
   observer.Wait();
 }
 
@@ -601,16 +613,8 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest, UrgentFastShutdownSharedTabProcess) {
   // The Tab Manager will not be able to fast-kill either of the tabs since they
   // share the same process regardless of the discard reason. An unsafe attempt
   // will be made on some platforms.
-  base::HistogramTester tester;
   EXPECT_TRUE(
       tab_manager()->DiscardTabImpl(LifecycleUnitDiscardReason::URGENT));
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  // The unsafe killing attempt will fail for the same reason.
-  tester.ExpectUniqueSample(
-      "TabManager.Discarding.DiscardedTabCouldUnsafeFastShutdown", false, 1);
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-  tester.ExpectUniqueSample(
-      "TabManager.Discarding.DiscardedTabCouldFastShutdown", false, 1);
 }
 
 IN_PROC_BROWSER_TEST_F(TabManagerTest, UrgentFastShutdownWithUnloadHandler) {
@@ -625,7 +629,6 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest, UrgentFastShutdownWithUnloadHandler) {
   // The Tab Manager will not be able to safely fast-kill either of the tabs as
   // one of them is current, and the other has an unload handler. An unsafe
   // attempt will be made on some platforms.
-  base::HistogramTester tester;
 #if BUILDFLAG(IS_CHROMEOS)
   // The unsafe attempt for ChromeOS should succeed as ChromeOS ignores unload
   // handlers when in critical condition.
@@ -636,14 +639,7 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest, UrgentFastShutdownWithUnloadHandler) {
   EXPECT_TRUE(
       tab_manager()->DiscardTabImpl(LifecycleUnitDiscardReason::URGENT));
 #if BUILDFLAG(IS_CHROMEOS)
-  tester.ExpectUniqueSample(
-      "TabManager.Discarding.DiscardedTabCouldUnsafeFastShutdown", true, 1);
-  tester.ExpectUniqueSample(
-      "TabManager.Discarding.DiscardedTabCouldFastShutdown", true, 1);
   observer.Wait();
-#else
-  tester.ExpectUniqueSample(
-      "TabManager.Discarding.DiscardedTabCouldFastShutdown", false, 1);
 #endif  // BUILDFLAG(IS_CHROMEOS)
 }
 
@@ -660,17 +656,8 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest,
   // The Tab Manager will not be able to safely fast-kill either of the tabs as
   // one of them is current, and the other has a beforeunload handler. An unsafe
   // attempt will be made on some platforms.
-  base::HistogramTester tester;
   EXPECT_TRUE(
       tab_manager()->DiscardTabImpl(LifecycleUnitDiscardReason::URGENT));
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  // The unsafe killing attempt will fail as ChromeOS does not ignore
-  // beforeunload handlers.
-  tester.ExpectUniqueSample(
-      "TabManager.Discarding.DiscardedTabCouldUnsafeFastShutdown", false, 1);
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-  tester.ExpectUniqueSample(
-      "TabManager.Discarding.DiscardedTabCouldFastShutdown", false, 1);
 }
 
 // Verifies the following state transitions for a tab:
@@ -679,19 +666,14 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest,
 // - Navigate: DISCARDED->ACTIVE
 //             window.document.wasDiscarded is true
 IN_PROC_BROWSER_TEST_F(TabManagerTestWithTwoTabs, TabUrgentDiscardAndNavigate) {
-  const char kDiscardedStateJS[] =
-      "window.domAutomationController.send("
-      "window.document.wasDiscarded);";
+  const char kDiscardedStateJS[] = "window.document.wasDiscarded;";
 
   GURL test_page(ui_test_utils::GetTestUrl(
       base::FilePath(), base::FilePath(FILE_PATH_LITERAL("simple.html"))));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_page));
 
   // document.wasDiscarded is false initially.
-  bool not_discarded_result;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      GetWebContentsAt(0), kDiscardedStateJS, &not_discarded_result));
-  EXPECT_FALSE(not_discarded_result);
+  EXPECT_EQ(false, content::EvalJs(GetWebContentsAt(0), kDiscardedStateJS));
 
   // Discard the tab.
   EXPECT_EQ(LifecycleUnitState::ACTIVE, GetLifecycleUnitAt(0)->GetState());
@@ -707,10 +689,7 @@ IN_PROC_BROWSER_TEST_F(TabManagerTestWithTwoTabs, TabUrgentDiscardAndNavigate) {
   EXPECT_EQ(LifecycleUnitState::ACTIVE, GetLifecycleUnitAt(0)->GetState());
 
   // document.wasDiscarded is true on navigate after discard.
-  bool discarded_result;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      GetWebContentsAt(0), kDiscardedStateJS, &discarded_result));
-  EXPECT_TRUE(discarded_result);
+  EXPECT_EQ(true, content::EvalJs(GetWebContentsAt(0), kDiscardedStateJS));
 }
 
 IN_PROC_BROWSER_TEST_F(TabManagerTest, DiscardedTabHasNoProcess) {
@@ -756,9 +735,7 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest, DiscardedTabHasNoProcess) {
 
 IN_PROC_BROWSER_TEST_F(TabManagerTest,
                        TabManagerWasDiscardedCrossSiteSubFrame) {
-  const char kDiscardedStateJS[] =
-      "window.domAutomationController.send("
-      "window.document.wasDiscarded);";
+  const char kDiscardedStateJS[] = "window.document.wasDiscarded;";
   // Navigate to a page with a cross-site frame.
   content::SetupCrossSiteRedirector(embedded_test_server());
   ASSERT_TRUE(embedded_test_server()->Start());
@@ -784,15 +761,9 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest,
 
   // document.wasDiscarded is false before discard, on main frame and child
   // frame.
-  bool before_discard_mainframe_result;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      main_frame, kDiscardedStateJS, &before_discard_mainframe_result));
-  EXPECT_FALSE(before_discard_mainframe_result);
+  EXPECT_EQ(false, content::EvalJs(main_frame, kDiscardedStateJS));
 
-  bool before_discard_childframe_result;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      child_frame, kDiscardedStateJS, &before_discard_childframe_result));
-  EXPECT_FALSE(before_discard_childframe_result);
+  EXPECT_EQ(false, content::EvalJs(child_frame, kDiscardedStateJS));
 
   // Discard the tab. This simulates a tab discard.
   TabLifecycleUnitExternal::FromWebContents(contents)->DiscardTab(
@@ -810,46 +781,34 @@ IN_PROC_BROWSER_TEST_F(TabManagerTest,
   ASSERT_TRUE(child_frame);
 
   // document.wasDiscarded is true after discard, on mainframe and childframe.
-  bool discarded_mainframe_result;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      main_frame, kDiscardedStateJS, &discarded_mainframe_result));
-  EXPECT_TRUE(discarded_mainframe_result);
+  EXPECT_EQ(true, content::EvalJs(main_frame, kDiscardedStateJS));
 
-  bool discarded_childframe_result;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      child_frame, kDiscardedStateJS, &discarded_childframe_result));
-  EXPECT_TRUE(discarded_childframe_result);
+  EXPECT_EQ(true, content::EvalJs(child_frame, kDiscardedStateJS));
 
   // Navigate the child frame, wasDiscarded is not set anymore.
   GURL childframe_url(embedded_test_server()->GetURL("b.com", "/title1.html"));
   EXPECT_TRUE(NavigateIframeToURL(contents, "frame1", childframe_url));
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      ChildFrameAt(contents, 0), kDiscardedStateJS,
-      &discarded_childframe_result));
-  EXPECT_FALSE(discarded_childframe_result);
+  EXPECT_EQ(false,
+            content::EvalJs(ChildFrameAt(contents, 0), kDiscardedStateJS));
 
   // Navigate second child frame cross site.
   GURL second_childframe_url(
       embedded_test_server()->GetURL("d.com", "/title1.html"));
   EXPECT_TRUE(NavigateIframeToURL(contents, "frame2", second_childframe_url));
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      ChildFrameAt(contents, 1), kDiscardedStateJS,
-      &discarded_childframe_result));
-  EXPECT_FALSE(discarded_childframe_result);
+  EXPECT_EQ(false,
+            content::EvalJs(ChildFrameAt(contents, 1), kDiscardedStateJS));
 
   // Navigate the main frame (same site) again, wasDiscarded is not set anymore.
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), main_url));
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      main_frame, kDiscardedStateJS, &discarded_mainframe_result));
-  EXPECT_FALSE(discarded_mainframe_result);
+  main_frame = contents->GetPrimaryMainFrame();
+  EXPECT_EQ(false, content::EvalJs(main_frame, kDiscardedStateJS));
 
   // Go back in history and ensure wasDiscarded is still false.
   content::TestNavigationObserver observer(contents);
   contents->GetController().GoBack();
   observer.Wait();
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      main_frame, kDiscardedStateJS, &discarded_mainframe_result));
-  EXPECT_FALSE(discarded_mainframe_result);
+  main_frame = contents->GetPrimaryMainFrame();
+  EXPECT_EQ(false, content::EvalJs(main_frame, kDiscardedStateJS));
 }
 
 class TabManagerFencedFrameTest : public TabManagerTest {
@@ -874,9 +833,7 @@ class TabManagerFencedFrameTest : public TabManagerTest {
 
 // Tests that `window.document.wasDiscarded` is updated for a fenced frame.
 IN_PROC_BROWSER_TEST_F(TabManagerFencedFrameTest, TabManagerWasDiscarded) {
-  const char kDiscardedStateJS[] =
-      "window.domAutomationController.send("
-      "window.document.wasDiscarded);";
+  const char kDiscardedStateJS[] = "window.document.wasDiscarded;";
 
   // Navigate to a page with a fenced frame.
   ASSERT_TRUE(https_server().Start());
@@ -896,15 +853,9 @@ IN_PROC_BROWSER_TEST_F(TabManagerFencedFrameTest, TabManagerWasDiscarded) {
 
   // document.wasDiscarded is false before discard, on a main frame and fenced
   // frame.
-  bool before_discard_mainframe_result = false;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      primary_main_frame, kDiscardedStateJS, &before_discard_mainframe_result));
-  EXPECT_FALSE(before_discard_mainframe_result);
+  EXPECT_EQ(false, content::EvalJs(primary_main_frame, kDiscardedStateJS));
 
-  bool before_discard_fencedframe_result = false;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      fenced_frame, kDiscardedStateJS, &before_discard_fencedframe_result));
-  EXPECT_FALSE(before_discard_fencedframe_result);
+  EXPECT_EQ(false, content::EvalJs(fenced_frame, kDiscardedStateJS));
 
   // Discard the tab. This simulates a tab discard.
   TabLifecycleUnitExternal::FromWebContents(contents)->DiscardTab(
@@ -923,15 +874,9 @@ IN_PROC_BROWSER_TEST_F(TabManagerFencedFrameTest, TabManagerWasDiscarded) {
 
   // document.wasDiscarded is true after discard, on a main frame and fenced
   // frame.
-  bool discarded_mainframe_result = false;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      primary_main_frame, kDiscardedStateJS, &discarded_mainframe_result));
-  EXPECT_TRUE(discarded_mainframe_result);
+  EXPECT_EQ(true, content::EvalJs(primary_main_frame, kDiscardedStateJS));
 
-  bool discarded_fencedframe_result = false;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      fenced_frame, kDiscardedStateJS, &discarded_fencedframe_result));
-  EXPECT_TRUE(discarded_fencedframe_result);
+  EXPECT_EQ(true, content::EvalJs(fenced_frame, kDiscardedStateJS));
 }
 
 namespace {

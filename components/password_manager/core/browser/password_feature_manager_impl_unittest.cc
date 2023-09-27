@@ -6,6 +6,7 @@
 
 #include "base/test/scoped_feature_list.h"
 #include "build/build_config.h"
+#include "components/password_manager/core/browser/features/password_features.h"
 #include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_manager_client.h"
 #include "components/password_manager/core/browser/password_manager_util.h"
@@ -14,7 +15,7 @@
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/testing_pref_service.h"
 #include "components/signin/public/identity_manager/account_info.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
 #include "components/sync/test/test_sync_service.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -159,11 +160,6 @@ class PasswordFeatureManagerImplTestBiometricAuthenticationTest
 TEST_P(PasswordFeatureManagerImplTestBiometricAuthenticationTest,
        IsBiometricAuthenticationBeforeFillingEnabled) {
   TestCase test_case = GetParam();
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitWithFeatureState(
-      password_manager::features::kBiometricAuthenticationForFilling,
-      test_case.had_biometrics);
-
   SCOPED_TRACE(test_case.description);
 
   pref_service_.SetBoolean(password_manager::prefs::kHadBiometricsAvailable,

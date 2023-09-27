@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/notreached.h"
 #include "build/chromeos_buildflags.h"
@@ -19,12 +20,12 @@
 #include "extensions/browser/extension_system.h"
 
 #if !BUILDFLAG(IS_CHROMEOS_ASH)
-#include "chrome/browser/ui/profile_picker.h"
+#include "chrome/browser/ui/profiles/profile_picker.h"
 #endif  // !BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
-#include "chrome/browser/supervised_user/supervised_user_service.h"
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
+#include "components/supervised_user/core/browser/supervised_user_service.h"
 #include "extensions/browser/api/management/management_api.h"
 #endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS)
 
@@ -101,18 +102,21 @@ void ExtensionEnableFlow::CheckPermissionAndMaybePromptUser() {
               ->Get(profile_)
               ->GetSupervisedUserExtensionsDelegate();
   DCHECK(supervised_user_extensions_delegate);
-  if (profile_->IsChild() && extension &&
+  supervised_user::SupervisedUserService* supervised_user_service =
+      SupervisedUserServiceFactory::GetForProfile(profile_);
+  DCHECK(supervised_user_service);
+  if (supervised_user_service->AreExtensionsPermissionsEnabled() && extension &&
+
       // Only ask for parent approval if the extension still requires approval.
       !supervised_user_extensions_delegate->IsExtensionAllowedByParent(
-          *extension, profile_)) {
+          *extension)) {
     // Either ask for parent permission or notify the child that their parent
     // has disabled this action.
     auto extension_approval_callback =
         base::BindOnce(&ExtensionEnableFlow::OnExtensionApprovalDone,
                        weak_ptr_factory_.GetWeakPtr());
     supervised_user_extensions_delegate->RequestToEnableExtensionOrShowError(
-        *extension, profile_, parent_contents_,
-        std::move(extension_approval_callback));
+        *extension, parent_contents_, std::move(extension_approval_callback));
     return;
   }
 #endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS)
@@ -244,12 +248,18 @@ void ExtensionEnableFlow::EnableExtension() {
     return;
   }
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
-  if (profile_->IsChild()) {
+  supervised_user::SupervisedUserService* supervised_user_service =
+      SupervisedUserServiceFactory::GetForProfile(profile_);
+  if (supervised_user_service->AreExtensionsPermissionsEnabled()) {
     // We need to add parent approval first.
-    SupervisedUserService* supervised_user_service =
-        SupervisedUserServiceFactory::GetForProfile(profile_);
-    supervised_user_service->AddExtensionApproval(*extension);
-    supervised_user_service->RecordExtensionEnablementUmaMetrics(
+    extensions::SupervisedUserExtensionsDelegate*
+        supervised_user_extensions_delegate =
+            extensions::ManagementAPI::GetFactoryInstance()
+                ->Get(profile_)
+                ->GetSupervisedUserExtensionsDelegate();
+    CHECK(supervised_user_extensions_delegate);
+    supervised_user_extensions_delegate->AddExtensionApproval(*extension);
+    supervised_user_extensions_delegate->RecordExtensionEnablementUmaMetrics(
         /*enabled=*/true);
   }
 #endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS)

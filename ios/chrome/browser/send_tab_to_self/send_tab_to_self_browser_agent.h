@@ -12,9 +12,9 @@
 
 #import "base/scoped_observation.h"
 #import "components/send_tab_to_self/send_tab_to_self_model_observer.h"
-#import "ios/chrome/browser/main/browser_observer.h"
-#import "ios/chrome/browser/main/browser_user_data.h"
-#import "ios/chrome/browser/web_state_list/web_state_list_observer.h"
+#import "ios/chrome/browser/shared/model/browser/browser_observer.h"
+#import "ios/chrome/browser/shared/model/browser/browser_user_data.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list_observer.h"
 #import "ios/web/public/web_state_observer.h"
 
 namespace web {
@@ -51,11 +51,9 @@ class SendTabToSelfBrowserAgent
   void EntriesRemovedRemotely(const std::vector<std::string>& guids) override;
 
   // WebStateListObserver::
-  void WebStateActivatedAt(WebStateList* web_state_list,
-                           web::WebState* old_web_state,
-                           web::WebState* new_web_state,
-                           int active_index,
-                           ActiveWebStateChangeReason reason) override;
+  void WebStateListDidChange(WebStateList* web_state_list,
+                             const WebStateListChange& change,
+                             const WebStateListStatus& status) override;
 
   // WebStateObserver::
   void WasShown(web::WebState* web_state) override;

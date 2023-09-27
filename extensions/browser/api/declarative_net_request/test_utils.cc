@@ -13,17 +13,17 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/json/json_file_value_serializer.h"
+#include "base/values.h"
 #include "extensions/browser/api/declarative_net_request/composite_matcher.h"
 #include "extensions/browser/api/declarative_net_request/file_backed_ruleset_source.h"
 #include "extensions/browser/api/declarative_net_request/indexed_rule.h"
-#include "extensions/browser/api/declarative_net_request/rules_count_pair.h"
+#include "extensions/browser/api/declarative_net_request/rule_counts.h"
 #include "extensions/browser/api/declarative_net_request/ruleset_matcher.h"
 #include "extensions/browser/api/declarative_net_request/ruleset_source.h"
 #include "extensions/browser/api/web_request/web_request_info.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/common/api/declarative_net_request/test_utils.h"
 #include "extensions/common/extension.h"
-#include "extensions/common/value_builder.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace extensions {
@@ -40,17 +40,17 @@ RequestAction CreateRequestActionForTesting(RequestAction::Type type,
     switch (type) {
       case RequestAction::Type::BLOCK:
       case RequestAction::Type::COLLAPSE:
-        return dnr_api::RULE_ACTION_TYPE_BLOCK;
+        return dnr_api::RuleActionType::kBlock;
       case RequestAction::Type::ALLOW:
-        return dnr_api::RULE_ACTION_TYPE_ALLOW;
+        return dnr_api::RuleActionType::kAllow;
       case RequestAction::Type::REDIRECT:
-        return dnr_api::RULE_ACTION_TYPE_REDIRECT;
+        return dnr_api::RuleActionType::kRedirect;
       case RequestAction::Type::UPGRADE:
-        return dnr_api::RULE_ACTION_TYPE_UPGRADESCHEME;
+        return dnr_api::RuleActionType::kUpgradeScheme;
       case RequestAction::Type::ALLOW_ALL_REQUESTS:
-        return dnr_api::RULE_ACTION_TYPE_ALLOWALLREQUESTS;
+        return dnr_api::RuleActionType::kAllowAllRequests;
       case RequestAction::Type::MODIFY_HEADERS:
-        return dnr_api::RULE_ACTION_TYPE_MODIFYHEADERS;
+        return dnr_api::RuleActionType::kModifyHeaders;
     }
   }();
   return RequestAction(type, rule_id,
@@ -349,8 +349,8 @@ std::ostream& operator<<(std::ostream& output, LoadRulesetResult result) {
   return output;
 }
 
-std::ostream& operator<<(std::ostream& output, const RulesCountPair& count) {
-  output << "\nRulesCountPair\n";
+std::ostream& operator<<(std::ostream& output, const RuleCounts& count) {
+  output << "\nRuleCounts\n";
   output << "|rule_count| " << count.rule_count << "\n";
   output << "|regex_rule_count| " << count.regex_rule_count << "\n";
   return output;
@@ -391,10 +391,10 @@ bool CreateVerifiedMatcher(const std::vector<TestRule>& rules,
   using IndexStatus = IndexAndPersistJSONRulesetResult::Status;
 
   // Serialize |rules|.
-  ListBuilder builder;
+  base::Value::List builder;
   for (const auto& rule : rules)
     builder.Append(rule.ToValue());
-  JSONFileValueSerializer(source.json_path()).Serialize(builder.Build());
+  JSONFileValueSerializer(source.json_path()).Serialize(std::move(builder));
 
   // Index ruleset.
   auto parse_flags = FileBackedRulesetSource::kRaiseErrorOnInvalidRules |

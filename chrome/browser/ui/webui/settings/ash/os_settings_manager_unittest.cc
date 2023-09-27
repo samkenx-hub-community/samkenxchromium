@@ -5,11 +5,11 @@
 #include "chrome/browser/ui/webui/settings/ash/os_settings_manager.h"
 
 #include "ash/constants/ash_features.h"
+#include "ash/webui/settings/public/constants/routes.mojom.h"
 #include "base/containers/contains.h"
 #include "base/metrics/histogram_base.h"
 #include "base/test/metrics/histogram_enum_reader.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
-#include "chrome/browser/ash/android_sms/android_sms_service_factory.h"
 #include "chrome/browser/ash/app_list/arc/arc_app_list_prefs_factory.h"
 #include "chrome/browser/ash/eche_app/eche_app_manager_factory.h"
 #include "chrome/browser/ash/kerberos/kerberos_credentials_manager_factory.h"
@@ -17,15 +17,14 @@
 #include "chrome/browser/ash/phonehub/phone_hub_manager_factory.h"
 #include "chrome/browser/ash/printing/cups_printers_manager_factory.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
-#include "chrome/browser/sync/sync_service_factory.h"
-#include "chrome/browser/ui/webui/settings/ash/constants/constants_util.h"
+#include "chrome/browser/ui/webui/ash/settings/constants/constants_util.h"
 #include "chrome/browser/ui/webui/settings/ash/hierarchy.h"
 #include "chrome/browser/ui/webui/settings/ash/os_settings_manager_factory.h"
 #include "chrome/browser/ui/webui/settings/ash/os_settings_sections.h"
-#include "chrome/browser/ui/webui/settings/chromeos/constants/routes.mojom.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/test/base/testing_profile_manager.h"
+#include "chromeos/ash/components/dbus/userdataauth/userdataauth_client.h"
 #include "chromeos/ash/components/local_search_service/public/cpp/local_search_service_proxy.h"
 #include "chromeos/ash/components/local_search_service/public/cpp/local_search_service_proxy_factory.h"
 #include "chromeos/ash/components/local_search_service/search_metrics_reporter.h"
@@ -53,8 +52,8 @@ class OsSettingsManagerTest : public testing::Test {
   void SetUp() override {
     scoped_feature_list_.InitWithFeatures(
         {::features::kAccessibilityChromeVoxPageMigration,
-         ::features::kAccessibilitySelectToSpeakPageMigration,
-         ash::features::kInputDeviceSettingsSplit},
+         ash::features::kInputDeviceSettingsSplit,
+         ash::features::kPeripheralCustomization},
         {});
     ASSERT_TRUE(profile_manager_.SetUp());
     TestingProfile* profile =
@@ -67,16 +66,16 @@ class OsSettingsManagerTest : public testing::Test {
     input_method::MockInputMethodManager::Initialize(
         new input_method::MockInputMethodManager);
 
+    UserDataAuthClient::InitializeFake();
+
     manager_ = std::make_unique<OsSettingsManager>(
         profile, local_search_service_proxy_.get(),
         multidevice_setup::MultiDeviceSetupClientFactory::GetForProfile(
             profile),
         phonehub::PhoneHubManagerFactory::GetForProfile(profile),
-        SyncServiceFactory::GetForProfile(profile),
         KerberosCredentialsManagerFactory::Get(profile),
         ArcAppListPrefsFactory::GetForBrowserContext(profile),
         IdentityManagerFactory::GetForProfile(profile),
-        android_sms::AndroidSmsServiceFactory::GetForBrowserContext(profile),
         CupsPrintersManagerFactory::GetForBrowserContext(profile),
         apps::AppServiceProxyFactory::GetForProfile(profile),
         eche_app::EcheAppManagerFactory::GetForProfile(profile));

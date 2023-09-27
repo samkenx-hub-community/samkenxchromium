@@ -30,6 +30,7 @@
 #include "components/password_manager/core/browser/password_manager_test_utils.h"
 #include "components/password_manager/core/browser/password_reuse_manager.h"
 #include "components/password_manager/core/browser/ui/password_check_referrer.h"
+#include "components/password_manager/core/common/password_manager_features.h"
 #include "components/password_manager/core/common/password_manager_pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
@@ -77,8 +78,9 @@ PasswordForm CreatePasswordFormWithPhishedEntry(std::string signon_realm,
   form.in_store = PasswordForm::Store::kProfileStore;
   form.password_issues = {
       {password_manager::InsecureType::kPhished,
-       password_manager::InsecurityMetadata(base::Time::FromTimeT(1),
-                                            password_manager::IsMuted(false))}};
+       password_manager::InsecurityMetadata(
+           base::Time::FromTimeT(1), password_manager::IsMuted(false),
+           password_manager::TriggerBackendNotification(false))}};
 
   return form;
 }
@@ -388,7 +390,7 @@ IN_PROC_BROWSER_TEST_F(
   // foreground tab.
   ASSERT_EQ(2, browser()->tab_strip_model()->count());
   ASSERT_EQ(
-      chrome::GetSettingsUrl(chrome::kPasswordCheckSubPage),
+      GURL(chrome::kChromeUIPasswordManagerCheckupURL),
       browser()->tab_strip_model()->GetActiveWebContents()->GetVisibleURL());
   histograms.ExpectUniqueSample(
       password_manager::kPasswordCheckReferrerHistogram,
@@ -684,7 +686,7 @@ IN_PROC_BROWSER_TEST_F(ChromePasswordProtectionServiceBrowserTest,
   std::string script =
       "var node = document.getElementById('reset-password-button'); \n"
       "node.click();";
-  ASSERT_TRUE(content::ExecuteScript(new_web_contents, script));
+  ASSERT_TRUE(content::ExecJs(new_web_contents, script));
   content::TestNavigationObserver observer1(new_web_contents,
                                             /*number_of_navigations=*/1);
   observer1.Wait();
@@ -900,13 +902,10 @@ class ChromePasswordProtectionServiceNavigationDeferralBrowserTest
     std::vector<password_manager::MatchingReusedCredential> credentials = {
         {kSignonRealm, kUsername}};
 
-    // TODO(bokan): This issues a real request, via a URLLoader, that actually
-    // gets a response. It'd be better if this test could control the response
-    // instead of manually calling Finish.
-    service->StartRequest(GetWebContents(), GURL(), GURL(), GURL(), "",
-                          PasswordType::SAVED_PASSWORD, credentials,
-                          LoginReputationClientRequest::PASSWORD_REUSE_EVENT,
-                          true);
+    service->StartRequestForTesting(
+        GetWebContents(), GURL(), GURL(), GURL(), "",
+        PasswordType::SAVED_PASSWORD, credentials,
+        LoginReputationClientRequest::PASSWORD_REUSE_EVENT, true);
     if (service->get_pending_requests_for_testing().size() != 1ul)
       return nullptr;
 
@@ -1121,7 +1120,7 @@ class ChromePasswordProtectionServiceDeferActivationBrowserTest
   }
 
   void SetUp() override {
-    prerender_helper_.SetUp(embedded_test_server());
+    prerender_helper_.RegisterServerRequestMonitor(embedded_test_server());
     ChromePasswordProtectionServiceNavigationDeferralBrowserTest::SetUp();
   }
 

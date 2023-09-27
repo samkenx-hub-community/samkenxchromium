@@ -12,8 +12,11 @@
 #include "base/files/file.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
+#include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
+#include "base/scoped_observation.h"
 #include "chrome/browser/ash/arc/session/arc_session_manager_observer.h"
 #include "chrome/browser/ash/drive/drive_integration_service.h"
 #include "chrome/browser/ash/file_manager/documents_provider_root_manager.h"
@@ -26,6 +29,7 @@
 #include "components/prefs/pref_change_registrar.h"
 #include "components/storage_monitor/removable_storage_observer.h"
 #include "services/device/public/mojom/mtp_manager.mojom.h"
+#include "ui/base/clipboard/clipboard_observer.h"
 
 class Profile;
 
@@ -53,12 +57,13 @@ class VolumeManagerObserver;
 // - Android/Arc++ file system.
 // - File System Providers.
 class VolumeManager : public KeyedService,
-                      public arc::ArcSessionManagerObserver,
-                      public drive::DriveIntegrationServiceObserver,
-                      public ash::disks::DiskMountManager::Observer,
-                      public ash::file_system_provider::Observer,
-                      public storage_monitor::RemovableStorageObserver,
-                      public DocumentsProviderRootManager::Observer {
+                      arc::ArcSessionManagerObserver,
+                      drive::DriveIntegrationService::Observer,
+                      ash::disks::DiskMountManager::Observer,
+                      ash::file_system_provider::Observer,
+                      storage_monitor::RemovableStorageObserver,
+                      ui::ClipboardObserver,
+                      DocumentsProviderRootManager::Observer {
  public:
   // An alternate to device::mojom::MtpManager::GetStorageInfo.
   // Used for injecting fake MTP manager for testing in VolumeManagerTest.
@@ -185,7 +190,8 @@ class VolumeManager : public KeyedService,
       const std::string& drive_label = "",
       const std::string& file_system_type = "");
 
-  // drive::DriveIntegrationServiceObserver overrides.
+  // DriveIntegrationService::Observer implementation.
+  void OnDriveIntegrationServiceDestroyed() override;
   void OnFileSystemMounted() override;
   void OnFileSystemBeingUnmounted() override;
 
@@ -248,6 +254,9 @@ class VolumeManager : public KeyedService,
   void OnDocumentsProviderRootRemoved(const std::string& authority,
                                       const std::string& root_id,
                                       const std::string& document_id) override;
+
+  // ui::ClipboardObserver:
+  void OnClipboardDataChanged() override;
 
   // For SmbFs.
   void AddSmbFsVolume(const base::FilePath& mount_point,
@@ -333,10 +342,13 @@ class VolumeManager : public KeyedService,
   static int counter_;
   const int id_ = ++counter_;  // Only used in log traces
 
-  Profile* const profile_;
-  drive::DriveIntegrationService* const drive_integration_service_;
-  ash::disks::DiskMountManager* const disk_mount_manager_;
-  ash::file_system_provider::Service* const file_system_provider_service_;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
+  const raw_ptr<drive::DriveIntegrationService, ExperimentalAsh>
+      drive_integration_service_;
+  const raw_ptr<ash::disks::DiskMountManager, ExperimentalAsh>
+      disk_mount_manager_;
+  const raw_ptr<ash::file_system_provider::Service, ExperimentalAsh>
+      file_system_provider_service_;
 
   PrefChangeRegistrar pref_change_registrar_;
   base::ObserverList<VolumeManagerObserver>::Unchecked observers_;
@@ -348,10 +360,17 @@ class VolumeManager : public KeyedService,
       documents_provider_root_manager_;
   io_task::IOTaskController io_task_controller_;
   bool arc_volumes_mounted_ = false;
+  bool ignore_clipboard_changed_ = false;
+
+  base::ScopedObservation<drive::DriveIntegrationService,
+                          drive::DriveIntegrationService::Observer>
+      drive_observer_{this};
 
   // Note: This should remain the last member so it'll be destroyed and
   // invalidate its weak pointers before any other members are destroyed.
   base::WeakPtrFactory<VolumeManager> weak_ptr_factory_{this};
+
+  FRIEND_TEST_ALL_PREFIXES(VolumeManagerTest, OnBootDeviceDiskEvent);
 };
 
 }  // namespace file_manager

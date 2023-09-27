@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {NetworkTestRunner} from 'network_test_runner';
+
+import * as Common from 'devtools/core/common/common.js';
+
 (async function() {
   TestRunner.addResult('Verifies that HAR exports contain websocket messages');
-  await TestRunner.loadTestModule('network_test_runner');
   await TestRunner.showPanel('network');
   await TestRunner.NetworkAgent.setCacheDisabled(true);
 
@@ -34,7 +38,7 @@
 
   const harString = await new Promise(async resolve => {
     const stream = new TestRunner.StringOutputStream(resolve);
-    const progress = new Common.Progress();
+    const progress = new Common.Progress.Progress();
     await NetworkTestRunner.writeHARLog(
         stream, NetworkTestRunner.networkRequests(), progress);
     progress.done();

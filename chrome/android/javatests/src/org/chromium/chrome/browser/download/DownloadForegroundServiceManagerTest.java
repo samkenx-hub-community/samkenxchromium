@@ -12,8 +12,8 @@ import static org.chromium.chrome.browser.notifications.NotificationConstants.DE
 
 import android.app.Notification;
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Before;
@@ -60,6 +60,11 @@ public final class DownloadForegroundServiceManagerTest {
         public MockDownloadForegroundServiceManager() {}
 
         @Override
+        boolean isEnabled() {
+            return true;
+        }
+
+        @Override
         void startAndBindService(Context context) {
             mIsServiceBound = true;
             super.startAndBindService(context);
@@ -91,6 +96,11 @@ public final class DownloadForegroundServiceManagerTest {
         @Override
         void postMaybeStopServiceRunnable() {}
 
+        @Override
+        protected boolean canStartForeground() {
+            return true;
+        }
+
         /**
          * Call for testing that mimics the onServiceConnected call in mConnection that ensures the
          * mBoundService is non-null and the pending queue is processed.
@@ -115,7 +125,7 @@ public final class DownloadForegroundServiceManagerTest {
     @Before
     public void setUp() {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            mContext = new AdvancedMockContext(InstrumentationRegistry.getTargetContext());
+            mContext = new AdvancedMockContext(ApplicationProvider.getApplicationContext());
             mDownloadServiceManager = new MockDownloadForegroundServiceManager();
 
             mNotification =

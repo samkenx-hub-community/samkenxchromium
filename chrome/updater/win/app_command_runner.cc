@@ -8,6 +8,7 @@
 #include <windows.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/base_paths_win.h"
@@ -63,7 +64,7 @@ HRESULT LoadAppCommandFormat(UpdaterScope scope,
 // REG_SZ `cmd`. Along with `cmd`, there are other properties of the app
 // registered, such as the version "pv"="107.0.5304.107". So, `pv` is also a
 // potential "command" for `IProcessLauncher`, which is unexpected.
-// TODO(crbug/1399177): Parameterize `LoadLegacyProcessLauncherFormat`.
+// TODO(crbug.com/1399177): Parameterize `LoadLegacyProcessLauncherFormat`.
 HRESULT LoadLegacyProcessLauncherFormat(const std::wstring& app_id,
                                         const std::wstring& command_id,
                                         std::wstring& command_format) {
@@ -181,7 +182,7 @@ AppCommandRunner::LoadAutoRunOnOsUpgradeAppCommands(
     HResultOr<AppCommandRunner> runner =
         LoadAppCommand(scope, app_id, it.Name());
     if (runner.has_value()) {
-      app_command_runners.push_back(*runner);
+      app_command_runners.push_back(*std::move(runner));
     }
   }
 

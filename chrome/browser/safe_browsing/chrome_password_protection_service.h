@@ -327,8 +327,8 @@ class ChromePasswordProtectionService : public PasswordProtectionService,
   void FillUserPopulation(const GURL& main_frame_url,
                           LoginReputationClientRequest* request_proto) override;
 
-  // If primary account is syncing.
-  bool IsPrimaryAccountSyncing() const override;
+  // If primary account is syncing history.
+  bool IsPrimaryAccountSyncingHistory() const override;
 
   // If primary account is signed in.
   bool IsPrimaryAccountSignedIn() const override;
@@ -557,7 +557,7 @@ class ChromePasswordProtectionService : public PasswordProtectionService,
       const password_manager::MatchingReusedCredential& reused_credential);
 
   scoped_refptr<SafeBrowsingUIManager> ui_manager_;
-  raw_ptr<TriggerManager> trigger_manager_;
+  raw_ptr<TriggerManager, DanglingUntriaged> trigger_manager_;
   // Profile associated with this instance.
   raw_ptr<Profile> profile_;
   // Current sync password hash.

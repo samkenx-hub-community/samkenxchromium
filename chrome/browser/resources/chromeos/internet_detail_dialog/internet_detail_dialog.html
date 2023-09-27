@@ -1,5 +1,5 @@
 <style include="cr-page-host-style cr-shared-style network-shared
-    iron-flex">
+    iron-flex cros-color-overrides">
   cr-policy-network-indicator-mojo {
     margin-inline-end: 10px;
   }
@@ -146,6 +146,7 @@
           id="apnList"
           managed-cellular-properties="[[managedProperties_.typeProperties.cellular]]"
           guid="[[guid]]"
+          error-state="[[managedProperties_.errorState]]"
           should-omit-links>
       </apn-list>
       <div id="apnButtonTitle">
@@ -228,4 +229,10 @@
       </network-property-list-mojo>
     </div>
   </template>
+</template>
+
+<template is="dom-if" if="[[isApnRevampEnabled_]]" restamp>
+  <cr-toast id="errorToast" duration="5000">
+    <span id="errorToastMessage">[[errorToastMessage_]]</span>
+  </cr-toast>
 </template>

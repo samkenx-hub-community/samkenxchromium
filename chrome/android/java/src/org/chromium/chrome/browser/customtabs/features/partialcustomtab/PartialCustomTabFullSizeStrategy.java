@@ -8,6 +8,7 @@ import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
 import static org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider.ACTIVITY_LAYOUT_STATE_FULL_SCREEN;
 
+import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.app.Activity;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
@@ -16,7 +17,9 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 
 import androidx.annotation.Px;
+import androidx.annotation.StringRes;
 
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider.ActivityLayoutState;
 import org.chromium.chrome.browser.customtabs.features.toolbar.CustomTabToolbar;
 import org.chromium.chrome.browser.fullscreen.FullscreenManager;
@@ -45,12 +48,18 @@ public class PartialCustomTabFullSizeStrategy extends PartialCustomTabBaseStrate
     }
 
     @Override
+    public @StringRes int getTypeStringId() {
+        return R.string.accessibility_partial_custom_tab_full_sheet;
+    }
+
+    @Override
     public void onToolbarInitialized(
             View coordinatorView, CustomTabToolbar toolbar, @Px int toolbarCornerRadius) {
         super.onToolbarInitialized(coordinatorView, toolbar, toolbarCornerRadius);
 
-        PartialCustomTabHandleStrategy handleStrategy = mHandleStrategyFactory.create(
-                getStrategyType(), mActivity, this::isFullHeight, () -> 0, null);
+        CustomTabToolbar.HandleStrategy handleStrategy =
+                mHandleStrategyFactory.create(getStrategyType(), mActivity, this::isFullHeight,
+                        () -> 0, null, this::handleCloseAnimation);
         toolbar.setHandleStrategy(handleStrategy);
         updateDragBarVisibility(/*dragHandlebarVisibility*/ View.GONE);
     }
@@ -76,6 +85,17 @@ public class PartialCustomTabFullSizeStrategy extends PartialCustomTabBaseStrate
     }
 
     @Override
+    public boolean handleCloseAnimation(Runnable finishRunnable) {
+        if (!super.handleCloseAnimation(finishRunnable)) return false;
+
+        configureLayoutBeyondScreen(true);
+        AnimatorUpdateListener updater = animator -> setWindowY((int) animator.getAnimatedValue());
+        int start = mActivity.getWindow().getAttributes().y;
+        startAnimation(start, mHeight, updater, this::onCloseAnimationEnd);
+        return true;
+    }
+
+    @Override
     protected int getHandleHeight() {
         return 0;
     }
@@ -91,8 +111,7 @@ public class PartialCustomTabFullSizeStrategy extends PartialCustomTabBaseStrate
     }
 
     @Override
-    @ActivityLayoutState
-    protected int getActivityLayoutState() {
+    protected @ActivityLayoutState int getActivityLayoutState() {
         return ACTIVITY_LAYOUT_STATE_FULL_SCREEN;
     }
 
@@ -128,7 +147,7 @@ public class PartialCustomTabFullSizeStrategy extends PartialCustomTabBaseStrate
     }
 
     @Override
-    protected void drawDividerLine(CustomTabToolbar toolbar) {}
+    protected void drawDividerLine() {}
 
     private void positionOnWindow() {
         WindowManager.LayoutParams attrs = mActivity.getWindow().getAttributes();

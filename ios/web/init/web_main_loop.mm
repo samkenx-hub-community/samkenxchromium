@@ -31,10 +31,6 @@
 #import "ios/web/web_thread_impl.h"
 #import "ios/web/webui/url_data_manager_ios.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace web {
 
 // The currently-running WebMainLoop.  There can be one or zero.
@@ -96,6 +92,11 @@ void WebMainLoop::CreateStartupTasks() {
   if (result > 0)
     return;
 
+  result = PostCreateThreads();
+  if (result > 0) {
+    return;
+  }
+
   result = WebThreadsStarted();
   if (result > 0)
     return;
@@ -117,6 +118,13 @@ int WebMainLoop::PreCreateThreads() {
   base::PowerMonitor::Initialize(
       std::make_unique<base::PowerMonitorDeviceSource>());
 
+  return result_code_;
+}
+
+int WebMainLoop::PostCreateThreads() {
+  if (parts_) {
+    parts_->PostCreateThreads();
+  }
   return result_code_;
 }
 

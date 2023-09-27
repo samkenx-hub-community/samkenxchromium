@@ -14,12 +14,14 @@
 #include "base/files/file.h"
 #include "base/files/file_error_or.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ash/file_manager/file_manager_copy_or_move_hook_delegate.h"
 #include "chrome/browser/ash/file_manager/io_task.h"
-#include "chrome/browser/ash/file_manager/speedometer.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chromeos/ash/components/drivefs/mojom/drivefs.mojom.h"
+#include "chromeos/ash/components/file_manager/speedometer.h"
 #include "components/drive/file_errors.h"
 #include "storage/browser/file_system/file_system_context.h"
 #include "storage/browser/file_system/file_system_operation_runner.h"
@@ -67,11 +69,25 @@ class CopyOrMoveIOTaskImpl {
   virtual void Execute(ProgressCallback progress_callback,
                        CompleteCallback complete_callback);
 
+  // Pauses the copy or move.
+  // TODO(b/283089374): Use this function to pause for conflict resolve.
+  void Pause(PauseParams);
+
   // Resumes the copy or move.
-  void Resume(ResumeParams);
+  virtual void Resume(ResumeParams);
 
   // Cancels the copy or move.
   void Cancel();
+
+  // Completes the copy or move. Called when the copy or move completes
+  // successfully or completes with error. Runs the |complete_callback_|.
+  // |progress_| should not be accessed after calling this. If you override this
+  // method, make sure to explicitly call CopyOrMoveIOTaskImpl::Complete.
+  virtual void Complete(State state);
+
+  // Aborts the copy or move because of policy error (does not run completion
+  // callback).
+  void CompleteWithError(PolicyError policy_error);
 
   // Helper function for copy or move tasks that determines whether or not
   // entries identified by their URLs should be considered as being on the
@@ -86,6 +102,11 @@ class CopyOrMoveIOTaskImpl {
       const storage::FileSystemURL& destination_url);
 
  protected:
+  // Returns the storage::CopyOrMoveHookDelegate to be used for the copy or move
+  // operation.
+  virtual std::unique_ptr<storage::CopyOrMoveHookDelegate> GetHookDelegate(
+      size_t idx);
+
   // Starts the actual file transfer. Should be called after the checks of
   // `VerifyTransfer` are completed. Protected to be called from child classes.
   void StartTransfer();
@@ -103,7 +124,7 @@ class CopyOrMoveIOTaskImpl {
   // The current progress state.
   // The reference is allowed here, as the owning object (CopyOrMoveIOTask) is
   // guaranteed to outlive the CopyOrMoveIOTaskImpl.
-  ProgressStatus& progress_;
+  const raw_ref<ProgressStatus, ExperimentalAsh> progress_;
 
   // ProgressCallback for this operation, used to notify the UI of the current
   // progress.
@@ -113,17 +134,12 @@ class CopyOrMoveIOTaskImpl {
   friend class CopyOrMoveIOTaskTest;
   FRIEND_TEST_ALL_PREFIXES(CopyOrMoveIOTaskTest, DriveQuota);
 
-  // Verifies the transfer, e.g., by using enterprise connectors for checking
-  // whether a transfer is allowed.
+  // Verifies the transfer, e.g., by using policies set by admins (if there are
+  // any) for checking whether a transfer is allowed.
   virtual void VerifyTransfer();
   // Returns the error behavior to be used for the copy or move operation.
   virtual storage::FileSystemOperation::ErrorBehavior GetErrorBehavior();
-  // Returns the storage::CopyOrMoveHookDelegate to be used for the copy or move
-  // operation.
-  virtual std::unique_ptr<storage::CopyOrMoveHookDelegate> GetHookDelegate(
-      size_t idx);
 
-  void Complete(State state);
   void GetFileSize(size_t idx);
   void GotFileSize(size_t idx,
                    base::File::Error error,
@@ -153,7 +169,7 @@ class CopyOrMoveIOTaskImpl {
   void SetCurrentOperationID(
       storage::FileSystemOperationRunner::OperationID id);
 
-  Profile* profile_;
+  raw_ptr<Profile, ExperimentalAsh> profile_;
   scoped_refptr<storage::FileSystemContext> file_system_context_;
 
   // Specifies whether the operation is already completed.

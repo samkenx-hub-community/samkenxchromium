@@ -66,14 +66,15 @@ export function createGifArgs({width, height}: Resolution): VideoProcessorArgs {
 /**
  * Creates the command line arguments to ffmpeg for time-lapse recording.
  */
-export function createTimeLapseArgs({width, height}: Resolution):
-    VideoProcessorArgs {
+export function createTimeLapseArgs(
+    {width, height}: Resolution, fps: number,
+    videoRotation = 0): VideoProcessorArgs {
   // clang-format off
   const decoderArgs = [
     // input format
     '-f', 'h264',
     // force input framerate
-    '-r', '30',
+    '-r', `${fps}`,
     // specify video size
     '-s', `${width}x${height}`,
   ];
@@ -82,6 +83,8 @@ export function createTimeLapseArgs({width, height}: Resolution):
   // to read with comments.
   // clang-format off
   const encoderArgs = [
+    // rotate the video by metadata
+    '-metadata:s:v', `rotate=${videoRotation}`,
     // disable audio and copy the video stream
     '-an', '-c:v', 'copy',
   ];

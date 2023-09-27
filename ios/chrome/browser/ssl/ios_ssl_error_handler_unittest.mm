@@ -7,7 +7,7 @@
 #import "base/functional/bind.h"
 #import "base/run_loop.h"
 #import "base/test/ios/wait_util.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/ssl/captive_portal_tab_helper.h"
 #import "ios/components/security_interstitials/ios_blocking_page_tab_helper.h"
 #import "ios/web/public/test/fakes/fake_navigation_manager.h"
@@ -22,10 +22,6 @@
 #import "services/network/test/test_url_loader_factory.h"
 #import "testing/platform_test.h"
 #import "third_party/ocmock/OCMock/OCMock.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using base::test::ios::kWaitForUIElementTimeout;
 using base::test::ios::WaitUntilConditionOrTimeout;

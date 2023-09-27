@@ -4,14 +4,13 @@
 
 #include "chrome/browser/ash/policy/remote_commands/device_command_fetch_crd_availability_info_job.h"
 
-#include <algorithm>
-
 #include "base/functional/bind.h"
+#include "base/json/json_writer.h"
+#include "base/numerics/clamped_math.h"
 #include "base/time/time.h"
 #include "chrome/browser/ash/policy/remote_commands/crd_logging.h"
 #include "chrome/browser/ash/policy/remote_commands/crd_remote_command_utils.h"
 #include "components/policy/core/common/remote_commands/remote_command_job.h"
-#include "extensions/common/value_builder.h"
 
 namespace policy {
 
@@ -19,7 +18,6 @@ namespace {
 
 using enterprise_management::CrdSessionAvailability;
 using enterprise_management::RemoteCommand;
-using extensions::DictionaryBuilder;
 
 constexpr char kIdleTime[] = "deviceIdleTimeInSeconds";
 constexpr char kUserSessionType[] = "userSessionType";
@@ -63,6 +61,10 @@ CrdSessionAvailability GetRemoteAccessAvailability(
   return CrdSessionAvailability::AVAILABLE;
 }
 
+int GetDeviceIdleTimeInSeconds() {
+  return base::ClampedNumeric<int32_t>(GetDeviceIdleTime().InSeconds());
+}
+
 }  // namespace
 
 DeviceCommandFetchCrdAvailabilityInfoJob::
@@ -86,18 +88,19 @@ void DeviceCommandFetchCrdAvailabilityInfoJob::SendPayload(
     CallbackWithResult callback,
     bool is_in_managed_environment) {
   std::string payload =
-      extensions::DictionaryBuilder()
-          .Set(kIdleTime, static_cast<int>(GetDeviceIdleTime().InSeconds()))
-          .Set(kUserSessionType, GetCurrentUserSessionType())
-          .Set(kIsInManagedEnvironment, is_in_managed_environment)
-          .Set(kSupportedCrdSessionTypes,
-               GetSupportedSessionTypes(is_in_managed_environment))
-          .Set(kRemoteSupportAvailability,
-               GetRemoteSupportAvailability(GetCurrentUserSessionType()))
-          .Set(kRemoteAccessAvailability,
-               GetRemoteAccessAvailability(is_in_managed_environment,
-                                           GetCurrentUserSessionType()))
-          .ToJSON();
+      base::WriteJson(
+          base::Value::Dict()
+              .Set(kIdleTime, GetDeviceIdleTimeInSeconds())
+              .Set(kUserSessionType, GetCurrentUserSessionType())
+              .Set(kIsInManagedEnvironment, is_in_managed_environment)
+              .Set(kSupportedCrdSessionTypes,
+                   GetSupportedSessionTypes(is_in_managed_environment))
+              .Set(kRemoteSupportAvailability,
+                   GetRemoteSupportAvailability(GetCurrentUserSessionType()))
+              .Set(kRemoteAccessAvailability,
+                   GetRemoteAccessAvailability(is_in_managed_environment,
+                                               GetCurrentUserSessionType())))
+          .value();
 
   CRD_DVLOG(1) << "Finished FETCH_CRD_AVAILABILITY_INFO remote command: "
                << payload;

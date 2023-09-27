@@ -179,8 +179,6 @@ bool HasCommunicatedWithPhone(SmartLockState state) {
     case SmartLockState::kPhoneNotFound:
       [[fallthrough]];
     case SmartLockState::kConnectingToPhone:
-      [[fallthrough]];
-    case SmartLockState::kPasswordReentryRequired:
       return false;
     case SmartLockState::kPhoneNotLockable:
       [[fallthrough]];
@@ -371,24 +369,6 @@ void UnlockManagerImpl::OnRemoteStatusUpdate(
 
   // This also calls |UpdateLockScreen()|
   SetIsPerformingInitialScan(false /* is_performing_initial_scan */);
-}
-
-void UnlockManagerImpl::OnDecryptResponse(const std::string& decrypted_bytes) {
-  if (!is_attempting_auth_) {
-    PA_LOG(ERROR) << "Decrypt response received but not attempting auth.";
-    return;
-  }
-
-  if (decrypted_bytes.empty()) {
-    PA_LOG(WARNING) << "Failed to decrypt sign-in challenge.";
-    FinalizeAuthAttempt(
-        SmartLockMetricsRecorder::SmartLockAuthResultFailureReason::
-            kFailedToDecryptSignInChallenge);
-  } else {
-    sign_in_secret_ = std::make_unique<std::string>(decrypted_bytes);
-    if (GetMessenger())
-      GetMessenger()->DispatchUnlockEvent();
-  }
 }
 
 void UnlockManagerImpl::OnUnlockResponse(bool success) {

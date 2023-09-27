@@ -6,6 +6,7 @@
 #define ASH_SYSTEM_TRAY_TRAY_CONSTANTS_H_
 
 #include "ash/ash_export.h"
+#include "base/time/time.h"
 #include "ui/gfx/color_palette.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/size.h"
@@ -30,8 +31,14 @@ constexpr int kTrayMenuWidth = 360;
 // The width of the revamped tray menu.
 constexpr int kRevampedTrayMenuWidth = 400;
 
-constexpr int kTrayPopupAutoCloseDelayInSeconds = 2;
-constexpr int kTrayPopupAutoCloseDelayInSecondsWithSpokenFeedback = 5;
+// Margins between the glanceable bubble and individual glanceables.
+constexpr int kGlanceablesLeftRightMargin = 16;
+constexpr int kGlanceablesVerticalMargin = 16;
+
+constexpr base::TimeDelta kSecondaryBubbleDuration = base::Seconds(3);
+constexpr base::TimeDelta kSecondaryBubbleWithSpokenFeedbackDuration =
+    base::Seconds(5);
+
 constexpr int kTrayPopupPaddingHorizontal = 18;
 constexpr int kTrayPopupButtonEndMargin = 10;
 
@@ -125,18 +132,17 @@ constexpr auto kUnifiedSliderBubblePadding = gfx::Insets::TLBR(12, 0, 4, 0);
 constexpr auto kUnifiedSliderPadding = gfx::Insets::VH(0, 16);
 constexpr auto kMicGainSliderViewPadding = gfx::Insets::TLBR(0, 52, 8, 0);
 constexpr auto kMicGainSliderPadding = gfx::Insets::TLBR(0, 8, 0, 48);
+constexpr int kSliderChildrenViewSpacing = 8;
 
 // Constants used in the QuickSettingsSlider of the `QuickSettingsView`.
 constexpr int kQsSliderIconSize = 20;
 constexpr auto kRadioSliderIconPadding = gfx::Insets::VH(0, 2);
-constexpr auto kRadioSliderPadding = gfx::Insets::TLBR(0, 4, 0, 24);
+constexpr auto kRadioSliderPadding = gfx::Insets::TLBR(4, 4, 4, 24);
 constexpr auto kRadioSliderPreferredSize = gfx::Size(0, 44);
 constexpr auto kRadioSliderViewPadding = gfx::Insets::TLBR(0, 20, 0, 0);
-constexpr int kRadioSliderViewSpacing = 8;
 
 constexpr int kMessageCenterCollapseThreshold = 175;
 constexpr int kStackedNotificationBarHeight = 32;
-constexpr int kStackedNotificationBarCollapsedHeight = 40;
 constexpr int kNotificationIconStackThreshold = 28;
 constexpr int kUnifiedSliderViewSpacing = 12;
 constexpr int kUnifiedMessageCenterBubbleSpacing = 8;
@@ -218,6 +224,7 @@ constexpr int kUnifiedFeaturePodsPageSpacing = 48;
 
 // Constants used in FeatureTiles of QuickSettingsView.
 constexpr int kFeatureTileMaxRows = 4;
+constexpr int kFeatureTileMaxRowsWhenMediaViewIsShowing = 3;
 constexpr int kFeatureTileMinRows = 1;
 constexpr int kFeatureTileHeight = 64;
 

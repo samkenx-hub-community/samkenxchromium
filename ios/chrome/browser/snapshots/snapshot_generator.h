@@ -7,7 +7,8 @@
 
 #import <UIKit/UIKit.h>
 
-@class SnapshotCache;
+class SnapshotID;
+@class SnapshotStorage;
 @protocol SnapshotGeneratorDelegate;
 
 namespace web {
@@ -18,14 +19,14 @@ class WebState;
 // tab's web page.
 @interface SnapshotGenerator : NSObject
 
-// Weak reference to the snapshot cache which is used to store and retrieve
+// Weak reference to the snapshot storage which is used to store and retrieve
 // snapshots for the WebState associated with this SnapshotGenerator.
-@property(nonatomic, weak) SnapshotCache* snapshotCache;
+@property(nonatomic, weak) SnapshotStorage* snapshotStorage;
 
 // Designated initializer.
 - (instancetype)initWithWebState:(web::WebState*)webState
-                           tabID:(NSString*)tabID NS_DESIGNATED_INITIALIZER;
-
+                      snapshotID:(SnapshotID)snapshotID
+    NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;
 
 // Gets a color snapshot for the current page, calling `callback` once it has
@@ -37,27 +38,39 @@ class WebState;
 // `callback` will be called with nil.
 - (void)retrieveGreySnapshot:(void (^)(UIImage*))callback;
 
-// Generates a new snapshot, updates the snapshot cache, and returns the new
+// Generates a new snapshot, updates the snapshot storage, and returns the new
 // snapshot image.
 - (UIImage*)updateSnapshot;
 
-// Asynchronously generates a new snapshot, updates the snapshot cache, and runs
-// `callback` with the new snapshot image. It is an error to call this method if
-// the web state is showing anything other (e.g., native content) than a web
-// view.
+// Asynchronously generates a new snapshot, updates the snapshot storage, and
+// runs `callback` with the new snapshot image. It is an error to call this
+// method if the web state is showing anything other (e.g., native content) than
+// a web view.
 - (void)updateWebViewSnapshotWithCompletion:(void (^)(UIImage*))completion;
 
 // Generates a new snapshot and returns the new snapshot image. This does not
-// update the snapshot cache. If `shouldAddOverlay` is YES, overlays (e.g.,
+// update the snapshot storage. If `shouldAddOverlay` is YES, overlays (e.g.,
 // infobars, the download manager, and sad tab view) are also captured in the
 // snapshot image.
 - (UIImage*)generateSnapshotWithOverlays:(BOOL)shouldAddOverlay;
+
+// Hints that the snapshot will likely be saved to disk when the application is
+// backgrounded.  The snapshot is then saved in memory, so it does not need to
+// be read off disk.
+- (void)willBeSavedGreyWhenBackgrounding;
+
+// Writes a grey copy of the snapshot to disk, but if and only if a color
+// version of the snapshot already exists in memory or on disk.
+- (void)saveGreyInBackground;
 
 // Requests deletion of the current page snapshot from disk and memory.
 - (void)removeSnapshot;
 
 // The SnapshotGenerator delegate.
 @property(nonatomic, weak) id<SnapshotGeneratorDelegate> delegate;
+
+// The snapshot ID.
+@property(nonatomic, readonly) SnapshotID snapshotID;
 
 @end
 

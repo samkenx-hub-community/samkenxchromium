@@ -8,15 +8,15 @@ import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.collection.ArraySet;
 import androidx.core.util.ObjectsCompat;
 
 import org.chromium.base.annotations.CalledByNative;
 import org.chromium.base.annotations.NativeMethods;
 import org.chromium.chrome.browser.omnibox.MatchClassificationStyle;
-import org.chromium.chrome.browser.omnibox.OmniboxSuggestionType;
 import org.chromium.components.omnibox.GroupsProto.GroupId;
-import org.chromium.components.omnibox.action.OmniboxPedal;
+import org.chromium.components.omnibox.action.OmniboxAction;
 import org.chromium.components.query_tiles.QueryTile;
 import org.chromium.url.GURL;
 
@@ -110,7 +110,7 @@ public class AutocompleteMatch {
     private boolean mHasTabMatch;
     private final @Nullable List<SuggestTile> mSuggestTiles;
     private long mNativeMatch;
-    private final @NonNull List<OmniboxPedal> mActions;
+    private final @NonNull List<OmniboxAction> mActions;
 
     public AutocompleteMatch(int nativeType, Set<Integer> subtypes, boolean isSearchType,
             int relevance, int transition, String displayText,
@@ -119,7 +119,7 @@ public class AutocompleteMatch {
             String fillIntoEdit, GURL url, GURL imageUrl, String imageDominantColor,
             boolean isDeletable, String postContentType, byte[] postData, int groupId,
             List<QueryTile> queryTiles, byte[] clipboardImageData, boolean hasTabMatch,
-            List<SuggestTile> suggestTiles, @Nullable List<OmniboxPedal> actions) {
+            List<SuggestTile> suggestTiles, @Nullable List<OmniboxAction> actions) {
         if (subtypes == null) {
             subtypes = Collections.emptySet();
         }
@@ -159,7 +159,7 @@ public class AutocompleteMatch {
             GURL url, GURL imageUrl, String imageDominantColor, boolean isDeletable,
             String postContentType, byte[] postData, int groupId, List<QueryTile> tiles,
             byte[] clipboardImageData, boolean hasTabMatch, String[] suggestTileTitles,
-            GURL[] suggestTileUrls, int[] suggestTileTypes, OmniboxPedal[] actions) {
+            GURL[] suggestTileUrls, int[] suggestTileTypes, @Nullable OmniboxAction[] actions) {
         assert contentClassificationOffsets.length == contentClassificationStyles.length;
         List<MatchClassification> contentClassifications = new ArrayList<>();
         for (int i = 0; i < contentClassificationOffsets.length; i++) {
@@ -184,7 +184,7 @@ public class AutocompleteMatch {
                 relevance, transition, contents, contentClassifications, description,
                 new ArrayList<>(), answer, fillIntoEdit, url, imageUrl, imageDominantColor,
                 isDeletable, postContentType, postData, groupId, tiles, clipboardImageData,
-                hasTabMatch, suggestTiles, Arrays.asList(actions));
+                hasTabMatch, suggestTiles, actions == null ? null : Arrays.asList(actions));
         match.updateNativeObjectRef(nativeObject);
         match.setDescription(
                 description, descriptionClassificationOffsets, descriptionClassificationStyles);
@@ -192,13 +192,14 @@ public class AutocompleteMatch {
     }
 
     @CalledByNative
-    private void updateNativeObjectRef(long nativeMatch) {
+    @VisibleForTesting
+    public void updateNativeObjectRef(long nativeMatch) {
         assert nativeMatch != 0 : "Invalid native object.";
         mNativeMatch = nativeMatch;
     }
 
     /** Returns a reference to Native AutocompleteMatch object. */
-    long getNativeObjectRef() {
+    public long getNativeObjectRef() {
         return mNativeMatch;
     }
 
@@ -330,7 +331,7 @@ public class AutocompleteMatch {
     }
 
     @NonNull
-    public List<OmniboxPedal> getActions() {
+    public List<OmniboxAction> getActions() {
         return mActions;
     }
 

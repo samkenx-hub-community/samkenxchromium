@@ -10,13 +10,9 @@
 #import "components/reading_list/core/offline_url_utils.h"
 #import "components/reading_list/core/reading_list_entry.h"
 #import "components/reading_list/core/reading_list_model.h"
-#import "ios/chrome/browser/url/chrome_url_constants.h"
+#import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
 #import "ios/components/webui/web_ui_url_constants.h"
 #import "net/base/url_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 const char kEntryURLQueryParam[] = "entryURL";

@@ -48,7 +48,6 @@ static_library("session") {
     "//ash/components/arc:arc_base_utils",
     "//ash/components/arc:arc_features",
     "//ash/components/arc:prefs",
-    "//ash/components/arc/enterprise",
     "//ash/components/arc/mojom",
     "//ash/constants:constants",
     "//ash/public/cpp",
@@ -63,11 +62,11 @@ static_library("session") {
     "//chromeos/ash/components/dbus/upstart",
     "//chromeos/ash/components/memory:memory",
     "//chromeos/ash/components/system",
-    "//chromeos/components/sensors:buildflags",
     "//chromeos/system",
     "//components/prefs:prefs",
     "//components/user_manager",
     "//components/version_info",
+    "//services/accessibility/android/public/mojom",
     "//ui/display/manager",
   ]
 }
@@ -146,6 +145,7 @@ source_set("unit_tests") {
     "//components/account_id",
     "//components/prefs:test_support",
     "//components/user_manager",
+    "//components/user_manager:test_support",
     "//components/version_info",
     "//content/test:test_support",
     "//ui/views:views",

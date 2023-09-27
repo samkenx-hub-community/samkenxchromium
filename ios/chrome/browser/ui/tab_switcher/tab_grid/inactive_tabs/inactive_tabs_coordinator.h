@@ -8,7 +8,12 @@
 #import "ios/chrome/browser/shared/coordinator/chrome_coordinator/chrome_coordinator.h"
 
 @class InactiveTabsCoordinator;
+@protocol GridCommands;
+@protocol GridToolbarsConfigurationProvider;
 @protocol TabContextMenuProvider;
+namespace web {
+class WebStateID;
+}  // namespace web
 
 // Delegate for the coordinator.
 @protocol InactiveTabsCoordinatorDelegate
@@ -16,7 +21,7 @@
 // Tells the delegate that the user selected an item.
 - (void)inactiveTabsCoordinator:
             (InactiveTabsCoordinator*)inactiveTabsCoordinator
-            didSelectItemWithID:(NSString*)itemID;
+            didSelectItemWithID:(web::WebStateID)itemID;
 
 // Tells the delegate that the coordinator should be dismissed.
 - (void)inactiveTabsCoordinatorDidFinish:
@@ -24,14 +29,40 @@
 
 @end
 
-// Handles interaction with the inactive tabs view controller.
+// Handles interaction for Inactive Tabs.
+//
+// This coordinator lifetime starts when the regular tab grid is started, and
+// stops only when the regular tab grid is stopped. `start` creates the mediator
+// but not the VC. By having this coordinator and its mediator always alive, the
+// mediator can react to "Close All" signals even when the Inactive Tabs UI is
+// not shown.
+// The VC (i.e. Inactive Tabs UI) is created and shown when calling `show`, and
+// hidden and destroyed when calling `hide`. This can be called multiple times.
+// TODO(crbug.com/1448025): Keep the scrolling position between showings.
 @interface InactiveTabsCoordinator : ChromeCoordinator
 
-// Delegate for dismissing the coordinator.
-@property(nonatomic, weak) id<InactiveTabsCoordinatorDelegate> delegate;
+// The GridCommands receiver handling "Close All"-related commands.
+@property(nonatomic, weak, readonly) id<GridCommands> gridCommandsHandler;
+// The mutator receiver handling regular grid calls.
+@property(nonatomic, weak, readonly) id<GridToolbarsConfigurationProvider>
+    toolbarsConfigurationProvider;
 
-// Provides the context menu for the tabs on the grid.
-@property(nonatomic, weak) id<TabContextMenuProvider> menuProvider;
+// Init the inactive tabs coordinator, all parameters should *not* be nil.
+- (instancetype)
+    initWithBaseViewController:(UIViewController*)viewController
+                       browser:(Browser*)browser
+                      delegate:(id<InactiveTabsCoordinatorDelegate>)delegate
+                  menuProvider:(id<TabContextMenuProvider>)menuProvider
+    NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)initWithBaseViewController:(UIViewController*)viewController
+                                   browser:(Browser*)browser NS_UNAVAILABLE;
+
+// Animates in the grid of inactive tabs.
+- (void)show;
+
+// Animates out the grid of inactive tabs.
+- (void)hide;
 
 @end
 

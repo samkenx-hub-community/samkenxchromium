@@ -6,7 +6,6 @@ package org.chromium.chrome.browser.tab;
 
 import androidx.annotation.Nullable;
 
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.url.GURL;
@@ -21,12 +20,17 @@ public class MockTab extends TabImpl {
     private boolean mIsDestroyed;
     private boolean mIsBeingRestored;
 
+    private boolean mIsCustomTab;
+
+    private Long mTimestampMillis;
+    private Integer mParentId;
+
     /**
      * Create a new Tab for testing and initializes Tab UserData objects.
      */
     public static Tab createAndInitialize(int id, boolean incognito) {
         TabImpl tab = new MockTab(id, incognito);
-        tab.initialize(null, null, null, null, null, false, null);
+        tab.initialize(null, null, null, null, null, false, null, false);
         return tab;
     }
 
@@ -36,14 +40,7 @@ public class MockTab extends TabImpl {
     public static Tab createAndInitialize(
             int id, boolean incognito, @TabLaunchType int tabLaunchType) {
         TabImpl tab = new MockTab(id, incognito, tabLaunchType);
-        tab.initialize(null, null, null, null, null, false, null);
-        return tab;
-    }
-
-    public static TabImpl initializeWithCriticalPersistedTabData(
-            TabImpl tab, CriticalPersistedTabData criticalPersistedTabData) {
-        tab.getUserDataHost().setUserData(CriticalPersistedTabData.class, criticalPersistedTabData);
-        tab.initialize(null, null, null, null, null, false, null);
+        tab.initialize(null, null, null, null, null, false, null, false);
         return tab;
     }
 
@@ -52,21 +49,20 @@ public class MockTab extends TabImpl {
      * these two fields only.
      */
     public MockTab(int id, boolean incognito) {
-        super(id, incognito, null, null);
+        super(id, incognito, null);
     }
 
     public MockTab(int id, boolean incognito, @TabLaunchType Integer type) {
-        super(id, incognito, type, null);
+        super(id, incognito, type);
     }
 
     @Override
     public void initialize(Tab parent, @Nullable @TabCreationState Integer creationState,
             LoadUrlParams loadUrlParams, WebContents webContents,
             @Nullable TabDelegateFactory delegateFactory, boolean initiallyHidden,
-            TabState tabState) {
+            TabState tabState, boolean initializeRenderer) {
         if (loadUrlParams != null) {
             mGurlOverride = new GURL(loadUrlParams.getUrl());
-            CriticalPersistedTabData.from(this).setUrl(mGurlOverride);
         }
         TabHelpers.initTabHelpers(this, parent);
     }
@@ -101,6 +97,10 @@ public class MockTab extends TabImpl {
         mIsInitialized = isInitialized;
     }
 
+    public void setIsCustomTab(boolean isCustomTab) {
+        mIsCustomTab = isCustomTab;
+    }
+
     @Override
     public void destroy() {
         mIsDestroyed = true;
@@ -111,7 +111,7 @@ public class MockTab extends TabImpl {
 
     @Override
     public boolean isCustomTab() {
-        return false;
+        return mIsCustomTab;
     }
 
     @Override
@@ -121,5 +121,34 @@ public class MockTab extends TabImpl {
 
     public void setIsBeingRestored(boolean isBeingRestored) {
         mIsBeingRestored = isBeingRestored;
+    }
+
+    @Override
+    public long getTimestampMillis() {
+        if (mTimestampMillis == null) {
+            return super.getTimestampMillis();
+        }
+        return mTimestampMillis;
+    }
+
+    public void setTimestampMillis(long timestampMillis) {
+        mTimestampMillis = timestampMillis;
+    }
+
+    @Override
+    public int getParentId() {
+        if (mParentId == null) {
+            return super.getParentId();
+        }
+        return mParentId;
+    }
+
+    public void setParentId(int parentId) {
+        mParentId = parentId;
+    }
+
+    @Override
+    public void setTitle(String title) {
+        super.setTitle(title);
     }
 }

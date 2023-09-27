@@ -9,6 +9,7 @@
 
 #include "base/check_op.h"
 #include "ui/events/event_constants.h"
+#include "ui/events/event_latency_metadata.h"
 #include "ui/events/events_base_export.h"
 #include "ui/events/types/event_type.h"
 #include "ui/events/types/scroll_types.h"
@@ -153,6 +154,26 @@ struct EVENTS_BASE_EXPORT GestureEventDetails {
     return data_.swipe.down;
   }
 
+  void set_swipe_left(bool swipe) {
+    DCHECK_EQ(ET_GESTURE_SWIPE, type_);
+    data_.swipe.left = swipe;
+  }
+
+  void set_swipe_right(bool swipe) {
+    DCHECK_EQ(ET_GESTURE_SWIPE, type_);
+    data_.swipe.right = swipe;
+  }
+
+  void set_swipe_up(bool swipe) {
+    DCHECK_EQ(ET_GESTURE_SWIPE, type_);
+    data_.swipe.up = swipe;
+  }
+
+  void set_swipe_down(bool swipe) {
+    DCHECK_EQ(ET_GESTURE_SWIPE, type_);
+    data_.swipe.down = swipe;
+  }
+
   int tap_count() const {
     DCHECK(type_ == ET_GESTURE_TAP ||
            type_ == ET_GESTURE_TAP_UNCONFIRMED ||
@@ -183,6 +204,13 @@ struct EVENTS_BASE_EXPORT GestureEventDetails {
     DCHECK_GE(scale, 0.0f);
     DCHECK_EQ(type_, ET_GESTURE_PINCH_UPDATE);
     data_.scale = scale;
+  }
+
+  const EventLatencyMetadata& GetEventLatencyMetadata() const {
+    return input_timestamps_;
+  }
+  EventLatencyMetadata& GetModifiableEventLatencyMetadata() {
+    return input_timestamps_;
   }
 
   // Supports comparison over internal structures for testing.
@@ -259,6 +287,8 @@ struct EVENTS_BASE_EXPORT GestureEventDetails {
   // Bounding box is an axis-aligned rectangle that contains all the
   // enclosing rectangles of the touch-points in the gesture.
   gfx::RectF bounding_box_;
+
+  EventLatencyMetadata input_timestamps_;
 };
 
 }  // namespace ui

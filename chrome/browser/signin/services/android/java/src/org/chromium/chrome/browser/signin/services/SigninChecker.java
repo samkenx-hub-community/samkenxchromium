@@ -7,14 +7,13 @@ package org.chromium.chrome.browser.signin.services;
 import android.accounts.Account;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Log;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.chrome.browser.SyncFirstSetupCompleteSource;
+import org.chromium.chrome.browser.signin.services.SigninManager.DataWipeOption;
 import org.chromium.chrome.browser.signin.services.SigninManager.SignInCallback;
-import org.chromium.chrome.browser.sync.SyncService;
 import org.chromium.components.signin.AccountManagerFacade;
 import org.chromium.components.signin.AccountManagerFacadeProvider;
 import org.chromium.components.signin.AccountRenameChecker;
@@ -24,6 +23,7 @@ import org.chromium.components.signin.identitymanager.AccountTrackerService;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
 import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.signin.metrics.SignoutReason;
+import org.chromium.components.sync.SyncService;
 
 import java.util.List;
 
@@ -34,6 +34,7 @@ public class SigninChecker implements AccountTrackerService.Observer {
     private static final String TAG = "SigninChecker";
     private final SigninManager mSigninManager;
     private final AccountTrackerService mAccountTrackerService;
+    private final SyncService mSyncService;
     private final AccountManagerFacade mAccountManagerFacade;
     // Counter to record the number of child account checks done for tests.
     private int mNumOfChildAccountChecksDone;
@@ -42,9 +43,11 @@ public class SigninChecker implements AccountTrackerService.Observer {
      * Please use {@link SigninCheckerProvider} to get {@link SigninChecker} instance instead of
      * creating it manually.
      */
-    public SigninChecker(SigninManager signinManager, AccountTrackerService accountTrackerService) {
+    public SigninChecker(SigninManager signinManager, AccountTrackerService accountTrackerService,
+            SyncService syncService) {
         mSigninManager = signinManager;
         mAccountTrackerService = accountTrackerService;
+        mSyncService = syncService;
         mAccountManagerFacade = AccountManagerFacadeProvider.getInstance();
         mNumOfChildAccountChecksDone = 0;
 
@@ -74,7 +77,6 @@ public class SigninChecker implements AccountTrackerService.Observer {
         });
     }
 
-    @VisibleForTesting
     public int getNumOfChildAccountChecksDoneForTests() {
         return mNumOfChildAccountChecksDone;
     }
@@ -120,11 +122,12 @@ public class SigninChecker implements AccountTrackerService.Observer {
     private void resigninAfterAccountRename(String newAccountName, boolean shouldEnableSync) {
         mSigninManager.signOut(SignoutReason.ACCOUNT_EMAIL_UPDATED, () -> {
             if (shouldEnableSync) {
-                mSigninManager.signinAndEnableSync(SigninAccessPoint.ACCOUNT_RENAMED,
-                        AccountUtils.createAccountFromName(newAccountName), new SignInCallback() {
+                mSigninManager.signinAndEnableSync(
+                        AccountUtils.createAccountFromName(newAccountName),
+                        SigninAccessPoint.ACCOUNT_RENAMED, new SignInCallback() {
                             @Override
                             public void onSignInComplete() {
-                                SyncService.get().setFirstSetupComplete(
+                                mSyncService.setInitialSyncFeatureSetupComplete(
                                         SyncFirstSetupCompleteSource.BASIC_FLOW);
                             }
 
@@ -132,13 +135,14 @@ public class SigninChecker implements AccountTrackerService.Observer {
                             public void onSignInAborted() {}
                         });
             } else {
-                mSigninManager.signin(AccountUtils.createAccountFromName(newAccountName), null);
+                mSigninManager.signin(AccountUtils.createAccountFromName(newAccountName),
+                        SigninAccessPoint.ACCOUNT_RENAMED, null);
             }
         }, false);
     }
 
     private void checkChildAccount(List<Account> accounts) {
-        AccountUtils.checkChildAccountStatus(
+        AccountUtils.checkChildAccountStatusLegacy(
                 mAccountManagerFacade, accounts, this::onChildAccountStatusReady);
     }
 
@@ -160,8 +164,9 @@ public class SigninChecker implements AccountTrackerService.Observer {
                     };
                     mSigninManager.wipeSyncUserData(() -> {
                         RecordUserAction.record("Signin_Signin_WipeDataOnChildAccountSignin2");
-                        mSigninManager.signin(childAccount, signInCallback);
-                    });
+                        mSigninManager.signin(
+                                childAccount, SigninAccessPoint.FORCED_SIGNIN, signInCallback);
+                    }, DataWipeOption.WIPE_SYNC_DATA);
                     return;
                 }
             });

@@ -11,21 +11,21 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/observer_list.h"
+#include "base/sequence_checker.h"
+#include "base/task/bind_post_task.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/accounts_in_cookie_jar_info.h"
-#include "components/sync/base/bind_to_task_runner.h"
-#include "components/sync/base/command_line_switches.h"
-#include "components/sync/base/features.h"
+#include "components/trusted_vault/command_line_switches.h"
 #include "components/trusted_vault/standalone_trusted_vault_backend.h"
 #include "components/trusted_vault/trusted_vault_access_token_fetcher_impl.h"
 #include "components/trusted_vault/trusted_vault_connection_impl.h"
 #include "google_apis/gaia/google_service_auth_error.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 
-namespace syncer {
+namespace trusted_vault {
 
 namespace {
 
@@ -240,10 +240,10 @@ StandaloneTrustedVaultClient::StandaloneTrustedVaultClient(
 
   backend_ = base::MakeRefCounted<StandaloneTrustedVaultBackend>(
       file_path, deprecated_file_path,
-      std::make_unique<
-          BackendDelegate>(BindToCurrentSequence(base::BindRepeating(
-          &StandaloneTrustedVaultClient::NotifyRecoverabilityDegradedChanged,
-          weak_ptr_factory_.GetWeakPtr()))),
+      std::make_unique<BackendDelegate>(base::BindPostTaskToCurrentDefault(
+          base::BindRepeating(&StandaloneTrustedVaultClient::
+                                  NotifyRecoverabilityDegradedChanged,
+                              weak_ptr_factory_.GetWeakPtr()))),
       std::move(connection));
   backend_task_runner_->PostTask(
       FROM_HERE,
@@ -285,7 +285,8 @@ void StandaloneTrustedVaultClient::FetchKeys(
   backend_task_runner_->PostTask(
       FROM_HERE,
       base::BindOnce(&StandaloneTrustedVaultBackend::FetchKeys, backend_,
-                     account_info, BindToCurrentSequence(std::move(cb))));
+                     account_info,
+                     base::BindPostTaskToCurrentDefault(std::move(cb))));
 }
 
 void StandaloneTrustedVaultClient::StoreKeys(
@@ -321,7 +322,7 @@ void StandaloneTrustedVaultClient::GetIsRecoverabilityDegraded(
       FROM_HERE,
       base::BindOnce(
           &StandaloneTrustedVaultBackend::GetIsRecoverabilityDegraded, backend_,
-          account_info, BindToCurrentSequence(std::move(cb))));
+          account_info, base::BindPostTaskToCurrentDefault(std::move(cb))));
 }
 
 void StandaloneTrustedVaultClient::AddTrustedRecoveryMethod(
@@ -335,7 +336,7 @@ void StandaloneTrustedVaultClient::AddTrustedRecoveryMethod(
       FROM_HERE,
       base::BindOnce(&StandaloneTrustedVaultBackend::AddTrustedRecoveryMethod,
                      backend_, gaia_id, public_key, method_type_hint,
-                     BindToCurrentSequence(std::move(cb))));
+                     base::BindPostTaskToCurrentDefault(std::move(cb))));
 }
 
 void StandaloneTrustedVaultClient::ClearLocalDataForAccount(
@@ -380,6 +381,19 @@ void StandaloneTrustedVaultClient::
       std::move(callback));
 }
 
+void StandaloneTrustedVaultClient::GetLastKeyVersionForTesting(
+    const std::string& gaia_id,
+    base::OnceCallback<void(int last_key_version)> callback) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  DCHECK(backend_);
+  backend_task_runner_->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce(
+          &StandaloneTrustedVaultBackend::GetLastKeyVersionForTesting, backend_,
+          gaia_id),
+      std::move(callback));
+}
+
 void StandaloneTrustedVaultClient::NotifyTrustedVaultKeysChanged() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   for (Observer& observer : observer_list_) {
@@ -394,4 +408,4 @@ void StandaloneTrustedVaultClient::NotifyRecoverabilityDegradedChanged() {
   }
 }
 
-}  // namespace syncer
+}  // namespace trusted_vault

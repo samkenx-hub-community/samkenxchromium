@@ -6,10 +6,10 @@
 
 #import "base/files/scoped_temp_dir.h"
 #import "base/run_loop.h"
+#import "ios/chrome/browser/shared/ui/util/image/image_util.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/snapshots/fake_snapshot_generator_delegate.h"
-#import "ios/chrome/browser/snapshots/snapshot_cache.h"
-#import "ios/chrome/browser/ui/image_util/image_util.h"
+#import "ios/chrome/browser/snapshots/snapshot_storage.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
 #import "ios/web/public/test/web_task_environment.h"
 #import "testing/gtest/include/gtest/gtest.h"
@@ -19,10 +19,6 @@
 #import "third_party/ocmock/gtest_support.h"
 #import "ui/base/test/ios/ui_image_test_utils.h"
 #import "ui/gfx/image/image.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using ui::test::uiimage_utils::UIImagesAreEqual;
 using ui::test::uiimage_utils::UIImageWithSizeAndSolidColor;
@@ -89,13 +85,13 @@ class SnapshotTabHelperTest : public PlatformTest {
     SnapshotTabHelper::CreateForWebState(&web_state_);
     SnapshotTabHelper::FromWebState(&web_state_)->SetDelegate(delegate_);
 
-    // Set custom snapshot cache.
+    // Set custom snapshot storage.
     EXPECT_TRUE(scoped_temp_directory_.CreateUniqueTempDir());
     base::FilePath directory_name = scoped_temp_directory_.GetPath();
-    snapshot_cache_ =
-        [[SnapshotCache alloc] initWithStoragePath:directory_name];
+    snapshot_storage_ =
+        [[SnapshotStorage alloc] initWithStoragePath:directory_name];
     SnapshotTabHelper::FromWebState(&web_state_)
-        ->SetSnapshotCache(snapshot_cache_);
+        ->SetSnapshotStorage(snapshot_storage_);
 
     // Add a fake view to the FakeWebState. This will be used to capture the
     // snapshot. By default the WebState is not ready for taking snapshot.
@@ -108,11 +104,12 @@ class SnapshotTabHelperTest : public PlatformTest {
   SnapshotTabHelperTest(const SnapshotTabHelperTest&) = delete;
   SnapshotTabHelperTest& operator=(const SnapshotTabHelperTest&) = delete;
 
-  ~SnapshotTabHelperTest() override { [snapshot_cache_ shutdown]; }
+  ~SnapshotTabHelperTest() override { [snapshot_storage_ shutdown]; }
 
   void SetCachedSnapshot(UIImage* image) {
-    [snapshot_cache_ setImage:image
-               withSnapshotID:web_state_.GetStableIdentifier()];
+    SnapshotID snapshot_id =
+        SnapshotTabHelper::FromWebState(&web_state_)->GetSnapshotID();
+    [snapshot_storage_ setImage:image withSnapshotID:snapshot_id];
   }
 
   UIImage* GetCachedSnapshot() {
@@ -120,11 +117,13 @@ class SnapshotTabHelperTest : public PlatformTest {
     base::RunLoop* run_loop_ptr = &run_loop;
 
     __block UIImage* snapshot = nil;
-    [snapshot_cache_ retrieveImageForSnapshotID:web_state_.GetStableIdentifier()
-                                       callback:^(UIImage* cached_snapshot) {
-                                         snapshot = cached_snapshot;
-                                         run_loop_ptr->Quit();
-                                       }];
+    SnapshotID snapshot_id =
+        SnapshotTabHelper::FromWebState(&web_state_)->GetSnapshotID();
+    [snapshot_storage_ retrieveImageForSnapshotID:snapshot_id
+                                         callback:^(UIImage* cached_snapshot) {
+                                           snapshot = cached_snapshot;
+                                           run_loop_ptr->Quit();
+                                         }];
 
     run_loop.Run();
     return snapshot;
@@ -134,13 +133,13 @@ class SnapshotTabHelperTest : public PlatformTest {
   web::WebTaskEnvironment task_environment_;
   base::ScopedTempDir scoped_temp_directory_;
   TabHelperSnapshotGeneratorDelegate* delegate_ = nil;
-  SnapshotCache* snapshot_cache_ = nil;
+  SnapshotStorage* snapshot_storage_ = nil;
   web::FakeWebState web_state_;
 };
 
 // Tests that RetrieveColorSnapshot uses the image from the cache if
 // there is one present.
-TEST_F(SnapshotTabHelperTest, RetrieveColorSnapshotCachedSnapshot) {
+TEST_F(SnapshotTabHelperTest, RetrieveColorSnapshotStoragedSnapshot) {
   SetCachedSnapshot(
       UIImageWithSizeAndSolidColor(kCachedSnapshotSize, [UIColor greenColor]));
 
@@ -205,7 +204,7 @@ TEST_F(SnapshotTabHelperTest, RetrieveColorSnapshotCannotTakeSnapshot) {
 
 // Tests that RetrieveGreySnapshot uses the image from the cache if
 // there is one present, and that it is greyscale.
-TEST_F(SnapshotTabHelperTest, RetrieveGreySnapshotCachedSnapshot) {
+TEST_F(SnapshotTabHelperTest, RetrieveGreySnapshotStoragedSnapshot) {
   SetCachedSnapshot(
       UIImageWithSizeAndSolidColor(kCachedSnapshotSize, [UIColor greenColor]));
 
@@ -335,8 +334,8 @@ TEST_F(SnapshotTabHelperTest, GenerateSnapshot) {
 }
 
 // Tests that RemoveSnapshot deletes the cached snapshot from memory and
-// disk (i.e. that SnapshotCache cannot retrieve a snapshot; depends on
-// a correct implementation of SnapshotCache).
+// disk (i.e. that SnapshotStorage cannot retrieve a snapshot; depends on
+// a correct implementation of SnapshotStorage).
 TEST_F(SnapshotTabHelperTest, RemoveSnapshot) {
   SetCachedSnapshot(
       UIImageWithSizeAndSolidColor(kDefaultSnapshotSize, [UIColor greenColor]));
@@ -347,12 +346,13 @@ TEST_F(SnapshotTabHelperTest, RemoveSnapshot) {
 }
 
 TEST_F(SnapshotTabHelperTest, ClosingWebStateDoesNotRemoveSnapshot) {
-  id partialMock = OCMPartialMock(snapshot_cache_);
+  id partialMock = OCMPartialMock(snapshot_storage_);
   auto web_state = std::make_unique<web::FakeWebState>();
 
   SnapshotTabHelper::CreateForWebState(web_state.get());
-  [[partialMock reject]
-      removeImageWithSnapshotID:web_state.get()->GetStableIdentifier()];
+  SnapshotID snapshot_id =
+      SnapshotTabHelper::FromWebState(web_state.get())->GetSnapshotID();
+  [[partialMock reject] removeImageWithSnapshotID:snapshot_id];
 
   // Use @try/@catch as -reject raises an exception.
   @try {

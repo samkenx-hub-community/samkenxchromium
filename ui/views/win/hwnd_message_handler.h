@@ -172,6 +172,8 @@ class VIEWS_EXPORT HWNDMessageHandler : public gfx::WindowImpl,
 
   void FrameTypeChanged();
 
+  void PaintAsActiveChanged();
+
   void SetWindowIcons(const gfx::ImageSkia& window_icon,
                       const gfx::ImageSkia& app_icon);
 
@@ -185,10 +187,14 @@ class VIEWS_EXPORT HWNDMessageHandler : public gfx::WindowImpl,
   void SetFullscreen(bool fullscreen, int64_t target_display_id);
 
   // Updates the aspect ratio of the window.
-  void SetAspectRatio(float aspect_ratio);
+  void SetAspectRatio(float aspect_ratio, const gfx::Size& excluded_mar);
 
   // Updates the window style to reflect whether it can be resized or maximized.
   void SizeConstraintsChanged();
+
+  // Lets pen events fall through to the default window handler until the next
+  // WM_POINTERUP event.
+  static void UseDefaultHandlerForPenEventsUntilPenUp();
 
   // Returns true if content is rendered to a child window instead of directly
   // to this window.
@@ -321,11 +327,6 @@ class VIEWS_EXPORT HWNDMessageHandler : public gfx::WindowImpl,
   // If |force| is true, the window region is reset to NULL even for native
   // frame windows.
   void ResetWindowRegion(bool force, bool redraw);
-
-  // Enables or disables rendering of the non-client (glass) area by DWM,
-  // under Vista and above, depending on whether the caller has requested a
-  // custom frame.
-  void UpdateDwmNcRenderingPolicy();
 
   // Calls DefWindowProc, safely wrapping the call in a ScopedRedrawLock to
   // prevent frame flicker. DefWindowProc handling can otherwise render the
@@ -557,6 +558,10 @@ class VIEWS_EXPORT HWNDMessageHandler : public gfx::WindowImpl,
                                           WPARAM w_param,
                                           LPARAM l_param);
 
+  // Helper to handle client area events of PT_PEN.
+  LRESULT HandlePointerEventTypePen(UINT message,
+                                    UINT32 pointer_id,
+                                    POINTER_PEN_INFO pointer_pen_info);
   // Returns true if the mouse message passed in is an OS synthesized mouse
   // message.
   // |message| identifies the mouse message.
@@ -646,6 +651,9 @@ class VIEWS_EXPORT HWNDMessageHandler : public gfx::WindowImpl,
   // for the non-client area.
   absl::optional<float> aspect_ratio_;
 
+  // Size to exclude from aspect ratio calculation.
+  gfx::Size excluded_margin_;
+
   // The current DPI.
   int dpi_;
 
@@ -733,6 +741,12 @@ class VIEWS_EXPORT HWNDMessageHandler : public gfx::WindowImpl,
   // over the client area, where it is not in sync with the mouse position.
   // Reset to false when we get user mouse input again.
   static bool is_pen_active_in_client_area_;
+
+  // If true, all pen events in the client area should be handled. If false,
+  // unhandled pen events will be allowed to fall through to the default
+  // handler. This should only be false in limited cases, as the default handler
+  // generates duplicate WM_MOUSE compatibility events for pen events it sees.
+  static bool handle_pen_events_in_client_area_;
 
   // Time the last WM_MOUSEHWHEEL message is received. Please refer to the
   // HandleMouseEventInternal function as to why this is needed.

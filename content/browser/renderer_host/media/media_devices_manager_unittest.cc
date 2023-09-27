@@ -62,11 +62,11 @@ const size_t kNumAudioInputDevices = 2;
 const auto kIgnoreLogMessageCB = base::DoNothing();
 
 std::string salt = "fake_media_device_salt";
-MediaDeviceSaltAndOrigin GetSaltAndOrigin(int /* process_id */,
-                                          int /* frame_id */) {
-  return MediaDeviceSaltAndOrigin(salt, "fake_group_id_salt",
-                                  url::Origin::Create(GURL("https://test.com")),
-                                  /*has_focus=*/true, /*is_background=*/false);
+void GetSaltAndOrigin(GlobalRenderFrameHostId,
+                      MediaDeviceSaltAndOriginCallback callback) {
+  std::move(callback).Run(MediaDeviceSaltAndOrigin(
+      salt, url::Origin::Create(GURL("https://test.com")), "fake_group_id_salt",
+      /*has_focus=*/true, /*is_background=*/false));
 }
 
 // This class mocks the audio manager and overrides some methods to ensure that
@@ -279,8 +279,7 @@ class MockMediaDevicesDispatcherHost
 class MediaDevicesManagerTest : public ::testing::Test {
  public:
   MediaDevicesManagerTest()
-      : task_environment_(content::BrowserTaskEnvironment::IO_MAINLOOP),
-        video_capture_device_factory_(nullptr) {}
+      : task_environment_(content::BrowserTaskEnvironment::IO_MAINLOOP) {}
 
   MediaDevicesManagerTest(const MediaDevicesManagerTest&) = delete;
   MediaDevicesManagerTest& operator=(const MediaDevicesManagerTest&) = delete;
@@ -389,11 +388,13 @@ class MediaDevicesManagerTest : public ::testing::Test {
         base::BindRepeating(
             &MockMediaDevicesManagerClient::InputDevicesChangedUI,
             base::Unretained(&media_devices_manager_client_)));
-    media_devices_manager_->set_salt_and_origin_callback_for_testing(
+    media_devices_manager_->set_get_salt_and_origin_cb_for_testing(
         base::BindRepeating(&GetSaltAndOrigin));
     media_devices_manager_->SetPermissionChecker(
         std::make_unique<MediaDevicesPermissionChecker>(true));
   }
+
+  void TearDown() override { video_capture_device_factory_ = nullptr; }
 
   void EnableCache(MediaDeviceType type) {
     media_devices_manager_->SetCachePolicy(
@@ -419,13 +420,14 @@ class MediaDevicesManagerTest : public ::testing::Test {
 
   std::unique_ptr<MediaDevicesManager> media_devices_manager_;
   scoped_refptr<VideoCaptureManager> video_capture_manager_;
-  raw_ptr<MockVideoCaptureDeviceFactory> video_capture_device_factory_;
+  raw_ptr<MockVideoCaptureDeviceFactory> video_capture_device_factory_ =
+      nullptr;
   std::unique_ptr<MockAudioManager> audio_manager_;
   std::unique_ptr<media::AudioSystem> audio_system_;
   testing::StrictMock<MockMediaDevicesManagerClient>
       media_devices_manager_client_;
   std::set<std::string> removed_device_ids_;
-  raw_ptr<MockVideoCaptureProvider> mock_video_capture_provider_;
+  raw_ptr<MockVideoCaptureProvider> mock_video_capture_provider_ = nullptr;
   std::unique_ptr<InProcessVideoCaptureProvider>
       in_process_video_capture_provider_;
   HistogramTester histogram_tester_;

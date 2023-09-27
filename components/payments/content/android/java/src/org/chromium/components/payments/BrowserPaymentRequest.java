@@ -130,14 +130,6 @@ public interface BrowserPaymentRequest {
     boolean onPaymentAppCreated(PaymentApp paymentApp);
 
     /**
-     * @return Whether payment sheet based payment app is supported, e.g., user entering credit
-     *      cards on payment sheet.
-     */
-    default boolean isPaymentSheetBasedPaymentAppSupported() {
-        return false;
-    }
-
-    /**
      * Patches the given payment response if needed.
      * @param response The payment response to be patched in place.
      * @return Whether the patching is successful.
@@ -145,13 +137,6 @@ public interface BrowserPaymentRequest {
     default boolean patchPaymentResponseIfNeeded(PaymentResponse response) {
         return true;
     }
-
-    /**
-     * Called by the payment app to let Chrome know that the payment app's UI is now hidden, but
-     * the payment details have not been returned yet. This is a good time to show a "loading"
-     * progress indicator UI.
-     */
-    default void onInstrumentDetailsLoading() {}
 
     /**
      * Called after retrieving payment details.

@@ -154,15 +154,6 @@ bool DeviceDisablingManager::IsDeviceDisabledDuringNormalOperation() {
     return false;
   }
 
-  // If Chromad features are disabled via flag, and the device is AD managed,
-  // force disable the device.
-  if (!features::IsChromadAvailableEnabled() &&
-      g_browser_process->platform_part()
-          ->browser_policy_connector_ash()
-          ->IsActiveDirectoryManaged()) {
-    return true;
-  }
-
   bool device_disabled = false;
   CrosSettings::Get()->GetBoolean(kDeviceDisabled, &device_disabled);
   return device_disabled;

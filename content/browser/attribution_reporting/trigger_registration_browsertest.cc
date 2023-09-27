@@ -6,7 +6,7 @@
 
 #include "base/functional/bind.h"
 #include "components/attribution_reporting/event_trigger_data.h"
-#include "components/attribution_reporting/registration_type.mojom.h"
+#include "components/attribution_reporting/registration_eligibility.mojom.h"
 #include "components/attribution_reporting/test_utils.h"
 #include "content/browser/attribution_reporting/attribution_manager_impl.h"
 #include "content/browser/attribution_reporting/attribution_test_utils.h"
@@ -18,8 +18,8 @@
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/content_browser_test.h"
 #include "content/public/test/content_browser_test_utils.h"
+#include "content/public/test/resource_load_observer.h"
 #include "content/shell/browser/shell.h"
-#include "content/test/resource_load_observer.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/default_handlers.h"
@@ -32,7 +32,7 @@ namespace content {
 
 namespace {
 
-using ::attribution_reporting::mojom::RegistrationType;
+using ::attribution_reporting::mojom::RegistrationEligibility;
 using ::testing::ElementsAre;
 using ::testing::Field;
 using ::testing::Pointee;
@@ -82,43 +82,6 @@ class AttributionTriggerRegistrationBrowserTest : public ContentBrowserTest {
   std::unique_ptr<net::EmbeddedTestServer> https_server_;
 };
 
-IN_PROC_BROWSER_TEST_F(AttributionTriggerRegistrationBrowserTest,
-                       NonAttributionSrcImg_TriggerRegistered) {
-  EXPECT_TRUE(NavigateToURL(
-      shell(),
-      https_server()->GetURL("c.test", "/page_with_conversion_redirect.html")));
-
-  std::unique_ptr<MockDataHost> data_host;
-  base::RunLoop loop;
-  EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
-      .WillOnce(
-          [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
-            data_host = GetRegisteredDataHost(std::move(host));
-            loop.Quit();
-          });
-
-  GURL register_url = https_server()->GetURL(
-      "c.test", "/register_trigger_headers_all_params.html");
-
-  EXPECT_TRUE(ExecJs(web_contents(),
-                     JsReplace("createTrackingPixel($1);", register_url)));
-
-  if (!data_host) {
-    loop.Run();
-  }
-
-  data_host->WaitForTriggerData(/*num_trigger_data=*/1);
-  const auto& trigger_data = data_host->trigger_data();
-
-  EXPECT_EQ(trigger_data.size(), 1u);
-  EXPECT_THAT(
-      trigger_data.front().event_triggers,
-      ElementsAre(
-          EventTriggerDataMatches(EventTriggerDataMatcherConfig(/*data=*/1)),
-          EventTriggerDataMatches(EventTriggerDataMatcherConfig(/*data=*/2))));
-}
-
 IN_PROC_BROWSER_TEST_F(
     AttributionTriggerRegistrationBrowserTest,
     NonAttributionSrcImgRedirect_MultipleTriggersRegistered) {
@@ -131,7 +94,7 @@ IN_PROC_BROWSER_TEST_F(
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillRepeatedly(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_hosts.push_back(GetRegisteredDataHost(std::move(host)));
             if (data_hosts.size() == 2) {
               loop.Quit();

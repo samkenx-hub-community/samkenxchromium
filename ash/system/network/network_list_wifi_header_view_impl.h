@@ -9,6 +9,7 @@
 #include "ash/style/icon_button.h"
 #include "ash/system/network/network_list_wifi_header_view.h"
 #include "ash/system/tray/tri_view.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "ui/views/view.h"
 
@@ -30,7 +31,7 @@ class ASH_EXPORT NetworkListWifiHeaderViewImpl
 
   // Used for testing.
   static constexpr int kJoinWifiButtonId =
-      NetworkListNetworkHeaderView::kToggleButtonId + 1;
+      NetworkListNetworkHeaderView::kToggleButtonId + 2;
 
   // NetworkListNetworkHeaderView:
   void AddExtraButtons() override;
@@ -43,7 +44,7 @@ class ASH_EXPORT NetworkListWifiHeaderViewImpl
   void JoinWifiButtonPressed();
 
   // A button to invoke "Join Wi-Fi network" dialog.
-  IconButton* join_wifi_button_ = nullptr;
+  raw_ptr<IconButton, ExperimentalAsh> join_wifi_button_ = nullptr;
 
   base::WeakPtrFactory<NetworkListWifiHeaderViewImpl> weak_factory_{this};
 };

@@ -17,8 +17,8 @@
 #include "ash/public/cpp/multi_user_window_manager.h"
 #include "ash/public/cpp/new_window_delegate.h"
 #include "ash/public/cpp/style/dark_light_mode_controller.h"
-#include "ash/public/cpp/style/scoped_light_mode_as_default.h"
 #include "ash/public/cpp/tablet_mode.h"
+#include "ash/webui/settings/public/constants/routes_util.h"
 #include "base/command_line.h"
 #include "base/files/file.h"
 #include "base/files/file_util.h"
@@ -36,6 +36,7 @@
 #include "chrome/browser/ash/drive/drive_integration_service.h"
 #include "chrome/browser/ash/drive/file_system_util.h"
 #include "chrome/browser/ash/extensions/file_manager/private_api_util.h"
+#include "chrome/browser/ash/file_manager/file_tasks.h"
 #include "chrome/browser/ash/file_manager/fileapi_util.h"
 #include "chrome/browser/ash/file_manager/path_util.h"
 #include "chrome/browser/ash/file_manager/url_util.h"
@@ -48,6 +49,7 @@
 #include "chrome/browser/ash/guest_os/public/guest_os_service.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/chromeos/upload_office_to_cloud/upload_office_to_cloud.h"
 #include "chrome/browser/devtools/devtools_window.h"
 #include "chrome/browser/extensions/devtools_util.h"
 #include "chrome/browser/file_util_service.h"
@@ -60,13 +62,16 @@
 #include "chrome/browser/ui/ash/multi_user/multi_user_util.h"
 #include "chrome/browser/ui/ash/multi_user/multi_user_window_manager_helper.h"
 #include "chrome/browser/ui/ash/system_web_apps/system_web_app_ui_utils.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/settings_window_manager_chromeos.h"
-#include "chrome/browser/ui/webui/settings/chromeos/constants/routes_util.h"
+#include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_dialog.h"
 #include "chrome/common/extensions/api/file_manager_private_internal.h"
 #include "chrome/common/extensions/api/manifest_types.h"
+#include "chrome/common/extensions/extension_constants.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/webui_url_constants.h"
+#include "chromeos/ash/components/drivefs/drivefs_pin_manager.h"
 #include "chromeos/ash/components/settings/timezone_settings.h"
 #include "components/account_id/account_id.h"
 #include "components/drive/drive_pref_names.h"
@@ -75,12 +80,12 @@
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/user_manager/user_manager.h"
 #include "components/zoom/page_zoom.h"
+#include "content/public/browser/network_service_instance.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/page_zoom.h"
 #include "extensions/browser/api/file_handlers/mime_util.h"
 #include "extensions/browser/app_window/app_window.h"
 #include "extensions/browser/app_window/app_window_registry.h"
-#include "google_apis/common/auth_service.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "storage/common/file_system/file_system_types.h"
 #include "storage/common/file_system/file_system_util.h"
@@ -93,8 +98,6 @@ namespace extensions {
 namespace {
 
 using api::file_manager_private::ProfileInfo;
-
-const char kCWSScope[] = "https://www.googleapis.com/auth/chromewebstore";
 
 // Thresholds for mountCrostini() API.
 constexpr base::TimeDelta kMountCrostiniSlowOperationThreshold =
@@ -228,7 +231,7 @@ std::string Redact(const base::FilePath& path) {
 ExtensionFunction::ResponseAction
 FileManagerPrivateGetPreferencesFunction::Run() {
   api::file_manager_private::Preferences result;
-  Profile* profile = Profile::FromBrowserContext(browser_context());
+  Profile* const profile = Profile::FromBrowserContext(browser_context());
   const PrefService* const service = profile->GetPrefs();
   auto* drive_integration_service =
       drive::DriveIntegrationServiceFactory::FindForProfile(profile);
@@ -236,9 +239,9 @@ FileManagerPrivateGetPreferencesFunction::Run() {
   result.drive_enabled = drive::util::IsDriveEnabledForProfile(profile) &&
                          drive_integration_service &&
                          !drive_integration_service->mount_failed();
-  result.cellular_disabled =
-      service->GetBoolean(drive::prefs::kDisableDriveOverCellular);
-  if (ash::features::IsDriveFsBulkPinningEnabled()) {
+  result.drive_sync_enabled_on_metered_network =
+      !service->GetBoolean(drive::prefs::kDisableDriveOverCellular);
+  if (drive::util::IsDriveFsBulkPinningAvailable(profile)) {
     result.drive_fs_bulk_pinning_enabled =
         service->GetBoolean(drive::prefs::kDriveFsBulkPinningEnabled);
   }
@@ -272,17 +275,21 @@ FileManagerPrivateSetPreferencesFunction::Run() {
   const absl::optional<Params> params = Params::Create(args());
   EXTENSION_FUNCTION_VALIDATE(params);
 
-  Profile* profile = Profile::FromBrowserContext(browser_context());
+  Profile* const profile = Profile::FromBrowserContext(browser_context());
   PrefService* const service = profile->GetPrefs();
 
-  if (params->change_info.cellular_disabled) {
+  if (params->change_info.drive_sync_enabled_on_metered_network) {
+    const bool drive_sync_enabled_on_metered_network =
+        *params->change_info.drive_sync_enabled_on_metered_network;
     service->SetBoolean(drive::prefs::kDisableDriveOverCellular,
-                        *params->change_info.cellular_disabled);
+                        !drive_sync_enabled_on_metered_network);
   }
-  if (ash::features::IsDriveFsBulkPinningEnabled() &&
+  if (drive::util::IsDriveFsBulkPinningAvailable(profile) &&
       params->change_info.drive_fs_bulk_pinning_enabled) {
     service->SetBoolean(drive::prefs::kDriveFsBulkPinningEnabled,
                         *params->change_info.drive_fs_bulk_pinning_enabled);
+    drivefs::pinning::RecordBulkPinningEnabledSource(
+        drivefs::pinning::BulkPinningEnabledSource::kBanner);
   }
   if (params->change_info.arc_enabled) {
     service->SetBoolean(arc::prefs::kArcEnabled,
@@ -302,208 +309,7 @@ FileManagerPrivateSetPreferencesFunction::Run() {
                      std::move(folder_shortcuts));
   }
 
-  return RespondNow(WithArguments());
-}
-
-// Collection of active ZipFileCreator objects, indexed by ZIP operation ID.
-using ZipCreators = std::unordered_map<int, scoped_refptr<ZipFileCreator>>;
-static base::NoDestructor<ZipCreators> zip_creators;
-
-FileManagerPrivateInternalZipSelectionFunction::
-    FileManagerPrivateInternalZipSelectionFunction() = default;
-
-FileManagerPrivateInternalZipSelectionFunction::
-    ~FileManagerPrivateInternalZipSelectionFunction() = default;
-
-ExtensionFunction::ResponseAction
-FileManagerPrivateInternalZipSelectionFunction::Run() {
-  using extensions::api::file_manager_private_internal::ZipSelection::Params;
-  const absl::optional<Params> params = Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-
-  Profile* const profile = Profile::FromBrowserContext(browser_context());
-
-  // Convert parent directory URL to absolute path.
-  if (params->parent_url.empty()) {
-    return RespondNow(Error("Empty parent URL"));
-  }
-
-  src_dir_ = file_manager::util::GetLocalPathFromURL(
-      render_frame_host(), profile, GURL(params->parent_url));
-  if (src_dir_.empty()) {
-    return RespondNow(
-        Error(base::StrCat({"Cannot convert parent URL ",
-                            Redact(params->parent_url), " to absolute path"})));
-  }
-
-  // Convert source file URLs to relative paths.
-  if (params->urls.empty()) {
-    return RespondNow(Error("No input files"));
-  }
-
-  src_files_.reserve(params->urls.size());
-
-  for (const std::string& url : params->urls) {
-    // Convert input URL to absolute path.
-    const base::FilePath absolute_path =
-        file_manager::util::GetLocalPathFromURL(render_frame_host(), profile,
-                                                GURL(url));
-    if (absolute_path.empty()) {
-      return RespondNow(Error(base::StrCat(
-          {"Cannot convert URL ", Redact(url), " to absolute file path"})));
-    }
-
-    // Convert absolute path to relative path under |src_dir_|.
-    base::FilePath relative_path;
-    if (!src_dir_.AppendRelativePath(absolute_path, &relative_path)) {
-      return RespondNow(
-          Error(base::StrCat({"Input file ", Redact(absolute_path),
-                              " is not in directory ", Redact(src_dir_)})));
-    }
-
-    src_files_.push_back(std::move(relative_path));
-  }
-
-  // Convert destination filename to absolute path.
-  if (params->dest_name.empty()) {
-    return RespondNow(Error("Empty destination file name"));
-  }
-
-  dest_file_ = src_dir_.Append(params->dest_name);
-
-  base::ThreadPool::PostTaskAndReply(
-      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
-      base::BindOnce(
-          &FileManagerPrivateInternalZipSelectionFunction::ComputeSize, this),
-      base::BindOnce(&FileManagerPrivateInternalZipSelectionFunction::ZipItems,
-                     this));
-
-  return RespondLater();
-}
-
-void FileManagerPrivateInternalZipSelectionFunction::ComputeSize() {
-  VLOG(1) << ">>> Computing total size of " << src_files_.size() << " items...";
-  total_bytes_ = 0;
-  base::File::Info info;
-  for (const base::FilePath& relative_path : src_files_) {
-    const base::FilePath absolute_path = src_dir_.Append(relative_path);
-    if (base::GetFileInfo(absolute_path, &info)) {
-      total_bytes_ += info.is_directory
-                          ? base::ComputeDirectorySize(absolute_path)
-                          : info.size;
-    }
-  }
-  VLOG(1) << "<<< Total size is " << total_bytes_ << " bytes";
-}
-
-void FileManagerPrivateInternalZipSelectionFunction::ZipItems() {
-  // Increment ZIP operation ID.
-  static int last_zip_id = 0;
-  const int zip_id = ++last_zip_id;
-
-  VLOG(1) << "Creating ZIP archive #" << zip_id << " " << Redact(dest_file_)
-          << " with " << src_files_.size() << " items...";
-
-  // Create a ZipFileCreator.
-  scoped_refptr<ZipFileCreator>& creator = (*zip_creators)[zip_id];
-  DCHECK(!creator);
-  creator =
-      base::MakeRefCounted<ZipFileCreator>(src_dir_, src_files_, dest_file_);
-
-  // Start the ZipFileCreator.
-  creator->Start(LaunchFileUtilService());
-
-  Respond(WithArguments(zip_id, static_cast<double>(total_bytes_)));
-}
-
-FileManagerPrivateCancelZipFunction::FileManagerPrivateCancelZipFunction() =
-    default;
-
-FileManagerPrivateCancelZipFunction::~FileManagerPrivateCancelZipFunction() =
-    default;
-
-ExtensionFunction::ResponseAction FileManagerPrivateCancelZipFunction::Run() {
-  using extensions::api::file_manager_private::CancelZip::Params;
-  const absl::optional<Params> params = Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-
-  // Retrieve matching ZipFileCreator from the collection of active ones.
-  const auto it = zip_creators->find(params->zip_id);
-  if (it == zip_creators->end()) {
-    return RespondNow(
-        Error(base::StringPrintf("No ZIP operation #%d", params->zip_id)));
-  }
-
-  ZipFileCreator* const creator = it->second.get();
-  DCHECK(creator);
-
-  // Tell the ZipFileCreator to stop.
-  creator->Stop();
-
-  return RespondNow(WithArguments());
-}
-
-FileManagerPrivateGetZipProgressFunction::
-    FileManagerPrivateGetZipProgressFunction() = default;
-
-FileManagerPrivateGetZipProgressFunction::
-    ~FileManagerPrivateGetZipProgressFunction() = default;
-
-ExtensionFunction::ResponseValue
-FileManagerPrivateGetZipProgressFunction::ZipProgressValue(
-    const ZipFileCreator::Progress& progress) {
-  if (progress.result != ZipFileCreator::kInProgress) {
-    // ZIP creation operation is finished.
-    if (progress.result == ZipFileCreator::kSuccess) {
-      VLOG(1) << "Created ZIP archive #" << zip_id_;
-    } else {
-      LOG(ERROR) << "Cannot create ZIP archive #" << zip_id_ << ": "
-                 << progress.result;
-    }
-
-    // Remove the matching ZipFileCreator from the list of active ones.
-    const size_t n = zip_creators->erase(zip_id_);
-    DCHECK_GT(n, 0u);
-  }
-
-  return WithArguments(static_cast<int>(progress.result),
-                       static_cast<double>(progress.bytes));
-}
-
-ExtensionFunction::ResponseAction
-FileManagerPrivateGetZipProgressFunction::Run() {
-  using extensions::api::file_manager_private::GetZipProgress::Params;
-  const absl::optional<Params> params = Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-
-  zip_id_ = params->zip_id;
-
-  // Retrieve matching ZipFileCreator from the collection of active ones.
-  const auto it = zip_creators->find(zip_id_);
-  if (it == zip_creators->end()) {
-    return RespondNow(
-        Error(base::StringPrintf("No ZIP operation #%d", zip_id_)));
-  }
-
-  creator_ = it->second;
-  DCHECK(creator_);
-
-  // Check if ZipFileCreator is in final state.
-  const ZipFileCreator::Progress progress = creator_->GetProgress();
-  if (progress.result != ZipFileCreator::kInProgress) {
-    return RespondNow(ZipProgressValue(progress));
-  }
-
-  // Not in final state yet. We'll report progress later.
-  creator_->SetProgressCallback(base::BindOnce(
-      &FileManagerPrivateGetZipProgressFunction::OnProgress, this));
-
-  return RespondLater();
-}
-
-void FileManagerPrivateGetZipProgressFunction::OnProgress() {
-  DCHECK(creator_);
-  Respond(ZipProgressValue(creator_->GetProgress()));
+  return RespondNow(NoArguments());
 }
 
 ExtensionFunction::ResponseAction FileManagerPrivateZoomFunction::Run() {
@@ -527,70 +333,7 @@ ExtensionFunction::ResponseAction FileManagerPrivateZoomFunction::Run() {
       return RespondNow(Error(kUnknownErrorDoNotUse));
   }
   zoom::PageZoom::Zoom(GetSenderWebContents(), zoom_type);
-  return RespondNow(WithArguments());
-}
-
-FileManagerPrivateRequestWebStoreAccessTokenFunction::
-    FileManagerPrivateRequestWebStoreAccessTokenFunction() = default;
-
-FileManagerPrivateRequestWebStoreAccessTokenFunction::
-    ~FileManagerPrivateRequestWebStoreAccessTokenFunction() = default;
-
-ExtensionFunction::ResponseAction
-FileManagerPrivateRequestWebStoreAccessTokenFunction::Run() {
-  std::vector<std::string> scopes;
-  scopes.emplace_back(kCWSScope);
-
-  Profile* const profile = Profile::FromBrowserContext(browser_context());
-  signin::IdentityManager* identity_manager =
-      IdentityManagerFactory::GetForProfile(profile);
-
-  if (!identity_manager) {
-    drive::EventLogger* logger = file_manager::util::GetLogger(profile);
-    if (logger) {
-      logger->Log(logging::LOG_ERROR,
-                  "CWS Access token fetch failed. IdentityManager can't "
-                  "be retrieved.");
-    }
-    return RespondNow(Error("Unable to fetch token."));
-  }
-
-  // "Unconsented" because this class doesn't care about browser sync consent.
-  auth_service_ = std::make_unique<google_apis::AuthService>(
-      identity_manager,
-      identity_manager->GetPrimaryAccountId(signin::ConsentLevel::kSignin),
-      g_browser_process->system_network_context_manager()
-          ->GetSharedURLLoaderFactory(),
-      scopes);
-  auth_service_->StartAuthentication(
-      base::BindOnce(&FileManagerPrivateRequestWebStoreAccessTokenFunction::
-                         OnAccessTokenFetched,
-                     this));
-
-  return RespondLater();
-}
-
-void FileManagerPrivateRequestWebStoreAccessTokenFunction::OnAccessTokenFetched(
-    google_apis::ApiErrorCode code,
-    const std::string& access_token) {
-  drive::EventLogger* logger = file_manager::util::GetLogger(
-      Profile::FromBrowserContext(browser_context()));
-
-  if (code == google_apis::HTTP_SUCCESS) {
-    DCHECK(auth_service_->HasAccessToken());
-    DCHECK(access_token == auth_service_->access_token());
-    if (logger) {
-      logger->Log(logging::LOG_INFO, "CWS OAuth token fetch succeeded.");
-    }
-    Respond(WithArguments(access_token));
-  } else {
-    if (logger) {
-      logger->Log(logging::LOG_ERROR,
-                  "CWS OAuth token fetch failed. (ApiErrorCode: %s)",
-                  google_apis::ApiErrorCodeToString(code).c_str());
-    }
-    Respond(Error("Token fetch failed."));
-  }
+  return RespondNow(NoArguments());
 }
 
 ExtensionFunction::ResponseAction FileManagerPrivateGetProfilesFunction::Run() {
@@ -654,7 +397,7 @@ FileManagerPrivateOpenInspectorFunction::Run() {
           base::StringPrintf("Unexpected inspection type(%d) is specified.",
                              static_cast<int>(params->type))));
   }
-  return RespondNow(WithArguments());
+  return RespondNow(NoArguments());
 }
 
 ExtensionFunction::ResponseAction
@@ -670,7 +413,7 @@ FileManagerPrivateOpenSettingsSubpageFunction::Run() {
   } else {
     chrome::ShowSettingsSubPageForProfile(profile, params->sub_page);
   }
-  return RespondNow(WithArguments());
+  return RespondNow(NoArguments());
 }
 
 FileManagerPrivateInternalGetMimeTypeFunction::
@@ -758,20 +501,42 @@ FileManagerPrivateAddProvidedFileSystemFunction::
 
 ExtensionFunction::ResponseAction
 FileManagerPrivateAddProvidedFileSystemFunction::Run() {
+  using ash::file_system_provider::ProviderId;
+  using ash::file_system_provider::Service;
   using extensions::api::file_manager_private::AddProvidedFileSystem::Params;
   const absl::optional<Params> params = Params::Create(args());
   EXTENSION_FUNCTION_VALIDATE(params);
 
-  using ash::file_system_provider::ProviderId;
-  using ash::file_system_provider::Service;
+  Profile* profile = Profile::FromBrowserContext(browser_context());
   Service* const service = Service::Get(browser_context());
+  ProviderId provider_id = ProviderId::FromString(params->provider_id);
 
-  if (!service->RequestMount(ProviderId::FromString(params->provider_id),
-                             base::DoNothing())) {
+  auto file_systems = service->GetProvidedFileSystemInfoList(provider_id);
+  bool first_file_system = file_systems.empty();
+  // Show Connect To OneDrive dialog only when mounting ODFS for the first time.
+  // There will already a ODFS mount if the user is requesting a new mount to
+  // replace the unauthenticated one.
+  if (chromeos::cloud_upload::IsMicrosoftOfficeCloudUploadAllowed(profile) &&
+      params->provider_id == extension_misc::kODFSExtensionId &&
+      first_file_system) {
+    // Get Files App window, if it exists.
+    Browser* browser =
+        FindSystemWebAppBrowser(profile, ash::SystemWebAppType::FILE_MANAGER);
+    gfx::NativeWindow modal_parent =
+        browser ? browser->window()->GetNativeWindow() : nullptr;
+
+    // This will call into service->RequestMount() if necessary. This is 'fire
+    // and forget' as Files app doesn't do anything if this succeeds or fails.
+    bool started = ash::cloud_upload::ShowConnectOneDriveDialog(modal_parent);
+    return RespondNow(started ? NoArguments()
+                              : Error("Failed to request a new mount."));
+  }
+
+  if (!service->RequestMount(provider_id, base::DoNothing())) {
     return RespondNow(Error("Failed to request a new mount."));
   }
 
-  return RespondNow(WithArguments());
+  return RespondNow(NoArguments());
 }
 
 FileManagerPrivateConfigureVolumeFunction::
@@ -833,7 +598,7 @@ void FileManagerPrivateConfigureVolumeFunction::OnCompleted(
     return;
   }
 
-  Respond(WithArguments());
+  Respond(NoArguments());
 }
 
 FileManagerPrivateMountCrostiniFunction::
@@ -863,8 +628,8 @@ FileManagerPrivateMountCrostiniFunction::Run() {
 void FileManagerPrivateMountCrostiniFunction::RestartCallback(
     crostini::CrostiniResult result) {
   if (result != crostini::CrostiniResult::SUCCESS) {
-    Respond(Error(
-        base::StringPrintf("Error mounting crostini container: %d", result)));
+    Respond(Error(base::StringPrintf("Error mounting crostini container: %d",
+                                     static_cast<int>(result))));
     return;
   }
   // Use OriginalProfile since using crostini in incognito such as saving
@@ -882,11 +647,11 @@ void FileManagerPrivateMountCrostiniFunction::RestartCallback(
 void FileManagerPrivateMountCrostiniFunction::MountCallback(
     crostini::CrostiniResult result) {
   if (result != crostini::CrostiniResult::SUCCESS) {
-    Respond(Error(
-        base::StringPrintf("Error mounting crostini container: %d", result)));
+    Respond(Error(base::StringPrintf("Error mounting crostini container: %d",
+                                     static_cast<int>(result))));
     return;
   }
-  Respond(WithArguments());
+  Respond(NoArguments());
 }
 
 FileManagerPrivateInternalImportCrostiniImageFunction::
@@ -922,7 +687,7 @@ FileManagerPrivateInternalImportCrostiniImageFunction::Run() {
             }
           },
           path));
-  return RespondNow(WithArguments());
+  return RespondNow(NoArguments());
 }
 
 ExtensionFunction::ResponseAction
@@ -960,13 +725,13 @@ FileManagerPrivateInternalSharePathsWithCrostiniFunction::Run() {
             this));
     return RespondLater();
   } else {
-    return RespondNow(WithArguments());
+    return RespondNow(NoArguments());
   }
 }
 
 void FileManagerPrivateInternalSharePathsWithCrostiniFunction::
     SharePathsCallback(bool success, const std::string& failure_reason) {
-  Respond(success ? WithArguments() : Error(failure_reason));
+  Respond(success ? NoArguments() : Error(failure_reason));
 }
 
 ExtensionFunction::ResponseAction
@@ -994,7 +759,7 @@ FileManagerPrivateInternalUnsharePathWithCrostiniFunction::Run() {
 
 void FileManagerPrivateInternalUnsharePathWithCrostiniFunction::
     UnsharePathCallback(bool success, const std::string& failure_reason) {
-  Respond(success ? WithArguments() : Error(failure_reason));
+  Respond(success ? NoArguments() : Error(failure_reason));
 }
 
 ExtensionFunction::ResponseAction
@@ -1217,7 +982,7 @@ void FileManagerPrivateInternalExecuteCustomActionFunction::OnCompleted(
     return;
   }
 
-  Respond(WithArguments());
+  Respond(NoArguments());
 }
 
 FileManagerPrivateInternalGetRecentFilesFunction::
@@ -1242,6 +1007,13 @@ FileManagerPrivateInternalGetRecentFilesFunction::Run() {
     return RespondNow(Error("Cannot convert category to file type"));
   }
 
+  if (base::FeatureList::IsEnabled(ash::features::kFSPsInRecents)) {
+    // If File System Provider is enabled, we set the maximum latency to be 3s.
+    // This is based on "User Preference and Search Engine Latency" paper, which
+    // stated that "[...] once latency exceeds 3 seconds for the slower engine,
+    // users are 1.5 times as likely to choose the faster engine."
+    model->SetScanTimeout(base::Milliseconds(3000));
+  }
   model->GetRecentFiles(
       file_system_context.get(), source_url(), file_type,
       params->invalidate_cache,
@@ -1332,7 +1104,7 @@ ExtensionFunction::ResponseAction FileManagerPrivateOpenURLFunction::Run() {
       url, ash::NewWindowDelegate::OpenUrlFrom::kUserInteraction,
       ash::NewWindowDelegate::Disposition::kNewForegroundTab);
 
-  return RespondNow(WithArguments());
+  return RespondNow(NoArguments());
 }
 
 ExtensionFunction::ResponseAction FileManagerPrivateOpenWindowFunction::Run() {
@@ -1383,7 +1155,19 @@ FileManagerPrivateSendFeedbackFunction::Run() {
                            /*description_placeholder_text=*/std::string(),
                            /*category_tag=*/"chromeos-files-app",
                            /*extra_diagnostics=*/std::string());
-  return RespondNow(WithArguments());
+  return RespondNow(NoArguments());
+}
+
+ExtensionFunction::ResponseAction
+FileManagerPrivateGetDeviceConnectionStateFunction::Run() {
+  api::file_manager_private::DeviceConnectionState result =
+      content::GetNetworkConnectionTracker()->IsOffline()
+          ? api::file_manager_private::DEVICE_CONNECTION_STATE_OFFLINE
+          : api::file_manager_private::DEVICE_CONNECTION_STATE_ONLINE;
+
+  return RespondNow(ArgumentList(
+      api::file_manager_private::GetDeviceConnectionState::Results::Create(
+          result)));
 }
 
 }  // namespace extensions

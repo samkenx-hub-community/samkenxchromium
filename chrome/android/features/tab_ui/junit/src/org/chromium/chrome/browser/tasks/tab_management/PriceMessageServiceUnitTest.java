@@ -82,11 +82,10 @@ public class PriceMessageServiceUnitTest {
         FeatureList.TestValues testValues = new FeatureList.TestValues();
         testValues.addFeatureFlagOverride(ChromeFeatureList.COMMERCE_PRICE_TRACKING, true);
         testValues.addFieldTrialParamOverride(ChromeFeatureList.COMMERCE_PRICE_TRACKING,
-                PriceTrackingFeatures.PRICE_NOTIFICATION_PARAM, "true");
-        testValues.addFieldTrialParamOverride(ChromeFeatureList.COMMERCE_PRICE_TRACKING,
                 CommerceSubscriptionsServiceConfig.IMPLICIT_SUBSCRIPTIONS_ENABLED_PARAM, "true");
         FeatureList.setTestValues(testValues);
 
+        PriceTrackingFeatures.setPriceTrackingEnabledForTesting(true);
         PriceTrackingFeatures.setIsSignedInAndSyncEnabledForTesting(true);
         PriceTrackingUtilities.SHARED_PREFERENCES_MANAGER.writeBoolean(
                 PriceTrackingUtilities.PRICE_WELCOME_MESSAGE_CARD, true);

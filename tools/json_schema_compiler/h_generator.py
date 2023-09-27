@@ -61,7 +61,9 @@ class _Generator(object):
       .Append('#include <vector>')
       .Append()
       .Append('#include "base/values.h"')
-      .Cblock(self._type_helper.GenerateIncludes(include_soft=include_soft))
+      .Cblock(self._type_helper.GenerateIncludes(
+        include_soft=include_soft,
+        generate_error_messages=self._generate_error_messages))
       .Append()
     )
 
@@ -153,16 +155,26 @@ class _Generator(object):
     c.Sblock('enum {enum_type} {name} {{'.format(
       enum_type=('class' if self._modernised_enums else ''),
       name=enum_name))
-    c.Append(self._type_helper.GetEnumNoneValue(type_, full_name=False) + ',')
+
+    # Explicitly initialize kNone to 0, since we rely on default initialization
+    # for enum members. Otherwise, default initialization will always set a
+    # value to 0, even if it's not a valid enum entry.
+    c.Append(
+      self._type_helper.GetEnumNoneValue(type_, full_name=False) + ' = 0,')
 
     for value in type_.enum_values:
       current_enum_string = (
         self._type_helper.GetEnumValue(type_, value, full_name=False))
       c.Append(current_enum_string + ',')
 
-    c.Append('{last_key} = {last_key_value},'.format(
-        last_key=self._type_helper.GetEnumLastValue(type_),
-        last_key_value=current_enum_string))
+    # Adding kMaxValue, which is friendly to enumaration histogram macros.
+    if self._modernised_enums:
+      c.Append('kMaxValue = {last_key_value},'.format(
+                last_key_value=current_enum_string))
+    else:
+      c.Append('{last_key} = {last_key_value},'.format(
+          last_key=self._type_helper.GetEnumLastValue(type_),
+          last_key_value=current_enum_string))
 
     c.Eblock('};')
     return c
@@ -210,15 +222,19 @@ class _Generator(object):
         c.Comment(type_.description)
       c.Cblock(self._GenerateType(type_.item_type, is_toplevel=is_toplevel))
       if generate_typedefs:
-        (c.Append('typedef std::vector<%s > %s;' % (
-                       self._type_helper.GetCppType(type_.item_type),
-                       classname))
-        )
+        item_cpp_type = self._type_helper.GetCppType(type_.item_type)
+        if item_cpp_type != 'base::Value':
+          (c.Append('using %s = std::vector<%s >;' % (
+                        classname,
+                        item_cpp_type))
+          )
+        else:
+          c.Append('using %s = base::Value::List;' % classname)
     elif type_.property_type == PropertyType.STRING:
       if generate_typedefs:
         if type_.description:
           c.Comment(type_.description)
-        c.Append('typedef std::string %(classname)s;')
+        c.Append('using %(classname)s = std::string;')
     elif type_.property_type == PropertyType.ENUM:
       if type_.description:
         c.Comment(type_.description)
@@ -269,20 +285,45 @@ class _Generator(object):
             .Append('static bool Populate(%s);' % self._GenerateParams(
                 ('const base::Value::Dict& value', '%s& out' % classname)))
           )
+        (c.Append()
+          .Comment('Creates a deep copy of %s.' % classname)
+          .Append('%s Clone() const;' % classname)
+        )
         if is_toplevel:
           (c.Append()
             .Comment('Creates a %s object from a base::Value, or NULL on '
                      'failure.' % classname)
             .Append('static std::unique_ptr<%s> FromValueDeprecated(%s);' % (
-                classname, self._GenerateParams(('const base::Value& value',))))
+                classname, self._GenerateParams(('const base::Value& value',),
+                  error_as_ptr=True)))
           )
+
+        return_type = self._type_helper.GetOptionalReturnType(
+            classname, support_errors=self._generate_error_messages)
+
+        if type_.property_type is not PropertyType.CHOICES:
           (c.Append()
-            .Comment('Creates a %s object from a base::Value, or nullopt on '
-                     'failure.' % classname)
-            .Append('static absl::optional<%s> FromValue(%s);' % (
-                classname, self._GenerateParams(
-                  ('const %s& value' % value_type,))))
+            .Comment('Creates a {classname} object from a base::Value::Dict,'
+                      ' or {failure} on failure.'.format(
+                        classname=classname,
+                        failure=('unexpected'
+                          if self._generate_error_messages else 'nullopt')))
+            .Append('static {return_type} '
+                    'FromValue(const base::Value::Dict& value);'.format(
+                      return_type=return_type))
           )
+
+        (c.Append()
+            .Comment('Creates a {classname} object from a base::Value,'
+                      ' or {failure} on failure.'.format(
+                        classname=classname,
+                        failure=('unexpected'
+                          if self._generate_error_messages else 'nullopt')))
+          .Append('static {return_type} '
+                  'FromValue(const base::Value& value);'.format(
+                    return_type=return_type))
+        )
+
       if type_.origin.from_client:
         (c.Append()
           .Comment('Returns a new %s representing the serialized form of this'
@@ -360,10 +401,17 @@ class _Generator(object):
       return Code()
 
     c = Code()
-    (c.Sblock('struct Params {')
-      .Append('static absl::optional<Params> Create(%s);' %
-                  self._GenerateParams(
-                      ('const base::Value::List& args',)))
+    (c.Sblock('struct Params {'))
+    if self._generate_error_messages:
+      (c.Append('static base::expected<Params, std::u16string> '
+        'Create(const base::Value::List& args);')
+        .Comment('DEPRECATED: prefer the variant of this function '
+          'returning errors with `base::expected`.')
+      )
+
+    (c.Append('static absl::optional<Params> Create(%s);' %
+                self._GenerateParams(
+                    ('const base::Value::List& args',)))
       .Append('Params(const Params&) = delete;')
       .Append('Params& operator=(const Params&) = delete;')
       .Append('Params(Params&& rhs);')
@@ -409,8 +457,8 @@ class _Generator(object):
     if type_.IsRootManifestKeyType():
       params = [
         'const base::Value::Dict& root_dict',
-        '%s* out' % classname,
-        'std::u16string* error'
+        '%s& out' % classname,
+        'std::u16string& error'
       ]
       comment = (
         'Parses manifest keys for this namespace. Any keys not available to the'
@@ -420,9 +468,9 @@ class _Generator(object):
       params = [
         'const base::Value::Dict& root_dict',
         'base::StringPiece key',
-        '%s* out' % classname,
-        'std::u16string* error',
-        'std::vector<base::StringPiece>* error_path_reversed'
+        '%s& out' % classname,
+        'std::u16string& error',
+        'std::vector<base::StringPiece>& error_path_reversed'
       ]
       comment = (
         'Parses the given |key| from |root_dict|. Any keys not available to the'
@@ -487,10 +535,12 @@ class _Generator(object):
     )
     return c
 
-  def _GenerateParams(self, params, generate_error_messages=None):
+  def _GenerateParams(
+        self, params, generate_error_messages=None, error_as_ptr=None):
     """Builds the parameter list for a function, given an array of parameters.
     If |generate_error_messages| is specified, it overrides
     |self._generate_error_messages|.
+    |error_as_ptr| is used to indicate a pointer argument should be preserved.
     """
     # |error| is populated with warnings and/or errors found during parsing.
     # |error| being set does not necessarily imply failure and may be
@@ -500,5 +550,11 @@ class _Generator(object):
     if generate_error_messages is None:
       generate_error_messages = self._generate_error_messages
     if generate_error_messages:
-      params += ('std::u16string* error',)
+      if error_as_ptr:
+        # TODO(crbug.com/1415174): error_as_ptr argument should eventually be
+        # removed, once all sites making use of FromValueDeprecated get
+        # migrated, and FromValueDeprecated is removed.
+        params += ('std::u16string* error',)
+      else:
+        params += ('std::u16string& error',)
     return ', '.join(str(p) for p in params)

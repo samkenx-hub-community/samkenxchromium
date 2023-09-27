@@ -8,13 +8,18 @@
 #import "base/strings/string_number_conversions.h"
 #import "base/time/time.h"
 #import "components/prefs/pref_service.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ui/base/device_form_factor.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+namespace {
+
+// Number of allowed moves between active and inactive.
+const int kMoveTabsLimit = 500;
+
+}  // namespace
+
+const int kInactiveTabsDisabledByUser = -1;
 
 BASE_FEATURE(kTabInactivityThreshold,
              "TabInactivityThreshold",
@@ -29,23 +34,33 @@ const char kTabInactivityThresholdThreeWeeksParam[] =
     "tab-inactivity-threshold-three-weeks";
 const char kTabInactivityThresholdOneMinuteDemoParam[] =
     "tab-inactivity-threshold-one-minute-demo";
+const char kTabInactivityThresholdImmediateDemoParam[] =
+    "tab-inactivity-threshold-immediate-demo";
 
-bool IsInactiveTabsEnabled() {
+bool IsInactiveTabsAvailable() {
   if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
     return false;
   }
 
-  if (!base::FeatureList::IsEnabled(kTabInactivityThreshold)) {
+  return base::FeatureList::IsEnabled(kTabInactivityThreshold);
+}
+
+bool IsInactiveTabsEnabled() {
+  if (!IsInactiveTabsAvailable()) {
     return false;
   }
 
-  static const int kDisabledByUser = -1;
+  return !IsInactiveTabsExplictlyDisabledByUser();
+}
+
+bool IsInactiveTabsExplictlyDisabledByUser() {
+  CHECK(IsInactiveTabsAvailable());
   return GetApplicationContext()->GetLocalState()->GetInteger(
-             prefs::kInactiveTabsTimeThreshold) != kDisabledByUser;
+             prefs::kInactiveTabsTimeThreshold) == kInactiveTabsDisabledByUser;
 }
 
 const base::TimeDelta InactiveTabsTimeThreshold() {
-  DCHECK(IsInactiveTabsEnabled());
+  CHECK(IsInactiveTabsAvailable());
 
   // Preference.
   PrefService* local_state = GetApplicationContext()->GetLocalState();
@@ -66,14 +81,10 @@ const base::TimeDelta InactiveTabsTimeThreshold() {
     return base::Days(21);
   } else if (feature_param == kTabInactivityThresholdOneMinuteDemoParam) {
     return base::Minutes(1);
+  } else if (feature_param == kTabInactivityThresholdImmediateDemoParam) {
+    return base::Seconds(0);
   }
   return base::Days(14);
-}
-
-NSString* InactiveTabsTimeThresholdDisplayString() {
-  DCHECK(IsInactiveTabsEnabled());
-  return [NSString
-      stringWithFormat:@"%@", @(InactiveTabsTimeThreshold().InDays())];
 }
 
 BASE_FEATURE(kShowInactiveTabsCount,
@@ -81,6 +92,17 @@ BASE_FEATURE(kShowInactiveTabsCount,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 bool IsShowInactiveTabsCountEnabled() {
-  DCHECK(IsInactiveTabsEnabled());
+  CHECK(IsInactiveTabsAvailable());
   return base::FeatureList::IsEnabled(kShowInactiveTabsCount);
+}
+
+BASE_FEATURE(kInactiveTabsMoveLimit,
+             "InactiveTabsMoveLimit",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsInactiveTabsMoveNumberExceeded(int currentMoveNumber) {
+  if (base::FeatureList::IsEnabled(kInactiveTabsMoveLimit)) {
+    return currentMoveNumber >= kMoveTabsLimit;
+  }
+  return false;
 }

@@ -39,7 +39,7 @@ mojom::SessionType EnvironmentProvider::GetSessionType() {
   if (profile->IsGuestSession()) {
     return mojom::SessionType::kGuestSession;
   }
-  if (profiles::IsPublicSession()) {
+  if (profiles::IsManagedGuestSession()) {
     return mojom::SessionType::kPublicSession;
   }
   if (user->GetType() == user_manager::USER_TYPE_WEB_KIOSK_APP) {
@@ -67,8 +67,6 @@ mojom::DeviceMode EnvironmentProvider::GetDeviceMode() {
       return mojom::DeviceMode::kConsumer;
     case policy::DEVICE_MODE_ENTERPRISE:
       return mojom::DeviceMode::kEnterprise;
-    case policy::DEVICE_MODE_ENTERPRISE_AD:
-      return mojom::DeviceMode::kEnterpriseActiveDirectory;
     case policy::DEPRECATED_DEVICE_MODE_LEGACY_RETAIL_MODE:
       return mojom::DeviceMode::kLegacyRetailMode;
     case policy::DEVICE_MODE_CONSUMER_KIOSK_AUTOLAUNCH:
@@ -137,20 +135,6 @@ mojom::DefaultPathsPtr EnvironmentProvider::GetDefaultPaths() {
       web_app::GetPreinstalledWebAppExtraConfigDirFromCommandLine(profile);
 
   return default_paths;
-}
-
-std::string EnvironmentProvider::GetDeviceAccountGaiaId() {
-  const user_manager::User* const user =
-      user_manager::UserManager::Get()->GetPrimaryUser();
-  if (!user)
-    return std::string();
-
-  const AccountId& account_id = user->GetAccountId();
-  if (account_id.GetAccountType() != AccountType::GOOGLE)
-    return std::string();
-
-  DCHECK(!account_id.GetGaiaId().empty());
-  return account_id.GetGaiaId();
 }
 
 absl::optional<account_manager::Account>

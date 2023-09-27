@@ -17,9 +17,6 @@ class Profile;
 
 namespace extensions {
 class PasswordsPrivateDelegate;
-namespace api::passwords_private {
-struct PasswordUiEntry;
-}  // namespace api::passwords_private
 }  // namespace extensions
 
 namespace syncer {
@@ -70,8 +67,6 @@ class PromoCardInterface {
   int number_of_times_shown_ = 0;
   base::Time last_time_shown_;
   bool was_dismissed_ = false;
-
- private:
   raw_ptr<PrefService> prefs_;
 };
 
@@ -91,14 +86,7 @@ class PasswordCheckupPromo : public PromoCardInterface {
   std::u16string GetDescription() const override;
   std::u16string GetActionButtonText() const override;
 
-  void OnPasswordsReceived(
-      const std::vector<extensions::api::passwords_private::PasswordUiEntry>&
-          passwords);
-
-  bool has_saved_passwords_ = false;
-
-  // `weak_factory_` is used for all callback uses.
-  base::WeakPtrFactory<PasswordCheckupPromo> weak_factory_{this};
+  base::WeakPtr<extensions::PasswordsPrivateDelegate> delegate_;
 };
 
 // Promoting web version of Password Manager. Has a link to the website in the
@@ -132,6 +120,7 @@ class PasswordManagerShortcutPromo : public PromoCardInterface {
   std::u16string GetActionButtonText() const override;
 
   bool is_shortcut_installed_ = false;
+  raw_ptr<Profile> profile_;
 };
 
 // Promo card to communicate how to use Password Manager on Android and iOS.

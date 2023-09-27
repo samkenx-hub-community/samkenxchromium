@@ -5,6 +5,7 @@
 #ifndef CHROME_BROWSER_ASH_LOGIN_TEST_OOBE_SCREENS_UTILS_H_
 #define CHROME_BROWSER_ASH_LOGIN_TEST_OOBE_SCREENS_UTILS_H_
 
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "chrome/browser/ash/login/screens/welcome_screen.h"
 #include "chrome/browser/ui/webui/ash/login/oobe_ui.h"
@@ -19,6 +20,8 @@ void WaitForNetworkSelectionScreen();
 void TapNetworkSelectionNext();
 void WaitForUpdateScreen();
 void ExitUpdateScreenNoUpdate();
+void WaitForConsumerUpdateScreen();
+void ExitConsumerUpdateScreenNoUpdate();
 void WaitForFingerprintScreen();
 void ExitFingerprintPinSetupScreen();
 void WaitForPinSetupScreen();
@@ -26,6 +29,7 @@ void ExitPinSetupScreen();
 void SkipToEnrollmentOnRecovery();
 void WaitForEnrollmentScreen();
 void WaitForUserCreationScreen();
+void TapForPersonalUseCrRadioButton();
 void TapUserCreationNext();
 // Wait for OobeUI to finish loading.
 void WaitForOobeJSReady();
@@ -42,6 +46,8 @@ void ClickSignInFatalScreenActionButton();
 bool IsScanningRequestedOnNetworkScreen();
 bool IsScanningRequestedOnErrorScreen();
 
+void SetFakeTouchpadDevice();
+
 class LanguageReloadObserver : public WelcomeScreen::Observer {
  public:
   explicit LanguageReloadObserver(WelcomeScreen* welcome_screen);
@@ -55,7 +61,7 @@ class LanguageReloadObserver : public WelcomeScreen::Observer {
   // WelcomeScreen::Observer:
   void OnLanguageListReloaded() override;
 
-  WelcomeScreen* const welcome_screen_;
+  const raw_ptr<WelcomeScreen, ExperimentalAsh> welcome_screen_;
   base::RunLoop run_loop_;
 };
 

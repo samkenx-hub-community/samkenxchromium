@@ -8,15 +8,13 @@
 #include "third_party/blink/renderer/modules/webgpu/dawn_object.h"
 #include "third_party/blink/renderer/modules/webgpu/gpu_programmable_pass_encoder.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
-#include "third_party/blink/renderer/platform/bindings/no_alloc_direct_call_host.h"
 
 namespace blink {
 
 class GPUBindGroup;
 
 class GPUComputePassEncoder : public DawnObject<WGPUComputePassEncoder>,
-                              public GPUProgrammablePassEncoder,
-                              public NoAllocDirectCallHost {
+                              public GPUProgrammablePassEncoder {
   DEFINE_WRAPPERTYPEINFO();
 
  public:
@@ -29,8 +27,9 @@ class GPUComputePassEncoder : public DawnObject<WGPUComputePassEncoder>,
   // gpu_compute_pass_encoder.idl
   void setBindGroup(uint32_t index,
                     const DawnObject<WGPUBindGroup>* bindGroup) {
-    GetProcs().computePassEncoderSetBindGroup(
-        GetHandle(), index, bindGroup->GetHandle(), 0, nullptr);
+    WGPUBindGroupImpl* bgImpl = bindGroup ? bindGroup->GetHandle() : nullptr;
+    GetProcs().computePassEncoderSetBindGroup(GetHandle(), index, bgImpl, 0,
+                                              nullptr);
   }
   void setBindGroup(uint32_t index,
                     GPUBindGroup* bindGroup,

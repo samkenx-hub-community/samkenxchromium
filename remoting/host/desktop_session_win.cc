@@ -8,6 +8,7 @@
 #include <sddl.h>
 #include <wrl/client.h>
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <string>
@@ -15,9 +16,8 @@
 
 #include "base/base_switches.h"
 #include "base/command_line.h"
-#include "base/cxx17_backports.h"
 #include "base/files/file_path.h"
-#include "base/guid.h"
+#include "base/i18n/time_formatting.h"
 #include "base/logging.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
@@ -25,6 +25,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_checker.h"
 #include "base/timer/timer.h"
+#include "base/uuid.h"
 #include "base/win/registry.h"
 #include "base/win/scoped_bstr.h"
 #include "base/win/scoped_handle.h"
@@ -63,7 +64,7 @@ const wchar_t kDaemonIpcSecurityDescriptor[] =
 
 // The command line parameters that should be copied from the service's command
 // line to the desktop process.
-const char* kCopiedSwitchNames[] = {switches::kV, switches::kVModule};
+const char* const kCopiedSwitchNames[] = {switches::kV, switches::kVModule};
 
 // The default screen dimensions for an RDP session.
 const int kDefaultRdpScreenWidth = 1280;
@@ -104,8 +105,8 @@ const wchar_t kSecurityLayerValueName[] = L"SecurityLayer";
 
 webrtc::DesktopSize GetBoundedRdpDesktopSize(int width, int height) {
   return webrtc::DesktopSize(
-      base::clamp(width, kMinRdpScreenWidth, kMaxRdpScreenWidth),
-      base::clamp(height, kMinRdpScreenHeight, kMaxRdpScreenHeight));
+      std::clamp(width, kMinRdpScreenWidth, kMaxRdpScreenWidth),
+      std::clamp(height, kMinRdpScreenHeight, kMaxRdpScreenHeight));
 }
 
 // DesktopSession implementation which attaches to the host's physical console.
@@ -312,7 +313,7 @@ bool RdpSession::Initialize(const ScreenResolution& resolution) {
   // Create an RDP session.
   Microsoft::WRL::ComPtr<IRdpDesktopSessionEventHandler> event_handler(
       new EventHandler(weak_factory_.GetWeakPtr()));
-  terminal_id_ = base::GenerateGUID();
+  terminal_id_ = base::Uuid::GenerateRandomV4().AsLowercaseString();
   base::win::ScopedBstr terminal_id(base::UTF8ToWide(terminal_id_));
   result = rdp_desktop_session_->Connect(
       host_size.width(), host_size.height(), kDefaultRdpDpi, kDefaultRdpDpi,
@@ -647,7 +648,7 @@ void DesktopSessionWin::OnSessionAttached(uint32_t session_id) {
   target->AppendSwitchASCII(kProcessTypeSwitchName, kProcessTypeDesktop);
   // Copy the command line switches enabling verbose logging.
   target->CopySwitchesFrom(*base::CommandLine::ForCurrentProcess(),
-                           kCopiedSwitchNames, std::size(kCopiedSwitchNames));
+                           kCopiedSwitchNames);
 
   // Create a delegate capable of launching a process in a different session.
   // Launch elevated to enable injection of Alt+Tab and Ctrl+Alt+Del.
@@ -715,12 +716,10 @@ void DesktopSessionWin::ReportElapsedTime(const std::string& event) {
                                 (now - last_timestamp_).InSecondsF());
   }
 
-  base::Time::Exploded exploded;
-  now.LocalExplode(&exploded);
-  VLOG(1) << base::StringPrintf("session(%d): %s at %02d:%02d:%02d.%03d%s",
-                                id(), event.c_str(), exploded.hour,
-                                exploded.minute, exploded.second,
-                                exploded.millisecond, passed.c_str());
+  VLOG(1) << base::StringPrintf(
+      "session(%d): %s at %s%s", id(), event.c_str(),
+      base::UnlocalizedTimeFormatWithPattern(now, "HH:mm:ss.SSS").c_str(),
+      passed.c_str());
 
   last_timestamp_ = now;
 }

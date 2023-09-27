@@ -4,9 +4,8 @@
 
 package org.chromium.chrome.browser.tabmodel;
 
-import android.support.test.InstrumentationRegistry;
-
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.Assert;

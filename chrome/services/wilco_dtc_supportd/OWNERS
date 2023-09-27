@@ -1,5 +1,4 @@
-pbond@chromium.org
-lamzin@google.com
+file://chromeos/ash/services/cros_healthd/OWNERS
 
 # Backup reviewers:
-pmarko@chromium.org
+lamzin@google.com

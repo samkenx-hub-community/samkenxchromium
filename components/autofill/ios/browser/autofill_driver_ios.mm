@@ -6,18 +6,17 @@
 
 #include "base/memory/ptr_util.h"
 #include "components/autofill/core/browser/form_structure.h"
+#include "components/autofill/core/common/mojom/autofill_types.mojom-shared.h"
 #include "components/autofill/ios/browser/autofill_driver_ios_bridge.h"
 #include "components/autofill/ios/browser/autofill_driver_ios_factory.h"
+#import "components/autofill/ios/browser/autofill_java_script_feature.h"
 #include "ios/web/public/browser_state.h"
-#include "ios/web/public/js_messaging/web_frame_util.h"
+#import "ios/web/public/js_messaging/web_frame.h"
+#import "ios/web/public/js_messaging/web_frames_manager.h"
 #import "ios/web/public/web_state.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "ui/accessibility/ax_tree_id.h"
 #include "ui/gfx/geometry/rect_f.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace autofill {
 
@@ -39,10 +38,29 @@ AutofillDriverIOS::AutofillDriverIOS(web::WebState* web_state,
       client_(client),
       browser_autofill_manager_(
           std::make_unique<BrowserAutofillManager>(this, client, app_locale)) {
-    web_frame_id_ = web::GetWebFrameId(web_frame);
+  web_frame_id_ = web_frame ? web_frame->GetFrameId() : "";
 }
 
 AutofillDriverIOS::~AutofillDriverIOS() = default;
+
+LocalFrameToken AutofillDriverIOS::GetFrameToken() const {
+  NOTIMPLEMENTED();  // TODO(crbug.com/1441921) implement.
+  return LocalFrameToken();
+}
+
+absl::optional<LocalFrameToken> AutofillDriverIOS::Resolve(FrameToken query) {
+  NOTIMPLEMENTED();  // TODO(crbug.com/1441921) implement.
+  return absl::nullopt;
+}
+
+AutofillDriverIOS* AutofillDriverIOS::GetParent() {
+  NOTIMPLEMENTED();  // TODO(crbug.com/1441921) implement.
+  return nullptr;
+}
+
+BrowserAutofillManager& AutofillDriverIOS::GetAutofillManager() {
+  return *browser_autofill_manager_;
+}
 
 // Return true as iOS has no MPArch.
 bool AutofillDriverIOS::IsInActiveFrame() const {
@@ -50,11 +68,15 @@ bool AutofillDriverIOS::IsInActiveFrame() const {
 }
 
 bool AutofillDriverIOS::IsInAnyMainFrame() const {
-  web::WebFrame* web_frame = web::GetWebFrameWithId(web_state_, web_frame_id_);
-  return web_frame ? web_frame->IsMainFrame() : true;
+  web::WebFrame* frame = web_frame();
+  return frame ? frame->IsMainFrame() : true;
 }
 
 bool AutofillDriverIOS::IsPrerendering() const {
+  return false;
+}
+
+bool AutofillDriverIOS::HasSharedAutofillPermission() const {
   return false;
 }
 
@@ -62,23 +84,23 @@ bool AutofillDriverIOS::CanShowAutofillUi() const {
   return true;
 }
 
-ui::AXTreeID AutofillDriverIOS::GetAxTreeId() const {
-  NOTIMPLEMENTED() << "See https://crbug.com/985933";
-  return ui::AXTreeIDUnknown();
-}
-
 bool AutofillDriverIOS::RendererIsAvailable() {
   return true;
 }
 
-std::vector<FieldGlobalId> AutofillDriverIOS::FillOrPreviewForm(
-    mojom::RendererFormDataAction action,
+std::vector<FieldGlobalId> AutofillDriverIOS::ApplyAutofillAction(
+    mojom::AutofillActionType action_type,
+    mojom::AutofillActionPersistence action_persistence,
     const FormData& data,
     const url::Origin& triggered_origin,
     const base::flat_map<FieldGlobalId, ServerFieldType>& field_type_map) {
-  web::WebFrame* web_frame = web::GetWebFrameWithId(web_state_, web_frame_id_);
-  if (web_frame) {
-    [bridge_ fillFormData:data inFrame:web_frame];
+  // TODO(crbug.com/1441410) Add Undo support on iOS.
+  if (action_type == mojom::AutofillActionType::kUndo) {
+    return {};
+  }
+  web::WebFrame* frame = web_frame();
+  if (frame) {
+    [bridge_ fillFormData:data inFrame:frame];
   }
   std::vector<FieldGlobalId> safe_fields;
   for (const auto& field : data.fields)
@@ -97,21 +119,21 @@ void AutofillDriverIOS::HandleParsedForms(const std::vector<FormData>& forms) {
       form_structures.push_back(it->second.get());
   }
 
-  web::WebFrame* web_frame = web::GetWebFrameWithId(web_state_, web_frame_id_);
-  if (!web_frame) {
+  web::WebFrame* frame = web_frame();
+  if (!frame) {
     return;
   }
-  [bridge_ handleParsedForms:form_structures inFrame:web_frame];
+  [bridge_ handleParsedForms:form_structures inFrame:frame];
 }
 
 void AutofillDriverIOS::SendAutofillTypePredictionsToRenderer(
     const std::vector<FormStructure*>& forms) {
-  web::WebFrame* web_frame = web::GetWebFrameWithId(web_state_, web_frame_id_);
-  if (!web_frame) {
+  web::WebFrame* frame = web_frame();
+  if (!frame) {
     return;
   }
   [bridge_ fillFormDataPredictions:FormStructure::GetFieldTypePredictions(forms)
-                           inFrame:web_frame];
+                           inFrame:frame];
 }
 
 void AutofillDriverIOS::RendererShouldAcceptDataListSuggestion(
@@ -121,18 +143,33 @@ void AutofillDriverIOS::RendererShouldAcceptDataListSuggestion(
 void AutofillDriverIOS::SendFieldsEligibleForManualFillingToRenderer(
     const std::vector<FieldGlobalId>& fields) {}
 
-void AutofillDriverIOS::SetShouldSuppressKeyboard(bool suppress) {
+void AutofillDriverIOS::TriggerFormExtraction() {
+  NOTIMPLEMENTED();  // TODO(crbug.com/1441921) implement.
+}
+
+void AutofillDriverIOS::TriggerFormExtractionInAllFrames(
+    base::OnceCallback<void(bool)> form_extraction_finished_callback) {
   NOTIMPLEMENTED();
 }
 
-void AutofillDriverIOS::TriggerReparseInAllFrames(
-    base::OnceCallback<void(bool)> trigger_reparse_finished_callback) {
+void AutofillDriverIOS::GetFourDigitCombinationsFromDOM(
+    base::OnceCallback<void(const std::vector<std::string>&)>
+        potential_matches) {
+  // TODO(crbug.com/1423605): Implement GetFourDigitCombinationsFromDOM in iOS.
   NOTIMPLEMENTED();
 }
 
 void AutofillDriverIOS::RendererShouldClearFilledSection() {}
 
 void AutofillDriverIOS::RendererShouldClearPreviewedForm() {
+}
+
+void AutofillDriverIOS::RendererShouldTriggerSuggestions(
+    const FieldGlobalId& field_id,
+    AutofillSuggestionTriggerSource trigger_source) {
+  // Triggering suggestions from the browser process is currently only used for
+  // manual fallbacks on Desktop. It is not implemented on iOS.
+  NOTIMPLEMENTED();
 }
 
 void AutofillDriverIOS::RendererShouldFillFieldWithValue(
@@ -151,25 +188,27 @@ void AutofillDriverIOS::PopupHidden() {
 }
 
 net::IsolationInfo AutofillDriverIOS::IsolationInfo() {
-  std::string main_web_frame_id = web::GetMainWebFrameId(web_state_);
-  web::WebFrame* main_web_frame =
-      web::GetWebFrameWithId(web_state_, main_web_frame_id);
+  web::WebFramesManager* frames_manager =
+      AutofillJavaScriptFeature::GetInstance()->GetWebFramesManager(web_state_);
+  web::WebFrame* main_web_frame = frames_manager->GetMainWebFrame();
   if (!main_web_frame)
     return net::IsolationInfo();
 
-  web::WebFrame* web_frame = web::GetWebFrameWithId(web_state_, web_frame_id_);
-  if (!web_frame)
+  web::WebFrame* frame = web_frame();
+  if (!frame) {
     return net::IsolationInfo();
+  }
 
   return net::IsolationInfo::Create(
       net::IsolationInfo::RequestType::kOther,
       url::Origin::Create(main_web_frame->GetSecurityOrigin()),
-      url::Origin::Create(web_frame->GetSecurityOrigin()),
-      net::SiteForCookies());
+      url::Origin::Create(frame->GetSecurityOrigin()), net::SiteForCookies());
 }
 
-web::WebFrame* AutofillDriverIOS::web_frame() {
-  return web::GetWebFrameWithId(web_state_, web_frame_id_);
+web::WebFrame* AutofillDriverIOS::web_frame() const {
+  web::WebFramesManager* frames_manager =
+      AutofillJavaScriptFeature::GetInstance()->GetWebFramesManager(web_state_);
+  return frames_manager->GetFrameWithId(web_frame_id_);
 }
 
 }  // namespace autofill

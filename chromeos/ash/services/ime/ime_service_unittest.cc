@@ -152,16 +152,24 @@ struct MockInputMethodHost : public mojom::InputMethodHost {
   void FinishComposition() override {}
   void DeleteSurroundingText(uint32_t num_before_cursor,
                              uint32_t num_after_cursor) override {}
+  void ReplaceSurroundingText(uint32_t num_before_cursor,
+                              uint32_t num_after_cursor,
+                              const std::u16string& text) override {}
   void HandleAutocorrect(mojom::AutocorrectSpanPtr autocorrect_span) override {}
   void RequestSuggestions(mojom::SuggestionsRequestPtr request,
                           RequestSuggestionsCallback callback) override {}
   void DisplaySuggestions(
-      const std::vector<AssistiveSuggestion>& suggestions) override {}
+      const std::vector<AssistiveSuggestion>& suggestions,
+      const absl::optional<SuggestionsTextContext>& context) override {}
   void UpdateCandidatesWindow(mojom::CandidatesWindowPtr window) override {}
   void RecordUkm(mojom::UkmEntryPtr entry) override {}
-  void ReportKoreanAction(mojom::KoreanAction action) override {}
-  void ReportKoreanSettings(mojom::KoreanSettingsPtr settings) override {}
-  void ReportSuggestionOpportunity(AssistiveSuggestionMode mode) override {}
+  void DEPRECATED_ReportKoreanAction(mojom::KoreanAction action) override {}
+  void DEPRECATED_ReportKoreanSettings(
+      mojom::KoreanSettingsPtr settings) override {}
+  void DEPRECATED_ReportSuggestionOpportunity(
+      AssistiveSuggestionMode mode) override {}
+  void ReportHistogramSample(base::Histogram* histogram,
+                             uint16_t value) override {}
   void UpdateQuickSettings(
       mojom::InputMethodQuickSettingsPtr settings) override {}
 
@@ -205,16 +213,24 @@ class ImeServiceTest : public testing::Test, public mojom::InputMethodHost {
   void FinishComposition() override {}
   void DeleteSurroundingText(uint32_t num_before_cursor,
                              uint32_t num_after_cursor) override {}
+  void ReplaceSurroundingText(uint32_t num_before_cursor,
+                              uint32_t num_after_cursor,
+                              const std::u16string& text) override {}
   void HandleAutocorrect(mojom::AutocorrectSpanPtr autocorrect_span) override {}
   void RequestSuggestions(mojom::SuggestionsRequestPtr request,
                           RequestSuggestionsCallback callback) override {}
   void DisplaySuggestions(
-      const std::vector<AssistiveSuggestion>& suggestions) override {}
+      const std::vector<AssistiveSuggestion>& suggestions,
+      const absl::optional<SuggestionsTextContext>& context) override {}
   void UpdateCandidatesWindow(mojom::CandidatesWindowPtr window) override {}
   void RecordUkm(mojom::UkmEntryPtr entry) override {}
-  void ReportKoreanAction(mojom::KoreanAction action) override {}
-  void ReportKoreanSettings(mojom::KoreanSettingsPtr settings) override {}
-  void ReportSuggestionOpportunity(AssistiveSuggestionMode mode) override {}
+  void DEPRECATED_ReportKoreanAction(mojom::KoreanAction action) override {}
+  void DEPRECATED_ReportKoreanSettings(
+      mojom::KoreanSettingsPtr settings) override {}
+  void DEPRECATED_ReportSuggestionOpportunity(
+      AssistiveSuggestionMode mode) override {}
+  void ReportHistogramSample(base::Histogram* histogram,
+                             uint16_t value) override {}
   void UpdateQuickSettings(
       mojom::InputMethodQuickSettingsPtr settings) override {}
 
@@ -224,8 +240,6 @@ class ImeServiceTest : public testing::Test, public mojom::InputMethodHost {
         remote_service_.BindNewPipeAndPassReceiver(),
         TestImeSharedLibraryWrapper::GetInstance(),
         std::make_unique<TestFieldTrialParamsRetriever>());
-    remote_service_->BindInputEngineManager(
-        remote_manager_.BindNewPipeAndPassReceiver());
   }
 
   void TearDown() override {
@@ -234,7 +248,6 @@ class ImeServiceTest : public testing::Test, public mojom::InputMethodHost {
   }
 
   mojo::Remote<mojom::ImeService> remote_service_;
-  mojo::Remote<mojom::InputEngineManager> remote_manager_;
 
  protected:
   std::unique_ptr<ImeService> service_;
@@ -250,13 +263,16 @@ class ImeServiceTest : public testing::Test, public mojom::InputMethodHost {
 TEST_F(ImeServiceTest, ConnectInvalidImeEngineDoesNotConnectRemote) {
   bool success = true;
   MockInputChannel test_channel;
+  mojo::Remote<mojom::InputEngineManager> remote_manager;
   mojo::Remote<mojom::InputChannel> remote_engine;
 
-  remote_manager_->ConnectToImeEngine(
+  remote_service_->BindInputEngineManager(
+      remote_manager.BindNewPipeAndPassReceiver());
+  remote_manager->ConnectToImeEngine(
       kInvalidImeSpec, remote_engine.BindNewPipeAndPassReceiver(),
       test_channel.CreatePendingRemote(), extra,
       base::BindOnce(&ConnectCallback, &success));
-  remote_manager_.FlushForTesting();
+  remote_manager.FlushForTesting();
 
   EXPECT_FALSE(success);
   EXPECT_FALSE(remote_engine.is_connected());
@@ -265,13 +281,16 @@ TEST_F(ImeServiceTest, ConnectInvalidImeEngineDoesNotConnectRemote) {
 TEST_F(ImeServiceTest, ConnectToValidEngineConnectsRemote) {
   bool success = true;
   MockInputChannel test_channel;
+  mojo::Remote<mojom::InputEngineManager> remote_manager;
   mojo::Remote<mojom::InputChannel> remote_engine;
 
-  remote_manager_->ConnectToImeEngine(
+  remote_service_->BindInputEngineManager(
+      remote_manager.BindNewPipeAndPassReceiver());
+  remote_manager->ConnectToImeEngine(
       kValidImeSpec, remote_engine.BindNewPipeAndPassReceiver(),
       test_channel.CreatePendingRemote(), {},
       base::BindOnce(&ConnectCallback, &success));
-  remote_manager_.FlushForTesting();
+  remote_manager.FlushForTesting();
 
   EXPECT_TRUE(success);
   EXPECT_TRUE(remote_engine.is_connected());
@@ -280,17 +299,20 @@ TEST_F(ImeServiceTest, ConnectToValidEngineConnectsRemote) {
 TEST_F(ImeServiceTest, ConnectToImeEngineWillOverrideExistingImeEngine) {
   bool success1, success2 = true;
   MockInputChannel test_channel1, test_channel2;
+  mojo::Remote<mojom::InputEngineManager> remote_manager;
   mojo::Remote<mojom::InputChannel> remote_engine1, remote_engine2;
 
-  remote_manager_->ConnectToImeEngine(
+  remote_service_->BindInputEngineManager(
+      remote_manager.BindNewPipeAndPassReceiver());
+  remote_manager->ConnectToImeEngine(
       kValidImeSpec, remote_engine1.BindNewPipeAndPassReceiver(),
       test_channel1.CreatePendingRemote(), /*extra=*/{},
       base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_->ConnectToImeEngine(
+  remote_manager->ConnectToImeEngine(
       kValidImeSpec, remote_engine2.BindNewPipeAndPassReceiver(),
       test_channel2.CreatePendingRemote(), /*extra=*/{},
       base::BindOnce(&ConnectCallback, &success2));
-  remote_manager_.FlushForTesting();
+  remote_manager.FlushForTesting();
 
   EXPECT_TRUE(success1);
   EXPECT_TRUE(success2);
@@ -302,18 +324,20 @@ TEST_F(ImeServiceTest,
        ConnectToImeEngineCannotConnectIfConnectionFactoryIsConnected) {
   bool success1, success2 = true;
   MockInputChannel test_channel;
+  mojo::Remote<mojom::InputEngineManager> remote_manager;
   mojo::Remote<mojom::ConnectionFactory> connection_factory;
   mojo::Remote<mojom::InputChannel> remote_engine;
 
-  remote_manager_->InitializeConnectionFactory(
+  remote_service_->BindInputEngineManager(
+      remote_manager.BindNewPipeAndPassReceiver());
+  remote_manager->InitializeConnectionFactory(
       connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kImeServiceLib,
       base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_->ConnectToImeEngine(
+  remote_manager->ConnectToImeEngine(
       kValidImeSpec, remote_engine.BindNewPipeAndPassReceiver(),
       test_channel.CreatePendingRemote(), /*extra=*/{},
       base::BindOnce(&ConnectCallback, &success2));
-  remote_manager_.FlushForTesting();
+  remote_manager.FlushForTesting();
 
   // The second connection should have failed.
   EXPECT_TRUE(success1);
@@ -326,19 +350,25 @@ TEST_F(ImeServiceTest,
        ConnectToImeEngineCanConnectIfConnectionFactoryIsDisconnected) {
   bool success1, success2 = true;
   MockInputChannel test_channel;
+  mojo::Remote<mojom::InputEngineManager> remote_manager;
   mojo::Remote<mojom::ConnectionFactory> connection_factory;
   mojo::Remote<mojom::InputChannel> remote_engine;
 
-  remote_manager_->InitializeConnectionFactory(
+  remote_service_->BindInputEngineManager(
+      remote_manager.BindNewPipeAndPassReceiver());
+  remote_manager->InitializeConnectionFactory(
       connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kImeServiceLib,
       base::BindOnce(&ConnectCallback, &success1));
+  remote_manager.FlushForTesting();
   connection_factory.reset();
-  remote_manager_->ConnectToImeEngine(
+  remote_manager.reset();
+  remote_service_->BindInputEngineManager(
+      remote_manager.BindNewPipeAndPassReceiver());
+  remote_manager->ConnectToImeEngine(
       kValidImeSpec, remote_engine.BindNewPipeAndPassReceiver(),
       test_channel.CreatePendingRemote(), /*extra=*/{},
       base::BindOnce(&ConnectCallback, &success2));
-  remote_manager_.FlushForTesting();
+  remote_manager.FlushForTesting();
 
   // The second connection should have succeed since the first connection was
   // disconnected.
@@ -351,23 +381,24 @@ TEST_F(ImeServiceTest,
 TEST_F(ImeServiceTest, InitializeConnectionFactoryCanOverrideAnyConnection) {
   bool success1, success2, success3 = true;
   MockInputChannel test_channel;
+  mojo::Remote<mojom::InputEngineManager> remote_manager;
   mojo::Remote<mojom::ConnectionFactory> connection_factory1,
       connection_factory2;
   mojo::Remote<mojom::InputChannel> remote_engine;
 
-  remote_manager_->ConnectToImeEngine(
+  remote_service_->BindInputEngineManager(
+      remote_manager.BindNewPipeAndPassReceiver());
+  remote_manager->ConnectToImeEngine(
       kValidImeSpec, remote_engine.BindNewPipeAndPassReceiver(),
       test_channel.CreatePendingRemote(), /*extra=*/{},
       base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_->InitializeConnectionFactory(
+  remote_manager->InitializeConnectionFactory(
       connection_factory1.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kImeServiceLib,
       base::BindOnce(&ConnectCallback, &success2));
-  remote_manager_->InitializeConnectionFactory(
+  remote_manager->InitializeConnectionFactory(
       connection_factory2.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kImeServiceLib,
       base::BindOnce(&ConnectCallback, &success3));
-  remote_manager_.FlushForTesting();
+  remote_manager.FlushForTesting();
 
   EXPECT_TRUE(success1);
   EXPECT_TRUE(success2);
@@ -375,469 +406,6 @@ TEST_F(ImeServiceTest, InitializeConnectionFactoryCanOverrideAnyConnection) {
   EXPECT_FALSE(remote_engine.is_connected());
   EXPECT_FALSE(connection_factory1.is_connected());
   EXPECT_TRUE(connection_factory2.is_connected());
-}
-
-TEST_F(ImeServiceTest, RuleBasedDoesNotHandleModifierKeys) {
-  bool success1 = false;
-  bool success2 = false;
-  mojo::Remote<mojom::ConnectionFactory> connection_factory;
-  mojo::PendingAssociatedRemote<mojom::InputMethodHost> host_remote;
-  mojo::AssociatedRemote<mojom::InputMethod> input_method;
-  mojo::AssociatedReceiver<mojom::InputMethodHost> host(this);
-
-  remote_manager_->InitializeConnectionFactory(
-      connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kRulebasedEngine,
-      base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_.FlushForTesting();
-  EXPECT_TRUE(success1);
-
-  host.Bind(host_remote.InitWithNewEndpointAndPassReceiver());
-  connection_factory->ConnectToInputMethod(
-      "m17n:ar", input_method.BindNewEndpointAndPassReceiver(),
-      std::move(host_remote), nullptr,
-      base::BindOnce(&ConnectCallback, &success2));
-  connection_factory.FlushForTesting();
-  EXPECT_TRUE(success2);
-
-  constexpr std::pair<mojom::NamedDomKey, mojom::DomCode> kModifierKeys[] = {
-      {mojom::NamedDomKey::kShift, mojom::DomCode::kShiftLeft},
-      {mojom::NamedDomKey::kShift, mojom::DomCode::kShiftRight},
-      {mojom::NamedDomKey::kAlt, mojom::DomCode::kAltLeft},
-      {mojom::NamedDomKey::kAlt, mojom::DomCode::kAltRight},
-      {mojom::NamedDomKey::kAltGraph, mojom::DomCode::kAltRight},
-      {mojom::NamedDomKey::kCapsLock, mojom::DomCode::kCapsLock},
-      {mojom::NamedDomKey::kControl, mojom::DomCode::kControlLeft},
-      {mojom::NamedDomKey::kControl, mojom::DomCode::kControlRight}};
-  for (const auto& modifier_key : kModifierKeys) {
-    input_method->ProcessKeyEvent(
-        mojom::PhysicalKeyEvent::New(
-            mojom::KeyEventType::kKeyDown,
-            mojom::DomKey::NewNamedKey(modifier_key.first), modifier_key.second,
-            mojom::ModifierState::New()),
-        base::BindLambdaForTesting([](mojom::KeyEventResult result) {
-          EXPECT_EQ(result, mojom::KeyEventResult::kNeedsHandlingBySystem);
-        }));
-    input_method.FlushForTesting();
-  }
-}
-
-TEST_F(ImeServiceTest, RuleBasedDoesNotHandleCtrlShortCut) {
-  bool success1 = false;
-  bool success2 = false;
-  mojo::Remote<mojom::ConnectionFactory> connection_factory;
-  mojo::PendingAssociatedRemote<mojom::InputMethodHost> host_remote;
-  mojo::AssociatedRemote<mojom::InputMethod> input_method;
-  mojo::AssociatedReceiver<mojom::InputMethodHost> host(this);
-
-  remote_manager_->InitializeConnectionFactory(
-      connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kRulebasedEngine,
-      base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_.FlushForTesting();
-  EXPECT_TRUE(success1);
-
-  host.Bind(host_remote.InitWithNewEndpointAndPassReceiver());
-  connection_factory->ConnectToInputMethod(
-      "m17n:ar", input_method.BindNewEndpointAndPassReceiver(),
-      std::move(host_remote), nullptr,
-      base::BindOnce(&ConnectCallback, &success2));
-  connection_factory.FlushForTesting();
-  EXPECT_TRUE(success2);
-
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown,
-          mojom::DomKey::NewNamedKey(mojom::NamedDomKey::kControl),
-          mojom::DomCode::kControlLeft,
-
-          mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kNeedsHandlingBySystem);
-      }));
-
-  auto modifier_state_with_control = mojom::ModifierState::New();
-  modifier_state_with_control->control = true;
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('a'),
-          mojom::DomCode::kKeyA, modifier_state_with_control->Clone()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kNeedsHandlingBySystem);
-      }));
-  input_method.FlushForTesting();
-}
-
-TEST_F(ImeServiceTest, RuleBasedDoesNotHandleAltShortCut) {
-  bool success1 = false;
-  bool success2 = false;
-  mojo::Remote<mojom::ConnectionFactory> connection_factory;
-  mojo::PendingAssociatedRemote<mojom::InputMethodHost> host_remote;
-  mojo::AssociatedRemote<mojom::InputMethod> input_method;
-  mojo::AssociatedReceiver<mojom::InputMethodHost> host(this);
-
-  remote_manager_->InitializeConnectionFactory(
-      connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kRulebasedEngine,
-      base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_.FlushForTesting();
-  EXPECT_TRUE(success1);
-
-  host.Bind(host_remote.InitWithNewEndpointAndPassReceiver());
-  connection_factory->ConnectToInputMethod(
-      "m17n:ar", input_method.BindNewEndpointAndPassReceiver(),
-      std::move(host_remote), nullptr,
-      base::BindOnce(&ConnectCallback, &success2));
-  connection_factory.FlushForTesting();
-  EXPECT_TRUE(success2);
-
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown,
-          mojom::DomKey::NewNamedKey(mojom::NamedDomKey::kAlt),
-          mojom::DomCode::kAltLeft,
-
-          mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kNeedsHandlingBySystem);
-      }));
-
-  auto new_modifier_state = mojom::ModifierState::New();
-  new_modifier_state->alt = true;
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('a'),
-          mojom::DomCode::kKeyA, std::move(new_modifier_state)),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kNeedsHandlingBySystem);
-      }));
-  input_method.FlushForTesting();
-}
-
-TEST_F(ImeServiceTest, RuleBasedHandlesAltRight) {
-  bool success1 = false;
-  bool success2 = false;
-  mojo::Remote<mojom::ConnectionFactory> connection_factory;
-  mojo::PendingAssociatedRemote<mojom::InputMethodHost> host_remote;
-  MockInputMethodHost mock_host;
-  mojo::AssociatedRemote<mojom::InputMethod> input_method;
-  mojo::AssociatedReceiver<mojom::InputMethodHost> host(&mock_host);
-
-  remote_manager_->InitializeConnectionFactory(
-      connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kRulebasedEngine,
-      base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_.FlushForTesting();
-  EXPECT_TRUE(success1);
-
-  host.Bind(host_remote.InitWithNewEndpointAndPassReceiver());
-  connection_factory->ConnectToInputMethod(
-      "m17n:ar", input_method.BindNewEndpointAndPassReceiver(),
-      std::move(host_remote), nullptr,
-      base::BindOnce(&ConnectCallback, &success2));
-  connection_factory.FlushForTesting();
-  EXPECT_TRUE(success2);
-
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown,
-          mojom::DomKey::NewNamedKey(mojom::NamedDomKey::kAlt),
-          mojom::DomCode::kAltRight,
-
-          mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kNeedsHandlingBySystem);
-      }));
-
-  auto modifier_state_with_alt = mojom::ModifierState::New();
-  modifier_state_with_alt->alt = true;
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('a'),
-          mojom::DomCode::kKeyA, modifier_state_with_alt->Clone()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_FALSE(mock_host.last_commit.empty());
-      }));
-  input_method.FlushForTesting();
-}
-
-// Tests that the rule-based Arabic keyboard can work correctly.
-TEST_F(ImeServiceTest, RuleBasedArabic) {
-  bool success1 = false;
-  bool success2 = false;
-  mojo::Remote<mojom::ConnectionFactory> connection_factory;
-  mojo::PendingAssociatedRemote<mojom::InputMethodHost> host_remote;
-  MockInputMethodHost mock_host;
-  mojo::AssociatedRemote<mojom::InputMethod> input_method;
-  mojo::AssociatedReceiver<mojom::InputMethodHost> host(&mock_host);
-
-  remote_manager_->InitializeConnectionFactory(
-      connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kRulebasedEngine,
-      base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_.FlushForTesting();
-  EXPECT_TRUE(success1);
-
-  host.Bind(host_remote.InitWithNewEndpointAndPassReceiver());
-  connection_factory->ConnectToInputMethod(
-      "m17n:ar", input_method.BindNewEndpointAndPassReceiver(),
-      std::move(host_remote), nullptr,
-      base::BindOnce(&ConnectCallback, &success2));
-  connection_factory.FlushForTesting();
-  EXPECT_TRUE(success2);
-
-  // Test Shift+KeyA.
-  auto modifier_state_with_shift = mojom::ModifierState::New();
-  modifier_state_with_shift->shift = true;
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('A'),
-          mojom::DomCode::kKeyA, modifier_state_with_shift->Clone()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_EQ(mock_host.last_commit, u"\u0650");
-        EXPECT_TRUE(mock_host.last_composition.empty());
-      }));
-  input_method.FlushForTesting();
-
-  // Test KeyB
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('b'),
-          mojom::DomCode::kKeyB, mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_EQ(mock_host.last_commit, u"\u0644\u0627");
-        EXPECT_TRUE(mock_host.last_composition.empty());
-      }));
-  input_method.FlushForTesting();
-
-  // Test unhandled key.
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown,
-          mojom::DomKey::NewNamedKey(mojom::NamedDomKey::kEnter),
-          mojom::DomCode::kEnter,
-
-          mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kNeedsHandlingBySystem);
-      }));
-  input_method.FlushForTesting();
-
-  // Test keyup.
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyUp,
-          mojom::DomKey::NewNamedKey(mojom::NamedDomKey::kEnter),
-          mojom::DomCode::kEnter,
-
-          mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kNeedsHandlingBySystem);
-      }));
-  input_method.FlushForTesting();
-
-  // TODO(keithlee) Test reset function
-  input_method->OnCompositionCanceledBySystem();
-}
-
-// Tests that the rule-based DevaPhone keyboard can work correctly.
-TEST_F(ImeServiceTest, RuleBasedDevaPhone) {
-  bool success1 = false;
-  bool success2 = false;
-  mojo::Remote<mojom::ConnectionFactory> connection_factory;
-  mojo::PendingAssociatedRemote<mojom::InputMethodHost> host_remote;
-  MockInputMethodHost mock_host;
-  mojo::AssociatedRemote<mojom::InputMethod> input_method;
-  mojo::AssociatedReceiver<mojom::InputMethodHost> host(&mock_host);
-
-  remote_manager_->InitializeConnectionFactory(
-      connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kRulebasedEngine,
-      base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_.FlushForTesting();
-  EXPECT_TRUE(success1);
-
-  host.Bind(host_remote.InitWithNewEndpointAndPassReceiver());
-  connection_factory->ConnectToInputMethod(
-      "m17n:deva_phone", input_method.BindNewEndpointAndPassReceiver(),
-      std::move(host_remote), nullptr,
-      base::BindOnce(&ConnectCallback, &success2));
-  connection_factory.FlushForTesting();
-  EXPECT_TRUE(success2);
-
-  // Test KeyN.
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('n'),
-          mojom::DomCode::kKeyN, mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_TRUE(mock_host.last_commit.empty());
-        EXPECT_EQ(mock_host.last_composition, u"\u0928");
-      }));
-  input_method.FlushForTesting();
-
-  // Backspace.
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown,
-          mojom::DomKey::NewNamedKey(mojom::NamedDomKey::kBackspace),
-          mojom::DomCode::kBackspace,
-
-          mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_TRUE(mock_host.last_commit.empty());
-        EXPECT_EQ(mock_host.last_composition, u"");
-      }));
-  input_method.FlushForTesting();
-
-  // KeyN + KeyC.
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('n'),
-          mojom::DomCode::kKeyN, mojom::ModifierState::New()),
-      base::DoNothing());
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('c'),
-          mojom::DomCode::kKeyC, mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_EQ(mock_host.last_composition, u"\u091e\u094d\u091a");
-      }));
-  input_method.FlushForTesting();
-
-  // Space.
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint(' '),
-          mojom::DomCode::kSpace, mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_EQ(mock_host.last_composition, u"\u091e\u094d\u091a");
-      }));
-  input_method.FlushForTesting();
-}
-
-// Tests escapable characters. See https://crbug.com/1014384.
-TEST_F(ImeServiceTest, RuleBasedDoesNotEscapeCharacters) {
-  bool success1 = false;
-  bool success2 = false;
-  mojo::Remote<mojom::ConnectionFactory> connection_factory;
-  mojo::PendingAssociatedRemote<mojom::InputMethodHost> host_remote;
-  MockInputMethodHost mock_host;
-  mojo::AssociatedRemote<mojom::InputMethod> input_method;
-  mojo::AssociatedReceiver<mojom::InputMethodHost> host(&mock_host);
-
-  remote_manager_->InitializeConnectionFactory(
-      connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kRulebasedEngine,
-      base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_.FlushForTesting();
-  EXPECT_TRUE(success1);
-
-  host.Bind(host_remote.InitWithNewEndpointAndPassReceiver());
-  connection_factory->ConnectToInputMethod(
-      "m17n:deva_phone", input_method.BindNewEndpointAndPassReceiver(),
-      std::move(host_remote), nullptr,
-      base::BindOnce(&ConnectCallback, &success2));
-  connection_factory.FlushForTesting();
-  EXPECT_TRUE(success2);
-
-  auto modifier_state_with_shift = mojom::ModifierState::New();
-  modifier_state_with_shift->shift = true;
-
-  // Test Shift+Quote ('"').
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('"'),
-          mojom::DomCode::kQuote, modifier_state_with_shift->Clone()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_EQ(mock_host.last_commit, u"\"");
-        EXPECT_TRUE(mock_host.last_composition.empty());
-      }));
-  input_method.FlushForTesting();
-
-  // Backslash.
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('\\'),
-          mojom::DomCode::kBackslash, mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_EQ(mock_host.last_commit, u"\\");
-        EXPECT_TRUE(mock_host.last_composition.empty());
-      }));
-  input_method.FlushForTesting();
-
-  // Shift+Comma ('<')
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('<'),
-          mojom::DomCode::kComma, modifier_state_with_shift->Clone()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_EQ(mock_host.last_commit, u"<");
-        EXPECT_TRUE(mock_host.last_composition.empty());
-      }));
-  input_method.FlushForTesting();
-}
-
-// Tests that AltGr works with rule-based. See crbug.com/1035145.
-TEST_F(ImeServiceTest, KhmerKeyboardAltGr) {
-  bool success1 = false;
-  bool success2 = false;
-  mojo::Remote<mojom::ConnectionFactory> connection_factory;
-  mojo::PendingAssociatedRemote<mojom::InputMethodHost> host_remote;
-  MockInputMethodHost mock_host;
-  mojo::AssociatedRemote<mojom::InputMethod> input_method;
-  mojo::AssociatedReceiver<mojom::InputMethodHost> host(&mock_host);
-
-  remote_manager_->InitializeConnectionFactory(
-      connection_factory.BindNewPipeAndPassReceiver(),
-      mojom::ConnectionTarget::kRulebasedEngine,
-      base::BindOnce(&ConnectCallback, &success1));
-  remote_manager_.FlushForTesting();
-  EXPECT_TRUE(success1);
-
-  host.Bind(host_remote.InitWithNewEndpointAndPassReceiver());
-  connection_factory->ConnectToInputMethod(
-      "m17n:km", input_method.BindNewEndpointAndPassReceiver(),
-      std::move(host_remote), nullptr,
-      base::BindOnce(&ConnectCallback, &success2));
-  connection_factory.FlushForTesting();
-  EXPECT_TRUE(success2);
-
-  // Test AltRight+KeyA.
-  // We do not support AltGr for rule-based. We treat AltRight as AltGr.
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown,
-          mojom::DomKey::NewNamedKey(mojom::NamedDomKey::kAlt),
-          mojom::DomCode::kAltRight,
-
-          mojom::ModifierState::New()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kNeedsHandlingBySystem);
-      }));
-
-  auto modifier_state_with_alt = mojom::ModifierState::New();
-  modifier_state_with_alt->alt = true;
-  input_method->ProcessKeyEvent(
-      mojom::PhysicalKeyEvent::New(
-          mojom::KeyEventType::kKeyDown, mojom::DomKey::NewCodepoint('a'),
-          mojom::DomCode::kKeyA, modifier_state_with_alt->Clone()),
-      base::BindLambdaForTesting([&](mojom::KeyEventResult result) {
-        EXPECT_EQ(result, mojom::KeyEventResult::kConsumedByIme);
-        EXPECT_EQ(mock_host.last_commit, u"+");
-        EXPECT_TRUE(mock_host.last_composition.empty());
-      }));
-  input_method.FlushForTesting();
 }
 
 TEST_F(ImeServiceTest, GetFieldTrialParamValueByFeatureNonConsidered) {

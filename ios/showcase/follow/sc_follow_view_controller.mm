@@ -6,11 +6,11 @@
 
 #import "ios/chrome/browser/follow/followed_web_site_state.h"
 #import "ios/chrome/browser/net/crurl.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_favicon_data_source.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller.h"
 #import "ios/chrome/browser/ui/follow/first_follow_view_controller.h"
 #import "ios/chrome/browser/ui/follow/followed_web_channel.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/ntp/feed_management/feed_management_follow_delegate.h"
 #import "ios/chrome/browser/ui/ntp/feed_management/feed_management_navigation_delegate.h"
 #import "ios/chrome/browser/ui/ntp/feed_management/feed_management_view_controller.h"
@@ -19,10 +19,6 @@
 #import "ios/chrome/browser/ui/ntp/feed_management/followed_web_channels_data_source.h"
 #import "ios/chrome/common/ui/favicon/favicon_attributes.h"
 #import "ios/showcase/common/protocol_alerter.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 

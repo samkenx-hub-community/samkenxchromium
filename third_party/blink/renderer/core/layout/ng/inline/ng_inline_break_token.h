@@ -25,6 +25,7 @@ class CORE_EXPORT NGInlineBreakToken final : public NGBreakToken {
     kHasSubBreakToken = 1 << 1,
     kUseFirstLineStyle = 1 << 2,
     kHasClonedBoxDecorations = 1 << 3,
+    kIsInParallelBlockFlow = 1 << 4,
     // When adding values, ensure |flags_| has enough storage.
   };
 
@@ -34,32 +35,28 @@ class CORE_EXPORT NGInlineBreakToken final : public NGBreakToken {
   static NGInlineBreakToken* Create(
       NGInlineNode node,
       const ComputedStyle* style,
-      const NGInlineItemTextIndex& index,
+      const NGInlineItemTextIndex& start,
       unsigned flags /* NGInlineBreakTokenFlags */,
-      const NGBreakToken* sub_break_token = nullptr);
-  static NGInlineBreakToken* Create(
+      const NGBlockBreakToken* sub_break_token = nullptr);
+
+  // Wrap a block break token inside an inline break token. The block break
+  // token may for instance be for a float inside an inline formatting context.
+  // Wrapping it inside an inline break token makes it possible to resume and
+  // place it correctly inside any inline ancestors.
+  static NGInlineBreakToken* CreateForParallelBlockFlow(
       NGInlineNode node,
-      const ComputedStyle* style,
-      unsigned item_index,
-      unsigned text_offset,
-      unsigned flags /* NGInlineBreakTokenFlags */,
-      const NGBreakToken* sub_break_token = nullptr) {
-    return Create(node, style, NGInlineItemTextIndex{item_index, text_offset},
-                  flags, sub_break_token);
-  }
+      const NGInlineItemTextIndex& start,
+      const NGBlockBreakToken& child_break_token);
 
   // The style at the end of this break token. The next line should start with
   // this style.
-  const ComputedStyle* Style() const { return style_.get(); }
+  const ComputedStyle* Style() const { return style_.Get(); }
 
-  const NGInlineItemTextIndex& ItemTextIndex() const { return index_; }
-  wtf_size_t ItemIndex() const { return index_.item_index; }
-  wtf_size_t TextOffset() const { return index_.text_offset; }
-
-  // True if the offset of `this` is equal to or after `other`.
-  bool IsAtEqualOrAfter(const NGInlineBreakToken& other) const {
-    return index_ >= other.index_;
-  }
+  // The point where the next layout should start, or where the previous layout
+  // ended.
+  const NGInlineItemTextIndex& Start() const { return start_; }
+  wtf_size_t StartItemIndex() const { return start_.item_index; }
+  wtf_size_t StartTextOffset() const { return start_.text_offset; }
 
   bool UseFirstLineStyle() const {
     return flags_ & kUseFirstLineStyle;
@@ -69,19 +66,8 @@ class CORE_EXPORT NGInlineBreakToken final : public NGBreakToken {
     return flags_ & kIsForcedBreak;
   }
 
-  // True if this is after a block-in-inline.
-  bool IsAfterBlockInInline() const;
-
-  // The BreakToken when a block-in-inline is block-fragmented.
-  const NGBlockBreakToken* BlockInInlineBreakToken() const;
-
-  // The BreakToken for the inline break token that has a block in inline break
-  // token inside. This should be resumed in the next fragmentainer as a
-  // parallel flow. This happens when a block inside an inline is overflowed
-  // beyond what was available in the fragmentainer. Regular inline content will
-  // then still fit in the fragmentainer, while the block inside the inline will
-  // be resumed in the next fragmentainer.
-  const NGInlineBreakToken* SubBreakTokenInParallelFlow() const;
+  // The BreakToken when a block-in-inline or float is block-fragmented.
+  const NGBlockBreakToken* BlockBreakToken() const;
 
   // True if the current position has open tags that has `box-decoration-break:
   // clone`. They should be cloned to the start of the next line.
@@ -89,13 +75,17 @@ class CORE_EXPORT NGInlineBreakToken final : public NGBreakToken {
     return flags_ & kHasClonedBoxDecorations;
   }
 
+  // True if this is to be resumed in a parallel fragmentation flow.
+  // https://www.w3.org/TR/css-break-3/#parallel-flows
+  bool IsInParallelBlockFlow() const { return flags_ & kIsInParallelBlockFlow; }
+
   using PassKey = base::PassKey<NGInlineBreakToken>;
   NGInlineBreakToken(PassKey,
                      NGInlineNode node,
                      const ComputedStyle*,
-                     const NGInlineItemTextIndex& index,
+                     const NGInlineItemTextIndex& start,
                      unsigned flags /* NGInlineBreakTokenFlags */,
-                     const NGBreakToken* sub_break_token);
+                     const NGBlockBreakToken* sub_break_token);
 
   explicit NGInlineBreakToken(PassKey, NGLayoutInputNode node);
 
@@ -108,11 +98,11 @@ class CORE_EXPORT NGInlineBreakToken final : public NGBreakToken {
  private:
   const Member<const NGBreakToken>* SubBreakTokenAddress() const;
 
-  scoped_refptr<const ComputedStyle> style_;
-  NGInlineItemTextIndex index_;
+  Member<const ComputedStyle> style_;
+  NGInlineItemTextIndex start_;
 
   // This is an array of one item if |kHasSubBreakToken|, or zero.
-  Member<const NGBreakToken> sub_break_token_[];
+  Member<const NGBlockBreakToken> sub_break_token_[];
 };
 
 template <>

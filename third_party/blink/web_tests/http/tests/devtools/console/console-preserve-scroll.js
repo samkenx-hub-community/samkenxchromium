@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
   TestRunner.addResult(`Tests that console preserves scroll position when switching away.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('console');
   // Do not use ConsoleTestRunner.fixConsoleViewportDimensions because fixing the height will affect
   // tests that may cause scrolling while the console moves into/out of the drawer.
@@ -24,7 +29,7 @@
   viewport.element.scrollTop = 10;
   dumpScrollTop();
 
-  UI.inspectorView._tabbedPane.addEventListener(UI.TabbedPane.Events.TabSelected, () => {
+  UI.inspectorView._tabbedPane.addEventListener(UIModule.TabbedPane.Events.TabSelected, () => {
     TestRunner.addResult('Panel ' + UI.inspectorView._tabbedPane._currentTab.id + ' was opened.');
   });
 
@@ -42,7 +47,7 @@
       const element = consoleView.visibleViewMessages[0]._element;
       await TestRunner.waitForPendingLiveLocationUpdates();
       element.querySelector('.devtools-link').click();
-      await UI.inspectorView._tabbedPane.once(UI.TabbedPane.Events.TabSelected);
+      await UI.inspectorView._tabbedPane.once(UIModule.TabbedPane.Events.TabSelected);
       await TestRunner.showPanel('console');
       dumpScrollTop();
       next();
@@ -61,7 +66,7 @@
 
     async function testCloseDrawerFromConsolePanelAndOpenFromAnotherPanel(next) {
       await TestRunner.showPanel('console');
-      TestRunner.addSniffer(UI.SplitWidget.prototype, '_showFinishedForTest', async () => {
+      TestRunner.addSniffer(UIModule.SplitWidget.SplitWidget.prototype, '_showFinishedForTest', async () => {
         await TestRunner.showPanel('sources');
         await showDrawerPromise();
         TestRunner.addResult('Drawer panel set to ' + UI.inspectorView._drawerTabbedPane._currentTab.id);
@@ -82,7 +87,7 @@
     // done asynchronously for TabbedPane contents.
     return new Promise((resolve, reject) => {
       UI.inspectorView._showDrawer(true);
-      TestRunner.addSniffer(UI.ViewManager._ContainerWidget.prototype, '_wasShownForTest', resolve);
+      TestRunner.addSniffer(UIModule.ViewManager.ContainerWidget.prototype, '_wasShownForTest', resolve);
     });
   }
 })();

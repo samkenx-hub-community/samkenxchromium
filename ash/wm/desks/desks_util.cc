@@ -10,8 +10,8 @@
 #include "ash/public/cpp/tablet_mode.h"
 #include "ash/shell.h"
 #include "ash/wm/desks/desk.h"
-#include "ash/wm/desks/desks_bar_view.h"
 #include "ash/wm/desks/desks_controller.h"
+#include "ash/wm/desks/legacy_desk_bar_view.h"
 #include "ash/wm/float/float_controller.h"
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/overview/overview_grid.h"
@@ -157,10 +157,11 @@ aura::Window* GetDeskContainerForContext(aura::Window* context) {
 const Desk* GetDeskForContext(aura::Window* context) {
   DCHECK(context);
 
-  for (const auto& desk : DesksController::Get()->desks()) {
-    if (desk.get()->container_id() ==
-        GetDeskContainerForContext(context)->GetId()) {
-      return desk.get();
+  if (aura::Window* context_desk = GetDeskContainerForContext(context)) {
+    for (auto& desk : DesksController::Get()->desks()) {
+      if (desk->container_id() == context_desk->GetId()) {
+        return desk.get();
+      }
     }
   }
 
@@ -193,7 +194,7 @@ bool IsDraggingAnyDesk() {
     return false;
 
   for (auto& grid : overview_session->grid_list()) {
-    const DesksBarView* desks_bar_view = grid->desks_bar_view();
+    const LegacyDeskBarView* desks_bar_view = grid->desks_bar_view();
     if (desks_bar_view && desks_bar_view->IsDraggingDesk())
       return true;
   }

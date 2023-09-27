@@ -122,7 +122,6 @@ void SpdyProxyClientSocket::Disconnect() {
 
   write_buffer_len_ = 0;
   write_callback_.Reset();
-  write_callback_weak_factory_.InvalidateWeakPtrs();
 
   next_state_ = STATE_DISCONNECTED;
 
@@ -277,9 +276,17 @@ int SpdyProxyClientSocket::GetLocalAddress(IPEndPoint* address) const {
   return spdy_stream_->GetLocalAddress(address);
 }
 
-void SpdyProxyClientSocket::RunWriteCallback(CompletionOnceCallback callback,
-                                             int result) const {
-  std::move(callback).Run(result);
+void SpdyProxyClientSocket::RunWriteCallback(int result) {
+  base::WeakPtr<SpdyProxyClientSocket> weak_ptr = weak_factory_.GetWeakPtr();
+  // `write_callback_` might be consumed by OnClose().
+  if (write_callback_) {
+    std::move(write_callback_).Run(result);
+  }
+  if (!weak_ptr) {
+    // `this` was already destroyed while running `write_callback_`. Must
+    // return immediately without touching any field member.
+    return;
+  }
 
   if (end_stream_state_ == EndStreamState::kEndStreamReceived) {
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
@@ -383,7 +390,8 @@ int SpdyProxyClientSocket::DoSendRequest() {
                        request_line, &request_.extra_headers);
 
   spdy::Http2HeaderBlock headers;
-  CreateSpdyHeadersFromHttpRequest(request_, request_.extra_headers, &headers);
+  CreateSpdyHeadersFromHttpRequest(request_, absl::nullopt,
+                                   request_.extra_headers, &headers);
 
   return spdy_stream_->SendRequestHeaders(std::move(headers),
                                           MORE_DATA_TO_SEND);
@@ -452,8 +460,7 @@ void SpdyProxyClientSocket::OnEarlyHintsReceived(
     const spdy::Http2HeaderBlock& headers) {}
 
 void SpdyProxyClientSocket::OnHeadersReceived(
-    const spdy::Http2HeaderBlock& response_headers,
-    const spdy::Http2HeaderBlock* pushed_request_headers) {
+    const spdy::Http2HeaderBlock& response_headers) {
   // If we've already received the reply, existing headers are too late.
   // TODO(mbelshe): figure out a way to make HEADERS frames useful after the
   //                initial response.
@@ -516,8 +523,7 @@ void SpdyProxyClientSocket::OnDataSent() {
   // stream's write callback chain to unwind (see crbug.com/355511).
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(&SpdyProxyClientSocket::RunWriteCallback,
-                                write_callback_weak_factory_.GetWeakPtr(),
-                                std::move(write_callback_), rv));
+                                weak_factory_.GetWeakPtr(), rv));
 }
 
 void SpdyProxyClientSocket::OnTrailers(const spdy::Http2HeaderBlock& trailers) {

@@ -4,20 +4,22 @@
 
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_table_view_controller.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/ios/ios_util.h"
-#import "base/mac/foundation_util.h"
 #import "base/metrics/histogram_functions.h"
 #import "base/metrics/histogram_macros.h"
+#import "base/metrics/user_metrics.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/password_manager/core/browser/password_manager_metrics_util.h"
 #import "components/password_manager/core/common/password_manager_constants.h"
 #import "components/password_manager/core/common/password_manager_features.h"
 #import "components/sync/base/features.h"
+#import "ios/chrome/browser/passwords/password_checkup_metrics.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
-#import "ios/chrome/browser/shared/public/commands/browser_commands.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_multi_line_text_edit_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_multi_line_text_edit_item_delegate.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_button_item.h"
@@ -26,39 +28,37 @@
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_header_footer_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_utils.h"
+#import "ios/chrome/browser/shared/ui/util/pasteboard_util.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/settings/cells/settings_image_detail_text_item.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/cells/table_view_stacked_details_item.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_consumer.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_handler.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_menu_item.h"
+#import "ios/chrome/browser/ui/settings/password/password_details/password_details_metrics_utils.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_table_view_constants.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_table_view_controller+private.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_table_view_controller_delegate.h"
+#import "ios/chrome/browser/ui/settings/password/password_manager_ui_features.h"
 #import "ios/chrome/browser/ui/settings/password/passwords_table_view_constants.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/elements/popover_label_view_controller.h"
 #import "ios/chrome/common/ui/reauthentication/reauthentication_module.h"
 #import "ios/chrome/common/ui/table_view/table_view_cells_constants.h"
-#import "ios/chrome/grit/ios_chromium_strings.h"
+#import "ios/chrome/grit/ios_branded_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+using base::UmaHistogramEnumeration;
+using password_manager::GetWarningTypeForDetailsContext;
+using password_manager::constants::kMaxPasswordNoteLength;
+using password_manager::features::IsAuthOnEntryV2Enabled;
+using password_manager::features::IsPasswordCheckupEnabled;
+using password_manager::metrics_util::LogPasswordNoteActionInSettings;
+using password_manager::metrics_util::PasswordNoteAction;
 
 namespace {
-
-using base::UmaHistogramEnumeration;
-using password_manager::constants::kMaxPasswordNoteLength;
-using password_manager::metrics_util::LogPasswordNoteActionInSettings;
-using password_manager::metrics_util::LogPasswordSettingsReauthResult;
-using password_manager::metrics_util::PasswordCheckInteraction;
-using password_manager::metrics_util::PasswordNoteAction;
-using password_manager::metrics_util::ReauthResult;
 
 typedef NS_ENUM(NSInteger, SectionIdentifier) {
   SectionIdentifierPassword = kSectionIdentifierEnumZero,
@@ -67,22 +67,11 @@ typedef NS_ENUM(NSInteger, SectionIdentifier) {
   SectionIdentifierMoveToAccount,
 };
 
-typedef NS_ENUM(NSInteger, ReauthenticationReason) {
-  ReauthenticationReasonShow = 0,
-  ReauthenticationReasonCopy,
-  ReauthenticationReasonEdit,
+typedef NS_ENUM(NSInteger, PasswordAccessReason) {
+  PasswordAccessReasonShow = 0,
+  PasswordAccessReasonCopy,
+  PasswordAccessReasonEdit,
 };
-
-// Return if the feature flag for the password grouping is enabled.
-// TODO(crbug.com/1359392): Remove this when kPasswordsGrouping flag is removed.
-bool IsPasswordGroupingEnabled() {
-  return base::FeatureList::IsEnabled(
-      password_manager::features::kPasswordsGrouping);
-}
-
-bool IsPasswordNotesWithBackupEnabled() {
-  return base::FeatureList::IsEnabled(syncer::kPasswordNotesWithBackup);
-}
 
 // Size of the symbols.
 const CGFloat kSymbolSize = 15;
@@ -90,7 +79,37 @@ const CGFloat kRecommendationSymbolSize = 22;
 // Minimal amount of characters in password note to display the warning.
 const int kMinNoteCharAmountForWarning = 901;
 
+// Returns true if the "Dismiss Warning" button should be shown.
+bool ShouldAllowToDismissWarning(DetailsContext context, bool is_compromised) {
+  switch (context) {
+    case DetailsContext::kPasswordSettings:
+    case DetailsContext::kOutsideSettings:
+    case DetailsContext::kCompromisedIssues:
+    case DetailsContext::kDismissedWarnings:
+      return IsPasswordCheckupEnabled() && is_compromised;
+    case DetailsContext::kReusedIssues:
+    case DetailsContext::kWeakIssues:
+      return false;
+  }
+}
+
+// Returns true if the "Restore Warning" button should be shown.
+bool ShouldAllowToRestoreWarning(DetailsContext context, bool is_muted) {
+  switch (context) {
+    case DetailsContext::kPasswordSettings:
+    case DetailsContext::kOutsideSettings:
+    case DetailsContext::kCompromisedIssues:
+    case DetailsContext::kReusedIssues:
+    case DetailsContext::kWeakIssues:
+      return false;
+    case DetailsContext::kDismissedWarnings:
+      return IsPasswordCheckupEnabled() && is_muted;
+  }
+}
+
 }  // namespace
+
+#pragma mark - PasswordDetailsInfoItem
 
 // Contains the website, username and password text items.
 @interface PasswordDetailsInfoItem : NSObject
@@ -114,15 +133,19 @@ const int kMinNoteCharAmountForWarning = 901;
 @implementation PasswordDetailsInfoItem
 @end
 
+#pragma mark - PasswordDetailsTableViewController
+
 @interface PasswordDetailsTableViewController () <
     TableViewTextEditItemDelegate,
-    TableViewMultiLineTextEditItemDelegate,
-    UIGestureRecognizerDelegate> {
+    TableViewMultiLineTextEditItemDelegate> {
   // Index of the password the user wants to reveal.
   NSInteger _passwordIndexToReveal;
 
   // Title label displayed in the navigation bar.
   UILabel* _titleLabel;
+
+  // Whether Settings have been dismissed.
+  BOOL _settingsAreDismissed;
 }
 
 // Array of passwords that are shown on the screen.
@@ -161,6 +184,11 @@ const int kMinNoteCharAmountForWarning = 901;
 // navigates to the password list view.
 @property(nonatomic, strong) NSTimer* authValidityTimer;
 
+// Used to avoid recording the "move to account offered" histogram twice for
+// the same credential.
+@property(nonatomic, strong)
+    NSMutableSet<NSString*>* usernamesWithMoveToAccountOfferRecorded;
+
 @end
 
 @implementation PasswordDetailsTableViewController
@@ -179,7 +207,7 @@ const int kMinNoteCharAmountForWarning = 901;
     _titleLabel.font =
         [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
     _titleLabel.adjustsFontForContentSizeCategory = YES;
-    self.navigationItem.titleView = _titleLabel;
+    self.usernamesWithMoveToAccountOfferRecorded = [[NSMutableSet alloc] init];
   }
   return self;
 }
@@ -191,12 +219,23 @@ const int kMinNoteCharAmountForWarning = 901;
 
   self.tableView.accessibilityIdentifier = kPasswordDetailsViewControllerId;
   self.tableView.allowsSelectionDuringEditing = YES;
+
   [self setOrExtendAuthValidityTimer];
 }
 
-- (void)viewDidDisappear:(BOOL)animated {
-  [self.handler passwordDetailsTableViewControllerDidDisappear];
-  [super viewDidDisappear:animated];
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  // Title may change between the call to -init and -viewWillAppear, so we want
+  // to wait until the last moment possible before setting the titleView.
+  self.navigationItem.titleView = _titleLabel;
+}
+
+- (void)didMoveToParentViewController:(UIViewController*)parent {
+  [super didMoveToParentViewController:parent];
+
+  if (!parent) {
+    [self.handler passwordDetailsTableViewControllerWasDismissed];
+  }
 }
 
 #pragma mark - ChromeTableViewController
@@ -209,24 +248,20 @@ const int kMinNoteCharAmountForWarning = 901;
     [super editButtonPressed];
 
     // Reload view to show the delete button.
-    if (IsPasswordGroupingEnabled()) {
-      [self reloadData];
-    }
+    [self reloadData];
     return;
   }
 
-  // Request reauthentication before revealing password during editing.
-  // Editing mode will be entered on successful reauth.
+  // Enter editing mode.
   if (!self.tableView.editing && !self.isPasswordShown) {
-    [self attemptToShowPasswordFor:ReauthenticationReasonEdit];
+    [self showPasswordFor:PasswordAccessReasonEdit];
     return;
   }
 
   if (self.tableView.editing) {
-    // If site, password or username value was changed show confirmation dialog
-    // before saving password. Editing mode will be exited only if user confirm
-    // saving.
-    if ([self fieldsDidChange]) {
+    // If password value was changed show confirmation dialog before saving.
+    // Editing mode will be exited only if user confirms saving.
+    if ([self passwordsDidChange]) {
       DCHECK(self.handler);
       // TODO(crbug.com/1401035): Show Password Edit Dialog when Password
       // Grouping is enabled.
@@ -261,15 +296,10 @@ const int kMinNoteCharAmountForWarning = 901;
     (PasswordDetails*)passwordDetails {
   TableViewStackedDetailsItem* item = [[TableViewStackedDetailsItem alloc]
       initWithType:PasswordDetailsItemTypeWebsite];
-  item.titleText = l10n_util::GetNSString(
-      IsPasswordGroupingEnabled() ? IDS_IOS_SHOW_PASSWORD_VIEW_SITES
-                                  : IDS_IOS_SHOW_PASSWORD_VIEW_SITE);
+  item.titleText = l10n_util::GetNSString(IDS_IOS_SHOW_PASSWORD_VIEW_SITES);
   item.detailTexts = passwordDetails.websites;
-  if (IsPasswordGroupingEnabled()) {
-    item.detailTextColor = [UIColor colorNamed:kTextSecondaryColor];
-    item.accessibilityTraits = UIAccessibilityTraitNotEnabled;
-  }
-
+  item.detailTextColor = [UIColor colorNamed:kTextSecondaryColor];
+  item.accessibilityTraits = UIAccessibilityTraitNotEnabled;
   return item;
 }
 
@@ -284,17 +314,24 @@ const int kMinNoteCharAmountForWarning = 901;
   // If password is missing (federated credential) don't allow to edit username.
   if (passwordDetails.credentialType != CredentialTypeFederation) {
     item.textFieldEnabled = self.tableView.editing;
-    item.hideIcon = !self.tableView.editing || IsPasswordGroupingEnabled();
     item.autoCapitalizationType = UITextAutocapitalizationTypeNone;
     item.delegate = self;
   } else {
     item.textFieldEnabled = NO;
-    item.hideIcon = YES;
   }
+  item.hideIcon = YES;
   item.textFieldPlaceholder = l10n_util::GetNSString(
       IDS_IOS_PASSWORD_SETTINGS_USERNAME_PLACEHOLDER_TEXT);
-  if (IsPasswordGroupingEnabled() && !self.tableView.editing) {
+  if (!self.tableView.editing) {
     item.textFieldTextColor = [UIColor colorNamed:kTextSecondaryColor];
+  }
+
+  // For testing: only use this custom accessibility identifier if there are
+  // more than one password shown on the Password Details.
+  if (_passwords.count > 1) {
+    item.customTextfieldAccessibilityIdentifier = [NSString
+        stringWithFormat:@"%@%@%@", kUsernameTextfieldForPasswordDetailsId,
+                         passwordDetails.username, passwordDetails.websites[0]];
   }
   return item;
 }
@@ -310,7 +347,7 @@ const int kMinNoteCharAmountForWarning = 901;
                             ? passwordDetails.password
                             : kMaskedPassword;
   item.textFieldEnabled = self.tableView.editing;
-  item.hideIcon = !self.tableView.editing || IsPasswordGroupingEnabled();
+  item.hideIcon = YES;
   item.autoCapitalizationType = UITextAutocapitalizationTypeNone;
   item.keyboardType = UIKeyboardTypeURL;
   item.returnKeyType = UIReturnKeyDone;
@@ -330,8 +367,16 @@ const int kMinNoteCharAmountForWarning = 901;
         [self isPasswordShown] ? IDS_IOS_SETTINGS_PASSWORD_HIDE_BUTTON
                                : IDS_IOS_SETTINGS_PASSWORD_SHOW_BUTTON);
   }
-  if (IsPasswordGroupingEnabled() && !self.tableView.editing) {
+  if (!self.tableView.editing) {
     item.textFieldTextColor = [UIColor colorNamed:kTextSecondaryColor];
+  }
+
+  // For testing: only use this custom accessibility identifier if there are
+  // more than one password shown on the Password Details.
+  if (_passwords.count > 1) {
+    item.customTextfieldAccessibilityIdentifier = [NSString
+        stringWithFormat:@"%@%@%@", kPasswordTextfieldForPasswordDetailsId,
+                         passwordDetails.username, passwordDetails.websites[0]];
   }
   return item;
 }
@@ -377,8 +422,30 @@ const int kMinNoteCharAmountForWarning = 901;
   item.detailText = l10n_util::GetNSString(
       IDS_IOS_CHANGE_COMPROMISED_PASSWORD_DESCRIPTION_BRANDED);
   item.image = [self compromisedIcon];
-  item.imageViewTintColor = [UIColor
-      colorNamed:IsPasswordGroupingEnabled() ? kRed500Color : kRedColor];
+  item.imageViewTintColor = [UIColor colorNamed:kRed500Color];
+  item.accessibilityIdentifier = kCompromisedWarningId;
+  return item;
+}
+
+- (TableViewTextItem*)dismissWarningItem {
+  TableViewTextItem* item = [[TableViewTextItem alloc]
+      initWithType:PasswordDetailsItemTypeDismissWarningButton];
+  item.text = l10n_util::GetNSString(IDS_IOS_DISMISS_WARNING);
+  item.textColor = self.tableView.editing
+                       ? [UIColor colorNamed:kTextSecondaryColor]
+                       : [UIColor colorNamed:kBlueColor];
+  item.accessibilityTraits = UIAccessibilityTraitButton;
+  return item;
+}
+
+- (TableViewTextItem*)restoreWarningItem {
+  TableViewTextItem* item = [[TableViewTextItem alloc]
+      initWithType:PasswordDetailsItemTypeRestoreWarningButton];
+  item.text = l10n_util::GetNSString(IDS_IOS_RESTORE_WARNING);
+  item.textColor = self.tableView.editing
+                       ? [UIColor colorNamed:kTextSecondaryColor]
+                       : [UIColor colorNamed:kBlueColor];
+  item.accessibilityTraits = UIAccessibilityTraitButton;
   return item;
 }
 
@@ -393,7 +460,7 @@ const int kMinNoteCharAmountForWarning = 901;
   item.accessibilityTraits = UIAccessibilityTraitButton;
   item.accessibilityIdentifier = [NSString
       stringWithFormat:@"%@%@%@", kDeleteButtonForPasswordDetailsId,
-                       passwordDetails.username, passwordDetails.password];
+                       passwordDetails.username, passwordDetails.websites[0]];
   return item;
 }
 
@@ -433,10 +500,9 @@ const int kMinNoteCharAmountForWarning = 901;
                forSection:(NSInteger)section {
   if ([view isKindOfClass:[TableViewTextHeaderFooterView class]]) {
     TableViewTextHeaderFooterView* footer =
-        base::mac::ObjCCastStrict<TableViewTextHeaderFooterView>(view);
-    int password = IsPasswordGroupingEnabled() ? section : 0;
+        base::apple::ObjCCastStrict<TableViewTextHeaderFooterView>(view);
     NSString* footerText =
-        self.passwordDetailsInfoItems[password].isNoteFooterShown
+        self.passwordDetailsInfoItems[section].isNoteFooterShown
             ? l10n_util::GetNSStringF(
                   IDS_IOS_SETTINGS_PASSWORDS_TOO_LONG_NOTE_DESCRIPTION,
                   base::NumberToString16(kMaxPasswordNoteLength))
@@ -462,7 +528,7 @@ const int kMinNoteCharAmountForWarning = 901;
         UITableViewCell* cell =
             [self.tableView cellForRowAtIndexPath:indexPath];
         TableViewTextEditCell* textFieldCell =
-            base::mac::ObjCCastStrict<TableViewTextEditCell>(cell);
+            base::apple::ObjCCastStrict<TableViewTextEditCell>(cell);
         [textFieldCell.textField becomeFirstResponder];
       } else {
         [self ensureContextMenuShownForItemType:itemType
@@ -476,7 +542,7 @@ const int kMinNoteCharAmountForWarning = 901;
         UITableViewCell* cell =
             [self.tableView cellForRowAtIndexPath:indexPath];
         TableViewTextEditCell* textFieldCell =
-            base::mac::ObjCCastStrict<TableViewTextEditCell>(cell);
+            base::apple::ObjCCastStrict<TableViewTextEditCell>(cell);
         [textFieldCell.textField becomeFirstResponder];
       } else {
         [self ensureContextMenuShownForItemType:itemType
@@ -487,20 +553,57 @@ const int kMinNoteCharAmountForWarning = 901;
     }
     case PasswordDetailsItemTypeChangePasswordButton:
       if (!self.tableView.editing) {
-        int passwordIndex = IsPasswordGroupingEnabled() ? indexPath.section : 0;
         DCHECK(self.applicationCommandsHandler);
-        DCHECK(self.passwords[passwordIndex].changePasswordURL.is_valid());
+        PasswordDetails* passwordDetails = self.passwords[indexPath.section];
+        DCHECK(passwordDetails.changePasswordURL.has_value());
+
+        CHECK(password_manager::ShouldRecordPasswordCheckUserAction(
+            passwordDetails.context, passwordDetails.compromised));
+
+        password_manager::LogChangePasswordOnWebsite(
+            GetWarningTypeForDetailsContext(passwordDetails.context));
+
         OpenNewTabCommand* command = [OpenNewTabCommand
-            commandWithURLFromChrome:self.passwords[passwordIndex]
-                                         .changePasswordURL];
-        UmaHistogramEnumeration("PasswordManager.BulkCheck.UserAction",
-                                PasswordCheckInteraction::kChangePassword);
+            commandWithURLFromChrome:passwordDetails.changePasswordURL.value()];
         [self.applicationCommandsHandler closeSettingsUIAndOpenURL:command];
       }
       break;
-    case PasswordDetailsItemTypeChangePasswordRecommendation:
+    case PasswordDetailsItemTypeNote: {
+      UITableViewCell* cell = [self.tableView cellForRowAtIndexPath:indexPath];
+      TableViewMultiLineTextEditCell* textFieldCell =
+          base::apple::ObjCCastStrict<TableViewMultiLineTextEditCell>(cell);
+      [textFieldCell.textView becomeFirstResponder];
+      break;
+    }
+    case PasswordDetailsItemTypeDismissWarningButton:
+      if (!self.tableView.editing) {
+        [self didTapDismissWarningButtonAtPasswordIndex:indexPath.section];
+        [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
+      }
+      break;
+    case PasswordDetailsItemTypeRestoreWarningButton:
+      if (!self.tableView.editing) {
+        [self didTapRestoreWarningButtonAtPasswordIndex:indexPath.section];
+        [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
+      }
+      break;
     case PasswordDetailsItemTypeDeleteButton:
+      if (self.tableView.editing) {
+        UITableViewCell* cell =
+            [self.tableView cellForRowAtIndexPath:indexPath];
+        [self didTapDeleteButton:cell atPasswordIndex:indexPath.section];
+        [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
+      }
+      break;
     case PasswordDetailsItemTypeMoveToAccountButton:
+      if (!self.tableView.editing) {
+        UITableViewCell* cell =
+            [self.tableView cellForRowAtIndexPath:indexPath];
+        [self moveCredentialToAccountStore:indexPath.section anchorView:cell];
+        [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
+      }
+      break;
+    case PasswordDetailsItemTypeChangePasswordRecommendation:
     case PasswordDetailsItemTypeMoveToAccountRecommendation:
       break;
   }
@@ -522,6 +625,8 @@ const int kMinNoteCharAmountForWarning = 901;
 - (void)ensureContextMenuShownForItemType:(NSInteger)itemType
                                 tableView:(UITableView*)tableView
                               atIndexPath:(NSIndexPath*)indexPath {
+  // TODO(crbug.com/1481223): Replace UIMenuController with
+  // UIEditMenuInteraction in iOS 16+.
   UIMenuController* menu = [UIMenuController sharedMenuController];
   if (![menu isMenuVisible]) {
     menu.menuItems = [self menuItemsForItemType:itemType];
@@ -533,21 +638,28 @@ const int kMinNoteCharAmountForWarning = 901;
 
 - (BOOL)tableView:(UITableView*)tableView
     shouldHighlightRowAtIndexPath:(NSIndexPath*)indexPath {
-  return !self.editing;
+  NSInteger itemType = [self.tableViewModel itemTypeForIndexPath:indexPath];
+  switch (itemType) {
+    case PasswordDetailsItemTypeWebsite:
+    case PasswordDetailsItemTypeFederation:
+    case PasswordDetailsItemTypeUsername:
+    case PasswordDetailsItemTypePassword:
+    case PasswordDetailsItemTypeChangePasswordButton:
+    case PasswordDetailsItemTypeMoveToAccountButton:
+      return !self.editing;
+    case PasswordDetailsItemTypeDeleteButton:
+    case PasswordDetailsItemTypeNote:
+      return self.editing;
+    case PasswordDetailsItemTypeChangePasswordRecommendation:
+    case PasswordDetailsItemTypeMoveToAccountRecommendation:
+      return NO;
+  }
+  return YES;
 }
 
 - (CGFloat)tableView:(UITableView*)tableView
     heightForFooterInSection:(NSInteger)section {
-  NSInteger sectionIdentifier =
-      [self.tableViewModel sectionIdentifierForSectionIndex:section];
-
-  if (IsPasswordGroupingEnabled() &&
-      !self.passwordDetailsInfoItems[section].isNoteFooterShown) {
-    return 0;
-  }
-
-  if (!IsPasswordGroupingEnabled() &&
-      sectionIdentifier == SectionIdentifierSite) {
+  if (!self.passwordDetailsInfoItems[section].isNoteFooterShown) {
     return 0;
   }
 
@@ -568,7 +680,7 @@ const int kMinNoteCharAmountForWarning = 901;
   switch (itemType) {
     case PasswordDetailsItemTypeUsername: {
       TableViewTextEditCell* textFieldCell =
-          base::mac::ObjCCastStrict<TableViewTextEditCell>(cell);
+          base::apple::ObjCCastStrict<TableViewTextEditCell>(cell);
       textFieldCell.textField.delegate = self;
       [textFieldCell.identifyingIconButton
                  addTarget:self
@@ -579,42 +691,51 @@ const int kMinNoteCharAmountForWarning = 901;
     }
     case PasswordDetailsItemTypePassword: {
       TableViewTextEditCell* textFieldCell =
-          base::mac::ObjCCastStrict<TableViewTextEditCell>(cell);
+          base::apple::ObjCCastStrict<TableViewTextEditCell>(cell);
       textFieldCell.textField.delegate = self;
       [textFieldCell.identifyingIconButton
                  addTarget:self
                     action:@selector(didTapShowHideButton:)
           forControlEvents:UIControlEventTouchUpInside];
-      [textFieldCell.identifyingIconButton setTag:indexPath.section];
+      textFieldCell.identifyingIconButton.tag = indexPath.section;
       break;
     }
-    case PasswordDetailsItemTypeChangePasswordRecommendation: {
+    case PasswordDetailsItemTypeChangePasswordRecommendation:
+    case PasswordDetailsItemTypeMoveToAccountRecommendation:
+    case PasswordDetailsItemTypeNote: {
       cell.selectionStyle = UITableViewCellSelectionStyleNone;
       break;
     }
-    case PasswordDetailsItemTypeDeleteButton: {
-      UITapGestureRecognizer* tapRecognizer = [[UITapGestureRecognizer alloc]
-          initWithTarget:self
-                  action:@selector(didTapDeleteButton:)];
-      tapRecognizer.delegate = self;
-      [cell addGestureRecognizer:tapRecognizer];
-      [cell setTag:indexPath.section];
-      break;
-    }
     case PasswordDetailsItemTypeMoveToAccountButton: {
-      UITapGestureRecognizer* tapRecognizer = [[UITapGestureRecognizer alloc]
-          initWithTarget:self
-                  action:@selector(didTapMoveButton:)];
-      tapRecognizer.delegate = self;
-      [cell addGestureRecognizer:tapRecognizer];
-      [cell setTag:indexPath.section];
+      // Record the "move to account offered" metric.
+      // 1) The metric mustn't be recorded for credentials that are not visible
+      // in the scroll view yet, so do it when the button cell is configured for
+      // display (the button, not the text that comes before).
+      // 2) The metric mustn't be recorded for the same credential again upon
+      // model changes, e.g. credential removed or moved to account. Such events
+      // reconfigure cells, so check if this username was already seen before
+      // recording. The username is the closest thing to a stable identifier of
+      // the credential. It can be edited, leading to a second recording, but
+      // that shouldn't happen often. This approach is good enough.
+      if (![self.usernamesWithMoveToAccountOfferRecorded
+              containsObject:self.passwords[indexPath.section].username]) {
+        [self.usernamesWithMoveToAccountOfferRecorded
+            addObject:self.passwords[indexPath.section].username];
+        // TODO(crbug.com/1392747): Use a common function for recording sites.
+        base::UmaHistogramEnumeration(
+            "PasswordManager.AccountStorage.MoveToAccountStoreFlowOffered",
+            password_manager::metrics_util::MoveToAccountStoreTrigger::
+                kExplicitlyTriggeredInSettings);
+      }
       break;
     }
-    case PasswordDetailsItemTypeNote:
     case PasswordDetailsItemTypeNoteFooter:
     case PasswordDetailsItemTypeWebsite:
     case PasswordDetailsItemTypeFederation:
     case PasswordDetailsItemTypeChangePasswordButton:
+    case PasswordDetailsItemTypeDismissWarningButton:
+    case PasswordDetailsItemTypeRestoreWarningButton:
+    case PasswordDetailsItemTypeDeleteButton:
       break;
   }
   return cell;
@@ -629,9 +750,28 @@ const int kMinNoteCharAmountForWarning = 901;
     case PasswordDetailsItemTypeUsername:
     case PasswordDetailsItemTypePassword:
     case PasswordDetailsItemTypeNote:
+    case PasswordDetailsItemTypeDeleteButton:
       return YES;
   }
   return NO;
+}
+
+#pragma mark - SettingsControllerProtocol
+
+- (void)reportDismissalUserAction {
+  base::RecordAction(
+      base::UserMetricsAction("MobilePasswordDetailsSettingsClose"));
+}
+
+- (void)reportBackUserAction {
+  base::RecordAction(
+      base::UserMetricsAction("MobilePasswordDetailsSettingsBack"));
+}
+
+- (void)settingsWillBeDismissed {
+  DCHECK(!_settingsAreDismissed);
+
+  _settingsAreDismissed = YES;
 }
 
 #pragma mark - PasswordDetailsConsumer
@@ -642,17 +782,18 @@ const int kMinNoteCharAmountForWarning = 901;
   _passwords = passwords;
   _pageTitle = title;
 
+  [self updateNavigationTitle];
+  // Update the model even if all passwords are deleted and the view controller
+  // will be dismissed. UIKit could still trigger events that execute CHECK in
+  // this file that would fail if `_passwords` and the model are not in sync.
+  [self reloadData];
+
   if (![passwords count]) {
     // onAllPasswordsDeleted() mustn't be called twice.
     if (hadPasswords) {
       [self.handler onAllPasswordsDeleted];
     }
-    return;
   }
-
-  [self updateNavigationTitle];
-
-  [self reloadData];
 }
 
 - (void)setIsBlockedSite:(BOOL)isBlockedSite {
@@ -661,6 +802,18 @@ const int kMinNoteCharAmountForWarning = 901;
 
 - (void)setUserEmail:(NSString*)userEmail {
   _userEmail = userEmail;
+}
+
+- (void)setupRightShareButton {
+  UIBarButtonItem* shareButton = [[UIBarButtonItem alloc]
+      initWithImage:DefaultSymbolWithPointSize(kShareSymbol,
+                                               kSymbolActionPointSize)
+              style:UIBarButtonItemStylePlain
+             target:self
+             action:@selector(onShareButtonPressed)];
+  shareButton.accessibilityIdentifier = kPasswordShareButtonId;
+  self.navigationItem.rightBarButtonItems =
+      @[ self.navigationItem.rightBarButtonItem, shareButton ];
 }
 
 #pragma mark - TableViewTextEditItemDelegate
@@ -701,23 +854,31 @@ const int kMinNoteCharAmountForWarning = 901;
   [self toggleNavigationBarRightButtonItem];
   [self reconfigureCellsForItems:@[ tableViewItem ]];
 
+  // Notify that the note character limit has been reached via VoiceOver.
+  if (!noteValid) {
+    NSString* tooLongNoteMessage = l10n_util::GetNSStringF(
+        IDS_IOS_SETTINGS_PASSWORDS_TOO_LONG_NOTE_DESCRIPTION,
+        base::NumberToString16(kMaxPasswordNoteLength));
+    UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification,
+                                    tooLongNoteMessage);
+  }
+
   BOOL shouldDisplayNoteFooter =
       tableViewItem.text.length >= kMinNoteCharAmountForWarning;
   NSIndexPath* indexPath = [self.tableViewModel
       indexPathForItem:static_cast<TableViewItem*>(tableViewItem)];
-  int passwordIndex = IsPasswordGroupingEnabled() ? indexPath.section : 0;
 
   // Refresh the cells' height and update note footer based on note's length.
   [self.tableView beginUpdates];
   if (shouldDisplayNoteFooter !=
-      self.passwordDetailsInfoItems[passwordIndex].isNoteFooterShown) {
-    self.passwordDetailsInfoItems[passwordIndex].isNoteFooterShown =
+      self.passwordDetailsInfoItems[indexPath.section].isNoteFooterShown) {
+    self.passwordDetailsInfoItems[indexPath.section].isNoteFooterShown =
         shouldDisplayNoteFooter;
 
     UITableViewHeaderFooterView* footer =
         [self.tableView footerViewForSection:indexPath.section];
     TableViewTextHeaderFooterView* textFooter =
-        base::mac::ObjCCastStrict<TableViewTextHeaderFooterView>(footer);
+        base::apple::ObjCCastStrict<TableViewTextHeaderFooterView>(footer);
     NSString* footerText =
         shouldDisplayNoteFooter
             ? l10n_util::GetNSStringF(
@@ -729,88 +890,18 @@ const int kMinNoteCharAmountForWarning = 901;
   [self.tableView endUpdates];
 }
 
-#pragma mark - SettingsRootTableViewController
-
-// Called when user tapped Delete button during editing. It means presented
-// password should be deleted.
-// TODO(crbug.com/1359392): Remove this toolbar delete button logic.
-- (void)deleteItems:(NSArray<NSIndexPath*>*)indexPaths {
-  // Remove this verification when it is implemented for password grouping.
-  if (!IsPasswordGroupingEnabled()) {
-    DCHECK(self.handler);
-    [self.handler showPasswordDeleteDialogWithPasswordDetails:self.passwords[0]
-                                                   anchorView:nil];
-  }
-}
-
-// TODO(crbug.com/1359392): Remove this override when kPasswordsGrouping flag is
-// removed.
-- (BOOL)shouldHideToolbar {
-  // When credentials are grouped, each credential section has its own Delete
-  // button displayed on editing mode, hence showing the toolbar with the Delete
-  // button is not necessary.
-  return IsPasswordGroupingEnabled() || !self.editing;
-}
-
 #pragma mark - Private
 
 // Applies tint colour and resizes image.
 - (UIImage*)compromisedIcon {
-  return DefaultSymbolTemplateWithPointSize(
-      IsPasswordGroupingEnabled() ? kErrorCircleFillSymbol : kWarningFillSymbol,
-      kRecommendationSymbolSize);
-}
-
-// Shows reauthentication dialog if needed. If the reauthentication is
-// successful reveals the password.
-- (void)attemptToShowPasswordFor:(ReauthenticationReason)reason {
-  // If password was already shown (before editing or copying) or the flag to
-  // override auth is YES, we don't need to request reauth again.
-  // With password notes feature enabled the authentication happens during
-  // navigation from the password list view to the password details view.
-  if (self.isPasswordShown || self.showPasswordWithoutAuth ||
-      IsPasswordNotesWithBackupEnabled()) {
-    [self showPasswordFor:reason];
-    return;
-  }
-
-  if ([self.reauthModule canAttemptReauth]) {
-    __weak __typeof(self) weakSelf = self;
-    void (^showPasswordHandler)(ReauthenticationResult) = ^(
-        ReauthenticationResult result) {
-      PasswordDetailsTableViewController* strongSelf = weakSelf;
-      if (!strongSelf) {
-        return;
-      }
-      [strongSelf logPasswordSettingsReauthResult:result];
-
-      if (result == ReauthenticationResult::kFailure) {
-        if (reason == ReauthenticationReasonCopy) {
-          [strongSelf
-               showToast:l10n_util::GetNSString(
-                             IDS_IOS_SETTINGS_PASSWORD_WAS_NOT_COPIED_MESSAGE)
-              forSuccess:NO];
-        }
-        return;
-      }
-
-      [strongSelf showPasswordFor:reason];
-    };
-
-    [self.reauthModule
-        attemptReauthWithLocalizedReason:[self localizedStringForReason:reason]
-                    canReusePreviousAuth:YES
-                                 handler:showPasswordHandler];
-  } else {
-    DCHECK(self.handler);
-    [self.handler showPasscodeDialog];
-  }
+  return DefaultSymbolTemplateWithPointSize(kErrorCircleFillSymbol,
+                                            kRecommendationSymbolSize);
 }
 
 // Reveals password to the user.
-- (void)showPasswordFor:(ReauthenticationReason)reason {
+- (void)showPasswordFor:(PasswordAccessReason)reason {
   switch (reason) {
-    case ReauthenticationReasonShow:
+    case PasswordAccessReasonShow: {
       self.passwordShown = YES;
       self.passwordDetailsInfoItems[_passwordIndexToReveal]
           .passwordTextItem.textFieldValue =
@@ -824,19 +915,24 @@ const int kMinNoteCharAmountForWarning = 901;
       [self reconfigureCellsForItems:@[
         self.passwordDetailsInfoItems[_passwordIndexToReveal].passwordTextItem
       ]];
-      if (self.passwords[_passwordIndexToReveal].compromised) {
-        UmaHistogramEnumeration("PasswordManager.BulkCheck.UserAction",
-                                PasswordCheckInteraction::kShowPassword);
+
+      PasswordDetails* passwordDetails = self.passwords[_passwordIndexToReveal];
+      DetailsContext detailsContext = passwordDetails.context;
+      // When details was opened from the Password Manager, only log password
+      // check actions if the password is compromised.
+      if (password_manager::ShouldRecordPasswordCheckUserAction(
+              detailsContext, passwordDetails.compromised)) {
+        password_manager::LogRevealPassword(
+            GetWarningTypeForDetailsContext(detailsContext));
       }
       break;
-    case ReauthenticationReasonCopy: {
-      UIPasteboard* generalPasteboard = [UIPasteboard generalPasteboard];
-
-      generalPasteboard.string =
-          self.passwords[IsPasswordGroupingEnabled()
-                             ? self.tableView.indexPathForSelectedRow.section
-                             : 0]
+    }
+    case PasswordAccessReasonCopy: {
+      NSString* copiedString =
+          self.passwords[self.tableView.indexPathForSelectedRow.section]
               .password;
+      StoreTextInPasteboard(copiedString);
+
       [self showToast:l10n_util::GetNSString(
                           IDS_IOS_SETTINGS_PASSWORD_WAS_COPIED_MESSAGE)
            forSuccess:YES];
@@ -844,28 +940,13 @@ const int kMinNoteCharAmountForWarning = 901;
       [self.handler onPasswordCopiedByUser];
       break;
     }
-    case ReauthenticationReasonEdit:
+    case PasswordAccessReasonEdit:
       // Called super because we want to update only `tableView.editing`.
       [super editButtonPressed];
       [self reloadData];
       break;
   }
   [self logPasswordAccessWith:reason];
-}
-
-// Returns localized reason for reauthentication dialog.
-- (NSString*)localizedStringForReason:(ReauthenticationReason)reason {
-  switch (reason) {
-    case ReauthenticationReasonShow:
-      return l10n_util::GetNSString(
-          IDS_IOS_SETTINGS_PASSWORD_REAUTH_REASON_SHOW);
-    case ReauthenticationReasonCopy:
-      return l10n_util::GetNSString(
-          IDS_IOS_SETTINGS_PASSWORD_REAUTH_REASON_COPY);
-    case ReauthenticationReasonEdit:
-      return l10n_util::GetNSString(
-          IDS_IOS_SETTINGS_PASSWORD_REAUTH_REASON_EDIT);
-  }
 }
 
 // Shows a snack bar with `message` and provides haptic feedback. The haptic
@@ -884,25 +965,6 @@ const int kMinNoteCharAmountForWarning = 901;
     [self.tableView
         deselectRowAtIndexPath:[self.tableView indexPathForSelectedRow]
                       animated:YES];
-  }
-}
-
-- (BOOL)isItemAtIndexPathTextEditCell:(NSIndexPath*)cellPath {
-  NSInteger itemType = [self.tableViewModel itemTypeForIndexPath:cellPath];
-  switch (static_cast<PasswordDetailsItemType>(itemType)) {
-    case PasswordDetailsItemTypeUsername:
-    case PasswordDetailsItemTypePassword:
-    case PasswordDetailsItemTypeNote:
-      return YES;
-    case PasswordDetailsItemTypeWebsite:
-    case PasswordDetailsItemTypeFederation:
-    case PasswordDetailsItemTypeChangePasswordButton:
-    case PasswordDetailsItemTypeChangePasswordRecommendation:
-    case PasswordDetailsItemTypeDeleteButton:
-    case PasswordDetailsItemTypeMoveToAccountButton:
-    case PasswordDetailsItemTypeMoveToAccountRecommendation:
-    case PasswordDetailsItemTypeNoteFooter:
-      return NO;
   }
 }
 
@@ -994,20 +1056,13 @@ const int kMinNoteCharAmountForWarning = 901;
   return NO;
 }
 
-- (BOOL)fieldsDidChange {
+- (BOOL)passwordsDidChange {
   DCHECK(self.passwords.count == self.passwordDetailsInfoItems.count);
 
   for (NSUInteger i = 0; i < self.passwordDetailsInfoItems.count; i++) {
     if (![self.passwords[i].password
             isEqualToString:self.passwordDetailsInfoItems[i]
-                                .passwordTextItem.textFieldValue] ||
-        ![self.passwords[i].username
-            isEqualToString:self.passwordDetailsInfoItems[i]
-                                .usernameTextItem.textFieldValue] ||
-        (IsPasswordNotesWithBackupEnabled() &&
-         ![self.passwords[i].note
-             isEqualToString:self.passwordDetailsInfoItems[i]
-                                 .passwordNoteItem.text])) {
+                                .passwordTextItem.textFieldValue]) {
       return YES;
     }
   }
@@ -1016,8 +1071,10 @@ const int kMinNoteCharAmountForWarning = 901;
 
 // Updates the title displayed in the navigation bar.
 - (void)updateNavigationTitle {
-  if (!self.pageTitle || self.pageTitle.length == 0) {
-    self.pageTitle = self.passwords[0].origins[0];
+  if (self.pageTitle.length == 0) {
+    // When no pageTitle is supplied, use origin of first password.
+    PasswordDetails* firstPassword = self.passwords.firstObject;
+    self.pageTitle = firstPassword.origins.firstObject;
   }
   _titleLabel.text = self.pageTitle;
 }
@@ -1034,7 +1091,6 @@ const int kMinNoteCharAmountForWarning = 901;
   NSInteger sectionForCompromisedInfo;
   NSInteger sectionForMoveCredential;
 
-  if (IsPasswordGroupingEnabled()) {
     // Password details are displayed in its own section when Grouping is
     // enabled.
     NSInteger nextSection =
@@ -1045,32 +1101,15 @@ const int kMinNoteCharAmountForWarning = 901;
     sectionForPassword = nextSection;
     sectionForCompromisedInfo = nextSection;
     sectionForMoveCredential = nextSection;
-  } else {
-    // Password details fields are displayed in separate sections when Grouping
-    // is not enabled.
-    sectionForWebsite = SectionIdentifierSite;
-    sectionForPassword = SectionIdentifierPassword;
-    sectionForCompromisedInfo = SectionIdentifierCompromisedInfo;
-    sectionForMoveCredential = SectionIdentifierMoveToAccount;
 
-    [model addSectionWithIdentifier:SectionIdentifierSite];
-    [model addSectionWithIdentifier:SectionIdentifierPassword];
-    if (passwordDetails.compromised) {
-      [model addSectionWithIdentifier:SectionIdentifierCompromisedInfo];
-    }
-    if (passwordDetails.shouldOfferToMoveToAccount) {
-      [model addSectionWithIdentifier:SectionIdentifierMoveToAccount];
-    }
-  }
+    // Add sites to section.
+    passwordItem.websiteItem =
+        [self websiteItemForPasswordDetails:passwordDetails];
+    [model addItem:passwordItem.websiteItem
+        toSectionWithIdentifier:sectionForWebsite];
 
-  // Add sites to section.
-  passwordItem.websiteItem =
-      [self websiteItemForPasswordDetails:passwordDetails];
-  [model addItem:passwordItem.websiteItem
-      toSectionWithIdentifier:sectionForWebsite];
-
-  // Add username and password to section according to credential type.
-  switch (passwordDetails.credentialType) {
+    // Add username and password to section according to credential type.
+    switch (passwordDetails.credentialType) {
     case CredentialTypeRegular: {
       passwordItem.usernameTextItem =
           [self usernameItemForPasswordDetails:passwordDetails];
@@ -1082,34 +1121,41 @@ const int kMinNoteCharAmountForWarning = 901;
       [model addItem:passwordItem.passwordTextItem
           toSectionWithIdentifier:sectionForPassword];
 
-      if (IsPasswordNotesWithBackupEnabled()) {
-        passwordItem.passwordNoteItem =
-            [self noteItemForPasswordDetails:passwordDetails];
-        [model addItem:passwordItem.passwordNoteItem
-            toSectionWithIdentifier:sectionForPassword];
+      passwordItem.passwordNoteItem =
+          [self noteItemForPasswordDetails:passwordDetails];
+      [model addItem:passwordItem.passwordNoteItem
+          toSectionWithIdentifier:sectionForPassword];
 
-        passwordItem.isNoteFooterShown =
-            self.tableView.editing &&
-            passwordItem.passwordNoteItem.text.length >=
-                kMinNoteCharAmountForWarning;
-        TableViewTextHeaderFooterItem* footer =
-            [[TableViewTextHeaderFooterItem alloc]
-                initWithType:PasswordDetailsItemTypeNoteFooter];
-        footer.subtitle =
-            passwordItem.isNoteFooterShown
-                ? l10n_util::GetNSStringF(
-                      IDS_IOS_SETTINGS_PASSWORDS_TOO_LONG_NOTE_DESCRIPTION,
-                      base::NumberToString16(kMaxPasswordNoteLength))
-                : @"";
-        [model setFooter:footer forSectionWithIdentifier:sectionForPassword];
-      }
+      passwordItem.isNoteFooterShown =
+          self.tableView.editing && passwordItem.passwordNoteItem.text.length >=
+                                        kMinNoteCharAmountForWarning;
+      TableViewTextHeaderFooterItem* footer =
+          [[TableViewTextHeaderFooterItem alloc]
+              initWithType:PasswordDetailsItemTypeNoteFooter];
+      footer.subtitle =
+          passwordItem.isNoteFooterShown
+              ? l10n_util::GetNSStringF(
+                    IDS_IOS_SETTINGS_PASSWORDS_TOO_LONG_NOTE_DESCRIPTION,
+                    base::NumberToString16(kMaxPasswordNoteLength))
+              : @"";
+      [model setFooter:footer forSectionWithIdentifier:sectionForPassword];
 
-      if (passwordDetails.isCompromised) {
+      if (passwordDetails.isCompromised || passwordDetails.isMuted) {
         [model addItem:[self changePasswordRecommendationItem]
             toSectionWithIdentifier:sectionForCompromisedInfo];
 
-        if (passwordDetails.changePasswordURL.is_valid()) {
+        if (passwordDetails.changePasswordURL.has_value()) {
           [model addItem:[self changePasswordItem]
+              toSectionWithIdentifier:sectionForCompromisedInfo];
+        }
+
+        if (ShouldAllowToDismissWarning(passwordDetails.context,
+                                        passwordDetails.compromised)) {
+          [model addItem:[self dismissWarningItem]
+              toSectionWithIdentifier:sectionForCompromisedInfo];
+        } else if (ShouldAllowToRestoreWarning(passwordDetails.context,
+                                               passwordDetails.muted)) {
+          [model addItem:[self restoreWarningItem]
               toSectionWithIdentifier:sectionForCompromisedInfo];
         }
       }
@@ -1139,7 +1185,7 @@ const int kMinNoteCharAmountForWarning = 901;
         toSectionWithIdentifier:sectionForMoveCredential];
   }
 
-  if (IsPasswordGroupingEnabled() && self.tableView.editing) {
+  if (self.tableView.editing) {
     [model addItem:[self deleteButtonItemForPasswordDetails:passwordDetails]
         toSectionWithIdentifier:sectionForPassword];
   }
@@ -1172,7 +1218,9 @@ const int kMinNoteCharAmountForWarning = 901;
 // Starts the timer after passing an authentication to open password details
 // view or extends it on an interaction with the details view.
 - (void)setOrExtendAuthValidityTimer {
-  if (!IsPasswordNotesWithBackupEnabled()) {
+  // With Auth on Entry V2 instead of kicking the user out, we block the surface
+  // and request for authentication on app switch or device lock.
+  if (IsAuthOnEntryV2Enabled()) {
     return;
   }
 
@@ -1186,6 +1234,34 @@ const int kMinNoteCharAmountForWarning = 901;
                              repeats:NO];
 }
 
+- (void)onShareButtonPressed {
+  CHECK(self.handler);
+  [self.handler onShareButtonPressed];
+}
+
+#pragma mark - AutofillEditTableViewController
+
+- (BOOL)isItemAtIndexPathTextEditCell:(NSIndexPath*)cellPath {
+  NSInteger itemType = [self.tableViewModel itemTypeForIndexPath:cellPath];
+  switch (static_cast<PasswordDetailsItemType>(itemType)) {
+    case PasswordDetailsItemTypeUsername:
+    case PasswordDetailsItemTypePassword:
+      return YES;
+    case PasswordDetailsItemTypeWebsite:
+    case PasswordDetailsItemTypeFederation:
+    case PasswordDetailsItemTypeChangePasswordButton:
+    case PasswordDetailsItemTypeChangePasswordRecommendation:
+    case PasswordDetailsItemTypeDismissWarningButton:
+    case PasswordDetailsItemTypeRestoreWarningButton:
+    case PasswordDetailsItemTypeDeleteButton:
+    case PasswordDetailsItemTypeMoveToAccountButton:
+    case PasswordDetailsItemTypeMoveToAccountRecommendation:
+    case PasswordDetailsItemTypeNoteFooter:
+    case PasswordDetailsItemTypeNote:
+      return NO;
+  }
+}
+
 #pragma mark - Actions
 
 // Called when the user tapped on the show/hide button near password.
@@ -1193,9 +1269,7 @@ const int kMinNoteCharAmountForWarning = 901;
   [self setOrExtendAuthValidityTimer];
   [self.tableView deselectRowAtIndexPath:self.tableView.indexPathForSelectedRow
                                 animated:NO];
-  if (IsPasswordGroupingEnabled()) {
-    _passwordIndexToReveal = [buttonView tag];
-  }
+  _passwordIndexToReveal = [buttonView tag];
 
   if (self.isPasswordShown) {
     self.passwordShown = NO;
@@ -1212,7 +1286,9 @@ const int kMinNoteCharAmountForWarning = 901;
       self.passwordDetailsInfoItems[_passwordIndexToReveal].passwordTextItem
     ]];
   } else {
-    [self attemptToShowPasswordFor:ReauthenticationReasonShow];
+    [self showPasswordFor:PasswordAccessReasonShow];
+    base::RecordAction(
+        base::UserMetricsAction("MobilePasswordDetailsViewPassword"));
   }
 }
 
@@ -1257,11 +1333,13 @@ const int kMinNoteCharAmountForWarning = 901;
 // Copies the password information to system pasteboard and shows a toast of
 // success/failure.
 - (void)copyPasswordDetails:(id)sender {
+  base::RecordAction(base::UserMetricsAction("MobilePasswordDetailsCopy"));
+
   [self setOrExtendAuthValidityTimer];
-  UIPasteboard* generalPasteboard = [UIPasteboard generalPasteboard];
-  UIMenuController* menu = base::mac::ObjCCastStrict<UIMenuController>(sender);
+  UIMenuController* menu =
+      base::apple::ObjCCastStrict<UIMenuController>(sender);
   PasswordDetailsMenuItem* menuItem =
-      base::mac::ObjCCastStrict<PasswordDetailsMenuItem>(
+      base::apple::ObjCCastStrict<PasswordDetailsMenuItem>(
           menu.menuItems.firstObject);
 
   NSString* message = nil;
@@ -1269,16 +1347,10 @@ const int kMinNoteCharAmountForWarning = 901;
   switch (menuItem.itemType) {
     case PasswordDetailsItemTypeWebsite: {
       PasswordDetails* detailsToCopy;
-      if (IsPasswordGroupingEnabled()) {
-        detailsToCopy =
-            self.passwords[self.tableView.indexPathForSelectedRow.section];
-        message =
-            l10n_util::GetNSString(IDS_IOS_SETTINGS_SITES_WERE_COPIED_MESSAGE);
-      } else {
-        message =
-            l10n_util::GetNSString(IDS_IOS_SETTINGS_SITE_WAS_COPIED_MESSAGE);
-        detailsToCopy = self.passwords.firstObject;
-      }
+      detailsToCopy =
+          self.passwords[self.tableView.indexPathForSelectedRow.section];
+      message =
+          l10n_util::GetNSString(IDS_IOS_SETTINGS_SITES_WERE_COPIED_MESSAGE);
       // Copy websites to pasteboard separated by a whitespace.
       NSArray<NSString*>* websites = detailsToCopy.websites;
       NSMutableString* websitesForPasteboard =
@@ -1287,90 +1359,67 @@ const int kMinNoteCharAmountForWarning = 901;
       for (NSUInteger index = 1U; index < websites.count; index++) {
         [websitesForPasteboard appendFormat:@" %@", websites[index]];
       }
-
-      generalPasteboard.string = websitesForPasteboard;
+      StoreTextInPasteboard(websitesForPasteboard);
       break;
     }
-    case PasswordDetailsItemTypeUsername:
-      generalPasteboard.string =
-          self.passwords[IsPasswordGroupingEnabled()
-                             ? self.tableView.indexPathForSelectedRow.section
-                             : 0]
+    case PasswordDetailsItemTypeUsername: {
+      NSString* copiedString =
+          self.passwords[self.tableView.indexPathForSelectedRow.section]
               .username;
+
+      StoreTextInPasteboard(copiedString);
       message =
           l10n_util::GetNSString(IDS_IOS_SETTINGS_USERNAME_WAS_COPIED_MESSAGE);
       break;
-    case PasswordDetailsItemTypeFederation:
-      generalPasteboard.string =
-          self.passwords[IsPasswordGroupingEnabled()
-                             ? self.tableView.indexPathForSelectedRow.section
-                             : 0]
+    }
+    case PasswordDetailsItemTypeFederation: {
+      NSString* copiedString =
+          self.passwords[self.tableView.indexPathForSelectedRow.section]
               .federation;
-      [self logCopyPasswordDetailsFailure:NO];
+      StoreTextInPasteboard(copiedString);
       return;
-    case PasswordDetailsItemTypePassword:
-      [self attemptToShowPasswordFor:ReauthenticationReasonCopy];
-      [self logCopyPasswordDetailsFailure:NO];
+    }
+    case PasswordDetailsItemTypePassword: {
+      [self showPasswordFor:PasswordAccessReasonCopy];
       return;
+    }
   }
 
   if (message.length) {
-    [self logCopyPasswordDetailsFailure:NO];
     [self showToast:message forSuccess:YES];
-  } else {
-    // TODO(crbug.com/1359331): There's a bug that is caused by `menu` being
-    // nil, which leads to a nil message and a crash. Avoiding the crash and
-    // logging for monitoring the issue. Since `menu` is an instance of
-    // `UIMenuController` which is deprecated on iOS 16, this crash should go
-    // away once we switch to `UIEditMenuInteraction`.
-    [self logCopyPasswordDetailsFailure:YES];
   }
 }
 
-- (void)didTapDeleteButton:(UIGestureRecognizer*)gestureRecognizer {
-  UIView* view = gestureRecognizer.view;
-  int position = view.tag;
-  DCHECK(position >= 0);
-  DCHECK(self.handler);
+- (void)didTapDismissWarningButtonAtPasswordIndex:(NSUInteger)passwordIndex {
+  CHECK(passwordIndex >= 0 && passwordIndex < self.passwords.count);
+  CHECK(self.delegate);
+
+  password_manager::LogMuteCompromisedWarning();
+
+  [self.delegate dismissWarningForPassword:self.passwords[passwordIndex]];
+}
+
+- (void)didTapRestoreWarningButtonAtPasswordIndex:(NSUInteger)passwordIndex {
+  CHECK(passwordIndex >= 0 && passwordIndex < self.passwords.count);
+  CHECK(self.delegate);
+
+  password_manager::LogUnmuteCompromisedWarning();
+
+  [self.delegate restoreWarningForCurrentPassword];
+}
+
+- (void)didTapDeleteButton:(UITableViewCell*)cell
+           atPasswordIndex:(NSUInteger)passwordIndex {
+  CHECK(passwordIndex >= 0 && passwordIndex < self.passwords.count);
+  CHECK(self.handler);
   [self.handler
-      showPasswordDeleteDialogWithPasswordDetails:self.passwords[position]
-                                       anchorView:view];
+      showPasswordDeleteDialogWithPasswordDetails:self.passwords[passwordIndex]
+                                       anchorView:cell];
 }
 
-- (void)didTapMoveButton:(UIGestureRecognizer*)gestureRecognizer {
-  [self setOrExtendAuthValidityTimer];
-  UIView* view = gestureRecognizer.view;
-  // Only one password at position 0 shows if no grouping applied.
-  int passwordIndex = IsPasswordGroupingEnabled() ? view.tag : 0;
-
-  // With password notes feature enabled the authentication happens during
-  // navigation from the password list view to the password details view.
-  if (IsPasswordNotesWithBackupEnabled()) {
-    [self moveCredentialToAccountStore:passwordIndex anchorView:view];
-    return;
-  }
-
-  if (![self.reauthModule canAttemptReauth]) {
-    return;
-  }
-  __weak __typeof(self) weakSelf = self;
-  void (^movePasswordHandler)(ReauthenticationResult) =
-      ^(ReauthenticationResult result) {
-        PasswordDetailsTableViewController* strongSelf = weakSelf;
-        if (!strongSelf) {
-          return;
-        }
-        if (result == ReauthenticationResult::kFailure) {
-          return;
-        }
-
-        [self moveCredentialToAccountStore:passwordIndex anchorView:view];
-      };
-  [self.reauthModule
-      attemptReauthWithLocalizedReason:
-          l10n_util::GetNSString(IDS_IOS_AUTH_TO_SAVE_PASSWORD_TO_ACCOUNT_STORE)
-                  canReusePreviousAuth:YES
-                               handler:movePasswordHandler];
+- (void)dismissView {
+  [self.view endEditing:YES];
+  [self.handler dismissPasswordDetailsTableViewController];
 }
 
 #pragma mark - UIResponder
@@ -1388,48 +1437,27 @@ const int kMinNoteCharAmountForWarning = 901;
 
 #pragma mark - Metrics
 
-// Logs metrics for the given reauthentication `result` (success, failure or
-// skipped).
-- (void)logPasswordSettingsReauthResult:(ReauthenticationResult)result {
-  switch (result) {
-    case ReauthenticationResult::kSuccess:
-      LogPasswordSettingsReauthResult(ReauthResult::kSuccess);
-      break;
-    case ReauthenticationResult::kFailure:
-      LogPasswordSettingsReauthResult(ReauthResult::kFailure);
-      break;
-    case ReauthenticationResult::kSkipped:
-      LogPasswordSettingsReauthResult(ReauthResult::kSkipped);
-      break;
-  }
-}
-
-- (void)logPasswordAccessWith:(ReauthenticationReason)reason {
+- (void)logPasswordAccessWith:(PasswordAccessReason)reason {
   switch (reason) {
-    case ReauthenticationReasonShow:
+    case PasswordAccessReasonShow:
       UMA_HISTOGRAM_ENUMERATION(
           "PasswordManager.AccessPasswordInSettings",
           password_manager::metrics_util::ACCESS_PASSWORD_VIEWED,
           password_manager::metrics_util::ACCESS_PASSWORD_COUNT);
       break;
-    case ReauthenticationReasonCopy:
+    case PasswordAccessReasonCopy:
       UMA_HISTOGRAM_ENUMERATION(
           "PasswordManager.AccessPasswordInSettings",
           password_manager::metrics_util::ACCESS_PASSWORD_COPIED,
           password_manager::metrics_util::ACCESS_PASSWORD_COUNT);
       break;
-    case ReauthenticationReasonEdit:
+    case PasswordAccessReasonEdit:
       UMA_HISTOGRAM_ENUMERATION(
           "PasswordManager.AccessPasswordInSettings",
           password_manager::metrics_util::ACCESS_PASSWORD_EDITED,
           password_manager::metrics_util::ACCESS_PASSWORD_COUNT);
       break;
   }
-}
-
-- (void)logCopyPasswordDetailsFailure:(BOOL)failure {
-  base::UmaHistogramBoolean(
-      "PasswordManager.iOS.PasswordDetails.CopyDetailsFailed", failure);
 }
 
 - (void)logChangeBetweenOldNote:(NSString*)oldNote
@@ -1452,26 +1480,32 @@ const int kMinNoteCharAmountForWarning = 901;
 - (void)passwordEditingConfirmed {
   DCHECK(self.passwords.count == self.passwordDetailsInfoItems.count);
   for (NSUInteger i = 0; i < self.passwordDetailsInfoItems.count; i++) {
-    NSString* oldUsername = self.passwords[i].username;
-    NSString* oldPassword = self.passwords[i].password;
-    NSString* oldNote = self.passwords[i].note;
-    self.passwords[i].username =
-        self.passwordDetailsInfoItems[i].usernameTextItem.textFieldValue;
-    self.passwords[i].password =
-        self.passwordDetailsInfoItems[i].passwordTextItem.textFieldValue;
-    if (IsPasswordNotesWithBackupEnabled()) {
-      self.passwords[i].note =
-          self.passwordDetailsInfoItems[i].passwordNoteItem.text;
-      [self logChangeBetweenOldNote:oldNote currentNote:self.passwords[i].note];
-    }
+    PasswordDetails* password = self.passwords[i];
+    NSString* oldUsername = password.username;
+    NSString* oldPassword = password.password;
+    NSString* oldNote = password.note;
+
+    PasswordDetailsInfoItem* passwordDetailsInfoItem =
+        self.passwordDetailsInfoItems[i];
+    password.username = passwordDetailsInfoItem.usernameTextItem.textFieldValue;
+    password.password = passwordDetailsInfoItem.passwordTextItem.textFieldValue;
+      password.note = passwordDetailsInfoItem.passwordNoteItem.text;
+      [self logChangeBetweenOldNote:oldNote currentNote:password.note];
     [self.delegate passwordDetailsViewController:self
-                          didEditPasswordDetails:self.passwords[i]
+                          didEditPasswordDetails:password
                                  withOldUsername:oldUsername
                                      oldPassword:oldPassword
                                          oldNote:oldNote];
-    if (self.passwords[i].compromised) {
-      UmaHistogramEnumeration("PasswordManager.BulkCheck.UserAction",
-                              PasswordCheckInteraction::kEditPassword);
+
+    if (oldUsername != password.username || oldPassword != password.password) {
+      DetailsContext detailsContext = password.context;
+      // When details was opened from the Password Manager, only log password
+      // check actions if the password is compromised.
+      if (password_manager::ShouldRecordPasswordCheckUserAction(
+              detailsContext, password.compromised)) {
+        password_manager::LogEditPassword(
+            GetWarningTypeForDetailsContext(detailsContext));
+      }
     }
   }
   [self.delegate didFinishEditingPasswordDetails];
@@ -1482,6 +1516,15 @@ const int kMinNoteCharAmountForWarning = 901;
 - (void)showEditViewWithoutAuthentication {
   self.showPasswordWithoutAuth = YES;
   [self editButtonPressed];
+}
+
+- (void)setupLeftCancelButton {
+  UIBarButtonItem* cancelButton = [[UIBarButtonItem alloc]
+      initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
+                           target:self
+                           action:@selector(dismissView)];
+  self.backButtonItem = cancelButton;
+  self.navigationItem.leftBarButtonItem = self.backButtonItem;
 }
 
 @end

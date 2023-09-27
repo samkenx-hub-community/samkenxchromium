@@ -123,9 +123,11 @@ public class FakeAccountManagerFacade implements AccountManagerFacade {
     }
 
     @Override
-    public AccessTokenData getAccessToken(Account account, String scope) throws AuthException {
+    public AccessTokenData getAccessToken(CoreAccountInfo coreAccountInfo, String scope)
+            throws AuthException {
         synchronized (mLock) {
-            AccountHolder accountHolder = getAccountHolder(account);
+            AccountHolder accountHolder = getAccountHolder(
+                    AccountUtils.createAccountFromName(coreAccountInfo.getEmail()));
             if (accountHolder.getAuthToken(scope) == null) {
                 accountHolder.updateAuthToken(scope, UUID.randomUUID().toString());
             }
@@ -171,6 +173,11 @@ public class FakeAccountManagerFacade implements AccountManagerFacade {
     @Override
     public String getAccountGaiaId(String accountEmail) {
         return toGaiaId(accountEmail);
+    }
+
+    @Override
+    public void confirmCredentials(Account account, Activity activity, Callback<Bundle> callback) {
+        callback.onResult(new Bundle());
     }
 
     /**
@@ -281,7 +288,6 @@ public class FakeAccountManagerFacade implements AccountManagerFacade {
     @MainThread
     private void fireOnAccountsChangedNotification() {
         for (AccountsChangeObserver observer : mObservers) {
-            observer.onAccountsChanged();
             observer.onCoreAccountInfosChanged();
         }
     }

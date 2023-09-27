@@ -10,8 +10,8 @@
 #include "chrome/browser/autofill/personal_data_manager_factory.h"
 #include "chrome/browser/fast_checkout/fast_checkout_client_impl.h"
 #include "chrome/browser/fast_checkout/fast_checkout_features.h"
+#include "chrome/browser/plus_addresses/plus_address_service_factory.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
-#include "components/autofill/content/browser/content_autofill_router.h"
 #include "components/autofill/content/browser/test_autofill_client_injector.h"
 #include "components/autofill/content/browser/test_autofill_driver_injector.h"
 #include "components/autofill/content/browser/test_autofill_manager_injector.h"
@@ -19,63 +19,84 @@
 #include "components/autofill/core/browser/test_autofill_clock.h"
 #include "components/autofill/core/browser/test_browser_autofill_manager.h"
 #include "components/autofill/core/browser/test_personal_data_manager.h"
+#include "components/autofill/core/browser/ui/mock_fast_checkout_client.h"
 #include "components/autofill/core/common/form_interactions_flow.h"
+#include "components/plus_addresses/features.h"
 #include "components/prefs/pref_service.h"
 #include "components/unified_consent/pref_names.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
-using base::test::ScopedFeatureList;
+#if BUILDFLAG(IS_ANDROID)
+#include "chrome/browser/ui/android/autofill/autofill_save_card_bottom_sheet_bridge.h"
+#include "components/autofill/core/browser/payments/autofill_save_card_delegate.h"
+#include "components/autofill/core/browser/payments/autofill_save_card_ui_info.h"
+#endif
 
 namespace autofill {
 namespace {
+
+using ::testing::InSequence;
+
+#if BUILDFLAG(IS_ANDROID)
+class MockAutofillSaveCardBottomSheetBridge
+    : public AutofillSaveCardBottomSheetBridge {
+ public:
+  MockAutofillSaveCardBottomSheetBridge()
+      : AutofillSaveCardBottomSheetBridge(
+            base::android::ScopedJavaGlobalRef<jobject>(nullptr)) {}
+
+  MOCK_METHOD(void,
+              RequestShowContent,
+              (const AutofillSaveCardUiInfo&,
+               std::unique_ptr<AutofillSaveCardDelegate>),
+              (override));
+};
+#endif
 
 // Exposes the protected constructor.
 class TestChromeAutofillClient : public ChromeAutofillClient {
  public:
   explicit TestChromeAutofillClient(content::WebContents* web_contents)
       : ChromeAutofillClient(web_contents) {}
-};
 
 #if BUILDFLAG(IS_ANDROID)
-class MockFastCheckoutClient : public FastCheckoutClientImpl {
- public:
-  explicit MockFastCheckoutClient(content::WebContents* web_contents)
-      : FastCheckoutClientImpl(web_contents) {}
-  ~MockFastCheckoutClient() override = default;
+  MockFastCheckoutClient* GetFastCheckoutClient() override {
+    return &fast_checkout_client_;
+  }
 
-  MOCK_METHOD(bool,
-              TryToStart,
-              (const GURL&,
-               const FormData&,
-               const FormFieldData&,
-               base::WeakPtr<AutofillManager>),
-              (override));
-  MOCK_METHOD(void, Stop, (bool reset), (override));
-  MOCK_METHOD(bool, IsRunning, (), (const override));
-  MOCK_METHOD(bool, IsShowing, (), (const override));
-};
+  // Inject a new MockAutofillSaveCardBottomSheetBridge.
+  // Returns a pointer to the mock.
+  MockAutofillSaveCardBottomSheetBridge*
+  InjectMockAutofillSaveCardBottomSheetBridge() {
+    auto mock = std::make_unique<MockAutofillSaveCardBottomSheetBridge>();
+    auto* pointer = mock.get();
+    SetAutofillSaveCardBottomSheetBridgeForTesting(std::move(mock));
+    return pointer;
+  }
+
+  MockFastCheckoutClient fast_checkout_client_;
+  base::test::ScopedFeatureList scoped_feature_list_;
 #endif
+};
 
 class ChromeAutofillClientTest : public ChromeRenderViewHostTestHarness {
  public:
   void SetUp() override {
     ChromeRenderViewHostTestHarness::SetUp();
     PreparePersonalDataManager();
-#if BUILDFLAG(IS_ANDROID)
-    auto fast_checkout_client =
-        std::make_unique<MockFastCheckoutClient>(web_contents());
-    fast_checkout_client_ = fast_checkout_client.get();
-    const void* key =
-        content::WebContentsUserData<FastCheckoutClientImpl>::UserDataKey();
-    web_contents()->SetUserData(key, std::move(fast_checkout_client));
-#endif
     // Creates the AutofillDriver and AutofillManager.
     NavigateAndCommit(GURL("about:blank"));
   }
 
+  void TearDown() override {
+    // Avoid that the raw pointer becomes dangling.
+    personal_data_manager_ = nullptr;
+    ChromeRenderViewHostTestHarness::TearDown();
+  }
+
  protected:
-  ChromeAutofillClient* client() {
+  TestChromeAutofillClient* client() {
     return test_autofill_client_injector_[web_contents()];
   }
 
@@ -90,12 +111,6 @@ class ChromeAutofillClientTest : public ChromeRenderViewHostTestHarness {
   TestBrowserAutofillManager* autofill_manager() {
     return test_autofill_manager_injector_[web_contents()];
   }
-
-#if BUILDFLAG(IS_ANDROID)
-  MockFastCheckoutClient* fast_checkout_client() {
-    return fast_checkout_client_;
-  }
-#endif
 
  private:
   void PreparePersonalDataManager() {
@@ -124,9 +139,7 @@ class ChromeAutofillClientTest : public ChromeRenderViewHostTestHarness {
   TestAutofillManagerInjector<TestBrowserAutofillManager>
       test_autofill_manager_injector_;
 
-#if BUILDFLAG(IS_ANDROID)
-  raw_ptr<MockFastCheckoutClient> fast_checkout_client_;
-#endif
+  base::OnceCallback<void()> setup_flags_;
 };
 
 TEST_F(ChromeAutofillClientTest, GetFormInteractionsFlowId_BelowMaxFlowTime) {
@@ -183,45 +196,77 @@ TEST_F(ChromeAutofillClientTest, GetFormInteractionsFlowId_AdvancedTwice) {
             client()->GetCurrentFormInteractionsFlowId());
 }
 
+// Ensure that, by default, the plus address service is not available.
+// The positive case (feature enabled) will be tested in plus_addresses browser
+// tests; this test is intended to ensure the default state does not behave
+// unexpectedly.
+TEST_F(ChromeAutofillClientTest,
+       PlusAddressesDefaultFeatureStateMeansNullPlusAddressService) {
+  PlusAddressServiceFactory::GetForBrowserContext(
+      web_contents()->GetBrowserContext());
+  EXPECT_EQ(client()->GetPlusAddressService(), nullptr);
+}
+
 #if BUILDFLAG(IS_ANDROID)
-TEST_F(ChromeAutofillClientTest, IsFastCheckoutSupportedWithDisabledFeature) {
-  FormData form;
-  FormFieldData field;
-  ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(::features::kFastCheckout);
-  EXPECT_FALSE(
-      client()->IsFastCheckoutSupported(form, field, *autofill_manager()));
+class ChromeAutofillClientTestWithPaymentsAndroidBottomSheetFeature
+    : public ChromeAutofillClientTest {
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_{
+      features::kAutofillEnablePaymentsAndroidBottomSheet};
+};
+
+TEST_F(ChromeAutofillClientTestWithPaymentsAndroidBottomSheetFeature,
+       ConfirmSaveCreditCardToCloud_RequestsBottomSheet) {
+  TestChromeAutofillClient* autofill_client = client();
+  auto* bottom_sheet_bridge =
+      autofill_client->InjectMockAutofillSaveCardBottomSheetBridge();
+
+  EXPECT_CALL(*bottom_sheet_bridge,
+              RequestShowContent(testing::An<const AutofillSaveCardUiInfo&>(),
+                                 testing::NotNull()));
+
+  autofill_client->ConfirmSaveCreditCardToCloud(
+      CreditCard(), LegalMessageLines(),
+      ChromeAutofillClient::SaveCreditCardOptions().with_show_prompt(true),
+      base::DoNothing());
 }
 
-TEST_F(ChromeAutofillClientTest,
-       HideFastCheckout_IsShowing_CallsStopOnFastCheckoutClient) {
-  ON_CALL(*fast_checkout_client(), IsShowing)
-      .WillByDefault(testing::Return(true));
-  EXPECT_CALL(*fast_checkout_client(), Stop(true));
-  client()->HideFastCheckout(/*allow_further_runs=*/true);
+TEST_F(ChromeAutofillClientTestWithPaymentsAndroidBottomSheetFeature,
+       ConfirmSaveCreditCardToCloud_DoesNotFailWithoutAWindow) {
+  TestChromeAutofillClient* autofill_client = client();
+
+  EXPECT_NO_FATAL_FAILURE(autofill_client->ConfirmSaveCreditCardToCloud(
+      CreditCard(), LegalMessageLines(),
+      ChromeAutofillClient::SaveCreditCardOptions().with_show_prompt(true),
+      base::DoNothing()));
 }
 
-TEST_F(ChromeAutofillClientTest,
-       HideFastCheckout_NotShowing_DoesNotCallStopOnFastCheckoutClient) {
-  ON_CALL(*fast_checkout_client(), IsShowing)
-      .WillByDefault(testing::Return(false));
-  EXPECT_CALL(*fast_checkout_client(), Stop).Times(0);
-  client()->HideFastCheckout(/*allow_further_runs=*/true);
+TEST_F(ChromeAutofillClientTestWithPaymentsAndroidBottomSheetFeature,
+       ConfirmSaveCreditCardLocally_RequestsBottomSheet) {
+  TestChromeAutofillClient* autofill_client = client();
+  auto* bottom_sheet_bridge =
+      autofill_client->InjectMockAutofillSaveCardBottomSheetBridge();
+
+  EXPECT_CALL(*bottom_sheet_bridge,
+              RequestShowContent(testing::An<const AutofillSaveCardUiInfo&>(),
+                                 testing::NotNull()));
+
+  autofill_client->ConfirmSaveCreditCardLocally(
+      CreditCard(),
+      ChromeAutofillClient::SaveCreditCardOptions().with_show_prompt(true),
+      base::DoNothing());
 }
 
-TEST_F(ChromeAutofillClientTest, IsShowingFastCheckoutUI) {
-  EXPECT_CALL(*fast_checkout_client(), IsShowing)
-      .WillOnce(testing::Return(true));
-  EXPECT_TRUE(client()->IsShowingFastCheckoutUI());
-}
+TEST_F(ChromeAutofillClientTestWithPaymentsAndroidBottomSheetFeature,
+       ConfirmSaveCreditCardLocally_DoesNotFailWithoutAWindow) {
+  TestChromeAutofillClient* autofill_client = client();
 
-TEST_F(ChromeAutofillClientTest, TryToShowFastCheckout) {
-  EXPECT_CALL(*fast_checkout_client(), TryToStart)
-      .WillOnce(testing::Return(true));
-  EXPECT_TRUE(client()->TryToShowFastCheckout(
-      FormData(), FormFieldData(), autofill_manager()->GetWeakPtr()));
+  EXPECT_NO_FATAL_FAILURE(autofill_client->ConfirmSaveCreditCardLocally(
+      CreditCard(),
+      ChromeAutofillClient::SaveCreditCardOptions().with_show_prompt(true),
+      base::DoNothing()));
 }
-#endif  // BUILDFLAG(IS_ANDROID)
+#endif
 
 }  // namespace
 }  // namespace autofill

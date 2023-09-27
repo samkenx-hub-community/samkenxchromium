@@ -8,7 +8,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <climits>
 #include <cstddef>
 #include <functional>
 #include <type_traits>
@@ -50,15 +49,13 @@
 
 #if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
 #include "base/allocator/partition_allocator/pointers/raw_ptr_backup_ref_impl.h"
-#endif  // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
-
-#if BUILDFLAG(USE_ASAN_UNOWNED_PTR)
+#elif BUILDFLAG(USE_ASAN_UNOWNED_PTR)
 #include "base/allocator/partition_allocator/pointers/raw_ptr_asan_unowned_impl.h"
-#endif  // BUILDFLAG(USE_ASAN_UNOWNED_PTR)
-
-#if BUILDFLAG(USE_HOOKABLE_RAW_PTR)
+#elif BUILDFLAG(USE_HOOKABLE_RAW_PTR)
 #include "base/allocator/partition_allocator/pointers/raw_ptr_hookable_impl.h"
-#endif  // BUILDFLAG(USE_HOOKABLE_RAW_PTR)
+#else
+#include "base/allocator/partition_allocator/pointers/raw_ptr_noop_impl.h"
+#endif
 
 namespace cc {
 class Scheduler;
@@ -94,31 +91,35 @@ enum class RawPtrTraits : unsigned {
   // instead.
   kMayDangle = (1 << 0),
 
-#if BUILDFLAG(USE_ASAN_BACKUP_REF_PTR)
-  // Disables any hooks, by switching to NoOpImpl in that case.
+  // Disables any hooks, when building with BUILDFLAG(USE_HOOKABLE_RAW_PTR).
   //
   // Internal use only.
   kDisableHooks = (1 << 2),
-#else
-  kDisableHooks = kEmpty,
-#endif
 
   // Pointer arithmetic is discouraged and disabled by default.
   //
   // Don't use directly, use AllowPtrArithmetic instead.
   kAllowPtrArithmetic = (1 << 3),
 
+  // This pointer is evaluated by a separate, Ash-related experiment.
+  //
+  // Don't use directly, use ExperimentalAsh instead.
+  kExperimentalAsh = (1 << 4),
+
+  // *** ForTest traits below ***
+
   // Adds accounting, on top of the chosen implementation, for test purposes.
   // raw_ptr/raw_ref with this trait perform extra bookkeeping, e.g. to track
   // the number of times the raw_ptr is wrapped, unwrapped, etc.
   //
-  // Test only.
-  kUseCountingWrapperForTest = (1 << 4),
+  // Test only. Include raw_ptr_counting_wrapper_impl_for_test.h in your test
+  // files when using this trait.
+  kUseCountingWrapperForTest = (1 << 10),
 
   // Helper trait that can be used to test raw_ptr's behaviour or conversions.
   //
   // Test only.
-  kDummyForTest = (1 << 5),
+  kDummyForTest = (1 << 11),
 };
 
 // Used to combine RawPtrTraits:
@@ -147,220 +148,11 @@ constexpr RawPtrTraits Remove(RawPtrTraits a, RawPtrTraits b) {
 constexpr bool AreValid(RawPtrTraits traits) {
   return Remove(traits, RawPtrTraits::kMayDangle | RawPtrTraits::kDisableHooks |
                             RawPtrTraits::kAllowPtrArithmetic |
+                            RawPtrTraits::kExperimentalAsh |
                             RawPtrTraits::kUseCountingWrapperForTest |
                             RawPtrTraits::kDummyForTest) ==
          RawPtrTraits::kEmpty;
 }
-
-template <RawPtrTraits Traits>
-struct TraitsToImpl;
-
-}  // namespace raw_ptr_traits
-
-namespace internal {
-// These classes/structures are part of the raw_ptr implementation.
-// DO NOT USE THESE CLASSES DIRECTLY YOURSELF.
-
-struct RawPtrNoOpImpl {
-  // Wraps a pointer.
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* WrapRawPtr(T* ptr) {
-    return ptr;
-  }
-
-  // Notifies the allocator when a wrapped pointer is being removed or replaced.
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr void ReleaseWrappedPtr(T*) {}
-
-  // Unwraps the pointer, while asserting that memory hasn't been freed. The
-  // function is allowed to crash on nullptr.
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* SafelyUnwrapPtrForDereference(
-      T* wrapped_ptr) {
-    return wrapped_ptr;
-  }
-
-  // Unwraps the pointer, while asserting that memory hasn't been freed. The
-  // function must handle nullptr gracefully.
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* SafelyUnwrapPtrForExtraction(
-      T* wrapped_ptr) {
-    return wrapped_ptr;
-  }
-
-  // Unwraps the pointer, without making an assertion on whether memory was
-  // freed or not.
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* UnsafelyUnwrapPtrForComparison(
-      T* wrapped_ptr) {
-    return wrapped_ptr;
-  }
-
-  // Upcasts the wrapped pointer.
-  template <typename To, typename From>
-  PA_ALWAYS_INLINE static constexpr To* Upcast(From* wrapped_ptr) {
-    static_assert(std::is_convertible<From*, To*>::value,
-                  "From must be convertible to To.");
-    // Note, this cast may change the address if upcasting to base that lies in
-    // the middle of the derived object.
-    return wrapped_ptr;
-  }
-
-  // Advance the wrapped pointer by `delta_elems`.
-  template <
-      typename T,
-      typename Z,
-      typename =
-          std::enable_if_t<partition_alloc::internal::is_offset_type<Z>, void>>
-  PA_ALWAYS_INLINE static constexpr T* Advance(T* wrapped_ptr, Z delta_elems) {
-    return wrapped_ptr + delta_elems;
-  }
-
-  // Retreat the wrapped pointer by `delta_elems`.
-  template <
-      typename T,
-      typename Z,
-      typename =
-          std::enable_if_t<partition_alloc::internal::is_offset_type<Z>, void>>
-  PA_ALWAYS_INLINE static constexpr T* Retreat(T* wrapped_ptr, Z delta_elems) {
-    return wrapped_ptr - delta_elems;
-  }
-
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr ptrdiff_t GetDeltaElems(T* wrapped_ptr1,
-                                                            T* wrapped_ptr2) {
-    return wrapped_ptr1 - wrapped_ptr2;
-  }
-
-  // Returns a copy of a wrapped pointer, without making an assertion on whether
-  // memory was freed or not.
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* Duplicate(T* wrapped_ptr) {
-    return wrapped_ptr;
-  }
-
-  // `WrapRawPtrForDuplication` and `UnsafelyUnwrapPtrForDuplication` are used
-  // to create a new raw_ptr<T> from another raw_ptr<T> of a different flavor.
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* WrapRawPtrForDuplication(T* ptr) {
-    return ptr;
-  }
-
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* UnsafelyUnwrapPtrForDuplication(
-      T* wrapped_ptr) {
-    return wrapped_ptr;
-  }
-
-  // This is for accounting only, used by unit tests.
-  PA_ALWAYS_INLINE constexpr static void IncrementSwapCountForTest() {}
-  PA_ALWAYS_INLINE constexpr static void IncrementLessCountForTest() {}
-  PA_ALWAYS_INLINE constexpr static void
-  IncrementPointerToMemberOperatorCountForTest() {}
-};
-
-// Wraps a raw_ptr/raw_ref implementation, with a class of the same interface
-// that provides accounting, for test purposes. raw_ptr/raw_ref that use it
-// perform extra bookkeeping, e.g. to track the number of times the raw_ptr is
-// wrapped, unrwapped, etc.
-//
-// Test only.
-template <RawPtrTraits Traits>
-struct RawPtrCountingImplWrapperForTest
-    : public raw_ptr_traits::TraitsToImpl<Traits>::Impl {
-  static_assert(
-      !raw_ptr_traits::Contains(Traits,
-                                RawPtrTraits::kUseCountingWrapperForTest));
-
-  using SuperImpl = typename raw_ptr_traits::TraitsToImpl<Traits>::Impl;
-
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* WrapRawPtr(T* ptr) {
-    ++wrap_raw_ptr_cnt;
-    return SuperImpl::WrapRawPtr(ptr);
-  }
-
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr void ReleaseWrappedPtr(T* ptr) {
-    ++release_wrapped_ptr_cnt;
-    SuperImpl::ReleaseWrappedPtr(ptr);
-  }
-
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* SafelyUnwrapPtrForDereference(
-      T* wrapped_ptr) {
-    ++get_for_dereference_cnt;
-    return SuperImpl::SafelyUnwrapPtrForDereference(wrapped_ptr);
-  }
-
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* SafelyUnwrapPtrForExtraction(
-      T* wrapped_ptr) {
-    ++get_for_extraction_cnt;
-    return SuperImpl::SafelyUnwrapPtrForExtraction(wrapped_ptr);
-  }
-
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* UnsafelyUnwrapPtrForComparison(
-      T* wrapped_ptr) {
-    ++get_for_comparison_cnt;
-    return SuperImpl::UnsafelyUnwrapPtrForComparison(wrapped_ptr);
-  }
-
-  PA_ALWAYS_INLINE static constexpr void IncrementSwapCountForTest() {
-    ++wrapped_ptr_swap_cnt;
-  }
-
-  PA_ALWAYS_INLINE static constexpr void IncrementLessCountForTest() {
-    ++wrapped_ptr_less_cnt;
-  }
-
-  PA_ALWAYS_INLINE static constexpr void
-  IncrementPointerToMemberOperatorCountForTest() {
-    ++pointer_to_member_operator_cnt;
-  }
-
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* WrapRawPtrForDuplication(T* ptr) {
-    ++wrap_raw_ptr_for_dup_cnt;
-    return SuperImpl::WrapRawPtrForDuplication(ptr);
-  }
-
-  template <typename T>
-  PA_ALWAYS_INLINE static constexpr T* UnsafelyUnwrapPtrForDuplication(
-      T* wrapped_ptr) {
-    ++get_for_duplication_cnt;
-    return SuperImpl::UnsafelyUnwrapPtrForDuplication(wrapped_ptr);
-  }
-
-  static constexpr void ClearCounters() {
-    wrap_raw_ptr_cnt = 0;
-    release_wrapped_ptr_cnt = 0;
-    get_for_dereference_cnt = 0;
-    get_for_extraction_cnt = 0;
-    get_for_comparison_cnt = 0;
-    wrapped_ptr_swap_cnt = 0;
-    wrapped_ptr_less_cnt = 0;
-    pointer_to_member_operator_cnt = 0;
-    wrap_raw_ptr_for_dup_cnt = 0;
-    get_for_duplication_cnt = 0;
-  }
-
-  static inline int wrap_raw_ptr_cnt = INT_MIN;
-  static inline int release_wrapped_ptr_cnt = INT_MIN;
-  static inline int get_for_dereference_cnt = INT_MIN;
-  static inline int get_for_extraction_cnt = INT_MIN;
-  static inline int get_for_comparison_cnt = INT_MIN;
-  static inline int wrapped_ptr_swap_cnt = INT_MIN;
-  static inline int wrapped_ptr_less_cnt = INT_MIN;
-  static inline int pointer_to_member_operator_cnt = INT_MIN;
-  static inline int wrap_raw_ptr_for_dup_cnt = INT_MIN;
-  static inline int get_for_duplication_cnt = INT_MIN;
-};
-
-}  // namespace internal
-
-namespace raw_ptr_traits {
 
 // IsSupportedType<T>::value answers whether raw_ptr<T> 1) compiles and 2) is
 // always safe at runtime.  Templates that may end up using `raw_ptr<T>` should
@@ -435,67 +227,64 @@ struct IsSupportedType<T,
 #undef PA_WINDOWS_HANDLE_TYPE
 #endif
 
-template <RawPtrTraits Traits>
-struct TraitsToImpl {
-  static_assert(AreValid(Traits), "Unknown raw_ptr trait(s)");
-
- private:
-  // UnderlyingImpl is the struct that provides the implementation of the
-  // protections related to raw_ptr.
 #if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
-  using UnderlyingImpl = internal::RawPtrBackupRefImpl<
-      /*allow_dangling=*/Contains(Traits, RawPtrTraits::kMayDangle)>;
+template <RawPtrTraits Traits>
+using UnderlyingImplForTraits = internal::RawPtrBackupRefImpl<
+    /*AllowDangling=*/Contains(Traits, RawPtrTraits::kMayDangle),
+    /*ExperimentalAsh=*/Contains(Traits, RawPtrTraits::kExperimentalAsh)>;
 
 #elif BUILDFLAG(USE_ASAN_UNOWNED_PTR)
-  using UnderlyingImpl = std::conditional_t<
-      Contains(Traits, RawPtrTraits::kMayDangle),
-      // No special bookkeeping required for this case,
-      // just treat these as ordinary pointers.
-      internal::RawPtrNoOpImpl,
-      internal::RawPtrAsanUnownedImpl<
-          Contains(Traits, RawPtrTraits::kAllowPtrArithmetic)>>;
+template <RawPtrTraits Traits>
+using UnderlyingImplForTraits =
+    internal::RawPtrAsanUnownedImpl<Contains(Traits,
+                                             RawPtrTraits::kAllowPtrArithmetic),
+                                    Contains(Traits, RawPtrTraits::kMayDangle)>;
+
 #elif BUILDFLAG(USE_HOOKABLE_RAW_PTR)
-  using UnderlyingImpl =
-      std::conditional_t<Contains(Traits, RawPtrTraits::kDisableHooks),
-                         internal::RawPtrNoOpImpl,
-                         internal::RawPtrHookableImpl>;
+template <RawPtrTraits Traits>
+using UnderlyingImplForTraits = internal::RawPtrHookableImpl<
+    /*EnableHooks=*/!Contains(Traits, RawPtrTraits::kDisableHooks)>;
+
 #else
-  using UnderlyingImpl = internal::RawPtrNoOpImpl;
+template <RawPtrTraits Traits>
+using UnderlyingImplForTraits = internal::RawPtrNoOpImpl;
 #endif
 
- public:
-  // Impl is the struct that implements raw_ptr functions. Think of raw_ptr as a
-  // thin wrapper, that directs calls to Impl.
-  // Impl may be different from UnderlyingImpl, because it may include a
-  // wrapper.
-  using Impl = std::conditional_t<
-      Contains(Traits, RawPtrTraits::kUseCountingWrapperForTest),
-      internal::RawPtrCountingImplWrapperForTest<
-          Remove(Traits, RawPtrTraits::kUseCountingWrapperForTest)>,
-      UnderlyingImpl>;
-};
+constexpr bool IsPtrArithmeticAllowed(RawPtrTraits Traits) {
+#if BUILDFLAG(ENABLE_POINTER_ARITHMETIC_TRAIT_CHECK)
+  return Contains(Traits, RawPtrTraits::kAllowPtrArithmetic);
+#else
+  return true;
+#endif
+}
+
+}  // namespace raw_ptr_traits
+
+namespace test {
+
+template <RawPtrTraits Traits>
+struct RawPtrCountingImplWrapperForTest;
+
+}  // namespace test
+
+namespace raw_ptr_traits {
+
+// ImplForTraits is the struct that implements raw_ptr functions. Think of
+// raw_ptr as a thin wrapper, that directs calls to ImplForTraits. ImplForTraits
+// may be different from UnderlyingImplForTraits, because it may include a
+// wrapper.
+template <RawPtrTraits Traits>
+using ImplForTraits = std::conditional_t<
+    Contains(Traits, RawPtrTraits::kUseCountingWrapperForTest),
+    test::RawPtrCountingImplWrapperForTest<
+        Remove(Traits, RawPtrTraits::kUseCountingWrapperForTest)>,
+    UnderlyingImplForTraits<Traits>>;
 
 }  // namespace raw_ptr_traits
 
 // `raw_ptr<T>` is a non-owning smart pointer that has improved memory-safety
-// over raw pointers.  It behaves just like a raw pointer on platforms where
-// USE_BACKUP_REF_PTR is off, and almost like one when it's on (the main
-// difference is that it's zero-initialized and cleared on destruction and
-// move). Unlike `std::unique_ptr<T>`, `base::scoped_refptr<T>`, etc., it
-// doesn’t manage ownership or lifetime of an allocated object - you are still
-// responsible for freeing the object when no longer used, just as you would
-// with a raw C++ pointer.
-//
-// Compared to a raw C++ pointer, on platforms where USE_BACKUP_REF_PTR is on,
-// `raw_ptr<T>` incurs additional performance overhead for initialization,
-// destruction, and assignment (including `ptr++` and `ptr += ...`).  There is
-// no overhead when dereferencing a pointer.
-//
-// `raw_ptr<T>` is beneficial for security, because it can prevent a significant
-// percentage of Use-after-Free (UaF) bugs from being exploitable.  `raw_ptr<T>`
-// has limited impact on stability - dereferencing a dangling pointer remains
-// Undefined Behavior.  Note that the security protection is not yet enabled by
-// default.
+// over raw pointers. See the documentation for details:
+// https://source.chromium.org/chromium/chromium/src/+/main:base/memory/raw_ptr.md
 //
 // raw_ptr<T> is marked as [[gsl::Pointer]] which allows the compiler to catch
 // some bugs where the raw_ptr holds a dangling pointer to a temporary object.
@@ -505,32 +294,52 @@ struct TraitsToImpl {
 // compiler. We have not managed to construct such an example in Chromium yet.
 template <typename T, RawPtrTraits Traits = RawPtrTraits::kEmpty>
 class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
-  // Type to return from ExtractAsDangling(), which is identical except
-  // kMayDangle trait is added (if one isn't there already).
-  using DanglingRawPtrType = raw_ptr<T, Traits | RawPtrTraits::kMayDangle>;
-
  public:
-  using Impl = typename raw_ptr_traits::TraitsToImpl<Traits>::Impl;
+  using Impl = typename raw_ptr_traits::ImplForTraits<Traits>;
+  // Needed to make gtest Pointee matcher work with raw_ptr.
+  using element_type = T;
+  using DanglingType = raw_ptr<T, Traits | RawPtrTraits::kMayDangle>;
 
 #if !BUILDFLAG(USE_PARTITION_ALLOC)
   // See comment at top about `PA_RAW_PTR_CHECK()`.
   static_assert(std::is_same_v<Impl, internal::RawPtrNoOpImpl>);
 #endif  // !BUILDFLAG(USE_PARTITION_ALLOC)
 
+  static_assert(raw_ptr_traits::AreValid(Traits), "Unknown raw_ptr trait(s)");
   static_assert(raw_ptr_traits::IsSupportedType<T>::value,
                 "raw_ptr<T> doesn't work with this kind of pointee type T");
+
+  // TODO(bartekn): Turn on zeroing as much as possible, to reduce
+  // pointer-related UBs. In the current implementation we do it only when the
+  // underlying implementation needs it for correctness, for performance
+  // reasons. There are two scenarios where it's important:
+  // 1. When rewriting renderer, we don't want extra overhead to get in the way
+  //    of our perf evaluation.
+  // 2. The same applies to rewriting 3rd party libraries, but also we want
+  //    RawPtrNoOpImpl to be a true no-op, in case the library is linked with
+  //    a product other than Chromium (this can be mitigated using
+  //    `build_with_chromium` GN variable).
+  static constexpr bool kZeroOnInit = Impl::kMustZeroOnInit;
+  static constexpr bool kZeroOnMove = Impl::kMustZeroOnMove;
+  static constexpr bool kZeroOnDestruct = Impl::kMustZeroOnDestruct;
 
 #if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) || \
     BUILDFLAG(USE_ASAN_UNOWNED_PTR) || BUILDFLAG(USE_HOOKABLE_RAW_PTR)
   // BackupRefPtr requires a non-trivial default constructor, destructor, etc.
-  PA_ALWAYS_INLINE constexpr raw_ptr() noexcept : wrapped_ptr_(nullptr) {}
+  PA_ALWAYS_INLINE constexpr raw_ptr() noexcept {
+    if constexpr (kZeroOnInit) {
+      wrapped_ptr_ = nullptr;
+    }
+  }
 
   PA_ALWAYS_INLINE constexpr raw_ptr(const raw_ptr& p) noexcept
       : wrapped_ptr_(Impl::Duplicate(p.wrapped_ptr_)) {}
 
   PA_ALWAYS_INLINE constexpr raw_ptr(raw_ptr&& p) noexcept {
     wrapped_ptr_ = p.wrapped_ptr_;
-    p.wrapped_ptr_ = nullptr;
+    if constexpr (kZeroOnMove) {
+      p.wrapped_ptr_ = nullptr;
+    }
   }
 
   PA_ALWAYS_INLINE constexpr raw_ptr& operator=(const raw_ptr& p) noexcept {
@@ -548,36 +357,31 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
   }
 
   PA_ALWAYS_INLINE constexpr raw_ptr& operator=(raw_ptr&& p) noexcept {
-    // Unlike the the copy version of this operator, this branch is necessaty
+    // Unlike the the copy version of this operator, this branch is necessary
     // for correctness.
     if (PA_LIKELY(this != &p)) {
       Impl::ReleaseWrappedPtr(wrapped_ptr_);
       wrapped_ptr_ = p.wrapped_ptr_;
-      p.wrapped_ptr_ = nullptr;
+      if constexpr (kZeroOnMove) {
+        p.wrapped_ptr_ = nullptr;
+      }
     }
     return *this;
   }
 
-// Constexpr destructors were introduced in C++20. PartitionAlloc's minimum
-// supported C++ version is C++17.
-#if defined(__cpp_constexpr) && __cpp_constexpr >= 201907L
-  PA_ALWAYS_INLINE constexpr ~raw_ptr() noexcept {
-#else
-  PA_ALWAYS_INLINE ~raw_ptr() noexcept {
-#endif
+  PA_ALWAYS_INLINE PA_CONSTEXPR_DTOR ~raw_ptr() noexcept {
     Impl::ReleaseWrappedPtr(wrapped_ptr_);
     // Work around external issues where raw_ptr is used after destruction.
-    wrapped_ptr_ = nullptr;
+    if constexpr (kZeroOnDestruct) {
+      wrapped_ptr_ = nullptr;
+    }
   }
 
-#else  // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) ||
-       // BUILDFLAG(USE_ASAN_UNOWNED_PTR) || BUILDFLAG(USE_HOOKABLE_RAW_PTR)
+#else   // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) ||
+        // BUILDFLAG(USE_ASAN_UNOWNED_PTR) || BUILDFLAG(USE_HOOKABLE_RAW_PTR)
 
   // raw_ptr can be trivially default constructed (leaving |wrapped_ptr_|
-  // uninitialized).  This is needed for compatibility with raw pointers.
-  //
-  // TODO(lukasza): Always initialize |wrapped_ptr_|.  Fix resulting build
-  // errors.  Analyze performance impact.
+  // uninitialized).
   PA_ALWAYS_INLINE constexpr raw_ptr() noexcept = default;
 
   // In addition to nullptr_t ctor above, raw_ptr needs to have these
@@ -592,8 +396,13 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
 
   PA_ALWAYS_INLINE ~raw_ptr() noexcept = default;
 
+  // With default constructor, destructor and move operations, we don't have an
+  // opportunity to zero the underlying pointer, so ensure this isn't expected.
+  static_assert(!kZeroOnInit);
+  static_assert(!kZeroOnMove);
+  static_assert(!kZeroOnDestruct);
 #endif  // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) ||
-        // BUILDFLAG(USE_ASAN_UNOWNED_PTR)
+        // BUILDFLAG(USE_ASAN_UNOWNED_PTR) || BUILDFLAG(USE_HOOKABLE_RAW_PTR)
 
   // Cross-kind copy constructor.
   // Move is not supported as different traits may use different ref-counts, so
@@ -603,7 +412,7 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
   PA_ALWAYS_INLINE constexpr explicit raw_ptr(
       const raw_ptr<T, PassedTraits>& p) noexcept
       : wrapped_ptr_(Impl::WrapRawPtrForDuplication(
-            raw_ptr_traits::TraitsToImpl<PassedTraits>::Impl::
+            raw_ptr_traits::ImplForTraits<PassedTraits>::
                 UnsafelyUnwrapPtrForDuplication(p.wrapped_ptr_))) {
     // Limit cross-kind conversions only to cases where kMayDangle gets added,
     // because that's needed for Unretained(Ref)Wrapper. Use a static_assert,
@@ -629,13 +438,14 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
 
     Impl::ReleaseWrappedPtr(wrapped_ptr_);
     wrapped_ptr_ = Impl::WrapRawPtrForDuplication(
-        raw_ptr_traits::TraitsToImpl<PassedTraits>::Impl::
-            UnsafelyUnwrapPtrForDuplication(p.wrapped_ptr_));
+        raw_ptr_traits::ImplForTraits<
+            PassedTraits>::UnsafelyUnwrapPtrForDuplication(p.wrapped_ptr_));
     return *this;
   }
 
   // Deliberately implicit, because raw_ptr is supposed to resemble raw ptr.
-  // NOLINTNEXTLINE(google-explicit-constructor)
+  // Ignore kZeroOnInit, because here the caller explicitly wishes to initialize
+  // with nullptr. NOLINTNEXTLINE(google-explicit-constructor)
   PA_ALWAYS_INLINE constexpr raw_ptr(std::nullptr_t) noexcept
       : wrapped_ptr_(nullptr) {}
 
@@ -661,9 +471,9 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
   // NOLINTNEXTLINE(google-explicit-constructor)
   PA_ALWAYS_INLINE constexpr raw_ptr(raw_ptr<U, Traits>&& ptr) noexcept
       : wrapped_ptr_(Impl::template Upcast<T, U>(ptr.wrapped_ptr_)) {
-#if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
-    ptr.wrapped_ptr_ = nullptr;
-#endif
+    if constexpr (kZeroOnMove) {
+      ptr.wrapped_ptr_ = nullptr;
+    }
   }
 
   PA_ALWAYS_INLINE constexpr raw_ptr& operator=(std::nullptr_t) noexcept {
@@ -713,15 +523,45 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
 #endif
     Impl::ReleaseWrappedPtr(wrapped_ptr_);
     wrapped_ptr_ = Impl::template Upcast<T, U>(ptr.wrapped_ptr_);
-#if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
-    ptr.wrapped_ptr_ = nullptr;
-#endif
+    if constexpr (kZeroOnMove) {
+      ptr.wrapped_ptr_ = nullptr;
+    }
     return *this;
   }
 
   // Avoid using. The goal of raw_ptr is to be as close to raw pointer as
   // possible, so use it only if absolutely necessary (e.g. for const_cast).
   PA_ALWAYS_INLINE constexpr T* get() const { return GetForExtraction(); }
+
+  // You may use |raw_ptr<T>::AsEphemeralRawAddr()| to obtain |T**| or |T*&|
+  // from |raw_ptr<T>|, as long as you follow these requirements:
+  // - DO NOT carry T**/T*& obtained via AsEphemeralRawAddr() out of
+  //   expression.
+  // - DO NOT use raw_ptr or T**/T*& multiple times within an expression.
+  //
+  // https://chromium.googlesource.com/chromium/src/+/main/base/memory/raw_ptr.md#in_out-arguments-need-to-be-refactored
+  class EphemeralRawAddr {
+   public:
+    EphemeralRawAddr(const EphemeralRawAddr&) = delete;
+    EphemeralRawAddr& operator=(const EphemeralRawAddr&) = delete;
+    void* operator new(size_t) = delete;
+    void* operator new(size_t, void*) = delete;
+    PA_ALWAYS_INLINE PA_CONSTEXPR_DTOR ~EphemeralRawAddr() { original = copy; }
+
+    PA_ALWAYS_INLINE constexpr T** operator&() && { return &copy; }
+    // NOLINTNEXTLINE(google-explicit-constructor)
+    PA_ALWAYS_INLINE constexpr operator T*&() && { return copy; }
+
+   private:
+    friend class raw_ptr;
+    PA_ALWAYS_INLINE constexpr explicit EphemeralRawAddr(raw_ptr& ptr)
+        : copy(ptr.get()), original(ptr) {}
+    T* copy;
+    raw_ptr& original;  // Original pointer.
+  };
+  PA_ALWAYS_INLINE PA_CONSTEXPR_DTOR EphemeralRawAddr AsEphemeralRawAddr() & {
+    return EphemeralRawAddr(*this);
+  }
 
   PA_ALWAYS_INLINE constexpr explicit operator bool() const {
     return !!wrapped_ptr_;
@@ -737,12 +577,6 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
     return GetForDereference();
   }
 
-  // Disables `(my_raw_ptr->*pmf)(...)` as a workaround for
-  // the ICE in GCC parsing the code, reported at
-  // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=103455
-  template <typename PMF>
-  void operator->*(PMF) const = delete;
-
   // Deliberately implicit, because raw_ptr is supposed to resemble raw ptr.
   // NOLINTNEXTLINE(google-explicit-constructor)
   PA_ALWAYS_INLINE constexpr operator T*() const { return GetForExtraction(); }
@@ -754,19 +588,31 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
   }
 
   PA_ALWAYS_INLINE constexpr raw_ptr& operator++() {
+    static_assert(
+        raw_ptr_traits::IsPtrArithmeticAllowed(Traits),
+        "cannot increment raw_ptr unless AllowPtrArithmetic trait is present.");
     wrapped_ptr_ = Impl::Advance(wrapped_ptr_, 1);
     return *this;
   }
   PA_ALWAYS_INLINE constexpr raw_ptr& operator--() {
+    static_assert(
+        raw_ptr_traits::IsPtrArithmeticAllowed(Traits),
+        "cannot decrement raw_ptr unless AllowPtrArithmetic trait is present.");
     wrapped_ptr_ = Impl::Retreat(wrapped_ptr_, 1);
     return *this;
   }
   PA_ALWAYS_INLINE constexpr raw_ptr operator++(int /* post_increment */) {
+    static_assert(
+        raw_ptr_traits::IsPtrArithmeticAllowed(Traits),
+        "cannot increment raw_ptr unless AllowPtrArithmetic trait is present.");
     raw_ptr result = *this;
     ++(*this);
     return result;
   }
   PA_ALWAYS_INLINE constexpr raw_ptr operator--(int /* post_decrement */) {
+    static_assert(
+        raw_ptr_traits::IsPtrArithmeticAllowed(Traits),
+        "cannot decrement raw_ptr unless AllowPtrArithmetic trait is present.");
     raw_ptr result = *this;
     --(*this);
     return result;
@@ -775,6 +621,9 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
       typename Z,
       typename = std::enable_if_t<partition_alloc::internal::is_offset_type<Z>>>
   PA_ALWAYS_INLINE constexpr raw_ptr& operator+=(Z delta_elems) {
+    static_assert(
+        raw_ptr_traits::IsPtrArithmeticAllowed(Traits),
+        "cannot increment raw_ptr unless AllowPtrArithmetic trait is present.");
     wrapped_ptr_ = Impl::Advance(wrapped_ptr_, delta_elems);
     return *this;
   }
@@ -782,9 +631,21 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
       typename Z,
       typename = std::enable_if_t<partition_alloc::internal::is_offset_type<Z>>>
   PA_ALWAYS_INLINE constexpr raw_ptr& operator-=(Z delta_elems) {
+    static_assert(
+        raw_ptr_traits::IsPtrArithmeticAllowed(Traits),
+        "cannot increment raw_ptr unless AllowPtrArithmetic trait is present.");
     wrapped_ptr_ = Impl::Retreat(wrapped_ptr_, delta_elems);
     return *this;
   }
+
+  template <typename Z,
+            typename U = T,
+            RawPtrTraits CopyTraits = Traits,
+            typename Unused = std::enable_if_t<
+                !raw_ptr_traits::IsPtrArithmeticAllowed(CopyTraits) &&
+                !std::is_void<typename std::remove_cv<U>::type>::value &&
+                partition_alloc::internal::is_offset_type<Z>>>
+  U& operator[](Z delta_elems) const = delete;
 
   // Do not disable operator+() and operator-().
   // They provide OOB checks, which prevent from assigning an arbitrary value to
@@ -847,21 +708,14 @@ class PA_TRIVIAL_ABI PA_GSL_POINTER raw_ptr {
   // variable (or worse, a field)! It's meant to be used as a temporary, to be
   // passed into a cleanup & freeing function, and destructed at the end of the
   // statement.
-  PA_ALWAYS_INLINE constexpr DanglingRawPtrType ExtractAsDangling() noexcept {
-    if constexpr (std::is_same_v<
-                      typename std::remove_reference<decltype(*this)>::type,
-                      DanglingRawPtrType>) {
-      DanglingRawPtrType res(std::move(*this));
-      // Not all implementation clear the source pointer on move, so do it
-      // here just in case. Should be cheap.
-      operator=(nullptr);
-      return res;
-    } else {
-      T* ptr = GetForExtraction();
-      DanglingRawPtrType res(ptr);
-      operator=(nullptr);
-      return res;
-    }
+  PA_ALWAYS_INLINE constexpr DanglingType ExtractAsDangling() noexcept {
+    DanglingType res(std::move(*this));
+    // Not all implementation clear the source pointer on move. Furthermore,
+    // even for implemtantions that do, cross-kind conversions (that add
+    // kMayDangle) fall back to a copy, instead of move. So do it here just in
+    // case. Should be cheap.
+    operator=(nullptr);
+    return res;
   }
 
   // Comparison operators between raw_ptr and raw_ptr<U>/U*/std::nullptr_t.
@@ -1084,6 +938,14 @@ struct RemovePointer<raw_ptr<T, Traits>> {
 template <typename T>
 using RemovePointerT = typename RemovePointer<T>::type;
 
+struct RawPtrGlobalSettings {
+  static void EnableExperimentalAsh() {
+#if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
+    internal::BackupRefPtrGlobalSettings::EnableExperimentalAsh();
+#endif
+  }
+};
+
 }  // namespace base
 
 using base::raw_ptr;
@@ -1104,17 +966,51 @@ constexpr auto DisableDanglingPtrDetection = base::RawPtrTraits::kMayDangle;
 // occurrences are meant to be removed. See https://crbug.com/1291138.
 constexpr auto DanglingUntriaged = base::RawPtrTraits::kMayDangle;
 
-// This type is to be used in callbacks arguments when it is known that they
-// might receive dangling pointers. In any other cases, please use one of:
-// - raw_ptr<T, DanglingUntriaged>
-// - raw_ptr<T, DisableDanglingPtrDetection>
-template <typename T, base::RawPtrTraits Traits = base::RawPtrTraits::kEmpty>
-using MayBeDangling = base::raw_ptr<T, Traits | base::RawPtrTraits::kMayDangle>;
+// Unlike DanglingUntriaged, this annotates raw_ptrs that are known to
+// dangle only occasionally on the CQ.
+//
+// These were found from CQ runs and analysed in this dashboard:
+// https://docs.google.com/spreadsheets/d/1k12PQOG4y1-UEV9xDfP1F8FSk4cVFywafEYHmzFubJ8/
+//
+// This is not meant to be added manually. You can ignore this flag.
+constexpr auto FlakyDanglingUntriaged = base::RawPtrTraits::kMayDangle;
+
+// Dangling raw_ptr that is more likely to cause UAF: its memory was freed in
+// one task, and the raw_ptr was released in a different one.
+//
+// This is not meant to be added manually. You can ignore this flag.
+constexpr auto AcrossTasksDanglingUntriaged = base::RawPtrTraits::kMayDangle;
 
 // The use of pointer arithmetic with raw_ptr is strongly discouraged and
 // disabled by default. Usually a container like span<> should be used
 // instead of the raw_ptr.
 constexpr auto AllowPtrArithmetic = base::RawPtrTraits::kAllowPtrArithmetic;
+
+// Temporary flag for `raw_ptr` / `raw_ref`. This is used by finch experiments
+// to differentiate pointers added recently for the ChromeOS ash rewrite.
+//
+// See launch plan:
+// https://docs.google.com/document/d/105OVhNl-2lrfWElQSk5BXYv-nLynfxUrbC4l8cZ0CoU/edit
+//
+// This is not meant to be added manually. You can ignore this flag.
+constexpr auto ExperimentalAsh = base::RawPtrTraits::kExperimentalAsh;
+
+// This flag is used to tag a subset of dangling pointers. Similarly to
+// DanglingUntriaged, those pointers are known to be dangling. However, we also
+// detected that those raw_ptr's were never released (either by calling
+// raw_ptr's destructor or by resetting its value), which can ultimately put
+// pressure on the BRP quarantine.
+//
+// This is not meant to be added manually. You can ignore this flag.
+constexpr auto LeakedDanglingUntriaged = base::RawPtrTraits::kMayDangle;
+
+// Public verson used in callbacks arguments when it is known that they might
+// receive dangling pointers. In any other cases, please
+// use one of:
+// - raw_ptr<T, DanglingUntriaged>
+// - raw_ptr<T, DisableDanglingPtrDetection>
+template <typename T, base::RawPtrTraits Traits = base::RawPtrTraits::kEmpty>
+using MayBeDangling = base::raw_ptr<T, Traits | base::RawPtrTraits::kMayDangle>;
 
 namespace std {
 
@@ -1154,7 +1050,6 @@ struct iterator_traits<raw_ptr<T, Traits>> {
   using iterator_category = std::random_access_iterator_tag;
 };
 
-#if defined(_LIBCPP_VERSION)
 // Specialize std::pointer_traits. The latter is required to obtain the
 // underlying raw pointer in the std::to_address(pointer) overload.
 // Implementing the pointer_traits is the standard blessed way to customize
@@ -1179,7 +1074,6 @@ struct pointer_traits<::raw_ptr<T, Traits>> {
     return p.get();
   }
 };
-#endif  // defined(_LIBCPP_VERSION)
 
 }  // namespace std
 

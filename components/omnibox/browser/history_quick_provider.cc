@@ -27,6 +27,7 @@
 #include "components/omnibox/browser/autocomplete_match_type.h"
 #include "components/omnibox/browser/autocomplete_provider_client.h"
 #include "components/omnibox/browser/autocomplete_result.h"
+#include "components/omnibox/browser/autocomplete_scoring_signals_annotator.h"
 #include "components/omnibox/browser/history_url_provider.h"
 #include "components/omnibox/browser/in_memory_url_index.h"
 #include "components/omnibox/browser/keyword_provider.h"
@@ -37,6 +38,7 @@
 #include "components/prefs/pref_service.h"
 #include "components/url_formatter/url_formatter.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
+#include "third_party/metrics_proto/omnibox_event.pb.h"
 #include "third_party/metrics_proto/omnibox_focus_type.pb.h"
 #include "third_party/metrics_proto/omnibox_input_type.pb.h"
 #include "ui/base/page_transition_types.h"
@@ -120,6 +122,13 @@ void HistoryQuickProvider::DoAutocomplete() {
 
   add_matches(matches);
 
+  // If ML scoring is enabled, mark all "extra" matches as `culled_by_provider`.
+  // If ML scoring is disabled, this is effectively a no-op as the matches will
+  // already be resized in the above call to `HistoryItemsForTerms()`.
+  ResizeMatches(
+      max_matches,
+      OmniboxFieldTrial::IsMlUrlScoringUnlimitedNumCandidatesEnabled());
+
   // Add suggestions from the user's highly visited domains bypassing
   // `provider_max_matches_`.
 
@@ -160,7 +169,7 @@ void HistoryQuickProvider::DoAutocomplete() {
     //  suggestions to distinguish them in metrics.
     if (!host_matches.empty()) {
       client()->GetOmniboxTriggeredFeatureService()->FeatureTriggered(
-          OmniboxTriggeredFeatureService::Feature::kDomainSuggestions);
+          metrics::OmniboxEventProto_Feature_DOMAIN_SUGGESTIONS);
       static const bool counterfactual =
           OmniboxFieldTrial::kDomainSuggestionsCounterfactual.Get();
       if (!counterfactual)
@@ -331,7 +340,7 @@ AutocompleteMatch HistoryQuickProvider::QuickMatchToACMatch(
         ACMatchClassification::URL);
   }
 
-  match.description = info.title();
+  match.description = AutocompleteMatch::SanitizeString(info.title());
   auto description_terms =
       FindTermMatches(autocomplete_input_.text(), match.description);
   match.description_class = ClassifyTermMatches(
@@ -359,14 +368,16 @@ AutocompleteMatch HistoryQuickProvider::QuickMatchToACMatch(
     match.from_keyword = true;
   }
 
-  if (OmniboxFieldTrial::IsLogUrlScoringSignalsEnabled()) {
+  if (OmniboxFieldTrial::IsPopulatingUrlScoringSignalsEnabled() &&
+      AutocompleteScoringSignalsAnnotator::IsEligibleMatch(match)) {
     // Propagate scoring signals to AC Match for ML Model training data.
     // `allowed_to_be_default_match` is set in this function, after the ACMatch
     // is constructed, rather than in ScoredHistoryMatch. We have to propagate
     // that signal to `scoring_signals` in addition to all signals calculated in
     // the ScoredHistoryMatch.
+    DCHECK(history_match.scoring_signals.has_value());
     match.scoring_signals = history_match.scoring_signals;
-    match.scoring_signals.set_allowed_to_be_default_match(
+    match.scoring_signals->set_allowed_to_be_default_match(
         match.allowed_to_be_default_match);
   }
   match.RecordAdditionalInfo("typed count", info.typed_count());

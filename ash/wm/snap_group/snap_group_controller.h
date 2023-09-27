@@ -9,7 +9,10 @@
 #include <vector>
 
 #include "ash/ash_export.h"
+#include "ash/public/cpp/tablet_mode_observer.h"
+#include "ash/wm/overview/overview_observer.h"
 #include "base/containers/flat_map.h"
+#include "base/observer_list.h"
 
 namespace aura {
 class Window;
@@ -21,17 +24,30 @@ class SnapGroup;
 
 // Works as the centralized place to manage the `SnapGroup`. A single instance
 // of this class will be created and owned by `Shell`. It controls the creation
-// and destruction of the `SnapGroup`. TODO: It also implements the
-// `OverviewObserver` and `TabletObserver`.
-class ASH_EXPORT SnapGroupController {
+// and destruction of the `SnapGroup`.
+class ASH_EXPORT SnapGroupController : public OverviewObserver,
+                                       public TabletModeObserver {
  public:
+  class Observer : public base::CheckedObserver {
+   public:
+    // Called to notify with the creation of snap group.
+    virtual void OnSnapGroupCreated() = 0;
+
+    // Called to notify the removal of snap group.
+    virtual void OnSnapGroupRemoved() = 0;
+  };
+
   using SnapGroups = std::vector<std::unique_ptr<SnapGroup>>;
   using WindowToSnapGroupMap = base::flat_map<aura::Window*, SnapGroup*>;
 
   SnapGroupController();
   SnapGroupController(const SnapGroupController&) = delete;
   SnapGroupController& operator=(const SnapGroupController&) = delete;
-  ~SnapGroupController();
+  ~SnapGroupController() override;
+
+  // Convenience function to get the snap group controller instance, which is
+  // created and owned by Shell.
+  static SnapGroupController* Get();
 
   // Returns true if `window1` and `window2` are in the same snap group.
   bool AreWindowsInSnapGroup(aura::Window* window1,
@@ -40,6 +56,8 @@ class ASH_EXPORT SnapGroupController {
   // Returns true if the corresponding SnapGroup for the given `window1` and
   // `window2` gets created, added to the `snap_groups_` and updated
   // `window_to_snap_group_map_` successfully. False otherwise.
+  // Currently, we make the assumption that the two windows need to be on the
+  // same parent container.
   bool AddSnapGroup(aura::Window* window1, aura::Window* window2);
 
   // Returns true if the corresponding `snap_group` has
@@ -51,6 +69,17 @@ class ASH_EXPORT SnapGroupController {
   // given `window` has been removed successfully. Returns false otherwise.
   bool RemoveSnapGroupContainingWindow(aura::Window* window);
 
+  // Returns the corresponding `SnapGroup` if the given `window` belongs to a
+  // snap group or nullptr otherwise.
+  SnapGroup* GetSnapGroupForGivenWindow(const aura::Window* window);
+
+  // Used to decide whether showing overview on window snapped is allowed in
+  // clamshell.
+  bool CanEnterOverview() const;
+
+  void AddObserver(Observer* observer);
+  void RemoveObserver(Observer* observer);
+
   // Returns true if the feature flag `kSnapGroup` is enabled and the feature
   // param `kAutomaticallyLockGroup` is true, i.e. a snap group will be created
   // automatically on two windows snapped.
@@ -61,9 +90,29 @@ class ASH_EXPORT SnapGroupController {
   // create the snap group when the lock option shows up on two windows snapped.
   bool IsArm2ManuallyLockEnabled() const;
 
+  // Minimizes the most recently used and unminimized snap groups.
+  void MinimizeTopMostSnapGroup();
+
+  // Returns the topmost snap group in unminimized state.
+  SnapGroup* GetTopmostSnapGroup();
+
+  // Restores the most recent used snap group to be at the default snapped state
+  // i.e. two windows in the most recent snap group are positioned at primary
+  // and secondary snapped location.
+  void RestoreTopmostSnapGroup();
+
+  // OverviewObserver:
+  void OnOverviewModeEnded() override;
+
+  // TabletModeObserver:
+  void OnTabletModeEnding() override;
+
   const SnapGroups& snap_groups_for_testing() const { return snap_groups_; }
   const WindowToSnapGroupMap& window_to_snap_group_map_for_testing() const {
     return window_to_snap_group_map_;
+  }
+  void set_can_enter_overview_for_testing(bool can_enter_overview) {
+    can_enter_overview_ = can_enter_overview;
   }
 
  private:
@@ -72,12 +121,15 @@ class ASH_EXPORT SnapGroupController {
   // group.
   aura::Window* RetrieveTheOtherWindowInSnapGroup(aura::Window* window) const;
 
-  // Restores the windows bounds on snap group removed as the windows bounds are
-  // shrunk either horizontally or vertically to make room for the split view
-  // divider during `UpdateSnappedWindowsAndDividerBounds()` in
-  // `SplitViewController`.
-  void RestoreWindowsBoundsOnSnapGroupRemoved(aura::Window* window1,
-                                              aura::Window* window2);
+  // Restores the snapped state of the `snap_groups_` upon completion of certain
+  // transitions such as overview mode or tablet mode. Disallow overview to be
+  // shown on the other side of the screen when restoring snap groups so that
+  // the restore will be instant and the recursive snapping behavior will be
+  // avoided.
+  void RestoreSnapGroups();
+
+  // Restore the snap state of the windows in the given `snap_group`.
+  void RestoreSnapState(SnapGroup* snap_group);
 
   // Contains all the `SnapGroup`(s), we will have one `SnapGroup` globally for
   // the first iteration but will have multiple in the future iteration.
@@ -87,6 +139,13 @@ class ASH_EXPORT SnapGroupController {
   // `SnapGroup` with the `aura::Window*` and can also be used to decide if a
   // window is in a `SnapGroup` or not.
   WindowToSnapGroupMap window_to_snap_group_map_;
+
+  base::ObserverList<Observer> observers_;
+
+  // If false, overview will not be allowed to show on the other side of the
+  // screen on one window snapped, which is an instant way to snap window when
+  // restoring the window snapped state.
+  bool can_enter_overview_ = true;
 };
 
 }  // namespace ash

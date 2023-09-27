@@ -34,6 +34,7 @@
 #include "chrome/browser/win/titlebar_config.h"
 #include "chrome/common/chrome_constants.h"
 #include "components/policy/core/common/policy_pref_names.h"
+#include "content/public/browser/browser_thread.h"
 #include "ui/base/theme_provider.h"
 #include "ui/base/win/hwnd_metrics.h"
 #include "ui/display/win/screen_win.h"
@@ -284,6 +285,8 @@ void BrowserDesktopWindowTreeHostWin::Show(ui::WindowShowState show_state,
 
 void BrowserDesktopWindowTreeHostWin::HandleWindowMinimizedOrRestored(
     bool restored) {
+  DesktopWindowTreeHostWin::HandleWindowMinimizedOrRestored(restored);
+
   // This is necessary since OnWidgetVisibilityChanged() doesn't get called on
   // Windows when the window is minimized or restored.
   if (base::FeatureList::IsEnabled(
@@ -314,8 +317,10 @@ bool BrowserDesktopWindowTreeHostWin::GetClientAreaInsets(
 
   // Use default insets for popups and apps, unless we are custom drawing the
   // titlebar.
-  if (!ShouldCustomDrawSystemTitlebar() && !browser_view_->GetIsNormalType())
+  if (!ShouldBrowserCustomDrawTitlebar(browser_view_) &&
+      !browser_view_->GetIsNormalType()) {
     return false;
+  }
 
   if (GetWidget()->IsFullscreen()) {
     // In fullscreen mode there is no frame.
@@ -332,8 +337,10 @@ bool BrowserDesktopWindowTreeHostWin::GetClientAreaInsets(
     // area, Windows will draw a full native titlebar outside the client area.
     // (This doesn't occur in the maximized case.)
     int top_thickness = 0;
-    if (ShouldCustomDrawSystemTitlebar() && GetWidget()->IsMaximized())
+    if (ShouldBrowserCustomDrawTitlebar(browser_view_) &&
+        GetWidget()->IsMaximized()) {
       top_thickness = frame_thickness;
+    }
     *insets = gfx::Insets::TLBR(top_thickness, frame_thickness, frame_thickness,
                                 frame_thickness);
   }
@@ -356,7 +363,7 @@ bool BrowserDesktopWindowTreeHostWin::GetDwmFrameInsetsInPixels(
 
   // Don't extend the glass in at all if it won't be visible.
   if (!ShouldUseNativeFrame() || GetWidget()->IsFullscreen() ||
-      ShouldCustomDrawSystemTitlebar()) {
+      ShouldBrowserCustomDrawTitlebar(browser_view_)) {
     *insets = gfx::Insets();
   } else {
     // The glass should extend to the bottom of the tabstrip.
@@ -389,13 +396,6 @@ void BrowserDesktopWindowTreeHostWin::HandleCreate() {
 void BrowserDesktopWindowTreeHostWin::HandleDestroying() {
   browser_window_property_manager_.reset();
   DesktopWindowTreeHostWin::HandleDestroying();
-}
-
-void BrowserDesktopWindowTreeHostWin::HandleFrameChanged() {
-  // Reinitialize the status bubble, since it needs to be initialized
-  // differently depending on whether or not DWM composition is enabled
-  browser_view_->InitStatusBubble();
-  DesktopWindowTreeHostWin::HandleFrameChanged();
 }
 
 void BrowserDesktopWindowTreeHostWin::HandleWindowScaleFactorChanged(
@@ -466,7 +466,7 @@ void BrowserDesktopWindowTreeHostWin::PostHandleMSG(UINT message,
 
 views::FrameMode BrowserDesktopWindowTreeHostWin::GetFrameMode() const {
   const views::FrameMode system_frame_mode =
-      ShouldCustomDrawSystemTitlebar()
+      ShouldBrowserCustomDrawTitlebar(browser_view_)
           ? views::FrameMode::SYSTEM_DRAWN_NO_CONTROLS
           : views::FrameMode::SYSTEM_DRAWN;
 
@@ -506,7 +506,7 @@ bool BrowserDesktopWindowTreeHostWin::ShouldUseNativeFrame() const {
 
 bool BrowserDesktopWindowTreeHostWin::ShouldWindowContentsBeTransparent()
     const {
-  return !ShouldCustomDrawSystemTitlebar() &&
+  return !ShouldBrowserCustomDrawTitlebar(browser_view_) &&
          views::DesktopWindowTreeHostWin::ShouldWindowContentsBeTransparent();
 }
 

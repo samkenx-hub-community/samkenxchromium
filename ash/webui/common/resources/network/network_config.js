@@ -26,7 +26,7 @@ import {assert, assertNotReached} from '//resources/ash/common/assert.js';
 import {I18nBehavior} from '//resources/ash/common/i18n_behavior.js';
 import {loadTimeData} from '//resources/ash/common/load_time_data.m.js';
 import {flush, Polymer} from '//resources/polymer/v3_0/polymer/polymer_bundled.min.js';
-import {CertificateType, ConfigProperties, CrosNetworkConfigRemote, EAPConfigProperties, GlobalPolicy, HiddenSsidMode, IPSecConfigProperties, L2TPConfigProperties, ManagedBoolean, ManagedEAPProperties, ManagedInt32, ManagedIPSecProperties, ManagedL2TPProperties, ManagedOpenVPNProperties, ManagedProperties, ManagedString, ManagedStringList, ManagedWireGuardProperties, NetworkCertificate, OpenVPNConfigProperties, SecurityType, StartConnectResult, SubjectAltName, VpnType, WireGuardConfigProperties} from 'chrome://resources/mojo/chromeos/services/network_config/public/mojom/cros_network_config.mojom-webui.js';
+import {CertificateType, ConfigProperties, CrosNetworkConfigInterface, EAPConfigProperties, GlobalPolicy, HiddenSsidMode, IPSecConfigProperties, L2TPConfigProperties, ManagedBoolean, ManagedEAPProperties, ManagedInt32, ManagedIPSecProperties, ManagedL2TPProperties, ManagedOpenVPNProperties, ManagedProperties, ManagedString, ManagedStringList, ManagedWireGuardProperties, NetworkCertificate, OpenVPNConfigProperties, SecurityType, StartConnectResult, SubjectAltName, VpnType, WireGuardConfigProperties} from 'chrome://resources/mojo/chromeos/services/network_config/public/mojom/cros_network_config.mojom-webui.js';
 import {ConnectionStateType, IPConfigType, NetworkType, OncSource, PolicySource} from 'chrome://resources/mojo/chromeos/services/network_config/public/mojom/network_types.mojom-webui.js';
 
 import {MojoInterfaceProvider, MojoInterfaceProviderImpl} from './mojo_interface_provider.js';
@@ -69,6 +69,8 @@ const WireGuardKeyConfigType = {
 /** @type {string}  */ const DO_NOT_CHECK_HASH = 'do-not-check';
 /** @type {string}  */ const NO_CERTS_HASH = 'no-certs';
 /** @type {string}  */ const NO_USER_CERT_HASH = 'no-user-cert';
+
+/** @type {string}  */ const DEFAULT_EAP_OUTER_PROTOCOL = 'PEAP';
 
 /** @type {string}  */ const PLACEHOLDER_CREDENTIAL = '(credential)';
 
@@ -372,12 +374,13 @@ Polymer({
 
     /**
      * Array of values for the EAP Method (Outer) dropdown.
+     * They will be presented in a dropdown in this order.
      * @private {!Array<string>}
      */
     eapOuterItems_: {
       type: Array,
       readOnly: true,
-      value: ['LEAP', 'PEAP', 'EAP-TLS', 'EAP-TTLS'],
+      value: ['PEAP', 'EAP-TLS', 'EAP-TTLS', 'LEAP'],
     },
 
     /**
@@ -504,7 +507,7 @@ Polymer({
   /** @const */
   MIN_PASSPHRASE_LENGTH: 5,
 
-  /** @private {?CrosNetworkConfigRemote} */
+  /** @private {?CrosNetworkConfigInterface} */
   networkConfig_: null,
 
   /*
@@ -540,13 +543,11 @@ Polymer({
     this.selectedServerCaHash_ = undefined;
     this.selectedUserCertHash_ = undefined;
 
-    if (this.getHiddenNetworkMigrationEnabled()) {
-      const dialogArgs = chrome.getVariableValue('dialogArguments');
-      if (dialogArgs) {
-        const args = JSON.parse(dialogArgs);
-        if ('loggedIn' in args) {
-          this.isLoggedIn_ = args.loggedIn;
-        }
+    const dialogArgs = chrome.getVariableValue('dialogArguments');
+    if (dialogArgs) {
+      const args = JSON.parse(dialogArgs);
+      if ('loggedIn' in args) {
+        this.isLoggedIn_ = args.loggedIn;
       }
     }
 
@@ -604,11 +605,6 @@ Polymer({
     }
   },
 
-  /** @private */
-  getHiddenNetworkMigrationEnabled() {
-    return loadTimeData.getBoolean('enableHiddenNetworkMigration');
-  },
-
   /**
    * @param {boolean} connect If true, connect after save.
    * @private
@@ -645,7 +641,7 @@ Polymer({
     }
     const propertiesToSet = this.getPropertiesToSet_();
     if (this.managedProperties_.source === OncSource.kNone) {
-      if (this.getHiddenNetworkMigrationEnabled() && this.isLoggedIn_) {
+      if (this.isLoggedIn_) {
         // Note: Set hidden SSID mode of new WiFi networks to disabled to avoid
         // unintentionally marking networks as hidden if not in range or
         // misspelled, etc.
@@ -945,7 +941,7 @@ Polymer({
       domainSuffixMatch: this.getActiveStringList_(eap.domainSuffixMatch) || [],
       identity: OncMojo.getActiveString(eap.identity),
       inner: OncMojo.getActiveString(eap.inner),
-      outer: OncMojo.getActiveString(eap.outer) || 'LEAP',
+      outer: OncMojo.getActiveString(eap.outer) || DEFAULT_EAP_OUTER_PROTOCOL,
       password: OncMojo.getActiveString(eap.password),
       saveCredentials: this.getActiveBoolean_(eap.saveCredentials),
       serverCaPems: this.getActiveStringList_(eap.serverCaPems),
@@ -1178,7 +1174,7 @@ Polymer({
     let eap;
     if (security === SecurityType.kWpaEap) {
       eap = this.getEap_(this.configProperties_, true);
-      eap.outer = eap.outer || 'LEAP';
+      eap.outer = eap.outer || DEFAULT_EAP_OUTER_PROTOCOL;
     }
     this.setEap_(eap);
   },
@@ -2030,7 +2026,8 @@ Polymer({
       return false;
     }
     // endpoint should be the form of IP:port or hostname:port
-    if (!peer.endpoint || !peer.endpoint.match(/^[a-zA-Z0-9\-\.]+:[0-9]+$/i)) {
+    if (!peer.endpoint ||
+        !peer.endpoint.match(/^\[?[a-zA-Z0-9\-\.:]+\]?:[0-9]+$/i)) {
       return false;
     }
     // allowedIps should be comma-separated list of IP/cidr.
@@ -2517,6 +2514,16 @@ Polymer({
 
     if (this.selectedServerCaHash_ !== DEFAULT_HASH) {
       // Does not use default CA server certs.
+      return true;
+    }
+
+    const isPropertyManaged = !!this.managedEapProperties_ &&
+        !!this.managedEapProperties_.useSystemCas &&
+        (this.managedEapProperties_.useSystemCas.policySource !==
+         PolicySource.kNone);
+    // Bypass `domainSuffixMatch` and `subjectAltNameMatch` checks for managed
+    // networks if the user doesn't control the CA setting.
+    if (isPropertyManaged) {
       return true;
     }
 

@@ -36,7 +36,8 @@ SupportedLinksInfoBarPrefsServiceFactory::GetForProfile(Profile* profile) {
 // static
 SupportedLinksInfoBarPrefsServiceFactory*
 SupportedLinksInfoBarPrefsServiceFactory::GetInstance() {
-  return base::Singleton<SupportedLinksInfoBarPrefsServiceFactory>::get();
+  static base::NoDestructor<SupportedLinksInfoBarPrefsServiceFactory> instance;
+  return instance.get();
 }
 
 SupportedLinksInfoBarPrefsServiceFactory::
@@ -50,9 +51,10 @@ SupportedLinksInfoBarPrefsServiceFactory::
 SupportedLinksInfoBarPrefsServiceFactory::
     ~SupportedLinksInfoBarPrefsServiceFactory() = default;
 
-KeyedService* SupportedLinksInfoBarPrefsServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+SupportedLinksInfoBarPrefsServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
-  return new SupportedLinksInfoBarPrefsService(
+  return std::make_unique<SupportedLinksInfoBarPrefsService>(
       Profile::FromBrowserContext(context));
 }
 

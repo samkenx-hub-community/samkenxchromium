@@ -9,6 +9,7 @@
 
 #include "ash/constants/app_types.h"
 #include "ash/frame/non_client_frame_view_ash.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "chrome/browser/sharesheet/sharesheet_metrics.h"
@@ -33,7 +34,6 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/events/base_event_utils.h"
-#include "ui/lottie/resource.h"
 #include "ui/views/controls/native/native_view_host.h"
 #include "ui/views/test/widget_test.h"
 #include "ui/views/view.h"
@@ -93,10 +93,6 @@ class SharesheetBubbleViewTest : public ChromeAshTestBase {
     widget->GetContentsView()->AddChildView(content_view);
 
     parent_window_ = widget->GetNativeWindow();
-
-    ui::ResourceBundle::SetLottieParsingFunctions(
-        &lottie::ParseLottieAsStillImage,
-        &lottie::ParseLottieAsThemedStillImage);
   }
 
   void ShowAndVerifyBubble(apps::IntentPtr intent,
@@ -165,32 +161,18 @@ class SharesheetBubbleViewTest : public ChromeAshTestBase {
  private:
   gfx::NativeWindow parent_window_;
   std::unique_ptr<TestingProfile> profile_;
-  SharesheetBubbleViewDelegate* bubble_delegate_;
-  SharesheetBubbleView* sharesheet_bubble_view_;
-  views::Widget* sharesheet_widget_;
+  raw_ptr<SharesheetBubbleViewDelegate, DanglingUntriaged | ExperimentalAsh>
+      bubble_delegate_;
+  raw_ptr<SharesheetBubbleView, DanglingUntriaged | ExperimentalAsh>
+      sharesheet_bubble_view_;
+  raw_ptr<views::Widget, DanglingUntriaged | ExperimentalAsh>
+      sharesheet_widget_;
 };
 
 TEST_F(SharesheetBubbleViewTest, BubbleDoesOpenAndClose) {
   ShowAndVerifyBubble(::sharesheet::CreateValidTextIntent(),
                       ::sharesheet::LaunchSource::kUnknown);
   CloseBubble();
-}
-
-TEST_F(SharesheetBubbleViewTest, EmptyState) {
-  ShowAndVerifyBubble(::sharesheet::CreateInvalidIntent(),
-                      ::sharesheet::LaunchSource::kUnknown);
-
-  // Header should contain Share label.
-  ASSERT_TRUE(header_view()->GetVisible());
-  ASSERT_EQ(header_view()->children().size(), 1u);
-
-  // Body view should contain 3 children, an image and 2 labels.
-  ASSERT_TRUE(body_view()->GetVisible());
-  ASSERT_EQ(body_view()->children().size(), 3u);
-
-  // Footer should be an empty view that just acts as padding.
-  ASSERT_TRUE(footer_view()->GetVisible());
-  ASSERT_EQ(footer_view()->children().size(), 0u);
 }
 
 TEST_F(SharesheetBubbleViewTest, RecordLaunchSource) {
@@ -222,7 +204,7 @@ TEST_F(SharesheetBubbleViewTest, RecordShareActionCount) {
       ::sharesheet::kSharesheetShareActionResultHistogram,
       ::sharesheet::SharesheetMetrics::UserAction::kCopyAction, 1);
 
-  // Drive intent should show only drive action.
+  // Drive intent should show drive and copy actions.
   ShowAndVerifyBubble(::sharesheet::CreateDriveIntent(),
                       ::sharesheet::LaunchSource::kUnknown);
   CloseBubble();
@@ -231,18 +213,7 @@ TEST_F(SharesheetBubbleViewTest, RecordShareActionCount) {
       ::sharesheet::SharesheetMetrics::UserAction::kDriveAction, 1);
   histograms.ExpectBucketCount(
       ::sharesheet::kSharesheetShareActionResultHistogram,
-      ::sharesheet::SharesheetMetrics::UserAction::kCopyAction, 1);
-
-  // Invalid intent should not show any actions.
-  ShowAndVerifyBubble(::sharesheet::CreateInvalidIntent(),
-                      ::sharesheet::LaunchSource::kUnknown);
-  CloseBubble();
-  histograms.ExpectBucketCount(
-      ::sharesheet::kSharesheetShareActionResultHistogram,
-      ::sharesheet::SharesheetMetrics::UserAction::kDriveAction, 1);
-  histograms.ExpectBucketCount(
-      ::sharesheet::kSharesheetShareActionResultHistogram,
-      ::sharesheet::SharesheetMetrics::UserAction::kCopyAction, 1);
+      ::sharesheet::SharesheetMetrics::UserAction::kCopyAction, 2);
 }
 
 TEST_F(SharesheetBubbleViewTest, ClickCopyToClipboard) {

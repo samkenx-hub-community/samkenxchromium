@@ -17,6 +17,7 @@
 #include "base/ranges/algorithm.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
 #include "base/threading/thread_restrictions.h"
@@ -57,6 +58,9 @@ constexpr char kRequesterPackageName[] = "org.chromium.arc.webapk";
 
 // Android property containing the list of supported ABIs.
 constexpr char kAbiListPropertyName[] = "ro.product.cpu.abilist";
+// Alternative property containing the list of supported ABIs, used on Android
+// T+.
+constexpr char kSystemAbiListPropertyName[] = "ro.system.product.cpu.abilist";
 
 const char kMinimumIconSize = 64;
 
@@ -175,6 +179,10 @@ void AddUpdateParams(webapk::WebApk* webapk,
   // The |manifest_url| is used as a key on Android, so the |manifest_url| sent
   // to the server to query a particular app should always be the same.
   webapk->set_manifest_url(web_apk_info->manifest_url);
+  // Any changes to web app identity which make it through to App Service will
+  // have gone through an update policy check, which makes it safe to update
+  // the WebAPK too.
+  webapk->set_app_identity_update_supported(true);
 
   auto manifest = webapk->manifest();
   if (manifest.short_name() != web_apk_info->name) {
@@ -237,14 +245,17 @@ absl::optional<std::string> AddIconDataAndSerializeProto(
 }
 
 std::string GetArcAbi(const arc::ArcFeatures& arc_features) {
-  const std::string& property =
-      arc_features.build_props.at(kAbiListPropertyName);
-  size_t separator_pos = property.find(',');
-  if (separator_pos != std::string::npos) {
-    return property.substr(0, separator_pos);
+  auto property = arc_features.build_props.find(kAbiListPropertyName);
+  if (property == arc_features.build_props.end()) {
+    property = arc_features.build_props.find(kSystemAbiListPropertyName);
   }
 
-  return property;
+  CHECK(property != arc_features.build_props.end()) << "ARC must have an ABI";
+
+  // The property value will be a comma separated list, e.g. "x86_64,x86". The
+  // highest priority will be listed first.
+  return base::SplitString(property->second, ",", base::KEEP_WHITESPACE,
+                           base::SPLIT_WANT_NONEMPTY)[0];
 }
 
 }  // namespace
@@ -290,7 +301,8 @@ void WebApkInstallTask::Start(ResultCallback callback) {
   std::unique_ptr<webapk::WebApk> webapk = std::make_unique<webapk::WebApk>();
   webapk->set_manifest_url(registrar.GetAppManifestUrl(app_id_).spec());
   webapk->set_requester_application_package(kRequesterPackageName);
-  webapk->set_requester_application_version(version_info::GetVersionNumber());
+  webapk->set_requester_application_version(
+      std::string(version_info::GetVersionNumber()));
 
   LoadWebApkInfo(std::move(webapk));
 }
@@ -559,7 +571,8 @@ void WebApkInstallTask::OnWebApkInfoFetchedFromCrosapi(
   }
 
   webapk->set_requester_application_package(kRequesterPackageName);
-  webapk->set_requester_application_version(version_info::GetVersionNumber());
+  webapk->set_requester_application_version(
+      std::string(version_info::GetVersionNumber()));
   LoadWebApkInfo(std::move(webapk));
 }
 

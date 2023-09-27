@@ -81,16 +81,14 @@ class BlinkSchedulerSingleThreadTaskRunnerTest : public testing::Test {
     if (!test_task_queue_) {
       return;
     }
-    test_task_queue_->ShutdownTaskQueue();
-    test_task_queue_ = nullptr;
+    test_task_queue_.reset();
   }
 
   void ShutDownBackupTaskQueue() {
     if (!backup_task_queue_) {
       return;
     }
-    backup_task_queue_->ShutdownTaskQueue();
-    backup_task_queue_ = nullptr;
+    backup_task_queue_.reset();
   }
 
   base::test::TaskEnvironment task_environment_;
@@ -99,10 +97,10 @@ class BlinkSchedulerSingleThreadTaskRunnerTest : public testing::Test {
   std::unique_ptr<base::sequence_manager::SequenceManagerForTest>
       sequence_manager_;
 
-  scoped_refptr<base::sequence_manager::TaskQueue> backup_task_queue_;
+  base::sequence_manager::TaskQueue::Handle backup_task_queue_;
   scoped_refptr<base::SingleThreadTaskRunner> backup_task_runner_;
 
-  scoped_refptr<base::sequence_manager::TaskQueue> test_task_queue_;
+  base::sequence_manager::TaskQueue::Handle test_task_queue_;
   scoped_refptr<base::SingleThreadTaskRunner> test_task_runner_;
 };
 

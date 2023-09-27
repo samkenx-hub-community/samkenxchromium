@@ -74,7 +74,6 @@ class FakeDownloadItem : public download::DownloadItem {
   bool CanResume() const override;
   int64_t GetBytesWasted() const override;
   int32_t GetAutoResumeCount() const override;
-  bool IsOffTheRecord() const override;
   const GURL& GetReferrerUrl() const override;
   const std::string& GetSerializedEmbedderDownloadData() const override;
   const GURL& GetTabUrl() const override;
@@ -171,7 +170,7 @@ class FakeDownloadItem : public download::DownloadItem {
       download::DownloadItem::InsecureDownloadStatus insecure_download_status);
 
  private:
-  base::ObserverList<Observer>::Unchecked observers_;
+  base::ObserverList<Observer> observers_;
   uint32_t id_ = 0;
   std::string guid_;
   GURL url_;

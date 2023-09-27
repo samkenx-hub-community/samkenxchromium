@@ -6,11 +6,15 @@
 
 #include <memory>
 
+#include "ash/constants/ash_features.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
 #include "base/time/tick_clock.h"
+#include "chromeos/ash/components/dbus/hermes/hermes_euicc_client.h"
 #include "chromeos/ash/components/dbus/hermes/hermes_manager_client.h"
+#include "chromeos/ash/components/dbus/hermes/hermes_profile_client.h"
 #include "chromeos/ash/components/feature_usage/feature_usage_metrics.h"
 #include "chromeos/ash/components/network/cellular_esim_profile.h"
 #include "chromeos/ash/components/network/cellular_esim_profile_handler.h"
@@ -368,10 +372,7 @@ CellularMetricsLogger::ShillErrorToConnectResult(
 class ESimFeatureUsageMetrics
     : public feature_usage::FeatureUsageMetrics::Delegate {
  public:
-  explicit ESimFeatureUsageMetrics(
-      CellularESimProfileHandler* cellular_esim_profile_handler)
-      : cellular_esim_profile_handler_(cellular_esim_profile_handler) {
-    DCHECK(cellular_esim_profile_handler);
+  ESimFeatureUsageMetrics() {
     feature_usage_metrics_ =
         std::make_unique<feature_usage::FeatureUsageMetrics>(
             kESimUMAFeatureName, this);
@@ -388,11 +389,29 @@ class ESimFeatureUsageMetrics
   // feature_usage::FeatureUsageMetrics::Delegate:
   bool IsEnabled() const final {
     // If there are installed ESim profiles.
-    for (const auto& profile :
-         cellular_esim_profile_handler_->GetESimProfiles()) {
-      if (profile.state() == CellularESimProfile::State::kActive ||
-          profile.state() == CellularESimProfile::State::kInactive) {
-        return true;
+    for (const dbus::ObjectPath& euicc_path :
+         HermesManagerClient::Get()->GetAvailableEuiccs()) {
+      HermesEuiccClient::Properties* euicc_properties =
+          HermesEuiccClient::Get()->GetProperties(euicc_path);
+      if (!euicc_properties) {
+        continue;
+      }
+      const std::vector<dbus::ObjectPath>& profiles =
+          ash::features::IsSmdsDbusMigrationEnabled()
+              ? euicc_properties->profiles().value()
+              : euicc_properties->installed_carrier_profiles().value();
+      for (const dbus::ObjectPath& profile_path : profiles) {
+        HermesProfileClient::Properties* profile_properties =
+            HermesProfileClient::Get()->GetProperties(profile_path);
+        if (!profile_properties) {
+          continue;
+        }
+        const hermes::profile::State profile_state =
+            profile_properties->state().value();
+        if (profile_state == hermes::profile::State::kActive ||
+            profile_state == hermes::profile::State::kInactive) {
+          return true;
+        }
       }
     }
     return false;
@@ -407,7 +426,6 @@ class ESimFeatureUsageMetrics
   void StopUsage() { feature_usage_metrics_->StopSuccessfulUsage(); }
 
  private:
-  CellularESimProfileHandler* cellular_esim_profile_handler_;
   std::unique_ptr<feature_usage::FeatureUsageMetrics> feature_usage_metrics_;
 };
 
@@ -473,17 +491,14 @@ void CellularMetricsLogger::Init(
   cellular_esim_profile_handler_ = cellular_esim_profile_handler;
   managed_network_configuration_handler_ =
       managed_network_configuration_handler;
-  network_state_handler_observer_.Observe(network_state_handler_);
+  network_state_handler_observer_.Observe(network_state_handler_.get());
 
   if (network_connection_handler) {
     network_connection_handler_ = network_connection_handler;
     network_connection_handler_->AddObserver(this);
   }
 
-  if (cellular_esim_profile_handler_) {
-    esim_feature_usage_metrics_ = std::make_unique<ESimFeatureUsageMetrics>(
-        cellular_esim_profile_handler_);
-  }
+  esim_feature_usage_metrics_ = std::make_unique<ESimFeatureUsageMetrics>();
 
   if (LoginState::IsInitialized())
     LoginState::Get()->AddObserver(this);
@@ -688,10 +703,10 @@ void CellularMetricsLogger::ConnectFailed(const std::string& service_path,
 
 void CellularMetricsLogger::DisconnectRequested(
     const std::string& service_path) {
-  const NetworkState* network =
-      network_state_handler_->GetNetworkState(service_path);
-  if (!network->Matches(NetworkTypePattern::Cellular()))
+  const NetworkState* network = GetCellularNetwork(service_path);
+  if (!network || !network->Matches(NetworkTypePattern::Cellular())) {
     return;
+  }
 
   ConnectionInfo* connection_info =
       GetConnectionInfoForCellularNetwork(network->guid());

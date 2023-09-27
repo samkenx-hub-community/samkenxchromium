@@ -5,8 +5,6 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_LOCATION_BAR_STAR_VIEW_H_
 #define CHROME_BROWSER_UI_VIEWS_LOCATION_BAR_STAR_VIEW_H_
 
-#include <memory>
-
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/ui/views/page_action/page_action_icon_view.h"
 #include "components/prefs/pref_member.h"

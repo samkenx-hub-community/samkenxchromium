@@ -74,13 +74,18 @@ public class FaviconUtils {
      * Create a bitmap with corresponding size of a generic favicon.
      * @param context {@link Context} to read the generic favicon.
      * @param size Desired size of the bitmap.
+     * @param backgroundColor Optional background color for the favicon.
      * @return A generic globe favicon.
      */
-    public static Bitmap createGenericFaviconBitmap(Context context, int size) {
+    public static Bitmap createGenericFaviconBitmap(
+            Context context, int size, @Nullable @ColorInt Integer backgroundColor) {
         Bitmap bitmap = Bitmap.createBitmap(size, size, Config.ARGB_8888);
-        Drawable drawable = AppCompatResources.getDrawable(context, R.drawable.ic_globe_24dp);
+        Drawable drawable = AppCompatResources.getDrawable(context, R.drawable.ic_globe_48dp);
         drawable.setBounds(0, 0, size, size);
         Canvas canvas = new Canvas(bitmap);
+        if (backgroundColor != null) {
+            canvas.drawColor(backgroundColor);
+        }
         drawable.draw(canvas);
         return bitmap;
     }
@@ -130,17 +135,18 @@ public class FaviconUtils {
      * @param iconGenerator RoundedIconGenerator to generate a monogram. Used only if {@code
      *         icon} is null.
      * @param defaultFaviconHelper Helper to generate default favicons.
-     * @param resources {@link Resources} to create a {@link BitmapDrawable}.
+     * @param context {@link Context} to create a {@link BitmapDrawable} and resolve resources.
      * @param iconSize Width and height of the returned icon.
      * @return A {@link Drawable} to be displayed as the favicon.
      */
     public static Drawable getIconDrawableWithFilter(@Nullable Bitmap icon, @Nullable GURL url,
             RoundedIconGenerator iconGenerator,
-            FaviconHelper.DefaultFaviconHelper defaultFaviconHelper, Resources resources,
+            FaviconHelper.DefaultFaviconHelper defaultFaviconHelper, Context context,
             int iconSize) {
         if (url == null) {
-            return defaultFaviconHelper.getDefaultFaviconDrawable(resources, url, true);
+            return defaultFaviconHelper.getDefaultFaviconDrawable(context, url, true);
         }
+        Resources resources = context.getResources();
         if (icon == null) {
             icon = iconGenerator.generateIconForUrl(url);
             return new BitmapDrawable(

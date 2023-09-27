@@ -11,11 +11,11 @@
 
 namespace ash {
 
-// A view contains a Label button with app icon and name
-class ASH_EXPORT AppStreamLauncherListItem : public views::View {
+// A LabelButton that represents an app in the launcher.
+class ASH_EXPORT AppStreamLauncherListItem : public views::LabelButton {
  public:
   AppStreamLauncherListItem(
-      views::LabelButton::PressedCallback callback,
+      PressedCallback callback,
       const phonehub::Notification::AppMetadata& app_metadata);
 
   ~AppStreamLauncherListItem() override;
@@ -26,15 +26,7 @@ class ASH_EXPORT AppStreamLauncherListItem : public views::View {
       const phonehub::Notification::AppMetadata& app_metadata);
 
   // views::View:
-  bool HasFocus() const override;
-  void RequestFocus() override;
   const char* GetClassName() const override;
-
-  views::LabelButton* GetAppButtonForTest();
-
- private:
-  // Owned by views hierarchy.
-  views::LabelButton* app_button_ = nullptr;
 };
 
 }  // namespace ash

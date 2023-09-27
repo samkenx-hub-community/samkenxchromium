@@ -4,18 +4,16 @@
 
 #include "chrome/updater/mac/privileged_helper/service.h"
 
-#include "base/memory/raw_ptr.h"
-#import "base/task/sequenced_task_runner.h"
-
 #import <Foundation/Foundation.h>
 #include <Security/Security.h>
-
 #include <pwd.h>
 #include <unistd.h>
 
 #include <string>
 #include <utility>
 
+#include "base/apple/foundation_util.h"
+#include "base/apple/scoped_cftyperef.h"
 #include "base/command_line.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
@@ -24,10 +22,8 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
-#include "base/mac/foundation_util.h"
 #include "base/mac/mac_util.h"
-#include "base/mac/scoped_cftyperef.h"
-#include "base/mac/scoped_nsobject.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/process/launch.h"
 #include "base/strings/strcat.h"
@@ -66,12 +62,15 @@
 #pragma mark PrivilegedHelperServiceProtocol
 - (void)setupSystemUpdaterWithBrowserPath:(NSString* _Nonnull)browserPath
                                     reply:(void (^_Nonnull)(int rc))reply {
-  auto cb = base::BindOnce(base::RetainBlock(^(const int rc) {
+  auto cb = base::BindOnce(^(const int rc) {
     VLOG(0) << "SetupSystemUpdaterWithUpdaterPath complete. Result: " << rc;
-    if (reply)
+    if (reply) {
       reply(rc);
-    _server->TaskCompleted();
-  }));
+    }
+    // This block is fired and then released, so this strong reference to the
+    // PrivilegedHelperServiceProtocol is OK.
+    self->_server->TaskCompleted();
+  });
 
   _server->TaskStarted();
   _callbackRunner->PostTask(
@@ -108,11 +107,10 @@
   newConnection.exportedInterface = [NSXPCInterface
       interfaceWithProtocol:@protocol(PrivilegedHelperServiceProtocol)];
 
-  base::scoped_nsobject<PrivilegedHelperServiceImpl> obj(
+  newConnection.exportedObject =
       [[PrivilegedHelperServiceImpl alloc] initWithService:_service.get()
                                                     server:_server
-                                            callbackRunner:_callbackRunner]);
-  newConnection.exportedObject = obj.get();
+                                            callbackRunner:_callbackRunner];
   [newConnection resume];
   return YES;
 }
@@ -191,18 +189,20 @@ int InstallUpdater(const base::FilePath& browser_path) {
 }  // namespace
 
 bool VerifyUpdaterSignature(const base::FilePath& updater_app_bundle) {
-  base::ScopedCFTypeRef<SecRequirementRef> requirement;
-  base::ScopedCFTypeRef<SecStaticCodeRef> code;
-  base::ScopedCFTypeRef<CFErrorRef> errors;
+  base::apple::ScopedCFTypeRef<SecRequirementRef> requirement;
+  base::apple::ScopedCFTypeRef<SecStaticCodeRef> code;
+  base::apple::ScopedCFTypeRef<CFErrorRef> errors;
   if (SecStaticCodeCreateWithPath(
-          base::mac::NSToCFCast(base::mac::FilePathToNSURL(updater_app_bundle)),
-          kSecCSDefaultFlags, code.InitializeInto()) != errSecSuccess) {
+          base::apple::FilePathToCFURL(updater_app_bundle), kSecCSDefaultFlags,
+          code.InitializeInto()) != errSecSuccess) {
     return false;
   }
   if (SecRequirementCreateWithString(
-          CFSTR("anchor apple generic and identifier "
-                "\"" MAC_BUNDLE_IDENTIFIER_STRING
-                "\" and certificate leaf[subject.OU] "
+          CFSTR("anchor apple generic and ("
+                " identifier \"" MAC_BUNDLE_IDENTIFIER_STRING "\""
+                " or identifier \"" LEGACY_GOOGLE_UPDATE_APPID "\""
+                " or identifier \"" LEGACY_GOOGLE_UPDATE_APPID ".Agent\""
+                ") and certificate leaf[subject.OU] "
                 "= " MAC_TEAM_IDENTIFIER_STRING),
           kSecCSDefaultFlags, requirement.InitializeInto()) != errSecSuccess) {
     return false;
@@ -215,9 +215,7 @@ bool VerifyUpdaterSignature(const base::FilePath& updater_app_bundle) {
   return true;
 }
 
-PrivilegedHelperService::PrivilegedHelperService()
-    : main_task_runner_(base::SequencedTaskRunner::GetCurrentDefault()) {}
-
+PrivilegedHelperService::PrivilegedHelperService() = default;
 PrivilegedHelperService::~PrivilegedHelperService() = default;
 
 void PrivilegedHelperService::SetupSystemUpdater(

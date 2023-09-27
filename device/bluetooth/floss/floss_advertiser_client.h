@@ -204,6 +204,9 @@ class DEVICE_BLUETOOTH_EXPORT FlossAdvertiserClient
   void CompleteRegisterCallback(dbus::Response* response,
                                 dbus::ErrorResponse* error_response);
 
+  // Completes the method call for UnregisterAdvertiserCallback.
+  void CompleteUnregisterCallback(DBusResult<bool> ret);
+
   // Completes the method call for |StartAdvertisingSet|.
   void CompleteStartAdvertisingSetCallback(
       StartSuccessCallback success_callback,
@@ -256,7 +259,7 @@ class DEVICE_BLUETOOTH_EXPORT FlossAdvertiserClient
       AdvertisingStatus status);
 
   // Managed by FlossDBusManager - we keep local pointer to access object proxy.
-  base::raw_ptr<dbus::Bus> bus_ = nullptr;
+  raw_ptr<dbus::Bus> bus_ = nullptr;
 
   // Path used for gatt api calls by this class.
   dbus::ObjectPath gatt_adapter_path_;

@@ -25,8 +25,10 @@
 #include "ash/system/status_area_widget.h"
 #include "ash/system/tray/tray_bubble_view.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/strcat.h"
 #include "chromeos/ash/components/phonehub/onboarding_ui_tracker.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -75,6 +77,9 @@ class OnboardingMainView : public PhoneHubInterstitialView {
         IDS_ASH_PHONE_HUB_ONBOARDING_DIALOG_DESCRIPTION));
 
     // Add "Dismiss" and "Get started" buttons.
+    // TODO(b/281844561): Migrate the "Dismiss" button to use
+    // |PillButton::Type::kSecondaryWithoutIcon| when the PillButton colors
+    // are updated with better contrast-ratios.
     auto dismiss = std::make_unique<PillButton>(
         base::BindRepeating(&OnboardingMainView::DismissButtonPressed,
                             base::Unretained(this)),
@@ -89,14 +94,18 @@ class OnboardingMainView : public PhoneHubInterstitialView {
                             base::Unretained(this)),
         l10n_util::GetStringUTF16(
             IDS_ASH_PHONE_HUB_ONBOARDING_DIALOG_GET_STARTED_BUTTON),
-        PillButton::Type::kDefaultWithoutIcon, /*icon=*/nullptr);
+        chromeos::features::IsJellyrollEnabled()
+            ? PillButton::Type::kPrimaryWithoutIcon
+            : PillButton::Type::kDefaultWithoutIcon,
+        /*icon=*/nullptr);
     get_started->SetID(PhoneHubViewID::kOnboardingGetStartedButton);
     AddButton(std::move(get_started));
   }
 
   void GetStartedButtonPressed() {
     LogInterstitialScreenEvent(InterstitialScreenEvent::kConfirm);
-    onboarding_ui_tracker_->HandleGetStarted();
+    onboarding_ui_tracker_->HandleGetStarted(
+        parent_view_->IsOnboardingViewStartedFromNudge());
   }
 
   void DismissButtonPressed() {
@@ -104,8 +113,9 @@ class OnboardingMainView : public PhoneHubInterstitialView {
     parent_view_->ShowDismissPrompt();
   }
 
-  phonehub::OnboardingUiTracker* onboarding_ui_tracker_ = nullptr;
-  OnboardingView* parent_view_ = nullptr;
+  raw_ptr<phonehub::OnboardingUiTracker, ExperimentalAsh>
+      onboarding_ui_tracker_ = nullptr;
+  raw_ptr<OnboardingView, ExperimentalAsh> parent_view_ = nullptr;
   const OnboardingView::OnboardingFlow onboarding_flow_;
 };
 
@@ -172,7 +182,8 @@ class OnboardingDismissPromptView : public PhoneHubInterstitialView {
     return Screen::kOnboardingDismissPrompt;
   }
 
-  phonehub::OnboardingUiTracker* onboarding_ui_tracker_ = nullptr;
+  raw_ptr<phonehub::OnboardingUiTracker, ExperimentalAsh>
+      onboarding_ui_tracker_ = nullptr;
 };
 
 // OnboardingView -------------------------------------------------------------
@@ -205,13 +216,21 @@ void OnboardingView::ShowDismissPrompt() {
 
   LogInterstitialScreenEvent(InterstitialScreenEvent::kShown);
 
-  RemoveChildViewT(main_view_);
+  RemoveChildViewT(main_view_.get());
   main_view_ = AddChildView(
       std::make_unique<OnboardingDismissPromptView>(onboarding_ui_tracker_));
 
   // We don't show status header view on top for the dismiss prompt.
   DCHECK(delegate_);
   delegate_->HideStatusHeaderView();
+}
+
+bool OnboardingView::IsOnboardingViewStartedFromNudge() {
+  if (!delegate_) {
+    return false;
+  }
+
+  return delegate_->IsPhoneHubIconClickedWhenNudgeVisible();
 }
 
 BEGIN_METADATA(OnboardingView, views::View)

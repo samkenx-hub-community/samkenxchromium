@@ -4,12 +4,13 @@
 
 package org.chromium.chrome.browser.keyboard_accessory.sheet_tabs;
 
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
+
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -41,6 +42,7 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.chrome.browser.autofill.PersonalDataManager;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.keyboard_accessory.AccessoryTabType;
 import org.chromium.chrome.browser.keyboard_accessory.R;
@@ -52,10 +54,12 @@ import org.chromium.chrome.browser.keyboard_accessory.sheet_component.AccessoryS
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.AccessorySheetTabItemsModel.AccessorySheetDataPiece;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.browser_ui.widget.chips.ChipView;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.url.GURL;
 
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -160,7 +164,11 @@ public class CreditCardAccessorySheetViewTest {
         assertThat(getChipText(R.id.cardholder), is("Kirby Puckett"));
         // Verify that the icon is correctly set.
         ImageView iconImageView = (ImageView) mView.get().getChildAt(0).findViewById(R.id.icon);
-        Drawable expectedIcon = mActivityTestRule.getActivity().getDrawable(R.drawable.visa_card);
+        Drawable expectedIcon =
+                ChromeFeatureList.isEnabled(
+                        ChromeFeatureList.AUTOFILL_ENABLE_NEW_CARD_ART_AND_NETWORK_IMAGES)
+                ? mActivityTestRule.getActivity().getDrawable(R.drawable.visa_metadata_card)
+                : mActivityTestRule.getActivity().getDrawable(R.drawable.visa_card);
         assertTrue(getBitmap(expectedIcon).sameAs(getBitmap(iconImageView.getDrawable())));
         // Chips are clickable:
         TestThreadUtils.runOnUiThreadBlocking(findChipView(R.id.cc_number)::performClick);
@@ -172,6 +180,7 @@ public class CreditCardAccessorySheetViewTest {
 
     @Test
     @MediumTest
+    @EnableFeatures({ChromeFeatureList.AUTOFILL_ENABLE_NEW_CARD_ART_AND_NETWORK_IMAGES})
     public void testAddingUserInfoWithIconUrl_iconCachedInPersonalDataManager()
             throws ExecutionException {
         GURL iconUrl = mock(GURL.class);
@@ -180,8 +189,8 @@ public class CreditCardAccessorySheetViewTest {
         // Return the cached image when
         // PersonalDataManager.getCustomImageForAutofillSuggestionIfAvailable is called for the
         // above url.
-        when(mMockPersonalDataManager.getCustomImageForAutofillSuggestionIfAvailable(any()))
-                .thenReturn(TEST_CARD_ART_IMAGE);
+        when(mMockPersonalDataManager.getCustomImageForAutofillSuggestionIfAvailable(any(), any()))
+                .thenReturn(Optional.of(TEST_CARD_ART_IMAGE));
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             mModel.add(new AccessorySheetDataPiece(
@@ -216,8 +225,8 @@ public class CreditCardAccessorySheetViewTest {
         when(iconUrl.getSpec()).thenReturn(CUSTOM_ICON_URL);
         // Return null when PersonalDataManager.getCustomImageForAutofillSuggestionIfAvailable is
         // called for the above url.
-        when(mMockPersonalDataManager.getCustomImageForAutofillSuggestionIfAvailable(any()))
-                .thenReturn(null);
+        when(mMockPersonalDataManager.getCustomImageForAutofillSuggestionIfAvailable(any(), any()))
+                .thenReturn(Optional.empty());
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             mModel.add(new AccessorySheetDataPiece(
@@ -237,7 +246,11 @@ public class CreditCardAccessorySheetViewTest {
         assertThat(getChipText(R.id.cardholder), is("Kirby Puckett"));
         // Verify that the icon is set to the drawable corresponding to `visaCC`.
         ImageView iconImageView = (ImageView) mView.get().getChildAt(0).findViewById(R.id.icon);
-        Drawable expectedIcon = mActivityTestRule.getActivity().getDrawable(R.drawable.visa_card);
+        Drawable expectedIcon =
+                ChromeFeatureList.isEnabled(
+                        ChromeFeatureList.AUTOFILL_ENABLE_NEW_CARD_ART_AND_NETWORK_IMAGES)
+                ? mActivityTestRule.getActivity().getDrawable(R.drawable.visa_metadata_card)
+                : mActivityTestRule.getActivity().getDrawable(R.drawable.visa_card);
         assertTrue(getBitmap(expectedIcon).sameAs(getBitmap(iconImageView.getDrawable())));
     }
 

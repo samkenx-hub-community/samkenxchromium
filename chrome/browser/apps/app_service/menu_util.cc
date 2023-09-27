@@ -19,13 +19,16 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/policy/core/common/policy_pref_names.h"
 #include "content/public/common/content_features.h"
+#include "third_party/blink/public/common/features.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/image_model.h"
 #include "ui/color/color_id.h"
 #include "ui/gfx/image/image_skia.h"
 
 namespace {
+
 const int kInvalidRadioGroupId = -1;
 const int kGroupId = 1;
 
@@ -53,6 +56,8 @@ void PopulateRadioItemFromMenuItems(
 }  // namespace
 
 namespace apps {
+
+DEFINE_ELEMENT_IDENTIFIER_VALUE(kLaunchNewMenuItem);
 
 void AddCommandItem(uint32_t command_id,
                     uint32_t string_id,
@@ -94,7 +99,7 @@ void CreateOpenNewSubmenu(uint32_t string_id, MenuItems& menu_items) {
   menu_item->submenu.push_back(CreateRadioItem(
       ash::USE_LAUNCH_TYPE_WINDOW,
       StringIdForUseLaunchTypeCommand(ash::USE_LAUNCH_TYPE_WINDOW), kGroupId));
-  if (base::FeatureList::IsEnabled(features::kDesktopPWAsTabStrip) &&
+  if (base::FeatureList::IsEnabled(blink::features::kDesktopPWAsTabStrip) &&
       base::FeatureList::IsEnabled(features::kDesktopPWAsTabStripSettings)) {
     menu_item->submenu.push_back(CreateRadioItem(
         ash::USE_LAUNCH_TYPE_TABBED_WINDOW,
@@ -143,6 +148,9 @@ void PopulateLaunchNewItemFromMenuItem(const MenuItemPtr& menu_item,
   switch (menu_item->type) {
     case apps::MenuItemType::kCommand: {
       model->AddItemWithStringId(menu_item->command_id, menu_item->string_id);
+      model->SetElementIdentifierAt(
+          model->GetIndexOfCommandId(menu_item->command_id).value(),
+          kLaunchNewMenuItem);
       break;
     }
     case apps::MenuItemType::kSubmenu:
@@ -206,7 +214,7 @@ MenuItems CreateBrowserMenuItems(const Profile* profile) {
 
   // "Normal" windows are not allowed when incognito is enforced.
   if (IncognitoModePrefs::GetAvailability(profile->GetPrefs()) !=
-      IncognitoModePrefs::Availability::kForced) {
+      policy::IncognitoModeAvailability::kForced) {
     AddCommandItem(ash::APP_CONTEXT_MENU_NEW_WINDOW, IDS_APP_LIST_NEW_WINDOW,
                    menu_items);
   }
@@ -214,7 +222,7 @@ MenuItems CreateBrowserMenuItems(const Profile* profile) {
   // Incognito windows are not allowed when incognito is disabled.
   if (!profile->IsOffTheRecord() &&
       IncognitoModePrefs::GetAvailability(profile->GetPrefs()) !=
-          IncognitoModePrefs::Availability::kDisabled) {
+          policy::IncognitoModeAvailability::kDisabled) {
     AddCommandItem(ash::APP_CONTEXT_MENU_NEW_INCOGNITO_WINDOW,
                    IDS_APP_LIST_NEW_INCOGNITO_WINDOW, menu_items);
   }

@@ -32,14 +32,13 @@
 #include "base/android/build_info.h"
 #include "base/android/bundle_utils.h"
 #include "base/task/thread_pool/environment_config.h"
+#include "chrome/browser/android/flags/chrome_cached_flags.h"
 #include "chrome/browser/android/signin/fre_mobile_identity_consistency_field_trial.h"
-#include "chrome/browser/flags/android/cached_feature_flags.h"
 #include "chrome/browser/flags/android/chrome_feature_list.h"
 #include "chrome/common/chrome_features.h"
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-#include "chrome/browser/ash/login/consolidated_consent_field_trial.h"
 #include "chrome/common/channel_info.h"
 #include "chromeos/ash/components/login/auth/recovery/recovery_utils.h"
 #include "chromeos/ash/services/multidevice_setup/public/cpp/first_run_field_trial.h"
@@ -70,11 +69,6 @@ void ChromeBrowserFieldTrials::SetUpClientSideFieldTrials(
     bool has_seed,
     const variations::EntropyProviders& entropy_providers,
     base::FeatureList* feature_list) {
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  ash::consolidated_consent_field_trial::Create(
-      entropy_providers.default_entropy(), feature_list, local_state_);
-#endif
-
   // Only create the fallback trials if there isn't already a variations seed
   // being applied. This should occur during first run when first-run variations
   // isn't supported. It's assumed that, if there is a seed, then it either

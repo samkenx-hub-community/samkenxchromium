@@ -19,6 +19,7 @@
 #include "chrome/grit/side_panel_user_notes_resources_map.h"
 #include "components/prefs/pref_service.h"
 #include "components/strings/grit/components_strings.h"
+#include "components/user_notes/user_notes_features.h"
 #include "components/user_notes/user_notes_prefs.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui_data_source.h"
@@ -26,6 +27,9 @@
 
 UserNotesSidePanelUI::UserNotesSidePanelUI(content::WebUI* web_ui)
     : ui::MojoBubbleWebUIController(web_ui, true) {
+  if (!user_notes::IsUserNotesEnabled()) {
+    return;
+  }
   content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
       web_ui->GetWebContents()->GetBrowserContext(),
       chrome::kChromeUIUserNotesSidePanelHost);
@@ -63,9 +67,7 @@ UserNotesSidePanelUI::UserNotesSidePanelUI(content::WebUI* web_ui)
   }
   source->AddBoolean("guestMode", profile->IsGuestSession());
 
-  source->AddString(
-      "chromeRefresh2023Attribute",
-      features::IsChromeRefresh2023() ? "chrome-refresh-2023" : "");
+  webui::SetupChromeRefresh2023(source);
 
   webui::SetupWebUIDataSource(source,
                               base::make_span(kSidePanelUserNotesResources,

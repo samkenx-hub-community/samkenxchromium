@@ -4,21 +4,18 @@
 
 package org.chromium.chrome.browser.keyboard_accessory.bar_component;
 
+import static org.chromium.chrome.browser.autofill.AutofillUiUtils.getCardIcon;
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryIPHUtils.hasShownAnyAutofillIphBefore;
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryIPHUtils.showHelpBubble;
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryProperties.HAS_SUGGESTIONS;
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryProperties.OBFUSCATED_CHILD_AT_CALLBACK;
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryProperties.SHOW_SWIPING_IPH;
 
-import android.content.res.Resources;
-import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
 import android.view.View;
 import android.view.ViewGroup;
 
 import org.chromium.base.TraceEvent;
 import org.chromium.chrome.browser.autofill.AutofillUiUtils;
-import org.chromium.chrome.browser.autofill.PersonalDataManager;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.keyboard_accessory.R;
 import org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryProperties.AutofillBarItem;
@@ -39,9 +36,6 @@ import org.chromium.ui.widget.RectProvider;
  * the {@link KeyboardAccessoryViewBinder} which will modify the view accordingly.
  */
 class KeyboardAccessoryModernViewBinder {
-    // Credit card suggestion ids are at least 17 bits long.
-    private static final int CREDIT_CARD_ID_BIT_MASK = 0xFFFF0000;
-
     static BarItemViewHolder create(ViewGroup parent, @BarItem.Type int viewType) {
         switch (viewType) {
             case BarItem.Type.SUGGESTION:
@@ -130,26 +124,11 @@ class KeyboardAccessoryModernViewBinder {
                     return true; // Click event consumed!
                 });
             }
-            // If the custom icon url is present, fetch the bitmap from the PersonalDataManager. In
-            // the event that the bitmap is not present in the PersonalDataManager, fall back to the
-            // default `iconId`.
-            Bitmap customIconBitmap = null;
-            Resources res = chipView.getContext().getResources();
-            if (item.getSuggestion().getCustomIconUrl() != null
-                    && item.getSuggestion().getCustomIconUrl().isValid()) {
-                customIconBitmap =
-                        PersonalDataManager.getInstance().getCustomImageForAutofillSuggestionIfAvailable(
-                                AutofillUiUtils.getCCIconURLWithParams(
-                                        item.getSuggestion().getCustomIconUrl(),
-                                        res.getDimensionPixelSize(
-                                                R.dimen.keyboard_accessory_bar_item_cc_icon_width),
-                                        res.getDimensionPixelSize(R.dimen.chip_icon_size)));
-            }
-            if (customIconBitmap != null) {
-                chipView.setIcon(new BitmapDrawable(res, customIconBitmap), false);
-            } else {
-                chipView.setIcon(iconId != 0 ? iconId : ChipView.INVALID_ICON_ID, false);
-            }
+            chipView.setIcon(
+                    getCardIcon(chipView.getContext(), item.getSuggestion().getCustomIconUrl(),
+                            iconId, AutofillUiUtils.CardIconSize.SMALL,
+                            /* showCustomIcon= */ true),
+                    /* tintWithTextColor= */ false);
             TraceEvent.end("BarItemChipViewHolder#bind");
         }
     }
@@ -196,7 +175,7 @@ class KeyboardAccessoryModernViewBinder {
     }
 
     private static boolean containsCreditCardInfo(AutofillSuggestion suggestion) {
-        return (suggestion.getSuggestionId() & CREDIT_CARD_ID_BIT_MASK) != 0
-                || suggestion.getSuggestionId() == PopupItemId.ITEM_ID_VIRTUAL_CREDIT_CARD_ENTRY;
+        return suggestion.getPopupItemId() == PopupItemId.CREDIT_CARD_ENTRY
+                || suggestion.getPopupItemId() == PopupItemId.VIRTUAL_CREDIT_CARD_ENTRY;
     }
 }

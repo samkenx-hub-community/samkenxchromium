@@ -11,6 +11,7 @@
 #include "ash/system/network/network_list_mobile_header_view_impl.h"
 #include "ash/system/network/network_list_network_item_view.h"
 #include "ash/system/network/network_list_wifi_header_view_impl.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/views/view.h"
 
 namespace ash {
@@ -48,7 +49,7 @@ class ASH_EXPORT FakeNetworkDetailedNetworkView
   NetworkListNetworkItemView* AddNetworkListItem(
       chromeos::network_config::mojom::NetworkType type) override;
   NetworkListWifiHeaderView* AddWifiSectionHeader() override;
-  HoverHighlightView* AddJoinNetworkEntry() override;
+  HoverHighlightView* AddConfigureNetworkEntry(NetworkType type) override;
   NetworkListMobileHeaderView* AddMobileSectionHeader() override;
   void UpdateScanningBarVisibility(bool visible) override;
   void ReorderFirstListView(size_t index) override {}
@@ -56,9 +57,12 @@ class ASH_EXPORT FakeNetworkDetailedNetworkView
   void ReorderNetworkListView(size_t index) override {}
   void ReorderMobileTopContainer(size_t index) override {}
   void ReorderMobileListView(size_t index) override {}
+  void ReorderTetherHostsTopContainer(size_t index) override {}
+  void ReorderTetherHostsListView(size_t index) override {}
   void MaybeRemoveFirstListView() override {}
   void UpdateWifiStatus(bool enabled) override {}
   void UpdateMobileStatus(bool enabled) override {}
+  void UpdateTetherHostsStatus(bool enabled) override {}
 
   // ViewClickListener:
   void OnViewClicked(views::View* view) override;
@@ -66,7 +70,8 @@ class ASH_EXPORT FakeNetworkDetailedNetworkView
   std::unique_ptr<views::View> network_list_;
   size_t notify_network_list_changed_call_count_ = 0;
   bool last_scan_bar_visibility_;
-  NetworkListItemView* last_clicked_network_list_item_ = nullptr;
+  raw_ptr<NetworkListItemView, DanglingUntriaged | ExperimentalAsh>
+      last_clicked_network_list_item_ = nullptr;
 };
 
 }  // namespace ash

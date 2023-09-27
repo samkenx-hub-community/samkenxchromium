@@ -11,11 +11,11 @@
 #include "ash/utility/haptics_tracking_test_input_controller.h"
 #include "ash/wm/desks/desk_animation_impl.h"
 #include "ash/wm/desks/desk_mini_view.h"
-#include "ash/wm/desks/desks_bar_view.h"
 #include "ash/wm/desks/desks_constants.h"
 #include "ash/wm/desks/desks_controller.h"
 #include "ash/wm/desks/desks_histogram_enums.h"
 #include "ash/wm/desks/desks_test_util.h"
+#include "ash/wm/desks/legacy_desk_bar_view.h"
 #include "ash/wm/desks/root_window_desk_switch_animator_test_api.h"
 #include "ash/wm/gestures/wm_gesture_handler.h"
 #include "ash/wm/overview/overview_controller.h"
@@ -143,7 +143,7 @@ TEST_F(HapticsUtilTest, HapticFeedbackForOverviewWindowSnap) {
   for (size_t i = 0; i < test_cases.size(); i++) {
     std::pair<gfx::Point, gfx::Rect> test_case = test_cases[i];
     EnterOverview();
-    OverviewItem* overview_item =
+    auto* overview_item =
         overview_controller->overview_session()->GetOverviewItemForWindow(
             window.get());
 
@@ -164,7 +164,7 @@ TEST_F(HapticsUtilTest, HapticFeedbackForOverviewWindowSnap) {
   for (size_t i = 0; i < test_cases.size(); i++) {
     std::pair<gfx::Point, gfx::Rect> test_case = test_cases[i];
     EnterOverview();
-    OverviewItem* overview_item =
+    auto* overview_item =
         overview_controller->overview_session()->GetOverviewItemForWindow(
             window.get());
 
@@ -300,7 +300,7 @@ TEST_F(HapticsUtilTest, HapticFeedbackForDragAndDrop) {
 
   // Drag a window in overview. Test that kTick feedback is sent.
   EnterOverview();
-  OverviewItem* overview_item =
+  auto* overview_item =
       overview_controller->overview_session()->GetOverviewItemForWindow(
           window.get());
   const gfx::RectF bounds_f = overview_item->target_bounds();

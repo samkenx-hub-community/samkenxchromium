@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -18,6 +18,9 @@
 #include "chrome/browser/k_anonymity_service/remote_trust_token_query_answerer.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/common/chrome_features.h"
+#include "components/signin/public/identity_manager/account_info.h"
+#include "components/signin/public/identity_manager/identity_manager.h"
+#include "components/signin/public/identity_manager/tribool.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/storage_partition.h"
 #include "crypto/sha2.h"
@@ -25,6 +28,7 @@
 #include "google_apis/google_api_keys.h"
 #include "net/base/isolation_info.h"
 #include "net/base/load_flags.h"
+#include "net/http/http_status_code.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/data_decoder/public/cpp/data_decoder.h"
 #include "services/network/public/cpp/resource_request.h"
@@ -53,7 +57,7 @@ constexpr net::NetworkTrafficAnnotationTag
     semantics {
       sender: "Chrome k-Anonymity Service Client"
       description:
-        "Request to the Chrome k-Anonymity JoinSet server to notify it of use "
+        "Request to the Chrome k-Anonymity Join server to notify it of use "
         "of a k-anonymity protected element."
       trigger:
         "Use of a k-anonymity protected element."
@@ -82,7 +86,7 @@ constexpr net::NetworkTrafficAnnotationTag
     semantics {
       sender: "Chrome k-Anonymity Service Client"
       description:
-        "Request to the Chrome k-Anonymity JoinSet server to query if "
+        "Request to the Chrome k-Anonymity Query server to query if "
         "k-anonymity protected element is k-anonymous. These results are "
         "typically cached."
       trigger:
@@ -121,14 +125,28 @@ class KAnonObliviousHttpClient : public network::mojom::ObliviousHttpClient {
     }
   }
 
-  void OnCompleted(const absl::optional<std::string>& response,
-                   int net_error) override {
+  void OnCompleted(
+      network::mojom::ObliviousHttpCompletionResultPtr status) override {
     if (called_) {
       mojo::ReportBadMessage("OnCompleted called more than once");
       return;
     }
     called_ = true;
-    std::move(callback_).Run(response, net_error);
+    if (status->is_net_error()) {
+      std::move(callback_).Run(absl::nullopt, status->get_net_error());
+    } else if (status->is_outer_response_error_code()) {
+      std::move(callback_).Run(absl::nullopt,
+                               net::ERR_HTTP_RESPONSE_CODE_FAILURE);
+    } else {
+      DCHECK(status->is_inner_response());
+      if (status->get_inner_response()->response_code != net::HTTP_OK) {
+        std::move(callback_).Run(absl::nullopt,
+                                 net::ERR_HTTP_RESPONSE_CODE_FAILURE);
+      } else {
+        std::move(callback_).Run(status->get_inner_response()->response_body,
+                                 net::OK);
+      }
+    }
   }
 
  private:
@@ -177,10 +195,6 @@ KAnonymityServiceClient::KAnonymityServiceClient(Profile* profile)
                     &trust_token_answerer_,
                     storage_.get()),
       profile_(profile) {
-  // We are currently relying on callers of this service to limit which users
-  // are allowed to use this service. No children should use this service
-  // since we are not approved to process their data.
-  DCHECK(!profile->IsChild());
   join_origin_ =
       url::Origin::Create(GURL(features::kKAnonymityServiceJoinServer.Get()));
   DCHECK(!join_origin_.opaque());
@@ -191,8 +205,27 @@ KAnonymityServiceClient::KAnonymityServiceClient(Profile* profile)
 
 KAnonymityServiceClient::~KAnonymityServiceClient() = default;
 
+bool KAnonymityServiceClient::CanUseKAnonymityService(Profile* profile) {
+  signin::IdentityManager* identity_manager =
+      IdentityManagerFactory::GetForProfile(profile);
+  if (!identity_manager) {
+    return false;
+  }
+  const AccountInfo account_info = identity_manager->FindExtendedAccountInfo(
+      identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin));
+  auto capability =
+      account_info.capabilities.can_run_chrome_privacy_sandbox_trials();
+  return capability == signin::Tribool::kTrue;
+}
+
 void KAnonymityServiceClient::JoinSet(std::string id,
                                       base::OnceCallback<void(bool)> callback) {
+  if (!CanUseKAnonymityService(profile_)) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(std::move(callback), false));
+    return;
+  }
+
   RecordJoinSetAction(KAnonymityServiceJoinSetAction::kJoinSet);
 
   // Fail immediately if the queue is full.
@@ -413,6 +446,12 @@ void KAnonymityServiceClient::DoJoinSetCallback(bool status) {
 void KAnonymityServiceClient::QuerySets(
     std::vector<std::string> set_ids,
     base::OnceCallback<void(std::vector<bool>)> callback) {
+  if (!CanUseKAnonymityService(profile_)) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(std::move(callback), std::vector<bool>()));
+    return;
+  }
+
   RecordQuerySetAction(KAnonymityServiceQuerySetAction::kQuerySet);
   RecordQuerySetSize(set_ids.size());
 

@@ -20,6 +20,13 @@
 #include "media/audio/mac/audio_auhal_mac.h"
 #include "media/audio/mac/audio_device_listener_mac.h"
 
+namespace base {
+
+namespace apple {
+class ScopedObjCClassSwizzler;
+}  // namespace apple
+}  // namespace base
+
 namespace media {
 
 class AUAudioInputStream;
@@ -29,7 +36,7 @@ class AUHALStream;
 // to the audio output and only internal users can call methods not exposed by
 // the AudioManager class.
 class MEDIA_EXPORT AudioManagerMac : public AudioManagerBase,
-                                     public AUHALStreamClient {
+                                     public AudioIOStreamClient {
  public:
   AudioManagerMac(std::unique_ptr<AudioThread> audio_thread,
                   AudioLogFactory* audio_log_factory);
@@ -80,6 +87,7 @@ class MEDIA_EXPORT AudioManagerMac : public AudioManagerBase,
   // for real streams and not for fake or mocked streams.
   void ReleaseOutputStreamUsingRealDevice(AudioOutputStream* stream,
                                           AudioDeviceID device_id) override;
+  void ReleaseInputStreamUsingRealDevice(AudioInputStream* stream) override;
 
   // Changes the I/O buffer size for |device_id| if |desired_buffer_size| is
   // lower than the current device buffer size. The buffer size can also be
@@ -92,6 +100,7 @@ class MEDIA_EXPORT AudioManagerMac : public AudioManagerBase,
                              size_t desired_buffer_size) override;
   base::TimeDelta GetDeferStreamStartTimeout() const override;
   base::SingleThreadTaskRunner* GetTaskRunner() const override;
+  void StopAmplitudePeakTrace() override;
 
   static int HardwareSampleRateForDevice(AudioDeviceID device_id);
   static int HardwareSampleRate();
@@ -220,6 +229,10 @@ class MEDIA_EXPORT AudioManagerMac : public AudioManagerBase,
   std::list<AudioInputStream*> basic_input_streams_;
   std::list<AUAudioInputStream*> low_latency_input_streams_;
   std::list<AUHALStream*> output_streams_;
+
+  // Used to swizzle SCStreamManager when performing loopback capture.
+  std::unique_ptr<base::apple::ScopedObjCClassSwizzler>
+      screen_capture_kit_swizzler_;
 
   // Set to true in the destructor. Ensures that methods that touches native
   // Core Audio APIs are not executed during shutdown.

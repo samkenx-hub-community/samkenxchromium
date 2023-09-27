@@ -7,7 +7,7 @@
 #include "base/debug/dump_without_crashing.h"
 #include "third_party/blink/renderer/core/editing/bidi_adjustment.h"
 #include "third_party/blink/renderer/core/editing/position_with_affinity.h"
-#include "third_party/blink/renderer/core/layout/ng/inline/layout_ng_text_combine.h"
+#include "third_party/blink/renderer/core/layout/layout_text_combine.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_caret_position.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_fragment_items_builder.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_cursor.h"
@@ -45,7 +45,7 @@ ASSERT_SIZE(NGFragmentItem, SameSizeAsNGFragmentItem);
 NGFragmentItem::NGFragmentItem(
     const NGInlineItem& inline_item,
     scoped_refptr<const ShapeResultView> shape_result,
-    const NGTextOffset& text_offset,
+    const NGTextOffsetRange& text_offset,
     const PhysicalSize& size,
     bool is_hidden_for_paint)
     : text_({std::move(shape_result), text_offset}),
@@ -208,6 +208,8 @@ NGFragmentItem::NGFragmentItem(const NGFragmentItem& source)
       is_dirty_(source.is_dirty_),
       is_last_for_node_(source.is_last_for_node_) {
   switch (Type()) {
+    case kInvalid:
+      NOTREACHED_NORETURN() << "Cannot construct invalid value";
     case kText:
       new (&text_) TextItem(source.text_);
       break;
@@ -251,6 +253,8 @@ NGFragmentItem::NGFragmentItem(NGFragmentItem&& source)
       is_dirty_(source.is_dirty_),
       is_last_for_node_(source.is_last_for_node_) {
   switch (Type()) {
+    case kInvalid:
+      NOTREACHED_NORETURN() << "Cannot construct invalid value";
     case kText:
       new (&text_) TextItem(std::move(source.text_));
       break;
@@ -272,6 +276,9 @@ NGFragmentItem::NGFragmentItem(NGFragmentItem&& source)
 
 NGFragmentItem::~NGFragmentItem() {
   switch (Type()) {
+    case kInvalid:
+      // Slot can be zeroed, do nothing.
+      return;
     case kText:
       text_.~TextItem();
       break;
@@ -533,7 +540,7 @@ const ShapeResultView* NGFragmentItem::TextShapeResult() const {
   return nullptr;
 }
 
-NGTextOffset NGFragmentItem::TextOffset() const {
+NGTextOffsetRange NGFragmentItem::TextOffset() const {
   if (Type() == kText)
     return text_.text_offset;
   if (Type() == kSvgText)
@@ -817,7 +824,6 @@ PhysicalRect NGFragmentItem::RecalcInkOverflowForCursor(
     if (UNLIKELY(item->IsLayoutObjectDestroyedOrMoved())) {
       // TODO(crbug.com/1099613): This should not happen, as long as it is
       // layout-clean. It looks like there are cases where the layout is dirty.
-      base::debug::DumpWithoutCrashing();
       continue;
     }
     if (UNLIKELY(item->HasSelfPaintingLayer()))
@@ -862,7 +868,7 @@ void NGFragmentItem::RecalcInkOverflow(
       if (Type() == kSvgText) {
         ink_overflow_type_ =
             static_cast<unsigned>(ink_overflow_.SetSvgTextInkOverflow(
-                InkOverflowType(), paint_info, Style(), ScaledFont(),
+                InkOverflowType(), cursor, paint_info, Style(), ScaledFont(),
                 SvgFragmentData()->rect, SvgScalingFactor(),
                 SvgFragmentData()->length_adjust_scale,
                 BuildSvgTransformForBoundingBox(), self_and_contents_rect_out));
@@ -874,8 +880,9 @@ void NGFragmentItem::RecalcInkOverflow(
                                                                 inline_context);
       ink_overflow_type_ =
           static_cast<unsigned>(ink_overflow_.SetTextInkOverflow(
-              InkOverflowType(), paint_info, Style(), RectInContainerFragment(),
-              inline_context, self_and_contents_rect_out));
+              InkOverflowType(), cursor, paint_info, Style(),
+              RectInContainerFragment(), inline_context,
+              self_and_contents_rect_out));
       return;
     }
 
@@ -920,7 +927,7 @@ void NGFragmentItem::RecalcInkOverflow(
     PhysicalRect contents_rect =
         RecalcInkOverflowForDescendantsOf(cursor, inline_context);
     const auto* const text_combine =
-        DynamicTo<LayoutNGTextCombine>(GetLayoutObject());
+        DynamicTo<LayoutTextCombine>(GetLayoutObject());
     if (UNLIKELY(text_combine))
       contents_rect = text_combine->AdjustRectForBoundingBox(contents_rect);
     // Line boxes don't have self overflow. Compute content overflow only.
@@ -1141,6 +1148,8 @@ void NGFragmentItem::Trace(Visitor* visitor) const {
 std::ostream& operator<<(std::ostream& ostream, const NGFragmentItem& item) {
   ostream << "{";
   switch (item.Type()) {
+    case NGFragmentItem::kInvalid:
+      NOTREACHED_NORETURN() << "Invalid NGFragmentItem";
     case NGFragmentItem::kText:
       ostream << "Text " << item.StartOffset() << "-" << item.EndOffset() << " "
               << (IsLtr(item.ResolvedDirection()) ? "LTR" : "RTL");

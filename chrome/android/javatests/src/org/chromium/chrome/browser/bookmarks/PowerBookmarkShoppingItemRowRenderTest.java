@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doAnswer;
 
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -16,7 +17,6 @@ import android.widget.TextView;
 
 import androidx.test.filters.MediumTest;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -34,12 +34,12 @@ import org.chromium.base.test.params.ParameterAnnotations;
 import org.chromium.base.test.params.ParameterSet;
 import org.chromium.base.test.params.ParameterizedRunner;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.commerce.ShoppingFeatures;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
@@ -59,7 +59,7 @@ import java.util.List;
  */
 @RunWith(ParameterizedRunner.class)
 @ParameterAnnotations.UseRunnerDelegate(ChromeJUnit4RunnerDelegate.class)
-@EnableFeatures({ChromeFeatureList.BOOKMARKS_REFRESH})
+@EnableFeatures(ChromeFeatureList.BOOKMARKS_REFRESH)
 public class PowerBookmarkShoppingItemRowRenderTest {
     @ParameterAnnotations.ClassParameter
     private static List<ParameterSet> sClassParams = new NightModeParams().getParameters();
@@ -95,7 +95,7 @@ public class PowerBookmarkShoppingItemRowRenderTest {
 
     private Bitmap mBitmap;
     private PowerBookmarkShoppingItemRow mPowerBookmarkShoppingItemRow;
-    private ViewGroup mContentView;
+    private LinearLayout mContentView;
 
     public PowerBookmarkShoppingItemRowRenderTest(boolean nightModeEnabled) {
         // Sets a fake background color to make the screenshots easier to compare with bare eyes.
@@ -133,28 +133,22 @@ public class PowerBookmarkShoppingItemRowRenderTest {
 
             FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-
             mActivityTestRule.getActivity().setContentView(mContentView, params);
+
             mPowerBookmarkShoppingItemRow =
-                    (PowerBookmarkShoppingItemRow) mActivityTestRule.getActivity()
-                            .getLayoutInflater()
-                            .inflate(R.layout.power_bookmark_shopping_item_row, mContentView, true)
-                            .findViewById(R.id.power_bookmark_shopping_row);
+                    BookmarkManagerCoordinator.buildShoppingItemView(mContentView);
+            mContentView.addView(mPowerBookmarkShoppingItemRow);
             mPowerBookmarkShoppingItemRow.setBackgroundColor(
                     SemanticColorUtils.getDefaultBgColor(mActivityTestRule.getActivity()));
             ((TextView) mPowerBookmarkShoppingItemRow.findViewById(R.id.title))
                     .setText("Test Bookmark");
             ((TextView) mPowerBookmarkShoppingItemRow.findViewById(R.id.description))
                     .setText("http://google.com");
+            mPowerBookmarkShoppingItemRow.findViewById(R.id.more).setVisibility(View.VISIBLE);
             mPowerBookmarkShoppingItemRow.init(
                     mImageFetcher, mBookmarkModel, mSnackbarManager, mProfile);
             mPowerBookmarkShoppingItemRow.setCurrencyFormatterForTesting(mCurrencyFormatter);
         });
-    }
-
-    @After
-    public void tearDown() {
-        ShoppingFeatures.setShoppingListEligibleForTesting(null);
     }
 
     @Test

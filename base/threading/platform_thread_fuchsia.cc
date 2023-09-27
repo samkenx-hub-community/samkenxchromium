@@ -51,6 +51,10 @@ void SetThreadRole(StringPiece role_name,
       fidl::SyncClient<fuchsia_media::ProfileProvider>>
       profile_provider(ConnectProfileProvider());
 
+  if (!profile_provider->is_valid()) {
+    return;
+  }
+
   zx::thread dup_thread;
   zx_status_t status =
       zx::thread::self()->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_thread);
@@ -85,7 +89,7 @@ void PlatformThread::SetName(const std::string& name) {
                                               name.data(), name.size());
   DCHECK_EQ(status, ZX_OK);
 
-  ThreadIdNameManager::GetInstance()->SetName(name);
+  SetNameCommon(name);
 }
 
 // static

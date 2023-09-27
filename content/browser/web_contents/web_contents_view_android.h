@@ -71,6 +71,7 @@ class WebContentsViewAndroid : public WebContentsView,
   void RestoreFocus() override;
   void FocusThroughTabTraversal(bool reverse) override;
   DropData* GetDropData() const override;
+  void CancelDragDropForPortalActivation() override;
   gfx::Rect GetViewBounds() const override;
   void CreateView(gfx::NativeView context) override;
   RenderWidgetHostViewBase* CreateViewForWidget(
@@ -171,10 +172,29 @@ class WebContentsViewAndroid : public WebContentsView,
   // The native view associated with the contents of the web.
   ui::ViewAndroid view_;
 
+  // A common parent to all the native widgets as part of a web page.
+  //
+  // Layer layout:
+  // `view_`
+  //   |
+  //   |- `parent_for_web_page_widgets_`
+  //   |                |
+  //   |                |- RenderWidgetHostViewAndroid
+  //   |                |- Overscroll
+  //   |                |- SelectionHandle
+  //   |
+  //   |- `NavigationEntryScreenshot`  // TODO(https://crbug.com/1420783)
+  //
+  // ViewAndroid layout:
+  // `view_`
+  //   |
+  //   |- `RenderWidgetHostViewAndroid`
+  scoped_refptr<cc::slim::Layer> parent_for_web_page_widgets_;
+
   // Interface used to get notified of events from the synchronous compositor.
   raw_ptr<SynchronousCompositorClient> synchronous_compositor_client_;
 
-  raw_ptr<SelectionPopupController, DanglingUntriaged>
+  raw_ptr<SelectionPopupController, AcrossTasksDanglingUntriaged>
       selection_popup_controller_ = nullptr;
 
   int device_orientation_ = 0;

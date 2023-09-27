@@ -51,7 +51,8 @@ class TestWebUIConfig : public content::WebUIConfig {
   ~TestWebUIConfig() override = default;
 
   std::unique_ptr<content::WebUIController> CreateWebUIController(
-      content::WebUI* web_ui) override;
+      content::WebUI* web_ui,
+      const GURL& url) override;
 };
 
 // Returns WebUIControllers whose CSPs and headers can be controlled through
@@ -81,8 +82,13 @@ class TestWebUIControllerFactory : public WebUIControllerFactory {
   bool UseWebUIForURL(BrowserContext* browser_context,
                       const GURL& url) override;
 
+  void SetSupportedScheme(const std::string& scheme);
+
  private:
   bool disable_xfo_ = false;
+
+  // Scheme supported by the WebUIControllerFactory.
+  std::string supported_scheme_;
 };
 
 }  // namespace content

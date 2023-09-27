@@ -8,7 +8,6 @@ import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.actionWithAssertions;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static androidx.test.espresso.matcher.ViewMatchers.isRoot;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
@@ -28,18 +27,18 @@ import static org.chromium.chrome.browser.dom_distiller.ReaderModeManager.DOM_DI
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.os.Build.VERSION_CODES;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.annotation.NonNull;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.espresso.Espresso;
 import androidx.test.espresso.action.GeneralClickAction;
 import androidx.test.espresso.action.GeneralLocation;
 import androidx.test.espresso.action.Press;
 import androidx.test.espresso.action.Tap;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -55,7 +54,6 @@ import org.chromium.base.test.util.CriteriaNotSatisfiedException;
 import org.chromium.base.test.util.DisableIf;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Restriction;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.customtabs.CustomTabActivity;
@@ -68,6 +66,7 @@ import org.chromium.chrome.browser.offlinepages.OfflinePageUtils;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.MenuUtils;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
@@ -120,14 +119,10 @@ public class ReaderModeTest implements CustomMainActivityStart {
     @Override
     public void customMainActivityStart() {
         MockitoAnnotations.initMocks(this);
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         mURL = mTestServer.getURL(TEST_PAGE);
         mDownloadTestRule.startMainActivityWithURL(mURL);
-    }
-
-    @After
-    public void tearDown() {
-        if (mTestServer != null) mTestServer.stopAndDestroyServer();
     }
 
     @Test
@@ -160,7 +155,7 @@ public class ReaderModeTest implements CustomMainActivityStart {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.READER_MODE_IN_CCT})
+    @EnableFeatures(ChromeFeatureList.READER_MODE_IN_CCT)
     public void testReaderModeInCCT_Downloaded() throws TimeoutException {
         Tab originalTab = mDownloadTestRule.getActivity().getActivityTab();
         String innerHtml = getInnerHtml(originalTab);
@@ -197,10 +192,10 @@ public class ReaderModeTest implements CustomMainActivityStart {
         CustomTabActivity customTabActivity = openReaderModeInIncognitoCCT();
 
         // Click on "Close all Incognito tabs" notification.
-        PendingIntent clearIntent =
-                IncognitoNotificationServiceImpl
-                        .getRemoveAllIncognitoTabsIntent(InstrumentationRegistry.getTargetContext())
-                        .getPendingIntent();
+        PendingIntent clearIntent = IncognitoNotificationServiceImpl
+                                            .getRemoveAllIncognitoTabsIntent(
+                                                    ApplicationProvider.getApplicationContext())
+                                            .getPendingIntent();
         clearIntent.send();
 
         // Verify the Incognito CCT is closed.
@@ -238,7 +233,7 @@ public class ReaderModeTest implements CustomMainActivityStart {
     private void downloadAndOpenOfflinePage() {
         int callCount = mDownloadTestRule.getChromeDownloadCallCount();
         MenuUtils.invokeCustomMenuActionSync(InstrumentationRegistry.getInstrumentation(),
-                mDownloadTestRule.getActivity(), org.chromium.chrome.R.id.offline_page_id);
+                mDownloadTestRule.getActivity(), R.id.offline_page_id);
         Assert.assertTrue(mDownloadTestRule.waitForChromeDownloadToFinish(callCount));
 
         // Stop the server and also disconnect the network.
@@ -342,23 +337,23 @@ public class ReaderModeTest implements CustomMainActivityStart {
     private void testThemeColor(ChromeActivity activity, Tab tab) {
         waitForBackgroundColor(tab, "\"rgb(255, 255, 255)\"");
 
-        MenuUtils.invokeCustomMenuActionSync(InstrumentationRegistry.getInstrumentation(), activity,
-                org.chromium.chrome.R.id.reader_mode_prefs_id);
-        onView(isRoot()).check(ViewUtils.waitForView(allOf(withText("Dark"), isDisplayed())));
+        MenuUtils.invokeCustomMenuActionSync(
+                InstrumentationRegistry.getInstrumentation(), activity, R.id.reader_mode_prefs_id);
+        ViewUtils.waitForVisibleView(allOf(withText("Dark"), isDisplayed()));
         onView(withText("Dark")).perform(click());
         Espresso.pressBack();
         waitForBackgroundColor(tab, "\"rgb(32, 33, 36)\"");
 
-        MenuUtils.invokeCustomMenuActionSync(InstrumentationRegistry.getInstrumentation(), activity,
-                org.chromium.chrome.R.id.reader_mode_prefs_id);
-        onView(isRoot()).check(ViewUtils.waitForView(allOf(withText("Sepia"), isDisplayed())));
+        MenuUtils.invokeCustomMenuActionSync(
+                InstrumentationRegistry.getInstrumentation(), activity, R.id.reader_mode_prefs_id);
+        ViewUtils.waitForVisibleView(allOf(withText("Sepia"), isDisplayed()));
         onView(withText("Sepia")).perform(click());
         Espresso.pressBack();
         waitForBackgroundColor(tab, "\"rgb(254, 247, 224)\"");
 
-        MenuUtils.invokeCustomMenuActionSync(InstrumentationRegistry.getInstrumentation(), activity,
-                org.chromium.chrome.R.id.reader_mode_prefs_id);
-        onView(isRoot()).check(ViewUtils.waitForView(allOf(withText("Light"), isDisplayed())));
+        MenuUtils.invokeCustomMenuActionSync(
+                InstrumentationRegistry.getInstrumentation(), activity, R.id.reader_mode_prefs_id);
+        ViewUtils.waitForVisibleView(allOf(withText("Light"), isDisplayed()));
         onView(withText("Light")).perform(click());
         Espresso.pressBack();
         waitForBackgroundColor(tab, "\"rgb(255, 255, 255)\"");
@@ -369,9 +364,9 @@ public class ReaderModeTest implements CustomMainActivityStart {
     private void testFontSize(ChromeActivity activity, Tab tab) {
         waitForFontSize(tab, "\"14px\"");
 
-        MenuUtils.invokeCustomMenuActionSync(InstrumentationRegistry.getInstrumentation(), activity,
-                org.chromium.chrome.R.id.reader_mode_prefs_id);
-        onView(isRoot()).check(ViewUtils.waitForView(allOf(withId(R.id.font_size), isDisplayed())));
+        MenuUtils.invokeCustomMenuActionSync(
+                InstrumentationRegistry.getInstrumentation(), activity, R.id.reader_mode_prefs_id);
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.font_size), isDisplayed()));
         // Max is 200% font size.
         onView(withId(R.id.font_size))
                 .perform(actionWithAssertions(new GeneralClickAction(
@@ -379,9 +374,9 @@ public class ReaderModeTest implements CustomMainActivityStart {
         Espresso.pressBack();
         waitForFontSize(tab, "\"28px\"");
 
-        MenuUtils.invokeCustomMenuActionSync(InstrumentationRegistry.getInstrumentation(), activity,
-                org.chromium.chrome.R.id.reader_mode_prefs_id);
-        onView(isRoot()).check(ViewUtils.waitForView(allOf(withId(R.id.font_size), isDisplayed())));
+        MenuUtils.invokeCustomMenuActionSync(
+                InstrumentationRegistry.getInstrumentation(), activity, R.id.reader_mode_prefs_id);
+        ViewUtils.waitForVisibleView(allOf(withId(R.id.font_size), isDisplayed()));
         // Min is 50% font size.
         onView(withId(R.id.font_size))
                 .perform(actionWithAssertions(new GeneralClickAction(

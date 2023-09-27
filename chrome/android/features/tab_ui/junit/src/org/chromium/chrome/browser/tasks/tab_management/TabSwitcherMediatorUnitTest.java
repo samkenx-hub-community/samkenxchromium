@@ -22,12 +22,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
 import android.content.res.Resources;
 import android.view.View;
+
+import androidx.test.filters.SmallTest;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -55,6 +58,7 @@ import org.chromium.chrome.browser.compositor.layouts.content.TabContentManager;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.incognito.reauth.IncognitoReauthController;
 import org.chromium.chrome.browser.incognito.reauth.IncognitoReauthManager;
+import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.multiwindow.MultiWindowModeStateDispatcher;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabSelectionType;
@@ -87,7 +91,7 @@ import java.util.List;
 @LooperMode(LooperMode.Mode.LEGACY)
 @DisableFeatures(
         {ChromeFeatureList.START_SURFACE_RETURN_TIME, ChromeFeatureList.START_SURFACE_ANDROID})
-@EnableFeatures({ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID, ChromeFeatureList.TAB_TO_GTS_ANIMATION})
+@EnableFeatures(ChromeFeatureList.TAB_TO_GTS_ANIMATION)
 public class TabSwitcherMediatorUnitTest {
     @Rule
     public TestRule mProcessor = new Features.JUnitProcessor();
@@ -104,6 +108,7 @@ public class TabSwitcherMediatorUnitTest {
     private static final int TAB2_ID = 789;
     private static final int TAB3_ID = 123;
     private static final int TAB4_ID = 357;
+    private static final int TAB_MODEL_FILTER_INDEX = 2;
 
     private final OneshotSupplierImpl<IncognitoReauthController>
             mIncognitoReauthControllerSupplier = new OneshotSupplierImpl<>();
@@ -112,6 +117,8 @@ public class TabSwitcherMediatorUnitTest {
 
     @Mock
     TabSwitcherMediator.ResetHandler mResetHandler;
+    @Mock
+    Runnable mTabSwitcherVisibilityDelegate;
     @Mock
     TabContentManager mTabContentManager;
     @Mock
@@ -148,6 +155,8 @@ public class TabSwitcherMediatorUnitTest {
     PriceMessageService mPriceMessageService;
     @Mock
     IncognitoReauthController mIncognitoReauthController;
+    @Mock
+    View mCustomViewMock;
 
     @Captor
     ArgumentCaptor<TabModelObserver> mTabModelObserverCaptor;
@@ -203,7 +212,7 @@ public class TabSwitcherMediatorUnitTest {
         doReturn(mTab2).when(mTabModelFilter).getTabAt(1);
         doReturn(mTab3).when(mTabModelFilter).getTabAt(2);
         doReturn(false).when(mTabModelFilter).isIncognito();
-        doReturn(2).when(mTabModelFilter).index();
+        doReturn(TAB_MODEL_FILTER_INDEX).when(mTabModelFilter).index();
         doReturn(3).when(mTabModelFilter).getCount();
 
         doReturn(2).when(mTabModel).index();
@@ -239,9 +248,10 @@ public class TabSwitcherMediatorUnitTest {
                 mBrowserControlsStateProvider, mCompositorViewHolder, null, mMessageItemsController,
                 mPriceWelcomeMessageController, mMultiWindowModeStateDispatcher,
                 TabListCoordinator.TabListMode.GRID, mIncognitoReauthControllerSupplier, null,
-                mTabGridDialogControllerSupplier);
+                mTabGridDialogControllerSupplier, mTabSwitcherVisibilityDelegate, null);
 
-        mMediator.initWithNative(mEditorController, null);
+        mMediator.initWithNative(null);
+        mMediator.setTabSelectionEditorController(mEditorController);
         mMediator.addTabSwitcherViewObserver(mTabSwitcherViewObserver);
         mMediator.setOnTabSelectingListener(mLayout::onTabSelecting);
         verify(mIncognitoReauthController, times(1))
@@ -356,9 +366,10 @@ public class TabSwitcherMediatorUnitTest {
         mMediator = new TabSwitcherMediator(mContext, mResetHandler, mModel, mTabModelSelector,
                 mBrowserControlsStateProvider, mCompositorViewHolder, null, mMessageItemsController,
                 mPriceWelcomeMessageController, mMultiWindowModeStateDispatcher,
-                TabListCoordinator.TabListMode.GRID, mIncognitoReauthControllerSupplier, null,
-                null);
-        mMediator.initWithNative(mEditorController, null);
+                TabListCoordinator.TabListMode.GRID, mIncognitoReauthControllerSupplier, null, null,
+                mTabSwitcherVisibilityDelegate, null);
+        mMediator.initWithNative(null);
+        mMediator.setTabSelectionEditorController(mEditorController);
         mMediator.addTabSwitcherViewObserver(mTabSwitcherViewObserver);
         mMediator.setOnTabSelectingListener(mLayout::onTabSelecting);
 
@@ -431,9 +442,10 @@ public class TabSwitcherMediatorUnitTest {
         mMediator = new TabSwitcherMediator(mContext, mResetHandler, mModel, mTabModelSelector,
                 mBrowserControlsStateProvider, mCompositorViewHolder, null, mMessageItemsController,
                 mPriceWelcomeMessageController, mMultiWindowModeStateDispatcher,
-                TabListCoordinator.TabListMode.GRID, mIncognitoReauthControllerSupplier, null,
-                null);
-        mMediator.initWithNative(mEditorController, null);
+                TabListCoordinator.TabListMode.GRID, mIncognitoReauthControllerSupplier, null, null,
+                mTabSwitcherVisibilityDelegate, null);
+        mMediator.initWithNative(null);
+        mMediator.setTabSelectionEditorController(mEditorController);
         mMediator.addTabSwitcherViewObserver(mTabSwitcherViewObserver);
         mMediator.setOnTabSelectingListener(mLayout::onTabSelecting);
 
@@ -725,7 +737,6 @@ public class TabSwitcherMediatorUnitTest {
     }
 
     @Test
-    @Features.EnableFeatures({ChromeFeatureList.TAB_GROUPS_ANDROID})
     public void openDialogButton_SingleTab() {
         // Mock that tab 1 is a single tab.
         doReturn(new ArrayList<>(Arrays.asList(mTab1)))
@@ -735,7 +746,6 @@ public class TabSwitcherMediatorUnitTest {
     }
 
     @Test
-    @Features.EnableFeatures({ChromeFeatureList.TAB_GROUPS_ANDROID})
     public void openDialogButton_TabGroup_NotEmpty() {
         // Set up a tab group.
         Tab newTab = prepareTab(TAB4_ID, TAB4_TITLE);
@@ -750,7 +760,6 @@ public class TabSwitcherMediatorUnitTest {
     }
 
     @Test
-    @Features.EnableFeatures({ChromeFeatureList.TAB_GROUPS_ANDROID})
     public void openDialogButton_TabGroup_Empty() {
         // Assume that due to tab model change, current group becomes empty in current model.
         doReturn(new ArrayList<>()).when(mTabModelFilter).getRelatedTabList(TAB1_ID);
@@ -876,10 +885,10 @@ public class TabSwitcherMediatorUnitTest {
     }
 
     @Test
-    @Features.EnableFeatures(ChromeFeatureList.START_SURFACE_ANDROID)
+    @EnableFeatures(ChromeFeatureList.START_SURFACE_ANDROID)
     // When Start surface refactoring is enabled, the top control properties are no longer handled
     // separately, and it is covered by test updatesPropertiesWithTopControlsChanges().
-    @Features.DisableFeatures(ChromeFeatureList.START_SURFACE_REFACTOR)
+    @DisableFeatures(ChromeFeatureList.START_SURFACE_REFACTOR)
     public void updatesPropertiesWithTopControlsChanges_StartSurface() {
         assertEquals(0, mModel.get(TabListContainerProperties.TOP_MARGIN));
         assertEquals(0, mModel.get(TabListContainerProperties.SHADOW_TOP_OFFSET));
@@ -910,7 +919,7 @@ public class TabSwitcherMediatorUnitTest {
                 mBrowserControlsStateProvider, mCompositorViewHolder, null, mMessageItemsController,
                 mPriceWelcomeMessageController, mMultiWindowModeStateDispatcher,
                 TabListCoordinator.TabListMode.GRID, mIncognitoReauthControllerSupplier, null,
-                mTabGridDialogControllerSupplier);
+                mTabGridDialogControllerSupplier, mTabSwitcherVisibilityDelegate, null);
         assertEquals(16, mModel.get(TabListContainerProperties.BOTTOM_PADDING));
 
         mModel.set(TabListContainerProperties.BOTTOM_PADDING, 0);
@@ -918,7 +927,7 @@ public class TabSwitcherMediatorUnitTest {
                 mBrowserControlsStateProvider, mCompositorViewHolder, null, mMessageItemsController,
                 mPriceWelcomeMessageController, mMultiWindowModeStateDispatcher,
                 TabListCoordinator.TabListMode.STRIP, mIncognitoReauthControllerSupplier, null,
-                mTabGridDialogControllerSupplier);
+                mTabGridDialogControllerSupplier, mTabSwitcherVisibilityDelegate, null);
         assertEquals(0, mModel.get(TabListContainerProperties.BOTTOM_PADDING));
     }
 
@@ -941,7 +950,7 @@ public class TabSwitcherMediatorUnitTest {
     }
 
     @Test
-    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testBackPress() {
         initAndAssertAllProperties();
         Assert.assertFalse(mMediator.shouldInterceptBackPress());
@@ -957,7 +966,7 @@ public class TabSwitcherMediatorUnitTest {
     }
 
     @Test
-    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testBackPressAfterSwitchIncognitoMode() {
         initAndAssertAllProperties();
         Assert.assertFalse(mMediator.shouldInterceptBackPress());
@@ -998,7 +1007,7 @@ public class TabSwitcherMediatorUnitTest {
     }
 
     @Test
-    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testBackPressAfterTabClosedBySite() {
         initAndAssertAllProperties();
         Assert.assertFalse(mMediator.shouldInterceptBackPress());
@@ -1049,6 +1058,28 @@ public class TabSwitcherMediatorUnitTest {
     }
 
     @Test
+    public void testBackPressToReturnToStartSurface() {
+        initAndAssertAllProperties();
+        Assert.assertFalse(mMediator.shouldInterceptBackPress());
+
+        doReturn(false).when(mTabGridDialogController).isVisible();
+        doReturn(mTab1).when(mTabModelSelector).getCurrentTab();
+        doReturn(false).when(mTabModelSelector).isIncognitoSelected();
+        mMediator.showTabSwitcherView(false);
+
+        //  Verifies that TabSwitcherMediator no longer handles the return to Start surface case.
+        mMediator.setLastActiveLayoutTypeForTesting(LayoutType.START_SURFACE);
+        Assert.assertFalse(mMediator.shouldInterceptBackPress());
+
+        // Verifies that TabSwitcherMediator still handles the back operation in incognito mode.
+        doReturn(true).when(mTabModelSelector).isIncognitoSelected();
+        Assert.assertTrue(mMediator.shouldInterceptBackPress());
+
+        mMediator.setLastActiveLayoutTypeForTesting(LayoutType.BROWSING);
+        Assert.assertTrue(mMediator.shouldInterceptBackPress());
+    }
+
+    @Test
     public void testOnTabModelSelected_NewModelIncognito_ReauthPending_ClearsTabList() {
         initAndAssertAllProperties();
         mModel.set(TabListContainerProperties.IS_VISIBLE, true);
@@ -1060,6 +1091,30 @@ public class TabSwitcherMediatorUnitTest {
 
         mTabModelSelectorObserverCaptor.getValue().onTabModelSelected(mTabModel, null);
         verify(mResetHandler, times(1)).resetWithTabList(eq(null), eq(false), eq(false));
+    }
+
+    @Test
+    public void testAddingCustomView_ClearsTabList_Requested_ClearsTabList() {
+        initAndAssertAllProperties();
+        mMediator.addCustomView(mCustomViewMock, null, /*clearTabList=*/true);
+        verify(mResetHandler, times(1)).resetWithTabList(eq(null), eq(false), eq(false));
+    }
+
+    @Test
+    public void testAddingCustomView_ClearsTabList_NotRequested_DoesNotClearTabList() {
+        initAndAssertAllProperties();
+        mMediator.addCustomView(mCustomViewMock, null, /*clearTabList=*/false);
+        verifyNoInteractions(mResetHandler);
+    }
+
+    @Test
+    public void testRemoveCustomView_ResetTabList() {
+        initAndAssertAllProperties();
+        mMediator.addCustomView(mCustomViewMock, null, /*clearTabList=*/true);
+        verify(mResetHandler, times(1)).resetWithTabList(eq(null), eq(false), eq(false));
+
+        mMediator.removeCustomView(mCustomViewMock);
+        verify(mResetHandler, times(1)).resetWithTabList(eq(mTabModelFilter), eq(false), eq(false));
     }
 
     @Test
@@ -1087,6 +1142,60 @@ public class TabSwitcherMediatorUnitTest {
         mIncognitoReauthCallbackArgumentCaptor.getValue().onIncognitoReauthFailure();
         // Verify we don't reset the tab-list with the current tab model filter again.
         verifyNoMoreInteractions(mResetHandler);
+    }
+
+    @Test
+    @SmallTest
+    public void testFocusTabForAccessibility_IsInvoked_OnIncognitoReauthSuccess() {
+        initAndAssertAllProperties();
+        mModel.set(TabListContainerProperties.IS_VISIBLE, true);
+        doReturn(true).when(mTabModelFilter).isIncognito();
+        doReturn(true).when(mTabModelSelector).isIncognitoSelected();
+        doReturn(true).when(mTabModelSelector).isTabStateInitialized();
+        doReturn(false).when(mIncognitoReauthController).isReauthPageShowing();
+        doReturn(true).when(mTabModel).isIncognito();
+
+        // Mock showing overview mode.
+        doNothing().when(mTabSwitcherViewObserver).finishedShowing();
+        mMediator.finishedShowing();
+
+        // Mock that the re-auth was successful.
+        mIncognitoReauthCallbackArgumentCaptor.getValue().onIncognitoReauthSuccess();
+
+        assertThat(mModel.get(TabListContainerProperties.FOCUS_TAB_INDEX_FOR_ACCESSIBILITY),
+                equalTo(TAB_MODEL_FILTER_INDEX));
+    }
+
+    @Test
+    @SmallTest
+    public void testFocusTabForAccessibility_IsInvoked_OnOverviewModeFinishedShowing() {
+        initAndAssertAllProperties();
+
+        doReturn(true).when(mTabModelSelector).isTabStateInitialized();
+
+        // Mock showing overview mode.
+        doNothing().when(mTabSwitcherViewObserver).finishedShowing();
+        mMediator.finishedShowing();
+
+        assertThat(mModel.get(TabListContainerProperties.FOCUS_TAB_INDEX_FOR_ACCESSIBILITY),
+                equalTo(TAB_MODEL_FILTER_INDEX));
+    }
+
+    @Test
+    @SmallTest
+    public void testFocusTabForAccessibility_IsInvoked_OnTabModelSelected() {
+        initAndAssertAllProperties();
+
+        mModel.set(TabListContainerProperties.IS_VISIBLE, true);
+        doReturn(true).when(mTabModelSelector).isTabStateInitialized();
+
+        // Mock showing overview mode.
+        doNothing().when(mTabSwitcherViewObserver).finishedShowing();
+        mMediator.finishedShowing();
+
+        mTabModelSelectorObserverCaptor.getValue().onTabModelSelected(mTabModel, null);
+        assertThat(mModel.get(TabListContainerProperties.FOCUS_TAB_INDEX_FOR_ACCESSIBILITY),
+                equalTo(TAB_MODEL_FILTER_INDEX));
     }
 
     private void initAndAssertAllProperties() {

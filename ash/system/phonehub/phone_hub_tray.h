@@ -18,6 +18,8 @@
 #include "base/functional/callback.h"
 #include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
+#include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/scoped_observation.h"
 #include "chromeos/ash/components/phonehub/app_stream_manager.h"
 #include "chromeos/ash/components/phonehub/icon_decoder.h"
@@ -31,6 +33,7 @@ class ImageButton;
 namespace ash {
 
 class EcheIconLoadingIndicatorView;
+class OnboardingNudgeController;
 class PhoneHubContentView;
 class TrayBubbleWrapper;
 class SessionControllerImpl;
@@ -62,6 +65,7 @@ class ASH_EXPORT PhoneHubTray : public TrayBackgroundView,
 
   // TrayBackgroundView:
   void ClickedOutsideBubble() override;
+  void UpdateTrayItemColor(bool is_active) override;
   std::u16string GetAccessibleNameForTray() override;
   void HandleLocaleChange() override;
   void HideBubbleWithView(const TrayBubbleView* bubble_view) override;
@@ -79,6 +83,7 @@ class ASH_EXPORT PhoneHubTray : public TrayBackgroundView,
 
   // OnboardingView::Delegate:
   void HideStatusHeaderView() override;
+  bool IsPhoneHubIconClickedWhenNudgeVisible() override;
 
   // WindowTreeHostManager::Observer
   void OnDisplayConfigurationChanged() override;
@@ -103,14 +108,20 @@ class ASH_EXPORT PhoneHubTray : public TrayBackgroundView,
   }
 
   // Sets a callback that will be called when eche icon is activated.
-  void SetEcheIconActivationCallback(
-      base::RepeatingCallback<bool(const ui::Event&)> callback);
+  void SetEcheIconActivationCallback(base::RepeatingCallback<void()> callback);
 
   views::View* content_view_for_testing() { return content_view_; }
 
-  PhoneHubUiController* ui_controller_for_testing() {
-    return ui_controller_.get();
+  PhoneHubUiController* ui_controller() { return ui_controller_.get(); }
+
+  OnboardingNudgeController* onboarding_nudge_controller_for_testing() {
+    return onboarding_nudge_controller_.get();
   }
+
+ protected:
+  // TrayBackgroundView:
+  void OnVisibilityAnimationFinished(bool should_log_visible_pod_count,
+                                     bool aborted) override;
 
  private:
   FRIEND_TEST_ALL_PREFIXES(PhoneHubTrayTest, SafeAccessToHeaderView);
@@ -146,35 +157,51 @@ class ASH_EXPORT PhoneHubTray : public TrayBackgroundView,
 
   views::View* GetPhoneStatusView();
 
+  // Checks if nudge should be shown based on user login time.
+  bool IsInsideUnlockWindow();
+
+  bool IsInPhoneHubNudgeExperimentGroup();
+
+  bool is_icon_clicked_when_setup_notification_visible_ = false;
+
+  bool is_icon_clicked_when_nudge_visible_ = false;
+
   // Icon of the tray. Unowned.
-  views::ImageButton* icon_;
+  raw_ptr<views::ImageButton, ExperimentalAsh> icon_;
 
   // Icon for Eche. Unowned.
-  views::ImageButton* eche_icon_ = nullptr;
+  raw_ptr<views::ImageButton, ExperimentalAsh> eche_icon_ = nullptr;
 
   // The loading indicator, showing a throbber animation on top of the icon.
-  EcheIconLoadingIndicatorView* eche_loading_indicator_ = nullptr;
+  raw_ptr<EcheIconLoadingIndicatorView, ExperimentalAsh>
+      eche_loading_indicator_ = nullptr;
 
   // This callback is called when the Eche icon is activated.
-  base::RepeatingCallback<bool(const ui::Event&)> eche_icon_callback_ =
-      base::BindRepeating([](const ui::Event&) { return true; });
+  base::RepeatingCallback<void()> eche_icon_callback_ = base::DoNothing();
 
   // Controls the main content view displayed in the bubble based on the current
   // PhoneHub state.
   std::unique_ptr<PhoneHubUiController> ui_controller_;
+
+  // Controls the behavior of a nudge shown to eligible users.
+  std::unique_ptr<OnboardingNudgeController> onboarding_nudge_controller_;
 
   // The bubble that appears after clicking the tray button.
   std::unique_ptr<TrayBubbleWrapper> bubble_;
 
   // The header status view on top of the bubble.
   // IMPORTANT: This is not owned, always access through GetPhoneStatusView
-  views::View* phone_status_view_dont_use_ = nullptr;
+  raw_ptr<views::View, ExperimentalAsh> phone_status_view_dont_use_ = nullptr;
 
   // The main content view of the bubble, which changes depending on the state.
   // Unowned.
-  PhoneHubContentView* content_view_ = nullptr;
+  raw_ptr<PhoneHubContentView, DanglingUntriaged | ExperimentalAsh>
+      content_view_ = nullptr;
 
-  phonehub::PhoneHubManager* phone_hub_manager_ = nullptr;
+  raw_ptr<phonehub::PhoneHubManager, ExperimentalAsh> phone_hub_manager_ =
+      nullptr;
+
+  base::Time last_unlocked_timestamp_;
 
   base::ScopedObservation<PhoneHubUiController, PhoneHubUiController::Observer>
       observed_phone_hub_ui_controller_{this};

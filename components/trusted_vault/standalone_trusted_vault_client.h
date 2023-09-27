@@ -17,8 +17,8 @@
 #include "base/sequence_checker.h"
 #include "base/task/sequenced_task_runner.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
-#include "components/sync/driver/trusted_vault_client.h"
 #include "components/trusted_vault/trusted_vault_access_token_fetcher_frontend.h"
+#include "components/trusted_vault/trusted_vault_client.h"
 
 struct CoreAccountInfo;
 
@@ -26,7 +26,7 @@ namespace network {
 class SharedURLLoaderFactory;
 }  // namespace network
 
-namespace syncer {
+namespace trusted_vault {
 
 class StandaloneTrustedVaultBackend;
 
@@ -80,6 +80,9 @@ class StandaloneTrustedVaultClient : public TrustedVaultClient {
   // FakeSecurityDomainsServer.
   void GetLastAddedRecoveryMethodPublicKeyForTesting(
       base::OnceCallback<void(const std::vector<uint8_t>&)> callback);
+  void GetLastKeyVersionForTesting(
+      const std::string& gaia_id,
+      base::OnceCallback<void(int last_key_version)> callback);
 
  private:
   void NotifyTrustedVaultKeysChanged();
@@ -106,6 +109,6 @@ class StandaloneTrustedVaultClient : public TrustedVaultClient {
   base::WeakPtrFactory<StandaloneTrustedVaultClient> weak_ptr_factory_{this};
 };
 
-}  // namespace syncer
+}  // namespace trusted_vault
 
 #endif  // COMPONENTS_TRUSTED_VAULT_STANDALONE_TRUSTED_VAULT_CLIENT_H_

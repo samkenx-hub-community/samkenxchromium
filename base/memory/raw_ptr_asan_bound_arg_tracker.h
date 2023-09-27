@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -14,8 +14,8 @@
 #include <vector>
 
 #include "base/base_export.h"
-#include "base/containers/stack_container.h"
 #include "base/memory/raw_ptr.h"
+#include "third_party/abseil-cpp/absl/container/inlined_vector.h"
 
 namespace base {
 namespace internal {
@@ -47,7 +47,7 @@ class UnretainedRefWrapper;
 class BASE_EXPORT RawPtrAsanBoundArgTracker {
  public:
   static constexpr size_t kInlineArgsCount = 3;
-  using ProtectedArgsVector = base::StackVector<uintptr_t, kInlineArgsCount>;
+  using ProtectedArgsVector = absl::InlinedVector<uintptr_t, kInlineArgsCount>;
 
   // Check whether ptr is an address inside an allocation pointed to by one of
   // the currently protected callback arguments. If it is, then this function
@@ -113,7 +113,7 @@ class BASE_EXPORT RawPtrAsanBoundArgTracker {
   // We save the previously bound arguments, so that we can restore them when
   // this callback returns. This helps with coverage while avoiding false
   // positives due to nested run loops/callback re-entrancy.
-  ProtectedArgsVector* prev_protected_args_;
+  raw_ptr<ProtectedArgsVector> prev_protected_args_;
   ProtectedArgsVector protected_args_;
 };
 

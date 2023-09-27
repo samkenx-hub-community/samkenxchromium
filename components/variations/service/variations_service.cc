@@ -15,6 +15,7 @@
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/observer_list.h"
@@ -318,7 +319,7 @@ class DeviceVariationsRestrictionByPolicyApplicator {
     }
   }
 
-  PrefService* const policy_pref_service_;
+  const raw_ptr<PrefService, ExperimentalAsh> policy_pref_service_;
 
   // Watch the changes of the variations prefs.
   std::unique_ptr<PrefChangeRegistrar> pref_change_registrar_;
@@ -427,6 +428,14 @@ void VariationsService::SetRestrictMode(const std::string& restrict_mode) {
   // builds that talk to the variations server - which don't enable DCHECKs.
   CHECK(variations_server_url_.is_empty());
   restrict_mode_ = restrict_mode;
+}
+
+bool VariationsService::IsLikelyDogfoodClient() const {
+  // The param is typically only set for dogfood clients, though in principle it
+  // could be set in other rare contexts as well.
+  const std::string restrict_mode = GetRestrictParameterValue(
+      restrict_mode_, client_.get(), policy_pref_service_);
+  return !restrict_mode.empty();
 }
 
 GURL VariationsService::GetVariationsServerURL(HttpOptions http_options) {
@@ -702,7 +711,8 @@ void VariationsService::InitResourceRequestedAllowedNotifier() {
   // ResourceRequestAllowedNotifier does not install an observer if there is no
   // NetworkChangeNotifier, which results in never being notified of changes to
   // network status.
-  resource_request_allowed_notifier_->Init(this, false /* leaky */);
+  resource_request_allowed_notifier_->Init(this, /*leaky=*/false,
+                                           /*wait_for_eula=*/false);
 }
 
 void VariationsService::StartRepeatedVariationsSeedFetch() {
@@ -937,6 +947,10 @@ bool VariationsService::SetUpFieldTrials(
       &safe_seed_manager_, /*add_entropy_source_to_variations_ids=*/true);
 }
 
+SeedType VariationsService::GetSeedType() const {
+  return field_trial_creator_.seed_type();
+}
+
 void VariationsService::OverrideCachedUIStrings() {
   field_trial_creator_.OverrideCachedUIStrings();
 }
@@ -982,13 +996,17 @@ bool VariationsService::OverrideStoredPermanentCountry(
     const std::string& country_override) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
+  const std::string country_override_lowercase =
+      base::ToLowerASCII(country_override);
   const std::string stored_country =
       local_state_->GetString(prefs::kVariationsPermanentOverriddenCountry);
 
-  if (stored_country == country_override)
+  if (stored_country == country_override_lowercase) {
     return false;
+  }
 
-  field_trial_creator_.StoreVariationsOverriddenCountry(country_override);
+  field_trial_creator_.StoreVariationsOverriddenCountry(
+      country_override_lowercase);
   return true;
 }
 

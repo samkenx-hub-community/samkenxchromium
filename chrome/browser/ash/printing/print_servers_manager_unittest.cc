@@ -10,6 +10,7 @@
 
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
+#include "base/memory/raw_ptr.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/task_environment.h"
 #include "chrome/browser/ash/printing/print_servers_provider.h"
@@ -61,7 +62,7 @@ class FakePrintServersProvider : public PrintServersProvider {
   ~FakePrintServersProvider() override = default;
 
   void AddObserver(Observer* observer) override { observer_ = observer; }
-  void RemoveObserver(Observer* observer) override {}
+  void RemoveObserver(Observer* observer) override { observer_ = nullptr; }
   void SetData(std::unique_ptr<std::string> data) override {}
   void SetAllowlistPref(PrefService* prefs,
                         const std::string& allowlist_pref) override {}
@@ -81,7 +82,7 @@ class FakePrintServersProvider : public PrintServersProvider {
 
  private:
   absl::optional<std::vector<PrintServer>> print_servers_;
-  PrintServersProvider::Observer* observer_;
+  raw_ptr<PrintServersProvider::Observer, ExperimentalAsh> observer_ = nullptr;
 };
 
 class PrintServersManagerTest : public testing::Test,
@@ -121,7 +122,8 @@ class PrintServersManagerTest : public testing::Test,
   // Captured printer lists from observer callbacks.
   base::flat_map<PrinterClass, std::vector<Printer>> observed_printers_;
 
-  FakeServerPrintersProvider* server_printers_provider_;
+  raw_ptr<FakeServerPrintersProvider, DanglingUntriaged | ExperimentalAsh>
+      server_printers_provider_;
   FakePrintServersProvider user_policy_print_servers_provider_;
   FakePrintServersProvider device_policy_print_servers_provider_;
 

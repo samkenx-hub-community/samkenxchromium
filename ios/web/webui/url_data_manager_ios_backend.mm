@@ -7,7 +7,6 @@
 #import <set>
 
 #import "base/command_line.h"
-#import "base/compiler_specific.h"
 #import "base/debug/alias.h"
 #import "base/functional/bind.h"
 #import "base/memory/ref_counted.h"
@@ -35,10 +34,6 @@
 #import "ui/base/template_expressions.h"
 #import "ui/base/webui/i18n_source_stream.h"
 #import "url/url_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using web::WebThread;
 

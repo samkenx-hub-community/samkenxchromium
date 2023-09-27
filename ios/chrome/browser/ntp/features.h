@@ -32,12 +32,6 @@ BASE_DECLARE_FEATURE(kEnableFeedInvisibleForegroundRefresh);
 // Use IsWebChannelsEnabled() instead of this constant directly.
 BASE_DECLARE_FEATURE(kEnableWebChannels);
 
-// Feature flag to enable Feed bottom sign-in promo feature, which displays a
-// sign-in promotion card at the bottom of the Discover Feed for signed out
-// users. Use IsFeedBottomSignInPromoEnabled() instead of this constant
-// directly.
-BASE_DECLARE_FEATURE(kEnableFeedBottomSignInPromo);
-
 // Feature flag to enable Feed card menu promo feature, which displays a sign-in
 // promotion UI when signed out users click on personalization options within
 // the feed card menu.
@@ -49,6 +43,24 @@ BASE_DECLARE_FEATURE(kEnableFeedAblation);
 
 // Feature flag to enable feed experiment tagging.
 BASE_DECLARE_FEATURE(kEnableFeedExperimentTagging);
+
+// Feature flag to enable the Set Up List.
+BASE_DECLARE_FEATURE(kIOSSetUpList);
+
+// Feature flag to disable Discover-controlled foregrounding refreshes.
+BASE_DECLARE_FEATURE(kFeedDisableHotStartRefresh);
+
+// Feature flag to enable the Follow UI update.
+BASE_DECLARE_FEATURE(kEnableFollowUIUpdate);
+
+// Feature flag to enable the live sport card in the Discover feed.
+BASE_DECLARE_FEATURE(kDiscoverFeedSportCard);
+
+// Feature flag to enable the content notifications.
+BASE_DECLARE_FEATURE(kContentPushNotifications);
+
+// Feature flag to enable the Large Fakebox design changes.
+BASE_DECLARE_FEATURE(kIOSLargeFakebox);
 
 // Feature param under `kEnableFeedBackgroundRefresh` to also enable background
 // refresh for the Following feed.
@@ -107,21 +119,40 @@ extern const char kFeedSeenRefreshThresholdInSeconds[];
 // threshold when the last refresh was unseen.
 extern const char kFeedUnseenRefreshThresholdInSeconds[];
 
+// Feature param under `kEnableFeedInvisibleForegroundRefresh` to enable using
+// engagement as a signal to invalidate the cache when the app is foregrounded.
+// This can result in a visible refresh when the NTP is visible during
+// foregrounding, or invisible refresh when a non-NTP is shown during
+// foregrounding. The engagement signals may include a deep scroll or 4 views,
+// and no sooner than 5 minutes from the last refresh.
+extern const char
+    kEnableFeedUseInteractivityInvalidationForForegroundRefreshes[];
+
 // Whether the Following Feed is enabled on NTP.
 bool IsWebChannelsEnabled();
 
 // Whether the Discover service is created early, alongside the app creation.
 bool IsDiscoverFeedServiceCreatedEarly();
 
-// Whether feed background refresh is enabled. Returns the value in
-// NSUserDefaults set by `SaveFeedBackgroundRefreshEnabledForNextColdStart()`.
-// This function always returns false if the `IOS_BACKGROUND_MODE_ENABLED`
-// buildflag is not defined.
+// Whether feed background refresh is enabled and the capability was enabled at
+// startup.
 bool IsFeedBackgroundRefreshEnabled();
 
-// Saves the current value for feature `kEnableFeedBackgroundRefresh`. This call
+// Whether feed background refresh capability is enabled. Returns the value in
+// NSUserDefaults set by
+// `SaveFeedBackgroundRefreshCapabilityEnabledForNextColdStart()`. This is used
+// because registering for background refreshes must happen early in app
+// initialization and FeatureList is not yet available. Enabling or disabling
+// background refresh features will always take effect after two cold starts
+// after the feature has been changed on the server (once for the Finch
+// configuration, and another for reading the stored value from NSUserDefaults).
+// This function always returns false if the `IOS_BACKGROUND_MODE_ENABLED`
+// buildflag is not defined.
+bool IsFeedBackgroundRefreshCapabilityEnabled();
+
+// Saves whether any background refresh experiment is enabled. This call
 // DCHECKs on the availability of `base::FeatureList`.
-void SaveFeedBackgroundRefreshEnabledForNextColdStart();
+void SaveFeedBackgroundRefreshCapabilityEnabledForNextColdStart();
 
 // Sets `timestamp` for key `NSUserDefaultsKey` to be displayed in Experimental
 // Settings in the Settings App. This is not available in stable.
@@ -171,7 +202,7 @@ bool IsFeedSessionCloseForegroundRefreshEnabled();
 bool IsFeedAppCloseForegroundRefreshEnabled();
 
 // Whether feed is refreshed in the background soon after the app is
-// backgrounded.
+// backgrounded, and the capability was enabled at startup.
 bool IsFeedAppCloseBackgroundRefreshEnabled();
 
 // Returns the engagement criteria type for a feed refresh.
@@ -191,8 +222,12 @@ double GetFeedSeenRefreshThresholdInSeconds();
 // Returns the refresh threshold (aka feed expiration) for an unseen feed.
 double GetFeedUnseenRefreshThresholdInSeconds();
 
-// YES if enabled Feed bottom sign-in promo.
-bool IsFeedBottomSignInPromoEnabled();
+// YES if user engagement is used as a signal to invalidate the cache when the
+// app is foregrounded. This can result in a visible refresh when the NTP is
+// visible during foregrounding, or invisible refresh when a non-NTP is shown
+// during foregrounding. The engagement signals may include a deep scroll or 4
+// views, and no sooner than 5 minutes from the last refresh.
+bool IsFeedUseInteractivityInvalidationForForegroundRefreshesEnabled();
 
 // YES if enabled Feed card menu promo.
 bool IsFeedCardMenuSignInPromoEnabled();
@@ -202,5 +237,17 @@ bool IsFeedAblationEnabled();
 
 // Whether the feed experiment tagging is enabled.
 bool IsFeedExperimentTaggingEnabled();
+
+// Whether the Set Up List feature is enabled.
+bool IsIOSSetUpListEnabled();
+
+// Whether Discover-controlled foregrounding refreshes are disabled.
+bool IsFeedHotStartRefreshDisabled();
+
+// YES when Follow UI Update is enabled.
+bool IsFollowUIUpdateEnabled();
+
+// Returns true when the IOSLargeFakebox feature is enabled.
+bool IsIOSLargeFakeboxEnabled();
 
 #endif  // IOS_CHROME_BROWSER_NTP_FEATURES_H_

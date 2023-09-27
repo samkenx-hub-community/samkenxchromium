@@ -57,18 +57,18 @@ function RunTestsInNestedIFrame(sourceURL) {
   }, true);
 }
 
-function RunRequestStorageAccessInDetachedFrame() {
+function CreateDetachedFrame() {
   const frame = document.createElement('iframe');
   document.body.append(frame);
   const inner_doc = frame.contentDocument;
   frame.remove();
-  return inner_doc.requestStorageAccess();
+  return inner_doc;
 }
 
-function RunRequestStorageAccessViaDomParser() {
+function CreateDocumentViaDOMParser() {
   const parser = new DOMParser();
   const doc = parser.parseFromString('<html></html>', 'text/html');
-  return doc.requestStorageAccess();
+  return doc;
 }
 
 function RunCallbackWithGesture(callback) {
@@ -150,6 +150,59 @@ async function CanFrameWriteCookies(frame, keep_after_writing = false) {
   return can_write;
 }
 
+// Sets a cookie in an unpartitioned context by creating a new frame
+// and requesting storage access in the frame.
+async function SetFirstPartyCookieAndUnsetStorageAccessPermission(origin) {
+  let frame = await CreateFrame(`${origin}/storage-access-api/resources/script-with-cookie-header.py?script=embedded_responder.js`);
+  await SetPermissionInFrame(frame, [{ name: 'storage-access' }, 'granted']);
+  await RequestStorageAccessInFrame(frame);
+  await SetDocumentCookieFromFrame(frame, `cookie=unpartitioned;Secure;SameSite=None;Path=/`);
+  await SetPermissionInFrame(frame, [{ name: 'storage-access' }, 'prompt']);
+}
+
+// Tests for the presence of the unpartitioned cookie set by SetFirstPartyCookieAndUnsetStorageAccessPermission
+// in both the `document.cookie` variable and same-origin subresource \
+// Request Headers in the given frame
+async function HasUnpartitionedCookie(frame) {
+  let frameDocumentCookie = await GetJSCookiesFromFrame(frame);
+  let jsAccess = cookieStringHasCookie("cookie", "unpartitioned", frameDocumentCookie);
+  const httpCookie = await FetchSubresourceCookiesFromFrame(frame, "");
+  let httpAccess = cookieStringHasCookie("cookie", "unpartitioned", httpCookie);
+  assert_equals(jsAccess, httpAccess, "HTTP and Javascript cookies must be in sync");
+  return jsAccess && httpAccess;
+}
+
+// Tests whether the current frame can read and write cookies via HTTP headers.
+// This deletes, writes, reads, then deletes a cookie named "cookie".
+async function CanAccessCookiesViaHTTP() {
+  // We avoid reusing SetFirstPartyCookieAndUnsetStorageAccessPermission here, since that bypasses the
+  // cookie-accessibility settings that we want to check here.
+  await fetch(`${window.location.origin}/storage-access-api/resources/set-cookie-header.py?cookie=1;path=/;SameSite=None;Secure`);
+  const http_cookies = await fetch(`${window.location.origin}/storage-access-api/resources/echo-cookie-header.py`)
+      .then((resp) => resp.text());
+  const can_access = cookieStringHasCookie("cookie", "1", http_cookies);
+
+  erase_cookie_from_js("cookie", "SameSite=None;Secure;Path=/");
+
+  return can_access;
+}
+
+// Tests whether the current frame can read and write cookies via
+// document.cookie. This deletes, writes, reads, then deletes a cookie named
+// "cookie".
+function CanAccessCookiesViaJS() {
+  erase_cookie_from_js("cookie", "SameSite=None;Secure;Path=/");
+  assert_false(cookieStringHasCookie("cookie", "1", document.cookie));
+
+  document.cookie = "cookie=1;SameSite=None;Secure;Path=/";
+  const can_access = cookieStringHasCookie("cookie", "1", document.cookie);
+
+  erase_cookie_from_js("cookie", "SameSite=None;Secure;Path=/");
+  assert_false(cookieStringHasCookie("cookie", "1", document.cookie));
+
+  return can_access;
+}
+
 // Reads cookies via the `httpCookies` variable in the given frame.
 function GetHTTPCookiesFromFrame(frame) {
   return PostMessageAndAwaitReply(
@@ -198,10 +251,17 @@ function FrameInitiatedNavigation(frame, url) {
   return load;
 }
 
-// Makes a subresource request to the provided host in the given frame, and returns the cookies in the response.
-function FetchFromFrame(frame, host) {
+// Makes a subresource request to the provided host in the given frame, and
+// returns the cookies that were included in the request.
+function FetchSubresourceCookiesFromFrame(frame, host) {
+  return FetchFromFrame(frame, `${host}/storage-access-api/resources/echo-cookie-header.py`);
+}
+
+// Makes a subresource request to the provided host in the given frame, and
+// returns the response.
+function FetchFromFrame(frame, url) {
   return PostMessageAndAwaitReply(
-    { command: "subresource cookies", host }, frame.contentWindow);
+    { command: "cors fetch", url }, frame.contentWindow);
 }
 
 // Tries to set storage access policy, ignoring any errors.

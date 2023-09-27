@@ -4,14 +4,15 @@
 
 #include "chrome/updater/win/installer_api.h"
 
+#include <algorithm>
 #include <iterator>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/check_op.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
-#include "base/cxx17_backports.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -46,35 +47,45 @@ absl::optional<base::win::RegKey> ClientStateAppKeyCreate(
   }
   base::win::RegKey key(UpdaterScopeToHKeyRoot(updater_scope), CLIENT_STATE_KEY,
                         Wow6432(regsam));
-  if (key.CreateKey(subkey.c_str(), Wow6432(regsam)) != ERROR_SUCCESS) {
+  if (!key.Valid() ||
+      key.CreateKey(subkey.c_str(), Wow6432(regsam)) != ERROR_SUCCESS) {
     return absl::nullopt;
   }
   return key;
 }
 
-bool RegRenameValue(base::win::RegKey& key,
-                    const std::wstring& old_value_name,
-                    const std::wstring& new_value_name) {
+bool RegCopyValue(base::win::RegKey& from_key,
+                  const std::wstring& from_value_name,
+                  base::win::RegKey& to_key,
+                  const std::wstring& to_value_name) {
   DWORD size = 0;
-  if (key.ReadValue(old_value_name.c_str(), nullptr, &size, nullptr) !=
+  if (from_key.ReadValue(from_value_name.c_str(), nullptr, &size, nullptr) !=
       ERROR_SUCCESS) {
     return false;
   }
 
   std::vector<char> raw_value(size);
   DWORD dtype = 0;
-  if (key.ReadValue(old_value_name.c_str(), raw_value.data(), &size, &dtype) !=
-      ERROR_SUCCESS) {
+  if (from_key.ReadValue(from_value_name.c_str(), raw_value.data(), &size,
+                         &dtype) != ERROR_SUCCESS) {
     return false;
   }
 
-  if (key.WriteValue(new_value_name.c_str(), raw_value.data(), size, dtype) !=
+  if (to_key.WriteValue(to_value_name.c_str(), raw_value.data(), size, dtype) !=
       ERROR_SUCCESS) {
-    PLOG(WARNING) << "could not write: " << new_value_name;
+    PLOG(WARNING) << "could not write: " << to_value_name;
     return false;
   }
+  return true;
+}
 
-  PLOG_IF(WARNING, key.DeleteValue(old_value_name.c_str()) != ERROR_SUCCESS);
+bool RegRenameValue(base::win::RegKey& key,
+                    const std::wstring& from_value_name,
+                    const std::wstring& to_value_name) {
+  if (!RegCopyValue(key, from_value_name, key, to_value_name)) {
+    return false;
+  }
+  key.DeleteValue(from_value_name.c_str());
   return true;
 }
 
@@ -86,17 +97,86 @@ void PersistLastInstallerResultValues(UpdaterScope updater_scope,
     return;
   }
 
-  // Rename InstallerResultXXX values to LastXXX.
-  RegRenameValue(key.value(), kRegValueInstallerResult,
-                 kRegValueLastInstallerResult);
-  RegRenameValue(key.value(), kRegValueInstallerError,
-                 kRegValueLastInstallerError);
-  RegRenameValue(key.value(), kRegValueInstallerExtraCode1,
-                 kRegValueLastInstallerExtraCode1);
-  RegRenameValue(key.value(), kRegValueInstallerResultUIString,
-                 kRegValueLastInstallerResultUIString);
-  RegRenameValue(key.value(), kRegValueInstallerSuccessLaunchCmdLine,
-                 kRegValueLastInstallerSuccessLaunchCmdLine);
+  // Rename `InstallerResultXXX` values to `LastXXX`.
+  for (const auto& [rename_from, rename_to] : {
+           std::make_pair(kRegValueInstallerResult,
+                          kRegValueLastInstallerResult),
+           std::make_pair(kRegValueInstallerError, kRegValueLastInstallerError),
+           std::make_pair(kRegValueInstallerExtraCode1,
+                          kRegValueLastInstallerExtraCode1),
+           std::make_pair(kRegValueInstallerResultUIString,
+                          kRegValueLastInstallerResultUIString),
+           std::make_pair(kRegValueInstallerSuccessLaunchCmdLine,
+                          kRegValueLastInstallerSuccessLaunchCmdLine),
+       }) {
+    RegRenameValue(key.value(), rename_from, rename_to);
+  }
+
+  // The updater copies and retains the last installer result values as a backup
+  // under the `UPDATER_KEY`, and the values under the `UPDATER_KEY` are not
+  // deleted when the updater uninstalls itself. The MSI installer uses this
+  // information to display the installer result in cases where an error occurs
+  // during app installation and no other apps are installed, and the updater
+  // immediately uninstalls itself and deletes the `ClientState` registry key
+  // under which the last installer results are usually stored.
+  if (base::win::RegKey updater_key(UpdaterScopeToHKeyRoot(updater_scope),
+                                    UPDATER_KEY, Wow6432(KEY_WRITE));
+      updater_key.Valid()) {
+    for (const wchar_t* const reg_value_last_installer :
+         kRegValuesLastInstaller) {
+      RegCopyValue(key.value(), reg_value_last_installer, updater_key,
+                   reg_value_last_installer);
+    }
+  }
+}
+
+bool ClientStateAppKeyExists(UpdaterScope updater_scope,
+                             const std::string& app_id) {
+  return base::win::RegKey(UpdaterScopeToHKeyRoot(updater_scope),
+                           GetAppClientStateKey(app_id).c_str(),
+                           Wow6432(KEY_QUERY_VALUE))
+      .Valid();
+}
+
+absl::optional<InstallerOutcome> GetLastInstallerOutcome(
+    absl::optional<base::win::RegKey> key) {
+  if (!key) {
+    return absl::nullopt;
+  }
+  InstallerOutcome installer_outcome;
+  {
+    DWORD val = 0;
+    if (key->ReadValueDW(kRegValueLastInstallerResult, &val) == ERROR_SUCCESS) {
+      installer_outcome.installer_result =
+          *CheckedCastToEnum<InstallerResult>(val);
+    }
+    if (key->ReadValueDW(kRegValueLastInstallerError, &val) == ERROR_SUCCESS) {
+      installer_outcome.installer_error = val;
+    }
+    if (key->ReadValueDW(kRegValueLastInstallerExtraCode1, &val) ==
+        ERROR_SUCCESS) {
+      installer_outcome.installer_extracode1 = val;
+    }
+  }
+  {
+    std::wstring val;
+    if (key->ReadValue(kRegValueLastInstallerResultUIString, &val) ==
+        ERROR_SUCCESS) {
+      std::string installer_text;
+      if (base::WideToUTF8(val.c_str(), val.size(), &installer_text)) {
+        installer_outcome.installer_text = installer_text;
+      }
+    }
+    if (key->ReadValue(kRegValueLastInstallerSuccessLaunchCmdLine, &val) ==
+        ERROR_SUCCESS) {
+      std::string installer_cmd_line;
+      if (base::WideToUTF8(val.c_str(), val.size(), &installer_cmd_line)) {
+        installer_outcome.installer_cmd_line = installer_cmd_line;
+      }
+    }
+  }
+
+  return installer_outcome;
 }
 
 }  // namespace
@@ -115,7 +195,8 @@ absl::optional<base::win::RegKey> ClientStateAppKeyOpen(
   }
   base::win::RegKey key(UpdaterScopeToHKeyRoot(updater_scope), CLIENT_STATE_KEY,
                         Wow6432(regsam));
-  if (key.OpenKey(subkey.c_str(), Wow6432(regsam)) != ERROR_SUCCESS) {
+  if (!key.Valid() ||
+      key.OpenKey(subkey.c_str(), Wow6432(regsam)) != ERROR_SUCCESS) {
     return absl::nullopt;
   }
   return key;
@@ -128,7 +209,7 @@ bool ClientStateAppKeyDelete(UpdaterScope updater_scope,
     return false;
   }
   return base::win::RegKey(UpdaterScopeToHKeyRoot(updater_scope),
-                           CLIENT_STATE_KEY, Wow6432(KEY_WRITE))
+                           CLIENT_STATE_KEY, Wow6432(DELETE))
              .DeleteKey(subkey.c_str()) == ERROR_SUCCESS;
 }
 
@@ -143,7 +224,7 @@ int GetInstallerProgress(UpdaterScope updater_scope,
                   ERROR_SUCCESS) {
     return -1;
   }
-  return base::clamp(progress, DWORD{0}, DWORD{100});
+  return std::clamp(progress, DWORD{0}, DWORD{100});
 }
 
 bool SetInstallerProgressForTesting(UpdaterScope updater_scope,
@@ -157,6 +238,9 @@ bool SetInstallerProgressForTesting(UpdaterScope updater_scope,
 
 bool DeleteInstallerProgress(UpdaterScope updater_scope,
                              const std::string& app_id) {
+  if (!ClientStateAppKeyExists(updater_scope, app_id)) {
+    return false;
+  }
   absl::optional<base::win::RegKey> key =
       ClientStateAppKeyOpen(updater_scope, app_id, KEY_SET_VALUE);
   return key && key->DeleteValue(kRegValueInstallerProgress) == ERROR_SUCCESS;
@@ -164,6 +248,9 @@ bool DeleteInstallerProgress(UpdaterScope updater_scope,
 
 bool DeleteInstallerOutput(UpdaterScope updater_scope,
                            const std::string& app_id) {
+  if (!ClientStateAppKeyExists(updater_scope, app_id)) {
+    return false;
+  }
   absl::optional<base::win::RegKey> key = ClientStateAppKeyOpen(
       updater_scope, app_id, KEY_SET_VALUE | KEY_QUERY_VALUE);
   if (!key) {
@@ -226,6 +313,26 @@ absl::optional<InstallerOutcome> GetInstallerOutcome(
   PersistLastInstallerResultValues(updater_scope, app_id);
 
   return installer_outcome;
+}
+
+absl::optional<InstallerOutcome> GetClientStateKeyLastInstallerOutcome(
+    UpdaterScope updater_scope,
+    const std::string& app_id) {
+  return GetLastInstallerOutcome(
+      ClientStateAppKeyOpen(updater_scope, app_id, KEY_READ));
+}
+
+absl::optional<InstallerOutcome> GetUpdaterKeyLastInstallerOutcome(
+    UpdaterScope updater_scope) {
+  return GetLastInstallerOutcome(
+      [&updater_scope]() -> absl::optional<base::win::RegKey> {
+        if (base::win::RegKey updater_key(UpdaterScopeToHKeyRoot(updater_scope),
+                                          UPDATER_KEY, Wow6432(KEY_READ));
+            updater_key.Valid()) {
+          return updater_key;
+        }
+        return {};
+      }());
 }
 
 bool SetInstallerOutcomeForTesting(UpdaterScope updater_scope,
@@ -293,78 +400,74 @@ std::string GetTextForSystemError(int error) {
 // As much as possible, the implementation of this function is intended to be
 // backward compatible with the implementation of the Installer API in
 // Omaha/Google Update. Some edge cases could be missing.
-// TODO(crbug.com/1172866): remove the hardcoded assumption that error must
-// be zero to indicate success.
 Installer::Result MakeInstallerResult(
     absl::optional<InstallerOutcome> installer_outcome,
     int exit_code) {
+  InstallerOutcome outcome;
   if (installer_outcome && installer_outcome->installer_result) {
-    Installer::Result result;
-    switch (*installer_outcome->installer_result) {
-      case InstallerResult::kSuccess:
-        // This is unconditional success:
-        // - use the command line if available, and ignore everything else.
-        result.error = 0;
-        if (installer_outcome->installer_cmd_line) {
-          result.installer_cmd_line = *installer_outcome->installer_cmd_line;
-        }
-        CHECK_EQ(result.error, 0);
-        break;
-
-      case InstallerResult::kCustomError:
-        // This is an unconditional error:
-        // - use the installer error, or the exit code, or report a generic
-        //   error.
-        // - use the installer extra code if available.
-        // - use the text description of the error if available.
-        result.error = installer_outcome->installer_error
-                           ? *installer_outcome->installer_error
-                           : exit_code;
-        if (!result.error) {
-          result.error = kErrorApplicationInstallerFailed;
-        }
-        if (installer_outcome->installer_extracode1) {
-          result.extended_error = *installer_outcome->installer_extracode1;
-        }
-        if (installer_outcome->installer_text) {
-          result.installer_text = *installer_outcome->installer_text;
-        }
-        CHECK_NE(result.error, 0);
-        break;
-
-      case InstallerResult::kMsiError:
-      case InstallerResult::kSystemError:
-        // This is an unconditional error:
-        // - same as the case above but use a system-provided text.
-        result.error = installer_outcome->installer_error
-                           ? *installer_outcome->installer_error
-                           : exit_code;
-        if (!result.error) {
-          result.error = kErrorApplicationInstallerFailed;
-        }
-        if (installer_outcome->installer_extracode1) {
-          result.extended_error = *installer_outcome->installer_extracode1;
-        }
-        result.installer_text = GetTextForSystemError(result.error);
-        CHECK_NE(result.error, 0);
-        break;
-
-      case InstallerResult::kExitCode:
-        // This is could be a success or an error.
-        // - if success, then use the command line if available.
-        // - if an error, then ignore everything.
-        result.error = exit_code;
-        if (result.error == 0 && installer_outcome->installer_cmd_line) {
-          result.installer_cmd_line = *installer_outcome->installer_cmd_line;
-        }
-        break;
+    outcome = *installer_outcome;
+  } else {
+    // Set the installer result based on whether this is a success or an error.
+    if (exit_code == 0) {
+      outcome.installer_result = InstallerResult::kSuccess;
+    } else {
+      outcome.installer_result = InstallerResult::kExitCode;
+      outcome.installer_error = exit_code;
     }
-    return result;
   }
 
-  return exit_code == 0
-             ? Installer::Result(update_client::InstallError::NONE)
-             : Installer::Result(kErrorApplicationInstallerFailed, exit_code);
+  Installer::Result result;
+
+  // Read and set the installer extra code in all cases if available. Installers
+  // can use the `installer_extracode1` to transmit a custom value even in the
+  // case of success.
+  if (outcome.installer_extracode1) {
+    result.extended_error = *outcome.installer_extracode1;
+  }
+
+  switch (*outcome.installer_result) {
+    case InstallerResult::kSuccess:
+      // This is unconditional success:
+      // - use the command line if available, and ignore everything else.
+      result.error = 0;
+      if (outcome.installer_cmd_line) {
+        result.installer_cmd_line = *outcome.installer_cmd_line;
+      }
+      CHECK_EQ(result.error, 0);
+      break;
+
+    case InstallerResult::kCustomError:
+    case InstallerResult::kMsiError:
+    case InstallerResult::kSystemError:
+    case InstallerResult::kExitCode:
+      // These are usually unconditional errors:
+      // - use the installer error, or the exit code, or report a generic
+      //   error.
+      // - use the installer extra code if available.
+      // - use the text description of the error if available.
+      result.original_error =
+          outcome.installer_error ? *outcome.installer_error : exit_code;
+      if (!result.original_error) {
+        result.original_error = kErrorApplicationInstallerFailed;
+      }
+
+      // `update_client` needs to view the below codes as a success, otherwise
+      // it will consider the app as not installed. So we reset the `error` to
+      // `0` in these cases.
+      result.error =
+          result.original_error == ERROR_SUCCESS_REBOOT_INITIATED ||
+                  result.original_error == ERROR_SUCCESS_REBOOT_REQUIRED ||
+                  result.original_error == ERROR_SUCCESS_RESTART_REQUIRED
+              ? 0
+              : kErrorApplicationInstallerFailed;
+      result.installer_text =
+          outcome.installer_text ? *outcome.installer_text
+                                 : GetTextForSystemError(result.original_error);
+      CHECK_NE(result.original_error, 0);
+      break;
+  }
+
+  return result;
 }
 
 // Clears the previous installer output, runs the application installer,
@@ -393,7 +496,7 @@ AppInstallerResult RunApplicationInstaller(
   if (!app_installer.MatchesExtension(L".exe") &&
       !app_installer.MatchesExtension(L".msi")) {
     return AppInstallerResult(
-        update_client::InstallError::LAUNCH_PROCESS_FAILED);
+        update_client::InstallError::LAUNCH_PROCESS_FAILED, -1);
   }
 
   DeleteInstallerOutput(app_info.scope, app_info.app_id);
@@ -415,10 +518,11 @@ AppInstallerResult RunApplicationInstaller(
                            : L"0"},
   };
 
-  auto process = base::LaunchProcess(cmdline, options);
+  base::Process process = base::LaunchProcess(cmdline, options);
   if (!process.IsValid()) {
     return AppInstallerResult(
-        update_client::InstallError::LAUNCH_PROCESS_FAILED);
+        update_client::InstallError::LAUNCH_PROCESS_FAILED,
+        HRESULTFromLastError());
   }
 
   int exit_code = -1;

@@ -28,7 +28,6 @@ import org.chromium.base.ObserverList.RewindableIterator;
 import org.chromium.base.UserDataHost;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.JniMocker;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.url.JUnitTestGURLs;
@@ -36,7 +35,6 @@ import org.chromium.url.JUnitTestGURLs;
 /** Unit tests for {@link TabFavicon}. */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-@Features.EnableFeatures(ChromeFeatureList.ANDROID_SCROLL_OPTIMIZATIONS)
 public class TabFaviconTest {
     private static final int IDEAL_SIZE = 4;
 
@@ -85,7 +83,7 @@ public class TabFaviconTest {
         doReturn(false).when(mTab).isNativePage();
         doReturn(true).when(mTab).isInitialized();
         doReturn(mWebContents).when(mTab).getWebContents();
-        doReturn(JUnitTestGURLs.getGURL(JUnitTestGURLs.EXAMPLE_URL)).when(mTab).getUrl();
+        doReturn(JUnitTestGURLs.EXAMPLE_URL).when(mTab).getUrl();
         doReturn(new EmptyIterator()).when(mTab).getTabObservers();
 
         mTabFavicon = TabFavicon.from(mTab);
@@ -102,7 +100,7 @@ public class TabFaviconTest {
     }
 
     private void onFaviconAvailable(Bitmap bitmap) {
-        mTabFavicon.onFaviconAvailable(bitmap, JUnitTestGURLs.getGURL(JUnitTestGURLs.EXAMPLE_URL));
+        mTabFavicon.onFaviconAvailable(bitmap, JUnitTestGURLs.EXAMPLE_URL);
     }
 
     @Test

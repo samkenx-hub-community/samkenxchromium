@@ -11,6 +11,8 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/memory/shared_memory_mapping.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string_piece.h"
@@ -26,6 +28,7 @@
 #include "extensions/browser/api/messaging/message_service.h"
 #include "extensions/browser/api/messaging/native_message_host.h"
 #include "extensions/browser/extension_registry.h"
+#include "extensions/common/api/messaging/channel_type.h"
 #include "extensions/common/api/messaging/messaging_endpoint.h"
 #include "extensions/common/api/messaging/serialization_format.h"
 #include "extensions/common/extension.h"
@@ -202,7 +205,9 @@ class WilcoDtcSupportdExtensionOwnedMessageHost final
       base::SingleThreadTaskRunner::GetCurrentDefault();
 
   // Unowned.
-  Client* client_ = nullptr;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter
+  // for: #constexpr-ctor-field-initializer
+  RAW_PTR_EXCLUSION Client* client_ = nullptr;
 
   // Whether a message has already been received from the extension.
   bool message_from_extension_received_ = false;
@@ -281,7 +286,7 @@ class WilcoDtcSupportdDaemonOwnedMessageHost final
   const std::string json_message_to_send_;
   base::OnceCallback<void(const std::string& response)> send_response_callback_;
   // Unowned.
-  Client* client_ = nullptr;
+  raw_ptr<Client, ExperimentalAsh> client_ = nullptr;
 };
 
 // Helper that wraps the specified OnceCallback and encapsulates logic that
@@ -362,7 +367,7 @@ void DeliverMessageToExtension(
       extensions::MessagingEndpoint::ForNativeApp(
           kWilcoDtcSupportdUiMessageHost),
       std::move(native_message_port), extension_id, GURL(),
-      std::string() /* channel_name */);
+      extensions::ChannelType::kNative, std::string() /* channel_name */);
 }
 
 }  // namespace

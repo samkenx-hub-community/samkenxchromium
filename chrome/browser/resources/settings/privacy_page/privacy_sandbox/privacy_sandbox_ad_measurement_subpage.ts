@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import '../../controls/settings_toggle_button.js';
-import '../../prefs/prefs.js';
+import 'chrome://resources/cr_components/settings_prefs/prefs.js';
+import '/shared/settings/controls/settings_toggle_button.js';
 import '../../settings_shared.css.js';
 
+import {SettingsToggleButtonElement} from '/shared/settings/controls/settings_toggle_button.js';
+import {PrefsMixin} from 'chrome://resources/cr_components/settings_prefs/prefs_mixin.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {SettingsToggleButtonElement} from '../../controls/settings_toggle_button.js';
+import {HatsBrowserProxyImpl, TrustSafetyInteraction} from '../../hats_browser_proxy.js';
 import {MetricsBrowserProxy, MetricsBrowserProxyImpl} from '../../metrics_browser_proxy.js';
-import {PrefsMixin} from '../../prefs/prefs_mixin.js';
 
 import {getTemplate} from './privacy_sandbox_ad_measurement_subpage.html.js';
 
@@ -47,6 +48,13 @@ export class SettingsPrivacySandboxAdMeasurementSubpageElement extends
 
   private metricsBrowserProxy_: MetricsBrowserProxy =
       MetricsBrowserProxyImpl.getInstance();
+
+  override ready() {
+    super.ready();
+
+    HatsBrowserProxyImpl.getInstance().trustSafetyInteractionOccurred(
+        TrustSafetyInteraction.OPENED_AD_MEASUREMENT_SUBPAGE);
+  }
 
   private onToggleChange_(e: Event) {
     const target = e.target as SettingsToggleButtonElement;

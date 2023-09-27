@@ -12,7 +12,6 @@ import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import org.chromium.base.jank_tracker.JankTracker;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.supplier.Supplier;
@@ -36,7 +35,6 @@ import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.widget.MenuOrKeyboardActionController;
 import org.chromium.components.browser_ui.widget.scrim.ScrimCoordinator;
-import org.chromium.components.module_installer.builder.ModuleInterface;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.resources.dynamics.DynamicResourceLoader;
 
@@ -45,10 +43,7 @@ import java.lang.annotation.RetentionPolicy;
 
 /**
  * Interface to get access to components concerning tab management.
- * TODO(crbug.com/982018): Move DFM configurations to 'chrome/android/modules/start_surface/'
  */
-@ModuleInterface(module = "tab_management",
-        impl = "org.chromium.chrome.browser.tasks.tab_management.TabManagementDelegateImpl")
 public interface TabManagementDelegate {
     @IntDef({TabSwitcherType.GRID, TabSwitcherType.CAROUSEL, TabSwitcherType.SINGLE,
             TabSwitcherType.NONE})
@@ -64,7 +59,10 @@ public interface TabManagementDelegate {
      * Create the {@link TabSwitcherLayout}.
      * @param context The current Android's context.
      * @param updateHost The parent {@link LayoutUpdateHost}.
+     * @param layoutStateProvider The {@link LayoutStateProvider} to provide layout state changes.
      * @param renderHost The parent {@link LayoutRenderHost}.
+     * @param browserControlsStateProvider The {@link BrowserControlsStateProvider} for the top
+     *         controls.
      * @param tabSwitcher The {@link TabSwitcher} the layout should own.
      * @param tabSwitcherScrimAnchor {@link ViewGroup} used by tab switcher layout to show scrim
      *         when overview is visible.
@@ -72,7 +70,8 @@ public interface TabManagementDelegate {
      * @return The {@link TabSwitcherLayout}.
      */
     Layout createTabSwitcherLayout(Context context, LayoutUpdateHost updateHost,
-            LayoutRenderHost renderHost, TabSwitcher tabSwitcher, JankTracker jankTracker,
+            LayoutStateProvider layoutStateProvider, LayoutRenderHost renderHost,
+            BrowserControlsStateProvider browserControlsStateProvider, TabSwitcher tabSwitcher,
             ViewGroup tabSwitcherScrimAnchor, ScrimCoordinator scrimCoordinator);
 
     /**
@@ -94,6 +93,8 @@ public interface TabManagementDelegate {
      * @param incognitoReauthControllerSupplier {@link OneshotSupplier<IncognitoReauthController>}
      *         to detect pending re-auth when tab switcher is shown.
      * @param backPressManager {@link BackPressManager} to handle back press gesture.
+     * @param layoutStateProviderSupplier {@link OneshotSupplier<LayoutStateProvider>} to provide
+     *                                    the layout state changes.
      * @return The {@link TabSwitcher}.
      */
     TabSwitcher createGridTabSwitcher(@NonNull Activity activity,
@@ -110,7 +111,8 @@ public interface TabManagementDelegate {
             @NonNull SnackbarManager snackbarManager,
             @NonNull ModalDialogManager modalDialogManager,
             @NonNull OneshotSupplier<IncognitoReauthController> incognitoReauthControllerSupplier,
-            @Nullable BackPressManager backPressManager);
+            @Nullable BackPressManager backPressManager,
+            @Nullable OneshotSupplier<LayoutStateProvider> layoutStateProviderSupplier);
 
     /**
      * Create the {@link TabSwitcher} to display Tabs in carousel.
@@ -148,6 +150,8 @@ public interface TabManagementDelegate {
      * Create the {@link TabGroupUi}.
      * @param activity The {@link Activity} that creates this surface.
      * @param parentView The parent view of this UI.
+     * @param browserControlsStateProvider The {@link BrowserControlsStateProvider} of the top
+     *                                     controls.
      * @param incognitoStateProvider Observable provider of incognito state.
      * @param scrimCoordinator The {@link ScrimCoordinator} to control scrim view.
      * @param omniboxFocusStateSupplier Supplier to access the focus state of the omnibox.
@@ -164,6 +168,7 @@ public interface TabManagementDelegate {
      * @return The {@link TabGroupUi}.
      */
     TabGroupUi createTabGroupUi(@NonNull Activity activity, @NonNull ViewGroup parentView,
+            @NonNull BrowserControlsStateProvider browserControlsStateProvider,
             @NonNull IncognitoStateProvider incognitoStateProvider,
             @NonNull ScrimCoordinator scrimCoordinator,
             @NonNull ObservableSupplier<Boolean> omniboxFocusStateSupplier,

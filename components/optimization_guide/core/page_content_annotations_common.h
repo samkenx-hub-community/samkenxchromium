@@ -14,6 +14,7 @@
 #include "components/optimization_guide/core/page_content_annotation_type.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
+#include "third_party/tflite_support/src/tensorflow_lite_support/cc/task/processor/proto/embedding.pb.h"
 
 namespace optimization_guide {
 
@@ -46,11 +47,6 @@ class WeightedIdentifier {
 // The result of an execution, and all associated data.
 class BatchAnnotationResult {
  public:
-  // Creates a result for a page topics annotation.
-  static BatchAnnotationResult CreatePageTopicsResult(
-      const std::string& input,
-      absl::optional<std::vector<WeightedIdentifier>> topics);
-
   // Creates a result for a page entities annotation.
   static BatchAnnotationResult CreatePageEntitiesResult(
       const std::string& input,
@@ -60,6 +56,11 @@ class BatchAnnotationResult {
   static BatchAnnotationResult CreateContentVisibilityResult(
       const std::string& input,
       absl::optional<double> visibility_score);
+
+  // Creates a result for a text embedding annotation.
+  static BatchAnnotationResult CreateTextEmbeddingResult(
+      const std::string& input,
+      absl::optional<std::vector<float>> embeddings);
 
   // Creates a result where the AnnotationType and output are not set.
   static BatchAnnotationResult CreateEmptyAnnotationsResult(
@@ -73,13 +74,11 @@ class BatchAnnotationResult {
 
   const std::string& input() const { return input_; }
   AnnotationType type() const { return type_; }
-  const absl::optional<std::vector<WeightedIdentifier>>& topics() const {
-    return topics_;
-  }
   const absl::optional<std::vector<ScoredEntityMetadata>>& entities() const {
     return entities_;
   }
   absl::optional<double> visibility_score() const { return visibility_score_; }
+  absl::optional<std::vector<float>> embeddings() const { return embeddings_; }
 
   std::string ToString() const;
   std::string ToJSON() const;
@@ -97,10 +96,6 @@ class BatchAnnotationResult {
   std::string input_;
   AnnotationType type_ = AnnotationType::kUnknown;
 
-  // Output for page topics annotations, set only if the |type_| matches and the
-  // execution was successful.
-  absl::optional<std::vector<WeightedIdentifier>> topics_;
-
   // Output for page entities annotations, set only if the |type_| matches and
   // the execution was successful.
   absl::optional<std::vector<ScoredEntityMetadata>> entities_;
@@ -108,6 +103,10 @@ class BatchAnnotationResult {
   // Output for visisbility score annotations, set only if the |type_| matches
   // and the execution was successful.
   absl::optional<double> visibility_score_;
+
+  // Output for text emebdding annotations, set only if the |type_| matches
+  // and the execution was successful.
+  absl::optional<std::vector<float>> embeddings_;
 };
 
 using BatchAnnotationCallback =
@@ -123,11 +122,16 @@ std::vector<BatchAnnotationResult> CreateEmptyBatchAnnotationResults(
 class PageContentAnnotationsResult {
   // The various type of results.
   typedef float ContentVisibilityScore;
+  typedef tflite::task::processor::EmbeddingResult TextEmbeddingResult;
 
  public:
   // Creates a result for a content visibility annotation.
   static PageContentAnnotationsResult CreateContentVisibilityScoreResult(
       const ContentVisibilityScore& score);
+
+  // Creates a result for a text embedding annotation.
+  static PageContentAnnotationsResult CreateTextEmbeddingResult(
+      const TextEmbeddingResult& embedding);
 
   PageContentAnnotationsResult(const PageContentAnnotationsResult&);
   PageContentAnnotationsResult& operator=(const PageContentAnnotationsResult&);

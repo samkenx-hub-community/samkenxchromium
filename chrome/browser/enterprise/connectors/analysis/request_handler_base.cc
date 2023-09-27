@@ -15,8 +15,10 @@ RequestHandlerBase::RequestHandlerBase(
     const std::string& source,
     const std::string& destination,
     const std::string& user_action_id,
+    const std::string& tab_title,
     uint64_t user_action_requests_count,
-    safe_browsing::DeepScanAccessPoint access_point)
+    safe_browsing::DeepScanAccessPoint access_point,
+    ContentAnalysisRequest::Reason reason)
     : upload_service_(upload_service ? upload_service->AsWeakPtr() : nullptr),
       profile_(profile),
       analysis_settings_(analysis_settings),
@@ -24,8 +26,10 @@ RequestHandlerBase::RequestHandlerBase(
       source_(source),
       destination_(destination),
       user_action_id_(user_action_id),
+      tab_title_(tab_title),
       user_action_requests_count_(user_action_requests_count),
-      access_point_(access_point) {}
+      access_point_(access_point),
+      reason_(reason) {}
 
 RequestHandlerBase::~RequestHandlerBase() = default;
 
@@ -55,6 +59,7 @@ void RequestHandlerBase::PrepareRequest(
   if (analysis_settings_->cloud_or_local_settings.is_local_analysis()) {
     request->set_user_action_id(user_action_id_);
     request->set_user_action_requests_count(user_action_requests_count_);
+    request->set_tab_title(tab_title_);
   }
 
   request->set_analysis_connector(connector);
@@ -64,10 +69,17 @@ void RequestHandlerBase::PrepareRequest(
   request->set_destination(destination_);
   request->set_tab_url(url_);
   request->set_per_profile_request(analysis_settings_->per_profile);
-  for (const auto& tag : analysis_settings_->tags)
+  for (const auto& tag : analysis_settings_->tags) {
     request->add_tag(tag.first);
-  if (analysis_settings_->client_metadata)
+  }
+
+  if (analysis_settings_->client_metadata) {
     request->set_client_metadata(*analysis_settings_->client_metadata);
+  }
+
+  if (reason_ != ContentAnalysisRequest::UNKNOWN) {
+    request->set_reason(reason_);
+  }
 }
 
 safe_browsing::BinaryUploadService*

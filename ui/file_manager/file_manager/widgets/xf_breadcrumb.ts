@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 import 'chrome://resources/cr_elements/cr_action_menu/cr_action_menu.js';
-import type {CrActionMenuElement} from 'chrome://resources/cr_elements/cr_action_menu/cr_action_menu.js';
 import 'chrome://resources/polymer/v3_0/paper-ripple/paper-ripple.js';
 
-import {addCSSPrefixSelector, mouseEnterMaybeShowTooltip} from '../common/js/dom_utils.js';
+import type {CrActionMenuElement} from 'chrome://resources/cr_elements/cr_action_menu/cr_action_menu.js';
+
+import {addCSSPrefixSelector, getCrActionMenuTop, mouseEnterMaybeShowTooltip} from '../common/js/dom_utils.js';
 import {str} from '../common/js/util.js';
 
-import {css, customElement, html, property, PropertyValues, query, state, XfBase} from './xf_base.js';
+import {css, customElement, html, property, type PropertyValues, query, state, XfBase} from './xf_base.js';
 
 
 /**
@@ -19,6 +20,9 @@ import {css, customElement, html, property, PropertyValues, query, state, XfBase
 export class XfBreadcrumb extends XfBase {
   /** A path is a "/" separated string. */
   @property({type: String, reflect: true}) path = '';
+
+  /** The maximum number of path elements shown. */
+  @property({type: Number, reflect: true}) maxPathParts = 4;
 
   static get events() {
     return {
@@ -48,7 +52,7 @@ export class XfBreadcrumb extends XfBase {
       return html``;
     }
     const parts = this.path.split('/');
-    const showElider = parts.length > 4;
+    const showElider = parts.length > this.maxPathParts;
     const partBeforeElider = parts[0];
     const eliderParts = showElider ? parts.slice(1, parts.length - 2) : [];
     const afterEliderIndex = showElider ? parts.length - 2 : 1;
@@ -226,17 +230,7 @@ export class XfBreadcrumb extends XfBase {
     }
 
     // Show drop-down below the elider button.
-    let offsetElement: Element|null = this.$eliderButton_!;
-    let top = this.$eliderButton_!.offsetHeight;
-    // We need to go upwards to add all offsetTop all offset parents because
-    // each level can have its own offsetTop.
-    while (offsetElement instanceof HTMLElement) {
-      top += offsetElement.offsetTop;
-      offsetElement = offsetElement.offsetParent;
-    }
-    // The gap between the elider button bottom and the dropdown menu top.
-    const gap = 8;
-    top += gap;
+    const top = getCrActionMenuTop(this.$eliderButton_!, 8);
     this.$actionMenu_!.showAt(this.$eliderButton_!, {top: top});
 
     // Style drop-down and horizontal position.
@@ -449,10 +443,9 @@ function getCSS() {
     :host {
       align-items: center;
       display: flex;
-      font-family: 'Roboto Medium';
-      font-size: 14px;
       outline: none;
       overflow: hidden;
+      padding-inline-start: 8px;
       user-select: none;
       white-space: nowrap;
     }
@@ -481,8 +474,7 @@ function getCSS() {
       display: inline-block;
       position: relative;
 
-      /* don't use browser's button font. */
-      font: inherit;
+      font: var(--cros-title-1-font);
       margin: 0;
 
       /* elide wide text */
@@ -499,7 +491,6 @@ function getCSS() {
 
     button[disabled] {
       cursor: default;
-      font-weight: 500;
       margin-inline-end: 4px;
       pointer-events: none;
     }
@@ -535,6 +526,10 @@ function getCSS() {
       padding: 0 12px;
     }
 
+    :host > button:first-child {
+      margin-inline-start: 0;
+    }
+
     button[disabled] {
       color: var(--cros-sys-on_surface);
     }
@@ -568,8 +563,7 @@ function getCSS() {
     #elider-menu button {
       color: var(--cros-sys-on_surface);
       display: block;
-      font-family: 'Roboto';
-      font-size: 13px;
+      font: var(--cros-button-2-font);
       height: 36px;
       max-width: min(288px, 40vw);
       min-width: 192px;  /* menu width */
@@ -578,9 +572,15 @@ function getCSS() {
       text-align: start;
     }
 
-    :host-context(.focus-outline-visible) #elider-menu button:focus {
-      outline: 2px solid var(--cros-sys-focus_ring);
-      outline-offset: -2px;
+    :host-context(.focus-outline-visible) #elider-menu button:focus::after {
+      border: 2px solid var(--cros-sys-focus_ring);
+      border-radius: 8px;
+      content: '';
+      height: 32px; /* option height - 2 x border width */
+      left: 0;
+      position: absolute;
+      top: 0;
+      width: calc(100% - 4px); /* 2 x border width */
     }
 
     /** Reset the hover color when using keyboard to navigate the menu items. */
@@ -589,7 +589,7 @@ function getCSS() {
     }
 
     cr-action-menu {
-      --cr-menu-background-color: var(--cros-sys-app_base_elevated);
+      --cr-menu-background-color: var(--cros-sys-base_elevated);
       --cr-menu-background-sheen: none;
       /* TODO(wenbojie): use elevation variable when it's ready.
       --cros-sys-elevation3 */

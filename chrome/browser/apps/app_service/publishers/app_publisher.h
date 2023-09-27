@@ -24,19 +24,27 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/base/resource/resource_scale_factor.h"
 
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "chrome/browser/apps/app_service/publishers/compressed_icon_getter.h"
+#endif
+
 namespace apps {
 
 struct AppLaunchParams;
 class PackageId;
 
+#if BUILDFLAG(IS_CHROMEOS_ASH)
 struct PromiseApp;
 using PromiseAppPtr = std::unique_ptr<PromiseApp>;
+#endif
 
 // AppPublisher parent class (in the App Service sense) for all app publishers.
 // See components/services/app_service/README.md.
-//
-// TODO(crbug.com/1253250): Add other mojom publisher functions.
-class AppPublisher {
+class AppPublisher
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+    : public CompressedIconGetter
+#endif
+{
  public:
   explicit AppPublisher(AppServiceProxy* proxy);
   AppPublisher(const AppPublisher&) = delete;
@@ -51,9 +59,6 @@ class AppPublisher {
                         InstallReason install_reason,
                         InstallSource install_source);
 
-  // Creates and returns a promise app object.
-  static PromiseAppPtr MakePromiseApp(const PackageId& package_id);
-
 #if !BUILDFLAG(IS_CHROMEOS_LACROS)
   // Registers this AppPublisher to AppServiceProxy, allowing it to receive App
   // Service API calls. This function must be called after the object's
@@ -62,9 +67,6 @@ class AppPublisher {
   // be called immediately before the first call to AppPublisher::Publish that
   // sends the initial list of apps to the App Service.
   void RegisterPublisher(AppType app_type);
-
-  // Publishes a single promise app delta to the Promise App Registry Cache.
-  void PublishPromiseApp(PromiseAppPtr delta);
 #endif
 
   // Requests an icon for an app identified by |app_id|. The icon is identified
@@ -82,21 +84,27 @@ class AppPublisher {
   //    is true and when no icon is available for the app (or an icon for the
   //    app cannot be efficiently provided). Otherwise, a null icon should be
   //    returned.
+  //
+  // NOTE: On Ash, App Service will not call this method, and instead will call
+  // `GetCompressedIconData()` to load raw icon data from the Publisher.
+  // TODO(crbug.com/1380608): Clean up/simplify remaining usages of LoadIcon.
   virtual void LoadIcon(const std::string& app_id,
                         const IconKey& icon_key,
                         apps::IconType icon_type,
                         int32_t size_hint_in_dip,
                         bool allow_placeholder_icon,
-                        LoadIconCallback callback) = 0;
+                        LoadIconCallback callback);
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-  // Requests a compressed icon data for an app identified by `app_id`. The icon
-  // is identified by `size_in_dip` and `scale_factor`. Calls `callback` with
-  // the result.
-  virtual void GetCompressedIconData(const std::string& app_id,
-                                     int32_t size_in_dip,
-                                     ui::ResourceScaleFactor scale_factor,
-                                     LoadIconCallback callback);
+  // Returns the default icon if a valid icon can't be loaded, e.g. because an
+  // app didn't supply an icon.
+  virtual int DefaultIconResourceId() const;
+
+  // CompressedIconGetter override.
+  void GetCompressedIconData(const std::string& app_id,
+                             int32_t size_in_dip,
+                             ui::ResourceScaleFactor scale_factor,
+                             LoadIconCallback callback) override;
 #endif
 
   // Launches an app identified by `app_id`. `event_flags` contains launch
@@ -181,6 +189,12 @@ class AppPublisher {
                             int64_t display_id,
                             base::OnceCallback<void(MenuItems)> callback);
 
+  // Requests the size of an app with |app_id|. Publishers are expected to
+  // calculate and update the size of the app and publish this to App Service.
+  // This allows app sizes to be requested on-demand and ensure up-to-date
+  // values.
+  virtual void UpdateAppSize(const std::string& app_id);
+
   // Executes the menu item command for an app with |app_id|.
   virtual void ExecuteContextMenuCommand(const std::string& app_id,
                                          int command_id,
@@ -215,6 +229,14 @@ class AppPublisher {
   // should do nothing.
   virtual void SetWindowMode(const std::string& app_id, WindowMode window_mode);
 
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  // Creates and returns a promise app object.
+  static PromiseAppPtr MakePromiseApp(const PackageId& package_id);
+
+  // Publishes a single promise app delta to the Promise App Registry Cache.
+  void PublishPromiseApp(PromiseAppPtr delta);
+#endif
+
  protected:
 #if !BUILDFLAG(IS_CHROMEOS_LACROS)
   // Publish one `app` to AppServiceProxy. Should be called whenever the app
@@ -241,6 +263,10 @@ class AppPublisher {
   void ModifyCapabilityAccess(const std::string& app_id,
                               absl::optional<bool> accessing_camera,
                               absl::optional<bool> accessing_microphone);
+
+  // Resets all tracked capabilities for apps of type `app_type`. Should be
+  // called when the publisher stops running apps (e.g. when a VM shuts down).
+  void ResetCapabilityAccess(AppType app_type);
 #endif
 
   AppServiceProxy* proxy() { return proxy_; }

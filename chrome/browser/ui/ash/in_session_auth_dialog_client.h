@@ -14,8 +14,8 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
-#include "chrome/browser/ui/ash/cryptohome_pin_engine.h"
-#include "chrome/browser/ui/ash/legacy_fingerprint_engine.h"
+#include "chrome/browser/ui/ash/auth/cryptohome_pin_engine.h"
+#include "chrome/browser/ui/ash/auth/legacy_fingerprint_engine.h"
 #include "chromeos/ash/components/dbus/userdataauth/userdataauth_client.h"
 #include "chromeos/ash/components/login/auth/auth_performer.h"
 #include "chromeos/ash/components/login/auth/auth_status_consumer.h"
@@ -143,7 +143,8 @@ class InSessionAuthDialogClient
 
   // Passed as a callback to `CryptohomePinEngine::InPinAuthAvailable`
   // Takes back ownership of the `user_context` that was borrowed by
-  // `CryptohomePinEngine` and notifies callers of pin availability status.
+  // `CryptohomePinEngine` and notifies callers of pin availability
+  // status.
   void OnCheckPinAuthAvailability(
       base::OnceCallback<void(bool)> callback,
       bool is_pin_auth_available,
@@ -158,7 +159,7 @@ class InSessionAuthDialogClient
   // Used to start and authenticate auth sessions.
   ash::AuthPerformer auth_performer_;
 
-  absl::optional<ash::CryptohomePinEngine> pin_engine_;
+  absl::optional<ash::legacy::CryptohomePinEngine> pin_engine_;
 
   absl::optional<ash::LegacyFingerprintEngine> legacy_fingerprint_engine_;
 

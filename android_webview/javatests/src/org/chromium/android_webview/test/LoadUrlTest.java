@@ -7,16 +7,15 @@ package org.chromium.android_webview.test;
 import static org.chromium.android_webview.test.AwActivityTestRule.WAIT_TIMEOUT_MS;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 import android.util.Base64;
 import android.util.Pair;
 import android.view.ViewGroup;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -70,11 +69,6 @@ public class LoadUrlTest {
     public void setUp() {
         mTestServer = AwEmbeddedTestServer.createAndStartServer(
                 InstrumentationRegistry.getInstrumentation().getTargetContext());
-    }
-
-    @After
-    public void tearDown() {
-        mTestServer.stopAndDestroyServer();
     }
 
     @Test

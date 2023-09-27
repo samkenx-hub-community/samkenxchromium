@@ -9,13 +9,9 @@
 #include "base/memory/raw_ptr.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/mock_callback.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "components/password_manager/core/browser/mock_password_store_backend.h"
-#include "components/password_manager/core/browser/password_manager_test_utils.h"
-#include "components/password_manager/core/common/password_manager_features.h"
 #include "components/password_manager/core/common/password_manager_pref_names.h"
-#include "components/prefs/pref_registry.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/testing_pref_service.h"
 #include "components/signin/public/base/signin_pref_names.h"
@@ -53,14 +49,6 @@ class PasswordStoreBackendMigrationDecoratorTest : public testing::Test {
         password_manager::prefs::
             kTimesAttemptedToReenrollToGoogleMobileServices,
         0);
-
-    feature_list_.InitWithFeaturesAndParameters(
-        /*enabled_features=*/{{features::kUnifiedPasswordManagerAndroid,
-                               {{"migration_version", "1"}, {"stage", "0"}}},
-                              {password_manager::features::
-                                   kUnifiedPasswordManagerReenrollment,
-                               {}}},
-        /*disabled_features=*/{});
 
     backend_migration_decorator_ =
         std::make_unique<PasswordStoreBackendMigrationDecorator>(
@@ -127,7 +115,6 @@ class PasswordStoreBackendMigrationDecoratorTest : public testing::Test {
 
   base::test::SingleThreadTaskEnvironment task_env_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
-  base::test::ScopedFeatureList feature_list_;
   TestingPrefServiceSimple prefs_;
   raw_ptr<MockPasswordStoreBackend> built_in_backend_;
   raw_ptr<MockPasswordStoreBackend> android_backend_;
@@ -191,44 +178,6 @@ TEST_F(
             prefs().GetBoolean(prefs::kRequiresMigrationAfterSyncStatusChange));
 }
 
-// TODO(crbug.com/1306001): Reenable or clean up for local-only users.
-TEST_F(PasswordStoreBackendMigrationDecoratorTest,
-       DISABLED_LocalAndroidPasswordsClearedWhenSyncEnabled) {
-  base::MockCallback<base::OnceCallback<void(bool)>> mock_completion_callback;
-  base::RepeatingClosure sync_status_changed_closure;
-
-  EXPECT_CALL(mock_completion_callback, Run(/*success=*/true));
-
-  EXPECT_CALL(*built_in_backend(), InitBackend)
-      .WillOnce(WithArgs<1, 2>(
-          [&sync_status_changed_closure](auto sync_status_changed,
-                                         auto completion_callback) {
-            std::move(completion_callback).Run(/*success=*/true);
-            // Capture |sync_enabled_or_disabled_cb| passed to the
-            // build_in_backend.
-            sync_status_changed_closure = std::move(sync_status_changed);
-          }));
-  EXPECT_CALL(*android_backend(), InitBackend)
-      .WillOnce(WithArg<2>([](auto completion_callback) {
-        std::move(completion_callback).Run(/*success=*/true);
-      }));
-
-  backend_migration_decorator()->InitBackend(
-      /*remote_form_changes_received=*/base::DoNothing(),
-      /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
-      /*completion=*/mock_completion_callback.Get());
-
-  InitSyncService(/*is_password_sync_enabled=*/true);
-
-  // Disable password sync in settings.
-  ChangeSyncSetting(/*is_password_sync_enabled=*/false);
-  // Invoke sync callback to simulate a change in sync status.
-  EXPECT_CALL(*android_backend(), ClearAllLocalPasswords);
-  sync_status_changed_closure.Run();
-
-  RunUntilIdle();
-}
-
 TEST_F(PasswordStoreBackendMigrationDecoratorTest,
        OnSyncServiceInitializedPropagatedToAndroidBackend) {
   EXPECT_CALL(*android_backend(), OnSyncServiceInitialized(&sync_service()));
@@ -243,7 +192,7 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
   // Init backend.
   EXPECT_CALL(mock_completion_callback, Run(/*success=*/true));
   EXPECT_CALL(*built_in_backend(), InitBackend)
-      .WillOnce(WithArgs<1, 2>(
+      .WillOnce(WithArgs<2, 3>(
           [&sync_status_changed_closure](auto sync_status_changed,
                                          auto completion_callback) {
             std::move(completion_callback).Run(/*success=*/true);
@@ -252,10 +201,11 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
             sync_status_changed_closure = std::move(sync_status_changed);
           }));
   EXPECT_CALL(*android_backend(), InitBackend)
-      .WillOnce(WithArg<2>([](auto completion_callback) {
+      .WillOnce(WithArg<3>([](auto completion_callback) {
         std::move(completion_callback).Run(/*success=*/true);
       }));
   backend_migration_decorator()->InitBackend(
+      /*affiliated_match_helper=*/nullptr,
       /*remote_form_changes_received=*/base::DoNothing(),
       /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
       /*completion=*/mock_completion_callback.Get());
@@ -288,7 +238,7 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
   base::RepeatingClosure sync_status_changed_closure;
   EXPECT_CALL(mock_completion_callback, Run(/*success=*/true));
   EXPECT_CALL(*built_in_backend(), InitBackend)
-      .WillOnce(WithArgs<1, 2>(
+      .WillOnce(WithArgs<2, 3>(
           [&sync_status_changed_closure](auto sync_status_changed,
                                          auto completion_callback) {
             std::move(completion_callback).Run(/*success=*/true);
@@ -297,10 +247,11 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
             sync_status_changed_closure = std::move(sync_status_changed);
           }));
   EXPECT_CALL(*android_backend(), InitBackend)
-      .WillOnce(WithArg<2>([](auto completion_callback) {
+      .WillOnce(WithArg<3>([](auto completion_callback) {
         std::move(completion_callback).Run(/*success=*/true);
       }));
   backend_migration_decorator()->InitBackend(
+      /*affiliated_match_helper=*/nullptr,
       /*remote_form_changes_received=*/base::DoNothing(),
       /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
       /*completion=*/mock_completion_callback.Get());
@@ -336,7 +287,7 @@ TEST_F(
   base::RepeatingClosure sync_status_changed_closure;
   EXPECT_CALL(mock_completion_callback, Run(/*success=*/true));
   EXPECT_CALL(*built_in_backend(), InitBackend)
-      .WillOnce(WithArgs<1, 2>(
+      .WillOnce(WithArgs<2, 3>(
           [&sync_status_changed_closure](auto sync_status_changed,
                                          auto completion_callback) {
             std::move(completion_callback).Run(/*success=*/true);
@@ -345,10 +296,11 @@ TEST_F(
             sync_status_changed_closure = std::move(sync_status_changed);
           }));
   EXPECT_CALL(*android_backend(), InitBackend)
-      .WillOnce(WithArg<2>([](auto completion_callback) {
+      .WillOnce(WithArg<3>([](auto completion_callback) {
         std::move(completion_callback).Run(/*success=*/true);
       }));
   backend_migration_decorator()->InitBackend(
+      /*affiliated_match_helper=*/nullptr,
       /*remote_form_changes_received=*/base::DoNothing(),
       /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
       /*completion=*/mock_completion_callback.Get());
@@ -371,7 +323,7 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
   base::RepeatingClosure sync_status_changed_closure;
   EXPECT_CALL(mock_completion_callback, Run(/*success=*/true));
   EXPECT_CALL(*built_in_backend(), InitBackend)
-      .WillOnce(WithArgs<1, 2>(
+      .WillOnce(WithArgs<2, 3>(
           [&sync_status_changed_closure](auto sync_status_changed,
                                          auto completion_callback) {
             std::move(completion_callback).Run(/*success=*/true);
@@ -380,10 +332,11 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
             sync_status_changed_closure = std::move(sync_status_changed);
           }));
   EXPECT_CALL(*android_backend(), InitBackend)
-      .WillOnce(WithArg<2>([](auto completion_callback) {
+      .WillOnce(WithArg<3>([](auto completion_callback) {
         std::move(completion_callback).Run(/*success=*/true);
       }));
   backend_migration_decorator()->InitBackend(
+      /*affiliated_match_helper=*/nullptr,
       /*remote_form_changes_received=*/base::DoNothing(),
       /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
       /*completion=*/mock_completion_callback.Get());
@@ -440,7 +393,7 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
   // Init backend.
   EXPECT_CALL(mock_completion_callback, Run(/*success=*/true));
   EXPECT_CALL(*built_in_backend(), InitBackend)
-      .WillOnce(WithArgs<1, 2>(
+      .WillOnce(WithArgs<2, 3>(
           [&sync_status_changed_closure](auto sync_status_changed,
                                          auto completion_callback) {
             std::move(completion_callback).Run(/*success=*/true);
@@ -449,10 +402,11 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
             sync_status_changed_closure = std::move(sync_status_changed);
           }));
   EXPECT_CALL(*android_backend(), InitBackend)
-      .WillOnce(WithArg<2>([](auto completion_callback) {
+      .WillOnce(WithArg<3>([](auto completion_callback) {
         std::move(completion_callback).Run(/*success=*/true);
       }));
   backend_migration_decorator()->InitBackend(
+      /*affiliated_match_helper=*/nullptr,
       /*remote_form_changes_received=*/base::DoNothing(),
       /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
       /*completion=*/mock_completion_callback.Get());
@@ -488,6 +442,7 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
   EXPECT_CALL(*built_in_backend(), InitBackend);
   EXPECT_CALL(*android_backend(), InitBackend);
   backend_migration_decorator()->InitBackend(
+      /*affiliated_match_helper=*/nullptr,
       /*remote_form_changes_received=*/base::DoNothing(),
       /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
       /*completion=*/mock_completion_callback.Get());
@@ -525,6 +480,7 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
   EXPECT_CALL(*built_in_backend(), InitBackend);
   EXPECT_CALL(*android_backend(), InitBackend);
   backend_migration_decorator()->InitBackend(
+      /*affiliated_match_helper=*/nullptr,
       /*remote_form_changes_received=*/base::DoNothing(),
       /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
       /*completion=*/mock_completion_callback.Get());
@@ -534,92 +490,6 @@ TEST_F(PasswordStoreBackendMigrationDecoratorTest,
   sync_service().GetUserSettings()->SetSelectedTypes(
       /*sync_everything=*/false, /*types=*/{});
   sync_service().SetPersistentAuthError();
-
-  // Reenrolling migration attempt should not happen, logins should not be
-  // retrieved.
-  EXPECT_CALL(*built_in_backend(), GetAllLoginsAsync).Times(0);
-  EXPECT_CALL(*android_backend(), GetAllLoginsAsync).Times(0);
-
-  // Imitate successfully completing a sync cycle.
-  sync_service().FireSyncCycleCompleted();
-  FastForwardUntilNoTasksRemain();
-
-  // Verify that migration attempt did not happen by checking that the time of
-  // the last migration attempt did not change.
-  EXPECT_EQ(
-      prefs().GetDouble(password_manager::prefs::kTimeOfLastMigrationAttempt),
-      kLastMigrationAttemptTime);
-}
-
-TEST_F(PasswordStoreBackendMigrationDecoratorTest,
-       ReenrollmentAttemptDoesNotStartWhenTooManyReenrollmentAttempts) {
-  // Imitate reaching max reenrollemnt attempts.
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeatureWithParameters(
-      /*feature=*/features::kUnifiedPasswordManagerReenrollment,
-      {{"max_reenrollment_attempts", "1"}});
-  prefs().SetBoolean(prefs::kUnenrolledFromGoogleMobileServicesDueToErrors,
-                     true);
-  prefs().SetInteger(prefs::kTimesAttemptedToReenrollToGoogleMobileServices, 1);
-
-  // Init backend.
-  EXPECT_CALL(*built_in_backend(), InitBackend);
-  EXPECT_CALL(*android_backend(), InitBackend);
-  base::MockCallback<base::OnceCallback<void(bool)>> mock_completion_callback;
-  backend_migration_decorator()->InitBackend(
-      /*remote_form_changes_received=*/base::DoNothing(),
-      /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
-      /*completion=*/mock_completion_callback.Get());
-
-  // Set password sync to be active and have no auth errors.
-  InitSyncService(/*is_password_sync_enabled=*/true);
-  sync_service().GetUserSettings()->SetSelectedTypes(
-      /*sync_everything=*/false,
-      /*types=*/{syncer::UserSelectableType::kPasswords});
-  sync_service().ClearAuthError();
-
-  // Reenrolling migration attempt should not happen, logins should not be
-  // retrieved.
-  EXPECT_CALL(*built_in_backend(), GetAllLoginsAsync).Times(0);
-  EXPECT_CALL(*android_backend(), GetAllLoginsAsync).Times(0);
-
-  // Imitate successfully completing a sync cycle.
-  sync_service().FireSyncCycleCompleted();
-  FastForwardUntilNoTasksRemain();
-
-  // Verify that migration attempt did not happen by checking that the time of
-  // the last migration attempt did not change.
-  EXPECT_EQ(
-      prefs().GetDouble(password_manager::prefs::kTimeOfLastMigrationAttempt),
-      kLastMigrationAttemptTime);
-}
-
-TEST_F(PasswordStoreBackendMigrationDecoratorTest,
-       ReenrollmentAttemptDoesNotStartWhenTooManyReenrollments) {
-  // Imitate reaching max reenrollemnts.
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeatureWithParameters(
-      /*feature=*/features::kUnifiedPasswordManagerReenrollment,
-      {{"max_reenrollments", "1"}});
-  prefs().SetBoolean(prefs::kUnenrolledFromGoogleMobileServicesDueToErrors,
-                     true);
-  prefs().SetInteger(prefs::kTimesReenrolledToGoogleMobileServices, 1);
-
-  // Init backend.
-  EXPECT_CALL(*built_in_backend(), InitBackend);
-  EXPECT_CALL(*android_backend(), InitBackend);
-  base::MockCallback<base::OnceCallback<void(bool)>> mock_completion_callback;
-  backend_migration_decorator()->InitBackend(
-      /*remote_form_changes_received=*/base::DoNothing(),
-      /*sync_enabled_or_disabled_cb=*/base::DoNothing(),
-      /*completion=*/mock_completion_callback.Get());
-
-  // Set password sync to be active and have no auth errors.
-  InitSyncService(/*is_password_sync_enabled=*/true);
-  sync_service().GetUserSettings()->SetSelectedTypes(
-      /*sync_everything=*/false,
-      /*types=*/{syncer::UserSelectableType::kPasswords});
-  sync_service().ClearAuthError();
 
   // Reenrolling migration attempt should not happen, logins should not be
   // retrieved.

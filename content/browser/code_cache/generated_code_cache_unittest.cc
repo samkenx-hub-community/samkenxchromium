@@ -14,7 +14,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
-#include "content/public/common/content_features.h"
+#include "content/common/features.h"
 #include "content/public/test/browser_task_environment.h"
 #include "content/public/test/test_utils.h"
 #include "net/base/network_isolation_key.h"
@@ -140,7 +140,7 @@ class GeneratedCodeCacheTest : public testing::TestWithParam<bool> {
   bool received_;
   bool received_null_;
   base::FilePath cache_path_;
-  raw_ptr<disk_cache::Backend> backend_;
+  raw_ptr<disk_cache::Backend, DanglingUntriaged> backend_;
 };
 
 constexpr char GeneratedCodeCacheTest::kInitialUrl[];

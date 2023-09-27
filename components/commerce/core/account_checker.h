@@ -10,6 +10,7 @@
 #include "components/endpoint_fetcher/endpoint_fetcher.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/primary_account_change_event.h"
+#include "components/sync/service/sync_service.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/data_decoder/public/cpp/data_decoder.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
@@ -20,12 +21,6 @@ class PrefChangeRegistrar;
 
 namespace commerce {
 
-extern const char kOAuthScope[];
-extern const char kOAuthName[];
-extern const char kGetHttpMethod[];
-extern const char kPostHttpMethod[];
-extern const char kContentType[];
-extern const char kEmptyPostData[];
 extern const char kNotificationsPrefUrl[];
 
 // Used to check user account status.
@@ -35,6 +30,11 @@ class AccountChecker : public signin::IdentityManager::Observer {
   ~AccountChecker() override;
 
   virtual bool IsSignedIn();
+
+  // Returns whether bookmarks is currently syncing. This will return true in
+  // cases where sync is still initializing, but the sync feature itself is
+  // enabled.
+  virtual bool IsSyncingBookmarks();
 
   virtual bool IsAnonymizedUrlDataCollectionEnabled();
 
@@ -50,6 +50,7 @@ class AccountChecker : public signin::IdentityManager::Observer {
   AccountChecker(
       PrefService* pref_service,
       signin::IdentityManager* identity_manager,
+      syncer::SyncService* sync_service,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory);
 
   // Fetch users' pref from server on whether to receive price tracking emails.
@@ -115,6 +116,8 @@ class AccountChecker : public signin::IdentityManager::Observer {
   raw_ptr<PrefService> pref_service_;
 
   raw_ptr<signin::IdentityManager> identity_manager_;
+
+  raw_ptr<syncer::SyncService> sync_service_;
 
   base::ScopedObservation<signin::IdentityManager,
                           signin::IdentityManager::Observer>

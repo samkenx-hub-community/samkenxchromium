@@ -11,17 +11,17 @@
 
 #include "base/notreached.h"
 #include "components/signin/public/base/consent_level.h"
-#include "components/sync/base/command_line_switches.h"
-#include "components/sync/driver/trusted_vault_histograms.h"
+#include "components/trusted_vault/command_line_switches.h"
 #include "components/trusted_vault/download_keys_response_handler.h"
 #include "components/trusted_vault/securebox.h"
 #include "components/trusted_vault/trusted_vault_access_token_fetcher_impl.h"
 #include "components/trusted_vault/trusted_vault_connection.h"
+#include "components/trusted_vault/trusted_vault_histograms.h"
 #include "components/trusted_vault/trusted_vault_request.h"
 #include "components/trusted_vault/trusted_vault_server_constants.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 
-namespace syncer {
+namespace trusted_vault {
 namespace {
 
 TrustedVaultDownloadKeysStatusForUMA GetDownloadKeysStatusForUMAFromResponse(
@@ -109,4 +109,4 @@ void TrustedVaultRegistrationVerifier::VerifyMembership(
   ongoing_verify_registration_request_ = std::move(request);
 }
 
-}  // namespace syncer
+}  // namespace trusted_vault

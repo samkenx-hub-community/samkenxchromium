@@ -15,11 +15,11 @@
 #import "components/translate/core/language_detection/language_detection_model.h"
 #import "components/translate/ios/browser/language_detection_model_service.h"
 #import "components/translate/ios/browser/translate_java_script_feature.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/infobars/infobar_manager_impl.h"
 #import "ios/chrome/browser/language/language_model_manager_factory.h"
 #import "ios/chrome/browser/optimization_guide/optimization_guide_service.h"
 #import "ios/chrome/browser/optimization_guide/optimization_guide_service_factory.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/translate/language_detection_model_service_factory.h"
 #import "ios/chrome/browser/translate/translate_model_service_factory.h"
 #import "ios/chrome/browser/translate/translate_ranker_factory.h"
@@ -29,10 +29,6 @@
 #import "ios/web/public/test/fakes/fake_web_state.h"
 #import "testing/platform_test.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 class ChromeIOSTranslateClientTest : public PlatformTest {
  public:

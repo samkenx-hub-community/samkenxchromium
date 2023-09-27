@@ -30,8 +30,7 @@
 #include <string>
 #include <type_traits>
 
-#include "base/threading/platform_thread.h"
-#include "components/gwp_asan/common/lightweight_detector.h"
+#include "components/gwp_asan/common/allocation_info.h"
 
 namespace gwp_asan {
 namespace internal {
@@ -92,21 +91,6 @@ class AllocatorState {
   struct SlotMetadata {
     SlotMetadata();
 
-    // Information saved for allocations and deallocations.
-    struct AllocationInfo {
-      // (De)allocation thread id or base::kInvalidThreadId if no (de)allocation
-      // occurred.
-      uint64_t tid = base::kInvalidThreadId;
-      // Length used to encode the packed stack trace.
-      uint16_t trace_len = 0;
-      // Whether a stack trace has been collected for this (de)allocation.
-      bool trace_collected = false;
-
-      static_assert(std::numeric_limits<decltype(trace_len)>::max() >=
-                        kMaxPackedTraceLength - 1,
-                    "trace_len can hold all possible length values.");
-    };
-
     // Size of the allocation
     size_t alloc_size = 0;
     // The allocation address.
@@ -119,13 +103,13 @@ class AllocatorState {
     // optimize on space.
     uint8_t stack_trace_pool[kMaxPackedTraceLength];
 
+    static_assert(
+        std::numeric_limits<decltype(AllocationInfo::trace_len)>::max() >=
+            kMaxPackedTraceLength,
+        "AllocationInfo::trace_len can hold all possible length values.");
+
     AllocationInfo alloc;
     AllocationInfo dealloc;
-
-    // Used by the lightweight UAF detector to make sure the metadata entry
-    // isn't stale.
-    LightweightDetector::MetadataId lightweight_id =
-        std::numeric_limits<LightweightDetector::MetadataId>::max();
   };
 
   AllocatorState();
@@ -179,18 +163,6 @@ class AllocatorState {
   uintptr_t SlotToAddr(SlotIdx slot) const;
   SlotIdx AddrToSlot(uintptr_t addr) const;
 
-  // Returns a reference to the metadata entry in the lightweight detector's
-  // ring buffer. Different IDs may point to the same slot.
-  AllocatorState::SlotMetadata& GetLightweightSlotMetadataById(
-      LightweightDetector::MetadataId,
-      SlotMetadata* metadata_arr);
-
-  // The relationship between a metadata slot and an ID is one-to-many.
-  // This function returns true if the ID stored in the slot matches
-  // the ID that's used to access the slot.
-  bool HasLightweightMetadataForId(LightweightDetector::MetadataId,
-                                   SlotMetadata* metadata_arr);
-
   uintptr_t pages_base_addr = 0;     // Points to start of mapped region.
   uintptr_t pages_end_addr = 0;      // Points to the end of mapped region.
   uintptr_t first_page_addr = 0;     // Points to first allocatable page.
@@ -213,12 +185,6 @@ class AllocatorState {
   // If an invalid pointer has been free()d, this is the address of that invalid
   // pointer.
   uintptr_t free_invalid_address = 0;
-
-  // Number of entries in |lightweight_detector_metadata_addr|.
-  size_t num_lightweight_detector_metadata = 0;
-  // Similar to |metadata_addr|, but used exclusively by the lightweight UAF
-  // detector.
-  uintptr_t lightweight_detector_metadata_addr = 0;
 };
 
 // Ensure that the allocator state is a plain-old-data. That way we can safely

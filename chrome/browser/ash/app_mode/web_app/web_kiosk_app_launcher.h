@@ -8,15 +8,17 @@
 #include <memory>
 
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "chrome/browser/ash/app_mode/kiosk_app_launcher.h"
 #include "chrome/browser/ash/crosapi/browser_manager.h"
 #include "chrome/browser/profiles/profile_observer.h"
-#include "chrome/browser/web_applications/web_app_install_task.h"
 #include "chrome/browser/web_applications/web_contents/web_app_url_loader.h"
 #include "components/account_id/account_id.h"
 #include "components/exo/wm_helper.h"
+#include "components/webapps/browser/install_result_code.h"
+#include "third_party/abseil-cpp/absl/types/variant.h"
 
 class Browser;
 class BrowserWindow;
@@ -25,6 +27,7 @@ class Profile;
 namespace web_app {
 class WebAppUrlLoader;
 class WebAppDataRetriever;
+struct WebAppInstallInfo;
 }  // namespace web_app
 
 namespace ash {
@@ -34,7 +37,6 @@ class WebKioskAppData;
 // Object responsible for preparing and launching web kiosk app. Is destroyed
 // upon app launch.
 class WebKioskAppLauncher : public KioskAppLauncher,
-                            public crosapi::BrowserManagerObserver,
                             public exo::WMHelper::ExoWindowObserver,
                             public ProfileObserver {
  public:
@@ -51,10 +53,10 @@ class WebKioskAppLauncher : public KioskAppLauncher,
       base::RepeatingCallback<std::unique_ptr<web_app::WebAppDataRetriever>()>
           data_retriever_factory);
 
-  // Replaces default browser window with |window| during launch.
+  // Replaces default browser window with `window` during launch.
   void SetBrowserWindowForTesting(BrowserWindow* window);
 
-  // Replaces current |url_loader_| with one provided.
+  // Replaces current `url_loader_` with one provided.
   void SetUrlLoaderForTesting(
       std::unique_ptr<web_app::WebAppUrlLoader> url_loader);
 
@@ -66,19 +68,18 @@ class WebKioskAppLauncher : public KioskAppLauncher,
   void LaunchApp() override;
 
  private:
-  // crosapi::BrowserManagerObserver:
-  void OnStateChanged() override;
-
   // exo::WMHelper::ExoWindowObserver:
   void OnExoWindowCreated(aura::Window* window) override;
 
   // ProfileObserver:
   void OnProfileWillBeDestroyed(Profile* profile) override;
 
-  // Callback method triggered after web application and its icon are obtained
-  // from `WebKioskAppManager`.
-  void OnAppDataObtained(
-      web_app::WebAppInstallTask::WebAppInstallInfoOrErrorCode);
+  void OnUrlLoaded(web_app::WebAppUrlLoader::Result result);
+
+  // Callback method triggered after web application and its icon are
+  // obtained from `WebKioskAppManager`.
+  void OnAppDataObtained(absl::variant<web_app::WebAppInstallInfo,
+                                       webapps::InstallResultCode> result);
 
   // Callback method triggered after the lacros-chrome window is created.
   void OnLacrosWindowCreated(crosapi::mojom::CreationResult result);
@@ -92,31 +93,28 @@ class WebKioskAppLauncher : public KioskAppLauncher,
   void NotifyAppWindowCreated();
 
   bool is_installed_ = false;  // Whether the installation was completed.
-  // |profile_| may become nullptr if the profile is being destroyed.
-  Profile* profile_;
+  // `profile_` may become nullptr if the profile is being destroyed.
+  raw_ptr<Profile, DanglingUntriaged | ExperimentalAsh> profile_;
   const AccountId account_id_;
   const bool should_skip_install_;
   base::ScopedObservation<Profile, ProfileObserver> profile_observation_{this};
 
   KioskAppLauncher::ObserverList observers_;
-  Browser* browser_ = nullptr;  // Browser instance that runs the web kiosk app.
+  raw_ptr<Browser, DanglingUntriaged | ExperimentalAsh> browser_ =
+      nullptr;  // Browser instance that runs the web kiosk app.
 
-  std::unique_ptr<web_app::WebAppInstallTask>
-      install_task_;  // task that is used to install the app.
-  std::unique_ptr<web_app::WebAppUrlLoader>
-      url_loader_;  // Loads the app to be installed.
+  // Web contents used for loading app info.
+  std::unique_ptr<content::WebContents> web_contents_for_app_info_;
+  // URL loader that loads the app site in the web contents.
+  std::unique_ptr<web_app::WebAppUrlLoader> url_loader_;
+  // Retrieves the app info from the page's metadata.
+  std::unique_ptr<web_app::WebAppDataRetriever> data_retriever_;
 
   // Produces retrievers used to obtain app data during installation.
   base::RepeatingCallback<std::unique_ptr<web_app::WebAppDataRetriever>()>
       data_retriever_factory_;
 
-  BrowserWindow* test_browser_window_ = nullptr;
-
-  // Observe the launch state of `BrowserManager`, and launch the lacros-chrome
-  // when it is ready. This object is only used when Lacros is enabled.
-  base::ScopedObservation<crosapi::BrowserManager,
-                          crosapi::BrowserManagerObserver>
-      observation_{this};
+  raw_ptr<BrowserWindow, ExperimentalAsh> test_browser_window_ = nullptr;
 
   base::WeakPtrFactory<WebKioskAppLauncher> weak_ptr_factory_{this};
 };

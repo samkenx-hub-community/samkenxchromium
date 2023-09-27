@@ -67,6 +67,7 @@
 #include "third_party/blink/renderer/core/layout/layout_theme.h"
 #include "third_party/blink/renderer/core/page/focus_controller.h"
 #include "third_party/blink/renderer/core/page/page.h"
+#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 
 namespace blink {
 
@@ -449,6 +450,14 @@ void InputMethodController::InsertTextDuringCompositionWithEvents(
   if (!target)
     return;
 
+  if (RuntimeEnabledFeatures::CompositionUpdateBeforeBeforeInputEnabled()) {
+    DispatchCompositionUpdateEvent(frame, text);
+    // 'compositionupdate' event handler may destroy document.
+    if (!IsAvailable()) {
+      return;
+    }
+  }
+
   DispatchBeforeInputFromComposition(
       target, InputEvent::InputType::kInsertCompositionText, text);
 
@@ -456,10 +465,13 @@ void InputMethodController::InsertTextDuringCompositionWithEvents(
   if (!IsAvailable())
     return;
 
-  DispatchCompositionUpdateEvent(frame, text);
-  // 'compositionupdate' event handler may destroy document.
-  if (!IsAvailable())
-    return;
+  if (!RuntimeEnabledFeatures::CompositionUpdateBeforeBeforeInputEnabled()) {
+    DispatchCompositionUpdateEvent(frame, text);
+    // 'compositionupdate' event handler may destroy document.
+    if (!IsAvailable()) {
+      return;
+    }
+  }
 
   // TODO(editing-dev): The use of UpdateStyleAndLayout
   // needs to be audited. see http://crbug.com/590369 for more details.
@@ -694,20 +706,32 @@ bool InputMethodController::CommitText(
   return InsertTextAndMoveCaret(text, relative_caret_position, ime_text_spans);
 }
 
-bool InputMethodController::ReplaceText(const String& text,
-                                        PlainTextRange range) {
+bool InputMethodController::ReplaceTextAndMoveCaret(
+    const String& text,
+    PlainTextRange range,
+    MoveCaretBehavior move_caret_behavior) {
   EventQueueScope scope;
   const PlainTextRange old_selection(GetSelectionOffsets());
   if (!SetSelectionOffsets(range))
     return false;
   if (!InsertText(text))
     return false;
-  wtf_size_t selection_delta = text.length() - range.length();
-  wtf_size_t start = old_selection.Start();
-  wtf_size_t end = old_selection.End();
-  return SetSelectionOffsets(
-      {start >= range.End() ? start + selection_delta : start,
-       end >= range.End() ? end + selection_delta : end});
+
+  switch (move_caret_behavior) {
+    case MoveCaretBehavior::kMoveCaretAfterText: {
+      wtf_size_t absolute_caret_position = range.Start() + text.length();
+      return SetSelectionOffsets(
+          {absolute_caret_position, absolute_caret_position});
+    }
+    case MoveCaretBehavior::kDoNotMove: {
+      wtf_size_t selection_delta = text.length() - range.length();
+      wtf_size_t start = old_selection.Start();
+      wtf_size_t end = old_selection.End();
+      return SetSelectionOffsets(
+          {start >= range.End() ? start + selection_delta : start,
+           end >= range.End() ? end + selection_delta : end});
+    }
+  }
 }
 
 bool InputMethodController::ReplaceComposition(const String& text) {
@@ -1547,6 +1571,23 @@ void InputMethodController::DeleteSurroundingTextInCodePoints(int before,
   return DeleteSurroundingText(before_length, after_length);
 }
 
+void InputMethodController::ExtendSelectionAndReplace(
+    int before,
+    int after,
+    const String& replacement_text) {
+  const PlainTextRange selection_offsets(GetSelectionOffsets());
+  if (selection_offsets.IsNull() || before < 0 || after < 0) {
+    return;
+  }
+
+  ReplaceTextAndMoveCaret(
+      replacement_text,
+      PlainTextRange(
+          std::max(static_cast<int>(selection_offsets.Start()) - before, 0),
+          selection_offsets.End() + after),
+      MoveCaretBehavior::kMoveCaretAfterText);
+}
+
 void InputMethodController::GetLayoutBounds(gfx::Rect* control_bounds,
                                             gfx::Rect* selection_bounds) {
   if (!IsAvailable())
@@ -1623,8 +1664,7 @@ WebTextInputInfo InputMethodController::TextInputInfo() const {
   if (const Node* start_node = first_range.StartPosition().AnchorNode()) {
     if (start_node->GetComputedStyle() &&
         !start_node->GetComputedStyle()->IsHorizontalWritingMode()) {
-      if (RuntimeEnabledFeatures::ImeVerticalFlagEnabled())
-        info.flags |= kWebTextInputFlagVertical;
+      info.flags |= kWebTextInputFlagVertical;
     }
   }
 
@@ -1784,16 +1824,14 @@ void InputMethodController::SetVirtualKeyboardVisibilityRequest(
     ui::mojom::VirtualKeyboardVisibilityRequest vk_visibility_request) {
   // show/hide API behavior is only applicable for elements/editcontexts that
   // have manual VK policy.
-  if ((VirtualKeyboardPolicyOfFocusedElement() ==
-       ui::mojom::VirtualKeyboardPolicy::MANUAL) ||
-      (GetActiveEditContext() &&
-       GetActiveEditContext()->IsVirtualKeyboardPolicyManual())) {
+  if (VirtualKeyboardPolicyOfFocusedElement() ==
+      ui::mojom::VirtualKeyboardPolicy::MANUAL) {
     last_vk_visibility_request_ = vk_visibility_request;
   }  // else we don't change the last VK visibility request.
 }
 
 DOMNodeId InputMethodController::NodeIdOfFocusedElement() const {
-  return DOMNodeIds::IdForNode(GetDocument().FocusedElement());
+  return GetDocument().FocusedElement()->GetDomNodeId();
 }
 
 WebTextInputType InputMethodController::TextInputType() const {

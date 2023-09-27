@@ -4,9 +4,9 @@
 
 #import "ios/chrome/test/app/chrome_test_util.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/check.h"
 #import "base/ios/ios_util.h"
-#import "base/mac/foundation_util.h"
 #import "base/test/ios/wait_util.h"
 #import "components/crash/core/common/reporter_running_ios.h"
 #import "components/metrics/metrics_pref_names.h"
@@ -19,30 +19,27 @@
 #import "ios/chrome/app/chrome_overlay_window.h"
 #import "ios/chrome/app/main_application_delegate_testing.h"
 #import "ios/chrome/app/main_controller.h"
-#import "ios/chrome/app/main_controller_private.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state_manager.h"
 #import "ios/chrome/browser/infobars/infobar_manager_impl.h"
-#import "ios/chrome/browser/main/browser.h"
-#import "ios/chrome/browser/main/browser_list.h"
-#import "ios/chrome/browser/main/browser_list_factory.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_controller.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_controller_testing.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser/browser_list.h"
+#import "ios/chrome/browser/shared/model/browser/browser_list_factory.h"
+#import "ios/chrome/browser/shared/model/browser/browser_provider.h"
+#import "ios/chrome/browser/shared/model/browser/browser_provider_interface.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state_manager.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/browser_view/browser_view_controller.h"
 #import "ios/chrome/browser/ui/main/bvc_container_view_controller.h"
-#import "ios/chrome/browser/ui/main/scene_controller.h"
-#import "ios/chrome/browser/ui/main/scene_controller_testing.h"
-#import "ios/chrome/browser/ui/main/scene_state.h"
 #import "ios/chrome/common/crash_report/crash_helper.h"
 #import "ios/chrome/test/app/tab_test_util.h"
 #import "ios/web/public/navigation/navigation_context.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ios/web/public/test/fakes/fake_web_state_observer.h"
 #import "net/base/mac/url_conversions.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 // A subclass to pass instances of UIOpenURLContext to scene delegate during
 // testing. UIOpenURLContext has no init available, so this can only be
@@ -108,7 +105,8 @@ ChromeBrowserState* GetCurrentIncognitoBrowserState() {
 }
 
 Browser* GetMainBrowser() {
-  return GetMainController().interfaceProvider.mainInterface.browser;
+  return GetMainController()
+      .browserProviderInterface.mainBrowserProvider.browser;
 }
 
 UIViewController* GetActiveViewController() {
@@ -126,7 +124,7 @@ UIViewController* GetActiveViewController() {
   if ([active_view_controller
           isKindOfClass:[BVCContainerViewController class]]) {
     active_view_controller =
-        base::mac::ObjCCastStrict<BVCContainerViewController>(
+        base::apple::ObjCCastStrict<BVCContainerViewController>(
             active_view_controller)
             .currentBVC;
   }
@@ -155,6 +153,11 @@ void ClearPresentedState(ProceduralBlock completion) {
   [GetForegroundActiveSceneController()
       dismissModalDialogsWithCompletion:completion
                          dismissOmnibox:YES];
+}
+
+void PresentSignInAccountsViewControllerIfNecessary() {
+  [GetForegroundActiveSceneController()
+      presentSignInAccountsViewControllerIfNecessary];
 }
 
 void SetBooleanLocalStatePref(const char* pref_name, bool value) {

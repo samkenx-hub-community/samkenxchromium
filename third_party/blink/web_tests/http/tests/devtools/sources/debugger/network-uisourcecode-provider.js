@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+
+import * as Common from 'devtools/core/common/common.js';
+
 (async function() {
   TestRunner.addResult(`Tests NetworkUISourceCodeProvider class.\n`);
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
+  await TestRunner.loadLegacyModule('sources');
   await TestRunner.showPanel('sources');
   await TestRunner.evaluateInPagePromise(`
       function removeStyleSheet()
@@ -23,8 +28,8 @@
 
   function dumpUISourceCode(uiSourceCode, callback) {
     TestRunner.addResult('UISourceCode: ' + uiSourceCodeURL(uiSourceCode));
-    if (uiSourceCode.contentType() === Common.resourceTypes.Script ||
-        uiSourceCode.contentType() === Common.resourceTypes.Document)
+    if (uiSourceCode.contentType() === Common.ResourceType.resourceTypes.Script ||
+        uiSourceCode.contentType() === Common.ResourceType.resourceTypes.Document)
       TestRunner.addResult(
           'UISourceCode is content script: ' +
           (uiSourceCode.project().type() ===

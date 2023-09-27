@@ -18,8 +18,8 @@
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/sync/base/user_selectable_type.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_user_settings.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 using password_manager::PasswordManagerSetting;
@@ -83,12 +83,9 @@ bool IsUnenrolledFromUPM(PrefService* pref_service) {
 // pref to temporarily prevent password saves. If the user doesn't use GMS,
 // saving keeps working and only the syncing of changes is delayed.
 bool ShouldSuspendPasswordSavingDueToError(PrefService* pref_service) {
-  // The messages feature is a subset of UPM. The actual feature is irrelevant.
-  if (!base::FeatureList::IsEnabled(
-          password_manager::features::kUnifiedPasswordManagerErrorMessages)) {
-    return false;  // Non-UPM users can still save.
-  }
   // Ensure the user is still enrolled. Evicted users can still save normally.
+  // TODO(crbug.com/1443356): possibly auth error disables password saving
+  // after pwd sync is turned off.
   return !IsUnenrolledFromUPM(pref_service) &&
          pref_service->GetBoolean(
              password_manager::prefs::kSavePasswordsSuspendedByError);
@@ -100,9 +97,7 @@ PasswordManagerSettingsServiceAndroidImpl::
     PasswordManagerSettingsServiceAndroidImpl(PrefService* pref_service,
                                               syncer::SyncService* sync_service)
     : pref_service_(pref_service), sync_service_(sync_service) {
-  DCHECK(pref_service_);
-  DCHECK(sync_service_);
-  DCHECK(password_manager::features::UsesUnifiedPasswordManagerUi());
+  CHECK(pref_service_);
   if (!PasswordSettingsUpdaterAndroidBridgeHelper::CanCreateAccessor())
     return;
   bridge_helper_ = PasswordSettingsUpdaterAndroidBridgeHelper::Create();
@@ -123,8 +118,7 @@ PasswordManagerSettingsServiceAndroidImpl::
       sync_service_(sync_service),
       bridge_helper_(std::move(bridge_helper)),
       lifecycle_helper_(std::move(lifecycle_helper)) {
-  DCHECK(pref_service_);
-  DCHECK(sync_service_);
+  CHECK(pref_service_);
   if (!bridge_helper_)
     return;
   Init();
@@ -138,7 +132,7 @@ PasswordManagerSettingsServiceAndroidImpl::
 }
 
 bool PasswordManagerSettingsServiceAndroidImpl::IsSettingEnabled(
-    PasswordManagerSetting setting) {
+    PasswordManagerSetting setting) const {
   if (setting == PasswordManagerSetting::kOfferToSavePasswords &&
       ShouldSuspendPasswordSavingDueToError(pref_service_)) {
     return false;
@@ -165,7 +159,7 @@ bool PasswordManagerSettingsServiceAndroidImpl::IsSettingEnabled(
 
   const PrefService::Preference* android_pref =
       GetGMSPrefFromSetting(pref_service_, setting);
-  DCHECK(android_pref);
+  CHECK(android_pref);
   return android_pref->GetValue()->GetBool();
 }
 
@@ -197,7 +191,7 @@ void PasswordManagerSettingsServiceAndroidImpl::TurnOffAutoSignIn() {
 }
 
 void PasswordManagerSettingsServiceAndroidImpl::Init() {
-  DCHECK(bridge_helper_);
+  CHECK(bridge_helper_);
   MigratePrefsIfNeeded();
   bridge_helper_->SetConsumer(weak_ptr_factory_.GetWeakPtr());
 
@@ -205,7 +199,11 @@ void PasswordManagerSettingsServiceAndroidImpl::Init() {
       &PasswordManagerSettingsServiceAndroidImpl::OnChromeForegrounded,
       weak_ptr_factory_.GetWeakPtr()));
   is_password_sync_enabled_ = IsPasswordSyncEnabled(sync_service_);
-  sync_service_->AddObserver(this);
+  if (sync_service_) {
+    // The `sync_service_` can be null when --disable-sync has been passed in as
+    // a command line flag.
+    sync_service_->AddObserver(this);
+  }
 
   pref_change_registrar_.Init(pref_service_);
   pref_change_registrar_.Add(
@@ -248,7 +246,7 @@ void PasswordManagerSettingsServiceAndroidImpl::OnSettingValueFetched(
 
 void PasswordManagerSettingsServiceAndroidImpl::OnSettingValueAbsent(
     password_manager::PasswordManagerSetting setting) {
-  DCHECK(bridge_helper_);
+  CHECK(bridge_helper_);
   UpdateSettingFetchState(setting);
   if (IsUnenrolledFromUPM(pref_service_))
     return;
@@ -324,7 +322,7 @@ void PasswordManagerSettingsServiceAndroidImpl::UpdateSettingFetchState(
 }
 
 void PasswordManagerSettingsServiceAndroidImpl::FetchSettings() {
-  DCHECK(bridge_helper_);
+  CHECK(bridge_helper_);
   for (PasswordManagerSetting setting : kAllPasswordSettings) {
     bridge_helper_->GetPasswordSettingValue(
         SyncingAccount(

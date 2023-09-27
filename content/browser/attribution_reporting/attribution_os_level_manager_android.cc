@@ -14,21 +14,26 @@
 
 #include "base/android/jni_array.h"
 #include "base/android/scoped_java_ref.h"
+#include "base/barrier_closure.h"
 #include "base/check.h"
-#include "base/dcheck_is_on.h"
+#include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/no_destructor.h"
+#include "base/location.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/ranges/algorithm.h"
 #include "base/sequence_checker.h"
+#include "base/task/task_traits.h"
+#include "base/task/thread_pool.h"
 #include "base/time/time.h"
-#include "components/attribution_reporting/os_support.mojom-shared.h"
+#include "base/timer/elapsed_timer.h"
 #include "content/browser/attribution_reporting/attribution_input_event.h"
+#include "content/browser/attribution_reporting/attribution_os_level_manager.h"
 #include "content/browser/attribution_reporting/attribution_reporting.mojom.h"
 #include "content/browser/attribution_reporting/os_registration.h"
+#include "content/browser/browser_thread_impl.h"
 #include "content/public/android/content_jni_headers/AttributionOsLevelManager_jni.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/browsing_data_filter_builder.h"
-#include "content/public/browser/render_process_host.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/android/gurl_android.h"
 #include "url/gurl.h"
 #include "url/origin.h"
@@ -37,39 +42,7 @@ namespace content {
 
 namespace {
 
-using ScopedOsSupportForTesting =
-    ::content::AttributionOsLevelManagerAndroid::ScopedOsSupportForTesting;
-
-using attribution_reporting::mojom::OsSupport;
-
-#if DCHECK_IS_ON()
-const base::SequenceChecker& GetSequenceChecker() {
-  static base::NoDestructor<base::SequenceChecker> checker;
-  return *checker;
-}
-#endif
-
-// This flag is per device and can only be changed by the OS. Currently we don't
-// observe setting changes on the device and the flag is only initialized once
-// on startup. The value may vary in tests.
-absl::optional<OsSupport> g_os_support GUARDED_BY_CONTEXT(GetSequenceChecker());
-
-void SetOsSupport(OsSupport os_support) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(GetSequenceChecker());
-
-  OsSupport previous = AttributionOsLevelManagerAndroid::GetOsSupport();
-
-  g_os_support = os_support;
-
-  if (previous == os_support) {
-    return;
-  }
-
-  for (RenderProcessHost::iterator it = RenderProcessHost::AllHostsIterator();
-       !it.IsAtEnd(); it.Advance()) {
-    it.GetCurrentValue()->SetOsSupportForAttributionReporting(os_support);
-  }
-}
+using ApiState = ::content::AttributionOsLevelManager::ApiState;
 
 int GetDeletionMode(bool delete_rate_limit_data) {
   // See
@@ -97,7 +70,7 @@ int GetMatchBehavior(BrowsingDataFilterBuilder::Mode mode) {
   }
 }
 
-OsSupport ConvertToOsSupport(int value) {
+ApiState ConvertToApiState(int value) {
   // See
   // https://developer.android.com/reference/androidx/privacysandbox/ads/adservices/measurement/MeasurementManager
   // for constant values.
@@ -106,11 +79,21 @@ OsSupport ConvertToOsSupport(int value) {
 
   switch (value) {
     case kMeasurementApiStateDisabled:
-      return OsSupport::kDisabled;
+      return ApiState::kDisabled;
     case kMeasurementApiStateEnabled:
-      return OsSupport::kEnabled;
+      return ApiState::kEnabled;
     default:
-      return OsSupport::kDisabled;
+      return ApiState::kDisabled;
+  }
+}
+
+void GetMeasurementApiStatus() {
+  base::ElapsedThreadTimer timer;
+  Java_AttributionOsLevelManager_getMeasurementApiStatus(
+      base::android::AttachCurrentThread());
+  if (timer.is_supported()) {
+    base::UmaHistogramTimes("Conversions.GetMeasurementStatusTime",
+                            timer.Elapsed());
   }
 }
 
@@ -119,29 +102,26 @@ OsSupport ConvertToOsSupport(int value) {
 static void JNI_AttributionOsLevelManager_OnMeasurementStateReturned(
     JNIEnv* env,
     jint state) {
-  SetOsSupport(ConvertToOsSupport(state));
-}
+  ApiState api_state = ConvertToApiState(state);
 
-ScopedOsSupportForTesting::ScopedOsSupportForTesting(OsSupport os_support)
-    : previous_(GetOsSupport()) {
-  SetOsSupport(os_support);
-}
+  if (BrowserThread::CurrentlyOn(BrowserThread::UI)) {
+    AttributionOsLevelManager::SetApiState(api_state);
+    return;
+  }
 
-ScopedOsSupportForTesting::~ScopedOsSupportForTesting() {
-  SetOsSupport(previous_);
-}
-
-// static
-OsSupport AttributionOsLevelManagerAndroid::GetOsSupport() {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(GetSequenceChecker());
-  return g_os_support.value_or(OsSupport::kDisabled);
+  GetUIThreadTaskRunner({})->PostTask(
+      FROM_HERE,
+      base::BindOnce(&AttributionOsLevelManager::SetApiState, api_state));
 }
 
 AttributionOsLevelManagerAndroid::AttributionOsLevelManagerAndroid() {
   jobj_ = Java_AttributionOsLevelManager_Constructor(
       base::android::AttachCurrentThread(), reinterpret_cast<intptr_t>(this));
 
-  InitializeOsSupport();
+  if (AttributionOsLevelManager::ShouldInitializeApiState()) {
+    base::ThreadPool::CreateSequencedTaskRunner({base::MayBlock()})
+        ->PostTask(FROM_HERE, base::BindOnce(&GetMeasurementApiStatus));
+  }
 }
 
 AttributionOsLevelManagerAndroid::~AttributionOsLevelManagerAndroid() {
@@ -150,28 +130,46 @@ AttributionOsLevelManagerAndroid::~AttributionOsLevelManagerAndroid() {
       base::android::AttachCurrentThread(), jobj_);
 }
 
-void AttributionOsLevelManagerAndroid::Register(
-    const OsRegistration& registration,
-    bool is_debug_key_allowed) {
+void AttributionOsLevelManagerAndroid::Register(OsRegistration registration,
+                                                bool is_debug_key_allowed,
+                                                RegisterCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   JNIEnv* env = base::android::AttachCurrentThread();
 
+  attribution_reporting::mojom::RegistrationType type = registration.GetType();
+  GlobalRenderFrameHostId render_frame_id = registration.render_frame_id;
   auto registration_url =
       url::GURLAndroid::FromNativeGURL(env, registration.registration_url);
   auto top_level_origin = url::GURLAndroid::FromNativeGURL(
       env, registration.top_level_origin.GetURL());
+  absl::optional<AttributionInputEvent> input_event = registration.input_event;
 
-  switch (registration.GetType()) {
-    case attribution_reporting::mojom::OsRegistrationType::kSource:
-      DCHECK(registration.input_event.has_value());
-      Java_AttributionOsLevelManager_registerAttributionSource(
-          env, jobj_, registration_url, top_level_origin, is_debug_key_allowed,
-          registration.input_event->input_event);
+  int request_id = next_callback_id_++;
+  pending_registration_callbacks_.emplace(
+      request_id, base::BindOnce(std::move(callback), std::move(registration)));
+
+  switch (type) {
+    case attribution_reporting::mojom::RegistrationType::kSource:
+      DCHECK(input_event.has_value());
+      if (AttributionOsLevelManager::ShouldUseOsWebSource(render_frame_id)) {
+        Java_AttributionOsLevelManager_registerWebAttributionSource(
+            env, jobj_, request_id, registration_url, top_level_origin,
+            is_debug_key_allowed, input_event->input_event);
+      } else {
+        Java_AttributionOsLevelManager_registerAttributionSource(
+            env, jobj_, request_id, registration_url, input_event->input_event);
+      }
       break;
-    case attribution_reporting::mojom::OsRegistrationType::kTrigger:
-      Java_AttributionOsLevelManager_registerAttributionTrigger(
-          env, jobj_, registration_url, top_level_origin, is_debug_key_allowed);
+    case attribution_reporting::mojom::RegistrationType::kTrigger:
+      if (AttributionOsLevelManager::ShouldUseOsWebTrigger(render_frame_id)) {
+        Java_AttributionOsLevelManager_registerWebAttributionTrigger(
+            env, jobj_, request_id, registration_url, top_level_origin,
+            is_debug_key_allowed);
+      } else {
+        Java_AttributionOsLevelManager_registerAttributionTrigger(
+            env, jobj_, request_id, registration_url);
+      }
       break;
   }
 }
@@ -194,7 +192,7 @@ void AttributionOsLevelManagerAndroid::ClearData(
         return url::GURLAndroid::FromNativeGURL(env, origin.GetURL());
       });
 
-  int request_id = next_pending_data_deletion_callback_id_++;
+  int request_id = next_callback_id_++;
   pending_data_deletion_callbacks_.emplace(request_id, std::move(done));
 
   Java_AttributionOsLevelManager_deleteRegistrations(
@@ -206,18 +204,18 @@ void AttributionOsLevelManagerAndroid::ClearData(
       GetDeletionMode(delete_rate_limit_data), GetMatchBehavior(mode));
 }
 
-void AttributionOsLevelManagerAndroid::InitializeOsSupport() {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(GetSequenceChecker());
+void AttributionOsLevelManagerAndroid::OnRegistrationCompleted(JNIEnv* env,
+                                                               jint request_id,
+                                                               bool success) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  if (g_os_support.has_value()) {
+  auto it = pending_registration_callbacks_.find(request_id);
+  if (it == pending_registration_callbacks_.end()) {
     return;
   }
 
-  // Only make the async call once.
-  g_os_support.emplace(OsSupport::kDisabled);
-
-  Java_AttributionOsLevelManager_getMeasurementApiStatus(
-      base::android::AttachCurrentThread(), jobj_);
+  std::move(it->second).Run(success);
+  pending_registration_callbacks_.erase(it);
 }
 
 void AttributionOsLevelManagerAndroid::OnDataDeletionCompleted(

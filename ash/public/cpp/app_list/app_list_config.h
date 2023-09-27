@@ -32,6 +32,10 @@ class ASH_PUBLIC_EXPORT SharedAppListConfig {
     return default_grid_icon_dimension_;
   }
 
+  int shortcut_badge_icon_dimension() const {
+    return shortcut_badge_icon_dimension_;
+  }
+
   size_t max_search_results() const { return max_search_results_; }
 
   size_t max_search_result_list_items() const {
@@ -92,6 +96,8 @@ class ASH_PUBLIC_EXPORT SharedAppListConfig {
 
   int answer_card_max_results() const { return answer_card_max_results_; }
 
+  size_t image_search_max_results() const { return image_search_max_results_; }
+
   // Returns the maximum number of items allowed in a page in the apps grid.
   int GetMaxNumOfItemsPerPage() const;
 
@@ -104,6 +110,10 @@ class ASH_PUBLIC_EXPORT SharedAppListConfig {
 
   // The icon dimension of tile views in apps grid view.
   const int default_grid_icon_dimension_ = 64;
+
+  // The badge icon dimension of a shortcut in apps grid view.
+  // TODO(crbug.com/1480423): Update the size after the effects visual done.
+  const int shortcut_badge_icon_dimension_ = 32;
 
   // Maximum number of results to show in the launcher Search UI.
   const size_t max_search_results_ = 6;
@@ -146,6 +156,9 @@ class ASH_PUBLIC_EXPORT SharedAppListConfig {
   // The maximum number of filtered results of type answer card within
   // categorical search
   const int answer_card_max_results_ = 1;
+
+  // The maximum number of results shown in the launcher image search category.
+  const size_t image_search_max_results_ = 3;
 };
 
 // Contains app list layout information for an app list view. `AppListConfig`
@@ -192,7 +205,6 @@ class ASH_PUBLIC_EXPORT AppListConfig {
   int unclipped_icon_dimension() const { return unclipped_icon_dimension_; }
   int folder_icon_radius() const { return folder_icon_radius_; }
   int icon_extended_background_radius() const {
-    DCHECK(features::IsAppCollectionFolderRefreshEnabled());
     return icon_extended_background_radius_;
   }
   int item_icon_in_folder_icon_dimension() const {
@@ -200,9 +212,6 @@ class ASH_PUBLIC_EXPORT AppListConfig {
   }
   int item_icon_in_folder_icon_margin() const {
     return item_icon_in_folder_icon_margin_;
-  }
-  int folder_dropping_circle_radius() const {
-    return folder_dropping_circle_radius_;
   }
 
   gfx::Size grid_icon_size() const {
@@ -215,15 +224,6 @@ class ASH_PUBLIC_EXPORT AppListConfig {
 
   gfx::Size unclipped_icon_size() const {
     return gfx::Size(unclipped_icon_dimension_, unclipped_icon_dimension_);
-  }
-
-  gfx::Insets folder_icon_insets() const {
-    int folder_icon_dimension_diff =
-        unclipped_icon_dimension_ - icon_visible_dimension_;
-    return gfx::Insets::TLBR(folder_icon_dimension_diff / 2,
-                             folder_icon_dimension_diff / 2,
-                             (folder_icon_dimension_diff + 1) / 2,
-                             (folder_icon_dimension_diff + 1) / 2);
   }
 
   gfx::Size item_icon_in_folder_icon_size() const {
@@ -293,7 +293,6 @@ class ASH_PUBLIC_EXPORT AppListConfig {
   const int folder_icon_radius_;
 
   // The background corner radius of an item icon in extended state.
-  // Only used if app collection folder icon refresh is enabled.
   const int icon_extended_background_radius_;
 
   // The dimension of the item icon in folder icon.
@@ -301,10 +300,6 @@ class ASH_PUBLIC_EXPORT AppListConfig {
 
   // The margin between item icons inside a folder icon.
   const int item_icon_in_folder_icon_margin_;
-
-  // Radius of the circle, in which if entered, show folder dropping preview
-  // UI.
-  const int folder_dropping_circle_radius_;
 };
 
 }  // namespace ash

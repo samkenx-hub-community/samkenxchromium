@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {CapabilitiesResponse, Cdd, DEFAULT_MAX_COPIES, Destination, DestinationOrigin, DestinationStore, ExtensionDestinationInfo, GooglePromotedDestinationId, LocalDestinationInfo, MeasurementSystemUnitType, MediaSizeCapability, MediaSizeOption, NativeInitialSettings, VendorCapabilityValueType} from 'chrome://print/print_preview.js';
+import {CapabilitiesResponse, Cdd, ColorOption, DEFAULT_MAX_COPIES, Destination, DestinationOrigin, DestinationStore, DpiOption, DuplexOption, ExtensionDestinationInfo, GooglePromotedDestinationId, LocalDestinationInfo, MeasurementSystemUnitType, MediaSizeCapability, MediaSizeOption, MediaTypeOption, NativeInitialSettings, PageOrientationOption, VendorCapabilityValueType} from 'chrome://print/print_preview.js';
 import {CrInputElement} from 'chrome://resources/cr_elements/cr_input/cr_input.js';
 import {WebUiListenerMixin} from 'chrome://resources/cr_elements/web_ui_listener_mixin.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
@@ -50,27 +50,27 @@ export function getCddTemplate(
           option: [
             {type: 'STANDARD_COLOR', is_default: true},
             {type: 'STANDARD_MONOCHROME'},
-          ],
+          ] as ColorOption[],
         },
         dpi: {
           option: [
             {horizontal_dpi: 200, vertical_dpi: 200, is_default: true},
             {horizontal_dpi: 100, vertical_dpi: 100},
-          ],
+          ] as DpiOption[],
         },
         duplex: {
           option: [
             {type: 'NO_DUPLEX', is_default: true},
             {type: 'LONG_EDGE'},
             {type: 'SHORT_EDGE'},
-          ],
+          ] as DuplexOption[],
         },
         page_orientation: {
           option: [
             {type: 'PORTRAIT', is_default: true},
             {type: 'LANDSCAPE'},
             {type: 'AUTO'},
-          ],
+          ] as PageOrientationOption[],
         },
         media_size: {
           option: [
@@ -86,8 +86,43 @@ export function getCddTemplate(
               width_microns: 215900,
               height_microns: 215900,
               custom_display_name: 'CUSTOM_SQUARE',
+              has_borderless_variant: true,
             },
-          ],
+            {
+              name: 'LEGAL',
+              width_microns: 215900,
+              height_microns: 355600,
+              custom_display_name: 'Legal',
+              imageable_area_left_microns: 5000,
+              imageable_area_bottom_microns: 5000,
+              imageable_area_right_microns: 5000,
+              imageable_area_top_microns: 5000,
+              has_borderless_variant: false,
+            },
+            {
+              name: '4x6',
+              width_microns: 101600,
+              height_microns: 152400,
+              custom_display_name: '4 x 6 in',
+              imageable_area_left_microns: 0,
+              imageable_area_bottom_microns: 0,
+              imageable_area_right_microns: 101600,
+              imageable_area_top_microns: 152400,
+            },
+          ] as MediaSizeOption[],
+        },
+        media_type: {
+          option: [
+            {
+              vendor_id: 'stationery',
+              custom_display_name: 'Plain',
+              is_default: true,
+            },
+            {
+              vendor_id: 'photographic',
+              custom_display_name: 'Photo',
+            },
+          ] as MediaTypeOption[],
         },
       },
     },
@@ -187,7 +222,7 @@ export function getPdfPrinter(): {capabilities: Cdd} {
             {type: 'AUTO', is_default: true},
             {type: 'PORTRAIT'},
             {type: 'LANDSCAPE'},
-          ],
+          ] as PageOrientationOption[],
         },
         color: {option: [{type: 'STANDARD_COLOR', is_default: true}]},
         media_size: {
@@ -322,7 +357,7 @@ export function getMediaSizeCapabilityWithCustomNames(): MediaSizeCapability {
         height_microns: 79400,
         custom_display_name: customMediaName,
       },
-    ],
+    ] as MediaSizeOption[],
   };
 }
 

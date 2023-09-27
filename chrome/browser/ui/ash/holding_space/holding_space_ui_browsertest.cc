@@ -20,13 +20,20 @@
 #include "ash/public/cpp/holding_space/holding_space_test_api.h"
 #include "ash/public/cpp/holding_space/mock_holding_space_client.h"
 #include "ash/public/cpp/holding_space/mock_holding_space_model_observer.h"
+#include "ash/root_window_controller.h"
+#include "ash/shelf/shelf.h"
+#include "ash/shell.h"
+#include "ash/style/ash_color_id.h"
 #include "ash/style/dark_light_mode_controller_impl.h"
+#include "ash/system/message_center/message_popup_animation_waiter.h"
+#include "ash/system/status_area_widget.h"
+#include "ash/system/unified/unified_system_tray.h"
 #include "ash/test/view_drawn_waiter.h"
 #include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
-#include "base/guid.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/scoped_observation.h"
 #include "base/task/sequenced_task_runner.h"
@@ -34,6 +41,7 @@
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/scoped_locale.h"
+#include "base/uuid.h"
 #include "build/build_config.h"
 #include "chrome/browser/ash/crosapi/crosapi_ash.h"
 #include "chrome/browser/ash/crosapi/crosapi_manager.h"
@@ -52,6 +60,7 @@
 #include "chrome/browser/ui/ash/holding_space/holding_space_test_util.h"
 #include "chrome/browser/ui/ash/holding_space/holding_space_util.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "components/download/public/common/mock_download_item.h"
 #include "components/user_manager/user.h"
 #include "content/public/browser/download_item_utils.h"
@@ -64,6 +73,7 @@
 #include "ui/base/clipboard/custom_data_helper.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/base/dragdrop/mojom/drag_drop_types.mojom.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_tree_owner.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
@@ -85,8 +95,28 @@
 #include "ui/wm/public/activation_client.h"
 
 namespace ash {
-
 namespace {
+
+// Aliases.
+using ::testing::Conditional;
+using ::testing::Eq;
+using ::testing::Matches;
+using ::testing::Optional;
+
+// Matchers --------------------------------------------------------------------
+
+MATCHER_P(EnabledColor, matcher, "") {
+  return Matches(matcher)(arg->GetEnabledColor());
+}
+
+MATCHER_P(EnabledColorId, matcher, "") {
+  return Matches(matcher)(arg->GetEnabledColorId());
+}
+
+MATCHER_P2(JellyConditional, enabled, disabled, "") {
+  return chromeos::features::IsJellyEnabled() ? Matches(enabled)(arg)
+                                              : Matches(disabled)(arg);
+}
 
 // Helpers ---------------------------------------------------------------------
 
@@ -446,7 +476,10 @@ class DropTargetView : public views::WidgetDelegateView {
   void PerformDrop(const ui::DropTargetEvent& event,
                    ui::mojom::DragOperation& output_drag_op,
                    std::unique_ptr<ui::LayerTreeOwner> drag_image_layer_owner) {
-    EXPECT_TRUE(event.data().GetFilename(&copied_file_path_));
+    std::vector<ui::FileInfo> files;
+    EXPECT_TRUE(event.data().GetFilenames(&files));
+    ASSERT_EQ(1u, files.size());
+    copied_file_path_ = files[0].path;
     output_drag_op = ui::mojom::DragOperation::kCopy;
   }
 
@@ -659,8 +692,8 @@ class HoldingSpaceUiDragAndDropBrowserTest
     return GetStorageLocationFlags() & flag;
   }
 
-  DropSenderView* drop_sender_view_ = nullptr;
-  DropTargetView* drop_target_view_ = nullptr;
+  raw_ptr<DropSenderView, ExperimentalAsh> drop_sender_view_ = nullptr;
+  raw_ptr<DropTargetView, ExperimentalAsh> drop_target_view_ = nullptr;
 };
 
 // Flaky on ChromeOS bots: crbug.com/1338054
@@ -685,7 +718,7 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiDragAndDropBrowserTest,
   ASSERT_EQ(1u, download_chips.size());
 
   PerformDragAndDrop(/*from=*/download_chips[0], /*to=*/target());
-  EXPECT_EQ(download_file->file_path(), target()->copied_file_path());
+  EXPECT_EQ(download_file->file().file_path, target()->copied_file_path());
 
   // Drag-and-drop should close holding space UI.
   FlushMessageLoop();
@@ -706,7 +739,7 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiDragAndDropBrowserTest,
   ASSERT_EQ(3u, pinned_file_chips.size());
 
   PerformDragAndDrop(/*from=*/pinned_file_chips.back(), /*to=*/target());
-  EXPECT_EQ(pinned_file->file_path(), target()->copied_file_path());
+  EXPECT_EQ(pinned_file->file().file_path, target()->copied_file_path());
 
   // Drag-and-drop should close holding space UI.
   FlushMessageLoop();
@@ -723,7 +756,7 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiDragAndDropBrowserTest,
   ASSERT_EQ(1u, screen_capture_views.size());
 
   PerformDragAndDrop(/*from=*/screen_capture_views[0], /*to=*/target());
-  EXPECT_EQ(screenshot_file->file_path(), target()->copied_file_path());
+  EXPECT_EQ(screenshot_file->file().file_path, target()->copied_file_path());
 
   // Drag-and-drop should close holding space UI.
   FlushMessageLoop();
@@ -769,7 +802,7 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiDragAndDropBrowserTest,
         .WillOnce([&](const std::vector<const HoldingSpaceItem*>& items) {
           ASSERT_EQ(items.size(), 1u);
           ASSERT_EQ(items[0]->type(), HoldingSpaceItem::Type::kPinnedFile);
-          ASSERT_EQ(items[0]->file_path(), file_paths[0]);
+          ASSERT_EQ(items[0]->file().file_path, file_paths[0]);
           run_loop.Quit();
         });
 
@@ -811,9 +844,9 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiDragAndDropBrowserTest,
         .WillOnce([&](const std::vector<const HoldingSpaceItem*>& items) {
           ASSERT_EQ(items.size(), 2u);
           ASSERT_EQ(items[0]->type(), HoldingSpaceItem::Type::kPinnedFile);
-          ASSERT_EQ(items[0]->file_path(), file_paths[1]);
+          ASSERT_EQ(items[0]->file().file_path, file_paths[1]);
           ASSERT_EQ(items[1]->type(), HoldingSpaceItem::Type::kPinnedFile);
-          ASSERT_EQ(items[1]->file_path(), file_paths[2]);
+          ASSERT_EQ(items[1]->file().file_path, file_paths[2]);
           run_loop.Quit();
         });
 
@@ -1434,7 +1467,7 @@ class HoldingSpaceUiInProgressDownloadsBrowserTestBase
 
           // Swap out the production download manager for the mock.
           context->SetDownloadManagerForTesting(
-              base::WrapUnique(download_manager_));
+              base::WrapUnique(download_manager_.get()));
 
           // Install a new download manager delegate after swapping out the
           // production download manager so it will properly register itself
@@ -1789,7 +1822,7 @@ class HoldingSpaceUiInProgressDownloadsBrowserTestBase
     // Mock `download::DownloadItem::GetGuid()`.
     ON_CALL(*ash_download_item, GetGuid)
         .WillByDefault(testing::ReturnRefOfCopy(
-            base::GUID::GenerateRandomV4().AsLowercaseString()));
+            base::Uuid::GenerateRandomV4().AsLowercaseString()));
 
     // Mock `download::DownloadItem::GetId()`.
     ON_CALL(*ash_download_item, GetId).WillByDefault(testing::Invoke([]() {
@@ -1936,7 +1969,7 @@ class HoldingSpaceUiInProgressDownloadsBrowserTestBase
     auto lacros_download_item = crosapi::mojom::DownloadItem::New();
 
     lacros_download_item->guid =
-        base::GUID::GenerateRandomV4().AsLowercaseString();
+        base::Uuid::GenerateRandomV4().AsLowercaseString();
     lacros_download_item->state = state;
     lacros_download_item->full_path = file_path;
     lacros_download_item->target_file_path = target_file_path;
@@ -2031,8 +2064,11 @@ class HoldingSpaceUiInProgressDownloadsBrowserTestBase
 
   const DownloadTypeToUse download_type_to_use_;
   base::test::ScopedFeatureList scoped_feature_list_;
-  testing::NiceMock<content::MockDownloadManager>* download_manager_ = nullptr;
-  content::DownloadManagerDelegate* download_manager_delegate_ = nullptr;
+  raw_ptr<testing::NiceMock<content::MockDownloadManager>,
+          DanglingUntriaged | ExperimentalAsh>
+      download_manager_ = nullptr;
+  raw_ptr<content::DownloadManagerDelegate, ExperimentalAsh>
+      download_manager_delegate_ = nullptr;
   base::ObserverList<content::DownloadManager::Observer>::Unchecked
       download_manager_observers_;
   testing::NiceMock<MockDownloadControllerClient> download_controller_client_;
@@ -2101,8 +2137,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   // `0 B` as there is no knowledge of the total number of bytes expected.
   EXPECT_TRUE(secondary_label->GetVisible());
   EXPECT_EQ(secondary_label->GetText(), u"0 B");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate that the download is in progress.
   EXPECT_EQ(GetAccessibleName(download_chips.at(0)),
@@ -2120,8 +2161,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Paused, 0 B");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate that the download is in progress and
   // that progress is paused.
@@ -2139,8 +2185,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Paused, 1,024 KB");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate that the download is in progress and
   // that progress is paused.
@@ -2158,8 +2209,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"1,024 KB");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate that the download is in progress.
   EXPECT_EQ(GetAccessibleName(download_chips.at(0)),
@@ -2177,8 +2233,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"1.0/2.0 MB");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate that the download is in progress.
   EXPECT_EQ(GetAccessibleName(download_chips.at(0)),
@@ -2196,8 +2257,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Paused, 1.0/2.0 MB");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate that the download is in progress and
   // that progress is paused.
@@ -2218,8 +2284,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Paused, 2.0/2.0 MB");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate that the download is in progress and
   // that progress is paused.
@@ -2239,8 +2310,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Dangerous file");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleRed300 : gfx::kGoogleRed600);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(cros_tokens::kTextColorAlert)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleRed300),
+                                                Eq(gfx::kGoogleRed600)))));
 
   // The accessible name should indicate that the download is dangerous.
   EXPECT_EQ(GetAccessibleName(download_chips.at(0)),
@@ -2255,8 +2331,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Scanning");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleBlue300 : gfx::kGoogleBlue600);
+  EXPECT_THAT(secondary_label,
+              JellyConditional(
+                  /*enabled=*/EnabledColorId(
+                      Optional(cros_tokens::kTextColorProminent)),
+                  /*disabled=*/EnabledColor(
+                      Conditional(is_dark_mode_state, Eq(gfx::kGoogleBlue300),
+                                  Eq(gfx::kGoogleBlue600)))));
 
   // The accessible name should indicate that the download is being scanning.
   EXPECT_EQ(GetAccessibleName(download_chips.at(0)),
@@ -2274,8 +2355,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Confirm download");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleYellow300 : gfx::kGoogleYellow900);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(cros_tokens::kTextColorWarning)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleYellow300),
+                                                Eq(gfx::kGoogleYellow900)))));
 
   // The accessible name should indicate that the download must be confirmed.
   EXPECT_EQ(GetAccessibleName(download_chips.at(0)),
@@ -2294,8 +2380,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Paused, 2.0/2.0 MB");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate that the download is in progress and
   // that progress is paused.
@@ -2315,8 +2406,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Dangerous file");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleRed300 : gfx::kGoogleRed600);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(cros_tokens::kTextColorAlert)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleRed300),
+                                                Eq(gfx::kGoogleRed600)))));
 
   // The accessible name should indicate that the download is dangerous.
   EXPECT_EQ(GetAccessibleName(download_chips.at(0)),
@@ -2335,8 +2431,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_TRUE(secondary_label->GetVisible());
   WaitForText(secondary_label, u"Paused, 2.0/2.0 MB");
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate that the download is in progress and
   // that progress is paused.
@@ -2350,8 +2451,13 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceUiInProgressDownloadsBrowserTest,
   EXPECT_TRUE(primary_label->GetVisible());
   EXPECT_EQ(primary_label->GetText(), target_file_name);
   EXPECT_FALSE(secondary_label->GetVisible());
-  EXPECT_EQ(secondary_label->GetEnabledColor(),
-            is_dark_mode_state ? gfx::kGoogleGrey400 : gfx::kGoogleGrey700);
+  EXPECT_THAT(
+      secondary_label,
+      JellyConditional(
+          /*enabled=*/EnabledColorId(Optional(kColorAshTextColorSecondary)),
+          /*disabled=*/EnabledColor(Conditional(is_dark_mode_state,
+                                                Eq(gfx::kGoogleGrey400),
+                                                Eq(gfx::kGoogleGrey700)))));
 
   // The accessible name should indicate the target file name.
   EXPECT_EQ(GetAccessibleName(download_chips.at(0)),
@@ -2958,7 +3064,8 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceScreenRecordingUiBrowserTest,
   ASSERT_FALSE(test_api().IsShowing());
   ash::CaptureModeTestApi capture_mode_test_api;
   capture_mode_test_api.SetRecordingType(recording_type());
-  capture_mode_test_api.StartForFullscreen(/*for_video=*/true);
+  capture_mode_test_api.StartForRegion(/*for_video=*/true);
+  capture_mode_test_api.SetUserSelectedRegion(gfx::Rect(200, 200));
   capture_mode_test_api.PerformCapture();
   // Record a 100 ms long video.
   base::RunLoop video_recording_time;
@@ -2985,6 +3092,19 @@ IN_PROC_BROWSER_TEST_P(HoldingSpaceScreenRecordingUiBrowserTest,
         wait_for_item.Quit();
       });
   wait_for_item.Run();
+
+  // The video recording and / or the GIF recording progress notifications can
+  // get in the way while tapping on the holding space tray button. Therefore,
+  // we must wait until the notification animation completes before attempting
+  // to tap on it.
+  // TODO(b/275558519): This should not be needed, since the notification should
+  // not overlap the shelf.
+  MessagePopupAnimationWaiter(ash::Shell::GetPrimaryRootWindowController()
+                                  ->shelf()
+                                  ->GetStatusAreaWidget()
+                                  ->unified_system_tray()
+                                  ->GetMessagePopupCollection())
+      .Wait();
 
   // Verify that the screen recording appears in holding space UI.
   test_api().Show();

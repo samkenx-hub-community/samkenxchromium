@@ -18,6 +18,7 @@ interface FileManager {
   taskController: TaskController;
   dialogType: DialogType;
   directoryModel: DirectoryModel;
+  directoryTreeNamingController: DirectoryTreeNamingController;
 }
 
 /**
@@ -28,6 +29,12 @@ declare global {
     fileManager: FileManager;
     IN_TEST: boolean;
     store: Store;
+    /** Log action data in the console for debugging purpose. */
+    DEBUG_STORE: boolean;
+
+    webkitResolveLocalFileSystemURL(
+        url: string, successCallback: FileSystemEntryCallback,
+        errorCallback: ErrorCallback): void;
   }
 }
 

@@ -9,6 +9,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -16,8 +17,8 @@
 #include "base/test/task_environment.h"
 #include "base/test/test_simple_task_runner.h"
 #include "base/timer/mock_timer.h"
-#include "chromeos/ash/services/secure_channel/ble_constants.h"
 #include "chromeos/ash/services/secure_channel/data_with_timestamp.h"
+#include "chromeos/ash/services/secure_channel/public/cpp/shared/ble_constants.h"
 #include "device/bluetooth/bluetooth_advertisement.h"
 #include "device/bluetooth/test/mock_bluetooth_adapter.h"
 #include "device/bluetooth/test/mock_bluetooth_advertisement.h"
@@ -200,8 +201,8 @@ class SecureChannelBleSynchronizerTest : public testing::Test {
 
     BleSynchronizer* derived_type =
         static_cast<BleSynchronizer*>(synchronizer_.get());
-    derived_type->SetTestDoubles(base::WrapUnique(mock_timer_), &test_clock_,
-                                 test_task_runner_);
+    derived_type->SetTestDoubles(base::WrapUnique(mock_timer_.get()),
+                                 &test_clock_, test_task_runner_);
   }
 
   base::TimeDelta TimeDeltaMillis(int64_t num_millis) {
@@ -422,7 +423,8 @@ class SecureChannelBleSynchronizerTest : public testing::Test {
 
   scoped_refptr<NiceMock<MockBluetoothAdapterWithAdvertisements>> mock_adapter_;
 
-  base::MockOneShotTimer* mock_timer_;
+  raw_ptr<base::MockOneShotTimer, DanglingUntriaged | ExperimentalAsh>
+      mock_timer_;
   base::SimpleTestClock test_clock_;
   scoped_refptr<base::TestSimpleTaskRunner> test_task_runner_;
 

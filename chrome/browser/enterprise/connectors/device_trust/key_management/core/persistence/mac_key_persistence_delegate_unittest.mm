@@ -10,8 +10,10 @@
 #include <string>
 #include <utility>
 
+#include "base/apple/bridging.h"
+#include "base/apple/scoped_cftyperef.h"
 #include "base/containers/span.h"
-#include "base/mac/scoped_cftyperef.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/sys_string_conversions.h"
 #include "chrome/browser/enterprise/connectors/device_trust/key_management/core/mac/mock_secure_enclave_client.h"
 #include "chrome/browser/enterprise/connectors/device_trust/key_management/core/mac/secure_enclave_signing_key.h"
@@ -51,29 +53,31 @@ class MacKeyPersistenceDelegateTest : public testing::Test {
   }
 
   // Creates a test key.
-  base::ScopedCFTypeRef<SecKeyRef> CreateTestKey() {
-    base::ScopedCFTypeRef<CFMutableDictionaryRef> test_attributes(
+  base::apple::ScopedCFTypeRef<SecKeyRef> CreateTestKey() {
+    base::apple::ScopedCFTypeRef<CFMutableDictionaryRef> test_attributes(
         CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
                                   &kCFTypeDictionaryKeyCallBacks,
                                   &kCFTypeDictionaryValueCallBacks));
-    CFDictionarySetValue(test_attributes, kSecAttrLabel,
-                         base::SysUTF8ToNSString("fake-label"));
+    CFDictionarySetValue(test_attributes, kSecAttrLabel, CFSTR("fake-label"));
     CFDictionarySetValue(test_attributes, kSecAttrKeyType,
                          kSecAttrKeyTypeECSECPrimeRandom);
-    CFDictionarySetValue(test_attributes, kSecAttrKeySizeInBits, @256);
-    base::ScopedCFTypeRef<CFMutableDictionaryRef> private_key_params(
+    CFDictionarySetValue(test_attributes, kSecAttrKeySizeInBits,
+                         base::apple::NSToCFPtrCast(@256));
+    base::apple::ScopedCFTypeRef<CFMutableDictionaryRef> private_key_params(
         CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
                                   &kCFTypeDictionaryKeyCallBacks,
                                   &kCFTypeDictionaryValueCallBacks));
-    CFDictionarySetValue(private_key_params, kSecAttrIsPermanent, @NO);
+    CFDictionarySetValue(private_key_params, kSecAttrIsPermanent,
+                         kCFBooleanFalse);
     CFDictionarySetValue(test_attributes, kSecPrivateKeyAttrs,
                          private_key_params);
-    return base::ScopedCFTypeRef<SecKeyRef>(
+    return base::apple::ScopedCFTypeRef<SecKeyRef>(
         SecKeyCreateRandomKey(test_attributes, nullptr));
   }
 
   std::unique_ptr<MacKeyPersistenceDelegate> persistence_delegate_;
-  MockSecureEnclaveClient* mock_secure_enclave_client_ = nullptr;
+  raw_ptr<MockSecureEnclaveClient, DanglingUntriaged>
+      mock_secure_enclave_client_ = nullptr;
 };
 
 // Tests that storing a key with an OS key trust level invokes the clients'
@@ -223,7 +227,7 @@ TEST_F(MacKeyPersistenceDelegateTest, CreateKeyPair__EmptySigningKey) {
 
   SetMockClient();
   EXPECT_CALL(*mock_secure_enclave_client_, CreatePermanentKey())
-      .WillOnce([]() { return base::ScopedCFTypeRef<SecKeyRef>(); });
+      .WillOnce([]() { return base::apple::ScopedCFTypeRef<SecKeyRef>(); });
   EXPECT_FALSE(persistence_delegate_->CreateKeyPair());
 }
 
@@ -254,6 +258,16 @@ TEST_F(MacKeyPersistenceDelegateTest, CleanupTemporaryKeyData) {
         return true;
       });
   persistence_delegate_->CleanupTemporaryKeyData();
+}
+
+// TODO(b/290068552): Add test coverage for this method.
+TEST_F(MacKeyPersistenceDelegateTest, PromoteTemporaryKeyPair) {
+  EXPECT_TRUE(persistence_delegate_->PromoteTemporaryKeyPair());
+}
+
+// TODO(b/290068552): Add test coverage for this method.
+TEST_F(MacKeyPersistenceDelegateTest, DeleteKeyPair) {
+  EXPECT_TRUE(persistence_delegate_->DeleteKeyPair(KeyStorageType::kTemporary));
 }
 
 }  // namespace enterprise_connectors

@@ -4,6 +4,7 @@
 
 package org.chromium.webapk.shell_apk.h2o;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -17,12 +18,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
+import android.graphics.Color;
 import android.os.Bundle;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
+import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.Shadows;
 import org.robolectric.android.controller.ActivityController;
@@ -35,7 +38,6 @@ import org.robolectric.shadows.ShadowApplication;
 import org.robolectric.shadows.ShadowPackageManager;
 
 import org.chromium.components.webapk.lib.common.WebApkMetaDataKeys;
-import org.chromium.testing.local.LocalRobolectricTestRunner;
 import org.chromium.webapk.shell_apk.CustomAndroidOsShadowAsyncTask;
 import org.chromium.webapk.shell_apk.HostBrowserUtils;
 import org.chromium.webapk.shell_apk.LaunchHostBrowserSelector;
@@ -44,7 +46,7 @@ import org.chromium.webapk.test.WebApkTestHelper;
 import java.util.Arrays;
 
 /** Tests for {@link SplashActivity}. */
-@RunWith(LocalRobolectricTestRunner.class)
+@RunWith(RobolectricTestRunner.class)
 @Config(manifest = Config.NONE,
         shadows = {SplashActivityTest.MockLaunchHostBrowserSelector.class,
                 CustomAndroidOsShadowAsyncTask.class})
@@ -230,6 +232,80 @@ public final class SplashActivityTest {
 
         assertNotNull(mShadowApplication.getNextStartedActivity());
         assertFalse(splashActivityController.get().isFinishing());
+    }
+
+    /**
+     * Test that SplashActivity sets the correct dark theme color when the system is in night mode
+     * and the dark theme color is valid.
+     */
+    @Test
+    @Config(qualifiers = "night")
+    public void testSplashScreenStatusBarWhenNightModeAndValidDarkThemeColor() {
+        ActivityController<SplashActivity> splashActivityController =
+                Robolectric.buildActivity(SplashActivity.class, new Intent());
+        setAppTaskTopActivity(splashActivityController.get().getTaskId(), new Activity());
+
+        Bundle metadata = new Bundle();
+        metadata.putString(WebApkMetaDataKeys.DARK_THEME_COLOR, "4280295456L");
+        splashActivityController.get().updateStatusBar(metadata);
+        assertEquals(Color.parseColor("#202020"),
+                splashActivityController.get().getWindow().getStatusBarColor());
+    }
+
+    /**
+     * Test that SplashActivity sets the light theme color when the system is in night mode
+     * and the dark theme color is invalid.
+     */
+    @Test
+    @Config(qualifiers = "night")
+    public void testSplashScreenStatusBarWhenNightModeAndiInvalidDarkThemeColor() {
+        ActivityController<SplashActivity> splashActivityController =
+                Robolectric.buildActivity(SplashActivity.class, new Intent());
+        setAppTaskTopActivity(splashActivityController.get().getTaskId(), new Activity());
+
+        Bundle metadata = new Bundle();
+        metadata.putString(WebApkMetaDataKeys.THEME_COLOR, "4286611584L");
+        metadata.putString(WebApkMetaDataKeys.DARK_THEME_COLOR, "");
+        splashActivityController.get().updateStatusBar(metadata);
+        assertEquals(Color.parseColor("#808080"),
+                splashActivityController.get().getWindow().getStatusBarColor());
+    }
+
+    /**
+     * Test that SplashActivity sets the light theme color when the system is in night mode
+     * and the dark theme color is missing.
+     */
+    @Test
+    @Config(qualifiers = "night")
+    public void testSplashScreenStatusBarWhenNightModeAndMissingDarkThemeColor() {
+        ActivityController<SplashActivity> splashActivityController =
+                Robolectric.buildActivity(SplashActivity.class, new Intent());
+        setAppTaskTopActivity(splashActivityController.get().getTaskId(), new Activity());
+
+        Bundle metadata = new Bundle();
+        metadata.putString(WebApkMetaDataKeys.THEME_COLOR, "4286611584L");
+        splashActivityController.get().updateStatusBar(metadata);
+        assertEquals(Color.parseColor("#808080"),
+                splashActivityController.get().getWindow().getStatusBarColor());
+    }
+
+    /**
+     * Test that SplashActivity sets the default black theme color when the system is in night mode
+     * and both theme colors are invalid.
+     */
+    @Test
+    @Config(qualifiers = "night")
+    public void testSplashScreenStatusBarWhenNightModeAndAllThemeColorsInvalid() {
+        ActivityController<SplashActivity> splashActivityController =
+                Robolectric.buildActivity(SplashActivity.class, new Intent());
+        setAppTaskTopActivity(splashActivityController.get().getTaskId(), new Activity());
+
+        Bundle metadata = new Bundle();
+        metadata.putString(WebApkMetaDataKeys.THEME_COLOR, "");
+        metadata.putString(WebApkMetaDataKeys.DARK_THEME_COLOR, "");
+        splashActivityController.get().updateStatusBar(metadata);
+        assertEquals(Color.parseColor("#000000"),
+                splashActivityController.get().getWindow().getStatusBarColor());
     }
 
     /**

@@ -32,17 +32,10 @@ class QuietModeFeaturePodControllerTest
   ~QuietModeFeaturePodControllerTest() override = default;
 
   void SetUp() override {
-    auto enabled_features = std::vector<base::test::FeatureRef>();
-    auto disabled_features = std::vector<base::test::FeatureRef>();
-    if (IsOsSettingsAppBadgingToggleEnabled()) {
-      enabled_features.push_back(features::kOsSettingsAppBadgingToggle);
-    } else {
-      disabled_features.push_back(features::kOsSettingsAppBadgingToggle);
-    }
-    if (IsQsRevampEnabled()) {
-      enabled_features.push_back(features::kQsRevamp);
-    }
-    feature_list_.InitWithFeatures(enabled_features, disabled_features);
+    feature_list_.InitWithFeatureStates(
+        {{features::kOsSettingsAppBadgingToggle,
+          IsOsSettingsAppBadgingToggleEnabled()},
+         {features::kQsRevamp, IsQsRevampEnabled()}});
     NoSessionAshTestBase::SetUp();
 
     GetPrimaryUnifiedSystemTray()->ShowBubble();
@@ -58,6 +51,10 @@ class QuietModeFeaturePodControllerTest
   bool IsQsRevampEnabled() { return std::get<1>(GetParam()); }
 
   void SetUpButton() {
+    auto* system_tray = GetPrimaryUnifiedSystemTray();
+    if (!system_tray->IsBubbleShown()) {
+      system_tray->ShowBubble();
+    }
     controller_ =
         std::make_unique<QuietModeFeaturePodController>(tray_controller());
     if (IsQsRevampEnabled()) {

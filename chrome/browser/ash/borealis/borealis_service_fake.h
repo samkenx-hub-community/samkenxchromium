@@ -5,6 +5,8 @@
 #ifndef CHROME_BROWSER_ASH_BOREALIS_BOREALIS_SERVICE_FAKE_H_
 #define CHROME_BROWSER_ASH_BOREALIS_BOREALIS_SERVICE_FAKE_H_
 
+#include "base/memory/raw_ptr.h"
+#include "chrome/browser/ash/borealis/borealis_install_url_handler.h"
 #include "chrome/browser/ash/borealis/borealis_service.h"
 
 namespace content {
@@ -29,9 +31,11 @@ class BorealisServiceFake : public BorealisService {
   BorealisDiskManagerDispatcher& DiskManagerDispatcher() override;
   BorealisFeatures& Features() override;
   BorealisInstaller& Installer() override;
+  BorealisInstallUrlHandler& InstallUrlHandler() override;
   BorealisLaunchOptions& LaunchOptions() override;
   BorealisShutdownMonitor& ShutdownMonitor() override;
   BorealisWindowManager& WindowManager() override;
+  BorealisSurveyHandler& SurveyHandler() override;
 
   void SetAppLauncherForTesting(BorealisAppLauncher* app_launcher);
   void SetAppUninstallerForTesting(BorealisAppUninstaller* app_uninstaller);
@@ -40,20 +44,30 @@ class BorealisServiceFake : public BorealisService {
       BorealisDiskManagerDispatcher* borealis_disk_manager_dispatcher);
   void SetFeaturesForTesting(BorealisFeatures* features);
   void SetInstallerForTesting(BorealisInstaller* installer);
+  void SetInstallUrlHandlerForTesting(
+      BorealisInstallUrlHandler* install_url_handler);
   void SetLaunchOptionsForTesting(BorealisLaunchOptions* launch_options);
   void SetShutdownMonitorForTesting(BorealisShutdownMonitor* shutdown_monitor);
   void SetWindowManagerForTesting(BorealisWindowManager* window_manager);
+  void SetSurveyHandlerForTesting(BorealisSurveyHandler* survey_handler);
 
  private:
-  BorealisAppLauncher* app_launcher_ = nullptr;
-  BorealisAppUninstaller* app_uninstaller_ = nullptr;
-  BorealisContextManager* context_manager_ = nullptr;
-  BorealisDiskManagerDispatcher* borealis_disk_manager_dispatcher_ = nullptr;
-  BorealisFeatures* features_ = nullptr;
-  BorealisInstaller* installer_ = nullptr;
-  BorealisLaunchOptions* launch_options_ = nullptr;
-  BorealisShutdownMonitor* shutdown_monitor_ = nullptr;
-  BorealisWindowManager* window_manager_ = nullptr;
+  raw_ptr<BorealisAppLauncher, ExperimentalAsh> app_launcher_ = nullptr;
+  raw_ptr<BorealisAppUninstaller, ExperimentalAsh> app_uninstaller_ = nullptr;
+  raw_ptr<BorealisContextManager, ExperimentalAsh> context_manager_ = nullptr;
+  raw_ptr<BorealisDiskManagerDispatcher, DanglingUntriaged | ExperimentalAsh>
+      borealis_disk_manager_dispatcher_ = nullptr;
+  raw_ptr<BorealisFeatures, DanglingUntriaged | ExperimentalAsh> features_ =
+      nullptr;
+  raw_ptr<BorealisInstaller, ExperimentalAsh> installer_ = nullptr;
+  raw_ptr<BorealisInstallUrlHandler, ExperimentalAsh> install_url_handler_ =
+      nullptr;
+  raw_ptr<BorealisLaunchOptions, ExperimentalAsh> launch_options_ = nullptr;
+  raw_ptr<BorealisShutdownMonitor, DanglingUntriaged | ExperimentalAsh>
+      shutdown_monitor_ = nullptr;
+  raw_ptr<BorealisWindowManager, DanglingUntriaged | ExperimentalAsh>
+      window_manager_ = nullptr;
+  raw_ptr<BorealisSurveyHandler, ExperimentalAsh> survey_handler_ = nullptr;
 };
 
 }  // namespace borealis

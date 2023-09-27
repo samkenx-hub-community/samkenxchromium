@@ -11,10 +11,6 @@
 #import "ios/chrome/browser/ui/omnibox/keyboard_assist/omnibox_keyboard_accessory_view.h"
 #import "ui/base/device_form_factor.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 OmniboxKeyboardAccessoryView* ConfigureAssistiveKeyboardViews(
     UITextField* textField,
     NSString* dotComTLD,
@@ -32,11 +28,11 @@ OmniboxKeyboardAccessoryView* ConfigureAssistiveKeyboardViews(
     textField.inputAssistantItem.leadingBarButtonGroups = @[];
     textField.inputAssistantItem.trailingBarButtonGroups = @[];
     OmniboxKeyboardAccessoryView* keyboardAccessoryView =
-        [[OmniboxKeyboardAccessoryView alloc]
-               initWithButtons:buttonTitles
-                      delegate:delegate
-                   pasteTarget:textField
-            templateURLService:templateURLService];
+        [[OmniboxKeyboardAccessoryView alloc] initWithButtons:buttonTitles
+                                                     delegate:delegate
+                                                  pasteTarget:textField
+                                           templateURLService:templateURLService
+                                                    textField:textField];
     [keyboardAccessoryView setAutoresizingMask:UIViewAutoresizingFlexibleWidth];
     [textField setInputAccessoryView:keyboardAccessoryView];
     return keyboardAccessoryView;

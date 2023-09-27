@@ -30,6 +30,7 @@ function fakeVolumeEntry(volumeType, displayRoot, additionalProperties) {
     displayRoot = createFakeDisplayRoot();
   }
   const fakeVolumeInfo = {
+    volumeId: `id:${volumeType}`,
     displayRoot: displayRoot,
     label: kLabel,
     volumeType: volumeType,
@@ -586,9 +587,9 @@ export function testFakeEntry(testReportCallback) {
   let callCounter = 0;
 
   fakeEntry.getMetadata((metadata) => {
-    // Returns empty (but non-null) metadata {}.
+    // Returns default initialized values (current date and 0 size).
     assert(metadata);
-    assertEquals(0, Object.keys(metadata).length);
+    assertEquals(2, Object.keys(metadata).length);
     callCounter++;
   }, notreached /* error */);
   fakeEntry.getParent((parentEntry) => {

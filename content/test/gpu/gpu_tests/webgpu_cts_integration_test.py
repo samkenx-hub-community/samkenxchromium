@@ -2,23 +2,29 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import collections
 import fnmatch
 import json
 import os
 import sys
 import time
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 import unittest
+
+import dataclasses  # Built-in, but pylint gives an ordering false positive.
 
 from gpu_tests import common_browser_args as cba
 from gpu_tests import common_typing as ct
 from gpu_tests import gpu_integration_test
-from gpu_tests.util import websocket_server
+from gpu_tests.util import websocket_server as wss
+from typ import expectations_parser
 
 import gpu_path_util
 
 EXPECTATIONS_FILE = os.path.join(gpu_path_util.CHROMIUM_SRC_DIR, 'third_party',
                                  'dawn', 'webgpu-cts', 'expectations.txt')
+SLOW_TESTS_FILE = os.path.join(gpu_path_util.CHROMIUM_SRC_DIR, 'third_party',
+                               'dawn', 'webgpu-cts', 'slow_tests.txt')
 TEST_LIST_FILE = os.path.join(gpu_path_util.CHROMIUM_SRC_DIR, 'third_party',
                               'dawn', 'third_party', 'gn', 'webgpu-cts',
                               'test_list.txt')
@@ -35,16 +41,23 @@ ASAN_MULTIPLIER = 4
 BACKEND_VALIDATION_MULTIPLIER = 6
 FIRST_LOAD_TEST_STARTED_MULTIPLER = 3
 
+MESSAGE_TIMEOUT_CONNECTION_ACK = 5
 # In most cases, this should be very fast, but the first test run after a page
 # load can be slow.
 MESSAGE_TIMEOUT_TEST_STARTED = 10
 MESSAGE_TIMEOUT_HEARTBEAT = 5
 MESSAGE_TIMEOUT_TEST_LOG = 1
 
+# Thresholds for how slow parts of the test have to be for the test to be
+# considered slow overall.
+SLOW_HEARTBEAT_THRESHOLD = 0.5
+SLOW_GLOBAL_TIMEOUT_THRESHOLD = 0.8
+
 HTML_FILENAME = os.path.join('webgpu-cts', 'test_page.html')
 
 JAVASCRIPT_DURATION = 'javascript_duration'
 MAY_EXONERATE = 'may_exonerate'
+MESSAGE_TYPE_CONNECTION_ACK = 'CONNECTION_ACK'
 MESSAGE_TYPE_TEST_STARTED = 'TEST_STARTED'
 MESSAGE_TYPE_TEST_HEARTBEAT = 'TEST_HEARTBEAT'
 MESSAGE_TYPE_TEST_STATUS = 'TEST_STATUS'
@@ -52,12 +65,11 @@ MESSAGE_TYPE_TEST_LOG = 'TEST_LOG'
 MESSAGE_TYPE_TEST_FINISHED = 'TEST_FINISHED'
 
 
+@dataclasses.dataclass
 class WebGpuTestResult():
   """Struct-like object for holding a single test result."""
-
-  def __init__(self):
-    self.status = None
-    self.log_pieces = []
+  status: Optional[str] = None
+  log_pieces: List[str] = ct.EmptyList()
 
 
 class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
@@ -69,28 +81,38 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
   _test_timeout = DEFAULT_TEST_TIMEOUT
   _is_asan = False
   _enable_dawn_backend_validation = False
-  _use_webgpu_adapter = None  # use the default
-  _original_environ = None
-  _use_webgpu_power_preference = None
+  _use_webgpu_adapter: Optional[str] = None  # use the default
+  _original_environ: Optional[collections.abc.Mapping] = None
+  _use_webgpu_power_preference: Optional[str] = None
+  _use_webgpu_compat_mode = False
+  _use_dxc = False
+  _os_name: Optional[str] = None
 
-  _build_dir = None
+  _build_dir: Optional[str] = None
 
-  _test_list = None
-  _worker_test_globs = None
+  _test_list: Optional[List[str]] = None
+  _worker_test_globs: Optional[List[str]] = None
 
   total_tests_run = 0
 
-  websocket_server = None
+  websocket_server: Optional[wss.WebsocketServer] = None
+
+  _slow_tests: Optional[expectations_parser.TestExpectations] = None
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._query = None
+    self._query: Optional[str] = None
     self._run_in_worker = False
+    self._longest_time_between_heartbeats = 0
+    self._heartbeat_timeout = 0
+    self._test_duration = 0
+    self._global_timeout_without_slow_multiplier = 1
 
   # Only perform the pre/post test cleanup every X tests instead of every test
   # to reduce overhead.
   def ShouldPerformMinidumpCleanupOnSetUp(self) -> bool:
-    return self.total_tests_run % TEST_RUNS_BETWEEN_CLEANUP == 0
+    return (self.total_tests_run % TEST_RUNS_BETWEEN_CLEANUP == 0
+            and super().ShouldPerformMinidumpCleanupOnSetUp())
 
   def ShouldPerformMinidumpCleanupOnTearDown(self) -> bool:
     return self.ShouldPerformMinidumpCleanupOnSetUp()
@@ -99,7 +121,8 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
   def Name(cls) -> str:
     return 'webgpu_cts'
 
-  def _SuiteSupportsParallelTests(self) -> bool:
+  @classmethod
+  def _SuiteSupportsParallelTests(cls) -> bool:
     return True
 
   def _GetSerialGlobs(self) -> Set[str]:
@@ -167,10 +190,31 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
           '*:api,operation,command_buffer,image_copy:origins_and_extents:'
           'initMethod="WriteTexture";checkMethod="PartialCopyT2B";format="%s";*'
       ) % f)
+
+    # Run shader tests in serial if backend validation is enabled on Mac.
+    # The validation layers significantly slow down shader compilation.
+    if sys.platform == 'darwin' and self._enable_dawn_backend_validation:
+      globs.add('webgpu:shader,execution*')
+
+    # Run limit tests in serial if backend validation is enabled on Windows.
+    # The validation layers add memory overhead which makes OOM likely when
+    # many browsers and tests run in parallel.
+    if sys.platform == 'win32' and self._enable_dawn_backend_validation:
+      globs.add('webgpu:api,validation,capability_checks,limits*')
+
     return globs
 
   def _GetSerialTests(self) -> Set[str]:
     return set()
+
+  @classmethod
+  def _GetSlowTests(cls):
+    if WebGpuCtsIntegrationTest._slow_tests is None:
+      with open(SLOW_TESTS_FILE, 'r') as f:
+        expectations = expectations_parser.TestExpectations()
+        expectations.parse_tagged_list(f.read(), f.name)
+        WebGpuCtsIntegrationTest._slow_tests = expectations
+    return WebGpuCtsIntegrationTest._slow_tests
 
   @classmethod
   def AddCommandlineArgs(cls, parser: ct.CmdArgParser) -> None:
@@ -193,28 +237,54 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
         type=str,
         default=None,
         help=('Runs the browser with a particular WebGPU power preference'))
+    parser.add_option(
+        '--use-webgpu-compat-mode',
+        action='store_true',
+        default=False,
+        help=('Passes compatibility=true to the tests via URL parameters'))
+    parser.add_option(
+        '--use-dxc',
+        action='store_true',
+        default=False,
+        help=(
+            'On Windows, pass --enable-dawn-features=use_dxc to the browser.'))
 
   @classmethod
   def StartBrowser(cls) -> None:
     cls._page_loaded = False
     super(WebGpuCtsIntegrationTest, cls).StartBrowser()
+    cls._os_name = cls.browser.platform.GetOSName()
+    # Set up the slow tests expectations' tags to match the test runner
+    # expectations' tags
+    WebGpuCtsIntegrationTest._GetSlowTests().set_tags(
+        cls.child.expectations.tags)
 
   @classmethod
-  def SetUpProcess(cls) -> None:
-    super(WebGpuCtsIntegrationTest, cls).SetUpProcess()
+  def GenerateBrowserArgs(cls, additional_args: List[str]) -> List[str]:
+    """Adds default arguments to |additional_args|.
 
-    cls.websocket_server = websocket_server.WebsocketServer()
-    cls.websocket_server.StartServer()
-    browser_args = [
-        '--disable-dawn-features=disallow_unsafe_apis',
-        # When running tests in parallel, windows can be treated as occluded if
-        # a newly opened window fully covers a previous one, which can cause
-        # issues in a few tests. This is practically only an issue on Windows
-        # since Linux/Mac stagger new windows, but pass in on all platforms
-        # since it could technically be hit on any platform.
-        '--disable-backgrounding-occluded-windows',
-    ] + cba.ENABLE_WEBGPU_FOR_TESTING
+    See the parent class' method documentation for additional information.
+    """
+    browser_args = super().GenerateBrowserArgs(additional_args)
 
+    enable_dawn_features = ['allow_unsafe_apis']
+    disable_dawn_features = []
+
+    if sys.platform == 'win32':
+      if cls._use_dxc:
+        enable_dawn_features.append('use_dxc')
+      else:
+        disable_dawn_features.append('use_dxc')
+
+    if enable_dawn_features:
+      browser_args.append('--enable-dawn-features=%s' %
+                          ','.join(enable_dawn_features))
+
+    if disable_dawn_features:
+      browser_args.append('--disable-dawn-features=%s' %
+                          ','.join(disable_dawn_features))
+
+    browser_args.extend(cba.ENABLE_WEBGPU_FOR_TESTING)
     if cls._use_webgpu_adapter:
       browser_args.append('--use-webgpu-adapter=%s' % cls._use_webgpu_adapter)
     if cls._use_webgpu_power_preference:
@@ -225,7 +295,16 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
         browser_args.append('--enable-dawn-backend-validation=partial')
       else:
         browser_args.append('--enable-dawn-backend-validation')
-    cls.CustomizeBrowserArgs(browser_args)
+    return browser_args
+
+  @classmethod
+  def SetUpProcess(cls) -> None:
+    super(WebGpuCtsIntegrationTest, cls).SetUpProcess()
+
+    cls.websocket_server = wss.WebsocketServer()
+    cls.websocket_server.StartServer()
+
+    cls.CustomizeBrowserArgs([])
     cls.StartBrowser()
     # pylint:disable=protected-access
     cls._build_dir = cls.browser._browser_backend.build_dir
@@ -242,11 +321,14 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
 
   @classmethod
   def _SetClassVariablesFromOptions(cls, options: ct.ParsedCmdArgs) -> None:
+    super()._SetClassVariablesFromOptions(options)
     if options.override_timeout:
       cls._test_timeout = options.override_timeout
     cls._enable_dawn_backend_validation = options.enable_dawn_backend_validation
     cls._use_webgpu_adapter = options.use_webgpu_adapter
     cls._use_webgpu_power_preference = options.use_webgpu_power_preference
+    cls._use_webgpu_compat_mode = options.use_webgpu_compat_mode
+    cls._use_dxc = options.use_dxc
 
   @classmethod
   def _ModifyBrowserEnvironment(cls) -> None:
@@ -286,6 +368,13 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
       else:
         yield (TestNameFromInputs(*test_inputs), HTML_FILENAME, test_inputs)
 
+  def GetExpectationsForTest(self):
+    if self._os_name == 'android':
+      # Temporarily expect all tests to fail
+      # TODO(crbug.com/1363409): remove this after failures suppressed
+      return (set([gpu_integration_test.ResultType.Failure]), False)
+    return super().GetExpectationsForTest()
+
   def _DetermineRetryWorkaround(self, exception: Exception) -> bool:
     # Instances of WebGpuMessageTimeoutError:
     # https://luci-analysis.appspot.com/p/chromium/rules/b9130da14f0fcab5d6ee415d209bf71b
@@ -302,6 +391,19 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
     # Retry in case the timeout was a flake.
     return True
 
+  def _TestWasSlow(self) -> bool:
+    # Consider the test slow if it either had a relatively long time between
+    # heartbeats or took up a significant chunk of the global timeout.
+    heartbeat_fraction = (self._longest_time_between_heartbeats /
+                          self._heartbeat_timeout)
+    heartbeat_was_slow = heartbeat_fraction > SLOW_HEARTBEAT_THRESHOLD
+
+    global_fraction = (self._test_duration /
+                       self._global_timeout_without_slow_multiplier)
+    global_was_slow = global_fraction > SLOW_GLOBAL_TIMEOUT_THRESHOLD
+
+    return heartbeat_was_slow or global_was_slow
+
   def RunActualGpuTest(self, test_path: str, args: ct.TestArgs) -> None:
     self._query, self._run_in_worker = args
     # Only a single instance is used to run tests despite a number of instances
@@ -312,13 +414,16 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
     if MAY_EXONERATE in self.additionalTags:
       del self.additionalTags[MAY_EXONERATE]
 
+    if self._use_webgpu_compat_mode:
+      self._query += '&compatibility=1'
+
+    if self._run_in_worker:
+      self._query += '&worker=1'
+
     try:
       first_load = self._NavigateIfNecessary(test_path)
       WebGpuCtsIntegrationTest.websocket_server.Send(
-          json.dumps({
-              'q': self._query,
-              'w': self._run_in_worker
-          }))
+          json.dumps({'q': self._query}))
       result = self.HandleMessageLoop(first_load)
 
       log_str = ''.join(result.log_pieces)
@@ -328,7 +433,7 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
                       log_str)
       elif status == 'fail':
         self.fail(log_str)
-    except websocket_server.ClientClosedConnectionError as e:
+    except wss.ClientClosedConnectionError as e:
       raise RuntimeError(
           'Detected closed websocket - likely caused by renderer crash') from e
     except WebGpuMessageTimeoutError as e:
@@ -361,15 +466,19 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
     Returns:
       A float.
     """
-    # Scale the test timeout if test execution is expected to be slow: the test
-    # is explicitly marked as slow, or we're running with backend validation.
+    return (self._GetTestExecutionTimeoutMultiplierWithoutSlowMultiplier() *
+            self._GetSlowTestMultiplier())
+
+  def _GetTestExecutionTimeoutMultiplierWithoutSlowMultiplier(self) -> float:
     test_execution_timeout_multiplier = 1
-    if self._IsSlowTest():
-      test_execution_timeout_multiplier *= SLOW_MULTIPLIER
     if self._enable_dawn_backend_validation:
       test_execution_timeout_multiplier *= BACKEND_VALIDATION_MULTIPLIER
-
     return test_execution_timeout_multiplier
+
+  def _GetSlowTestMultiplier(self) -> float:
+    if self._IsSlowTest():
+      return SLOW_MULTIPLIER
+    return 1
 
   def HandleMessageLoop(self, first_load) -> WebGpuTestResult:
     """Helper function to handle the loop for the message protocol.
@@ -399,6 +508,10 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
 
     global_timeout = (self._test_timeout * test_execution_timeout_multiplier *
                       browser_timeout_multiplier)
+    self._global_timeout_without_slow_multiplier = (
+        self._test_timeout *
+        self._GetTestExecutionTimeoutMultiplierWithoutSlowMultiplier() *
+        browser_timeout_multiplier)
     start_time = time.time()
 
     # Loop until one of the following happens:
@@ -412,8 +525,13 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
     #     which case we report a message protocol error.
     while True:
       timeout = step_timeout * browser_timeout_multiplier
+      self._heartbeat_timeout = timeout
       try:
+        response_start_time = time.time()
         response = WebGpuCtsIntegrationTest.websocket_server.Receive(timeout)
+        self._longest_time_between_heartbeats = max(
+            self._longest_time_between_heartbeats,
+            time.time() - response_start_time)
         response = json.loads(response)
         response_type = response['type']
 
@@ -456,11 +574,13 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
         else:
           raise WebGpuMessageProtocolError('Received unknown message type %s' %
                                            response_type)
-      except websocket_server.WebsocketReceiveMessageTimeoutError as e:
+      except wss.WebsocketReceiveMessageTimeoutError as e:
         self.HandleDurationTagOnFailure(message_state, global_timeout)
         raise WebGpuMessageTimeoutError(
             'Timed out waiting %.3f seconds for a message. Message state: %s' %
             (timeout, message_state)) from e
+      finally:
+        self._test_duration = time.time() - start_time
     return result
 
   def HandleDurationTagOnFailure(self, message_state: Dict[str, bool],
@@ -493,6 +613,12 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
         'window.setupWebsocket("%s")' %
         WebGpuCtsIntegrationTest.websocket_server.server_port)
     WebGpuCtsIntegrationTest.websocket_server.WaitForConnection()
+
+    # Wait for the page to set up the websocket.
+    response = WebGpuCtsIntegrationTest.websocket_server.Receive(
+        MESSAGE_TIMEOUT_CONNECTION_ACK)
+    assert json.loads(response)['type'] == MESSAGE_TYPE_CONNECTION_ACK
+
     WebGpuCtsIntegrationTest._page_loaded = True
     return True
 
@@ -500,7 +626,7 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
     # We access the expectations directly instead of using
     # self.GetExpectationsForTest since we need the raw results, but that method
     # only returns the parsed results and whether the test should be retried.
-    expectation = self.child.expectations.expectations_for(
+    expectation = WebGpuCtsIntegrationTest._GetSlowTests().expectations_for(
         TestNameFromInputs(self._query, self._run_in_worker))
     return 'Slow' in expectation.raw_results
 
@@ -515,6 +641,17 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
       tags.append('webgpu-adapter-' + cls._use_webgpu_adapter)
     else:
       tags.append('webgpu-adapter-default')
+    if cls._use_webgpu_compat_mode:
+      tags.append('webgpu-compat')
+    else:
+      tags.append('webgpu-not-compat')
+
+    if sys.platform == 'win32':
+      if cls._use_dxc:
+        tags.append('webgpu-dxc-enabled')
+      else:
+        tags.append('webgpu-dxc-disabled')
+
     # No need to tag _use_webgpu_power_preference here,
     # since Telemetry already reports the GPU vendorID
 
@@ -527,6 +664,10 @@ class WebGpuCtsIntegrationTest(gpu_integration_test.GpuIntegrationTest):
   @classmethod
   def ExpectationsFiles(cls) -> List[str]:
     return [EXPECTATIONS_FILE]
+
+  @classmethod
+  def GetExpectationsFilesRepoPath(cls) -> str:
+    return os.path.join(gpu_path_util.CHROMIUM_SRC_DIR, 'third_party', 'dawn')
 
 
 class WebGpuMessageProtocolError(RuntimeError):

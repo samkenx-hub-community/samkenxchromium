@@ -7,6 +7,7 @@
 
 #include "ash/ash_export.h"
 #include "ash/system/tray/tray_bubble_base.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/views/widget/widget_observer.h"
 #include "ui/wm/public/activation_change_observer.h"
 
@@ -14,6 +15,7 @@ namespace ash {
 
 class TrayBackgroundView;
 class TrayBubbleView;
+class TrayEventFilter;
 
 // Creates and manages the Widget and EventFilter components of a bubble.
 class ASH_EXPORT TrayBubbleWrapper : public TrayBubbleBase,
@@ -41,8 +43,6 @@ class ASH_EXPORT TrayBubbleWrapper : public TrayBubbleBase,
 
   // views::WidgetObserver overrides:
   void OnWidgetDestroying(views::Widget* widget) override;
-  void OnWidgetBoundsChanged(views::Widget* widget,
-                             const gfx::Rect& new_bounds) override;
 
   // ::wm::ActivationChangeObserver overrides:
   void OnWindowActivated(ActivationReason reason,
@@ -54,11 +54,13 @@ class ASH_EXPORT TrayBubbleWrapper : public TrayBubbleBase,
   views::Widget* bubble_widget() { return bubble_widget_; }
 
  private:
-  TrayBackgroundView* tray_;
-  views::Widget* bubble_widget_ = nullptr;
+  raw_ptr<TrayBackgroundView, ExperimentalAsh> tray_;
+  raw_ptr<views::Widget, ExperimentalAsh> bubble_widget_ = nullptr;
 
   // Owned by `bubble_widget_`
-  TrayBubbleView* bubble_view_ = nullptr;
+  raw_ptr<TrayBubbleView, ExperimentalAsh> bubble_view_ = nullptr;
+
+  std::unique_ptr<TrayEventFilter> tray_event_filter_;
 
   // When set to false disables the tray's event filtering
   // and also ignores the activation events. Eche window is an example of a use

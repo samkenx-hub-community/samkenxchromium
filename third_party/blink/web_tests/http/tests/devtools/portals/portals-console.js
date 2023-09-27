@@ -2,20 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+
 (async function() {
   TestRunner.addResult(`Tests that the console works correctly with portals`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('console');
 
   await TestRunner.navigatePromise('resources/append-predecessor-host.html');
 
   async function setContextLabel(target, label) {
-    var runtimeModel = target.model(SDK.RuntimeModel);
+    var runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
     await TestRunner.waitForExecutionContext(runtimeModel);
     runtimeModel.executionContexts()[0].setLabel(label);
   }
 
-  var targets = SDK.targetManager.targets();
+  var targets = SDK.TargetManager.TargetManager.instance().targets();
   TestRunner.assertEquals(2, targets.length);
 
   TestRunner.runTestSuite([
@@ -49,11 +54,11 @@
 
     async function activate(next) {
       TestRunner.evaluateInPage('activate()');
-      await TestRunner.waitForTargetRemoved(SDK.targetManager.rootTarget());
+      await TestRunner.waitForTargetRemoved(SDK.TargetManager.TargetManager.instance().rootTarget());
       await TestRunner.waitForTarget();
-      await TestRunner.waitForTarget(target => target != SDK.targetManager.rootTarget());
+      await TestRunner.waitForTarget(target => target != SDK.TargetManager.TargetManager.instance().rootTarget());
       await TestRunner.waitForExecutionContext(TestRunner.runtimeModel);
-      targets = SDK.targetManager.targets();
+      targets = SDK.TargetManager.TargetManager.instance().targets();
       next();
     },
 

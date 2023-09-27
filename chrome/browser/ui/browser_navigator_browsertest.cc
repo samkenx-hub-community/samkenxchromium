@@ -206,11 +206,11 @@ void BrowserNavigatorTest::RunDoNothingIfIncognitoIsForcedTest(
   PrefService* prefs1 = browser->profile()->GetPrefs();
   prefs1->SetInteger(
       policy::policy_prefs::kIncognitoModeAvailability,
-      static_cast<int>(IncognitoModePrefs::Availability::kForced));
+      static_cast<int>(policy::IncognitoModeAvailability::kForced));
   PrefService* prefs2 = browser->profile()->GetOriginalProfile()->GetPrefs();
   prefs2->SetInteger(
       policy::policy_prefs::kIncognitoModeAvailability,
-      static_cast<int>(IncognitoModePrefs::Availability::kForced));
+      static_cast<int>(policy::IncognitoModeAvailability::kForced));
 
   // Navigate to the page.
   NavigateParams params(MakeNavigateParams(browser));
@@ -697,8 +697,10 @@ IN_PROC_BROWSER_TEST_F(BrowserNavigatorTest, NavigateOnTabSwitchLostTest) {
 
   NavigateHelper(GURL("chrome://about"), browser(),
                  WindowOpenDisposition::NEW_FOREGROUND_TAB, true);
+  int previous_tab_count = browser()->tab_strip_model()->count();
   browser()->tab_strip_model()->CloseWebContentsAt(0,
                                                    TabCloseTypes::CLOSE_NONE);
+  EXPECT_EQ(previous_tab_count - 1, browser()->tab_strip_model()->count());
   // This expects a new WebContents, since we just closed the tab.
   NavigateHelper(singleton_url, browser(), WindowOpenDisposition::SWITCH_TO_TAB,
                  true, nullptr /* expected_contents */);
@@ -1610,8 +1612,10 @@ IN_PROC_BROWSER_TEST_F(BrowserNavigatorTest, MAYBE_CloseSingletonTab) {
     observer.Wait();
   }
 
-  EXPECT_TRUE(browser()->tab_strip_model()->CloseWebContentsAt(
-      2, TabCloseTypes::CLOSE_USER_GESTURE));
+  int previous_tab_count = browser()->tab_strip_model()->count();
+  browser()->tab_strip_model()->CloseWebContentsAt(
+      2, TabCloseTypes::CLOSE_USER_GESTURE);
+  EXPECT_EQ(previous_tab_count - 1, browser()->tab_strip_model()->count());
   EXPECT_EQ(0, browser()->tab_strip_model()->active_index());
 }
 
@@ -1874,9 +1878,18 @@ IN_PROC_BROWSER_TEST_F(BrowserNavigatorTest,
   web_contents_params.picture_in_picture_options = *pip_options;
 
   // Opening a picture in picture window should create a new browser.
-  NavigateParams params(MakeNavigateParams(browser()));
+  NavigateParams params = MakeNavigateParams(browser());
   params.disposition = WindowOpenDisposition::NEW_PICTURE_IN_PICTURE;
-  params.source_contents = browser()->tab_strip_model()->GetActiveWebContents();
+
+  // Navigate to https:// page
+  // TODO: Extract the navigation logic to a helper function?
+  net::EmbeddedTestServer https_server(net::EmbeddedTestServer::TYPE_HTTPS);
+  ASSERT_TRUE(https_server.Start());
+  WebContents* tab = browser()->tab_strip_model()->GetActiveWebContents();
+  const GURL url = https_server.GetURL("/simple.html");
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
+
+  params.source_contents = tab;
   params.contents_to_insert = WebContents::Create(web_contents_params);
   Navigate(&params);
 
@@ -1903,9 +1916,17 @@ IN_PROC_BROWSER_TEST_F(BrowserNavigatorTest,
   web_contents_params.picture_in_picture_options = *pip_options;
 
   // Opening a picture in picture window should create a new browser.
-  NavigateParams params(MakeNavigateParams(browser()));
+  NavigateParams params = MakeNavigateParams(browser());
   params.disposition = WindowOpenDisposition::NEW_PICTURE_IN_PICTURE;
-  params.source_contents = browser()->tab_strip_model()->GetActiveWebContents();
+
+  // Navigate to https:// page
+  net::EmbeddedTestServer https_server(net::EmbeddedTestServer::TYPE_HTTPS);
+  ASSERT_TRUE(https_server.Start());
+  WebContents* tab = browser()->tab_strip_model()->GetActiveWebContents();
+  const GURL url = https_server.GetURL("/simple.html");
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
+
+  params.source_contents = tab;
   params.contents_to_insert = WebContents::Create(web_contents_params);
   Navigate(&params);
 
@@ -1921,9 +1942,17 @@ IN_PROC_BROWSER_TEST_F(BrowserNavigatorTest,
   // picture in picture window fails.
   Browser* pip = CreateEmptyBrowserForType(Browser::TYPE_PICTURE_IN_PICTURE,
                                            browser()->profile());
-  NavigateParams params(MakeNavigateParams(pip));
+  NavigateParams params = MakeNavigateParams(pip);
   params.disposition = WindowOpenDisposition::NEW_PICTURE_IN_PICTURE;
-  params.source_contents = browser()->tab_strip_model()->GetActiveWebContents();
+
+  // Navigate to https:// page
+  net::EmbeddedTestServer https_server(net::EmbeddedTestServer::TYPE_HTTPS);
+  ASSERT_TRUE(https_server.Start());
+  WebContents* tab = browser()->tab_strip_model()->GetActiveWebContents();
+  const GURL url = https_server.GetURL("/simple.html");
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
+
+  params.source_contents = tab;
   Navigate(&params);
 
   EXPECT_EQ(params.browser, nullptr);
@@ -1935,10 +1964,25 @@ IN_PROC_BROWSER_TEST_F(
   // Opening a picture-in-picture window without a source contents should fail.
   Browser* pip = CreateEmptyBrowserForType(Browser::TYPE_PICTURE_IN_PICTURE,
                                            browser()->profile());
-  NavigateParams params(MakeNavigateParams(pip));
+  NavigateParams params = MakeNavigateParams(pip);
   params.disposition = WindowOpenDisposition::NEW_PICTURE_IN_PICTURE;
   params.source_contents = nullptr;
 
+  EXPECT_EQ(nullptr, Navigate(&params));
+}
+
+IN_PROC_BROWSER_TEST_F(BrowserNavigatorTest,
+                       Disposition_PictureInPicture_CantFromAboutBlank) {
+  // Disallow document PiP windows from opening from a window with about:blank
+  // in the omnibox
+  Browser* pip = CreateEmptyBrowserForType(Browser::TYPE_PICTURE_IN_PICTURE,
+                                           browser()->profile());
+  NavigateParams params = MakeNavigateParams(pip);
+  params.disposition = WindowOpenDisposition::NEW_PICTURE_IN_PICTURE;
+
+  WebContents* tab = browser()->tab_strip_model()->GetActiveWebContents();
+  EXPECT_TRUE(tab->GetLastCommittedURL().IsAboutBlank());
+  params.source_contents = tab;
   EXPECT_EQ(nullptr, Navigate(&params));
 }
 
@@ -1990,10 +2034,10 @@ class MAYBE_BrowserNavigatorTestWithMockScreen : public BrowserNavigatorTest {
     BrowserNavigatorTest::SetScreenInstance();
 #else
     mock_screen_.Init();
-    mock_screen_.display_list().AddDisplay({1, gfx::Rect(0, 0, 800, 800)},
+    mock_screen_.display_list().AddDisplay({1, gfx::Rect(0, 0, 800, 700)},
                                            display::DisplayList::Type::PRIMARY);
     mock_screen_.display_list().AddDisplay(
-        {2, gfx::Rect(800, 0, 800, 800)},
+        {2, gfx::Rect(800, 0, 800, 700)},
         display::DisplayList::Type::NOT_PRIMARY);
     ASSERT_EQ(2, display::Screen::GetScreen()->GetNumDisplays());
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
@@ -2004,7 +2048,7 @@ class MAYBE_BrowserNavigatorTestWithMockScreen : public BrowserNavigatorTest {
     // This has to happen later than `SetScreenInstance` as the Ash shell does
     // not exist yet.
     display::test::DisplayManagerTestApi(ash::Shell::Get()->display_manager())
-        .UpdateDisplay("0+0-800x800,800+0-800x800");
+        .UpdateDisplay("0+0-800x700,800+0-800x700");
     ASSERT_EQ(2, display::Screen::GetScreen()->GetNumDisplays());
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
   }
@@ -2048,10 +2092,17 @@ IN_PROC_BROWSER_TEST_F(MAYBE_BrowserNavigatorTestWithMockScreen,
     ASSERT_EQ(display1.id(), opener_display.id());
 
     // Open the PiP window.
-    NavigateParams params(MakeNavigateParams(browser()));
+    NavigateParams params = MakeNavigateParams(browser());
     params.disposition = WindowOpenDisposition::NEW_PICTURE_IN_PICTURE;
-    params.source_contents =
-        browser()->tab_strip_model()->GetActiveWebContents();
+
+    // Navigate to https:// page
+    net::EmbeddedTestServer https_server(net::EmbeddedTestServer::TYPE_HTTPS);
+    ASSERT_TRUE(https_server.Start());
+    WebContents* tab = browser()->tab_strip_model()->GetActiveWebContents();
+    const GURL url = https_server.GetURL("/simple.html");
+    ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
+
+    params.source_contents = tab;
     params.contents_to_insert = WebContents::Create(web_contents_params);
     Navigate(&params);
 
@@ -2076,10 +2127,17 @@ IN_PROC_BROWSER_TEST_F(MAYBE_BrowserNavigatorTestWithMockScreen,
     ASSERT_EQ(display2.id(), opener_display.id());
 
     // Open the PiP window.
-    NavigateParams params(MakeNavigateParams(browser()));
+    NavigateParams params = MakeNavigateParams(browser());
     params.disposition = WindowOpenDisposition::NEW_PICTURE_IN_PICTURE;
-    params.source_contents =
-        browser()->tab_strip_model()->GetActiveWebContents();
+
+    // Navigate to https:// page
+    net::EmbeddedTestServer https_server(net::EmbeddedTestServer::TYPE_HTTPS);
+    ASSERT_TRUE(https_server.Start());
+    WebContents* tab = browser()->tab_strip_model()->GetActiveWebContents();
+    const GURL url = https_server.GetURL("/simple.html");
+    ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
+
+    params.source_contents = tab;
     params.contents_to_insert = WebContents::Create(web_contents_params);
     Navigate(&params);
 

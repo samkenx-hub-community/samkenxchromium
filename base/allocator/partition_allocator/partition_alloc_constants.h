@@ -16,17 +16,20 @@
 #include "base/allocator/partition_allocator/partition_alloc_buildflags.h"
 #include "base/allocator/partition_allocator/partition_alloc_config.h"
 #include "base/allocator/partition_allocator/partition_alloc_forward.h"
-#include "base/allocator/partition_allocator/tagging.h"
 #include "build/build_config.h"
 
 #if BUILDFLAG(IS_APPLE) && defined(ARCH_CPU_64_BITS)
 #include <mach/vm_page_size.h>
 #endif
 
+#if PA_CONFIG(HAS_MEMORY_TAGGING)
+#include "base/allocator/partition_allocator/tagging.h"
+#endif
+
 namespace partition_alloc {
 
-// Bit flag constants used as `flag` argument of PartitionRoot::AllocWithFlags,
-// AlignedAllocWithFlags, etc.
+// Bit flag constants used as `flag` argument of PartitionRoot::Alloc<flags>,
+// AlignedAlloc, etc.
 struct AllocFlags {
   static constexpr unsigned int kReturnNull = 1 << 0;
   static constexpr unsigned int kZeroFill = 1 << 1;
@@ -42,16 +45,21 @@ struct AllocFlags {
   // allocations return nullptr, such as direct-mapped ones, and even for
   // smaller ones, a nullptr value is common.
   static constexpr unsigned int kFastPathOrReturnNull = 1 << 5;  // Internal.
+  // An allocation override hook should tag the allocated memory for MTE.
+  static constexpr unsigned int kMemoryShouldBeTaggedForMte =
+      1 << 6;  // Internal.
 
-  static constexpr unsigned int kLastFlag = kFastPathOrReturnNull;
+  static constexpr unsigned int kLastFlag = kMemoryShouldBeTaggedForMte;
 };
 
-// Bit flag constants used as `flag` argument of PartitionRoot::FreeWithFlags.
+// Bit flag constants used as `flag` argument of PartitionRoot::Free<flags>.
 struct FreeFlags {
   // See AllocFlags::kNoMemoryToolOverride.
   static constexpr unsigned int kNoMemoryToolOverride = 1 << 0;
+  // Don't allow any hooks (override or observers).
+  static constexpr unsigned int kNoHooks = 1 << 1;  // Internal.
 
-  static constexpr unsigned int kLastFlag = kNoMemoryToolOverride;
+  static constexpr unsigned int kLastFlag = kNoHooks;
 };
 
 namespace internal {
@@ -81,7 +89,7 @@ constexpr size_t kPartitionCachelineSize = 64;
 // other constant values, we pack _all_ `PartitionRoot::Alloc` sizes perfectly
 // up against the end of a system page.
 
-#if defined(_MIPS_ARCH_LOONGSON) || defined(ARCH_CPU_LOONG64)
+#if defined(_MIPS_ARCH_LOONGSON) || defined(ARCH_CPU_LOONGARCH64)
 PA_ALWAYS_INLINE PAGE_ALLOCATOR_CONSTANTS_DECLARE_CONSTEXPR size_t
 PartitionPageShift() {
   return 16;  // 64 KiB
@@ -270,10 +278,10 @@ enum pool_handle : unsigned {
 
 // New pool_handles will be added here.
 
-#if BUILDFLAG(ENABLE_PKEYS)
-  // The pkey pool must come last since we pkey_mprotect its entry in the
-  // metadata tables, e.g. AddressPoolManager::aligned_pools_
-  kPkeyPoolHandle,
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
+  // The thread isolated pool must come last since we write-protect its entry in
+  // the metadata tables, e.g. AddressPoolManager::aligned_pools_
+  kThreadIsolatedPoolHandle,
 #endif
   kMaxPoolHandle
 };
@@ -293,7 +301,8 @@ constexpr size_t kNumPools = kMaxPoolHandle - 1;
 // When pointer compression is enabled, we cannot use large pools (at most
 // 8GB for each of the glued pools).
 #if BUILDFLAG(HAS_64_BIT_POINTERS)
-#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS) || PA_CONFIG(POINTER_COMPRESSION)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS) || \
+    BUILDFLAG(ENABLE_POINTER_COMPRESSION)
 constexpr size_t kPoolMaxSize = 8 * kGiB;
 #else
 constexpr size_t kPoolMaxSize = 16 * kGiB;
@@ -303,18 +312,16 @@ constexpr size_t kPoolMaxSize = 4 * kGiB;
 #endif
 constexpr size_t kMaxSuperPagesInPool = kPoolMaxSize / kSuperPageSize;
 
-#if BUILDFLAG(ENABLE_PKEYS)
-static_assert(
-    kPkeyPoolHandle == kNumPools,
-    "The pkey pool must come last since we pkey_mprotect its metadata.");
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
+static_assert(kThreadIsolatedPoolHandle == kNumPools,
+              "The thread isolated pool must come last since we write-protect "
+              "its metadata.");
 #endif
 
 // Slots larger than this size will not receive MTE protection. Pages intended
 // for allocations larger than this constant should not be backed with PROT_MTE
 // (which saves shadow tag memory). We also save CPU cycles by skipping tagging
 // of large areas which are less likely to benefit from MTE protection.
-// TODO(Richard.Townsend@arm.com): adjust RecommitSystemPagesForData to skip
-// PROT_MTE.
 constexpr size_t kMaxMemoryTaggingSize = 1024;
 
 #if PA_CONFIG(HAS_MEMORY_TAGGING)
@@ -418,7 +425,7 @@ PA_ALWAYS_INLINE constexpr size_t MaxDirectMapped() {
   return (1UL << 31) - kSuperPageSize;
 }
 
-// Max alignment supported by AlignedAllocWithFlags().
+// Max alignment supported by AlignedAlloc().
 // kSuperPageSize alignment can't be easily supported, because each super page
 // starts with guard pages & metadata.
 constexpr size_t kMaxSupportedAlignment = kSuperPageSize / 2;
@@ -476,17 +483,6 @@ constexpr size_t kInvalidBucketSize = 1;
 #if PA_CONFIG(ENABLE_MAC11_MALLOC_SIZE_HACK)
 // Requested size that require the hack.
 constexpr size_t kMac11MallocSizeHackRequestedSize = 32;
-// Usable size for allocations that require the hack.
-constexpr size_t kMac11MallocSizeHackUsableSize =
-#if BUILDFLAG(ENABLE_DANGLING_RAW_PTR_CHECKS) || \
-    PA_CONFIG(REF_COUNT_STORE_REQUESTED_SIZE) || \
-    PA_CONFIG(REF_COUNT_CHECK_COOKIE)
-    40;
-#else
-    44;
-#endif  // BUILDFLAG(ENABLE_DANGLING_RAW_PTR_CHECKS) ||
-        // PA_CONFIG(REF_COUNT_STORE_REQUESTED_SIZE) ||
-        // PA_CONFIG(REF_COUNT_CHECK_COOKIE)
 #endif  // PA_CONFIG(ENABLE_MAC11_MALLOC_SIZE_HACK)
 }  // namespace internal
 

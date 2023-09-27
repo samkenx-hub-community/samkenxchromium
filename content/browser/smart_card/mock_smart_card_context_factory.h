@@ -32,6 +32,7 @@ class MockSmartCardContextFactory
        std::vector<device::mojom::SmartCardReaderStateInPtr> reader_states,
        GetStatusChangeCallback callback),
       (override));
+  MOCK_METHOD(void, Cancel, (CancelCallback callback), (override));
   MOCK_METHOD(void,
               Connect,
               (const std::string& reader,
@@ -39,6 +40,14 @@ class MockSmartCardContextFactory
                device::mojom::SmartCardProtocolsPtr preferred_protocols,
                ConnectCallback callback),
               (override));
+
+  // Expect a Connect("Fake reader", kShared, kT1) call.
+  // A pending remote for the given `connection_receiver` will be passed to
+  // the call result on success.
+  void ExpectConnectFakeReaderSharedT1(
+      mojo::Receiver<device::mojom::SmartCardConnection>& connection_receiver);
+
+  void ClearContextReceivers();
 
  private:
   mojo::ReceiverSet<device::mojom::SmartCardContextFactory> receivers_;

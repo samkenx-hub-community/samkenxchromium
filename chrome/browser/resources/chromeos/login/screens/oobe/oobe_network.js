@@ -14,9 +14,10 @@ import '../../components/buttons/oobe_next_button.js';
 import '../../components/common_styles/oobe_common_styles.css.js';
 import '../../components/common_styles/oobe_dialog_host_styles.css.js';
 import '../../components/dialogs/oobe_adaptive_dialog.js';
+import '../../components/quick_start_entry_point.js';
 
-import {NetworkList} from '//resources/ash/common/network/network_list_types.js';
 import {assert} from '//resources/ash/common/assert.js';
+import {NetworkList} from '//resources/ash/common/network/network_list_types.js';
 import {html, mixinBehaviors, PolymerElement} from '//resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {LoginScreenBehavior, LoginScreenBehaviorInterface} from '../../components/behaviors/login_screen_behavior.js';
@@ -99,6 +100,17 @@ class NetworkScreen extends NetworkScreenBase {
         type: Boolean,
         value: true,
       },
+
+      /**
+       * Whether Quick start feature is enabled. If it's enabled the quick start
+       * button will be shown in the network screen.
+       * @type {boolean}
+       * @private
+       */
+      isQuickStartEnabled_: {
+        type: Boolean,
+        value: false,
+      },
     };
   }
 
@@ -107,7 +119,7 @@ class NetworkScreen extends NetworkScreenBase {
   }
 
   get EXTERNAL_API() {
-    return ['setError'];
+    return ['setError', 'setQuickStartEnabled'];
   }
 
   /** Called when dialog is shown. */
@@ -155,6 +167,10 @@ class NetworkScreen extends NetworkScreenBase {
    */
   setError(message) {
     this.errorMessage_ = message;
+  }
+
+  setQuickStartEnabled() {
+    this.isQuickStartEnabled_ = true;
   }
 
   /**
@@ -205,6 +221,14 @@ class NetworkScreen extends NetworkScreenBase {
    */
   onNextClicked_() {
     chrome.send('login.NetworkScreen.userActed', ['continue']);
+  }
+
+  /**
+   * Quick start button click handler.
+   * @private
+   */
+  onQuickStartClicked_() {
+    chrome.send('login.NetworkScreen.userActed', ['activateQuickStart']);
   }
 
   /**

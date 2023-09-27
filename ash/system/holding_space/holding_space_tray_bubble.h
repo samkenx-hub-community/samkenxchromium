@@ -16,6 +16,7 @@
 #include "ash/system/screen_layout_observer.h"
 #include "ash/system/tray/tray_bubble_wrapper.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
+#include "base/memory/raw_ptr.h"
 #include "base/scoped_observation.h"
 
 namespace ash {
@@ -32,6 +33,8 @@ class ASH_EXPORT HoldingSpaceTrayBubble : public ScreenLayoutObserver,
   HoldingSpaceTrayBubble(const HoldingSpaceTrayBubble&) = delete;
   HoldingSpaceTrayBubble& operator=(const HoldingSpaceTrayBubble&) = delete;
   ~HoldingSpaceTrayBubble() override;
+
+  void Init();
 
   void AnchorUpdated();
 
@@ -66,15 +69,17 @@ class ASH_EXPORT HoldingSpaceTrayBubble : public ScreenLayoutObserver,
   void OnTabletModeEnded() override;
 
   // The owner of this class.
-  HoldingSpaceTray* const holding_space_tray_;
+  const raw_ptr<HoldingSpaceTray, DanglingUntriaged | ExperimentalAsh>
+      holding_space_tray_;
 
   // The singleton delegate for holding space views that implements support
   // for context menu, drag-and-drop, and multiple selection.
   HoldingSpaceViewDelegate delegate_{this};
 
   // Views owned by view hierarchy.
-  views::View* header_ = nullptr;
-  ChildBubbleContainer* child_bubble_container_ = nullptr;
+  raw_ptr<views::View, ExperimentalAsh> header_ = nullptr;
+  raw_ptr<ChildBubbleContainer, ExperimentalAsh> child_bubble_container_ =
+      nullptr;
   std::vector<HoldingSpaceTrayChildBubble*> child_bubbles_;
 
   std::unique_ptr<TrayBubbleWrapper> bubble_wrapper_;

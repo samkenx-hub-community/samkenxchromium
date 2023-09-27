@@ -7,7 +7,6 @@
 
 #include <memory>
 
-#include "base/compiler_specific.h"
 #import "ios/web/public/web_client.h"
 
 namespace ios_web_view {
@@ -33,9 +32,6 @@ class WebViewWebClient : public web::WebClient {
   base::RefCountedMemory* GetDataResourceBytes(int resource_id) const override;
   std::vector<web::JavaScriptFeature*> GetJavaScriptFeatures(
       web::BrowserState* browser_state) const override;
-  NSString* GetDocumentStartScriptForMainFrame(
-      web::BrowserState* browser_state) const override;
-  std::u16string GetPluginNotSupportedText() const override;
   void PrepareErrorPage(web::WebState* web_state,
                         const GURL& url,
                         NSError* error,
@@ -45,6 +41,7 @@ class WebViewWebClient : public web::WebClient {
                         int64_t navigation_id,
                         base::OnceCallback<void(NSString*)> callback) override;
   bool EnableLongPressUIContextMenu() const override;
+  bool EnableWebInspector(web::BrowserState* browser_state) const override;
   bool IsMixedContentAutoupgradeEnabled(
       web::BrowserState* browser_state) const override;
 };

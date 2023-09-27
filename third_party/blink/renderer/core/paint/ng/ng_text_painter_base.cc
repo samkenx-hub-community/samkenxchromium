@@ -4,11 +4,12 @@
 
 #include "third_party/blink/renderer/core/paint/ng/ng_text_painter_base.h"
 
+#include "base/containers/adapters.h"
 #include "third_party/blink/renderer/core/dom/document.h"
-#include "third_party/blink/renderer/core/layout/text_decoration_offset_base.h"
+#include "third_party/blink/renderer/core/highlight/highlight_style_utils.h"
+#include "third_party/blink/renderer/core/layout/ng/ng_text_decoration_offset.h"
 #include "third_party/blink/renderer/core/paint/applied_decoration_painter.h"
 #include "third_party/blink/renderer/core/paint/box_painter_base.h"
-#include "third_party/blink/renderer/core/paint/highlight_painting_utils.h"
 #include "third_party/blink/renderer/core/paint/paint_info.h"
 #include "third_party/blink/renderer/core/paint/text_decoration_info.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
@@ -29,7 +30,7 @@ namespace blink {
 //   3. Paint line through
 void NGTextPainterBase::PaintUnderOrOverLineDecorations(
     const NGTextFragmentPaintInfo& fragment_paint_info,
-    const TextDecorationOffsetBase& decoration_offset,
+    const NGTextDecorationOffset& decoration_offset,
     TextDecorationInfo& decoration_info,
     TextDecorationLine lines_to_paint,
     const PaintInfo& paint_info,
@@ -63,27 +64,26 @@ void NGTextPainterBase::PaintUnderOrOverLineDecorations(
 
 void NGTextPainterBase::PaintUnderOrOverLineDecorationShadows(
     const NGTextFragmentPaintInfo& fragment_paint_info,
-    const TextDecorationOffsetBase& decoration_offset,
+    const NGTextDecorationOffset& decoration_offset,
     TextDecorationInfo& decoration_info,
     TextDecorationLine lines_to_paint,
     const cc::PaintFlags* flags,
     const TextPaintStyle& text_style,
     GraphicsContext& context) {
-  if (text_style.shadow == nullptr)
-    return;
-
   const ShadowList* shadow_list = text_style.shadow.get();
-  if (shadow_list == nullptr)
+  if (!shadow_list) {
     return;
+  }
 
-  for (const auto& shadow : shadow_list->Shadows()) {
+  for (const auto& shadow : base::Reversed(shadow_list->Shadows())) {
     const Color& color = shadow.GetColor().Resolve(text_style.current_color,
                                                    text_style.color_scheme);
     // Detect when there's no effective shadow.
-    if (color.IsTransparent())
+    if (color.IsFullyTransparent()) {
       continue;
+    }
 
-    const gfx::Vector2dF& offset = shadow.Location().OffsetFromOrigin();
+    const gfx::Vector2dF& offset = shadow.Offset();
 
     float blur = shadow.Blur();
     DCHECK_GE(blur, 0);
@@ -103,7 +103,7 @@ void NGTextPainterBase::PaintUnderOrOverLineDecorationShadows(
 
 void NGTextPainterBase::PaintUnderOrOverLineDecorations(
     const NGTextFragmentPaintInfo& fragment_paint_info,
-    const TextDecorationOffsetBase& decoration_offset,
+    const NGTextDecorationOffset& decoration_offset,
     TextDecorationInfo& decoration_info,
     TextDecorationLine lines_to_paint,
     const cc::PaintFlags* flags,

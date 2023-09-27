@@ -19,6 +19,7 @@
 #include "chrome/browser/renderer_host/chrome_navigation_ui_data.h"
 #include "chrome/browser/ui/bookmarks/bookmark_editor.h"
 #include "chrome/browser/ui/bookmarks/bookmark_stats.h"
+#include "chrome/browser/ui/bookmarks/bookmark_stats_tab_helper.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -27,7 +28,7 @@
 #include "chrome/browser/ui/simple_message_box.h"
 #include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_node.h"
@@ -72,7 +73,9 @@ std::vector<UrlAndId> GetURLsToOpen(
     content::BrowserContext* browser_context = nullptr,
     bool incognito_urls_only = false) {
   std::vector<UrlAndId> url_and_ids;
-  const auto AddUrlIfLegal = [&](const GURL url, int64_t id) {
+  const auto AddUrlIfLegal = [browser_context, incognito_urls_only,
+                              &url_and_ids](const GURL& url,
+                                            const base::Uuid& id) {
     if (!incognito_urls_only || IsURLAllowedInIncognito(url, browser_context)) {
       UrlAndId url_and_id;
       url_and_id.url = url;
@@ -82,13 +85,13 @@ std::vector<UrlAndId> GetURLsToOpen(
   };
   for (const BookmarkNode* node : nodes) {
     if (node->is_url()) {
-      AddUrlIfLegal(node->url(), node->id());
+      AddUrlIfLegal(node->url(), node->uuid());
     } else {
       // If the node is not a URL, it is a folder. We want to add those of its
       // children which are URLs.
       for (const auto& child : node->children()) {
         if (child->is_url())
-          AddUrlIfLegal(child->url(), child->id());
+          AddUrlIfLegal(child->url(), child->uuid());
       }
     }
   }
@@ -106,7 +109,6 @@ int ChildURLCountTotal(const BookmarkNode* node) {
                          count_children);
 }
 
-#if !BUILDFLAG(IS_ANDROID)
 // Returns in |urls|, the url and title pairs for each open tab in browser.
 void GetURLsAndFoldersForOpenTabs(
     Browser* browser,
@@ -131,7 +133,6 @@ void GetURLsAndFoldersForOpenTabs(
   }
   GetURLsAndFoldersForTabEntries(folder_data, tab_entries, groups_by_index);
 }
-#endif
 
 // Represents a reference set of web contents opened by OpenAllHelper() so that
 // the actual web contents and what browsers they are located in can be
@@ -141,9 +142,11 @@ using OpenedWebContentsSet = base::flat_set<const content::WebContents*>;
 // Opens all of the URLs in `bookmark_urls` using `navigator` and
 // `initial_disposition` as a starting point. Returns a reference set of the
 // WebContents created; see OpenedWebContentsSet.
-OpenedWebContentsSet OpenAllHelper(Browser* browser,
-                                   std::vector<UrlAndId> bookmark_urls,
-                                   WindowOpenDisposition initial_disposition) {
+OpenedWebContentsSet OpenAllHelper(
+    Browser* browser,
+    std::vector<UrlAndId> bookmark_urls,
+    WindowOpenDisposition initial_disposition,
+    absl::optional<BookmarkLaunchAction> launch_action) {
   OpenedWebContentsSet::container_type opened_tabs;
   WindowOpenDisposition disposition = initial_disposition;
   // We keep track of (potentially) two browsers in addition to the original
@@ -196,7 +199,13 @@ OpenedWebContentsSet OpenAllHelper(Browser* browser,
     if (!opened_tab)
       continue;
 
-    if (url_and_id_it->id != -1) {
+    if (launch_action.has_value()) {
+      BookmarkStatsTabHelper::CreateForWebContents(opened_tab);
+      BookmarkStatsTabHelper::FromWebContents(opened_tab)
+          ->SetLaunchAction(launch_action.value(), disposition);
+    }
+
+    if (url_and_id_it->id.is_valid()) {
       ChromeNavigationUIData* ui_data =
           static_cast<ChromeNavigationUIData*>(handle->GetNavigationUIData());
       if (ui_data)
@@ -243,22 +252,24 @@ OpenedWebContentsSet OpenAllHelper(Browser* browser,
 
 }  // namespace
 
-#if !BUILDFLAG(IS_ANDROID)
 void OpenAllIfAllowed(Browser* browser,
                       const std::vector<const bookmarks::BookmarkNode*>& nodes,
                       WindowOpenDisposition initial_disposition,
-                      bool add_to_group) {
+                      bool add_to_group,
+                      absl::optional<BookmarkLaunchAction> launch_action) {
   std::vector<UrlAndId> url_and_ids = GetURLsToOpen(
       nodes, browser->profile(),
       initial_disposition == WindowOpenDisposition::OFF_THE_RECORD);
   auto do_open = [](Browser* browser, std::vector<UrlAndId> url_and_ids_to_open,
                     WindowOpenDisposition initial_disposition,
                     absl::optional<std::u16string> folder_title,
+                    absl::optional<BookmarkLaunchAction> launch_action,
                     chrome::MessageBoxResult result) {
     if (result != chrome::MESSAGE_BOX_RESULT_YES)
       return;
-    const auto opened_web_contents = OpenAllHelper(
-        browser, std::move(url_and_ids_to_open), initial_disposition);
+    const auto opened_web_contents =
+        OpenAllHelper(browser, std::move(url_and_ids_to_open),
+                      initial_disposition, std::move(launch_action));
     if (folder_title.has_value()) {
       TabStripModel* model = browser->tab_strip_model();
 
@@ -300,7 +311,7 @@ void OpenAllIfAllowed(Browser* browser,
             add_to_group ? absl::optional<std::u16string>(
                                nodes[0]->GetTitledUrlNodeTitle())
                          : absl::nullopt,
-            chrome::MESSAGE_BOX_RESULT_YES);
+            std::move(launch_action), chrome::MESSAGE_BOX_RESULT_YES);
     return;
   }
 
@@ -317,23 +328,8 @@ void OpenAllIfAllowed(Browser* browser,
                      initial_disposition,
                      add_to_group ? absl::optional<std::u16string>(
                                         nodes[0]->GetTitledUrlNodeTitle())
-                                  : absl::nullopt));
-}
-
-void OpenAllNow(Browser* browser,
-                const std::vector<const BookmarkNode*>& nodes,
-                WindowOpenDisposition initial_disposition,
-                content::BrowserContext* browser_context) {
-  // Opens all |nodes| of type URL and any children of |nodes| that are of type
-  // URL. |navigator| is the PageNavigator used to open URLs. After the first
-  // url is opened |navigator| is set to the PageNavigator of the last active
-  // tab. This is done to handle a window disposition of new window, in which
-  // case we want subsequent tabs to open in that window.
-  OpenAllHelper(browser,
-                GetURLsToOpen(nodes, browser_context,
-                              initial_disposition ==
-                                  WindowOpenDisposition::OFF_THE_RECORD),
-                initial_disposition);
+                                  : absl::nullopt,
+                     absl::nullopt));
 }
 
 int OpenCount(gfx::NativeWindow parent,
@@ -419,6 +415,5 @@ void GetURLsAndFoldersForTabEntries(
     }
   }
 }
-#endif  // !BUILDFLAG(IS_ANDROID)
 
 }  // namespace chrome

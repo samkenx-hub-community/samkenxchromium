@@ -13,7 +13,6 @@
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/mac/mac_util.h"
-#include "base/mac/scoped_nsobject.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/test/gmock_callback_support.h"

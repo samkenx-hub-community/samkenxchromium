@@ -7,6 +7,8 @@
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
 
+#include <memory>
+
 #include "base/process/process.h"
 #include "content/browser/browser_child_process_host_impl.h"
 #include "content/public/browser/child_process_data.h"
@@ -19,9 +21,16 @@ bool g_notifications_enabled = true;
 
 }  // namespace
 
+struct BrowserChildProcessBackgroundedBridge::ObjCStorage {
+  // Registration IDs for NSApplicationDidBecomeActiveNotification and
+  // NSApplicationDidResignActiveNotification.
+  id __strong did_become_active_observer = nil;
+  id __strong did_resign_active_observer = nil;
+};
+
 BrowserChildProcessBackgroundedBridge::BrowserChildProcessBackgroundedBridge(
     BrowserChildProcessHostImpl* process)
-    : process_(process) {
+    : process_(process), objc_storage_(std::make_unique<ObjCStorage>()) {
   base::PortProvider* port_provider =
       BrowserChildProcessHost::GetPortProvider();
   if (port_provider->TaskForPid(process_->GetData().GetProcess().Pid()) !=
@@ -36,13 +45,13 @@ BrowserChildProcessBackgroundedBridge::BrowserChildProcessBackgroundedBridge(
 
 BrowserChildProcessBackgroundedBridge::
     ~BrowserChildProcessBackgroundedBridge() {
-  if (did_become_active_observer_) {
+  if (objc_storage_->did_become_active_observer) {
     [NSNotificationCenter.defaultCenter
-        removeObserver:did_become_active_observer_];
+        removeObserver:objc_storage_->did_become_active_observer];
   }
-  if (did_resign_active_observer_) {
+  if (objc_storage_->did_resign_active_observer) {
     [NSNotificationCenter.defaultCenter
-        removeObserver:did_resign_active_observer_];
+        removeObserver:objc_storage_->did_resign_active_observer];
   }
 }
 
@@ -63,11 +72,12 @@ void BrowserChildProcessBackgroundedBridge::SetOSNotificationsEnabledForTesting(
 }
 
 void BrowserChildProcessBackgroundedBridge::Initialize() {
-  // Do the initial ajustment based on the initial value of the
+  // Do the initial adjustment based on the initial value of the
   // TASK_CATEGORY_POLICY role of the browser process.
   base::SelfPortProvider self_port_provider;
-  process_->SetProcessBackgrounded(
-      base::Process::Current().IsProcessBackgrounded(&self_port_provider));
+  const base::Process::Priority browser_process_priority =
+      base::Process::Current().GetPriority(&self_port_provider);
+  process_->SetProcessPriority(browser_process_priority);
 
   if (!g_notifications_enabled) {
     return;
@@ -76,22 +86,24 @@ void BrowserChildProcessBackgroundedBridge::Initialize() {
   // Now subscribe to both NSApplicationDidBecomeActiveNotification and
   // NSApplicationDidResignActiveNotification, which are sent when the browser
   // process becomes foreground and background, respectively. The blocks
-  // implicity captures `this`. It is safe to do so since the subscriptions are
-  // removed in the destructor
-  did_become_active_observer_ = [NSNotificationCenter.defaultCenter
-      addObserverForName:NSApplicationDidBecomeActiveNotification
-                  object:nil
-                   queue:nil
-              usingBlock:^(NSNotification* notification) {
-                OnBrowserProcessForegrounded();
-              }];
-  did_resign_active_observer_ = [NSNotificationCenter.defaultCenter
-      addObserverForName:NSApplicationDidResignActiveNotification
-                  object:nil
-                   queue:nil
-              usingBlock:^(NSNotification* notification) {
-                OnBrowserProcessBackgrounded();
-              }];
+  // implicitly captures `this`. It is safe to do so since the subscriptions are
+  // removed in the destructor.
+  objc_storage_->did_become_active_observer =
+      [NSNotificationCenter.defaultCenter
+          addObserverForName:NSApplicationDidBecomeActiveNotification
+                      object:nil
+                       queue:nil
+                  usingBlock:^(NSNotification* notification) {
+                    OnBrowserProcessForegrounded();
+                  }];
+  objc_storage_->did_resign_active_observer =
+      [NSNotificationCenter.defaultCenter
+          addObserverForName:NSApplicationDidResignActiveNotification
+                      object:nil
+                       queue:nil
+                  usingBlock:^(NSNotification* notification) {
+                    OnBrowserProcessBackgrounded();
+                  }];
 }
 
 void BrowserChildProcessBackgroundedBridge::OnReceivedTaskPort(
@@ -107,11 +119,11 @@ void BrowserChildProcessBackgroundedBridge::OnReceivedTaskPort(
 }
 
 void BrowserChildProcessBackgroundedBridge::OnBrowserProcessForegrounded() {
-  process_->SetProcessBackgrounded(false);
+  process_->SetProcessPriority(base::Process::Priority::kUserBlocking);
 }
 
 void BrowserChildProcessBackgroundedBridge::OnBrowserProcessBackgrounded() {
-  process_->SetProcessBackgrounded(true);
+  process_->SetProcessPriority(base::Process::Priority::kUserVisible);
 }
 
 }  // namespace content

@@ -23,6 +23,7 @@
 #include "third_party/blink/renderer/core/paint/svg_object_painter.h"
 #include "third_party/blink/renderer/core/paint/timing/paint_timing_detector.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
+#include "third_party/blink/renderer/core/style/paint_order_array.h"
 #include "third_party/blink/renderer/core/style/shadow_list.h"
 #include "third_party/blink/renderer/core/svg/svg_element.h"
 #include "third_party/blink/renderer/platform/fonts/font.h"
@@ -122,8 +123,8 @@ bool SetupPaintForSvgText(const NGTextPainter::SvgTextPaintState& state,
                                           ? *state.InlineText().Parent()
                                           : state.TextDecorationObject();
   if (!SVGObjectPainter(layout_parent)
-           .PreparePaint(state.IsRenderingClipPathAsMaskImage(), style,
-                         resource_mode, flags, state.GetShaderTransform())) {
+           .PreparePaint(state.GetPaintFlags(), style, resource_mode, flags,
+                         state.GetShaderTransform())) {
     return false;
   }
 
@@ -273,8 +274,7 @@ void NGTextPainter::PaintDecorationsExceptLineThrough(
                                   ~TextDecorationLine::kLineThrough))
     return;
 
-  const NGTextDecorationOffset decoration_offset(decoration_info.TargetStyle(),
-                                                 text_item.Style());
+  const NGTextDecorationOffset decoration_offset(text_item.Style());
 
   if (svg_text_paint_state_.has_value() &&
       !decoration_info.HasDecorationOverride()) {
@@ -437,10 +437,11 @@ void NGTextPainter::PaintSvgTextFragment(
       GetSvgStyleToPaint(state, SvgPaintMode::kText, selection_style_scope,
                          has_fill, has_visible_stroke);
 
-  for (int i = 0; i < 3; i++) {
+  const PaintOrderArray paint_order(state.Style().PaintOrder());
+  for (unsigned i = 0; i < 3; i++) {
     absl::optional<LayoutSVGResourceMode> resource_mode;
 
-    switch (state.Style().PaintOrderType(i)) {
+    switch (paint_order[i]) {
       case PT_FILL:
         if (has_fill)
           resource_mode = kApplyToFillMode;
@@ -471,7 +472,7 @@ void NGTextPainter::PaintSvgTextFragment(
 
 void NGTextPainter::PaintSvgDecorationsExceptLineThrough(
     const NGTextFragmentPaintInfo& fragment_paint_info,
-    const TextDecorationOffsetBase& decoration_offset,
+    const NGTextDecorationOffset& decoration_offset,
     TextDecorationInfo& decoration_info,
     TextDecorationLine lines_to_paint,
     const PaintInfo& paint_info,
@@ -484,10 +485,11 @@ void NGTextPainter::PaintSvgDecorationsExceptLineThrough(
       GetSvgStyleToPaint(state, SvgPaintMode::kTextDecoration,
                          selection_style_scope, has_fill, has_visible_stroke);
 
-  for (int i = 0; i < 3; i++) {
+  const PaintOrderArray paint_order(state.Style().PaintOrder());
+  for (unsigned i = 0; i < 3; i++) {
     absl::optional<LayoutSVGResourceMode> resource_mode;
 
-    switch (state.Style().PaintOrderType(i)) {
+    switch (paint_order[i]) {
       case PT_FILL:
         if (has_fill)
           resource_mode = kApplyToFillMode;
@@ -529,10 +531,11 @@ void NGTextPainter::PaintSvgDecorationsOnlyLineThrough(
       GetSvgStyleToPaint(state, SvgPaintMode::kTextDecoration,
                          selection_style_scope, has_fill, has_visible_stroke);
 
-  for (int i = 0; i < 3; i++) {
+  const PaintOrderArray paint_order(state.Style().PaintOrder());
+  for (unsigned i = 0; i < 3; i++) {
     absl::optional<LayoutSVGResourceMode> resource_mode;
 
-    switch (state.Style().PaintOrderType(i)) {
+    switch (paint_order[i]) {
       case PT_FILL:
         if (has_fill)
           resource_mode = kApplyToFillMode;
@@ -565,9 +568,9 @@ NGTextPainter::SvgTextPaintState& NGTextPainter::SetSvgState(
     const LayoutSVGInlineText& svg_inline_text,
     const ComputedStyle& style,
     NGStyleVariant style_variant,
-    bool is_rendering_clip_path_as_mask_image) {
+    PaintFlags paint_flags) {
   return svg_text_paint_state_.emplace(svg_inline_text, style, style_variant,
-                                       is_rendering_clip_path_as_mask_image);
+                                       paint_flags);
 }
 
 NGTextPainter::SvgTextPaintState& NGTextPainter::SetSvgState(
@@ -586,12 +589,11 @@ NGTextPainter::SvgTextPaintState::SvgTextPaintState(
     const LayoutSVGInlineText& layout_svg_inline_text,
     const ComputedStyle& style,
     NGStyleVariant style_variant,
-    bool is_rendering_clip_path_as_mask_image)
+    PaintFlags paint_flags)
     : layout_svg_inline_text_(layout_svg_inline_text),
       style_(style),
       style_variant_(style_variant),
-      is_rendering_clip_path_as_mask_image_(
-          is_rendering_clip_path_as_mask_image) {}
+      paint_flags_(paint_flags) {}
 
 NGTextPainter::SvgTextPaintState::SvgTextPaintState(
     const LayoutSVGInlineText& layout_svg_inline_text,
@@ -638,8 +640,12 @@ bool NGTextPainter::SvgTextPaintState::IsPaintingSelection() const {
   return is_painting_selection_;
 }
 
+PaintFlags NGTextPainter::SvgTextPaintState::GetPaintFlags() const {
+  return paint_flags_;
+}
+
 bool NGTextPainter::SvgTextPaintState::IsRenderingClipPathAsMaskImage() const {
-  return is_rendering_clip_path_as_mask_image_;
+  return paint_flags_ & PaintFlag::kPaintingClipPathAsMask;
 }
 
 bool NGTextPainter::SvgTextPaintState::IsPaintingTextMatch() const {

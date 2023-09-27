@@ -8,8 +8,7 @@ import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min
 import {NetworkPredictionOptions, PreloadingPageElement} from 'chrome://settings/lazy_load.js';
 import {CrSettingsPrefs, SettingsPrefsElement} from 'chrome://settings/settings.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
-
-import {FakeSettingsPrivate} from './fake_settings_private.js';
+import {FakeSettingsPrivate} from 'chrome://webui-test/fake_settings_private.js';
 
 suite('PreloadingPage', function() {
   function getFakePrefs() {
@@ -18,8 +17,8 @@ suite('PreloadingPage', function() {
         key: 'net.network_prediction_options',
         type: chrome.settingsPrivate.PrefType.NUMBER,
         // By default the pref is initialized to WIFI_ONLY_DEPRECATED, but then
-        // treated as STANDARD. See chrome/browser/prefetch/prefetch_prefs.h for
-        // more details.
+        // treated as STANDARD. See chrome/browser/preloading/preloading_prefs.h
+        // for more details.
         value: NetworkPredictionOptions.WIFI_ONLY_DEPRECATED,
       },
     ];

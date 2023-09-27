@@ -8,11 +8,11 @@ import android.content.Context;
 import android.os.Build;
 import android.text.TextUtils;
 
+import org.chromium.base.ResettersForTesting;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.gsa.GSAState;
-import org.chromium.chrome.browser.lens.LensController;
 import org.chromium.components.externalauth.ExternalAuthUtils;
 
 /**
@@ -46,6 +46,7 @@ public class LensUtils {
      */
     public static void setFakePassableLensEnvironmentForTesting(final boolean shouldFake) {
         sFakePassableLensEnvironmentForTesting = shouldFake;
+        ResettersForTesting.register(() -> sFakePassableLensEnvironmentForTesting = false);
     }
 
     /**
@@ -125,32 +126,6 @@ public class LensUtils {
         }
 
         return externalAuthUtils.isGoogleSigned(IntentHandler.PACKAGE_GSA);
-    }
-
-    /**
-     * Start an early Lens AGSA connection if feature parameter is enabled and client is not
-     * incognito. Eligibity checks happen in LensController.
-     *
-     * @param isIncognito Whether the client is incognito
-     */
-    public static void startLensConnectionIfNecessary(boolean isIncognito) {
-        // TODO(crbug/1157543): Pass isIncognito through to LensController.
-        if (!isIncognito) {
-            LensController.getInstance().startLensConnection();
-        }
-    }
-
-    /**
-     * Terminate an early Lens AGSA connection if feature parameter is enabled and client is not
-     * incognito. Eligibity checks happen in LensController.
-     *
-     * @param isIncognito Whether the client is incognito
-     */
-    public static void terminateLensConnectionsIfNecessary(boolean isIncognito) {
-        // TODO(crbug/1157543): Pass isIncognito through to LensController.
-        if (!isIncognito) {
-            LensController.getInstance().terminateLensConnections();
-        }
     }
 
     public static boolean isGoogleLensFeatureEnabled(boolean isIncognito) {

@@ -9,11 +9,13 @@
 
 #import "ios/chrome/browser/ui/tab_switcher/tab_collection_consumer.h"
 
-@protocol GridImageDataSource;
-@class GridTransitionLayout;
+@class LegacyGridTransitionLayout;
 @class PinnedTabsViewController;
 @protocol TabCollectionDragDropHandler;
 @protocol TabContextMenuProvider;
+namespace web {
+class WebStateID;
+}  // namespace web
 
 // Protocol used to relay relevant user interactions from the
 // PinnedTabsViewController.
@@ -23,7 +25,7 @@
 // was selected.
 - (void)pinnedTabsViewController:
             (PinnedTabsViewController*)pinnedTabsViewController
-             didSelectItemWithID:(NSString*)itemID;
+             didSelectItemWithID:(web::WebStateID)itemID;
 
 // Tells the delegate that the the number of items in `pinnedTabsViewController`
 // changed to `count`.
@@ -34,11 +36,11 @@
 // Tells the delegate that the item with `itemID` was moved.
 - (void)pinnedTabsViewController:
             (PinnedTabsViewController*)pinnedTabsViewController
-               didMoveItemWithID:(NSString*)itemID;
+               didMoveItemWithID:(web::WebStateID)itemID;
 
 // Tells the delegate that the item with `itemID` was removed.
 - (void)pinnedTabsViewController:(PinnedTabsViewController*)gridViewController
-             didRemoveItemWIthID:(NSString*)itemID;
+             didRemoveItemWIthID:(web::WebStateID)itemID;
 
 // Tells the delegate that the `pinnedTabsViewController` visibility has
 // changed.
@@ -63,9 +65,6 @@
 @interface PinnedTabsViewController
     : UICollectionViewController <TabCollectionConsumer>
 
-// Data source for images.
-@property(nonatomic, weak) id<GridImageDataSource> imageDataSource;
-
 // Delegate used to to relay relevant user interactions.
 @property(nonatomic, weak) id<PinnedTabsViewControllerDelegate> delegate;
 
@@ -77,6 +76,9 @@
 
 // Tracks if a drop animation is in progress.
 @property(nonatomic, assign) BOOL dropAnimationInProgress;
+
+// Tracks the visibility of the view.
+@property(nonatomic, readonly) BOOL visible;
 
 // Returns YES if the collection has no items.
 @property(nonatomic, readonly, getter=isCollectionEmpty) BOOL collectionEmpty;
@@ -96,7 +98,7 @@
 - (void)dropAnimationDidEnd;
 
 // Returns the layout of the pinned tabs to be used in an animated transition.
-- (GridTransitionLayout*)transitionLayout;
+- (LegacyGridTransitionLayout*)transitionLayout;
 
 // Returns whether there is a selected cell in the collection.
 - (BOOL)hasSelectedCell;

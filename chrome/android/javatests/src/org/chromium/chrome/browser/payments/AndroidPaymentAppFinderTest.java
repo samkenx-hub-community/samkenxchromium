@@ -4,12 +4,10 @@
 
 package org.chromium.chrome.browser.payments;
 
-import android.support.test.InstrumentationRegistry;
-
 import androidx.annotation.Nullable;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -23,7 +21,7 @@ import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.payments.AndroidPaymentAppFinder;
 import org.chromium.components.payments.AppCreationFailureReason;
 import org.chromium.components.payments.CSPChecker;
@@ -215,8 +213,7 @@ public class AndroidPaymentAppFinderTest
 
     // PaymentAppFactoryParams implementation.
     @Override
-    @Nullable
-    public String getTwaPackageName() {
+    public @Nullable String getTwaPackageName() {
         return mTwaPackageName;
     }
 
@@ -229,17 +226,13 @@ public class AndroidPaymentAppFinderTest
     public void setUp() throws Throwable {
         mActivityTestRule.startMainActivityOnBlankPage();
         mPackageManager.reset();
-        mServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         mDownloader.setTestServerUrl(new GURL(mServer.getURL("/components/test/data/payments/")));
         mPaymentApps = new ArrayList<>();
         mAllPaymentAppsCreated = false;
         mPaymentOptions = new PaymentOptions();
         mTwaPackageName = null;
-    }
-
-    @After
-    public void tearDown() {
-        if (mServer != null) mServer.stopAndDestroyServer();
     }
 
     /** Absence of installed apps should result in no payment apps. */
@@ -1326,7 +1319,7 @@ public class AndroidPaymentAppFinderTest
      * debug mode enabled.
      */
     @Test
-    @Features.EnableFeatures({PaymentFeatureList.WEB_PAYMENTS_APP_STORE_BILLING_DEBUG})
+    @EnableFeatures({PaymentFeatureList.WEB_PAYMENTS_APP_STORE_BILLING_DEBUG})
     @Feature({"Payments"})
     public void testFindAppStoreBillingAppAllowedAnySourceInDebug() throws Throwable {
         Set<String> methods = new HashSet<>();

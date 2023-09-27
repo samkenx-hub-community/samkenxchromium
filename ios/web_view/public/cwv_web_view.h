@@ -15,6 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 @class CWVAutofillController;
 @class CWVBackForwardList;
 @class CWVBackForwardListItem;
+@class CWVFindInPageController;
 @class CWVScriptCommand;
 @class CWVTranslationController;
 @class CWVWebViewConfiguration;
@@ -120,6 +121,10 @@ CWV_EXPORT
 // The web view's autofill controller.
 @property(nonatomic, readonly) CWVAutofillController* autofillController;
 
+// The web view's find in page controller.
+@property(nonatomic, readonly)
+    CWVFindInPageController* findInPageController API_AVAILABLE(ios(16.0));
+
 // An equivalent of
 // https://developer.apple.com/documentation/webkit/wkwebview/1414977-backforwardlist
 @property(nonatomic, readonly, nonnull) CWVBackForwardList* backForwardList;
@@ -129,6 +134,10 @@ CWV_EXPORT
 // This class property setting should only be changed BEFORE any
 // CWVWebViewConfiguration instance is initialized.
 @property(nonatomic, class) BOOL chromeContextMenuEnabled;
+
+// Whether or not to enable debugging by Safari Web Inspector.
+// Defaults to NO.
+@property(nonatomic, class) BOOL webInspectorEnabled;
 
 // Set this to customize the underlying WKWebView's inputAccessoryView. Setting
 // to nil means to use the WKWebView's default inputAccessoryView instead.
@@ -228,7 +237,10 @@ CWV_EXPORT
 - (void)evaluateJavaScript:(NSString*)javaScriptString
                 completion:(void (^)(id result, NSError* error))completion;
 
-// Adds a message handler for messages sent from JavaScript.
+// DEPRECATED: Use `CWVUserContentController addMessageHandler:forCommand:`
+// instead.
+// Adds a message handler for messages sent from JavaScript from *any*
+// CWVWebView.
 // `handler` will be called each time a message is sent with the corresponding
 // value of `command`. To send messages from JavaScript, use the WebKit
 // message handler `CWVWebViewMessage` and provide values for the `command` and
@@ -248,6 +260,8 @@ CWV_EXPORT
 - (void)addMessageHandler:(void (^)(NSDictionary* payload))handler
                forCommand:(NSString*)command;
 
+// DEPRECATED: Use `CWVUserContentController removeMessageHandlerForCommand:`
+// instead.
 // Removes the message handler associated with `command` previously added with
 // `addMessageHandler:forCommand:`.
 - (void)removeMessageHandlerForCommand:(NSString*)command;

@@ -260,9 +260,7 @@ std::vector<uint8_t> BuildGetInfoResponse() {
 
   cbor::Value::ArrayValue extensions;
   extensions.emplace_back("devicePubKey");
-  if (base::FeatureList::IsEnabled(kWebAuthnPRFAsAuthenticator)) {
-    extensions.emplace_back("prf");
-  }
+  extensions.emplace_back("prf");
 
   cbor::Value::MapValue response_map;
   response_map.emplace(1, std::move(versions));
@@ -290,14 +288,12 @@ using GeneratePairingDataCallback =
 class TunnelTransport : public Transport {
  public:
   TunnelTransport(
-      unsigned protocol_revision,
       Platform* platform,
       network::mojom::NetworkContext* network_context,
       base::span<const uint8_t> secret,
       base::span<const uint8_t, device::kP256X962Length> peer_identity,
       GeneratePairingDataCallback generate_pairing_data)
-      : protocol_revision_(protocol_revision),
-        platform_(platform),
+      : platform_(platform),
         tunnel_id_(device::cablev2::Derive<EXTENT(tunnel_id_)>(
             secret,
             base::span<uint8_t>(),
@@ -322,7 +318,6 @@ class TunnelTransport : public Transport {
   }
 
   TunnelTransport(
-      unsigned protocol_revision,
       Platform* platform,
       network::mojom::NetworkContext* network_context,
       base::span<const uint8_t> secret,
@@ -330,8 +325,7 @@ class TunnelTransport : public Transport {
       std::array<uint8_t, device::cablev2::kRoutingIdSize> routing_id,
       base::span<const uint8_t, 16> tunnel_id,
       bssl::UniquePtr<EC_KEY> local_identity)
-      : protocol_revision_(protocol_revision),
-        platform_(platform),
+      : platform_(platform),
         tunnel_id_(fido_parsing_utils::Materialize(tunnel_id)),
         eid_key_(device::cablev2::Derive<EXTENT(eid_key_)>(
             secret,
@@ -375,10 +369,7 @@ class TunnelTransport : public Transport {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
     DCHECK_EQ(state_, kReady);
 
-    if (protocol_revision_ >= 1) {
-      data.insert(data.begin(), static_cast<uint8_t>(MessageType::kCTAP));
-    }
-
+    data.insert(data.begin(), static_cast<uint8_t>(MessageType::kCTAP));
     if (!crypter_->Encrypt(&data)) {
       FIDO_LOG(ERROR) << "Failed to encrypt response";
       return;
@@ -416,7 +407,8 @@ class TunnelTransport : public Transport {
   void OnTunnelReady(
       WebSocketAdapter::Result result,
       absl::optional<std::array<uint8_t, device::cablev2::kRoutingIdSize>>
-          routing_id) {
+          routing_id,
+      WebSocketAdapter::ConnectSignalSupport) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
     DCHECK(state_ == State::kConnecting || state_ == State::kConnectingPaired);
     bool ok = (result == WebSocketAdapter::Result::OK);
@@ -484,35 +476,13 @@ class TunnelTransport : public Transport {
         update_callback_.Run(Platform::Status::HANDSHAKE_COMPLETE);
         websocket_client_->Write(response);
         crypter_ = std::move(result->first);
-        crypter_->UseNewConstruction();
 
         cbor::Value::MapValue post_handshake_msg;
         post_handshake_msg.emplace(1, BuildGetInfoResponse());
 
-        if (state_ == State::kConnected && protocol_revision_ < 1) {
-          // For revision zero, linking information (if any) is included in the
-          // post-handshake message.
-          absl::optional<cbor::Value> pairing_data(
-              std::move(generate_pairing_data_)
-                  .Run(*peer_identity_, result->second));
-          if (pairing_data) {
-            post_handshake_msg.emplace(2, std::move(*pairing_data));
-          }
-        }
-
         absl::optional<std::vector<uint8_t>> post_handshake_msg_bytes;
-        if (protocol_revision_ >= 1) {
-          post_handshake_msg_bytes =
-              cbor::Writer::Write(cbor::Value(std::move(post_handshake_msg)));
-        } else {
-          post_handshake_msg_bytes =
-              EncodePaddedCBORMap(std::move(post_handshake_msg));
-          // All post-handshake messages should fit into the same padding
-          // bucket. It doesn't have to be the smallest one, but that's
-          // currently true which yields this easy check:
-          DCHECK_EQ(post_handshake_msg_bytes->size(),
-                    kPostHandshakeMsgPaddingGranularity);
-        }
+        post_handshake_msg_bytes =
+            cbor::Writer::Write(cbor::Value(std::move(post_handshake_msg)));
         if (!post_handshake_msg_bytes) {
           FIDO_LOG(ERROR) << "failed to encode post-handshake message";
           return;
@@ -524,10 +494,9 @@ class TunnelTransport : public Transport {
         }
         websocket_client_->Write(*post_handshake_msg_bytes);
 
-        if (state_ == State::kConnected && protocol_revision_ >= 1) {
-          // For revision one and greater, linking information can be sent at
-          // any time. We always send it immediately after the post-handshake
-          // message.
+        if (state_ == State::kConnected) {
+          // Linking information can be sent at any time. We always send it
+          // immediately after the post-handshake message.
           absl::optional<cbor::Value> pairing_data(
               std::move(generate_pairing_data_)
                   .Run(*peer_identity_, result->second));
@@ -597,44 +566,41 @@ class TunnelTransport : public Transport {
           return;
         }
 
-        if (protocol_revision_ >= 1) {
-          if (plaintext.empty()) {
-            FIDO_LOG(ERROR) << "invalid empty message";
-            update_callback_.Run(Platform::Error::DECRYPT_FAILURE);
-            return;
-          }
+        if (plaintext.empty()) {
+          FIDO_LOG(ERROR) << "invalid empty message";
+          update_callback_.Run(Platform::Error::DECRYPT_FAILURE);
+          return;
+        }
 
-          const uint8_t message_type_byte = plaintext[0];
-          plaintext.erase(plaintext.begin());
-          if (message_type_byte >
-              static_cast<uint8_t>(MessageType::kMaxValue)) {
-            FIDO_LOG(ERROR) << "unknown message type "
-                            << static_cast<int>(message_type_byte);
+        const uint8_t message_type_byte = plaintext[0];
+        plaintext.erase(plaintext.begin());
+        if (message_type_byte > static_cast<uint8_t>(MessageType::kMaxValue)) {
+          FIDO_LOG(ERROR) << "unknown message type "
+                          << static_cast<int>(message_type_byte);
+          update_callback_.Run(Disconnected::kDisconnected);
+          return;
+        }
+
+        const MessageType message_type =
+            static_cast<MessageType>(message_type_byte);
+        switch (message_type) {
+          case MessageType::kShutdown: {
             update_callback_.Run(Disconnected::kDisconnected);
             return;
           }
 
-          const MessageType message_type =
-              static_cast<MessageType>(message_type_byte);
-          switch (message_type) {
-            case MessageType::kShutdown: {
+          case MessageType::kCTAP:
+            break;
+
+          case MessageType::kUpdate:
+            // The payload is ignored for now. Maybe there will be desktop
+            // updates defined in the future. But we still check that the
+            // payload is well-formed.
+            if (!cbor::Reader::Read(plaintext)) {
+              FIDO_LOG(ERROR) << "invalid CBOR payload in update message";
               update_callback_.Run(Disconnected::kDisconnected);
-              return;
             }
-
-            case MessageType::kCTAP:
-              break;
-
-            case MessageType::kUpdate:
-              // The payload is ignored for now. Maybe there will be desktop
-              // updates defined in the future. But we still check that the
-              // payload is well-formed.
-              if (!cbor::Reader::Read(plaintext)) {
-                FIDO_LOG(ERROR) << "invalid CBOR payload in update message";
-                update_callback_.Run(Disconnected::kDisconnected);
-              }
-              return;
-          }
+            return;
         }
 
         if (first_message_) {
@@ -650,8 +616,7 @@ class TunnelTransport : public Transport {
     }
   }
 
-  const unsigned protocol_revision_;
-  const raw_ptr<Platform> platform_;
+  const raw_ptr<Platform, DanglingUntriaged> platform_;
   State state_ = State::kNone;
   const std::array<uint8_t, kTunnelIdSize> tunnel_id_;
   const std::array<uint8_t, kEIDKeySize> eid_key_;
@@ -873,6 +838,8 @@ class CTAP2Processor : public Transaction {
         }
 
         auto params = blink::mojom::PublicKeyCredentialRequestOptions::New();
+        params->extensions =
+            blink::mojom::AuthenticationExtensionsClientInputs::New();
         params->challenge = *get_assertion_request.client_data_hash;
         params->relying_party_id = *get_assertion_request.rp_id;
         params->user_verification =
@@ -887,22 +854,22 @@ class CTAP2Processor : public Transaction {
         if (get_assertion_request.device_public_key_attestation) {
           // Play Services doesn't support any of the devicePubKey parameters so
           // this code doesn't bother parsing them nor passing them on.
-          params->device_public_key =
+          params->extensions->device_public_key =
               blink::mojom::DevicePublicKeyRequest::New();
         }
 
         if (get_assertion_request.prf_eval_first) {
-          params->prf = true;
+          params->extensions->prf = true;
           auto values = blink::mojom::PRFValues::New();
           values->first = *get_assertion_request.prf_eval_first;
           if (get_assertion_request.prf_eval_second) {
             values->second = *get_assertion_request.prf_eval_second;
           }
-          params->prf_inputs.emplace_back(std::move(values));
+          params->extensions->prf_inputs.emplace_back(std::move(values));
         }
 
         if (get_assertion_request.prf_eval_by_cred) {
-          params->prf = true;
+          params->extensions->prf = true;
           if (!get_assertion_request.prf_eval_by_cred->is_map()) {
             return Platform::Error::INVALID_CTAP;
           }
@@ -931,9 +898,14 @@ class CTAP2Processor : public Transaction {
               values->second = second_it->second.GetBytestring();
             }
 
-            params->prf_inputs.emplace_back(std::move(values));
+            params->extensions->prf_inputs.emplace_back(std::move(values));
           }
         }
+
+        // PRF inputs are already hashed when coming via CTAP so, if there are
+        // any PRF inputs, they're hashed.
+        params->extensions->prf_inputs_hashed =
+            !params->extensions->prf_inputs.empty();
 
         transaction_received_ = true;
         const bool empty_allowlist = params->allow_credentials.empty();
@@ -1264,7 +1236,6 @@ std::unique_ptr<Transaction> TransactWithPlaintextTransport(
 }
 
 std::unique_ptr<Transaction> TransactFromQRCode(
-    unsigned protocol_revision,
     std::unique_ptr<Platform> platform,
     network::mojom::NetworkContext* network_context,
     base::span<const uint8_t, kRootSecretSize> root_secret,
@@ -1277,14 +1248,13 @@ std::unique_ptr<Transaction> TransactFromQRCode(
 
   Platform* const platform_ptr = platform.get();
   return std::make_unique<CTAP2Processor>(
-      std::make_unique<TunnelTransport>(
-          protocol_revision, platform_ptr, network_context, qr_secret,
-          peer_identity, std::move(generate_pairing_data)),
+      std::make_unique<TunnelTransport>(platform_ptr, network_context,
+                                        qr_secret, peer_identity,
+                                        std::move(generate_pairing_data)),
       std::move(platform));
 }
 
 std::unique_ptr<Transaction> TransactFromFCM(
-    unsigned protocol_revision,
     std::unique_ptr<Platform> platform,
     network::mojom::NetworkContext* network_context,
     base::span<const uint8_t, kRootSecretSize> root_secret,
@@ -1298,9 +1268,9 @@ std::unique_ptr<Transaction> TransactFromFCM(
 
   Platform* const platform_ptr = platform.get();
   return std::make_unique<CTAP2Processor>(
-      std::make_unique<TunnelTransport>(
-          protocol_revision, platform_ptr, network_context, paired_secret,
-          client_nonce, routing_id, tunnel_id, IdentityKey(root_secret)),
+      std::make_unique<TunnelTransport>(platform_ptr, network_context,
+                                        paired_secret, client_nonce, routing_id,
+                                        tunnel_id, IdentityKey(root_secret)),
       std::move(platform));
 }
 

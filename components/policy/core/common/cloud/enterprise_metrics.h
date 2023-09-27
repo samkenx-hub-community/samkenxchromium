@@ -13,7 +13,8 @@ namespace policy {
 // Metrics collected for enterprise events.
 
 // Events related to device enrollment.
-// This enum is used to define the buckets for an enumerated UMA histogram.
+// This enum is used to define the buckets for an enumerated UMA histogram with
+// the name of EnterpriseEnrollmentType.
 // Hence,
 //   (a) existing enumerated constants should never be deleted or reordered, and
 //   (b) new constants should only be appended at the end of the enumeration
@@ -278,6 +279,51 @@ POLICY_EXPORT extern const char kUMAHashDanceNetworkErrorCode[];
 POLICY_EXPORT extern const char kUMASuffixInitialEnrollment[];
 // Suffix for Forced Re-Enrollment.
 POLICY_EXPORT extern const char kUMASuffixFRE[];
+
+// Histograpms for the unified state determination.
+POLICY_EXPORT extern const char kUMAStateDeterminationDeviceIdentifierStatus[];
+POLICY_EXPORT extern const char kUMAStateDeterminationEmbargoDatePassed[];
+POLICY_EXPORT extern const char kUMAStateDeterminationEnabled[];
+POLICY_EXPORT extern const char
+    kUMAStateDeterminationKillSwitchFetchNetworkErrorCode[];
+POLICY_EXPORT extern const char kUMAStateDeterminationKillSwitchFetchNumTries[];
+POLICY_EXPORT extern const char kUMAStateDeterminationOnFlex[];
+POLICY_EXPORT extern const char kUMAStateDeterminationOwnershipStatus[];
+POLICY_EXPORT extern const char
+    kUMAStateDeterminationPsmReportedAvailableState[];
+POLICY_EXPORT extern const char
+    kUMAStateDeterminationPsmRlweOprfRequestDmStatusCode[];
+POLICY_EXPORT extern const char
+    kUMAStateDeterminationPsmRlweOprfRequestNetworkErrorCode[];
+POLICY_EXPORT extern const char
+    kUMAStateDeterminationPsmRlweQueryRequestDmStatusCode[];
+POLICY_EXPORT extern const char
+    kUMAStateDeterminationPsmRlweQueryRequestNetworkErrorCode[];
+POLICY_EXPORT extern const char kUMAStateDeterminationStateKeysRetrieved[];
+POLICY_EXPORT extern const char
+    kUMAStateDeterminationStateRequestDmStatusCode[];
+POLICY_EXPORT extern const char
+    kUMAStateDeterminationStateRequestNetworkErrorCode[];
+POLICY_EXPORT extern const char kUMAStateDeterminationStateReturned[];
+POLICY_EXPORT extern const char kUMAStateDeterminationStepDuration[];
+POLICY_EXPORT extern const char kUMAStateDeterminationSystemClockSynchronized[];
+POLICY_EXPORT extern const char kUMAStateDeterminationTotalDurationByState[];
+POLICY_EXPORT extern const char kUMAStateDeterminationTotalDuration[];
+
+// Suffixes added to kUMAStateDeterminationTotalDurationByState.
+POLICY_EXPORT extern const char kUMASuffixConnectionError[];
+POLICY_EXPORT extern const char kUMASuffixDisabled[];
+POLICY_EXPORT extern const char kUMASuffixEnrollment[];
+POLICY_EXPORT extern const char kUMASuffixNoEnrollment[];
+POLICY_EXPORT extern const char kUMASuffixServerError[];
+
+// Suffixes added to kUMAStateDeterminationStepDuration.
+POLICY_EXPORT extern const char kUMASuffixOPRFRequest[];
+POLICY_EXPORT extern const char kUMASuffixOwnershipCheck[];
+POLICY_EXPORT extern const char kUMASuffixQueryRequest[];
+POLICY_EXPORT extern const char kUMASuffixStateKeyRetrieval[];
+POLICY_EXPORT extern const char kUMASuffixStateRequest[];
+POLICY_EXPORT extern const char kUMASuffixSystemClockSync[];
 
 }  // namespace policy
 

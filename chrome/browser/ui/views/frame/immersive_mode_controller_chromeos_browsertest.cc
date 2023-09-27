@@ -5,6 +5,7 @@
 #include "chrome/browser/ui/views/frame/immersive_mode_controller_chromeos.h"
 
 #include "ash/public/cpp/test/shell_test_api.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/test_mock_time_task_runner.h"
 #include "build/build_config.h"
 #include "chrome/browser/profiles/profile_io_data.h"
@@ -28,6 +29,7 @@
 #include "chromeos/ui/frame/caption_buttons/frame_caption_button_container_view.h"
 #include "chromeos/ui/frame/immersive/immersive_fullscreen_controller_test_api.h"
 #include "components/permissions/request_type.h"
+#include "content/public/browser/notification_service.h"
 #include "content/public/test/browser_test.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/events/base_event_utils.h"
@@ -56,7 +58,7 @@ class ImmersiveModeControllerChromeosWebAppBrowserTest
     ASSERT_TRUE(https_server_.Start());
 
     const GURL app_url = GetAppUrl();
-    auto web_app_info = std::make_unique<WebAppInstallInfo>();
+    auto web_app_info = std::make_unique<web_app::WebAppInstallInfo>();
     web_app_info->start_url = app_url;
     web_app_info->scope = app_url.GetWithoutFilename();
     web_app_info->theme_color = SK_ColorBLUE;
@@ -130,9 +132,10 @@ class ImmersiveModeControllerChromeosWebAppBrowserTest
   }
 
  private:
-  web_app::AppId app_id;
-  Browser* browser_ = nullptr;
-  ImmersiveModeController* controller_ = nullptr;
+  webapps::AppId app_id;
+  raw_ptr<Browser, DanglingUntriaged | ExperimentalAsh> browser_ = nullptr;
+  raw_ptr<ImmersiveModeController, DanglingUntriaged | ExperimentalAsh>
+      controller_ = nullptr;
 
   std::unique_ptr<ImmersiveRevealedLock> revealed_lock_;
 

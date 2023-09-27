@@ -11,12 +11,14 @@
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "components/user_prefs/user_prefs.h"
+#include "components/vector_icons/vector_icons.h"
 #include "ui/base/dragdrop/mojom/drag_drop_types.mojom.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -25,6 +27,7 @@
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/styled_label.h"
 #include "ui/views/layout/fill_layout.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
 
 // HomePageUndoBubble ---------------------------------------------------------
@@ -128,9 +131,13 @@ HomeButton::HomeButton(PressedCallback callback, PrefService* prefs)
     : ToolbarButton(std::move(callback)),
       prefs_(prefs),
       coordinator_(this, prefs) {
+  SetProperty(views::kElementIdentifierKey, kToolbarHomeButtonElementId);
   SetTriggerableEventFlags(ui::EF_LEFT_MOUSE_BUTTON |
                            ui::EF_MIDDLE_MOUSE_BUTTON);
-  SetVectorIcons(kNavigateHomeIcon, kNavigateHomeTouchIcon);
+  SetVectorIcons(features::IsChromeRefresh2023()
+                     ? kNavigateHomeChromeRefreshIcon
+                     : kNavigateHomeIcon,
+                 kNavigateHomeTouchIcon);
   SetTooltipText(l10n_util::GetStringUTF16(IDS_TOOLTIP_HOME));
   SetAccessibleName(l10n_util::GetStringUTF16(IDS_ACCNAME_HOME));
   SetID(VIEW_ID_HOME_BUTTON);

@@ -8,6 +8,8 @@
 #include "base/path_service.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_restrictions.h"
+#include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/ui/browser.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/js_test_api.h"
 #include "components/nacl/common/buildflags.h"
@@ -132,18 +134,24 @@ void JavaScriptBrowserTest::BuildJavascriptLibraries(
 std::u16string JavaScriptBrowserTest::BuildRunTestJSCall(
     bool is_async,
     const std::string& function_name,
-    std::vector<base::Value> test_func_args) {
-  std::vector<base::Value> arguments;
-  arguments.emplace_back(is_async);
-  arguments.emplace_back(function_name);
-  base::Value::List baked_argument_list;
-  for (auto& arg : test_func_args)
-    baked_argument_list.Append(std::move(arg));
-  arguments.emplace_back(std::move(baked_argument_list));
+    base::Value::List test_func_args) {
+  auto arguments = base::Value::List()
+                       .Append(is_async)
+                       .Append(function_name)
+                       .Append(std::move(test_func_args));
+  return content::WebUI::GetJavascriptCall(std::string("runTest"), arguments);
+}
 
-  std::vector<base::ValueView> view_vector;
-  view_vector.reserve(arguments.size());
-  for (const auto& argument : arguments)
-    view_vector.push_back(argument);
-  return content::WebUI::GetJavascriptCall(std::string("runTest"), view_vector);
+Profile* JavaScriptBrowserTest::GetProfile() const {
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  CHECK(ash_starter_);
+  if (ash_starter_->HasLacrosArgument()) {
+    // In LacrosOnly mode, ash web browser is disabled, don't access profile via
+    // browser().
+    Profile* profile = ProfileManager::GetActiveUserProfile();
+    CHECK(profile) << "Failed to get a valid profile in Ash.";
+    return profile;
+  }
+#endif
+  return browser()->profile();
 }

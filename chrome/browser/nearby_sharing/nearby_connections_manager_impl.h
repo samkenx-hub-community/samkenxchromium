@@ -5,6 +5,7 @@
 #ifndef CHROME_BROWSER_NEARBY_SHARING_NEARBY_CONNECTIONS_MANAGER_IMPL_H_
 #define CHROME_BROWSER_NEARBY_SHARING_NEARBY_CONNECTIONS_MANAGER_IMPL_H_
 
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/nearby_sharing/public/cpp/nearby_connections_manager.h"
 
 #include <memory>
@@ -71,6 +72,8 @@ class NearbyConnectionsManagerImpl
       const std::string& endpoint_id) override;
   absl::optional<std::vector<uint8_t>> GetRawAuthenticationToken(
       const std::string& endpoint_id) override;
+  void RegisterBandwidthUpgradeListener(
+      base::WeakPtr<BandwidthUpgradeListener> listener) override;
   void UpgradeBandwidth(const std::string& endpoint_id) override;
   base::WeakPtr<NearbyConnectionsManager> GetWeakPtr() override;
 
@@ -136,12 +139,14 @@ class NearbyConnectionsManagerImpl
   absl::optional<Medium> GetUpgradedMedium(
       const std::string& endpoint_id) const;
 
-  ash::nearby::NearbyProcessManager* process_manager_;
+  raw_ptr<ash::nearby::NearbyProcessManager, ExperimentalAsh> process_manager_;
   std::unique_ptr<ash::nearby::NearbyProcessManager::NearbyProcessReference>
       process_reference_;
   NearbyFileHandler file_handler_;
-  IncomingConnectionListener* incoming_connection_listener_ = nullptr;
-  DiscoveryListener* discovery_listener_ = nullptr;
+  raw_ptr<IncomingConnectionListener, ExperimentalAsh>
+      incoming_connection_listener_ = nullptr;
+  raw_ptr<DiscoveryListener, ExperimentalAsh> discovery_listener_ = nullptr;
+  base::WeakPtr<BandwidthUpgradeListener> bandwidth_upgrade_listener_;
   base::flat_set<std::string> discovered_endpoints_;
   // A map of endpoint_id to NearbyConnectionCallback.
   base::flat_map<std::string, NearbyConnectionCallback>
@@ -163,6 +168,9 @@ class NearbyConnectionsManagerImpl
   // For metrics. A set of endpoint_ids for which we have requested a bandwidth
   // upgrade.
   base::flat_set<std::string> requested_bwu_endpoint_ids_;
+  // For metrics. A set of endpoint_ids for which we have received the first
+  // OnBandwidthChanged event.
+  base::flat_set<std::string> on_bandwidth_changed_endpoint_ids_;
   // For metrics. A map of endpoint_id to current upgraded medium.
   base::flat_map<std::string, Medium> current_upgraded_mediums_;
 

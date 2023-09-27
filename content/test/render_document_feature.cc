@@ -20,8 +20,9 @@ void InitAndEnableRenderDocumentFeature(
 }
 
 std::vector<std::string> RenderDocumentFeatureLevelValues() {
-  // Note: We don't return kSubframe here as kAllFrames also covers subframe
-  // navigation and will affect tests that only do subframe navigations.
+  // Note: We don't return kSubframe nor kNonLocalRootSubframe here as
+  // kAllFrames also covers subframe navigations and will affect tests that only
+  // do subframe navigations.
   return {
       GetRenderDocumentLevelName(RenderDocumentLevel::kCrashedFrame),
       GetRenderDocumentLevelName(RenderDocumentLevel::kAllFrames),
@@ -39,8 +40,9 @@ std::string GetRenderDocumentLevelNameForTestParams(
   if (render_document_level ==
       GetRenderDocumentLevelName(RenderDocumentLevel::kCrashedFrame)) {
     return "RDCrashedFrame";
+  } else {
+    return "RDAllFrames";
   }
-  return "RDSubframe";
 }
 
 }  // namespace content

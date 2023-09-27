@@ -10,14 +10,13 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.annotation.Config;
-import org.robolectric.annotation.LooperMode;
 
 import org.chromium.base.FeatureList;
 import org.chromium.base.FeatureList.TestValues;
-import org.chromium.base.task.test.ShadowPostTask;
+import org.chromium.base.task.test.PausedExecutorTestRule;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.flags.CachedFlagsSafeMode.Behavior;
 
@@ -30,9 +29,10 @@ import java.util.Arrays;
  * {@link CachedFlagsSafeMode}.
  */
 @RunWith(BaseRobolectricTestRunner.class)
-@Config(shadows = {ShadowPostTask.class})
-@LooperMode(LooperMode.Mode.LEGACY)
 public class CachedFeatureFlagsSafeModeUnitTest {
+    @Rule
+    public PausedExecutorTestRule mExecutorRule = new PausedExecutorTestRule();
+
     private static final String CRASHY_FEATURE = "CrashyFeature";
     private static final String OK_FEATURE = "OkFeature";
     private static final boolean CRASHY_FEATURE_DEFAULT = false;
@@ -71,17 +71,15 @@ public class CachedFeatureFlagsSafeModeUnitTest {
 
     @Before
     public void setUp() {
-        CachedFeatureFlags.setSafeModeExperimentEnabledForTesting(true);
-        CachedFeatureFlags.resetFlagsForTesting();
+        CachedFlagsSafeMode.getInstance().setExperimentEnabledForTesting(true);
+        clearMemory();
     }
 
     @After
     public void tearDown() {
-        CachedFeatureFlags.setSafeModeExperimentEnabledForTesting(null);
-        CachedFeatureFlags.resetFlagsForTesting();
-
+        CachedFlagsSafeMode.getInstance().setExperimentEnabledForTesting(null);
         FeatureList.setTestFeatures(null);
-        CachedFlagsSafeMode.clearDiskForTesting();
+        clearMemory();
     }
 
     @Test
@@ -392,7 +390,7 @@ public class CachedFeatureFlagsSafeModeUnitTest {
         CachedFeatureFlags.cacheFieldTrialParameters(
                 Arrays.asList(BOOL_PARAM, INT_PARAM, DOUBLE_PARAM, STRING_PARAM));
 
-        CachedFeatureFlags.resetFlagsForTesting();
+        clearMemory();
         // Cached values became true(crashy)/true/native1.
 
         startRun();
@@ -556,11 +554,11 @@ public class CachedFeatureFlagsSafeModeUnitTest {
 
     private void endFirstRunWithKill() {
         CachedFeatureFlags.onPauseCheckpoint();
-        CachedFeatureFlags.resetFlagsForTesting();
+        clearMemory();
     }
 
     private void endCrashyRun() {
-        CachedFeatureFlags.resetFlagsForTesting();
+        clearMemory();
     }
 
     private void endCleanRunCachingIrrelevantValues() {
@@ -588,11 +586,12 @@ public class CachedFeatureFlagsSafeModeUnitTest {
                 Arrays.asList(BOOL_PARAM, INT_PARAM, DOUBLE_PARAM, STRING_PARAM));
 
         CachedFeatureFlags.onEndCheckpoint();
-        // Async task writing values should have run synchronously because of ShadowPostTask.
+        mExecutorRule.runAllBackgroundAndUi();
+
         assertTrue(CachedFlagsSafeMode.getSafeValuePreferences().contains(
                 "Chrome.Flags.CachedFlag.CrashyFeature"));
 
-        CachedFeatureFlags.resetFlagsForTesting();
+        clearMemory();
     }
 
     private void assertCachedParamsEqualDefaults() {
@@ -614,5 +613,10 @@ public class CachedFeatureFlagsSafeModeUnitTest {
         assertEquals(INT_PARAM_NATIVE_2, INT_PARAM.getValue());
         assertEquals(DOUBLE_PARAM_NATIVE_2, DOUBLE_PARAM.getValue(), 1e-10);
         assertEquals(STRING_PARAM_NATIVE_2, STRING_PARAM.getValue());
+    }
+
+    private static void clearMemory() {
+        CachedFeatureFlags.resetFlagsForTesting();
+        CachedFlagsSafeMode.getInstance().clearMemoryForTesting();
     }
 }

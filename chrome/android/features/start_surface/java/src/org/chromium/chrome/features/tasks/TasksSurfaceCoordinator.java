@@ -24,6 +24,7 @@ import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider
 import org.chromium.chrome.browser.compositor.layouts.content.TabContentManager;
 import org.chromium.chrome.browser.feed.FeedReliabilityLogger;
 import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncherImpl;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.incognito.reauth.IncognitoReauthController;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.multiwindow.MultiWindowModeStateDispatcher;
@@ -42,8 +43,9 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tasks.ReturnToChromeUtil;
+import org.chromium.chrome.browser.tasks.tab_management.RecyclerViewPosition;
 import org.chromium.chrome.browser.tasks.tab_management.TabManagementDelegate.TabSwitcherType;
-import org.chromium.chrome.browser.tasks.tab_management.TabManagementModuleProvider;
+import org.chromium.chrome.browser.tasks.tab_management.TabManagementDelegateProvider;
 import org.chromium.chrome.browser.tasks.tab_management.TabSwitcher;
 import org.chromium.chrome.browser.tasks.tab_management.TabSwitcherCustomViewManager;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiFeatureUtilities;
@@ -108,7 +110,13 @@ public class TasksSurfaceCoordinator implements TasksSurface {
             @Nullable OneshotSupplier<IncognitoReauthController>
                     incognitoReauthControllerSupplier) {
         mActivity = activity;
-        mView = (TasksView) LayoutInflater.from(activity).inflate(R.layout.tasks_view_layout, null);
+        if (!ChromeFeatureList.sSurfacePolish.isEnabled()) {
+            mView = (TasksView) LayoutInflater.from(mActivity).inflate(
+                    R.layout.tasks_view_layout, null);
+        } else {
+            mView = (TasksView) LayoutInflater.from(mActivity).inflate(
+                    R.layout.tasks_view_layout_polish, null);
+        }
         mView.initialize(activityLifecycleDispatcher,
                 parentTabSupplier.hasValue() && parentTabSupplier.get().isIncognito(),
                 windowAndroid);
@@ -122,7 +130,7 @@ public class TasksSurfaceCoordinator implements TasksSurface {
         mModalDialogManager = modalDialogManager;
         mParentTabSupplier = parentTabSupplier;
         if (tabSwitcherType == TabSwitcherType.CAROUSEL) {
-            mTabSwitcher = TabManagementModuleProvider.getDelegate().createCarouselTabSwitcher(
+            mTabSwitcher = TabManagementDelegateProvider.getDelegate().createCarouselTabSwitcher(
                     activity, activityLifecycleDispatcher, tabModelSelector, tabContentManager,
                     browserControlsStateProvider, tabCreatorManager, menuOrKeyboardActionController,
                     mView.getCarouselTabSwitcherContainer(), multiWindowModeStateDispatcher,
@@ -131,15 +139,19 @@ public class TasksSurfaceCoordinator implements TasksSurface {
         } else if (tabSwitcherType == TabSwitcherType.GRID) {
             assert incognitoReauthControllerSupplier
                     != null : "Valid Incognito re-auth controller supplier needed to create GTS.";
-            mTabSwitcher = TabManagementModuleProvider.getDelegate().createGridTabSwitcher(activity,
-                    activityLifecycleDispatcher, tabModelSelector, tabContentManager,
+            mTabSwitcher = TabManagementDelegateProvider.getDelegate().createGridTabSwitcher(
+                    activity, activityLifecycleDispatcher, tabModelSelector, tabContentManager,
                     browserControlsStateProvider, tabCreatorManager, menuOrKeyboardActionController,
                     mView.getBodyViewContainer(), multiWindowModeStateDispatcher, scrimCoordinator,
                     rootView, dynamicResourceLoaderSupplier, snackbarManager, modalDialogManager,
-                    incognitoReauthControllerSupplier, null /*BackPressManager*/);
+                    incognitoReauthControllerSupplier, /*BackPressManager*/ null,
+                    /* layoutStateProviderSupplier */ null);
         } else if (tabSwitcherType == TabSwitcherType.SINGLE) {
-            mTabSwitcher = new SingleTabSwitcherCoordinator(
-                    activity, mView.getCarouselTabSwitcherContainer(), tabModelSelector);
+            mTabSwitcher = new SingleTabSwitcherCoordinator(activity,
+                    mView.getCarouselTabSwitcherContainer(), null, tabModelSelector,
+                    /* isTablet= */ false, /* isScrollableMvtEnabled */ true,
+                    /* mostRecentTab= */ null, /* singleTabCardClickedCallback */ null,
+                    /* snapshotParentViewRunnable */ null, mTabContentManager);
         } else if (tabSwitcherType == TabSwitcherType.NONE) {
             mTabSwitcher = null;
         } else {
@@ -245,6 +257,23 @@ public class TasksSurfaceCoordinator implements TasksSurface {
     @Override
     public @Nullable TabSwitcher.TabListDelegate getTabListDelegate() {
         return mTabSwitcher != null ? mTabSwitcher.getTabListDelegate() : null;
+    }
+
+    @Override
+    public int getTabSwitcherTabListModelSize() {
+        if (mTabSwitcher != null
+                && mTabSwitcher.getController().getTabSwitcherType() == TabSwitcherType.GRID) {
+            return mTabSwitcher.getTabSwitcherTabListModelSize();
+        }
+        return 0;
+    }
+
+    @Override
+    public void setTabSwitcherRecyclerViewPosition(RecyclerViewPosition recyclerViewPosition) {
+        if (mTabSwitcher != null
+                && mTabSwitcher.getController().getTabSwitcherType() == TabSwitcherType.GRID) {
+            mTabSwitcher.setTabSwitcherRecyclerViewPosition(recyclerViewPosition);
+        }
     }
 
     @Override

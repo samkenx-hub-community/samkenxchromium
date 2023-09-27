@@ -40,6 +40,7 @@ include_rules = [
   "+components/url_formatter",
   "+components/viz",
   "+components/web_package",
+  "+components/webauthn/json",
   "+components/cbor",
   "+components/os_crypt/sync/os_crypt_switches.h",
   # *********************************** NOTE ***********************************
@@ -51,7 +52,6 @@ include_rules = [
   "+content/public/browser",
   "+device/base/synchronization",
   "+device/bluetooth",
-  "+device/fido/hid",
   "+device/gamepad", # For gamepad API
   "+device/nfc",
   "+device/vr/public", # For WebXR API
@@ -137,9 +137,13 @@ specific_include_rules = {
   ".*test_utils\.(h|cc)": [
     "+services/network/test",
   ],
+  "browser_interface_binders\.cc": [
+    "+components/ml/webnn/features.h",
+  ],
   "browser_main_loop\.cc": [
     # TODO(crbug.com/1049894): Remove.
     "+services/network/transitional_url_loader_factory_owner.h",
+    "+device/fido/hid/fido_hid_discovery.h",
   ],
   "browser_main_loop\.h": [
     "+ui/ozone/buildflags.h",
@@ -187,4 +191,8 @@ specific_include_rules = {
   "site_per_process_mac_browsertest\.mm": [
     "+content/app_shim_remote_cocoa",
   ],
+  "utility_sandbox_delegate_win\.cc": [
+    "+content/utility/sandbox_delegate_data.mojom.h"
+  ]
+
 }

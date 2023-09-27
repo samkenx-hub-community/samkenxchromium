@@ -4,26 +4,23 @@
 
 #include "chrome/browser/chromeos/policy/dlp/dlp_content_manager.h"
 
-#include <functional>
-
 #include "base/functional/bind.h"
-#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/mock_callback.h"
-#include "build/chromeos_buildflags.h"
-#include "chrome/browser/chromeos/policy/dlp/dlp_content_manager_test_helper.h"
+#include "base/test/test_future.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_histogram_helper.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_policy_event.pb.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_reporting_manager.h"
-#include "chrome/browser/chromeos/policy/dlp/dlp_reporting_manager_test_helper.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager_factory.h"
-#include "chrome/browser/chromeos/policy/dlp/dlp_warn_notifier.h"
-#include "chrome/browser/chromeos/policy/dlp/mock_dlp_rules_manager.h"
+#include "chrome/browser/chromeos/policy/dlp/test/dlp_content_manager_test_helper.h"
+#include "chrome/browser/chromeos/policy/dlp/test/dlp_reporting_manager_test_helper.h"
+#include "chrome/browser/chromeos/policy/dlp/test/mock_dlp_rules_manager.h"
 #include "chrome/browser/notifications/notification_display_service_tester.h"
+#include "chrome/browser/printing/print_test_utils.h"
 #include "chrome/browser/printing/print_view_manager.h"
 #include "chrome/browser/printing/print_view_manager_common.h"
 #include "chrome/browser/printing/test_print_preview_dialog_cloned_observer.h"
@@ -36,10 +33,9 @@
 #include "components/reporting/client/report_queue_impl.h"
 #include "components/reporting/storage/test_storage_module.h"
 #include "components/reporting/util/test_support_callbacks.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/test/browser_test.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 using testing::_;
 
@@ -161,10 +157,7 @@ IN_PROC_BROWSER_TEST_F(DlpContentManagerBrowserTest, PrintingNotRestricted) {
 
   // Start printing and check that there is no notification when printing is not
   // restricted.
-  printing::StartPrint(web_contents,
-                       /*print_renderer=*/mojo::NullAssociatedRemote(),
-                       /*print_preview_disabled=*/false,
-                       /*has_selection=*/false);
+  printing::test::StartPrint(web_contents);
   EXPECT_FALSE(
       display_service_tester.GetNotification(kPrintBlockedNotificationId));
   CheckEvents(DlpRulesManager::Restriction::kPrinting,
@@ -414,14 +407,10 @@ class DlpContentManagerReportingBrowserTest
   void StartPrint(
       printing::TestPrintViewManagerForRequestPreview* print_manager,
       content::WebContents* web_contents) {
-    base::RunLoop run_loop;
-    print_manager->set_quit_closure(run_loop.QuitClosure());
-
-    printing::StartPrint(web_contents,
-                         /*print_renderer=*/mojo::NullAssociatedRemote(),
-                         /*print_preview_disabled=*/false,
-                         /*has_selection=*/false);
-    run_loop.Run();
+    base::test::TestFuture<void> future;
+    print_manager->set_quit_closure(future.GetCallback());
+    printing::test::StartPrint(web_contents);
+    EXPECT_TRUE(future.Wait());
   }
 
  protected:
@@ -464,14 +453,8 @@ class DlpContentManagerReportingBrowserTest
       cloned_tab_observer_;
 };
 
-// TODO(crbug.com/1291074): Flaky on ChromeOS.
-#if BUILDFLAG(IS_CHROMEOS)
-#define MAYBE_PrintingRestricted DISABLED_PrintingRestricted
-#else
-#define MAYBE_PrintingRestricted PrintingRestricted
-#endif
 IN_PROC_BROWSER_TEST_F(DlpContentManagerReportingBrowserTest,
-                       MAYBE_PrintingRestricted) {
+                       PrintingRestricted) {
   // Set up mock rules manager.
   SetupDlpRulesManager();
   // Set up real report queue.
@@ -517,14 +500,8 @@ IN_PROC_BROWSER_TEST_F(DlpContentManagerReportingBrowserTest,
       display_service_tester.GetNotification(kPrintBlockedNotificationId));
 }
 
-// TODO(crbug.com/1291074): Flaky on ChromeOS Lacros.
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-#define MAYBE_PrintingReported DISABLED_PrintingReported
-#else
-#define MAYBE_PrintingReported PrintingReported
-#endif
 IN_PROC_BROWSER_TEST_F(DlpContentManagerReportingBrowserTest,
-                       MAYBE_PrintingReported) {
+                       PrintingReported) {
   SetupDlpRulesManager();
   SetupReportQueue();
   SetAddRecordCheck(
@@ -557,14 +534,7 @@ IN_PROC_BROWSER_TEST_F(DlpContentManagerReportingBrowserTest,
       display_service_tester.GetNotification(kPrintBlockedNotificationId));
 }
 
-// Test is flaky on Lacros: https://crbug.com/1344827
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-#define MAYBE_PrintingWarned DISABLED_PrintingWarned
-#else
-#define MAYBE_PrintingWarned PrintingWarned
-#endif
-IN_PROC_BROWSER_TEST_F(DlpContentManagerReportingBrowserTest,
-                       MAYBE_PrintingWarned) {
+IN_PROC_BROWSER_TEST_F(DlpContentManagerReportingBrowserTest, PrintingWarned) {
   SetupDlpRulesManager();
   SetupReportQueue();
   NotificationDisplayServiceTester display_service_tester(browser()->profile());
@@ -618,14 +588,8 @@ IN_PROC_BROWSER_TEST_F(DlpContentManagerReportingBrowserTest,
   EXPECT_EQ(helper_->ActiveWarningDialogsCount(), 0);
 }
 
-// Test is flaky on Lacros: https://crbug.com/1344827
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-#define MAYBE_TabShareWarnedDuringAllowed DISABLED_TabShareWarnedDuringAllowed
-#else
-#define MAYBE_TabShareWarnedDuringAllowed TabShareWarnedDuringAllowed
-#endif
 IN_PROC_BROWSER_TEST_F(DlpContentManagerReportingBrowserTest,
-                       MAYBE_TabShareWarnedDuringAllowed) {
+                       TabShareWarnedDuringAllowed) {
   SetupReporting();
   NotificationDisplayServiceTester display_service_tester(browser()->profile());
 

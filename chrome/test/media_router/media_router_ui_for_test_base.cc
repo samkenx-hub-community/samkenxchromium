@@ -35,43 +35,14 @@ void MediaRouterUiForTestBase::TearDown() {
   if (IsDialogShown()) {
     HideDialog();
   }
-}
-
-void MediaRouterUiForTestBase::StartCasting(const std::string& sink_name) {
-  StartCasting(GetSinkButton(sink_name));
-}
-
-void MediaRouterUiForTestBase::StopCasting(const std::string& sink_name) {
-  StopCasting(GetSinkButton(sink_name));
-}
-
-void MediaRouterUiForTestBase::StartCasting(views::View* sink_button) {
-  CHECK(sink_button->GetEnabled());
-  sink_button->OnMousePressed(CreateMousePressedEvent());
-  sink_button->OnMouseReleased(CreateMouseReleasedEvent());
-  base::RunLoop().RunUntilIdle();
-}
-
-void MediaRouterUiForTestBase::StopCasting(views::View* sink_button) {
-  sink_button->OnMousePressed(CreateMousePressedEvent());
-  sink_button->OnMouseReleased(CreateMouseReleasedEvent());
-  base::RunLoop().RunUntilIdle();
+  torn_down_ = true;
 }
 
 // static
-CastDialogSinkButton* MediaRouterUiForTestBase::GetSinkButtonWithName(
-    const std::vector<CastDialogSinkButton*>& sink_buttons,
-    const std::string& sink_name) {
-  auto it = base::ranges::find(sink_buttons, base::UTF8ToUTF16(sink_name),
-                               [](CastDialogSinkButton* sink_button) {
-                                 return sink_button->sink().friendly_name;
-                               });
-  if (it == sink_buttons.end()) {
-    NOTREACHED() << "Sink button not found for sink: " << sink_name;
-    return nullptr;
-  } else {
-    return *it;
-  }
+void MediaRouterUiForTestBase::ClickOnView(views::View* view) {
+  view->OnMousePressed(CreateMousePressedEvent());
+  view->OnMouseReleased(CreateMouseReleasedEvent());
+  base::RunLoop().RunUntilIdle();
 }
 
 void MediaRouterUiForTestBase::OnDialogCreated() {
@@ -80,6 +51,10 @@ void MediaRouterUiForTestBase::OnDialogCreated() {
     watch_callback_.reset();
     watch_type_ = WatchType::kNone;
   }
+}
+
+MediaRouterUiForTestBase::~MediaRouterUiForTestBase() {
+  DCHECK(torn_down_);
 }
 
 MediaRouterUiForTestBase::MediaRouterUiForTestBase(
@@ -91,8 +66,6 @@ MediaRouterUiForTestBase::MediaRouterUiForTestBase(
   dialog_controller_->SetDialogCreationCallbackForTesting(base::BindRepeating(
       &MediaRouterUiForTestBase::OnDialogCreated, weak_factory_.GetWeakPtr()));
 }
-
-MediaRouterUiForTestBase::~MediaRouterUiForTestBase() = default;
 
 void MediaRouterUiForTestBase::WaitForAnyDialogShown() {
   base::RunLoop run_loop;

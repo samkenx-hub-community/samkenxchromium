@@ -48,6 +48,8 @@ const char kAtomicPref[] = "atomic_pref";
 const char kAtomicPref2[] = "atomic_pref2";
 const char kAtomicPref3[] = "pref3";
 const char kAtomicPref4[] = "pref4";
+const char kDeprecatedTrackedDictionaryEntry[] = "dictionary.pref";
+const char kDeprecatedUntrackedDictionary[] = "dictionary";
 const char kReportOnlyPref[] = "report_only";
 const char kReportOnlySplitPref[] = "report_only_split_pref";
 const char kSplitPref[] = "split_pref";
@@ -203,6 +205,7 @@ class MockPrefHashStore : public PrefHashStore {
   void RecordStoreHash(const std::string& path,
                        const void* new_value,
                        PrefTrackingStrategy strategy);
+  void ClearStoreHash(const std::string& path);
 
   std::map<std::string, ValueState> check_results_;
   std::map<std::string, std::vector<std::string>> invalid_keys_results_;
@@ -287,6 +290,10 @@ void MockPrefHashStore::RecordStoreHash(const std::string& path,
           .second);
 }
 
+void MockPrefHashStore::ClearStoreHash(const std::string& path) {
+  stored_values_.erase(path);
+}
+
 base::StringPiece
 MockPrefHashStore::MockPrefHashStoreTransaction ::GetStoreUMASuffix() const {
   return "unused";
@@ -344,6 +351,7 @@ void MockPrefHashStore::MockPrefHashStoreTransaction::ClearHash(
     const std::string& path) {
   // Allow this to be called by PrefHashFilter's deprecated tracked prefs
   // cleanup tasks.
+  outer_->ClearStoreHash(path);
 }
 
 bool MockPrefHashStore::MockPrefHashStoreTransaction::IsSuperMACValid() const {
@@ -622,9 +630,11 @@ class PrefHashFilterTest : public testing::TestWithParam<EnforcementLevel>,
         std::move(pref_store_contents_));
   }
 
-  raw_ptr<MockPrefHashStore> mock_pref_hash_store_;
-  raw_ptr<MockPrefHashStore> mock_external_validation_pref_hash_store_;
-  raw_ptr<MockHashStoreContents> mock_external_validation_hash_store_contents_;
+  raw_ptr<MockPrefHashStore, DanglingUntriaged> mock_pref_hash_store_;
+  raw_ptr<MockPrefHashStore, DanglingUntriaged>
+      mock_external_validation_pref_hash_store_;
+  raw_ptr<MockHashStoreContents, DanglingUntriaged>
+      mock_external_validation_hash_store_contents_;
   base::Value::Dict pref_store_contents_;
   scoped_refptr<MockValidationDelegateRecord> mock_validation_delegate_record_;
   std::unique_ptr<PrefHashFilter> pref_hash_filter_;
@@ -729,9 +739,10 @@ TEST_P(PrefHashFilterTest, FilterTrackedPrefClearing) {
 
 TEST_P(PrefHashFilterTest, FilterSplitPrefUpdate) {
   base::Value::Dict root_dict;
-  base::Value* dict_value = root_dict.Set(kSplitPref, base::Value::Dict());
-  dict_value->SetStringKey("a", "foo");
-  dict_value->SetIntKey("b", 1234);
+  base::Value::Dict& dict_value =
+      root_dict.Set(kSplitPref, base::Value::Dict())->GetDict();
+  dict_value.Set("a", "foo");
+  dict_value.Set("b", 1234);
 
   // No path should be stored on FilterUpdate.
   pref_hash_filter_->FilterUpdate(kSplitPref);
@@ -742,7 +753,7 @@ TEST_P(PrefHashFilterTest, FilterSplitPrefUpdate) {
   ASSERT_EQ(1u, mock_pref_hash_store_->stored_paths_count());
   MockPrefHashStore::ValuePtrStrategyPair stored_value =
       mock_pref_hash_store_->stored_value(kSplitPref);
-  ASSERT_EQ(dict_value, stored_value.first);
+  ASSERT_EQ(&dict_value, stored_value.first);
   ASSERT_EQ(PrefTrackingStrategy::SPLIT, stored_value.second);
 
   ASSERT_EQ(1u, mock_pref_hash_store_->transactions_performed());
@@ -794,7 +805,7 @@ TEST_P(PrefHashFilterTest, MultiplePrefsFilterSerializeData) {
   root_dict.Set(kAtomicPref3, 3);
   root_dict.Set("untracked", 4);
   base::Value* dict_value = root_dict.Set(kSplitPref, base::Value::Dict());
-  dict_value->SetBoolKey("a", true);
+  dict_value->GetDict().Set("a", true);
 
   // Only update kAtomicPref, kAtomicPref3, and kSplitPref.
   pref_hash_filter_->FilterUpdate(kAtomicPref);
@@ -1362,6 +1373,31 @@ TEST_P(PrefHashFilterTest, DISABLED_ExternalValidationValueChanged) {
   ASSERT_EQ(std::size(kTestTrackedPrefs) - 2u,
             mock_validation_delegate_record_->CountExternalValidationsOfState(
                 ValueState::UNCHANGED));
+}
+
+TEST_P(PrefHashFilterTest, CleanupDeprecatedTrackedDictionary) {
+  // Fake a preference value and stored hash from an old version of Chrome.
+  base::Value pref_value(1234);
+  pref_store_contents_.SetByDottedPath(kDeprecatedTrackedDictionaryEntry, 1234);
+  {
+    std::unique_ptr<PrefHashStoreTransaction> transaction(
+        mock_pref_hash_store_->BeginTransaction(nullptr));
+    transaction->StoreHash(kDeprecatedTrackedDictionaryEntry, &pref_value);
+  }
+
+  ASSERT_EQ(1u, mock_pref_hash_store_->stored_paths_count());
+
+  std::vector<const char*> test_deprecated_prefs{
+      kDeprecatedTrackedDictionaryEntry,
+      kDeprecatedUntrackedDictionary,
+  };
+  PrefHashFilter::SetDeprecatedPrefsForTesting(test_deprecated_prefs);
+
+  DoFilterOnLoad(false);
+
+  EXPECT_EQ(0u, mock_pref_hash_store_->stored_paths_count());
+  EXPECT_FALSE(pref_store_contents_.contains("dictionary.pref"));
+  EXPECT_FALSE(pref_store_contents_.contains("dictionary"));
 }
 
 INSTANTIATE_TEST_SUITE_P(PrefHashFilterTestInstance,

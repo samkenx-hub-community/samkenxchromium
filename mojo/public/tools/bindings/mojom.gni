@@ -122,6 +122,9 @@ mojom_generator_sources =
       "$mojom_generator_root/generators/mojom_ts_generator.py",
       "$mojom_generator_root/generators/mojom_webui_js_bridge_generator.py",
       "$mojom_generator_script",
+      "//build/action_helpers.py",
+      "//build/gn_helpers.py",
+      "//build/zip_helpers.py",
     ]
 
 if (enable_scrambled_message_ids) {
@@ -435,21 +438,40 @@ if (enable_scrambled_message_ids) {
 #             should be mapped in generated bindings. This is a string like
 #             "::base::Value" or "std::vector<::base::Value>".
 #
+#         copyable_pass_by_value (optional)
+#             A boolean value (default false) which effectively indicates
+#             whether the C++ type is very cheap to copy. If so, generated
+#             bindings will pass by value but not use std::move() at call sites.
+#
+#         default_constructible (optional)
+#             A boolean value (default true) which indicates whether the C++
+#             type is default constructible. If a C++ type is not default
+#             constructible (e.g. the implementor of the type prefers not to
+#             publicly expose a default constructor that creates an object in an
+#             invalid state), Mojo will instead construct C++ type with an
+#             argument of the type `mojo::DefaultConstruct::Tag` (essentially a
+#             passkey-like type specifically for this use case).
+#
+#         force_serialize (optional)
+#             A boolean value (default false) which disables lazy serialization
+#             of the typemapped type if lazy serialization is enabled for the
+#             mojom target applying this typemap.
+#
 #         forward_declaration (optional)
 #             A forward declaration of the C++ type, which bindings that don't
 #             need the full type definition can use to reduce the size of
 #             the generated code. This is a string like
 #             "namespace base { class Value; }".
 #
+#         hashable (optional)
+#             A boolean value (default false) indicating whether the C++ type is
+#             hashable. Set to true if true AND needed (i.e. you need to use the
+#             type as the key of a mojom map).
+#
 #         move_only (optional)
 #             A boolean value (default false) which indicates whether the C++
 #             type is move-only. If true, generated bindings will pass the type
 #             by value and use std::move() at call sites.
-#
-#         copyable_pass_by_value (optional)
-#             A boolean value (default false) which effectively indicates
-#             whether the C++ type is very cheap to copy. If so, generated
-#             bindings will pass by value but not use std::move() at call sites.
 #
 #         nullable_is_same_type (optional)
 #             A boolean value (default false) which indicates that the C++ type
@@ -459,16 +481,6 @@ if (enable_scrambled_message_ids) {
 #             When false, nullable fields are represented by wrapping the C++
 #             type with absl::optional, and null values are simply
 #             absl::nullopt.
-#
-#         hashable (optional)
-#             A boolean value (default false) indicating whether the C++ type is
-#             hashable. Set to true if true AND needed (i.e. you need to use the
-#             type as the key of a mojom map).
-#
-#         force_serialize (optional)
-#             A boolean value (default false) which disables lazy serialization
-#             of the typemapped type if lazy serialization is enabled for the
-#             mojom target applying this typemap.
 #
 # Additional typemap scope parameters:
 #
@@ -710,18 +722,17 @@ template("mojom") {
         "is_chromeos",
         "is_chromeos_ash",
       ]
+    } else if (is_chromeos_lacros) {
+      enabled_features += [
+        "is_chromeos",
+        "is_chromeos_lacros",
+      ]
     } else if (is_fuchsia) {
       enabled_features += [ "is_fuchsia" ]
     } else if (is_ios) {
       enabled_features += [ "is_ios" ]
-    } else if (is_linux || is_chromeos_lacros) {
+    } else if (is_linux) {
       enabled_features += [ "is_linux" ]
-      if (is_chromeos_lacros) {
-        enabled_features += [
-          "is_chromeos",
-          "is_chromeos_lacros",
-        ]
-      }
     } else if (is_mac) {
       enabled_features += [ "is_mac" ]
     } else if (is_win) {
@@ -792,8 +803,12 @@ template("mojom") {
           "--add-module-metadata",
           "webui_module_path=${invoker.webui_module_path}",
         ]
-        if (defined(invoker.generate_legacy_js_bindings)) {
-          args += [ "legacy_js_only=${invoker.generate_legacy_js_bindings}" ]
+        if (!defined(invoker.use_typescript_sources) ||
+            !invoker.use_typescript_sources) {
+          args += [
+            "--add-module-metadata",
+            "generate_webui_js=True",
+          ]
         }
       }
     }
@@ -996,6 +1011,7 @@ template("mojom") {
     if (defined(invoker.testonly)) {
       testonly = invoker.testonly
     }
+    configs += [ "//build/config/compiler:wexit_time_destructors" ]
     deps = []
     public_deps = []
     if (output_file_base_paths != []) {
@@ -1880,6 +1896,7 @@ template("mojom") {
             "$root_gen_dir/${base_path}-webui-js-bridge-impl.h",
           ]
         }
+        configs += [ "//build/config/compiler:wexit_time_destructors" ]
         deps = [
           ":$cpp_target_name",
           ":$generator_webui_js_bridge_impl_target_name",

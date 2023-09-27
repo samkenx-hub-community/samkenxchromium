@@ -11,7 +11,6 @@
 #include "base/android/jni_string.h"
 #include "base/android/scoped_java_ref.h"
 #include "base/check_op.h"
-#include "base/cxx17_backports.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
@@ -124,10 +123,8 @@ MediaPlayerBridge::~MediaPlayerBridge() {
 
 void MediaPlayerBridge::Initialize() {
   cookies_.clear();
-  if (url_.SchemeIsBlob() || url_.SchemeIsFileSystem()) {
-    NOTREACHED();
-    return;
-  }
+  CHECK(!url_.SchemeIsBlob());
+  CHECK(!url_.SchemeIsFileSystem());
 
   if (allow_credentials_ && !url_.SchemeIsFile()) {
     media::MediaResourceGetter* resource_getter =
@@ -189,11 +186,8 @@ void MediaPlayerBridge::SetPlaybackRate(double playback_rate) {
 
 void MediaPlayerBridge::Prepare() {
   DCHECK(j_media_player_bridge_.is_null());
-
-  if (url_.SchemeIsBlob() || url_.SchemeIsFileSystem()) {
-    NOTREACHED();
-    return;
-  }
+  CHECK(!url_.SchemeIsBlob());
+  CHECK(!url_.SchemeIsFileSystem());
 
   CreateJavaMediaPlayerBridge();
 
@@ -421,7 +415,7 @@ void MediaPlayerBridge::Release() {
 }
 
 void MediaPlayerBridge::SetVolume(double volume) {
-  volume_ = base::clamp(volume, 0.0, 1.0);
+  volume_ = std::clamp(volume, 0.0, 1.0);
   UpdateVolumeInternal();
 }
 

@@ -22,14 +22,15 @@ SelectToSpeakMouseSelectionTest = class extends SelectToSpeakE2ETest {
     window.EventType = chrome.automation.EventType;
     window.SelectToSpeakState = chrome.accessibilityPrivate.SelectToSpeakState;
 
-    await importModule(
-        'selectToSpeak', '/select_to_speak/select_to_speak_main.js');
-    await importModule(
-        'SELECT_TO_SPEAK_TRAY_CLASS_NAME', '/select_to_speak/ui_manager.js');
-    await importModule(
-        'SelectToSpeakConstants',
-        '/select_to_speak/select_to_speak_constants.js');
-    await importModule('PrefsManager', '/select_to_speak/prefs_manager.js');
+    await Promise.all([
+      importModule('selectToSpeak', '/select_to_speak/select_to_speak_main.js'),
+      importModule(
+          'SELECT_TO_SPEAK_TRAY_CLASS_NAME', '/select_to_speak/ui_manager.js'),
+      importModule(
+          'SelectToSpeakConstants',
+          '/select_to_speak/select_to_speak_constants.js'),
+      importModule('PrefsManager', '/select_to_speak/prefs_manager.js'),
+    ]);
     await new Promise(resolve => {
       chrome.settingsPrivate.setPref(
           PrefsManager.ENHANCED_VOICES_DIALOG_SHOWN_KEY, true,
@@ -162,16 +163,18 @@ AX_TEST_F(
       })]);
 
       const textNode = this.findTextNode(root, 'This is some text');
-      const event = {
-        screenX: textNode.location.left + 1,
-        screenY: textNode.location.top + 1,
-      };
+      const mouseX = textNode.location.left + 1;
+      const mouseY = textNode.location.top + 1;
       // A state change request should shift us into 'selecting' state
       // from 'inactive'.
       const desktop = root.parent.root;
       this.tapTrayButton(desktop, () => {
-        selectToSpeak.fireMockMouseDownEvent(event);
-        selectToSpeak.fireMockMouseUpEvent(event);
+        selectToSpeak.fireMockMouseEvent(
+            chrome.accessibilityPrivate.SyntheticMouseEventType.PRESS, mouseX,
+            mouseY);
+        selectToSpeak.fireMockMouseEvent(
+            chrome.accessibilityPrivate.SyntheticMouseEventType.RELEASE, mouseX,
+            mouseY);
       });
     });
 
@@ -182,15 +185,13 @@ AX_TEST_F(
           'data:text/html;charset=utf-8,' +
           '<p>This is some text</p>');
       const textNode = this.findTextNode(root, 'This is some text');
-      const event = {
-        screenX: textNode.location.left + 1,
-        screenY: textNode.location.top + 1,
-      };
       // A state change request should shift us into 'selecting' state
       // from 'inactive'.
       const desktop = root.parent.root;
       this.tapTrayButton(desktop, () => {
-        selectToSpeak.fireMockMouseDownEvent(event);
+        selectToSpeak.fireMockMouseEvent(
+            chrome.accessibilityPrivate.SyntheticMouseEventType.PRESS,
+            textNode.location.left + 1, textNode.location.top + 1);
         assertEquals(SelectToSpeakState.SELECTING, selectToSpeak.state_);
 
         // Another state change puts us back in 'inactive'.
@@ -262,12 +263,14 @@ TEST_F(
               }),
               true);
 
-          const event = {
-            screenX: button.location.left + 1,
-            screenY: button.location.top + 1,
-          };
-          selectToSpeak.fireMockMouseDownEvent(event);
-          selectToSpeak.fireMockMouseUpEvent(event);
+          const mouseX = button.location.left + 1;
+          const mouseY = button.location.top + 1;
+          selectToSpeak.fireMockMouseEvent(
+              chrome.accessibilityPrivate.SyntheticMouseEventType.PRESS, mouseX,
+              mouseY);
+          selectToSpeak.fireMockMouseEvent(
+              chrome.accessibilityPrivate.SyntheticMouseEventType.RELEASE,
+              mouseX, mouseY);
         });
       });
     });

@@ -5,6 +5,7 @@
 #include "chrome/browser/ash/login/screens/demo_preferences_screen.h"
 
 #include "ash/constants/ash_features.h"
+#include "ash/constants/ash_pref_names.h"
 #include "base/check_op.h"
 #include "base/memory/weak_ptr.h"
 #include "base/values.h"
@@ -14,7 +15,6 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/ui/webui/ash/login/demo_preferences_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/welcome_screen_handler.h"
-#include "chrome/common/pref_names.h"
 #include "components/prefs/pref_service.h"
 
 namespace ash {
@@ -69,7 +69,7 @@ void DemoPreferencesScreen::OnUserAction(const base::Value::List& args) {
     const std::string& store_number_input = args[2].GetString();
     DemoSetupController* demo_setup_controller =
         WizardController::default_controller()->demo_setup_controller();
-    demo_setup_controller->set_retailer_name(retailer_name_input);
+    demo_setup_controller->SetAndCanonicalizeRetailerName(retailer_name_input);
     demo_setup_controller->set_store_number(store_number_input);
 
     exit_callback_.Run(Result::COMPLETED);

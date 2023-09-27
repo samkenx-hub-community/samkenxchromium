@@ -11,14 +11,14 @@
 
 #include <memory>
 
+#include "base/apple/foundation_util.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
-#include "base/mac/foundation_util.h"
-#include "base/path_service.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/web_applications/os_integration/os_integration_test_override.h"
+#include "base/test/scoped_path_override.h"
 #include "chrome/browser/web_applications/os_integration/web_app_shortcut_mac.h"
+#include "chrome/browser/web_applications/test/os_integration_test_override_impl.h"
 #include "chrome/browser/web_applications/test/web_app_test.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
 #include "chrome/common/chrome_paths.h"
@@ -77,9 +77,10 @@ class WebAppRunOnOsLoginMacTest : public WebAppTest {
  public:
   void SetUp() override {
     WebAppTest::SetUp();
-    base::mac::SetBaseBundleID(kFakeChromeBundleId);
+    base::apple::SetBaseBundleID(kFakeChromeBundleId);
 
-    override_registration_ = OsIntegrationTestOverride::OverrideForTesting();
+    override_registration_ =
+        OsIntegrationTestOverrideImpl::OverrideForTesting();
     destination_dir_ =
         override_registration_->test_override->chrome_apps_folder();
 
@@ -95,8 +96,7 @@ class WebAppRunOnOsLoginMacTest : public WebAppTest {
     // When using base::PathService::Override, it calls
     // base::MakeAbsoluteFilePath. On Mac this prepends "/private" to the path,
     // but points to the same directory in the file system.
-    EXPECT_TRUE(
-        base::PathService::Override(chrome::DIR_USER_DATA, user_data_dir_));
+    user_data_dir_override_.emplace(chrome::DIR_USER_DATA, user_data_dir_);
     user_data_dir_ = base::MakeAbsoluteFilePath(user_data_dir_);
     app_data_dir_ = base::MakeAbsoluteFilePath(app_data_dir_);
 
@@ -138,11 +138,12 @@ class WebAppRunOnOsLoginMacTest : public WebAppTest {
   base::FilePath app_data_dir_;
   base::FilePath destination_dir_;
   base::FilePath user_data_dir_;
+  absl::optional<base::ScopedPathOverride> user_data_dir_override_;
 
   std::unique_ptr<WebAppAutoLoginUtilMock> auto_login_util_mock_;
   std::unique_ptr<ShortcutInfo> info_;
   base::FilePath shim_path_;
-  std::unique_ptr<OsIntegrationTestOverride::BlockingRegistration>
+  std::unique_ptr<OsIntegrationTestOverrideImpl::BlockingRegistration>
       override_registration_;
 };
 

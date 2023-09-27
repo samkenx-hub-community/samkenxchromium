@@ -16,9 +16,11 @@
 #include "ash/system/unified/buttons.h"
 #include "ash/system/unified/unified_system_tray_controller.h"
 #include "ash/system/unified/unified_system_tray_model.h"
+#include "ash/system/update/eol_notice_quick_settings_view.h"
 #include "ash/test/ash_test_base.h"
 #include "ash/test_shell_delegate.h"
 #include "base/check.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
 #include "components/user_manager/user_type.h"
 #include "components/version_info/channel.h"
@@ -94,33 +96,36 @@ class QuickSettingsHeaderTest : public NoSessionAshTestBase {
   }
 
   base::test::ScopedFeatureList feature_list_;
-  TestShellDelegate* test_shell_delegate_ = nullptr;
+  raw_ptr<TestShellDelegate, DanglingUntriaged | ExperimentalAsh>
+      test_shell_delegate_ = nullptr;
   scoped_refptr<UnifiedSystemTrayModel> model_;
   std::unique_ptr<UnifiedSystemTrayController> controller_;
   std::unique_ptr<views::Widget> widget_;
-  QuickSettingsHeader* header_ = nullptr;
+  raw_ptr<QuickSettingsHeader, ExperimentalAsh> header_ = nullptr;
 };
 
-TEST_F(QuickSettingsHeaderTest, HiddenByDefaultBeforeLogin) {
+TEST_F(QuickSettingsHeaderTest, HiddenOnStable) {
+  test_shell_delegate_->set_channel(version_info::Channel::STABLE);
+
   CreateQuickSettingsHeader();
 
   EXPECT_FALSE(GetManagedButton()->GetVisible());
   EXPECT_FALSE(GetSupervisedButton()->GetVisible());
 
-  // By default, channel view is not created.
+  // Channel view is not created.
   EXPECT_FALSE(header_->channel_view_for_test());
 
   // Since no views are created, the header is hidden.
   EXPECT_FALSE(header_->GetVisible());
 }
 
-TEST_F(QuickSettingsHeaderTest, DoesNotShowChannelViewBeforeLogin) {
+TEST_F(QuickSettingsHeaderTest, ShowChannelViewBeforeLoginOnNonStable) {
   test_shell_delegate_->set_channel(version_info::Channel::BETA);
 
   CreateQuickSettingsHeader();
 
-  EXPECT_FALSE(header_->channel_view_for_test());
-  EXPECT_FALSE(header_->GetVisible());
+  EXPECT_TRUE(header_->channel_view_for_test());
+  EXPECT_TRUE(header_->GetVisible());
 }
 
 TEST_F(QuickSettingsHeaderTest, ShowsChannelViewAfterLogin) {
@@ -154,10 +159,15 @@ TEST_F(QuickSettingsHeaderTest, EolNoticeVisible) {
 }
 
 TEST_F(QuickSettingsHeaderTest, EolNoticeNotVisibleBeforeLogin) {
+  test_shell_delegate_->set_channel(version_info::Channel::BETA);
   Shell::Get()->system_tray_model()->SetShowEolNotice(true);
   CreateQuickSettingsHeader();
-  // Header is not shown.
-  EXPECT_FALSE(header_->GetVisible());
+
+  // Header is shown.
+  EXPECT_TRUE(header_->GetVisible());
+
+  // Channel view is created.
+  EXPECT_TRUE(header_->channel_view_for_test());
 
   // EOL notice is not visible.
   EXPECT_FALSE(header_->eol_notice_for_test());
@@ -254,10 +264,13 @@ TEST_F(QuickSettingsHeaderTest, BothEolNoticeAndEnterpriseVisible) {
   EXPECT_EQ(GetManagedButtonLabel()->GetText(), u"Managed");
   EXPECT_EQ(GetManagedButton()->GetTooltipText({}), u"Managed by example.com");
   EXPECT_TRUE(header_->GetVisible());
-  ASSERT_TRUE(header_->eol_notice_for_test());
-  EXPECT_TRUE(header_->eol_notice_for_test()->GetVisible());
+  EolNoticeQuickSettingsView* eol_notice = header_->eol_notice_for_test();
+  ASSERT_TRUE(eol_notice);
+  EXPECT_TRUE(eol_notice->GetVisible());
+  // The label is shorter due to the two-column layout.
+  EXPECT_EQ(eol_notice->GetText(), u"Updates ended");
 
-  LeftClickOn(header_->eol_notice_for_test());
+  LeftClickOn(eol_notice);
   EXPECT_EQ(1, GetSystemTrayClient()->show_eol_info_count());
 }
 
@@ -286,6 +299,9 @@ TEST_F(QuickSettingsHeaderTest, ChildVisible) {
   EXPECT_EQ(GetSupervisedButton()->GetTooltipText({}),
             u"Account managed by parent@test.com");
   EXPECT_TRUE(header_->GetVisible());
+
+  LeftClickOn(GetSupervisedButton());
+  EXPECT_EQ(GetSystemTrayClient()->show_account_settings_count(), 1);
 }
 
 }  // namespace ash

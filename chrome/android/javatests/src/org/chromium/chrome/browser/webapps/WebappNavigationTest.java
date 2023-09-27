@@ -5,7 +5,6 @@
 package org.chromium.chrome.browser.webapps;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 import static org.chromium.base.ApplicationState.HAS_DESTROYED_ACTIVITIES;
 import static org.chromium.base.ApplicationState.HAS_PAUSED_ACTIVITIES;
@@ -16,11 +15,11 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
 import android.net.Uri;
-import android.support.test.InstrumentationRegistry;
 import android.util.Base64;
 
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.Before;
@@ -33,8 +32,6 @@ import org.junit.runner.RunWith;
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.CommandLine;
-import org.chromium.base.task.PostTask;
-import org.chromium.base.task.TaskTraits;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
@@ -43,7 +40,6 @@ import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.blink.mojom.DisplayMode;
 import org.chromium.cc.input.BrowserControlsState;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider;
@@ -61,11 +57,11 @@ import org.chromium.chrome.browser.test.MockCertVerifierRuleAndroid;
 import org.chromium.chrome.browser.theme.TopUiThemeColorProvider;
 import org.chromium.chrome.test.ChromeActivityTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.browser.contextmenu.ContextMenuUtils;
 import org.chromium.chrome.test.util.browser.webapps.WebappTestPage;
 import org.chromium.components.browser_ui.styles.ChromeColors;
-import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.test.NativeLibraryTestUtils;
 import org.chromium.content_public.browser.test.util.DOMUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
@@ -309,39 +305,13 @@ public class WebappNavigationTest {
                         WebappConstants.EXTRA_DISPLAY_MODE, DisplayMode.MINIMAL_UI));
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            activity.getComponent().resolveNavigationController().openCurrentUrlInBrowser(true);
-            assertNull(activity.getActivityTab());
+            activity.getComponent().resolveNavigationController().openCurrentUrlInBrowser();
         });
 
         ChromeTabbedActivity tabbedChrome =
                 ChromeActivityTestRule.waitFor(ChromeTabbedActivity.class);
         ChromeTabUtils.waitForTabPageLoaded(tabbedChrome.getActivityTab(),
                 WebappTestPage.getServiceWorkerUrl(mActivityTestRule.getTestServer()));
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"Webapps"})
-    // Regression test for crbug.com/771174.
-    public void testCanNavigateAfterReparentingToTabbedChrome() throws Exception {
-        runWebappActivityAndWaitForIdle(
-                mActivityTestRule.createIntent()
-                        .putExtra(WebappConstants.EXTRA_DISPLAY_MODE, DisplayMode.MINIMAL_UI)
-                        .putExtra(WebappConstants.EXTRA_THEME_COLOR, (long) Color.CYAN));
-
-        PostTask.postTask(TaskTraits.UI_DEFAULT, () -> {
-            mActivityTestRule.getActivity()
-                    .getComponent()
-                    .resolveNavigationController()
-                    .openCurrentUrlInBrowser(true);
-            assertNull(mActivityTestRule.getActivity().getActivityTab());
-        });
-
-        ChromeTabbedActivity tabbedChrome =
-                ChromeActivityTestRule.waitFor(ChromeTabbedActivity.class);
-        TestThreadUtils.runOnUiThreadBlocking(
-                () -> tabbedChrome.getActivityTab().loadUrl(new LoadUrlParams(offOriginUrl())));
-        ChromeTabUtils.waitForTabPageLoaded(tabbedChrome.getActivityTab(), offOriginUrl());
     }
 
     @Test

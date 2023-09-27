@@ -47,7 +47,7 @@ namespace http://www.w3.org/1999/xhtml
     property ariaDescription
     property ariaDetailsElements
     property ariaDisabled
-    property ariaErrorMessageElement
+    property ariaErrorMessageElements
     property ariaExpanded
     property ariaFlowToElements
     property ariaHasPopup
@@ -550,6 +550,7 @@ html element del
     property cite
     property dateTime
 html element details
+    property name
     property open
 html element dfn
 html element dialog
@@ -573,6 +574,12 @@ html element embed
     property name
     property src
     property type
+    property width
+html element fencedframe
+    property allow
+    property config
+    property height
+    property sandbox
     property width
 html element fieldset
     property checkValidity
@@ -665,6 +672,7 @@ html element hr
     property size
     property width
 html element html
+    property blocking
     property version
 html element i
 html element iframe
@@ -672,6 +680,7 @@ html element iframe
     property allow
     property allowFullscreen
     property allowPaymentRequest
+    property browsingTopics
     property contentDocument
     property contentWindow
     property credentialless
@@ -818,6 +827,7 @@ html element link
     property sizes
     property target
     property type
+html element listbox
 html element listing
     property width
 html element main
@@ -960,6 +970,7 @@ html element script
     property src
     property text
     property type
+html element search
 html element section
 html element select
     property add
@@ -985,7 +996,8 @@ html element select
     property validity
     property value
     property willValidate
-html element selectmenu
+html element selectedoption
+html element selectlist
     property checkValidity
     property disabled
     property form
@@ -1297,7 +1309,7 @@ namespace http://www.w3.org/2000/svg
     property ariaDescription
     property ariaDetailsElements
     property ariaDisabled
-    property ariaErrorMessageElement
+    property ariaErrorMessageElements
     property ariaExpanded
     property ariaFlowToElements
     property ariaHasPopup
@@ -1642,13 +1654,6 @@ svg element circle
     property transform
 svg element clipPath
     property clipPathUnits
-    property farthestViewportElement
-    property getBBox
-    property getCTM
-    property getScreenCTM
-    property nearestViewportElement
-    property requiredExtensions
-    property systemLanguage
     property transform
 svg element defs
     property farthestViewportElement
@@ -2000,6 +2005,7 @@ svg element g
     property systemLanguage
     property transform
 svg element image
+    property crossOrigin
     property decode
     property decoding
     property farthestViewportElement

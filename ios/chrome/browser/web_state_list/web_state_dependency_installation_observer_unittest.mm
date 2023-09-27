@@ -7,16 +7,12 @@
 #import <memory>
 #import <set>
 
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/web_state_list/web_state_list_delegate.h"
-#import "ios/chrome/browser/web_state_list/web_state_opener.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list_delegate.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_opener.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
 #import "testing/gtest_mac.h"
 #import "testing/platform_test.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 // DependencyInstaller which simply tracks which WebStates have been passed to
 // the install/uninstall methods.
@@ -58,7 +54,6 @@ class WebStateDependencyInstallationObserverTest : public PlatformTest,
 
   // WebStateListDelegate.
   void WillAddWebState(web::WebState* web_state) override {}
-  void WebStateDetached(web::WebState* web_state) override {}
 
  protected:
   WebStateList web_state_list_;

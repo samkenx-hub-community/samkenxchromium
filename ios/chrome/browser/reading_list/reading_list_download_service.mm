@@ -20,14 +20,10 @@
 #import "components/reading_list/core/offline_url_utils.h"
 #import "components/reading_list/core/reading_list_entry.h"
 #import "components/reading_list/core/reading_list_model.h"
-#import "ios/chrome/browser/application_context/application_context.h"
 #import "ios/chrome/browser/reading_list/reading_list_distiller_page_factory.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "net/base/network_change_notifier.h"
 #import "services/network/public/cpp/shared_url_loader_factory.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 // Status of the download when it ends, for UMA report.

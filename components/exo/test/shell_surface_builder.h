@@ -7,8 +7,10 @@
 
 #include <memory>
 
+#include "base/memory/raw_ptr.h"
 #include "cc/base/region.h"
 #include "components/exo/client_controlled_shell_surface.h"
+#include "components/exo/shell_surface.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/base/class_property.h"
 #include "ui/gfx/buffer_types.h"
@@ -60,12 +62,18 @@ class ShellSurfaceBuilder {
   ShellSurfaceBuilder& SetParent(ShellSurface* shell_surface);
   ShellSurfaceBuilder& SetAsPopup();
   ShellSurfaceBuilder& SetAsMenu();
+  ShellSurfaceBuilder& SetClientSubmitsInPixelCoordinates(bool enabled);
+  ShellSurfaceBuilder& SetConfigureCallback(
+      ShellSurface::ConfigureCallback callback);
 
   // Sets parameters defined in ClientControlledShellSurface.
   ShellSurfaceBuilder& SetWindowState(chromeos::WindowStateType window_state);
   ShellSurfaceBuilder& EnableDefaultScaleCancellation();
   ShellSurfaceBuilder& SetDelegate(
       std::unique_ptr<ClientControlledShellSurface::Delegate> delegate);
+  ShellSurfaceBuilder& DisableSupportsFloatedState();
+  ShellSurfaceBuilder& SetDisplayId(int64_t display_id);
+  ShellSurfaceBuilder& SetBounds(const gfx::Rect& bounds);
 
   // Must be called only once for either of the below and the object cannot
   // be used to create multiple windows.
@@ -79,8 +87,8 @@ class ShellSurfaceBuilder {
                                   const gfx::Rect& bounds);
 
  private:
-  bool isConfigurationValidForShellSurface();
-  bool isConfigurationValidForClientControlledShellSurface();
+  bool IsConfigurationValidForShellSurface();
+  bool IsConfigurationValidForClientControlledShellSurface();
   void SetCommonPropertiesAndCommitIfNecessary(ShellSurfaceBase* shell_surface);
   int GetContainer();
 
@@ -93,7 +101,7 @@ class ShellSurfaceBuilder {
   absl::optional<gfx::Rect> geometry_;
   absl::optional<cc::Region> input_region_;
   absl::optional<SurfaceFrameType> type_;
-  SecurityDelegate* security_delegate_ = nullptr;
+  raw_ptr<SecurityDelegate, ExperimentalAsh> security_delegate_ = nullptr;
   std::string application_id_;
   bool use_system_modal_container_ = false;
   bool system_modal_ = false;
@@ -103,16 +111,21 @@ class ShellSurfaceBuilder {
   bool disable_movement_ = false;
   bool centered_ = false;
   bool built_ = false;
+  int64_t display_id_ = display::kInvalidDisplayId;
+  absl::optional<gfx::Rect> bounds_;
 
   // ShellSurface-specific parameters.
-  ShellSurface* parent_shell_surface_ = nullptr;
+  raw_ptr<ShellSurface, ExperimentalAsh> parent_shell_surface_ = nullptr;
   bool popup_ = false;
   bool menu_ = false;
+  absl::optional<bool> client_submits_surfaces_in_pixel_coordinates_;
+  ShellSurface::ConfigureCallback configure_callback_;
 
   // ClientControlledShellSurface-specific parameters.
   absl::optional<chromeos::WindowStateType> window_state_;
   bool default_scale_cancellation_ = false;
   std::unique_ptr<ClientControlledShellSurface::Delegate> delegate_;
+  bool supports_floated_state_ = true;
 };
 
 }  // namespace test

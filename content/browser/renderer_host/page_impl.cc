@@ -30,11 +30,6 @@ PageImpl::PageImpl(RenderFrameHostImpl& rfh, PageDelegate& delegate)
       delegate_(delegate),
       text_autosizer_page_info_({0, 0, 1.f}) {
   if (base::FeatureList::IsEnabled(
-          blink::features::kSharedStorageReportEventLimit)) {
-    select_url_report_event_budget_ = static_cast<double>(
-        blink::features::kSharedStorageReportEventBitBudgetPerPageLoad.Get());
-  }
-  if (base::FeatureList::IsEnabled(
           blink::features::kSharedStorageSelectURLLimit)) {
     select_url_overall_budget_ = static_cast<double>(
         blink::features::kSharedStorageSelectURLBitBudgetPerPageLoad.Get());
@@ -100,6 +95,10 @@ bool PageImpl::IsPageScaleFactorOne() {
   return GetPageScaleFactor() == 1.f;
 }
 
+const std::string& PageImpl::GetContentsMimeType() const {
+  return contents_mime_type_;
+}
+
 void PageImpl::OnFirstVisuallyNonEmptyPaint() {
   did_first_visually_non_empty_paint_ = true;
   delegate_->OnFirstVisuallyNonEmptyPaint(*this);
@@ -110,9 +109,10 @@ void PageImpl::OnThemeColorChanged(const absl::optional<SkColor>& theme_color) {
   delegate_->OnThemeColorChanged(*this);
 }
 
-void PageImpl::DidChangeBackgroundColor(SkColor background_color,
+void PageImpl::DidChangeBackgroundColor(SkColor4f background_color,
                                         bool color_adjust) {
-  main_document_background_color_ = background_color;
+  // TODO(aaronhk): This should remain an SkColor4f
+  main_document_background_color_ = background_color.toSkColor();
   delegate_->OnBackgroundColorChanged(*this);
   if (color_adjust) {
     // <meta name="color-scheme" content="dark"> may pass the dark canvas
@@ -123,7 +123,7 @@ void PageImpl::DidChangeBackgroundColor(SkColor background_color,
     // process navigations we would paint the default background (typically
     // white) while the rendering is blocked.
     main_document_->GetRenderWidgetHost()->GetView()->SetContentBackgroundColor(
-        background_color);
+        background_color.toSkColor());
   }
 }
 
@@ -170,7 +170,7 @@ void PageImpl::OnTextAutosizerPageInfoChanged(
       ->render_manager()
       ->ExecuteRemoteFramesBroadcastMethod(
           std::move(remote_frames_broadcast_callback),
-          main_document_->GetSiteInstance());
+          main_document_->GetSiteInstance()->group());
 }
 
 void PageImpl::SetActivationStartTime(base::TimeTicks activation_start) {
@@ -181,6 +181,8 @@ void PageImpl::SetActivationStartTime(base::TimeTicks activation_start) {
 void PageImpl::ActivateForPrerendering(
     StoredPage::RenderViewHostImplSafeRefSet& render_view_hosts,
     absl::optional<blink::ViewTransitionState> view_transition_state) {
+  TRACE_EVENT0("navigation", "PageImpl::ActivateForPrerendering");
+
   base::OnceClosure did_activate_render_views =
       base::BindOnce(&PageImpl::DidActivateAllRenderViewsForPrerendering,
                      weak_factory_.GetWeakPtr());
@@ -251,6 +253,9 @@ void PageImpl::MaybeDispatchLoadEventsOnPrerenderActivation() {
 }
 
 void PageImpl::DidActivateAllRenderViewsForPrerendering() {
+  TRACE_EVENT0("navigation",
+               "PageImpl::DidActivateAllRenderViewsForPrerendering");
+
   // Tell each RenderFrameHostImpl in this Page that activation finished.
   main_document_->ForEachRenderFrameHostIncludingSpeculative(
       [this](RenderFrameHostImpl* rfh) {
@@ -357,49 +362,6 @@ bool PageImpl::CheckAndMaybeDebitSelectURLBudgets(const url::Origin& origin,
 
   // Charge the overall budget.
   select_url_overall_budget_.value() -= bits_to_charge;
-  return true;
-}
-
-bool PageImpl::CheckAndMaybeDebitReportEventForSelectURLBudget(
-    RenderFrameHost& rfh) {
-  if (!select_url_report_event_budget_.has_value()) {
-    // `blink::features::kSharedStorageReportEventLimit` is disabled.
-    return true;
-  }
-
-  std::vector<const SharedStorageBudgetMetadata*> metadata_vector =
-      static_cast<RenderFrameHostImpl&>(rfh)
-          .frame_tree_node()
-          ->FindSharedStorageBudgetMetadata();
-
-  // Get the total charge.
-  double total_to_charge = 0;
-  for (const auto* metadata : metadata_vector) {
-    if (metadata->report_event_called) {
-      // The bits have already been charged for this URN.
-      continue;
-    }
-
-    total_to_charge += metadata->budget_to_charge;
-  }
-
-  if (total_to_charge > select_url_report_event_budget_.value()) {
-    // There is insufficient budget remaining.
-    return false;
-  }
-
-  // Set flag(s) that `reportEvent()` has now been called.
-  for (const auto* metadata : metadata_vector) {
-    if (metadata->report_event_called) {
-      // The bits have already been charged for this URN.
-      continue;
-    }
-
-    metadata->report_event_called = true;
-  }
-
-  // There is sufficient budget, so charge the total now.
-  select_url_report_event_budget_.value() -= total_to_charge;
   return true;
 }
 

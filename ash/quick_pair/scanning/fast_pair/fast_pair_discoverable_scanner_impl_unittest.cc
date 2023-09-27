@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 
+#include "ash/constants/ash_features.h"
 #include "ash/quick_pair/common/constants.h"
 #include "ash/quick_pair/common/device.h"
 #include "ash/quick_pair/common/pair_failure.h"
@@ -15,11 +16,13 @@
 #include "ash/quick_pair/scanning/fast_pair/fast_pair_discoverable_scanner.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/bind.h"
 #include "base/test/mock_callback.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "chromeos/ash/components/network/network_handler.h"
 #include "chromeos/ash/components/network/network_state_handler.h"
@@ -46,12 +49,12 @@ class FakeQuickPairProcessManager
  public:
   FakeQuickPairProcessManager(
       base::test::SingleThreadTaskEnvironment* task_environment)
-      : task_enviornment_(task_environment) {
+      : task_environment_(task_environment) {
     data_parser_ = std::make_unique<ash::quick_pair::FastPairDataParser>(
         fast_pair_data_parser_.InitWithNewPipeAndPassReceiver());
 
     data_parser_remote_.Bind(std::move(fast_pair_data_parser_),
-                             task_enviornment_->GetMainThreadTaskRunner());
+                             task_environment_->GetMainThreadTaskRunner());
   }
 
   ~FakeQuickPairProcessManager() override = default;
@@ -82,7 +85,8 @@ class FakeQuickPairProcessManager
   mojo::PendingRemote<ash::quick_pair::mojom::FastPairDataParser>
       fast_pair_data_parser_;
   std::unique_ptr<ash::quick_pair::FastPairDataParser> data_parser_;
-  base::test::SingleThreadTaskEnvironment* task_enviornment_;
+  raw_ptr<base::test::SingleThreadTaskEnvironment, ExperimentalAsh>
+      task_environment_;
   ProcessStoppedCallback on_process_stopped_callback_;
 };
 
@@ -101,6 +105,10 @@ class FastPairDiscoverableScannerImplTest : public testing::Test {
     metadata.set_trigger_distance(2);
     metadata.set_device_type(
         nearby::fastpair::DeviceType::TRUE_WIRELESS_HEADPHONES);
+
+    nearby::fastpair::Status* status = metadata.mutable_status();
+    status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
+
     repository_->SetFakeMetadata(kValidModelId, metadata);
 
     scanner_ = base::MakeRefCounted<FakeFastPairScanner>();
@@ -109,7 +117,7 @@ class FastPairDiscoverableScannerImplTest : public testing::Test {
         base::MakeRefCounted<testing::NiceMock<device::MockBluetoothAdapter>>();
 
     process_manager_ =
-        std::make_unique<FakeQuickPairProcessManager>(&task_enviornment_);
+        std::make_unique<FakeQuickPairProcessManager>(&task_environment_);
     quick_pair_process::SetProcessManager(process_manager_.get());
     fake_process_manager_ =
         static_cast<FakeQuickPairProcessManager*>(process_manager_.get());
@@ -152,8 +160,9 @@ class FastPairDiscoverableScannerImplTest : public testing::Test {
     return device_ptr;
   }
 
-  FakeQuickPairProcessManager* fake_process_manager_;
-  base::test::SingleThreadTaskEnvironment task_enviornment_;
+  raw_ptr<FakeQuickPairProcessManager, DanglingUntriaged | ExperimentalAsh>
+      fake_process_manager_;
+  base::test::SingleThreadTaskEnvironment task_environment_;
   NetworkStateTestHelper helper_{/*use_default_devices_and_services=*/true};
   scoped_refptr<FakeFastPairScanner> scanner_;
   std::unique_ptr<FakeFastPairRepository> repository_;
@@ -250,6 +259,8 @@ TEST_F(FastPairDiscoverableScannerImplTest, ValidModelId) {
 TEST_F(FastPairDiscoverableScannerImplTest, WrongDeviceType) {
   nearby::fastpair::Device metadata;
   metadata.set_trigger_distance(2);
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
   metadata.set_device_type(nearby::fastpair::DeviceType::AUTOMOTIVE);
   repository_->SetFakeMetadata(kValidModelId, metadata);
 
@@ -265,6 +276,8 @@ TEST_F(FastPairDiscoverableScannerImplTest, UnspecifiedNotificationType) {
   // we'll show the notification to be safe.
   nearby::fastpair::Device metadata;
   metadata.set_trigger_distance(2);
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
   metadata.set_device_type(
       nearby::fastpair::DeviceType::DEVICE_TYPE_UNSPECIFIED);
   metadata.set_notification_type(
@@ -285,6 +298,8 @@ TEST_F(FastPairDiscoverableScannerImplTest, V1NotificationType) {
   // FAST_PAIR_ONE.
   nearby::fastpair::Device metadata;
   metadata.set_trigger_distance(2);
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
   metadata.set_device_type(
       nearby::fastpair::DeviceType::DEVICE_TYPE_UNSPECIFIED);
   metadata.set_notification_type(
@@ -305,6 +320,8 @@ TEST_F(FastPairDiscoverableScannerImplTest, V2NotificationType) {
   // notification type of FAST_PAIR.
   nearby::fastpair::Device metadata;
   metadata.set_trigger_distance(2);
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
   metadata.set_device_type(
       nearby::fastpair::DeviceType::TRUE_WIRELESS_HEADPHONES);
   metadata.set_notification_type(nearby::fastpair::NotificationType::FAST_PAIR);
@@ -324,6 +341,8 @@ TEST_F(FastPairDiscoverableScannerImplTest, WrongNotificationType) {
   // APP_LAUNCH.
   nearby::fastpair::Device metadata;
   metadata.set_trigger_distance(2);
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
   metadata.set_device_type(
       nearby::fastpair::DeviceType::DEVICE_TYPE_UNSPECIFIED);
   metadata.set_notification_type(
@@ -343,6 +362,8 @@ TEST_F(FastPairDiscoverableScannerImplTest, WrongInteractionType) {
   // no device type, interaction type of AUTO_LAUNCH, and a notification type of
   // FAST_PAIR_ONE.
   nearby::fastpair::Device metadata;
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
   metadata.set_trigger_distance(2);
   metadata.set_device_type(
       nearby::fastpair::DeviceType::DEVICE_TYPE_UNSPECIFIED);
@@ -352,6 +373,96 @@ TEST_F(FastPairDiscoverableScannerImplTest, WrongInteractionType) {
   repository_->SetFakeMetadata(kValidModelId, metadata);
 
   EXPECT_CALL(found_device_callback_, Run).Times(0);
+  device::BluetoothDevice* device = GetDevice(kValidModelId);
+  scanner_->NotifyDeviceFound(device);
+  base::RunLoop().RunUntilIdle();
+}
+
+TEST_F(FastPairDiscoverableScannerImplTest,
+       InputDeviceDisallowedWhenHIDDisabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{},
+      /*disabled_features=*/{features::kFastPairHID});
+  nearby::fastpair::Device metadata;
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
+  metadata.set_trigger_distance(2);
+  metadata.set_device_type(nearby::fastpair::DeviceType::INPUT_DEVICE);
+  repository_->SetFakeMetadata(kValidModelId, metadata);
+
+  EXPECT_CALL(found_device_callback_, Run).Times(0);
+  device::BluetoothDevice* device = GetDevice(kValidModelId);
+  scanner_->NotifyDeviceFound(device);
+  base::RunLoop().RunUntilIdle();
+}
+
+TEST_F(FastPairDiscoverableScannerImplTest, InputDeviceAllowedWhenHIDEnabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{features::kFastPairHID},
+      /*disabled_features=*/{});
+  nearby::fastpair::Device metadata;
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
+  metadata.set_trigger_distance(2);
+  metadata.set_device_type(nearby::fastpair::DeviceType::INPUT_DEVICE);
+  repository_->SetFakeMetadata(kValidModelId, metadata);
+
+  EXPECT_CALL(found_device_callback_, Run).Times(1);
+  device::BluetoothDevice* device = GetDevice(kValidModelId);
+  scanner_->NotifyDeviceFound(device);
+  base::RunLoop().RunUntilIdle();
+}
+
+TEST_F(FastPairDiscoverableScannerImplTest, PublishedStatusTypeShown) {
+  // Set metadata to mimic a device with a published Status Type.
+  nearby::fastpair::Device metadata;
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
+  metadata.set_trigger_distance(2);
+  repository_->SetFakeMetadata(kValidModelId, metadata);
+
+  // A DeviceFound notification should be displayed.
+  EXPECT_CALL(found_device_callback_, Run).Times(1);
+  device::BluetoothDevice* device = GetDevice(kValidModelId);
+  scanner_->NotifyDeviceFound(device);
+  base::RunLoop().RunUntilIdle();
+}
+
+TEST_F(FastPairDiscoverableScannerImplTest, UnpublishedStatusTypeHidden) {
+  // Set metadata to mimic a device that doesn't specify the status type,
+  // which is what a "Debug device" will look like.
+  nearby::fastpair::Device metadata;
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::TYPE_UNSPECIFIED);
+  metadata.set_trigger_distance(2);
+  repository_->SetFakeMetadata(kValidModelId, metadata);
+
+  // No notification should be displayed.
+  EXPECT_CALL(found_device_callback_, Run).Times(0);
+  device::BluetoothDevice* device = GetDevice(kValidModelId);
+  scanner_->NotifyDeviceFound(device);
+  base::RunLoop().RunUntilIdle();
+}
+
+TEST_F(FastPairDiscoverableScannerImplTest,
+       UnpublishedStatusTypeShownWithDebugMetadataFlag) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{features::kFastPairDebugMetadata},
+      /*disabled_features=*/{});
+
+  // Set metadata to mimic a device that has submitted to the Nearby console and
+  // is awaiting publication.
+  nearby::fastpair::Device metadata;
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::SUBMITTED);
+  metadata.set_trigger_distance(2);
+  repository_->SetFakeMetadata(kValidModelId, metadata);
+
+  // The notification should be displayed since Debug Metadata flag is on.
+  EXPECT_CALL(found_device_callback_, Run).Times(1);
   device::BluetoothDevice* device = GetDevice(kValidModelId);
   scanner_->NotifyDeviceFound(device);
   base::RunLoop().RunUntilIdle();
@@ -436,6 +547,8 @@ TEST_F(FastPairDiscoverableScannerImplTest,
 TEST_F(FastPairDiscoverableScannerImplTest, InvokesLostCallbackAfterFound_v2) {
   nearby::fastpair::Device metadata;
   metadata.set_trigger_distance(2);
+  nearby::fastpair::Status* status = metadata.mutable_status();
+  status->set_status_type(nearby::fastpair::StatusType::PUBLISHED);
   metadata.set_device_type(
       nearby::fastpair::DeviceType::TRUE_WIRELESS_HEADPHONES);
   auto* key_pair = new ::nearby::fastpair::AntiSpoofingKeyPair();

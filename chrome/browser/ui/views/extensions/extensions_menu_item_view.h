@@ -12,6 +12,7 @@
 #include "base/memory/raw_ptr.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/controls/button/toggle_button.h"
 #include "ui/views/layout/flex_layout_view.h"
 
 class Browser;
@@ -21,6 +22,10 @@ class HoverButton;
 class ToolbarActionViewController;
 class ToolbarActionsModel;
 
+namespace views {
+class ToggleButton;
+}  // namespace views
+
 // Single row inside the extensions menu for every installed extension. Includes
 // information about the extension, a button to pin the extension to the toolbar
 // and a button for accessing the associated context menu.
@@ -28,12 +33,47 @@ class ExtensionMenuItemView : public views::FlexLayoutView {
  public:
   METADATA_HEADER(ExtensionMenuItemView);
 
+  enum class SiteAccessToggleState {
+    // Button is not visible.
+    kHidden,
+    // Button is visible and off.
+    kOff,
+    // Button is visible and on.
+    kOn,
+  };
+
+  enum class SitePermissionsButtonState {
+    // Button is not visible.
+    kHidden,
+    // Button is visible, but disabled.
+    kDisabled,
+    // Button is visible and enabled.
+    kEnabled,
+  };
+
+  // Extension site access displayed in the site permissions button.
+  enum class SitePermissionsButtonAccess {
+    // Extension has no site access.
+    kNone,
+    // Extension has site access when clicked.
+    kOnClick,
+    // Extension has site access to this site.
+    kOnSite,
+    // Extension has site access to all sites.
+    kOnAllSites
+  };
+
+  ExtensionMenuItemView(Browser* browser,
+                        std::unique_ptr<ToolbarActionViewController> controller,
+                        bool allow_pinning);
+
+  // Constructor for the kExtensionsMenuAccessControl feature.
   ExtensionMenuItemView(
       Browser* browser,
+      bool is_enterprise,
       std::unique_ptr<ToolbarActionViewController> controller,
-      bool allow_pinning,
-      views::Button::PressedCallback site_permissions_button_callback =
-          base::RepeatingClosure(base::NullCallback()));
+      base::RepeatingCallback<void(bool)> site_access_toggle_callback,
+      views::Button::PressedCallback site_permissions_button_callback);
   ExtensionMenuItemView(const ExtensionMenuItemView&) = delete;
   ExtensionMenuItemView& operator=(const ExtensionMenuItemView&) = delete;
   ~ExtensionMenuItemView() override;
@@ -42,10 +82,15 @@ class ExtensionMenuItemView : public views::FlexLayoutView {
   void OnThemeChanged() override;
 
   // Updates the controller and child views to be on sync with the parent views.
-  void Update();
+  void Update(SiteAccessToggleState site_access_toggle_state,
+              SitePermissionsButtonState site_permissions_button_state,
+              SitePermissionsButtonAccess site_permissions_button_access);
 
   // Updates the pin button.
-  void UpdatePinButton();
+  void UpdatePinButton(bool is_force_pinned, bool is_pinned);
+
+  // Updates the context menu button given `is_action_pinned`.
+  void UpdateContextMenuButton(bool is_action_pinned);
 
   ToolbarActionViewController* view_controller() { return controller_.get(); }
   const ToolbarActionViewController* view_controller() const {
@@ -56,6 +101,9 @@ class ExtensionMenuItemView : public views::FlexLayoutView {
   ExtensionsMenuButton* primary_action_button_for_testing() {
     return primary_action_button_;
   }
+  views::ToggleButton* site_access_toggle_for_testing() {
+    return site_access_toggle_;
+  }
   HoverButton* context_menu_button_for_testing() {
     return context_menu_button_;
   }
@@ -63,11 +111,14 @@ class ExtensionMenuItemView : public views::FlexLayoutView {
   HoverButton* site_permissions_button_for_testing() {
     return site_permissions_button_;
   }
+  views::View* site_permissions_button_icon_for_testing() {
+    return site_permissions_button_icon_;
+  }
 
  private:
-  // Returns whether the action corresponding to this view is pinned to the
-  // toolbar.
-  bool IsPinned() const;
+  // Sets ups the context menu button controllers. Must be called by the
+  // constructor.
+  void SetupContextMenuButton();
 
   // Handles the context menu button press. This is passed as a callback to
   // `context_menu_button_`.
@@ -88,7 +139,12 @@ class ExtensionMenuItemView : public views::FlexLayoutView {
 
   raw_ptr<ExtensionsMenuButton> primary_action_button_;
 
+  raw_ptr<views::ToggleButton> site_access_toggle_ = nullptr;
+
+  // Button that displays the extension site access and opens its site
+  // permissions page.
   raw_ptr<HoverButton> site_permissions_button_ = nullptr;
+  raw_ptr<views::View> site_permissions_button_icon_ = nullptr;
 
   raw_ptr<HoverButton> pin_button_ = nullptr;
 

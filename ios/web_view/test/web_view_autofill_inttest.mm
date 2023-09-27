@@ -17,10 +17,6 @@
 #import "third_party/ocmock/OCMock/OCMock.h"
 #include "url/gurl.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 using base::test::ios::kWaitForActionTimeout;
 using base::test::ios::WaitUntilConditionOrTimeout;
 using base::test::ios::kWaitForPageLoadTimeout;
@@ -98,7 +94,6 @@ class WebViewAutofillTest : public WebViewInttestBase {
   // that form.
   [[nodiscard]] bool LoadTestPage() {
     std::string html = base::SysNSStringToUTF8(kTestFormHtml);
-    main_frame_id_ = nil;
     GURL url = GetUrlForPageWithHtmlBody(html);
     [[autofill_controller_delegate_ expect]
         autofillController:autofill_controller_
@@ -138,14 +133,14 @@ class WebViewAutofillTest : public WebViewInttestBase {
     return !error;
   }
 
-  NSArray<CWVAutofillSuggestion*>* FetchSuggestions() {
+  NSArray<CWVAutofillSuggestion*>* FetchSuggestions(NSString* main_frame_id) {
     __block bool suggestions_fetched = false;
     __block NSArray<CWVAutofillSuggestion*>* fetched_suggestions = nil;
     [autofill_controller_
         fetchSuggestionsForFormWithName:kTestFormName
                         fieldIdentifier:kTestAddressFieldID
                               fieldType:kTestFieldType
-                                frameID:GetMainFrameId()
+                                frameID:main_frame_id
                       completionHandler:^(
                           NSArray<CWVAutofillSuggestion*>* suggestions) {
                         fetched_suggestions = suggestions;
@@ -158,12 +153,8 @@ class WebViewAutofillTest : public WebViewInttestBase {
   }
 
   NSString* GetMainFrameId() {
-    if (main_frame_id_) {
-      return main_frame_id_;
-    }
     NSString* main_frame_id_script = @"__gCrWeb.message.getFrameId();";
-    main_frame_id_ = test::EvaluateJavaScript(web_view_, main_frame_id_script);
-    return main_frame_id_;
+    return test::EvaluateJavaScript(web_view_, main_frame_id_script);
   }
 
   bool WaitUntilPageLoaded() {
@@ -180,7 +171,6 @@ class WebViewAutofillTest : public WebViewInttestBase {
   CWVAutofillController* autofill_controller_;
   id autofill_controller_delegate_ = nil;
   id<CWVNavigationDelegate> navigation_delegate_ = nil;
-  NSString* main_frame_id_ = nil;
   UIView* dummy_super_view_ = nil;
 };
 
@@ -248,11 +238,13 @@ TEST_F(WebViewAutofillTest, TestDelegateCallbacks) {
   [autofill_controller_delegate_
       verifyWithDelay:kWaitForActionTimeout.InSecondsF()];
 
-  [[autofill_controller_delegate_ expect]
+  // TODO(crbug.com/1444468): `userInitiated` flipped from `NO` in iOS 16.1 to
+  // `YES` in 16.4, so we cannot reliably verify it until the bug is fixed.
+  [[[autofill_controller_delegate_ expect] ignoringNonObjectArgs]
          autofillController:autofill_controller_
       didSubmitFormWithName:kTestFormName
                     frameID:[OCMArg any]
-              userInitiated:NO];
+              userInitiated:[OCMArg any]];
   // The 'submit' event listener defined in form.js is only called during the
   // bubbling phase.
   NSString* submit_script =
@@ -295,13 +287,18 @@ TEST_F(WebViewAutofillTest, TestSuggestionFetchFillClear) {
 
   ASSERT_TRUE(LoadTestPage());
 
+  __block NSString* main_frame_id = nil;
+
   // The input element needs to be focused before suggestions can be fetched.
   [[autofill_controller_delegate_ expect]
                  autofillController:autofill_controller_
       didFocusOnFieldWithIdentifier:kTestAddressFieldID
                           fieldType:kTestFieldType
                            formName:kTestFormName
-                            frameID:[OCMArg any]
+                            frameID:[OCMArg checkWithBlock:^BOOL(id frameId) {
+                              main_frame_id = frameId;
+                              return frameId != nil;
+                            }]
                               value:[OCMArg any]
                       userInitiated:YES];
   NSString* focus_script =
@@ -313,12 +310,13 @@ TEST_F(WebViewAutofillTest, TestSuggestionFetchFillClear) {
   [autofill_controller_delegate_
       verifyWithDelay:kWaitForActionTimeout.InSecondsF()];
 
-  NSArray<CWVAutofillSuggestion*>* fetched_suggestions = FetchSuggestions();
+  NSArray<CWVAutofillSuggestion*>* fetched_suggestions =
+      FetchSuggestions(main_frame_id);
   ASSERT_EQ(1U, fetched_suggestions.count);
   CWVAutofillSuggestion* fetched_suggestion = fetched_suggestions.firstObject;
   EXPECT_NSEQ(kTestAddressFieldValue, fetched_suggestion.value);
   EXPECT_NSEQ(kTestFormName, fetched_suggestion.formName);
-  EXPECT_NSEQ(GetMainFrameId(), fetched_suggestion.frameID);
+  EXPECT_NSEQ(main_frame_id, fetched_suggestion.frameID);
 
   [autofill_controller_ acceptSuggestion:fetched_suggestion
                        completionHandler:nil];
@@ -339,7 +337,7 @@ TEST_F(WebViewAutofillTest, TestSuggestionFetchFillClear) {
   ASSERT_FALSE(filled_error);
   [autofill_controller_ clearFormWithName:kTestFormName
                           fieldIdentifier:kTestAddressFieldID
-                                  frameID:GetMainFrameId()
+                                  frameID:main_frame_id
                         completionHandler:nil];
   NSString* cleared_script =
       [NSString stringWithFormat:@"document.getElementById('%@').value",

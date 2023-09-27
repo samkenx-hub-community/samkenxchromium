@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "chrome/browser/ash/login/ui/captive_portal_window_proxy.h"
+#include "base/memory/raw_ptr.h"
 
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/ash/login/ui/captive_portal_view.h"
@@ -33,11 +34,11 @@ class CaptivePortalWidget : public views::Widget {
 
   // views::Widget:
   const ui::ThemeProvider* GetThemeProvider() const override;
-  ui::ColorProviderManager::ThemeInitializerSupplier* GetCustomTheme()
+  ui::ColorProviderKey::ThemeInitializerSupplier* GetCustomTheme()
       const override;
 
  private:
-  Profile* profile_;
+  raw_ptr<Profile, ExperimentalAsh> profile_;
 };
 
 CaptivePortalWidget::CaptivePortalWidget(Profile* profile)
@@ -47,7 +48,7 @@ const ui::ThemeProvider* CaptivePortalWidget::GetThemeProvider() const {
   return &ThemeService::GetThemeProviderForProfile(profile_);
 }
 
-ui::ColorProviderManager::ThemeInitializerSupplier*
+ui::ColorProviderKey::ThemeInitializerSupplier*
 CaptivePortalWidget::GetCustomTheme() const {
   return ThemeService::GetThemeSupplierForProfile(profile_);
 }

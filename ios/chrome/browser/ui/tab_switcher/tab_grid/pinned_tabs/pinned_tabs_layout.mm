@@ -6,10 +6,6 @@
 
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_constants.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 @implementation PinnedTabsLayout
 
 - (instancetype)init {
@@ -26,7 +22,7 @@
   [super prepareLayout];
 
   NSInteger itemCount = [self.collectionView numberOfItemsInSection:0];
-  // No neeed to update the layout if the collectionView is empty.
+  // No need to update the layout if the collectionView is empty.
   if (itemCount == 0) {
     return;
   }

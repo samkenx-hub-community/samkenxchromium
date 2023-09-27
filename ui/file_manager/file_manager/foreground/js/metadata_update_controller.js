@@ -4,7 +4,7 @@
 
 import {util} from '../../common/js/util.js';
 import {Store} from '../../externs/ts/store.js';
-import {updateMetadata} from '../../state/actions/all_entries.js';
+import {updateMetadata} from '../../state/ducks/all_entries.js';
 import {getStore} from '../../state/store.js';
 
 import {DirectoryModel} from './directory_model.js';
@@ -71,7 +71,7 @@ export class MetadataUpdateController {
     // changed.
     const isFakeEntry = util.isFakeEntry(directoryEntry);
     const changedEntries =
-        (isFakeEntry ? [] : [directoryEntry]).concat(entries);
+        (isFakeEntry ? [] : [util.unwrapEntry(directoryEntry)]).concat(entries);
     this.metadataModel_.notifyEntriesChanged(changedEntries);
 
     // We don't pass callback here. When new metadata arrives, we have an

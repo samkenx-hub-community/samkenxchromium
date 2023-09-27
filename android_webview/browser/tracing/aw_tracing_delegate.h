@@ -24,14 +24,12 @@ class AwTracingDelegate : public content::TracingDelegate {
   static void RegisterPrefs(PrefRegistrySimple* registry);
 
   // content::TracingDelegate implementation:
-  bool IsAllowedToBeginBackgroundScenario(
-      const content::BackgroundTracingConfig& config,
-      bool requires_anonymized_data) override;
-  bool IsAllowedToEndBackgroundScenario(
-      const content::BackgroundTracingConfig& config,
-      bool requires_anonymized_data,
-      bool is_crash_scenario) override;
+  bool OnBackgroundTracingActive(bool requires_anonymized_data) override;
+  bool OnBackgroundTracingIdle(bool requires_anonymized_data) override;
   absl::optional<base::Value::Dict> GenerateMetadataDict() override;
+
+ private:
+  bool IsAllowedToStartScenario() const;
 };
 
 }  // namespace android_webview

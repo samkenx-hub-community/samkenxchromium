@@ -24,11 +24,18 @@ extern const char kPrivacySandboxSettings4ConsentRequiredName[];
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const char kPrivacySandboxSettings4NoticeRequiredName[];
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+extern const char kPrivacySandboxSettings4RestrictedNoticeName[];
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const char kPrivacySandboxSettings4ForceShowConsentForTestingName[];
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const char kPrivacySandboxSettings4ForceShowNoticeRowForTestingName[];
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const char kPrivacySandboxSettings4ForceShowNoticeEeaForTestingName[];
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+extern const char
+    kPrivacySandboxSettings4ForceShowNoticeRestrictedForTestingName[];
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+extern const char kPrivacySandboxSettings4ForceRestrictedUserForTestingName[];
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const char kPrivacySandboxSettings4ShowSampleDataForTestingName[];
 
@@ -42,6 +49,10 @@ extern const base::FeatureParam<bool> kPrivacySandboxSettings4ConsentRequired;
 // should be enabled at any one time.
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const base::FeatureParam<bool> kPrivacySandboxSettings4NoticeRequired;
+
+// When true, the user could be shown a Privacy Sandbox restricted notice.
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+extern const base::FeatureParam<bool> kPrivacySandboxSettings4RestrictedNotice;
 
 // Feature parameters which should exclusively be used for testing purposes.
 // Enabling any of these parameters may result in the Privacy Sandbox prefs
@@ -58,7 +69,24 @@ extern const base::FeatureParam<bool>
     kPrivacySandboxSettings4ForceShowNoticeEeaForTesting;
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const base::FeatureParam<bool>
+    kPrivacySandboxSettings4ForceShowNoticeRestrictedForTesting;
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+extern const base::FeatureParam<bool>
+    kPrivacySandboxSettings4ForceRestrictedUserForTesting;
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+extern const base::FeatureParam<bool>
     kPrivacySandboxSettings4ShowSampleDataForTesting;
+
+// When true, suppress any Privacy Sandbox dialog if Chrome is launched
+// from an external app.
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+extern const base::FeatureParam<bool>
+    kPrivacySandboxSettings4SuppressDialogForExternalAppLaunches;
+
+// When true, attempts to close all open dialogs when one dialog's flow has
+// been completed. Included as a kill switch.
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+extern const base::FeatureParam<bool> kPrivacySandboxSettings4CloseAllPrompts;
 
 // Enables the third release of the Privacy Sandbox settings.
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
@@ -111,6 +139,29 @@ BASE_DECLARE_FEATURE(kPrivacySandboxFirstPartySetsUI);
 // for testing purposes only.
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const base::FeatureParam<bool> kPrivacySandboxFirstPartySetsUISampleSets;
+
+// Enables enforcement of Privacy Sandbox Enrollment/Attestations.
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+BASE_DECLARE_FEATURE(kEnforcePrivacySandboxAttestations);
+
+// Gives a list of sites permission to use Privacy Sandbox features without
+// being officially enrolled.
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+extern const char kPrivacySandboxEnrollmentOverrides[];
+
+// Allow the Privacy Sandbox Attestations component registration to use higher
+// task priority.
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+BASE_DECLARE_FEATURE(
+    kPrivacySandboxAttestationsHigherComponentRegistrationPriority);
+
+// Enables Privacy Sandbox Proactive Topics Blocking.
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+BASE_DECLARE_FEATURE(kPrivacySandboxProactiveTopicsBlocking);
+
+// Forces profile eligibility for Tracking Protection Onboarding.
+COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
+BASE_DECLARE_FEATURE(kTrackingProtectionOnboardingForceEligibility);
 
 }  // namespace privacy_sandbox
 

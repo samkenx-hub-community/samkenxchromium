@@ -8,6 +8,8 @@
 #include <map>
 
 #include "base/containers/flat_map.h"
+#include "base/memory/raw_ptr.h"
+#include "base/scoped_observation.h"
 #include "chrome/browser/apps/app_service/metrics/app_platform_metrics_utils.h"
 #include "chrome/browser/apps/app_service/metrics/browser_to_tab_list.h"
 #include "chrome/browser/profiles/profile.h"
@@ -107,7 +109,7 @@ class AppPlatformInputMetrics : public ui::EventHandler,
   // Records the input events UKM saved in the user pref.
   void RecordInputEventsUkmFromPref();
 
-  Profile* profile_;
+  raw_ptr<Profile, ExperimentalAsh> profile_;
 
   BrowserToTabList browser_to_tab_list_;
 
@@ -133,6 +135,9 @@ class AppPlatformInputMetrics : public ui::EventHandler,
   // },
   std::map<std::string, EventSourceToCounts>
       app_id_to_event_count_per_two_hours_;
+
+  base::ScopedObservation<InstanceRegistry, InstanceRegistry::Observer>
+      instance_registry_observation_{this};
 };
 
 }  // namespace apps

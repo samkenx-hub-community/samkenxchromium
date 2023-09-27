@@ -5,15 +5,11 @@
 #import "ios/chrome/browser/ui/tab_switcher/tab_strip/tab_strip_coordinator.h"
 
 #import "base/check_op.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/main/browser.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_strip/tab_strip_mediator.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_strip/tab_strip_view_controller.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @protocol TabStripContaining;
 
@@ -39,19 +35,20 @@
   if (self.tabStripViewController)
     return;
 
+  ChromeBrowserState* browserState = self.browser->GetBrowserState();
+  CHECK(browserState);
+
   self.tabStripViewController = [[TabStripViewController alloc] init];
   self.tabStripViewController.overrideUserInterfaceStyle =
-      self.browser->GetBrowserState()->IsOffTheRecord()
-          ? UIUserInterfaceStyleDark
-          : UIUserInterfaceStyleUnspecified;
-  self.tabStripViewController.isOffTheRecord =
-      self.browser->GetBrowserState()->IsOffTheRecord();
+      browserState->IsOffTheRecord() ? UIUserInterfaceStyleDark
+                                     : UIUserInterfaceStyleUnspecified;
+  self.tabStripViewController.isOffTheRecord = browserState->IsOffTheRecord();
 
   self.mediator =
       [[TabStripMediator alloc] initWithConsumer:self.tabStripViewController];
   self.mediator.webStateList = self.browser->GetWebStateList();
+  self.mediator.browserState = browserState;
 
-  self.tabStripViewController.faviconDataSource = self.mediator;
   self.tabStripViewController.delegate = self.mediator;
 }
 
@@ -65,10 +62,6 @@
 
 - (UIViewController*)viewController {
   return self.tabStripViewController;
-}
-
-- (void)setLongPressDelegate:(id<PopupMenuLongPressDelegate>)longPressDelegate {
-  _longPressDelegate = longPressDelegate;
 }
 
 - (UIView<TabStripContaining>*)view {

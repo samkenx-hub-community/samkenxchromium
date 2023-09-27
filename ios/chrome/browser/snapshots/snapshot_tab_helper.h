@@ -9,10 +9,11 @@
 
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
+#include "ios/chrome/browser/snapshots/snapshot_id.h"
 #include "ios/web/public/web_state_observer.h"
-#import "ios/web/public/web_state_user_data.h"
+#include "ios/web/public/web_state_user_data.h"
 
-@class SnapshotCache;
+@class SnapshotStorage;
 @class SnapshotGenerator;
 @protocol SnapshotGeneratorDelegate;
 
@@ -33,9 +34,9 @@ class SnapshotTabHelper : public web::WebStateObserver,
   // results in failures. The delegate is not owned by the tab helper.
   void SetDelegate(id<SnapshotGeneratorDelegate> delegate);
 
-  // Sets the snapshot cache to be used to store and retrieve snapshots. This is
-  // not owned by the tab helper.
-  void SetSnapshotCache(SnapshotCache* snapshot_cache);
+  // Sets the snapshot storage to be used to store and retrieve snapshots. This
+  // is not owned by the tab helper.
+  void SetSnapshotStorage(SnapshotStorage* snapshot_storage);
 
   // Retrieves a color snapshot for the current page, invoking `callback` with
   // the image. The callback may be called synchronously if there is a cached
@@ -51,13 +52,13 @@ class SnapshotTabHelper : public web::WebStateObserver,
   // `callback` with nil if a snapshot does not exist.
   void RetrieveGreySnapshot(void (^callback)(UIImage*));
 
-  // Asynchronously generates a new snapshot, updates the snapshot cache, and
+  // Asynchronously generates a new snapshot, updates the snapshot storage, and
   // invokes `callback` with the new snapshot image. Invokes `callback` with nil
   // if snapshot generation fails.
   void UpdateSnapshotWithCallback(void (^callback)(UIImage*));
 
   // Generates a new snapshot without any overlays, and returns the new snapshot
-  // image. This does not update the snapshot cache. Returns nil if snapshot
+  // image. This does not update the snapshot storage. Returns nil if snapshot
   // generation fails.
   UIImage* GenerateSnapshotWithoutOverlays();
 
@@ -75,6 +76,9 @@ class SnapshotTabHelper : public web::WebStateObserver,
   // Write a grey copy of the snapshot to disk, but if and only if a color
   // version of the snapshot already exists in memory or on disk.
   void SaveGreyInBackground();
+
+  // Returns the ID to use for the snapshot.
+  SnapshotID GetSnapshotID() const;
 
  private:
   friend class web::WebStateUserData<SnapshotTabHelper>;
@@ -103,7 +107,7 @@ class SnapshotTabHelper : public web::WebStateObserver,
 
   // Used to ensure `UpdateSnapshotWithCallback()` is not run when this object
   // is destroyed.
-  base::WeakPtrFactory<SnapshotTabHelper> weak_ptr_factory_;
+  base::WeakPtrFactory<SnapshotTabHelper> weak_ptr_factory_{this};
 
   WEB_STATE_USER_DATA_KEY_DECL();
 };

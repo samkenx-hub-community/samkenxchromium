@@ -7,6 +7,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/no_destructor.h"
 #include "build/chromeos_buildflags.h"
+#include "chrome/browser/browser_features.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -19,7 +20,7 @@
 #include "components/safe_browsing/core/browser/sync/sync_utils.h"
 #include "components/safe_browsing/core/browser/user_population.h"
 #include "components/safe_browsing/core/browser/verdict_cache_manager.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
 
 namespace safe_browsing {
 
@@ -67,8 +68,8 @@ ChromeUserPopulation GetUserPopulationForProfile(Profile* profile) {
     return ChromeUserPopulation();
 
   syncer::SyncService* sync = SyncServiceFactory::GetForProfile(profile);
-  bool is_history_sync_enabled =
-      sync && sync->IsSyncFeatureActive() && !sync->IsLocalSyncEnabled() &&
+  bool is_history_sync_active =
+      sync && !sync->IsLocalSyncEnabled() &&
       sync->GetActiveDataTypes().Has(syncer::HISTORY_DELETE_DIRECTIVES);
   signin::IdentityManager* identity_manager =
       IdentityManagerFactory::GetForProfile(profile);
@@ -103,13 +104,32 @@ ChromeUserPopulation GetUserPopulationForProfile(Profile* profile) {
   }
 
   ChromeUserPopulation population = GetUserPopulation(
-      profile->GetPrefs(), profile->IsOffTheRecord(), is_history_sync_enabled,
+      profile->GetPrefs(), profile->IsOffTheRecord(), is_history_sync_active,
       is_signed_in, is_under_advanced_protection,
       g_browser_process->browser_policy_connector(), std::move(num_profiles),
       std::move(num_loaded_profiles), std::move(num_open_profiles));
 
   ComparePopulationWithCache(profile, population);
   GetCachedUserPopulation(profile) = population;
+
+  return population;
+}
+
+ChromeUserPopulation GetUserPopulationForProfileWithCookieTheftExperiments(
+    Profile* profile) {
+  ChromeUserPopulation population = GetUserPopulationForProfile(profile);
+
+  if (population.user_population() ==
+      ChromeUserPopulation::ENHANCED_PROTECTION) {
+    static const base::NoDestructor<std::vector<const base::Feature*>>
+        kCookieTheftExperiments{{
+#if BUILDFLAG(IS_WIN)
+            &features::kLockProfileCookieDatabase
+#endif
+        }};
+
+    GetExperimentStatus(*kCookieTheftExperiments, &population);
+  }
 
   return population;
 }

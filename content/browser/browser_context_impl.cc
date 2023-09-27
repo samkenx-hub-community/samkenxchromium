@@ -15,6 +15,8 @@
 #include "content/browser/download/download_manager_impl.h"
 #include "content/browser/permissions/permission_controller_impl.h"
 #include "content/browser/preloading/prefetch/prefetch_service.h"
+#include "content/browser/renderer_host/navigation_transitions/navigation_entry_screenshot_cache.h"
+#include "content/browser/renderer_host/navigation_transitions/navigation_entry_screenshot_manager.h"
 #include "content/browser/speech/tts_controller_impl.h"
 #include "content/browser/storage_partition_impl_map.h"
 #include "content/public/browser/browser_context.h"
@@ -39,7 +41,7 @@ void ShutdownServiceWorkerContext(StoragePartition* partition) {
   ServiceWorkerContextWrapper* wrapper =
       static_cast<ServiceWorkerContextWrapper*>(
           partition->GetServiceWorkerContext());
-  wrapper->process_manager()->Shutdown();
+  wrapper->Shutdown();
 }
 
 void ShutdownSharedWorkerContext(StoragePartition* partition) {
@@ -293,10 +295,25 @@ storage::ExternalMountPoints* BrowserContextImpl::GetMountPoints() {
 }
 
 PrefetchService* BrowserContextImpl::GetPrefetchService() {
-  if (!prefetch_service_)
-    prefetch_service_ = PrefetchService::CreateIfPossible(self_);
+  if (!prefetch_service_) {
+    prefetch_service_ = std::make_unique<PrefetchService>(self_);
+  }
 
   return prefetch_service_.get();
+}
+
+void BrowserContextImpl::SetPrefetchServiceForTesting(
+    std::unique_ptr<PrefetchService> prefetch_service) {
+  prefetch_service_ = std::move(prefetch_service);
+}
+
+NavigationEntryScreenshotManager*
+BrowserContextImpl::GetNavigationEntryScreenshotManager() {
+  if (!nav_entry_screenshot_manager_ && AreBackForwardTransitionsEnabled()) {
+    nav_entry_screenshot_manager_ =
+        std::make_unique<NavigationEntryScreenshotManager>();
+  }
+  return nav_entry_screenshot_manager_.get();
 }
 
 void BrowserContextImpl::WriteIntoTrace(

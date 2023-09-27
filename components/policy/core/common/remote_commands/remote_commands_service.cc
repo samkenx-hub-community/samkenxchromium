@@ -9,12 +9,14 @@
 #include <string>
 #include <utility>
 
+#include "base/check_is_test.h"
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/stringprintf.h"
 #include "base/syslog_logging.h"
+#include "build/chromeos_buildflags.h"
 #include "components/policy/core/common/cloud/cloud_policy_client.h"
 #include "components/policy/core/common/cloud/cloud_policy_constants.h"
 #include "components/policy/core/common/cloud/cloud_policy_store.h"
@@ -182,6 +184,24 @@ std::string RemoteCommandsService::GetMetricNameExecutedRemoteCommand(
                             RemoteCommandTypeToString(command_type));
 }
 
+// static
+std::string RemoteCommandsService::GetRequestType(
+    PolicyInvalidationScope scope) {
+  switch (scope) {
+    case PolicyInvalidationScope::kDevice:
+    case PolicyInvalidationScope::kDeviceLocalAccount:
+      return dm_protocol::kChromeDeviceRemoteCommandType;
+    case PolicyInvalidationScope::kCBCM:
+      return dm_protocol::kChromeBrowserRemoteCommandType;
+    case PolicyInvalidationScope::kUser:
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+      return dm_protocol::kChromeAshUserRemoteCommandType;
+#else
+      return dm_protocol::kChromeUserRemoteCommandType;
+#endif
+  }
+}
+
 RemoteCommandsService::RemoteCommandsService(
     std::unique_ptr<RemoteCommandsFactory> factory,
     CloudPolicyClient* client,
@@ -192,12 +212,13 @@ RemoteCommandsService::RemoteCommandsService(
       store_(store),
       scope_(scope) {
   DCHECK(client_);
-  queue_.AddObserver(this);
+  remote_commands_queue_observation.Observe(&queue_);
+  if (!factory_) {
+    CHECK_IS_TEST();
+  }
 }
 
-RemoteCommandsService::~RemoteCommandsService() {
-  queue_.RemoveObserver(this);
-}
+RemoteCommandsService::~RemoteCommandsService() = default;
 
 bool RemoteCommandsService::FetchRemoteCommands() {
   if (!client_->is_registered()) {
@@ -234,6 +255,7 @@ bool RemoteCommandsService::FetchRemoteCommands() {
 
   client_->FetchRemoteCommands(
       std::move(id_to_acknowledge), previous_results, GetSignatureType(),
+      GetRequestType(scope_),
       base::BindOnce(&RemoteCommandsService::OnRemoteCommandsFetched,
                      weak_factory_.GetWeakPtr()));
 

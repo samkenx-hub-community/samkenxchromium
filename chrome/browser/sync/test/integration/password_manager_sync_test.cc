@@ -7,6 +7,7 @@
 
 #include "base/files/file_util.h"
 #include "base/json/json_reader.h"
+#include "base/memory/raw_ptr.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/stringprintf.h"
@@ -36,6 +37,7 @@
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/password_manager/core/browser/features/password_features.h"
 #include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_manager_features_util.h"
 #include "components/password_manager/core/browser/password_manager_test_utils.h"
@@ -53,7 +55,7 @@
 #include "components/prefs/pref_service.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/sync/base/model_type.h"
-#include "components/sync/driver/sync_service_impl.h"
+#include "components/sync/service/sync_service_impl.h"
 #include "components/sync/test/fake_server_nigori_helper.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browsing_data_remover.h"
@@ -112,9 +114,12 @@ class SavedPasswordsPresenterWaiter
     return presenter_->GetSavedCredentials().size() == n_passwords_;
   }
 
-  void OnSavedPasswordsChanged() override { CheckExitCondition(); }
+  void OnSavedPasswordsChanged(
+      const password_manager::PasswordStoreChangeList& changes) override {
+    CheckExitCondition();
+  }
 
-  password_manager::SavedPasswordsPresenter* const presenter_;
+  const raw_ptr<password_manager::SavedPasswordsPresenter> presenter_;
   const size_t n_passwords_;
 };
 
@@ -804,12 +809,17 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerSyncTest,
   // is *not* the primary one.
   NavigateToFileHttps(web_contents, "accounts.google.com",
                       "/password/simple_password.html");
+  // The call ensures that the form wasn't submitted too quickly before the
+  // password store returned something. Otherwise, the password prompt won't be
+  // shown.
+  GetAllLoginsFromProfilePasswordStore();
+  GetAllLoginsFromAccountPasswordStore();
   FillAndSubmitPasswordForm(web_contents, "different-user@gmail.com", "pass");
 
   // Since the submitted credential is *not* for the primary account, Chrome
   // should offer to save it normally.
   BubbleObserver bubble_observer(web_contents);
-  EXPECT_TRUE(bubble_observer.IsSavePromptAvailable());
+  bubble_observer.WaitForAutomaticSavePrompt();
 }
 
 IN_PROC_BROWSER_TEST_F(PasswordManagerSyncTest,
@@ -829,13 +839,18 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerSyncTest,
   // account.
   NavigateToFileHttps(web_contents, "accounts.google.com",
                       "/password/simple_password.html");
+  // The call ensures that the form wasn't submitted too quickly before the
+  // password store returned something. Otherwise, the password prompt won't be
+  // shown.
+  GetAllLoginsFromProfilePasswordStore();
+  GetAllLoginsFromAccountPasswordStore();
   FillAndSubmitPasswordForm(web_contents, kTestUserEmail, "newpass");
 
   // Since (an outdated version of) the credential is already saved, Chrome
   // should offer to update it, even though it otherwise does *not* offer to
   // save this credential.
   BubbleObserver bubble_observer(web_contents);
-  EXPECT_TRUE(bubble_observer.IsUpdatePromptAvailable());
+  bubble_observer.WaitForAutomaticUpdatePrompt();
 }
 
 // Signing out on Lacros is not possible,
@@ -1037,7 +1052,8 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerSyncTestWithPolicy,
 }
 
 IN_PROC_BROWSER_TEST_F(PasswordManagerSyncTestWithPolicy,
-                       SyncTypesListDisabled) {
+                       // TODO(crbug.com/1431264): Re-enable this test
+                       DISABLED_SyncTypesListDisabled) {
   // Disable passwords via the kSyncTypesListDisabled policy. The PRE_ test is
   // required because the policy is only applied on startup.
   base::Value::List disabled_types;

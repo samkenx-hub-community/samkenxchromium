@@ -4,8 +4,12 @@
 
 #include "chrome/browser/ui/lens/lens_core_tab_side_panel_helper.h"
 
+#include "chrome/browser/companion/core/constants.h"
+#include "chrome/browser/companion/core/features.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
+#include "chrome/browser/ui/views/side_panel/side_panel.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
 #include "components/lens/buildflags.h"
 #include "components/lens/lens_features.h"
 #include "components/search/search.h"
@@ -16,6 +20,8 @@
 #else
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
+#include "chrome/browser/ui/side_panel/companion/companion_utils.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #endif  // BUILDFLAG(IS_ANDROID)
 
 namespace lens {
@@ -51,6 +57,18 @@ TemplateURLService* GetTemplateURLService(content::WebContents* web_contents) {
 }
 
 }  // namespace internal
+
+gfx::Size GetSidePanelInitialContentSizeUpperBound(
+    content::WebContents* web_contents) {
+#if !BUILDFLAG(IS_ANDROID)
+  Browser* browser = chrome::FindBrowserWithWebContents(web_contents);
+  const SidePanel* side_panel =
+      BrowserView::GetBrowserViewForBrowser(browser)->unified_side_panel();
+  return side_panel->GetContentSizeUpperBound();
+#else
+  return gfx::Size();
+#endif  // !BUILDFLAG(IS_ANDROID)
+}
 
 bool IsSidePanelEnabledForLens(content::WebContents* web_contents) {
   return search::DefaultSearchProviderIsGoogle(

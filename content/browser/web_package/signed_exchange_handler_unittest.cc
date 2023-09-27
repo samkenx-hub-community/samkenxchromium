@@ -155,6 +155,8 @@ class GMockCertVerifier : public net::CertVerifier {
                    std::unique_ptr<net::CertVerifier::Request>* out_req,
                    const net::NetLogWithSource& net_log));
   MOCK_METHOD1(SetConfig, void(const net::CertVerifier::Config& config));
+  MOCK_METHOD1(AddObserver, void(Observer* observer));
+  MOCK_METHOD1(RemoveObserver, void(Observer* observer));
 };
 
 class MockCTPolicyEnforcer : public net::CTPolicyEnforcer {
@@ -392,11 +394,12 @@ class SignedExchangeHandlerTest
 
  protected:
   const base::HistogramTester histogram_tester_;
-  raw_ptr<MockSignedExchangeCertFetcherFactory> mock_cert_fetcher_factory_;
+  raw_ptr<MockSignedExchangeCertFetcherFactory, DanglingUntriaged>
+      mock_cert_fetcher_factory_;
   std::unique_ptr<net::CertVerifier> cert_verifier_;
   std::unique_ptr<MockCTPolicyEnforcer> mock_ct_policy_enforcer_;
   std::unique_ptr<MockSCTAuditingDelegate> mock_sct_auditing_delegate_;
-  raw_ptr<net::MockSourceStream> source_;
+  raw_ptr<net::MockSourceStream, DanglingUntriaged> source_;
   std::unique_ptr<SignedExchangeHandler> handler_;
 
  private:

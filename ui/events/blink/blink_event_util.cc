@@ -335,6 +335,8 @@ WebGestureEvent CreateWebGestureEvent(const GestureEventDetails& details,
   gesture.primary_unique_touch_event_id =
       details.primary_unique_touch_event_id();
   gesture.unique_touch_event_id = unique_touch_event_id;
+  gesture.GetModifiableEventLatencyMetadata() =
+      details.GetEventLatencyMetadata();
 
   switch (details.type()) {
     case ET_GESTURE_SHOW_PRESS:
@@ -452,6 +454,7 @@ WebGestureEvent CreateWebGestureEvent(const GestureEventDetails& details,
       break;
     case ET_GESTURE_TAP_DOWN:
       gesture.SetType(WebInputEvent::Type::kGestureTapDown);
+      gesture.data.tap_down.tap_down_count = details.tap_down_count();
       gesture.data.tap_down.width =
           IfNanUseMaxFloat(details.bounding_box_f().width());
       gesture.data.tap_down.height =

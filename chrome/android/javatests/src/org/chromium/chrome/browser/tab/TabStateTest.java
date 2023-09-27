@@ -4,8 +4,7 @@
 
 package org.chromium.chrome.browser.tab;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
 import org.junit.After;
@@ -36,12 +35,11 @@ public class TabStateTest {
     @Before
     public void setUp() {
         mTestTabModelDirectory = new TestTabModelDirectory(
-                InstrumentationRegistry.getTargetContext(), "TabStateTest", null);
+                ApplicationProvider.getApplicationContext(), "TabStateTest", null);
     }
 
     @After
     public void tearDown() {
-        TabStateFileManager.setChannelNameOverrideForTest(null);
         mTestTabModelDirectory.tearDown();
     }
 
@@ -67,7 +65,6 @@ public class TabStateTest {
     @Test
     @SmallTest
     public void testLoadV1Tabs() throws Exception {
-        TabStateFileManager.setChannelNameOverrideForTest(null);
         loadAndCheckTabState(TestTabModelDirectory.M26_GOOGLE_COM);
         loadAndCheckTabState(TestTabModelDirectory.M26_GOOGLE_CA);
     }
@@ -75,8 +72,6 @@ public class TabStateTest {
     @Test
     @SmallTest
     public void testLoadV2Tabs() throws Exception {
-        TabStateFileManager.setChannelNameOverrideForTest(null);
-
         // Standard English tabs.
         loadAndCheckTabState(TestTabModelDirectory.V2_DUCK_DUCK_GO);
         loadAndCheckTabState(TestTabModelDirectory.V2_TEXTAREA);
@@ -87,5 +82,4 @@ public class TabStateTest {
         // Hebrew, RTL.
         loadAndCheckTabState(TestTabModelDirectory.V2_HAARETZ);
     }
-
 }

@@ -11,18 +11,19 @@
 #include "ash/shell.h"
 #include "base/command_line.h"
 #include "base/test/scoped_feature_list.h"
+#include "chrome/browser/ash/login/app_mode/test/kiosk_apps_mixin.h"
 #include "chrome/browser/ash/login/lock/screen_locker_tester.h"
 #include "chrome/browser/ash/login/login_manager_test.h"
 #include "chrome/browser/ash/login/screens/user_selection_screen.h"
 #include "chrome/browser/ash/login/startup_utils.h"
 #include "chrome/browser/ash/login/test/device_state_mixin.h"
 #include "chrome/browser/ash/login/test/js_checker.h"
-#include "chrome/browser/ash/login/test/kiosk_apps_mixin.h"
 #include "chrome/browser/ash/login/test/local_state_mixin.h"
 #include "chrome/browser/ash/login/test/logged_in_user_mixin.h"
 #include "chrome/browser/ash/login/test/login_manager_mixin.h"
 #include "chrome/browser/ash/login/test/oobe_base_test.h"
 #include "chrome/browser/ash/login/test/oobe_screen_waiter.h"
+#include "chrome/browser/ash/login/test/oobe_screens_utils.h"
 #include "chrome/browser/ash/login/test/scoped_policy_update.h"
 #include "chrome/browser/ash/login/test/test_predicate_waiter.h"
 #include "chrome/browser/ash/login/test/user_policy_mixin.h"
@@ -71,11 +72,11 @@ class InterruptedAutoStartEnrollmentTest : public OobeBaseTest,
 // Tests that the default first screen is the welcome screen after OOBE
 // when auto enrollment is enabled and device is not yet enrolled.
 IN_PROC_BROWSER_TEST_F(InterruptedAutoStartEnrollmentTest, ShowsWelcome) {
-  OobeScreenWaiter(WelcomeView::kScreenId).Wait();
+  test::WaitForWelcomeScreen();
 }
 
 IN_PROC_BROWSER_TEST_F(OobeBaseTest, OobeNoExceptions) {
-  OobeScreenWaiter(WelcomeView::kScreenId).Wait();
+  test::WaitForWelcomeScreen();
   OobeBaseTest::CheckJsExceptionErrors(0);
 }
 
@@ -328,8 +329,9 @@ class UserManagementDisclosureTest : public LoginManagerTest {
 
   void LoginAndLock(const LoginManagerMixin::TestUserInfo& test_user,
                     UserPolicyMixin* user_policy_mixin) {
-    if (user_policy_mixin)
+    if (user_policy_mixin) {
       user_policy_mixin->RequestPolicyUpdate();
+    }
 
     login_manager_mixin_.SkipPostLoginScreens();
 
@@ -372,6 +374,8 @@ IN_PROC_BROWSER_TEST_F(UserManagementDisclosureTest,
   LoginAndLock(not_managed_user, nullptr);
   EXPECT_FALSE(
       LoginScreenTestApi::IsManagedIconShown(not_managed_user.account_id));
+  EXPECT_TRUE(
+      LoginScreenTestApi::ShowRemoveAccountDialog(not_managed_user.account_id));
   EXPECT_FALSE(LoginScreenTestApi::IsManagedMessageInDialogShown(
       not_managed_user.account_id));
 }
@@ -382,6 +386,8 @@ IN_PROC_BROWSER_TEST_F(UserManagementDisclosureTest,
                        EnterpriseIconInvisibleNotManagedUser) {
   EXPECT_FALSE(
       LoginScreenTestApi::IsManagedIconShown(not_managed_user.account_id));
+  EXPECT_TRUE(
+      LoginScreenTestApi::ShowRemoveAccountDialog(not_managed_user.account_id));
   EXPECT_FALSE(LoginScreenTestApi::IsManagedMessageInDialogShown(
       not_managed_user.account_id));
 }
@@ -392,6 +398,8 @@ IN_PROC_BROWSER_TEST_F(UserManagementDisclosureTest,
                        PRE_EnterpriseIconVisibleManagedUser) {
   LoginAndLock(managed_user, &managed_user_policy_mixin_);
   EXPECT_TRUE(LoginScreenTestApi::IsManagedIconShown(managed_user.account_id));
+  EXPECT_TRUE(
+      LoginScreenTestApi::ShowRemoveAccountDialog(managed_user.account_id));
   EXPECT_TRUE(LoginScreenTestApi::IsManagedMessageInDialogShown(
       managed_user.account_id));
 }
@@ -400,6 +408,8 @@ IN_PROC_BROWSER_TEST_F(UserManagementDisclosureTest,
 // managed user.
 IN_PROC_BROWSER_TEST_F(UserManagementDisclosureTest,
                        EnterpriseIconVisibleManagedUser) {
+  EXPECT_TRUE(
+      LoginScreenTestApi::ShowRemoveAccountDialog(managed_user.account_id));
   EXPECT_TRUE(LoginScreenTestApi::IsManagedIconShown(managed_user.account_id));
   EXPECT_TRUE(LoginScreenTestApi::IsManagedMessageInDialogShown(
       managed_user.account_id));
@@ -425,6 +435,8 @@ IN_PROC_BROWSER_TEST_F(UserManagementDisclosureChildTest,
   screen_locker_tester.Lock();
   EXPECT_FALSE(LoginScreenTestApi::IsManagedIconShown(
       logged_in_user_mixin_.GetAccountId()));
+  EXPECT_TRUE(LoginScreenTestApi::ShowRemoveAccountDialog(
+      logged_in_user_mixin_.GetAccountId()));
   EXPECT_FALSE(LoginScreenTestApi::IsManagedMessageInDialogShown(
       logged_in_user_mixin_.GetAccountId()));
 }
@@ -434,6 +446,8 @@ IN_PROC_BROWSER_TEST_F(UserManagementDisclosureChildTest,
 IN_PROC_BROWSER_TEST_F(UserManagementDisclosureChildTest,
                        EnterpriseIconVisibleChildUser) {
   EXPECT_FALSE(LoginScreenTestApi::IsManagedIconShown(
+      logged_in_user_mixin_.GetAccountId()));
+  EXPECT_TRUE(LoginScreenTestApi::ShowRemoveAccountDialog(
       logged_in_user_mixin_.GetAccountId()));
   EXPECT_FALSE(LoginScreenTestApi::IsManagedMessageInDialogShown(
       logged_in_user_mixin_.GetAccountId()));

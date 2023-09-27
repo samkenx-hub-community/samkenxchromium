@@ -4,18 +4,18 @@
 
 #import "ios/chrome/browser/ui/ntp/feed_top_section/feed_top_section_mediator.h"
 
+#import "base/feature_list.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
 #import "components/signin/public/identity_manager/objc/identity_manager_observer_bridge.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
+#import "components/sync/base/features.h"
+#import "ios/chrome/browser/ntp/features.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/identity_manager_factory.h"
 #import "ios/chrome/browser/ui/authentication/signin_promo_view_mediator.h"
+#import "ios/chrome/browser/ui/content_suggestions/set_up_list/utils.h"
 #import "ios/chrome/browser/ui/ntp/feed_top_section/feed_top_section_consumer.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_delegate.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface FeedTopSectionMediator () <IdentityManagerObserverBridgeDelegate> {
   // Observes changes in identity.
@@ -23,7 +23,10 @@
       _identityObserverBridge;
 }
 
-@property(nonatomic, assign) ChromeBrowserState* browserState;
+@property(nonatomic, assign) AuthenticationService* authenticationService;
+@property(nonatomic, assign) signin::IdentityManager* identityManager;
+@property(nonatomic, assign) BOOL isIncognito;
+@property(nonatomic, assign) PrefService* prefService;
 
 // Consumer for this mediator.
 @property(nonatomic, weak) id<FeedTopSectionConsumer> consumer;
@@ -40,14 +43,18 @@
 @synthesize signinPromoConfigurator = _signinPromoConfigurator;
 
 - (instancetype)initWithConsumer:(id<FeedTopSectionConsumer>)consumer
-                    browserState:(ChromeBrowserState*)browserState {
+                 identityManager:(signin::IdentityManager*)identityManager
+                     authService:(AuthenticationService*)authenticationService
+                     isIncognito:(BOOL)isIncognito
+                     prefService:(PrefService*)prefService {
   self = [super init];
   if (self) {
-    _browserState = browserState;
-    signin::IdentityManager* identityManager =
-        IdentityManagerFactory::GetForBrowserState(_browserState);
+    _authenticationService = authenticationService;
+    _identityManager = identityManager;
     _identityObserverBridge.reset(
-        new signin::IdentityManagerObserverBridge(identityManager, self));
+        new signin::IdentityManagerObserverBridge(_identityManager, self));
+    _isIncognito = isIncognito;
+    _prefService = prefService;
     _consumer = consumer;
   }
   return self;
@@ -63,6 +70,9 @@
 
 - (void)shutdown {
   _identityObserverBridge.reset();
+  self.authenticationService = nullptr;
+  self.identityManager = nullptr;
+  self.prefService = nullptr;
 }
 
 #pragma mark - Setters
@@ -91,9 +101,13 @@
 // Called when a user changes the syncing state.
 - (void)onPrimaryAccountChanged:
     (const signin::PrimaryAccountChangeEvent&)event {
-  switch (event.GetEventTypeFor(signin::ConsentLevel::kSync)) {
+  auto consent =
+      base::FeatureList::IsEnabled(syncer::kReplaceSyncPromosWithSignInPromos)
+          ? signin::ConsentLevel::kSignin
+          : signin::ConsentLevel::kSync;
+  switch (event.GetEventTypeFor(consent)) {
     case signin::PrimaryAccountChangeEvent::Type::kSet:
-      if (!self.signinPromoMediator.signinInProgress) {
+      if (!self.signinPromoMediator.showSpinner) {
         // User has signed in, stop showing the promo.
         self.shouldShowSigninPromo = NO;
       }
@@ -111,12 +125,8 @@
 - (void)configureSigninPromoWithConfigurator:
             (SigninPromoViewConfigurator*)configurator
                              identityChanged:(BOOL)identityChanged {
-  // Identity was changed: So first figure out if the promo should still
-  // appear. Then update it to match the new configurator if it will show.
-  [self updateShouldShowSigninPromo];
-  if (self.shouldShowSigninPromo) {
-    [self.consumer updateSigninPromoWithConfigurator:configurator];
-  }
+  // No-op: The NTP is always recreated when the identity changes, so this is
+  // not needed.
 }
 
 - (void)signinPromoViewMediatorCloseButtonWasTapped:
@@ -128,25 +138,31 @@
 #pragma mark - Private
 
 - (void)updateShouldShowSigninPromo {
-  DCHECK(self.browserState);
   self.shouldShowSigninPromo = NO;
   // Don't show the promo for incognito or start surface.
-  if (self.browserState->IsOffTheRecord() ||
-      [self.ntpDelegate isStartSurface]) {
+  if (self.isIncognito || [self.ntpDelegate isStartSurface] ||
+      !self.isSignInPromoEnabled) {
     return;
   }
-  AuthenticationService* authenticationService =
-      AuthenticationServiceFactory::GetForBrowserState(_browserState);
+
+  // Don't show the promo if SetUpList might be displayed.
+  PrefService* localState = GetApplicationContext()->GetLocalState();
+  if (IsIOSSetUpListEnabled() &&
+      set_up_list_utils::IsSetUpListActive(localState)) {
+    return;
+  }
+
   if ([SigninPromoViewMediator
           shouldDisplaySigninPromoViewWithAccessPoint:
               signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_TOP_PROMO
-                                authenticationService:authenticationService
-                                          prefService:_browserState
-                                                          ->GetPrefs()]) {
-    signin::IdentityManager* identityManager =
-        IdentityManagerFactory::GetForBrowserState(_browserState);
+                                authenticationService:self.authenticationService
+                                          prefService:self.prefService]) {
+    auto consent =
+        base::FeatureList::IsEnabled(syncer::kReplaceSyncPromosWithSignInPromos)
+            ? signin::ConsentLevel::kSignin
+            : signin::ConsentLevel::kSync;
     self.shouldShowSigninPromo =
-        !identityManager->HasPrimaryAccount(signin::ConsentLevel::kSync);
+        !self.identityManager->HasPrimaryAccount(consent);
   }
 }
 

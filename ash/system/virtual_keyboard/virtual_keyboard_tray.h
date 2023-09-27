@@ -11,6 +11,7 @@
 #include "ash/public/cpp/session/session_observer.h"
 #include "ash/shell_observer.h"
 #include "ash/system/tray/tray_background_view.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 
 namespace views {
@@ -41,6 +42,7 @@ class VirtualKeyboardTray : public TrayBackgroundView,
   void HandleLocaleChange() override;
   void HideBubbleWithView(const TrayBubbleView* bubble_view) override;
   void ClickedOutsideBubble() override;
+  void UpdateTrayItemColor(bool is_active) override;
 
   // AccessibilityObserver:
   void OnAccessibilityStatusChanged() override;
@@ -50,10 +52,10 @@ class VirtualKeyboardTray : public TrayBackgroundView,
 
  private:
   // Owned by the views hierarchy.
-  views::ImageView* icon_ = nullptr;
+  raw_ptr<views::ImageView, ExperimentalAsh> icon_ = nullptr;
 
   // Unowned.
-  Shelf* const shelf_;
+  const raw_ptr<Shelf, ExperimentalAsh> shelf_;
 };
 
 }  // namespace ash

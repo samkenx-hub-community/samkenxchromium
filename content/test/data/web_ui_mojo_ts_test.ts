@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {WebUITsMojoTestCache} from './web_ui_ts_test.test-mojom-webui.js';
+import {OptionalNumericsStruct, TestEnum, WebUITsMojoTestCache} from './web_ui_ts_test.test-mojom-webui.js';
 
 const TEST_DATA: Array<{url: string, contents: string}> = [
   { url: 'https://google.com/', contents: 'i am in fact feeling lucky' },
@@ -35,18 +35,68 @@ async function doTest(): Promise<boolean> {
     }
   }
 
+  {
+    const testStruct: OptionalNumericsStruct = {
+      optionalBool: true,
+      optionalUint8: undefined,
+      optionalEnum: TestEnum.kOne,
+    };
+
+    const {optionalBool, optionalUint8, optionalEnum, optionalNumerics} =
+        await cache.echo(true, null, TestEnum.kOne, testStruct);
+    if (optionalBool !== false) {
+      return false;
+    }
+    if (optionalUint8 !== null) {
+      return false;
+    }
+    if (optionalEnum !== TestEnum.kTwo) {
+      return false;
+    }
+    if (optionalNumerics.optionalBool !== false) {
+      return false;
+    }
+    if (optionalNumerics.optionalUint8 !== null) {
+      return false;
+    }
+    if (optionalNumerics.optionalEnum !== TestEnum.kTwo) {
+      return false;
+    }
+  }
+  {
+    const testStruct: OptionalNumericsStruct = {
+      optionalBool: undefined,
+      optionalUint8: 1,
+      optionalEnum: undefined,
+    };
+
+    const {optionalBool, optionalUint8, optionalEnum, optionalNumerics} =
+        await cache.echo(null, 1, null, testStruct);
+    if (optionalBool !== null) {
+      return false;
+    }
+    if (optionalUint8 !== 254) {
+      return false;
+    }
+    if (optionalEnum !== null) {
+      return false;
+    }
+    if (optionalNumerics.optionalBool !== null) {
+      return false;
+    }
+    if (optionalNumerics.optionalUint8 !== 254) {
+      return false;
+    }
+    if (optionalNumerics.optionalEnum !== null) {
+      return false;
+    }
+  }
+
   return true;
 }
 
-type WindowWithDomAutomationController = Window & {
-  domAutomationController: {
-    send: (success: boolean) => void;
-  }
-};
-
-async function runTest() {
-  (window as unknown as WindowWithDomAutomationController)
-      .domAutomationController.send(await doTest());
+async function runTest(): Promise<boolean> {
+  return doTest();
 }
 
 Object.assign(window, {runTest});

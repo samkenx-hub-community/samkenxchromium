@@ -5,12 +5,13 @@
 package org.chromium.content.browser.input;
 
 import android.graphics.Matrix;
+import android.os.Build;
 import android.view.View;
 import android.view.inputmethod.CursorAnchorInfo;
+import android.view.inputmethod.EditorBoundsInfo;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.content_public.browser.InputMethodManagerWrapper;
 
@@ -45,10 +46,12 @@ final class CursorAnchorInfoController {
     private boolean mHasPendingImmediateRequest;
     private boolean mMonitorModeEnabled;
 
-    // Parmeter for CursorAnchorInfo, updated by setCompositionCharacterBounds.
+    // Parameters for CursorAnchorInfo, updated by setBounds.
     @Nullable
     private float[] mCompositionCharacterBounds;
-    // Paremeters for CursorAnchorInfo, updated by onUpdateFrameInfo.
+    @Nullable
+    private float[] mVisibleLineBounds;
+    // Parameters for CursorAnchorInfo, updated by onUpdateFrameInfo.
     private boolean mHasCoordinateInfo;
     private float mScale;
     private float mTranslationX;
@@ -58,6 +61,10 @@ final class CursorAnchorInfoController {
     private float mInsertionMarkerHorizontal;
     private float mInsertionMarkerTop;
     private float mInsertionMarkerBottom;
+
+    // Data updated on stylus writing.
+    @Nullable
+    private EditorBoundsInfo mEditorBoundsInfo;
 
     @Nullable
     private CursorAnchorInfo mLastCursorAnchorInfo;
@@ -100,7 +107,6 @@ final class CursorAnchorInfoController {
         mInputMethodManagerWrapper = inputMethodManagerWrapper;
     }
 
-    @VisibleForTesting
     public static CursorAnchorInfoController createForTest(
             InputMethodManagerWrapper inputMethodManagerWrapper,
             ComposingTextDelegate composingTextDelegate,
@@ -119,20 +125,48 @@ final class CursorAnchorInfoController {
     }
 
     /**
-     * Sets positional information of composing text as an array of character bounds.
-     * @param compositionCharacterBounds Array of character bounds in local coordinates.
+     * Sets positional information of composing text as an array of character bounds or line
+     * bounding boxes as an array of line bounds (or both).
+     * @param characterBounds Array of character bounds in local coordinates.
+     * @param lineBounds Array of line bounds in local coordinates.
      * @param view The attached view.
      */
-    public void setCompositionCharacterBounds(float[] compositionCharacterBounds, View view) {
+    public void setBounds(
+            @Nullable float[] characterBounds, @Nullable float[] lineBounds, View view) {
         if (!mIsEditable) return;
+        boolean shouldUpdate = false;
 
-        if (!Arrays.equals(compositionCharacterBounds, mCompositionCharacterBounds)) {
+        if (characterBounds != null
+                && !Arrays.equals(characterBounds, mCompositionCharacterBounds)) {
+            shouldUpdate = true;
+            mCompositionCharacterBounds = characterBounds;
+        }
+        if (lineBounds != null && !Arrays.equals(lineBounds, mVisibleLineBounds)) {
+            shouldUpdate = true;
+            mVisibleLineBounds = lineBounds;
+        }
+        if (shouldUpdate) {
             mLastCursorAnchorInfo = null;
-            mCompositionCharacterBounds = compositionCharacterBounds;
             if (mHasCoordinateInfo) {
                 updateCursorAnchorInfo(view);
             }
         }
+    }
+
+    /**
+     * Sends one CursorAnchorInfo object with the EditorBoundsInfo field set. All subsequent
+     * CursorAnchorInfo updates will not have this field set unless they are sent through this
+     * method.
+     * @param editorBoundsInfo The EditorBoundsInfo sent with the CursorAnchorInfo. This is not
+     *         cached.
+     * @param view The attached view.
+     */
+    public void updateWithEditorBoundsInfo(EditorBoundsInfo editorBoundsInfo, View view) {
+        if (!mIsEditable) return;
+        mLastCursorAnchorInfo = null;
+        mEditorBoundsInfo = editorBoundsInfo;
+        updateCursorAnchorInfo(view);
+        mEditorBoundsInfo = null;
     }
 
     /**
@@ -195,6 +229,7 @@ final class CursorAnchorInfoController {
     public void focusedNodeChanged(boolean isEditable) {
         mIsEditable = isEditable;
         mCompositionCharacterBounds = null;
+        mVisibleLineBounds = null;
         mHasCoordinateInfo = false;
         mLastCursorAnchorInfo = null;
     }
@@ -249,10 +284,14 @@ final class CursorAnchorInfoController {
                     }
                 }
             }
+            addVisibleLineBoundsToCursorAnchorInfo();
             mCursorAnchorInfoBuilder.setSelectionRange(selectionStart, selectionEnd);
             mMatrix.setScale(mScale, mScale);
             mMatrix.postTranslate(mTranslationX, mTranslationY);
             mCursorAnchorInfoBuilder.setMatrix(mMatrix);
+            if (mEditorBoundsInfo != null && Build.VERSION.SDK_INT > Build.VERSION_CODES.TIRAMISU) {
+                mCursorAnchorInfoBuilder.setEditorBoundsInfo(mEditorBoundsInfo);
+            }
             if (mHasInsertionMarker) {
                 mCursorAnchorInfoBuilder.setInsertionMarkerLocation(
                         mInsertionMarkerHorizontal,
@@ -269,5 +308,21 @@ final class CursorAnchorInfoController {
             mInputMethodManagerWrapper.updateCursorAnchorInfo(view, mLastCursorAnchorInfo);
         }
         mHasPendingImmediateRequest = false;
+    }
+
+    private void addVisibleLineBoundsToCursorAnchorInfo() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                || mVisibleLineBounds == null) {
+            return;
+        }
+        float[] visibleLineBounds = mVisibleLineBounds;
+        int numBounds = visibleLineBounds.length / 4;
+        for (int i = 0; i < numBounds; ++i) {
+            float left = visibleLineBounds[i * 4];
+            float top = visibleLineBounds[i * 4 + 1];
+            float right = visibleLineBounds[i * 4 + 2];
+            float bottom = visibleLineBounds[i * 4 + 3];
+            mCursorAnchorInfoBuilder.addVisibleLineBounds(left, top, right, bottom);
+        }
     }
 }

@@ -3,41 +3,36 @@
 // found in the LICENSE file.
 
 #include "base/memory/scoped_refptr.h"
+#include "base/test/spin_wait.h"
 #include "base/test/test_future.h"
+#include "base/test/test_timeouts.h"
 #include "base/time/time.h"
 #include "chrome/browser/chromeos/extensions/wm/wm_desks_private_api.h"
 #include "chrome/browser/extensions/extension_apitest.h"
-#include "chrome/browser/extensions/extension_function_test_utils.h"
 #include "chromeos/crosapi/mojom/desk.mojom.h"
 #include "chromeos/crosapi/mojom/test_controller.mojom.h"
 #include "chromeos/lacros/lacros_service.h"
 #include "content/public/test/browser_test.h"
+#include "extensions/browser/api_test_utils.h"
 
 namespace extensions {
 
-namespace {
-constexpr base::TimeDelta kWaitForAnimationTimeout = base::Seconds(20);
-}
-
-// TODO(aprilzhou): Add lacros test for switch desk once switching desk is
-// implemented in lacros.
 class DesksExtensionApiLacrosTest : public extensions::ExtensionApiTest {
  public:
   DesksExtensionApiLacrosTest() = default;
   ~DesksExtensionApiLacrosTest() override = default;
-  void WaitForDeskAnimation(chromeos::LacrosService* lacros_service,
-                            base::TimeDelta animation_timeout) {
-    auto are_desks_being_modified = true;
-    auto start = base::Time::NowFromSystemTime();
-    while (are_desks_being_modified) {
-      base::test::TestFuture<bool> future;
-      lacros_service->GetRemote<crosapi::mojom::TestController>()
-          ->AreDesksBeingModified(future.GetCallback());
-      are_desks_being_modified = future.Get();
-      auto now = base::Time::NowFromSystemTime();
-      if (start + animation_timeout < now)
-        FAIL() << "Desk animation timeout";
-    }
+  bool CheckIsSavedDeskStorageReady(chromeos::LacrosService* service) {
+    base::test::TestFuture<bool> future;
+    service->GetRemote<crosapi::mojom::TestController>()
+        ->IsSavedDeskStorageReady(future.GetCallback());
+    return future.Get();
+  }
+
+  bool CheckAreDesksModified(chromeos::LacrosService* service) {
+    base::test::TestFuture<bool> future;
+    service->GetRemote<crosapi::mojom::TestController>()->AreDesksBeingModified(
+        future.GetCallback());
+    return future.Get();
   }
 };
 
@@ -49,11 +44,18 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest,
   chromeos::LacrosService* lacros_service = chromeos::LacrosService::Get();
 
   if (!lacros_service->IsAvailable<crosapi::mojom::Desk>() ||
-      lacros_service->GetInterfaceVersion(crosapi::mojom::Desk::Uuid_) <
+      lacros_service->GetInterfaceVersion<crosapi::mojom::Desk>() <
           static_cast<int>(crosapi::mojom::Desk::MethodMinVersions::
-                               kGetSavedDesksMinVersion)) {
+                               kGetSavedDesksMinVersion) ||
+      lacros_service->GetInterfaceVersion<crosapi::mojom::TestController>() <
+          static_cast<int>(crosapi::mojom::TestController::MethodMinVersions::
+                               kIsSavedDeskStorageReadyMinVersion)) {
     GTEST_SKIP() << "Unsupported ash version.";
   }
+
+  SPIN_FOR_TIMEDELTA_OR_UNTIL_TRUE(
+      TestTimeouts::action_max_timeout(),
+      CheckIsSavedDeskStorageReady(lacros_service) == true);
   // This loads and runs an extension from
   // chrome/test/data/extensions/api_test/wm_desks_private.
   ASSERT_TRUE(RunExtensionTest("wm_desks_private")) << message_;
@@ -69,14 +71,15 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, ListDesksTest) {
 
   auto list_desks_function =
       base::MakeRefCounted<WmDesksPrivateGetAllDesksFunction>();
-  auto all_desks =
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          list_desks_function.get(), "[]", browser());
+  auto all_desks = api_test_utils::RunFunctionAndReturnSingleResult(
+      list_desks_function.get(), "[]", profile());
   EXPECT_TRUE(all_desks->is_list());
 }
 
 // Tests launch and close a desk.
-IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, LaunchAndCloseDeskTest) {
+// Disable due to flakiness (crbug.com/1442077)
+IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest,
+                       DISABLED_LaunchAndCloseDeskTest) {
   auto* lacros_service = chromeos::LacrosService::Get();
   if (!lacros_service->IsAvailable<crosapi::mojom::Desk>()) {
     GTEST_SKIP() << "Unsupported ash version.";
@@ -87,27 +90,76 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, LaunchAndCloseDeskTest) {
       base::MakeRefCounted<WmDesksPrivateLaunchDeskFunction>();
   base::HistogramTester histogram_tester;
   // The RunFunctionAndReturnSingleResult already asserts no error
-  auto desk_id =
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          launch_desk_function.get(), R"([{"deskName":"test"}])", browser());
+  auto desk_id = api_test_utils::RunFunctionAndReturnSingleResult(
+      launch_desk_function.get(), R"([{"deskName":"test"}])", profile());
   EXPECT_TRUE(desk_id->is_string());
   EXPECT_TRUE(
-      base::GUID::ParseCaseInsensitive(desk_id->GetString()).is_valid());
+      base::Uuid::ParseCaseInsensitive(desk_id->GetString()).is_valid());
 
   // Wait for launch desk animation to settle.
-  WaitForDeskAnimation(lacros_service, kWaitForAnimationTimeout);
+  SPIN_FOR_TIMEDELTA_OR_UNTIL_TRUE(
+      TestTimeouts::action_max_timeout(),
+      CheckAreDesksModified(lacros_service) == false);
+
   histogram_tester.ExpectBucketCount("Ash.DeskApi.LaunchDesk.Result", 1, 1);
 
   // Remove a desk.
   auto remove_desk_function =
       base::MakeRefCounted<WmDesksPrivateRemoveDeskFunction>();
-  extension_function_test_utils::RunFunctionAndReturnSingleResult(
+  api_test_utils::RunFunctionAndReturnSingleResult(
       remove_desk_function.get(),
-      R"([")" + desk_id->GetString() + R"(", { "combineDesks": false }])",
-      browser());
+      R"([")" + desk_id->GetString() +
+          R"(", { "combineDesks": false, "allowUndo": false }])",
+      profile());
 
   // Wait for remove desk animation to settle.
-  WaitForDeskAnimation(lacros_service, kWaitForAnimationTimeout);
+  SPIN_FOR_TIMEDELTA_OR_UNTIL_TRUE(
+      TestTimeouts::action_max_timeout(),
+      CheckAreDesksModified(lacros_service) == false);
+  histogram_tester.ExpectBucketCount("Ash.DeskApi.RemoveDesk.Result", 1, 1);
+}
+
+// Tests launch and removes desk. Waits for undo toast to expire.
+// Disabled due to flakiness
+IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest,
+                       DISABLED_LaunchAndAttemptUndo) {
+  auto* lacros_service = chromeos::LacrosService::Get();
+  if (!lacros_service->IsAvailable<crosapi::mojom::Desk>()) {
+    GTEST_SKIP() << "Unsupported ash version.";
+  }
+
+  // Launch a desk.
+  auto launch_desk_function =
+      base::MakeRefCounted<WmDesksPrivateLaunchDeskFunction>();
+  base::HistogramTester histogram_tester;
+  // The RunFunctionAndReturnSingleResult already asserts no error
+  auto desk_id = api_test_utils::RunFunctionAndReturnSingleResult(
+      launch_desk_function.get(), R"([{"deskName":"test"}])", profile());
+  EXPECT_TRUE(desk_id->is_string());
+  EXPECT_TRUE(
+      base::Uuid::ParseCaseInsensitive(desk_id->GetString()).is_valid());
+
+  // Wait for launch desk animation to settle.
+  SPIN_FOR_TIMEDELTA_OR_UNTIL_TRUE(
+      TestTimeouts::action_max_timeout(),
+      CheckAreDesksModified(lacros_service) == false);
+
+  histogram_tester.ExpectBucketCount("Ash.DeskApi.LaunchDesk.Result", 1, 1);
+
+  // Remove a desk.
+  auto remove_desk_function =
+      base::MakeRefCounted<WmDesksPrivateRemoveDeskFunction>();
+  api_test_utils::RunFunctionAndReturnSingleResult(
+      remove_desk_function.get(),
+      R"([")" + desk_id->GetString() +
+          R"(", { "combineDesks": false, "allowUndo": true }])",
+      profile());
+
+  // Wait for remove desk animation to settle.
+  SPIN_FOR_TIMEDELTA_OR_UNTIL_TRUE(
+      TestTimeouts::action_max_timeout(),
+      CheckAreDesksModified(lacros_service) == false);
+
   histogram_tester.ExpectBucketCount("Ash.DeskApi.RemoveDesk.Result", 1, 1);
 }
 
@@ -122,19 +174,21 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest,
   base::HistogramTester histogram_tester;
   auto remove_desk_function =
       base::MakeRefCounted<WmDesksPrivateRemoveDeskFunction>();
-  auto error = extension_function_test_utils::RunFunctionAndReturnError(
-      remove_desk_function.get(), R"(["invalid-id"])", browser());
+  auto error = api_test_utils::RunFunctionAndReturnError(
+      remove_desk_function.get(), R"(["invalid-id"])", profile());
 
   EXPECT_EQ(error, "InvalidIdError");
   histogram_tester.ExpectBucketCount("Ash.DeskApi.RemoveDesk.Result", 0, 1);
 }
 
 // Tests switch to different desk show trigger animation.
-IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, SwitchToDifferentDeskTest) {
+// Disable due to flakiness (crbug.com/1442077)
+IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest,
+                       DISABLED_SwitchToDifferentDeskTest) {
   auto* lacros_service = chromeos::LacrosService::Get();
 
   if (!lacros_service->IsAvailable<crosapi::mojom::Desk>() ||
-      lacros_service->GetInterfaceVersion(crosapi::mojom::Desk::Uuid_) <
+      lacros_service->GetInterfaceVersion<crosapi::mojom::Desk>() <
           static_cast<int>(
               crosapi::mojom::Desk::MethodMinVersions::kSwitchDeskMinVersion)) {
     GTEST_SKIP() << "Unsupported ash version.";
@@ -144,56 +198,58 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, SwitchToDifferentDeskTest) {
   auto get_active_desk_function =
       base::MakeRefCounted<WmDesksPrivateGetActiveDeskFunction>();
   // Asserts no error.
-  auto desk_id =
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          get_active_desk_function.get(), "[]", browser());
+  auto desk_id = api_test_utils::RunFunctionAndReturnSingleResult(
+      get_active_desk_function.get(), "[]", profile());
   ASSERT_TRUE(desk_id->is_string());
   EXPECT_TRUE(
-      base::GUID::ParseCaseInsensitive(desk_id->GetString()).is_valid());
+      base::Uuid::ParseCaseInsensitive(desk_id->GetString()).is_valid());
 
   // Launch a desk.
   auto launch_desk_function =
       base::MakeRefCounted<WmDesksPrivateLaunchDeskFunction>();
 
   // Asserts no error.
-  auto desk_id_1 =
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          launch_desk_function.get(), R"([{"deskName":"test"}])", browser());
+  auto desk_id_1 = api_test_utils::RunFunctionAndReturnSingleResult(
+      launch_desk_function.get(), R"([{"deskName":"test"}])", profile());
   ASSERT_TRUE(desk_id_1->is_string());
   EXPECT_TRUE(
-      base::GUID::ParseCaseInsensitive(desk_id_1->GetString()).is_valid());
+      base::Uuid::ParseCaseInsensitive(desk_id_1->GetString()).is_valid());
   // Waiting for desk launch animation to settle
-  WaitForDeskAnimation(lacros_service, kWaitForAnimationTimeout);
+  SPIN_FOR_TIMEDELTA_OR_UNTIL_TRUE(
+      TestTimeouts::action_max_timeout(),
+      CheckAreDesksModified(lacros_service) == false);
 
   // Switches to the previous desk.
   auto switch_desk_function =
       base::MakeRefCounted<WmDesksPrivateSwitchDeskFunction>();
 
-  extension_function_test_utils::RunFunctionAndReturnSingleResult(
+  api_test_utils::RunFunctionAndReturnSingleResult(
       switch_desk_function.get(), R"([")" + desk_id->GetString() + R"("])",
-      browser());
-
-  WaitForDeskAnimation(lacros_service, kWaitForAnimationTimeout);
+      profile());
+  SPIN_FOR_TIMEDELTA_OR_UNTIL_TRUE(
+      TestTimeouts::action_max_timeout(),
+      CheckAreDesksModified(lacros_service) == false);
 
   auto get_active_desk_function_ =
       base::MakeRefCounted<WmDesksPrivateGetActiveDeskFunction>();
   // Asserts no error.
-  auto desk_id_2 =
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          get_active_desk_function_.get(), "[]", browser());
+  auto desk_id_2 = api_test_utils::RunFunctionAndReturnSingleResult(
+      get_active_desk_function_.get(), "[]", profile());
   ASSERT_TRUE(desk_id_2->is_string());
   EXPECT_EQ(desk_id->GetString(), desk_id_2->GetString());
 
   // Clean up desks.
   auto remove_desk_function =
       base::MakeRefCounted<WmDesksPrivateRemoveDeskFunction>();
-  extension_function_test_utils::RunFunctionAndReturnSingleResult(
+  api_test_utils::RunFunctionAndReturnSingleResult(
       remove_desk_function.get(),
       R"([")" + desk_id_1->GetString() + R"(", { "combineDesks": false }])",
-      browser());
+      profile());
 
   // Wait for remove desk animation to settle.
-  WaitForDeskAnimation(lacros_service, kWaitForAnimationTimeout);
+  SPIN_FOR_TIMEDELTA_OR_UNTIL_TRUE(
+      TestTimeouts::action_max_timeout(),
+      CheckAreDesksModified(lacros_service) == false);
 }
 
 // Tests switch to current desk should skip animation.
@@ -201,7 +257,7 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, SwitchToCurrentDeskTest) {
   auto* lacros_service = chromeos::LacrosService::Get();
 
   if (!lacros_service->IsAvailable<crosapi::mojom::Desk>() ||
-      lacros_service->GetInterfaceVersion(crosapi::mojom::Desk::Uuid_) <
+      lacros_service->GetInterfaceVersion<crosapi::mojom::Desk>() <
           static_cast<int>(
               crosapi::mojom::Desk::MethodMinVersions::kSwitchDeskMinVersion)) {
     GTEST_SKIP() << "Unsupported ash version.";
@@ -211,26 +267,24 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, SwitchToCurrentDeskTest) {
   auto get_active_desk_function =
       base::MakeRefCounted<WmDesksPrivateGetActiveDeskFunction>();
   // Asserts no error.
-  auto desk_id =
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          get_active_desk_function.get(), "[]", browser());
+  auto desk_id = api_test_utils::RunFunctionAndReturnSingleResult(
+      get_active_desk_function.get(), "[]", profile());
   ASSERT_TRUE(desk_id->is_string());
   ASSERT_TRUE(
-      base::GUID::ParseCaseInsensitive(desk_id->GetString()).is_valid());
+      base::Uuid::ParseCaseInsensitive(desk_id->GetString()).is_valid());
 
   // Switches to the current desk.
   auto switch_desk_function =
       base::MakeRefCounted<WmDesksPrivateSwitchDeskFunction>();
-  extension_function_test_utils::RunFunctionAndReturnSingleResult(
+  api_test_utils::RunFunctionAndReturnSingleResult(
       switch_desk_function.get(), R"([")" + desk_id->GetString() + R"("])",
-      browser());
+      profile());
 
   // Get the current desk.
   auto get_active_desk_function_ =
       base::MakeRefCounted<WmDesksPrivateGetActiveDeskFunction>();
-  auto desk_id_1 =
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          get_active_desk_function_.get(), "[]", browser());
+  auto desk_id_1 = api_test_utils::RunFunctionAndReturnSingleResult(
+      get_active_desk_function_.get(), "[]", profile());
   ASSERT_TRUE(desk_id_1->is_string());
   EXPECT_EQ(desk_id->GetString(), desk_id_1->GetString());
 }
@@ -240,24 +294,23 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, GetDeskByIDTest) {
   auto* lacros_service = chromeos::LacrosService::Get();
 
   if (!lacros_service->IsAvailable<crosapi::mojom::Desk>() ||
-      lacros_service->GetInterfaceVersion(crosapi::mojom::Desk::Uuid_) <
+      lacros_service->GetInterfaceVersion<crosapi::mojom::Desk>() <
           static_cast<int>(crosapi::mojom::Desk::MethodMinVersions::
                                kGetDeskByIDMinVersion)) {
     GTEST_SKIP() << "Unsupported ash version.";
   }
 
   // Get desk Id of active desk.
-  auto desk_id =
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
-          base::MakeRefCounted<WmDesksPrivateGetActiveDeskFunction>().get(),
-          "[]", browser());
+  auto desk_id = api_test_utils::RunFunctionAndReturnSingleResult(
+      base::MakeRefCounted<WmDesksPrivateGetActiveDeskFunction>().get(), "[]",
+      profile());
 
   // Retrieve desk by Id.
   auto get_desk_by_id_function =
       base::MakeRefCounted<WmDesksPrivateGetDeskByIDFunction>();
-  auto result = extension_function_test_utils::RunFunctionAndReturnSingleResult(
+  auto result = api_test_utils::RunFunctionAndReturnSingleResult(
       get_desk_by_id_function.get(), R"([")" + desk_id->GetString() + R"("])",
-      browser());
+      profile());
   EXPECT_TRUE(result->is_dict());
   auto* desk_id_1 = result->GetDict().Find("deskUuid");
   auto* desk_name = result->GetDict().Find("deskName");
@@ -271,7 +324,7 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, GetDeskByInvalidIDTest) {
   auto* lacros_service = chromeos::LacrosService::Get();
 
   if (!lacros_service->IsAvailable<crosapi::mojom::Desk>() ||
-      lacros_service->GetInterfaceVersion(crosapi::mojom::Desk::Uuid_) <
+      lacros_service->GetInterfaceVersion<crosapi::mojom::Desk>() <
           static_cast<int>(crosapi::mojom::Desk::MethodMinVersions::
                                kGetDeskByIDMinVersion)) {
     GTEST_SKIP() << "Unsupported ash version.";
@@ -279,8 +332,8 @@ IN_PROC_BROWSER_TEST_F(DesksExtensionApiLacrosTest, GetDeskByInvalidIDTest) {
 
   auto get_desk_by_id_function =
       base::MakeRefCounted<WmDesksPrivateGetDeskByIDFunction>();
-  auto error = extension_function_test_utils::RunFunctionAndReturnError(
-      get_desk_by_id_function.get(), R"(["invalid-id"])", browser());
+  auto error = api_test_utils::RunFunctionAndReturnError(
+      get_desk_by_id_function.get(), R"(["invalid-id"])", profile());
   EXPECT_EQ(error, "InvalidIdError");
 }
 

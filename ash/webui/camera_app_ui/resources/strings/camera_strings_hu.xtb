@@ -27,9 +27,7 @@
 <translation id="199526504800285197">A felvétel leállt</translation>
 <translation id="1995951722691075581">A felvétel leállt, mert az eszközön kevés a tárhely. További videók rögzítéséhez tárhelyet kell felszabadítania az eszközön.</translation>
 <translation id="2036868001356139588">Időzítés hossza</translation>
-<translation id="2050339315714019657">Álló</translation>
 <translation id="2064538373111010176"><ph name="CAMERA" /> aktív</translation>
-<translation id="2128052519899549250">Time-lapse videó rögzítése</translation>
 <translation id="2134029355740465625">Videobeállítások</translation>
 <translation id="2144806332417375165">Egyedi videóparaméterek</translation>
 <translation id="2175927920773552910">QR-kód</translation>
@@ -59,6 +57,7 @@
 <translation id="3566302376254083266">Mozgatás a bal felső sarok irányába</translation>
 <translation id="3573890771273113519">Váltás a beolvasási módra</translation>
 <translation id="3583444040776960729">Dokumentum bal alsó sarka</translation>
+<translation id="3642192109456033823">Videó feldolgozása…</translation>
 <translation id="3789724198583203151">Forgatás 90 fokkal az óramutató járásával ellentétesen</translation>
 <translation id="3810838688059735925">Videó</translation>
 <translation id="3892148308691398805">Szöveg másolása</translation>
@@ -67,9 +66,10 @@
 <translation id="4118525110028899586">Felvétel szüneteltetése</translation>
 <translation id="4121305183798804752">Dokumentum észlelve</translation>
 <translation id="414641094616694804">A kamera felbontását nem lehet módosítani</translation>
+<translation id="4176463684765177261">Letiltva</translation>
 <translation id="4269820728363426813">Link másolása</translation>
-<translation id="4281620174117014503">Közepes felbontás</translation>
 <translation id="428234092390943511">Oldal indexképe</translation>
+<translation id="4349714250734879769">Keretek átméretezése Chrome-mal</translation>
 <translation id="4383571725254449280">Teljesítménynaplók nyomtatása</translation>
 <translation id="4445542136948522167">Fotókészítés leállítása</translation>
 <translation id="4570032796877367747">Elülső kamera</translation>
@@ -82,19 +82,21 @@
 <translation id="4864143361253542638">Beszkennelt oldalak listája</translation>
 <translation id="4890010094662541459">3 × 3</translation>
 <translation id="491895758387112773">Multi-stream videó rögzítése</translation>
+<translation id="495170559598752135">Műveletek</translation>
 <translation id="4984613436295737187">Quad HD (1440p)</translation>
 <translation id="5034763830503483128">Fotó méretaránya</translation>
 <translation id="5057360777601936059">A kamera jelenleg nem használható.
         Ellenőrizze, hogy a kamera megfelelően van-e csatlakoztatva.</translation>
 <translation id="5163387177077603948">Mozgatás jobb oldali irányba</translation>
+<translation id="5219374179772385066">Mostantól használhatja time-lapse módot.</translation>
 <translation id="5235304959032763950">16:9</translation>
 <translation id="5266635337630551423">Dokumentum bal felső sarka</translation>
 <translation id="5317780077021120954">Mentés</translation>
 <translation id="5320594929574852403">Mozgatás bal oldali irányba</translation>
 <translation id="5374917190292010970">4K (2160p)</translation>
-<translation id="5577251651370645658">Time-lapse</translation>
 <translation id="5662366948659129155"><ph name="COUNT" />. oldal beolvasása</translation>
 <translation id="5671277269877808209">Négyzet</translation>
+<translation id="574392208103952083">Közepes</translation>
 <translation id="5746169159649715125">Mentés PDF-ként</translation>
 <translation id="5753488212459587150">Szakértői mód bekapcsolása</translation>
 <translation id="5759254179196327752">Dokumentum beolvasása</translation>
@@ -122,6 +124,7 @@ Ha visszajelzése a kép vagy a videó minőségével kapcsolatos, kérjük, mel
 <translation id="6888362557094394345">Mozgatás lefelé</translation>
 <translation id="695140971690006676">Az összes visszaállítása</translation>
 <translation id="6965382102122355670">OK</translation>
+<translation id="6965830616442491568">Portré</translation>
 <translation id="698156982839284926">3 másodperc</translation>
 <translation id="7134221860976209830">Tíz másodperces időzítő</translation>
 <translation id="7191890674911603392">Rögzítés típusa</translation>
@@ -137,6 +140,7 @@ Ha visszajelzése a kép vagy a videó minőségével kapcsolatos, kérjük, mel
 <translation id="7658239707568436148">Mégse</translation>
 <translation id="7670511624014457267">60 FPS</translation>
 <translation id="7671804233658741790">Dokumentum jobb alsó sarka</translation>
+<translation id="7684446460490665873">Time-lapse videó rögzítése</translation>
 <translation id="7692090236657809299">Pásztázás/billentés/nagyítás engedélyezése</translation>
 <translation id="7726641833034062494">Normál videó rögzítése</translation>
 <translation id="7748344063862150053">Dokumentum jobb felső sarka</translation>
@@ -148,6 +152,7 @@ Ha visszajelzése a kép vagy a videó minőségével kapcsolatos, kérjük, mel
 <translation id="8145038249676204903">Váltás fotókészítésre</translation>
 <translation id="8167081290930651932">Mentés fotóként</translation>
 <translation id="8239780215768881278">Pillanatkép készítése a videóból</translation>
+<translation id="8346544573713510785">Keretek átméretezése a Kamera HAL által</translation>
 <translation id="8425673304802773841">Billentés lefelé</translation>
 <translation id="8428213095426709021">Beállítások</translation>
 <translation id="8629662593426079630">360p</translation>
@@ -162,6 +167,7 @@ Ha visszajelzése a kép vagy a videó minőségével kapcsolatos, kérjük, mel
 <translation id="9045010116236796332">A dokumentum összes szélének a kereten belül kell lennie</translation>
 <translation id="9045155556724273246">10 másodperc</translation>
 <translation id="906331135292332864">Kép feldolgozása…</translation>
+<translation id="9161584225258678723">Time-lapse</translation>
 <translation id="922762992951083513">Tükrözés be</translation>
 <translation id="945522503751344254">Visszajelzés küldése</translation>
 </translationbundle>

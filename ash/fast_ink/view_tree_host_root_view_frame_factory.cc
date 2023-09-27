@@ -13,8 +13,8 @@
 #include "components/viz/common/gpu/context_provider.h"
 #include "components/viz/common/quads/compositor_frame.h"
 #include "components/viz/common/quads/texture_draw_quad.h"
-#include "components/viz/common/resources/resource_format_utils.h"
 #include "components/viz/common/resources/resource_id.h"
+#include "components/viz/common/resources/shared_image_format_utils.h"
 #include "gpu/command_buffer/client/gpu_memory_buffer_manager.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
 #include "gpu/command_buffer/common/shared_image_usage.h"
@@ -37,8 +37,9 @@
 namespace ash {
 namespace {
 
-constexpr viz::ResourceFormat kResourceFormat =
-    SK_B32_SHIFT ? viz::RGBA_8888 : viz::BGRA_8888;
+constexpr viz::SharedImageFormat kSharedImageFormat =
+    SK_B32_SHIFT ? viz::SinglePlaneFormat::kRGBA_8888
+                 : viz::SinglePlaneFormat::kBGRA_8888;
 
 constexpr uint32_t kUiSourceId = 1u;
 
@@ -59,10 +60,11 @@ ViewTreeHostRootViewFrameFactory::ViewTreeHostRootViewFrameFactory(
 
 // static
 std::unique_ptr<ViewTreeHostUiResource>
-ViewTreeHostRootViewFrameFactory::CreateUiResource(const gfx::Size& size,
-                                                   viz::ResourceFormat format,
-                                                   UiSourceId ui_source_id,
-                                                   bool is_overlay_candidate) {
+ViewTreeHostRootViewFrameFactory::CreateUiResource(
+    const gfx::Size& size,
+    viz::SharedImageFormat format,
+    UiSourceId ui_source_id,
+    bool is_overlay_candidate) {
   DCHECK(!size.IsEmpty());
   DCHECK(ui_source_id > 0);
 
@@ -72,9 +74,10 @@ ViewTreeHostRootViewFrameFactory::CreateUiResource(const gfx::Size& size,
       aura::Env::GetInstance()
           ->context_factory()
           ->GetGpuMemoryBufferManager()
-          ->CreateGpuMemoryBuffer(size, viz::BufferFormat(format),
-                                  gfx::BufferUsage::SCANOUT_CPU_READ_WRITE,
-                                  gpu::kNullSurfaceHandle, nullptr);
+          ->CreateGpuMemoryBuffer(
+              size, viz::SinglePlaneSharedImageFormatToBufferFormat(format),
+              gfx::BufferUsage::SCANOUT_CPU_READ_WRITE, gpu::kNullSurfaceHandle,
+              nullptr);
 
   if (!resource->gpu_memory_buffer) {
     LOG(ERROR) << "Failed to create GPU memory buffer";
@@ -83,7 +86,7 @@ ViewTreeHostRootViewFrameFactory::CreateUiResource(const gfx::Size& size,
 
   resource->context_provider = aura::Env::GetInstance()
                                    ->context_factory()
-                                   ->SharedMainThreadContextProvider();
+                                   ->SharedMainThreadRasterContextProvider();
 
   if (!resource->context_provider) {
     LOG(ERROR) << "Failed to acquire a context provider";
@@ -98,11 +101,10 @@ ViewTreeHostRootViewFrameFactory::CreateUiResource(const gfx::Size& size,
     usage |= gpu::SHARED_IMAGE_USAGE_SCANOUT;
   }
 
-  gpu::GpuMemoryBufferManager* gmb_manager =
-      aura::Env::GetInstance()->context_factory()->GetGpuMemoryBufferManager();
   resource->mailbox = sii->CreateSharedImage(
-      resource->gpu_memory_buffer.get(), gmb_manager, gfx::ColorSpace(),
-      kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, usage);
+      format, size, gfx::ColorSpace(), kTopLeft_GrSurfaceOrigin,
+      kPremul_SkAlphaType, usage, "FastInkRootViewFrame",
+      resource->gpu_memory_buffer->CloneHandle());
 
   resource->sync_token = sii->GenVerifiedSyncToken();
   resource->damaged = true;
@@ -281,7 +283,8 @@ void ViewTreeHostRootViewFrameFactory::AppendQuad(
                      /*clip=*/absl::nullopt, /*contents_opaque=*/false,
                      /*opacity_f=*/1.f,
                      /*blend=*/SkBlendMode::kSrcOver,
-                     /*sorting_context=*/0);
+                     /*sorting_context=*/0,
+                     /*layer_id=*/0u, /*fast_rounded_corner=*/false);
 
   gfx::Rect quad_rect = gfx::Rect(buffer_size);
 
@@ -309,8 +312,8 @@ ViewTreeHostRootViewFrameFactory::AcquireUiResource(
     const gfx::Size& size,
     bool is_overlay_candidate,
     UiResourceManager& resource_manager) const {
-  viz::ResourceId reusable_resource_id =
-      resource_manager.FindResourceToReuse(size, kResourceFormat, kUiSourceId);
+  viz::ResourceId reusable_resource_id = resource_manager.FindResourceToReuse(
+      size, kSharedImageFormat, kUiSourceId);
 
   std::unique_ptr<ViewTreeHostUiResource> resource;
 
@@ -319,7 +322,7 @@ ViewTreeHostRootViewFrameFactory::AcquireUiResource(
         resource_manager.ReleaseAvailableResource(reusable_resource_id)
             .release()));
   } else {
-    resource = CreateUiResource(size, kResourceFormat, kUiSourceId,
+    resource = CreateUiResource(size, kSharedImageFormat, kUiSourceId,
                                 is_overlay_candidate);
   }
 

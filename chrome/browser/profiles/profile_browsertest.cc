@@ -92,7 +92,6 @@
 #include "extensions/browser/extension_registry.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_builder.h"
-#include "extensions/common/value_builder.h"
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -234,7 +233,7 @@ class BrowserCloseObserver : public BrowserListObserver {
   }
 
  private:
-  raw_ptr<Browser, DanglingUntriaged> browser_;
+  raw_ptr<Browser, AcrossTasksDanglingUntriaged> browser_;
   base::RunLoop run_loop_;
 };
 
@@ -787,9 +786,8 @@ class ProfileBrowserTestWithoutDestroyProfile : public ProfileBrowserTest {
 
 // Verifies destroying regular profile will result in destruction of OTR
 // profiles.
-// TODO(crbug.com/1225252): Flakily fails on ASAN/LSAN builds
-// TODO(crbug.com/1304167): Failing on Mac.
-#if defined(ADDRESS_SANITIZER) || BUILDFLAG(IS_MAC)
+// TODO(crbug.com/1468503): Re-enable this test on ChromeOS.
+#if BUILDFLAG(IS_CHROMEOS)
 #define MAYBE_DestroyRegularProfileBeforeOTRs \
   DISABLED_DestroyRegularProfileBeforeOTRs
 #else
@@ -824,7 +822,10 @@ IN_PROC_BROWSER_TEST_F(ProfileBrowserTestWithoutDestroyProfile,
   ProfileDestroyer::DestroyOriginalProfileWhenAppropriate(
       std::move(regular_profile));
 
+  waiter1.Wait();
   EXPECT_TRUE(waiter1.destroyed());
+
+  waiter2.Wait();
   EXPECT_TRUE(waiter2.destroyed());
 }
 
@@ -952,22 +953,22 @@ IN_PROC_BROWSER_TEST_F(ProfileBrowserTestWithDestroyProfile,
 
   ProfileManager* profile_manager = g_browser_process->profile_manager();
   // Create a secondary profile.
-  Profile* secondary_profile = profiles::testing::CreateProfileSync(
+  Profile& secondary_profile = profiles::testing::CreateProfileSync(
       profile_manager, profile_manager->GenerateNextProfileDirectoryPath());
-  ASSERT_FALSE(Profile::IsMainProfilePath(secondary_profile->GetPath()));
+  ASSERT_FALSE(Profile::IsMainProfilePath(secondary_profile.GetPath()));
 
   // Creates a browser for the secondary profile.
-  Browser* secondary_browser = CreateBrowser(secondary_profile);
+  Browser* secondary_browser = CreateBrowser(&secondary_profile);
   Browser* main_browser = browser();
 
   EXPECT_TRUE(profile_manager->HasKeepAliveForTesting(
       main_profile, ProfileKeepAliveOrigin::kLacrosMainProfile));
   EXPECT_FALSE(profile_manager->HasKeepAliveForTesting(
-      secondary_profile, ProfileKeepAliveOrigin::kLacrosMainProfile));
+      &secondary_profile, ProfileKeepAliveOrigin::kLacrosMainProfile));
 
   // Destruction Waiters for both profiles.
   ProfileDestructionWaiter main_waiter(main_profile);
-  ProfileDestructionWaiter secondary_waiter(secondary_profile);
+  ProfileDestructionWaiter secondary_waiter(&secondary_profile);
 
   // Close both browsers.
   CloseBrowserSynchronously(secondary_browser);
@@ -1174,39 +1175,6 @@ IN_PROC_BROWSER_TEST_F(ProfileBrowserTest,
 
     EXPECT_EQ(chromeos::BrowserParamsProxy::Get()->SessionType(),
               crosapi::mojom::SessionType::kWebKioskSession);
-    EXPECT_TRUE(profile->IsMainProfile());
-
-    // Creating a profile causes an implicit connection attempt to a Mojo
-    // service, which occurs as part of a new task. Before deleting |profile|,
-    // ensure this task runs to prevent a crash.
-    FlushIoTaskRunnerAndSpinThreads();
-  }
-  FlushIoTaskRunnerAndSpinThreads();
-}
-
-IN_PROC_BROWSER_TEST_F(
-    ProfileBrowserTest,
-    IsMainProfileReturnsTrueForActiveDirectoryEnrolledDevices) {
-  base::ScopedAllowBlockingForTesting allow_blocking;
-  base::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.CreateUniqueTempDir());
-
-  {
-    base::FilePath profile_path =
-        temp_dir.GetPath().Append(chrome::kInitialProfile);
-    std::unique_ptr<Profile> profile(
-        CreateProfile(profile_path, /* delegate= */ nullptr,
-                      Profile::CREATE_MODE_SYNCHRONOUS));
-
-    crosapi::mojom::BrowserInitParamsPtr init_params =
-        crosapi::mojom::BrowserInitParams::New();
-    init_params->session_type = crosapi::mojom::SessionType::kRegularSession;
-    init_params->device_mode =
-        crosapi::mojom::DeviceMode::kEnterpriseActiveDirectory;
-    chromeos::BrowserInitParams::SetInitParamsForTests(std::move(init_params));
-
-    EXPECT_EQ(chromeos::BrowserParamsProxy::Get()->SessionType(),
-              crosapi::mojom::SessionType::kRegularSession);
     EXPECT_TRUE(profile->IsMainProfile());
 
     // Creating a profile causes an implicit connection attempt to a Mojo

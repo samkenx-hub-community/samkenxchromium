@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
 #include <tuple>
 
-#include "base/cxx17_backports.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/memory/raw_ptr.h"
@@ -36,14 +36,6 @@ class YUVReadbackTest : public testing::Test {
  protected:
   YUVReadbackTest() : context_(std::make_unique<gpu::GLInProcessContext>()) {
     gpu::ContextCreationAttribs attributes;
-    attributes.alpha_size = 8;
-    attributes.depth_size = 24;
-    attributes.red_size = 8;
-    attributes.green_size = 8;
-    attributes.blue_size = 8;
-    attributes.stencil_size = 8;
-    attributes.samples = 4;
-    attributes.sample_buffers = 1;
     attributes.bind_generates_resource = false;
 
     auto result = context_->Initialize(
@@ -98,11 +90,11 @@ class YUVReadbackTest : public testing::Test {
         << json_data;
 
     CHECK(parsed_json->is_list());
-    for (const base::Value& dict : parsed_json->GetList()) {
-      CHECK(dict.is_dict());
-      const std::string* name = dict.FindStringPath("name");
+    for (const base::Value& entry : parsed_json->GetList()) {
+      const auto& dict = entry.GetDict();
+      const std::string* name = dict.FindString("name");
       CHECK(name);
-      const std::string* trace_type = dict.FindStringPath("ph");
+      const std::string* trace_type = dict.FindString("ph");
       CHECK(trace_type);
       // Count all except END traces, as they come in BEGIN/END pairs.
       if (*trace_type != "E" && *trace_type != "e")
@@ -116,14 +108,14 @@ class YUVReadbackTest : public testing::Test {
   int Channel(SkBitmap* pixels, int x, int y, int c) {
     if (pixels->bytesPerPixel() == 4) {
       uint32_t* data =
-          pixels->getAddr32(base::clamp(x, 0, pixels->width() - 1),
-                            base::clamp(y, 0, pixels->height() - 1));
+          pixels->getAddr32(std::clamp(x, 0, pixels->width() - 1),
+                            std::clamp(y, 0, pixels->height() - 1));
       return (*data) >> (c * 8) & 0xff;
     } else {
       DCHECK_EQ(pixels->bytesPerPixel(), 1);
       DCHECK_EQ(c, 0);
-      return *pixels->getAddr8(base::clamp(x, 0, pixels->width() - 1),
-                               base::clamp(y, 0, pixels->height() - 1));
+      return *pixels->getAddr8(std::clamp(x, 0, pixels->width() - 1),
+                               std::clamp(y, 0, pixels->height() - 1));
     }
   }
 
@@ -136,13 +128,13 @@ class YUVReadbackTest : public testing::Test {
     DCHECK_LT(y, pixels->height());
     if (pixels->bytesPerPixel() == 4) {
       uint32_t* data = pixels->getAddr32(x, y);
-      v = base::clamp(v, 0, 255);
+      v = std::clamp(v, 0, 255);
       *data = (*data & ~(0xffu << (c * 8))) | (v << (c * 8));
     } else {
       DCHECK_EQ(pixels->bytesPerPixel(), 1);
       DCHECK_EQ(c, 0);
       uint8_t* data = pixels->getAddr8(x, y);
-      v = base::clamp(v, 0, 255);
+      v = std::clamp(v, 0, 255);
       *data = v;
     }
   }

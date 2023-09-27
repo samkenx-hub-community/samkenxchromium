@@ -1067,7 +1067,7 @@ gfx::RectF View::ConvertRectToTarget(const View* source,
 // static
 gfx::Rect View::ConvertRectToTarget(const View* source,
                                     const View* target,
-                                    gfx::Rect& rect) {
+                                    const gfx::Rect& rect) {
   constexpr float kDefaultAllowedConversionError = 0.00001f;
   return gfx::ToEnclosedRectIgnoringError(
       ConvertRectToTarget(source, target, gfx::RectF(rect)),
@@ -1354,6 +1354,12 @@ const ui::NativeTheme* View::GetNativeTheme() const {
 }
 
 void View::SetNativeThemeForTesting(ui::NativeTheme* theme) {
+  // In testing, View maybe not have a parent or widget, in this case we set the
+  // `native_theme_` to the global NativeTheme to prevent the DCHECK in
+  // GetNativeTheme().
+  if (!native_theme_ && !parent() && !GetWidget()) {
+    native_theme_ = ui::NativeTheme::GetInstanceForNativeUi();
+  }
   ui::NativeTheme* original_native_theme = GetNativeTheme();
   native_theme_ = theme;
   if (native_theme_ != original_native_theme)
@@ -1980,8 +1986,11 @@ void View::SetAccessibleName(const std::u16string& name) {
                 ax::mojom::IntAttribute::kNameFrom)));
 }
 
-void View::SetAccessibleName(const std::u16string& name,
+void View::SetAccessibleName(std::u16string name,
                              ax::mojom::NameFrom name_from) {
+  // Allow subclasses to adjust the name.
+  AdjustAccessibleName(name, name_from);
+
   // Ensure we have a current `name_from` value. For instance, the name might
   // still be an empty string, but a view is now indicating that this is by
   // design by setting `NameFrom::kAttributeExplicitlyEmpty`.
@@ -2713,6 +2722,9 @@ void View::AfterPropertyChange(const void* key, int64_t old_value) {
                                                               this);
     }
   }
+  for (auto& observer : observers_) {
+    observer.OnViewPropertyChanged(this, key, old_value);
+  }
 }
 
 void View::OnPropertyChanged(ui::metadata::PropertyKey property,
@@ -3197,15 +3209,16 @@ void View::SetLayoutManagerImpl(std::unique_ptr<LayoutManager> layout_manager) {
 void View::SetLayerBounds(const gfx::Size& size,
                           const LayerOffsetData& offset_data) {
   const gfx::Rect bounds = gfx::Rect(size) + offset_data.offset();
-  const bool bounds_changed = (bounds != layer()->GetTargetBounds());
   layer()->SetBounds(bounds);
   for (ui::Layer* layer : GetLayersInOrder(ViewLayer::kExclude)) {
     layer->SetBounds(gfx::Rect(layer->size()) + bounds.OffsetFromOrigin());
   }
   SnapLayerToPixelBoundary(offset_data);
-  if (bounds_changed) {
-    for (ViewObserver& observer : observers_)
-      observer.OnLayerTargetBoundsChanged(this);
+
+  // Observers may need to adjust the bounds of layers in regions, so always
+  // notify observers even if the bounds of `layer()` didn't change.
+  for (ViewObserver& observer : observers_) {
+    observer.OnViewLayerBoundsSet(this);
   }
 }
 
@@ -3303,6 +3316,8 @@ void View::CreateLayer(ui::LayerType layer_type) {
 }
 
 bool View::UpdateParentLayers() {
+  TRACE_EVENT1("views", "View::UpdateParentLayers", "class", GetClassName());
+
   // Attach all top-level un-parented layers.
   if (layer()) {
     if (!layer()->parent()) {

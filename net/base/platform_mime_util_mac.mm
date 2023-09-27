@@ -9,8 +9,9 @@
 
 #include <string>
 
-#include "base/mac/foundation_util.h"
-#include "base/mac/scoped_cftyperef.h"
+#include "base/apple/bridging.h"
+#include "base/apple/foundation_util.h"
+#include "base/apple/scoped_cftyperef.h"
 #include "base/notreached.h"
 #include "base/strings/sys_string_conversions.h"
 #include "build/build_config.h"
@@ -39,7 +40,7 @@ bool PlatformMimeUtil::GetPlatformMimeTypeFromExtension(
     // Dynamic UTTypes are made by the system in the event that there's a
     // non-identifiable mime type. For now, we should treat dynamic UTTypes as a
     // nonstandard format.
-    if ([uttype isDynamic] || uttype.preferredMIMEType == nil) {
+    if (uttype.dynamic || uttype.preferredMIMEType == nil) {
       return false;
     }
     *result = base::SysNSStringToUTF8(uttype.preferredMIMEType);
@@ -49,18 +50,19 @@ bool PlatformMimeUtil::GetPlatformMimeTypeFromExtension(
      MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_VERSION_11_0) || \
     (BUILDFLAG(IS_IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_14_0)
   else {
-    base::ScopedCFTypeRef<CFStringRef> ext_ref(
+    base::apple::ScopedCFTypeRef<CFStringRef> ext_ref(
         base::SysUTF8ToCFStringRef(ext_nodot));
     if (!ext_ref) {
       return false;
     }
-    base::ScopedCFTypeRef<CFStringRef> uti(
+    base::apple::ScopedCFTypeRef<CFStringRef> uti(
         UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension,
-                                              ext_ref, nullptr));
+                                              ext_ref,
+                                              /*inConformingToUTI=*/nullptr));
     if (!uti) {
       return false;
     }
-    base::ScopedCFTypeRef<CFStringRef> mime_ref(
+    base::apple::ScopedCFTypeRef<CFStringRef> mime_ref(
         UTTypeCopyPreferredTagWithClass(uti, kUTTagClassMIMEType));
     if (!mime_ref) {
       return false;
@@ -85,7 +87,7 @@ bool PlatformMimeUtil::GetPlatformPreferredExtensionForMimeType(
   if (@available(macOS 11, iOS 14, *)) {
     UTType* uttype =
         [UTType typeWithMIMEType:base::SysUTF8ToNSString(mime_type)];
-    if ([uttype isDynamic] || uttype.preferredFilenameExtension == nil) {
+    if (uttype.dynamic || uttype.preferredFilenameExtension == nil) {
       return false;
     }
     *ext = base::SysNSStringToUTF8(uttype.preferredFilenameExtension);
@@ -95,18 +97,18 @@ bool PlatformMimeUtil::GetPlatformPreferredExtensionForMimeType(
      MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_VERSION_11_0) || \
     (BUILDFLAG(IS_IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_14_0)
   else {
-    base::ScopedCFTypeRef<CFStringRef> mime_ref(
+    base::apple::ScopedCFTypeRef<CFStringRef> mime_ref(
         base::SysUTF8ToCFStringRef(mime_type));
     if (!mime_ref) {
       return false;
     }
-    base::ScopedCFTypeRef<CFStringRef> uti(
+    base::apple::ScopedCFTypeRef<CFStringRef> uti(
         UTTypeCreatePreferredIdentifierForTag(kUTTagClassMIMEType, mime_ref,
-                                              nullptr));
+                                              /*inConformingToUTI=*/nullptr));
     if (!uti) {
       return false;
     }
-    base::ScopedCFTypeRef<CFStringRef> ext_ref(
+    base::apple::ScopedCFTypeRef<CFStringRef> ext_ref(
         UTTypeCopyPreferredTagWithClass(uti, kUTTagClassFilenameExtension));
     if (!ext_ref) {
       return false;
@@ -164,23 +166,25 @@ void PlatformMimeUtil::GetPlatformExtensionsForMimeType(
      MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_VERSION_11_0) || \
     (BUILDFLAG(IS_IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_14_0)
   else {
-    base::ScopedCFTypeRef<CFStringRef> mime_ref(
+    base::apple::ScopedCFTypeRef<CFStringRef> mime_ref(
         base::SysUTF8ToCFStringRef(mime_type));
     if (mime_ref) {
       bool extensions_found = false;
-      base::ScopedCFTypeRef<CFArrayRef> types(UTTypeCreateAllIdentifiersForTag(
-          kUTTagClassMIMEType, mime_ref, nullptr));
+      base::apple::ScopedCFTypeRef<CFArrayRef> types(
+          UTTypeCreateAllIdentifiersForTag(kUTTagClassMIMEType, mime_ref,
+                                           nullptr));
       if (types) {
         for (CFIndex i = 0; i < CFArrayGetCount(types); i++) {
-          base::ScopedCFTypeRef<CFArrayRef> extensions_list(
-              UTTypeCopyAllTagsWithClass(base::mac::CFCast<CFStringRef>(
+          base::apple::ScopedCFTypeRef<CFArrayRef> extensions_list(
+              UTTypeCopyAllTagsWithClass(base::apple::CFCast<CFStringRef>(
                                              CFArrayGetValueAtIndex(types, i)),
                                          kUTTagClassFilenameExtension));
           if (!extensions_list) {
             continue;
           }
           extensions_found = true;
-          for (NSString* extension in base::mac::CFToNSCast(extensions_list)) {
+          for (NSString* extension in base::apple::CFToNSPtrCast(
+                   extensions_list)) {
             extensions->insert(base::SysNSStringToUTF8(extension));
           }
         }

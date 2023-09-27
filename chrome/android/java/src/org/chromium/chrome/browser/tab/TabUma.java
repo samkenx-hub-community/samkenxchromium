@@ -5,13 +5,11 @@
 package org.chromium.chrome.browser.tab;
 
 import android.os.SystemClock;
-import android.text.format.DateUtils;
 
 import androidx.annotation.Nullable;
 
 import org.chromium.base.UserData;
 import org.chromium.base.metrics.RecordHistogram;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.net.NetError;
 import org.chromium.ui.base.WindowAndroid;
@@ -39,9 +37,7 @@ public class TabUma extends EmptyTabObserver implements UserData {
     private static final int TAB_STATE_INITIAL = 0;
     private static final int TAB_STATE_ACTIVE = 1;
     private static final int TAB_STATE_INACTIVE = 2;
-    private static final int TAB_STATE_DETACHED = 3;
     private static final int TAB_STATE_CLOSED = 4;
-    private static final int TAB_STATE_MAX = TAB_STATE_CLOSED;
 
     // Counter of tab shows (as per onShow()) for all tabs.
     private static long sAllTabsShowCount;
@@ -118,7 +114,6 @@ public class TabUma extends EmptyTabObserver implements UserData {
 
     @Override
     public void onShown(Tab tab, @TabSelectionType int selectionType) {
-        long previousTimestampMillis = CriticalPersistedTabData.from(tab).getTimestampMillis();
         long now = SystemClock.elapsedRealtime();
 
         // Do not collect the tab switching data for the first switch to a tab after the cold start
@@ -162,19 +157,6 @@ public class TabUma extends EmptyTabObserver implements UserData {
         if (selectionType == TabSelectionType.FROM_USER) {
             RecordHistogram.recordEnumeratedHistogram(
                     "Tab.StatusWhenSwitchedBackToForeground", status, TAB_STATUS_LIM);
-        }
-
-        // Record "tab age upon first display" metrics. previousTimestampMillis is persisted through
-        // cold starts.
-        if (mLastShownTimestamp == -1 && previousTimestampMillis > 0) {
-            long duration = System.currentTimeMillis() - previousTimestampMillis;
-            if (isOnBrowserStartup) {
-                RecordHistogram.recordCount1MHistogram("Tabs.ForegroundTabAgeAtStartup",
-                        (int) (duration / DateUtils.MINUTE_IN_MILLIS));
-            } else if (selectionType == TabSelectionType.FROM_USER) {
-                RecordHistogram.recordCount1MHistogram("Tab.AgeUponRestoreFromColdStart",
-                        (int) (duration / DateUtils.MINUTE_IN_MILLIS));
-            }
         }
 
         mLastShownTimestamp = now;

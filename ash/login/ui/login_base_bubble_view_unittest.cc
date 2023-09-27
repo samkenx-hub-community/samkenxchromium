@@ -4,9 +4,12 @@
 
 #include "ash/login/ui/login_base_bubble_view.h"
 #include "ash/login/ui/login_test_base.h"
+#include "ash/style/ash_color_id.h"
 #include "ash/style/ash_color_provider.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/events/test/event_generator.h"
 #include "ui/views/controls/label.h"
@@ -42,7 +45,7 @@ class LoginBaseBubbleViewTest : public LoginTestBase {
     container_ = new views::View();
     container_->SetLayoutManager(std::make_unique<views::BoxLayout>(
         views::BoxLayout::Orientation::kVertical));
-    container_->AddChildView(anchor_);
+    container_->AddChildView(anchor_.get());
 
     SetWidget(CreateWidgetWithContent(container_));
 
@@ -54,12 +57,12 @@ class LoginBaseBubbleViewTest : public LoginTestBase {
         views::BoxLayout::Orientation::kVertical));
     bubble_->AddChildView(label);
 
-    container_->AddChildView(bubble_);
+    container_->AddChildView(bubble_.get());
   }
 
-  LoginBaseBubbleView* bubble_;
-  views::View* container_;
-  AnchorView* anchor_;
+  raw_ptr<LoginBaseBubbleView, DanglingUntriaged | ExperimentalAsh> bubble_;
+  raw_ptr<views::View, DanglingUntriaged | ExperimentalAsh> container_;
+  raw_ptr<AnchorView, DanglingUntriaged | ExperimentalAsh> anchor_;
 };
 
 TEST_F(LoginBaseBubbleViewTest, BasicProperties) {
@@ -69,8 +72,8 @@ TEST_F(LoginBaseBubbleViewTest, BasicProperties) {
   EXPECT_TRUE(bubble_->GetVisible());
 
   EXPECT_EQ(bubble_->width(), kBubbleTotalWidthDp);
-  SkColor background_color = AshColorProvider::Get()->GetBaseLayerColor(
-      AshColorProvider::BaseLayerType::kTransparent80);
+  SkColor background_color = bubble_->GetColorProvider()->GetColor(
+      cros_tokens::kCrosSysSystemBaseElevated);
   EXPECT_EQ(bubble_->background()->get_color(), background_color);
 
   bubble_->Hide();

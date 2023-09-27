@@ -14,6 +14,7 @@
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
+#include "third_party/blink/public/common/storage_key/storage_key.h"
 #include "third_party/blink/public/mojom/service_worker/service_worker.mojom.h"
 
 namespace content {
@@ -57,12 +58,17 @@ class FakeServiceWorker : public blink::mojom::ServiceWorker {
   void InitializeGlobalScope(
       mojo::PendingAssociatedRemote<blink::mojom::ServiceWorkerHost>
           service_worker_host,
+      mojo::PendingAssociatedRemote<blink::mojom::AssociatedInterfaceProvider>
+          associated_interfaces_from_browser,
+      mojo::PendingAssociatedReceiver<blink::mojom::AssociatedInterfaceProvider>
+          associated_interfaces_to_browser,
       blink::mojom::ServiceWorkerRegistrationObjectInfoPtr registration_info,
       blink::mojom::ServiceWorkerObjectInfoPtr service_worker_info,
       FetchHandlerExistence fetch_handler_existence,
       mojo::PendingReceiver<blink::mojom::ReportingObserver>
           reporting_observer_receiver,
-      blink::mojom::AncestorFrameType ancestor_frame_type) override;
+      blink::mojom::AncestorFrameType ancestor_frame_type,
+      const blink::StorageKey& storage_key) override;
   void DispatchInstallEvent(DispatchInstallEventCallback callback) override;
   void DispatchActivateEvent(DispatchActivateEventCallback callback) override;
   void DispatchBackgroundFetchAbortEvent(

@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "ash/public/cpp/holding_space/holding_space_file.h"
 #include "ash/public/cpp/holding_space/holding_space_image.h"
 #include "ash/public/cpp/holding_space/holding_space_section.h"
 #include "ash/public/cpp/holding_space/holding_space_test_api.h"
@@ -18,6 +19,7 @@
 #include "ash/system/holding_space/test_holding_space_tray_child_bubble.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/strcat.h"
 #include "ui/views/widget/unique_widget_ptr.h"
 #include "ui/views/widget/widget.h"
@@ -108,7 +110,8 @@ class HoldingSpaceItemViewsSectionTest
   views::UniqueWidgetPtr widget_;
   std::unique_ptr<HoldingSpaceViewDelegate> view_delegate_;
 
-  TestHoldingSpaceItemViewsSection* item_views_section_ = nullptr;
+  raw_ptr<TestHoldingSpaceItemViewsSection, DanglingUntriaged | ExperimentalAsh>
+      item_views_section_ = nullptr;
 };
 
 INSTANTIATE_TEST_SUITE_P(All,
@@ -167,9 +170,12 @@ TEST_P(HoldingSpaceItemViewsSectionTest, PartiallyInitializedItemsDontShow) {
   // Once initialized, the item should show a view as normal.
   model()->InitializeOrRemoveItem(
       partially_initialized_item->id(),
-      GURL(base::StrCat(
-          {"filesystem:",
-           partially_initialized_item->file_path().BaseName().value()})));
+      HoldingSpaceFile(
+          partially_initialized_item->file().file_path,
+          HoldingSpaceFile::FileSystemType::kTest,
+          GURL(base::StrCat({"filesystem:", partially_initialized_item->file()
+                                                .file_path.BaseName()
+                                                .value()}))));
 
   views = item_views_section()->GetHoldingSpaceItemViews();
   ASSERT_EQ(views.size(), 2u);

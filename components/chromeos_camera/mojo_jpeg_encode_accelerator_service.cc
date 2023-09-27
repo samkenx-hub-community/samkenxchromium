@@ -265,13 +265,13 @@ void MojoJpegEncodeAcceleratorService::EncodeWithFD(
   const uint8_t* input_shm_memory =
       input_mapping.GetMemoryAsSpan<uint8_t>().data();
   scoped_refptr<media::VideoFrame> frame = media::VideoFrame::WrapExternalData(
-      media::PIXEL_FORMAT_I420,                // format
-      coded_size,                              // coded_size
-      gfx::Rect(coded_size),                   // visible_rect
-      coded_size,                              // natural_size
-      const_cast<uint8_t*>(input_shm_memory),  // data
-      input_buffer_size,                       // data_size
-      base::TimeDelta());                      // timestamp
+      media::PIXEL_FORMAT_I420,  // format
+      coded_size,                // coded_size
+      gfx::Rect(coded_size),     // visible_rect
+      coded_size,                // natural_size
+      input_shm_memory,          // data
+      input_buffer_size,         // data_size
+      base::TimeDelta());        // timestamp
   if (!frame.get()) {
     LOG(ERROR) << "Could not create VideoFrame for buffer id " << task_id;
     NotifyEncodeStatus(
@@ -297,6 +297,8 @@ void MojoJpegEncodeAcceleratorService::EncodeWithDmaBuf(
     int32_t coded_size_width,
     int32_t coded_size_height,
     int32_t quality,
+    bool has_input_modifier,
+    uint64_t input_modifier,
     EncodeWithDmaBufCallback callback) {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
 
@@ -326,7 +328,9 @@ void MojoJpegEncodeAcceleratorService::EncodeWithDmaBuf(
   }
 
   auto input_video_frame = ConstructVideoFrame(
-      std::move(input_planes), ToVideoPixelFormat(input_format), coded_size);
+      std::move(input_planes), ToVideoPixelFormat(input_format), coded_size,
+      has_input_modifier ? input_modifier
+                         : gfx::NativePixmapHandle::kNoModifier);
   if (!input_video_frame) {
     std::move(callback).Run(
         0, ::chromeos_camera::JpegEncodeAccelerator::Status::PLATFORM_FAILURE);

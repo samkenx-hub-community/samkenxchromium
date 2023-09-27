@@ -20,6 +20,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_frame_host.h"
 #include "printing/print_job_constants.h"
+#include "printing/print_settings.h"
 
 namespace android_webview {
 
@@ -95,7 +96,7 @@ void AwPrintManager::UpdateParam(
   settings_ = std::move(settings);
   fd_ = file_descriptor;
   set_pdf_writing_done_callback(std::move(callback));
-  set_cookie(1);  // Set a valid dummy cookie value.
+  set_cookie(printing::PrintSettings::NewCookie());
 }
 
 void AwPrintManager::ScriptedPrint(

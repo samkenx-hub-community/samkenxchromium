@@ -6,6 +6,7 @@
 #define IOS_CHROME_BROWSER_PROMOS_MANAGER_CONSTANTS_H_
 
 #include "base/strings/string_piece.h"
+#import "base/values.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace promos_manager {
@@ -15,6 +16,10 @@ extern const char kImpressionPromoKey[];
 
 // Dictionary key for `day` in stored impression (base::Value).
 extern const char kImpressionDayKey[];
+
+// Dictionary key for `feature_engagement_migration_completed` stored impression
+// (base::Value).
+extern const char kImpressionFeatureEngagementMigrationCompletedKey[];
 
 // The max number of days for impression history to be stored & maintained.
 extern const int kNumDaysImpressionHistoryStored;
@@ -28,7 +33,10 @@ enum class Promo {
       4,  // Post Restore Sign-In (fullscreen, FRE-like promo)
   PostRestoreSignInAlert = 5,  // Post Restore Sign-In (native iOS alert)
   WhatsNew = 6,                // What's New Promo
-  kMaxValue = WhatsNew,
+  Choice = 7,                  // Offer a choice
+  PostRestoreDefaultBrowserAlert =
+      8,  // Post Restore Default Browser (native iOS alert)
+  kMaxValue = PostRestoreDefaultBrowserAlert,
 };
 
 // Enum for IOS.PromosManager.Promo.ImpressionLimitEvaluation histogram.
@@ -56,15 +64,25 @@ struct Impression {
   // A day (int) is represented as the number of days since the Unix epoch
   // (running from UTC midnight to UTC midnight).
   int day;
+  bool feature_engagement_migration_completed;
 
-  Impression(Promo promo, int day) : promo(promo), day(day) {}
+  Impression(Promo promo, int day, bool feature_engagement_migration_completed)
+      : promo(promo),
+        day(day),
+        feature_engagement_migration_completed(
+            feature_engagement_migration_completed) {}
 };
 
 // Returns string representation of promos_manager::Promo `promo`.
-base::StringPiece NameForPromo(Promo promo);
+std::string NameForPromo(Promo promo);
+
+// Returns a string representation of the short name for the provided `promo`.
+base::StringPiece ShortNameForPromo(Promo promo);
 
 // Returns promos_manager::Promo for string `promo`.
 absl::optional<Promo> PromoForName(base::StringPiece promo);
+
+absl::optional<Impression> ImpressionFromDict(const base::Value::Dict& dict);
 
 }  // namespace promos_manager
 

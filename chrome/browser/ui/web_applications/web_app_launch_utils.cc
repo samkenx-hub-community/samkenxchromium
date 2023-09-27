@@ -68,6 +68,10 @@
 #include "extensions/common/extension.h"
 #endif
 
+#if BUILDFLAG(IS_CHROMEOS)
+#include "chromeos/components/kiosk/kiosk_utils.h"
+#endif  // BUILDFLAG(IS_CHROMEOS)
+
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 #include "chrome/browser/ash/app_mode/web_app/web_kiosk_browser_controller_ash.h"
 #include "chrome/browser/ash/system_web_apps/system_web_app_manager.h"
@@ -75,24 +79,22 @@
 #include "chrome/browser/ui/ash/system_web_apps/system_web_app_ui_utils.h"
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-#include "chromeos/constants/chromeos_features.h"
-#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
-
 namespace web_app {
 
 namespace {
 
-ui::WindowShowState DetermineWindowShowState() {
-  if (chrome::IsRunningInForcedAppMode())
+ui::WindowShowState DetermineWindowShowState(bool is_system_web_app) {
+  // Show SWAs in Kiosk non-fullscreen.
+  if (chrome::IsRunningInForcedAppMode() && !is_system_web_app) {
     return ui::SHOW_STATE_FULLSCREEN;
+  }
 
   return ui::SHOW_STATE_DEFAULT;
 }
 
 Browser* ReparentWebContentsIntoAppBrowser(content::WebContents* contents,
                                            Browser* target_browser,
-                                           const AppId& app_id,
+                                           const webapps::AppId& app_id,
                                            bool as_pinned_home_tab) {
   DCHECK(target_browser->is_type_app());
   Browser* source_browser = chrome::FindBrowserWithWebContents(contents);
@@ -150,24 +152,10 @@ Browser* ReparentWebContentsIntoAppBrowser(content::WebContents* contents,
   return target_browser;
 }
 
-#if BUILDFLAG(IS_CHROMEOS)
-std::unique_ptr<AppBrowserController> CreateWebKioskBrowserController(
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+const ash::SystemWebAppDelegate* GetSystemWebAppDelegate(
     Browser* browser,
-    WebAppProvider* provider,
-    const AppId& app_id) {
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  return std::make_unique<ash::WebKioskBrowserControllerAsh>(*provider, browser,
-                                                             app_id);
-#else
-  // TODO(b/242023891): Add web Kiosk browser controller for Lacros.
-  return nullptr;
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-}
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-const ash::SystemWebAppDelegate* GetSystemWebAppDelegate(Browser* browser,
-                                                         const AppId& app_id) {
+    const webapps::AppId& app_id) {
   auto system_app_type =
       ash::GetSystemWebAppTypeForAppId(browser->profile(), app_id);
   if (system_app_type) {
@@ -178,10 +166,27 @@ const ash::SystemWebAppDelegate* GetSystemWebAppDelegate(Browser* browser,
 }
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
+#if BUILDFLAG(IS_CHROMEOS)
+std::unique_ptr<AppBrowserController> CreateWebKioskBrowserController(
+    Browser* browser,
+    WebAppProvider* provider,
+    const webapps::AppId& app_id) {
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  const ash::SystemWebAppDelegate* system_app =
+      GetSystemWebAppDelegate(browser, app_id);
+  return std::make_unique<ash::WebKioskBrowserControllerAsh>(
+      *provider, browser, app_id, system_app);
+#else
+  // TODO(b/242023891): Add web Kiosk browser controller for Lacros.
+  return nullptr;
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+}
+#endif  // BUILDFLAG(IS_CHROMEOS)
+
 std::unique_ptr<AppBrowserController> CreateWebAppBrowserController(
     Browser* browser,
     WebAppProvider* provider,
-    const AppId& app_id) {
+    const webapps::AppId& app_id) {
   bool should_have_tab_strip_for_swa = false;
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   const ash::SystemWebAppDelegate* system_app =
@@ -202,7 +207,7 @@ std::unique_ptr<AppBrowserController> CreateWebAppBrowserController(
 
 std::unique_ptr<AppBrowserController> MaybeCreateHostedAppBrowserController(
     Browser* browser,
-    const AppId& app_id) {
+    const webapps::AppId& app_id) {
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   const extensions::Extension* extension =
       extensions::ExtensionRegistry::Get(browser->profile())
@@ -216,12 +221,13 @@ std::unique_ptr<AppBrowserController> MaybeCreateHostedAppBrowserController(
 
 }  // namespace
 
-absl::optional<AppId> GetWebAppForActiveTab(Browser* browser) {
-  WebAppProvider* provider = WebAppProvider::GetForWebApps(browser->profile());
+absl::optional<webapps::AppId> GetWebAppForActiveTab(const Browser* browser) {
+  const WebAppProvider* const provider =
+      WebAppProvider::GetForWebApps(browser->profile());
   if (!provider)
     return absl::nullopt;
 
-  content::WebContents* web_contents =
+  const content::WebContents* const web_contents =
       browser->tab_strip_model()->GetActiveWebContents();
   if (!web_contents)
     return absl::nullopt;
@@ -251,7 +257,7 @@ void PrunePreScopeNavigationHistory(const GURL& scope,
 }
 
 Browser* ReparentWebAppForActiveTab(Browser* browser) {
-  absl::optional<AppId> app_id = GetWebAppForActiveTab(browser);
+  absl::optional<webapps::AppId> app_id = GetWebAppForActiveTab(browser);
   if (!app_id)
     return nullptr;
   return ReparentWebContentsIntoAppBrowser(
@@ -259,7 +265,7 @@ Browser* ReparentWebAppForActiveTab(Browser* browser) {
 }
 
 Browser* ReparentWebContentsIntoAppBrowser(content::WebContents* contents,
-                                           const AppId& app_id) {
+                                           const webapps::AppId& app_id) {
   Profile* profile = Profile::FromBrowserContext(contents->GetBrowserContext());
   // Incognito tabs reparent correctly, but remain incognito without any
   // indication to the user, so disallow it.
@@ -291,9 +297,9 @@ Browser* ReparentWebContentsIntoAppBrowser(content::WebContents* contents,
 
   if (web_app->launch_handler()
           .value_or(LaunchHandler{})
-          .TargetsExistingClients()) {
-    if (Browser* browser =
-            AppBrowserController::FindForWebApp(*profile, app_id)) {
+          .TargetsExistingClients() ||
+      registrar.IsPreventCloseEnabled(web_app->app_id())) {
+    if (AppBrowserController::FindForWebApp(*profile, app_id)) {
       // TODO(crbug.com/1385226): Use apps::AppServiceProxy::LaunchAppWithUrl()
       // instead to ensure all the usual wrapping code around web app launches
       // gets executed.
@@ -309,26 +315,32 @@ Browser* ReparentWebContentsIntoAppBrowser(content::WebContents* contents,
     }
   }
 
-  bool as_pinned_home_tab = IsPinnedHomeTabUrl(registrar, app_id, launch_url);
+  Browser* browser = nullptr;
 
   if (registrar.IsTabbedWindowModeEnabled(app_id)) {
-    if (Browser* browser =
-            AppBrowserController::FindForWebApp(*profile, app_id)) {
-      return ReparentWebContentsIntoAppBrowser(contents, browser, app_id,
-                                               as_pinned_home_tab);
-    }
+    browser = AppBrowserController::FindForWebApp(*profile, app_id);
   }
 
-  return ReparentWebContentsIntoAppBrowser(
-      contents,
-      Browser::Create(Browser::CreateParams::CreateForApp(
-          GenerateApplicationNameFromAppId(app_id), true /* trusted_source */,
-          gfx::Rect(), profile, true /* user_gesture */)),
-      app_id, as_pinned_home_tab);
+  if (!browser) {
+    browser = Browser::Create(Browser::CreateParams::CreateForApp(
+        GenerateApplicationNameFromAppId(app_id), true /* trusted_source */,
+        gfx::Rect(), profile, true /* user_gesture */));
+
+    // If the current url isn't in scope, then set the initial url on the
+    // AppBrowserController so that the 'x' button still shows up.
+    CHECK(browser->app_controller());
+    browser->app_controller()->MaybeSetInitialUrlOnReparentTab();
+  }
+
+  bool as_pinned_home_tab =
+      browser->app_controller()->IsUrlInHomeTabScope(launch_url);
+
+  return ReparentWebContentsIntoAppBrowser(contents, browser, app_id,
+                                           as_pinned_home_tab);
 }
 
 void SetWebContentsActingAsApp(content::WebContents* contents,
-                               const AppId& app_id) {
+                               const webapps::AppId& app_id) {
   auto* helper = WebAppTabHelper::FromWebContents(contents);
   helper->SetAppId(app_id);
   helper->set_acting_as_app(true);
@@ -356,12 +368,13 @@ void ClearAppPrefsForWebContents(content::WebContents* web_contents) {
 std::unique_ptr<AppBrowserController> MaybeCreateAppBrowserController(
     Browser* browser) {
   std::unique_ptr<AppBrowserController> controller;
-  const AppId app_id = GetAppIdFromApplicationName(browser->app_name());
+  const webapps::AppId app_id =
+      GetAppIdFromApplicationName(browser->app_name());
   auto* const provider =
       WebAppProvider::GetForLocalAppsUnchecked(browser->profile());
   if (provider && provider->registrar_unsafe().IsInstalled(app_id)) {
 #if BUILDFLAG(IS_CHROMEOS)
-    if (profiles::IsKioskSession() &&
+    if (chromeos::IsKioskSession() &&
         base::FeatureList::IsEnabled(features::kKioskEnableAppService)) {
       controller = CreateWebKioskBrowserController(browser, provider, app_id);
     } else {
@@ -410,6 +423,8 @@ Browser* CreateWebApplicationWindow(Profile* profile,
                                     bool omit_from_session_restore,
                                     bool can_resize,
                                     bool can_maximize,
+                                    bool can_fullscreen,
+                                    bool is_system_web_app,
                                     const gfx::Rect initial_bounds) {
   std::string app_name = GenerateApplicationNameFromAppId(app_id);
   Browser::CreateParams browser_params =
@@ -420,13 +435,15 @@ Browser* CreateWebApplicationWindow(Profile* profile,
           : Browser::CreateParams::CreateForApp(
                 app_name, /*trusted_source=*/true, initial_bounds, profile,
                 /*user_gesture=*/true);
-  browser_params.initial_show_state = DetermineWindowShowState();
+  browser_params.initial_show_state =
+      DetermineWindowShowState(is_system_web_app);
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   browser_params.restore_id = restore_id;
 #endif
   browser_params.omit_from_session_restore = omit_from_session_restore;
   browser_params.can_resize = can_resize;
   browser_params.can_maximize = can_maximize;
+  browser_params.can_fullscreen = can_fullscreen;
   Browser* browser = Browser::Create(browser_params);
   MaybeAddPinnedHomeTab(browser, app_id);
   return browser;
@@ -444,11 +461,9 @@ content::WebContents* NavigateWebApplicationWindow(
 
 content::WebContents* NavigateWebAppUsingParams(const std::string& app_id,
                                                 NavigateParams& nav_params) {
-  WebAppRegistrar& registrar =
-      WebAppProvider::GetForLocalAppsUnchecked(nav_params.browser->profile())
-          ->registrar_unsafe();
-
-  if (IsPinnedHomeTabUrl(registrar, app_id, nav_params.url)) {
+  if (nav_params.browser->app_controller() &&
+      nav_params.browser->app_controller()->IsUrlInHomeTabScope(
+          nav_params.url)) {
     // Navigations to the home tab URL in tabbed apps should happen in the home
     // tab.
     nav_params.browser->tab_strip_model()->ActivateTabAt(0);
@@ -488,13 +503,14 @@ content::WebContents* NavigateWebAppUsingParams(const std::string& app_id,
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   // Highly experimental feature to isolate web app application with a different
   // storage partition.
-  if (base::FeatureList::IsEnabled(
-          chromeos::features::kExperimentalWebAppStoragePartitionIsolation)) {
+  if (ResolveExperimentalWebAppIsolationFeature() ==
+      ExperimentalWebAppIsolationMode::kStoragePartition) {
     // TODO(crbug.com/1425284): Cover other app launch paths (e.g. restore
     // apps).
     auto partition_config = content::StoragePartitionConfig::Create(
-        nav_params.browser->profile(), /*partition_domain=*/app_id,
-        /*partition_name=*/"goldfish", /*in_memory=*/false);
+        nav_params.browser->profile(),
+        /*partition_domain=*/kExperimentalWebAppStorageParitionDomain,
+        /*partition_name=*/app_id, /*in_memory=*/false);
 
     auto guest_site_instance = content::SiteInstance::CreateForGuest(
         nav_params.browser->profile(), partition_config);
@@ -594,7 +610,7 @@ void RecordAppTabLaunchMetric(Profile* profile,
   }
 }
 
-void RecordLaunchMetrics(const AppId& app_id,
+void RecordLaunchMetrics(const webapps::AppId& app_id,
                          apps::LaunchContainer container,
                          apps::LaunchSource launch_source,
                          const GURL& launch_url,
@@ -622,8 +638,9 @@ void RecordLaunchMetrics(const AppId& app_id,
 }
 
 void UpdateLaunchStats(content::WebContents* web_contents,
-                       const AppId& app_id,
+                       const webapps::AppId& app_id,
                        const GURL& launch_url) {
+  CHECK(web_contents != nullptr);
   Profile* profile =
       Profile::FromBrowserContext(web_contents->GetBrowserContext());
 
@@ -642,11 +659,6 @@ void UpdateLaunchStats(content::WebContents* web_contents,
   // app launch will provide an engagement boost to the origin.
   site_engagement::SiteEngagementService::Get(profile)
       ->SetLastShortcutLaunchTime(web_contents, launch_url);
-
-  // Refresh the app banner added to homescreen event. The user may have
-  // cleared their browsing data since installing the app, which removes the
-  // event and will potentially permit a banner to be shown for the site.
-  RecordAppBanner(web_contents, launch_url);
 }
 
 }  // namespace web_app

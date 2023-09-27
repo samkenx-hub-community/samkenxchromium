@@ -13,6 +13,7 @@
 
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/bind.h"
 #include "base/test/task_environment.h"
 #include "chromeos/ash/components/multidevice/remote_device_test_util.h"
@@ -141,7 +142,8 @@ class SecureChannelAuthenticatedChannelImplTest : public testing::Test {
 
   std::unordered_set<int> sent_sequence_numbers_;
 
-  FakeSecureChannelConnection* fake_secure_channel_;
+  raw_ptr<FakeSecureChannelConnection, DanglingUntriaged | ExperimentalAsh>
+      fake_secure_channel_;
   std::unique_ptr<FakeAuthenticatedChannelObserver> test_observer_;
 
   std::unique_ptr<AuthenticatedChannel> channel_;

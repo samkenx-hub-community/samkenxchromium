@@ -10,6 +10,7 @@
 #include "base/feature_list.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/time/time.h"
+#include "components/attribution_reporting/features.h"
 #include "services/network/public/cpp/features.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/origin_trials/origin_trials.h"
@@ -499,6 +500,12 @@ bool OriginTrialContext::CanEnableTrialFromName(const StringView& trial_name) {
   if (trial_name == "PrivacySandboxAdsAPIs")
     return base::FeatureList::IsEnabled(features::kPrivacySandboxAdsAPIs);
 
+  if (trial_name == "FledgeBiddingAndAuctionServer") {
+    return base::FeatureList::IsEnabled(features::kInterestGroupStorage) &&
+           base::FeatureList::IsEnabled(
+               features::kFledgeBiddingAndAuctionServer);
+  }
+
   if (trial_name == "FencedFrames")
     return base::FeatureList::IsEnabled(features::kFencedFrames);
 
@@ -527,6 +534,26 @@ bool OriginTrialContext::CanEnableTrialFromName(const StringView& trial_name) {
         features::kBackForwardCacheSendNotRestoredReasons);
   }
 
+  if (trial_name == "CompressionDictionaryTransport") {
+    return base::FeatureList::IsEnabled(
+        network::features::kCompressionDictionaryTransportBackend);
+  }
+
+  if (trial_name == "AttributionReportingCrossAppWeb") {
+    return base::FeatureList::IsEnabled(
+               attribution_reporting::features::kConversionMeasurement) &&
+           base::FeatureList::IsEnabled(
+               network::features::kAttributionReportingCrossAppWeb);
+  }
+
+  if (trial_name == "ComputePressure_v2") {
+    return base::FeatureList::IsEnabled(features::kComputePressure);
+  }
+
+  if (trial_name == "WebEnvironmentIntegrity") {
+    return base::FeatureList::IsEnabled(features::kWebEnvironmentIntegrity);
+  }
+
   return true;
 }
 
@@ -542,8 +569,14 @@ Vector<OriginTrialFeature> OriginTrialContext::RestrictedFeaturesForTrial(
         !base::FeatureList::IsEnabled(features::kBrowsingTopicsXHR)) {
       restricted.push_back(OriginTrialFeature::kTopicsXHR);
     }
-    if (!base::FeatureList::IsEnabled(features::kConversionMeasurement))
+    if (!base::FeatureList::IsEnabled(features::kBrowsingTopics) ||
+        !base::FeatureList::IsEnabled(features::kBrowsingTopicsDocumentAPI)) {
+      restricted.push_back(OriginTrialFeature::kTopicsDocumentAPI);
+    }
+    if (!base::FeatureList::IsEnabled(
+            attribution_reporting::features::kConversionMeasurement)) {
       restricted.push_back(OriginTrialFeature::kAttributionReporting);
+    }
     if (!base::FeatureList::IsEnabled(features::kFencedFrames))
       restricted.push_back(OriginTrialFeature::kFencedFrames);
     if (!base::FeatureList::IsEnabled(features::kSharedStorageAPI))

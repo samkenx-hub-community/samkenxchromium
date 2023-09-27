@@ -8,6 +8,7 @@
 #include "ash/constants/ash_features.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
 #include "base/test/scoped_feature_list.h"
@@ -103,9 +104,11 @@ class FakeEligibleHostDevicesProviderFactory
     return instance;
   }
 
-  device_sync::FakeDeviceSyncClient* expected_device_sync_client_;
+  raw_ptr<device_sync::FakeDeviceSyncClient, ExperimentalAsh>
+      expected_device_sync_client_;
 
-  FakeEligibleHostDevicesProvider* instance_ = nullptr;
+  raw_ptr<FakeEligibleHostDevicesProvider, DanglingUntriaged | ExperimentalAsh>
+      instance_ = nullptr;
 };
 
 class FakeHostBackendDelegateFactory : public HostBackendDelegateImpl::Factory {
@@ -148,12 +151,15 @@ class FakeHostBackendDelegateFactory : public HostBackendDelegateImpl::Factory {
     return instance;
   }
 
-  FakeEligibleHostDevicesProviderFactory*
+  raw_ptr<FakeEligibleHostDevicesProviderFactory, ExperimentalAsh>
       fake_eligible_host_devices_provider_factory_;
-  sync_preferences::TestingPrefServiceSyncable* expected_testing_pref_service_;
-  device_sync::FakeDeviceSyncClient* expected_device_sync_client_;
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable, ExperimentalAsh>
+      expected_testing_pref_service_;
+  raw_ptr<device_sync::FakeDeviceSyncClient, ExperimentalAsh>
+      expected_device_sync_client_;
 
-  FakeHostBackendDelegate* instance_ = nullptr;
+  raw_ptr<FakeHostBackendDelegate, DanglingUntriaged | ExperimentalAsh>
+      instance_ = nullptr;
 };
 
 class FakeHostVerifierFactory : public HostVerifierImpl::Factory {
@@ -194,11 +200,15 @@ class FakeHostVerifierFactory : public HostVerifierImpl::Factory {
     return instance;
   }
 
-  FakeHostBackendDelegateFactory* fake_host_backend_delegate_factory_;
-  device_sync::FakeDeviceSyncClient* expected_device_sync_client_;
-  sync_preferences::TestingPrefServiceSyncable* expected_testing_pref_service_;
+  raw_ptr<FakeHostBackendDelegateFactory, ExperimentalAsh>
+      fake_host_backend_delegate_factory_;
+  raw_ptr<device_sync::FakeDeviceSyncClient, ExperimentalAsh>
+      expected_device_sync_client_;
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable, ExperimentalAsh>
+      expected_testing_pref_service_;
 
-  FakeHostVerifier* instance_ = nullptr;
+  raw_ptr<FakeHostVerifier, DanglingUntriaged | ExperimentalAsh> instance_ =
+      nullptr;
 };
 
 class FakeHostStatusProviderFactory : public HostStatusProviderImpl::Factory {
@@ -243,13 +253,16 @@ class FakeHostStatusProviderFactory : public HostStatusProviderImpl::Factory {
     return instance;
   }
 
-  FakeEligibleHostDevicesProviderFactory*
+  raw_ptr<FakeEligibleHostDevicesProviderFactory, ExperimentalAsh>
       fake_eligible_host_devices_provider_factory_;
-  FakeHostBackendDelegateFactory* fake_host_backend_delegate_factory_;
-  FakeHostVerifierFactory* fake_host_verifier_factory_;
-  device_sync::FakeDeviceSyncClient* expected_device_sync_client_;
+  raw_ptr<FakeHostBackendDelegateFactory, ExperimentalAsh>
+      fake_host_backend_delegate_factory_;
+  raw_ptr<FakeHostVerifierFactory, ExperimentalAsh> fake_host_verifier_factory_;
+  raw_ptr<device_sync::FakeDeviceSyncClient, ExperimentalAsh>
+      expected_device_sync_client_;
 
-  FakeHostStatusProvider* instance_ = nullptr;
+  raw_ptr<FakeHostStatusProvider, DanglingUntriaged | ExperimentalAsh>
+      instance_ = nullptr;
 };
 
 class FakeGlobalStateFeatureManagerFactory
@@ -286,9 +299,12 @@ class FakeGlobalStateFeatureManagerFactory
     return std::make_unique<FakeGlobalStateFeatureManager>();
   }
 
-  FakeHostStatusProviderFactory* fake_host_status_provider_factory_;
-  sync_preferences::TestingPrefServiceSyncable* expected_testing_pref_service_;
-  device_sync::FakeDeviceSyncClient* expected_device_sync_client_;
+  raw_ptr<FakeHostStatusProviderFactory, ExperimentalAsh>
+      fake_host_status_provider_factory_;
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable, ExperimentalAsh>
+      expected_testing_pref_service_;
+  raw_ptr<device_sync::FakeDeviceSyncClient, ExperimentalAsh>
+      expected_device_sync_client_;
 };
 
 class FakeWifiSyncNotificationControllerFactory
@@ -326,9 +342,12 @@ class FakeWifiSyncNotificationControllerFactory
     return nullptr;
   }
 
-  FakeHostStatusProviderFactory* fake_host_status_provider_factory_;
-  sync_preferences::TestingPrefServiceSyncable* expected_testing_pref_service_;
-  device_sync::FakeDeviceSyncClient* expected_device_sync_client_;
+  raw_ptr<FakeHostStatusProviderFactory, ExperimentalAsh>
+      fake_host_status_provider_factory_;
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable, ExperimentalAsh>
+      expected_testing_pref_service_;
+  raw_ptr<device_sync::FakeDeviceSyncClient, ExperimentalAsh>
+      expected_device_sync_client_;
 };
 
 class FakeGrandfatheredEasyUnlockHostDisablerFactory
@@ -366,9 +385,12 @@ class FakeGrandfatheredEasyUnlockHostDisablerFactory
     return nullptr;
   }
 
-  FakeHostBackendDelegateFactory* fake_host_backend_delegate_factory_;
-  device_sync::FakeDeviceSyncClient* expected_device_sync_client_;
-  sync_preferences::TestingPrefServiceSyncable* expected_testing_pref_service_;
+  raw_ptr<FakeHostBackendDelegateFactory, ExperimentalAsh>
+      fake_host_backend_delegate_factory_;
+  raw_ptr<device_sync::FakeDeviceSyncClient, ExperimentalAsh>
+      expected_device_sync_client_;
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable, ExperimentalAsh>
+      expected_testing_pref_service_;
 };
 
 class FakeFeatureStateManagerFactory : public FeatureStateManagerImpl::Factory {
@@ -421,14 +443,19 @@ class FakeFeatureStateManagerFactory : public FeatureStateManagerImpl::Factory {
     return instance;
   }
 
-  sync_preferences::TestingPrefServiceSyncable* expected_testing_pref_service_;
-  FakeHostStatusProviderFactory* fake_host_status_provider_factory_;
-  device_sync::FakeDeviceSyncClient* expected_device_sync_client_;
-  FakeAndroidSmsPairingStateTracker*
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable, ExperimentalAsh>
+      expected_testing_pref_service_;
+  raw_ptr<FakeHostStatusProviderFactory, ExperimentalAsh>
+      fake_host_status_provider_factory_;
+  raw_ptr<device_sync::FakeDeviceSyncClient, ExperimentalAsh>
+      expected_device_sync_client_;
+  raw_ptr<FakeAndroidSmsPairingStateTracker,
+          DanglingUntriaged | ExperimentalAsh>
       expected_android_sms_pairing_state_tracker_;
   bool expected_is_secondary_user_;
 
-  FakeFeatureStateManager* instance_ = nullptr;
+  raw_ptr<FakeFeatureStateManager, DanglingUntriaged | ExperimentalAsh>
+      instance_ = nullptr;
 };
 
 class FakeHostDeviceTimestampManagerFactory
@@ -466,10 +493,13 @@ class FakeHostDeviceTimestampManagerFactory
     return instance;
   }
 
-  FakeHostStatusProviderFactory* fake_host_status_provider_factory_;
-  sync_preferences::TestingPrefServiceSyncable* expected_testing_pref_service_;
+  raw_ptr<FakeHostStatusProviderFactory, ExperimentalAsh>
+      fake_host_status_provider_factory_;
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable, ExperimentalAsh>
+      expected_testing_pref_service_;
 
-  FakeHostDeviceTimestampManager* instance_ = nullptr;
+  raw_ptr<FakeHostDeviceTimestampManager, DanglingUntriaged | ExperimentalAsh>
+      instance_ = nullptr;
 };
 
 class FakeAccountStatusChangeDelegateNotifierFactory
@@ -518,13 +548,18 @@ class FakeAccountStatusChangeDelegateNotifierFactory
     return instance;
   }
 
-  FakeHostStatusProviderFactory* fake_host_status_provider_factory_;
-  sync_preferences::TestingPrefServiceSyncable* expected_testing_pref_service_;
-  FakeHostDeviceTimestampManagerFactory*
+  raw_ptr<FakeHostStatusProviderFactory, ExperimentalAsh>
+      fake_host_status_provider_factory_;
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable, ExperimentalAsh>
+      expected_testing_pref_service_;
+  raw_ptr<FakeHostDeviceTimestampManagerFactory, ExperimentalAsh>
       fake_host_device_timestamp_manager_factory_;
-  OobeCompletionTracker* expected_oobe_completion_tracker_;
+  raw_ptr<OobeCompletionTracker, ExperimentalAsh>
+      expected_oobe_completion_tracker_;
 
-  FakeAccountStatusChangeDelegateNotifier* instance_ = nullptr;
+  raw_ptr<FakeAccountStatusChangeDelegateNotifier,
+          DanglingUntriaged | ExperimentalAsh>
+      instance_ = nullptr;
 };
 
 class FakeAndroidSmsAppInstallingStatusObserverFactory
@@ -563,9 +598,12 @@ class FakeAndroidSmsAppInstallingStatusObserverFactory
     return nullptr;
   }
 
-  FakeHostStatusProviderFactory* fake_host_status_provider_factory_;
-  FakeFeatureStateManagerFactory* fake_feature_state_manager_factory_;
-  AndroidSmsAppHelperDelegate* expected_android_sms_app_helper_delegate_;
+  raw_ptr<FakeHostStatusProviderFactory, ExperimentalAsh>
+      fake_host_status_provider_factory_;
+  raw_ptr<FakeFeatureStateManagerFactory, ExperimentalAsh>
+      fake_feature_state_manager_factory_;
+  raw_ptr<AndroidSmsAppHelperDelegate, DanglingUntriaged | ExperimentalAsh>
+      expected_android_sms_app_helper_delegate_;
 };
 
 }  // namespace

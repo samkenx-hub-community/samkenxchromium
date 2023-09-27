@@ -60,6 +60,12 @@ class PLATFORM_EXPORT MediaStreamTrackPlatform {
     absl::optional<bool> suppress_local_audio_playback;
   };
 
+  struct VideoFrameStats {
+    size_t deliverable_frames = 0u;
+    size_t discarded_frames = 0u;
+    size_t dropped_frames = 0u;
+  };
+
   struct CaptureHandle {
     bool IsEmpty() const { return origin.empty() && handle.empty(); }
 
@@ -99,6 +105,13 @@ class PLATFORM_EXPORT MediaStreamTrackPlatform {
 
   // TODO(hta): Make method pure virtual when all tracks have the method.
   virtual void GetSettings(Settings& settings) const {}
+
+  virtual VideoFrameStats GetVideoFrameStats() const {
+    // This method is only callable on video tracks.
+    NOTREACHED();
+    return {};
+  }
+
   virtual CaptureHandle GetCaptureHandle();
 
   // Adds a one off callback that will be invoked when observing the first frame

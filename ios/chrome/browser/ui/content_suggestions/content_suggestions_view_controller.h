@@ -12,6 +12,9 @@
 @protocol ContentSuggestionsCommands;
 @protocol ContentSuggestionsMenuProvider;
 @protocol ContentSuggestionsViewControllerAudience;
+@protocol SafetyCheckViewDelegate;
+@protocol SetUpListViewDelegate;
+@class ContentSuggestionsMetricsRecorder;
 class UrlLoadingBrowserAgent;
 
 // CollectionViewController to display the suggestions items.
@@ -31,11 +34,21 @@ class UrlLoadingBrowserAgent;
 // Handler for the commands sent by the ContentSuggestionsViewController.
 @property(nonatomic, weak) id<ContentSuggestionsCommands>
     suggestionCommandHandler;
-@property(nonatomic, weak) id<ContentSuggestionsViewControllerAudience>
+@property(nonatomic, weak) id<ContentSuggestionsViewControllerAudience,
+                              SafetyCheckViewDelegate,
+                              SetUpListViewDelegate>
     audience;
 // Provider of menu configurations for the contentSuggestions component.
 @property(nonatomic, weak) id<ContentSuggestionsMenuProvider> menuProvider;
 @property(nonatomic, assign) UrlLoadingBrowserAgent* urlLoadingBrowserAgent;
+
+// Recorder for content suggestions metrics.
+@property(nonatomic, weak)
+    ContentSuggestionsMetricsRecorder* contentSuggestionsMetricsRecorder;
+
+// Delegate for SetUpListView events.
+@property(nonatomic, weak) id<SetUpListViewDelegate> setUpListViewDelegate;
+
 @end
 
 #endif  // IOS_CHROME_BROWSER_UI_CONTENT_SUGGESTIONS_CONTENT_SUGGESTIONS_VIEW_CONTROLLER_H_

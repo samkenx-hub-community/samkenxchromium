@@ -5,13 +5,7 @@
 #ifndef MEDIA_GPU_V4L2_TEST_VP8_DECODER_H_
 #define MEDIA_GPU_V4L2_TEST_VP8_DECODER_H_
 
-// build_config.h must come before BUILDFLAG()
-#include "build/build_config.h"
-
-// ChromeOS specific header; does not exist upstream
-#if BUILDFLAG(IS_CHROMEOS)
-#include <linux/media/vp8-ctrls-upstream.h>
-#endif
+#include <linux/v4l2-controls.h>
 
 #include <set>
 
@@ -38,17 +32,16 @@ class Vp8Decoder : public VideoDecoder {
   // Parses next frame from IVF stream and decodes the frame. This method will
   // place the Y, U, and V values into the respective vectors and update the
   // size with the display area size of the decoded frame.
-  VideoDecoder::Result DecodeNextFrame(std::vector<uint8_t>& y_plane,
+  VideoDecoder::Result DecodeNextFrame(const int frame_number,
+                                       std::vector<uint8_t>& y_plane,
                                        std::vector<uint8_t>& u_plane,
                                        std::vector<uint8_t>& v_plane,
-                                       gfx::Size& size,
-                                       const int frame_number) override;
+                                       gfx::Size& size) override;
 
  private:
   Vp8Decoder(std::unique_ptr<IvfParser> ivf_parser,
              std::unique_ptr<V4L2IoctlShim> v4l2_ioctl,
-             std::unique_ptr<V4L2Queue> OUTPUT_queue,
-             std::unique_ptr<V4L2Queue> CAPTURE_queue);
+             gfx::Size display_resolution);
   enum ParseResult { kOk, kEOStream, kError };
 
   // Reads next frame from IVF stream into |vp8_frame_header|

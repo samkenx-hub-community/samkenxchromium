@@ -68,14 +68,12 @@ void UIResourceLayer::SetUV(const gfx::PointF& top_left,
     cc_layer()->SetUV(top_left, bottom_right);
     return;
   }
-  if (uv_.origin() == top_left && uv_.bottom_right() == bottom_right) {
+  if (uv_top_left_ == top_left && uv_bottom_right_ == bottom_right) {
     return;
   }
 
-  uv_.set_origin(top_left);
-  uv_.set_width(bottom_right.x() - top_left.x());
-  uv_.set_height(bottom_right.y() - top_left.y());
-  DCHECK_EQ(uv_.bottom_right(), bottom_right);
+  uv_top_left_ = top_left;
+  uv_bottom_right_ = bottom_right;
   NotifyPropertyChanged();
 }
 
@@ -151,8 +149,9 @@ void UIResourceLayer::AppendQuads(viz::CompositorRenderPass& render_pass,
     return;
   }
 
-  viz::SharedQuadState* quad_state = CreateAndAppendSharedQuadState(
-      render_pass, transform_to_target, clip_in_target, visible_rect, opacity);
+  viz::SharedQuadState* quad_state =
+      CreateAndAppendSharedQuadState(render_pass, data, transform_to_target,
+                                     clip_in_target, visible_rect, opacity);
 
   viz::TextureDrawQuad* quad =
       render_pass.CreateAndAppendDrawQuad<viz::TextureDrawQuad>();

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "base/time/time.h"
@@ -55,7 +56,7 @@ class CertProvisioningWorkerStatic : public CertProvisioningWorker {
   base::Time GetLastUpdateTime() const override;
   const absl::optional<BackendServerError>& GetLastBackendServerError()
       const override;
-  const std::string& GetFailureMessage() const override;
+  std::string GetFailureMessage() const override;
 
  private:
   friend class CertProvisioningSerializer;
@@ -157,8 +158,8 @@ class CertProvisioningWorkerStatic : public CertProvisioningWorker {
       absl::optional<int64_t> try_later);
 
   CertScope cert_scope_ = CertScope::kUser;
-  Profile* profile_ = nullptr;
-  PrefService* pref_service_ = nullptr;
+  raw_ptr<Profile, ExperimentalAsh> profile_ = nullptr;
+  raw_ptr<PrefService, ExperimentalAsh> pref_service_ = nullptr;
   CertProfile cert_profile_;
   base::RepeatingClosure state_change_callback_;
   CertProvisioningWorkerCallback result_callback_;
@@ -202,8 +203,15 @@ class CertProvisioningWorkerStatic : public CertProvisioningWorker {
   std::string signature_;
 
   // Holds a message describing the reason for failure when the worker fails.
+  // This may not contain PII or stable identifiers as it will be logged.
   // If the worker did not fail, this message is empty.
   std::string failure_message_;
+  // Optionally holds a message like `failure_message_` but containing PII or
+  // stable identifiers for display on the UI.
+  // If the worker did not fail, this is absent.
+  // If the worker did fail and this is absent, the UI should display
+  // failure_message_.
+  absl::optional<std::string> failure_message_ui_;
 
   // IMPORTANT:
   // Increment this when you add/change any member in
@@ -215,10 +223,12 @@ class CertProvisioningWorkerStatic : public CertProvisioningWorker {
   // observe the PlatformKeysService for shutdown events. Instead, it relies on
   // the CertProvisioningScheduler to destroy all CertProvisioningWorker
   // instances when the corresponding PlatformKeysService is shutting down.
-  platform_keys::PlatformKeysService* platform_keys_service_ = nullptr;
+  raw_ptr<platform_keys::PlatformKeysService, ExperimentalAsh>
+      platform_keys_service_ = nullptr;
   std::unique_ptr<attestation::TpmChallengeKeySubtle>
       tpm_challenge_key_subtle_impl_;
-  CertProvisioningClient* const cert_provisioning_client_;
+  const raw_ptr<CertProvisioningClient, ExperimentalAsh>
+      cert_provisioning_client_;
 
   std::unique_ptr<CertProvisioningInvalidator> invalidator_;
 

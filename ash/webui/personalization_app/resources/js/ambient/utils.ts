@@ -6,9 +6,9 @@
  * @fileoverview Utility functions to be used for ambient mode.
  */
 
-import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 
-import {TopicSource} from '../../personalization_app.mojom-webui.js';
+import {AmbientTheme, TopicSource} from '../../personalization_app.mojom-webui.js';
 
 /**
  * Returns photo count string.
@@ -31,6 +31,8 @@ export function getTopicSourceName(topicSource: TopicSource): string {
       return loadTimeData.getString('ambientModeTopicSourceGooglePhotos');
     case TopicSource.kArtGallery:
       return loadTimeData.getString('ambientModeTopicSourceArtGallery');
+    case TopicSource.kVideo:
+      return loadTimeData.getString('ambientModeTopicSourceVideo');
     default:
       console.warn('Invalid TopicSource value.');
       return '';
@@ -38,8 +40,14 @@ export function getTopicSourceName(topicSource: TopicSource): string {
 }
 
 /**
- * Returns a x-length dummy array of zeros (0s)
+ * Returns whether the params represent a valid ambient state.
+ *
+ * Note: TopicSource.kVideo is exclusively paired with AmbientTheme.kVideo
  */
-export function getZerosArray(x: number): number[] {
-  return new Array(x).fill(0);
+export function isValidTopicSourceAndTheme(
+    topicSource: TopicSource, ambientTheme: AmbientTheme|null) {
+  return (ambientTheme === AmbientTheme.kVideo &&
+          topicSource === TopicSource.kVideo) ||
+      (ambientTheme !== AmbientTheme.kVideo &&
+       topicSource !== TopicSource.kVideo);
 }

@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ui/views/autofill/edit_address_profile_view.h"
 
+#include <utility>
+
 #include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
 #include "build/build_config.h"
@@ -31,15 +33,15 @@ class MockEditAddressProfileDialogController
     : public EditAddressProfileDialogController {
  public:
   MOCK_METHOD(std::u16string, GetWindowTitle, (), (const, override));
+  MOCK_METHOD(const std::u16string&, GetFooterMessage, (), (const, override));
   MOCK_METHOD(std::u16string, GetOkButtonLabel, (), (const, override));
   MOCK_METHOD(const AutofillProfile&, GetProfileToEdit, (), (const, override));
   MOCK_METHOD(bool, GetIsValidatable, (), (const, override));
   MOCK_METHOD(void,
-              OnUserDecision,
+              OnDialogClosed,
               (AutofillClient::SaveAddressProfileOfferUserDecision decision,
                const AutofillProfile& profile),
               (override));
-  MOCK_METHOD(void, OnDialogClosed, (), (override));
 };
 
 class EditAddressProfileViewTest : public ChromeViewsTestBase {
@@ -55,10 +57,14 @@ class EditAddressProfileViewTest : public ChromeViewsTestBase {
     address_profile_to_edit_ = test::GetFullProfile();
     test_web_contents_ =
         content::WebContentsTester::CreateTestWebContents(&profile_, nullptr);
+
+    ON_CALL(mock_controller_, GetFooterMessage)
+        .WillByDefault(::testing::ReturnRefOfCopy(std::u16string()));
   }
 
   void TearDown() override {
-    widget_->Close();
+    dialog_ = nullptr;
+    std::exchange(widget_, nullptr)->Close();
     parent_widget_.reset();
     ChromeViewsTestBase::TearDown();
   }
@@ -80,7 +86,7 @@ class EditAddressProfileViewTest : public ChromeViewsTestBase {
   std::unique_ptr<content::WebContents> test_web_contents_;
   std::unique_ptr<views::Widget> parent_widget_;
   raw_ptr<views::Widget> widget_ = nullptr;
-  raw_ptr<EditAddressProfileView> dialog_;
+  raw_ptr<EditAddressProfileView> dialog_ = nullptr;
   testing::NiceMock<MockEditAddressProfileDialogController> mock_controller_;
 };
 
@@ -93,7 +99,7 @@ void EditAddressProfileViewTest::CreateViewAndShow() {
   dialog_ = new EditAddressProfileView(mock_controller());
   dialog_->ShowForWebContents(test_web_contents_.get());
 
-  gfx::NativeView parent = gfx::kNullNativeView;
+  gfx::NativeView parent = gfx::NativeView();
 #if BUILDFLAG(IS_MAC)
   // We need a native view parent for the dialog to avoid a DCHECK
   // on Mac.
@@ -135,7 +141,7 @@ TEST_F(EditAddressProfileViewTest, SaveInvokesTheCallbackWithEditedFullname) {
 
   EXPECT_CALL(
       *mock_controller(),
-      OnUserDecision(
+      OnDialogClosed(
           AutofillClient::SaveAddressProfileOfferUserDecision::kEditAccepted,
           AutofillProfileHasInfo(autofill::ServerFieldType::NAME_FULL,
                                  kNewFirstName)));
@@ -163,7 +169,7 @@ TEST_F(EditAddressProfileViewTest,
 
   EXPECT_CALL(
       *mock_controller(),
-      OnUserDecision(
+      OnDialogClosed(
           AutofillClient::SaveAddressProfileOfferUserDecision::kEditAccepted,
           AutofillProfileHasInfo(
               autofill::ServerFieldType::PHONE_HOME_WHOLE_NUMBER,
@@ -187,7 +193,7 @@ TEST_F(EditAddressProfileViewTest, SaveInvokesTheCallbackWithEditedEmail) {
 
   EXPECT_CALL(
       *mock_controller(),
-      OnUserDecision(
+      OnDialogClosed(
           AutofillClient::SaveAddressProfileOfferUserDecision::kEditAccepted,
           AutofillProfileHasInfo(autofill::ServerFieldType::EMAIL_ADDRESS,
                                  kNewEmail)));

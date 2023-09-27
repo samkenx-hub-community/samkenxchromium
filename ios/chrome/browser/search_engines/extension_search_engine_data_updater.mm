@@ -7,15 +7,11 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/search_engines/template_url_service.h"
 #import "ios/chrome/browser/search_engines/search_engines_util.h"
-#import "ios/chrome/browser/widget_kit/features.h"
+#import "ios/chrome/browser/widget_kit/model/features.h"
 #import "ios/chrome/common/app_group/app_group_constants.h"
 
 #if BUILDFLAG(ENABLE_WIDGET_KIT_EXTENSION)
-#import "ios/chrome/browser/widget_kit/widget_kit_swift.h"  // nogncheck
-#endif
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
+#import "ios/chrome/browser/widget_kit/model/model_swift.h"  // nogncheck
 #endif
 
 ExtensionSearchEngineDataUpdater::ExtensionSearchEngineDataUpdater(

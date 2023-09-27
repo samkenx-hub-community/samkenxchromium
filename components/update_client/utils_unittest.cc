@@ -11,7 +11,7 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
-#include "base/path_service.h"
+#include "components/update_client/test_utils.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "url/gurl.h"
 
@@ -19,40 +19,29 @@
 #include <shlobj.h>
 #endif  // BUILDFLAG(IS_WIN)
 
-namespace {
-
-base::FilePath MakeTestFilePath(const char* file) {
-  base::FilePath path;
-  base::PathService::Get(base::DIR_SOURCE_ROOT, &path);
-  return path.AppendASCII("components/test/data/update_client")
-      .AppendASCII(file);
-}
-
-}  // namespace
-
 namespace update_client {
 
 TEST(UpdateClientUtils, VerifyFileHash256) {
   EXPECT_TRUE(VerifyFileHash256(
-      MakeTestFilePath("jebgalgnebhfojomionfpkfelancnnkf.crx"),
+      GetTestFilePath("jebgalgnebhfojomionfpkfelancnnkf.crx"),
       std::string(
           "7ab32f071cd9b5ef8e0d7913be161f532d98b3e9fa284a7cd8059c3409ce0498")));
 
   EXPECT_TRUE(VerifyFileHash256(
-      MakeTestFilePath("empty_file"),
+      GetTestFilePath("empty_file"),
       std::string(
           "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")));
 
-  EXPECT_FALSE(VerifyFileHash256(
-      MakeTestFilePath("jebgalgnebhfojomionfpkfelancnnkf.crx"),
-      std::string("")));
+  EXPECT_FALSE(
+      VerifyFileHash256(GetTestFilePath("jebgalgnebhfojomionfpkfelancnnkf.crx"),
+                        std::string("")));
+
+  EXPECT_FALSE(
+      VerifyFileHash256(GetTestFilePath("jebgalgnebhfojomionfpkfelancnnkf.crx"),
+                        std::string("abcd")));
 
   EXPECT_FALSE(VerifyFileHash256(
-      MakeTestFilePath("jebgalgnebhfojomionfpkfelancnnkf.crx"),
-      std::string("abcd")));
-
-  EXPECT_FALSE(VerifyFileHash256(
-      MakeTestFilePath("jebgalgnebhfojomionfpkfelancnnkf.crx"),
+      GetTestFilePath("jebgalgnebhfojomionfpkfelancnnkf.crx"),
       std::string(
           "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
 }
@@ -209,22 +198,6 @@ TEST(UpdateClientUtils, ToInstallerResult) {
   const auto result4 = ToInstallerResult(EnumB::ENTRY1, 20000);
   EXPECT_EQ(101, result4.error);
   EXPECT_EQ(20000, result4.extended_error);
-}
-
-TEST(UpdateClientUtils, BaseCreateNewTempDirectory) {
-  base::FilePath temp_dir;
-  EXPECT_TRUE(base::CreateNewTempDirectory(FILE_PATH_LITERAL("update_client"),
-                                           &temp_dir));
-
-  base::ScopedTempDir temp_dir_owner;
-  EXPECT_TRUE(temp_dir_owner.Set(temp_dir));
-
-#if BUILDFLAG(IS_WIN)
-  base::FilePath program_files_dir;
-  EXPECT_TRUE(
-      base::PathService::Get(base::DIR_PROGRAM_FILES, &program_files_dir));
-  EXPECT_EQ(program_files_dir.IsParent(temp_dir), !!::IsUserAnAdmin());
-#endif  // BUILDFLAG(IS_WIN)
 }
 
 TEST(UpdateClientUtils, GetArchitecture) {

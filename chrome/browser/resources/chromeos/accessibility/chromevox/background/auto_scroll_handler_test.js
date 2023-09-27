@@ -13,12 +13,14 @@ ChromeVoxAutoScrollHandlerTest = class extends ChromeVoxE2ETest {
   async setUpDeferred() {
     await super.setUpDeferred();
 
-    // Alphabetical based on file path.
-    await importModule(
-        'AutoScrollHandler', '/chromevox/background/auto_scroll_handler.js');
-    await importModule(
-        'ChromeVoxState', '/chromevox/background/chromevox_state.js');
-    await importModule('CursorRange', '/common/cursors/range.js');
+    await Promise.all([
+      // Alphabetical based on file path.
+      importModule(
+          'AutoScrollHandler', '/chromevox/background/auto_scroll_handler.js'),
+      importModule(
+          'ChromeVoxState', '/chromevox/background/chromevox_state.js'),
+      importModule('CursorRange', '/common/cursors/range.js'),
+    ]);
 
     globalThis.EventType = chrome.automation.EventType;
     globalThis.RoleType = chrome.automation.RoleType;
@@ -279,7 +281,8 @@ AX_TEST_F(
     });
 
 AX_TEST_F(
-    'ChromeVoxAutoScrollHandlerTest', 'RecyclerViewByCharacter',
+    // TODO(crbug.com/1419811): Test is flaky.
+    'ChromeVoxAutoScrollHandlerTest', 'DISABLED_RecyclerViewByCharacter',
     async function() {
       const mockFeedback = this.createMockFeedback();
       const root = await this.runWithFakeArcRecyclerView();

@@ -105,19 +105,16 @@ class ScopedChildrenLock;
 // View::ViewHierarchyChanged.
 // TODO(pbos): Move to a separate view_hierarchy_changed_details.h header.
 struct VIEWS_EXPORT ViewHierarchyChangedDetails {
-  ViewHierarchyChangedDetails() = default;
-
   ViewHierarchyChangedDetails(bool is_add,
                               View* parent,
                               View* child,
                               View* move_view)
       : is_add(is_add), parent(parent), child(child), move_view(move_view) {}
-
-  bool is_add = false;
+  const bool is_add;
   // New parent if |is_add| is true, old parent if |is_add| is false.
-  raw_ptr<View> parent = nullptr;
+  const raw_ptr<View> parent;
   // The view being added or removed.
-  raw_ptr<View> child = nullptr;
+  const raw_ptr<View> child;
   // If this is a move (reparent), meaning AddChildViewAt() is invoked with an
   // existing parent, then a notification for the remove is sent first,
   // followed by one for the add.  This case can be distinguished by a
@@ -126,7 +123,7 @@ struct VIEWS_EXPORT ViewHierarchyChangedDetails {
   // being removed.
   // For the add part of move, |move_view| is the old parent of the View being
   // added.
-  raw_ptr<View> move_view = nullptr;
+  const raw_ptr<View> move_view;
 };
 
 using PropertyChangedCallback = ui::metadata::PropertyChangedCallback;
@@ -449,6 +446,17 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
     return view;
   }
 
+  template <typename T, base::RawPtrTraits Traits = base::RawPtrTraits::kEmpty>
+  T* AddChildView(raw_ptr<T, Traits> view) {
+    AddChildViewAtImpl(view.get(), children_.size());
+    return view;
+  }
+  template <typename T, base::RawPtrTraits Traits = base::RawPtrTraits::kEmpty>
+  T* AddChildViewAt(raw_ptr<T, Traits> view, size_t index) {
+    AddChildViewAtImpl(view.get(), index);
+    return view;
+  }
+
   // Moves |view| to the specified |index|. An |index| at least as large as that
   // of the last child moves the view to the end.
   void ReorderChildView(View* view, size_t index);
@@ -471,8 +479,8 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   }
 
   // Partially specialized version to directly take a raw_ptr<T>.
-  template <typename T>
-  std::unique_ptr<T> RemoveChildViewT(raw_ptr<T> view) {
+  template <typename T, base::RawPtrTraits Traits = base::RawPtrTraits::kEmpty>
+  std::unique_ptr<T> RemoveChildViewT(raw_ptr<T, Traits> view) {
     return RemoveChildViewT(view.get());
   }
 
@@ -908,7 +916,7 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // (0.00001f).
   static gfx::Rect ConvertRectToTarget(const View* source,
                                        const View* target,
-                                       gfx::Rect& rect);
+                                       const gfx::Rect& rect);
 
   // Converts a point from a View's coordinate system to that of its Widget.
   static void ConvertPointToWidget(const View* src, gfx::Point* point);
@@ -1467,7 +1475,7 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // reader when that object gains focus and is critical to understanding the
   // purpose of that object non-visually.
   void SetAccessibleName(const std::u16string& name);
-  virtual const std::u16string& GetAccessibleName() const;
+  const std::u16string& GetAccessibleName() const;
 
   // Sets the accessible name to the specified string and source type.
   // To indicate that this view should never have an accessible name, e.g. to
@@ -1476,8 +1484,7 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // on a view which may or may not have a name depending on circumstances. Also
   // please seek review from accessibility OWNERs when removing the name,
   // especially for views which are focusable or otherwise interactive.
-  void SetAccessibleName(const std::u16string& name,
-                         ax::mojom::NameFrom name_from);
+  void SetAccessibleName(std::u16string name, ax::mojom::NameFrom name_from);
 
   // Sets the accessible name of this view to that of `naming_view`. Often
   // `naming_view` is a `views::Label`, but any view with an accessible name
@@ -1602,6 +1609,13 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
 
   // Called when the accessible name of the View changed.
   virtual void OnAccessibleNameChanged(const std::u16string& new_name) {}
+
+  // Called by `SetAccessibleName` to allow subclasses to adjust the new name.
+  // Potential use cases include setting the accessible name to the tooltip
+  // text when the new name is empty and prepending/appending additional text
+  // to the new name.
+  virtual void AdjustAccessibleName(std::u16string& new_name,
+                                    ax::mojom::NameFrom& name_from) {}
 
   // Size and disposition ------------------------------------------------------
 
@@ -2174,7 +2188,7 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // Tree operations -----------------------------------------------------------
 
   // This view's parent.
-  raw_ptr<View, DanglingUntriaged> parent_ = nullptr;
+  raw_ptr<View, AcrossTasksDanglingUntriaged> parent_ = nullptr;
 
   // This view's children.
   Views children_;
@@ -2264,7 +2278,8 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // A native theme for this view and its descendants. Typically null, in which
   // case the native theme is drawn from the parent view (eventually the
   // widget).
-  raw_ptr<ui::NativeTheme, DanglingUntriaged> native_theme_ = nullptr;
+  raw_ptr<ui::NativeTheme, AcrossTasksDanglingUntriaged> native_theme_ =
+      nullptr;
 
   // RTL painting --------------------------------------------------------------
 
@@ -2301,7 +2316,8 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // Accelerators --------------------------------------------------------------
 
   // Focus manager accelerators registered on.
-  raw_ptr<FocusManager, DanglingUntriaged> accelerator_focus_manager_ = nullptr;
+  raw_ptr<FocusManager, AcrossTasksDanglingUntriaged>
+      accelerator_focus_manager_ = nullptr;
 
   // The list of accelerators. List elements in the range
   // [0, registered_accelerator_count_) are already registered to FocusManager,
@@ -2312,10 +2328,11 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // Focus ---------------------------------------------------------------------
 
   // Next view to be focused when the Tab key is pressed.
-  raw_ptr<View, DanglingUntriaged> next_focusable_view_ = nullptr;
+  raw_ptr<View, AcrossTasksDanglingUntriaged> next_focusable_view_ = nullptr;
 
   // Next view to be focused when the Shift-Tab key combination is pressed.
-  raw_ptr<View, DanglingUntriaged> previous_focusable_view_ = nullptr;
+  raw_ptr<View, AcrossTasksDanglingUntriaged> previous_focusable_view_ =
+      nullptr;
 
   // The focus behavior of the view in regular and accessibility mode.
   FocusBehavior focus_behavior_ = FocusBehavior::NEVER;
@@ -2327,12 +2344,13 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // Context menus -------------------------------------------------------------
 
   // The menu controller.
-  raw_ptr<ContextMenuController, DanglingUntriaged> context_menu_controller_ =
-      nullptr;
+  raw_ptr<ContextMenuController, AcrossTasksDanglingUntriaged>
+      context_menu_controller_ = nullptr;
 
   // Drag and drop -------------------------------------------------------------
 
-  raw_ptr<DragController, DanglingUntriaged> drag_controller_ = nullptr;
+  raw_ptr<DragController, AcrossTasksDanglingUntriaged> drag_controller_ =
+      nullptr;
 
   // Input  --------------------------------------------------------------------
 
@@ -2397,7 +2415,7 @@ BuilderT&& SetLayoutManager(std::unique_ptr<LayoutManager> layout_manager) && {
 VIEW_BUILDER_OVERLOAD_METHOD(SetAccessibleName, const std::u16string&)
 VIEW_BUILDER_OVERLOAD_METHOD(SetAccessibleName, View*)
 VIEW_BUILDER_OVERLOAD_METHOD(SetAccessibleName,
-                             const std::u16string&,
+                             std::u16string,
                              ax::mojom::NameFrom)
 VIEW_BUILDER_OVERLOAD_METHOD(SetAccessibleDescription, const std::u16string&)
 VIEW_BUILDER_OVERLOAD_METHOD(SetAccessibleDescription, View*)

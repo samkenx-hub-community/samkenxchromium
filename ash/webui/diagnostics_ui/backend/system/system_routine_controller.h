@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "ash/webui/diagnostics_ui/mojom/system_routine_controller.mojom.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "chromeos/ash/services/cros_healthd/public/mojom/cros_healthd.mojom.h"
@@ -29,14 +30,11 @@ namespace ash::diagnostics {
 using RunRoutineCallback =
     base::OnceCallback<void(cros_healthd::mojom::RunRoutineResponsePtr)>;
 
-class RoutineLog;
-
 constexpr int32_t kInvalidRoutineId = 0;
 
 class SystemRoutineController : public mojom::SystemRoutineController {
  public:
   SystemRoutineController();
-  explicit SystemRoutineController(RoutineLog* routine_log_ptr);
   ~SystemRoutineController() override;
 
   SystemRoutineController(const SystemRoutineController&) = delete;
@@ -125,13 +123,9 @@ class SystemRoutineController : public mojom::SystemRoutineController {
   void OnRoutineCancelAttempted(
       cros_healthd::mojom::RoutineUpdatePtr update_ptr);
 
-  bool IsLoggingEnabled() const;
-
   void AcquireWakeLock();
 
   void ReleaseWakeLock();
-
-  RoutineLog* routine_log_ptr_ = nullptr;  // Not Owned.
 
   // Keeps track of the id created by CrosHealthd for the currently running
   // routine.

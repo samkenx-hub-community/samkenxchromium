@@ -189,6 +189,10 @@ bool CSSPropertyParser::ParseValueStart(CSSPropertyID unresolved_property,
   if (CSSVariableParser::ContainsValidVariableReferences(original_range)) {
     StringView text =
         CSSVariableParser::StripTrailingWhitespaceAndComments(value_.text);
+    if (text.length() > CSSVariableData::kMaxVariableBytes) {
+      return false;
+    }
+
     bool is_animation_tainted = false;
     auto* variable = MakeGarbageCollected<CSSVariableReferenceValue>(
         CSSVariableData::Create({original_range, text}, is_animation_tainted,
@@ -434,8 +438,8 @@ bool CSSPropertyParser::ParseFontFaceDescriptor(
   if (id == AtRuleDescriptorID::Invalid) {
     return false;
   }
-  CSSValue* parsed_value = AtRuleDescriptorParser::ParseFontFaceDescriptor(
-      id, value_.range, *context_);
+  CSSValue* parsed_value =
+      AtRuleDescriptorParser::ParseFontFaceDescriptor(id, value_, *context_);
   if (!parsed_value) {
     return false;
   }

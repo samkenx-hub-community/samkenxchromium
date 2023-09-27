@@ -43,9 +43,13 @@ namespace secure_dns = chrome_browser_net::secure_dns;
 namespace {
 
 net::DohProviderEntry::List GetFilteredProviders() {
-  return secure_dns::ProvidersForCountry(
-      secure_dns::SelectEnabledProviders(net::DohProviderEntry::GetList()),
-      country_codes::GetCurrentCountryID());
+  // Note: Check whether each provider is enabled *after* filtering based on
+  // country code so that if we are doing experimentation via Finch for a
+  // regional provider, the experiment groups will be less likely to include
+  // users from other regions unnecessarily (since a client will be included in
+  // the experiment if the provider feature flag is checked).
+  return secure_dns::SelectEnabledProviders(secure_dns::ProvidersForCountry(
+      net::DohProviderEntry::GetList(), country_codes::GetCurrentCountryID()));
 }
 
 // Runs a DNS probe according to the configuration in |overrides|,
@@ -140,16 +144,6 @@ static jint JNI_SecureDnsBridge_GetManagementMode(JNIEnv* env) {
           ->GetSecureDnsConfiguration(
               true /* force_check_parental_controls_for_automatic_mode */)
           .management_mode());
-}
-
-static void JNI_SecureDnsBridge_UpdateDropdownHistograms(
-    JNIEnv* env,
-    const JavaParamRef<jstring>& old_config,
-    const JavaParamRef<jstring>& new_config) {
-  secure_dns::UpdateDropdownHistograms(
-      GetFilteredProviders(),
-      base::android::ConvertJavaStringToUTF8(old_config),
-      base::android::ConvertJavaStringToUTF8(new_config));
 }
 
 static void JNI_SecureDnsBridge_UpdateValidationHistogram(JNIEnv* env,

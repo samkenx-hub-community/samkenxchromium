@@ -75,10 +75,6 @@ bool OSExchangeData::GetURLAndTitle(FilenameToURLPolicy policy,
   return provider_->GetURLAndTitle(policy, url, title);
 }
 
-bool OSExchangeData::GetFilename(base::FilePath* path) const {
-  return provider_->GetFilename(path);
-}
-
 bool OSExchangeData::GetFilenames(std::vector<FileInfo>* filenames) const {
   return provider_->GetFilenames(filenames);
 }
@@ -150,11 +146,11 @@ bool OSExchangeData::GetVirtualFilenames(
   return provider_->GetVirtualFilenames(filenames);
 }
 
-bool OSExchangeData::GetVirtualFilesAsTempFiles(
+void OSExchangeData::GetVirtualFilesAsTempFiles(
     base::OnceCallback<
         void(const std::vector<std::pair<base::FilePath, base::FilePath>>&)>
         callback) const {
-  return provider_->GetVirtualFilesAsTempFiles(std::move(callback));
+  provider_->GetVirtualFilesAsTempFiles(std::move(callback));
 }
 #endif
 

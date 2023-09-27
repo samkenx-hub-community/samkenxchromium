@@ -7,6 +7,7 @@
 #include "chrome/browser/speech/tts_controller_delegate_impl.h"
 
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/common/pref_names.h"
@@ -20,10 +21,10 @@
 // Subclass of TtsController with a public ctor and dtor.
 class MockTtsControllerDelegate : public TtsControllerDelegateImpl {
  public:
-  MockTtsControllerDelegate() {}
-  ~MockTtsControllerDelegate() override {}
+  MockTtsControllerDelegate() = default;
+  ~MockTtsControllerDelegate() override = default;
 
-  PrefService* pref_service_ = nullptr;
+  raw_ptr<PrefService, ExperimentalAsh> pref_service_ = nullptr;
 
  private:
   const PrefService* GetPrefService(content::TtsUtterance* utterance) override {
@@ -106,14 +107,11 @@ TEST(TtsControllerDelegateImplTest, GetPreferredVoiceIdsForUtterance) {
 
   TestingPrefServiceSimple pref_service;
   // Uses default pref voices.
-  base::Value lang_to_voices(base::Value::Type::DICT);
-  lang_to_voices.SetKey(
-      "es", base::Value("{\"name\":\"Voice7\",\"extension\":\"id7\"}"));
-  lang_to_voices.SetKey(
-      "he", base::Value("{\"name\":\"Voice8\",\"extension\":\"id8\"}"));
-  lang_to_voices.SetKey(
-      "noLanguageCode",
-      base::Value("{\"name\":\"Android\",\"extension\":\"x\"}"));
+  auto lang_to_voices =
+      base::Value::Dict()
+          .Set("es", "{\"name\":\"Voice7\",\"extension\":\"id7\"}")
+          .Set("he", "{\"name\":\"Voice8\",\"extension\":\"id8\"}")
+          .Set("noLanguageCode", "{\"name\":\"Android\",\"extension\":\"x\"}");
   pref_service.registry()->RegisterDictionaryPref(
       prefs::kTextToSpeechLangToVoiceName, std::move(lang_to_voices));
   delegate.pref_service_ = &pref_service;

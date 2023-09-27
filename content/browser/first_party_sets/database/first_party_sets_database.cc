@@ -14,7 +14,6 @@
 #include "base/check.h"
 #include "base/check_op.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/sequence_checker.h"
@@ -752,9 +751,8 @@ void FirstPartySetsDatabase::DatabaseErrorCallback(int extended_error,
     return;
   }
 
-  // The default handling is to assert on debug and to ignore on release.
   if (!sql::Database::IsExpectedSqliteError(extended_error))
-    DLOG(FATAL) << db_->GetErrorMessage();
+    DLOG(ERROR) << db_->GetErrorMessage();
 
   // Consider the database closed if we did not attempt to recover so we did not
   // produce further errors.
@@ -770,13 +768,12 @@ FirstPartySetsDatabase::InitStatus FirstPartySetsDatabase::InitializeTables() {
 
   // Razes the DB if the version is deprecated or too new to get the feature
   // working.
-  //
-  // TODO(crbug.com/1372445): Re-enable track DB init status kTooNew and kTooOld
-  // after the bug is resolved and migration is implemented.
   CHECK_LT(kDeprecatedVersionNumber, kCurrentVersionNumber);
-  sql::MetaTable::RazeIfIncompatible(
-      db_.get(), /*lowest_supported_version=*/kDeprecatedVersionNumber + 1,
-      kCurrentVersionNumber);
+  if (!sql::MetaTable::RazeIfIncompatible(
+          db_.get(), /*lowest_supported_version=*/kDeprecatedVersionNumber + 1,
+          kCurrentVersionNumber)) {
+    return InitStatus::kError;
+  }
 
   // db could have been razed due to version being deprecated or too new.
   bool db_empty = !sql::MetaTable::DoesTableExist(db_.get());
@@ -785,7 +782,7 @@ FirstPartySetsDatabase::InitStatus FirstPartySetsDatabase::InitializeTables() {
   sql::Transaction transaction(db_.get());
   if (!transaction.Begin()) {
     LOG(WARNING) << "First-Party Sets database begin initialization failed.";
-    db_->RazeAndClose();
+    db_->RazeAndPoison();
     return InitStatus::kError;
   }
 
@@ -901,14 +898,15 @@ bool FirstPartySetsDatabase::Destroy() {
   // Reset the value.
   run_count_ = 0;
 
-  if (db_ && db_->is_open() && !db_->RazeAndClose())
+  if (db_ && db_->is_open() && !db_->RazeAndPoison()) {
     return false;
+  }
 
   // The file already doesn't exist.
   if (db_path_.empty())
     return true;
 
-  return base::DeleteFile(db_path_);
+  return sql::Database::Delete(db_path_);
 }
 
 }  // namespace content

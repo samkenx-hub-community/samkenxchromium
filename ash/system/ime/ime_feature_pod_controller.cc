@@ -94,12 +94,8 @@ std::unique_ptr<FeatureTile> IMEFeaturePodController::CreateTile(bool compact) {
   tile_ = tile.get();
   tile_->SetVectorIcon(kUnifiedMenuKeyboardIcon);
   tile_->SetLabel(l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_IME_SHORT));
-  std::u16string tooltip = GetTooltipString();
-  tile_->SetTooltipText(tooltip);
-  tile_->CreateDrillInButton(
-      base::BindRepeating(&IMEFeaturePodController::OnLabelPressed,
-                          weak_factory_.GetWeakPtr()),
-      tooltip);
+  tile_->SetTooltipText(GetTooltipString());
+  tile_->CreateDecorativeDrillInArrow();
   // `Update` will update the visibility.
   tile_->SetVisible(false);
   Update();
@@ -125,8 +121,16 @@ void IMEFeaturePodController::OnIMEMenuActivationChanged(bool is_active) {
 
 void IMEFeaturePodController::Update() {
   bool is_button_visible = IsButtonVisible();
+  const std::u16string tooltip = GetTooltipString();
+  std::u16string label_string = GetLabelString();
   if (features::IsQsRevampEnabled()) {
-    tile_->SetSubLabel(GetLabelString());
+    if (label_string.empty()) {
+      tile_->SetSubLabelVisibility(false);
+    } else {
+      tile_->SetSubLabel(label_string);
+      tile_->SetSubLabelVisibility(true);
+    }
+    tile_->SetTooltipText(tooltip);
     // If the tile's visibility changes from invisible to visible, log its
     // visibility.
     if (!tile_->GetVisible() && is_button_visible) {
@@ -134,7 +138,8 @@ void IMEFeaturePodController::Update() {
     }
     tile_->SetVisible(is_button_visible);
   } else {
-    button_->SetSubLabel(GetLabelString());
+    button_->SetSubLabel(label_string);
+    button_->SetLabelTooltip(tooltip);
     // If the button's visibility changes from invisible to visible, log its
     // visibility.
     if (!button_->GetVisible() && is_button_visible) {

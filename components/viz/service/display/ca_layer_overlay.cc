@@ -18,7 +18,6 @@
 #include "components/viz/common/quads/yuv_video_draw_quad.h"
 #include "components/viz/service/display/display_resource_provider.h"
 #include "gpu/GLES2/gl2extchromium.h"
-#include "third_party/skia/include/core/SkDeferredDisplayList.h"
 #include "ui/base/cocoa/remote_layer_api.h"
 #include "ui/gfx/buffer_types.h"
 
@@ -30,10 +29,21 @@ namespace {
 // quads are promoted to CALayers. At extremes, corruption can occur.
 // https://crbug.com/1022116
 
-constexpr size_t kTooManyQuads = 128;
-// |kTooManyQuadsWithVideos| can be re-assigned by kMacCAOverlayQuadMaxNum when
-// feature kMacCAOverlayQuad is enabled.
-constexpr size_t kTooManyQuadsWithVideos = 300;
+// The default CALayer number allowed for CoreAnimation when kCALayerNewLimit is
+// disabled.
+constexpr size_t kLayerLimitDefault = 128;
+
+// The new limit if kCALayerNewLimit is enabled. It can be overridden by the
+// "default" feature parameters.
+constexpr size_t kLayerNewLimitDefault = 1024;
+
+// The default CALayer number allowed for CoreAnimation with many videos (video
+// count >= kMaxNumVideos) when kCALayerNewLimit is disabled.
+constexpr size_t kLayerLimitWithManyVideos = 300;
+
+// The new limit with many videos if kCALayerNewLimit is enabled. It can be
+// overridden by the "many-video" feature parameters.
+constexpr size_t kLayerNewLimitWithManyVideos = 1024;
 
 // If there are too many RenderPassDrawQuads, we shouldn't use Core
 // Animation to present them as individual layers, since that potentially
@@ -106,6 +116,7 @@ gfx::CALayerResult FromRenderPassQuad(
   }
 
   ca_layer_overlay->rpdq = quad;
+  ca_layer_overlay->is_render_pass_draw_quad = true;
   ca_layer_overlay->uv_rect = gfx::RectF(0, 0, 1, 1);
 
   // For RenderPassDrawQuad, the opacity is applied when its ddl is recorded, so
@@ -154,7 +165,6 @@ gfx::CALayerResult FromTextureQuad(DisplayResourceProvider* resource_provider,
   }
   ca_layer_overlay->opacity *= quad->vertex_opacity[0];
   ca_layer_overlay->nearest_neighbor_filter = quad->nearest_neighbor;
-  ca_layer_overlay->hdr_mode = quad->hdr_mode;
   ca_layer_overlay->hdr_metadata = quad->hdr_metadata;
   if (quad->is_video_frame)
     ca_layer_overlay->protected_video_type = quad->protected_video_type;
@@ -219,7 +229,8 @@ gfx::CALayerResult FromYUVVideoQuad(DisplayResourceProvider* resource_provider,
 
   ca_layer_overlay->resource_id = y_resource_id;
   ca_layer_overlay->uv_rect = ya_contents_rect;
-  ca_layer_overlay->hdr_metadata = quad->hdr_metadata;
+  ca_layer_overlay->hdr_metadata =
+      quad->hdr_metadata.value_or(gfx::HDRMetadata());
   ca_layer_overlay->protected_video_type = quad->protected_video_type;
   return gfx::kCALayerSuccess;
 }
@@ -302,9 +313,11 @@ class CALayerOverlayProcessorInternal {
       case DrawQuad::Material::kTextureContent: {
         const TextureDrawQuad* texture_draw_quad =
             TextureDrawQuad::MaterialCast(quad);
-        // Stream video counts as a yuv draw quad.
-        if (texture_draw_quad->is_stream_video)
+        // Stream video and video frame counts as a yuv draw quad.
+        if (texture_draw_quad->is_stream_video ||
+            texture_draw_quad->is_video_frame) {
           yuv_draw_quad_count += 1;
+        }
         return FromTextureQuad(resource_provider, texture_draw_quad,
                                ca_layer_overlay);
       }
@@ -368,16 +381,23 @@ CALayerOverlayProcessor::CALayerOverlayProcessor()
     : overlays_allowed_(ui::RemoteLayerAPISupported()),
       enable_ca_renderer_(base::FeatureList::IsEnabled(kCARenderer)),
       enable_hdr_underlays_(base::FeatureList::IsEnabled(kHDRUnderlays)) {
-  if (base::FeatureList::IsEnabled(features::kMacCAOverlayQuad)) {
-    max_quad_list_size_for_videos_ = kTooManyQuadsWithVideos;
-    const int max_num = features::kMacCAOverlayQuadMaxNum.Get();
-    if (max_num > 0)
-      max_quad_list_size_for_videos_ = max_num;
-  } else {
-    max_quad_list_size_for_videos_ = kTooManyQuads;
-  }
+  layer_limit_default_ = kLayerLimitDefault;
+  layer_limit_with_many_videos_ = kLayerLimitWithManyVideos;
+  if (base::FeatureList::IsEnabled(features::kCALayerNewLimit)) {
+    layer_limit_default_ = kLayerNewLimitDefault;
+    const int layer_limit_default_field_trial =
+        features::kCALayerNewLimitDefault.Get();
+    if (layer_limit_default_field_trial > 0) {
+      layer_limit_default_ = layer_limit_default_field_trial;
+    }
 
-  DCHECK_GE(max_quad_list_size_for_videos_, kTooManyQuads);
+    const int layer_limit_with_many_videos_field_trial =
+        features::kCALayerNewLimitManyVideos.Get();
+    layer_limit_with_many_videos_ = kLayerNewLimitWithManyVideos;
+    if (layer_limit_with_many_videos_field_trial > 0) {
+      layer_limit_with_many_videos_ = layer_limit_with_many_videos_field_trial;
+    }
+  }
 }
 
 bool CALayerOverlayProcessor::AreClipSettingsValid(
@@ -478,8 +498,6 @@ bool CALayerOverlayProcessor::ProcessForCALayerOverlays(
     result = gfx::kCALayerFailedVideoCaptureEnabled;
   } else if (!render_pass->copy_requests.empty()) {
     result = gfx::kCALayerFailedCopyRequests;
-  } else if (num_visible_quads > max_quad_list_size_for_videos_) {
-    result = gfx::kCALayerFailedTooManyQuads;
   }
 
   if (result != gfx::kCALayerSuccess) {
@@ -527,12 +545,11 @@ bool CALayerOverlayProcessor::ProcessForCALayerOverlays(
     ca_layer_overlays->push_back(ca_layer);
   }
 
-  // Apply Feature kMacCAOverlayQuad to non-video-conferencing mode only.
-  // In the case of |max_quad_list_size_for_videos_| > |num_visible_quads| >
-  // kTooManyQuads, accept OverlayCandidate only if it's in a video conferencing
-  // mode. (video count >= kMaxNumVideos(5)) Otherwise, fail OverlayCandidate.
-  if (num_visible_quads > kTooManyQuads &&
-      yuv_draw_quad_count < kMaxNumVideos) {
+  // Fails if there are more draw quads than allowed for CoreAnimation.
+  size_t max_number = (yuv_draw_quad_count < kMaxNumVideos)
+                          ? layer_limit_default_
+                          : layer_limit_with_many_videos_;
+  if (num_visible_quads > max_number) {
     result = gfx::kCALayerFailedTooManyQuads;
   }
 

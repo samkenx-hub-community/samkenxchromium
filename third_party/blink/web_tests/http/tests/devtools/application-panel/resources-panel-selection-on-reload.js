@@ -2,13 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ApplicationTestRunner} from 'application_test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as Common from 'devtools/core/common/common.js';
+
 (async function() {
   TestRunner.addResult(`Tests Application Panel response to a main frame navigation.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('application_test_runner');
+  await TestRunner.loadLegacyModule('console');
     // Note: every test that uses a storage API must manually clean-up state from previous tests.
   await ApplicationTestRunner.resetState();
 
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('resources');
 
   function createIndexedDB(callback) {
@@ -44,7 +50,6 @@
   }
 
   await new Promise(createIndexedDB);
-  await ApplicationTestRunner.createWebSQLDatabase('database-for-test');
   await UI.viewManager.showView('resources');
   UI.panels.resources.sidebar.cookieListTreeElement.firstChild().select(false, true);
   dumpCurrentState('Initial state:');

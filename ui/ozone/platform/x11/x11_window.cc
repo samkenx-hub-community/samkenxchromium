@@ -1104,7 +1104,8 @@ void X11Window::SetDecorationInsets(const gfx::Insets* insets_px) {
   }
 }
 
-void X11Window::SetOpaqueRegion(const std::vector<gfx::Rect>* region_px) {
+void X11Window::SetOpaqueRegion(
+    absl::optional<std::vector<gfx::Rect>> region_px) {
   auto atom = x11::GetAtom("_NET_WM_OPAQUE_REGION");
   if (!region_px) {
     x11::DeleteProperty(xwindow_, atom);
@@ -1120,7 +1121,7 @@ void X11Window::SetOpaqueRegion(const std::vector<gfx::Rect>* region_px) {
   x11::SetArrayProperty(xwindow_, atom, x11::Atom::CARDINAL, value);
 }
 
-void X11Window::SetInputRegion(const gfx::Rect* region_px) {
+void X11Window::SetInputRegion(absl::optional<gfx::Rect> region_px) {
   if (!region_px) {
     // Reset the input region.
     connection_->shape().Mask({
@@ -2285,13 +2286,7 @@ void X11Window::OnWindowMapped() {
 
 void X11Window::OnConfigureEvent(const x11::ConfigureNotifyEvent& configure,
                                  bool send_event) {
-  DCHECK_EQ(xwindow_, configure.event);
-
-  // ConfigureNotifyEvent could be received for child windows. Ignore events for
-  // child windows.
-  if (xwindow_ != configure.window) {
-    return;
-  }
+  DCHECK_EQ(xwindow_, configure.window);
 
   if (pending_counter_value_) {
     DCHECK(!configure_counter_value_);

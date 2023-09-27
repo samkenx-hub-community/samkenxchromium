@@ -12,6 +12,7 @@
 #include "base/types/strong_alias.h"
 #include "components/autofill/core/common/mojom/autofill_types.mojom-forward.h"
 #include "components/device_reauth/device_authenticator.h"
+#include "components/password_manager/core/browser/password_manager_metrics_util.h"
 #include "components/password_manager/core/browser/password_store_consumer.h"
 #include "ui/gfx/native_widget_types.h"
 #include "url/gurl.h"
@@ -21,11 +22,16 @@ class PasswordManagerClient;
 class PasswordManagerDriver;
 }  // namespace password_manager
 
+namespace safe_browsing {
+class PasswordReuseDetectionManagerClient;
+}
+
 namespace content {
 class WebContents;
 }  // namespace content
 
 class AllPasswordsBottomSheetView;
+class Profile;
 
 // This class gets credentials and creates AllPasswordsBottomSheetView.
 class AllPasswordsBottomSheetController
@@ -33,15 +39,23 @@ class AllPasswordsBottomSheetController
  public:
   using RequestsToFillPassword =
       base::StrongAlias<struct RequestsToFillPasswordTag, bool>;
+  using ShowMigrationWarningCallback = base::RepeatingCallback<void(
+      gfx::NativeWindow,
+      Profile*,
+      password_manager::metrics_util::PasswordMigrationWarningTriggers)>;
   // No-op constructor for tests.
   AllPasswordsBottomSheetController(
       base::PassKey<class AllPasswordsBottomSheetControllerTest>,
+      content::WebContents* web_contents,
       std::unique_ptr<AllPasswordsBottomSheetView> view,
       base::WeakPtr<password_manager::PasswordManagerDriver> driver,
       password_manager::PasswordStoreInterface* store,
       base::OnceCallback<void()> dismissal_callback,
       autofill::mojom::FocusedFieldType focused_field_type,
-      password_manager::PasswordManagerClient* client);
+      password_manager::PasswordManagerClient* client,
+      safe_browsing::PasswordReuseDetectionManagerClient*
+          password_reuse_detection_manager_client,
+      ShowMigrationWarningCallback show_migration_warning_callback);
 
   AllPasswordsBottomSheetController(
       content::WebContents* web_contents,
@@ -104,15 +118,24 @@ class AllPasswordsBottomSheetController
   base::WeakPtr<password_manager::PasswordManagerDriver> driver_;
 
   // Authenticator used to trigger a biometric re-auth before password filling.
-  scoped_refptr<device_reauth::DeviceAuthenticator> authenticator_;
+  std::unique_ptr<device_reauth::DeviceAuthenticator> authenticator_;
 
   // The type of field on which the user is focused, e.g. PASSWORD.
   autofill::mojom::FocusedFieldType focused_field_type_;
 
   // The PasswordManagerClient associated with the current |web_contents_|.
-  // Used to tell `PasswordReuseDetectionManager` that a password has been
-  // reused.
+  // Used to get a pointer to a BiometricAuthenticator.
   raw_ptr<password_manager::PasswordManagerClient> client_ = nullptr;
+
+  // The passwordReuseDetectionManagerClient associated with the current
+  // |web_contents_|. Used to tell `PasswordReuseDetectionManager` that a
+  // password has been reused.
+  raw_ptr<safe_browsing::PasswordReuseDetectionManagerClient>
+      password_reuse_detection_manager_client_ = nullptr;
+
+  // Callback invoked to try to show the password migration warning. Used
+  // to facilitate testing.
+  ShowMigrationWarningCallback show_migration_warning_callback_;
 
   base::WeakPtrFactory<AllPasswordsBottomSheetController> weak_ptr_factory_{
       this};

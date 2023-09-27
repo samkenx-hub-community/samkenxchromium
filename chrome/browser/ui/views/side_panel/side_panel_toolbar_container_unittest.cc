@@ -6,6 +6,8 @@
 
 #include <vector>
 
+#include "chrome/browser/companion/core/features.h"
+#include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/test_with_browser_view.h"
@@ -25,7 +27,10 @@
 class SidePanelToolbarContainerTest : public TestWithBrowserView {
  public:
   void SetUp() override {
-    scoped_feature_list_.InitAndEnableFeature(features::kSidePanelCompanion);
+    scoped_feature_list_.InitWithFeatures(
+        {companion::features::internal::kSidePanelCompanion,
+         features::kSidePanelCompanionDefaultPinned},
+        {});
     TestWithBrowserView::SetUp();
     AddTab(browser_view()->browser(), GURL("http://foo1.com"));
     browser_view()->browser()->tab_strip_model()->ActivateTabAt(0);
@@ -44,7 +49,8 @@ class SidePanelToolbarContainerTest : public TestWithBrowserView {
         ui::ImageModel::FromVectorIcon(search_companion_coordinator->icon()),
         base::BindRepeating([]() { return std::make_unique<views::View>(); })));
 
-    browser_view()->side_panel_coordinator()->SetNoDelaysForTesting(true);
+    SidePanelUtil::GetSidePanelCoordinatorForBrowser(browser())
+        ->SetNoDelaysForTesting(true);
   }
 
   void WaitForAnimation() {
@@ -80,6 +86,11 @@ class SidePanelToolbarContainerTest : public TestWithBrowserView {
     return result;
   }
 
+ protected:
+  SidePanelCoordinator* GetSidePanelCoordinator() {
+    return SidePanelUtil::GetSidePanelCoordinatorForBrowser(browser());
+  }
+
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
 };
@@ -92,15 +103,16 @@ TEST_F(SidePanelToolbarContainerTest, CompanionPinnedByDefault) {
       SearchCompanionSidePanelCoordinator::GetOrCreateForBrowser(
           browser_view()->browser());
   ASSERT_EQ(pinned_buttons[0]->GetTooltipText(gfx::Point()),
-            search_companion_coordinator->name());
+            search_companion_coordinator->GetTooltipForToolbarButton());
 }
 
 TEST_F(SidePanelToolbarContainerTest, ClickingPinnedEntryOpensSidePanel) {
   auto* search_companion_button = GetPinnedEntryButtons()[0];
   ClickButton(search_companion_button);
   ASSERT_TRUE(browser_view()->unified_side_panel()->GetVisible());
-  ASSERT_EQ(browser_view()->side_panel_coordinator()->GetCurrentEntryId(),
-            SidePanelEntry::Id::kSearchCompanion);
+  ASSERT_EQ(
+      SidePanelUI::GetSidePanelUIForBrowser(browser())->GetCurrentEntryId(),
+      SidePanelEntry::Id::kSearchCompanion);
   ASSERT_TRUE(views::InkDrop::Get(search_companion_button)->GetHighlighted());
 }
 
@@ -111,10 +123,9 @@ TEST_F(SidePanelToolbarContainerTest,
   browser_view()->GetProfile()->GetPrefs()->SetBoolean(
       prefs::kSidePanelCompanionEntryPinnedToToolbar, false);
   search_companion_button->SetVisible(false);
-  browser_view()->side_panel_coordinator()->Show(
-      SidePanelEntry::Id::kSearchCompanion);
+  GetSidePanelCoordinator()->Show(SidePanelEntry::Id::kSearchCompanion);
   ASSERT_TRUE(browser_view()->unified_side_panel()->GetVisible());
-  ASSERT_EQ(browser_view()->side_panel_coordinator()->GetCurrentEntryId(),
+  ASSERT_EQ(GetSidePanelCoordinator()->GetCurrentEntryId(),
             SidePanelEntry::Id::kSearchCompanion);
   ASSERT_TRUE(views::InkDrop::Get(side_panel_button)->GetHighlighted());
 }
@@ -123,11 +134,11 @@ TEST_F(SidePanelToolbarContainerTest, PinButtonOnlyVisibleForCompanion) {
   auto* side_panel_button = browser_view()->toolbar()->GetSidePanelButton();
   ClickButton(side_panel_button);
   views::ImageButton* header_pin_button =
-      browser_view()->side_panel_coordinator()->GetHeaderPinButtonForTesting();
+      GetSidePanelCoordinator()->GetHeaderPinButtonForTesting();
   // Verify that the pin button is not visible for entries other than the
   // companion.
   ASSERT_TRUE(browser_view()->unified_side_panel()->GetVisible());
-  ASSERT_NE(browser_view()->side_panel_coordinator()->GetCurrentEntryId(),
+  ASSERT_NE(GetSidePanelCoordinator()->GetCurrentEntryId(),
             SidePanelEntry::Id::kSearchCompanion);
   ASSERT_FALSE(header_pin_button->GetVisible());
 
@@ -136,7 +147,7 @@ TEST_F(SidePanelToolbarContainerTest, PinButtonOnlyVisibleForCompanion) {
   auto* search_companion_button = GetPinnedEntryButtons()[0];
   ClickButton(search_companion_button);
   ASSERT_TRUE(browser_view()->unified_side_panel()->GetVisible());
-  ASSERT_EQ(browser_view()->side_panel_coordinator()->GetCurrentEntryId(),
+  ASSERT_EQ(GetSidePanelCoordinator()->GetCurrentEntryId(),
             SidePanelEntry::Id::kSearchCompanion);
   ASSERT_TRUE(header_pin_button->GetVisible());
 }
@@ -154,4 +165,25 @@ TEST_F(SidePanelToolbarContainerTest, PinStateUpdatesOnPrefChange) {
 #else
   ASSERT_FALSE(pinned_buttons[0]->GetVisible());
 #endif
+}
+
+TEST_F(SidePanelToolbarContainerTest, CompanionButtonRemovedOnDSPChange) {
+  // Verify the pinned companion button exists.
+  auto pinned_buttons = GetPinnedEntryButtons();
+  ASSERT_EQ(pinned_buttons.size(), 1u);
+
+  // Update the default search provider.
+  TemplateURLService* template_url_service =
+      TemplateURLServiceFactory::GetForProfile(profile());
+  TemplateURLData data;
+  data.SetShortName(u"foo.com");
+  data.SetURL("http://foo.com/url?bar={searchTerms}");
+  data.new_tab_url = "https://foo.com/newtab";
+  TemplateURL* template_url =
+      template_url_service->Add(std::make_unique<TemplateURL>(data));
+  template_url_service->SetUserSelectedDefaultSearchProvider(template_url);
+
+  // Verify the button no longer exists.
+  pinned_buttons = GetPinnedEntryButtons();
+  ASSERT_EQ(pinned_buttons.size(), 0u);
 }

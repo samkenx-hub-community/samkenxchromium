@@ -11,6 +11,7 @@
 #include "crypto/scoped_nss_types.h"
 #include "net/base/net_export.h"
 #include "net/cert/pki/trust_store.h"
+#include "net/cert/scoped_nss_types.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
 
 namespace net {
@@ -27,36 +28,6 @@ class NET_EXPORT TrustStoreNSS : public TrustStore {
   struct UseTrustFromAllUserSlots : absl::monostate {};
   using UserSlotTrustSetting =
       absl::variant<UseTrustFromAllUserSlots, crypto::ScopedPK11Slot>;
-
-  class ResultDebugData : public base::SupportsUserData::Data {
-   public:
-    enum class SlotFilterType {
-      kDontFilter,
-      kDoNotAllowUserSlots,
-      kAllowSpecifiedUserSlot
-    };
-
-    explicit ResultDebugData(bool ignore_system_trust_settings,
-                             SlotFilterType slot_filter_type);
-
-    static const ResultDebugData* Get(const base::SupportsUserData* debug_data);
-    static void Create(bool ignore_system_trust_settings,
-                       SlotFilterType slot_filter_type,
-                       base::SupportsUserData* debug_data);
-
-    // base::SupportsUserData::Data implementation:
-    std::unique_ptr<Data> Clone() override;
-
-    bool ignore_system_trust_settings() const {
-      return ignore_system_trust_settings_;
-    }
-
-    SlotFilterType slot_filter_type() const { return slot_filter_type_; }
-
-   private:
-    const bool ignore_system_trust_settings_;
-    const SlotFilterType slot_filter_type_;
-  };
 
   // Creates a TrustStoreNSS which will find anchors that are trusted for
   // SSL server auth.
@@ -82,19 +53,29 @@ class NET_EXPORT TrustStoreNSS : public TrustStore {
                         ParsedCertificateList* issuers) override;
 
   // TrustStore implementation:
-  CertificateTrust GetTrust(const ParsedCertificate* cert,
-                            base::SupportsUserData* debug_data) override;
+  CertificateTrust GetTrust(const ParsedCertificate* cert) override;
+
+  struct ListCertsResult {
+    ListCertsResult(ScopedCERTCertificate cert, CertificateTrust trust);
+    ~ListCertsResult();
+    ListCertsResult(ListCertsResult&& other);
+    ListCertsResult& operator=(ListCertsResult&& other);
+
+    ScopedCERTCertificate cert;
+    CertificateTrust trust;
+  };
+  std::vector<ListCertsResult> ListCertsIgnoringNSSRoots();
 
  private:
   bool IsCertAllowedForTrust(CERTCertificate* cert) const;
   CertificateTrust GetTrustForNSSTrust(const CERTCertTrust& trust) const;
 
   CertificateTrust GetTrustIgnoringSystemTrust(
-      const ParsedCertificate* cert,
-      base::SupportsUserData* debug_data) const;
-  CertificateTrust GetTrustWithSystemTrust(
-      const ParsedCertificate* cert,
-      base::SupportsUserData* debug_data) const;
+      const ParsedCertificate* cert) const;
+
+  CertificateTrust GetTrustIgnoringSystemTrust(CERTCertificate* nss_cert) const;
+
+  CertificateTrust GetTrustWithSystemTrust(const ParsedCertificate* cert) const;
 
   // |ignore_system_certs_trust_settings_| specifies if the system trust
   // settings should be considered when determining a cert's trustworthiness.

@@ -4,13 +4,12 @@
 
 package org.chromium.chrome.browser.ssl;
 
-import android.support.test.InstrumentationRegistry;
 import android.util.Base64;
 
 import androidx.annotation.IntDef;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -91,15 +90,11 @@ public class CaptivePortalTest {
     public void setUp() {
         mActivityTestRule.startMainActivityWithURL(UrlConstants.NTP_URL);
         mServer = EmbeddedTestServer.createAndStartHTTPSServer(
-                InstrumentationRegistry.getContext(), ServerCertificate.CERT_MISMATCHED_NAME);
+                ApplicationProvider.getApplicationContext(),
+                ServerCertificate.CERT_MISMATCHED_NAME);
 
         CaptivePortalHelper.setOSReportsCaptivePortalForTesting(false);
         CaptivePortalHelper.setCaptivePortalCertificateForTesting("sha256/test");
-    }
-
-    @After
-    public void tearDown() {
-        mServer.stopAndDestroyServer();
     }
 
     /** Navigate the tab to an interstitial with a name mismatch error and check if this

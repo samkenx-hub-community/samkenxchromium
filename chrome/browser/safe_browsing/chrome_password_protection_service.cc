@@ -46,7 +46,7 @@
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/google/core/common/google_util.h"
 #include "components/omnibox/common/omnibox_features.h"
-#include "components/password_manager/core/browser/form_parsing/form_parser.h"
+#include "components/password_manager/core/browser/form_parsing/form_data_parser.h"
 #include "components/password_manager/core/browser/insecure_credentials_helper.h"
 #include "components/password_manager/core/browser/leak_detection_dialog_utils.h"
 #include "components/password_manager/core/browser/ui/password_check_referrer.h"
@@ -58,6 +58,7 @@
 #include "components/safe_browsing/content/browser/safe_browsing_navigation_observer_manager.h"
 #include "components/safe_browsing/content/browser/triggers/trigger_throttler.h"
 #include "components/safe_browsing/content/browser/ui_manager.h"
+#include "components/safe_browsing/content/browser/web_contents_key.h"
 #include "components/safe_browsing/content/browser/web_ui/safe_browsing_ui.h"
 #include "components/safe_browsing/core/browser/db/database_manager.h"
 #include "components/safe_browsing/core/browser/realtime/policy_engine.h"
@@ -75,8 +76,8 @@
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/strings/grit/components_strings.h"
-#include "components/sync/driver/sync_service.h"
 #include "components/sync/protocol/user_event_specifics.pb.h"
+#include "components/sync/service/sync_service.h"
 #include "components/sync_user_events/user_event_service.h"
 #include "components/unified_consent/pref_names.h"
 #include "components/variations/service/variations_service.h"
@@ -101,7 +102,7 @@
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/password_manager/android/password_checkup_launcher_helper.h"
+#include "chrome/browser/password_manager/android/password_checkup_launcher_helper_impl.h"
 #include "chrome/browser/safe_browsing/android/password_reuse_controller_android.h"
 #include "chrome/browser/safe_browsing/android/safe_browsing_referring_app_bridge_android.h"
 #include "components/password_manager/core/browser/password_check_referrer_android.h"
@@ -621,8 +622,9 @@ void ChromePasswordProtectionService::MaybeFinishCollectingThreatDetails(
   // ignore the result of |FinishCollectingThreatDetails()|. TriggerManager will
   // take care of whether report should be sent.
   trigger_manager_->FinishCollectingThreatDetails(
-      safe_browsing::TriggerType::GAIA_PASSWORD_REUSE, web_contents,
-      base::Milliseconds(0), did_proceed, /*num_visit=*/0,
+      safe_browsing::TriggerType::GAIA_PASSWORD_REUSE,
+      GetWebContentsKey(web_contents), base::Milliseconds(0), did_proceed,
+      /*num_visits=*/0,
       TriggerManager::GetSBErrorDisplayOptions(*profile_->GetPrefs(),
                                                web_contents));
 }
@@ -1028,8 +1030,9 @@ void ChromePasswordProtectionService::OpenChangePasswordUrl(
         "PasswordProtection.SavedPassword.ChangePasswordButtonClicked"));
 #if BUILDFLAG(IS_ANDROID)
     JNIEnv* env = base::android::AttachCurrentThread();
-    PasswordCheckupLauncherHelper::LaunchLocalCheckup(
-        env, web_contents->GetTopLevelNativeWindow()->GetJavaObject(),
+    PasswordCheckupLauncherHelperImpl checkup_launcher;
+    checkup_launcher.LaunchLocalCheckup(
+        env, web_contents->GetTopLevelNativeWindow(),
         password_manager::PasswordCheckReferrerAndroid::kPhishedWarningDialog);
 #endif
 #if BUILDFLAG(FULL_SAFE_BROWSING)
@@ -1508,9 +1511,11 @@ void ChromePasswordProtectionService::FillUserPopulation(
       &token);
 }
 
-bool ChromePasswordProtectionService::IsPrimaryAccountSyncing() const {
+bool ChromePasswordProtectionService::IsPrimaryAccountSyncingHistory() const {
   syncer::SyncService* sync = SyncServiceFactory::GetForProfile(profile_);
-  return sync && sync->IsSyncFeatureActive() && !sync->IsLocalSyncEnabled();
+  return sync &&
+         sync->GetActiveDataTypes().Has(syncer::HISTORY_DELETE_DIRECTIVES) &&
+         !sync->IsLocalSyncEnabled();
 }
 
 bool ChromePasswordProtectionService::IsPrimaryAccountSignedIn() const {
@@ -1618,7 +1623,7 @@ AccountInfo ChromePasswordProtectionService::GetAccountInfo() const {
     return AccountInfo();
 
   return identity_manager->FindExtendedAccountInfo(
-      identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSync));
+      identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin));
 }
 
 ChromeUserPopulation::UserPopulation

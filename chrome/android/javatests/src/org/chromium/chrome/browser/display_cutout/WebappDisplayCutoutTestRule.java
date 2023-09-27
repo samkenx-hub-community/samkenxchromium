@@ -7,9 +7,10 @@ package org.chromium.chrome.browser.display_cutout;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.annotation.RequiresApi;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.runner.Description;
@@ -71,7 +72,7 @@ public class WebappDisplayCutoutTestRule extends DisplayCutoutTestRule<WebappAct
 
     private void startWebappActivity(@DisplayMode.EnumType int displayMode) {
         Intent intent =
-                new Intent(InstrumentationRegistry.getTargetContext(), WebappActivity.class);
+                new Intent(ApplicationProvider.getApplicationContext(), WebappActivity.class);
         intent.setData(Uri.parse(WebappActivity.WEBAPP_SCHEME + "://" + WEBAPP_ID));
         intent.putExtra(WebappConstants.EXTRA_ID, WEBAPP_ID);
         intent.putExtra(WebappConstants.EXTRA_URL, getTestURL());

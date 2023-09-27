@@ -32,9 +32,9 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
-#include "base/guid.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/posix/safe_strerror.h"
 #include "base/process/process_metrics.h"
 #include "base/ranges/algorithm.h"
@@ -48,12 +48,15 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/test/scoped_run_loop_timeout.h"
 #include "base/time/time.h"
+#include "base/uuid.h"
 #include "chromeos/ash/components/cryptohome/cryptohome_parameters.h"
 #include "chromeos/ash/components/dbus/concierge/fake_concierge_client.h"
 #include "chromeos/ash/components/dbus/debug_daemon/debug_daemon_client.h"
 #include "chromeos/ash/components/dbus/debug_daemon/fake_debug_daemon_client.h"
 #include "chromeos/ash/components/dbus/session_manager/fake_session_manager_client.h"
 #include "chromeos/ash/components/dbus/upstart/fake_upstart_client.h"
+#include "components/user_manager/fake_user_manager.h"
+#include "components/user_manager/scoped_user_manager.h"
 #include "components/user_manager/user_names.h"
 #include "content/public/test/browser_task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -109,14 +112,15 @@ std::string GenerateAbstractAddress() {
   std::string address(kArcVmBootNotificationServerAddressPrefix,
                       sizeof(kArcVmBootNotificationServerAddressPrefix) - 1);
   return address.append("-" +
-                        base::GUID::GenerateRandomV4().AsLowercaseString());
+                        base::Uuid::GenerateRandomV4().AsLowercaseString());
 }
 
 bool HasDiskImage(const vm_tools::concierge::StartArcVmRequest& request,
                   const std::string& disk_path) {
   for (const auto& disk : request.disks()) {
-    if (disk.path() == disk_path)
+    if (disk.path() == disk_path) {
       return true;
+    }
   }
   return false;
 }
@@ -167,8 +171,9 @@ class TestConciergeClient : public ash::FakeConciergeClient {
     ++stop_vm_call_count_;
     stop_vm_request_ = request;
     ash::FakeConciergeClient::StopVm(request, std::move(callback));
-    if (on_stop_vm_callback_ && (stop_vm_call_count_ == callback_count_))
+    if (on_stop_vm_callback_ && (stop_vm_call_count_ == callback_count_)) {
       std::move(on_stop_vm_callback_).Run();
+    }
   }
 
   void StartArcVm(
@@ -289,8 +294,9 @@ class TestArcVmBootNotificationServer
     char buf[256];
     while (true) {
       ssize_t len = HANDLE_EINTR(read(client_fd.get(), buf, sizeof(buf)));
-      if (len <= 0)
+      if (len <= 0) {
         break;
+      }
       out.append(buf, len);
     }
     received_.append(out);
@@ -323,8 +329,9 @@ class ArcVmClientAdapterTest : public testing::Test,
                                public ArcClientAdapter::Observer {
  public:
   ArcVmClientAdapterTest() {
-    // Use the same VLOG() level as production. Note that session_manager sets
-    // "--vmodule=*arc/*=1" in src/platform2/login_manager/chrome_setup.cc.
+    // Use the same VLOG() level as production. Note that
+    // arc_vm_client_adapter.cc defines ENABLED_VLOG_LEVEL 1, which is respected
+    // at compile time when use_runtime_vlog is set to false.
     logging::SetMinLogLevel(-1);
 
     // Create and set new fake clients every time to reset clients' status.
@@ -338,6 +345,7 @@ class ArcVmClientAdapterTest : public testing::Test,
   ArcVmClientAdapterTest& operator=(const ArcVmClientAdapterTest&) = delete;
 
   ~ArcVmClientAdapterTest() override {
+    ash::UpstartClient::Shutdown();
     ash::ConciergeClient::Shutdown();
     ash::DebugDaemonClient::SetInstanceForTest(nullptr);
     test_debug_daemon_client_.reset();
@@ -362,7 +370,6 @@ class ArcVmClientAdapterTest : public testing::Test,
     GetTestConciergeClient()->set_start_vm_response(start_vm_response);
 
     // Reset to the original behavior.
-    RemoveUpstartStartStopJobFailures();
     SetArcVmBootNotificationServerFdForTesting(absl::nullopt);
 
     const std::string abstract_addr(GenerateAbstractAddress());
@@ -381,9 +388,14 @@ class ArcVmClientAdapterTest : public testing::Test,
     app_host_ = std::make_unique<FakeAppHost>(arc_bridge_service()->app());
     app_instance_ = std::make_unique<FakeAppInstance>(app_host_.get());
     arc_dlc_installer_ = std::make_unique<ArcDlcInstaller>();
+
+    auto fake_user_manager = std::make_unique<user_manager::FakeUserManager>();
+    scoped_user_manager_ = std::make_unique<user_manager::ScopedUserManager>(
+        std::move(fake_user_manager));
   }
 
   void TearDown() override {
+    scoped_user_manager_.reset();
     arc_dlc_installer_.reset();
     ash::SessionManagerClient::Shutdown();
     adapter_->RemoveObserver(this);
@@ -420,6 +432,10 @@ class ArcVmClientAdapterTest : public testing::Test,
     UpstartOperationType type;
   };
   using UpstartOperations = std::vector<UpstartOperation>;
+
+  void SetAccountId(const AccountId& account_id) {
+    arc_service_manager_.set_account_id(account_id);
+  }
 
   void SetValidUserInfo() { SetUserInfo(kUserIdHash, kSerialNumber); }
 
@@ -486,15 +502,17 @@ class ArcVmClientAdapterTest : public testing::Test,
   void SendVmStartedSignal() {
     vm_tools::concierge::VmStartedSignal signal;
     signal.set_name(kArcVmName);
-    for (auto& observer : GetTestConciergeClient()->vm_observer_list())
+    for (auto& observer : GetTestConciergeClient()->vm_observer_list()) {
       observer.OnVmStarted(signal);
+    }
   }
 
   void SendVmStartedSignalNotForArcVm() {
     vm_tools::concierge::VmStartedSignal signal;
     signal.set_name("penguin");
-    for (auto& observer : GetTestConciergeClient()->vm_observer_list())
+    for (auto& observer : GetTestConciergeClient()->vm_observer_list()) {
       observer.OnVmStarted(signal);
+    }
   }
 
   void SendVmStoppedSignalForCid(vm_tools::concierge::VmStopReason reason,
@@ -503,8 +521,9 @@ class ArcVmClientAdapterTest : public testing::Test,
     signal.set_name(kArcVmName);
     signal.set_cid(cid);
     signal.set_reason(reason);
-    for (auto& observer : GetTestConciergeClient()->vm_observer_list())
+    for (auto& observer : GetTestConciergeClient()->vm_observer_list()) {
       observer.OnVmStopped(signal);
+    }
   }
 
   void SendVmStoppedSignal(vm_tools::concierge::VmStopReason reason) {
@@ -517,13 +536,15 @@ class ArcVmClientAdapterTest : public testing::Test,
     signal.set_name("penguin");
     signal.set_cid(kCid);
     signal.set_reason(reason);
-    for (auto& observer : GetTestConciergeClient()->vm_observer_list())
+    for (auto& observer : GetTestConciergeClient()->vm_observer_list()) {
       observer.OnVmStopped(signal);
+    }
   }
 
   void SendNameOwnerChangedSignal() {
-    for (auto& observer : GetTestConciergeClient()->observer_list())
+    for (auto& observer : GetTestConciergeClient()->observer_list()) {
       observer.ConciergeServiceStopped();
+    }
   }
 
   void InjectUpstartStartJobFailure(const std::string& job_name_to_fail) {
@@ -532,7 +553,8 @@ class ArcVmClientAdapterTest : public testing::Test,
         [job_name_to_fail](const std::string& job_name,
                            const std::vector<std::string>& env) {
           // Return success unless |job_name| is |job_name_to_fail|.
-          return job_name != job_name_to_fail;
+          return ash::FakeUpstartClient::StartJobResult(job_name !=
+                                                        job_name_to_fail);
         }));
   }
 
@@ -553,7 +575,7 @@ class ArcVmClientAdapterTest : public testing::Test,
                                           const std::vector<std::string>& env) {
           upstart_operations_.push_back(
               {job_name, env, UpstartOperationType::START});
-          return true;
+          return ash::FakeUpstartClient::StartJobResult(true /* success */);
         }));
     upstart_client->set_stop_job_cb(
         base::BindLambdaForTesting([this](const std::string& job_name,
@@ -562,14 +584,6 @@ class ArcVmClientAdapterTest : public testing::Test,
               {job_name, env, UpstartOperationType::STOP});
           return true;
         }));
-  }
-
-  void RemoveUpstartStartStopJobFailures() {
-    auto* upstart_client = ash::FakeUpstartClient::Get();
-    upstart_client->set_start_job_cb(
-        ash::FakeUpstartClient::StartStopJobCallback());
-    upstart_client->set_stop_job_cb(
-        ash::FakeUpstartClient::StartStopJobCallback());
   }
 
   // We expect ConciergeClient::StopVm to have been called two times,
@@ -676,6 +690,7 @@ class ArcVmClientAdapterTest : public testing::Test,
   std::unique_ptr<FakeAppInstance> app_instance_;
   std::unique_ptr<ArcDlcInstaller> arc_dlc_installer_;
   std::unique_ptr<TestDebugDaemonClient> test_debug_daemon_client_;
+  std::unique_ptr<user_manager::ScopedUserManager> scoped_user_manager_;
 };
 
 // Tests that SetUserInfo() doesn't crash.
@@ -858,8 +873,9 @@ TEST_F(ArcVmClientAdapterTest, DoesNotGetArcInstanceStoppedOnNestedInstance) {
     Observer& operator=(const Observer&) = delete;
 
     ~Observer() override {
-      if (child_observer_ && nested_adapter_)
+      if (child_observer_ && nested_adapter_) {
         nested_adapter_->RemoveObserver(child_observer_);
+      }
     }
 
     bool stopped_called() const { return stopped_called_; }
@@ -894,7 +910,7 @@ TEST_F(ArcVmClientAdapterTest, DoesNotGetArcInstanceStoppedOnNestedInstance) {
     }
 
     base::RepeatingCallback<base::RunLoop*()> const run_loop_factory_;
-    Observer* const child_observer_;
+    const raw_ptr<Observer, ExperimentalAsh> child_observer_;
     std::unique_ptr<ArcClientAdapter> nested_adapter_;
     FakeDemoModeDelegate demo_mode_delegate_;
     bool stopped_called_ = false;
@@ -1042,11 +1058,10 @@ TEST_F(ArcVmClientAdapterTest, StartMiniArc_UreadaheadByDefault) {
   StartMiniArcWithParams(true, std::move(start_params));
 
   const auto& ops = upstart_operations();
-  const auto it =
-      base::ranges::find_if(ops, [](const UpstartOperation& op) {
-        return op.type == UpstartOperationType::START &&
-               kArcVmPreLoginServicesJobName == op.name;
-      });
+  const auto it = base::ranges::find_if(ops, [](const UpstartOperation& op) {
+    return op.type == UpstartOperationType::START &&
+           kArcVmPreLoginServicesJobName == op.name;
+  });
   ASSERT_NE(ops.end(), it);
   EXPECT_TRUE(it->env.empty());
 }
@@ -1060,11 +1075,10 @@ TEST_F(ArcVmClientAdapterTest, StartMiniArc_DisableUreadahead) {
   StartMiniArcWithParams(true, std::move(start_params));
 
   const auto& ops = upstart_operations();
-  const auto it =
-      base::ranges::find_if(ops, [](const UpstartOperation& op) {
-        return op.type == UpstartOperationType::START &&
-               kArcVmPreLoginServicesJobName == op.name;
-      });
+  const auto it = base::ranges::find_if(ops, [](const UpstartOperation& op) {
+    return op.type == UpstartOperationType::START &&
+           kArcVmPreLoginServicesJobName == op.name;
+  });
   ASSERT_NE(ops.end(), it);
   const auto it_ureadahead =
       base::ranges::find(it->env, "DISABLE_UREADAHEAD=1");
@@ -1494,7 +1508,7 @@ TEST_F(ArcVmClientAdapterTest, KernelParam_RO) {
 
   // Check "rw" is not in |params|.
   const auto& request = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_FALSE(request.enable_rw());
+  EXPECT_FALSE(request.rootfs_writable());
 }
 
 // Tests that the kernel parameter does include "rw" when '/' is writable and
@@ -1507,7 +1521,7 @@ TEST_F(ArcVmClientAdapterTest, KernelParam_RW) {
 
   // Check "rw" is in |params|.
   const auto& request = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_TRUE(request.enable_rw());
+  EXPECT_TRUE(request.rootfs_writable());
 }
 
 // Tests that CreateArcVmClientAdapter() doesn't crash.
@@ -1625,11 +1639,19 @@ TEST_F(ArcVmClientAdapterTest, VirtioBlkForData_LvmSupported) {
   EXPECT_EQ(GetTestConciergeClient()->create_disk_image_call_count(), 0);
 
   // StartArcVmRequest should contain the LVM-provided disk path.
+  const auto& req = GetTestConciergeClient()->start_arc_vm_request();
+  EXPECT_TRUE(req.enable_virtio_blk_data());
   const std::string expected_lvm_disk_path =
       base::StringPrintf("/dev/mapper/vm/dmcrypt-%s-arcvm",
                          std::string(kUserIdHash).substr(0, 8).c_str());
-  const auto& req = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_TRUE(HasDiskImage(req, expected_lvm_disk_path));
+  const auto& disks = req.disks();
+  auto it =
+      base::ranges::find_if(disks, [&expected_lvm_disk_path](const auto& disk) {
+        return disk.path() == expected_lvm_disk_path;
+      });
+  EXPECT_NE(it, disks.end());
+  // O_DIRECT option should always be enabled on LVM-provided disk images.
+  EXPECT_TRUE(it->o_direct());
 }
 
 TEST_F(ArcVmClientAdapterTest, VirtioBlkForData_OverrideUseLvm) {
@@ -1650,12 +1672,61 @@ TEST_F(ArcVmClientAdapterTest, VirtioBlkForData_OverrideUseLvm) {
   EXPECT_EQ(GetTestConciergeClient()->create_disk_image_call_count(), 0);
 
   // StartArcVmRequest should contain the LVM-provided disk path.
+  const auto& req = GetTestConciergeClient()->start_arc_vm_request();
+  EXPECT_TRUE(req.enable_virtio_blk_data());
   const std::string expected_lvm_disk_path =
       base::StringPrintf("/dev/mapper/vm/dmcrypt-%s-arcvm",
                          std::string(kUserIdHash).substr(0, 8).c_str());
+  const auto& disks = req.disks();
+  auto it =
+      base::ranges::find_if(disks, [&expected_lvm_disk_path](const auto& disk) {
+        return disk.path() == expected_lvm_disk_path;
+      });
+  EXPECT_NE(it, disks.end());
+  // O_DIRECT option should always be enabled on LVM-provided disk images.
+  EXPECT_TRUE(it->o_direct());
+}
+
+TEST_F(ArcVmClientAdapterTest, VirtioBlkForData_NoLvmForEphemeralCryptohome) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(arc::kLvmApplicationContainers);
+
+  // Set the guest account, whose cryptohome data is ephemeral.
+  SetAccountId(user_manager::GuestAccountId());
+
+  GetTestConciergeClient()->set_create_disk_image_response(
+      CreateDiskImageResponse(vm_tools::concierge::DISK_STATUS_CREATED));
+
+  StartParams start_params(GetPopulatedStartParams());
+  start_params.use_virtio_blk_data = true;
+  StartMiniArcWithParams(true, std::move(start_params));
+  EXPECT_GE(GetTestConciergeClient()->start_arc_vm_call_count(), 1);
+
+  EXPECT_EQ(GetTestConciergeClient()->create_disk_image_call_count(), 1);
+
+  // LVM shouldn't be used for ephemeral user even if LvmApplicationContainers
+  // feature is enabled.
   const auto& req = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_TRUE(HasDiskImage(req, expected_lvm_disk_path));
+  EXPECT_TRUE(HasDiskImage(req, kCreatedDiskImagePath));
   EXPECT_TRUE(req.enable_virtio_blk_data());
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcErofsImagesDisabled) {
+  StartParams start_params(GetPopulatedStartParams());
+  StartMiniArcWithParams(true, std::move(start_params));
+  const auto& request = GetTestConciergeClient()->start_arc_vm_request();
+  EXPECT_FALSE(request.rootfs_o_direct());  // system image
+  EXPECT_FALSE(request.disks(0).o_direct());  // vendor image
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcErofsImagesEnabled) {
+  base::CommandLine::ForCurrentProcess()->InitFromArgv(
+      {"", "--arc-erofs"});
+  StartParams start_params(GetPopulatedStartParams());
+  StartMiniArcWithParams(true, std::move(start_params));
+  const auto& request = GetTestConciergeClient()->start_arc_vm_request();
+  EXPECT_TRUE(request.rootfs_o_direct());  // system image
+  EXPECT_TRUE(request.disks(0).o_direct());  // vendor image
 }
 
 // Tests that the binary translation type is set to None when no library is
@@ -2086,6 +2157,37 @@ TEST_F(ArcVmClientAdapterTest, ArcVmMemorySizeEnabledMax) {
   EXPECT_EQ(request.memory_mib(), 2049u);
 }
 
+// Test that ARCMVM size is set by ram_percentage.
+TEST_F(ArcVmClientAdapterTest, ArcVmMemorySizeWithPercentageParam) {
+  base::test::ScopedFeatureList feature_list;
+  base::FieldTrialParams params;
+  params["ram_percentage"] = "25";
+  feature_list.InitAndEnableFeatureWithParameters(kVmMemorySize, params);
+  base::SystemMemoryInfoKB info;
+  ASSERT_TRUE(base::GetSystemMemoryInfo(&info));
+  const uint32_t total_mib = info.total / 1024;
+  StartParams start_params(GetPopulatedStartParams());
+  StartMiniArcWithParams(true, std::move(start_params));
+  const auto& request = GetTestConciergeClient()->start_arc_vm_request();
+  EXPECT_EQ(request.memory_mib(), total_mib / 4);
+}
+
+// Test that ARCMVM size is set by both ram_percentage and shift_mib.
+TEST_F(ArcVmClientAdapterTest, ArcVmMemorySizeWithPercentageParamAndShiftMiB) {
+  base::test::ScopedFeatureList feature_list;
+  base::FieldTrialParams params;
+  params["ram_percentage"] = "25";
+  params["shift_mib"] = "-512";
+  feature_list.InitAndEnableFeatureWithParameters(kVmMemorySize, params);
+  base::SystemMemoryInfoKB info;
+  ASSERT_TRUE(base::GetSystemMemoryInfo(&info));
+  const uint32_t total_mib = info.total / 1024;
+  StartParams start_params(GetPopulatedStartParams());
+  StartMiniArcWithParams(true, std::move(start_params));
+  const auto& request = GetTestConciergeClient()->start_arc_vm_request();
+  EXPECT_EQ(request.memory_mib(), total_mib / 4 - 512);
+}
+
 // Test that StartArcVmRequest has no memory_mib field when getting system
 // memory info fails.
 TEST_F(ArcVmClientAdapterTest, ArcVmMemorySizeEnabledNoSystemMemoryInfo) {
@@ -2263,18 +2365,19 @@ TEST_F(ArcVmClientAdapterTest,
   EXPECT_GE(GetTestConciergeClient()->start_arc_vm_call_count(), 1);
   EXPECT_FALSE(is_system_shutdown().has_value());
   const auto& request = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_TRUE(request.enable_consumer_auto_update_toggle());
+  EXPECT_TRUE(
+      request.mini_instance_request().enable_consumer_auto_update_toggle());
 }
 
 TEST_F(ArcVmClientAdapterTest,
        StartArc_EnableConsumerAutoUpdateToggle_Enabled) {
   base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(ash::features::kConsumerAutoUpdateToggleAllowed);
+  feature_list.InitAndEnableFeature(
+      ash::features::kConsumerAutoUpdateToggleAllowed);
   StartMiniArc();
   EXPECT_GE(GetTestConciergeClient()->start_arc_vm_call_count(), 1);
   EXPECT_FALSE(is_system_shutdown().has_value());
   const auto& request = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_TRUE(request.enable_consumer_auto_update_toggle());
   EXPECT_TRUE(
       request.mini_instance_request().enable_consumer_auto_update_toggle());
 }
@@ -2282,12 +2385,12 @@ TEST_F(ArcVmClientAdapterTest,
 TEST_F(ArcVmClientAdapterTest,
        StartArc_EnableConsumerAutoUpdateToggle_Disabled) {
   base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(ash::features::kConsumerAutoUpdateToggleAllowed);
+  feature_list.InitAndDisableFeature(
+      ash::features::kConsumerAutoUpdateToggleAllowed);
   StartMiniArc();
   EXPECT_GE(GetTestConciergeClient()->start_arc_vm_call_count(), 1);
   EXPECT_FALSE(is_system_shutdown().has_value());
   const auto& request = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_FALSE(request.enable_consumer_auto_update_toggle());
   EXPECT_FALSE(
       request.mini_instance_request().enable_consumer_auto_update_toggle());
 }
@@ -2338,7 +2441,8 @@ TEST_F(ArcVmClientAdapterTest, ArcGuestZramSwappinessValid) {
   base::test::ScopedFeatureList feature_list;
   base::FieldTrialParams params;
   params["swappiness"] = "90";
-  params["size"] = "2000";
+  params["size"] = base::NumberToString(256 * 1024 * 1024);
+  params["size_percentage"] = "0";
   feature_list.InitAndEnableFeatureWithParameters(kGuestZram, params);
   StartParams start_params(GetPopulatedStartParams());
   StartMiniArcWithParams(true, std::move(start_params));
@@ -2346,7 +2450,84 @@ TEST_F(ArcVmClientAdapterTest, ArcGuestZramSwappinessValid) {
   EXPECT_FALSE(is_system_shutdown().has_value());
   const auto& request = GetTestConciergeClient()->start_arc_vm_request();
   EXPECT_EQ(90, request.guest_swappiness());
-  EXPECT_EQ(2000, request.guest_zram_size());
+  EXPECT_EQ(0, request.guest_zram_size());
+  EXPECT_EQ(256u, request.guest_zram_mib());
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcGuestZramSizeByPercentage_5GbSystem) {
+  class TestDelegate : public ArcVmClientAdapterDelegate {
+    bool GetSystemMemoryInfo(base::SystemMemoryInfoKB* info) override {
+      info->total = 5 * 1024 * 1024;
+      return true;
+    }
+    bool IsCrosvm32bit() override { return false; }
+  };
+  SetArcVmClientAdapterDelegateForTesting(adapter(),
+                                          std::make_unique<TestDelegate>());
+  base::test::ScopedFeatureList feature_list;
+  base::FieldTrialParams params;
+  params["size"] = "2000";  // Should be ignored
+  params["size_percentage"] = "50";
+
+  feature_list.InitAndEnableFeatureWithParameters(kGuestZram, params);
+  StartParams start_params(GetPopulatedStartParams());
+  StartMiniArcWithParams(true, std::move(start_params));
+
+  const auto& request = GetTestConciergeClient()->start_arc_vm_request();
+  EXPECT_EQ(0, request.guest_zram_size());
+  // 5GB system should result in 4GB VM size => 2GB ZRAM.
+  EXPECT_EQ(2048u, request.guest_zram_mib());
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcGuestZramSizeByPercentage_4GbSystem) {
+  class TestDelegate : public ArcVmClientAdapterDelegate {
+    bool GetSystemMemoryInfo(base::SystemMemoryInfoKB* info) override {
+      info->total = 4 * 1024 * 1024;
+      return true;
+    }
+    bool IsCrosvm32bit() override { return false; }
+  };
+  SetArcVmClientAdapterDelegateForTesting(adapter(),
+                                          std::make_unique<TestDelegate>());
+  base::test::ScopedFeatureList feature_list;
+  base::FieldTrialParams params;
+  params["size"] = "2000";  // Should be ignored
+  params["size_percentage"] = "50";
+
+  feature_list.InitAndEnableFeatureWithParameters(kGuestZram, params);
+  StartParams start_params(GetPopulatedStartParams());
+  StartMiniArcWithParams(true, std::move(start_params));
+
+  const auto& request = GetTestConciergeClient()->start_arc_vm_request();
+  EXPECT_EQ(0, request.guest_zram_size());
+  // 4GB system should result in 3GB VM size => 1.5GB ZRAM.
+  EXPECT_EQ(1536u, request.guest_zram_mib());
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcGuestZramSizeByPercentage_CustomMem) {
+  class TestDelegate : public ArcVmClientAdapterDelegate {
+    bool GetSystemMemoryInfo(base::SystemMemoryInfoKB* info) override {
+      info->total = 6 * 1024 * 1024;
+      return true;
+    }
+    bool IsCrosvm32bit() override { return false; }
+  };
+  SetArcVmClientAdapterDelegateForTesting(adapter(),
+                                          std::make_unique<TestDelegate>());
+  base::test::ScopedFeatureList feature_list;
+  base::FieldTrialParams params;
+
+  feature_list.InitWithFeaturesAndParameters(
+      {{kGuestZram, {{"size_percentage", "50"}}},
+       {kVmMemorySize, {{"shift_mib", "-2048"}}}},
+      {});
+  StartParams start_params(GetPopulatedStartParams());
+  StartMiniArcWithParams(true, std::move(start_params));
+
+  const auto& request = GetTestConciergeClient()->start_arc_vm_request();
+  EXPECT_EQ(0, request.guest_zram_size());
+  // 6GB system with -2GB shift results in 4GB VM size => 2GB ZRAM.
+  EXPECT_EQ(2048u, request.guest_zram_mib());
 }
 
 // Test that StartArcVmRequest has no matching command line flag
@@ -2415,41 +2596,6 @@ TEST_P(ArcVmClientAdapterDalvikMemoryProfileTest, Profile) {
   const auto& request = GetTestConciergeClient()->start_arc_vm_request();
   EXPECT_EQ(request.mini_instance_request().dalvik_memory_profile(),
             test_param.arc_profile);
-}
-
-struct UsapProfileTestParam {
-  // Requested profile.
-  StartParams::UsapProfile profile;
-  // Name of profile that is expected.
-  const char* profile_name;
-  int memory;
-};
-
-constexpr UsapProfileTestParam kUsapProfileTestCases[] = {
-    {StartParams::UsapProfile::DEFAULT, nullptr,
-     vm_tools::concierge::StartArcVmRequest::USAP_PROFILE_DEFAULT},
-    {StartParams::UsapProfile::M4G, "4G",
-     vm_tools::concierge::StartArcVmRequest::USAP_PROFILE_4G},
-    {StartParams::UsapProfile::M8G, "8G",
-     vm_tools::concierge::StartArcVmRequest::USAP_PROFILE_8G},
-    {StartParams::UsapProfile::M16G, "16G",
-     vm_tools::concierge::StartArcVmRequest::USAP_PROFILE_16G}};
-
-class ArcVmClientAdapterUsapProfileTest
-    : public ArcVmClientAdapterTest,
-      public testing::WithParamInterface<UsapProfileTestParam> {};
-
-INSTANTIATE_TEST_SUITE_P(All,
-                         ArcVmClientAdapterUsapProfileTest,
-                         ::testing::ValuesIn(kUsapProfileTestCases));
-
-TEST_P(ArcVmClientAdapterUsapProfileTest, Profile) {
-  const auto& test_param = GetParam();
-  StartParams start_params(GetPopulatedStartParams());
-  start_params.usap_profile = test_param.profile;
-  StartMiniArcWithParams(true, std::move(start_params));
-  const auto& request = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_EQ(request.usap_profile(), test_param.memory);
 }
 
 TEST_F(ArcVmClientAdapterTest, ArcVmTTSCachingDefault) {
@@ -2521,26 +2667,6 @@ TEST_F(ArcVmClientAdapterTest, ConvertUpgradeParams_EnableTtsCacheSetup) {
   UpgradeArcWithParams(true, std::move(upgrade_params));
   EXPECT_TRUE(base::Contains(boot_notification_server()->received_data(),
                              "ro.boot.skip_tts_cache=0"));
-}
-
-// Test that update_o4c_list_via_a2c2 is not set with the feature flag disabled.
-TEST_F(ArcVmClientAdapterTest, ArcUpdateO4CListViaA2C2Disabled) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(kArcUpdateO4CListViaA2C2);
-  StartParams start_params(GetPopulatedStartParams());
-  StartMiniArcWithParams(true, std::move(start_params));
-  auto request = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_FALSE(request.update_o4c_list_via_a2c2());
-}
-
-// Test that update_o4c_list_via_a2c2 is set with the feature flag enabled.
-TEST_F(ArcVmClientAdapterTest, ArcUpdateO4CListViaA2C2Enabled) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(kArcUpdateO4CListViaA2C2);
-  StartParams start_params(GetPopulatedStartParams());
-  StartMiniArcWithParams(true, std::move(start_params));
-  auto request = GetTestConciergeClient()->start_arc_vm_request();
-  EXPECT_TRUE(request.update_o4c_list_via_a2c2());
 }
 
 TEST_F(ArcVmClientAdapterTest, mglruReclaimDisabled) {
@@ -2648,6 +2774,102 @@ TEST_F(ArcVmClientAdapterTest, ArcEnableNotificationRefreshTrue) {
   StartMiniArcWithParams(true, std::move(start_params));
   const auto& request = GetTestConciergeClient()->start_arc_vm_request();
   EXPECT_TRUE(request.mini_instance_request().enable_notifications_refresh());
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcPriorityAppLmkDelayDisabled) {
+  StartMiniArc();
+  UpgradeParams upgrade_params = GetPopulatedUpgradeParams();
+  upgrade_params.enable_priority_app_lmk_delay = false;
+  UpgradeArcWithParams(true, std::move(upgrade_params));
+  EXPECT_FALSE(base::Contains(boot_notification_server()->received_data(),
+                              "ro.boot.arc.lmk.enable_priority_app_delay"));
+  EXPECT_FALSE(
+      base::Contains(boot_notification_server()->received_data(),
+                     "ro.boot.arc.lmk.priority_app_delay_duration_sec"));
+  EXPECT_FALSE(base::Contains(boot_notification_server()->received_data(),
+                              "ro.boot.arc.lmk.priority_apps"));
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcPriorityAppLmkDelayEnabled_NoApp) {
+  StartMiniArc();
+  UpgradeParams upgrade_params = GetPopulatedUpgradeParams();
+  upgrade_params.enable_priority_app_lmk_delay = true;
+  upgrade_params.priority_app_lmk_delay_list = "";
+  UpgradeArcWithParams(true, std::move(upgrade_params));
+  EXPECT_FALSE(base::Contains(boot_notification_server()->received_data(),
+                              "ro.boot.arc.lmk.enable_priority_app_delay"));
+  EXPECT_FALSE(
+      base::Contains(boot_notification_server()->received_data(),
+                     "ro.boot.arc.lmk.priority_app_delay_duration_sec"));
+  EXPECT_FALSE(base::Contains(boot_notification_server()->received_data(),
+                              "ro.boot.arc.lmk.priority_apps"));
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcPriorityAppLmkDelayEnabled_SomeApp) {
+  StartMiniArc();
+  UpgradeParams upgrade_params = GetPopulatedUpgradeParams();
+  upgrade_params.enable_priority_app_lmk_delay = true;
+  upgrade_params.priority_app_lmk_delay_list =
+      "com.example.app1,com.example.app2";
+  upgrade_params.priority_app_lmk_delay_second = 60;
+  UpgradeArcWithParams(true, std::move(upgrade_params));
+  EXPECT_TRUE(base::Contains(boot_notification_server()->received_data(),
+                             "ro.boot.arc.lmk.enable_priority_app_delay=1"));
+  EXPECT_TRUE(base::Contains(
+      boot_notification_server()->received_data(),
+      "ro.boot.arc.lmk.priority_apps=com.example.app1,com.example.app2"));
+  EXPECT_TRUE(
+      base::Contains(boot_notification_server()->received_data(),
+                     "ro.boot.arc.lmk.priority_app_delay_duration_sec=60"));
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcLmkPerceptibleMinStateUpdateDisabled) {
+  StartMiniArc();
+  UpgradeParams upgrade_params = GetPopulatedUpgradeParams();
+  upgrade_params.enable_lmk_perceptible_min_state_update = false;
+  UpgradeArcWithParams(true, std::move(upgrade_params));
+  EXPECT_FALSE(base::Contains(boot_notification_server()->received_data(),
+                              "ro.boot.arc.lmk.perceptible_min_state_update"));
+}
+
+TEST_F(ArcVmClientAdapterTest, ArcLmkPerceptibleMinStateUpdateEnabled) {
+  StartMiniArc();
+  UpgradeParams upgrade_params = GetPopulatedUpgradeParams();
+  upgrade_params.enable_lmk_perceptible_min_state_update = true;
+  UpgradeArcWithParams(true, std::move(upgrade_params));
+  EXPECT_TRUE(base::Contains(boot_notification_server()->received_data(),
+                             "ro.boot.arc.lmk.perceptible_min_state_update=1"));
+}
+
+TEST_F(ArcVmClientAdapterTest, ForcePostBootDexOpDisabled) {
+  StartMiniArc();
+  UpgradeParams upgrade_params = GetPopulatedUpgradeParams();
+  upgrade_params.force_post_boot_dex_opt = false;
+  UpgradeArcWithParams(true, std::move(upgrade_params));
+  EXPECT_FALSE(base::Contains(boot_notification_server()->received_data(),
+                              "ro.boot.force_post_boot_dexopt"));
+}
+
+TEST_F(ArcVmClientAdapterTest, ForcePostBootDexOpEnabledArcT) {
+  base::test::ScopedChromeOSVersionInfo version(
+      "CHROMEOS_ARC_ANDROID_SDK_VERSION=33", base::Time::Now());
+  StartMiniArc();
+  UpgradeParams upgrade_params = GetPopulatedUpgradeParams();
+  upgrade_params.force_post_boot_dex_opt = true;
+  UpgradeArcWithParams(true, std::move(upgrade_params));
+  EXPECT_TRUE(base::Contains(boot_notification_server()->received_data(),
+                             "ro.boot.force_post_boot_dexopt=1"));
+}
+
+TEST_F(ArcVmClientAdapterTest, ForcePostBootDexOpEnabledArcR) {
+  base::test::ScopedChromeOSVersionInfo version(
+      "CHROMEOS_ARC_ANDROID_SDK_VERSION=30", base::Time::Now());
+  StartMiniArc();
+  UpgradeParams upgrade_params = GetPopulatedUpgradeParams();
+  upgrade_params.force_post_boot_dex_opt = true;
+  UpgradeArcWithParams(true, std::move(upgrade_params));
+  EXPECT_FALSE(base::Contains(boot_notification_server()->received_data(),
+                              "ro.boot.force_post_boot_dexopt"));
 }
 
 }  // namespace

@@ -4,8 +4,7 @@
 
 package org.chromium.chrome.browser.customtabs;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.hamcrest.Matchers;
@@ -17,6 +16,7 @@ import org.junit.runner.RunWith;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
+import org.chromium.base.test.util.DisabledTest;
 import org.chromium.chrome.browser.customtabs.content.CustomTabActivityNavigationController.FinishReason;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tab.Tab;
@@ -39,12 +39,13 @@ public class CustomTabTabPersistenceIntegrationTest {
     public void setUp() {
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(
                 CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
-                        InstrumentationRegistry.getTargetContext(),
+                        ApplicationProvider.getApplicationContext(),
                         ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL));
     }
 
     @Test
     @MediumTest
+    @DisabledTest(message = "crbug.com/1477814")
     public void testTabFilesDeletedOnClose() {
         Tab tab = mCustomTabActivityTestRule.getActivity().getActivityTab();
         String expectedTabFileName = TabStateFileManager.getTabStateFilename(tab.getId(), false);

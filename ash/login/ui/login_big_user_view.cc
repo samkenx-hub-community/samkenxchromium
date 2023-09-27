@@ -4,12 +4,16 @@
 
 #include "ash/login/ui/login_big_user_view.h"
 
+#include "ash/login/login_screen_controller.h"
 #include "ash/login/ui/login_constants.h"
 #include "ash/shell.h"
 #include "ash/style/ash_color_id.h"
-#include "ash/style/default_color_constants.h"
 #include "ash/wallpaper/wallpaper_controller_impl.h"
+#include "base/logging.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "components/account_id/account_id.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
+#include "ui/color/color_id.h"
 #include "ui/compositor/layer.h"
 #include "ui/views/background.h"
 #include "ui/views/layout/fill_layout.h"
@@ -53,16 +57,6 @@ LoginBigUserView::LoginBigUserView(
 
 LoginBigUserView::~LoginBigUserView() = default;
 
-void LoginBigUserView::OnThemeChanged() {
-  NonAccessibleView::OnThemeChanged();
-
-  auto* background = GetBackground();
-  if (background) {
-    background->SetNativeControlColor(
-        GetColorProvider()->GetColor(kColorAshShieldAndBase80));
-  }
-}
-
 void LoginBigUserView::CreateChildView(const LoginUserInfo& user) {
   if (IsPublicAccountUser(user)) {
     CreatePublicAccount(user);
@@ -76,6 +70,11 @@ void LoginBigUserView::UpdateForUser(const LoginUserInfo& user) {
   // 1. Public Account -> Auth User
   // 2. Auth User      -> Public Account
   if (IsPublicAccountUser(user) != IsPublicAccountUser(GetCurrentUser())) {
+    if (Shell::Get()->login_screen_controller()->IsAuthenticating()) {
+      // TODO(b/276246832): We should avoid re-layouting during Authentication.
+      LOG(WARNING)
+          << "LoginBigUserView::UpdateForUser called during Authentication.";
+    }
     CreateChildView(user);
   }
 
@@ -127,10 +126,12 @@ void LoginBigUserView::OnWallpaperBlurChanged() {
   } else {
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
-    SetBackground(views::CreateBackgroundFromPainter(
-        views::Painter::CreateSolidRoundRectPainter(
-            GetColorProvider()->GetColor(kColorAshShieldAndBase80),
-            login::kNonBlurredWallpaperBackgroundRadiusDp)));
+    const ui::ColorId background_color_id =
+        chromeos::features::IsJellyEnabled()
+            ? static_cast<ui::ColorId>(cros_tokens::kCrosSysScrim2)
+            : kColorAshShieldAndBase80;
+    SetBackground(views::CreateThemedRoundedRectBackground(
+        background_color_id, login::kNonBlurredWallpaperBackgroundRadiusDp, 0));
   }
 }
 
@@ -141,7 +142,7 @@ void LoginBigUserView::CreateAuthUser(const LoginUserInfo& user) {
   auth_user_ = new LoginAuthUserView(user, auth_user_callbacks_);
   delete public_account_;
   public_account_ = nullptr;
-  AddChildView(auth_user_);
+  AddChildView(auth_user_.get());
 }
 
 void LoginBigUserView::CreatePublicAccount(const LoginUserInfo& user) {
@@ -152,7 +153,7 @@ void LoginBigUserView::CreatePublicAccount(const LoginUserInfo& user) {
       new LoginPublicAccountUserView(user, public_account_callbacks_);
   delete auth_user_;
   auth_user_ = nullptr;
-  AddChildView(public_account_);
+  AddChildView(public_account_.get());
 }
 
 }  // namespace ash

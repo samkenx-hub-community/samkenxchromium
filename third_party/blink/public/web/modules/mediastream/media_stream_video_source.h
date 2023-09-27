@@ -140,12 +140,12 @@ class BLINK_MODULES_EXPORT MediaStreamVideoSource
   // an alpha channel, due to a change in an attached track.
   void UpdateCanDiscardAlpha();
 
+  // Request underlying source to request a key frame, if applicable (sources
+  // that can provide encoded video frames only).
+  virtual void RequestKeyFrame() {}
+
   // Request underlying source to capture a new frame.
   virtual void RequestRefreshFrame() {}
-
-  // Optionally overridden by subclasses to implement handling frame drop
-  // events.
-  virtual void OnFrameDropped(media::VideoCaptureFrameDropReason reason) {}
 
   // Optionally overridden by subclasses to implement handling log messages.
   virtual void OnLog(const std::string& message) {}
@@ -246,10 +246,13 @@ class BLINK_MODULES_EXPORT MediaStreamVideoSource
   // * |crop_version_callback| whenever it is guaranteed that all subsequent
   //   frames that |frame_callback| will be called for, will have either
   //   the given crop version or higher.
+  // * |frame_dropped_callback| will be called when a frame was dropped prior to
+  //   delivery (i.e. |frame_callback| was not called for this frame).
   virtual void StartSourceImpl(
       VideoCaptureDeliverFrameCB frame_callback,
       EncodedVideoFrameCB encoded_frame_callback,
-      VideoCaptureCropVersionCB crop_version_callback) = 0;
+      VideoCaptureCropVersionCB crop_version_callback,
+      VideoCaptureNotifyFrameDroppedCB frame_dropped_callback) = 0;
   void OnStartDone(mojom::MediaStreamRequestResult result);
 
   // A subclass that supports restart must override this method such that it

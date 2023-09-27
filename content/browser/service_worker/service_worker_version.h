@@ -26,11 +26,11 @@
 #include "base/time/tick_clock.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "base/uuid.h"
 #include "components/services/storage/public/mojom/service_worker_storage_control.mojom.h"
 #include "content/browser/renderer_host/back_forward_cache_metrics.h"
 #include "content/browser/renderer_host/policy_container_host.h"
 #include "content/browser/service_worker/embedded_worker_instance.h"
-#include "content/browser/service_worker/embedded_worker_status.h"
 #include "content/browser/service_worker/service_worker_client_utils.h"
 #include "content/browser/service_worker/service_worker_metrics.h"
 #include "content/browser/service_worker/service_worker_ping_controller.h"
@@ -38,12 +38,14 @@
 #include "content/browser/service_worker/service_worker_script_cache_map.h"
 #include "content/browser/service_worker/service_worker_update_checker.h"
 #include "content/common/content_export.h"
+#include "content/common/service_worker/service_worker_router_evaluator.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/global_routing_id.h"
 #include "content/public/browser/service_worker_client_info.h"
 #include "ipc/ipc_message.h"
 #include "mojo/public/cpp/bindings/associated_receiver.h"
+#include "mojo/public/cpp/bindings/associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
@@ -52,9 +54,13 @@
 #include "services/network/public/mojom/client_security_state.mojom.h"
 #include "services/network/public/mojom/cross_origin_embedder_policy.mojom-forward.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
+#include "third_party/blink/public/common/associated_interfaces/associated_interface_registry.h"
 #include "third_party/blink/public/common/origin_trials/trial_token_validator.h"
+#include "third_party/blink/public/common/service_worker/embedded_worker_status.h"
 #include "third_party/blink/public/common/service_worker/service_worker_status_code.h"
 #include "third_party/blink/public/common/storage_key/storage_key.h"
+#include "third_party/blink/public/mojom/associated_interfaces/associated_interfaces.mojom.h"
 #include "third_party/blink/public/mojom/loader/fetch_client_settings_object.mojom.h"
 #include "third_party/blink/public/mojom/service_worker/controller_service_worker.mojom.h"
 #include "third_party/blink/public/mojom/service_worker/service_worker.mojom.h"
@@ -128,6 +134,7 @@ class ServiceWorkerMainResourceLoaderTest;
 // Unless otherwise noted, all methods of this class run on the UI thread.
 class CONTENT_EXPORT ServiceWorkerVersion
     : public blink::mojom::ServiceWorkerHost,
+      public blink::mojom::AssociatedInterfaceProvider,
       public base::RefCounted<ServiceWorkerVersion>,
       public EmbeddedWorkerInstance::Listener {
  public:
@@ -219,7 +226,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   const blink::StorageKey& key() const { return key_; }
   const GURL& scope() const { return scope_; }
   blink::mojom::ScriptType script_type() const { return script_type_; }
-  EmbeddedWorkerStatus running_status() const {
+  blink::EmbeddedWorkerStatus running_status() const {
     return embedded_worker_->status();
   }
   ServiceWorkerVersionInfo GetInfo();
@@ -264,6 +271,20 @@ class CONTENT_EXPORT ServiceWorkerVersion
   void set_fetch_handler_bypass_option(
       FetchHandlerBypassOption fetch_handler_bypass_option) {
     fetch_handler_bypass_option_ = fetch_handler_bypass_option;
+  }
+
+  bool has_hid_event_handlers() const { return has_hid_event_handlers_; }
+  void set_has_hid_event_handlers(bool has_hid_event_handlers);
+
+  bool has_usb_event_handlers() const { return has_usb_event_handlers_; }
+  void set_has_usb_event_handlers(bool has_usb_event_handlers);
+
+  // Returns true on setup success.
+  // Otherwise, setup error, and subsequent `router_evaluator()` will return
+  // `absl::nullopt`.
+  bool SetupRouterEvaluator(const blink::ServiceWorkerRouterRules& rules);
+  const ServiceWorkerRouterEvaluator* router_evaluator() const {
+    return router_evaluator_.get();
   }
 
   base::TimeDelta TimeSinceNoControllees() const {
@@ -372,7 +393,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // |timeout_type| is to specfiy request timeout behaviour of the worker.
   // Returns true if the request was successfully scheduled to starrt.
   ServiceWorkerExternalRequestResult StartExternalRequest(
-      const std::string& request_uuid,
+      const base::Uuid& request_uuid,
       ServiceWorkerExternalRequestTimeoutType timeout_type);
 
   // Informs ServiceWorkerVersion that an event has finished being dispatched.
@@ -391,7 +412,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   // Finishes an external request that was started by StartExternalRequest().
   ServiceWorkerExternalRequestResult FinishExternalRequest(
-      const std::string& request_uuid);
+      const base::Uuid& request_uuid);
 
   // Creates a callback that is to be used for marking simple events dispatched
   // through blink::mojom::ServiceWorker as finished for the |request_id|.
@@ -402,8 +423,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // This must be called when is_endpoint_ready() returns true, which is after
   // InitializeGlobalScope() is called.
   blink::mojom::ServiceWorker* endpoint() {
-    DCHECK(running_status() == EmbeddedWorkerStatus::STARTING ||
-           running_status() == EmbeddedWorkerStatus::RUNNING);
+    DCHECK(running_status() == blink::EmbeddedWorkerStatus::kStarting ||
+           running_status() == blink::EmbeddedWorkerStatus::kRunning);
     DCHECK(service_worker_remote_.is_bound());
     return service_worker_remote_.get();
   }
@@ -685,6 +706,16 @@ class CONTENT_EXPORT ServiceWorkerVersion
   void ExecuteScriptForTest(const std::string& script,
                             ServiceWorkerScriptExecutionCallback callback);
 
+  // Returns true if this SW is going to warm-up. This function can be called
+  // anytime. If the `running_status()` is `RUNNING`, `STOPPING` or `STOPPED`,
+  // this function returns false.
+  bool IsWarmingUp() const;
+
+  // Returns true if this SW already warmed-up. This function can be called
+  // anytime. If the `running_status()` is `RUNNING`, `STOPPING` or `STOPPED`,
+  // this function returns false.
+  bool IsWarmedUp() const;
+
   blink::mojom::AncestorFrameType ancestor_frame_type() const {
     return ancestor_frame_type_;
   }
@@ -699,8 +730,18 @@ class CONTENT_EXPORT ServiceWorkerVersion
     return sha256_script_checksum_;
   }
 
+  blink::AssociatedInterfaceProvider* associated_interface_provider() {
+    return associated_interface_provider_.get();
+  }
+
+  // Check if the static router API is enabled. It checks if the feature flag is
+  // enabled or having a valid trial token.
+  bool IsStaticRouterEnabled();
+
   // Timeout for a request to be handled.
   static constexpr base::TimeDelta kRequestTimeout = base::Minutes(5);
+
+  base::WeakPtr<ServiceWorkerVersion> GetWeakPtr();
 
  private:
   friend class base::RefCounted<ServiceWorkerVersion>;
@@ -792,6 +833,9 @@ class CONTENT_EXPORT ServiceWorkerVersion
       service_worker_version_unittest::ServiceWorkerVersionTest,
       Doom);
   FRIEND_TEST_ALL_PREFIXES(ServiceWorkerRegistryTest, ScriptResponseTime);
+  FRIEND_TEST_ALL_PREFIXES(ServiceWorkerBrowserTest,
+                           WarmUpAndStartServiceWorker);
+  FRIEND_TEST_ALL_PREFIXES(ServiceWorkerBrowserTest, WarmUpWorkerAndTimeout);
 
   // Contains timeout info for InflightRequest.
   struct InflightRequestTimeoutInfo {
@@ -843,12 +887,15 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   // EmbeddedWorkerInstance::Listener overrides:
   void OnScriptEvaluationStart() override;
+  void OnScriptLoaded() override;
   void OnStarting() override;
   void OnStarted(blink::mojom::ServiceWorkerStartStatus status,
-                 FetchHandlerType fetch_handler_type) override;
+                 FetchHandlerType new_fetch_handler_type,
+                 bool new_has_hid_event_handlers,
+                 bool new_has_usb_event_handlers) override;
   void OnStopping() override;
-  void OnStopped(EmbeddedWorkerStatus old_status) override;
-  void OnDetached(EmbeddedWorkerStatus old_status) override;
+  void OnStopped(blink::EmbeddedWorkerStatus old_status) override;
+  void OnDetached(blink::EmbeddedWorkerStatus old_status) override;
   void OnRegisteredToDevToolsManager() override;
   void OnReportException(const std::u16string& error_message,
                          int line_number,
@@ -885,6 +932,14 @@ class CONTENT_EXPORT ServiceWorkerVersion
                       const GURL& url,
                       NavigateClientCallback callback) override;
   void SkipWaiting(SkipWaitingCallback callback) override;
+  void RegisterRouter(const blink::ServiceWorkerRouterRules& rules,
+                      RegisterRouterCallback callback) override;
+
+  // Implements blink::mojom::AssociatedInterfaceProvider.
+  void GetAssociatedInterface(
+      const std::string& name,
+      mojo::PendingAssociatedReceiver<blink::mojom::AssociatedInterface>
+          receiver) override;
 
   void OnSetCachedMetadataFinished(int64_t callback_id,
                                    size_t size,
@@ -954,13 +1009,13 @@ class CONTENT_EXPORT ServiceWorkerVersion
       blink::ServiceWorkerStatusCode status,
       scoped_refptr<ServiceWorkerRegistration> registration);
 
-  void OnStoppedInternal(EmbeddedWorkerStatus old_status);
+  void OnStoppedInternal(blink::EmbeddedWorkerStatus old_status);
 
   // Fires and clears all start callbacks.
   void FinishStartWorker(blink::ServiceWorkerStatusCode status);
 
-  // Removes any pending external request that has GUID of |request_uuid|.
-  void CleanUpExternalRequest(const std::string& request_uuid,
+  // Removes any pending external request that has Uuid of |request_uuid|.
+  void CleanUpExternalRequest(const base::Uuid& request_uuid,
                               blink::ServiceWorkerStatusCode status);
 
   // Called if no inflight events exist on the browser process. Triggers
@@ -976,6 +1031,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
   void NotifyControlleeNavigationCommitted(
       const std::string& uuid,
       GlobalRenderFrameHostId render_frame_host_id);
+  void NotifyWindowOpened(const GURL& script_url, const GURL& url);
+  void NotifyClientNavigated(const GURL& script_url, const GURL& url);
 
   void GetClientOnExecutionReady(const std::string& client_uuid,
                                  GetClientCallback callback,
@@ -997,6 +1054,14 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   FetchHandlerBypassOption fetch_handler_bypass_option_ =
       FetchHandlerBypassOption::kDefault;
+
+  // Whether the associated script has any HID event handlers after the script
+  // is evaluated.
+  bool has_hid_event_handlers_ = false;
+
+  // Whether the associated script has any USB event handlers after the script
+  // is evaluated.
+  bool has_usb_event_handlers_ = false;
 
   // The source of truth for navigation preload state is the
   // ServiceWorkerRegistration. |navigation_preload_state_| is essentially a
@@ -1046,6 +1111,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // re-enter StartWorker().
   bool is_running_start_callbacks_ = false;
   std::vector<StatusCallback> start_callbacks_;
+  std::vector<StatusCallback> warm_up_callbacks_;
   std::vector<base::OnceClosure> stop_callbacks_;
   std::vector<base::OnceClosure> status_change_callbacks_;
 
@@ -1061,12 +1127,12 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   // Container for pending external requests for this service worker.
   // (key, value): (request uuid, request id).
-  using RequestUUIDToRequestIDMap = std::map<std::string, int>;
+  using RequestUUIDToRequestIDMap = std::map<base::Uuid, int>;
   RequestUUIDToRequestIDMap external_request_uuid_to_request_id_;
 
   // External request infos that were issued before this worker reached RUNNING.
   // Info contains UUID and timeout type.
-  std::map<std::string, ServiceWorkerExternalRequestTimeoutType>
+  std::map<base::Uuid, ServiceWorkerExternalRequestTimeoutType>
       pending_external_requests_;
 
   // Connected to ServiceWorkerContextClient while the worker is running.
@@ -1088,6 +1154,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
   base::TimeTicks no_controllees_time_;
 
   mojo::AssociatedReceiver<blink::mojom::ServiceWorkerHost> receiver_{this};
+  mojo::AssociatedReceiver<blink::mojom::AssociatedInterfaceProvider>
+      associated_interface_receiver_{this};
 
   // Set to true if the worker has no inflight events and the idle timer has
   // been triggered. Set back to false if another event starts since the worker
@@ -1152,12 +1220,6 @@ class CONTENT_EXPORT ServiceWorkerVersion
   bool is_update_scheduled_ = false;
   bool in_dtor_ = false;
 
-  // When true, script evaluation doesn't start until InitializeGlobalScope() is
-  // called. This allows the browser process to prevent the renderer from
-  // evaluating the script immediately after the script has been loaded, until
-  // the subresource loader factories are updated.
-  bool initialize_global_scope_after_main_script_loaded_for_testing = false;
-
   // Populated via network::mojom::URLResponseHead of the main script.
   std::unique_ptr<MainScriptResponse> main_script_response_;
 
@@ -1202,11 +1264,6 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // change was found. Otherwise, it's the empty GURL.
   GURL updated_script_url_;
 
-  // This holds a mojo interface pointer info to this instance until
-  // InitializeGlobalScope() is called.
-  mojo::PendingAssociatedRemote<blink::mojom::ServiceWorkerHost>
-      service_worker_host_;
-
   blink::mojom::FetchClientSettingsObjectPtr
       outside_fetch_client_settings_object_;
 
@@ -1239,6 +1296,12 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // after the worker has started when there is a change in the script and new
   // version is created.
   absl::optional<std::string> sha256_script_checksum_;
+
+  std::unique_ptr<content::ServiceWorkerRouterEvaluator> router_evaluator_;
+
+  std::unique_ptr<blink::AssociatedInterfaceRegistry> associated_registry_;
+  std::unique_ptr<blink::AssociatedInterfaceProvider>
+      associated_interface_provider_;
 
   base::WeakPtrFactory<ServiceWorkerVersion> weak_factory_{this};
 };

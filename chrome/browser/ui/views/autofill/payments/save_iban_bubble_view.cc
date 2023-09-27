@@ -8,6 +8,7 @@
 #include "chrome/browser/ui/views/autofill/payments/dialog_view_ids.h"
 #include "chrome/browser/ui/views/autofill/payments/payments_view_util.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
+#include "chrome/browser/ui/views/chrome_typography.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/theme_resources.h"
 #include "components/autofill/core/browser/data_model/iban.h"
@@ -19,9 +20,17 @@
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/flex_layout_types.h"
+#include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 #include "ui/views/view_class_properties.h"
 
 namespace autofill {
+
+namespace {
+
+const int kMaxNicknameChars = 25;
+
+}  // namespace
 
 SaveIbanBubbleView::SaveIbanBubbleView(views::View* anchor_view,
                                        content::WebContents* web_contents,
@@ -31,8 +40,6 @@ SaveIbanBubbleView::SaveIbanBubbleView(views::View* anchor_view,
   DCHECK(controller);
   SetButtonLabel(ui::DIALOG_BUTTON_OK, controller->GetAcceptButtonText());
   SetButtonLabel(ui::DIALOG_BUTTON_CANCEL, controller->GetDeclineButtonText());
-  SetCancelCallback(base::BindOnce(&SaveIbanBubbleView::OnDialogCancelled,
-                                   base::Unretained(this)));
   SetAcceptCallback(base::BindOnce(&SaveIbanBubbleView::OnDialogAccepted,
                                    base::Unretained(this)));
 
@@ -83,6 +90,16 @@ void SaveIbanBubbleView::WindowClosing() {
   }
 }
 
+void SaveIbanBubbleView::ContentsChanged(views::Textfield* sender,
+                                         const std::u16string& new_contents) {
+  if (new_contents.length() > kMaxNicknameChars) {
+    nickname_textfield_->SetText(new_contents.substr(0, kMaxNicknameChars));
+  }
+  // Update the IBAN nickname count label to current_length/max_length,
+  // e.g. "6/25".
+  UpdateNicknameLengthLabel();
+}
+
 SaveIbanBubbleView::~SaveIbanBubbleView() = default;
 
 void SaveIbanBubbleView::CreateMainContentView() {
@@ -90,7 +107,7 @@ void SaveIbanBubbleView::CreateMainContentView() {
 
   SetID(DialogViewId::MAIN_CONTENT_VIEW_LOCAL);
   SetProperty(views::kMarginsKey, gfx::Insets());
-  const int row_height = views::style::GetLineHeight(
+  const int row_height = views::TypographyProvider::Get().GetLineHeight(
       views::style::CONTEXT_DIALOG_BODY_TEXT, views::style::STYLE_PRIMARY);
   views::TableLayout* layout =
       SetLayoutManager(std::make_unique<views::TableLayout>());
@@ -124,9 +141,9 @@ void SaveIbanBubbleView::CreateMainContentView() {
 
   iban_value_and_toggle_ =
       AddChildView(std::make_unique<ObscurableLabelWithToggleButton>(
-          controller_->GetIBAN().GetIdentifierStringForAutofillDisplay(
+          controller_->GetIban().GetIdentifierStringForAutofillDisplay(
               /*is_value_masked=*/true),
-          controller_->GetIBAN().GetIdentifierStringForAutofillDisplay(
+          controller_->GetIban().GetIdentifierStringForAutofillDisplay(
               /*is_value_masked=*/false),
           l10n_util::GetStringUTF16(IDS_MANAGE_IBAN_VALUE_SHOW_VALUE),
           l10n_util::GetStringUTF16(IDS_MANAGE_IBAN_VALUE_HIDE_VALUE)));
@@ -134,13 +151,46 @@ void SaveIbanBubbleView::CreateMainContentView() {
   AddChildView(std::make_unique<views::Label>(
       l10n_util::GetStringUTF16(IDS_AUTOFILL_SAVE_IBAN_PROMPT_NICKNAME),
       views::style::CONTEXT_DIALOG_BODY_TEXT, views::style::STYLE_PRIMARY));
-  nickname_textfield_ = AddChildView(std::make_unique<views::Textfield>());
+
+  // Adds view that combines nickname textfield and nickname length count label.
+  auto* nickname_input_textfield_view =
+      AddChildView(std::make_unique<views::BoxLayoutView>());
+  nickname_input_textfield_view->SetBorder(
+      views::CreateSolidBorder(1, SK_ColorLTGRAY));
+  nickname_input_textfield_view->SetInsideBorderInsets(
+      views::LayoutProvider::Get()->GetInsetsMetric(
+          views::InsetsMetric::INSETS_LABEL_BUTTON));
+  nickname_input_textfield_view->SetOrientation(
+      views::BoxLayout::Orientation::kHorizontal);
+  nickname_input_textfield_view->SetBetweenChildSpacing(
+      ChromeLayoutProvider::Get()->GetDistanceMetric(
+          views::DISTANCE_RELATED_CONTROL_VERTICAL));
+
+  // Adds nickname textfield.
+  nickname_textfield_ = nickname_input_textfield_view->AddChildView(
+      std::make_unique<views::Textfield>());
   nickname_textfield_->SetAccessibleName(
       l10n_util::GetStringUTF16(IDS_AUTOFILL_SAVE_IBAN_PROMPT_NICKNAME));
   nickname_textfield_->SetTextInputType(
       ui::TextInputType::TEXT_INPUT_TYPE_TEXT);
+  nickname_textfield_->set_controller(this);
   nickname_textfield_->SetPlaceholderText(
       l10n_util::GetStringUTF16(IDS_AUTOFILL_SAVE_IBAN_PLACEHOLDER));
+  nickname_textfield_->SetProperty(
+      views::kFlexBehaviorKey,
+      views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
+                               views::MaximumFlexSizeRule::kScaleToMaximum));
+  nickname_textfield_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  nickname_textfield_->SetBorder(views::NullBorder());
+
+  // Adds nickname length count label.
+  // Note: nickname is empty at the prompt.
+  nickname_length_label_ = nickname_input_textfield_view->AddChildView(
+      std::make_unique<views::Label>(/*text=*/u"", views::style::CONTEXT_LABEL,
+                                     views::style::STYLE_SECONDARY));
+  nickname_length_label_->SetHorizontalAlignment(
+      gfx::HorizontalAlignment::ALIGN_RIGHT);
+  UpdateNicknameLengthLabel();
 }
 
 void SaveIbanBubbleView::AssignIdsToDialogButtonsForTesting() {
@@ -170,14 +220,15 @@ void SaveIbanBubbleView::OnDialogAccepted() {
   }
 }
 
-void SaveIbanBubbleView::OnDialogCancelled() {
-  if (controller_) {
-    controller_->OnCancelButton();
-  }
-}
-
 void SaveIbanBubbleView::Init() {
   CreateMainContentView();
+}
+
+void SaveIbanBubbleView::UpdateNicknameLengthLabel() {
+  nickname_length_label_->SetText(l10n_util::GetStringFUTF16(
+      IDS_IBAN_NICKNAME_COUNT_BY,
+      base::NumberToString16(nickname_textfield_->GetText().length()),
+      base::NumberToString16(kMaxNicknameChars)));
 }
 
 }  // namespace autofill

@@ -208,8 +208,7 @@ bool TextInputTestHelper::ClickElement(const std::string& id,
                                        content::WebContents* tab) {
   std::string coordinate =
       content::EvalJs(
-          tab, "textinput_helper.retrieveElementCoordinate('" + id + "')",
-          content::EXECUTE_SCRIPT_USE_MANUAL_REPLY)
+          tab, "textinput_helper.retrieveElementCoordinate('" + id + "')")
           .ExtractString();
 
   gfx::Rect rect;
@@ -229,6 +228,14 @@ bool TextInputTestHelper::ClickElement(const std::string& id,
   mouse_event.SetType(blink::WebInputEvent::Type::kMouseUp);
   tab->GetRenderViewHost()->GetWidget()->ForwardMouseEvent(mouse_event);
   return true;
+}
+
+// static
+std::string TextInputTestHelper::GetElementInnerText(
+    const std::string& id,
+    content::WebContents* tab) {
+  return content::EvalJs(tab, "document.getElementById('" + id + "').innerText")
+      .ExtractString();
 }
 
 }  // namespace input_method

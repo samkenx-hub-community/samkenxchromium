@@ -11,7 +11,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -19,6 +18,7 @@ import androidx.browser.customtabs.CustomTabsService;
 import androidx.browser.customtabs.CustomTabsSession;
 import androidx.browser.customtabs.CustomTabsSessionToken;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -31,9 +31,9 @@ import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisableIf;
+import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.HistogramWatcher;
-import org.chromium.chrome.browser.MockSafeBrowsingApiHandler;
+import org.chromium.chrome.browser.MockSafetyNetApiHandler;
 import org.chromium.chrome.browser.browserservices.verification.ChromeOriginVerifier;
 import org.chromium.chrome.browser.document.ChromeLauncherActivity;
 import org.chromium.chrome.browser.firstrun.FirstRunStatus;
@@ -88,8 +88,6 @@ public class DetachedResourceRequestTest {
     @After
     public void tearDown() {
         CustomTabsTestUtils.cleanupSessions(mConnection);
-        if (mServer != null) mServer.stopAndDestroyServer();
-        mServer = null;
     }
 
     @Test
@@ -325,7 +323,7 @@ public class DetachedResourceRequestTest {
     @Test
     @SmallTest
     @DisableFeatures(ChromeFeatureList.SPLIT_CACHE_BY_NETWORK_ISOLATION_KEY)
-
+    @DisabledTest(message = "https://crbug.com/1431268")
     public void testSafeBrowsingMainResource() throws Exception {
         testSafeBrowsingMainResource(true /* afterNative */, false /* splitCacheEnabled */);
     }
@@ -358,6 +356,7 @@ public class DetachedResourceRequestTest {
     @Test
     @SmallTest
     @DisableFeatures(ChromeFeatureList.SPLIT_CACHE_BY_NETWORK_ISOLATION_KEY)
+    @DisabledTest(message = "https://crbug.com/1431268")
     public void testSafeBrowsingMainResourceBeforeNative() throws Exception {
         testSafeBrowsingMainResource(false /* afterNative */, false /* splitCacheEnabled */);
     }
@@ -374,8 +373,8 @@ public class DetachedResourceRequestTest {
 
     @Test
     @SmallTest
+    @EnableFeatures(ChromeFeatureList.CCT_REPORT_PARALLEL_REQUEST_STATUS)
     public void testCanBlockThirdPartyCookies() throws Exception {
-        CustomTabsSessionToken session = prepareSession();
         CustomTabsTestUtils.warmUpAndWait();
         mServer = EmbeddedTestServer.createAndStartHTTPSServer(mContext, ServerCertificate.CERT_OK);
         TestThreadUtils.runOnUiThreadBlocking(() -> {
@@ -385,10 +384,16 @@ public class DetachedResourceRequestTest {
             prefs.setInteger(COOKIE_CONTROLS_MODE, CookieControlsMode.BLOCK_THIRD_PARTY);
         });
         final Uri url = Uri.parse(mServer.getURL("/set-cookie?acookie;SameSite=none;Secure"));
+        DetachedResourceRequestCheckCallback customTabsCallback =
+                new DetachedResourceRequestCheckCallback(
+                        url, CustomTabsConnection.ParallelRequestStatus.SUCCESS, NET_OK);
+        CustomTabsSessionToken session = prepareSession(ORIGIN, customTabsCallback);
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             Assert.assertEquals(CustomTabsConnection.ParallelRequestStatus.SUCCESS,
                     mConnection.handleParallelRequest(session, prepareIntent(url, ORIGIN)));
         });
+        customTabsCallback.waitForRequest(0, 1);
+        customTabsCallback.waitForCompletion(0, 1);
 
         String echoUrl = mServer.getURL("/echoheader?Cookie");
         Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(mContext, echoUrl);
@@ -406,9 +411,8 @@ public class DetachedResourceRequestTest {
      */
     @Test
     @SmallTest
-    @DisableIf.Build(supported_abis_includes = "x86", message = "http://crbug.com/1376972")
+    @EnableFeatures(ChromeFeatureList.CCT_REPORT_PARALLEL_REQUEST_STATUS)
     public void testSameSiteLaxByDefaultCookies() throws Exception {
-        CustomTabsSessionToken session = prepareSession();
         CustomTabsTestUtils.warmUpAndWait();
         mServer = EmbeddedTestServer.createAndStartHTTPSServer(mContext, ServerCertificate.CERT_OK);
         // This isn't blocking third-party cookies by preferences.
@@ -423,10 +427,16 @@ public class DetachedResourceRequestTest {
         // https isn't enough).
         final Uri url = Uri.parse(
                 mServer.getURL("/set-cookie?a=1&b=2;SameSite=None&c=3;SameSite=None;Secure;"));
+        DetachedResourceRequestCheckCallback customTabsCallback =
+                new DetachedResourceRequestCheckCallback(
+                        url, CustomTabsConnection.ParallelRequestStatus.SUCCESS, NET_OK);
+        CustomTabsSessionToken session = prepareSession(ORIGIN, customTabsCallback);
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             Assert.assertEquals(CustomTabsConnection.ParallelRequestStatus.SUCCESS,
                     mConnection.handleParallelRequest(session, prepareIntent(url, ORIGIN)));
         });
+        customTabsCallback.waitForRequest(0, 1);
+        customTabsCallback.waitForCompletion(0, 1);
 
         String echoUrl = mServer.getURL("/echoheader?Cookie");
         Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(mContext, echoUrl);
@@ -440,6 +450,7 @@ public class DetachedResourceRequestTest {
 
     @Test
     @SmallTest
+    @EnableFeatures(ChromeFeatureList.CCT_REPORT_PARALLEL_REQUEST_STATUS)
     public void testThirdPartyCookieBlockingAllowsFirstParty() throws Exception {
         CustomTabsTestUtils.warmUpAndWait();
         mServer = EmbeddedTestServer.createAndStartServer(mContext);
@@ -451,12 +462,17 @@ public class DetachedResourceRequestTest {
         });
         final Uri url = Uri.parse(mServer.getURL("/set-cookie?acookie"));
         final Uri origin = Uri.parse(Origin.create(url).toString());
-        CustomTabsSessionToken session = prepareSession(url);
+        DetachedResourceRequestCheckCallback customTabsCallback =
+                new DetachedResourceRequestCheckCallback(
+                        url, CustomTabsConnection.ParallelRequestStatus.SUCCESS, NET_OK);
+        CustomTabsSessionToken session = prepareSession(origin, customTabsCallback);
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             Assert.assertEquals(CustomTabsConnection.ParallelRequestStatus.SUCCESS,
                     mConnection.handleParallelRequest(session, prepareIntent(url, origin)));
         });
+        customTabsCallback.waitForRequest(0, 1);
+        customTabsCallback.waitForCompletion(0, 1);
 
         String echoUrl = mServer.getURL("/echoheader?Cookie");
         Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(mContext, echoUrl);
@@ -560,7 +576,7 @@ public class DetachedResourceRequestTest {
 
     private void testSafeBrowsingMainResource(boolean afterNative, boolean splitCacheEnabled)
             throws Exception {
-        SafeBrowsingApiBridge.setHandler(new MockSafeBrowsingApiHandler());
+        SafeBrowsingApiBridge.setSafetyNetApiHandler(new MockSafetyNetApiHandler());
         CustomTabsSessionToken session = prepareSession();
 
         String cacheable = "/cachetime";
@@ -569,7 +585,7 @@ public class DetachedResourceRequestTest {
         Uri url = Uri.parse(mServer.getURL(cacheable));
 
         try {
-            MockSafeBrowsingApiHandler.addMockResponse(
+            MockSafetyNetApiHandler.addMockResponse(
                     url.toString(), "{\"matches\":[{\"threat_type\":\"5\"}]}");
 
             Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
@@ -598,19 +614,19 @@ public class DetachedResourceRequestTest {
                 Assert.assertEquals(1, readFromSocketCallback.getCallCount());
             }
         } finally {
-            MockSafeBrowsingApiHandler.clearMockResponses();
+            MockSafetyNetApiHandler.clearMockResponses();
         }
     }
 
     private void testSafeBrowsingSubresource(boolean afterNative) throws Exception {
-        SafeBrowsingApiBridge.setHandler(new MockSafeBrowsingApiHandler());
+        SafeBrowsingApiBridge.setSafetyNetApiHandler(new MockSafetyNetApiHandler());
         CustomTabsSessionToken session = prepareSession();
         String cacheable = "/cachetime";
         waitForDetachedRequest(session, cacheable, afterNative);
         Uri url = Uri.parse(mServer.getURL(cacheable));
 
         try {
-            MockSafeBrowsingApiHandler.addMockResponse(
+            MockSafetyNetApiHandler.addMockResponse(
                     url.toString(), "{\"matches\":[{\"threat_type\":\"5\"}]}");
 
             String pageUrl = mServer.getURL("/chrome/test/data/android/cacheable_subresource.html");
@@ -626,7 +642,7 @@ public class DetachedResourceRequestTest {
             // robust check.
             CriteriaHelper.pollUiThread(() -> webContents.getTitle().equals("Security error"));
         } finally {
-            MockSafeBrowsingApiHandler.clearMockResponses();
+            MockSafetyNetApiHandler.clearMockResponses();
         }
     }
 

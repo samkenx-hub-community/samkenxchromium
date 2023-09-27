@@ -15,7 +15,7 @@
 
 namespace ui {
 class ColorProvider;
-}  // namespace ui
+}
 
 namespace ash {
 
@@ -30,7 +30,7 @@ class ASH_EXPORT StylusBatteryDelegate
   ~StylusBatteryDelegate() override;
 
   SkColor GetColorForBatteryLevel() const;
-  gfx::ImageSkia GetBatteryImage(ui::ColorProvider* color_provider) const;
+  gfx::ImageSkia GetBatteryImage(const ui::ColorProvider* color_provider) const;
   gfx::ImageSkia GetBatteryStatusUnknownImage() const;
   void SetBatteryUpdateCallback(Callback battery_update_callback);
   bool IsBatteryCharging() const;

@@ -20,6 +20,8 @@
 #include "ash/shelf/shelf_view.h"
 #include "base/cancelable_callback.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/compositor/layer.h"
@@ -123,6 +125,10 @@ class ASH_EXPORT ScrollableShelfView : public views::AccessiblePaneView,
   // target bounds or the current bounds, indicated by |use_target_bounds|. Note
   // that the returned value is mirrored for the horizontal shelf under RTL.
   gfx::Insets CalculateMirroredEdgePadding(bool use_target_bounds) const;
+
+  // Returns whether the shelf will be overflown (i.e. it will show one or both
+  // arrow buttons) if it is given the input length.
+  bool CalculateShelfOverflowForAvailableLength(int available_length) const;
 
   views::View* GetShelfContainerViewForTest();
   bool ShouldAdjustForTest() const;
@@ -272,7 +278,8 @@ class ASH_EXPORT ScrollableShelfView : public views::AccessiblePaneView,
 
   // ShelfTooltipDelegate:
   bool ShouldShowTooltipForView(const views::View* view) const override;
-  bool ShouldHideTooltip(const gfx::Point& cursor_location) const override;
+  bool ShouldHideTooltip(const gfx::Point& cursor_location,
+                         views::View* delegate_view) const override;
   const std::vector<aura::Window*> GetOpenWindowsForView(
       views::View* view) override;
   std::u16string GetTitleForView(const views::View* view) const override;
@@ -471,15 +478,15 @@ class ASH_EXPORT ScrollableShelfView : public views::AccessiblePaneView,
   LayoutStrategy layout_strategy_ = kNotShowArrowButtons;
 
   // Child views Owned by views hierarchy.
-  ScrollArrowView* left_arrow_ = nullptr;
-  ScrollArrowView* right_arrow_ = nullptr;
-  ShelfContainerView* shelf_container_view_ = nullptr;
+  raw_ptr<ScrollArrowView, ExperimentalAsh> left_arrow_ = nullptr;
+  raw_ptr<ScrollArrowView, ExperimentalAsh> right_arrow_ = nullptr;
+  raw_ptr<ShelfContainerView, ExperimentalAsh> shelf_container_view_ = nullptr;
 
   // Available space to accommodate child views. It is mirrored for the
   // horizontal shelf under RTL.
   gfx::Rect available_space_;
 
-  ShelfView* shelf_view_ = nullptr;
+  raw_ptr<ShelfView, ExperimentalAsh> shelf_view_ = nullptr;
 
   // Defines the padding space inside the scrollable shelf. It is decided by the
   // current padding strategy. Note that `edge_padding_insets_` is mirrored
@@ -537,7 +544,7 @@ class ASH_EXPORT ScrollableShelfView : public views::AccessiblePaneView,
   // Waiting time before flipping the page.
   base::TimeDelta page_flip_time_threshold_;
 
-  TestObserver* test_observer_ = nullptr;
+  raw_ptr<TestObserver, ExperimentalAsh> test_observer_ = nullptr;
 
   // If page flip timer is active for shelf item drag, the last known drag item
   // bounds in screen coordinates.
@@ -553,6 +560,8 @@ class ASH_EXPORT ScrollableShelfView : public views::AccessiblePaneView,
   std::unique_ptr<ui::PresentationTimeRecorder> presentation_time_recorder_;
 
   base::ScopedClosureRunner force_show_hotseat_resetter_;
+
+  base::WeakPtrFactory<ScrollableShelfView> weak_ptr_factory_{this};
 };
 
 }  // namespace ash

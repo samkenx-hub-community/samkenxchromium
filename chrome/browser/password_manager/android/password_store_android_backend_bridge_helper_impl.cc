@@ -30,8 +30,6 @@ PasswordStoreAndroidBackendBridgeHelper::Create() {
 }
 
 bool PasswordStoreAndroidBackendBridgeHelper::CanCreateBackend() {
-  // TODO(crbug.com/1394715): Either move this call to the background thread or
-  // use cached GMS Core version from `BuildInfo.gmsVersionCode`.
   return PasswordStoreAndroidBackendDispatcherBridge::CanCreateBackend();
 }
 
@@ -78,6 +76,12 @@ PasswordStoreAndroidBackendBridgeHelperImpl::
   bool will_delete = background_task_runner_->DeleteSoon(
       FROM_HERE, std::move(dispatcher_bridge_));
   DCHECK(will_delete);
+}
+
+bool PasswordStoreAndroidBackendBridgeHelperImpl::
+    CanUseGetAffiliatedPasswordsAPI() {
+  return PasswordStoreAndroidBackendDispatcherBridge::
+      CanUseGetAffiliatedPasswordsAPI();
 }
 
 void PasswordStoreAndroidBackendBridgeHelperImpl::SetConsumer(
@@ -129,6 +133,20 @@ JobId PasswordStoreAndroidBackendBridgeHelperImpl::GetLoginsForSignonRealm(
   return job_id;
 }
 
+JobId PasswordStoreAndroidBackendBridgeHelperImpl::
+    GetAffiliatedLoginsForSignonRealm(const std::string& signon_realm,
+                                      Account account) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(main_sequence_checker_);
+  CHECK(dispatcher_bridge_);
+  JobId job_id = GetNextJobId();
+  background_task_runner_->PostTask(
+      FROM_HERE, base::BindOnce(&PasswordStoreAndroidBackendDispatcherBridge::
+                                    GetAffiliatedLoginsForSignonRealm,
+                                base::Unretained(dispatcher_bridge_.get()),
+                                job_id, signon_realm, std::move(account)));
+  return job_id;
+}
+
 JobId PasswordStoreAndroidBackendBridgeHelperImpl::AddLogin(
     const password_manager::PasswordForm& form,
     Account account) {
@@ -174,16 +192,6 @@ JobId PasswordStoreAndroidBackendBridgeHelperImpl::RemoveLogin(
 JobId PasswordStoreAndroidBackendBridgeHelperImpl::GetNextJobId() {
   last_job_id_ = JobId(last_job_id_.value() + 1);
   return last_job_id_;
-}
-
-void PasswordStoreAndroidBackendBridgeHelperImpl::ShowErrorNotification() {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(main_sequence_checker_);
-  DCHECK(dispatcher_bridge_);
-  background_task_runner_->PostTask(
-      FROM_HERE,
-      base::BindOnce(
-          &PasswordStoreAndroidBackendDispatcherBridge::ShowErrorNotification,
-          base::Unretained(dispatcher_bridge_.get())));
 }
 
 }  // namespace password_manager

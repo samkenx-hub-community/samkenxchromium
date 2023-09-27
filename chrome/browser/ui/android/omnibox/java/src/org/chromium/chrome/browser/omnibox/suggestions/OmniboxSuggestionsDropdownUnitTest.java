@@ -26,6 +26,7 @@ import android.view.ViewGroup.MarginLayoutParams;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView.LayoutParams;
+import androidx.recyclerview.widget.RecyclerView.RecycledViewPool;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
@@ -68,6 +69,7 @@ public class OmniboxSuggestionsDropdownUnitTest {
     private @Mock Runnable mDropdownScrollToTopListener;
     private @Mock WindowDelegate mWindowDelegate;
     private @Mock OmniboxSuggestionsDropdownAdapter mAdapter;
+    private @Mock RecycledViewPool mPool;
 
     private Context mContext;
 
@@ -122,20 +124,20 @@ public class OmniboxSuggestionsDropdownUnitTest {
     public void setUp() {
         mContext = new ContextThemeWrapper(
                 ApplicationProvider.getApplicationContext(), R.style.Theme_BrowserUI_DayNight);
-        mDropdown = new OmniboxSuggestionsDropdown(mContext);
+        mDropdown = new OmniboxSuggestionsDropdown(mContext, mPool);
         mDropdown.setAdapter(mAdapter);
         mListener = mDropdown.getLayoutScrollListener();
     }
 
     @After
     public void tearDown() {
-        mListener.resetKeyboardShowState();
+        mListener.resetKeyboardShownState();
     }
 
     @Test
     @SmallTest
     @Feature("Omnibox")
-    @EnableFeatures({ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE})
+    @EnableFeatures(ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE)
     @CommandLineFlags.
     Add({"enable-features=" + ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE + "<Study",
             "force-fieldtrials=Study/Group",
@@ -143,18 +145,16 @@ public class OmniboxSuggestionsDropdownUnitTest {
     public void
     testBackgroundColor_withOmniboxModernizeVisualUpdateFlags() {
         assertEquals(mDropdown.getStandardBgColor(),
-                ChromeColors.getSurfaceColor(mContext,
-                        org.chromium.chrome.browser.omnibox.R.dimen
-                                .omnibox_suggestion_dropdown_bg_elevation));
+                ChromeColors.getSurfaceColor(
+                        mContext, R.dimen.omnibox_suggestion_dropdown_bg_elevation));
         assertEquals(mDropdown.getIncognitoBgColor(),
-                mContext.getColor(
-                        org.chromium.chrome.browser.omnibox.R.color.omnibox_dropdown_bg_incognito));
+                mContext.getColor(R.color.omnibox_dropdown_bg_incognito));
     }
 
     @Test
     @SmallTest
     @Feature("Omnibox")
-    @DisableFeatures({ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE})
+    @DisableFeatures(ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE)
     public void testBackgroundColor_withoutOmniboxModernizeVisualUpdateFlags() {
         assertEquals(
                 mDropdown.getStandardBgColor(), ChromeColors.getDefaultThemeColor(mContext, false));
@@ -209,7 +209,13 @@ public class OmniboxSuggestionsDropdownUnitTest {
         assertEquals(-5, mListener.updateKeyboardVisibilityAndScroll(-5, -5));
         verifyNoMoreInteractions(mDropdownScrollListener);
 
-        // Overscroll to top. Expect the keyboard to be called in.
+        // Overscroll to top. This is part of the same gesture.
+        // Expect to see keyboard state unchanged.
+        assertEquals(-5, mListener.updateKeyboardVisibilityAndScroll(-5, -10));
+        verifyNoMoreInteractions(mDropdownScrollToTopListener);
+
+        // Overscroll to top again, but this time as a new gesture.
+        mListener.onNewGesture();
         assertEquals(-5, mListener.updateKeyboardVisibilityAndScroll(-5, -10));
         verify(mDropdownScrollToTopListener, times(1)).run();
         verifyNoMoreInteractions(mDropdownScrollToTopListener);
@@ -221,36 +227,52 @@ public class OmniboxSuggestionsDropdownUnitTest {
 
     @Test
     @SmallTest
-    public void testScrollListener_notDismissingKeyboardWhenScrollDoesNotHappen() {
+    public void testScrollListener_dismissingKeyboardWhenScrollDoesNotHappen() {
+        // In some cases the list may be long enough to stretch below the keyboard, but not long
+        // enough to be scrollable. We want to dismiss the keyboard in these cases, too.
         mDropdown.setSuggestionDropdownScrollListener(mDropdownScrollListener);
+        mDropdown.setSuggestionDropdownOverscrolledToTopListener(mDropdownScrollToTopListener);
 
         // Pretend we're scrolling down (delta=10) but there is no content to move to (scroll=0).
         assertEquals(0, mListener.updateKeyboardVisibilityAndScroll(0, 10));
-        // Confirm that we're not hiding the keyboard.
-        verifyNoMoreInteractions(mDropdownScrollListener);
+        // Confirm that we're hiding the keyboard.
+        verify(mDropdownScrollListener).run();
 
+        // Simulate scroll up as part of the same gesture. Observe that no events are emitted.
+        assertEquals(0, mListener.updateKeyboardVisibilityAndScroll(0, -10));
+        verifyNoMoreInteractions(mDropdownScrollToTopListener);
+
+        // Begin a new gesture.
         // Pretend we're scrolling up now (delta=-10) but we're already on top and can't move.
+        mListener.onNewGesture();
         assertEquals(0, mListener.updateKeyboardVisibilityAndScroll(0, -10));
         // Confirm that we're not trying to show the keyboard.
-        verifyNoMoreInteractions(mDropdownScrollListener);
+        verify(mDropdownScrollToTopListener).run();
+
+        verifyNoMoreInteractions(mDropdownScrollListener, mDropdownScrollToTopListener);
     }
 
     @Test
     @SmallTest
-    public void testScrollListener_notDismissingKeyboardWhenTheListIsOnlyBarelyUnderTheKeyboard() {
+    public void testScrollListener_dismissingKeyboardWhenTheListIsOnlyBarelyUnderTheKeyboard() {
         mDropdown.setSuggestionDropdownScrollListener(mDropdownScrollListener);
+        mDropdown.setSuggestionDropdownOverscrolledToTopListener(mDropdownScrollToTopListener);
 
-        // We want to scroll by 10px, but there's only 1px of content. Don't hide the keyboard.
-        assertEquals(1, mListener.updateKeyboardVisibilityAndScroll(1, 10));
-        verifyNoMoreInteractions(mDropdownScrollListener);
+        // We want to scroll by 10px, but there's only 1px of slack. This means the suggestions list
+        // spans entirely under the keyboard. Hide the keyboard.
+        assertEquals(0, mListener.updateKeyboardVisibilityAndScroll(1, 10));
+        verify(mDropdownScrollListener).run();
 
-        // We want to scroll by 10px, but there's only 9px of content. Don't hide the keyboard.
-        assertEquals(9, mListener.updateKeyboardVisibilityAndScroll(9, 10));
-        verifyNoMoreInteractions(mDropdownScrollListener);
-
-        // But then, if we scroll back up, we likely should not ask for keyboard to show.
+        // Expect no more events emitted during the same gesture.
         assertEquals(-9, mListener.updateKeyboardVisibilityAndScroll(-9, -10));
-        verifyNoMoreInteractions(mDropdownScrollListener);
+        verifyNoMoreInteractions(mDropdownScrollToTopListener);
+
+        // Reset keyboard state as part of the new gesture.
+        mListener.onNewGesture();
+        assertEquals(-9, mListener.updateKeyboardVisibilityAndScroll(-9, -10));
+        verify(mDropdownScrollToTopListener).run();
+
+        verifyNoMoreInteractions(mDropdownScrollListener, mDropdownScrollToTopListener);
     }
 
     @Test
@@ -265,7 +287,7 @@ public class OmniboxSuggestionsDropdownUnitTest {
         verifyNoMoreInteractions(mDropdownScrollListener);
 
         // Simulate lists being shown again.
-        mListener.resetKeyboardShowState();
+        mListener.resetKeyboardShownState();
 
         // Scroll attempt should suppress the scroll and emit keyboard dismiss.
         // Condition: the list is long enough that the scroll distance equals to delta.
@@ -305,6 +327,7 @@ public class OmniboxSuggestionsDropdownUnitTest {
 
     @Test
     @SmallTest
+    @DisableFeatures(ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE)
     public void testAlignmentProvider_paddingChange() {
         assertEquals(0, mDropdown.getMeasuredWidth());
 
@@ -352,28 +375,27 @@ public class OmniboxSuggestionsDropdownUnitTest {
         mDropdown.onAttachedToWindow();
         mDropdown.setLayoutParams(new LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        mOmniboxAlignment = new OmniboxAlignment(0, 100, 600, 0, 10, 10);
+        int marginTop = 100;
+        int height = 800 - marginTop;
+        mOmniboxAlignment = new OmniboxAlignment(0, 100, 600, height, 10, 10);
         mOmniboxAlignmentSupplier.set(mOmniboxAlignment);
-        layoutDropdown(600, 800);
+        layoutDropdown(600, height);
 
         MarginLayoutParams layoutParams = (MarginLayoutParams) mDropdown.getLayoutParams();
         assertNotNull(layoutParams);
-        assertEquals(100, layoutParams.topMargin);
-        assertEquals(800 - 100, mDropdown.getMeasuredHeight());
+        assertEquals(marginTop, layoutParams.topMargin);
 
         mOmniboxAlignment = new OmniboxAlignment(0, 54, 600, 0, 10, 10);
         mOmniboxAlignmentSupplier.set(mOmniboxAlignment);
-        layoutDropdown(600, 800);
+        layoutDropdown(600, height);
 
         layoutParams = (MarginLayoutParams) mDropdown.getLayoutParams();
         assertNotNull(layoutParams);
         assertEquals(54, layoutParams.topMargin);
-        assertEquals(800 - 54, mDropdown.getMeasuredHeight());
     }
 
     @Test
     @SmallTest
-    @EnableFeatures({ChromeFeatureList.OMNIBOX_CONSUMERS_IME_INSETS})
     public void testAlignmentProvider_heightChange() {
         mDropdown.setEmbedder(mEmbedder);
         mDropdown.onAttachedToWindow();
@@ -398,7 +420,7 @@ public class OmniboxSuggestionsDropdownUnitTest {
     @SmallTest
     @LooperMode(Mode.PAUSED)
     public void testAlignmentProvider_changeDuringlayout() {
-        mDropdown = Mockito.spy(new OmniboxSuggestionsDropdown(mContext));
+        mDropdown = Mockito.spy(new OmniboxSuggestionsDropdown(mContext, mPool));
         mDropdown.setAdapter(mAdapter);
         mDropdown.setEmbedder(mEmbedder);
         mDropdown.onAttachedToWindow();

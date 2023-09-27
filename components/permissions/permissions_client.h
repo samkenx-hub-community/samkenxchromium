@@ -162,6 +162,7 @@ class PermissionsClient {
       permissions::PermissionRequestGestureType gesture_type,
       absl::optional<base::TimeDelta> prompt_display_duration,
       bool is_post_prompt,
+      const GURL& gurl,
       base::OnceCallback<void()> hats_shown_callback_);
 #endif
 
@@ -275,6 +276,17 @@ class PermissionsClient {
       content::WebContents* web_contents,
       PermissionPrompt::Delegate* delegate);
 #endif
+
+  // Returns true if the browser has the necessary permission(s) from the
+  // platform to provide a particular permission-gated capability to sites. This
+  // can include both app-specific permissions relevant to the browser and
+  // device-wide permissions.
+  virtual bool HasDevicePermission(ContentSettingsType type) const;
+
+  // Returns true if the browser is able to request from the platform the
+  // necessary permission(s) needed to provide a particular permission-gated
+  // capability to sites.
+  virtual bool CanRequestDevicePermission(ContentSettingsType type) const;
 };
 
 }  // namespace permissions

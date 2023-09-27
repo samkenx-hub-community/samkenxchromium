@@ -17,6 +17,7 @@
 #include "components/autofill/core/browser/payments/payments_service_url.h"
 #include "components/autofill/core/browser/payments/virtual_card_enrollment_manager.h"
 #include "components/autofill/core/browser/ui/payments/virtual_card_enroll_bubble_controller.h"
+#include "components/autofill/core/common/autofill_payments_features.h"
 #include "components/grit/components_scaled_resources.h"
 #include "components/strings/grit/components_strings.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -49,9 +50,10 @@ VirtualCardEnrollBubbleViews::VirtualCardEnrollBubbleViews(
   set_fixed_width(views::LayoutProvider::Get()->GetDistanceMetric(
       views::DISTANCE_BUBBLE_PREFERRED_WIDTH));
 
-  raw_ptr<views::View> legal_message_view =
-      SetFootnoteView(CreateLegalMessageView());
-  legal_message_view->SetID(DialogViewId::FOOTNOTE_VIEW);
+  if (!base::FeatureList::IsEnabled(
+          features::kAutofillMoveLegalTermsAndIconForNewCardEnrollment)) {
+    SetFootnoteView(CreateLegalMessageView())->SetID(DialogViewId::FOOTNOTE_VIEW);
+  }
 }
 
 VirtualCardEnrollBubbleViews::~VirtualCardEnrollBubbleViews() = default;
@@ -96,9 +98,8 @@ void VirtualCardEnrollBubbleViews::AddedToWidget() {
   header_view->AddChildView(std::move(image_view));
 
   GetBubbleFrameView()->SetHeaderView(std::move(header_view));
-  GetBubbleFrameView()->SetTitleView(
-      std::make_unique<TitleWithIconAndSeparatorView>(
-          GetWindowTitle(), TitleWithIconAndSeparatorView::Icon::GOOGLE_PAY));
+  GetBubbleFrameView()->SetTitleView(CreateTitleView(
+      GetWindowTitle(), TitleWithIconAndSeparatorView::Icon::GOOGLE_PAY));
 }
 
 std::u16string VirtualCardEnrollBubbleViews::GetWindowTitle() const {
@@ -115,6 +116,14 @@ void VirtualCardEnrollBubbleViews::WindowClosing() {
 
 void VirtualCardEnrollBubbleViews::Init() {
   ChromeLayoutProvider* const provider = ChromeLayoutProvider::Get();
+
+  // If terms of service on top enabled, add padding between TOS and Buttons
+  if (base::FeatureList::IsEnabled(
+          features::kAutofillMoveLegalTermsAndIconForNewCardEnrollment)) {
+    set_margins(provider->GetDialogInsetsForContentType(
+        views::DialogContentType::kText, views::DialogContentType::kText));
+  }
+
   SetLayoutManager(std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kVertical, gfx::Insets(),
       provider->GetDistanceMetric(views::DISTANCE_UNRELATED_CONTROL_VERTICAL)));
@@ -178,6 +187,8 @@ void VirtualCardEnrollBubbleViews::Init() {
       card_name_4digits_view->AddChildView(std::make_unique<views::Label>(
           card.CardNameForAutofillDisplay(),
           views::style::CONTEXT_DIALOG_BODY_TEXT, views::style::STYLE_PRIMARY));
+  card_name_label->SetHorizontalAlignment(
+      gfx::HorizontalAlignment::ALIGN_TO_HEAD);
   card_name_4digits_view->SetFlexForView(card_name_label, /*flex=*/1);
   card_name_4digits_view->AddChildView(std::make_unique<views::Label>(
       card.ObfuscatedNumberWithVisibleLastFourDigits(),
@@ -186,6 +197,12 @@ void VirtualCardEnrollBubbleViews::Init() {
       l10n_util::GetStringUTF16(IDS_AUTOFILL_VIRTUAL_CARD_ENTRY_PREFIX),
       ChromeTextContext::CONTEXT_DIALOG_BODY_TEXT_SMALL,
       views::style::STYLE_SECONDARY));
+
+  if (base::FeatureList::IsEnabled(
+          features::kAutofillMoveLegalTermsAndIconForNewCardEnrollment)) {
+    AddChildView(CreateLegalMessageView())
+        ->SetID(DialogViewId::LEGAL_MESSAGE_VIEW);
+  }
 }
 
 std::unique_ptr<views::View>

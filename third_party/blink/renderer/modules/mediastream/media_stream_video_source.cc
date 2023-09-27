@@ -93,6 +93,10 @@ void MediaStreamVideoSource::AddTrack(
           ConvertToBaseRepeatingCallback(CrossThreadBindRepeating(
               &VideoTrackAdapter::NewCropVersionOnVideoTaskRunner,
               GetTrackAdapter()));
+      VideoCaptureNotifyFrameDroppedCB frame_dropped_callback =
+          ConvertToBaseRepeatingCallback(CrossThreadBindRepeating(
+              &VideoTrackAdapter::OnFrameDroppedOnVideoTaskRunner,
+              GetTrackAdapter()));
       // Callbacks are invoked from the IO thread. With
       // UseThreadPoolForMediaStreamVideoTaskRunner disabled, the video task
       // runner is the same as the IO thread and there is no need to post frames
@@ -106,11 +110,14 @@ void MediaStreamVideoSource::AddTrack(
                 video_task_runner(),
                 std::move(deliver_encoded_frame_on_video_callback)),
             base::BindPostTask(video_task_runner(),
-                               std::move(new_crop_version_on_video_callback)));
+                               std::move(new_crop_version_on_video_callback)),
+            base::BindPostTask(video_task_runner(),
+                               std::move(frame_dropped_callback)));
       } else {
         StartSourceImpl(std::move(deliver_frame_on_video_callback),
                         std::move(deliver_encoded_frame_on_video_callback),
-                        std::move(new_crop_version_on_video_callback));
+                        std::move(new_crop_version_on_video_callback),
+                        std::move(frame_dropped_callback));
       }
       break;
     }
@@ -162,6 +169,11 @@ void MediaStreamVideoSource::RemoveTrack(MediaStreamVideoTrack* video_track,
   // Call |frame_adapter_->RemoveTrack| here even if adding the track has
   // failed and |frame_adapter_->AddCallback| has not been called.
   GetTrackAdapter()->RemoveTrack(video_track);
+
+  if (video_track->CountEncodedSinks()) {
+    // Notifies the source that encoded sinks have been removed.
+    UpdateNumEncodedSinks();
+  }
 
   if (tracks_.empty()) {
     if (callback) {
@@ -544,9 +556,7 @@ void MediaStreamVideoSource::UpdateTrackSettings(
   if (VideoTrackAdapter::CalculateDesiredSize(
           false /* is_rotated */, GetCurrentFormat()->frame_size,
           adapter_settings, &desired_size)) {
-    track->SetTargetSizeAndFrameRate(desired_size.width(),
-                                     desired_size.height(),
-                                     adapter_settings.max_frame_rate());
+    track->SetTargetSize(desired_size.width(), desired_size.height());
   }
   track->SetTrackAdapterSettings(adapter_settings);
 }

@@ -4,6 +4,9 @@
 
 import {assert} from 'chrome://resources/js/assert_ts.js';
 
+import {ColorScheme} from '../color_scheme.mojom-webui.js';
+import {StaticColor} from '../personalization_app.mojom-webui.js';
+
 import {Paths} from './personalization_router_element.js';
 
 // Numerical values are used for metrics; do not change or reuse values. These
@@ -18,8 +21,9 @@ enum MetricsPath {
   WALLPAPER_LOCAL_COLLECTION = 5,
   ROOT = 6,
   USER = 7,
+  WALLPAPER_SEA_PEN_COLLECTION = 8,
 
-  MAX_VALUE = USER,
+  MAX_VALUE = WALLPAPER_SEA_PEN_COLLECTION,
 }
 
 const enum HistogramName {
@@ -27,6 +31,11 @@ const enum HistogramName {
   AMBIENT_OPTIN = 'Ash.Personalization.AmbientMode.OptIn',
   AMBIENT_PERFORMANCE_GOOGLE_PHOTOS_PREVIEWS =
       'Ash.Personalization.Ambient.GooglePhotosPreviewsLoadTime',
+  DYNAMIC_COLOR_COLOR_SCHEME_BUTTON =
+      'Ash.Personalization.DynamicColor.ColorSchemeButton',
+  DYNAMIC_COLOR_STATIC_COLOR_BUTTON =
+      'Ash.Personalization.DynamicColor.StaticColorButton',
+  DYNAMIC_COLOR_TOGGLE_BUTTON = 'Ash.Personalization.DynamicColor.ToggleButton',
   KEYBOARD_BACKLIGHT_OPEN_ZONE_CUSTOMIZATION =
       'Ash.Personalization.KeyboardBacklight.OpenZoneCustomization',
 }
@@ -49,6 +58,8 @@ function toMetricsEnum(path: Paths) {
       return MetricsPath.ROOT;
     case Paths.USER:
       return MetricsPath.USER;
+    case Paths.SEA_PEN_COLLECTION:
+      return MetricsPath.WALLPAPER_SEA_PEN_COLLECTION;
   }
 }
 
@@ -75,4 +86,21 @@ export function logGooglePhotosPreviewsLoadTime() {
 export function logKeyboardBacklightOpenZoneCustomizationUMA() {
   chrome.metricsPrivate.recordBoolean(
       HistogramName.KEYBOARD_BACKLIGHT_OPEN_ZONE_CUSTOMIZATION, true);
+}
+
+export function logDynamicColorToggleButtonClick(enabled: boolean) {
+  chrome.metricsPrivate.recordBoolean(
+      HistogramName.DYNAMIC_COLOR_TOGGLE_BUTTON, enabled);
+}
+
+export function logDynamicColorStaticColorButtonClick(color: StaticColor) {
+  chrome.metricsPrivate.recordEnumerationValue(
+      HistogramName.DYNAMIC_COLOR_STATIC_COLOR_BUTTON, color,
+      StaticColor.MAX_VALUE);
+}
+
+export function logDynamicColorColorSchemeButtonClick(color: ColorScheme) {
+  chrome.metricsPrivate.recordEnumerationValue(
+      HistogramName.DYNAMIC_COLOR_COLOR_SCHEME_BUTTON, color,
+      ColorScheme.MAX_VALUE);
 }

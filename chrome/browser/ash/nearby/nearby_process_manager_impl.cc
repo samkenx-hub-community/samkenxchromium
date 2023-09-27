@@ -11,10 +11,10 @@
 #include "base/time/time.h"
 #include "chrome/browser/ash/nearby/bluetooth_adapter_manager.h"
 #include "chrome/browser/ash/nearby/nearby_dependencies_provider.h"
-#include "chrome/browser/nearby_sharing/logging/logging.h"
 #include "chrome/browser/nearby_sharing/sharing_mojo_service.h"
 #include "chromeos/ash/services/nearby/public/mojom/nearby_decoder.mojom.h"
 #include "chromeos/ash/services/nearby/public/mojom/quick_start_decoder.mojom.h"
+#include "components/cross_device/logging/logging.h"
 #include "components/keyed_service/core/keyed_service.h"
 
 namespace ash {
@@ -29,8 +29,9 @@ void OnSharingShutDownComplete(
     mojo::Remote<sharing::mojom::Sharing> sharing,
     mojo::SharedRemote<::nearby::connections::mojom::NearbyConnections>
         connections,
+    mojo::SharedRemote<::ash::nearby::presence::mojom::NearbyPresence> presence,
     mojo::SharedRemote<sharing::mojom::NearbySharingDecoder> decoder) {
-  NS_LOG(INFO) << "Asynchronous process shutdown complete.";
+  CD_LOG(INFO, Feature::NS) << "Asynchronous process shutdown complete.";
   // Note: Let the parameters go out of scope, which will disconnect them.
 }
 
@@ -58,11 +59,14 @@ void NearbyProcessManagerImpl::Factory::SetFactoryForTesting(Factory* factory) {
 NearbyProcessManagerImpl::NearbyReferenceImpl::NearbyReferenceImpl(
     const mojo::SharedRemote<::nearby::connections::mojom::NearbyConnections>&
         connections,
+    const mojo::SharedRemote<::ash::nearby::presence::mojom::NearbyPresence>&
+        presence,
     const mojo::SharedRemote<sharing::mojom::NearbySharingDecoder>& decoder,
     const mojo::SharedRemote<quick_start::mojom::QuickStartDecoder>&
         quick_start_decoder,
     base::OnceClosure destructor_callback)
     : connections_(connections),
+      presence_(presence),
       decoder_(decoder),
       quick_start_decoder_(quick_start_decoder),
       destructor_callback_(std::move(destructor_callback)) {}
@@ -72,6 +76,7 @@ NearbyProcessManagerImpl::NearbyReferenceImpl::~NearbyReferenceImpl() {
   // that all connections to the utility process are destroyed before we attempt
   // to tear the process down.
   connections_.reset();
+  presence_.reset();
   decoder_.reset();
 
   std::move(destructor_callback_).Run();
@@ -80,6 +85,11 @@ NearbyProcessManagerImpl::NearbyReferenceImpl::~NearbyReferenceImpl() {
 const mojo::SharedRemote<::nearby::connections::mojom::NearbyConnections>&
 NearbyProcessManagerImpl::NearbyReferenceImpl::GetNearbyConnections() const {
   return connections_;
+}
+
+const mojo::SharedRemote<::ash::nearby::presence::mojom::NearbyPresence>&
+NearbyProcessManagerImpl::NearbyReferenceImpl::GetNearbyPresence() const {
+  return presence_;
 }
 
 const mojo::SharedRemote<sharing::mojom::NearbySharingDecoder>&
@@ -110,15 +120,16 @@ NearbyProcessManagerImpl::GetNearbyProcessReference(
     return nullptr;
   }
 
-  if (!sharing_ || !connections_ || !decoder_) {
+  if (!sharing_ || !connections_ || !presence_ || !decoder_) {
     if (!AttemptToBindToUtilityProcess()) {
-      NS_LOG(WARNING) << "Could not connect to Nearby utility process; this "
-                      << "likely means that the attempt was during shutdown.";
+      CD_LOG(WARNING, Feature::NS)
+          << "Could not connect to Nearby utility process; this "
+          << "likely means that the attempt was during shutdown.";
       return nullptr;
     }
   }
 
-  NS_LOG(VERBOSE) << "New Nearby process reference requested.";
+  CD_LOG(VERBOSE, Feature::NS) << "New Nearby process reference requested.";
   auto reference_id = base::UnguessableToken::Create();
   id_to_process_stopped_callback_map_.emplace(
       reference_id, std::move(on_process_stopped_callback));
@@ -129,9 +140,13 @@ NearbyProcessManagerImpl::GetNearbyProcessReference(
   shutdown_debounce_timer_->Stop();
 
   return std::make_unique<NearbyReferenceImpl>(
-      connections_, decoder_, quick_start_decoder_,
+      connections_, presence_, decoder_, quick_start_decoder_,
       base::BindOnce(&NearbyProcessManagerImpl::OnReferenceDeleted,
                      weak_ptr_factory_.GetWeakPtr(), reference_id));
+}
+
+void NearbyProcessManagerImpl::ShutDownProcess() {
+  DoShutDownProcess(NearbyProcessShutdownReason::kNormal);
 }
 
 void NearbyProcessManagerImpl::Shutdown() {
@@ -144,12 +159,12 @@ void NearbyProcessManagerImpl::Shutdown() {
   NearbyProcessShutdownReason shutdown_reason =
       NearbyProcessShutdownReason::kNormal;
 
-  ShutDownProcess(shutdown_reason);
+  DoShutDownProcess(shutdown_reason);
   NotifyProcessStopped(shutdown_reason);
 }
 
 bool NearbyProcessManagerImpl::AttemptToBindToUtilityProcess() {
-  DCHECK(!sharing_ && !connections_ && !decoder_);
+  CHECK(!sharing_ && !connections_ && !presence_ && !decoder_);
 
   sharing::mojom::NearbyDependenciesPtr deps =
       nearby_dependencies_provider_->GetDependencies();
@@ -158,7 +173,7 @@ bool NearbyProcessManagerImpl::AttemptToBindToUtilityProcess() {
     return false;
   }
 
-  NS_LOG(INFO) << "Starting up Nearby utility process.";
+  CD_LOG(INFO, Feature::NS) << "Starting up Nearby utility process.";
 
   // Bind to the Sharing interface, which launches the process.
   sharing_.Bind(sharing_binder_.Run());
@@ -178,6 +193,17 @@ bool NearbyProcessManagerImpl::AttemptToBindToUtilityProcess() {
           &NearbyProcessManagerImpl::OnMojoPipeDisconnect,
           weak_ptr_factory_.GetWeakPtr(),
           NearbyProcessShutdownReason::kConnectionsMojoPipeDisconnection),
+      base::SequencedTaskRunner::GetCurrentDefault());
+
+  mojo::PendingRemote<::ash::nearby::presence::mojom::NearbyPresence> presence;
+  mojo::PendingReceiver<::ash::nearby::presence::mojom::NearbyPresence>
+      presence_receiver = presence.InitWithNewPipeAndPassReceiver();
+  presence_.Bind(std::move(presence), /*bind_task_runner=*/nullptr);
+  presence_.set_disconnect_handler(
+      base::BindOnce(
+          &NearbyProcessManagerImpl::OnMojoPipeDisconnect,
+          weak_ptr_factory_.GetWeakPtr(),
+          NearbyProcessShutdownReason::kPresenceMojoPipeDisconnection),
       base::SequencedTaskRunner::GetCurrentDefault());
 
   mojo::PendingRemote<sharing::mojom::NearbySharingDecoder> decoder;
@@ -207,29 +233,30 @@ bool NearbyProcessManagerImpl::AttemptToBindToUtilityProcess() {
 
   // Pass these references to Connect() to start up the process.
   sharing_->Connect(std::move(deps), std::move(connections_receiver),
-                    std::move(decoder_receiver),
+                    std::move(presence_receiver), std::move(decoder_receiver),
                     std::move(quick_start_decoder_receiver));
 
   return true;
 }
 
 void NearbyProcessManagerImpl::OnSharingProcessCrash() {
-  NS_LOG(ERROR) << "The utility process has crashed.";
+  CD_LOG(ERROR, Feature::NS) << "The utility process has crashed.";
 
   NearbyProcessShutdownReason shutdown_reason =
       NearbyProcessShutdownReason::kCrash;
 
-  ShutDownProcess(shutdown_reason);
+  DoShutDownProcess(shutdown_reason);
   NotifyProcessStopped(shutdown_reason);
 }
 
 void NearbyProcessManagerImpl::OnMojoPipeDisconnect(
     NearbyProcessShutdownReason shutdown_reason) {
-  NS_LOG(ERROR) << "The browser process has detected that the utility process "
-                   "disconnected from a mojo pipe. ["
-                << shutdown_reason << "]";
+  CD_LOG(ERROR, Feature::NS)
+      << "The browser process has detected that the utility process "
+         "disconnected from a mojo pipe. ["
+      << shutdown_reason << "]";
 
-  ShutDownProcess(shutdown_reason);
+  DoShutDownProcess(shutdown_reason);
   NotifyProcessStopped(shutdown_reason);
 }
 
@@ -248,9 +275,10 @@ void NearbyProcessManagerImpl::OnReferenceDeleted(
     return;
   }
 
-  NS_LOG(VERBOSE) << "All Nearby references have been released; will shut down "
-                  << "process in " << kProcessCleanupTimeout << " unless a new "
-                  << "reference is obtained.";
+  CD_LOG(VERBOSE, Feature::NS)
+      << "All Nearby references have been released; will shut down "
+      << "process in " << kProcessCleanupTimeout << " unless a new "
+      << "reference is obtained.";
 
   // Stop the process, but wait |kProcessCleanupTimeout| before doing so. Adding
   // this additional timeout works around issues during Nearby shutdown
@@ -258,12 +286,12 @@ void NearbyProcessManagerImpl::OnReferenceDeleted(
   // TODO(https://crbug.com/1152892): Remove this timeout.
   shutdown_debounce_timer_->Start(
       FROM_HERE, kProcessCleanupTimeout,
-      base::BindOnce(&NearbyProcessManagerImpl::ShutDownProcess,
+      base::BindOnce(&NearbyProcessManagerImpl::DoShutDownProcess,
                      weak_ptr_factory_.GetWeakPtr(),
                      NearbyProcessShutdownReason::kNormal));
 }
 
-void NearbyProcessManagerImpl::ShutDownProcess(
+void NearbyProcessManagerImpl::DoShutDownProcess(
     NearbyProcessShutdownReason shutdown_reason) {
   if (!sharing_ && !connections_ && !decoder_) {
     return;
@@ -272,7 +300,7 @@ void NearbyProcessManagerImpl::ShutDownProcess(
   // Ensure that we don't try to stop the process again.
   shutdown_debounce_timer_->Stop();
 
-  NS_LOG(INFO) << "Shutting down Nearby utility process.";
+  CD_LOG(INFO, Feature::NS) << "Shutting down Nearby utility process.";
 
   base::UmaHistogramEnumeration(
       "Nearby.Connections.UtilityProcessShutdownReason", shutdown_reason);
@@ -283,6 +311,7 @@ void NearbyProcessManagerImpl::ShutDownProcess(
   if (!sharing_) {
     sharing_.reset();
     connections_.reset();
+    presence_.reset();
     decoder_.reset();
     return;
   }
@@ -294,7 +323,7 @@ void NearbyProcessManagerImpl::ShutDownProcess(
   sharing::mojom::Sharing* sharing = sharing_.get();
   sharing->ShutDown(base::BindOnce(&OnSharingShutDownComplete,
                                    std::move(sharing_), std::move(connections_),
-                                   std::move(decoder_)));
+                                   std::move(presence_), std::move(decoder_)));
   nearby_dependencies_provider_->PrepareForShutdown();
 }
 

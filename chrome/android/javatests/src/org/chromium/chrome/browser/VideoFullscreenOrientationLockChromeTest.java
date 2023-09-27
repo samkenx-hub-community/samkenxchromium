@@ -7,10 +7,10 @@ package org.chromium.chrome.browser;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.net.Uri;
-import android.support.test.InstrumentationRegistry;
 import android.view.KeyEvent;
 
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.Assert;
@@ -125,7 +125,8 @@ public class VideoFullscreenOrientationLockChromeTest {
         Uri fileUri = Uri.parse(UrlUtils.getIsolatedTestFileUrl(VIDEO_URL));
         String mimeType = "video/mp4";
         Intent intent = MediaViewerUtils.getMediaViewerIntent(fileUri, fileUri, mimeType,
-                true /* allowExternalAppHandlers */, mActivityTestRule.getActivity());
+                true /* allowExternalAppHandlers */, true /* allowShareAction */,
+                mActivityTestRule.getActivity());
         IntentHandler.startActivityForTrustedIntent(intent);
         waitUntilUnlocked();
 

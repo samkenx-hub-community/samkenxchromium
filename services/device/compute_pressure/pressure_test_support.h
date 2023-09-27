@@ -7,8 +7,11 @@
 
 #include <stdint.h>
 
+#include <type_traits>
+
 #include "base/functional/callback_forward.h"
 #include "base/synchronization/lock.h"
+#include "base/test/test_future.h"
 #include "base/thread_annotations.h"
 #include "base/time/time.h"
 #include "services/device/compute_pressure/cpu_probe.h"
@@ -16,6 +19,28 @@
 #include "services/device/public/mojom/pressure_update.mojom-shared.h"
 
 namespace device {
+
+// Test double for platform specific CpuProbe that overrides
+// OnPressureSampleAvailable() to get PressureSample.
+template <typename T,
+          typename = std::enable_if_t<std::is_base_of_v<CpuProbe, T>>>
+class FakePlatformCpuProbe : public T {
+ public:
+  template <typename... Args>
+  explicit FakePlatformCpuProbe(Args&&... args)
+      : T(std::forward<Args>(args)...) {}
+  ~FakePlatformCpuProbe() override = default;
+
+  void OnPressureSampleAvailable(PressureSample sample) override {
+    T::OnPressureSampleAvailable(sample);
+    sample_.SetValue(std::move(sample));
+  }
+
+  PressureSample WaitForSample() { return sample_.Take(); }
+
+ private:
+  base::test::TestFuture<PressureSample> sample_;
+};
 
 // Test double for CpuProbe that always returns a predetermined value.
 class FakeCpuProbe : public CpuProbe {

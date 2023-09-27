@@ -4,7 +4,10 @@
 
 #include "ash/system/audio/audio_effects_controller.h"
 
+#include <memory>
+
 #include "ash/accessibility/accessibility_controller_impl.h"
+#include "ash/constants/ash_features.h"
 #include "ash/resources/vector_icons/vector_icons.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
@@ -23,9 +26,11 @@ AudioEffectsController::AudioEffectsController() {
   auto* session_controller = Shell::Get()->session_controller();
   DCHECK(session_controller);
   session_observation_.Observe(session_controller);
+  CrasAudioHandler::Get()->AddAudioObserver(this);
 }
 
 AudioEffectsController::~AudioEffectsController() {
+  CrasAudioHandler::Get()->RemoveAudioObserver(this);
   VideoConferenceTrayEffectsManager& effects_manager =
       VideoConferenceTrayController::Get()->effects_manager();
   if (effects_manager.IsDelegateRegistered(this)) {
@@ -33,14 +38,23 @@ AudioEffectsController::~AudioEffectsController() {
   }
 }
 
+bool IsNoiseCancellationSupported() {
+  auto* cras_audio_handler = CrasAudioHandler::Get();
+  return cras_audio_handler->IsNoiseCancellationSupportedForDevice(
+      cras_audio_handler->GetPrimaryActiveInputNode());
+}
+
 bool AudioEffectsController::IsEffectSupported(VcEffectId effect_id) {
   switch (effect_id) {
     case VcEffectId::kNoiseCancellation:
-      return CrasAudioHandler::Get()->noise_cancellation_supported();
+      return IsNoiseCancellationSupported();
     case VcEffectId::kLiveCaption:
-      return captions::IsLiveCaptionFeatureSupported();
+      return base::FeatureList::IsEnabled(
+                 features::kShowLiveCaptionInVideoConferenceTray) &&
+             captions::IsLiveCaptionFeatureSupported();
     case VcEffectId::kBackgroundBlur:
     case VcEffectId::kPortraitRelighting:
+    case VcEffectId::kCameraFraming:
     case VcEffectId::kTestEffect:
       NOTREACHED();
       return false;
@@ -58,6 +72,7 @@ absl::optional<int> AudioEffectsController::GetEffectState(
                  : 0;
     case VcEffectId::kBackgroundBlur:
     case VcEffectId::kPortraitRelighting:
+    case VcEffectId::kCameraFraming:
     case VcEffectId::kTestEffect:
       NOTREACHED();
       return absl::nullopt;
@@ -72,7 +87,9 @@ void AudioEffectsController::OnEffectControlActivated(
       // Toggle noise cancellation.
       CrasAudioHandler* audio_handler = CrasAudioHandler::Get();
       bool new_state = !audio_handler->GetNoiseCancellationState();
-      audio_handler->SetNoiseCancellationState(new_state);
+      audio_handler->SetNoiseCancellationState(
+          new_state,
+          CrasAudioHandler::AudioSettingsChangeSource::kVideoConferenceTray);
       return;
     }
     case VcEffectId::kLiveCaption: {
@@ -85,6 +102,7 @@ void AudioEffectsController::OnEffectControlActivated(
     }
     case VcEffectId::kBackgroundBlur:
     case VcEffectId::kPortraitRelighting:
+    case VcEffectId::kCameraFraming:
     case VcEffectId::kTestEffect:
       NOTREACHED();
       return;
@@ -93,42 +111,72 @@ void AudioEffectsController::OnEffectControlActivated(
 
 void AudioEffectsController::OnActiveUserPrefServiceChanged(
     PrefService* pref_service) {
-  VideoConferenceTrayEffectsManager& effects_manager =
-      VideoConferenceTrayController::Get()->effects_manager();
-
-  // Invoked when the user initially logs in and on user switching in
-  // multi-profile. If the delegate is already registered, no need to continue.
-  if (effects_manager.IsDelegateRegistered(this)) {
-    return;
-  }
-
-  const bool noise_cancellation_supported =
+  noise_cancellation_supported_ =
       IsEffectSupported(VcEffectId::kNoiseCancellation);
-  const bool live_caption_supported =
-      IsEffectSupported(VcEffectId::kLiveCaption);
-
-  if (noise_cancellation_supported) {
+  if (noise_cancellation_supported_) {
     AddNoiseCancellationEffect();
   }
 
-  if (live_caption_supported) {
+  if (IsEffectSupported(VcEffectId::kLiveCaption)) {
     AddLiveCaptionEffect();
-  }
-
-  if (noise_cancellation_supported || live_caption_supported) {
-    effects_manager.RegisterDelegate(this);
   }
 }
 
+void AudioEffectsController::OnActiveInputNodeChanged() {
+  RefreshNoiseCancellationSupported();
+}
+
+void AudioEffectsController::OnAudioNodesChanged() {
+  RefreshNoiseCancellationSupported();
+}
+
+void AudioEffectsController::OnActiveOutputNodeChanged() {
+  RefreshNoiseCancellationSupported();
+}
+
+void AudioEffectsController::OnNoiseCancellationStateChanged() {
+  RefreshNoiseCancellationSupported();
+}
+
+void AudioEffectsController::RefreshNoiseCancellationSupported() {
+  const bool noise_cancellation_supported = IsNoiseCancellationSupported();
+
+  if (noise_cancellation_supported_ == noise_cancellation_supported) {
+    return;
+  }
+
+  noise_cancellation_supported_ = noise_cancellation_supported;
+
+  const bool effect_added = GetEffectById(VcEffectId::kNoiseCancellation);
+
+  if (noise_cancellation_supported_ && !effect_added) {
+    AddNoiseCancellationEffect();
+  } else if (!noise_cancellation_supported_ && effect_added) {
+    RemoveEffect(VcEffectId::kNoiseCancellation);
+  }
+
+  VideoConferenceTrayController::Get()
+      ->effects_manager()
+      .NotifyEffectSupportStateChanged(VcEffectId::kNoiseCancellation,
+                                       noise_cancellation_supported_);
+}
+
 void AudioEffectsController::AddNoiseCancellationEffect() {
+  const auto noise_cancellation_id = VcEffectId::kNoiseCancellation;
+
+  // Do nothing if the effect was already added.
+  if (GetEffectById(noise_cancellation_id)) {
+    return;
+  }
+
   std::unique_ptr<VcHostedEffect> effect = std::make_unique<VcHostedEffect>(
       /*type=*/VcEffectType::kToggle,
       /*get_state_callback=*/
       base::BindRepeating(&AudioEffectsController::GetEffectState,
-                          base::Unretained(this),
-                          VcEffectId::kNoiseCancellation),
-      /*effect_id=*/VcEffectId::kNoiseCancellation);
-  effect->AddState(std::make_unique<VcEffectState>(
+                          base::Unretained(this), noise_cancellation_id),
+      /*effect_id=*/noise_cancellation_id);
+
+  auto effect_state = std::make_unique<VcEffectState>(
       /*icon=*/&kVideoConferenceNoiseCancellationOnIcon,
       /*label_text=*/
       l10n_util::GetStringUTF16(
@@ -138,20 +186,40 @@ void AudioEffectsController::AddNoiseCancellationEffect() {
       /*button_callback=*/
       base::BindRepeating(&AudioEffectsController::OnEffectControlActivated,
                           weak_factory_.GetWeakPtr(),
-                          /*effect_id=*/VcEffectId::kNoiseCancellation,
-                          /*value=*/0)));
+                          /*effect_id=*/noise_cancellation_id,
+                          /*value=*/0));
+  effect_state->set_disabled_icon(&kVideoConferenceNoiseCancellationOffIcon);
+  effect->AddState(std::move(effect_state));
+
   effect->set_dependency_flags(VcHostedEffect::ResourceDependency::kMicrophone);
   AddEffect(std::move(effect));
+
+  // Register this delegate if needed so that the effect is added to the UI.
+  // Note that other functions might register this delegate already and we need
+  // to avoid registering twice.
+  VideoConferenceTrayEffectsManager& effects_manager =
+      VideoConferenceTrayController::Get()->effects_manager();
+  if (!effects_manager.IsDelegateRegistered(this)) {
+    effects_manager.RegisterDelegate(this);
+  }
 }
 
 void AudioEffectsController::AddLiveCaptionEffect() {
+  const auto live_caption_id = VcEffectId::kLiveCaption;
+
+  // Do nothing if the effect was already added.
+  if (GetEffectById(live_caption_id)) {
+    return;
+  }
+
   std::unique_ptr<VcHostedEffect> effect = std::make_unique<VcHostedEffect>(
       /*type=*/VcEffectType::kToggle,
       /*get_state_callback=*/
       base::BindRepeating(&AudioEffectsController::GetEffectState,
-                          base::Unretained(this), VcEffectId::kLiveCaption),
-      /*effect_id=*/VcEffectId::kLiveCaption);
-  effect->AddState(std::make_unique<VcEffectState>(
+                          base::Unretained(this), live_caption_id),
+      /*effect_id=*/live_caption_id);
+
+  auto effect_state = std::make_unique<VcEffectState>(
       /*icon=*/&kVideoConferenceLiveCaptionOnIcon,
       /*label_text=*/
       l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_LIVE_CAPTION),
@@ -160,9 +228,21 @@ void AudioEffectsController::AddLiveCaptionEffect() {
       /*button_callback=*/
       base::BindRepeating(&AudioEffectsController::OnEffectControlActivated,
                           weak_factory_.GetWeakPtr(),
-                          /*effect_id=*/VcEffectId::kLiveCaption,
-                          /*value=*/0)));
+                          /*effect_id=*/live_caption_id,
+                          /*value=*/0));
+  effect_state->set_disabled_icon(&kVideoConferenceLiveCaptionOffIcon);
+
+  effect->AddState(std::move(effect_state));
   AddEffect(std::move(effect));
+
+  // Register this delegate if needed so that the effect is added to the UI.
+  // Note that other functions might register this delegate already and we need
+  // to avoid registering twice.
+  VideoConferenceTrayEffectsManager& effects_manager =
+      VideoConferenceTrayController::Get()->effects_manager();
+  if (!effects_manager.IsDelegateRegistered(this)) {
+    effects_manager.RegisterDelegate(this);
+  }
 }
 
 }  // namespace ash

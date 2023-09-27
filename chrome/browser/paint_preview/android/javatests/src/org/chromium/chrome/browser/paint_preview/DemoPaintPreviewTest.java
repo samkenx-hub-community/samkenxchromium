@@ -24,7 +24,6 @@ import org.mockito.Mockito;
 
 import org.chromium.base.Callback;
 import org.chromium.base.test.util.Batch;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.paint_preview.services.PaintPreviewTabService;
 import org.chromium.chrome.browser.tab.Tab;
@@ -33,7 +32,7 @@ import org.chromium.chrome.browser.ui.appmenu.AppMenuTestSupport;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.paintpreview.player.PlayerManager;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
@@ -43,7 +42,7 @@ import java.util.concurrent.ExecutionException;
  * Tests for the {@link DemoPaintPreview} class.
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
-@Features.EnableFeatures({ChromeFeatureList.PAINT_PREVIEW_DEMO})
+@EnableFeatures({ChromeFeatureList.PAINT_PREVIEW_DEMO})
 @Batch(PER_CLASS)
 public class DemoPaintPreviewTest {
     @ClassRule

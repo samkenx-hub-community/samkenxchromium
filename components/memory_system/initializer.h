@@ -30,7 +30,10 @@ class Initializer {
       metrics::CallStackProfileParams::Process process_type);
   Initializer& SetDispatcherParameters(
       DispatcherParameters::PoissonAllocationSamplerInclusion
-          poisson_allocation_sampler_inclusion);
+          poisson_allocation_sampler_inclusion,
+      DispatcherParameters::AllocationTraceRecorderInclusion
+          allocation_trace_recorder_inclusion,
+      base::StringPiece process_type);
 
   void Initialize(MemorySystem& memory_system) const;
 

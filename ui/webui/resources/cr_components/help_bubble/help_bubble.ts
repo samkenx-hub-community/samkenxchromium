@@ -104,7 +104,6 @@ export class HelpBubbleElement extends PolymerElement {
   progress: Progress|null = null;
   bodyIconName: string|null;
   bodyIconAltText: string;
-  forceCloseButton: boolean;
   timeoutMs: number|null = null;
   timeoutTimerId: number|null = null;
   debouncedUpdate: (() => void)|null = null;
@@ -260,6 +259,25 @@ export class HelpBubbleElement extends PolymerElement {
     }));
   }
 
+  /**
+   * Handles ESC keypress (dismiss bubble) and prevents it from propagating up
+   * to parent elements.
+   */
+  private onKeyDown_(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      this.dismiss_();
+    }
+  }
+
+  /**
+   * Prevent event propagation. Attach to any event that should not bubble up
+   * out of the help bubble.
+   */
+  private blockPropagation_(e: Event) {
+    e.stopPropagation();
+  }
+
   private getProgressClass_(index: number): string {
     return index < this.progress!.current ? 'current-progress' :
                                             'total-progress';
@@ -278,11 +296,6 @@ export class HelpBubbleElement extends PolymerElement {
   private shouldShowBodyInMain_(progress: Progress|null, titleText: string):
       boolean {
     return !!progress || !!titleText;
-  }
-
-  private shouldShowCloseButton_(
-      buttons: HelpBubbleButtonParams[], forceCloseButton: boolean): boolean {
-    return buttons.length === 0 || forceCloseButton;
   }
 
   private shouldShowBodyIcon_(bodyIconName: string): boolean {
@@ -311,7 +324,8 @@ export class HelpBubbleElement extends PolymerElement {
   }
 
   private getButtonClass_(isDefault: boolean): string {
-    return isDefault ? 'default-button' : '';
+    return isDefault ? 'default-button focus-outline-visible' :
+                       'focus-outline-visible';
   }
 
   private getButtonTabIndex_(index: number, isDefault: boolean): number {

@@ -61,7 +61,6 @@ class ExtensionWebUITest : public ExtensionApiTest {
     }
 
     // Run the test.
-    bool actual_result = false;
     EXPECT_TRUE(ui_test_utils::NavigateToURL(browser(), page_url));
     content::RenderFrameHost* webui = browser()
                                           ->tab_strip_model()
@@ -69,7 +68,7 @@ class ExtensionWebUITest : public ExtensionApiTest {
                                           ->GetPrimaryMainFrame();
     if (!webui)
       return testing::AssertionFailure() << "Failed to navigate to WebUI";
-    CHECK(content::ExecuteScriptAndExtractBool(webui, script, &actual_result));
+    bool actual_result = content::EvalJs(webui, script).ExtractBool();
     return (expected_result == actual_result)
                ? testing::AssertionSuccess()
                : (testing::AssertionFailure() << "Check console output");
@@ -91,13 +90,10 @@ class ExtensionWebUIEmbeddedOptionsTest : public ExtensionWebUITest {
  public:
   void SetUpOnMainThread() override {
     ExtensionWebUITest::SetUpOnMainThread();
-    guest_view::GuestViewManager::set_factory_for_testing(
-        &test_guest_view_manager_factory_);
-    test_guest_view_manager_ = static_cast<guest_view::TestGuestViewManager*>(
-        guest_view::GuestViewManager::CreateWithDelegate(
+    test_guest_view_manager_ =
+        test_guest_view_manager_factory_.GetOrCreateTestGuestViewManager(
             browser()->profile(),
-            ExtensionsAPIClient::Get()->CreateGuestViewManagerDelegate(
-                browser()->profile())));
+            ExtensionsAPIClient::Get()->CreateGuestViewManagerDelegate());
   }
 
  protected:
@@ -111,7 +107,7 @@ class ExtensionWebUIEmbeddedOptionsTest : public ExtensionWebUITest {
 
     EXPECT_EQ(0U, test_guest_view_manager_->num_guests_created());
 
-    EXPECT_TRUE(content::ExecuteScript(
+    EXPECT_TRUE(content::ExecJs(
         webui,
         content::JsReplace(
             "let extensionoptions = document.createElement('extensionoptions');"
@@ -219,63 +215,82 @@ IN_PROC_BROWSER_TEST_F(ExtensionWebUITest, CanEmbedExtensionOptions) {
   ASSERT_TRUE(load_listener.WaitUntilSatisfied());
 }
 
-// Tests that an <extensionoptions> guest view can access the chrome.storage
-// API, a privileged extension API.
+// Tests that an <extensionoptions> guest view can access appropriate APIs,
+// including chrome.storage (semi-privileged; exposed to trusted contexts and
+// contexts like content scripts and embedded resources in platform apps) and
+// chrome.tabs (privileged; only exposed to trusted contexts).
 IN_PROC_BROWSER_TEST_F(ExtensionWebUIEmbeddedOptionsTest,
-                       ExtensionOptionsCanAccessStorage) {
+                       ExtensionOptionsCanAccessAppropriateAPIs) {
   const Extension* extension =
       LoadExtension(test_data_dir_.AppendASCII("extension_options")
                         .AppendASCII("extension_with_options_page"));
   ASSERT_TRUE(extension);
 
-  auto* guest_rfh = OpenExtensionOptions(extension);
+  auto* guest_render_frame_host = OpenExtensionOptions(extension);
 
+  // Check access to the storage API, both for getting/setting values and being
+  // notified of changes.
   const std::string storage_key = "test";
   const int storage_value = 42;
 
-  EXPECT_TRUE(content::ExecuteScript(
-      guest_rfh,
+  EXPECT_TRUE(content::ExecJs(
+      guest_render_frame_host,
       content::JsReplace("var onChangedPromise = new Promise((resolve) => {"
                          "  chrome.storage.onChanged.addListener((change) => {"
                          "    resolve(change[$1].newValue);"
                          "  });"
                          "});",
-                         storage_key)));
-
-  std::string set_result;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractString(
-      guest_rfh,
-      content::JsReplace(
-          "try {"
-          "  chrome.storage.local.set({$1: $2}, () => {"
-          "    domAutomationController.send("
-          "        chrome.runtime.lastError ?"
-          "            chrome.runtime.lastError.message : 'success');"
-          "  });"
-          "} catch (e) {"
-          "  domAutomationController.send(e.name + ': ' + e.message);"
-          "}",
-          storage_key, storage_value),
-      &set_result));
-  ASSERT_EQ("success", set_result);
-
-  int actual_value = 0;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractInt(
-      guest_rfh,
-      content::JsReplace("chrome.storage.local.get((storage) => {"
-                         "  domAutomationController.send(storage[$1]);"
-                         "});",
                          storage_key),
-      &actual_value));
-  EXPECT_EQ(storage_value, actual_value);
+      content::EXECUTE_SCRIPT_NO_RESOLVE_PROMISES));
 
-  EXPECT_TRUE(content::ExecuteScriptAndExtractInt(
-      guest_rfh,
-      "onChangedPromise.then((newValue) => {"
-      "  domAutomationController.send(newValue);"
-      "});",
-      &actual_value));
-  EXPECT_EQ(storage_value, actual_value);
+  ASSERT_EQ(
+      "success",
+      content::EvalJs(
+          guest_render_frame_host,
+          content::JsReplace(
+              "try {"
+              "  new Promise(resolve => {"
+              "    chrome.storage.local.set({$1: $2}, () => {"
+              "      resolve("
+              "          chrome.runtime.lastError ?"
+              "              chrome.runtime.lastError.message : 'success');"
+              "    });"
+              "  });"
+              "} catch (e) {"
+              "  e.name + ': ' + e.message;"
+              "}",
+              storage_key, storage_value)));
+
+  EXPECT_EQ(storage_value,
+            content::EvalJs(
+                guest_render_frame_host,
+                content::JsReplace("new Promise(resolve =>"
+                                   "  chrome.storage.local.get((storage) => "
+                                   "    resolve(storage[$1])));",
+                                   storage_key)));
+
+  EXPECT_EQ(storage_value,
+            content::EvalJs(guest_render_frame_host, "onChangedPromise;"));
+
+  // Now check access to the tabs API, which is restricted to
+  // Feature::BLESSED_EXTENSION_CONTEXTs (which this should be).
+  static constexpr char kTabsExecution[] =
+      R"(new Promise(r => {
+           chrome.tabs.create({}, (tab) => {
+             let message;
+             // Sanity check that it looks and smells like a tab.
+             if (tab && tab.index) {
+               message = 'success';
+             } else {
+               message = chrome.runtime.lastError ?
+                             chrome.runtime.lastError.message :
+                             'Unknown error';
+             }
+             r(message);
+           });
+         });)";
+  EXPECT_EQ("success",
+            content::EvalJs(guest_render_frame_host, kTabsExecution));
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionWebUIEmbeddedOptionsTest,
@@ -285,11 +300,11 @@ IN_PROC_BROWSER_TEST_F(ExtensionWebUIEmbeddedOptionsTest,
                         .AppendASCII("extension_with_options_page"));
   ASSERT_TRUE(extension);
 
-  auto* guest_rfh = OpenExtensionOptions(extension);
+  auto* guest_render_frame_host = OpenExtensionOptions(extension);
 
   content::WebContentsAddedObserver new_contents_observer;
-  EXPECT_TRUE(content::ExecuteScript(
-      guest_rfh, "document.getElementById('link').click();"));
+  EXPECT_TRUE(content::ExecJs(guest_render_frame_host,
+                              "document.getElementById('link').click();"));
   content::WebContents* new_contents = new_contents_observer.GetWebContents();
   EXPECT_NE(TabStripModel::kNoTab,
             browser()->tab_strip_model()->GetIndexOfWebContents(new_contents));
@@ -384,8 +399,8 @@ IN_PROC_BROWSER_TEST_F(ExtensionWebUITest, MultipleURLListeners) {
   EXPECT_FALSE(event_router->HasEventListener("test.onMessage"));
   // Register a listener and create a child frame at a different URL.
   content::TestNavigationObserver observer(web_contents);
-  EXPECT_TRUE(content::ExecuteScript(main_frame, R"(
-      const listener = e => {};
+  EXPECT_TRUE(content::ExecJs(main_frame, R"(
+      var listener = e => {};
       chrome.test.onMessage.addListener(listener);
       const iframe = document.createElement('iframe');
       iframe.src = 'chrome://test/body2.html';
@@ -398,7 +413,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionWebUITest, MultipleURLListeners) {
   content::RenderFrameHost* child_frame = ChildFrameAt(main_frame, 0);
   EXPECT_EQ(GURL("chrome://test/body2.html"),
             child_frame->GetLastCommittedURL());
-  EXPECT_TRUE(content::ExecuteScript(child_frame, R"(
+  EXPECT_TRUE(content::ExecJs(child_frame, R"(
       const listener = e => {};
       chrome.test.onMessage.addListener(listener);
       chrome.test.onMessage.removeListener(listener);
@@ -406,7 +421,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionWebUITest, MultipleURLListeners) {
   EXPECT_TRUE(event_router->HasEventListener("test.onMessage"));
 
   // Now remove last listener from main frame.
-  EXPECT_TRUE(content::ExecuteScript(main_frame, R"(
+  EXPECT_TRUE(content::ExecJs(main_frame, R"(
       chrome.test.onMessage.removeListener(listener);
   )"));
   EXPECT_FALSE(event_router->HasEventListener("test.onMessage"));

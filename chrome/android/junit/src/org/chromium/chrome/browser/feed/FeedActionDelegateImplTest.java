@@ -14,7 +14,6 @@ import android.content.Intent;
 
 import com.google.common.collect.ImmutableMap;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -31,6 +30,7 @@ import org.chromium.chrome.browser.bookmarks.BookmarkModel;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.native_page.NativePageNavigationDelegate;
 import org.chromium.chrome.browser.signin.SyncConsentActivityLauncherImpl;
+import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.ui.signin.SyncConsentActivityLauncher;
 import org.chromium.chrome.browser.util.BrowserUiUtils;
@@ -54,6 +54,9 @@ public final class FeedActionDelegateImplTest {
     @Mock
     private Context mActivityContext;
 
+    @Mock
+    private TabModelSelector mTabModelSelector;
+
     @Captor
     ArgumentCaptor<Intent> mIntentCaptor;
 
@@ -65,12 +68,8 @@ public final class FeedActionDelegateImplTest {
 
         SyncConsentActivityLauncherImpl.setLauncherForTest(mMockSyncConsentActivityLauncher);
         mFeedActionDelegateImpl = new FeedActionDelegateImpl(mActivityContext, mMockSnackbarManager,
-                mMockNavigationDelegate, mMockBookmarkModel, BrowserUiUtils.HostSurface.NOT_SET);
-    }
-
-    @After
-    public void tearDown() {
-        SyncConsentActivityLauncherImpl.setLauncherForTest(null);
+                mMockNavigationDelegate, mMockBookmarkModel, BrowserUiUtils.HostSurface.NOT_SET,
+                mTabModelSelector);
     }
 
     @Test
@@ -96,7 +95,7 @@ public final class FeedActionDelegateImplTest {
         FeatureList.setTestFeatures(ImmutableMap.of(ChromeFeatureList.CORMORANT, true));
         String webFeedName = "SomeFeedName";
 
-        mFeedActionDelegateImpl.openWebFeed(webFeedName);
+        mFeedActionDelegateImpl.openWebFeed(webFeedName, SingleWebFeedEntryPoint.OTHER);
 
         verify(mActivityContext).startActivity(mIntentCaptor.capture());
         Assert.assertArrayEquals("Feed ID not passed correctly.", webFeedName.getBytes(),
@@ -106,7 +105,7 @@ public final class FeedActionDelegateImplTest {
     @Test
     public void testOpenWebFeed_disabledWhenCormorantFlagDisabled() {
         FeatureList.setTestFeatures(ImmutableMap.of(ChromeFeatureList.CORMORANT, false));
-        mFeedActionDelegateImpl.openWebFeed("SomeFeedName");
+        mFeedActionDelegateImpl.openWebFeed("SomeFeedName", SingleWebFeedEntryPoint.OTHER);
         verify(mActivityContext, never()).startActivity(any());
     }
 }

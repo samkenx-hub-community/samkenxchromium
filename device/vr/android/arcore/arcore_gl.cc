@@ -12,7 +12,6 @@
 #include "base/android/jni_android.h"
 #include "base/containers/contains.h"
 #include "base/containers/queue.h"
-#include "base/cxx17_backports.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
@@ -24,7 +23,7 @@
 #include "device/vr/android/arcore/ar_image_transport.h"
 #include "device/vr/android/arcore/arcore.h"
 #include "device/vr/android/arcore/arcore_math_utils.h"
-#include "device/vr/android/arcore/type_converters.h"
+#include "device/vr/android/arcore/vr_service_type_converters.h"
 #include "device/vr/android/web_xr_presentation_state.h"
 #include "device/vr/android/xr_java_coordinator.h"
 #include "device/vr/public/cpp/xr_frame_sink_client.h"
@@ -223,7 +222,7 @@ void ArCoreGl::Initialize(
 
   // Get the activity context.
   base::android::ScopedJavaLocalRef<jobject> application_context =
-      session_utils->GetApplicationContext();
+      session_utils->GetCurrentActivityContext();
   if (!application_context.obj()) {
     DLOG(ERROR) << "Unable to retrieve the Java context/activity!";
     std::move(callback).Run(
@@ -873,7 +872,7 @@ base::TimeDelta ArCoreGl::EstimatedArCoreFrameTime() {
   // Ensure that the returned value is within ARCore's nominal frame time range.
   // This helps avoid underestimating the frame rate if the app is too slow
   // to reach the minimum target FPS value.
-  return base::clamp(frametime, min_frametime, max_frametime);
+  return std::clamp(frametime, min_frametime, max_frametime);
 }
 
 base::TimeDelta ArCoreGl::WaitTimeForArCoreUpdate() {
@@ -1422,13 +1421,6 @@ void ArCoreGl::GetEnvironmentIntegrationProvider(
   environment_receiver_.Bind(std::move(environment_provider));
   environment_receiver_.set_disconnect_handler(base::BindOnce(
       &ArCoreGl::OnBindingDisconnect, weak_ptr_factory_.GetWeakPtr()));
-}
-
-void ArCoreGl::SetInputSourceButtonListener(
-    mojo::PendingAssociatedRemote<device::mojom::XRInputSourceButtonListener>) {
-  // Input eventing is not supported. This call should not
-  // be made on this device.
-  frame_data_receiver_.ReportBadMessage("Input eventing is not supported.");
 }
 
 void ArCoreGl::SubscribeToHitTest(

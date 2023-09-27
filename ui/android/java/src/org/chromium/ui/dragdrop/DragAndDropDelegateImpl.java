@@ -23,7 +23,6 @@ import android.view.DragEvent;
 import android.view.View;
 import android.view.View.DragShadowBuilder;
 import android.view.ViewGroup;
-import android.view.accessibility.AccessibilityManager;
 import android.widget.ImageView;
 
 import androidx.annotation.IntDef;
@@ -40,6 +39,10 @@ import org.chromium.base.compat.ApiHelperForN;
 import org.chromium.base.compat.ApiHelperForO;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.ui.R;
+import org.chromium.ui.accessibility.AccessibilityState;
+import org.chromium.ui.base.MimeTypeUtils;
+import org.chromium.ui.dragdrop.AnimatedImageDragShadowBuilder.CursorOffset;
+import org.chromium.ui.dragdrop.AnimatedImageDragShadowBuilder.DragShadowSpec;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -108,10 +111,10 @@ public class DragAndDropDelegateImpl implements DragAndDropDelegate, DragStateTr
             int dragObjRectWidth, int dragObjRectHeight) {
         // Drag and drop is disabled when gesture related a11y service is enabled.
         // See https://crbug.com/1250067.
-        AccessibilityManager a11yManager =
-                (AccessibilityManager) containerView.getContext().getSystemService(
-                        Context.ACCESSIBILITY_SERVICE);
-        if (a11yManager.isEnabled() && a11yManager.isTouchExplorationEnabled()) return false;
+        if (AccessibilityState.isTouchExplorationEnabled()
+                || AccessibilityState.isPerformGesturesEnabled()) {
+            return false;
+        }
 
         ClipData clipdata = buildClipData(dropData);
         if (clipdata == null) {
@@ -206,7 +209,10 @@ public class DragAndDropDelegateImpl implements DragAndDropDelegate, DragStateTr
         int type = getDragTargetType(dropData);
         switch (type) {
             case DragTargetType.TEXT:
-                return ClipData.newPlainText(null, dropData.text);
+                return new ClipData(null,
+                        new String[] {ClipDescription.MIMETYPE_TEXT_PLAIN,
+                                MimeTypeUtils.CHROME_MIMETYPE_TEXT},
+                        new Item(dropData.text));
             case DragTargetType.IMAGE:
                 Uri cachedUri = DropDataProviderUtils.cacheImageData(dropData);
                 // If there's no content provider we shouldn't start the drag.
@@ -231,7 +237,8 @@ public class DragAndDropDelegateImpl implements DragAndDropDelegate, DragStateTr
                     if (intent != null) {
                         return new ClipData(null,
                                 new String[] {ClipDescription.MIMETYPE_TEXT_PLAIN,
-                                        ClipDescription.MIMETYPE_TEXT_INTENT},
+                                        ClipDescription.MIMETYPE_TEXT_INTENT,
+                                        MimeTypeUtils.CHROME_MIMETYPE_LINK},
                                 new Item(getTextForLinkData(dropData), intent, null));
                     }
                 }
@@ -291,13 +298,13 @@ public class DragAndDropDelegateImpl implements DragAndDropDelegate, DragStateTr
                         context, dragShadowSpec.targetWidth, dragShadowSpec.targetHeight);
                 if (mDragAndDropBrowserDelegate != null
                         && mDragAndDropBrowserDelegate.getSupportAnimatedImageDragShadow()) {
-                    // TODO(shuyng): Need update to support cropped image.
-                    //  See go/animated-image-drag-shadow-corner-cases for details.
                     assert dragObjRectWidth != 0;
-                    float scaleFactor = (float) dragShadowSpec.startWidth / dragObjRectWidth;
-                    return new AnimatedImageDragShadowBuilder(containerView, shadowImage,
-                            cursorOffsetX * scaleFactor, cursorOffsetY * scaleFactor,
+                    assert dragObjRectHeight != 0;
+                    CursorOffset cursorOffset = AnimatedImageDragShadowBuilder.adjustCursorOffset(
+                            cursorOffsetX, cursorOffsetY, dragObjRectWidth, dragObjRectHeight,
                             dragShadowSpec);
+                    return new AnimatedImageDragShadowBuilder(containerView, shadowImage,
+                            cursorOffset.x, cursorOffset.y, dragShadowSpec);
                 } else {
                     updateShadowImage(context, shadowImage, imageView, dragShadowSpec.targetWidth,
                             dragShadowSpec.targetHeight);
@@ -441,22 +448,5 @@ public class DragAndDropDelegateImpl implements DragAndDropDelegate, DragStateTr
     @VisibleForTesting
     float getDragStartYDp() {
         return mDragStartYDp;
-    }
-
-    static class DragShadowSpec {
-        public final int startWidth;
-        public final int startHeight;
-        public final int targetWidth;
-        public final int targetHeight;
-        public final boolean isTruncated;
-
-        DragShadowSpec(int startWidth, int startHeight, int targetWidth, int targetHeight,
-                boolean isTruncated) {
-            this.startWidth = startWidth;
-            this.startHeight = startHeight;
-            this.targetWidth = targetWidth;
-            this.targetHeight = targetHeight;
-            this.isTruncated = isTruncated;
-        }
     }
 }

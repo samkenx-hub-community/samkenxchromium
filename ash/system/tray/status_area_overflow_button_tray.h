@@ -10,6 +10,7 @@
 #include "ash/ash_export.h"
 #include "ash/system/tray/tray_background_view.h"
 #include "ash/system/tray/tray_bubble_view.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/gfx/animation/animation_delegate.h"
 #include "ui/views/controls/image_view.h"
@@ -42,6 +43,8 @@ class ASH_EXPORT StatusAreaOverflowButtonTray : public TrayBackgroundView {
 
   // TrayBackgroundView:
   void ClickedOutsideBubble() override;
+  // No need to override since this view doesn't have an active/inactive state.
+  void UpdateTrayItemColor(bool is_active) override {}
   std::u16string GetAccessibleNameForTray() override;
   void HandleLocaleChange() override;
   void HideBubbleWithView(const TrayBubbleView* bubble_view) override;
@@ -80,7 +83,7 @@ class ASH_EXPORT StatusAreaOverflowButtonTray : public TrayBackgroundView {
   State state_ = CLICK_TO_EXPAND;
 
   // Owned by the views hierarchy.
-  IconView* const icon_;
+  const raw_ptr<IconView, ExperimentalAsh> icon_;
 };
 
 }  // namespace ash

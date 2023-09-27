@@ -11,12 +11,13 @@
 #include "base/files/file.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/threading/sequence_bound.h"
 #include "base/values.h"
 #include "chrome/browser/ash/fusebox/fusebox.pb.h"
 #include "chrome/browser/ash/fusebox/fusebox_moniker.h"
-#include "chrome/browser/ash/fusebox/fusebox_staging.pb.h"
+#include "chrome/browser/ash/system_web_apps/apps/files_internals_debug_json_provider.h"
 #include "storage/browser/file_system/async_file_util.h"
 #include "storage/browser/file_system/file_system_context.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
@@ -27,7 +28,7 @@ namespace fusebox {
 
 class ReadWriter;
 
-class Server {
+class Server : public ash::FilesInternalsDebugJSONProvider {
  public:
   struct Delegate {
     // These methods cause D-Bus signals to be sent that a storage unit (as
@@ -47,7 +48,7 @@ class Server {
   explicit Server(Delegate* delegate);
   Server(const Server&) = delete;
   Server& operator=(const Server&) = delete;
-  ~Server();
+  ~Server() override;
 
   // Manages monikers in the context of the Server's MonikerMap.
   fusebox::Moniker CreateMoniker(const storage::FileSystemURL& target,
@@ -73,8 +74,26 @@ class Server {
   storage::FileSystemURL ResolveFilename(Profile* profile,
                                          const std::string& filename);
 
-  // Returns human-readable debugging information as a JSON value.
-  base::Value GetDebugJSON();
+  // Performs the inverse of ResolveFilename. It converts a FileSystemURL like
+  // "filesystem:origin/external/mount_name/xxx/yyy/p/q.txt" to a FuseBox
+  // filename like "/media/fuse/fusebox/subdir/p/q.txt".
+  //
+  // It returns an empty base::FilePath on failure, such as when there was no
+  // previously registered (subdir, fs_url_prefix) that matched.
+  base::FilePath InverseResolveFSURL(const storage::FileSystemURL& fs_url);
+
+  // Chains GetInstance and InverseResolveFSURL, returning an empty
+  // base::FilePath when there is no instance.
+  static base::FilePath SubstituteFuseboxFilePath(
+      const storage::FileSystemURL& fs_url) {
+    Server* server = GetInstance();
+    return server ? server->InverseResolveFSURL(fs_url) : base::FilePath();
+  }
+
+  // ash::FilesInternalsDebugJSONProvider overrides.
+  void GetDebugJSONForKey(
+      std::string_view key,
+      base::OnceCallback<void(JSONKeyValuePair)> callback) override;
 
   // These methods map 1:1 to the D-Bus methods implemented by
   // fusebox_service_provider.cc.
@@ -311,7 +330,7 @@ class Server {
   // Returns the fuse_handle that is the map key.
   uint64_t InsertFuseFileMapEntry(FuseFileMapEntry&& entry);
 
-  Delegate* delegate_;
+  raw_ptr<Delegate, ExperimentalAsh> delegate_;
   FuseFileMap fuse_file_map_;
   fusebox::MonikerMap moniker_map_;
   PrefixMap prefix_map_;

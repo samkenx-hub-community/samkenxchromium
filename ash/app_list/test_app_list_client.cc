@@ -9,6 +9,7 @@
 #include "ash/app_list/app_list_model_provider.h"
 #include "ash/app_list/model/app_list_item.h"
 #include "ash/public/cpp/app_list/app_list_controller.h"
+#include "ash/public/cpp/app_list/app_list_types.h"
 #include "base/functional/bind.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
@@ -16,9 +17,22 @@
 
 namespace ash {
 
+namespace {
+class FakeScopedIphSession : public ScopedIphSession {
+ public:
+  ~FakeScopedIphSession() override = default;
+  void NotifyEvent(const std::string& event) override {}
+};
+}  // namespace
+
 TestAppListClient::TestAppListClient() = default;
 
 TestAppListClient::~TestAppListClient() = default;
+
+std::vector<AppListSearchControlCategory>
+TestAppListClient::GetToggleableCategories() const {
+  return toggleable_categories_for_test_;
+}
 
 void TestAppListClient::StartZeroStateSearch(base::OnceClosure on_done,
                                              base::TimeDelta timeout) {
@@ -83,6 +97,19 @@ AppListNotifier* TestAppListClient::GetNotifier() {
   return nullptr;
 }
 
+void TestAppListClient::RecalculateWouldTriggerLauncherSearchIph() {}
+
+std::unique_ptr<ScopedIphSession>
+TestAppListClient::CreateLauncherSearchIphSession() {
+  return std::make_unique<FakeScopedIphSession>();
+}
+
+void TestAppListClient::OpenSearchBoxIphUrl() {}
+
+void TestAppListClient::LoadIcon(int profile_id, const std::string& app_id) {
+  loaded_icon_app_ids_.push_back(app_id);
+}
+
 std::vector<TestAppListClient::SearchResultActionId>
 TestAppListClient::GetAndResetInvokedResultActions() {
   std::vector<SearchResultActionId> result;
@@ -99,13 +126,6 @@ std::vector<std::u16string> TestAppListClient::GetAndResetPastSearchQueries() {
 ash::AppListSortOrder TestAppListClient::GetPermanentSortingOrder() const {
   NOTIMPLEMENTED();
   return ash::AppListSortOrder::kCustom;
-}
-
-void TestAppListClient::CommitTemporarySortOrder() {
-  // Committing the temporary sort order should not introduce item reorder so
-  // reset the sort order without reorder animation.
-  AppListController::Get()->UpdateAppListWithNewTemporarySortOrder(
-      /*new_order=*/absl::nullopt, /*animate=*/false, base::NullCallback());
 }
 
 void TestAppListClient::OnZeroStateSearchDone(base::OnceClosure on_done) {

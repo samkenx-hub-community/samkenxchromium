@@ -85,7 +85,7 @@ class XRRuntimeManagerTest : public testing::Test {
   void DropRuntimeManagerRef() { xr_runtime_manager_ = nullptr; }
 
  private:
-  raw_ptr<device::FakeVRDeviceProvider> provider_ = nullptr;
+  raw_ptr<device::FakeVRDeviceProvider, DanglingUntriaged> provider_ = nullptr;
   scoped_refptr<XRRuntimeManagerImpl> xr_runtime_manager_;
 };
 
@@ -108,7 +108,7 @@ TEST_F(XRRuntimeManagerTest, GetNoDevicesTest) {
 
   // GetDeviceByIndex should return nullptr if an invalid index in queried.
   device::mojom::XRRuntime* queried_device =
-      GetRuntimeForTest(device::mojom::XRDeviceId::GVR_DEVICE_ID);
+      GetRuntimeForTest(device::mojom::XRDeviceId::FAKE_DEVICE_ID);
   EXPECT_EQ(nullptr, queried_device);
 }
 

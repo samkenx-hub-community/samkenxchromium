@@ -12,19 +12,17 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "base/scoped_observation.h"
 #include "build/build_config.h"
+#include "components/enterprise/buildflags/buildflags.h"
 #include "components/enterprise/common/files_scan_data.h"
 #include "components/safe_browsing/buildflags.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/render_widget_host.h"
-#include "content/public/browser/render_widget_host_observer.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "net/base/directory_lister.h"
 #include "third_party/blink/public/mojom/choosers/file_chooser.mojom.h"
 #include "ui/shell_dialogs/select_file_dialog.h"
 
-#if BUILDFLAG(FULL_SAFE_BROWSING)
+#if BUILDFLAG(ENTERPRISE_CLOUD_CONTENT_ANALYSIS)
 #include "chrome/browser/enterprise/connectors/analysis/content_analysis_delegate.h"
 #endif
 
@@ -40,22 +38,21 @@ struct SelectedFileInfo;
 }
 
 namespace policy {
-FORWARD_DECLARE_TEST(DlpFilesControllerBrowserTest, FilesUploadCallerPassed);
+FORWARD_DECLARE_TEST(DlpFilesControllerAshBrowserTest, FilesUploadCallerPassed);
 }  // namespace policy
 
 // This class handles file-selection requests coming from renderer processes.
 // It implements both the initialisation and listener functions for
 // file-selection dialogs.
 //
-// Since FileSelectHelper listens to observations of a widget, it needs to live
-// on and be destroyed on the UI thread. References to FileSelectHelper may be
+// Since FileSelectHelper listens to WebContentsObserver, it needs to live on
+// and be destroyed on the UI thread. References to FileSelectHelper may be
 // passed on to other threads.
 class FileSelectHelper : public base::RefCountedThreadSafe<
                              FileSelectHelper,
                              content::BrowserThread::DeleteOnUIThread>,
                          public ui::SelectFileDialog::Listener,
                          public content::WebContentsObserver,
-                         public content::RenderWidgetHostObserver,
                          private net::DirectoryLister::DirectoryListerDelegate {
  public:
   FileSelectHelper(const FileSelectHelper&) = delete;
@@ -111,7 +108,7 @@ class FileSelectHelper : public base::RefCountedThreadSafe<
       ContentAnalysisCompletionCallback_FolderUpload_OKBad);
   FRIEND_TEST_ALL_PREFIXES(FileSelectHelperTest, GetFileTypesFromAcceptType);
   FRIEND_TEST_ALL_PREFIXES(FileSelectHelperTest, MultipleFileExtensionsForMime);
-  FRIEND_TEST_ALL_PREFIXES(policy::DlpFilesControllerBrowserTest,
+  FRIEND_TEST_ALL_PREFIXES(policy::DlpFilesControllerAshBrowserTest,
                            FilesUploadCallerPassed);
 
   explicit FileSelectHelper(Profile* profile);
@@ -151,10 +148,6 @@ class FileSelectHelper : public base::RefCountedThreadSafe<
       const std::vector<ui::SelectedFileInfo>& files,
       void* params) override;
   void FileSelectionCanceled(void* params) override;
-
-  // content::RenderWidgetHostObserver overrides.
-  void RenderWidgetHostDestroyed(
-      content::RenderWidgetHost* widget_host) override;
 
   // content::WebContentsObserver overrides.
   void RenderFrameHostChanged(content::RenderFrameHost* old_host,
@@ -219,8 +212,10 @@ class FileSelectHelper : public base::RefCountedThreadSafe<
   // platform, this function calls NotifyListenerAndEnd() directly.
   //
   // ContentAnalysisCompletionCallback: processes the results of the deep scan.
-  // Any files that did not pass the scan are removed from the list.  Ends by
-  // calling NotifyListenerAndEnd().
+  // For folder upload, any files not passing the scan result in the entire
+  // folder being blocked (the list cleared). For multiple-file upload, any
+  // files that did not pass the scan are removed from the list. Ends by calling
+  // NotifyListenerAndEnd().
   //
   // NotifyListenerAndEnd: Informs the listener of the final list of files to
   // use and performs any required cleanup.
@@ -236,31 +231,10 @@ class FileSelectHelper : public base::RefCountedThreadSafe<
   void PerformContentAnalysisIfNeeded(
       std::vector<blink::mojom::FileChooserFileInfoPtr> list);
 
-#if BUILDFLAG(FULL_SAFE_BROWSING)
+#if BUILDFLAG(ENTERPRISE_CLOUD_CONTENT_ANALYSIS)
   // Callback used to receive the results of a content analysis scan.
   void ContentAnalysisCompletionCallback(
       std::vector<blink::mojom::FileChooserFileInfoPtr> list,
-      const enterprise_connectors::ContentAnalysisDelegate::Data& data,
-      enterprise_connectors::ContentAnalysisDelegate::Result& result);
-#endif
-
-  // Perform a content analysis when using the file selection helper in
-  // folder selection mode.  In this case, if any one file would be blocked,
-  // the entire folder should be blocked.
-  void PerformContentAnalysisForFolderUploadIfNeeded(
-      const base::FilePath& path);
-
-#if BUILDFLAG(FULL_SAFE_BROWSING)
-  // Callback used with the FilesScanData class to calculate the files
-  // required for scanning during folder upload.
-  void ScanDataCallback(
-      const base::FilePath& path,
-      std::unique_ptr<enterprise_connectors::FilesScanData> files_scan_data);
-
-  // Callback used to receive the results of a content analysis scan
-  // when doing a folder upload.
-  void FolderUploadContentAnalysisCompletionCallback(
-      const base::FilePath& path,
       const enterprise_connectors::ContentAnalysisDelegate::Data& data,
       enterprise_connectors::ContentAnalysisDelegate::Result& result);
 #endif
@@ -287,8 +261,6 @@ class FileSelectHelper : public base::RefCountedThreadSafe<
       scoped_refptr<content::FileSelectListener> listener);
 
   void DontAbortOnMissingWebContentsForTesting();
-
-  bool IsDirectoryEnumerationStartedForTesting();
 
   // Helper method to get allowed extensions for select file dialog from
   // the specified accept types as defined in the spec:
@@ -349,10 +321,6 @@ class FileSelectHelper : public base::RefCountedThreadSafe<
   // more than one going on at a time.
   struct ActiveDirectoryEnumeration;
   std::unique_ptr<ActiveDirectoryEnumeration> directory_enumeration_;
-
-  base::ScopedObservation<content::RenderWidgetHost,
-                          content::RenderWidgetHostObserver>
-      observation_{this};
 
   // Temporary files only used on OSX. This class is responsible for deleting
   // these files when they are no longer needed.

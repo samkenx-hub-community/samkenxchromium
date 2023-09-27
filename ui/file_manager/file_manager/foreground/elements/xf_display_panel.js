@@ -4,7 +4,7 @@
 
 import {html} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {str, util} from '../../common/js/util.js';
+import {str, strf, util} from '../../common/js/util.js';
 
 import {PanelItem} from './xf_panel_item.js';
 
@@ -45,8 +45,6 @@ export class DisplayPanel extends HTMLElement {
      * @private
      */
     this.items_ = [];
-
-    this.setAriaHidden_();
   }
 
   /**
@@ -56,6 +54,15 @@ export class DisplayPanel extends HTMLElement {
   createElement_() {
     const fragment = htmlTemplate.content.cloneNode(true);
     this.attachShadow({mode: 'open'}).appendChild(fragment);
+  }
+
+  /**
+   * We cannot set attributes in the constructor for custom elements when using
+   * `createElement()`. Set attributes in the connected callback instead.
+   * @private
+   */
+  connectedCallback() {
+    this.setAriaHidden_();
   }
 
   /**
@@ -152,6 +159,7 @@ export class DisplayPanel extends HTMLElement {
       return;
     }
     let errors = 0;
+    let warnings = 0;
     let progressCount = 0;
     const connectedPanels = this.connectedPanelItems_();
     for (const panel of connectedPanels) {
@@ -163,41 +171,69 @@ export class DisplayPanel extends HTMLElement {
         progressCount++;
       } else if (panel.panelType === panel.panelTypeError) {
         errors++;
+      } else if (panel.panelType === panel.panelTypeInfo) {
+        warnings++;
       }
     }
     if (progressCount > 0) {
       total /= progressCount;
     }
     const summaryPanel = this.summary_.querySelector('xf-panel-item');
-    if (summaryPanel) {
-      // Show either a progress indicator or error count if no operations going.
-      if (progressCount > 0) {
-        // Make sure we have a progress indicator on the summary panel.
-        if (summaryPanel.indicator != 'largeprogress') {
-          summaryPanel.indicator = 'largeprogress';
-        }
-        summaryPanel.primaryText =
-            util.strf('PERCENT_COMPLETE', total.toFixed(0));
-        summaryPanel.progress = total;
-        summaryPanel.setAttribute('count', progressCount);
-        summaryPanel.errorMarkerVisibility =
-            (errors > 0) ? 'visible' : 'hidden';
-      } else if (errors == 0) {
-        if (summaryPanel.indicator != 'status') {
-          summaryPanel.indicator = 'status';
-          summaryPanel.status = 'success';
-          summaryPanel.primaryText = util.strf('PERCENT_COMPLETE', 100);
-        }
-      } else {
-        // Make sure we have a failure indicator on the summary panel.
-        if (summaryPanel.indicator != 'status') {
-          summaryPanel.indicator = 'status';
-          summaryPanel.status = 'failure';
-        }
-        summaryPanel.primaryText =
-            util.strf('ERROR_PROGRESS_SUMMARY_PLURAL', errors);
-      }
+    if (!summaryPanel) {
+      return;
     }
+    // Show either a progress indicator or a status indicator (success, warning,
+    // error) if no operations are ongoing.
+    if (progressCount > 0) {
+      // Make sure we have a progress indicator on the summary panel.
+      if (summaryPanel.indicator != 'largeprogress') {
+        summaryPanel.indicator = 'largeprogress';
+      }
+      summaryPanel.primaryText =
+          util.strf('PERCENT_COMPLETE', total.toFixed(0));
+      summaryPanel.progress = total;
+      summaryPanel.setAttribute('count', progressCount);
+      summaryPanel.errorMarkerVisibility = (errors > 0) ? 'visible' : 'hidden';
+      return;
+    }
+
+    if (summaryPanel.indicator != 'status') {
+      // Make sure we have a status indicator on the summary panel.
+      summaryPanel.indicator = 'status';
+    }
+
+    if (errors > 0 && warnings > 0) {
+      // Both errors and warnings: show the error indicator, along with counts
+      // of both.
+      summaryPanel.status = 'failure';
+      summaryPanel.primaryText =
+          util.strf('ERROR_PROGRESS_SUMMARY_PLURAL', errors) + ' ' +
+          this.generateWarningMessage_(warnings);
+      return;
+    }
+
+    if (errors > 0) {
+      // Only errors, but no warnings.
+      summaryPanel.status = 'failure';
+      summaryPanel.primaryText =
+          util.strf('ERROR_PROGRESS_SUMMARY_PLURAL', errors);
+      if (warnings > 0) {
+        summaryPanel.primaryText +=
+            ' ' + this.generateWarningMessage_(warnings);
+      }
+      return;
+    }
+
+    if (warnings > 0) {
+      // Only warnings, but no errors.
+      summaryPanel.status = 'warning';
+      summaryPanel.primaryText = this.generateWarningMessage_(warnings);
+      return;
+    }
+
+    // No errors or warnings.
+    summaryPanel.status = 'success';
+    summaryPanel.primaryText = util.strf('PERCENT_COMPLETE', 100);
   }
 
   /**
@@ -368,6 +404,22 @@ export class DisplayPanel extends HTMLElement {
     this.items_ = [];
     this.setAriaHidden_();
     this.updateSummaryPanel();
+  }
+
+  /**
+   * Generates the summary panel title message based on the number of warnings.
+   * @param {number} warnings Number of warning subpanels.
+   * @returns {string} Title text.
+   * @private
+   */
+  generateWarningMessage_(warnings) {
+    if (warnings <= 0) {
+      console.warn(`generateWarningMessage_ expected warnings > 0, but got ${
+          warnings}.`);
+      return '';
+    }
+    return warnings === 1 ? str('WARNING_PROGRESS_SUMMARY_SINGLE') :
+                            strf('WARNING_PROGRESS_SUMMARY_PLURAL', warnings);
   }
 }
 

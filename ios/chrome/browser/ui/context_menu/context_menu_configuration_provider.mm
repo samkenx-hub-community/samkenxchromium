@@ -6,36 +6,39 @@
 
 #import "base/ios/ios_util.h"
 #import "base/metrics/histogram_functions.h"
-#import "base/metrics/histogram_macros.h"
 #import "base/metrics/user_metrics.h"
 #import "components/prefs/pref_service.h"
 #import "components/search_engines/template_url_service.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/favicon/favicon_loader.h"
 #import "ios/chrome/browser/favicon/ios_chrome_favicon_loader_factory.h"
-#import "ios/chrome/browser/main/browser.h"
+#import "ios/chrome/browser/photos/photos_availability.h"
 #import "ios/chrome/browser/policy/policy_util.h"
-#import "ios/chrome/browser/prefs/pref_names.h"
+#import "ios/chrome/browser/reading_list/reading_list_browser_agent.h"
 #import "ios/chrome/browser/search_engines/search_engines_util.h"
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
+#import "ios/chrome/browser/shared/coordinator/alert/action_sheet_coordinator.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state_browser_agent.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
-#import "ios/chrome/browser/shared/public/commands/browser_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/lens_commands.h"
+#import "ios/chrome/browser/shared/public/commands/mini_map_commands.h"
 #import "ios/chrome/browser/shared/public/commands/reading_list_add_command.h"
 #import "ios/chrome/browser/shared/public/commands/search_image_with_lens_command.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/util/image/image_copier.h"
+#import "ios/chrome/browser/shared/ui/util/image/image_saver.h"
 #import "ios/chrome/browser/shared/ui/util/pasteboard_util.h"
 #import "ios/chrome/browser/shared/ui/util/url_with_title.h"
-#import "ios/chrome/browser/ui/alert_coordinator/action_sheet_coordinator.h"
+#import "ios/chrome/browser/ui/context_menu/context_menu_configuration_provider+private.h"
 #import "ios/chrome/browser/ui/context_menu/context_menu_utils.h"
-#import "ios/chrome/browser/ui/image_util/image_copier.h"
-#import "ios/chrome/browser/ui/image_util/image_saver.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_commands.h"
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_scene_agent.h"
 #import "ios/chrome/browser/ui/lens/lens_availability.h"
 #import "ios/chrome/browser/ui/lens/lens_entrypoint.h"
-#import "ios/chrome/browser/ui/main/scene_state_browser_agent.h"
 #import "ios/chrome/browser/ui/menu/browser_action_factory.h"
 #import "ios/chrome/browser/ui/menu/menu_histograms.h"
 #import "ios/chrome/browser/url_loading/image_search_param_generator.h"
@@ -43,7 +46,6 @@
 #import "ios/chrome/browser/url_loading/url_loading_params.h"
 #import "ios/chrome/browser/web/image_fetch/image_fetch_tab_helper.h"
 #import "ios/chrome/browser/web/web_navigation_util.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
 #import "ios/chrome/common/ui/favicon/favicon_constants.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/public/provider/chrome/browser/context_menu/context_menu_api.h"
@@ -55,10 +57,6 @@
 #import "ui/base/device_form_factor.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -101,10 +99,46 @@ const NSUInteger kContextMenuMaxTitleLength = 30;
   return self;
 }
 
-// TODO(crbug.com/1318432): rafactor long method.
+- (void)stop {
+  _browser = nil;
+  _baseViewController = nil;
+  [_imageSaver stop];
+  _imageSaver = nil;
+  [_imageCopier stop];
+  _imageCopier = nil;
+}
+
+- (void)dealloc {
+  CHECK(!_browser);
+}
+
 - (UIContextMenuConfiguration*)
     contextMenuConfigurationForWebState:(web::WebState*)webState
                                  params:(web::ContextMenuParams)params {
+  UIContextMenuActionProvider actionProvider =
+      [self contextMenuActionProviderForWebState:webState params:params];
+  if (!actionProvider) {
+    return nil;
+  }
+  return
+      [UIContextMenuConfiguration configurationWithIdentifier:nil
+                                              previewProvider:nil
+                                               actionProvider:actionProvider];
+}
+
+#pragma mark - Properties
+
+- (web::WebState*)currentWebState {
+  return self.browser ? self.browser->GetWebStateList()->GetActiveWebState()
+                      : nullptr;
+}
+
+#pragma mark - Private
+
+// TODO(crbug.com/1318432): rafactor long method.
+- (UIContextMenuActionProvider)
+    contextMenuActionProviderForWebState:(web::WebState*)webState
+                                  params:(web::ContextMenuParams)params {
   // Reset the URL.
   _URLToLoad = GURL();
 
@@ -190,11 +224,12 @@ const NSUInteger kContextMenuMaxTitleLength = 30;
                 if (!strongSelf)
                   return;
 
-                id<BrowserCommands> handler = static_cast<id<BrowserCommands>>(
-                    strongSelf.browser->GetCommandDispatcher());
-                [handler addToReadingList:[[ReadingListAddCommand alloc]
-                                              initWithURL:linkURL
-                                                    title:innerText]];
+                ReadingListAddCommand* command =
+                    [[ReadingListAddCommand alloc] initWithURL:linkURL
+                                                         title:innerText];
+                ReadingListBrowserAgent* readingListBrowserAgent =
+                    ReadingListBrowserAgent::FromBrowser(self.browser);
+                readingListBrowserAgent->AddURLsToReadingList(command.URLs);
               }];
           [menuElements addObject:addToReadingList];
         }
@@ -222,6 +257,17 @@ const NSUInteger kContextMenuMaxTitleLength = 30;
                        baseViewController:weakBaseViewController];
     }];
     [menuElements addObject:saveImage];
+
+    // Save Image to Photos.
+    const BOOL saveToPhotosAvailable =
+        IsSaveToPhotosAvailable(self.browser->GetBrowserState());
+    if (saveToPhotosAvailable) {
+      UIAction* saveImageToPhotosAction =
+          [actionFactory actionToSaveToPhotosWithImageURL:imageURL
+                                                 referrer:referrer
+                                                 webState:webState];
+      [menuElements addObject:saveImageToPhotosAction];
+    }
 
     // Copy Image.
     UIAction* copyImage = [actionFactory actionCopyImageWithBlock:^{
@@ -258,13 +304,10 @@ const NSUInteger kContextMenuMaxTitleLength = 30;
         ios::TemplateURLServiceFactory::GetForBrowserState(
             self.browser->GetBrowserState());
 
-    const BOOL lensEnabled =
-        ios::provider::IsLensSupported() &&
-        base::FeatureList::IsEnabled(kUseLensToSearchForImage);
     const BOOL useLens =
-        lensEnabled && search_engines::SupportsSearchImageWithLens(service) &&
-        ui::GetDeviceFormFactor() != ui::DEVICE_FORM_FACTOR_TABLET;
-
+        lens_availability::CheckAndLogAvailabilityForLensEntryPoint(
+            LensEntrypoint::ContextMenu,
+            search_engines::SupportsSearchImageWithLens(service));
     if (useLens) {
       UIAction* searchImageWithLensAction =
           [actionFactory actionToSearchImageUsingLensWithBlock:^{
@@ -273,14 +316,6 @@ const NSUInteger kContextMenuMaxTitleLength = 30;
                                 referrer:referrer];
           }];
       [menuElements addObject:searchImageWithLensAction];
-      UMA_HISTOGRAM_ENUMERATION(kIOSLensSupportStatusHistogram,
-                                LensSupportStatus::LensSearchSupported);
-    } else if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
-      UMA_HISTOGRAM_ENUMERATION(kIOSLensSupportStatusHistogram,
-                                LensSupportStatus::DeviceFormFactorTablet);
-    } else {
-      UMA_HISTOGRAM_ENUMERATION(kIOSLensSupportStatusHistogram,
-                                LensSupportStatus::NonGoogleSearchEngine);
     }
 
     if (!useLens && search_engines::SupportsSearchByImage(service)) {
@@ -304,8 +339,9 @@ const NSUInteger kContextMenuMaxTitleLength = 30;
   // inserting at beginning or adding to end.
   ElementsToAddToContextMenu* result =
       ios::provider::GetContextMenuElementsToAdd(
-          self.browser->GetBrowserState(), webState, params,
-          self.baseViewController);
+          webState, params, self.baseViewController,
+          HandlerForProtocol(self.browser->GetCommandDispatcher(),
+                             MiniMapCommands));
   if (result && result.elements) {
     [menuElements addObjectsFromArray:result.elements];
     menuTitle = result.title;
@@ -339,20 +375,8 @@ const NSUInteger kContextMenuMaxTitleLength = 30;
         return menu;
       };
 
-  return
-      [UIContextMenuConfiguration configurationWithIdentifier:nil
-                                              previewProvider:nil
-                                               actionProvider:actionProvider];
+  return actionProvider;
 }
-
-#pragma mark - Properties
-
-- (web::WebState*)currentWebState {
-  return self.browser ? self.browser->GetWebStateList()->GetActiveWebState()
-                      : nullptr;
-}
-
-#pragma mark - Private
 
 // Searches an image with the given `imageURL` and `referrer`, optionally using
 // Lens.
@@ -383,7 +407,7 @@ const NSUInteger kContextMenuMaxTitleLength = 30;
   const BOOL isIncognito = self.browser->GetBrowserState()->IsOffTheRecord();
 
   // Apply variation header data to the params.
-  NSMutableDictionary* combinedExtraHeaders =
+  NSMutableDictionary<NSString*, NSString*>* combinedExtraHeaders =
       [web_navigation_util::VariationHeadersForURL(webParams.url, isIncognito)
           mutableCopy];
   [combinedExtraHeaders addEntriesFromDictionary:webParams.extra_headers];

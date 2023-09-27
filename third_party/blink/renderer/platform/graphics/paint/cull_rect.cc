@@ -92,9 +92,15 @@ bool CullRect::ApplyScrollTranslation(
   if (disable_expansion) {
     return false;
   }
-  if (!RuntimeEnabledFeatures::UnifiedScrollPaintingEnabled() &&
-      // Don't expand for non-composited scrolling.
-      !scroll_translation.HasDirectCompositingReasons()) {
+  if (RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled()) {
+    // kNotPreferred is used for selects/inputs which don't benefit from
+    // composited scrolling.
+    if (scroll->GetCompositedScrollingPreference() ==
+        CompositedScrollingPreference::kNotPreferred) {
+      return false;
+    }
+  } else if (!scroll_translation.HasDirectCompositingReasons()) {
+    // Don't expand for non-composited scrolling.
     return false;
   }
 
@@ -363,7 +369,7 @@ bool CullRect::HasScrolledEnough(
     const gfx::Vector2dF& delta,
     const TransformPaintPropertyNode& scroll_translation) {
   if (!scroll_translation.ScrollNode() ||
-      (!RuntimeEnabledFeatures::UnifiedScrollPaintingEnabled() &&
+      (!RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled() &&
        !scroll_translation.HasDirectCompositingReasons())) {
     return !delta.IsZero();
   }

@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -17,6 +17,7 @@ import {Filenamer} from '../models/file_namer.js';
 import {getI18nMessage} from '../models/load_time_data.js';
 import {ResultSaver} from '../models/result_saver.js';
 import {ChromeHelper} from '../mojo/chrome_helper.js';
+import {ToteMetricFormat} from '../mojo/type.js';
 import * as nav from '../nav.js';
 import {speakMessage} from '../spoken_msg.js';
 import {show as showToast} from '../toast.js';
@@ -53,6 +54,10 @@ export enum Mode {
   PREVIEW,
 }
 
+// The class to set on page element when the page is selected.
+const ACTIVE_PAGE_CLASS = 'active';
+const DELETE_PAGE_BUTTON_SELECTOR = '.delete';
+
 /**
  * View controller for reviewing document scanning.
  */
@@ -83,17 +88,6 @@ export class DocumentReview extends View {
    */
   private mode = Mode.PREVIEW;
 
-  private readonly classes = {
-    active: 'active',
-    delete: 'delete',
-    page: 'page',
-    pages: 'document-pages',
-    preview: 'document-preview',
-    thumbnail: 'thumbnail',
-  } as const;
-
-  private readonly pageTemplateSelector = '#document-review-page';
-
   private readonly modes: {
     [Mode.FIX]: DocumentFixMode,
     [Mode.PREVIEW]: DocumentPreviewMode,
@@ -118,13 +112,14 @@ export class DocumentReview extends View {
   private fixCount = 0;
 
   constructor(protected readonly resultSaver: ResultSaver) {
-    super(
-        ViewName.DOCUMENT_REVIEW,
-        {dismissByEsc: true, defaultFocusSelector: 'primary'});
+    super(ViewName.DOCUMENT_REVIEW, {
+      dismissByEsc: true,
+      defaultFocusSelector: '.show .primary',
+    });
     this.pagesElement =
-        dom.getFrom(this.root, `.${this.classes.pages}`, HTMLDivElement);
+        dom.getFrom(this.root, '.document-pages', HTMLDivElement);
     this.previewElement =
-        dom.getFrom(this.root, `.${this.classes.preview}`, HTMLDivElement);
+        dom.getFrom(this.root, '.document-preview', HTMLDivElement);
     this.pagesElement.addEventListener('keydown', (e) => {
       const key = getKeyboardShortcut(e);
       if (key === ' ') {
@@ -134,19 +129,19 @@ export class DocumentReview extends View {
     });
     this.pagesElement.addEventListener('click', async (e: MouseEvent) => {
       const target = assertInstanceof(e.target, HTMLElement);
-      const pageElement = target.closest(`.${this.classes.page}`);
+      const pageElement = target.closest('.page');
       if (pageElement === null) {
         return;
       }
       const index = Array.from(this.pagesElement.children).indexOf(pageElement);
       await this.waitForUpdatingPage();
       const clickOnDeleteButton =
-          target.closest(`.${this.classes.delete}`) !== null;
+          target.closest(DELETE_PAGE_BUTTON_SELECTOR) !== null;
       if (clickOnDeleteButton) {
         await this.onDeletePage(index);
         return;
       }
-      this.selectPage(index);
+      await this.selectPage(index);
     });
 
     const pagesElementMutationObserver = new MutationObserver((mutations) => {
@@ -161,10 +156,10 @@ export class DocumentReview extends View {
 
     const fixMode = new DocumentFixMode({
       target: this.previewElement,
-      onDone: () => {
-        this.waitForUpdatingPage(() => this.showMode(Mode.PREVIEW));
+      onDone: async () => {
+        await this.waitForUpdatingPage(() => this.showMode(Mode.PREVIEW));
       },
-      onUpdatePage: ({corners, rotation}) => {
+      onUpdatePage: async ({corners, rotation}) => {
         const page = this.pages[this.selectedIndex];
         const isCornersUpdated = page.isCornersUpdated ||
             page.corners.some(
@@ -172,7 +167,7 @@ export class DocumentReview extends View {
                     oldCorner.y !== corners[i].y);
         const isRotationUpdated =
             page.isRotationUpdated || page.rotation !== rotation;
-        this.updatePage(this.selectedIndex, {
+        await this.updatePage(this.selectedIndex, {
           ...page,
           corners,
           rotation,
@@ -195,13 +190,13 @@ export class DocumentReview extends View {
         this.clearPages();
         this.close();
       },
-      onFix: () => {
+      onFix: async () => {
         sendDocScanEvent(DocScanActionType.FIX);
-        this.showMode(Mode.FIX);
+        await this.showMode(Mode.FIX);
       },
-      onShare: () => {
+      onShare: async () => {
         this.sendResultEvent(DocScanResultActionType.SHARE);
-        this.share(
+        await this.share(
             this.pages.length > 1 ? MimeType.PDF : MimeType.JPEG,
         );
       },
@@ -246,7 +241,7 @@ export class DocumentReview extends View {
   }
 
   private async addPageView(blob: Blob): Promise<void> {
-    const fragment = instantiateTemplate(this.pageTemplateSelector);
+    const fragment = instantiateTemplate('#document-review-page');
     await this.updatePageView(fragment, blob);
     this.pagesElement.appendChild(fragment);
   }
@@ -259,10 +254,12 @@ export class DocumentReview extends View {
     const blobs = this.pages.map((page) => page.croppedBlob);
     const name = (new Filenamer()).newDocumentName(mimeType);
     if (mimeType === MimeType.JPEG) {
-      await this.resultSaver.savePhoto(blobs[0], name, null);
+      await this.resultSaver.savePhoto(
+          blobs[0], ToteMetricFormat.SCAN_JPG, name, null);
     } else {
       const pdfBlob = await ChromeHelper.getInstance().convertToPdf(blobs);
-      await this.resultSaver.savePhoto(pdfBlob, name, null);
+      await this.resultSaver.savePhoto(
+          pdfBlob, ToteMetricFormat.SCAN_PDF, name, null);
     }
   }
 
@@ -311,6 +308,7 @@ export class DocumentReview extends View {
       this.modes[mode].show();
       this.mode = mode;
     }
+    this.modes[this.mode].focusDefaultElement();
   }
 
   /**
@@ -326,7 +324,7 @@ export class DocumentReview extends View {
       case Mode.PREVIEW: {
         const {src} = this.getPageImageElement(
             this.pagesElement.children[this.selectedIndex]);
-        this.modes[mode].update({src, pageIndex: this.selectedIndex});
+        await this.modes[mode].update({src, pageIndex: this.selectedIndex});
         break;
       }
       default:
@@ -348,7 +346,7 @@ export class DocumentReview extends View {
     if (this.updatingPage !== null) {
       return;
     }
-    while (this.pendingUpdatePayload) {
+    while (this.pendingUpdatePayload !== null) {
       this.updatingPage = this.updatePageInternal(...this.pendingUpdatePayload);
       this.pendingUpdatePayload = null;
       await this.updatingPage;
@@ -361,7 +359,7 @@ export class DocumentReview extends View {
    */
   private async waitForUpdatingPage<T>(onUpdated?: () => Promise<T>):
       Promise<T|undefined> {
-    if (!this.updatingPage) {
+    if (this.updatingPage === null) {
       return onUpdated?.();
     }
     nav.open(ViewName.FLASH);
@@ -421,10 +419,12 @@ export class DocumentReview extends View {
     pageElement.remove();
   }
 
-  private async selectPage(index: number): Promise<void> {
+  // TODO(pihsun): Revisit which operations of document scanning should be on
+  // the same queue.
+  private async selectPage(index: number) {
     this.selectedIndex = index;
-    await this.updateModeView(this.mode);
     this.selectPageView(index);
+    await this.updateModeView(this.mode);
   }
 
   /**
@@ -433,13 +433,13 @@ export class DocumentReview extends View {
   private selectPageView(index: number): void {
     for (let i = 0; i < this.pagesElement.children.length; i++) {
       const pageElement = this.pagesElement.children[i];
-      pageElement.classList.remove(this.classes.active);
+      pageElement.classList.remove(ACTIVE_PAGE_CLASS);
       pageElement.setAttribute('aria-selected', 'false');
       pageElement.setAttribute('tabindex', '-1');
     }
     const activePageElement =
         assertInstanceof(this.pagesElement.children[index], HTMLElement);
-    activePageElement.classList.add(this.classes.active);
+    activePageElement.classList.add(ACTIVE_PAGE_CLASS);
     activePageElement.setAttribute('aria-selected', 'true');
     activePageElement.setAttribute('tabindex', '0');
     activePageElement.focus();
@@ -470,21 +470,19 @@ export class DocumentReview extends View {
   }
 
   private getPageImageElement(node: ParentNode) {
-    return dom.getFrom(node, `.${this.classes.thumbnail}`, HTMLImageElement);
+    return dom.getFrom(node, '.thumbnail', HTMLImageElement);
   }
 
   protected override leaving(): boolean {
-    this.waitForUpdatingPage();
+    // TODO(pihsun): Should have a proper way to "pause" leaving.
+    void this.waitForUpdatingPage();
     if (this.pages.length === 0) {
       this.fixCount = 0;
     }
     return true;
   }
 
-  override onKeyPressed(key: KeyboardShortcut): boolean {
-    if (super.onKeyPressed(key)) {
-      return true;
-    }
+  override handlingKey(key: KeyboardShortcut): boolean {
     if (this.pages.length === 1 ||
         !this.pagesElement.contains(document.activeElement)) {
       return false;
@@ -492,16 +490,22 @@ export class DocumentReview extends View {
     if (key === 'ArrowUp') {
       const index = this.selectedIndex === 0 ? this.pages.length - 1 :
                                                this.selectedIndex - 1;
-      this.selectPage(index);
+      // TODO(b/301360817): Revisit which operations should be on the same
+      // queue.
+      void this.selectPage(index);
       return true;
     } else if (key === 'ArrowDown') {
       const index = this.selectedIndex === this.pages.length - 1 ?
           0 :
           this.selectedIndex + 1;
-      this.selectPage(index);
+      // TODO(b/301360817): Revisit which operations should be on the same
+      // queue.
+      void this.selectPage(index);
       return true;
     } else if (key === 'Delete') {
-      this.onDeletePage(this.selectedIndex);
+      // TODO(b/301360817): Revisit which operations should be on the same
+      // queue.
+      void this.onDeletePage(this.selectedIndex);
       return true;
     }
     return false;
@@ -537,7 +541,7 @@ export class DocumentReview extends View {
   private updateDeleteButtonLabels() {
     for (let i = 0; i < this.pagesElement.children.length; i++) {
       const deleteButton = dom.getFrom(
-          this.pagesElement.children[i], `.${this.classes.delete}`,
+          this.pagesElement.children[i], DELETE_PAGE_BUTTON_SELECTOR,
           HTMLElement);
       deleteButton.setAttribute(
           'aria-label', getI18nMessage(I18nString.DELETE_PAGE_BUTTON, i + 1));

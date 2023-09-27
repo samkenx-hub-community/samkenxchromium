@@ -9,7 +9,9 @@
 
 #include <stdint.h>
 #include <string>
+#include "base/memory/raw_ptr.h"
 
+#include "chromeos/ash/components/phonehub/phone_hub_ui_readiness_recorder.h"
 #include "chromeos/ash/components/phonehub/proto/phonehub_api.pb.h"
 
 namespace ash {
@@ -22,8 +24,9 @@ namespace phonehub {
 
 class MessageSenderImpl : public MessageSender {
  public:
-  explicit MessageSenderImpl(
-      secure_channel::ConnectionManager* connection_manager);
+  MessageSenderImpl(
+      secure_channel::ConnectionManager* connection_manager,
+      PhoneHubUiReadinessRecorder* phone_hub_ui_readiness_recorder);
   ~MessageSenderImpl() override;
 
   // MessageSender:
@@ -52,7 +55,10 @@ class MessageSenderImpl : public MessageSender {
   void SendMessage(proto::MessageType message_type,
                    const google::protobuf::MessageLite* request);
 
-  secure_channel::ConnectionManager* connection_manager_;
+  raw_ptr<secure_channel::ConnectionManager, ExperimentalAsh>
+      connection_manager_;
+  raw_ptr<PhoneHubUiReadinessRecorder, ExperimentalAsh>
+      phone_hub_ui_readiness_recorder_;
 };
 
 }  // namespace phonehub

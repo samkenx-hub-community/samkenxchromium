@@ -27,10 +27,10 @@ UserLevelMemoryPressureSignalGenerator* g_instance = nullptr;
 }  // namespace
 
 // static
-UserLevelMemoryPressureSignalGenerator&
+UserLevelMemoryPressureSignalGenerator*
 UserLevelMemoryPressureSignalGenerator::Instance() {
   DCHECK(g_instance);
-  return *g_instance;
+  return g_instance;
 }
 
 // static
@@ -40,19 +40,17 @@ void UserLevelMemoryPressureSignalGenerator::Initialize(
   DEFINE_STATIC_LOCAL(
       UserLevelMemoryPressureSignalGenerator, generator,
       (std::move(task_runner),
-       platform->InertIntervalOfUserLevelMemoryPressureSignal(),
-       platform->MinimumIntervalOfUserLevelMemoryPressureSignal()));
+       platform->InertAndMinimumIntervalOfUserLevelMemoryPressureSignal()));
   (void)generator;
 }
 
 UserLevelMemoryPressureSignalGenerator::UserLevelMemoryPressureSignalGenerator(
     scoped_refptr<base::SingleThreadTaskRunner> task_runner,
-    base::TimeDelta inert_interval,
-    base::TimeDelta minimum_interval)
+    std::pair<base::TimeDelta, base::TimeDelta> inert_and_minimum_interval)
     : UserLevelMemoryPressureSignalGenerator(
           std::move(task_runner),
-          inert_interval,
-          minimum_interval,
+          inert_and_minimum_interval.first,
+          inert_and_minimum_interval.second,
           base::DefaultTickClock::GetInstance(),
           ThreadScheduler::Current()->ToMainThreadScheduler()) {}
 
@@ -196,8 +194,17 @@ void UserLevelMemoryPressureSignalGenerator::OnTimerFired() {
 }
 
 void RequestUserLevelMemoryPressureSignal() {
-  UserLevelMemoryPressureSignalGenerator::Instance()
-      .RequestMemoryPressureSignal();
+  // TODO(crbug.com/1473814): AndroidWebView creates renderer processes
+  // without appending extra commandline switches,
+  // c.f. ChromeContentBrowserClient::AppendExtraCommandLineSwitches(),
+  // So renderer processes do not initialize user-level memory pressure
+  // siginal generators but the browser code expects they have already been
+  // initialized. So when requesting memory pressure signals, g_instance is
+  // nullptr and g_instance->clock_ will crash.
+  if (UserLevelMemoryPressureSignalGenerator* generator =
+          UserLevelMemoryPressureSignalGenerator::Instance()) {
+    generator->RequestMemoryPressureSignal();
+  }
 }
 
 }  // namespace blink

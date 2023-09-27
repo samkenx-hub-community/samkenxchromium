@@ -4,6 +4,7 @@
 
 #include "chrome/updater/persisted_data.h"
 
+#include <string>
 #include <vector>
 
 #include "base/base64.h"
@@ -31,16 +32,22 @@
 
 #include "base/strings/sys_string_conversions.h"
 #include "chrome/updater/util/win_util.h"
+#include "chrome/updater/win/win_constants.h"
 #endif
 
 namespace {
 
-constexpr char kPV[] = "pv";    // Key for storing product version.
-constexpr char kFP[] = "fp";    // Key for storing fingerprint.
-constexpr char kECP[] = "ecp";  // Key for storing existence checker path.
-constexpr char kBC[] = "bc";    // Key for storing brand code.
-constexpr char kBP[] = "bp";    // Key for storing brand path.
-constexpr char kAP[] = "ap";    // Key for storing ap.
+constexpr char kPV[] = "pv";      // Key for storing product version.
+constexpr char kFP[] = "fp";      // Key for storing fingerprint.
+constexpr char kECP[] = "ecp";    // Key for storing existence checker path.
+constexpr char kBC[] = "bc";      // Key for storing brand code.
+constexpr char kBP[] = "bp";      // Key for storing brand path.
+constexpr char kAP[] = "ap";      // Key for storing ap.
+constexpr char kDLA[] = "dla";    // Key for storing date-last-active.
+constexpr char kDLRC[] = "dlrc";  // Key for storing date-last-rollcall.
+constexpr char kCohort[] = "cohort";
+constexpr char kCohortName[] = "cohortname";
+constexpr char kCohortHint[] = "cohorthint";
 
 constexpr char kHadApps[] = "had_apps";
 constexpr char kUsageStatsEnabledKey[] = "usage_stats_enabled";
@@ -119,8 +126,18 @@ void PersistedData::SetBrandPath(const std::string& id,
   SetString(id, kBP, bp.AsUTF8Unsafe());
 }
 
-std::string PersistedData::GetAP(const std::string& id) const {
+std::string PersistedData::GetAP(const std::string& id) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+#if BUILDFLAG(IS_WIN)
+  // For backwards compatibility, we read AP from ClientState first, since some
+  // applications write to it there.
+  if (const std::string ap(GetAppAPValue(scope_, id)); !ap.empty()) {
+    SetAP(id, ap);
+    return ap;
+  }
+#endif
+
   return GetString(id, kAP);
 }
 
@@ -145,6 +162,77 @@ void PersistedData::SetAP(const std::string& id, const std::string& ap) {
 #endif
 }
 
+absl::optional<int> PersistedData::GetDateLastActive(
+    const std::string& id) const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  return GetInteger(id, kDLA);
+}
+
+void PersistedData::SetDateLastActive(const std::string& id, int dla) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  SetInteger(id, kDLA, dla);
+}
+
+absl::optional<int> PersistedData::GetDateLastRollcall(
+    const std::string& id) const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  return GetInteger(id, kDLRC);
+}
+
+void PersistedData::SetDateLastRollcall(const std::string& id, int dlrc) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  SetInteger(id, kDLRC, dlrc);
+}
+
+std::string PersistedData::GetCohort(const std::string& id) const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  return GetString(id, kCohort);
+}
+
+void PersistedData::SetCohort(const std::string& id,
+                              const std::string& cohort) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  SetString(id, kCohort, cohort);
+
+#if BUILDFLAG(IS_WIN)
+  // For backwards compatibility, we record the Cohort in ClientState as well.
+  // (Some applications read it from there.)
+  SetRegistryKey(UpdaterScopeToHKeyRoot(scope_),
+                 GetAppCohortKey(base::SysUTF8ToWide(id)), L"",
+                 base::SysUTF8ToWide(cohort));
+#endif
+}
+
+std::string PersistedData::GetCohortName(const std::string& id) const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  return GetString(id, kCohortName);
+}
+
+void PersistedData::SetCohortName(const std::string& id,
+                                  const std::string& cohort_name) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  SetString(id, kCohortName, cohort_name);
+
+#if BUILDFLAG(IS_WIN)
+  // For backwards compatibility, we record the Cohort in ClientState as well.
+  // (Some applications read it from there.)
+  SetRegistryKey(UpdaterScopeToHKeyRoot(scope_),
+                 GetAppCohortKey(base::SysUTF8ToWide(id)), kRegValueCohortName,
+                 base::SysUTF8ToWide(cohort_name));
+#endif
+}
+
+std::string PersistedData::GetCohortHint(const std::string& id) const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  return GetString(id, kCohortHint);
+}
+
+void PersistedData::SetCohortHint(const std::string& id,
+                                  const std::string& cohort_hint) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  SetString(id, kCohortHint, cohort_hint);
+}
+
 void PersistedData::RegisterApp(const RegistrationRequest& rq) {
   VLOG(2) << __func__ << ": Registering " << rq.app_id << " at version "
           << rq.version;
@@ -162,6 +250,21 @@ void PersistedData::RegisterApp(const RegistrationRequest& rq) {
   }
   if (!rq.ap.empty()) {
     SetAP(rq.app_id, rq.ap);
+  }
+  if (rq.dla) {
+    SetDateLastActive(rq.app_id, rq.dla.value());
+  }
+  if (rq.dlrc) {
+    SetDateLastRollcall(rq.app_id, rq.dlrc.value());
+  }
+  if (!rq.cohort.empty()) {
+    SetCohort(rq.app_id, rq.cohort);
+  }
+  if (!rq.cohort_name.empty()) {
+    SetCohortName(rq.app_id, rq.cohort_name);
+  }
+  if (!rq.cohort_hint.empty()) {
+    SetCohortHint(rq.app_id, rq.cohort_hint);
   }
 }
 
@@ -228,6 +331,37 @@ base::Value::Dict* PersistedData::GetOrCreateAppKey(const std::string& id,
   base::Value::Dict* apps = root.EnsureDict("apps");
   base::Value::Dict* app = apps->EnsureDict(base::ToLowerASCII(id));
   return app;
+}
+
+absl::optional<int> PersistedData::GetInteger(const std::string& id,
+                                              const std::string& key) const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!pref_service_) {
+    return absl::nullopt;
+  }
+  ScopedDictPrefUpdate update(pref_service_,
+                              update_client::kPersistedDataPreference);
+  base::Value::Dict* apps = update->FindDict("apps");
+  if (!apps) {
+    return absl::nullopt;
+  }
+  base::Value::Dict* app = apps->FindDict(base::ToLowerASCII(id));
+  if (!app) {
+    return absl::nullopt;
+  }
+  return app->FindInt(key);
+}
+
+void PersistedData::SetInteger(const std::string& id,
+                               const std::string& key,
+                               int value) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!pref_service_) {
+    return;
+  }
+  ScopedDictPrefUpdate update(pref_service_,
+                              update_client::kPersistedDataPreference);
+  GetOrCreateAppKey(id, update.Get())->Set(key, value);
 }
 
 void PersistedData::SetString(const std::string& id,

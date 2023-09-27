@@ -3253,6 +3253,32 @@ void ReadbackARGBImagePixelsINTERNAL(GLint src_x,
   }
 }
 
+void WritePixelsYUVINTERNAL(GLuint src_width,
+                            GLuint src_height,
+                            GLuint src_row_bytes_plane1,
+                            GLuint src_row_bytes_plane2,
+                            GLuint src_row_bytes_plane3,
+                            GLuint src_row_bytes_plane4,
+                            GLuint src_yuv_plane_config,
+                            GLuint src_yuv_subsampling,
+                            GLuint src_yuv_datatype,
+                            GLint shm_id,
+                            GLuint shm_offset,
+                            GLuint pixels_offset_plane1,
+                            GLuint pixels_offset_plane2,
+                            GLuint pixels_offset_plane3,
+                            GLuint pixels_offset_plane4) {
+  gles2::cmds::WritePixelsYUVINTERNAL* c =
+      GetCmdSpace<gles2::cmds::WritePixelsYUVINTERNAL>();
+  if (c) {
+    c->Init(src_width, src_height, src_row_bytes_plane1, src_row_bytes_plane2,
+            src_row_bytes_plane3, src_row_bytes_plane4, src_yuv_plane_config,
+            src_yuv_subsampling, src_yuv_datatype, shm_id, shm_offset,
+            pixels_offset_plane1, pixels_offset_plane2, pixels_offset_plane3,
+            pixels_offset_plane4);
+  }
+}
+
 void EnableiOES(GLenum target, GLuint index) {
   gles2::cmds::EnableiOES* c = GetCmdSpace<gles2::cmds::EnableiOES>();
   if (c) {
@@ -3418,6 +3444,22 @@ void PixelLocalStorageBarrierANGLE() {
   }
 }
 
+void FramebufferPixelLocalStorageInterruptANGLE() {
+  gles2::cmds::FramebufferPixelLocalStorageInterruptANGLE* c =
+      GetCmdSpace<gles2::cmds::FramebufferPixelLocalStorageInterruptANGLE>();
+  if (c) {
+    c->Init();
+  }
+}
+
+void FramebufferPixelLocalStorageRestoreANGLE() {
+  gles2::cmds::FramebufferPixelLocalStorageRestoreANGLE* c =
+      GetCmdSpace<gles2::cmds::FramebufferPixelLocalStorageRestoreANGLE>();
+  if (c) {
+    c->Init();
+  }
+}
+
 void GetFramebufferPixelLocalStorageParameterfvANGLE(
     GLint plane,
     GLenum pname,
@@ -3439,6 +3481,29 @@ void GetFramebufferPixelLocalStorageParameterivANGLE(
       gles2::cmds::GetFramebufferPixelLocalStorageParameterivANGLE>();
   if (c) {
     c->Init(plane, pname, params_shm_id, params_shm_offset);
+  }
+}
+
+void ClipControlEXT(GLenum origin, GLenum depth) {
+  gles2::cmds::ClipControlEXT* c = GetCmdSpace<gles2::cmds::ClipControlEXT>();
+  if (c) {
+    c->Init(origin, depth);
+  }
+}
+
+void PolygonModeANGLE(GLenum face, GLenum mode) {
+  gles2::cmds::PolygonModeANGLE* c =
+      GetCmdSpace<gles2::cmds::PolygonModeANGLE>();
+  if (c) {
+    c->Init(face, mode);
+  }
+}
+
+void PolygonOffsetClampEXT(GLfloat factor, GLfloat units, GLfloat clamp) {
+  gles2::cmds::PolygonOffsetClampEXT* c =
+      GetCmdSpace<gles2::cmds::PolygonOffsetClampEXT>();
+  if (c) {
+    c->Init(factor, units, clamp);
   }
 }
 

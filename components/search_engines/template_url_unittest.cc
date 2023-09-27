@@ -381,17 +381,17 @@ TEST_F(TemplateURLTest, SetPrepopulatedAndReplace) {
   const SearchTermsData& stdata = search_terms_data_;
 
   TemplateURL url(data);
-  EXPECT_EQ("http://foo%7Bfhqwhgads%7Dsearch/?q=X",
+  EXPECT_EQ("http://foo{fhqwhgads}search/?q=X",
             url.url_ref().ReplaceSearchTerms(args, stdata));
-  EXPECT_EQ("http://foo%7Bfhqwhgads%7Dalternate/?q=X",
+  EXPECT_EQ("http://foo{fhqwhgads}alternate/?q=X",
             url.url_refs()[0].ReplaceSearchTerms(args, stdata));
-  EXPECT_EQ("http://foo%7Bfhqwhgads%7Dsearch/?q=X",
+  EXPECT_EQ("http://foo{fhqwhgads}search/?q=X",
             url.url_refs()[1].ReplaceSearchTerms(args, stdata));
-  EXPECT_EQ("http://foo%7Bfhqwhgads%7Dsuggest/?q=X",
+  EXPECT_EQ("http://foo{fhqwhgads}suggest/?q=X",
             url.suggestions_url_ref().ReplaceSearchTerms(args, stdata));
   EXPECT_EQ("http://foo{fhqwhgads}image/",
             url.image_url_ref().ReplaceSearchTerms(args, stdata));
-  EXPECT_EQ("http://foo%7Bfhqwhgads%7Dimage/?translate",
+  EXPECT_EQ("http://foo{fhqwhgads}image/?translate",
             url.image_translate_url_ref().ReplaceSearchTerms(args, stdata));
   EXPECT_EQ("http://foo{fhqwhgads}newtab/",
             url.new_tab_url_ref().ReplaceSearchTerms(args, stdata));
@@ -936,14 +936,16 @@ TEST_F(TemplateURLTest, ReplaceOmniboxFocusType) {
 TEST_F(TemplateURLTest, ReplaceIsPrefetch) {
   struct TestData {
     const std::u16string search_term;
-    bool is_prefetch;
+    std::string prefetch_param;
     const std::string url;
     const std::string expected_result;
   } test_data[] = {
-      {u"foo", false, "{google:baseURL}?{searchTerms}&{google:prefetchSource}",
+      {u"foo", "", "{google:baseURL}?{searchTerms}&{google:prefetchSource}",
        "http://www.google.com/?foo&"},
-      {u"foo", true, "{google:baseURL}?{searchTerms}&{google:prefetchSource}",
+      {u"foo", "cs", "{google:baseURL}?{searchTerms}&{google:prefetchSource}",
        "http://www.google.com/?foo&pf=cs&"},
+      {u"foo", "op", "{google:baseURL}?{searchTerms}&{google:prefetchSource}",
+       "http://www.google.com/?foo&pf=op&"},
   };
   TemplateURLData data;
   data.input_encodings.push_back("UTF-8");
@@ -953,7 +955,7 @@ TEST_F(TemplateURLTest, ReplaceIsPrefetch) {
     EXPECT_TRUE(url.url_ref().IsValid(search_terms_data_));
     ASSERT_TRUE(url.url_ref().SupportsReplacement(search_terms_data_));
     TemplateURLRef::SearchTermsArgs search_terms_args(entry.search_term);
-    search_terms_args.is_prefetch = entry.is_prefetch;
+    search_terms_args.prefetch_param = entry.prefetch_param;
     GURL result(url.url_ref().ReplaceSearchTerms(search_terms_args,
                                                  search_terms_data_));
     ASSERT_TRUE(result.is_valid());
@@ -1996,7 +1998,7 @@ TEST_F(TemplateURLTest, ContextualSearchParameters) {
   // event.
   TemplateURLRef::SearchTermsArgs::ContextualSearchParams params(
       2, 1, std::string(), 0, 0, false, std::string(), std::string(),
-      std::string(), std::string());
+      std::string(), std::string(), false);
   search_terms_args.contextual_search_params = params;
   result = url.url_ref().ReplaceSearchTerms(search_terms_args,
                                             search_terms_data_);
@@ -2010,7 +2012,7 @@ TEST_F(TemplateURLTest, ContextualSearchParameters) {
   search_terms_args.contextual_search_params =
       TemplateURLRef::SearchTermsArgs::ContextualSearchParams(
           2, 2, "CH", 1657713458, 5, false, std::string(), std::string(),
-          std::string(), std::string());
+          std::string(), std::string(), false);
   result =
       url.url_ref().ReplaceSearchTerms(search_terms_args, search_terms_data_);
 
@@ -2027,7 +2029,7 @@ TEST_F(TemplateURLTest, ContextualSearchParameters) {
   search_terms_args.contextual_search_params =
       TemplateURLRef::SearchTermsArgs::ContextualSearchParams(
           2, 1, std::string(), 0, 0, true, std::string(), std::string(),
-          std::string(), std::string());
+          std::string(), std::string(), false);
   result =
       url.url_ref().ReplaceSearchTerms(search_terms_args, search_terms_data_);
   // Find our param.
@@ -2038,7 +2040,7 @@ TEST_F(TemplateURLTest, ContextualSearchParameters) {
   search_terms_args.contextual_search_params =
       TemplateURLRef::SearchTermsArgs::ContextualSearchParams(
           2, 1, std::string(), 0, 0, true, "es", "de", std::string(),
-          std::string());
+          std::string(), false);
   result =
       url.url_ref().ReplaceSearchTerms(search_terms_args, search_terms_data_);
   // Find our params.
@@ -2051,7 +2053,7 @@ TEST_F(TemplateURLTest, ContextualSearchParameters) {
   search_terms_args.contextual_search_params =
       TemplateURLRef::SearchTermsArgs::ContextualSearchParams(
           2, 1, std::string(), 0, 0, true, std::string(), std::string(),
-          "es,de", std::string());
+          "es,de", std::string(), false);
   result =
       url.url_ref().ReplaceSearchTerms(search_terms_args, search_terms_data_);
   // Find our param.  These may actually be URL encoded.
@@ -2062,12 +2064,23 @@ TEST_F(TemplateURLTest, ContextualSearchParameters) {
   search_terms_args.contextual_search_params =
       TemplateURLRef::SearchTermsArgs::ContextualSearchParams(
           2, 1, std::string(), 0, 0, true, std::string(), std::string(),
-          std::string(), "1RbCu");
+          std::string(), "1RbCu", false);
   result =
       url.url_ref().ReplaceSearchTerms(search_terms_args, search_terms_data_);
   // Find our param.
   size_t ctxsl_rs_pos = result.find("&ctxsl_rs=1RbCu");
   EXPECT_NE(ctxsl_rs_pos, std::string::npos);
+
+  // Test apply language hint.
+  search_terms_args.contextual_search_params =
+      TemplateURLRef::SearchTermsArgs::ContextualSearchParams(
+          2, 1, std::string(), 0, 0, true, std::string(), std::string(),
+          std::string(), std::string(), true);
+  result =
+      url.url_ref().ReplaceSearchTerms(search_terms_args, search_terms_data_);
+  // Find our param.
+  size_t ctxsl_applylh = result.find("&ctxsl_applylh=1");
+  EXPECT_NE(ctxsl_applylh, std::string::npos);
 }
 
 TEST_F(TemplateURLTest, GenerateKeyword) {
@@ -2089,7 +2102,7 @@ TEST_F(TemplateURLTest, GenerateKeyword) {
   // stores TemplateURLs in maps using keyword as key.
   EXPECT_TRUE(IsLowerCase(TemplateURL::GenerateKeyword(GURL("http://BLAH/"))));
   EXPECT_TRUE(IsLowerCase(
-      TemplateURL::GenerateKeyword(GURL("http://embeddedhtml.<head>/"))));
+      TemplateURL::GenerateKeyword(GURL("http://embeddedhtml.-head-/"))));
 }
 
 TEST_F(TemplateURLTest, KeepSearchTermsInURL) {

@@ -9,22 +9,65 @@
         padding: 0 var(--cr-section-padding);
       }
 
+      #exceptionHeader3pcd {
+        padding: 0 var(--cr-section-padding);
+        margin-bottom: -40px;
+      }
+
       #explanationText {
         margin-top: 16px;
+      }
+
+      #blockThirdPartyToggle {
+        padding: 0;
+      }
+
+      #trackingProtectionControls {
+        padding: var(--cr-section-vertical-padding) var(--cr-section-padding);
+      }
+
+      #borderWrapper {
+        align-items: center;
+        display: flex;
+        width: 100%;
+      }
+
+      #labelWrapper {
+        flex: 1;
+      }
+
+      .separator {
+        margin-inline-end: 0;
+      }
+
+      .cr-row {
+        padding: 0;
+        border-top: none;
       }
 
       .radio-group-sub-heading {
         padding-bottom: 10px;
       }
 
+      .bullet-row {
+        align-items: center;
+        display: flex;
+        padding: var(--cr-section-vertical-padding) 0;
+      }
+
+      .bullet-row > div {
+        padding-left: var(--cr-section-padding);
+        padding-right: 48px;
+      }
+
       .bullet-line {
         align-items: center;
         display: flex;
-        min-height: var(--settings-row-two-line-min-height);
+        min-height: var(--cr-section-two-line-min-height);
       }
 
       .bullet-line.one-line {
-        min-height: var(--settings-row-min-height);
+        min-height: var(--cr-section-min-height);
       }
 
       .bullet-line > div {
@@ -32,7 +75,7 @@
       }
 
       settings-collapse-radio-button {
-        --settings-collapse-toggle-min-height: var(--settings-row-min-height);
+        --settings-collapse-toggle-min-height: var(--cr-section-min-height);
       }
 
       settings-collapse-radio-button:not(:first-of-type) {
@@ -43,21 +86,86 @@
         padding-bottom: 12px;
       }
 
+      #firstPartySetsToggle {
+        padding-inline-end: 0;
+        padding-inline-start: 0;
+      }
+
       #toastText {
         align-items: center;
         display: flex;
         max-width: 300px;
-        min-height: var(--settings-row-two-line-min-height);
+        min-height: var(--cr-section-two-line-min-height);
       }
     </style>
-    <picture>
+    <picture hidden="[[is3pcdRedesignEnabled_]]">
       <source
           srcset="chrome://settings/images/cookies_banner_dark.svg"
           media="(prefers-color-scheme: dark)">
       <img id="banner" alt=""
           src="chrome://settings/images/cookies_banner.svg">
     </picture>
-    <template is="dom-if" if="[[isPrivacySandboxSettings4_]]">
+    <picture hidden="[[!is3pcdRedesignEnabled_]]">
+      <source
+            srcset="chrome://settings/images/tracking_protection_banner_dark.svg"
+            media="(prefers-color-scheme: dark)">
+        <img id="banner" alt=""
+            src="chrome://settings/images/tracking_protection_banner.svg">
+      </template>
+    </picture>
+    <template is="dom-if" if="[[is3pcdRedesignEnabled_]]">
+      <div id="explanationText" class="secondary">
+        $i18n{trackingProtectionPageDescription}
+      </div>
+      <div id="trackingProtectionControls">
+        <div class="bullet-row">
+          <iron-icon icon="settings:visibility-off"></iron-icon>
+          <div>
+            $i18n{trackingProtectionBulletOne}
+            <div class="secondary">
+              $i18n{trackingProtectionBulletOneDescription}
+            </div>
+          </div>
+        </div>
+        <div class="bullet-row">
+          <iron-icon icon="settings:domain-verification"></iron-icon>
+          <div>
+            $i18n{trackingProtectionBulletTwo}
+            <div class="secondary">
+              $i18nRaw{trackingProtectionBulletTwoDescription}
+            </div>
+        </div>
+      </div>
+      <div id="borderWrapper">
+        <div id="labelWrapper" class="cr-padded-text">
+          $i18n{trackingProtectionAdvancedLabel}
+        </div>
+        <div class="separator"></div>
+        <cr-expand-button id="advanced" class="cr-row"
+            expanded="{{advancedExpanded_}}"
+            aria-label="{{
+              $i18n{trackingProtectionAdvancedExpandA11yLabel}}}"
+            no-hover>
+        </cr-expand-button>
+      </div>
+      <iron-collapse opened="[[advancedExpanded_]]">
+        <settings-toggle-button
+            id="blockThirdPartyToggle"
+            pref="{{prefs.tracking_protection.block_all_3pc_toggle_enabled}}"
+            label="$i18n{trackingProtectionThirdPartyCookiesToggleLabel}"
+            sub-label="
+              $i18n{trackingProtectionThirdPartyCookiesToggleSubLabel}"
+            learn-more-url="
+              $i18n{trackingProtectionThirdPartyCookiesLearnMoreUrl}"
+            icon="settings:visibility-off">
+        </settings-toggle-button>
+        <settings-do-not-track-toggle id="doNotTrack" prefs="{{prefs}}">
+        </settings-do-not-track-toggle>
+      </iron-collapse>
+    </template>
+    <template is="dom-if"
+      if="[[isPrivacySandboxSettings4CookieSettingsEnabled_(
+        isPrivacySandboxSettings4_, is3pcdRedesignEnabled_)]]">
       <div id="explanationText" class="secondary">
         $i18n{thirdPartyCookiesPageDescription}
       </div>
@@ -132,7 +240,9 @@
                   $i18n{thirdPartyCookiesPageBlockBulTwo}
                 </div>
               </div>
-              <template is="dom-if" if="[[enableFirstPartySetsUI_]]">
+            </div>
+            <template is="dom-if" if="[[enableFirstPartySetsUI_]]">
+              <div slot="noSelectionCollapse">
                 <settings-toggle-button
                     id="firstPartySetsToggle"
                     pref="{{prefs.privacy_sandbox.first_party_sets_enabled}}"
@@ -141,13 +251,15 @@
                     disabled="[[firstPartySetsToggleDisabled_(
                         prefs.profile.cookie_controls_mode.value)]]">
                 </settings-toggle-button>
-              </template>
-            </div>
+              </div>
+            </template>
           </settings-collapse-radio-button>
         </settings-radio-group>
       </div>
     </template>
-    <template is="dom-if" if="[[!isPrivacySandboxSettings4_]]">
+    <template is="dom-if"
+      if="[[isPrivacySandboxSettings3CookieSettingsEnabled_(
+        isPrivacySandboxSettings4_, is3pcdRedesignEnabled_)]]">
       <div id="generalControls">
         <h2>$i18n{cookiePageGeneralControls}</h2>
         <settings-radio-group id="primarySettingGroup" no-set-pref
@@ -207,17 +319,19 @@
                 <iron-icon icon="settings:block"></iron-icon>
                 <div class="secondary">$i18n{cookiePageBlockThirdBulTwo}</div>
               </div>
-              <template is="dom-if" if="[[enableFirstPartySetsUI_]]">
+            </div>
+            <template is="dom-if" if="[[enableFirstPartySetsUI_]]">
+              <div slot="noSelectionCollapse">
                 <settings-toggle-button
                     id="firstPartySetsToggle"
                     pref="{{prefs.privacy_sandbox.first_party_sets_enabled}}"
                     label="$i18n{cookiePageFpsLabel}"
                     sub-label="$i18n{cookiePageFpsSubLabel}"
                     disabled="[[firstPartySetsToggleDisabled_(
-                        prefs.generated.cookie_primary_setting.value)]]">
+                        prefs.profile.cookie_controls_mode.value)]]">
                 </settings-toggle-button>
-              </template>
-            </div>
+              </div>
+            </template>
           </settings-collapse-radio-button>
           <settings-collapse-radio-button id="blockAll"
               pref="[[blockAllPref_]]"
@@ -251,20 +365,10 @@
       </settings-toggle-button>
     </template>
     <settings-do-not-track-toggle id="doNotTrack"
-        prefs="{{prefs}}">
+        prefs="{{prefs}}"
+        hidden="[[is3pcdRedesignEnabled_]]">
     </settings-do-not-track-toggle>
-    <template is="dom-if" if="[[!showPreloadingSubPage_]]">
-      <settings-toggle-button id="preloadingToggle"
-          class="hr"
-          hidden="[[!pageVisibility.networkPrediction]]"
-          label="$i18n{networkPredictionEnabled}"
-          sub-label="$i18n{networkPredictionEnabledDescCookiesPage}"
-          pref="{{prefs.net.network_prediction_options}}"
-          numeric-unchecked-value="[[networkPredictionUncheckedValue_]]"
-          on-settings-boolean-control-change="onNetworkPredictionChange_">
-      </settings-toggle-button>
-    </template>
-    <template is="dom-if" if="[[showPreloadingSubPage_]]">
+    <template is="dom-if" if="[[showPreloadingSubpage_]]">
       <cr-link-row id="preloadingLinkRow"
           class="hr"
           hidden="[[!pageVisibility.networkPrediction]]"
@@ -279,7 +383,9 @@
         on-click="onSiteDataClick_" label="$i18n{cookiePageAllSitesLink}"
         role-description="$i18n{subpageArrowRoleDescription}">
     </cr-link-row>
-    <template is="dom-if" if="[[isPrivacySandboxSettings4_]]">
+    <template is="dom-if"
+      if="[[isPrivacySandboxSettings4CookieSettingsEnabled_(
+        isPrivacySandboxSettings4_, is3pcdRedesignEnabled_)]]">
       <div id="exceptionHeader">
         <h2>$i18n{thirdPartyCookiesPageCustomizedBehaviorHeading}</h2>
         <div id="exceptionHeaderSubLabel" class="secondary">
@@ -296,7 +402,22 @@
           cookies-exception-type="third-party">
       </site-list>
     </template>
-    <template is="dom-if" if="[[!isPrivacySandboxSettings4_]]">
+    <template is="dom-if" if="[[is3pcdRedesignEnabled_]]">
+      <div id="exceptionHeader3pcd">
+        <h2>$i18n{siteDataPageCustomized3pcdHeading}</h2>
+      </div>
+      <site-list id="allowExceptionsList"
+          category="[[cookiesContentSettingType_]]"
+          category-subtype="[[contentSetting_.ALLOW]]"
+          category-header="$i18n{siteSettings3pcdBehaviorsDescription}"
+          read-only-list="[[exceptionListsReadOnly_]]"
+          search-filter="[[searchTerm]]"
+          cookies-exception-type="third-party">
+      </site-list>
+    </template>
+    <template is="dom-if"
+      if="[[isPrivacySandboxSettings3CookieSettingsEnabled_(
+        isPrivacySandboxSettings4_, is3pcdRedesignEnabled_)]]">
       <div id="exceptionHeader">
         <h2>$i18n{siteSettingsCustomizedBehaviors}</h2>
       </div>
@@ -307,7 +428,6 @@
           read-only-list="[[exceptionListsReadOnly_]]"
           search-filter="[[searchTerm]]"
           cookies-exception-type="combined">
-      </site-list>
       </site-list>
       <site-list id="sessionOnlyExceptionsList"
           category="[[cookiesContentSettingType_]]"

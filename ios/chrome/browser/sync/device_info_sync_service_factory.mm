@@ -19,16 +19,12 @@
 #import "components/sync_device_info/device_info_sync_client.h"
 #import "components/sync_device_info/device_info_sync_service_impl.h"
 #import "components/sync_device_info/local_device_info_provider_impl.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state_manager.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state_manager.h"
 #import "ios/chrome/browser/sync/model_type_store_service_factory.h"
 #import "ios/chrome/browser/sync/sync_invalidations_service_factory.h"
 #import "ios/chrome/common/channel_info.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -60,9 +56,9 @@ class DeviceInfoSyncClient : public syncer::DeviceInfoSyncClient {
   }
 
   // syncer::DeviceInfoSyncClient:
-  absl::optional<syncer::DeviceInfo::PhoneAsASecurityKeyInfo>
+  syncer::DeviceInfo::PhoneAsASecurityKeyInfo::StatusOrInfo
   GetPhoneAsASecurityKeyInfo() const override {
-    return absl::nullopt;
+    return syncer::DeviceInfo::PhoneAsASecurityKeyInfo::NoSupport();
   }
 
   // syncer::DeviceInfoSyncClient:

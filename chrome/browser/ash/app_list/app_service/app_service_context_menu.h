@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_forward.h"
 #include "chrome/browser/apps/app_service/app_shortcut_item.h"
@@ -70,10 +71,6 @@ class AppServiceContextMenu : public app_list::AppContextMenu {
   // The SimpleMenuModel used to hold the submenu items.
   std::unique_ptr<ui::SimpleMenuModel> submenu_;
 
-  // The SimpleMenuModel that contains reorder options. Could be nullptr if
-  // sorting is not available.
-  std::unique_ptr<ui::SimpleMenuModel> reorder_submenu_;
-
   std::unique_ptr<extensions::ContextMenuMatcher> extension_menu_items_;
 
   // This member holds all logic for context menus associated with standalone
@@ -84,10 +81,7 @@ class AppServiceContextMenu : public app_list::AppContextMenu {
   // Caches the app shortcut items.
   std::unique_ptr<apps::AppShortcutItems> app_shortcut_items_;
 
-  apps::AppServiceProxy* const proxy_;
-
-  // Where this item is being shown (e.g. the apps grid or recent apps).
-  const ash::AppListItemContext item_context_;
+  const raw_ptr<apps::AppServiceProxy, ExperimentalAsh> proxy_;
 
   // String id for the `LAUNCH_NEW` menu item tracked so the menu icon and label
   // can be changed dynamically after the app launch type changes using the

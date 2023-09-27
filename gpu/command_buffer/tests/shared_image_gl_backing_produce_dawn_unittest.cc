@@ -44,14 +44,6 @@ class SharedImageGLBackingProduceDawnTest : public WebGPUTest {
     }
 
     gpu::ContextCreationAttribs attributes;
-    attributes.alpha_size = 8;
-    attributes.depth_size = 24;
-    attributes.red_size = 8;
-    attributes.green_size = 8;
-    attributes.blue_size = 8;
-    attributes.stencil_size = 8;
-    attributes.samples = 4;
-    attributes.sample_buffers = 1;
     attributes.bind_generates_resource = false;
 
     gl_context_ = std::make_unique<GLInProcessContext>();
@@ -106,7 +98,7 @@ TEST_F(SharedImageGLBackingProduceDawnTest, Basic) {
   Mailbox gl_mailbox = sii->CreateSharedImage(
       viz::SinglePlaneFormat::kRGBA_8888, {1, 1}, gfx::ColorSpace::CreateSRGB(),
       kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, SHARED_IMAGE_USAGE_GLES2,
-      kNullSurfaceHandle);
+      "TestLabel", kNullSurfaceHandle);
   SyncToken mailbox_produced_token = sii->GenVerifiedSyncToken();
   gl()->WaitSyncTokenCHROMIUM(mailbox_produced_token.GetConstData());
   GLuint texture =

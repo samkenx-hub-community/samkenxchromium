@@ -30,12 +30,6 @@ class StyledMarkupSerializerTest : public EditingTestBase {
         .Build();
   }
 
-  CreateMarkupOptions ShouldSkipUnselectableContent() const {
-    return CreateMarkupOptions::Builder()
-        .SetShouldSkipUnselectableContent(true)
-        .Build();
-  }
-
   template <typename Strategy>
   std::string Serialize(
       const CreateMarkupOptions& options = CreateMarkupOptions());
@@ -250,7 +244,7 @@ TEST_F(StyledMarkupSerializerTest, ShadowTreeStyle) {
       "<p id='host' style='color: red'><span style='font-weight: bold;'><span "
       "id='one'>11</span></span></p>\n";
   SetBodyContent(body_content);
-  Element* one = GetDocument().getElementById("one");
+  Element* one = GetDocument().getElementById(AtomicString("one"));
   auto* text = To<Text>(one->firstChild());
   Position start_dom(text, 0);
   Position end_dom(text, 2);
@@ -264,7 +258,7 @@ TEST_F(StyledMarkupSerializerTest, ShadowTreeStyle) {
       "<span style='font-weight: bold'><slot name='#one'></slot></span>";
   SetBodyContent(body_content);
   SetShadowContent(shadow_content, "host");
-  one = GetDocument().getElementById("one");
+  one = GetDocument().getElementById(AtomicString("one"));
   text = To<Text>(one->firstChild());
   PositionInFlatTree start_ict(text, 0);
   PositionInFlatTree end_ict(text, 2);
@@ -280,8 +274,8 @@ TEST_F(StyledMarkupSerializerTest, DISABLED_AcrossShadow) {
       "<p id='host1'>[<span id='one'>11</span>]</p><p id='host2'>[<span "
       "id='two'>22</span>]</p>";
   SetBodyContent(body_content);
-  Element* one = GetDocument().getElementById("one");
-  Element* two = GetDocument().getElementById("two");
+  Element* one = GetDocument().getElementById(AtomicString("one"));
+  Element* two = GetDocument().getElementById(AtomicString("two"));
   Position start_dom(To<Text>(one->firstChild()), 0);
   Position end_dom(To<Text>(two->firstChild()), 2);
   const std::string& serialized_dom = SerializePart<EditingStrategy>(
@@ -296,8 +290,8 @@ TEST_F(StyledMarkupSerializerTest, DISABLED_AcrossShadow) {
   SetBodyContent(body_content);
   SetShadowContent(shadow_content1, "host1");
   SetShadowContent(shadow_content2, "host2");
-  one = GetDocument().getElementById("one");
-  two = GetDocument().getElementById("two");
+  one = GetDocument().getElementById(AtomicString("one"));
+  two = GetDocument().getElementById(AtomicString("two"));
   PositionInFlatTree start_ict(To<Text>(one->firstChild()), 0);
   PositionInFlatTree end_ict(To<Text>(two->firstChild()), 2);
   const std::string& serialized_ict = SerializePart<EditingInFlatTreeStrategy>(
@@ -313,8 +307,8 @@ TEST_F(StyledMarkupSerializerTest, AcrossInvisibleElements) {
       "<span id='span1' style='display: none'>11</span><span id='span2' "
       "style='display: none'>22</span>";
   SetBodyContent(body_content);
-  Element* span1 = GetDocument().getElementById("span1");
-  Element* span2 = GetDocument().getElementById("span2");
+  Element* span1 = GetDocument().getElementById(AtomicString("span1"));
+  Element* span2 = GetDocument().getElementById(AtomicString("span2"));
   Position start_dom = Position::FirstPositionInNode(*span1);
   Position end_dom = Position::LastPositionInNode(*span2);
   EXPECT_EQ("", SerializePart<EditingStrategy>(start_dom, end_dom));
@@ -333,67 +327,6 @@ TEST_F(StyledMarkupSerializerTest, DisplayContentsStyle) {
   SetBodyContent(body_content);
   EXPECT_EQ(expected_result, Serialize<EditingStrategy>());
   EXPECT_EQ(expected_result, Serialize<EditingInFlatTreeStrategy>());
-}
-
-// Test serialization of selectable and unselectable content.
-TEST_F(StyledMarkupSerializerTest, SkipUnselectableContent) {
-  // Mix of unnested selectable and unselectable content.
-  const char* body_content =
-      "<span>KEEP_1</span><span style='user-select: none;'>SKIP_2</span><span "
-      "style='user-select: none;'>SKIP_3</span><span>KEEP_4</span>";
-  const char* expected_result = "<span>KEEP_1</span><span>KEEP_4</span>";
-  SetBodyContent(body_content);
-  EXPECT_EQ(expected_result,
-            Serialize<EditingStrategy>(ShouldSkipUnselectableContent()));
-  EXPECT_EQ(expected_result, Serialize<EditingInFlatTreeStrategy>(
-                                 ShouldSkipUnselectableContent()));
-
-  // Shadow elements should be serialized, regardless if they're unselectable.
-  body_content = "<span id='with-shadow-root' style='user-select:none;'>";
-  const char* shadow_content = "<span>Shadow Content</span>";
-  expected_result =
-      "<span id=\"with-shadow-root\" style=\"user-select: none;\"></span>";
-  const char* flat_tree_expected_result =
-      "<span id=\"with-shadow-root\" style=\"user-select: none;\"><span>Shadow "
-      "Content</span></span>";
-  SetBodyContent(body_content);
-  SetShadowContent(shadow_content, "with-shadow-root");
-  EXPECT_EQ(expected_result,
-            Serialize<EditingStrategy>(ShouldSkipUnselectableContent()));
-  EXPECT_EQ(flat_tree_expected_result, Serialize<EditingInFlatTreeStrategy>(
-                                           ShouldSkipUnselectableContent()));
-
-  // Test nested selectable and unselectable descendants.
-  // Selectable descendants of unselectable content should not be skipped and
-  // those descendants should inherit any styling from its unselectable
-  // ancestors.
-  body_content =
-      "<span>KEEP_1<span style='user-select: none; color: red;'>SKIP_2<span "
-      "style='user-select: all;'>KEEP_3<span style='user-select: "
-      "none; background-color: yellow;'>SKIP_4<img src='SKIP_5.png'><span "
-      "id='shadow-root-6'></span><span style='user-select: "
-      "all;'>KEEP_7</span></span></span></span></span><span>KEEP_8</span></"
-      "span>";
-  shadow_content = "<span style='user-select: none;'>KEEP_6</span>";
-  expected_result =
-      "<span>KEEP_1<span style=\"user-select: none; color: red;\"><span "
-      "style=\"user-select: all;\">KEEP_3<span style=\"user-select: none; "
-      "background-color: yellow;\"><span id=\"shadow-root-6\"></span><span "
-      "style=\"user-select: "
-      "all;\">KEEP_7</span></span></span></span></span><span>KEEP_8</span>";
-  flat_tree_expected_result =
-      "<span>KEEP_1<span style=\"user-select: none; color: red;\"><span "
-      "style=\"user-select: all;\">KEEP_3<span style=\"user-select: none; "
-      "background-color: yellow;\"><span id=\"shadow-root-6\"><span "
-      "style=\"user-select: none;\">KEEP_6</span></span><span "
-      "style=\"user-select: "
-      "all;\">KEEP_7</span></span></span></span></span><span>KEEP_8</span>";
-  SetBodyContent(body_content);
-  SetShadowContent(shadow_content, "shadow-root-6");
-  EXPECT_EQ(expected_result,
-            Serialize<EditingStrategy>(ShouldSkipUnselectableContent()));
-  EXPECT_EQ(flat_tree_expected_result, Serialize<EditingInFlatTreeStrategy>(
-                                           ShouldSkipUnselectableContent()));
 }
 
 }  // namespace blink

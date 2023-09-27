@@ -6,47 +6,37 @@
 
 #include <string>
 
+#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
-#include "base/strings/stringprintf.h"
+#include "base/strings/strcat.h"
 #include "components/update_client/update_query_params.h"
 #include "components/version_info/version_info.h"
 #include "ios/chrome/common/channel_info.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "testing/platform_test.h"
 
-using base::StringPrintf;
-
-namespace {
-
-bool Contains(const std::string& source, const std::string& target) {
-  return source.find(target) != std::string::npos;
-}
-
-}  // namespace
-
 void TestParams(update_client::UpdateQueryParams::ProdId prod_id) {
   std::string params = update_client::UpdateQueryParams::Get(prod_id);
 
-  EXPECT_TRUE(Contains(
+  EXPECT_TRUE(base::Contains(
       params,
-      StringPrintf("os=%s", update_client::UpdateQueryParams::GetOS())));
-  EXPECT_TRUE(Contains(
+      base::StrCat({"os=", update_client::UpdateQueryParams::GetOS()})));
+  EXPECT_TRUE(base::Contains(
       params,
-      StringPrintf("arch=%s", update_client::UpdateQueryParams::GetArch())));
-  EXPECT_TRUE(Contains(
-      params, StringPrintf(
-                  "prod=%s",
-                  update_client::UpdateQueryParams::GetProdIdString(prod_id))));
-  EXPECT_TRUE(Contains(
-      params, StringPrintf("prodchannel=%s", GetChannelString().c_str())));
-  EXPECT_TRUE(
-      Contains(params, StringPrintf("prodversion=%s",
-                                    version_info::GetVersionNumber().c_str())));
-  EXPECT_TRUE(Contains(
+      base::StrCat({"arch=", update_client::UpdateQueryParams::GetArch()})));
+  EXPECT_TRUE(base::Contains(
       params,
-      StringPrintf("lang=%s",
-                   IOSChromeUpdateQueryParamsDelegate::GetLang().c_str())));
+      base::StrCat({"prod=", update_client::UpdateQueryParams::GetProdIdString(
+                                 prod_id)})));
+  EXPECT_TRUE(base::Contains(
+      params, base::StrCat({"prodchannel=", GetChannelString()})));
+  EXPECT_TRUE(base::Contains(
+      params,
+      base::StrCat({"prodversion=", version_info::GetVersionNumber()})));
+  EXPECT_TRUE(base::Contains(
+      params,
+      base::StrCat({"lang=", IOSChromeUpdateQueryParamsDelegate::GetLang()})));
 }
 
 using IOSChromeUpdateQueryParamsDelegateTest = PlatformTest;

@@ -5,7 +5,9 @@
 #include "chromeos/ash/components/login/auth/auth_performer.h"
 
 #include "ash/constants/ash_features.h"
+#include "ash/constants/ash_switches.h"
 #include "base/check.h"
+#include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/notreached.h"
@@ -21,6 +23,7 @@
 #include "chromeos/ash/components/dbus/cryptohome/auth_factor.pb.h"
 #include "chromeos/ash/components/dbus/cryptohome/key.pb.h"
 #include "chromeos/ash/components/dbus/userdataauth/userdataauth_client.h"
+#include "chromeos/ash/components/login/auth/auth_events_recorder.h"
 #include "chromeos/ash/components/login/auth/challenge_response/key_label_utils.h"
 #include "chromeos/ash/components/login/auth/cryptohome_parameter_utils.h"
 #include "chromeos/ash/components/login/auth/public/auth_session_intent.h"
@@ -70,10 +73,8 @@ absl::optional<AuthSessionIntent> DeserializeIntent(
 
 }  // namespace
 
-AuthPerformer::AuthPerformer(
-    base::raw_ptr<UserDataAuthClient, DanglingUntriaged> client)
-    : client_(client) {
-  DCHECK(client_);
+AuthPerformer::AuthPerformer(UserDataAuthClient* client) : client_(client) {
+  CHECK(client_);
 }
 
 AuthPerformer::~AuthPerformer() = default;
@@ -185,12 +186,12 @@ void AuthPerformer::AuthenticateUsingKnowledgeKey(
 
   // The login code might speculatively set the "gaia" label in the user
   // context, however at the cryptohome level the existing user key's label can
-  // be either "gaia" or "legacy-N" - which is what we need to use when talking
-  // to cryptohome. If in cryptohome, "gaia" is indeed the label, then at the
-  // end of this operation, gaia would be returned. This case applies to only
-  // "gaia" labels only because they are created at oobe.
+  // be either "gaia", "local-password" or "legacy-N" - which is what we need to
+  // use when talking to cryptohome. If in cryptohome, "gaia" is indeed the
+  // label, then at the end of this operation, gaia would be returned. This case
+  // applies to only "gaia" labels only because they are created at oobe.
   if (key->GetLabel() == kCryptohomeGaiaKeyLabel || key->GetLabel().empty()) {
-    auto* factor = auth_factors.FindOnlinePasswordFactor();
+    const auto* factor = auth_factors.FindAnyPasswordFactor();
     if (factor == nullptr) {
       LOGIN_LOG(ERROR) << "Could not find Password key";
       std::move(callback).Run(
@@ -223,9 +224,22 @@ void AuthPerformer::AuthenticateUsingKnowledgeKey(
     request.set_auth_factor_label(ref.label().value());
   }
   client_->AuthenticateAuthFactor(
-      request, base::BindOnce(&AuthPerformer::OnAuthenticateAuthFactor,
-                              weak_factory_.GetWeakPtr(), std::move(context),
-                              std::move(callback)));
+      request,
+      base::BindOnce(&AuthPerformer::MaybeRecordKnowledgeFactorAuthFailure,
+                     weak_factory_.GetWeakPtr(), std::move(context),
+                     std::move(callback)));
+}
+
+void AuthPerformer::MaybeRecordKnowledgeFactorAuthFailure(
+    std::unique_ptr<UserContext> context,
+    AuthOperationCallback callback,
+    absl::optional<user_data_auth::AuthenticateAuthFactorReply> reply) {
+  if (auto error = user_data_auth::ReplyToCryptohomeError(reply);
+      error == user_data_auth::CRYPTOHOME_ERROR_KEY_NOT_FOUND) {
+    AuthEventsRecorder::Get()->OnKnowledgeFactorAuthFailue();
+  }
+  OnAuthenticateAuthFactor(std::move(context), std::move(callback),
+                           std::move(reply));
 }
 
 void AuthPerformer::HashKeyAndAuthenticate(std::unique_ptr<UserContext> context,
@@ -379,6 +393,78 @@ void AuthPerformer::GetAuthSessionStatus(std::unique_ptr<UserContext> context,
                               std::move(callback)));
 }
 
+void AuthPerformer::GetRecoveryRequest(
+    const std::string& access_token,
+    const CryptohomeRecoveryEpochResponse& epoch,
+    std::unique_ptr<UserContext> context,
+    RecoveryRequestCallback callback) {
+  if (context->GetAuthSessionId().empty()) {
+    NOTREACHED() << "Auth session should exist";
+  }
+
+  LOGIN_LOG(EVENT) << "Obtaining RecoveryRequest";
+
+  user_data_auth::GetRecoveryRequestRequest request;
+
+  request.set_auth_session_id(context->GetAuthSessionId());
+
+  const std::string& gaia_id = context->GetGaiaID();
+  CHECK(!gaia_id.empty()) << "Recovery is only supported for gaia users";
+  CHECK(!access_token.empty());
+  const std::string& reauth_proof_token = context->GetReauthProofToken();
+  CHECK(!reauth_proof_token.empty()) << "Reauth proof token must be set";
+
+  request.set_requestor_user_id_type(
+      user_data_auth::GetRecoveryRequestRequest::GAIA_ID);
+  request.set_requestor_user_id(gaia_id);
+  request.set_auth_factor_label(kCryptohomeRecoveryKeyLabel);
+  request.set_gaia_access_token(access_token);
+  request.set_gaia_reauth_proof_token(reauth_proof_token);
+  request.set_epoch_response(epoch->data(), epoch->size());
+
+  client_->GetRecoveryRequest(
+      std::move(request),
+      base::BindOnce(&AuthPerformer::OnGetRecoveryRequest,
+                     weak_factory_.GetWeakPtr(), std::move(callback),
+                     std::move(context)));
+}
+
+void AuthPerformer::AuthenticateWithRecovery(
+    const CryptohomeRecoveryEpochResponse& epoch,
+    const CryptohomeRecoveryResponse& recovery_response,
+    const RecoveryLedgerName ledger_name,
+    const RecoveryLedgerPubKey ledger_public_key,
+    uint32_t ledger_public_key_hash,
+    std::unique_ptr<UserContext> context,
+    AuthOperationCallback callback) {
+  if (context->GetAuthSessionId().empty()) {
+    NOTREACHED() << "Auth session should exist";
+  }
+
+  LOGIN_LOG(EVENT) << "Authenticating via Recovery";
+
+  user_data_auth::AuthenticateAuthFactorRequest request;
+
+  request.set_auth_session_id(context->GetAuthSessionId());
+  request.set_auth_factor_label(kCryptohomeRecoveryKeyLabel);
+
+  user_data_auth::CryptohomeRecoveryAuthInput* recovery_input =
+      request.mutable_auth_input()->mutable_cryptohome_recovery_input();
+  recovery_input->set_epoch_response(epoch->data(), epoch->size());
+  recovery_input->set_recovery_response(recovery_response->data(),
+                                        recovery_response->size());
+  user_data_auth::CryptohomeRecoveryAuthInput::LedgerInfo* ledger =
+      recovery_input->mutable_ledger_info();
+  ledger->set_name(ledger_name.value());
+  ledger->set_key_hash(ledger_public_key_hash);
+  ledger->set_public_key(ledger_public_key.value());
+
+  client_->AuthenticateAuthFactor(
+      request, base::BindOnce(&AuthPerformer::OnAuthenticateAuthFactor,
+                              weak_factory_.GetWeakPtr(), std::move(context),
+                              std::move(callback)));
+}
+
 /// ---- private callbacks ----
 
 void AuthPerformer::OnStartAuthSession(
@@ -396,14 +482,25 @@ void AuthPerformer::OnStartAuthSession(
   LOGIN_LOG(EVENT) << "AuthSession started, user "
                    << (reply->user_exists() ? "exists" : "does not exist");
 
-  context->SetAuthSessionId(reply->auth_session_id());
+  context->SetAuthSessionIds(reply->auth_session_id(), reply->broadcast_id());
+
   std::vector<cryptohome::AuthFactor> next_factors;
   cryptohome::AuthFactorType fallback_type =
       cryptohome::AuthFactorType::kPassword;
   if (IsKioskUserType(context->GetUserType())) {
     fallback_type = cryptohome::AuthFactorType::kKiosk;
   }
+
+  // Ignore unknown factors that are in development.
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  bool ignore_unknown_factors =
+      command_line->HasSwitch(ash::switches::kIgnoreUnknownAuthFactors);
+
   for (const auto& factor_proto : reply->auth_factors()) {
+    if (ignore_unknown_factors &&
+        !cryptohome::SafeConvertFactorTypeFromProto(factor_proto.type())) {
+      continue;
+    }
     next_factors.emplace_back(
         cryptohome::DeserializeAuthFactor(factor_proto, fallback_type));
   }
@@ -420,7 +517,7 @@ void AuthPerformer::OnInvalidateAuthSession(
     AuthOperationCallback callback,
     absl::optional<user_data_auth::InvalidateAuthSessionReply> reply) {
   // The auth session is useless even if we failed to invalidate it.
-  context->ResetAuthSessionId();
+  context->ResetAuthSessionIds();
 
   auto error = user_data_auth::ReplyToCryptohomeError(reply);
   if (error != user_data_auth::CRYPTOHOME_ERROR_NOT_SET &&
@@ -482,6 +579,8 @@ void AuthPerformer::OnAuthenticateAuthFactor(
       context->AddAuthorizedIntent(intent.value());
     }
   }
+  context->SetSessionLifetime(base::Time::Now() +
+                              base::Seconds(reply->seconds_left()));
   LOGIN_LOG(EVENT) << "Authenticated successfully";
   std::move(callback).Run(std::move(context), absl::nullopt);
 }
@@ -529,6 +628,25 @@ void AuthPerformer::OnGetAuthSessionStatus(
   }
   std::move(callback).Run(status, lifetime, std::move(context),
                           /*cryptohome_error=*/absl::nullopt);
+}
+
+void AuthPerformer::OnGetRecoveryRequest(
+    RecoveryRequestCallback callback,
+    std::unique_ptr<UserContext> context,
+    absl::optional<user_data_auth::GetRecoveryRequestReply> reply) {
+  auto error = user_data_auth::ReplyToCryptohomeError(reply);
+
+  if (error != user_data_auth::CRYPTOHOME_ERROR_NOT_SET) {
+    LOGIN_LOG(EVENT) << "Failed to obtain recovery request, error code "
+                     << error;
+    std::move(callback).Run(absl::nullopt, std::move(context),
+                            AuthenticationError{error});
+    return;
+  }
+
+  CHECK(!reply->recovery_request().empty());
+  std::move(callback).Run(RecoveryRequest(reply->recovery_request()),
+                          std::move(context), absl::nullopt);
 }
 
 }  // namespace ash

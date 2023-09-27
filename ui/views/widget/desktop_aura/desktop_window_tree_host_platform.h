@@ -97,6 +97,7 @@ class VIEWS_EXPORT DesktopWindowTreeHostPlatform
   void Activate() override;
   void Deactivate() override;
   bool IsActive() const override;
+  bool CanMaximize() override;
   void Maximize() override;
   void Minimize() override;
   void Restore() override;
@@ -120,10 +121,12 @@ class VIEWS_EXPORT DesktopWindowTreeHostPlatform
   bool ShouldUseNativeFrame() const override;
   bool ShouldWindowContentsBeTransparent() const override;
   void FrameTypeChanged() override;
+  bool CanFullscreen() override;
   void SetFullscreen(bool fullscreen, int64_t display_id) override;
   bool IsFullscreen() const override;
   void SetOpacity(float opacity) override;
-  void SetAspectRatio(const gfx::SizeF& aspect_ratio) override;
+  void SetAspectRatio(const gfx::SizeF& aspect_ratio,
+                      const gfx::Size& excluded_margin) override;
   void SetWindowIcons(const gfx::ImageSkia& window_icon,
                       const gfx::ImageSkia& app_icon) override;
   void InitModalType(ui::ModalType modal_type) override;
@@ -151,6 +154,8 @@ class VIEWS_EXPORT DesktopWindowTreeHostPlatform
   void OnCloseRequest() override;
   void OnAcceleratedWidgetAvailable(gfx::AcceleratedWidget widget) override;
   void OnWillDestroyAcceleratedWidget() override;
+  bool OnRotateFocus(ui::PlatformWindowDelegate::RotateDirection direction,
+                     bool reset) override;
   void OnActivationChanged(bool active) override;
   absl::optional<gfx::Size> GetMinimumSizeForWindow() override;
   absl::optional<gfx::Size> GetMaximumSizeForWindow() override;
@@ -201,6 +206,7 @@ class VIEWS_EXPORT DesktopWindowTreeHostPlatform
                            UpdateWindowShapeFromWindowMask);
   FRIEND_TEST_ALL_PREFIXES(DesktopWindowTreeHostPlatformTest,
                            MakesParentChildRelationship);
+  FRIEND_TEST_ALL_PREFIXES(DesktopWindowTreeHostPlatformTest, OnRotateFocus);
 
   void ScheduleRelayout();
 
@@ -218,6 +224,12 @@ class VIEWS_EXPORT DesktopWindowTreeHostPlatform
 
   // Helper method that returns the display for the |window()|.
   display::Display GetDisplayNearestRootWindow() const;
+
+  // Impl for rotation logic.
+  static bool RotateFocusForWidget(
+      Widget& widget,
+      ui::PlatformWindowDelegate::RotateDirection direction,
+      bool reset);
 
   const base::WeakPtr<internal::NativeWidgetDelegate> native_widget_delegate_;
   const raw_ptr<DesktopNativeWidgetAura> desktop_native_widget_aura_;

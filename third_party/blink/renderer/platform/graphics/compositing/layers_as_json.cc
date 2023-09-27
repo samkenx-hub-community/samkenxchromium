@@ -73,7 +73,7 @@ std::unique_ptr<JSONObject> CCLayerAsJSON(const cc::Layer& layer,
   if (layer.should_check_backface_visibility())
     json->SetString("backfaceVisibility", "hidden");
 
-  if (Color::FromSkColor4f(layer.background_color()).Alpha() &&
+  if (!Color::FromSkColor4f(layer.background_color()).IsFullyTransparent() &&
       ((flags & kLayerTreeIncludesDebugInfo) ||
        // Omit backgroundColor for these layers because it's not interesting
        // and we want to avoid platform differences and changes with CLs
@@ -92,6 +92,13 @@ std::unique_ptr<JSONObject> CCLayerAsJSON(const cc::Layer& layer,
         compositing_reasons_json->PushString(name);
       json->SetArray("compositingReasons", std::move(compositing_reasons_json));
     }
+  }
+
+  if (RuntimeEnabledFeatures::HitTestOpaquenessEnabled() &&
+      (flags & kLayerTreeIncludesDebugInfo) &&
+      layer.hit_test_opaqueness() != cc::HitTestOpaqueness::kOpaque) {
+    json->SetString("hitTestOpaqueness",
+                    cc::HitTestOpaquenessToString(layer.hit_test_opaqueness()));
   }
 
   return json;

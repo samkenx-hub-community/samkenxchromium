@@ -12,6 +12,7 @@
 #include "base/component_export.h"
 #include "base/containers/flat_map.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 
 namespace base {
 class FilePath;
@@ -45,6 +46,8 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_SYSTEM) NameValuePairsParser {
 
   // The obtained info will be written into the given map.
   explicit NameValuePairsParser(NameValueMap* map);
+
+  ~NameValuePairsParser();
 
   NameValuePairsParser(const NameValuePairsParser&) = delete;
   NameValuePairsParser& operator=(const NameValuePairsParser&) = delete;
@@ -86,7 +89,7 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_SYSTEM) NameValuePairsParser {
                            NameValuePairsFormat format,
                            const std::string& debug_source);
 
-  NameValueMap* map_;
+  raw_ptr<NameValueMap, ExperimentalAsh> map_;
 };
 
 }  // namespace ash::system

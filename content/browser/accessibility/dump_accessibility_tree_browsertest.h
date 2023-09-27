@@ -8,6 +8,7 @@
 #include "content/browser/accessibility/dump_accessibility_browsertest_base.h"
 
 #include "base/command_line.h"
+#include "content/public/common/content_switches.h"
 #include "ui/accessibility/accessibility_features.h"
 #include "ui/accessibility/accessibility_switches.h"
 
@@ -20,6 +21,7 @@ constexpr const char kFormControls[]{"form-controls"};
 constexpr const char kHTML[]{"html"};
 constexpr const char kMathML[]{"mathml"};
 constexpr const char kDisplayLocking[]{"display-locking"};
+constexpr const char kRelations[]{"relations"};
 constexpr const char kRegression[]{"regression"};
 constexpr const char kTestHarness[]{"test-harness"};
 
@@ -75,12 +77,24 @@ class DumpAccessibilityTreeTest : public DumpAccessibilityTestBase {
     RunTypedTest<kHTML>(file_path);
   }
 
+  // TODO(accessibility): Replace all tests using RunPopoverHintTest to just
+  // RunHtmlTest when Popover hints are enabled by default.
+  void RunPopoverHintTest(const base::FilePath::CharType* file_path) {
+    base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
+        switches::kEnableBlinkFeatures, "HTMLPopoverHint");
+    RunTypedTest<kHTML>(file_path);
+  }
+
   void RunMathMLTest(const base::FilePath::CharType* file_path) {
     RunTypedTest<kMathML>(file_path);
   }
 
   void RunDisplayLockingTest(const base::FilePath::CharType* file_path) {
     RunTypedTest<kDisplayLocking>(file_path);
+  }
+
+  void RunRelationsTest(const base::FilePath::CharType* file_path) {
+    RunTypedTest<kRelations>(file_path);
   }
 
   void RunRegressionTest(const base::FilePath::CharType* file_path) {

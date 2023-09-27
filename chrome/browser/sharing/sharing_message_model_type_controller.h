@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include "components/sync/driver/model_type_controller.h"
+#include "components/sync/service/model_type_controller.h"
 
 // Controls syncing of SHARING_MESSAGE.
 class SharingMessageModelTypeController : public syncer::ModelTypeController {
@@ -26,8 +26,7 @@ class SharingMessageModelTypeController : public syncer::ModelTypeController {
       const SharingMessageModelTypeController&) = delete;
 
   // DataTypeController overrides.
-  void Stop(syncer::ShutdownReason shutdown_reason,
-            StopCallback callback) override;
+  void Stop(syncer::SyncStopMetadataFate fate, StopCallback callback) override;
 };
 
 #endif  // CHROME_BROWSER_SHARING_SHARING_MESSAGE_MODEL_TYPE_CONTROLLER_H_

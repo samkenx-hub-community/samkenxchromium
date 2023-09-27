@@ -15,15 +15,14 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/ash/drive/file_system_util.h"
 #include "chrome/browser/ash/login/demo_mode/demo_session.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/printing/printing_section.h"
+#include "chrome/browser/ui/webui/ash/settings/search/search_tag_registry.h"
 #include "chrome/browser/ui/webui/settings/ash/device_display_handler.h"
 #include "chrome/browser/ui/webui/settings/ash/device_keyboard_handler.h"
 #include "chrome/browser/ui/webui/settings/ash/device_pointer_handler.h"
-#include "chrome/browser/ui/webui/settings/ash/device_power_handler.h"
 #include "chrome/browser/ui/webui/settings/ash/device_stylus_handler.h"
-#include "chrome/browser/ui/webui/settings/ash/os_settings_features_util.h"
-#include "chrome/browser/ui/webui/settings/ash/search/search_tag_registry.h"
 #include "chrome/browser/ui/webui/webui_util.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/url_constants.h"
@@ -32,22 +31,29 @@
 #include "components/user_manager/user_manager.h"
 #include "content/public/browser/web_ui.h"
 #include "content/public/browser/web_ui_data_source.h"
-#include "ui/base/l10n/l10n_util.h"
+#include "media/base/media_switches.h"
 #include "ui/base/webui/web_ui_util.h"
-#include "ui/chromeos/events/keyboard_capability.h"
-#include "ui/chromeos/events/keyboard_layout_util.h"
 #include "ui/display/display_features.h"
 #include "ui/display/display_switches.h"
 #include "ui/display/manager/touch_device_manager.h"
+#include "ui/events/ash/keyboard_capability.h"
+#include "ui/events/ash/keyboard_layout_util.h"
 #include "ui/events/devices/device_data_manager.h"
 
 namespace ash::settings {
 
 namespace mojom {
 using ::chromeos::settings::mojom::kAudioSubpagePath;
+using ::chromeos::settings::mojom::kCustomizeMouseButtonsSubpagePath;
+using ::chromeos::settings::mojom::kCustomizePenButtonsSubpagePath;
+using ::chromeos::settings::mojom::kCustomizeTabletButtonsSubpagePath;
 using ::chromeos::settings::mojom::kDeviceSectionPath;
 using ::chromeos::settings::mojom::kDisplaySubpagePath;
-using ::chromeos::settings::mojom::kExternalStorageSubpagePath;
+using ::chromeos::settings::mojom::kEditDictionarySubpagePath;
+using ::chromeos::settings::mojom::kGraphicsTabletSubpagePath;
+using ::chromeos::settings::mojom::kInputMethodOptionsSubpagePath;
+using ::chromeos::settings::mojom::kInputSubpagePath;
+using ::chromeos::settings::mojom::kJapaneseManageUserDictionarySubpagePath;
 using ::chromeos::settings::mojom::kKeyboardSubpagePath;
 using ::chromeos::settings::mojom::kPerDeviceKeyboardRemapKeysSubpagePath;
 using ::chromeos::settings::mojom::kPerDeviceKeyboardSubpagePath;
@@ -55,8 +61,6 @@ using ::chromeos::settings::mojom::kPerDeviceMouseSubpagePath;
 using ::chromeos::settings::mojom::kPerDevicePointingStickSubpagePath;
 using ::chromeos::settings::mojom::kPerDeviceTouchpadSubpagePath;
 using ::chromeos::settings::mojom::kPointersSubpagePath;
-using ::chromeos::settings::mojom::kPowerSubpagePath;
-using ::chromeos::settings::mojom::kStorageSubpagePath;
 using ::chromeos::settings::mojom::kStylusSubpagePath;
 using ::chromeos::settings::mojom::Section;
 using ::chromeos::settings::mojom::Setting;
@@ -67,12 +71,6 @@ namespace {
 
 const std::vector<SearchConcept>& GetDeviceSearchConcepts() {
   static const base::NoDestructor<std::vector<SearchConcept>> tags({
-      {IDS_OS_SETTINGS_TAG_POWER,
-       mojom::kPowerSubpagePath,
-       mojom::SearchResultIcon::kPower,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSubpage,
-       {.subpage = mojom::Subpage::kPower}},
       {IDS_OS_SETTINGS_TAG_DISPLAY_SIZE,
        mojom::kDisplaySubpagePath,
        mojom::SearchResultIcon::kDisplay,
@@ -86,14 +84,6 @@ const std::vector<SearchConcept>& GetDeviceSearchConcepts() {
            IDS_OS_SETTINGS_TAG_DISPLAY_SIZE_ALT4,
            IDS_OS_SETTINGS_TAG_DISPLAY_SIZE_ALT5,
        }},
-      {IDS_OS_SETTINGS_TAG_STORAGE,
-       mojom::kStorageSubpagePath,
-       mojom::SearchResultIcon::kHardDrive,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSubpage,
-       {.subpage = mojom::Subpage::kStorage},
-       {IDS_OS_SETTINGS_TAG_STORAGE_ALT1, IDS_OS_SETTINGS_TAG_STORAGE_ALT2,
-        SearchConcept::kAltTagEnd}},
       {IDS_OS_SETTINGS_TAG_DISPLAY_NIGHT_LIGHT,
        mojom::kDisplaySubpagePath,
        mojom::SearchResultIcon::kDisplay,
@@ -117,55 +107,57 @@ const std::vector<SearchConcept>& GetDeviceSearchConcepts() {
        mojom::SearchResultDefaultRank::kHigh,
        mojom::SearchResultType::kSection,
        {.section = mojom::Section::kDevice}},
-      {IDS_OS_SETTINGS_TAG_POWER_IDLE_WHILE_CHARGING,
-       mojom::kPowerSubpagePath,
-       mojom::SearchResultIcon::kPower,
+      {IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS,
+       mojom::kAudioSubpagePath,
+       mojom::SearchResultIcon::kAudio,
        mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kPowerIdleBehaviorWhileCharging},
-       {IDS_OS_SETTINGS_TAG_POWER_IDLE_WHILE_CHARGING_ALT1,
-        SearchConcept::kAltTagEnd}},
-      {IDS_OS_SETTINGS_TAG_POWER_IDLE_WHILE_ON_BATTERY,
-       mojom::kPowerSubpagePath,
-       mojom::SearchResultIcon::kPower,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kPowerIdleBehaviorWhileOnBattery},
-       {IDS_OS_SETTINGS_TAG_POWER_IDLE_WHILE_ON_BATTERY_ALT1,
-        SearchConcept::kAltTagEnd}},
+       mojom::SearchResultType::kSubpage,
+       {.subpage = mojom::Subpage::kAudio},
+       {IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS_ALT1,
+        IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS_ALT2,
+        IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS_ALT3,
+        IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS_ALT4, SearchConcept::kAltTagEnd}},
   });
   return *tags;
 }
 
 const std::vector<SearchConcept>& GetKeyboardSearchConcepts() {
-  static const base::NoDestructor<std::vector<SearchConcept>> tags({
-      {IDS_OS_SETTINGS_TAG_KEYBOARD,
-       mojom::kKeyboardSubpagePath,
-       mojom::SearchResultIcon::kKeyboard,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSubpage,
-       {.subpage = mojom::Subpage::kKeyboard}},
-      {IDS_OS_SETTINGS_TAG_KEYBOARD_AUTO_REPEAT,
-       mojom::kKeyboardSubpagePath,
-       mojom::SearchResultIcon::kKeyboard,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kKeyboardAutoRepeat},
-       {IDS_OS_SETTINGS_TAG_KEYBOARD_AUTO_REPEAT_ALT1,
-        SearchConcept::kAltTagEnd}},
-      {IDS_OS_SETTINGS_TAG_KEYBOARD_SHORTCUTS,
-       mojom::kKeyboardSubpagePath,
-       mojom::SearchResultIcon::kKeyboard,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kKeyboardShortcuts}},
-      {IDS_OS_SETTINGS_TAG_KEYBOARD_FUNCTION_KEYS,
-       mojom::kKeyboardSubpagePath,
-       mojom::SearchResultIcon::kKeyboard,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kKeyboardFunctionKeys}},
-  });
+  static const base::NoDestructor<std::vector<SearchConcept>> tags(
+      {{IDS_OS_SETTINGS_TAG_KEYBOARD,
+        mojom::kKeyboardSubpagePath,
+        mojom::SearchResultIcon::kKeyboard,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::SearchResultType::kSubpage,
+        {.subpage = mojom::Subpage::kKeyboard}},
+       {IDS_OS_SETTINGS_TAG_KEYBOARD_AUTO_REPEAT,
+        mojom::kKeyboardSubpagePath,
+        mojom::SearchResultIcon::kKeyboard,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::SearchResultType::kSetting,
+        {.setting = mojom::Setting::kKeyboardAutoRepeat},
+        {IDS_OS_SETTINGS_TAG_KEYBOARD_AUTO_REPEAT_ALT1,
+         SearchConcept::kAltTagEnd}},
+       {IDS_OS_SETTINGS_TAG_KEYBOARD_SHORTCUTS,
+        mojom::kKeyboardSubpagePath,
+        mojom::SearchResultIcon::kKeyboard,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::SearchResultType::kSetting,
+        {.setting = mojom::Setting::kKeyboardShortcuts}},
+       {IDS_OS_SETTINGS_TAG_KEYBOARD_FUNCTION_KEYS,
+        mojom::kKeyboardSubpagePath,
+        mojom::SearchResultIcon::kKeyboard,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::SearchResultType::kSetting,
+        {.setting = mojom::Setting::kKeyboardFunctionKeys}},
+       {IDS_OS_SETTINGS_TAG_KEYBOARD_DIACRITIC,
+        mojom::kKeyboardSubpagePath,
+        mojom::SearchResultIcon::kKeyboard,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::SearchResultType::kSetting,
+        {.setting = mojom::Setting::kShowDiacritic},
+        {IDS_OS_SETTINGS_TAG_KEYBOARD_DIACRITIC1,
+         IDS_OS_SETTINGS_TAG_KEYBOARD_DIACRITIC2,
+         IDS_OS_SETTINGS_TAG_KEYBOARD_DIACRITIC3, SearchConcept::kAltTagEnd}}});
   return *tags;
 }
 
@@ -197,6 +189,18 @@ const std::vector<SearchConcept>& GetPerDeviceKeyboardSearchConcepts() {
        mojom::SearchResultDefaultRank::kMedium,
        mojom::SearchResultType::kSetting,
        {.setting = mojom::Setting::kKeyboardFunctionKeys}},
+      {IDS_OS_SETTINGS_TAG_KEYBOARD_BLOCK_META_FKEY_COMBO_REWRITES,
+       mojom::kPerDeviceKeyboardSubpagePath,
+       mojom::SearchResultIcon::kKeyboard,
+       mojom::SearchResultDefaultRank::kMedium,
+       mojom::SearchResultType::kSetting,
+       {.setting = mojom::Setting::kKeyboardBlockMetaFkeyRewrites}},
+      {IDS_OS_SETTINGS_TAG_KEYBOARD_REMAP_KEYS,
+       mojom::kPerDeviceKeyboardSubpagePath,
+       mojom::SearchResultIcon::kKeyboard,
+       mojom::SearchResultDefaultRank::kMedium,
+       mojom::SearchResultType::kSetting,
+       {.setting = mojom::Setting::kKeyboardRemapKeys}},
   });
   return *tags;
 }
@@ -283,32 +287,6 @@ const std::vector<SearchConcept>& GetPerDeviceTouchpadSearchConcepts() {
        mojom::SearchResultDefaultRank::kMedium,
        mojom::SearchResultType::kSetting,
        {.setting = mojom::Setting::kTouchpadAcceleration}},
-  });
-  return *tags;
-}
-
-const std::vector<SearchConcept>&
-GetTouchpadScrollAccelerationSearchConcepts() {
-  static const base::NoDestructor<std::vector<SearchConcept>> tags({
-      {IDS_OS_SETTINGS_TAG_TOUCHPAD_SCROLL_ACCELERATION,
-       mojom::kPointersSubpagePath,
-       mojom::SearchResultIcon::kLaptop,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kTouchpadScrollAcceleration}},
-  });
-  return *tags;
-}
-
-const std::vector<SearchConcept>&
-GetPerDeviceTouchpadScrollAccelerationSearchConcepts() {
-  static const base::NoDestructor<std::vector<SearchConcept>> tags({
-      {IDS_OS_SETTINGS_TAG_TOUCHPAD_SCROLL_ACCELERATION,
-       mojom::kPerDeviceTouchpadSubpagePath,
-       mojom::SearchResultIcon::kLaptop,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kTouchpadScrollAcceleration}},
   });
   return *tags;
 }
@@ -535,18 +513,24 @@ const std::vector<SearchConcept>& GetStylusSearchConcepts() {
   return *tags;
 }
 
-const std::vector<SearchConcept>& GetAudioSearchConcepts() {
+const std::vector<SearchConcept>& GetAudioPowerSoundsSearchConcepts() {
   static const base::NoDestructor<std::vector<SearchConcept>> tags({
-      {IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS,
-       mojom::kAudioSubpagePath,
-       mojom::SearchResultIcon::kAudio,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSubpage,
-       {.subpage = mojom::Subpage::kAudio},
-       {IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS_ALT1,
-        IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS_ALT2,
-        IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS_ALT3,
-        IDS_OS_SETTINGS_TAG_AUDIO_SETTINGS_ALT4, SearchConcept::kAltTagEnd}},
+      {
+          IDS_OS_SETTINGS_TAG_CHARGING_SOUNDS,
+          mojom::kAudioSubpagePath,
+          mojom::SearchResultIcon::kAudio,
+          mojom::SearchResultDefaultRank::kMedium,
+          mojom::SearchResultType::kSetting,
+          {.setting = mojom::Setting::kChargingSounds},
+      },
+      {
+          IDS_OS_SETTINGS_TAG_LOW_BATTERY_SOUND,
+          mojom::kAudioSubpagePath,
+          mojom::SearchResultIcon::kAudio,
+          mojom::SearchResultDefaultRank::kMedium,
+          mojom::SearchResultType::kSetting,
+          {.setting = mojom::Setting::kLowBatterySound},
+      },
   });
   return *tags;
 }
@@ -677,64 +661,6 @@ const std::vector<SearchConcept>& GetDisplayNightLightOnSearchConcepts() {
   return *tags;
 }
 
-const std::vector<SearchConcept>& GetExternalStorageSearchConcepts() {
-  static const base::NoDestructor<std::vector<SearchConcept>> tags({
-      {IDS_OS_SETTINGS_TAG_EXTERNAL_STORAGE,
-       mojom::kExternalStorageSubpagePath,
-       mojom::SearchResultIcon::kHardDrive,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSubpage,
-       {.subpage = mojom::Subpage::kExternalStorage}},
-  });
-  return *tags;
-}
-
-const std::vector<SearchConcept>& GetPowerWithBatterySearchConcepts() {
-  static const base::NoDestructor<std::vector<SearchConcept>> tags({
-      {IDS_OS_SETTINGS_TAG_POWER_SOURCE,
-       mojom::kPowerSubpagePath,
-       mojom::SearchResultIcon::kPower,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kPowerSource},
-       {IDS_OS_SETTINGS_TAG_POWER_SOURCE_ALT1,
-        IDS_OS_SETTINGS_TAG_POWER_SOURCE_ALT2, SearchConcept::kAltTagEnd}},
-  });
-  return *tags;
-}
-
-const std::vector<SearchConcept>& GetPowerWithLaptopLidSearchConcepts() {
-  static const base::NoDestructor<std::vector<SearchConcept>> tags({
-      {IDS_OS_SETTINGS_TAG_POWER_SLEEP_COVER_CLOSED,
-       mojom::kPowerSubpagePath,
-       mojom::SearchResultIcon::kPower,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kSleepWhenLaptopLidClosed},
-       {IDS_OS_SETTINGS_TAG_POWER_SLEEP_COVER_CLOSED_ALT1,
-        IDS_OS_SETTINGS_TAG_POWER_SLEEP_COVER_CLOSED_ALT2,
-        SearchConcept::kAltTagEnd}},
-  });
-  return *tags;
-}
-
-const std::vector<SearchConcept>& GetPowerWithAdaptiveChargingSearchConcepts() {
-  static const base::NoDestructor<std::vector<SearchConcept>> tags({
-      {IDS_OS_SETTINGS_TAG_POWER_ADAPTIVE_CHARGING,
-       mojom::kPowerSubpagePath,
-       mojom::SearchResultIcon::kPower,
-       mojom::SearchResultDefaultRank::kMedium,
-       mojom::SearchResultType::kSetting,
-       {.setting = mojom::Setting::kAdaptiveCharging},
-       {}},
-  });
-  return *tags;
-}
-
-bool AreScrollSettingsAllowed() {
-  return base::FeatureList::IsEnabled(features::kAllowScrollSettings);
-}
-
 bool IsUnifiedDesktopAvailable() {
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kEnableUnifiedDesktop);
@@ -750,22 +676,55 @@ bool IsTouchCalibrationAvailable() {
          display::HasExternalTouchscreenDevice();
 }
 
-bool IsDriveFsBulkPinningEnabled() {
-  return ash::features::IsDriveFsBulkPinningEnabled();
-}
-
 bool IsListAllDisplayModesEnabled() {
   return display::features::IsListAllDisplayModesEnabled();
 }
 
+bool IsShowForceRespectUiGainsToggleEnabled() {
+  // No need to show the toggle if UI gains is not going to be ignored.
+  if (!base::FeatureList::IsEnabled(media::kIgnoreUiGains)) {
+    return false;
+  }
+  return base::FeatureList::IsEnabled(media::kShowForceRespectUiGainsToggle);
+}
+
 void AddDeviceKeyboardStrings(content::WebUIDataSource* html_source) {
-  static constexpr webui::LocalizedString keyboard_strings[] = {
+  const bool kIsRevampEnabled =
+      ash::features::IsOsSettingsRevampWayfindingEnabled();
+
+  webui::LocalizedString keyboard_strings[] = {
       {"builtInKeyboardName", IDS_SETTINGS_BUILT_IN_KEYBOARD_NAME},
-      {"keyboardBlockMetaFunctionKeyRewrites",
-       IDS_SETTINGS_KEYBOARD_BLOCK_META_FUNCTION_KEY_REWRITES},
-      {"keyboardBlockMetaFunctionKeyRewritesDescription",
-       IDS_SETTINGS_KEYBOARD_BLOCK_META_FUNCTION_KEY_REWRITES_DESCRIPTION},
+      {"f11KeyLabel", IDS_SETTINGS_F11_KEY_LABEL},
+      {"f12KeyLabel", IDS_SETTINGS_F12_KEY_LABEL},
+      {"backKeyLabel", IDS_SETTINGS_BACK},
+      {"forwardKeyLabel", IDS_SETTINGS_FORWARD},
+      {"fullscreenKeyLabel", IDS_SETTINGS_FULLSCREEN},
+      {"backlightDownKeyLabel", IDS_SETTINGS_KEYBOARD_BACKLIGHT_DOWN},
+      {"backlightToggleKeyLabel", IDS_SETTINGS_KEYBOARD_BACKLIGHT_TOGGLE},
+      {"backlightUpKeyLabel", IDS_SETTINGS_KEYBOARD_BACKLIGHT_UP},
+      {"microphoneMuteKeyLabel", IDS_SETTINGS_MICROPHONE_MUTE},
+      {"muteKeyLabel", IDS_SETTINGS_MUTE},
+      {"overviewKeyLabel", IDS_SETTINGS_OVERVIEW},
+      {"playPauseKeyLabel", IDS_SETTINGS_PLAY_PAUSE},
+      {"privacyScreenToggleKeyLabel", IDS_SETTINGS_PRIVACY_SCREEN_TOGGLE},
+      {"refreshKeyLabel", IDS_SETTINGS_REFRESH},
+      {"screenshotKeyLabel", IDS_SETTINGS_SCREENSHOT},
+      {"screenBrightnessDownKeyLabel", IDS_SETTINGS_SCREEN_BRIGHTNESS_DOWN},
+      {"screenBrightnessUpKeyLabel", IDS_SETTINGS_SCREEN_BRIGHTNESS_UP},
+      {"screenMirrorKeyLabel", IDS_SETTINGS_SCREEN_MIRROR},
+      {"trackNextKeyLabel", IDS_SETTINGS_TRACK_NEXT},
+      {"trackPreviousKeyLabel", IDS_SETTINGS_TRACK_PREVIOUS},
+      {"volumeDownKeyLabel", IDS_SETTINGS_VOLUME_DOWN},
+      {"volumeUpKeyLabel", IDS_SETTINGS_VOLUME_UP},
+      {"allApplicationsKeyLabel", IDS_SETTINGS_ALL_APPLICATIONS},
+      {"emojiPickerKeyLabel", IDS_SETTINGS_EMOJI_PICKER},
+      {"dictationKeyLabel", IDS_SETTINGS_DICTATION},
+      {"fKeyShiftOption", IDS_SETTINGS_F_KEY_SHIFT_DROPDOWN_OPTION},
+      {"fKeyCtrlShiftOption", IDS_SETTINGS_F_KEY_CTRL_SHIFT_DROPDOWN_OPTION},
+      {"fKeyAltOption", IDS_SETTINGS_F_KEY_ALT_DROPDOWN_OPTION},
       {"keyboardEnableAutoRepeat", IDS_SETTINGS_KEYBOARD_AUTO_REPEAT_ENABLE},
+      {"keyboardEnableAutoRepeatSubLabel",
+       IDS_SETTINGS_KEYBOARD_AUTO_REPEAT_ENABLE_SUB_LABEL},
       {"keyboardKeyAlt", IDS_SETTINGS_KEYBOARD_KEY_LEFT_ALT},
       {"keyboardKeyAssistant", IDS_SETTINGS_KEYBOARD_KEY_ASSISTANT},
       {"keyboardKeyBackspace", IDS_SETTINGS_KEYBOARD_KEY_BACKSPACE},
@@ -784,11 +743,15 @@ void AddDeviceKeyboardStrings(content::WebUIDataSource* html_source) {
        IDS_SETTINGS_KEYBOARD_SEND_INVERTED_FUNCTION_KEYS},
       {"keyboardSendInvertedFunctionKeysDescription",
        IDS_SETTINGS_KEYBOARD_SEND_INVERTED_FUNCTION_KEYS_DESCRIPTION},
-      {"keyboardShowInputSettings", IDS_SETTINGS_KEYBOARD_SHOW_INPUT_SETTINGS},
+      {"keyboardShowInputSettings",
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_KEYBOARD_SHOW_INPUT_SETTINGS
+                        : IDS_SETTINGS_KEYBOARD_SHOW_INPUT_SETTINGS},
       // TODO(crbug.com/1097328): Remove this string, as it is unused.
       {"keyboardShowLanguageAndInput",
        IDS_SETTINGS_KEYBOARD_SHOW_LANGUAGE_AND_INPUT},
-      {"keyboardTitle", IDS_SETTINGS_KEYBOARD_TITLE},
+      {"keyboardTitle", kIsRevampEnabled
+                            ? IDS_OS_SETTINGS_REVAMP_KEYBOARD_AND_INPUTS_TITLE
+                            : IDS_SETTINGS_KEYBOARD_TITLE},
       {"keyRepeatDelay", IDS_SETTINGS_KEYBOARD_AUTO_REPEAT_DELAY},
       {"keyRepeatDelayLong", IDS_SETTINGS_KEYBOARD_AUTO_REPEAT_DELAY_LONG},
       {"keyRepeatDelayShort", IDS_SETTINGS_KEYBOARD_AUTO_REPEAT_DELAY_SHORT},
@@ -800,24 +763,116 @@ void AddDeviceKeyboardStrings(content::WebUIDataSource* html_source) {
        IDS_SETTINGS_KEYBOARD_REMAP_KEYS_DESCRIPTION},
       {"showKeyboardShortcutViewer",
        IDS_SETTINGS_KEYBOARD_SHOW_SHORTCUT_VIEWER},
+      {"viewAndCustomizeKeyboardShortcut",
+       IDS_SETTINGS_KEYBOARD_VIEW_AND_CUSTOMIZE_SHORTCUTS},
       {"keyboardKeyLauncher", IDS_SETTINGS_KEYBOARD_KEY_LAUNCHER},
       {"keyboardKeySearch", IDS_SETTINGS_KEYBOARD_KEY_SEARCH},
       {"keyboardRemapRestoreDefaultsLabel",
        IDS_SETTINGS_KEYBOARD_REMAP_RESTORE_BUTTON_LABEL},
+      {"keyboardHoldingKeys", IDS_SETTINGS_KEYBOARD_HOLDING_KEYS},
+      {"keyboardAccentMarks", IDS_SETTINGS_KEYBOARD_ACCENT_MARKS},
+      {"keyboardAccentMarksSubLabel",
+       IDS_SETTINGS_KEYBOARD_ACCENT_MARKS_SUB_LABEL},
       {"noKeyboardsConnected", IDS_SETTINGS_KEYBOARD_NO_KEYBOARDS_HELP_MESSAGE},
+      {"perDeviceKeyboardKeyAlt",
+       IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_LEFT_ALT},
+      {"perDeviceKeyboardKeyAssistant",
+       IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_ASSISTANT},
+      {"perDeviceKeyboardKeyBackspace",
+       IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_BACKSPACE},
+      {"perDeviceKeyboardKeyCapsLock",
+       IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_CAPS_LOCK},
+      {"perDeviceKeyboardKeyCommand",
+       IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_COMMAND},
+      {"perDeviceKeyboardKeyCtrl",
+       IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_LEFT_CTRL},
+      {"perDeviceKeyboardKeyDisabled",
+       IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_DISABLED},
+      {"perDeviceKeyboardKeyEscape",
+       IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_ESCAPE},
+      {"perDeviceKeyboardKeyMeta", IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_META},
   };
   html_source->AddLocalizedStrings(keyboard_strings);
 
-  html_source->AddLocalizedString(
-      "keyboardKeySearch",
-      Shell::Get()->keyboard_capability()->HasLauncherButton()
-          ? IDS_SETTINGS_KEYBOARD_KEY_LAUNCHER
-          : IDS_SETTINGS_KEYBOARD_KEY_SEARCH);
-  html_source->AddLocalizedString(
-      "keyboardSendFunctionKeysDescription",
-      ui::DeviceUsesKeyboardLayout2()
-          ? IDS_SETTINGS_KEYBOARD_SEND_FUNCTION_KEYS_LAYOUT2_DESCRIPTION
-          : IDS_SETTINGS_KEYBOARD_SEND_FUNCTION_KEYS_DESCRIPTION);
+  if (Shell::Get()->keyboard_capability()->HasLauncherButtonOnAnyKeyboard()) {
+    html_source->AddLocalizedString(
+        "keyboardBlockMetaFunctionKeyRewrites",
+        IDS_SETTINGS_KEYBOARD_BLOCK_META_FUNCTION_KEY_REWRITES_LAUNCHER);
+    html_source->AddLocalizedString(
+        "keyboardBlockMetaFunctionKeyRewritesDescription",
+        IDS_SETTINGS_KEYBOARD_BLOCK_META_FUNCTION_KEY_REWRITES_DESCRIPTION_LAUNCHER);
+    html_source->AddLocalizedString(
+        "perDeviceKeyboardKeySearch",
+        IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_LAUNCHER);
+    html_source->AddLocalizedString("keyboardKeySearch",
+                                    IDS_SETTINGS_KEYBOARD_KEY_LAUNCHER);
+    html_source->AddLocalizedString(
+        "keyboardSendFunctionKeysDescription",
+        IDS_SETTINGS_KEYBOARD_SEND_FUNCTION_KEYS_LAYOUT2_DESCRIPTION);
+    html_source->AddLocalizedString("sixPackKeyDeleteSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_DELETE_LAUNCHER);
+    html_source->AddLocalizedString("sixPackKeyHomeSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_HOME_LAUNCHER);
+    html_source->AddLocalizedString("sixPackKeyEndSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_END_LAUNCHER);
+    html_source->AddLocalizedString("sixPackKeyPageUpSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_PAGE_UP_LAUNCHER);
+    html_source->AddLocalizedString(
+        "sixPackKeyPageDownSearch",
+        IDS_SETTINGS_SIX_PACK_KEY_PAGE_DOWN_LAUNCHER);
+    html_source->AddLocalizedString("sixPackKeyInsertSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_INSERT_LAUNCHER);
+    html_source->AddLocalizedString(
+        "touchpadSimulateRightClickOptionSearch",
+        IDS_SETTINGS_TOUCHPAD_SIMULATE_RIGHT_CLICK_OPTION_LAUNCHER);
+    html_source->AddLocalizedString(
+        "fKeyShiftOptionSearch",
+        IDS_SETTINGS_F_KEY_SHIFT_DROPDOWN_OPTION_LAUNCHER);
+    html_source->AddLocalizedString(
+        "fKeyCtrlShiftOptionSearch",
+        IDS_SETTINGS_F_KEY_CTRL_SHIFT_DROPDOWN_OPTION_LAUNCHER);
+    html_source->AddLocalizedString(
+        "fKeyAltOptionSearch", IDS_SETTINGS_F_KEY_ALT_DROPDOWN_OPTION_LAUNCHER);
+
+  } else {
+    html_source->AddLocalizedString(
+        "keyboardBlockMetaFunctionKeyRewrites",
+        IDS_SETTINGS_KEYBOARD_BLOCK_META_FUNCTION_KEY_REWRITES_SEARCH);
+    html_source->AddLocalizedString(
+        "keyboardBlockMetaFunctionKeyRewritesDescription",
+        IDS_SETTINGS_KEYBOARD_BLOCK_META_FUNCTION_KEY_REWRITES_DESCRIPTION_SEARCH);
+    html_source->AddLocalizedString(
+        "perDeviceKeyboardKeySearch",
+        IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_SEARCH);
+    html_source->AddLocalizedString("keyboardKeySearch",
+                                    IDS_SETTINGS_KEYBOARD_KEY_SEARCH);
+    html_source->AddLocalizedString(
+        "keyboardSendFunctionKeysDescription",
+        IDS_SETTINGS_KEYBOARD_SEND_FUNCTION_KEYS_DESCRIPTION);
+    html_source->AddLocalizedString("sixPackKeyDeleteSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_DELETE_SEARCH);
+    html_source->AddLocalizedString("sixPackKeyHomeSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_HOME_SEARCH);
+    html_source->AddLocalizedString("sixPackKeyEndSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_END_SEARCH);
+    html_source->AddLocalizedString("sixPackKeyPageUpSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_PAGE_UP_SEARCH);
+    html_source->AddLocalizedString("sixPackKeyPageDownSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_PAGE_DOWN_SEARCH);
+    html_source->AddLocalizedString("sixPackKeyInsertSearch",
+                                    IDS_SETTINGS_SIX_PACK_KEY_INSERT_SEARCH);
+    html_source->AddLocalizedString(
+        "touchpadSimulateRightClickOptionSearch",
+        IDS_SETTINGS_TOUCHPAD_SIMULATE_RIGHT_CLICK_OPTION_SEARCH);
+    html_source->AddLocalizedString(
+        "fKeyShiftOptionSearch",
+        IDS_SETTINGS_F_KEY_SHIFT_DROPDOWN_OPTION_SEARCH);
+    html_source->AddLocalizedString(
+        "fKeyCtrlShiftOptionSearch",
+        IDS_SETTINGS_F_KEY_CTRL_SHIFT_DROPDOWN_OPTION_SEARCH);
+    html_source->AddLocalizedString(
+        "fKeyAltOptionSearch", IDS_SETTINGS_F_KEY_ALT_DROPDOWN_OPTION_SEARCH);
+  }
 }
 
 void AddDeviceStylusStrings(content::WebUIDataSource* html_source) {
@@ -845,165 +900,6 @@ void AddDeviceStylusStrings(content::WebUIDataSource* html_source) {
                           stylus_utils::HasInternalStylus());
 }
 
-void AddDeviceDisplayStrings(content::WebUIDataSource* html_source) {
-  static constexpr webui::LocalizedString kDisplayStrings[] = {
-      {"displayAmbientColorTitle", IDS_SETTINGS_DISPLAY_AMBIENT_COLOR_TITLE},
-      {"displayAmbientColorSubtitle",
-       IDS_SETTINGS_DISPLAY_AMBIENT_COLOR_SUBTITLE},
-      {"displayArrangementTitle", IDS_SETTINGS_DISPLAY_ARRANGEMENT_TITLE},
-      {"displayMirror", IDS_SETTINGS_DISPLAY_MIRROR},
-      {"displayMirrorDisplayName", IDS_SETTINGS_DISPLAY_MIRROR_DISPLAY_NAME},
-      {"displayNightLightLabel", IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_LABEL},
-      {"displayNightLightOnAtSunset",
-       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_ON_AT_SUNSET},
-      {"displayNightLightOffAtSunrise",
-       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_OFF_AT_SUNRISE},
-      {"displayNightLightScheduleCustom",
-       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_SCHEDULE_CUSTOM},
-      {"displayNightLightScheduleLabel",
-       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_SCHEDULE_LABEL},
-      {"displayNightLightScheduleNever",
-       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_SCHEDULE_NEVER},
-      {"displayNightLightScheduleSunsetToSunRise",
-       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_SCHEDULE_SUNSET_TO_SUNRISE},
-      {"displayNightLightTemperatureLabel",
-       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_TEMPERATURE_LABEL},
-      {"displayNightLightTempSliderMaxLabel",
-       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_TEMP_SLIDER_MAX_LABEL},
-      {"displayNightLightTempSliderMinLabel",
-       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_TEMP_SLIDER_MIN_LABEL},
-      {"displayNightLightText", IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_TEXT},
-      {"displayOrientation", IDS_SETTINGS_DISPLAY_ORIENTATION},
-      {"displayOrientationAutoRotate",
-       IDS_SETTINGS_DISPLAY_ORIENTATION_AUTO_ROTATE},
-      {"displayOrientationStandard", IDS_SETTINGS_DISPLAY_ORIENTATION_STANDARD},
-      {"displayOverscanInstructions",
-       IDS_SETTINGS_DISPLAY_OVERSCAN_INSTRUCTIONS},
-      {"displayOverscanPageText", IDS_SETTINGS_DISPLAY_OVERSCAN_TEXT},
-      {"displayOverscanPageTitle", IDS_SETTINGS_DISPLAY_OVERSCAN_TITLE},
-      {"displayOverscanPosition", IDS_SETTINGS_DISPLAY_OVERSCAN_POSITION},
-      {"displayOverscanResize", IDS_SETTINGS_DISPLAY_OVERSCAN_RESIZE},
-      {"displayOverscanReset", IDS_SETTINGS_DISPLAY_OVERSCAN_RESET},
-      {"displayOverscanSubtitle", IDS_SETTINGS_DISPLAY_OVERSCAN_SUBTITLE},
-      {"displayRefreshRateInterlacedMenuItem",
-       IDS_SETTINGS_DISPLAY_REFRESH_RATE_INTERLACED_MENU_ITEM},
-      {"displayRefreshRateMenuItem",
-       IDS_SETTINGS_DISPLAY_REFRESH_RATE_MENU_ITEM},
-      {"displayRefreshRateSublabel",
-       IDS_SETTINGS_DISPLAY_REFRESH_RATE_SUBLABEL},
-      {"displayRefreshRateTitle", IDS_SETTINGS_DISPLAY_REFRESH_RATE_TITLE},
-      {"displayResolutionInterlacedMenuItem",
-       IDS_SETTINGS_DISPLAY_RESOLUTION_INTERLACED_MENU_ITEM},
-      {"displayResolutionMenuItem", IDS_SETTINGS_DISPLAY_RESOLUTION_MENU_ITEM},
-      {"displayResolutionOnlyMenuItem",
-       IDS_SETTINGS_DISPLAY_RESOLUTION_ONLY_MENU_ITEM},
-      {"displayResolutionSublabel", IDS_SETTINGS_DISPLAY_RESOLUTION_SUBLABEL},
-      {"displayResolutionText", IDS_SETTINGS_DISPLAY_RESOLUTION_TEXT},
-      {"displayResolutionTextBest", IDS_SETTINGS_DISPLAY_RESOLUTION_TEXT_BEST},
-      {"displayResolutionTextNative",
-       IDS_SETTINGS_DISPLAY_RESOLUTION_TEXT_NATIVE},
-      {"displayResolutionTitle", IDS_SETTINGS_DISPLAY_RESOLUTION_TITLE},
-      {"displayScreenExtended", IDS_SETTINGS_DISPLAY_SCREEN_EXTENDED},
-      {"displayScreenPrimary", IDS_SETTINGS_DISPLAY_SCREEN_PRIMARY},
-      {"displayScreenTitle", IDS_SETTINGS_DISPLAY_SCREEN},
-      {"displaySizeSliderMaxLabel", IDS_SETTINGS_DISPLAY_ZOOM_SLIDER_MAXIMUM},
-      {"displaySizeSliderMinLabel", IDS_SETTINGS_DISPLAY_ZOOM_SLIDER_MINIMUM},
-      {"displayTitle", IDS_SETTINGS_DISPLAY_TITLE},
-      {"displayTouchCalibrationText",
-       IDS_SETTINGS_DISPLAY_TOUCH_CALIBRATION_TEXT},
-      {"displayTouchCalibrationTitle",
-       IDS_SETTINGS_DISPLAY_TOUCH_CALIBRATION_TITLE},
-      {"displayUnifiedDesktop", IDS_SETTINGS_DISPLAY_UNIFIED_DESKTOP},
-      {"displayUnifiedDesktopOff", IDS_SETTINGS_DISPLAY_UNIFIED_DESKTOP_OFF},
-      {"displayUnifiedDesktopOn", IDS_SETTINGS_DISPLAY_UNIFIED_DESKTOP_ON},
-      {"displayZoomLogicalResolutionDefaultText",
-       IDS_SETTINGS_DISPLAY_ZOOM_LOGICAL_RESOLUTION_DEFAULT_TEXT},
-      {"displayZoomLogicalResolutionText",
-       IDS_SETTINGS_DISPLAY_ZOOM_LOGICAL_RESOLUTION_TEXT},
-      {"displayZoomNativeLogicalResolutionNativeText",
-       IDS_SETTINGS_DISPLAY_ZOOM_LOGICAL_RESOLUTION_NATIVE_TEXT},
-      {"displayZoomSublabel", IDS_SETTINGS_DISPLAY_ZOOM_SUBLABEL},
-      {"displayZoomTitle", IDS_SETTINGS_DISPLAY_ZOOM_TITLE},
-      {"displayZoomValue", IDS_SETTINGS_DISPLAY_ZOOM_VALUE},
-  };
-  html_source->AddLocalizedStrings(kDisplayStrings);
-
-  html_source->AddLocalizedString(
-      "displayArrangementText",
-      IDS_SETTINGS_DISPLAY_ARRANGEMENT_WITH_KEYBOARD_TEXT);
-
-  html_source->AddBoolean(
-      "isCryptohomeDataEphemeral",
-      user_manager::UserManager::Get()->IsCurrentUserCryptohomeDataEphemeral());
-
-  html_source->AddBoolean("unifiedDesktopAvailable",
-                          IsUnifiedDesktopAvailable());
-
-  html_source->AddBoolean("listAllDisplayModes",
-                          IsListAllDisplayModesEnabled());
-
-  html_source->AddBoolean("deviceSupportsAmbientColor",
-                          DoesDeviceSupportAmbientColor());
-
-  html_source->AddBoolean("enableTouchCalibrationSetting",
-                          IsTouchCalibrationAvailable());
-
-  html_source->AddBoolean("enableDriveFsBulkPinning",
-                          IsDriveFsBulkPinningEnabled());
-
-  html_source->AddString("invalidDisplayId",
-                         base::NumberToString(display::kInvalidDisplayId));
-
-  html_source->AddBoolean(
-      "allowDisplayAlignmentApi",
-      base::FeatureList::IsEnabled(ash::features::kDisplayAlignAssist));
-}
-
-void AddDeviceStorageStrings(content::WebUIDataSource* html_source,
-                             bool is_external_storage_page_available) {
-  static constexpr webui::LocalizedString kStorageStrings[] = {
-      {"storageExternal", IDS_SETTINGS_STORAGE_EXTERNAL},
-      {"storageExternalStorageEmptyListHeader",
-       IDS_SETTINGS_STORAGE_EXTERNAL_STORAGE_EMPTY_LIST_HEADER},
-      {"storageExternalStorageListHeader",
-       IDS_SETTINGS_STORAGE_EXTERNAL_STORAGE_LIST_HEADER},
-      {"storageItemApps", IDS_SETTINGS_STORAGE_ITEM_APPS},
-      {"storageItemOffline", IDS_SETTINGS_STORAGE_ITEM_OFFLINE},
-      {"storageItemAvailable", IDS_SETTINGS_STORAGE_ITEM_AVAILABLE},
-      {"storageItemBrowsingData", IDS_SETTINGS_STORAGE_ITEM_BROWSING_DATA},
-      {"storageItemCrostini", IDS_SETTINGS_STORAGE_ITEM_CROSTINI},
-      {"storageItemInUse", IDS_SETTINGS_STORAGE_ITEM_IN_USE},
-      {"storageItemMyFiles", IDS_SETTINGS_STORAGE_ITEM_MY_FILES},
-      {"storageItemOtherUsers", IDS_SETTINGS_STORAGE_ITEM_OTHER_USERS},
-      {"storageItemSystem", IDS_SETTINGS_STORAGE_ITEM_SYSTEM},
-      {"storageOverviewAriaLabel", IDS_SETTINGS_STORAGE_OVERVIEW_ARIA_LABEL},
-      {"storageSizeComputing", IDS_SETTINGS_STORAGE_SIZE_CALCULATING},
-      {"storageSizeUnknown", IDS_SETTINGS_STORAGE_SIZE_UNKNOWN},
-      {"storageSpaceCriticallyLowMessageLine1",
-       IDS_SETTINGS_STORAGE_SPACE_CRITICALLY_LOW_MESSAGE_LINE_1},
-      {"storageSpaceCriticallyLowMessageLine2",
-       IDS_SETTINGS_STORAGE_SPACE_CRITICALLY_LOW_MESSAGE_LINE_2},
-      {"storageSpaceCriticallyLowMessageTitle",
-       IDS_SETTINGS_STORAGE_SPACE_CRITICALLY_LOW_MESSAGE_TITLE},
-      {"storageSpaceLowMessageLine1",
-       IDS_SETTINGS_STORAGE_SPACE_LOW_MESSAGE_LINE_1},
-      {"storageSpaceLowMessageLine2",
-       IDS_SETTINGS_STORAGE_SPACE_LOW_MESSAGE_LINE_2},
-      {"storageSpaceLowMessageTitle",
-       IDS_SETTINGS_STORAGE_SPACE_LOW_MESSAGE_TITLE},
-      {"storageTitle", IDS_SETTINGS_STORAGE_TITLE},
-  };
-  html_source->AddLocalizedStrings(kStorageStrings);
-
-  html_source->AddBoolean("androidEnabled", is_external_storage_page_available);
-
-  html_source->AddString(
-      "storageAndroidAppsExternalDrivesNote",
-      l10n_util::GetStringFUTF16(
-          IDS_SETTINGS_STORAGE_ANDROID_APPS_ACCESS_EXTERNAL_DRIVES_NOTE,
-          base::ASCIIToUTF16(chrome::kArcExternalStorageLearnMoreURL)));
-}
-
 void AddDeviceAudioStrings(content::WebUIDataSource* html_source) {
   static constexpr webui::LocalizedString kAudioStrings[] = {
       {"audioDeviceBluetoothLabel", IDS_SETTINGS_AUDIO_DEVICE_BLUETOOTH_LABEL},
@@ -1018,6 +914,7 @@ void AddDeviceAudioStrings(content::WebUIDataSource* html_source) {
       {"audioDeviceRearMicLabel", IDS_SETTINGS_AUDIO_DEVICE_REAR_MIC_LABEL},
       {"audioDeviceUsbLabel", IDS_SETTINGS_AUDIO_DEVICE_USB_LABEL},
       {"audioInputDeviceTitle", IDS_SETTINGS_AUDIO_INPUT_DEVICE_TITLE},
+      {"audioInputAllowAGCTitle", IDS_SETTINGS_AUDIO_INPUT_ALLOW_AGC_TITLE},
       {"audioInputGainTitle", IDS_SETTINGS_AUDIO_INPUT_GAIN_TITLE},
       {"audioInputMuteButtonAriaLabelMuted",
        IDS_SETTINGS_AUDIO_INPUT_MUTE_BUTTON_ARIA_LABEL_MUTED},
@@ -1042,46 +939,19 @@ void AddDeviceAudioStrings(content::WebUIDataSource* html_source) {
       {"audioToggleToUnmuteTooltip",
        IDS_SETTINGS_AUDIO_TOGGLE_TO_UNMUTE_TOOLTIP},
       {"audioVolumeTitle", IDS_SETTINGS_AUDIO_VOLUME_TITLE},
+      {"chargingSoundsLabel",
+       IDS_SETTINGS_AUDIO_DEVICE_SOUNDS_CHARGING_SOUNDS_LABEL},
+      {"deviceStartupSoundLabel",
+       IDS_SETTINGS_AUDIO_DEVICE_SOUNDS_STARTUP_SOUND_LABEL},
+      {"deviceSoundsTitle", IDS_SETTINGS_AUDIO_DEVICE_SOUNDS_TITLE},
+      {"lowBatterySoundLabel",
+       IDS_SETTINGS_AUDIO_DEVICE_SOUNDS_LOW_BATTERY_SOUND_LABEL},
   };
 
   html_source->AddLocalizedStrings(kAudioStrings);
-}
 
-void AddDevicePowerStrings(content::WebUIDataSource* html_source) {
-  static constexpr webui::LocalizedString kPowerStrings[] = {
-      {"calculatingPower", IDS_SETTINGS_POWER_SOURCE_CALCULATING},
-      {"powerAdaptiveChargingLabel",
-       IDS_SETTINGS_POWER_ADAPTIVE_CHARGING_LABEL},
-      {"powerAdaptiveChargingSubtext",
-       IDS_SETTINGS_POWER_ADAPTIVE_CHARGING_SUBTEXT},
-      {"powerIdleDisplayOff", IDS_SETTINGS_POWER_IDLE_DISPLAY_OFF},
-      {"powerIdleDisplayOffSleep", IDS_SETTINGS_POWER_IDLE_DISPLAY_OFF_SLEEP},
-      {"powerIdleDisplayOn", IDS_SETTINGS_POWER_IDLE_DISPLAY_ON},
-      {"powerIdleDisplayShutDown", IDS_SETTINGS_POWER_IDLE_SHUT_DOWN},
-      {"powerIdleDisplayStopSession", IDS_SETTINGS_POWER_IDLE_STOP_SESSION},
-      {"powerIdleLabel", IDS_SETTINGS_POWER_IDLE_LABEL},
-      {"powerIdleWhileChargingAriaLabel",
-       IDS_SETTINGS_POWER_IDLE_WHILE_CHARGING_ARIA_LABEL},
-      {"powerIdleWhileChargingLabel",
-       IDS_SETTINGS_POWER_IDLE_WHILE_CHARGING_LABEL},
-      {"powerIdleWhileOnBatteryAriaLabel",
-       IDS_SETTINGS_POWER_IDLE_WHILE_ON_BATTERY_ARIA_LABEL},
-      {"powerIdleWhileOnBatteryLabel",
-       IDS_SETTINGS_POWER_IDLE_WHILE_ON_BATTERY_LABEL},
-      {"powerLidShutDownLabel", IDS_SETTINGS_POWER_LID_CLOSED_SHUT_DOWN_LABEL},
-      {"powerLidSignOutLabel", IDS_SETTINGS_POWER_LID_CLOSED_SIGN_OUT_LABEL},
-      {"powerLidSleepLabel", IDS_SETTINGS_POWER_LID_CLOSED_SLEEP_LABEL},
-      {"powerSourceAcAdapter", IDS_SETTINGS_POWER_SOURCE_AC_ADAPTER},
-      {"powerSourceBattery", IDS_SETTINGS_POWER_SOURCE_BATTERY},
-      {"powerSourceLabel", IDS_SETTINGS_POWER_SOURCE_LABEL},
-      {"powerSourceLowPowerCharger",
-       IDS_SETTINGS_POWER_SOURCE_LOW_POWER_CHARGER},
-      {"powerTitle", IDS_SETTINGS_POWER_TITLE},
-  };
-  html_source->AddLocalizedStrings(kPowerStrings);
-
-  // TODO(b:216035280): create and link to real "learn more" webpage.
-  html_source->AddString("powerAdaptiveChargingLearnMoreUrl", u"about://blank");
+  html_source->AddBoolean("areSystemSoundsEnabled",
+                          ash::features::AreSystemSoundsEnabled());
 }
 
 // Mirrors enum of the same name in enums.xml.
@@ -1099,9 +969,36 @@ enum class TouchpadSensitivity {
 
 DeviceSection::DeviceSection(Profile* profile,
                              SearchTagRegistry* search_tag_registry,
+                             CupsPrintersManager* printers_manager,
                              PrefService* pref_service)
     : OsSettingsSection(profile, search_tag_registry),
-      pref_service_(pref_service) {
+      power_subsection_(
+          !ash::features::IsOsSettingsRevampWayfindingEnabled()
+              ? absl::make_optional<PowerSection>(profile,
+                                                  search_tag_registry,
+                                                  pref_service)
+              : absl::nullopt),
+      printing_subsection_(
+          ash::features::IsOsSettingsRevampWayfindingEnabled()
+              ? absl::make_optional<PrintingSection>(profile,
+                                                     search_tag_registry,
+                                                     printers_manager)
+              : absl::nullopt),
+      storage_subsection_(
+          !ash::features::IsOsSettingsRevampWayfindingEnabled()
+              ? absl::make_optional<StorageSection>(profile,
+                                                    search_tag_registry)
+              : absl::nullopt) {
+  CHECK(profile);
+  CHECK(search_tag_registry);
+  CHECK(pref_service);
+  if (ash::features::IsOsSettingsRevampWayfindingEnabled()) {
+    CHECK(printing_subsection_);
+  } else {
+    CHECK(power_subsection_);
+    CHECK(storage_subsection_);
+  }
+
   SearchTagRegistry::ScopedTagUpdater updater = registry()->StartUpdate();
   updater.AddSearchTags(GetDeviceSearchConcepts());
 
@@ -1110,30 +1007,11 @@ DeviceSection::DeviceSection(Profile* profile,
   } else {
     updater.AddSearchTags(GetKeyboardSearchConcepts());
   }
-  if (ShouldShowExternalStorageSettings(profile))
-    updater.AddSearchTags(GetExternalStorageSearchConcepts());
 
-  if (ash::features::IsAudioSettingsPageEnabled()) {
-    updater.AddSearchTags(GetAudioSearchConcepts());
-  }
-
-  chromeos::PowerManagerClient* power_manager_client =
-      chromeos::PowerManagerClient::Get();
-  if (power_manager_client) {
-    power_manager_client->AddObserver(this);
-
-    const absl::optional<power_manager::PowerSupplyProperties>& last_status =
-        power_manager_client->GetLastStatus();
-    if (last_status)
-      PowerChanged(*last_status);
-
-    // Determine whether to show laptop lid power settings.
-    power_manager_client->GetSwitchStates(base::BindOnce(
-        &DeviceSection::OnGotSwitchStates, weak_ptr_factory_.GetWeakPtr()));
-
-    // Surface adaptive charging setting in search if the feature is enabled.
-    if (ash::features::IsAdaptiveChargingEnabled())
-      updater.AddSearchTags(GetPowerWithAdaptiveChargingSearchConcepts());
+  // Only when the feature is enabled, the toggle buttons for charging sounds
+  // and the low battery sound will be shown up.
+  if (ash::features::AreSystemSoundsEnabled()) {
+    updater.AddSearchTags(GetAudioPowerSoundsSearchConcepts());
   }
 
   // Keyboard/mouse search tags are added/removed dynamically.
@@ -1169,45 +1047,71 @@ DeviceSection::~DeviceSection() {
   pointer_device_observer_.RemoveObserver(this);
   ui::DeviceDataManager::GetInstance()->RemoveObserver(this);
 
-  chromeos::PowerManagerClient* power_manager_client =
-      chromeos::PowerManagerClient::Get();
-  if (power_manager_client)
-    power_manager_client->RemoveObserver(this);
-
   NightLightController* night_light_controller =
       NightLightController::GetInstance();
-  if (night_light_controller)
+  if (night_light_controller) {
     night_light_controller->RemoveObserver(this);
+  }
 }
 
 void DeviceSection::AddLoadTimeData(content::WebUIDataSource* html_source) {
-  static constexpr webui::LocalizedString kDeviceStrings[] = {
+  const bool kIsRevampEnabled =
+      ash::features::IsOsSettingsRevampWayfindingEnabled();
+
+  webui::LocalizedString kDeviceStrings[] = {
       {"devicePageTitle", IDS_SETTINGS_DEVICE_TITLE},
-      {"touchPadScrollLabel", IDS_OS_SETTINGS_TOUCHPAD_REVERSE_SCROLL_LABEL},
+      {"touchpadScrollLabel",
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_TOUCHPAD_REVERSE_SCROLL_LABEL
+                        : IDS_OS_SETTINGS_TOUCHPAD_REVERSE_SCROLL_LABEL},
+      {"touchpadScrollDescription",
+       IDS_OS_SETTINGS_REVAMP_TOUCHPAD_REVERSE_SCROLL_DESCRIPTION},
   };
   html_source->AddLocalizedStrings(kDeviceStrings);
 
   html_source->AddBoolean("isDemoSession", DemoSession::IsDeviceInDemoMode());
 
+  html_source->AddBoolean("enableInputDeviceSettingsSplit",
+                          ash::features::IsInputDeviceSettingsSplitEnabled());
+
+  html_source->AddBoolean("enablePeripheralCustomization",
+                          ash::features::IsPeripheralCustomizationEnabled());
+
+  html_source->AddBoolean(
+      "enableAltClickAndSixPackCustomization",
+      ash::features::IsAltClickAndSixPackCustomizationEnabled());
+
+  html_source->AddBoolean(
+      "enableF11AndF12KeyShortcuts",
+      base::FeatureList::IsEnabled(::features::kSupportF11AndF12KeyShortcuts));
+
   AddDevicePointersStrings(html_source);
+  AddDeviceGraphicsTabletStrings(html_source);
+  AddCustomizeButtonsPageStrings(html_source);
   AddDeviceKeyboardStrings(html_source);
   AddDeviceStylusStrings(html_source);
   AddDeviceDisplayStrings(html_source);
   AddDeviceAudioStrings(html_source);
-  AddDeviceStorageStrings(html_source,
-                          ShouldShowExternalStorageSettings(profile()));
-  AddDevicePowerStrings(html_source);
 
-  html_source->AddBoolean("isAdaptiveChargingEnabled",
-                          ash::features::IsAdaptiveChargingEnabled());
+  if (ash::features::IsOsSettingsRevampWayfindingEnabled()) {
+    printing_subsection_->AddLoadTimeData(html_source);
+  } else {
+    power_subsection_->AddLoadTimeData(html_source);
+    storage_subsection_->AddLoadTimeData(html_source);
+  }
 }
 
 void DeviceSection::AddHandlers(content::WebUI* web_ui) {
   web_ui->AddMessageHandler(std::make_unique<DisplayHandler>());
   web_ui->AddMessageHandler(std::make_unique<KeyboardHandler>());
   web_ui->AddMessageHandler(std::make_unique<PointerHandler>());
-  web_ui->AddMessageHandler(std::make_unique<PowerHandler>(pref_service_));
   web_ui->AddMessageHandler(std::make_unique<StylusHandler>());
+
+  if (ash::features::IsOsSettingsRevampWayfindingEnabled()) {
+    printing_subsection_->AddHandlers(web_ui);
+  } else {
+    power_subsection_->AddHandlers(web_ui);
+    storage_subsection_->AddHandlers(web_ui);
+  }
 }
 
 int DeviceSection::GetSectionNameMessageId() const {
@@ -1222,7 +1126,7 @@ mojom::SearchResultIcon DeviceSection::GetSectionIcon() const {
   return mojom::SearchResultIcon::kLaptop;
 }
 
-std::string DeviceSection::GetSectionPath() const {
+const char* DeviceSection::GetSectionPath() const {
   return mojom::kDeviceSectionPath;
 }
 
@@ -1240,12 +1144,27 @@ bool DeviceSection::LogMetric(mojom::Setting setting,
                                 value.GetBool());
       return true;
 
+    case mojom::Setting::kLowBatterySound:
+      base::UmaHistogramBoolean(
+          "ChromeOS.Settings.Device.LowBatterySoundButtonEnabled",
+          value.GetBool());
+      return true;
+
+    case mojom::Setting::kChargingSounds:
+      base::UmaHistogramBoolean(
+          "ChromeOS.Settings.Device.ChargingSoundsButtonEnabled",
+          value.GetBool());
+      return true;
+
     default:
       return false;
   }
 }
 
 void DeviceSection::RegisterHierarchy(HierarchyGenerator* generator) const {
+  const bool kIsRevampEnabled =
+      ash::features::IsOsSettingsRevampWayfindingEnabled();
+
   // Pointers.
   generator->RegisterTopLevelSubpage(
       IDS_SETTINGS_MOUSE_AND_TOUCHPAD_TITLE, mojom::Subpage::kPointers,
@@ -1272,9 +1191,12 @@ void DeviceSection::RegisterHierarchy(HierarchyGenerator* generator) const {
   RegisterNestedSettingBulk(mojom::Subpage::kPointers, kPointersSettings,
                             generator);
 
+  const int kKeyboardTitleStringID =
+      kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_KEYBOARD_AND_INPUTS_TITLE
+                       : IDS_SETTINGS_KEYBOARD_TITLE;
   if (base::FeatureList::IsEnabled(ash::features::kInputDeviceSettingsSplit)) {
     // Per-device Keyboard.
-    generator->RegisterTopLevelSubpage(IDS_SETTINGS_KEYBOARD_TITLE,
+    generator->RegisterTopLevelSubpage(kKeyboardTitleStringID,
                                        mojom::Subpage::kPerDeviceKeyboard,
                                        mojom::SearchResultIcon::kKeyboard,
                                        mojom::SearchResultDefaultRank::kMedium,
@@ -1286,6 +1208,13 @@ void DeviceSection::RegisterHierarchy(HierarchyGenerator* generator) const {
         mojom::Subpage::kPerDeviceKeyboard, mojom::SearchResultIcon::kKeyboard,
         mojom::SearchResultDefaultRank::kMedium,
         mojom::kPerDeviceKeyboardRemapKeysSubpagePath);
+
+    static constexpr mojom::Setting kPerDeviceKeyboardSettings[] = {
+        mojom::Setting::kKeyboardBlockMetaFkeyRewrites,
+        mojom::Setting::kKeyboardRemapKeys,
+    };
+    RegisterNestedSettingBulk(mojom::Subpage::kPerDeviceKeyboard,
+                              kPerDeviceKeyboardSettings, generator);
 
     // Per-device Mouse.
     generator->RegisterTopLevelSubpage(IDS_SETTINGS_MOUSE_TITLE,
@@ -1310,18 +1239,99 @@ void DeviceSection::RegisterHierarchy(HierarchyGenerator* generator) const {
         mojom::kPerDevicePointingStickSubpagePath);
   }
 
+  if (ash::features::IsPeripheralCustomizationEnabled()) {
+    // TODO(yyhyyh@): Add icon for graphics tablet to replace the temporary
+    // stylus icon.
+    generator->RegisterTopLevelSubpage(IDS_SETTINGS_GRAPHICS_TABLET_TITLE,
+                                       mojom::Subpage::kGraphicsTablet,
+                                       mojom::SearchResultIcon::kStylus,
+                                       mojom::SearchResultDefaultRank::kMedium,
+                                       mojom::kGraphicsTabletSubpagePath);
+
+    generator->RegisterNestedSubpage(IDS_SETTINGS_CUSTOMIZE_MOUSE_BUTTONS_TITLE,
+                                     mojom::Subpage::kCustomizeMouseButtons,
+                                     mojom::Subpage::kPerDeviceMouse,
+                                     mojom::SearchResultIcon::kMouse,
+                                     mojom::SearchResultDefaultRank::kMedium,
+                                     mojom::kCustomizeMouseButtonsSubpagePath);
+
+    // TODO(yyhyyh@): Add icon for graphics tablet to replace the temporary
+    // stylus icon.
+    generator->RegisterNestedSubpage(
+        IDS_SETTINGS_GRAPHICS_TABLET_CUSTOMIZE_TABLET_BUTTONS_LABEL,
+        mojom::Subpage::kCustomizeTabletButtons,
+        mojom::Subpage::kGraphicsTablet, mojom::SearchResultIcon::kStylus,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::kCustomizeTabletButtonsSubpagePath);
+
+    // TODO(yyhyyh@): Decide whether to use stylus icon or add a new icon.
+    generator->RegisterNestedSubpage(
+        IDS_SETTINGS_GRAPHICS_TABLET_CUSTOMIZE_TABLET_BUTTONS_LABEL,
+        mojom::Subpage::kCustomizePenButtons, mojom::Subpage::kGraphicsTablet,
+        mojom::SearchResultIcon::kStylus,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::kCustomizePenButtonsSubpagePath);
+  }
+
   // Keyboard.
   generator->RegisterTopLevelSubpage(
-      IDS_SETTINGS_KEYBOARD_TITLE, mojom::Subpage::kKeyboard,
+      kKeyboardTitleStringID, mojom::Subpage::kKeyboard,
       mojom::SearchResultIcon::kKeyboard,
       mojom::SearchResultDefaultRank::kMedium, mojom::kKeyboardSubpagePath);
   static constexpr mojom::Setting kKeyboardSettings[] = {
+      mojom::Setting::kShowDiacritic,
       mojom::Setting::kKeyboardFunctionKeys,
       mojom::Setting::kKeyboardAutoRepeat,
       mojom::Setting::kKeyboardShortcuts,
   };
   RegisterNestedSettingBulk(mojom::Subpage::kKeyboard, kKeyboardSettings,
                             generator);
+
+  if (kIsRevampEnabled) {
+    // Input subpage
+    generator->RegisterTopLevelSubpage(
+        IDS_OS_SETTINGS_LANGUAGES_INPUT_PAGE_TITLE_V2, mojom::Subpage::kInput,
+        mojom::SearchResultIcon::kGlobe,
+        mojom::SearchResultDefaultRank::kMedium, mojom::kInputSubpagePath);
+    static constexpr mojom::Setting kInputSubpageSettings[] = {
+        mojom::Setting::kAddInputMethod,
+        mojom::Setting::kShowEmojiSuggestions,
+        mojom::Setting::kShowInputOptionsInShelf,
+        mojom::Setting::kSpellCheck,
+    };
+    RegisterNestedSettingBulk(mojom::Subpage::kInput, kInputSubpageSettings,
+                              generator);
+
+    // Edit dictionary subpage
+    generator->RegisterNestedSubpage(
+        IDS_OS_SETTINGS_LANGUAGES_EDIT_DICTIONARY_LABEL,
+        mojom::Subpage::kEditDictionary, mojom::Subpage::kInput,
+        mojom::SearchResultIcon::kGlobe,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::kEditDictionarySubpagePath);
+
+    // Japanese Manage User Dictionary subpage
+    generator->RegisterNestedSubpage(
+        IDS_OS_SETTINGS_LANGUAGES_JAPANESE_MANAGE_USER_DICTIONARY_LABEL,
+        mojom::Subpage::kJapaneseManageUserDictionary, mojom::Subpage::kInput,
+        mojom::SearchResultIcon::kGlobe,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::kJapaneseManageUserDictionarySubpagePath);
+
+    // Input method options subpage
+    generator->RegisterNestedSubpage(
+        IDS_SETTINGS_LANGUAGES_INPUT_METHOD_OPTIONS_TITLE,
+        mojom::Subpage::kInputMethodOptions, mojom::Subpage::kInput,
+        mojom::SearchResultIcon::kGlobe,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::kInputMethodOptionsSubpagePath);
+    static constexpr mojom::Setting kInputMethodOptionsSubpageSettings[] = {
+        mojom::Setting::kShowPKAutoCorrection,
+        mojom::Setting::kShowVKAutoCorrection,
+    };
+    RegisterNestedSettingBulk(mojom::Subpage::kInputMethodOptions,
+                              kInputMethodOptionsSubpageSettings, generator);
+  }
 
   // Stylus.
   generator->RegisterTopLevelSubpage(
@@ -1359,36 +1369,26 @@ void DeviceSection::RegisterHierarchy(HierarchyGenerator* generator) const {
   RegisterNestedSettingBulk(mojom::Subpage::kDisplay, kDisplaySettings,
                             generator);
 
-  // Storage.
-  generator->RegisterTopLevelSubpage(
-      IDS_SETTINGS_STORAGE_TITLE, mojom::Subpage::kStorage,
-      mojom::SearchResultIcon::kHardDrive,
-      mojom::SearchResultDefaultRank::kMedium, mojom::kStorageSubpagePath);
-  generator->RegisterNestedSubpage(
-      IDS_SETTINGS_STORAGE_EXTERNAL, mojom::Subpage::kExternalStorage,
-      mojom::Subpage::kStorage, mojom::SearchResultIcon::kHardDrive,
-      mojom::SearchResultDefaultRank::kMedium,
-      mojom::kExternalStorageSubpagePath);
+  if (ash::features::IsOsSettingsRevampWayfindingEnabled()) {
+    // Printing.
+    printing_subsection_->RegisterHierarchy(generator);
+  } else {
+    // Power.
+    power_subsection_->RegisterHierarchy(generator);
+
+    // Storage.
+    storage_subsection_->RegisterHierarchy(generator);
+  }
 
   // Audio.
   generator->RegisterTopLevelSubpage(
       IDS_SETTINGS_AUDIO_TITLE, mojom::Subpage::kAudio,
       mojom::SearchResultIcon::kAudio, mojom::SearchResultDefaultRank::kMedium,
       mojom::kAudioSubpagePath);
-
-  // Power.
-  generator->RegisterTopLevelSubpage(
-      IDS_SETTINGS_POWER_TITLE, mojom::Subpage::kPower,
-      mojom::SearchResultIcon::kPower, mojom::SearchResultDefaultRank::kMedium,
-      mojom::kPowerSubpagePath);
-  static constexpr mojom::Setting kPowerSettings[] = {
-      mojom::Setting::kPowerIdleBehaviorWhileCharging,
-      mojom::Setting::kPowerIdleBehaviorWhileOnBattery,
-      mojom::Setting::kPowerSource,
-      mojom::Setting::kSleepWhenLaptopLidClosed,
-      mojom::Setting::kAdaptiveCharging,
-  };
-  RegisterNestedSettingBulk(mojom::Subpage::kPower, kPowerSettings, generator);
+  generator->RegisterNestedSetting(mojom::Setting::kChargingSounds,
+                                   mojom::Subpage::kAudio);
+  generator->RegisterNestedSetting(mojom::Setting::kLowBatterySound,
+                                   mojom::Subpage::kAudio);
 }
 
 void DeviceSection::TouchpadExists(bool exists) {
@@ -1396,27 +1396,17 @@ void DeviceSection::TouchpadExists(bool exists) {
 
   if (!ash::features::IsInputDeviceSettingsSplitEnabled()) {
     updater.RemoveSearchTags(GetTouchpadSearchConcepts());
-    updater.RemoveSearchTags(GetTouchpadScrollAccelerationSearchConcepts());
 
     if (exists) {
       updater.AddSearchTags(GetTouchpadSearchConcepts());
-      if (base::FeatureList::IsEnabled(features::kAllowScrollSettings)) {
-        updater.AddSearchTags(GetTouchpadScrollAccelerationSearchConcepts());
-      }
     }
     return;
   }
 
   updater.RemoveSearchTags(GetPerDeviceTouchpadSearchConcepts());
-  updater.RemoveSearchTags(
-      GetPerDeviceTouchpadScrollAccelerationSearchConcepts());
 
   if (exists) {
     updater.AddSearchTags(GetPerDeviceTouchpadSearchConcepts());
-    if (base::FeatureList::IsEnabled((features::kAllowScrollSettings))) {
-      updater.AddSearchTags(
-          GetPerDeviceTouchpadScrollAccelerationSearchConcepts());
-    }
   }
 }
 
@@ -1448,7 +1438,7 @@ void DeviceSection::MouseExists(bool exists) {
 
     if (exists) {
       updater.AddSearchTags(GetMouseSearchConcepts());
-      if (AreScrollSettingsAllowed()) {
+      if (features::IsAllowScrollSettingsEnabled()) {
         updater.AddSearchTags(GetMouseScrollAccelerationSearchConcepts());
       }
     }
@@ -1460,7 +1450,7 @@ void DeviceSection::MouseExists(bool exists) {
 
   if (exists) {
     updater.AddSearchTags(GetPerDeviceMouseSearchConcepts());
-    if (AreScrollSettingsAllowed()) {
+    if (features::IsAllowScrollSettingsEnabled()) {
       updater.AddSearchTags(
           GetPerDeviceMouseScrollAccelerationSearchConcepts());
     }
@@ -1501,16 +1491,6 @@ void DeviceSection::OnDisplayConfigChanged() {
                      base::Unretained(this)));
 }
 
-void DeviceSection::PowerChanged(
-    const power_manager::PowerSupplyProperties& properties) {
-  SearchTagRegistry::ScopedTagUpdater updater = registry()->StartUpdate();
-
-  if (properties.battery_state() !=
-      power_manager::PowerSupplyProperties_BatteryState_NOT_PRESENT) {
-    updater.AddSearchTags(GetPowerWithBatterySearchConcepts());
-  }
-}
-
 void DeviceSection::OnGetDisplayUnitInfoList(
     std::vector<crosapi::mojom::DisplayUnitInfoPtr> display_unit_info_list) {
   cros_display_config_->GetDisplayLayoutInfo(base::BindOnce(
@@ -1543,16 +1523,18 @@ void DeviceSection::OnGetDisplayLayoutInfo(
   SearchTagRegistry::ScopedTagUpdater updater = registry()->StartUpdate();
 
   // Arrangement UI.
-  if (has_multiple_displays || is_mirrored)
+  if (has_multiple_displays || is_mirrored) {
     updater.AddSearchTags(GetDisplayArrangementSearchConcepts());
-  else
+  } else {
     updater.RemoveSearchTags(GetDisplayArrangementSearchConcepts());
+  }
 
   // Mirror toggle.
-  if (is_mirrored || (!unified_desktop_mode && has_multiple_displays))
+  if (is_mirrored || (!unified_desktop_mode && has_multiple_displays)) {
     updater.AddSearchTags(GetDisplayMirrorSearchConcepts());
-  else
+  } else {
     updater.RemoveSearchTags(GetDisplayMirrorSearchConcepts());
+  }
 
   // Unified Desktop toggle.
   if (unified_desktop_mode ||
@@ -1563,70 +1545,84 @@ void DeviceSection::OnGetDisplayLayoutInfo(
   }
 
   // External display settings.
-  if (has_external_display)
+  if (has_external_display) {
     updater.AddSearchTags(GetDisplayExternalSearchConcepts());
-  else
+  } else {
     updater.RemoveSearchTags(GetDisplayExternalSearchConcepts());
+  }
 
   // Refresh Rate dropdown.
-  if (has_external_display && IsListAllDisplayModesEnabled())
+  if (has_external_display && IsListAllDisplayModesEnabled()) {
     updater.AddSearchTags(GetDisplayExternalWithRefreshSearchConcepts());
-  else
+  } else {
     updater.RemoveSearchTags(GetDisplayExternalWithRefreshSearchConcepts());
+  }
 
   // Orientation settings.
-  if (!unified_desktop_mode)
+  if (!unified_desktop_mode) {
     updater.AddSearchTags(GetDisplayOrientationSearchConcepts());
-  else
+  } else {
     updater.RemoveSearchTags(GetDisplayOrientationSearchConcepts());
+  }
 
   // Ambient color settings.
-  if (DoesDeviceSupportAmbientColor() && has_internal_display)
+  if (DoesDeviceSupportAmbientColor() && has_internal_display) {
     updater.AddSearchTags(GetDisplayAmbientSearchConcepts());
-  else
+  } else {
     updater.RemoveSearchTags(GetDisplayAmbientSearchConcepts());
+  }
 
   // Touch calibration settings.
-  if (IsTouchCalibrationAvailable())
+  if (IsTouchCalibrationAvailable()) {
     updater.AddSearchTags(GetDisplayTouchCalibrationSearchConcepts());
-  else
+  } else {
     updater.RemoveSearchTags(GetDisplayTouchCalibrationSearchConcepts());
+  }
 
   // Night Light on settings.
-  if (NightLightController::GetInstance()->GetEnabled())
+  if (NightLightController::GetInstance()->GetEnabled()) {
     updater.AddSearchTags(GetDisplayNightLightOnSearchConcepts());
-  else
+  } else {
     updater.RemoveSearchTags(GetDisplayNightLightOnSearchConcepts());
-}
-
-void DeviceSection::OnGotSwitchStates(
-    absl::optional<chromeos::PowerManagerClient::SwitchStates> result) {
-  SearchTagRegistry::ScopedTagUpdater updater = registry()->StartUpdate();
-
-  if (result &&
-      result->lid_state != chromeos::PowerManagerClient::LidState::NOT_PRESENT)
-    updater.AddSearchTags(GetPowerWithLaptopLidSearchConcepts());
+  }
 }
 
 void DeviceSection::UpdateStylusSearchTags() {
   // If not yet complete, wait for OnDeviceListsComplete() callback.
-  if (!ui::DeviceDataManager::GetInstance()->AreDeviceListsComplete())
+  if (!ui::DeviceDataManager::GetInstance()->AreDeviceListsComplete()) {
     return;
+  }
 
   SearchTagRegistry::ScopedTagUpdater updater = registry()->StartUpdate();
 
   // TODO(https://crbug.com/1071905): Only show stylus settings if a stylus has
   // been set up. HasStylusInput() will return true for any stylus-compatible
   // device, even if it doesn't have a stylus.
-  if (stylus_utils::HasStylusInput())
+  if (stylus_utils::HasStylusInput()) {
     updater.AddSearchTags(GetStylusSearchConcepts());
-  else
+  } else {
     updater.RemoveSearchTags(GetStylusSearchConcepts());
+  }
 }
 
 void DeviceSection::AddDevicePointersStrings(
     content::WebUIDataSource* html_source) {
-  static constexpr webui::LocalizedString kPointersStrings[] = {
+  const bool kIsRevampEnabled =
+      ash::features::IsOsSettingsRevampWayfindingEnabled();
+  const bool kIsAllowMouseScrollSettingsEnabled =
+      features::IsAllowScrollSettingsEnabled();
+
+  webui::LocalizedString kPointersStrings[] = {
+      {"allMiceDisconnectedA11yLabel",
+       IDS_SETTINGS_PER_DEVICE_ALL_MICE_DISCONNECTED_A11Y_LABEL},
+      {"allTouchpadsDisconnectedA11yLabel",
+       IDS_SETTINGS_PER_DEVICE_ALL_TOUCHPADS_DISCONNECTED_A11Y_LABEL},
+      {"allPointingSticksDisconnectedA11yLabel",
+       IDS_SETTINGS_PER_DEVICE_ALL_POINTING_STICKS_DISCONNECTED_A11Y_LABEL},
+      {"deviceConnectedA11yLabel",
+       IDS_SETTINGS_PER_DEVICE_CONNECTED_A11Y_LABEL},
+      {"deviceDisconnectedA11yLabel",
+       IDS_SETTINGS_PER_DEVICE_DISCONNECTED_A11Y_LABEL},
       {"mouseTitle", IDS_SETTINGS_MOUSE_TITLE},
       {"builtInPointingStickName", IDS_SETTINGS_BUILT_IN_POINTING_STICK_NAME},
       {"pointingStickTitle", IDS_SETTINGS_POINTING_STICK_TITLE},
@@ -1634,26 +1630,50 @@ void DeviceSection::AddDevicePointersStrings(
       {"touchpadTitle", IDS_SETTINGS_TOUCHPAD_TITLE},
       {"mouseAndTouchpadTitle", IDS_SETTINGS_MOUSE_AND_TOUCHPAD_TITLE},
       {"touchpadTapToClickEnabledLabel",
-       IDS_SETTINGS_TOUCHPAD_TAP_TO_CLICK_ENABLED_LABEL},
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_TOUCHPAD_TAP_TO_CLICK_LABEL
+                        : IDS_SETTINGS_TOUCHPAD_TAP_TO_CLICK_ENABLED_LABEL},
+      {"touchpadTapToClickDescription",
+       IDS_OS_SETTINGS_REVAMP_TOUCHPAD_TAP_TO_CLICK_DESCRIPTION},
       {"touchpadSpeed", IDS_SETTINGS_TOUCHPAD_SPEED_LABEL},
       {"pointerSlow", IDS_SETTINGS_POINTER_SPEED_SLOW_LABEL},
       {"pointerFast", IDS_SETTINGS_POINTER_SPEED_FAST_LABEL},
       {"mouseScrollSpeed", IDS_SETTINGS_MOUSE_SCROLL_SPEED_LABEL},
       {"mouseSpeed", IDS_SETTINGS_MOUSE_SPEED_LABEL},
+      {"cursorSpeed", IDS_SETTINGS_CURSOR_SPEED_LABEL},
       {"pointingStickSpeed", IDS_SETTINGS_POINTING_STICK_SPEED_LABEL},
-      {"mouseSwapButtons", IDS_SETTINGS_MOUSE_SWAP_BUTTONS_LABEL},
+      {"mouseSwapButtonsLabel",
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_MOUSE_SWAP_BUTTONS_LABEL
+                        : IDS_SETTINGS_MOUSE_SWAP_BUTTONS_LABEL},
+      {"mouseCursor", IDS_SETTINGS_MOUSE_CURSOR_LABEL},
+      {"mouseScrolling", IDS_SETTINGS_MOUSE_SCROLLING_LABEL},
       {"pointingStickPrimaryButton",
        IDS_SETTINGS_POINTING_STICK_PRIMARY_BUTTON_LABEL},
       {"primaryMouseButtonLeft", IDS_SETTINGS_PRIMARY_MOUSE_BUTTON_LEFT_LABEL},
       {"primaryMouseButtonRight",
        IDS_SETTINGS_PRIMARY_MOUSE_BUTTON_RIGHT_LABEL},
-      {"mouseReverseScroll", IDS_SETTINGS_MOUSE_REVERSE_SCROLL_LABEL},
-      {"mouseAccelerationLabel", IDS_SETTINGS_MOUSE_ACCELERATION_LABEL},
+      {"mouseReverseScrollLabel",
+       (kIsRevampEnabled || kIsAllowMouseScrollSettingsEnabled)
+           ? IDS_OS_SETTINGS_REVAMP_MOUSE_REVERSE_SCROLL_LABEL
+           : IDS_SETTINGS_MOUSE_REVERSE_SCROLL_LABEL},
+      {"mouseReverseScrollDescription",
+       IDS_OS_SETTINGS_REVAMP_MOUSE_REVERSE_SCROLL_DESCRIPTION},
+      {"mouseAccelerationLabel",
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_MOUSE_ACCELERATION_LABEL
+                        : IDS_SETTINGS_MOUSE_ACCELERATION_LABEL},
+      {"mouseAccelerationDescription",
+       IDS_OS_SETTINGS_REVAMP_MOUSE_ACCELERATION_DESCRIPTION},
+      {"cursorAccelerationLabel", IDS_SETTINGS_CURSOR_ACCELERATION_LABEL},
       {"mouseScrollAccelerationLabel",
        IDS_SETTINGS_MOUSE_SCROLL_ACCELERATION_LABEL},
+      {"mouseControlledScrollingLabel",
+       IDS_SETTINGS_MOUSE_CONTROLLED_SCROLLING_LABEL},
       {"pointingStickAccelerationLabel",
        IDS_SETTINGS_POINTING_STICK_ACCELERATION_LABEL},
-      {"touchpadAccelerationLabel", IDS_SETTINGS_TOUCHPAD_ACCELERATION_LABEL},
+      {"touchpadAccelerationLabel",
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_TOUCHPAD_ACCELERATION_LABEL
+                        : IDS_SETTINGS_TOUCHPAD_ACCELERATION_LABEL},
+      {"touchpadAccelerationDescription",
+       IDS_OS_SETTINGS_REVAMP_TOUCHPAD_ACCELERATION_DESCRIPTION},
       {"touchpadHapticClickSensitivityLabel",
        IDS_SETTINGS_TOUCHPAD_HAPTIC_CLICK_SENSITIVITY_LABEL},
       {"touchpadHapticFeedbackTitle",
@@ -1664,26 +1684,211 @@ void DeviceSection::AddDevicePointersStrings(
        IDS_SETTINGS_TOUCHPAD_HAPTIC_FIRM_CLICK_LABEL},
       {"touchpadHapticLightClickLabel",
        IDS_SETTINGS_TOUCHPAD_HAPTIC_LIGHT_CLICK_LABEL},
-      {"touchpadScrollAccelerationLabel",
-       IDS_SETTINGS_TOUCHPAD_SCROLL_ACCELERATION_LABEL},
-      {"touchpadScrollSpeed", IDS_SETTINGS_TOUCHPAD_SCROLL_SPEED_LABEL},
+      {"touchpadSimulateRightClickLabel",
+       IDS_SETTINGS_TOUCHPAD_SIMULATE_RIGHT_CLICK_LABEL},
+      {"touchpadSimulateRightClickOptionAlt",
+       IDS_SETTINGS_TOUCHPAD_SIMULATE_RIGHT_CLICK_OPTION_ALT},
+      {"touchpadSimulateRightClickOptionDisabled",
+       IDS_SETTINGS_TOUCHPAD_SIMULATE_RIGHT_CLICK_OPTION_DISABLED},
+      {"learnMoreLabel", IDS_SETTINGS_LEARN_MORE_LABEL},
+      {"modifierKeysLabel", IDS_SETTINGS_MODIFIER_KEYS_LABEL},
+      {"otherKeysLabel", IDS_SETTINGS_OTHER_KEYS_LABEL},
+      {"sixPackKeyLabelInsert", IDS_SETTINGS_SIX_PACK_KEY_INSERT},
+      {"sixPackKeyLabelHome", IDS_SETTINGS_SIX_PACK_KEY_HOME},
+      {"sixPackKeyLabelEnd", IDS_SETTINGS_SIX_PACK_KEY_END},
+      {"sixPackKeyLabelDelete", IDS_SETTINGS_SIX_PACK_KEY_DELETE},
+      {"sixPackKeyLabelPageUp", IDS_SETTINGS_SIX_PACK_KEY_PAGE_UP},
+      {"sixPackKeyLabelPageDown", IDS_SETTINGS_SIX_PACK_KEY_PAGE_DOWN},
+      {"sixPackKeyDeleteAlt", IDS_SETTINGS_SIX_PACK_KEY_DELETE_ALT},
+      {"sixPackKeyHomeAlt", IDS_SETTINGS_SIX_PACK_KEY_HOME_ALT},
+      {"sixPackKeyEndAlt", IDS_SETTINGS_SIX_PACK_KEY_END_ALT},
+      {"sixPackKeyPageUpAlt", IDS_SETTINGS_SIX_PACK_KEY_PAGE_UP_ALT},
+      {"sixPackKeyPageDownAlt", IDS_SETTINGS_SIX_PACK_KEY_PAGE_DOWN_ALT},
+      {"sixPackKeyPageDownSearch", IDS_SETTINGS_SIX_PACK_KEY_PAGE_DOWN_SEARCH},
+      {"sixPackKeyInsertSearch", IDS_SETTINGS_SIX_PACK_KEY_INSERT_SEARCH},
+      {"sixPackKeyDisabled", IDS_SETTINGS_SIX_PACK_KEY_OPTION_DISABLED},
   };
   html_source->AddLocalizedStrings(kPointersStrings);
 
   html_source->AddString("naturalScrollLearnMoreLink",
                          GetHelpUrlWithBoard(chrome::kNaturalScrollHelpURL));
+  html_source->AddString(
+      "controlledScrollingLearnMoreLink",
+      GetHelpUrlWithBoard(chrome::kControlledScrollingHelpURL));
   html_source->AddString("hapticFeedbackLearnMoreLink",
                          GetHelpUrlWithBoard(chrome::kHapticFeedbackHelpURL));
 
-  html_source->AddBoolean("allowScrollSettings", AreScrollSettingsAllowed());
+  html_source->AddBoolean("allowScrollSettings",
+                          features::IsAllowScrollSettingsEnabled());
+}
+
+void DeviceSection::AddDeviceGraphicsTabletStrings(
+    content::WebUIDataSource* html_source) const {
+  static constexpr webui::LocalizedString kGraphicsTabletStrings[] = {
+      {"customizePenButtonsLabel",
+       IDS_SETTINGS_GRAPHICS_TABLET_CUSTOMIZE_PEN_BUTTONS_LABEL},
+      {"customizeTabletButtonsLabel",
+       IDS_SETTINGS_GRAPHICS_TABLET_CUSTOMIZE_TABLET_BUTTONS_LABEL},
+      {"tabletTitle", IDS_SETTINGS_GRAPHICS_TABLET_TITLE},
+  };
+  html_source->AddLocalizedStrings(kGraphicsTabletStrings);
+}
+
+void DeviceSection::AddCustomizeButtonsPageStrings(
+    content::WebUIDataSource* html_source) const {
+  static constexpr webui::LocalizedString kCustomizeButtonsPageStrings[] = {
+      {"buttonRemappingDialogInputLabel",
+       IDS_SETTINGS_CUSTOMIZE_BUTTONS_RENAMING_DIALOG_INPUT_LABEL},
+      {"buttonRemappingDialogCancelLabel",
+       IDS_SETTINGS_CUSTOMIZE_BUTTONS_DIALOG_CANCEL},
+      {"buttonRemappingDialogSaveLabel",
+       IDS_SETTINGS_CUSTOMIZE_BUTTONS_DIALOG_SAVE},
+      {"buttonRenamingDialogTitle",
+       IDS_SETTINGS_CUSTOMIZE_BUTTONS_RENAMING_DIALOG_TITLE},
+      {"customizeButtonSubpageDescription",
+       IDS_SETTINGS_CUSTOMIZE_BUTTONS_SUBPAGE_DESCRIPTION},
+      {"customizeMouseButtonsTitle",
+       IDS_SETTINGS_CUSTOMIZE_MOUSE_BUTTONS_TITLE},
+      {"keyCombinationDialogTitle", IDS_SETTINGS_KEY_COMBINATION_DIALOG_TITLE},
+      {"keyCombinationOptionLabel", IDS_SETTINGS_KEY_COMBINATION_OPTION_LABEL},
+      {"noRemappingOptionLabel", IDS_SETTINGS_NO_REMAPPING_OPTION_LABEL},
+  };
+  html_source->AddLocalizedStrings(kCustomizeButtonsPageStrings);
+}
+
+void DeviceSection::AddDeviceDisplayStrings(
+    content::WebUIDataSource* html_source) const {
+  const bool kIsRevampEnabled =
+      ash::features::IsOsSettingsRevampWayfindingEnabled();
+
+  webui::LocalizedString kDisplayStrings[] = {
+      {"displayAmbientColorTitle", IDS_SETTINGS_DISPLAY_AMBIENT_COLOR_TITLE},
+      {"displayAmbientColorSubtitle",
+       IDS_SETTINGS_DISPLAY_AMBIENT_COLOR_SUBTITLE},
+      {"displayArrangementTitle", IDS_SETTINGS_DISPLAY_ARRANGEMENT_TITLE},
+      {"displayMirror", IDS_SETTINGS_DISPLAY_MIRROR},
+      {"displayMirrorDisplayName", IDS_SETTINGS_DISPLAY_MIRROR_DISPLAY_NAME},
+      {"displayNightLightLabel", IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_LABEL},
+      {"displayNightLightOnAtSunset",
+       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_ON_AT_SUNSET},
+      {"displayNightLightOffAtSunrise",
+       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_OFF_AT_SUNRISE},
+      {"displayNightLightScheduleCustom",
+       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_SCHEDULE_CUSTOM},
+      {"displayNightLightScheduleLabel",
+       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_SCHEDULE_LABEL},
+      {"displayNightLightScheduleNever",
+       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_SCHEDULE_NEVER},
+      {"displayNightLightScheduleSunsetToSunRise",
+       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_SCHEDULE_SUNSET_TO_SUNRISE},
+      {"displayNightLightTemperatureLabel",
+       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_TEMPERATURE_LABEL},
+      {"displayNightLightTempSliderMaxLabel",
+       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_TEMP_SLIDER_MAX_LABEL},
+      {"displayNightLightTempSliderMinLabel",
+       IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_TEMP_SLIDER_MIN_LABEL},
+      {"displayNightLightText", IDS_SETTINGS_DISPLAY_NIGHT_LIGHT_TEXT},
+      {"displayOrientation", IDS_SETTINGS_DISPLAY_ORIENTATION},
+      {"displayOrientationAutoRotate",
+       IDS_SETTINGS_DISPLAY_ORIENTATION_AUTO_ROTATE},
+      {"displayOrientationStandard", IDS_SETTINGS_DISPLAY_ORIENTATION_STANDARD},
+      {"displayOverscanInstructions",
+       IDS_SETTINGS_DISPLAY_OVERSCAN_INSTRUCTIONS},
+      {"displayOverscanPageText", IDS_SETTINGS_DISPLAY_OVERSCAN_TEXT},
+      {"displayOverscanPageTitle",
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_DISPLAY_BOUNDARIES_TITLE
+                        : IDS_SETTINGS_DISPLAY_OVERSCAN_TITLE},
+      {"displayOverscanPosition", IDS_SETTINGS_DISPLAY_OVERSCAN_POSITION},
+      {"displayOverscanResize", IDS_SETTINGS_DISPLAY_OVERSCAN_RESIZE},
+      {"displayOverscanReset", IDS_SETTINGS_DISPLAY_OVERSCAN_RESET},
+      {"displayOverscanSubtitle",
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_DISPLAY_BOUNDARIES_DESCRIPTION
+                        : IDS_SETTINGS_DISPLAY_OVERSCAN_SUBTITLE},
+      {"displayRefreshRateInterlacedMenuItem",
+       IDS_SETTINGS_DISPLAY_REFRESH_RATE_INTERLACED_MENU_ITEM},
+      {"displayRefreshRateMenuItem",
+       IDS_SETTINGS_DISPLAY_REFRESH_RATE_MENU_ITEM},
+      {"displayRefreshRateSublabel",
+       kIsRevampEnabled
+           ? IDS_OS_SETTINGS_REVAMP_DISPLAY_REFRESH_RATE_DESCRIPTION
+           : IDS_SETTINGS_DISPLAY_REFRESH_RATE_SUBLABEL},
+      {"displayRefreshRateTitle",
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_DISPLAY_REFRESH_RATE_TITLE
+                        : IDS_SETTINGS_DISPLAY_REFRESH_RATE_TITLE},
+      {"displayResolutionInterlacedMenuItem",
+       IDS_SETTINGS_DISPLAY_RESOLUTION_INTERLACED_MENU_ITEM},
+      {"displayResolutionMenuItem", IDS_SETTINGS_DISPLAY_RESOLUTION_MENU_ITEM},
+      {"displayResolutionOnlyMenuItem",
+       IDS_SETTINGS_DISPLAY_RESOLUTION_ONLY_MENU_ITEM},
+      {"displayResolutionSublabel", IDS_SETTINGS_DISPLAY_RESOLUTION_SUBLABEL},
+      {"displayResolutionText", IDS_SETTINGS_DISPLAY_RESOLUTION_TEXT},
+      {"displayResolutionTextBest", IDS_SETTINGS_DISPLAY_RESOLUTION_TEXT_BEST},
+      {"displayResolutionTextNative",
+       IDS_SETTINGS_DISPLAY_RESOLUTION_TEXT_NATIVE},
+      {"displayResolutionTitle", IDS_SETTINGS_DISPLAY_RESOLUTION_TITLE},
+      {"displayScreenExtended", IDS_SETTINGS_DISPLAY_SCREEN_EXTENDED},
+      {"displayScreenPrimary", IDS_SETTINGS_DISPLAY_SCREEN_PRIMARY},
+      {"displayScreenTitle", IDS_SETTINGS_DISPLAY_SCREEN},
+      {"displaySizeSliderMaxLabel", IDS_SETTINGS_DISPLAY_ZOOM_SLIDER_MAXIMUM},
+      {"displaySizeSliderMinLabel", IDS_SETTINGS_DISPLAY_ZOOM_SLIDER_MINIMUM},
+      {"displayTitle", kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_DISPLAY_TITLE
+                                        : IDS_SETTINGS_DISPLAY_TITLE},
+      {"displayTouchCalibrationText",
+       IDS_SETTINGS_DISPLAY_TOUCH_CALIBRATION_TEXT},
+      {"displayTouchCalibrationTitle",
+       IDS_SETTINGS_DISPLAY_TOUCH_CALIBRATION_TITLE},
+      {"displayUnifiedDesktop", IDS_SETTINGS_DISPLAY_UNIFIED_DESKTOP},
+      {"displayUnifiedDesktopOff", IDS_SETTINGS_DISPLAY_UNIFIED_DESKTOP_OFF},
+      {"displayUnifiedDesktopOn", IDS_SETTINGS_DISPLAY_UNIFIED_DESKTOP_ON},
+      {"displayZoomLogicalResolutionDefaultText",
+       IDS_SETTINGS_DISPLAY_ZOOM_LOGICAL_RESOLUTION_DEFAULT_TEXT},
+      {"displayZoomLogicalResolutionText",
+       IDS_SETTINGS_DISPLAY_ZOOM_LOGICAL_RESOLUTION_TEXT},
+      {"displayZoomNativeLogicalResolutionNativeText",
+       IDS_SETTINGS_DISPLAY_ZOOM_LOGICAL_RESOLUTION_NATIVE_TEXT},
+      {"displayZoomLabel", kIsRevampEnabled
+                               ? IDS_OS_SETTINGS_REVAMP_DISPLAY_ZOOM_LABEL
+                               : IDS_SETTINGS_DISPLAY_ZOOM_TITLE},
+      {"displayZoomDescription",
+       kIsRevampEnabled ? IDS_OS_SETTINGS_REVAMP_DISPLAY_ZOOM_DESCRIPTION
+                        : IDS_SETTINGS_DISPLAY_ZOOM_SUBLABEL},
+      {"displayZoomValue", IDS_SETTINGS_DISPLAY_ZOOM_VALUE},
+  };
+  html_source->AddLocalizedStrings(kDisplayStrings);
+
+  html_source->AddLocalizedString(
+      "displayArrangementText",
+      IDS_SETTINGS_DISPLAY_ARRANGEMENT_WITH_KEYBOARD_TEXT);
 
   html_source->AddBoolean(
-      "enableAudioSettingsPage",
-      base::FeatureList::IsEnabled(ash::features::kAudioSettingsPage));
+      "isCryptohomeDataEphemeral",
+      user_manager::UserManager::Get()->IsCurrentUserCryptohomeDataEphemeral());
+
+  html_source->AddBoolean("unifiedDesktopAvailable",
+                          IsUnifiedDesktopAvailable());
+
+  html_source->AddBoolean("listAllDisplayModes",
+                          IsListAllDisplayModesEnabled());
+
+  html_source->AddBoolean("deviceSupportsAmbientColor",
+                          DoesDeviceSupportAmbientColor());
+
+  html_source->AddBoolean("enableForceRespectUiGainsToggle",
+                          IsShowForceRespectUiGainsToggleEnabled());
+
+  html_source->AddBoolean("enableTouchCalibrationSetting",
+                          IsTouchCalibrationAvailable());
+
+  html_source->AddString("invalidDisplayId",
+                         base::NumberToString(display::kInvalidDisplayId));
 
   html_source->AddBoolean(
-      "enableInputDeviceSettingsSplit",
-      base::FeatureList::IsEnabled(ash::features::kInputDeviceSettingsSplit));
+      "enableDriveFsBulkPinning",
+      drive::util::IsDriveFsBulkPinningAvailable(profile()));
+
+  html_source->AddBoolean(
+      "allowDisplayAlignmentApi",
+      base::FeatureList::IsEnabled(ash::features::kDisplayAlignAssist));
 }
 
 }  // namespace ash::settings

@@ -44,7 +44,8 @@ export const EntryType = {
  *   entry: (Entry|FilesAppEntry),
  *   icon: (!string|!chrome.fileManagerPrivate.IconSet),
  *   label: string,
- *   volumeType: (VolumeManagerCommon.VolumeType|null),
+ *   volumeId: (VolumeId|null),
+ *   rootType: (VolumeManagerCommon.RootType|null),
  *   metadata: !MetadataItem,
  *   isDirectory: boolean,
  *   type: !EntryType,
@@ -53,6 +54,7 @@ export const EntryType = {
  *   shouldDelayLoadingChildren: !boolean,
  *   children: (!Array<!FileKey>),
  *   expanded: !boolean,
+ *   disabled: !boolean,
  * }}
  */
 export let FileData;
@@ -220,7 +222,7 @@ export let CurrentDirectory;
  */
 export const SearchLocation = {
   EVERYWHERE: 'everywhere',
-  THIS_CHROMEBOOK: 'this_chromebook',
+  ROOT_FOLDER: 'root_folder',
   THIS_FOLDER: 'this_folder',
 };
 
@@ -238,24 +240,11 @@ export const SearchRecency = {
 };
 
 /**
- * Enumeration of all supported file types. We use generic buckets such as
- * Images, to denote all "*.jpg", "*.gif", "*.png", etc., file types.
- * @enum{string}
- */
-export const SearchFileType = {
-  ALL_TYPES: 'all_types',
-  AUDIO: 'audio',
-  DOCUMENTS: 'documents',
-  IMAGES: 'images',
-  VIDEOS: 'videos',
-};
-
-/**
  * The options used by the file search operation.
  * @typedef {{
- *   location: SearchLocation,
+ *   location: !SearchLocation,
  *   recency: SearchRecency,
- *   type: SearchFileType,
+ *   fileCategory:  chrome.fileManagerPrivate.FileCategory,
  * }}
  */
 export let SearchOptions;
@@ -277,7 +266,9 @@ export let SearchData;
  *      - MY_FILES: My Files (which includes Downloads, Crostini and Arc++ as
  *                  its children).
  *      - TRASH: trash.
- *      - CLOUD: Drive and FSPs.
+ *      - GOOGLE_DRIVE: Just Google Drive.
+ *      - ODFS: Just ODFS.
+ *      - CLOUD: All other cloud: SMBs, FSPs and Documents Providers.
  *      - ANDROID_APPS: ANDROID picker apps.
  *      - REMOVABLE: Archives, MTPs, Media Views and Removables.
  * @enum {string}
@@ -285,6 +276,8 @@ export let SearchData;
 export const NavigationSection = {
   TOP: 'top',
   MY_FILES: 'my_files',
+  GOOGLE_DRIVE: 'google_drive',
+  ODFS: 'odfs',
   CLOUD: 'cloud',
   TRASH: 'trash',
   ANDROID_APPS: 'android_apps',
@@ -371,6 +364,7 @@ export let NavigationTree;
  *   vmType: (chrome.fileManagerPrivate.VmType|undefined),
  *   isDisabled: boolean,
  *   prefixKey: (FileKey|undefined),
+ *   isInteractive: boolean,
  * }}
  */
 export let Volume;
@@ -381,16 +375,41 @@ export let Volume;
 export let VolumeMap;
 
 /**
+ * This carries the state related to physical user device.
+ *
+ * @typedef {{
+ *   connection: (chrome.fileManagerPrivate.DeviceConnectionState),
+ * }}
+ */
+export let Device;
+
+/**
+ * This carries the state related to the underlying Drive connection status.
+ * This differs from the device connection state as the Drive can also be in a
+ * effectively paused state when on a metered network.
+ *
+ * @typedef {{
+ *   connectionType: (chrome.fileManagerPrivate.DeviceConnectionState),
+ *   offlineReason: (chrome.fileManagerPrivate.DriveOfflineReason|undefined),
+ * }}
+ */
+export let Drive;
+
+/**
  * Files app's state.
  * @typedef {{
  *   allEntries: !Object<!FileKey, !FileData>,
  *   currentDirectory: (CurrentDirectory|undefined),
+ *   device: !Device,
+ *   drive: !Drive,
  *   search: (!SearchData|undefined),
  *   navigation: !NavigationTree,
  *   volumes: !Object<!VolumeId, !Volume>,
  *   uiEntries: !Array<!FileKey>,
  *   folderShortcuts: !Array<!FileKey>,
- *   androidApps: !Object<!string, !chrome.fileManagerPrivate.AndroidApp>
+ *   androidApps: !Object<!string, !chrome.fileManagerPrivate.AndroidApp>,
+ *   bulkPinning: (chrome.fileManagerPrivate.BulkPinProgress|undefined),
+ *   preferences: (chrome.fileManagerPrivate.Preferences|undefined),
  * }}
  */
 export let State;

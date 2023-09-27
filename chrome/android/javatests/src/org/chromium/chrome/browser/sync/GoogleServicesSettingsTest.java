@@ -23,9 +23,9 @@ import org.junit.runner.RunWith;
 
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisableIf;
+import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.R;
+import org.chromium.base.test.util.MinAndroidSdkLevel;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.preferences.Pref;
@@ -37,6 +37,7 @@ import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.sync.settings.GoogleServicesSettings;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.chrome.test.util.browser.signin.AccountManagerTestRule;
@@ -51,6 +52,7 @@ import org.chromium.content_public.browser.test.util.TestThreadUtils;
  * Tests for GoogleServicesSettings.
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
+@DoNotBatch(reason = "A subset of tests requires adding a new account that could fail if batched.")
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 public class GoogleServicesSettingsTest {
     private static final String CHILD_ACCOUNT_NAME =
@@ -185,12 +187,13 @@ public class GoogleServicesSettingsTest {
     @Feature({"Preference"})
     @EnableFeatures({ChromeFeatureList.COMMERCE_PRICE_TRACKING + "<Study"})
     @CommandLineFlags.Add({"force-fieldtrials=Study/Group",
-            "force-fieldtrial-params=Study.Group:enable_price_tracking/true"
-                    + "/allow_disable_price_annotations/true"})
+            "force-fieldtrial-params=Study.Group:allow_disable_price_annotations/true"})
     public void
     testPriceTrackingAnnotations() {
-        TestThreadUtils.runOnUiThreadBlocking(
-                () -> PriceTrackingFeatures.setIsSignedInAndSyncEnabledForTesting(true));
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            PriceTrackingFeatures.setPriceTrackingEnabledForTesting(true);
+            PriceTrackingFeatures.setIsSignedInAndSyncEnabledForTesting(true);
+        });
 
         final GoogleServicesSettings googleServicesSettings = startGoogleServicesSettings();
 
@@ -213,12 +216,13 @@ public class GoogleServicesSettingsTest {
     @Feature({"Preference"})
     @EnableFeatures({ChromeFeatureList.COMMERCE_PRICE_TRACKING + "<Study"})
     @CommandLineFlags.Add({"force-fieldtrials=Study/Group",
-            "force-fieldtrial-params=Study.Group:enable_price_tracking/true"
-                    + "/allow_disable_price_annotations/false"})
+            "force-fieldtrial-params=Study.Group:allow_disable_price_annotations/false"})
     public void
     testPriceTrackingAnnotations_FeatureDisabled() {
-        TestThreadUtils.runOnUiThreadBlocking(
-                () -> PriceTrackingFeatures.setIsSignedInAndSyncEnabledForTesting(true));
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            PriceTrackingFeatures.setPriceTrackingEnabledForTesting(true);
+            PriceTrackingFeatures.setIsSignedInAndSyncEnabledForTesting(true);
+        });
 
         final GoogleServicesSettings googleServicesSettings = startGoogleServicesSettings();
 
@@ -233,12 +237,13 @@ public class GoogleServicesSettingsTest {
     @Feature({"Preference"})
     @EnableFeatures({ChromeFeatureList.COMMERCE_PRICE_TRACKING + "<Study"})
     @CommandLineFlags.Add({"force-fieldtrials=Study/Group",
-            "force-fieldtrial-params=Study.Group:enable_price_tracking/true"
-                    + "/allow_disable_price_annotations/true"})
+            "force-fieldtrial-params=Study.Group:allow_disable_price_annotations/true"})
     public void
     testPriceTrackingAnnotations_NotSignedIn() {
-        TestThreadUtils.runOnUiThreadBlocking(
-                () -> PriceTrackingFeatures.setIsSignedInAndSyncEnabledForTesting(false));
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            PriceTrackingFeatures.setPriceTrackingEnabledForTesting(true);
+            PriceTrackingFeatures.setIsSignedInAndSyncEnabledForTesting(false);
+        });
 
         final GoogleServicesSettings googleServicesSettings = startGoogleServicesSettings();
 
@@ -250,9 +255,9 @@ public class GoogleServicesSettingsTest {
 
     @Test
     @LargeTest
-    @EnableFeatures({ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4})
-    @DisableIf.Build(sdk_is_less_than = Build.VERSION_CODES.Q,
-            message = "Digital Wellbeing is only available from Q.")
+    @EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    @MinAndroidSdkLevel(
+            value = Build.VERSION_CODES.Q, reason = "Digital Wellbeing is only available from Q.")
     public void
     testUsageStatsReportingShown() {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
@@ -271,9 +276,9 @@ public class GoogleServicesSettingsTest {
 
     @Test
     @LargeTest
-    @EnableFeatures({ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4})
-    @DisableIf.Build(sdk_is_less_than = Build.VERSION_CODES.Q,
-            message = "Digital Wellbeing is only available from Q.")
+    @EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    @MinAndroidSdkLevel(
+            value = Build.VERSION_CODES.Q, reason = "Digital Wellbeing is only available from Q.")
     public void
     testUsageStatsReportingNotShown_FeatureEnabledPrefDisabled() {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
@@ -292,9 +297,9 @@ public class GoogleServicesSettingsTest {
 
     @Test
     @LargeTest
-    @DisableFeatures({ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4})
-    @DisableIf.Build(sdk_is_less_than = Build.VERSION_CODES.Q,
-            message = "Digital Wellbeing is only available from Q.")
+    @DisableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
+    @MinAndroidSdkLevel(
+            value = Build.VERSION_CODES.Q, reason = "Digital Wellbeing is only available from Q.")
     public void
     testUsageStatsReportingNotShown_FeatureDisabled() {
         TestThreadUtils.runOnUiThreadBlocking(() -> {

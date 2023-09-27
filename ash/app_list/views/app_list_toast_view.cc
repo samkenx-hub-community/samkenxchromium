@@ -13,12 +13,13 @@
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/style/ash_color_id.h"
 #include "ash/style/ash_color_provider.h"
-#include "ash/style/dark_light_mode_controller_impl.h"
 #include "ash/style/icon_button.h"
 #include "ash/style/pill_button.h"
 #include "ash/style/typography.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "components/vector_icons/vector_icons.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/color/color_id.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
@@ -84,18 +85,14 @@ AppListToastView::Builder::~Builder() = default;
 
 std::unique_ptr<AppListToastView> AppListToastView::Builder::Build() {
   std::unique_ptr<AppListToastView> toast =
-      std::make_unique<AppListToastView>(title_);
+      std::make_unique<AppListToastView>(title_, style_for_tablet_mode_);
 
   if (view_delegate_)
     toast->SetViewDelegate(view_delegate_);
 
-  if (style_for_tablet_mode_)
-    toast->StyleForTabletMode();
-
-  if (dark_icon_ && light_icon_)
-    toast->SetThemingIcons(dark_icon_, light_icon_);
-  else if (icon_)
-    toast->SetIcon(icon_);
+  if (icon_) {
+    toast->SetIcon(*icon_);
+  }
 
   if (icon_size_)
     toast->SetIconSize(*icon_size_);
@@ -112,31 +109,28 @@ std::unique_ptr<AppListToastView> AppListToastView::Builder::Build() {
   if (subtitle_)
     toast->SetSubtitle(*subtitle_);
 
+  if (subtitle_ && is_subtitle_multiline_) {
+    toast->SetSubtitleMultiline(is_subtitle_multiline_);
+  }
+
   return toast;
 }
 
 AppListToastView::Builder& AppListToastView::Builder::SetIcon(
-    const gfx::VectorIcon* icon) {
-  DCHECK(!dark_icon_);
-  DCHECK(!light_icon_);
-
+    const ui::ImageModel& icon) {
   icon_ = icon;
-  return *this;
-}
-
-AppListToastView::Builder& AppListToastView::Builder::SetThemingIcons(
-    const gfx::VectorIcon* dark_icon,
-    const gfx::VectorIcon* light_icon) {
-  DCHECK(!icon_);
-
-  dark_icon_ = dark_icon;
-  light_icon_ = light_icon;
   return *this;
 }
 
 AppListToastView::Builder& AppListToastView::Builder::SetSubtitle(
     const std::u16string subtitle) {
   subtitle_ = subtitle;
+  return *this;
+}
+
+AppListToastView::Builder& AppListToastView::Builder::SetSubtitleMultiline(
+    bool multiline) {
+  is_subtitle_multiline_ = multiline;
   return *this;
 }
 
@@ -190,7 +184,8 @@ bool AppListToastView::IsToastButton(views::View* view) {
   return views::IsViewClass<ToastPillButton>(view);
 }
 
-AppListToastView::AppListToastView(const std::u16string title) {
+AppListToastView::AppListToastView(const std::u16string title,
+                                   bool style_for_tablet_mode) {
   layout_manager_ = SetLayoutManager(std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kHorizontal, kInteriorMargin));
   layout_manager_->set_cross_axis_alignment(
@@ -203,50 +198,52 @@ AppListToastView::AppListToastView(const std::u16string title) {
 
   title_label_ =
       label_container_->AddChildView(std::make_unique<views::Label>(title));
-  bubble_utils::ApplyStyle(title_label_, TypographyToken::kCrosBody2);
+
+  const bool is_jelly_enabled = chromeos::features::IsJellyEnabled();
+  const ui::ColorId title_color_id =
+      is_jelly_enabled
+          ? static_cast<ui::ColorId>(cros_tokens::kCrosSysOnSurface)
+          : kColorAshTextColorPrimary;
+  bubble_utils::ApplyStyle(title_label_,
+                           style_for_tablet_mode ? TypographyToken::kCrosBody1
+                                                 : TypographyToken::kCrosBody2,
+                           title_color_id);
+
   title_label_->SetHorizontalAlignment(gfx::HorizontalAlignment::ALIGN_LEFT);
   title_label_->SetMultiLine(true);
   SetTitleLabelMaximumWidth();
 
   layout_manager_->SetFlexForView(label_container_, 1);
+
+  if (style_for_tablet_mode) {
+    SetPaintToLayer();
+    layer()->SetFillsBoundsOpaquely(false);
+    layer()->SetBackgroundBlur(ColorProvider::kBackgroundBlurSigma);
+    layer()->SetBackdropFilterQuality(ColorProvider::kBackgroundBlurQuality);
+    layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(kCornerRadius));
+
+    const ui::ColorId background_color_id =
+        is_jelly_enabled
+            ? static_cast<ui::ColorId>(cros_tokens::kCrosSysSystemBaseElevated)
+            : kColorAshShieldAndBase80;
+    SetBackground(views::CreateThemedRoundedRectBackground(background_color_id,
+                                                           kCornerRadius));
+    SetBorder(std::make_unique<views::HighlightBorder>(
+        kCornerRadius,
+        is_jelly_enabled
+            ? views::HighlightBorder::Type::kHighlightBorderNoShadow
+            : views::HighlightBorder::Type::kHighlightBorder1));
+  } else {
+    const ui::ColorId background_color_id =
+        is_jelly_enabled
+            ? static_cast<ui::ColorId>(cros_tokens::kCrosSysSystemOnBase)
+            : kColorAshControlBackgroundColorInactive;
+    SetBackground(views::CreateThemedRoundedRectBackground(background_color_id,
+                                                           kCornerRadius));
+  }
 }
 
 AppListToastView::~AppListToastView() = default;
-
-void AppListToastView::StyleForTabletMode() {
-  style_for_tablet_mode_ = true;
-
-  SetPaintToLayer();
-  layer()->SetFillsBoundsOpaquely(false);
-  layer()->SetBackgroundBlur(ColorProvider::kBackgroundBlurSigma);
-  layer()->SetBackdropFilterQuality(ColorProvider::kBackgroundBlurQuality);
-  layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(kCornerRadius));
-}
-
-void AppListToastView::OnThemeChanged() {
-  views::View::OnThemeChanged();
-
-  if (style_for_tablet_mode_) {
-    SetBackground(views::CreateRoundedRectBackground(
-        ColorProvider::Get()->GetBaseLayerColor(
-            ColorProvider::BaseLayerType::kTransparent80),
-        kCornerRadius));
-    SetBorder(std::make_unique<views::HighlightBorder>(
-        kCornerRadius,
-        chromeos::features::IsJellyrollEnabled()
-            ? views::HighlightBorder::Type::kHighlightBorderNoShadow
-            : views::HighlightBorder::Type::kHighlightBorder1,
-        /*use_light_colors=*/false));
-  } else {
-    SetBackground(views::CreateRoundedRectBackground(
-        AshColorProvider::Get()->GetControlsLayerColor(
-            AshColorProvider::ControlsLayerType::
-                kControlBackgroundColorInactive),
-        kCornerRadius));
-  }
-
-  UpdateIconImage();
-}
 
 void AppListToastView::SetButton(
     std::u16string button_text,
@@ -284,29 +281,27 @@ void AppListToastView::SetSubtitle(const std::u16string subtitle) {
 
   subtitle_label_ =
       label_container_->AddChildView(std::make_unique<views::Label>(subtitle));
+  const ui::ColorId label_color_id =
+      chromeos::features::IsJellyEnabled()
+          ? static_cast<ui::ColorId>(cros_tokens::kCrosSysOnSurfaceVariant)
+          : kColorAshTextColorSecondary;
   bubble_utils::ApplyStyle(subtitle_label_, TypographyToken::kCrosAnnotation1,
-                           kColorAshTextColorSecondary);
+                           label_color_id);
   subtitle_label_->SetHorizontalAlignment(gfx::HorizontalAlignment::ALIGN_LEFT);
 }
 
-void AppListToastView::SetIcon(const gfx::VectorIcon* icon) {
-  DCHECK(!dark_icon_);
-  DCHECK(!light_icon_);
+void AppListToastView::SetSubtitleMultiline(bool multiline) {
+  if (!subtitle_label_) {
+    return;
+  }
 
+  subtitle_label_->SetMultiLine(multiline);
+}
+
+void AppListToastView::SetIcon(const ui::ImageModel& icon) {
   CreateIconView();
 
   default_icon_ = icon;
-  UpdateIconImage();
-}
-
-void AppListToastView::SetThemingIcons(const gfx::VectorIcon* dark_icon,
-                                       const gfx::VectorIcon* light_icon) {
-  DCHECK(!default_icon_);
-
-  CreateIconView();
-
-  dark_icon_ = dark_icon;
-  light_icon_ = light_icon;
   UpdateIconImage();
 }
 
@@ -318,7 +313,7 @@ void AppListToastView::SetIconSize(int icon_size) {
 
 void AppListToastView::AddIconBackground() {
   if (icon_) {
-    RemoveChildViewT(icon_);
+    RemoveChildViewT(icon_.get());
     icon_ = nullptr;
   }
 
@@ -354,14 +349,16 @@ AppListToastView::ToastPillButton::ToastPillButton(
     Type type,
     const gfx::VectorIcon* icon)
     : PillButton(callback, text, type, icon), view_delegate_(view_delegate) {
-  views::FocusRing::Get(this)->SetHasFocusPredicate([&](View* view) -> bool {
-    // With a `view_delegate_` present, focus ring should only show when
-    // button is focused and keyboard traversal is engaged.
-    if (view_delegate_ && !view_delegate_->KeyboardTraversalEngaged())
-      return false;
-
-    return view->HasFocus();
-  });
+  views::FocusRing::Get(this)->SetHasFocusPredicate(
+      base::BindRepeating([](const View* view) {
+        const auto* v = views::AsViewClass<ToastPillButton>(view);
+        CHECK(v);
+        // With a `view_delegate_` present, focus ring should only show when
+        // button is focused and keyboard traversal is engaged.
+        return (!v->view_delegate_ ||
+                v->view_delegate_->KeyboardTraversalEngaged()) &&
+               v->HasFocus();
+      }));
 }
 
 void AppListToastView::ToastPillButton::OnFocus() {
@@ -374,28 +371,18 @@ void AppListToastView::ToastPillButton::OnBlur() {
   views::FocusRing::Get(this)->SchedulePaint();
 }
 
+BEGIN_METADATA(AppListToastView, ToastPillButton, PillButton)
+END_METADATA
+
 void AppListToastView::UpdateIconImage() {
   if (!icon_)
     return;
 
-  if (default_icon_) {
-    icon_->SetImage(ui::ImageModel::FromVectorIcon(
-        *default_icon_,
-        AshColorProvider::Get()->GetContentLayerColor(
-            AshColorProvider::ContentLayerType::kIconColorPrimary),
-        icon_size_.value_or(gfx::GetDefaultSizeOfVectorIcon(*default_icon_))));
+  if (!default_icon_) {
     return;
   }
 
-  // Default to dark_icon_ if dark/light mode feature is not enabled.
-  const gfx::VectorIcon* themed_icon =
-      !features::IsDarkLightModeEnabled() ||
-              DarkLightModeControllerImpl::Get()->IsDarkModeEnabled()
-          ? dark_icon_
-          : light_icon_;
-  icon_->SetImage(ui::ImageModel::FromVectorIcon(
-      *themed_icon, ui::kColorAshSystemUIMenuIcon,
-      icon_size_.value_or(gfx::GetDefaultSizeOfVectorIcon(*themed_icon))));
+  icon_->SetImage(*default_icon_);
 }
 
 void AppListToastView::CreateIconView() {

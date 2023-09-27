@@ -12,7 +12,7 @@ namespace content {
 class BrowserContext;
 }
 
-namespace image_service {
+namespace page_image_service {
 
 class ImageService;
 
@@ -34,10 +34,10 @@ class ImageServiceFactory : public ProfileKeyedServiceFactory {
   ~ImageServiceFactory() override;
 
   // BrowserContextKeyedServiceFactory:
-  KeyedService* BuildServiceInstanceFor(
+  std::unique_ptr<KeyedService> BuildServiceInstanceForBrowserContext(
       content::BrowserContext* context) const override;
 };
 
-}  // namespace image_service
+}  // namespace page_image_service
 
 #endif  // CHROME_BROWSER_IMAGE_SERVICE_IMAGE_SERVICE_FACTORY_H_

@@ -15,8 +15,10 @@ import 'chrome://resources/ash/common/network/network_siminfo.js';
 import 'chrome://resources/cr_elements/cr_expand_button/cr_expand_button.js';
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_page_host_style.css.js';
+import 'chrome://resources/cr_elements/cr_toast/cr_toast.js';
 import 'chrome://resources/cr_elements/icons.html.js';
 import 'chrome://resources/cr_elements/cr_shared_style.css.js';
+import 'chrome://resources/cr_elements/chromeos/cros_color_overrides.css.js';
 import 'chrome://resources/polymer/v3_0/iron-collapse/iron-collapse.js';
 import 'chrome://resources/ash/common/network/apn_list.js';
 import './strings.m.js';
@@ -24,12 +26,13 @@ import './strings.m.js';
 import {assert} from 'chrome://resources/ash/common/assert.js';
 import {I18nBehavior} from 'chrome://resources/ash/common/i18n_behavior.js';
 import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
-import {isActiveSim} from 'chrome://resources/ash/common/network/cellular_utils.js';
+import {getApnDisplayName, isActiveSim} from 'chrome://resources/ash/common/network/cellular_utils.js';
 import {CrPolicyNetworkBehaviorMojo} from 'chrome://resources/ash/common/network/cr_policy_network_behavior_mojo.js';
 import {MojoInterfaceProviderImpl} from 'chrome://resources/ash/common/network/mojo_interface_provider.js';
 import {NetworkListenerBehavior} from 'chrome://resources/ash/common/network/network_listener_behavior.js';
 import {OncMojo} from 'chrome://resources/ash/common/network/onc_mojo.js';
-import {ApnProperties, ConfigProperties, CrosNetworkConfigRemote, GlobalPolicy, IPConfigProperties, ManagedProperties, MAX_NUM_CUSTOM_APNS, NetworkStateProperties, ProxySettings, StartConnectResult} from 'chrome://resources/mojo/chromeos/services/network_config/public/mojom/cros_network_config.mojom-webui.js';
+import {ColorChangeUpdater} from 'chrome://resources/cr_components/color_change_listener/colors_css_updater.js';
+import {ApnProperties, ConfigProperties, CrosNetworkConfigInterface, GlobalPolicy, IPConfigProperties, ManagedProperties, MAX_NUM_CUSTOM_APNS, NetworkStateProperties, ProxySettings, StartConnectResult} from 'chrome://resources/mojo/chromeos/services/network_config/public/mojom/cros_network_config.mojom-webui.js';
 import {ConnectionStateType, NetworkType, OncSource, PortalState} from 'chrome://resources/mojo/chromeos/services/network_config/public/mojom/network_types.mojom-webui.js';
 import {html, Polymer} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
@@ -121,6 +124,19 @@ Polymer({
     },
 
     /**
+     * Return true if Jelly feature flag is enabled.
+     * @private
+     */
+    isJellyEnabled_: {
+      type: Boolean,
+      readOnly: true,
+      value() {
+        return loadTimeData.valueExists('isJellyEnabled') &&
+            loadTimeData.getBoolean('isJellyEnabled');
+      },
+    },
+
+    /**
      * Return true if custom APNs limit is reached.
      * @private
      */
@@ -129,6 +145,15 @@ Polymer({
       notify: true,
       value: false,
       computed: 'computeIsNumCustomApnsLimitReached_(managedProperties_)',
+    },
+
+    /**
+     * The message to be displayed in the error toast when shown.
+     * @private
+     */
+    errorToastMessage_: {
+      type: String,
+      value: '',
     },
   },
 
@@ -145,7 +170,7 @@ Polymer({
    */
   propertiesReceived_: false,
 
-  /** @private {?CrosNetworkConfigRemote} */
+  /** @private {?CrosNetworkConfigInterface} */
   networkConfig_: null,
 
   /** @private {?InternetDetailDialogBrowserProxy} */
@@ -162,9 +187,27 @@ Polymer({
   },
 
   /** @override */
+  ready() {
+    this.addEventListener('show-error-toast', (event) => {
+      this.onShowErrorToast_(event);
+    });
+  },
+
+  /** @override */
   attached() {
     this.browserProxy_ = InternetDetailDialogBrowserProxyImpl.getInstance();
     const dialogArgs = this.browserProxy_.getDialogArguments();
+    if (this.isJellyEnabled_) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'chrome://theme/colors.css?sets=legacy,sys';
+      document.head.appendChild(link);
+      document.body.classList.add('jelly-enabled');
+      /** @suppress {checkTypes} */
+      (function() {
+        ColorChangeUpdater.forDocument().start();
+      })();
+    }
     let type;
     let name;
     if (dialogArgs) {
@@ -366,7 +409,7 @@ Polymer({
    * @private
    */
   getNameText_(managedProperties) {
-    return OncMojo.getNetworkName(managedProperties);
+    return OncMojo.getNetworkNameUnsafe(managedProperties);
   },
 
   /**
@@ -472,8 +515,8 @@ Polymer({
     if (apnExpanded) {
       return '';
     }
-    return managedProperties.typeProperties.cellular.connectedApn
-        .accessPointName;
+    return getApnDisplayName(
+        managedProperties.typeProperties.cellular.connectedApn);
   },
 
   /**
@@ -853,5 +896,17 @@ Polymer({
     const customApnList =
         this.managedProperties_.typeProperties.cellular.customApnList;
     return !!customApnList && customApnList.length >= MAX_NUM_CUSTOM_APNS;
+  },
+
+  /**
+   * @param {!Event} event
+   * @private
+   */
+  onShowErrorToast_(event) {
+    if (!this.isApnRevampEnabled_) {
+      return;
+    }
+    this.errorToastMessage_ = event.detail;
+    this.shadowRoot.querySelector('#errorToast').show();
   },
 });

@@ -37,6 +37,7 @@
 #include "content/browser/renderer_host/should_swap_browsing_instance.h"
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/common/content_navigation_policy.h"
+#include "content/common/features.h"
 #include "content/public/browser/back_forward_cache.h"
 #include "content/public/browser/document_service.h"
 #include "content/public/browser/global_routing_id.h"
@@ -150,10 +151,15 @@ BackForwardCacheBrowserTest::~BackForwardCacheBrowserTest() {
     // be flaky due calls to `LocalFrameHost::DidFocusFrame()` after entering
     // BFCache. So we ignore it for now by removing it if it's present until we
     // can fix the root cause.
+    // TODO(https://crbug.com/1470528): Remove this.
+    // As above but `LocalMainFrameHost::DidFirstVisuallyNonEmptyPaint()`.
     std::erase_if(samples, [](base::Bucket bucket) {
       return bucket.min ==
-             static_cast<base::HistogramBase::Sample>(
-                 base::HashMetricName(blink::mojom::LocalFrameHost::Name_));
+                 static_cast<base::HistogramBase::Sample>(base::HashMetricName(
+                     blink::mojom::LocalFrameHost::Name_)) ||
+             bucket.min ==
+                 static_cast<base::HistogramBase::Sample>(base::HashMetricName(
+                     blink::mojom::LocalMainFrameHost::Name_));
     });
 
     EXPECT_THAT(samples, testing::ElementsAre());
@@ -196,9 +202,8 @@ void BackForwardCacheBrowserTest::SetUpCommandLine(
   EnableFeatureAndSetParams(
       blink::features::kBackForwardCacheSendNotRestoredReasons, "", "");
 
-  // Do not trigger NotReached() for JavaScript execution.
-  DisableFeature(
-      blink::features::kBackForwardCacheNotReachedOnJavaScriptExecution);
+  // Do not trigger DumpWithoutCrashing() for JavaScript execution.
+  DisableFeature(blink::features::kBackForwardCacheDWCOnJavaScriptExecution);
 #if BUILDFLAG(IS_ANDROID)
   EnableFeatureAndSetParams(features::kBackForwardCache,
                             "process_binding_strength", "NORMAL");
@@ -209,6 +214,10 @@ void BackForwardCacheBrowserTest::SetUpCommandLine(
     // `content::kBackForwardCacheSize`, as many browser tests here assume
     // specific or smaller cache size (e.g. 1) rather than 6.
     DisableFeature(kBackForwardCacheSize);
+
+    // WebSQL is disabled by default as of M119 (crbug/695592). Enable feature
+    // in tests during deprecation trial and enterprise policy support.
+    EnableFeatureAndSetParams(blink::features::kWebSQLAccess, "", "");
 
     SetupFeaturesAndParameters();
 
@@ -469,6 +478,31 @@ SameOriginMatcher BackForwardCacheBrowserTest::MatchesSameOriginDetails(
           "children",
           &blink::mojom::SameOriginBfcacheNotRestoredDetails::children,
           testing::ElementsAreArray(children))));
+}
+
+BlockingDetailsMatcher BackForwardCacheBrowserTest::MatchesBlockingDetails(
+    const absl::optional<testing::Matcher<std::string>>& url,
+    const absl::optional<testing::Matcher<std::string>>& function_name,
+    const testing::Matcher<uint64_t>& line_number,
+    const testing::Matcher<uint64_t>& column_number) {
+  return testing::Pointee(testing::AllOf(
+      url.has_value()
+          ? testing::Field("url", &blink::mojom::BlockingDetails::url,
+                           testing::Optional(url.value()))
+          : testing::Field("url", &blink::mojom::BlockingDetails::url,
+                           absl::optional<std::string>(absl::nullopt)),
+      function_name.has_value()
+          ? testing::Field("function_name",
+                           &blink::mojom::BlockingDetails::function_name,
+                           testing::Optional(function_name.value()))
+          : testing::Field("function_name",
+                           &blink::mojom::BlockingDetails::function_name,
+                           absl::optional<std::string>(absl::nullopt)),
+      testing::Field("line_number", &blink::mojom::BlockingDetails::line_number,
+                     line_number),
+      testing::Field("column_number",
+                     &blink::mojom::BlockingDetails::column_number,
+                     column_number)));
 }
 
 void BackForwardCacheUnloadBrowserTest::SetUpCommandLine(
@@ -797,6 +831,13 @@ IN_PROC_BROWSER_TEST_F(HighCacheSizeBackForwardCacheBrowserTest,
   // 5) Trigger a back navigation to B. This will create a BFCache restore
   // navigation to B, but will wait for C's beforeunload handler to finish
   // running before continuing.
+  // The BFCache entry will be evicted before the back navigation completes, so
+  // the old navigation will be reset and a new navigation will be restarted.
+  // This observer is waiting for the two navigation requests to complete.
+  TestNavigationObserver observer(web_contents(),
+                                  /* expected_number_of_navigations= */ 2,
+                                  MessageLoopRunner::QuitMode::IMMEDIATE,
+                                  /* ignore_uncommitted_navigations= */ false);
   web_contents()->GetController().GoBack();
 
   // 6) Post a task to run BeforeUnloadCompleted (task #2). This will continue
@@ -826,7 +867,7 @@ IN_PROC_BROWSER_TEST_F(HighCacheSizeBackForwardCacheBrowserTest,
   // NavigationRequest to replace the previous NavigationRequest to B.
   // - Task #4 from step 7 to destroy evicted entries runs and won't destroy
   // any entry since there's no longer any entry in the back/forward cache.
-  EXPECT_TRUE(WaitForLoadStop(shell()->web_contents()));
+  observer.Wait();
   EXPECT_EQ(web_contents()->GetLastCommittedURL(), url_b);
   ExpectNotRestored({BackForwardCacheMetrics::NotRestoredReason::
                          kDisableForRenderFrameHostCalled},
@@ -946,9 +987,16 @@ IN_PROC_BROWSER_TEST_F(BackForwardCacheBrowserTest, CacheHTTPDocumentOnly) {
 // The test below tests that the brief period of time where two main frames are
 // alive in the same BrowsingInstance does not cause anything to blow up.
 
-// TODO(crbug.com/1127979): Flaky on Linux and Windows
+// TODO(crbug.com/1127979, crbug.com/1446206): Flaky on Linux, Windows and
+// ChromeOS, iOS, and Mac.
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS) || \
+    BUILDFLAG(IS_MAC) || BUILDFLAG(IS_IOS)
+#define MAYBE_NavigateToTwoPagesOnSameSite DISABLED_NavigateToTwoPagesOnSameSite
+#else
+#define MAYBE_NavigateToTwoPagesOnSameSite NavigateToTwoPagesOnSameSite
+#endif
 IN_PROC_BROWSER_TEST_F(BackForwardCacheBrowserTest,
-                       NavigateToTwoPagesOnSameSite) {
+                       MAYBE_NavigateToTwoPagesOnSameSite) {
   ASSERT_TRUE(embedded_test_server()->Start());
   GURL url_a1(embedded_test_server()->GetURL("a.com", "/title1.html"));
   GURL url_a2(embedded_test_server()->GetURL("a.com", "/title2.html"));
@@ -2426,9 +2474,9 @@ IN_PROC_BROWSER_TEST_F(BackForwardCacheBrowserTest, TreeResultFeatureUsage) {
   // a
   EXPECT_THAT(can_store_result.tree_reasons->GetDocumentResult(),
               MatchesDocumentResult(
-                  NotRestoredReasons(NotRestoredReason::kBlocklistedFeatures),
+                  NotRestoredReasons({NotRestoredReason::kBlocklistedFeatures}),
                   BlockListedFeatures(
-                      blink::scheduler::WebSchedulerTrackedFeature::kDummy)));
+                      {blink::scheduler::WebSchedulerTrackedFeature::kDummy})));
   // a->a
   EXPECT_THAT(
       can_store_result.tree_reasons->GetChildren().at(0)->GetDocumentResult(),
@@ -2438,9 +2486,9 @@ IN_PROC_BROWSER_TEST_F(BackForwardCacheBrowserTest, TreeResultFeatureUsage) {
   EXPECT_THAT(
       can_store_result.tree_reasons->GetChildren().at(1)->GetDocumentResult(),
       MatchesDocumentResult(
-          NotRestoredReasons(NotRestoredReason::kBlocklistedFeatures),
+          NotRestoredReasons({NotRestoredReason::kBlocklistedFeatures}),
           BlockListedFeatures(
-              blink::scheduler::WebSchedulerTrackedFeature::kDummy)));
+              {blink::scheduler::WebSchedulerTrackedFeature::kDummy})));
   // a->c
   EXPECT_THAT(
       can_store_result.tree_reasons->GetChildren().at(2)->GetDocumentResult(),
@@ -2472,7 +2520,7 @@ IN_PROC_BROWSER_TEST_F(BackForwardCacheBrowserTest,
                     FROM_HERE);
   EXPECT_THAT(GetTreeResult()->GetDocumentResult(),
               MatchesDocumentResult(
-                  NotRestoredReasons(NotRestoredReason::kJavaScriptExecution),
+                  NotRestoredReasons({NotRestoredReason::kJavaScriptExecution}),
                   BlockListedFeatures()));
 }
 
@@ -2508,7 +2556,7 @@ IN_PROC_BROWSER_TEST_F(BackForwardCacheBrowserTest,
   // Subframe result in the tree contains the reason.
   EXPECT_THAT(GetTreeResult()->GetChildren().at(0)->GetDocumentResult(),
               MatchesDocumentResult(
-                  NotRestoredReasons(NotRestoredReason::kJavaScriptExecution),
+                  NotRestoredReasons({NotRestoredReason::kJavaScriptExecution}),
                   BlockListedFeatures()));
 }
 
@@ -2556,7 +2604,7 @@ IN_PROC_BROWSER_TEST_F(BackForwardCacheBrowserTest,
                   .at(0)
                   ->GetDocumentResult(),
               MatchesDocumentResult(
-                  NotRestoredReasons(NotRestoredReason::kJavaScriptExecution),
+                  NotRestoredReasons({NotRestoredReason::kJavaScriptExecution}),
                   BlockListedFeatures()));
 }
 
@@ -2825,7 +2873,7 @@ IN_PROC_BROWSER_TEST_P(
       use_cross_origin_subframe ? "b.com" : "a.com", "/title1.html");
 
   IsolateOriginsForTesting(embedded_test_server(), web_contents(),
-                           {"a.com", "b.com"});
+                           std::vector<std::string>{"a.com", "b.com"});
 
   // 1) Navigate to a.com.
   EXPECT_TRUE(NavigateToURL(shell(), a_url));
@@ -2850,9 +2898,9 @@ IN_PROC_BROWSER_TEST_P(
       }));
 
   // 3) Start navigation in subframe to |subframe_url|.
-  EXPECT_TRUE(ExecJs(
+  ExecuteScriptAsync(
       main_frame,
-      JsReplace("document.querySelector('#child').src = $1;", subframe_url)));
+      JsReplace("document.querySelector('#child').src = $1;", subframe_url));
   // 4) Wait until subframe navigation is pending commit.
   commit_message_delayer.Wait();
 }

@@ -2,10 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+import {SourcesTestRunner} from 'sources_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
   TestRunner.addResult(`Tests console execution context selector for paintworklet.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
-  await TestRunner.loadLegacyModule('sources'); await TestRunner.loadTestModule('sources_test_runner');
+  await TestRunner.loadLegacyModule('console');
+  await TestRunner.loadLegacyModule('sources');
   await TestRunner.showPanel('console');
   await TestRunner.loadHTML(`
     <script id="code" type="text/worklet">
@@ -26,7 +33,7 @@
   var selector = consoleView.consoleContextSelector;
   TestRunner.addResult('Console context selector:');
   for (var executionContext of selector._items) {
-    var selected = UI.context.flavor(SDK.ExecutionContext) === executionContext;
+    var selected = UIModule.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext) === executionContext;
     var text = '____'.repeat(selector.depthFor(executionContext)) + selector.titleFor(executionContext) + " / " + selector._subtitleFor(executionContext);
     var disabled = !selector.isItemSelectable(executionContext);
     TestRunner.addResult(`${selected ? '*' : ' '} ${text} ${disabled ? '[disabled]' : ''}`);

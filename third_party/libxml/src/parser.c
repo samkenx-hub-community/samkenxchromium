@@ -51,42 +51,27 @@
 #include <stddef.h>
 #include <ctype.h>
 #include <stdlib.h>
-#include <libxml/xmlmemory.h>
-#include <libxml/threads.h>
-#include <libxml/globals.h>
-#include <libxml/tree.h>
 #include <libxml/parser.h>
+#include <libxml/xmlmemory.h>
+#include <libxml/tree.h>
 #include <libxml/parserInternals.h>
-#include <libxml/HTMLparser.h>
 #include <libxml/valid.h>
 #include <libxml/entities.h>
 #include <libxml/xmlerror.h>
 #include <libxml/encoding.h>
 #include <libxml/xmlIO.h>
 #include <libxml/uri.h>
+#include <libxml/SAX2.h>
 #ifdef LIBXML_CATALOG_ENABLED
 #include <libxml/catalog.h>
 #endif
-#ifdef LIBXML_SCHEMAS_ENABLED
-#include <libxml/xmlschemastypes.h>
-#include <libxml/relaxng.h>
-#endif
-#if defined(LIBXML_XPATH_ENABLED) || defined(LIBXML_SCHEMAS_ENABLED)
-#include <libxml/xpath.h>
-#endif
 
 #include "private/buf.h"
-#include "private/dict.h"
-#include "private/enc.h"
 #include "private/entities.h"
 #include "private/error.h"
-#include "private/globals.h"
 #include "private/html.h"
 #include "private/io.h"
-#include "private/memory.h"
 #include "private/parser.h"
-#include "private/threads.h"
-#include "private/xpath.h"
 
 struct _xmlStartTag {
     const xmlChar *prefix;
@@ -100,8 +85,6 @@ xmlCreateEntityParserCtxtInternal(xmlSAXHandlerPtr sax, void *userData,
         const xmlChar *URL, const xmlChar *ID, const xmlChar *base,
         xmlParserCtxtPtr pctx);
 
-static void xmlHaltParser(xmlParserCtxtPtr ctxt);
-
 static int
 xmlParseElementStart(xmlParserCtxtPtr ctxt);
 
@@ -114,20 +97,25 @@ xmlParseElementEnd(xmlParserCtxtPtr ctxt);
  *									*
  ************************************************************************/
 
-#define XML_MAX_HUGE_LENGTH 1000000000
-
 #define XML_PARSER_BIG_ENTITY 1000
 #define XML_PARSER_LOT_ENTITY 5000
 
 /*
- * XML_PARSER_NON_LINEAR is the threshold where the ratio of parsed entity
- *    replacement over the size in byte of the input indicates that you have
- *    and exponential behaviour. A value of 10 correspond to at least 3 entity
- *    replacement per byte of input.
+ * Constants for protection against abusive entity expansion
+ * ("billion laughs").
  */
-#define XML_PARSER_NON_LINEAR 10
 
-#define XML_ENT_FIXED_COST 50
+/*
+ * A certain amount of entity expansion which is always allowed.
+ */
+#define XML_PARSER_ALLOWED_EXPANSION 1000000
+
+/*
+ * Fixed cost for each entity reference. This crudely models processing time
+ * as well to protect, for example, against exponential expansion of empty
+ * or very short entities.
+ */
+#define XML_ENT_FIXED_COST 20
 
 /**
  * xmlParserMaxDepth:
@@ -156,6 +144,14 @@ unsigned int xmlParserMaxDepth = 256;
  * are followed by 0, which should be provided by the I/O level
  */
 #define XML_PARSER_CHUNK_SIZE 100
+
+/**
+ * xmlParserVersion:
+ *
+ * Constant string describing the internal version of the library
+ */
+const char *const
+xmlParserVersion = LIBXML_VERSION_STRING LIBXML_VERSION_EXTRA;
 
 /*
  * List of XML prefixed PI allowed by W3C specs
@@ -237,222 +233,6 @@ xmlErrAttributeDup(xmlParserCtxtPtr ctxt, const xmlChar * prefix,
 }
 
 /**
- * xmlFatalErr:
- * @ctxt:  an XML parser context
- * @error:  the error number
- * @extra:  extra information string
- *
- * Handle a fatal parser error, i.e. violating Well-Formedness constraints
- */
-static void
-xmlFatalErr(xmlParserCtxtPtr ctxt, xmlParserErrors error, const char *info)
-{
-    const char *errmsg;
-
-    if ((ctxt != NULL) && (ctxt->disableSAX != 0) &&
-        (ctxt->instate == XML_PARSER_EOF))
-	return;
-    switch (error) {
-        case XML_ERR_INVALID_HEX_CHARREF:
-            errmsg = "CharRef: invalid hexadecimal value";
-            break;
-        case XML_ERR_INVALID_DEC_CHARREF:
-            errmsg = "CharRef: invalid decimal value";
-            break;
-        case XML_ERR_INVALID_CHARREF:
-            errmsg = "CharRef: invalid value";
-            break;
-        case XML_ERR_INTERNAL_ERROR:
-            errmsg = "internal error";
-            break;
-        case XML_ERR_PEREF_AT_EOF:
-            errmsg = "PEReference at end of document";
-            break;
-        case XML_ERR_PEREF_IN_PROLOG:
-            errmsg = "PEReference in prolog";
-            break;
-        case XML_ERR_PEREF_IN_EPILOG:
-            errmsg = "PEReference in epilog";
-            break;
-        case XML_ERR_PEREF_NO_NAME:
-            errmsg = "PEReference: no name";
-            break;
-        case XML_ERR_PEREF_SEMICOL_MISSING:
-            errmsg = "PEReference: expecting ';'";
-            break;
-        case XML_ERR_ENTITY_LOOP:
-            errmsg = "Detected an entity reference loop";
-            break;
-        case XML_ERR_ENTITY_NOT_STARTED:
-            errmsg = "EntityValue: \" or ' expected";
-            break;
-        case XML_ERR_ENTITY_PE_INTERNAL:
-            errmsg = "PEReferences forbidden in internal subset";
-            break;
-        case XML_ERR_ENTITY_NOT_FINISHED:
-            errmsg = "EntityValue: \" or ' expected";
-            break;
-        case XML_ERR_ATTRIBUTE_NOT_STARTED:
-            errmsg = "AttValue: \" or ' expected";
-            break;
-        case XML_ERR_LT_IN_ATTRIBUTE:
-            errmsg = "Unescaped '<' not allowed in attributes values";
-            break;
-        case XML_ERR_LITERAL_NOT_STARTED:
-            errmsg = "SystemLiteral \" or ' expected";
-            break;
-        case XML_ERR_LITERAL_NOT_FINISHED:
-            errmsg = "Unfinished System or Public ID \" or ' expected";
-            break;
-        case XML_ERR_MISPLACED_CDATA_END:
-            errmsg = "Sequence ']]>' not allowed in content";
-            break;
-        case XML_ERR_URI_REQUIRED:
-            errmsg = "SYSTEM or PUBLIC, the URI is missing";
-            break;
-        case XML_ERR_PUBID_REQUIRED:
-            errmsg = "PUBLIC, the Public Identifier is missing";
-            break;
-        case XML_ERR_HYPHEN_IN_COMMENT:
-            errmsg = "Comment must not contain '--' (double-hyphen)";
-            break;
-        case XML_ERR_PI_NOT_STARTED:
-            errmsg = "xmlParsePI : no target name";
-            break;
-        case XML_ERR_RESERVED_XML_NAME:
-            errmsg = "Invalid PI name";
-            break;
-        case XML_ERR_NOTATION_NOT_STARTED:
-            errmsg = "NOTATION: Name expected here";
-            break;
-        case XML_ERR_NOTATION_NOT_FINISHED:
-            errmsg = "'>' required to close NOTATION declaration";
-            break;
-        case XML_ERR_VALUE_REQUIRED:
-            errmsg = "Entity value required";
-            break;
-        case XML_ERR_URI_FRAGMENT:
-            errmsg = "Fragment not allowed";
-            break;
-        case XML_ERR_ATTLIST_NOT_STARTED:
-            errmsg = "'(' required to start ATTLIST enumeration";
-            break;
-        case XML_ERR_NMTOKEN_REQUIRED:
-            errmsg = "NmToken expected in ATTLIST enumeration";
-            break;
-        case XML_ERR_ATTLIST_NOT_FINISHED:
-            errmsg = "')' required to finish ATTLIST enumeration";
-            break;
-        case XML_ERR_MIXED_NOT_STARTED:
-            errmsg = "MixedContentDecl : '|' or ')*' expected";
-            break;
-        case XML_ERR_PCDATA_REQUIRED:
-            errmsg = "MixedContentDecl : '#PCDATA' expected";
-            break;
-        case XML_ERR_ELEMCONTENT_NOT_STARTED:
-            errmsg = "ContentDecl : Name or '(' expected";
-            break;
-        case XML_ERR_ELEMCONTENT_NOT_FINISHED:
-            errmsg = "ContentDecl : ',' '|' or ')' expected";
-            break;
-        case XML_ERR_PEREF_IN_INT_SUBSET:
-            errmsg =
-                "PEReference: forbidden within markup decl in internal subset";
-            break;
-        case XML_ERR_GT_REQUIRED:
-            errmsg = "expected '>'";
-            break;
-        case XML_ERR_CONDSEC_INVALID:
-            errmsg = "XML conditional section '[' expected";
-            break;
-        case XML_ERR_EXT_SUBSET_NOT_FINISHED:
-            errmsg = "Content error in the external subset";
-            break;
-        case XML_ERR_CONDSEC_INVALID_KEYWORD:
-            errmsg =
-                "conditional section INCLUDE or IGNORE keyword expected";
-            break;
-        case XML_ERR_CONDSEC_NOT_FINISHED:
-            errmsg = "XML conditional section not closed";
-            break;
-        case XML_ERR_XMLDECL_NOT_STARTED:
-            errmsg = "Text declaration '<?xml' required";
-            break;
-        case XML_ERR_XMLDECL_NOT_FINISHED:
-            errmsg = "parsing XML declaration: '?>' expected";
-            break;
-        case XML_ERR_EXT_ENTITY_STANDALONE:
-            errmsg = "external parsed entities cannot be standalone";
-            break;
-        case XML_ERR_ENTITYREF_SEMICOL_MISSING:
-            errmsg = "EntityRef: expecting ';'";
-            break;
-        case XML_ERR_DOCTYPE_NOT_FINISHED:
-            errmsg = "DOCTYPE improperly terminated";
-            break;
-        case XML_ERR_LTSLASH_REQUIRED:
-            errmsg = "EndTag: '</' not found";
-            break;
-        case XML_ERR_EQUAL_REQUIRED:
-            errmsg = "expected '='";
-            break;
-        case XML_ERR_STRING_NOT_CLOSED:
-            errmsg = "String not closed expecting \" or '";
-            break;
-        case XML_ERR_STRING_NOT_STARTED:
-            errmsg = "String not started expecting ' or \"";
-            break;
-        case XML_ERR_ENCODING_NAME:
-            errmsg = "Invalid XML encoding name";
-            break;
-        case XML_ERR_STANDALONE_VALUE:
-            errmsg = "standalone accepts only 'yes' or 'no'";
-            break;
-        case XML_ERR_DOCUMENT_EMPTY:
-            errmsg = "Document is empty";
-            break;
-        case XML_ERR_DOCUMENT_END:
-            errmsg = "Extra content at the end of the document";
-            break;
-        case XML_ERR_NOT_WELL_BALANCED:
-            errmsg = "chunk is not well balanced";
-            break;
-        case XML_ERR_EXTRA_CONTENT:
-            errmsg = "extra content at the end of well balanced chunk";
-            break;
-        case XML_ERR_VERSION_MISSING:
-            errmsg = "Malformed declaration expecting version";
-            break;
-        case XML_ERR_NAME_TOO_LONG:
-            errmsg = "Name too long";
-            break;
-#if 0
-        case:
-            errmsg = "";
-            break;
-#endif
-        default:
-            errmsg = "Unregistered error message";
-    }
-    if (ctxt != NULL)
-	ctxt->errNo = error;
-    if (info == NULL) {
-        __xmlRaiseError(NULL, NULL, NULL, ctxt, NULL, XML_FROM_PARSER, error,
-                        XML_ERR_FATAL, NULL, 0, info, NULL, NULL, 0, 0, "%s\n",
-                        errmsg);
-    } else {
-        __xmlRaiseError(NULL, NULL, NULL, ctxt, NULL, XML_FROM_PARSER, error,
-                        XML_ERR_FATAL, NULL, 0, info, NULL, NULL, 0, 0, "%s: %s\n",
-                        errmsg, info);
-    }
-    if (ctxt != NULL) {
-	ctxt->wellFormed = 0;
-	if (ctxt->recovery == 0)
-	    ctxt->disableSAX = 1;
-    }
-}
-
-/**
  * xmlFatalErrMsg:
  * @ctxt:  an XML parser context
  * @error:  the error number
@@ -488,7 +268,7 @@ xmlFatalErrMsg(xmlParserCtxtPtr ctxt, xmlParserErrors error,
  *
  * Handle a warning.
  */
-static void LIBXML_ATTR_FORMAT(3,0)
+void LIBXML_ATTR_FORMAT(3,0)
 xmlWarningMsg(xmlParserCtxtPtr ctxt, xmlParserErrors error,
               const char *msg, const xmlChar *str1, const xmlChar *str2)
 {
@@ -795,11 +575,12 @@ xmlParserEntityCheck(xmlParserCtxtPtr ctxt, unsigned long extra)
      * entity sizes to make the size checks reliable. If "sizeentcopy"
      * overflows, we have to abort.
      */
-    if ((ctxt->sizeentcopy > XML_MAX_TEXT_LENGTH) &&
+    if ((ctxt->sizeentcopy > XML_PARSER_ALLOWED_EXPANSION) &&
         ((ctxt->sizeentcopy >= ULONG_MAX) ||
-         (ctxt->sizeentcopy / XML_PARSER_NON_LINEAR > consumed))) {
+         (ctxt->sizeentcopy / ctxt->maxAmpl > consumed))) {
         xmlFatalErrMsg(ctxt, XML_ERR_ENTITY_LOOP,
-                       "Maximum entity amplification factor exceeded");
+                       "Maximum entity amplification factor exceeded, see "
+                       "xmlCtxtSetMaxAmplification.\n");
         xmlHaltParser(ctxt);
         return(1);
     }
@@ -1049,10 +830,7 @@ xmlDetectSAX2(xmlParserCtxtPtr ctxt) {
     if (ctxt == NULL) return;
     sax = ctxt->sax;
 #ifdef LIBXML_SAX1_ENABLED
-    if ((sax) &&  (sax->initialized == XML_SAX2_MAGIC) &&
-        ((sax->startElementNs != NULL) ||
-         (sax->endElementNs != NULL) ||
-         ((sax->startElement == NULL) && (sax->endElement == NULL))))
+    if ((sax) && (sax->initialized == XML_SAX2_MAGIC))
         ctxt->sax2 = 1;
 #else
     ctxt->sax2 = 1;
@@ -1366,6 +1144,8 @@ xmlCleanSpecialAttr(xmlParserCtxtPtr ctxt)
 /**
  * xmlCheckLanguageID:
  * @lang:  pointer to the string value
+ *
+ * DEPRECATED: Internal function, do not use.
  *
  * Checks that the value conforms to the LanguageID production:
  *
@@ -1741,6 +1521,8 @@ inputPop(xmlParserCtxtPtr ctxt)
  * @ctxt:  an XML parser context
  * @value:  the element node
  *
+ * DEPRECATED: Internal function, do not use.
+ *
  * Pushes a new element node on top of the node stack
  *
  * Returns -1 in case of error, the index in the stack otherwise
@@ -1778,6 +1560,8 @@ nodePush(xmlParserCtxtPtr ctxt, xmlNodePtr value)
 /**
  * nodePop:
  * @ctxt: an XML parser context
+ *
+ * DEPRECATED: Internal function, do not use.
  *
  * Pops the top element node from the node stack
  *
@@ -1890,6 +1674,8 @@ nameNsPop(xmlParserCtxtPtr ctxt)
  * @ctxt:  an XML parser context
  * @value:  the element name
  *
+ * DEPRECATED: Internal function, do not use.
+ *
  * Pushes a new element name on top of the name stack
  *
  * Returns -1 in case of error, the index in the stack otherwise
@@ -1917,9 +1703,12 @@ mem_error:
     xmlErrMemory(ctxt, NULL);
     return (-1);
 }
+
 /**
  * namePop:
  * @ctxt: an XML parser context
+ *
+ * DEPRECATED: Internal function, do not use.
  *
  * Pops the top element name from the name stack
  *
@@ -2036,7 +1825,7 @@ static int spacePop(xmlParserCtxtPtr ctxt) {
 #define SKIP(val) do {							\
     ctxt->input->cur += (val),ctxt->input->col+=(val);			\
     if (*ctxt->input->cur == 0)						\
-        xmlParserInputGrow(ctxt->input, INPUT_CHUNK);			\
+        xmlParserGrow(ctxt);						\
   } while (0)
 
 #define SKIPL(val) do {							\
@@ -2048,50 +1837,17 @@ static int spacePop(xmlParserCtxtPtr ctxt) {
 	ctxt->input->cur++;						\
     }									\
     if (*ctxt->input->cur == 0)						\
-        xmlParserInputGrow(ctxt->input, INPUT_CHUNK);			\
+        xmlParserGrow(ctxt);						\
   } while (0)
 
 #define SHRINK if ((ctxt->progressive == 0) &&				\
 		   (ctxt->input->cur - ctxt->input->base > 2 * INPUT_CHUNK) && \
 		   (ctxt->input->end - ctxt->input->cur < 2 * INPUT_CHUNK)) \
-	xmlSHRINK (ctxt);
-
-static void xmlSHRINK (xmlParserCtxtPtr ctxt) {
-    /* Don't shrink memory buffers. */
-    if ((ctxt->input->buf) &&
-        ((ctxt->input->buf->encoder) || (ctxt->input->buf->readcallback)))
-        xmlParserInputShrink(ctxt->input);
-    if (*ctxt->input->cur == 0)
-        xmlParserInputGrow(ctxt->input, INPUT_CHUNK);
-}
+	xmlParserShrink(ctxt);
 
 #define GROW if ((ctxt->progressive == 0) &&				\
 		 (ctxt->input->end - ctxt->input->cur < INPUT_CHUNK))	\
-	xmlGROW (ctxt);
-
-static void xmlGROW (xmlParserCtxtPtr ctxt) {
-    ptrdiff_t curEnd = ctxt->input->end - ctxt->input->cur;
-    ptrdiff_t curBase = ctxt->input->cur - ctxt->input->base;
-
-    if (((curEnd > XML_MAX_LOOKUP_LIMIT) ||
-         (curBase > XML_MAX_LOOKUP_LIMIT)) &&
-         ((ctxt->input->buf) &&
-          (ctxt->input->buf->readcallback != NULL)) &&
-        ((ctxt->options & XML_PARSE_HUGE) == 0)) {
-        xmlFatalErr(ctxt, XML_ERR_INTERNAL_ERROR, "Huge input lookup");
-        xmlHaltParser(ctxt);
-	return;
-    }
-    xmlParserInputGrow(ctxt->input, INPUT_CHUNK);
-    if ((ctxt->input->cur > ctxt->input->end) ||
-        (ctxt->input->cur < ctxt->input->base)) {
-        xmlHaltParser(ctxt);
-        xmlFatalErr(ctxt, XML_ERR_INTERNAL_ERROR, "cur index out of bound");
-	return;
-    }
-    if ((ctxt->input->cur != NULL) && (*ctxt->input->cur == 0))
-        xmlParserInputGrow(ctxt->input, INPUT_CHUNK);
-}
+	xmlParserGrow(ctxt);
 
 #define SKIP_BLANKS xmlSkipBlankChars(ctxt)
 
@@ -2101,7 +1857,7 @@ static void xmlGROW (xmlParserCtxtPtr ctxt) {
 	ctxt->input->col++;						\
 	ctxt->input->cur++;						\
 	if (*ctxt->input->cur == 0)					\
-	    xmlParserInputGrow(ctxt->input, INPUT_CHUNK);		\
+	    xmlParserGrow(ctxt);						\
     }
 
 #define NEXTL(l) do {							\
@@ -2121,6 +1877,8 @@ static void xmlGROW (xmlParserCtxtPtr ctxt) {
 /**
  * xmlSkipBlankChars:
  * @ctxt:  the XML parser context
+ *
+ * DEPRECATED: Internal function, do not use.
  *
  * skip all blanks character found at that point in the input streams.
  * It pops up finished entities in the process if allowable at that point.
@@ -2154,7 +1912,7 @@ xmlSkipBlankChars(xmlParserCtxtPtr ctxt) {
 		res++;
 	    if (*cur == 0) {
 		ctxt->input->cur = cur;
-		xmlParserInputGrow(ctxt->input, INPUT_CHUNK);
+		xmlParserGrow(ctxt);
 		cur = ctxt->input->cur;
 	    }
 	}
@@ -2248,7 +2006,7 @@ xmlPopInput(xmlParserCtxtPtr ctxt) {
         input->entity->flags &= ~XML_ENT_EXPANDING;
     xmlFreeInputStream(input);
     if (*ctxt->input->cur == 0)
-        xmlParserInputGrow(ctxt->input, INPUT_CHUNK);
+        xmlParserGrow(ctxt);
     return(CUR);
 }
 
@@ -2497,6 +2255,8 @@ xmlParseStringCharRef(xmlParserCtxtPtr ctxt, const xmlChar **str) {
  * xmlParserHandlePEReference:
  * @ctxt:  the parser context
  *
+ * DEPRECATED: Internal function, do not use.
+ *
  * [69] PEReference ::= '%' Name ';'
  *
  * [ WFC: No Recursion ]
@@ -2541,6 +2301,7 @@ xmlParserHandlePEReference(xmlParserCtxtPtr ctxt) {
 	    return;
         case XML_PARSER_PROLOG:
 	case XML_PARSER_START:
+	case XML_PARSER_XML_DECL:
 	case XML_PARSER_MISC:
 	    xmlFatalErr(ctxt, XML_ERR_PEREF_IN_PROLOG, NULL);
 	    return;
@@ -3129,14 +2890,6 @@ xmlSplitQName(xmlParserCtxtPtr ctxt, const xmlChar *name, xmlChar **prefix) {
  *	Routines to parse Name, NCName and NmToken			*
  *									*
  ************************************************************************/
-#ifdef DEBUG
-static unsigned long nbParseName = 0;
-static unsigned long nbParseNmToken = 0;
-static unsigned long nbParseNCName = 0;
-static unsigned long nbParseNCNameComplex = 0;
-static unsigned long nbParseNameComplex = 0;
-static unsigned long nbParseStringName = 0;
-#endif
 
 /*
  * The two following functions are related to the change of accepted
@@ -3225,21 +2978,13 @@ static const xmlChar *
 xmlParseNameComplex(xmlParserCtxtPtr ctxt) {
     int len = 0, l;
     int c;
-    int count = 0;
     int maxLength = (ctxt->options & XML_PARSE_HUGE) ?
                     XML_MAX_TEXT_LENGTH :
                     XML_MAX_NAME_LENGTH;
 
-#ifdef DEBUG
-    nbParseNameComplex++;
-#endif
-
     /*
      * Handler for more complex cases
      */
-    GROW;
-    if (ctxt->instate == XML_PARSER_EOF)
-        return(NULL);
     c = CUR_CHAR(l);
     if ((ctxt->options & XML_PARSE_OLD10) == 0) {
         /*
@@ -3288,12 +3033,6 @@ xmlParseNameComplex(xmlParserCtxtPtr ctxt) {
 	        ((c >= 0xFDF0) && (c <= 0xFFFD)) ||
 	        ((c >= 0x10000) && (c <= 0xEFFFF))
 		)) {
-	    if (count++ > XML_PARSER_CHUNK_SIZE) {
-		count = 0;
-		GROW;
-                if (ctxt->instate == XML_PARSER_EOF)
-                    return(NULL);
-	    }
             if (len <= INT_MAX - l)
 	        len += l;
 	    NEXTL(l);
@@ -3315,18 +3054,14 @@ xmlParseNameComplex(xmlParserCtxtPtr ctxt) {
 		(c == '_') || (c == ':') ||
 		(IS_COMBINING(c)) ||
 		(IS_EXTENDER(c)))) {
-	    if (count++ > XML_PARSER_CHUNK_SIZE) {
-		count = 0;
-		GROW;
-                if (ctxt->instate == XML_PARSER_EOF)
-                    return(NULL);
-	    }
             if (len <= INT_MAX - l)
 	        len += l;
 	    NEXTL(l);
 	    c = CUR_CHAR(l);
 	}
     }
+    if (ctxt->instate == XML_PARSER_EOF)
+        return(NULL);
     if (len > maxLength) {
         xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "Name");
         return(NULL);
@@ -3374,10 +3109,8 @@ xmlParseName(xmlParserCtxtPtr ctxt) {
                        XML_MAX_NAME_LENGTH;
 
     GROW;
-
-#ifdef DEBUG
-    nbParseName++;
-#endif
+    if (ctxt->instate == XML_PARSER_EOF)
+        return(NULL);
 
     /*
      * Accelerator for simple ASCII names
@@ -3415,20 +3148,14 @@ static const xmlChar *
 xmlParseNCNameComplex(xmlParserCtxtPtr ctxt) {
     int len = 0, l;
     int c;
-    int count = 0;
     int maxLength = (ctxt->options & XML_PARSE_HUGE) ?
                     XML_MAX_TEXT_LENGTH :
                     XML_MAX_NAME_LENGTH;
     size_t startPosition = 0;
 
-#ifdef DEBUG
-    nbParseNCNameComplex++;
-#endif
-
     /*
      * Handler for more complex cases
      */
-    GROW;
     startPosition = CUR_PTR - BASE_PTR;
     c = CUR_CHAR(l);
     if ((c == ' ') || (c == '>') || (c == '/') || /* accelerators */
@@ -3438,31 +3165,13 @@ xmlParseNCNameComplex(xmlParserCtxtPtr ctxt) {
 
     while ((c != ' ') && (c != '>') && (c != '/') && /* test bigname.xml */
 	   (xmlIsNameChar(ctxt, c) && (c != ':'))) {
-	if (count++ > XML_PARSER_CHUNK_SIZE) {
-	    count = 0;
-	    GROW;
-            if (ctxt->instate == XML_PARSER_EOF)
-                return(NULL);
-	}
         if (len <= INT_MAX - l)
 	    len += l;
 	NEXTL(l);
 	c = CUR_CHAR(l);
-	if (c == 0) {
-	    count = 0;
-	    /*
-	     * when shrinking to extend the buffer we really need to preserve
-	     * the part of the name we already parsed. Hence rolling back
-	     * by current length.
-	     */
-	    ctxt->input->cur -= l;
-	    GROW;
-            if (ctxt->instate == XML_PARSER_EOF)
-                return(NULL);
-	    ctxt->input->cur += l;
-	    c = CUR_CHAR(l);
-	}
     }
+    if (ctxt->instate == XML_PARSER_EOF)
+        return(NULL);
     if (len > maxLength) {
         xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "NCName");
         return(NULL);
@@ -3493,10 +3202,6 @@ xmlParseNCName(xmlParserCtxtPtr ctxt) {
     size_t maxLength = (ctxt->options & XML_PARSE_HUGE) ?
                        XML_MAX_TEXT_LENGTH :
                        XML_MAX_NAME_LENGTH;
-
-#ifdef DEBUG
-    nbParseNCName++;
-#endif
 
     /*
      * Accelerator for simple ASCII names
@@ -3603,10 +3308,6 @@ xmlParseStringName(xmlParserCtxtPtr ctxt, const xmlChar** str) {
                     XML_MAX_TEXT_LENGTH :
                     XML_MAX_NAME_LENGTH;
 
-#ifdef DEBUG
-    nbParseStringName++;
-#endif
-
     c = CUR_SCHAR(cur, l);
     if (!xmlIsNameStartChar(ctxt, c)) {
 	return(NULL);
@@ -3688,35 +3389,16 @@ xmlParseNmtoken(xmlParserCtxtPtr ctxt) {
     xmlChar buf[XML_MAX_NAMELEN + 5];
     int len = 0, l;
     int c;
-    int count = 0;
     int maxLength = (ctxt->options & XML_PARSE_HUGE) ?
                     XML_MAX_TEXT_LENGTH :
                     XML_MAX_NAME_LENGTH;
 
-#ifdef DEBUG
-    nbParseNmToken++;
-#endif
-
-    GROW;
-    if (ctxt->instate == XML_PARSER_EOF)
-        return(NULL);
     c = CUR_CHAR(l);
 
     while (xmlIsNameChar(ctxt, c)) {
-	if (count++ > XML_PARSER_CHUNK_SIZE) {
-	    count = 0;
-	    GROW;
-	}
 	COPY_BUF(l,buf,len,c);
 	NEXTL(l);
 	c = CUR_CHAR(l);
-	if (c == 0) {
-	    count = 0;
-	    GROW;
-	    if (ctxt->instate == XML_PARSER_EOF)
-		return(NULL);
-            c = CUR_CHAR(l);
-	}
 	if (len >= XML_MAX_NAMELEN) {
 	    /*
 	     * Okay someone managed to make a huge token, so he's ready to pay
@@ -3732,14 +3414,6 @@ xmlParseNmtoken(xmlParserCtxtPtr ctxt) {
 	    }
 	    memcpy(buffer, buf, len);
 	    while (xmlIsNameChar(ctxt, c)) {
-		if (count++ > XML_PARSER_CHUNK_SIZE) {
-		    count = 0;
-		    GROW;
-                    if (ctxt->instate == XML_PARSER_EOF) {
-                        xmlFree(buffer);
-                        return(NULL);
-                    }
-		}
 		if (len + 10 > max) {
 		    xmlChar *tmp;
 
@@ -3753,18 +3427,24 @@ xmlParseNmtoken(xmlParserCtxtPtr ctxt) {
 		    buffer = tmp;
 		}
 		COPY_BUF(l,buffer,len,c);
-		NEXTL(l);
-		c = CUR_CHAR(l);
                 if (len > maxLength) {
                     xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "NmToken");
                     xmlFree(buffer);
                     return(NULL);
                 }
+		NEXTL(l);
+		c = CUR_CHAR(l);
 	    }
 	    buffer[len] = 0;
+            if (ctxt->instate == XML_PARSER_EOF) {
+                xmlFree(buffer);
+                return(NULL);
+            }
 	    return(buffer);
 	}
     }
+    if (ctxt->instate == XML_PARSER_EOF)
+        return(NULL);
     if (len == 0)
         return(NULL);
     if (len > maxLength) {
@@ -4255,9 +3935,7 @@ xmlParseSystemLiteral(xmlParserCtxtPtr ctxt) {
                     XML_MAX_NAME_LENGTH;
     xmlChar stop;
     int state = ctxt->instate;
-    int count = 0;
 
-    SHRINK;
     if (RAW == '"') {
         NEXT;
 	stop = '"';
@@ -4290,32 +3968,21 @@ xmlParseSystemLiteral(xmlParserCtxtPtr ctxt) {
 	    }
 	    buf = tmp;
 	}
-	count++;
-	if (count > 50) {
-	    SHRINK;
-	    GROW;
-	    count = 0;
-            if (ctxt->instate == XML_PARSER_EOF) {
-	        xmlFree(buf);
-		return(NULL);
-            }
-	}
 	COPY_BUF(l,buf,len,cur);
-	NEXTL(l);
-	cur = CUR_CHAR(l);
-	if (cur == 0) {
-	    GROW;
-	    SHRINK;
-	    cur = CUR_CHAR(l);
-	}
         if (len > maxLength) {
             xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "SystemLiteral");
             xmlFree(buf);
             ctxt->instate = (xmlParserInputState) state;
             return(NULL);
         }
+	NEXTL(l);
+	cur = CUR_CHAR(l);
     }
     buf[len] = 0;
+    if (ctxt->instate == XML_PARSER_EOF) {
+        xmlFree(buf);
+        return(NULL);
+    }
     ctxt->instate = (xmlParserInputState) state;
     if (!IS_CHAR(cur)) {
 	xmlFatalErr(ctxt, XML_ERR_LITERAL_NOT_FINISHED, NULL);
@@ -4348,10 +4015,8 @@ xmlParsePubidLiteral(xmlParserCtxtPtr ctxt) {
                     XML_MAX_NAME_LENGTH;
     xmlChar cur;
     xmlChar stop;
-    int count = 0;
     xmlParserInputState oldstate = ctxt->instate;
 
-    SHRINK;
     if (RAW == '"') {
         NEXT;
 	stop = '"';
@@ -4383,40 +4048,29 @@ xmlParsePubidLiteral(xmlParserCtxtPtr ctxt) {
 	    buf = tmp;
 	}
 	buf[len++] = cur;
-	count++;
-	if (count > 50) {
-	    SHRINK;
-	    GROW;
-	    count = 0;
-            if (ctxt->instate == XML_PARSER_EOF) {
-		xmlFree(buf);
-		return(NULL);
-            }
-	}
-	NEXT;
-	cur = CUR;
-	if (cur == 0) {
-	    GROW;
-	    SHRINK;
-	    cur = CUR;
-	}
         if (len > maxLength) {
             xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "Public ID");
             xmlFree(buf);
             return(NULL);
         }
+	NEXT;
+	cur = CUR;
     }
     buf[len] = 0;
+    if (ctxt->instate == XML_PARSER_EOF) {
+        xmlFree(buf);
+        return(NULL);
+    }
     if (cur != stop) {
 	xmlFatalErr(ctxt, XML_ERR_LITERAL_NOT_FINISHED, NULL);
     } else {
-	NEXT;
+	NEXTL(1);
     }
     ctxt->instate = oldstate;
     return(buf);
 }
 
-static void xmlParseCharDataComplex(xmlParserCtxtPtr ctxt);
+static void xmlParseCharDataComplex(xmlParserCtxtPtr ctxt, int partial);
 
 /*
  * used for the test in the inner loop of the char data testing
@@ -4457,16 +4111,12 @@ static const unsigned char test_char_data[256] = {
 };
 
 /**
- * xmlParseCharData:
+ * xmlParseCharDataInternal:
  * @ctxt:  an XML parser context
- * @cdata:  unused
- *
- * DEPRECATED: Internal function, don't use.
+ * @partial:  buffer may contain partial UTF-8 sequences
  *
  * Parse character data. Always makes progress if the first char isn't
  * '<' or '&'.
- *
- * if we are within a CDATA section ']]>' marks an end of section.
  *
  * The right angle bracket (>) may be represented using the string "&gt;",
  * and must, for compatibility, be escaped using "&gt;" or a character
@@ -4475,16 +4125,14 @@ static const unsigned char test_char_data[256] = {
  *
  * [14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)
  */
-
-void
-xmlParseCharData(xmlParserCtxtPtr ctxt, ATTRIBUTE_UNUSED int cdata) {
+static void
+xmlParseCharDataInternal(xmlParserCtxtPtr ctxt, int partial) {
     const xmlChar *in;
     int nbchar = 0;
     int line = ctxt->input->line;
     int col = ctxt->input->col;
     int ccol;
 
-    SHRINK;
     GROW;
     /*
      * Accelerated common case where input don't need to be
@@ -4547,7 +4195,8 @@ get_more:
         if (*in == ']') {
             if ((in[1] == ']') && (in[2] == '>')) {
                 xmlFatalErr(ctxt, XML_ERR_MISPLACED_CDATA_END, NULL);
-                ctxt->input->cur = in + 1;
+                if (ctxt->instate != XML_PARSER_EOF)
+                    ctxt->input->cur = in + 1;
                 return;
             }
             in++;
@@ -4583,6 +4232,8 @@ get_more:
                 line = ctxt->input->line;
                 col = ctxt->input->col;
             }
+            if (ctxt->instate == XML_PARSER_EOF)
+                return;
         }
         ctxt->input->cur = in;
         if (*in == 0xD) {
@@ -4610,7 +4261,7 @@ get_more:
              (*in == 0x09) || (*in == 0x0a));
     ctxt->input->line = line;
     ctxt->input->col = col;
-    xmlParseCharDataComplex(ctxt);
+    xmlParseCharDataComplex(ctxt, partial);
 }
 
 /**
@@ -4625,14 +4276,11 @@ get_more:
  * of non-ASCII characters.
  */
 static void
-xmlParseCharDataComplex(xmlParserCtxtPtr ctxt) {
+xmlParseCharDataComplex(xmlParserCtxtPtr ctxt, int partial) {
     xmlChar buf[XML_PARSER_BIG_BUFFER_SIZE + 5];
     int nbchar = 0;
     int cur, l;
-    int count = 0;
 
-    SHRINK;
-    GROW;
     cur = CUR_CHAR(l);
     while ((cur != '<') && /* checked */
            (cur != '&') &&
@@ -4643,7 +4291,6 @@ xmlParseCharDataComplex(xmlParserCtxtPtr ctxt) {
 	COPY_BUF(l,buf,nbchar,cur);
 	/* move current position before possible calling of ctxt->sax->characters */
 	NEXTL(l);
-	cur = CUR_CHAR(l);
 	if (nbchar >= XML_PARSER_BIG_BUFFER_SIZE) {
 	    buf[nbchar] = 0;
 
@@ -4668,16 +4315,12 @@ xmlParseCharDataComplex(xmlParserCtxtPtr ctxt) {
             /* something really bad happened in the SAX callback */
             if (ctxt->instate != XML_PARSER_CONTENT)
                 return;
+            SHRINK;
 	}
-	count++;
-	if (count > 50) {
-	    SHRINK;
-	    GROW;
-	    count = 0;
-            if (ctxt->instate == XML_PARSER_EOF)
-		return;
-	}
+	cur = CUR_CHAR(l);
     }
+    if (ctxt->instate == XML_PARSER_EOF)
+        return;
     if (nbchar != 0) {
         buf[nbchar] = 0;
 	/*
@@ -4696,13 +4339,40 @@ xmlParseCharDataComplex(xmlParserCtxtPtr ctxt) {
 	    }
 	}
     }
-    if ((ctxt->input->cur < ctxt->input->end) && (!IS_CHAR(cur))) {
-	/* Generate the error and skip the offending character */
-        xmlFatalErrMsgInt(ctxt, XML_ERR_INVALID_CHAR,
-                          "PCDATA invalid Char value %d\n",
-	                  cur ? cur : CUR);
-	NEXT;
+    /*
+     * cur == 0 can mean
+     *
+     * - XML_PARSER_EOF or memory error. This is checked above.
+     * - An actual 0 character.
+     * - End of buffer.
+     * - An incomplete UTF-8 sequence. This is allowed if partial is set.
+     */
+    if (ctxt->input->cur < ctxt->input->end) {
+        if ((cur == 0) && (CUR != 0)) {
+            if (partial == 0) {
+                xmlFatalErrMsgInt(ctxt, XML_ERR_INVALID_CHAR,
+                        "Incomplete UTF-8 sequence starting with %02X\n", CUR);
+                NEXTL(1);
+            }
+        } else if ((cur != '<') && (cur != '&')) {
+            /* Generate the error and skip the offending character */
+            xmlFatalErrMsgInt(ctxt, XML_ERR_INVALID_CHAR,
+                              "PCDATA invalid Char value %d\n", cur);
+            NEXTL(l);
+        }
     }
+}
+
+/**
+ * xmlParseCharData:
+ * @ctxt:  an XML parser context
+ * @cdata:  unused
+ *
+ * DEPRECATED: Internal function, don't use.
+ */
+void
+xmlParseCharData(xmlParserCtxtPtr ctxt, ATTRIBUTE_UNUSED int cdata) {
+    xmlParseCharDataInternal(ctxt, 0);
 }
 
 /**
@@ -4732,8 +4402,6 @@ xmlParseCharDataComplex(xmlParserCtxtPtr ctxt) {
 xmlChar *
 xmlParseExternalID(xmlParserCtxtPtr ctxt, xmlChar **publicID, int strict) {
     xmlChar *URI = NULL;
-
-    SHRINK;
 
     *publicID = NULL;
     if (CMP6(CUR_PTR, 'S', 'Y', 'S', 'T', 'E', 'M')) {
@@ -4802,7 +4470,6 @@ xmlParseCommentComplex(xmlParserCtxtPtr ctxt, xmlChar *buf,
     int q, ql;
     int r, rl;
     int cur, l;
-    size_t count = 0;
     size_t maxLength = (ctxt->options & XML_PARSE_HUGE) ?
                        XML_MAX_HUGE_LENGTH :
                        XML_MAX_TEXT_LENGTH;
@@ -4819,7 +4486,6 @@ xmlParseCommentComplex(xmlParserCtxtPtr ctxt, xmlChar *buf,
 	    return;
 	}
     }
-    GROW;	/* Assure there's enough input data */
     q = CUR_CHAR(ql);
     if (q == 0)
         goto not_terminated;
@@ -4866,37 +4532,27 @@ xmlParseCommentComplex(xmlParserCtxtPtr ctxt, xmlChar *buf,
             size = new_size;
 	}
 	COPY_BUF(ql,buf,len,q);
-	q = r;
-	ql = rl;
-	r = cur;
-	rl = l;
-
-	count++;
-	if (count > 50) {
-	    SHRINK;
-	    GROW;
-	    count = 0;
-            if (ctxt->instate == XML_PARSER_EOF) {
-		xmlFree(buf);
-		return;
-            }
-	}
-	NEXTL(l);
-	cur = CUR_CHAR(l);
-	if (cur == 0) {
-	    SHRINK;
-	    GROW;
-	    cur = CUR_CHAR(l);
-	}
-
         if (len > maxLength) {
             xmlFatalErrMsgStr(ctxt, XML_ERR_COMMENT_NOT_FINISHED,
                          "Comment too big found", NULL);
             xmlFree (buf);
             return;
         }
+
+	q = r;
+	ql = rl;
+	r = cur;
+	rl = l;
+
+	NEXTL(l);
+	cur = CUR_CHAR(l);
+
     }
     buf[len] = 0;
+    if (ctxt->instate == XML_PARSER_EOF) {
+        xmlFree(buf);
+        return;
+    }
     if (cur == 0) {
 	xmlFatalErrMsgStr(ctxt, XML_ERR_COMMENT_NOT_FINISHED,
 	                     "Comment not terminated \n<!--%.50s\n", buf);
@@ -4963,7 +4619,6 @@ xmlParseComment(xmlParserCtxtPtr ctxt) {
     ctxt->instate = XML_PARSER_COMMENT;
     inputid = ctxt->input->id;
     SKIP(2);
-    SHRINK;
     GROW;
 
     /*
@@ -5240,7 +4895,6 @@ xmlParsePI(xmlParserCtxtPtr ctxt) {
     int cur, l;
     const xmlChar *target;
     xmlParserInputState state;
-    int count = 0;
 
     if ((RAW == '<') && (NXT(1) == '?')) {
 	int inputid = ctxt->input->id;
@@ -5250,7 +4904,6 @@ xmlParsePI(xmlParserCtxtPtr ctxt) {
 	 * this is a Processing Instruction.
 	 */
 	SKIP(2);
-	SHRINK;
 
 	/*
 	 * Parse the target name and check for special support like
@@ -5303,24 +4956,7 @@ xmlParsePI(xmlParserCtxtPtr ctxt) {
 		    buf = tmp;
                     size = new_size;
 		}
-		count++;
-		if (count > 50) {
-		    SHRINK;
-		    GROW;
-                    if (ctxt->instate == XML_PARSER_EOF) {
-                        xmlFree(buf);
-                        return;
-                    }
-		    count = 0;
-		}
 		COPY_BUF(l,buf,len,cur);
-		NEXTL(l);
-		cur = CUR_CHAR(l);
-		if (cur == 0) {
-		    SHRINK;
-		    GROW;
-		    cur = CUR_CHAR(l);
-		}
                 if (len > maxLength) {
                     xmlFatalErrMsgStr(ctxt, XML_ERR_PI_NOT_FINISHED,
                                       "PI %s too big found", target);
@@ -5328,8 +4964,14 @@ xmlParsePI(xmlParserCtxtPtr ctxt) {
                     ctxt->instate = state;
                     return;
                 }
+		NEXTL(l);
+		cur = CUR_CHAR(l);
 	    }
 	    buf[len] = 0;
+            if (ctxt->instate == XML_PARSER_EOF) {
+                xmlFree(buf);
+                return;
+            }
 	    if (cur != '?') {
 		xmlFatalErrMsgStr(ctxt, XML_ERR_PI_NOT_FINISHED,
 		      "ParsePI: PI %s never end ...\n", target);
@@ -5400,7 +5042,6 @@ xmlParseNotationDecl(xmlParserCtxtPtr ctxt) {
 
     if (CMP8(CUR_PTR, 'N', 'O', 'T', 'A', 'T', 'I', 'O', 'N')) {
 	int inputid = ctxt->input->id;
-	SHRINK;
 	SKIP(8);
 	if (SKIP_BLANKS == 0) {
 	    xmlFatalErrMsg(ctxt, XML_ERR_SPACE_REQUIRED,
@@ -5488,7 +5129,6 @@ xmlParseEntityDecl(xmlParserCtxtPtr ctxt) {
     /* GROW; done in the caller */
     if (CMP6(CUR_PTR, 'E', 'N', 'T', 'I', 'T', 'Y')) {
 	int inputid = ctxt->input->id;
-	SHRINK;
 	SKIP(6);
 	if (SKIP_BLANKS == 0) {
 	    xmlFatalErrMsg(ctxt, XML_ERR_SPACE_REQUIRED,
@@ -5812,7 +5452,6 @@ xmlParseNotationType(xmlParserCtxtPtr ctxt) {
 	xmlFatalErr(ctxt, XML_ERR_NOTATION_NOT_STARTED, NULL);
 	return(NULL);
     }
-    SHRINK;
     do {
         NEXT;
 	SKIP_BLANKS;
@@ -5884,7 +5523,6 @@ xmlParseEnumerationType(xmlParserCtxtPtr ctxt) {
 	xmlFatalErr(ctxt, XML_ERR_ATTLIST_NOT_STARTED, NULL);
 	return(NULL);
     }
-    SHRINK;
     do {
         NEXT;
 	SKIP_BLANKS;
@@ -6013,7 +5651,6 @@ xmlParseEnumeratedType(xmlParserCtxtPtr ctxt, xmlEnumerationPtr *tree) {
  */
 int
 xmlParseAttributeType(xmlParserCtxtPtr ctxt, xmlEnumerationPtr *tree) {
-    SHRINK;
     if (CMP5(CUR_PTR, 'C', 'D', 'A', 'T', 'A')) {
 	SKIP(5);
 	return(XML_ATTRIBUTE_CDATA);
@@ -6198,7 +5835,6 @@ xmlParseElementMixedContentDecl(xmlParserCtxtPtr ctxt, int inputchk) {
     if (CMP7(CUR_PTR, '#', 'P', 'C', 'D', 'A', 'T', 'A')) {
 	SKIP(7);
 	SKIP_BLANKS;
-	SHRINK;
 	if (RAW == ')') {
 	    if (ctxt->input->id != inputchk) {
 		xmlFatalErrMsg(ctxt, XML_ERR_ENTITY_BOUNDARY,
@@ -6370,7 +6006,6 @@ xmlParseElementChildrenContentDeclPriv(xmlParserCtxtPtr ctxt, int inputchk,
 	GROW;
     }
     SKIP_BLANKS;
-    SHRINK;
     while ((RAW != ')') && (ctxt->instate != XML_PARSER_EOF)) {
         /*
 	 * Each loop we parse one separator and one element.
@@ -6915,6 +6550,7 @@ xmlParseConditionalSections(xmlParserCtxtPtr ctxt) {
             break;
 
         SKIP_BLANKS;
+        SHRINK;
         GROW;
     }
 
@@ -7003,7 +6639,6 @@ xmlParseMarkupDecl(xmlParserCtxtPtr ctxt) {
 void
 xmlParseTextDecl(xmlParserCtxtPtr ctxt) {
     xmlChar *version;
-    const xmlChar *encoding;
     int oldstate;
 
     /*
@@ -7042,7 +6677,7 @@ xmlParseTextDecl(xmlParserCtxtPtr ctxt) {
     /*
      * We must have the encoding declaration
      */
-    encoding = xmlParseEncodingDecl(ctxt);
+    xmlParseEncodingDecl(ctxt);
     if (ctxt->instate == XML_PARSER_EOF)
         return;
     if (ctxt->errNo == XML_ERR_UNSUPPORTED_ENCODING) {
@@ -7051,10 +6686,6 @@ xmlParseTextDecl(xmlParserCtxtPtr ctxt) {
 	 */
         ctxt->instate = oldstate;
         return;
-    }
-    if ((encoding == NULL) && (ctxt->errNo == XML_ERR_OK)) {
-	xmlFatalErrMsg(ctxt, XML_ERR_MISSING_ENCODING,
-		       "Missing encoding in text declaration\n");
     }
 
     SKIP_BLANKS;
@@ -7094,21 +6725,8 @@ void
 xmlParseExternalSubset(xmlParserCtxtPtr ctxt, const xmlChar *ExternalID,
                        const xmlChar *SystemID) {
     xmlDetectSAX2(ctxt);
-    GROW;
 
-    if ((ctxt->encoding == NULL) &&
-        (ctxt->input->end - ctxt->input->cur >= 4)) {
-        xmlChar start[4];
-	xmlCharEncoding enc;
-
-	start[0] = RAW;
-	start[1] = NXT(1);
-	start[2] = NXT(2);
-	start[3] = NXT(3);
-	enc = xmlDetectCharEncoding(start, 4);
-	if (enc != XML_CHAR_ENCODING_NONE)
-	    xmlSwitchEncoding(ctxt, enc);
-    }
+    xmlDetectEncoding(ctxt);
 
     if (CMP5(CUR_PTR, '<', '?', 'x', 'm', 'l')) {
 	xmlParseTextDecl(ctxt);
@@ -7146,6 +6764,7 @@ xmlParseExternalSubset(xmlParserCtxtPtr ctxt, const xmlChar *ExternalID,
             return;
         }
         SKIP_BLANKS;
+        SHRINK;
     }
 
     if (RAW != 0) {
@@ -7187,42 +6806,19 @@ xmlParseReference(xmlParserCtxtPtr ctxt) {
     if (NXT(1) == '#') {
 	int i = 0;
 	xmlChar out[16];
-	int hex = NXT(2);
 	int value = xmlParseCharRef(ctxt);
 
 	if (value == 0)
 	    return;
-	if (ctxt->charset != XML_CHAR_ENCODING_UTF8) {
-	    /*
-	     * So we are using non-UTF-8 buffers
-	     * Check that the char fit on 8bits, if not
-	     * generate a CharRef.
-	     */
-	    if (value <= 0xFF) {
-		out[0] = value;
-		out[1] = 0;
-		if ((ctxt->sax != NULL) && (ctxt->sax->characters != NULL) &&
-		    (!ctxt->disableSAX))
-		    ctxt->sax->characters(ctxt->userData, out, 1);
-	    } else {
-		if ((hex == 'x') || (hex == 'X'))
-		    snprintf((char *)out, sizeof(out), "#x%X", value);
-		else
-		    snprintf((char *)out, sizeof(out), "#%d", value);
-		if ((ctxt->sax != NULL) && (ctxt->sax->reference != NULL) &&
-		    (!ctxt->disableSAX))
-		    ctxt->sax->reference(ctxt->userData, out);
-	    }
-	} else {
-	    /*
-	     * Just encode the value in UTF-8
-	     */
-	    COPY_BUF(0 ,out, i, value);
-	    out[i] = 0;
-	    if ((ctxt->sax != NULL) && (ctxt->sax->characters != NULL) &&
-		(!ctxt->disableSAX))
-		ctxt->sax->characters(ctxt->userData, out, i);
-	}
+
+        /*
+         * Just encode the value in UTF-8
+         */
+        COPY_BUF(0, out, i, value);
+        out[i] = 0;
+        if ((ctxt->sax != NULL) && (ctxt->sax->characters != NULL) &&
+            (!ctxt->disableSAX))
+            ctxt->sax->characters(ctxt->userData, out, i);
 	return;
     }
 
@@ -8070,8 +7666,6 @@ xmlParsePEReference(xmlParserCtxtPtr ctxt)
 		  "Internal: %%%s; is not a parameter entity\n",
 			  name, NULL);
 	} else {
-            xmlChar start[4];
-            xmlCharEncoding enc;
             unsigned long parentConsumed;
             xmlEntityPtr oldEnt;
 
@@ -8112,28 +7706,7 @@ xmlParsePEReference(xmlParserCtxtPtr ctxt)
             input->parentConsumed = parentConsumed;
 
 	    if (entity->etype == XML_EXTERNAL_PARAMETER_ENTITY) {
-                /*
-                 * Get the 4 first bytes and decode the charset
-                 * if enc != XML_CHAR_ENCODING_NONE
-                 * plug some encoding conversion routines.
-                 * Note that, since we may have some non-UTF8
-                 * encoding (like UTF16, bug 135229), the 'length'
-                 * is not known, but we can calculate based upon
-                 * the amount of data in the buffer.
-                 */
-                GROW
-                if (ctxt->instate == XML_PARSER_EOF)
-                    return;
-                if ((ctxt->input->end - ctxt->input->cur)>=4) {
-                    start[0] = RAW;
-                    start[1] = NXT(1);
-                    start[2] = NXT(2);
-                    start[3] = NXT(3);
-                    enc = xmlDetectCharEncoding(start, 4);
-                    if (enc != XML_CHAR_ENCODING_NONE) {
-                        xmlSwitchEncoding(ctxt, enc);
-                    }
-                }
+                xmlDetectEncoding(ctxt);
 
                 if ((CMP5(CUR_PTR, '<', '?', 'x', 'm', 'l')) &&
                     (IS_BLANK_CH(NXT(5)))) {
@@ -8158,10 +7731,11 @@ xmlParsePEReference(xmlParserCtxtPtr ctxt)
  */
 static int
 xmlLoadEntityContent(xmlParserCtxtPtr ctxt, xmlEntityPtr entity) {
-    xmlParserInputPtr input;
-    xmlBufferPtr buf;
-    int l, c;
-    int count = 0;
+    xmlParserInputPtr input = NULL;
+    xmlChar *content = NULL;
+    size_t length, i;
+    int ret = -1;
+    int res;
 
     if ((ctxt == NULL) || (entity == NULL) ||
         ((entity->etype != XML_EXTERNAL_PARAMETER_ENTITY) &&
@@ -8176,74 +7750,54 @@ xmlLoadEntityContent(xmlParserCtxtPtr ctxt, xmlEntityPtr entity) {
 	xmlGenericError(xmlGenericErrorContext,
 		"Reading %s entity content input\n", entity->name);
 
-    buf = xmlBufferCreate();
-    if (buf == NULL) {
-	xmlFatalErr(ctxt, XML_ERR_INTERNAL_ERROR,
-	            "xmlLoadEntityContent parameter error");
-        return(-1);
-    }
-    xmlBufferSetAllocationScheme(buf, XML_BUFFER_ALLOC_DOUBLEIT);
-
-    input = xmlNewEntityInputStream(ctxt, entity);
+    input = xmlLoadExternalEntity((char *) entity->URI,
+           (char *) entity->ExternalID, ctxt);
     if (input == NULL) {
 	xmlFatalErr(ctxt, XML_ERR_INTERNAL_ERROR,
 	            "xmlLoadEntityContent input error");
-	xmlBufferFree(buf);
         return(-1);
     }
 
-    /*
-     * Push the entity as the current input, read char by char
-     * saving to the buffer until the end of the entity or an error
-     */
-    if (xmlPushInput(ctxt, input) < 0) {
-        xmlBufferFree(buf);
-	xmlFreeInputStream(input);
-	return(-1);
+    while ((res = xmlParserInputBufferGrow(input->buf, 16384)) > 0)
+        ;
+
+    if (res < 0) {
+        xmlFatalErr(ctxt, input->buf->error, NULL);
+        goto error;
     }
 
-    GROW;
-    c = CUR_CHAR(l);
-    while ((ctxt->input == input) && (ctxt->input->cur < ctxt->input->end) &&
-           (IS_CHAR(c))) {
-        xmlBufferAdd(buf, ctxt->input->cur, l);
-	if (count++ > XML_PARSER_CHUNK_SIZE) {
-	    count = 0;
-	    GROW;
-            if (ctxt->instate == XML_PARSER_EOF) {
-                xmlBufferFree(buf);
-                return(-1);
-            }
-	}
-	NEXTL(l);
-	c = CUR_CHAR(l);
-	if (c == 0) {
-	    count = 0;
-	    GROW;
-            if (ctxt->instate == XML_PARSER_EOF) {
-                xmlBufferFree(buf);
-                return(-1);
-            }
-	    c = CUR_CHAR(l);
-	}
+    length = xmlBufUse(input->buf->buffer);
+    content = xmlBufDetach(input->buf->buffer);
+
+    if (length > INT_MAX) {
+        xmlErrMemory(ctxt, NULL);
+        goto error;
     }
 
-    if ((ctxt->input == input) && (ctxt->input->cur >= ctxt->input->end)) {
-        xmlSaturatedAdd(&ctxt->sizeentities, ctxt->input->consumed);
-        xmlPopInput(ctxt);
-    } else if (!IS_CHAR(c)) {
-        xmlFatalErrMsgInt(ctxt, XML_ERR_INVALID_CHAR,
-                          "xmlLoadEntityContent: invalid char value %d\n",
-	                  c);
-	xmlBufferFree(buf);
-	return(-1);
-    }
-    entity->content = buf->content;
-    entity->length = buf->use;
-    buf->content = NULL;
-    xmlBufferFree(buf);
+    for (i = 0; i < length; ) {
+        int clen = length - i;
+        int c = xmlGetUTF8Char(content + i, &clen);
 
-    return(0);
+        if ((c < 0) || (!IS_CHAR(c))) {
+            xmlFatalErrMsgInt(ctxt, XML_ERR_INVALID_CHAR,
+                              "xmlLoadEntityContent: invalid char value %d\n",
+                              content[i]);
+            goto error;
+        }
+        i += clen;
+    }
+
+    xmlSaturatedAdd(&ctxt->sizeentities, length);
+    entity->content = content;
+    entity->length = length;
+    content = NULL;
+    ret = 0;
+
+error:
+    xmlFree(content);
+    xmlFreeInputStream(input);
+
+    return(ret);
 }
 
 /**
@@ -8485,6 +8039,8 @@ xmlParseInternalSubset(xmlParserCtxtPtr ctxt) {
                 return;
             }
 	    SKIP_BLANKS;
+            SHRINK;
+            GROW;
 	}
 	if (RAW == ']') {
 	    NEXT;
@@ -8885,6 +8441,8 @@ xmlParseQName(xmlParserCtxtPtr ctxt, const xmlChar **prefix) {
     const xmlChar *l, *p;
 
     GROW;
+    if (ctxt->instate == XML_PARSER_EOF)
+        return(NULL);
 
     l = xmlParseNCName(ctxt);
     if (l == NULL) {
@@ -9363,20 +8921,12 @@ xmlParseStartTag2(xmlParserCtxtPtr ctxt, const xmlChar **pref,
     int maxatts = ctxt->maxatts;
     int nratts, nbatts, nbdef, inputid;
     int i, j, nbNs, attval;
-    unsigned long cur;
+    size_t cur;
     int nsNr = ctxt->nsNr;
 
     if (RAW != '<') return(NULL);
     NEXT1;
 
-    /*
-     * NOTE: it is crucial with the SAX2 API to never call SHRINK beyond that
-     *       point since the attribute values may be stored as pointers to
-     *       the buffer and calling SHRINK would destroy them !
-     *       The Shrinking is only possible once the full set of attribute
-     *       callbacks have been done.
-     */
-    SHRINK;
     cur = ctxt->input->cur - ctxt->input->base;
     inputid = ctxt->input->id;
     nbatts = 0;
@@ -9555,19 +9105,21 @@ xmlParseStartTag2(xmlParserCtxtPtr ctxt, const xmlChar **pref,
             ctxt->attallocs[nratts++] = alloc;
             atts[nbatts++] = attname;
             atts[nbatts++] = aprefix;
-            /*
-             * The namespace URI field is used temporarily to point at the
-             * base of the current input buffer for non-alloced attributes.
-             * When the input buffer is reallocated, all the pointers become
-             * invalid, but they can be reconstructed later.
-             */
-            if (alloc)
-                atts[nbatts++] = NULL;
-            else
-                atts[nbatts++] = ctxt->input->base;
-            atts[nbatts++] = attvalue;
-            attvalue += len;
-            atts[nbatts++] = attvalue;
+            atts[nbatts++] = NULL;
+            if (alloc) {
+                atts[nbatts++] = attvalue;
+                attvalue += len;
+                atts[nbatts++] = attvalue;
+            } else {
+                /*
+                 * attvalue points into the input buffer which can be
+                 * reallocated. Store differences to input->base instead.
+                 * The pointers will be reconstructed later.
+                 */
+                atts[nbatts++] = (void *) (attvalue - BASE_PTR);
+                attvalue += len;
+                atts[nbatts++] = (void *) (attvalue - BASE_PTR);
+            }
             /*
              * tag if some deallocation is needed
              */
@@ -9603,15 +9155,9 @@ next_attr:
 
     /* Reconstruct attribute value pointers. */
     for (i = 0, j = 0; j < nratts; i += 5, j++) {
-        if (atts[i+2] != NULL) {
-            /*
-             * Arithmetic on dangling pointers is technically undefined
-             * behavior, but well...
-             */
-            const xmlChar *old = atts[i+2];
-            atts[i+2]  = NULL;    /* Reset repurposed namespace URI */
-            atts[i+3] = ctxt->input->base + (atts[i+3] - old);  /* value */
-            atts[i+4] = ctxt->input->base + (atts[i+4] - old);  /* valuend */
+        if (ctxt->attallocs[j] == 0) {
+            atts[i+3] = BASE_PTR + (ptrdiff_t) atts[i+3];  /* value */
+            atts[i+4] = BASE_PTR + (ptrdiff_t) atts[i+4];  /* valuend */
         }
     }
 
@@ -9866,7 +9412,6 @@ xmlParseCDSect(xmlParserCtxtPtr ctxt) {
     int r, rl;
     int	s, sl;
     int cur, l;
-    int count = 0;
     int maxLength = (ctxt->options & XML_PARSE_HUGE) ?
                     XML_MAX_HUGE_LENGTH :
                     XML_MAX_TEXT_LENGTH;
@@ -9912,28 +9457,23 @@ xmlParseCDSect(xmlParserCtxtPtr ctxt) {
 	    size *= 2;
 	}
 	COPY_BUF(rl,buf,len,r);
-	r = s;
-	rl = sl;
-	s = cur;
-	sl = l;
-	count++;
-	if (count > 50) {
-	    SHRINK;
-	    GROW;
-            if (ctxt->instate == XML_PARSER_EOF) {
-                goto out;
-            }
-	    count = 0;
-	}
-	NEXTL(l);
-	cur = CUR_CHAR(l);
         if (len > maxLength) {
             xmlFatalErrMsg(ctxt, XML_ERR_CDATA_NOT_FINISHED,
                            "CData section too big found\n");
             goto out;
         }
+	r = s;
+	rl = sl;
+	s = cur;
+	sl = l;
+	NEXTL(l);
+	cur = CUR_CHAR(l);
     }
     buf[len] = 0;
+    if (ctxt->instate == XML_PARSER_EOF) {
+        xmlFree(buf);
+        return;
+    }
     if (cur != '>') {
 	xmlFatalErrMsgStr(ctxt, XML_ERR_CDATA_NOT_FINISHED,
 	                     "CData section not finished\n%.50s\n", buf);
@@ -9970,7 +9510,7 @@ xmlParseContentInternal(xmlParserCtxtPtr ctxt) {
     int nameNr = ctxt->nameNr;
 
     GROW;
-    while ((RAW != 0) &&
+    while ((ctxt->input->cur < ctxt->input->end) &&
 	   (ctxt->instate != XML_PARSER_EOF)) {
 	const xmlChar *cur = ctxt->input->cur;
 
@@ -10024,11 +9564,11 @@ xmlParseContentInternal(xmlParserCtxtPtr ctxt) {
 	 * Last case, text. Note that References are handled directly.
 	 */
 	else {
-	    xmlParseCharData(ctxt, 0);
+	    xmlParseCharDataInternal(ctxt, 0);
 	}
 
-	GROW;
 	SHRINK;
+	GROW;
     }
 }
 
@@ -10047,7 +9587,9 @@ xmlParseContent(xmlParserCtxtPtr ctxt) {
 
     xmlParseContentInternal(ctxt);
 
-    if ((ctxt->instate != XML_PARSER_EOF) && (ctxt->nameNr > nameNr)) {
+    if ((ctxt->instate != XML_PARSER_EOF) &&
+        (ctxt->errNo == XML_ERR_OK) &&
+        (ctxt->nameNr > nameNr)) {
         const xmlChar *name = ctxt->nameTab[ctxt->nameNr - 1];
         int line = ctxt->pushTab[ctxt->nameNr - 1].line;
         xmlFatalErrMsgStrIntStr(ctxt, XML_ERR_TAG_NOT_FINISHED,
@@ -10081,12 +9623,14 @@ xmlParseElement(xmlParserCtxtPtr ctxt) {
     if (ctxt->instate == XML_PARSER_EOF)
 	return;
 
-    if (CUR == 0) {
-        const xmlChar *name = ctxt->nameTab[ctxt->nameNr - 1];
-        int line = ctxt->pushTab[ctxt->nameNr - 1].line;
-        xmlFatalErrMsgStrIntStr(ctxt, XML_ERR_TAG_NOT_FINISHED,
-                "Premature end of data in tag %s line %d\n",
-		name, line, NULL);
+    if (ctxt->input->cur >= ctxt->input->end) {
+        if (ctxt->errNo == XML_ERR_OK) {
+            const xmlChar *name = ctxt->nameTab[ctxt->nameNr - 1];
+            int line = ctxt->pushTab[ctxt->nameNr - 1].line;
+            xmlFatalErrMsgStrIntStr(ctxt, XML_ERR_TAG_NOT_FINISHED,
+                    "Premature end of data in tag %s line %d\n",
+                    name, line, NULL);
+        }
         return;
     }
 
@@ -10109,7 +9653,7 @@ xmlParseElementStart(xmlParserCtxtPtr ctxt) {
     const xmlChar *URI = NULL;
     xmlParserNodeInfo node_info;
     int line, tlen = 0;
-    xmlNodePtr ret;
+    xmlNodePtr cur;
     int nsNr = ctxt->nsNr;
 
     if (((unsigned int) ctxt->nameNr > xmlParserMaxDepth) &&
@@ -10151,7 +9695,7 @@ xmlParseElementStart(xmlParserCtxtPtr ctxt) {
         return(-1);
     }
     nameNsPush(ctxt, name, prefix, URI, line, ctxt->nsNr - nsNr);
-    ret = ctxt->node;
+    cur = ctxt->node;
 
 #ifdef LIBXML_VALID_ENABLED
     /*
@@ -10184,17 +9728,23 @@ xmlParseElementStart(xmlParserCtxtPtr ctxt) {
 	spacePop(ctxt);
 	if (nsNr != ctxt->nsNr)
 	    nsPop(ctxt, ctxt->nsNr - nsNr);
-	if ( ret != NULL && ctxt->record_info ) {
-	   node_info.end_pos = ctxt->input->consumed +
-			      (CUR_PTR - ctxt->input->base);
-	   node_info.end_line = ctxt->input->line;
-	   node_info.node = ret;
-	   xmlParserAddNodeInfo(ctxt, &node_info);
+	if (cur != NULL && ctxt->record_info) {
+            node_info.node = cur;
+            node_info.end_pos = ctxt->input->consumed +
+                                (CUR_PTR - ctxt->input->base);
+            node_info.end_line = ctxt->input->line;
+            xmlParserAddNodeInfo(ctxt, &node_info);
 	}
 	return(1);
     }
     if (RAW == '>') {
         NEXT1;
+        if (cur != NULL && ctxt->record_info) {
+            node_info.node = cur;
+            node_info.end_pos = 0;
+            node_info.end_line = 0;
+            xmlParserAddNodeInfo(ctxt, &node_info);
+        }
     } else {
         xmlFatalErrMsgStrIntStr(ctxt, XML_ERR_GT_REQUIRED,
 		     "Couldn't find end of Start Tag %s line %d\n",
@@ -10208,17 +9758,6 @@ xmlParseElementStart(xmlParserCtxtPtr ctxt) {
 	spacePop(ctxt);
 	if (nsNr != ctxt->nsNr)
 	    nsPop(ctxt, ctxt->nsNr - nsNr);
-
-	/*
-	 * Capture end position and add node
-	 */
-	if ( ret != NULL && ctxt->record_info ) {
-	   node_info.end_pos = ctxt->input->consumed +
-			      (CUR_PTR - ctxt->input->base);
-	   node_info.end_line = ctxt->input->line;
-	   node_info.node = ret;
-	   xmlParserAddNodeInfo(ctxt, &node_info);
-	}
 	return(-1);
     }
 
@@ -10233,8 +9772,7 @@ xmlParseElementStart(xmlParserCtxtPtr ctxt) {
  */
 static void
 xmlParseElementEnd(xmlParserCtxtPtr ctxt) {
-    xmlParserNodeInfo node_info;
-    xmlNodePtr ret = ctxt->node;
+    xmlNodePtr cur = ctxt->node;
 
     if (ctxt->nameNr <= 0) {
         if ((RAW == '<') && (NXT(1) == '/'))
@@ -10255,14 +9793,17 @@ xmlParseElementEnd(xmlParserCtxtPtr ctxt) {
 #endif /* LIBXML_SAX1_ENABLED */
 
     /*
-     * Capture end position and add node
+     * Capture end position
      */
-    if ( ret != NULL && ctxt->record_info ) {
-       node_info.end_pos = ctxt->input->consumed +
-                          (CUR_PTR - ctxt->input->base);
-       node_info.end_line = ctxt->input->line;
-       node_info.node = ret;
-       xmlParserAddNodeInfo(ctxt, &node_info);
+    if (cur != NULL && ctxt->record_info) {
+        xmlParserNodeInfoPtr node_info;
+
+        node_info = (xmlParserNodeInfoPtr) xmlParserFindNodeInfo(ctxt, cur);
+        if (node_info != NULL) {
+            node_info->end_pos = ctxt->input->consumed +
+                                 (CUR_PTR - ctxt->input->base);
+            node_info->end_line = ctxt->input->line;
+        }
     }
 }
 
@@ -10394,6 +9935,9 @@ xmlParseEncName(xmlParserCtxtPtr ctxt) {
     xmlChar *buf = NULL;
     int len = 0;
     int size = 10;
+    int maxLength = (ctxt->options & XML_PARSE_HUGE) ?
+                    XML_MAX_TEXT_LENGTH :
+                    XML_MAX_NAME_LENGTH;
     xmlChar cur;
 
     cur = CUR;
@@ -10426,13 +9970,13 @@ xmlParseEncName(xmlParserCtxtPtr ctxt) {
 		buf = tmp;
 	    }
 	    buf[len++] = cur;
+            if (len > maxLength) {
+                xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "EncName");
+                xmlFree(buf);
+                return(NULL);
+            }
 	    NEXT;
 	    cur = CUR;
-	    if (cur == 0) {
-	        SHRINK;
-		GROW;
-		cur = CUR;
-	    }
         }
 	buf[len] = 0;
     } else {
@@ -10461,100 +10005,45 @@ xmlParseEncodingDecl(xmlParserCtxtPtr ctxt) {
     xmlChar *encoding = NULL;
 
     SKIP_BLANKS;
-    if (CMP8(CUR_PTR, 'e', 'n', 'c', 'o', 'd', 'i', 'n', 'g')) {
-	SKIP(8);
-	SKIP_BLANKS;
-	if (RAW != '=') {
-	    xmlFatalErr(ctxt, XML_ERR_EQUAL_REQUIRED, NULL);
-	    return(NULL);
-        }
-	NEXT;
-	SKIP_BLANKS;
-	if (RAW == '"') {
-	    NEXT;
-	    encoding = xmlParseEncName(ctxt);
-	    if (RAW != '"') {
-		xmlFatalErr(ctxt, XML_ERR_STRING_NOT_CLOSED, NULL);
-		xmlFree((xmlChar *) encoding);
-		return(NULL);
-	    } else
-	        NEXT;
-	} else if (RAW == '\''){
-	    NEXT;
-	    encoding = xmlParseEncName(ctxt);
-	    if (RAW != '\'') {
-		xmlFatalErr(ctxt, XML_ERR_STRING_NOT_CLOSED, NULL);
-		xmlFree((xmlChar *) encoding);
-		return(NULL);
-	    } else
-	        NEXT;
-	} else {
-	    xmlFatalErr(ctxt, XML_ERR_STRING_NOT_STARTED, NULL);
-	}
+    if (CMP8(CUR_PTR, 'e', 'n', 'c', 'o', 'd', 'i', 'n', 'g') == 0)
+        return(NULL);
 
-        /*
-         * Non standard parsing, allowing the user to ignore encoding
-         */
-        if (ctxt->options & XML_PARSE_IGNORE_ENC) {
-	    xmlFree((xmlChar *) encoding);
-            return(NULL);
-	}
-
-	/*
-	 * UTF-16 encoding switch has already taken place at this stage,
-	 * more over the little-endian/big-endian selection is already done
-	 */
-        if ((encoding != NULL) &&
-	    ((!xmlStrcasecmp(encoding, BAD_CAST "UTF-16")) ||
-	     (!xmlStrcasecmp(encoding, BAD_CAST "UTF16")))) {
-	    /*
-	     * If no encoding was passed to the parser, that we are
-	     * using UTF-16 and no decoder is present i.e. the
-	     * document is apparently UTF-8 compatible, then raise an
-	     * encoding mismatch fatal error
-	     */
-	    if ((ctxt->encoding == NULL) &&
-	        (ctxt->input->buf != NULL) &&
-	        (ctxt->input->buf->encoder == NULL)) {
-		xmlFatalErrMsg(ctxt, XML_ERR_INVALID_ENCODING,
-		  "Document labelled UTF-16 but has UTF-8 content\n");
-	    }
-	    if (ctxt->encoding != NULL)
-		xmlFree((xmlChar *) ctxt->encoding);
-	    ctxt->encoding = encoding;
-	}
-	/*
-	 * UTF-8 encoding is handled natively
-	 */
-        else if ((encoding != NULL) &&
-	    ((!xmlStrcasecmp(encoding, BAD_CAST "UTF-8")) ||
-	     (!xmlStrcasecmp(encoding, BAD_CAST "UTF8")))) {
-	    if (ctxt->encoding != NULL)
-		xmlFree((xmlChar *) ctxt->encoding);
-	    ctxt->encoding = encoding;
-	}
-	else if (encoding != NULL) {
-	    xmlCharEncodingHandlerPtr handler;
-
-	    if (ctxt->input->encoding != NULL)
-		xmlFree((xmlChar *) ctxt->input->encoding);
-	    ctxt->input->encoding = encoding;
-
-            handler = xmlFindCharEncodingHandler((const char *) encoding);
-	    if (handler != NULL) {
-		if (xmlSwitchToEncoding(ctxt, handler) < 0) {
-		    /* failed to convert */
-		    ctxt->errNo = XML_ERR_UNSUPPORTED_ENCODING;
-		    return(NULL);
-		}
-	    } else {
-		xmlFatalErrMsgStr(ctxt, XML_ERR_UNSUPPORTED_ENCODING,
-			"Unsupported encoding %s\n", encoding);
-		return(NULL);
-	    }
-	}
+    SKIP(8);
+    SKIP_BLANKS;
+    if (RAW != '=') {
+        xmlFatalErr(ctxt, XML_ERR_EQUAL_REQUIRED, NULL);
+        return(NULL);
     }
-    return(encoding);
+    NEXT;
+    SKIP_BLANKS;
+    if (RAW == '"') {
+        NEXT;
+        encoding = xmlParseEncName(ctxt);
+        if (RAW != '"') {
+            xmlFatalErr(ctxt, XML_ERR_STRING_NOT_CLOSED, NULL);
+            xmlFree((xmlChar *) encoding);
+            return(NULL);
+        } else
+            NEXT;
+    } else if (RAW == '\''){
+        NEXT;
+        encoding = xmlParseEncName(ctxt);
+        if (RAW != '\'') {
+            xmlFatalErr(ctxt, XML_ERR_STRING_NOT_CLOSED, NULL);
+            xmlFree((xmlChar *) encoding);
+            return(NULL);
+        } else
+            NEXT;
+    } else {
+        xmlFatalErr(ctxt, XML_ERR_STRING_NOT_STARTED, NULL);
+    }
+
+    if (encoding == NULL)
+        return(NULL);
+
+    xmlSetDeclaredEncoding(ctxt, encoding);
+
+    return(ctxt->encoding);
 }
 
 /**
@@ -10663,7 +10152,8 @@ xmlParseXMLDecl(xmlParserCtxtPtr ctxt) {
      * XML declaration but it does not have a standalone attribute.
      * It will be overwritten later if a standalone attribute is found.
      */
-    ctxt->input->standalone = -2;
+
+    ctxt->standalone = -2;
 
     /*
      * We know that '<?xml' is here.
@@ -10730,7 +10220,7 @@ xmlParseXMLDecl(xmlParserCtxtPtr ctxt) {
     /*
      * We may have the standalone status.
      */
-    if ((ctxt->input->encoding != NULL) && (!IS_BLANK_CH(RAW))) {
+    if ((ctxt->encoding != NULL) && (!IS_BLANK_CH(RAW))) {
         if ((RAW == '?') && (NXT(1) == '>')) {
 	    SKIP(2);
 	    return;
@@ -10744,7 +10234,7 @@ xmlParseXMLDecl(xmlParserCtxtPtr ctxt) {
     GROW;
 
     SKIP_BLANKS;
-    ctxt->input->standalone = xmlParseSDDecl(ctxt);
+    ctxt->standalone = xmlParseSDDecl(ctxt);
 
     SKIP_BLANKS;
     if ((RAW == '?') && (NXT(1) == '>')) {
@@ -10808,9 +10298,6 @@ xmlParseMisc(xmlParserCtxtPtr ctxt) {
 
 int
 xmlParseDocument(xmlParserCtxtPtr ctxt) {
-    xmlChar start[4];
-    xmlCharEncoding enc;
-
     xmlInitParser();
 
     if ((ctxt == NULL) || (ctxt->input == NULL))
@@ -10831,38 +10318,14 @@ xmlParseDocument(xmlParserCtxtPtr ctxt) {
     if (ctxt->instate == XML_PARSER_EOF)
 	return(-1);
 
-    if ((ctxt->encoding == NULL) &&
-        ((ctxt->input->end - ctxt->input->cur) >= 4)) {
-	/*
-	 * Get the 4 first bytes and decode the charset
-	 * if enc != XML_CHAR_ENCODING_NONE
-	 * plug some encoding conversion routines.
-	 */
-	start[0] = RAW;
-	start[1] = NXT(1);
-	start[2] = NXT(2);
-	start[3] = NXT(3);
-	enc = xmlDetectCharEncoding(&start[0], 4);
-	if (enc != XML_CHAR_ENCODING_NONE) {
-	    xmlSwitchEncoding(ctxt, enc);
-	}
-    }
-
+    xmlDetectEncoding(ctxt);
 
     if (CUR == 0) {
 	xmlFatalErr(ctxt, XML_ERR_DOCUMENT_EMPTY, NULL);
 	return(-1);
     }
 
-    /*
-     * Check for the XMLDecl in the Prolog.
-     * do not GROW here to avoid the detected encoder to decode more
-     * than just the first line, unless the amount of data is really
-     * too small to hold "<?xml version="1.0" encoding="foo"
-     */
-    if ((ctxt->input->end - ctxt->input->cur) < 35) {
-       GROW;
-    }
+    GROW;
     if ((CMP5(CUR_PTR, '<', '?', 'x', 'm', 'l')) && (IS_BLANK_CH(NXT(5)))) {
 
 	/*
@@ -10876,7 +10339,6 @@ xmlParseDocument(xmlParserCtxtPtr ctxt) {
 	     */
 	    return(-1);
 	}
-	ctxt->standalone = ctxt->input->standalone;
 	SKIP_BLANKS;
     } else {
 	ctxt->version = xmlCharStrdup(XML_DEFAULT_VERSION);
@@ -10947,9 +10409,15 @@ xmlParseDocument(xmlParserCtxtPtr ctxt) {
 	 */
 	xmlParseMisc(ctxt);
 
-	if (RAW != 0) {
-	    xmlFatalErr(ctxt, XML_ERR_DOCUMENT_END, NULL);
-	}
+        if (ctxt->input->cur < ctxt->input->end) {
+            if (ctxt->errNo == XML_ERR_OK)
+	        xmlFatalErr(ctxt, XML_ERR_DOCUMENT_END, NULL);
+        } else if ((ctxt->input->buf != NULL) &&
+                   (ctxt->input->buf->encoder != NULL) &&
+                   (!xmlBufIsEmpty(ctxt->input->buf->raw))) {
+            xmlFatalErrMsg(ctxt, XML_ERR_INVALID_CHAR,
+                           "Truncated multi-byte sequence at EOF\n");
+        }
 	ctxt->instate = XML_PARSER_EOF;
     }
 
@@ -11000,15 +10468,10 @@ xmlParseDocument(xmlParserCtxtPtr ctxt) {
 
 int
 xmlParseExtParsedEnt(xmlParserCtxtPtr ctxt) {
-    xmlChar start[4];
-    xmlCharEncoding enc;
-
     if ((ctxt == NULL) || (ctxt->input == NULL))
         return(-1);
 
     xmlDetectSAX2(ctxt);
-
-    GROW;
 
     /*
      * SAX: beginning of the document processing.
@@ -11016,22 +10479,7 @@ xmlParseExtParsedEnt(xmlParserCtxtPtr ctxt) {
     if ((ctxt->sax) && (ctxt->sax->setDocumentLocator))
         ctxt->sax->setDocumentLocator(ctxt->userData, &xmlDefaultSAXLocator);
 
-    /*
-     * Get the 4 first bytes and decode the charset
-     * if enc != XML_CHAR_ENCODING_NONE
-     * plug some encoding conversion routines.
-     */
-    if ((ctxt->input->end - ctxt->input->cur) >= 4) {
-	start[0] = RAW;
-	start[1] = NXT(1);
-	start[2] = NXT(2);
-	start[3] = NXT(3);
-	enc = xmlDetectCharEncoding(start, 4);
-	if (enc != XML_CHAR_ENCODING_NONE) {
-	    xmlSwitchEncoding(ctxt, enc);
-	}
-    }
-
+    xmlDetectEncoding(ctxt);
 
     if (CUR == 0) {
 	xmlFatalErr(ctxt, XML_ERR_DOCUMENT_EMPTY, NULL);
@@ -11115,7 +10563,13 @@ xmlParseLookupChar(xmlParserCtxtPtr ctxt, int c) {
     }
 
     if (memchr(cur, c, ctxt->input->end - cur) == NULL) {
-        ctxt->checkIndex = ctxt->input->end - ctxt->input->cur;
+        size_t index = ctxt->input->end - ctxt->input->cur;
+
+        if (index > LONG_MAX) {
+            ctxt->checkIndex = 0;
+            return(1);
+        }
+        ctxt->checkIndex = index;
         return(0);
     } else {
         ctxt->checkIndex = 0;
@@ -11146,13 +10600,19 @@ xmlParseLookupString(xmlParserCtxtPtr ctxt, size_t startDelta,
     term = BAD_CAST strstr((const char *) cur, str);
     if (term == NULL) {
         const xmlChar *end = ctxt->input->end;
+        size_t index;
 
         /* Rescan (strLen - 1) characters. */
         if ((size_t) (end - cur) < strLen)
             end = cur;
         else
             end -= strLen - 1;
-        ctxt->checkIndex = end - ctxt->input->cur;
+        index = end - ctxt->input->cur;
+        if (index > LONG_MAX) {
+            ctxt->checkIndex = 0;
+            return(ctxt->input->end - strLen);
+        }
+        ctxt->checkIndex = index;
     } else {
         ctxt->checkIndex = 0;
     }
@@ -11170,6 +10630,7 @@ static int
 xmlParseLookupCharData(xmlParserCtxtPtr ctxt) {
     const xmlChar *cur = ctxt->input->cur + ctxt->checkIndex;
     const xmlChar *end = ctxt->input->end;
+    size_t index;
 
     while (cur < end) {
         if ((*cur == '<') || (*cur == '&')) {
@@ -11179,7 +10640,12 @@ xmlParseLookupCharData(xmlParserCtxtPtr ctxt) {
         cur++;
     }
 
-    ctxt->checkIndex = cur - ctxt->input->cur;
+    index = cur - ctxt->input->cur;
+    if (index > LONG_MAX) {
+        ctxt->checkIndex = 0;
+        return(1);
+    }
+    ctxt->checkIndex = index;
     return(0);
 }
 
@@ -11195,6 +10661,7 @@ xmlParseLookupGt(xmlParserCtxtPtr ctxt) {
     const xmlChar *cur;
     const xmlChar *end = ctxt->input->end;
     int state = ctxt->endCheckState;
+    size_t index;
 
     if (ctxt->checkIndex == 0)
         cur = ctxt->input->cur + 1;
@@ -11215,7 +10682,13 @@ xmlParseLookupGt(xmlParserCtxtPtr ctxt) {
         cur++;
     }
 
-    ctxt->checkIndex = cur - ctxt->input->cur;
+    index = cur - ctxt->input->cur;
+    if (index > LONG_MAX) {
+        ctxt->checkIndex = 0;
+        ctxt->endCheckState = 0;
+        return(1);
+    }
+    ctxt->checkIndex = index;
     ctxt->endCheckState = state;
     return(0);
 }
@@ -11239,6 +10712,7 @@ xmlParseLookupInternalSubset(xmlParserCtxtPtr ctxt) {
     const xmlChar *cur, *start;
     const xmlChar *end = ctxt->input->end;
     int state = ctxt->endCheckState;
+    size_t index;
 
     if (ctxt->checkIndex == 0) {
         cur = ctxt->input->cur + 1;
@@ -11318,7 +10792,13 @@ xmlParseLookupInternalSubset(xmlParserCtxtPtr ctxt) {
         else
             cur -= 3;
     }
-    ctxt->checkIndex = cur - ctxt->input->cur;
+    index = cur - ctxt->input->cur;
+    if (index > LONG_MAX) {
+        ctxt->checkIndex = 0;
+        ctxt->endCheckState = 0;
+        return(1);
+    }
+    ctxt->checkIndex = index;
     ctxt->endCheckState = state;
     return(0);
 }
@@ -11403,100 +10883,23 @@ xmlCheckCdataPush(const xmlChar *utf, int len, int complete) {
 static int
 xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
     int ret = 0;
-    int avail, tlen;
+    int tlen;
+    size_t avail;
     xmlChar cur, next;
 
     if (ctxt->input == NULL)
         return(0);
 
-#ifdef DEBUG_PUSH
-    switch (ctxt->instate) {
-	case XML_PARSER_EOF:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try EOF\n"); break;
-	case XML_PARSER_START:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try START\n"); break;
-	case XML_PARSER_MISC:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try MISC\n");break;
-	case XML_PARSER_COMMENT:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try COMMENT\n");break;
-	case XML_PARSER_PROLOG:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try PROLOG\n");break;
-	case XML_PARSER_START_TAG:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try START_TAG\n");break;
-	case XML_PARSER_CONTENT:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try CONTENT\n");break;
-	case XML_PARSER_CDATA_SECTION:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try CDATA_SECTION\n");break;
-	case XML_PARSER_END_TAG:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try END_TAG\n");break;
-	case XML_PARSER_ENTITY_DECL:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try ENTITY_DECL\n");break;
-	case XML_PARSER_ENTITY_VALUE:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try ENTITY_VALUE\n");break;
-	case XML_PARSER_ATTRIBUTE_VALUE:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try ATTRIBUTE_VALUE\n");break;
-	case XML_PARSER_DTD:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try DTD\n");break;
-	case XML_PARSER_EPILOG:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try EPILOG\n");break;
-	case XML_PARSER_PI:
-	    xmlGenericError(xmlGenericErrorContext,
-		    "PP: try PI\n");break;
-        case XML_PARSER_IGNORE:
-            xmlGenericError(xmlGenericErrorContext,
-		    "PP: try IGNORE\n");break;
-    }
-#endif
-
     if ((ctxt->input != NULL) &&
         (ctxt->input->cur - ctxt->input->base > 4096)) {
-        xmlParserInputShrink(ctxt->input);
+        xmlParserShrink(ctxt);
     }
 
     while (ctxt->instate != XML_PARSER_EOF) {
 	if ((ctxt->errNo != XML_ERR_OK) && (ctxt->disableSAX == 1))
 	    return(0);
 
-	if (ctxt->input == NULL) break;
-	if (ctxt->input->buf == NULL)
-	    avail = ctxt->input->length -
-	            (ctxt->input->cur - ctxt->input->base);
-	else {
-	    /*
-	     * If we are operating on converted input, try to flush
-	     * remaining chars to avoid them stalling in the non-converted
-	     * buffer. But do not do this in document start where
-	     * encoding="..." may not have been read and we work on a
-	     * guessed encoding.
-	     */
-	    if ((ctxt->instate != XML_PARSER_START) &&
-	        (ctxt->input->buf->raw != NULL) &&
-		(xmlBufIsEmpty(ctxt->input->buf->raw) == 0)) {
-                size_t base = xmlBufGetInputBase(ctxt->input->buf->buffer,
-                                                 ctxt->input);
-		size_t current = ctxt->input->cur - ctxt->input->base;
-
-		xmlParserInputBufferPush(ctxt->input->buf, 0, "");
-                xmlBufSetInputBaseCur(ctxt->input->buf->buffer, ctxt->input,
-                                      base, current);
-	    }
-	    avail = xmlBufUse(ctxt->input->buf->buffer) -
-		    (ctxt->input->cur - ctxt->input->base);
-	}
+        avail = ctxt->input->end - ctxt->input->cur;
         if (avail < 1)
 	    goto done;
         switch (ctxt->instate) {
@@ -11506,68 +10909,41 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
 		 */
 	        goto done;
             case XML_PARSER_START:
-		if (ctxt->charset == XML_CHAR_ENCODING_NONE) {
-		    xmlChar start[4];
-		    xmlCharEncoding enc;
+                /*
+                 * Very first chars read from the document flow.
+                 */
+                if ((!terminate) && (avail < 4))
+                    goto done;
 
-		    /*
-		     * Very first chars read from the document flow.
-		     */
-		    if (avail < 4)
-			goto done;
+                /*
+                 * We need more bytes to detect EBCDIC code pages.
+                 * See xmlDetectEBCDIC.
+                 */
+                if ((CMP4(CUR_PTR, 0x4C, 0x6F, 0xA7, 0x94)) &&
+                    (!terminate) && (avail < 200))
+                    goto done;
 
-		    /*
-		     * Get the 4 first bytes and decode the charset
-		     * if enc != XML_CHAR_ENCODING_NONE
-		     * plug some encoding conversion routines,
-		     * else xmlSwitchEncoding will set to (default)
-		     * UTF8.
-		     */
-		    start[0] = RAW;
-		    start[1] = NXT(1);
-		    start[2] = NXT(2);
-		    start[3] = NXT(3);
-		    enc = xmlDetectCharEncoding(start, 4);
-		    xmlSwitchEncoding(ctxt, enc);
-		    break;
-		}
+                xmlDetectEncoding(ctxt);
+                if (ctxt->instate == XML_PARSER_EOF)
+                    goto done;
+                ctxt->instate = XML_PARSER_XML_DECL;
+		break;
 
-		if (avail < 2)
+            case XML_PARSER_XML_DECL:
+		if ((!terminate) && (avail < 2))
 		    goto done;
 		cur = ctxt->input->cur[0];
 		next = ctxt->input->cur[1];
-		if (cur == 0) {
-		    if ((ctxt->sax) && (ctxt->sax->setDocumentLocator))
-			ctxt->sax->setDocumentLocator(ctxt->userData,
-						      &xmlDefaultSAXLocator);
-		    xmlFatalErr(ctxt, XML_ERR_DOCUMENT_EMPTY, NULL);
-		    xmlHaltParser(ctxt);
-#ifdef DEBUG_PUSH
-		    xmlGenericError(xmlGenericErrorContext,
-			    "PP: entering EOF\n");
-#endif
-		    if ((ctxt->sax) && (ctxt->sax->endDocument != NULL))
-			ctxt->sax->endDocument(ctxt->userData);
-		    goto done;
-		}
 	        if ((cur == '<') && (next == '?')) {
 		    /* PI or XML decl */
-		    if (avail < 5) goto done;
 		    if ((!terminate) &&
                         (!xmlParseLookupString(ctxt, 2, "?>", 2)))
 			goto done;
-		    if ((ctxt->sax) && (ctxt->sax->setDocumentLocator))
-			ctxt->sax->setDocumentLocator(ctxt->userData,
-						      &xmlDefaultSAXLocator);
 		    if ((ctxt->input->cur[2] == 'x') &&
 			(ctxt->input->cur[3] == 'm') &&
 			(ctxt->input->cur[4] == 'l') &&
 			(IS_BLANK_CH(ctxt->input->cur[5]))) {
 			ret += 5;
-#ifdef DEBUG_PUSH
-			xmlGenericError(xmlGenericErrorContext,
-				"PP: Parsing XML Decl\n");
-#endif
 			xmlParseXMLDecl(ctxt);
 			if (ctxt->errNo == XML_ERR_UNSUPPORTED_ENCODING) {
 			    /*
@@ -11577,47 +10953,25 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
 			    xmlHaltParser(ctxt);
 			    return(0);
 			}
-			ctxt->standalone = ctxt->input->standalone;
-			if ((ctxt->encoding == NULL) &&
-			    (ctxt->input->encoding != NULL))
-			    ctxt->encoding = xmlStrdup(ctxt->input->encoding);
-			if ((ctxt->sax) && (ctxt->sax->startDocument) &&
-			    (!ctxt->disableSAX))
-			    ctxt->sax->startDocument(ctxt->userData);
-			ctxt->instate = XML_PARSER_MISC;
-#ifdef DEBUG_PUSH
-			xmlGenericError(xmlGenericErrorContext,
-				"PP: entering MISC\n");
-#endif
 		    } else {
 			ctxt->version = xmlCharStrdup(XML_DEFAULT_VERSION);
-			if ((ctxt->sax) && (ctxt->sax->startDocument) &&
-			    (!ctxt->disableSAX))
-			    ctxt->sax->startDocument(ctxt->userData);
-			ctxt->instate = XML_PARSER_MISC;
-#ifdef DEBUG_PUSH
-			xmlGenericError(xmlGenericErrorContext,
-				"PP: entering MISC\n");
-#endif
 		    }
 		} else {
-		    if ((ctxt->sax) && (ctxt->sax->setDocumentLocator))
-			ctxt->sax->setDocumentLocator(ctxt->userData,
-						      &xmlDefaultSAXLocator);
 		    ctxt->version = xmlCharStrdup(XML_DEFAULT_VERSION);
 		    if (ctxt->version == NULL) {
 		        xmlErrMemory(ctxt, NULL);
 			break;
 		    }
-		    if ((ctxt->sax) && (ctxt->sax->startDocument) &&
-		        (!ctxt->disableSAX))
-			ctxt->sax->startDocument(ctxt->userData);
-		    ctxt->instate = XML_PARSER_MISC;
-#ifdef DEBUG_PUSH
-		    xmlGenericError(xmlGenericErrorContext,
-			    "PP: entering MISC\n");
-#endif
 		}
+                if ((ctxt->sax) && (ctxt->sax->setDocumentLocator))
+                    ctxt->sax->setDocumentLocator(ctxt->userData,
+                                                  &xmlDefaultSAXLocator);
+                if ((ctxt->sax) && (ctxt->sax->startDocument) &&
+                    (!ctxt->disableSAX))
+                    ctxt->sax->startDocument(ctxt->userData);
+                if (ctxt->instate == XML_PARSER_EOF)
+                    goto done;
+                ctxt->instate = XML_PARSER_MISC;
 		break;
             case XML_PARSER_START_TAG: {
 	        const xmlChar *name;
@@ -11626,11 +10980,12 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
                 int line = ctxt->input->line;
 		int nsNr = ctxt->nsNr;
 
-		if ((avail < 2) && (ctxt->inputNr == 1))
+		if ((!terminate) && (avail < 2))
 		    goto done;
 		cur = ctxt->input->cur[0];
 	        if (cur != '<') {
-		    xmlFatalErr(ctxt, XML_ERR_DOCUMENT_EMPTY, NULL);
+		    xmlFatalErrMsg(ctxt, XML_ERR_DOCUMENT_EMPTY,
+                                   "Start tag expected, '<' not found");
 		    xmlHaltParser(ctxt);
 		    if ((ctxt->sax) && (ctxt->sax->endDocument != NULL))
 			ctxt->sax->endDocument(ctxt->userData);
@@ -11715,57 +11070,70 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
 		}
                 nameNsPush(ctxt, name, prefix, URI, line, ctxt->nsNr - nsNr);
 
+                if (ctxt->instate == XML_PARSER_EOF)
+                    goto done;
 		ctxt->instate = XML_PARSER_CONTENT;
                 break;
 	    }
             case XML_PARSER_CONTENT: {
-		if ((avail < 2) && (ctxt->inputNr == 1))
-		    goto done;
 		cur = ctxt->input->cur[0];
-		next = ctxt->input->cur[1];
 
-		if ((cur == '<') && (next == '/')) {
-		    ctxt->instate = XML_PARSER_END_TAG;
-		    break;
-	        } else if ((cur == '<') && (next == '?')) {
-		    if ((!terminate) &&
-		        (!xmlParseLookupString(ctxt, 2, "?>", 2)))
-			goto done;
-		    xmlParsePI(ctxt);
-		    ctxt->instate = XML_PARSER_CONTENT;
-		} else if ((cur == '<') && (next != '!')) {
-		    ctxt->instate = XML_PARSER_START_TAG;
-		    break;
-		} else if ((cur == '<') && (next == '!') &&
-		           (ctxt->input->cur[2] == '-') &&
-			   (ctxt->input->cur[3] == '-')) {
-		    if ((!terminate) &&
-		        (!xmlParseLookupString(ctxt, 4, "-->", 3)))
-			goto done;
-		    xmlParseComment(ctxt);
-		    ctxt->instate = XML_PARSER_CONTENT;
-		} else if ((cur == '<') && (ctxt->input->cur[1] == '!') &&
-		    (ctxt->input->cur[2] == '[') &&
-		    (ctxt->input->cur[3] == 'C') &&
-		    (ctxt->input->cur[4] == 'D') &&
-		    (ctxt->input->cur[5] == 'A') &&
-		    (ctxt->input->cur[6] == 'T') &&
-		    (ctxt->input->cur[7] == 'A') &&
-		    (ctxt->input->cur[8] == '[')) {
-		    SKIP(9);
-		    ctxt->instate = XML_PARSER_CDATA_SECTION;
-		    break;
-		} else if ((cur == '<') && (next == '!') &&
-		           (avail < 9)) {
-		    goto done;
-		} else if (cur == '<') {
-		    xmlFatalErr(ctxt, XML_ERR_INTERNAL_ERROR,
-		                "detected an error in element content\n");
-                    SKIP(1);
+		if (cur == '<') {
+                    if ((!terminate) && (avail < 2))
+                        goto done;
+		    next = ctxt->input->cur[1];
+
+                    if (next == '/') {
+                        ctxt->instate = XML_PARSER_END_TAG;
+                        break;
+                    } else if (next == '?') {
+                        if ((!terminate) &&
+                            (!xmlParseLookupString(ctxt, 2, "?>", 2)))
+                            goto done;
+                        xmlParsePI(ctxt);
+                        if (ctxt->instate == XML_PARSER_EOF)
+                            goto done;
+                        ctxt->instate = XML_PARSER_CONTENT;
+                        break;
+                    } else if (next == '!') {
+                        if ((!terminate) && (avail < 3))
+                            goto done;
+                        next = ctxt->input->cur[2];
+
+                        if (next == '-') {
+                            if ((!terminate) && (avail < 4))
+                                goto done;
+                            if (ctxt->input->cur[3] == '-') {
+                                if ((!terminate) &&
+                                    (!xmlParseLookupString(ctxt, 4, "-->", 3)))
+                                    goto done;
+                                xmlParseComment(ctxt);
+                                if (ctxt->instate == XML_PARSER_EOF)
+                                    goto done;
+                                ctxt->instate = XML_PARSER_CONTENT;
+                                break;
+                            }
+                        } else if (next == '[') {
+                            if ((!terminate) && (avail < 9))
+                                goto done;
+                            if ((ctxt->input->cur[2] == '[') &&
+                                (ctxt->input->cur[3] == 'C') &&
+                                (ctxt->input->cur[4] == 'D') &&
+                                (ctxt->input->cur[5] == 'A') &&
+                                (ctxt->input->cur[6] == 'T') &&
+                                (ctxt->input->cur[7] == 'A') &&
+                                (ctxt->input->cur[8] == '[')) {
+                                SKIP(9);
+                                ctxt->instate = XML_PARSER_CDATA_SECTION;
+                                break;
+                            }
+                        }
+                    }
 		} else if (cur == '&') {
 		    if ((!terminate) && (!xmlParseLookupChar(ctxt, ';')))
 			goto done;
 		    xmlParseReference(ctxt);
+                    break;
 		} else {
 		    /* TODO Avoid the extra copy, handle directly !!! */
 		    /*
@@ -11779,19 +11147,19 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
 		     *    callbacks between the push and pull versions
 		     *    of the parser.
 		     */
-		    if ((ctxt->inputNr == 1) &&
-		        (avail < XML_PARSER_BIG_BUFFER_SIZE)) {
+		    if (avail < XML_PARSER_BIG_BUFFER_SIZE) {
 			if ((!terminate) && (!xmlParseLookupCharData(ctxt)))
 			    goto done;
                     }
                     ctxt->checkIndex = 0;
-		    xmlParseCharData(ctxt, 0);
+		    xmlParseCharDataInternal(ctxt, !terminate);
+                    break;
 		}
+
+                ctxt->instate = XML_PARSER_START_TAG;
 		break;
 	    }
             case XML_PARSER_END_TAG:
-		if (avail < 2)
-		    goto done;
 		if ((!terminate) && (!xmlParseLookupChar(ctxt, '>')))
 		    goto done;
 		if (ctxt->sax2) {
@@ -11802,9 +11170,9 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
 		  else
 		    xmlParseEndTag1(ctxt, 0);
 #endif /* LIBXML_SAX1_ENABLED */
-		if (ctxt->instate == XML_PARSER_EOF) {
-		    /* Nothing */
-		} else if (ctxt->nameNr == 0) {
+                if (ctxt->instate == XML_PARSER_EOF)
+                    goto done;
+		if (ctxt->nameNr == 0) {
 		    ctxt->instate = XML_PARSER_EPILOG;
 		} else {
 		    ctxt->instate = XML_PARSER_CONTENT;
@@ -11894,10 +11262,6 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
 			goto done;
 		    SKIPL(base + 3);
 		    ctxt->instate = XML_PARSER_CONTENT;
-#ifdef DEBUG_PUSH
-		    xmlGenericError(xmlGenericErrorContext,
-			    "PP: entering CONTENT\n");
-#endif
 		}
 		break;
 	    }
@@ -11905,103 +11269,88 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
             case XML_PARSER_PROLOG:
             case XML_PARSER_EPILOG:
 		SKIP_BLANKS;
-		if (ctxt->input->buf == NULL)
-		    avail = ctxt->input->length -
-		            (ctxt->input->cur - ctxt->input->base);
-		else
-		    avail = xmlBufUse(ctxt->input->buf->buffer) -
-		            (ctxt->input->cur - ctxt->input->base);
-		if (avail < 2)
+                avail = ctxt->input->end - ctxt->input->cur;
+		if (avail < 1)
 		    goto done;
-		cur = ctxt->input->cur[0];
-		next = ctxt->input->cur[1];
-	        if ((cur == '<') && (next == '?')) {
-		    if ((!terminate) &&
-                        (!xmlParseLookupString(ctxt, 2, "?>", 2)))
-			goto done;
-#ifdef DEBUG_PUSH
-		    xmlGenericError(xmlGenericErrorContext,
-			    "PP: Parsing PI\n");
-#endif
-		    xmlParsePI(ctxt);
-		    if (ctxt->instate == XML_PARSER_EOF)
-			goto done;
-		} else if ((cur == '<') && (next == '!') &&
-		    (ctxt->input->cur[2] == '-') &&
-		    (ctxt->input->cur[3] == '-')) {
-		    if ((!terminate) &&
-                        (!xmlParseLookupString(ctxt, 4, "-->", 3)))
-			goto done;
-#ifdef DEBUG_PUSH
-		    xmlGenericError(xmlGenericErrorContext,
-			    "PP: Parsing Comment\n");
-#endif
-		    xmlParseComment(ctxt);
-		    if (ctxt->instate == XML_PARSER_EOF)
-			goto done;
-		} else if ((ctxt->instate == XML_PARSER_MISC) &&
-                    (cur == '<') && (next == '!') &&
-		    (ctxt->input->cur[2] == 'D') &&
-		    (ctxt->input->cur[3] == 'O') &&
-		    (ctxt->input->cur[4] == 'C') &&
-		    (ctxt->input->cur[5] == 'T') &&
-		    (ctxt->input->cur[6] == 'Y') &&
-		    (ctxt->input->cur[7] == 'P') &&
-		    (ctxt->input->cur[8] == 'E')) {
-		    if ((!terminate) && (!xmlParseLookupGt(ctxt)))
+		if (ctxt->input->cur[0] == '<') {
+                    if ((!terminate) && (avail < 2))
                         goto done;
-#ifdef DEBUG_PUSH
-		    xmlGenericError(xmlGenericErrorContext,
-			    "PP: Parsing internal subset\n");
-#endif
-		    ctxt->inSubset = 1;
-		    xmlParseDocTypeDecl(ctxt);
-		    if (ctxt->instate == XML_PARSER_EOF)
-			goto done;
-		    if (RAW == '[') {
-			ctxt->instate = XML_PARSER_DTD;
-#ifdef DEBUG_PUSH
-			xmlGenericError(xmlGenericErrorContext,
-				"PP: entering DTD\n");
-#endif
-		    } else {
-			/*
-			 * Create and update the external subset.
-			 */
-			ctxt->inSubset = 2;
-			if ((ctxt->sax != NULL) && (!ctxt->disableSAX) &&
-			    (ctxt->sax->externalSubset != NULL))
-			    ctxt->sax->externalSubset(ctxt->userData,
-				    ctxt->intSubName, ctxt->extSubSystem,
-				    ctxt->extSubURI);
-			ctxt->inSubset = 0;
-			xmlCleanSpecialAttr(ctxt);
-			ctxt->instate = XML_PARSER_PROLOG;
-#ifdef DEBUG_PUSH
-			xmlGenericError(xmlGenericErrorContext,
-				"PP: entering PROLOG\n");
-#endif
-		    }
-		} else if ((cur == '<') && (next == '!') &&
-		           (avail <
-                            (ctxt->instate == XML_PARSER_MISC ? 9 : 4))) {
-		    goto done;
-		} else if (ctxt->instate == XML_PARSER_EPILOG) {
-		    xmlFatalErr(ctxt, XML_ERR_DOCUMENT_END, NULL);
-		    xmlHaltParser(ctxt);
-#ifdef DEBUG_PUSH
-		    xmlGenericError(xmlGenericErrorContext,
-			    "PP: entering EOF\n");
-#endif
-		    if ((ctxt->sax) && (ctxt->sax->endDocument != NULL))
-			ctxt->sax->endDocument(ctxt->userData);
-		    goto done;
+                    next = ctxt->input->cur[1];
+                    if (next == '?') {
+                        if ((!terminate) &&
+                            (!xmlParseLookupString(ctxt, 2, "?>", 2)))
+                            goto done;
+                        xmlParsePI(ctxt);
+                        if (ctxt->instate == XML_PARSER_EOF)
+                            goto done;
+                        break;
+                    } else if (next == '!') {
+                        if ((!terminate) && (avail < 3))
+                            goto done;
+
+                        if (ctxt->input->cur[2] == '-') {
+                            if ((!terminate) && (avail < 4))
+                                goto done;
+                            if (ctxt->input->cur[3] == '-') {
+                                if ((!terminate) &&
+                                    (!xmlParseLookupString(ctxt, 4, "-->", 3)))
+                                    goto done;
+                                xmlParseComment(ctxt);
+                                if (ctxt->instate == XML_PARSER_EOF)
+                                    goto done;
+                                break;
+                            }
+                        } else if (ctxt->instate == XML_PARSER_MISC) {
+                            if ((!terminate) && (avail < 9))
+                                goto done;
+                            if ((ctxt->input->cur[2] == 'D') &&
+                                (ctxt->input->cur[3] == 'O') &&
+                                (ctxt->input->cur[4] == 'C') &&
+                                (ctxt->input->cur[5] == 'T') &&
+                                (ctxt->input->cur[6] == 'Y') &&
+                                (ctxt->input->cur[7] == 'P') &&
+                                (ctxt->input->cur[8] == 'E')) {
+                                if ((!terminate) && (!xmlParseLookupGt(ctxt)))
+                                    goto done;
+                                ctxt->inSubset = 1;
+                                xmlParseDocTypeDecl(ctxt);
+                                if (ctxt->instate == XML_PARSER_EOF)
+                                    goto done;
+                                if (RAW == '[') {
+                                    ctxt->instate = XML_PARSER_DTD;
+                                } else {
+                                    /*
+                                     * Create and update the external subset.
+                                     */
+                                    ctxt->inSubset = 2;
+                                    if ((ctxt->sax != NULL) &&
+                                        (!ctxt->disableSAX) &&
+                                        (ctxt->sax->externalSubset != NULL))
+                                        ctxt->sax->externalSubset(
+                                                ctxt->userData,
+                                                ctxt->intSubName,
+                                                ctxt->extSubSystem,
+                                                ctxt->extSubURI);
+                                    ctxt->inSubset = 0;
+                                    xmlCleanSpecialAttr(ctxt);
+                                    if (ctxt->instate == XML_PARSER_EOF)
+                                        goto done;
+                                    ctxt->instate = XML_PARSER_PROLOG;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (ctxt->instate == XML_PARSER_EPILOG) {
+                    if (ctxt->errNo == XML_ERR_OK)
+                        xmlFatalErr(ctxt, XML_ERR_DOCUMENT_END, NULL);
+		    ctxt->instate = XML_PARSER_EOF;
+                    if ((ctxt->sax) && (ctxt->sax->endDocument != NULL))
+                        ctxt->sax->endDocument(ctxt->userData);
                 } else {
 		    ctxt->instate = XML_PARSER_START_TAG;
-#ifdef DEBUG_PUSH
-		    xmlGenericError(xmlGenericErrorContext,
-			    "PP: entering START_TAG\n");
-#endif
 		}
 		break;
             case XML_PARSER_DTD: {
@@ -12020,90 +11369,16 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
 		if (ctxt->instate == XML_PARSER_EOF)
 		    goto done;
 		ctxt->instate = XML_PARSER_PROLOG;
-#ifdef DEBUG_PUSH
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: entering PROLOG\n");
-#endif
                 break;
 	    }
-            case XML_PARSER_COMMENT:
+            default:
 		xmlGenericError(xmlGenericErrorContext,
-			"PP: internal error, state == COMMENT\n");
-		ctxt->instate = XML_PARSER_CONTENT;
-#ifdef DEBUG_PUSH
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: entering CONTENT\n");
-#endif
-		break;
-            case XML_PARSER_IGNORE:
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: internal error, state == IGNORE");
-	        ctxt->instate = XML_PARSER_DTD;
-#ifdef DEBUG_PUSH
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: entering DTD\n");
-#endif
-	        break;
-            case XML_PARSER_PI:
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: internal error, state == PI\n");
-		ctxt->instate = XML_PARSER_CONTENT;
-#ifdef DEBUG_PUSH
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: entering CONTENT\n");
-#endif
-		break;
-            case XML_PARSER_ENTITY_DECL:
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: internal error, state == ENTITY_DECL\n");
-		ctxt->instate = XML_PARSER_DTD;
-#ifdef DEBUG_PUSH
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: entering DTD\n");
-#endif
-		break;
-            case XML_PARSER_ENTITY_VALUE:
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: internal error, state == ENTITY_VALUE\n");
-		ctxt->instate = XML_PARSER_CONTENT;
-#ifdef DEBUG_PUSH
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: entering DTD\n");
-#endif
-		break;
-            case XML_PARSER_ATTRIBUTE_VALUE:
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: internal error, state == ATTRIBUTE_VALUE\n");
-		ctxt->instate = XML_PARSER_START_TAG;
-#ifdef DEBUG_PUSH
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: entering START_TAG\n");
-#endif
-		break;
-            case XML_PARSER_SYSTEM_LITERAL:
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: internal error, state == SYSTEM_LITERAL\n");
-		ctxt->instate = XML_PARSER_START_TAG;
-#ifdef DEBUG_PUSH
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: entering START_TAG\n");
-#endif
-		break;
-            case XML_PARSER_PUBLIC_LITERAL:
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: internal error, state == PUBLIC_LITERAL\n");
-		ctxt->instate = XML_PARSER_START_TAG;
-#ifdef DEBUG_PUSH
-		xmlGenericError(xmlGenericErrorContext,
-			"PP: entering START_TAG\n");
-#endif
+			"PP: internal error\n");
+		ctxt->instate = XML_PARSER_EOF;
 		break;
 	}
     }
 done:
-#ifdef DEBUG_PUSH
-    xmlGenericError(xmlGenericErrorContext, "PP: done %d\n", ret);
-#endif
     return(ret);
 encoding_error:
     if (ctxt->input->end - ctxt->input->cur < 4) {
@@ -12138,7 +11413,6 @@ int
 xmlParseChunk(xmlParserCtxtPtr ctxt, const char *chunk, int size,
               int terminate) {
     int end_in_lf = 0;
-    int remain = 0;
 
     if (ctxt == NULL)
         return(XML_ERR_INTERNAL_ERROR);
@@ -12158,87 +11432,21 @@ xmlParseChunk(xmlParserCtxtPtr ctxt, const char *chunk, int size,
 	size--;
     }
 
-xmldecl_done:
-
     if ((size > 0) && (chunk != NULL) && (ctxt->input != NULL) &&
         (ctxt->input->buf != NULL) && (ctxt->instate != XML_PARSER_EOF))  {
-	size_t base = xmlBufGetInputBase(ctxt->input->buf->buffer, ctxt->input);
-	size_t cur = ctxt->input->cur - ctxt->input->base;
+	size_t pos = ctxt->input->cur - ctxt->input->base;
 	int res;
 
-        /*
-         * Specific handling if we autodetected an encoding, we should not
-         * push more than the first line ... which depend on the encoding
-         * And only push the rest once the final encoding was detected
-         */
-        if ((ctxt->instate == XML_PARSER_START) && (ctxt->input != NULL) &&
-            (ctxt->input->buf != NULL) && (ctxt->input->buf->encoder != NULL)) {
-            unsigned int len = 45;
-
-            if ((xmlStrcasestr(BAD_CAST ctxt->input->buf->encoder->name,
-                               BAD_CAST "UTF-16")) ||
-                (xmlStrcasestr(BAD_CAST ctxt->input->buf->encoder->name,
-                               BAD_CAST "UTF16")))
-                len = 90;
-            else if ((xmlStrcasestr(BAD_CAST ctxt->input->buf->encoder->name,
-                                    BAD_CAST "UCS-4")) ||
-                     (xmlStrcasestr(BAD_CAST ctxt->input->buf->encoder->name,
-                                    BAD_CAST "UCS4")))
-                len = 180;
-
-            if (ctxt->input->buf->rawconsumed < len)
-                len -= ctxt->input->buf->rawconsumed;
-
-            /*
-             * Change size for reading the initial declaration only
-             * if size is greater than len. Otherwise, memmove in xmlBufferAdd
-             * will blindly copy extra bytes from memory.
-             */
-            if ((unsigned int) size > len) {
-                remain = size - len;
-                size = len;
-            } else {
-                remain = 0;
-            }
-        }
 	res = xmlParserInputBufferPush(ctxt->input->buf, size, chunk);
-        xmlBufSetInputBaseCur(ctxt->input->buf->buffer, ctxt->input, base, cur);
+        xmlBufUpdateInput(ctxt->input->buf->buffer, ctxt->input, pos);
 	if (res < 0) {
-	    ctxt->errNo = XML_PARSER_EOF;
+            xmlFatalErr(ctxt, ctxt->input->buf->error, NULL);
 	    xmlHaltParser(ctxt);
-	    return (XML_PARSER_EOF);
-	}
-#ifdef DEBUG_PUSH
-	xmlGenericError(xmlGenericErrorContext, "PP: pushed %d\n", size);
-#endif
-
-    } else if (ctxt->instate != XML_PARSER_EOF) {
-	if ((ctxt->input != NULL) && ctxt->input->buf != NULL) {
-	    xmlParserInputBufferPtr in = ctxt->input->buf;
-	    if ((in->encoder != NULL) && (in->buffer != NULL) &&
-		    (in->raw != NULL)) {
-		int nbchars;
-		size_t base = xmlBufGetInputBase(in->buffer, ctxt->input);
-		size_t current = ctxt->input->cur - ctxt->input->base;
-
-		nbchars = xmlCharEncInput(in, terminate);
-		xmlBufSetInputBaseCur(in->buffer, ctxt->input, base, current);
-		if (nbchars < 0) {
-		    /* TODO 2.6.0 */
-		    xmlGenericError(xmlGenericErrorContext,
-				    "xmlParseChunk: encoder error\n");
-                    xmlHaltParser(ctxt);
-		    return(XML_ERR_INVALID_ENCODING);
-		}
-	    }
+	    return(ctxt->errNo);
 	}
     }
 
-    if (remain != 0) {
-        xmlParseTryOrFinish(ctxt, 0);
-    } else {
-        xmlParseTryOrFinish(ctxt, terminate);
-    }
+    xmlParseTryOrFinish(ctxt, terminate);
     if (ctxt->instate == XML_PARSER_EOF)
         return(ctxt->errNo);
 
@@ -12252,45 +11460,43 @@ xmldecl_done:
     if ((ctxt->errNo != XML_ERR_OK) && (ctxt->disableSAX == 1))
         return(ctxt->errNo);
 
-    if (remain != 0) {
-        chunk += size;
-        size = remain;
-        remain = 0;
-        goto xmldecl_done;
-    }
     if ((end_in_lf == 1) && (ctxt->input != NULL) &&
         (ctxt->input->buf != NULL)) {
-	size_t base = xmlBufGetInputBase(ctxt->input->buf->buffer,
-					 ctxt->input);
-	size_t current = ctxt->input->cur - ctxt->input->base;
+	size_t pos = ctxt->input->cur - ctxt->input->base;
+        int res;
 
-	xmlParserInputBufferPush(ctxt->input->buf, 1, "\r");
-
-	xmlBufSetInputBaseCur(ctxt->input->buf->buffer, ctxt->input,
-			      base, current);
+	res = xmlParserInputBufferPush(ctxt->input->buf, 1, "\r");
+	xmlBufUpdateInput(ctxt->input->buf->buffer, ctxt->input, pos);
+        if (res < 0) {
+            xmlFatalErr(ctxt, ctxt->input->buf->error, NULL);
+            xmlHaltParser(ctxt);
+            return(ctxt->errNo);
+        }
     }
     if (terminate) {
 	/*
 	 * Check for termination
 	 */
-	int cur_avail = 0;
-
-	if (ctxt->input != NULL) {
-	    if (ctxt->input->buf == NULL)
-		cur_avail = ctxt->input->length -
-			    (ctxt->input->cur - ctxt->input->base);
-	    else
-		cur_avail = xmlBufUse(ctxt->input->buf->buffer) -
-			              (ctxt->input->cur - ctxt->input->base);
-	}
-
-	if ((ctxt->instate != XML_PARSER_EOF) &&
-	    (ctxt->instate != XML_PARSER_EPILOG)) {
-	    xmlFatalErr(ctxt, XML_ERR_DOCUMENT_END, NULL);
-	}
-	if ((ctxt->instate == XML_PARSER_EPILOG) && (cur_avail > 0)) {
-	    xmlFatalErr(ctxt, XML_ERR_DOCUMENT_END, NULL);
-	}
+        if ((ctxt->instate != XML_PARSER_EOF) &&
+            (ctxt->instate != XML_PARSER_EPILOG)) {
+            if (ctxt->nameNr > 0) {
+                const xmlChar *name = ctxt->nameTab[ctxt->nameNr - 1];
+                int line = ctxt->pushTab[ctxt->nameNr - 1].line;
+                xmlFatalErrMsgStrIntStr(ctxt, XML_ERR_TAG_NOT_FINISHED,
+                        "Premature end of data in tag %s line %d\n",
+                        name, line, NULL);
+            } else if (ctxt->instate == XML_PARSER_START) {
+                xmlFatalErr(ctxt, XML_ERR_DOCUMENT_EMPTY, NULL);
+            } else {
+                xmlFatalErrMsg(ctxt, XML_ERR_DOCUMENT_EMPTY,
+                               "Start tag expected, '<' not found\n");
+            }
+        } else if ((ctxt->input->buf != NULL) &&
+                   (ctxt->input->buf->encoder != NULL) &&
+                   (!xmlBufIsEmpty(ctxt->input->buf->raw))) {
+            xmlFatalErrMsg(ctxt, XML_ERR_INVALID_CHAR,
+                           "Truncated multi-byte sequence at EOF\n");
+        }
 	if (ctxt->instate != XML_PARSER_EOF) {
 	    if ((ctxt->sax) && (ctxt->sax->endDocument != NULL))
 		ctxt->sax->endDocument(ctxt->userData);
@@ -12334,15 +11540,8 @@ xmlCreatePushParserCtxt(xmlSAXHandlerPtr sax, void *user_data,
     xmlParserCtxtPtr ctxt;
     xmlParserInputPtr inputStream;
     xmlParserInputBufferPtr buf;
-    xmlCharEncoding enc = XML_CHAR_ENCODING_NONE;
 
-    /*
-     * plug some encoding conversion routines
-     */
-    if ((chunk != NULL) && (size >= 4))
-	enc = xmlDetectCharEncoding((const xmlChar *) chunk, size);
-
-    buf = xmlAllocParserInputBuffer(enc);
+    buf = xmlAllocParserInputBuffer(XML_CHAR_ENCODING_NONE);
     if (buf == NULL) return(NULL);
 
     ctxt = xmlNewSAXParserCtxt(sax, user_data);
@@ -12381,68 +11580,22 @@ xmlCreatePushParserCtxt(xmlSAXHandlerPtr sax, void *user_data,
     xmlBufResetInput(inputStream->buf->buffer, inputStream);
     inputPush(ctxt, inputStream);
 
-    /*
-     * If the caller didn't provide an initial 'chunk' for determining
-     * the encoding, we set the context to XML_CHAR_ENCODING_NONE so
-     * that it can be automatically determined later
-     */
-    ctxt->charset = XML_CHAR_ENCODING_NONE;
-
     if ((size != 0) && (chunk != NULL) &&
         (ctxt->input != NULL) && (ctxt->input->buf != NULL)) {
-	size_t base = xmlBufGetInputBase(ctxt->input->buf->buffer, ctxt->input);
-	size_t cur = ctxt->input->cur - ctxt->input->base;
+	size_t pos = ctxt->input->cur - ctxt->input->base;
+        int res;
 
-	xmlParserInputBufferPush(ctxt->input->buf, size, chunk);
-
-        xmlBufSetInputBaseCur(ctxt->input->buf->buffer, ctxt->input, base, cur);
-#ifdef DEBUG_PUSH
-	xmlGenericError(xmlGenericErrorContext, "PP: pushed %d\n", size);
-#endif
-    }
-
-    if (enc != XML_CHAR_ENCODING_NONE) {
-        xmlSwitchEncoding(ctxt, enc);
+	res = xmlParserInputBufferPush(ctxt->input->buf, size, chunk);
+        xmlBufUpdateInput(ctxt->input->buf->buffer, ctxt->input, pos);
+        if (res < 0) {
+            xmlFatalErr(ctxt, ctxt->input->buf->error, NULL);
+            xmlHaltParser(ctxt);
+        }
     }
 
     return(ctxt);
 }
 #endif /* LIBXML_PUSH_ENABLED */
-
-/**
- * xmlHaltParser:
- * @ctxt:  an XML parser context
- *
- * Blocks further parser processing don't override error
- * for internal use
- */
-static void
-xmlHaltParser(xmlParserCtxtPtr ctxt) {
-    if (ctxt == NULL)
-        return;
-    ctxt->instate = XML_PARSER_EOF;
-    ctxt->disableSAX = 1;
-    while (ctxt->inputNr > 1)
-        xmlFreeInputStream(inputPop(ctxt));
-    if (ctxt->input != NULL) {
-        /*
-	 * in case there was a specific allocation deallocate before
-	 * overriding base
-	 */
-        if (ctxt->input->free != NULL) {
-	    ctxt->input->free((xmlChar *) ctxt->input->base);
-	    ctxt->input->free = NULL;
-	}
-        if (ctxt->input->buf != NULL) {
-            xmlFreeParserInputBuffer(ctxt->input->buf);
-            ctxt->input->buf = NULL;
-        }
-	ctxt->input->cur = BAD_CAST"";
-        ctxt->input->length = 0;
-	ctxt->input->base = ctxt->input->cur;
-        ctxt->input->end = ctxt->input->cur;
-    }
-}
 
 /**
  * xmlStopParser:
@@ -12530,7 +11683,6 @@ xmlIOParseDTD(xmlSAXHandlerPtr sax, xmlParserInputBufferPtr input,
     xmlDtdPtr ret = NULL;
     xmlParserCtxtPtr ctxt;
     xmlParserInputPtr pinput = NULL;
-    xmlChar start[4];
 
     if (input == NULL)
 	return(NULL);
@@ -12568,13 +11720,6 @@ xmlIOParseDTD(xmlSAXHandlerPtr sax, xmlParserInputBufferPtr input,
         xmlSwitchEncoding(ctxt, enc);
     }
 
-    pinput->filename = NULL;
-    pinput->line = 1;
-    pinput->col = 1;
-    pinput->base = ctxt->input->cur;
-    pinput->cur = ctxt->input->cur;
-    pinput->free = NULL;
-
     /*
      * let's parse that entity knowing it's an external subset.
      */
@@ -12588,22 +11733,7 @@ xmlIOParseDTD(xmlSAXHandlerPtr sax, xmlParserInputBufferPtr input,
     ctxt->myDoc->extSubset = xmlNewDtd(ctxt->myDoc, BAD_CAST "none",
 	                               BAD_CAST "none", BAD_CAST "none");
 
-    if ((enc == XML_CHAR_ENCODING_NONE) &&
-        ((ctxt->input->end - ctxt->input->cur) >= 4)) {
-	/*
-	 * Get the 4 first bytes and decode the charset
-	 * if enc != XML_CHAR_ENCODING_NONE
-	 * plug some encoding conversion routines.
-	 */
-	start[0] = RAW;
-	start[1] = NXT(1);
-	start[2] = NXT(2);
-	start[3] = NXT(3);
-	enc = xmlDetectCharEncoding(start, 4);
-	if (enc != XML_CHAR_ENCODING_NONE) {
-	    xmlSwitchEncoding(ctxt, enc);
-	}
-    }
+    xmlDetectEncoding(ctxt);
 
     xmlParseExternalSubset(ctxt, BAD_CAST "none", BAD_CAST "none");
 
@@ -12651,7 +11781,6 @@ xmlSAXParseDTD(xmlSAXHandlerPtr sax, const xmlChar *ExternalID,
     xmlDtdPtr ret = NULL;
     xmlParserCtxtPtr ctxt;
     xmlParserInputPtr input = NULL;
-    xmlCharEncoding enc;
     xmlChar* systemIdCanonic;
 
     if ((ExternalID == NULL) && (SystemID == NULL)) return(NULL);
@@ -12696,20 +11825,13 @@ xmlSAXParseDTD(xmlSAXHandlerPtr sax, const xmlChar *ExternalID,
 	    xmlFree(systemIdCanonic);
 	return(NULL);
     }
-    if ((ctxt->input->end - ctxt->input->cur) >= 4) {
-	enc = xmlDetectCharEncoding(ctxt->input->cur, 4);
-	xmlSwitchEncoding(ctxt, enc);
-    }
+
+    xmlDetectEncoding(ctxt);
 
     if (input->filename == NULL)
 	input->filename = (char *) systemIdCanonic;
     else
 	xmlFree(systemIdCanonic);
-    input->line = 1;
-    input->col = 1;
-    input->base = ctxt->input->cur;
-    input->cur = ctxt->input->cur;
-    input->free = NULL;
 
     /*
      * let's parse that entity knowing it's an external subset.
@@ -12837,8 +11959,6 @@ xmlParseExternalEntityPrivate(xmlDocPtr doc, xmlParserCtxtPtr oldctxt,
     xmlDocPtr newDoc;
     xmlNodePtr newRoot;
     xmlParserErrors ret = XML_ERR_OK;
-    xmlChar start[4];
-    xmlCharEncoding enc;
 
     if (((depth > 40) &&
 	((oldctxt == NULL) || (oldctxt->options & XML_PARSE_HUGE) == 0)) ||
@@ -12899,22 +12019,7 @@ xmlParseExternalEntityPrivate(xmlDocPtr doc, xmlParserCtxtPtr oldctxt,
         newRoot->doc = doc;
     }
 
-    /*
-     * Get the 4 first bytes and decode the charset
-     * if enc != XML_CHAR_ENCODING_NONE
-     * plug some encoding conversion routines.
-     */
-    GROW;
-    if ((ctxt->input->end - ctxt->input->cur) >= 4) {
-	start[0] = RAW;
-	start[1] = NXT(1);
-	start[2] = NXT(2);
-	start[3] = NXT(3);
-	enc = xmlDetectCharEncoding(start, 4);
-	if (enc != XML_CHAR_ENCODING_NONE) {
-	    xmlSwitchEncoding(ctxt, enc);
-	}
-    }
+    xmlDetectEncoding(ctxt);
 
     /*
      * Parse a possible text declaration first
@@ -13131,7 +12236,6 @@ xmlParseBalancedChunkMemoryInternal(xmlParserCtxtPtr oldctxt,
     xmlSAXHandlerPtr oldsax = NULL;
     xmlNodePtr content = NULL;
     xmlNodePtr last = NULL;
-    int size;
     xmlParserErrors ret = XML_ERR_OK;
 #ifdef SAX2
     int i;
@@ -13150,9 +12254,7 @@ xmlParseBalancedChunkMemoryInternal(xmlParserCtxtPtr oldctxt,
     if (string == NULL)
         return(XML_ERR_INTERNAL_ERROR);
 
-    size = xmlStrlen(string);
-
-    ctxt = xmlCreateMemoryParserCtxt((char *) string, size);
+    ctxt = xmlCreateDocParserCtxt(string);
     if (ctxt == NULL) return(XML_WAR_UNDECLARED_ENTITY);
     ctxt->nbErrors = oldctxt->nbErrors;
     ctxt->nbWarnings = oldctxt->nbWarnings;
@@ -13401,10 +12503,6 @@ xmlParseInNodeContext(xmlNodePtr node, const char *data, int datalen,
     if (doc->encoding != NULL) {
         xmlCharEncodingHandlerPtr hdlr;
 
-        if (ctxt->encoding != NULL)
-	    xmlFree((xmlChar *) ctxt->encoding);
-        ctxt->encoding = xmlStrdup((const xmlChar *) doc->encoding);
-
         hdlr = xmlFindCharEncodingHandler((const char *) doc->encoding);
         if (hdlr != NULL) {
             xmlSwitchToEncoding(ctxt, hdlr);
@@ -13563,7 +12661,6 @@ xmlParseBalancedChunkMemoryRecover(xmlDocPtr doc, xmlSAXHandlerPtr sax,
     xmlDocPtr newDoc;
     xmlSAXHandlerPtr oldsax = NULL;
     xmlNodePtr content, newRoot;
-    int size;
     int ret = 0;
 
     if (depth > 40) {
@@ -13576,9 +12673,7 @@ xmlParseBalancedChunkMemoryRecover(xmlDocPtr doc, xmlSAXHandlerPtr sax,
     if (string == NULL)
         return(-1);
 
-    size = xmlStrlen(string);
-
-    ctxt = xmlCreateMemoryParserCtxt((char *) string, size);
+    ctxt = xmlCreateDocParserCtxt(string);
     if (ctxt == NULL) return(-1);
     ctxt->userData = ctxt;
     if (sax != NULL) {
@@ -14381,20 +13476,44 @@ int xmlSAXUserParseMemory(xmlSAXHandlerPtr sax, void *user_data,
 
 /**
  * xmlCreateDocParserCtxt:
- * @cur:  a pointer to an array of xmlChar
+ * @str:  a pointer to an array of xmlChar
  *
  * Creates a parser context for an XML in-memory document.
  *
  * Returns the new parser context or NULL
  */
 xmlParserCtxtPtr
-xmlCreateDocParserCtxt(const xmlChar *cur) {
-    int len;
+xmlCreateDocParserCtxt(const xmlChar *str) {
+    xmlParserCtxtPtr ctxt;
+    xmlParserInputPtr input;
+    xmlParserInputBufferPtr buf;
 
-    if (cur == NULL)
+    if (str == NULL)
 	return(NULL);
-    len = xmlStrlen(cur);
-    return(xmlCreateMemoryParserCtxt((const char *)cur, len));
+
+    ctxt = xmlNewParserCtxt();
+    if (ctxt == NULL)
+	return(NULL);
+
+    buf = xmlParserInputBufferCreateString(str);
+    if (buf == NULL) {
+	xmlFreeParserCtxt(ctxt);
+	return(NULL);
+    }
+
+    input = xmlNewInputStream(ctxt);
+    if (input == NULL) {
+	xmlFreeParserInputBuffer(buf);
+	xmlFreeParserCtxt(ctxt);
+	return(NULL);
+    }
+
+    input->filename = NULL;
+    input->buf = buf;
+    xmlBufResetInput(input->buf->buffer, input);
+
+    inputPush(ctxt, input);
+    return(ctxt);
 }
 
 #ifdef LIBXML_SAX1_ENABLED
@@ -14506,118 +13625,6 @@ xmlSetEntityReferenceFunc(xmlEntityReferenceFunc func)
 
 /************************************************************************
  *									*
- *				Miscellaneous				*
- *									*
- ************************************************************************/
-
-static int xmlParserInitialized = 0;
-
-/**
- * xmlInitParser:
- *
- * Initialization function for the XML parser.
- * This is not reentrant. Call once before processing in case of
- * use in multithreaded programs.
- */
-
-void
-xmlInitParser(void) {
-    /*
-     * Note that the initialization code must not make memory allocations.
-     */
-    if (xmlParserInitialized != 0)
-	return;
-
-#ifdef LIBXML_THREAD_ENABLED
-    __xmlGlobalInitMutexLock();
-    if (xmlParserInitialized == 0) {
-#endif
-#if defined(_WIN32) && (!defined(LIBXML_STATIC) || defined(LIBXML_STATIC_FOR_DLL))
-        if (xmlFree == free)
-            atexit(xmlCleanupParser);
-#endif
-
-	xmlInitThreadsInternal();
-	xmlInitGlobalsInternal();
-	xmlInitMemoryInternal();
-        __xmlInitializeDict();
-	xmlInitEncodingInternal();
-	xmlRegisterDefaultInputCallbacks();
-#ifdef LIBXML_OUTPUT_ENABLED
-	xmlRegisterDefaultOutputCallbacks();
-#endif /* LIBXML_OUTPUT_ENABLED */
-#if defined(LIBXML_XPATH_ENABLED) || defined(LIBXML_SCHEMAS_ENABLED)
-	xmlInitXPathInternal();
-#endif
-	xmlParserInitialized = 1;
-#ifdef LIBXML_THREAD_ENABLED
-    }
-    __xmlGlobalInitMutexUnlock();
-#endif
-}
-
-/**
- * xmlCleanupParser:
- *
- * This function name is somewhat misleading. It does not clean up
- * parser state, it cleans up memory allocated by the library itself.
- * It is a cleanup function for the XML library. It tries to reclaim all
- * related global memory allocated for the library processing.
- * It doesn't deallocate any document related memory. One should
- * call xmlCleanupParser() only when the process has finished using
- * the library and all XML/HTML documents built with it.
- * See also xmlInitParser() which has the opposite function of preparing
- * the library for operations.
- *
- * WARNING: if your application is multithreaded or has plugin support
- *          calling this may crash the application if another thread or
- *          a plugin is still using libxml2. It's sometimes very hard to
- *          guess if libxml2 is in use in the application, some libraries
- *          or plugins may use it without notice. In case of doubt abstain
- *          from calling this function or do it just before calling exit()
- *          to avoid leak reports from valgrind !
- */
-
-void
-xmlCleanupParser(void) {
-    if (!xmlParserInitialized)
-	return;
-
-    xmlCleanupCharEncodingHandlers();
-#ifdef LIBXML_CATALOG_ENABLED
-    xmlCatalogCleanup();
-#endif
-    xmlCleanupDictInternal();
-    xmlCleanupInputCallbacks();
-#ifdef LIBXML_OUTPUT_ENABLED
-    xmlCleanupOutputCallbacks();
-#endif
-#ifdef LIBXML_SCHEMAS_ENABLED
-    xmlSchemaCleanupTypes();
-    xmlRelaxNGCleanupTypes();
-#endif
-    xmlCleanupGlobalsInternal();
-    xmlCleanupThreadsInternal();
-    xmlCleanupMemoryInternal();
-    xmlParserInitialized = 0;
-}
-
-#if defined(HAVE_ATTRIBUTE_DESTRUCTOR) && !defined(LIBXML_STATIC) && \
-    !defined(_WIN32)
-static void
-ATTRIBUTE_DESTRUCTOR
-xmlDestructor(void) {
-    /*
-     * Calling custom deallocation functions in a destructor can cause
-     * problems, for example with Nokogiri.
-     */
-    if (xmlFree == free)
-        xmlCleanupParser();
-}
-#endif
-
-/************************************************************************
- *									*
  *	New set (2.6.0) of simpler and more flexible APIs		*
  *									*
  ************************************************************************/
@@ -14711,7 +13718,6 @@ xmlCtxtReset(xmlParserCtxtPtr ctxt)
     ctxt->inSubset = 0;
     ctxt->errNo = XML_ERR_OK;
     ctxt->depth = 0;
-    ctxt->charset = XML_CHAR_ENCODING_UTF8;
     ctxt->catalogs = NULL;
     ctxt->sizeentities = 0;
     ctxt->sizeentcopy = 0;
@@ -14754,15 +13760,11 @@ xmlCtxtResetPush(xmlParserCtxtPtr ctxt, const char *chunk,
 {
     xmlParserInputPtr inputStream;
     xmlParserInputBufferPtr buf;
-    xmlCharEncoding enc = XML_CHAR_ENCODING_NONE;
 
     if (ctxt == NULL)
         return(1);
 
-    if ((encoding == NULL) && (chunk != NULL) && (size >= 4))
-        enc = xmlDetectCharEncoding((const xmlChar *) chunk, size);
-
-    buf = xmlAllocParserInputBuffer(enc);
+    buf = xmlAllocParserInputBuffer(XML_CHAR_ENCODING_NONE);
     if (buf == NULL)
         return(1);
 
@@ -14797,23 +13799,20 @@ xmlCtxtResetPush(xmlParserCtxtPtr ctxt, const char *chunk,
 
     if ((size > 0) && (chunk != NULL) && (ctxt->input != NULL) &&
         (ctxt->input->buf != NULL)) {
-	size_t base = xmlBufGetInputBase(ctxt->input->buf->buffer, ctxt->input);
-        size_t cur = ctxt->input->cur - ctxt->input->base;
+        size_t pos = ctxt->input->cur - ctxt->input->base;
+        int res;
 
-        xmlParserInputBufferPush(ctxt->input->buf, size, chunk);
-
-        xmlBufSetInputBaseCur(ctxt->input->buf->buffer, ctxt->input, base, cur);
-#ifdef DEBUG_PUSH
-        xmlGenericError(xmlGenericErrorContext, "PP: pushed %d\n", size);
-#endif
+        res = xmlParserInputBufferPush(ctxt->input->buf, size, chunk);
+        xmlBufUpdateInput(ctxt->input->buf->buffer, ctxt->input, pos);
+        if (res < 0) {
+            xmlFatalErr(ctxt, ctxt->input->buf->error, NULL);
+            xmlHaltParser(ctxt);
+            return(1);
+        }
     }
 
     if (encoding != NULL) {
         xmlCharEncodingHandlerPtr hdlr;
-
-        if (ctxt->encoding != NULL)
-	    xmlFree((xmlChar *) ctxt->encoding);
-        ctxt->encoding = xmlStrdup((const xmlChar *) encoding);
 
         hdlr = xmlFindCharEncodingHandler(encoding);
         if (hdlr != NULL) {
@@ -14822,8 +13821,6 @@ xmlCtxtResetPush(xmlParserCtxtPtr ctxt, const char *chunk,
 	    xmlFatalErrMsgStr(ctxt, XML_ERR_UNSUPPORTED_ENCODING,
 			      "Unsupported encoding %s\n", BAD_CAST encoding);
         }
-    } else if (enc != XML_CHAR_ENCODING_NONE) {
-        xmlSwitchEncoding(ctxt, enc);
     }
 
     return(0);
@@ -14909,8 +13906,6 @@ xmlCtxtUseOptionsInternal(xmlParserCtxtPtr ctxt, int options, const char *encodi
     }
 #ifdef LIBXML_SAX1_ENABLED
     if (options & XML_PARSE_SAX1) {
-        ctxt->sax->startElement = xmlSAX2StartElement;
-        ctxt->sax->endElement = xmlSAX2EndElement;
         ctxt->sax->startElementNs = NULL;
         ctxt->sax->endElementNs = NULL;
         ctxt->sax->initialized = 1;
@@ -14989,6 +13984,25 @@ xmlCtxtUseOptions(xmlParserCtxtPtr ctxt, int options)
 }
 
 /**
+ * xmlCtxtSetMaxAmplification:
+ * @ctxt: an XML parser context
+ * @maxAmpl:  maximum amplification factor
+ *
+ * To protect against exponential entity expansion ("billion laughs"), the
+ * size of serialized output is (roughly) limited to the input size
+ * multiplied by this factor. The default value is 5.
+ *
+ * When working with documents making heavy use of entity expansion, it can
+ * be necessary to increase the value. For security reasons, this should only
+ * be considered when processing trusted input.
+ */
+void
+xmlCtxtSetMaxAmplification(xmlParserCtxtPtr ctxt, unsigned maxAmpl)
+{
+    ctxt->maxAmpl = maxAmpl;
+}
+
+/**
  * xmlDoRead:
  * @ctxt:  an XML parser context
  * @URL:  the base URL to use for the document
@@ -15010,6 +14024,12 @@ xmlDoRead(xmlParserCtxtPtr ctxt, const char *URL, const char *encoding,
     if (encoding != NULL) {
         xmlCharEncodingHandlerPtr hdlr;
 
+        /*
+         * TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
+         * caller provided an encoding. Otherwise, we might switch to
+         * the encoding from the XML declaration which is likely to
+         * break things. Also see xmlSwitchInputEncoding.
+         */
 	hdlr = xmlFindCharEncodingHandler(encoding);
 	if (hdlr != NULL)
 	    xmlSwitchToEncoding(ctxt, hdlr);
@@ -15199,7 +14219,7 @@ xmlReadIO(xmlInputReadCallback ioread, xmlInputCloseCallback ioclose,
 /**
  * xmlCtxtReadDoc:
  * @ctxt:  an XML parser context
- * @cur:  a pointer to a zero terminated string
+ * @str:  a pointer to a zero terminated string
  * @URL:  the base URL to use for the document
  * @encoding:  the document encoding, or NULL
  * @options:  a combination of xmlParserOption
@@ -15210,13 +14230,33 @@ xmlReadIO(xmlInputReadCallback ioread, xmlInputCloseCallback ioclose,
  * Returns the resulting document tree
  */
 xmlDocPtr
-xmlCtxtReadDoc(xmlParserCtxtPtr ctxt, const xmlChar * cur,
+xmlCtxtReadDoc(xmlParserCtxtPtr ctxt, const xmlChar *str,
                const char *URL, const char *encoding, int options)
 {
-    if (cur == NULL)
+    xmlParserInputBufferPtr input;
+    xmlParserInputPtr stream;
+
+    if (ctxt == NULL)
         return (NULL);
-    return (xmlCtxtReadMemory(ctxt, (const char *) cur, xmlStrlen(cur), URL,
-                              encoding, options));
+    if (str == NULL)
+        return (NULL);
+    xmlInitParser();
+
+    xmlCtxtReset(ctxt);
+
+    input = xmlParserInputBufferCreateString(str);
+    if (input == NULL) {
+	return(NULL);
+    }
+
+    stream = xmlNewIOInputStream(ctxt, input, XML_CHAR_ENCODING_NONE);
+    if (stream == NULL) {
+	xmlFreeParserInputBuffer(input);
+	return(NULL);
+    }
+
+    inputPush(ctxt, stream);
+    return (xmlDoRead(ctxt, URL, encoding, options, 1));
 }
 
 /**

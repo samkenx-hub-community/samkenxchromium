@@ -31,6 +31,7 @@
 #include "chromeos/ash/components/network/network_type_pattern.h"
 #include "chromeos/ash/components/network/technology_state_controller.h"
 #include "chromeos/ash/services/network_config/public/cpp/cros_network_config_test_helper.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "third_party/cros_system_api/dbus/shill/dbus-constants.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/gfx/image/image.h"
@@ -94,26 +95,16 @@ class NetworkFeaturePodControllerTest
       public testing::WithParamInterface<bool> {
  public:
   void SetUp() override {
-    auto enabled_features = std::vector<base::test::FeatureRef>();
-    auto disabled_features = std::vector<base::test::FeatureRef>();
-    if (IsQsRevampEnabled()) {
-      feature_list_.InitAndEnableFeature(features::kQsRevamp);
-    } else {
-      feature_list_.InitAndDisableFeature(features::kQsRevamp);
-    }
+    feature_list_.InitWithFeatureStates(
+        {{features::kQsRevamp, IsQsRevampEnabled()},
+         {chromeos::features::kJellyroll, IsQsRevampEnabled()},
+         {chromeos::features::kJelly, IsQsRevampEnabled()}});
 
     AshTestBase::SetUp();
 
+    // Create the feature tile.
     GetPrimaryUnifiedSystemTray()->ShowBubble();
-
-    network_feature_pod_controller_ =
-        std::make_unique<NetworkFeaturePodController>(tray_controller());
-    if (IsQsRevampEnabled()) {
-      feature_tile_ = network_feature_pod_controller_->CreateTile();
-    } else {
-      feature_pod_button_.reset(
-          network_feature_pod_controller_->CreateButton());
-    }
+    CreateFeatureTile();
 
     // Add the non-default cellular and ethernet devices to Shill.
     network_state_helper()->manager_test()->AddTechnology(shill::kTypeCellular,
@@ -131,9 +122,7 @@ class NetworkFeaturePodControllerTest
 
   void TearDown() override {
     network_feature_pod_controller_.reset();
-    if (IsQsRevampEnabled()) {
-      feature_tile_.reset();
-    } else {
+    if (!IsQsRevampEnabled()) {
       feature_pod_button_.reset();
     }
 
@@ -143,6 +132,18 @@ class NetworkFeaturePodControllerTest
   bool IsQsRevampEnabled() const { return GetParam(); }
 
  protected:
+  void CreateFeatureTile() {
+    network_feature_pod_controller_ =
+        std::make_unique<NetworkFeaturePodController>(tray_controller());
+    if (IsQsRevampEnabled()) {
+      feature_tile_ = quick_settings_view()->AddChildView(
+          network_feature_pod_controller_->CreateTile());
+    } else {
+      feature_pod_button_.reset(
+          network_feature_pod_controller_->CreateButton());
+    }
+  }
+
   // Disabling a network technology does not remove corresponding networks from
   // the testing fakes. This function is used to clear the existing networks.
   void ClearNetworks() {
@@ -154,6 +155,11 @@ class NetworkFeaturePodControllerTest
   void LockScreen() {
     GetSessionControllerClient()->LockScreen();
 
+    // Changing the lock state closes the system tray bubble which destroys all
+    // feature tiles, so open the bubble and recreate the feature tile.
+    GetPrimaryUnifiedSystemTray()->ShowBubble();
+    CreateFeatureTile();
+
     // Perform an action to cause the button to be updated since we do not
     // actually observe session state changes.
     PressLabel();
@@ -161,6 +167,11 @@ class NetworkFeaturePodControllerTest
 
   void UnlockScreen() {
     GetSessionControllerClient()->UnlockScreen();
+
+    // Changing the lock state closes the system tray bubble which destroys all
+    // feature tiles, so open the bubble and recreate the feature tile.
+    GetPrimaryUnifiedSystemTray()->ShowBubble();
+    CreateFeatureTile();
 
     // Perform an action to cause the button to be updated since we do not
     // actually observe session state changes.
@@ -241,20 +252,21 @@ class NetworkFeaturePodControllerTest
 
   bool IsDetailedViewEmpty() {
     if (IsQsRevampEnabled()) {
-      return quick_settings_view()->detailed_view()->children().empty();
+      auto* container = quick_settings_view()->detailed_view_container();
+      return container->children().empty();
     } else {
-      return unified_view()->detailed_view()->children().empty();
+      return unified_view()->detailed_view_container()->children().empty();
     }
   }
 
   void CheckNetworkDetailedViewFocused() {
     views::View::Views children;
     if (IsQsRevampEnabled()) {
-      EXPECT_TRUE(quick_settings_view()->detailed_view());
-      children = quick_settings_view()->detailed_view()->children();
+      EXPECT_TRUE(quick_settings_view()->detailed_view_container());
+      children = quick_settings_view()->detailed_view_container()->children();
     } else {
-      EXPECT_TRUE(unified_view()->detailed_view());
-      children = unified_view()->detailed_view()->children();
+      EXPECT_TRUE(unified_view()->detailed_view_container());
+      children = unified_view()->detailed_view_container()->children();
     }
     ASSERT_EQ(1u, children.size());
     EXPECT_STREQ("NetworkDetailedNetworkViewImpl",
@@ -300,8 +312,9 @@ class NetworkFeaturePodControllerTest
   }
 
   bool IsDiveInButtonEnabled() {
+    // QsRevamp doesn't have a separate "dive-in" button, just the tile itself.
     return IsQsRevampEnabled()
-               ? feature_tile_->drill_in_button()->GetEnabled()
+               ? feature_tile_->GetEnabled()
                : feature_pod_button_->label_button()->GetEnabled();
   }
 
@@ -329,14 +342,14 @@ class NetworkFeaturePodControllerTest
   }
 
   const std::u16string GetIconTooltipText() {
-    return IsQsRevampEnabled() ? feature_tile_->GetTooltipText()
+    return IsQsRevampEnabled() ? feature_tile_->icon_button()->GetTooltipText()
                                : feature_pod_icon_button()->GetTooltipText();
   }
 
   const std::u16string GetLabelTooltipText() {
-    return IsQsRevampEnabled()
-               ? feature_tile_->drill_in_button()->GetTooltipText()
-               : feature_pod_label_button()->GetTooltipText();
+    // QsRevamp doesn't have a separate label button, just the tile itself.
+    return IsQsRevampEnabled() ? feature_tile_->GetTooltipText()
+                               : feature_pod_label_button()->GetTooltipText();
   }
 
   NetworkStateTestHelper* network_state_helper() {
@@ -353,7 +366,7 @@ class NetworkFeaturePodControllerTest
 
   FeaturePodButton* feature_pod_button() { return feature_pod_button_.get(); }
 
-  FeatureTile* feature_tile() { return feature_tile_.get(); }
+  FeatureTile* feature_tile() { return feature_tile_; }
 
   FeaturePodIconButton* feature_pod_icon_button() {
     return feature_pod_button_->icon_button_;
@@ -387,14 +400,14 @@ class NetworkFeaturePodControllerTest
     return network_state_helper()->ConfigureService(shill_json_string);
   }
 
-  network_config::CrosNetworkConfigTestHelper network_config_helper_;
   base::test::ScopedFeatureList feature_list_;
+  network_config::CrosNetworkConfigTestHelper network_config_helper_;
   std::string cellular_path_;
   std::string ethernet_path_;
   std::string wifi_path_;
   std::string tether_path_;
   std::string tether_wifi_path_;
-  std::unique_ptr<FeatureTile> feature_tile_;
+  raw_ptr<FeatureTile, DanglingUntriaged | ExperimentalAsh> feature_tile_;
   std::unique_ptr<FeaturePodButton> feature_pod_button_;
   std::unique_ptr<NetworkFeaturePodController> network_feature_pod_controller_;
 };
@@ -838,27 +851,32 @@ TEST_P(NetworkFeaturePodControllerTest, HasCorrectIcons) {
   ActiveNetworkIcon* active_network_icon =
       Shell::Get()->system_tray_model()->active_network_icon();
 
-  gfx::Image image;
-  image = IsQsRevampEnabled() ? gfx::Image(feature_tile()->icon()->GetImage())
-                              : gfx::Image(feature_pod_icon_button()->GetImage(
-                                    views::Button::STATE_NORMAL));
+  views::ImageButton* icon_button = IsQsRevampEnabled()
+                                        ? feature_tile()->icon_button()
+                                        : feature_pod_icon_button();
+  gfx::Image image =
+      gfx::Image(icon_button->GetImage(views::Button::STATE_NORMAL));
 
-  EXPECT_TRUE(
-      gfx::test::AreImagesEqual(gfx::Image(active_network_icon->GetImage(
-                                    ActiveNetworkIcon::Type::kSingle,
-                                    network_icon::ICON_TYPE_FEATURE_POD_TOGGLED,
-                                    /*animating=*/nullptr)),
-                                image));
-
-  // Lock screen to get the button's disabled state.
-  LockScreen();
-  image = IsQsRevampEnabled() ? gfx::Image(feature_tile()->icon()->GetImage())
-                              : gfx::Image(feature_pod_icon_button()->GetImage(
-                                    views::Button::STATE_DISABLED));
+  ui::ColorProvider* color_provider =
+      IsQsRevampEnabled() ? quick_settings_view()->GetColorProvider()
+                          : unified_view()->GetColorProvider();
 
   EXPECT_TRUE(gfx::test::AreImagesEqual(
       gfx::Image(active_network_icon->GetImage(
-          ActiveNetworkIcon::Type::kSingle,
+          color_provider, ActiveNetworkIcon::Type::kSingle,
+          network_icon::ICON_TYPE_FEATURE_POD_TOGGLED,
+          /*animating=*/nullptr)),
+      image));
+
+  // Lock screen to get the button's disabled state.
+  LockScreen();
+  icon_button = IsQsRevampEnabled() ? feature_tile()->icon_button()
+                                    : feature_pod_icon_button();
+  image = gfx::Image(icon_button->GetImage(views::Button::STATE_DISABLED));
+
+  EXPECT_TRUE(gfx::test::AreImagesEqual(
+      gfx::Image(active_network_icon->GetImage(
+          color_provider, ActiveNetworkIcon::Type::kSingle,
           network_icon::ICON_TYPE_FEATURE_POD_DISABLED, /*animating=*/nullptr)),
       image));
 
@@ -872,13 +890,14 @@ TEST_P(NetworkFeaturePodControllerTest, HasCorrectIcons) {
       network_handler::ErrorCallback());
   base::RunLoop().RunUntilIdle();
 
-  image = IsQsRevampEnabled() ? gfx::Image(feature_tile()->icon()->GetImage())
-                              : gfx::Image(feature_pod_icon_button()->GetImage(
-                                    views::Button::STATE_NORMAL));
+  icon_button = IsQsRevampEnabled() ? feature_tile()->icon_button()
+                                    : feature_pod_icon_button();
+  image = gfx::Image(icon_button->GetImage(views::Button::STATE_NORMAL));
 
   EXPECT_TRUE(gfx::test::AreImagesEqual(
       gfx::Image(active_network_icon->GetImage(
-          ActiveNetworkIcon::Type::kSingle, network_icon::ICON_TYPE_FEATURE_POD,
+          color_provider, ActiveNetworkIcon::Type::kSingle,
+          network_icon::ICON_TYPE_FEATURE_POD,
           /*animating=*/nullptr)),
       image));
 }

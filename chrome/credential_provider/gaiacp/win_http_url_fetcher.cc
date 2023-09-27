@@ -18,8 +18,7 @@
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/memory/ptr_util.h"
-#include "base/strings/strcat.h"
-#include "base/strings/stringprintf.h"
+#include "base/strings/strcat_win.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/lock.h"
 #include "base/time/time.h"
@@ -348,7 +347,7 @@ HRESULT WinHttpUrlFetcher::Fetch(std::vector<char>* response) {
   for (const auto& kv : request_headers_) {
     const wchar_t* key = A2CW(kv.first.c_str());
     const wchar_t* value = A2CW(kv.second.c_str());
-    std::wstring header = base::StringPrintf(L"%ls: %ls", key, value);
+    std::wstring header = base::StrCat({key, L": ", value});
     if (!::WinHttpAddRequestHeaders(
             request_.Get(), header.c_str(), header.length(),
             WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE)) {
@@ -445,8 +444,8 @@ HRESULT WinHttpUrlFetcher::BuildRequestAndFetchResultFromHttpService(
       continue;
 
     *request_result = std::move(extracted_param);
-    const base::Value* error_detail =
-        (*request_result)->FindDictKey(kErrorKeyInRequestResult);
+    const base::Value::Dict* error_detail =
+        (*request_result)->GetDict().FindDict(kErrorKeyInRequestResult);
     if (!error_detail)
       return S_OK;
 
@@ -454,7 +453,7 @@ HRESULT WinHttpUrlFetcher::BuildRequestAndFetchResultFromHttpService(
 
     // If error code is known, retry only on retryable server errors.
     absl::optional<int> error_code =
-        error_detail->FindIntKey(kHttpErrorCodeKeyNameInResponse);
+        error_detail->FindInt(kHttpErrorCodeKeyNameInResponse);
     if (error_code.has_value() &&
         !base::Contains(kRetryableHttpErrorCodes, error_code.value())) {
       return E_FAIL;

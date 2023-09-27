@@ -4,8 +4,9 @@
 
 #import "ios/chrome/browser/shared/ui/table_view/chrome_table_view_controller.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/check.h"
-#import "base/mac/foundation_util.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_cell.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_header_footer_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_item.h"
@@ -17,10 +18,6 @@
 #import "ios/chrome/browser/shared/ui/table_view/table_view_model.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 const CGFloat kTableViewSeparatorInset = 16;
 const CGFloat kTableViewSeparatorInsetWithIcon = 60;
@@ -60,6 +57,19 @@ const CGFloat kTableViewSeparatorInsetWithIcon = 60;
                                          0)];
 }
 
+- (void)viewWillTransitionToSize:(CGSize)size
+       withTransitionCoordinator:
+           (id<UIViewControllerTransitionCoordinator>)coordinator {
+  // Make sure the large title appears after rotating back to portrait
+  // mode.
+  [coordinator
+      animateAlongsideTransition:^(
+          id<UIViewControllerTransitionCoordinatorContext> context) {
+        [self.navigationController.navigationBar sizeToFit];
+      }
+                      completion:nil];
+}
+
 #pragma mark - UITableViewDelegate
 
 - (NSIndexPath*)tableView:(UITableView*)tableView
@@ -69,17 +79,6 @@ const CGFloat kTableViewSeparatorInsetWithIcon = 60;
     return nil;
   }
   return indexPath;
-}
-
-// TODO(crbug.com/1254652): Large titles appear collapsed in some case when
-// opening a tableView. e.g when opening History screen without entry. Remove
-// this method when iOS 14 is dropped.
-- (void)viewWillAppear:(BOOL)animated {
-  [super viewWillAppear:animated];
-  if (@available(iOS 15, *)) {
-  } else {
-    [self.navigationController.navigationBar sizeToFit];
-  }
 }
 
 #pragma mark - Accessors
@@ -94,10 +93,15 @@ const CGFloat kTableViewSeparatorInsetWithIcon = 60;
     return;
   }
   _emptyView = emptyView;
-  _emptyView.scrollViewContentInsets = self.view.safeAreaInsets;
+  [self updateEmptyViewInsets];
   self.tableView.backgroundView = _emptyView;
   // Since this would replace any loadingView, set it to nil.
   self.loadingView = nil;
+}
+
+- (void)setEmptyViewTopOffset:(CGFloat)offset {
+  _emptyViewTopOffset = offset;
+  [self updateEmptyViewInsets];
 }
 
 #pragma mark - Public
@@ -110,7 +114,7 @@ const CGFloat kTableViewSeparatorInsetWithIcon = 60;
   [super viewSafeAreaInsetsDidChange];
   // The safe area insets aren't propagated to the inner scroll view. Manually
   // set the content insets.
-  self.emptyView.scrollViewContentInsets = self.view.safeAreaInsets;
+  [self updateEmptyViewInsets];
 }
 
 - (void)startLoadingIndicatorWithLoadingMessage:(NSString*)loadingMessage {
@@ -228,7 +232,7 @@ const CGFloat kTableViewSeparatorInsetWithIcon = 60;
       // `cell` may be nil if the row is not currently on screen.
       if (cell) {
         TableViewCell* tableViewCell =
-            base::mac::ObjCCastStrict<TableViewCell>(cell);
+            base::apple::ObjCCastStrict<TableViewCell>(cell);
         [item configureCell:tableViewCell withStyler:self.styler];
       }
     }
@@ -263,8 +267,22 @@ const CGFloat kTableViewSeparatorInsetWithIcon = 60;
   UITableViewCell* cell =
       [self.tableView dequeueReusableCellWithIdentifier:reuseIdentifier
                                            forIndexPath:indexPath];
-  TableViewCell* tableViewCell = base::mac::ObjCCastStrict<TableViewCell>(cell);
+  TableViewCell* tableViewCell =
+      base::apple::ObjCCastStrict<TableViewCell>(cell);
   [item configureCell:tableViewCell withStyler:self.styler];
+
+  if (base::FeatureList::IsEnabled(kBlockSimultaneousCellSelectionKillSwitch)) {
+    // Enabling `exclusiveTouch` for all cells to prevent simultanoeus cell
+    // selection. Not blocking simultaneous cell selection can lead to starting
+    // one or more of a coordinator's child coordinators multiple times, which
+    // can result in multiple view controllers being presented back-to-back. If
+    // there's a need for `exclusiveTouch` to be disabled for some cells,
+    // `exclusiveTouch` can be overridden for those cells in the
+    // ChromeTableViewController subclass that implments them.
+    // TODO(crbug.com/1471527): Make Chrome Coordinators robust against the
+    // launch of multiple child coordinators.
+    cell.exclusiveTouch = YES;
+  }
 
   return cell;
 }
@@ -312,6 +330,17 @@ const CGFloat kTableViewSeparatorInsetWithIcon = 60;
       dequeueReusableHeaderFooterViewWithIdentifier:reuseIdentifier];
   [item configureHeaderFooterView:view withStyler:self.styler];
   return view;
+}
+
+#pragma mark - Private
+
+// Sets the empty view's insets to the sum of the top offset and the safe area
+// insets.
+- (void)updateEmptyViewInsets {
+  UIEdgeInsets safeAreaInsets = self.view.safeAreaInsets;
+  _emptyView.scrollViewContentInsets = UIEdgeInsetsMake(
+      safeAreaInsets.top + self.emptyViewTopOffset, safeAreaInsets.left,
+      safeAreaInsets.bottom, safeAreaInsets.right);
 }
 
 @end

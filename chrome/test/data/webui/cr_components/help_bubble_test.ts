@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'chrome://webui-test/mojo_webui_test_support.js';
 import 'chrome://resources/cr_components/help_bubble/help_bubble.js';
 
 import {CrButtonElement} from '//resources/cr_elements/cr_button/cr_button.js';
@@ -458,7 +457,6 @@ suite('CrComponentsHelpBubbleTest', () => {
     helpBubble.position = HelpBubbleArrowPosition.TOP_CENTER;
     helpBubble.bodyText = HELP_BUBBLE_BODY;
     helpBubble.buttons = THREE_BUTTONS_MIDDLE_DEFAULT;
-    helpBubble.forceCloseButton = true;
     helpBubble.show(el);
     await waitAfterNextRender(helpBubble);
     assertEquals(3, getNumButtons(), 'there should be three buttons');

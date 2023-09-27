@@ -62,7 +62,9 @@ AggregatableReport CreateExampleAggregatableReport() {
                         /*key_id=*/"key_1",
                         /*debug_cleartext_payload=*/absl::nullopt);
   return AggregatableReport(std::move(payloads), "example_shared_info",
-                            /*debug_key=*/absl::nullopt);
+                            /*debug_key=*/absl::nullopt,
+                            /*additional_fields=*/{},
+                            /*aggregation_coordinator_origin=*/absl::nullopt);
 }
 
 }  // namespace

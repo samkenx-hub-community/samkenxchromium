@@ -4,15 +4,15 @@
 
 import 'chrome://password-manager/password_manager.js';
 
-import {AddPasswordDialogElement, AuthTimedOutDialogElement, Page, PasswordListItemElement, PasswordManagerImpl, PasswordsSectionElement, Router, UrlParam} from 'chrome://password-manager/password_manager.js';
-import {PluralStringProxyImpl} from 'chrome://resources/js/plural_string_proxy.js';
+import {AddPasswordDialogElement, AuthTimedOutDialogElement, Page, PasswordListItemElement, PasswordManagerImpl, PasswordsSectionElement, PasswordViewPageInteractions, PluralStringProxyImpl, Router, SyncBrowserProxyImpl, UrlParam} from 'chrome://password-manager/password_manager.js';
 import {assertArrayEquals, assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 import {TestPluralStringProxy} from 'chrome://webui-test/test_plural_string_proxy.js';
 import {eventToPromise, isVisible} from 'chrome://webui-test/test_util.js';
 
 import {TestPasswordManagerProxy} from './test_password_manager_proxy.js';
-import {createAffiliatedDomain, createCredentialGroup, createPasswordEntry} from './test_util.js';
+import {TestSyncBrowserProxy} from './test_sync_browser_proxy.js';
+import {createAffiliatedDomain, createCredentialGroup, createPasswordEntry, makePasswordManagerPrefs} from './test_util.js';
 
 /**
  * @param subsection The passwords subsection element that will be checked.
@@ -36,10 +36,10 @@ function validatePasswordsSubsection(
     const matchingDomain =
         expectedGroup.entries
             .find(
-                cred => cred.affiliatedDomains?.some(
+                cred => cred.affiliatedDomains.some(
                     domain => domain.name.includes(searchTerm)))
             ?.affiliatedDomains
-            ?.find(domain => domain.name.includes(searchTerm))
+            .find(domain => domain.name.includes(searchTerm))
             ?.name;
 
     assertTrue(!!listItemElement);
@@ -62,6 +62,7 @@ function validatePasswordsSubsection(
 suite('PasswordsSectionTest', function() {
   let passwordManager: TestPasswordManagerProxy;
   let pluralString: TestPluralStringProxy;
+  let syncProxy: TestSyncBrowserProxy;
 
   async function createPasswordsSection(): Promise<PasswordsSectionElement> {
     const section: PasswordsSectionElement =
@@ -79,6 +80,8 @@ suite('PasswordsSectionTest', function() {
     PasswordManagerImpl.setInstance(passwordManager);
     pluralString = new TestPluralStringProxy();
     PluralStringProxyImpl.setInstance(pluralString);
+    syncProxy = new TestSyncBrowserProxy();
+    SyncBrowserProxyImpl.setInstance(syncProxy);
     Router.getInstance().updateRouterParams(new URLSearchParams());
     return flushTasks();
   });
@@ -125,6 +128,9 @@ suite('PasswordsSectionTest', function() {
         section.shadowRoot!.querySelector<HTMLElement>('password-list-item');
     assertTrue(!!listEntry);
     listEntry.click();
+    assertEquals(
+        PasswordViewPageInteractions.CREDENTIAL_ROW_CLICKED,
+        await passwordManager.whenCalled('recordPasswordViewInteraction'));
     assertArrayEquals(
         [0, 1], await passwordManager.whenCalled('requestCredentialsDetails'));
 
@@ -174,7 +180,6 @@ suite('PasswordsSectionTest', function() {
         document.createElement('passwords-section');
     document.body.appendChild(section);
     await passwordManager.whenCalled('getCredentialGroups');
-    await pluralString.whenCalled('getPluralString');
     await flushTasks();
 
     const listEntries =
@@ -273,6 +278,35 @@ suite('PasswordsSectionTest', function() {
         section, passwordManager.data.groups.slice(1), 'bar.uk');
   });
 
+  test('search by group name ranked higher', async function() {
+    passwordManager.data.groups = [
+      createCredentialGroup({
+        name: 'bar.com',
+        credentials: [
+          createPasswordEntry({
+            username: 'test@foo.com',
+          }),
+        ],
+      }),
+      createCredentialGroup({
+        name: 'foo.com',
+      }),
+    ];
+
+    const section = await createPasswordsSection();
+
+    validatePasswordsSubsection(section, passwordManager.data.groups, '');
+
+    const query = new URLSearchParams();
+    query.set(UrlParam.SEARCH_TERM, 'foo');
+    Router.getInstance().updateRouterParams(query);
+    await flushTasks();
+
+    // Now foo.com is the first item because the group name matches query.
+    validatePasswordsSubsection(
+        section, passwordManager.data.groups.reverse(), 'foo');
+  });
+
   test('clicking add button opens an add password dialog', async function() {
     const section: PasswordsSectionElement =
         document.createElement('passwords-section');
@@ -334,6 +368,10 @@ suite('PasswordsSectionTest', function() {
       credentials: [createPasswordEntry(
           {username: 'user', id: 0, inProfileStore: true})],
     })];
+    syncProxy.syncInfo = {
+      isEligibleForAccountStorage: true,
+      isSyncingPasswords: false,
+    };
 
     const section = await createPasswordsSection();
 
@@ -357,6 +395,10 @@ suite('PasswordsSectionTest', function() {
       credentials: [createPasswordEntry(
           {username: 'user', id: 0, inAccountStore: true})],
     })];
+    syncProxy.syncInfo = {
+      isEligibleForAccountStorage: true,
+      isSyncingPasswords: false,
+    };
 
     const section = await createPasswordsSection();
 
@@ -405,4 +447,187 @@ suite('PasswordsSectionTest', function() {
     // Now import passwords option is hidden.
     assertTrue(section.$.importPasswords.hidden);
   });
+
+  test('add button hidden when pref disabled', async function() {
+    const section: PasswordsSectionElement =
+        document.createElement('passwords-section');
+    section.prefs = makePasswordManagerPrefs();
+    section.prefs.credentials_enable_service.value = false;
+    section.prefs.credentials_enable_service.enforcement =
+        chrome.settingsPrivate.Enforcement.ENFORCED;
+    document.body.appendChild(section);
+    await flushTasks();
+
+    assertFalse(isVisible(section.$.addPasswordButton));
+  });
+
+  test('import hidden when policy disabled', async function() {
+    const section: PasswordsSectionElement =
+        document.createElement('passwords-section');
+    section.prefs = makePasswordManagerPrefs();
+    section.prefs.credentials_enable_service.value = false;
+    section.prefs.credentials_enable_service.enforcement =
+        chrome.settingsPrivate.Enforcement.ENFORCED;
+    document.body.appendChild(section);
+    await flushTasks();
+
+    assertFalse(isVisible(section.$.importPasswords));
+  });
+
+  test('clicking move passwords opens move passwords dialog', async function() {
+    passwordManager.data.isOptedInAccountStorage = true;
+    passwordManager.data.groups = [createCredentialGroup({
+      name: 'test.com',
+      credentials: [createPasswordEntry({
+        username: 'user',
+        id: 0,
+        inProfileStore: true,
+        affiliatedDomains: [createAffiliatedDomain('test.com')],
+      })],
+    })];
+    passwordManager.setRequestCredentialsDetailsResponse(
+        passwordManager.data.groups[0]!.entries);
+    syncProxy.syncInfo = {
+      isEligibleForAccountStorage: true,
+      isSyncingPasswords: false,
+    };
+
+    const section = await createPasswordsSection();
+
+    assertTrue(isVisible(section.$.movePasswords));
+
+    section.$.movePasswords.click();
+    await flushTasks();
+
+    const movdeDialog =
+        section.shadowRoot!.querySelector('move-passwords-dialog');
+    assertTrue(!!movdeDialog);
+    assertTrue(movdeDialog.$.dialog.open);
+  });
+
+  test('description is hidden during search', async function() {
+    passwordManager.data.groups = [
+      createCredentialGroup({
+        name: 'foo.com',
+      }),
+      createCredentialGroup({
+        name: 'bar.com',
+      }),
+    ];
+
+    const section = await createPasswordsSection();
+
+    assertTrue(isVisible(section.$.descriptionLabel));
+
+    const query = new URLSearchParams();
+    query.set(UrlParam.SEARCH_TERM, 'bar');
+    Router.getInstance().updateRouterParams(query);
+    await flushTasks();
+
+    assertFalse(isVisible(section.$.descriptionLabel));
+  });
+
+  test('Move passwords is hidden during search', async function() {
+    passwordManager.data.isOptedInAccountStorage = true;
+    passwordManager.data.groups = [createCredentialGroup({
+      name: 'test.com',
+      credentials: [createPasswordEntry({
+        username: 'user',
+        id: 0,
+        inProfileStore: true,
+        affiliatedDomains: [createAffiliatedDomain('test.com')],
+      })],
+    })];
+    passwordManager.setRequestCredentialsDetailsResponse(
+        passwordManager.data.groups[0]!.entries);
+    syncProxy.syncInfo = {
+      isEligibleForAccountStorage: true,
+      isSyncingPasswords: false,
+    };
+
+    const section = await createPasswordsSection();
+
+    assertTrue(isVisible(section.$.movePasswords));
+
+    const query = new URLSearchParams();
+    query.set(UrlParam.SEARCH_TERM, 'bar');
+    Router.getInstance().updateRouterParams(query);
+    await flushTasks();
+
+    assertFalse(isVisible(section.$.movePasswords));
+  });
+
+  test('No password is shown when no matches', async function() {
+    passwordManager.data.groups = [
+      createCredentialGroup({
+        name: 'foo.com',
+      }),
+      createCredentialGroup({
+        name: 'bar.com',
+      }),
+    ];
+
+    const section = await createPasswordsSection();
+
+    assertFalse(isVisible(section.$.noPasswordsFound));
+
+    const query = new URLSearchParams();
+    query.set(UrlParam.SEARCH_TERM, 'bar');
+    Router.getInstance().updateRouterParams(query);
+    await flushTasks();
+    assertFalse(isVisible(section.$.noPasswordsFound));
+
+    query.set(UrlParam.SEARCH_TERM, 'bar.org');
+    Router.getInstance().updateRouterParams(query);
+    await flushTasks();
+    assertTrue(isVisible(section.$.noPasswordsFound));
+  });
+
+  test('No password is hidden when there are no passwords', async function() {
+    const section = await createPasswordsSection();
+
+    assertFalse(isVisible(section.$.noPasswordsFound));
+
+    const query = new URLSearchParams();
+    query.set(UrlParam.SEARCH_TERM, 'test');
+    Router.getInstance().updateRouterParams(query);
+    await flushTasks();
+
+    assertFalse(isVisible(section.$.noPasswordsFound));
+  });
+
+  test(
+      'clicking group navigates to details page and keeps old query',
+      async function() {
+        const query = new URLSearchParams();
+        query.set(UrlParam.SEARCH_TERM, 'test');
+        Router.getInstance().navigateTo(Page.PASSWORDS, null, query);
+
+        passwordManager.data.groups = [createCredentialGroup({
+          name: 'test.com',
+          credentials: [
+            createPasswordEntry({id: 0}),
+            createPasswordEntry({id: 1}),
+          ],
+        })];
+        passwordManager.setRequestCredentialsDetailsResponse(
+            passwordManager.data.groups[0]!.entries.slice());
+
+        const section = await createPasswordsSection();
+
+        const listEntry = section.shadowRoot!.querySelector<HTMLElement>(
+            'password-list-item');
+        assertTrue(!!listEntry);
+        listEntry.click();
+        assertEquals(
+            PasswordViewPageInteractions.CREDENTIAL_ROW_CLICKED,
+            await passwordManager.whenCalled('recordPasswordViewInteraction'));
+        assertArrayEquals(
+            [0, 1],
+            await passwordManager.whenCalled('requestCredentialsDetails'));
+
+        assertEquals(
+            Page.PASSWORD_DETAILS, Router.getInstance().currentRoute.page);
+        assertEquals(query, Router.getInstance().currentRoute.queryParameters);
+      });
 });

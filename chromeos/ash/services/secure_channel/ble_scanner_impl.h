@@ -8,6 +8,7 @@
 #include <memory>
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
 #include "chromeos/ash/services/secure_channel/ble_scanner.h"
@@ -74,6 +75,8 @@ class BleScannerImpl : public BleScanner,
   void HandleScanRequestChange() override;
 
   // device::BluetoothAdapter::Observer:
+  void AdapterPoweredChanged(device::BluetoothAdapter* adapter,
+                             bool powered) override;
   void DeviceAdvertisementReceived(device::BluetoothAdapter* adapter,
                                    device::BluetoothDevice* device,
                                    int16_t rssi,
@@ -113,8 +116,8 @@ class BleScannerImpl : public BleScanner,
   void SetServiceDataProviderForTesting(
       std::unique_ptr<ServiceDataProvider> service_data_provider);
 
-  BluetoothHelper* bluetooth_helper_;
-  BleSynchronizerBase* ble_synchronizer_;
+  raw_ptr<BluetoothHelper, ExperimentalAsh> bluetooth_helper_;
+  raw_ptr<BleSynchronizerBase, ExperimentalAsh> ble_synchronizer_;
   scoped_refptr<device::BluetoothAdapter> adapter_;
 
   std::unique_ptr<ServiceDataProvider> service_data_provider_;

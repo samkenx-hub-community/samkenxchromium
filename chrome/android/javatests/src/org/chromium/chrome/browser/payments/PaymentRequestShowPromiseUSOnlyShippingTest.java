@@ -12,16 +12,15 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.test.util.CommandLineFlags;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.autofill.AutofillTestHelper;
-import org.chromium.chrome.browser.autofill.PersonalDataManager.AutofillProfile;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.payments.PaymentRequestTestRule.AppPresence;
 import org.chromium.chrome.browser.payments.PaymentRequestTestRule.AppSpeed;
 import org.chromium.chrome.browser.payments.PaymentRequestTestRule.FactorySpeed;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.R;
+import org.chromium.components.autofill.AutofillProfile;
 
 import java.util.concurrent.TimeoutException;
 
@@ -37,7 +36,6 @@ public class PaymentRequestShowPromiseUSOnlyShippingTest {
 
     @Test
     @MediumTest
-    @DisabledTest(message = "crbug.com/1182234")
     @Feature({"Payments"})
     public void testCannotShipWithFastApp() throws TimeoutException {
         mRule.addPaymentAppFactory(
@@ -47,7 +45,6 @@ public class PaymentRequestShowPromiseUSOnlyShippingTest {
 
     @Test
     @MediumTest
-    @DisabledTest(message = "crbug.com/1182234")
     @Feature({"Payments"})
     public void testCannotShipWithSlowApp() throws TimeoutException {
         mRule.addPaymentAppFactory("https://example.test", AppPresence.HAVE_APPS,
@@ -57,9 +54,17 @@ public class PaymentRequestShowPromiseUSOnlyShippingTest {
 
     private void runCannotShipTest() throws TimeoutException {
         AutofillTestHelper autofillTestHelper = new AutofillTestHelper();
-        autofillTestHelper.setProfile(new AutofillProfile("", "https://example.test", true,
-                "" /* honorific prefix */, "Jon Doe", "Google", "51 Breithaupt St", "ON",
-                "Kitchener", "", "N2H 5G5", "", "CA", "555-222-2222", "", "en-CA"));
+        autofillTestHelper.setProfile(AutofillProfile.builder()
+                                              .setFullName("Jon Doe")
+                                              .setCompanyName("Google")
+                                              .setStreetAddress("51 Breithaupt St")
+                                              .setRegion("ON")
+                                              .setLocality("Kitchener")
+                                              .setPostalCode("N2H 5G5")
+                                              .setCountryCode("CA")
+                                              .setPhoneNumber("555-222-2222")
+                                              .setLanguageCode("en-CA")
+                                              .build());
         mRule.triggerUIAndWait("buy", mRule.getReadyForInput());
         Assert.assertEquals("USD $1.00", mRule.getOrderSummaryTotal());
         mRule.clickInShippingAddressAndWait(R.id.payments_section, mRule.getReadyForInput());
@@ -74,7 +79,6 @@ public class PaymentRequestShowPromiseUSOnlyShippingTest {
 
     @Test
     @MediumTest
-    @DisabledTest(message = "crbug.com/1182234")
     @Feature({"Payments"})
     public void testCanShipWithFastApp() throws TimeoutException {
         mRule.addPaymentAppFactory(
@@ -84,7 +88,6 @@ public class PaymentRequestShowPromiseUSOnlyShippingTest {
 
     @Test
     @MediumTest
-    @DisabledTest(message = "crbug.com/1182234")
     @Feature({"Payments"})
     public void testCanShipWithSlowApp() throws TimeoutException {
         mRule.addPaymentAppFactory("https://example.test", AppPresence.HAVE_APPS,
@@ -94,9 +97,17 @@ public class PaymentRequestShowPromiseUSOnlyShippingTest {
 
     private void runCanShipTest() throws TimeoutException {
         AutofillTestHelper autofillTestHelper = new AutofillTestHelper();
-        autofillTestHelper.setProfile(new AutofillProfile("", "https://example.test", true,
-                "" /* honorific prefix */, "Jane Smith", "Google", "340 Main St", "California",
-                "Los Angeles", "", "90291", "", "US", "555-111-1111", "", "en-US"));
+        autofillTestHelper.setProfile(AutofillProfile.builder()
+                                              .setFullName("Jane Smith")
+                                              .setCompanyName("Google")
+                                              .setStreetAddress("340 Main St")
+                                              .setRegion("California")
+                                              .setLocality("Los Angeles")
+                                              .setPostalCode("90291")
+                                              .setCountryCode("US")
+                                              .setPhoneNumber("555-111-1111")
+                                              .setLanguageCode("en-US")
+                                              .build());
         mRule.triggerUIAndWait("buy", mRule.getReadyForInput());
         Assert.assertEquals("USD $1.00", mRule.getOrderSummaryTotal());
         mRule.clickInShippingAddressAndWait(R.id.payments_section, mRule.getReadyForInput());

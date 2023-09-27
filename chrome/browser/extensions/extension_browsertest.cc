@@ -56,6 +56,7 @@
 #include "components/services/app_service/public/cpp/app_launch_util.h"
 #include "components/sync/model/string_ordinal.h"
 #include "components/version_info/version_info.h"
+#include "content/public/browser/browser_context.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_registrar.h"
@@ -72,7 +73,6 @@
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
-#include "extensions/browser/notification_types.h"
 #include "extensions/browser/service_worker/service_worker_test_utils.h"
 #include "extensions/browser/test_extension_registry_observer.h"
 #include "extensions/browser/uninstall_reason.h"
@@ -299,8 +299,8 @@ ExtensionBrowserTest::ExtensionBrowserTest(ContextType context_type)
       set_chromeos_user_(true),
 #endif
       context_type_(context_type),
-      // Default channel is STABLE but override with UNKNOWN so that unlaunched
-      // or incomplete APIs can write tests.
+      // TODO(crbug/1427323): Move this ScopedCurrentChannel down into tests
+      // that specifically require it.
       current_channel_(version_info::Channel::UNKNOWN),
       override_prompt_for_external_extensions_(
           FeatureSwitch::prompt_for_external_extensions(),
@@ -789,8 +789,7 @@ void ExtensionBrowserTest::OpenWindow(content::WebContents* contents,
                                       bool should_succeed,
                                       content::WebContents** newtab_result) {
   content::WebContentsAddedObserver tab_added_observer;
-  ASSERT_TRUE(content::ExecuteScript(contents,
-                                     "window.open('" + url.spec() + "');"));
+  ASSERT_TRUE(content::ExecJs(contents, "window.open('" + url.spec() + "');"));
   content::WebContents* newtab = tab_added_observer.GetWebContents();
   ASSERT_TRUE(newtab);
   WaitForLoadStop(newtab);
@@ -822,10 +821,8 @@ void ExtensionBrowserTest::OpenWindow(content::WebContents* contents,
 
 bool ExtensionBrowserTest::NavigateInRenderer(content::WebContents* contents,
                                               const GURL& url) {
-  // Note: We use ExecuteScript instead of ExecJS here, because ExecuteScript
-  // works on pages with a Content Security Policy.
-  EXPECT_TRUE(content::ExecuteScript(
-      contents, "window.location = '" + url.spec() + "';"));
+  EXPECT_TRUE(
+      content::ExecJs(contents, "window.location = '" + url.spec() + "';"));
   bool result = content::WaitForLoadStop(contents);
   EXPECT_EQ(url, contents->GetController().GetLastCommittedEntry()->GetURL());
   return result;
@@ -847,11 +844,19 @@ ExtensionHost* ExtensionBrowserTest::FindHostWithPath(ProcessManager* manager,
   return result_host;
 }
 
-std::string ExtensionBrowserTest::ExecuteScriptInBackgroundPage(
+base::Value ExtensionBrowserTest::ExecuteScriptInBackgroundPage(
     const std::string& extension_id,
     const std::string& script,
     browsertest_util::ScriptUserActivation script_user_activation) {
   return browsertest_util::ExecuteScriptInBackgroundPage(
+      profile(), extension_id, script, script_user_activation);
+}
+
+std::string ExtensionBrowserTest::ExecuteScriptInBackgroundPageDeprecated(
+    const std::string& extension_id,
+    const std::string& script,
+    browsertest_util::ScriptUserActivation script_user_activation) {
+  return browsertest_util::ExecuteScriptInBackgroundPageDeprecated(
       profile(), extension_id, script, script_user_activation);
 }
 
@@ -860,6 +865,16 @@ bool ExtensionBrowserTest::ExecuteScriptInBackgroundPageNoWait(
     const std::string& script) {
   return browsertest_util::ExecuteScriptInBackgroundPageNoWait(
       profile(), extension_id, script);
+}
+
+content::ServiceWorkerContext* ExtensionBrowserTest::GetServiceWorkerContext() {
+  return GetServiceWorkerContext(profile());
+}
+
+// static
+content::ServiceWorkerContext* ExtensionBrowserTest::GetServiceWorkerContext(
+    content::BrowserContext* browser_context) {
+  return service_worker_test_utils::GetServiceWorkerContext(browser_context);
 }
 
 bool ExtensionBrowserTest::ModifyExtensionIfNeeded(

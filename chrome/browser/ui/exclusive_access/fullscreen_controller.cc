@@ -9,8 +9,8 @@
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
-#include "base/metrics/histogram_macros.h"
 #include "base/metrics/user_metrics.h"
+#include "base/notreached.h"
 #include "base/observer_list.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
@@ -44,9 +44,6 @@
 using content::WebContents;
 
 namespace {
-
-const char kFullscreenBubbleReshowsHistogramName[] =
-    "ExclusiveAccess.BubbleReshowsPerSession.Fullscreen";
 
 int64_t GetDisplayId(const WebContents& web_contents) {
   if (auto* screen = display::Screen::GetScreen()) {
@@ -192,6 +189,13 @@ void FullscreenController::EnterFullscreenModeForTab(
   const bool was_window_fullscreen_for_tab_or_pending =
       !requesting_another_screen && IsWindowFullscreenForTabOrPending();
 
+  if (exclusive_access_tab() && exclusive_access_tab() != web_contents) {
+    // This unexpected condition may be hit in practice; see crbug.com/1456875.
+    // In known circumstances it is safe to just clear the exclusive_access_tab,
+    // but behavior and assumptions should be rectified; see crbug.com/1244121.
+    NOTIMPLEMENTED() << "Conflicting exclusive access tab assignment detected";
+    SetTabWithExclusiveAccess(nullptr);
+  }
   SetTabWithExclusiveAccess(web_contents);
   requesting_origin_ =
       requesting_frame->GetLastCommittedURL().DeprecatedGetOriginAsURL();
@@ -448,12 +452,6 @@ void FullscreenController::NotifyTabExclusiveAccessLost() {
   }
 }
 
-void FullscreenController::RecordBubbleReshowsHistogram(
-    int bubble_reshow_count) {
-  UMA_HISTOGRAM_COUNTS_100(kFullscreenBubbleReshowsHistogramName,
-                           bubble_reshow_count);
-}
-
 void FullscreenController::ToggleFullscreenModeInternal(
     FullscreenInternalOption option,
     content::RenderFrameHost* requesting_frame,
@@ -538,7 +536,6 @@ void FullscreenController::ExitFullscreenModeInternal() {
   if (chrome::IsRunningInAppMode())
     return;
 
-  RecordExitingUMA();
   toggled_into_fullscreen_ = false;
   started_fullscreen_transition_ = true;
 #if BUILDFLAG(IS_MAC)

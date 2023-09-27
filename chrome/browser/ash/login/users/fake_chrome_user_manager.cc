@@ -19,12 +19,8 @@
 #include "chrome/browser/ash/login/users/chrome_user_manager.h"
 #include "chrome/browser/ash/login/users/chrome_user_manager_util.h"
 #include "chrome/browser/ash/login/users/default_user_image/default_user_images.h"
-#include "chrome/browser/ash/login/users/fake_supervised_user_manager.h"
-#include "chrome/browser/ash/policy/core/browser_policy_connector_ash.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/ash/settings/cros_settings.h"
-#include "chrome/browser/browser_process.h"
-#include "chrome/browser/browser_process_platform_part.h"
 #include "chrome/browser/ui/ash/wallpaper_controller_client_impl.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chromeos/ash/components/login/login_state/login_state.h"
@@ -72,11 +68,8 @@ class FakeTaskRunner : public base::SingleThreadTaskRunner {
 
 namespace ash {
 
-class FakeSupervisedUserManager;
-
 FakeChromeUserManager::FakeChromeUserManager()
-    : ChromeUserManager(new FakeTaskRunner()),
-      supervised_user_manager_(new FakeSupervisedUserManager) {
+    : ChromeUserManager(new FakeTaskRunner()) {
   ProfileHelper::SetProfileToUserForTestingEnabled(true);
 }
 
@@ -102,6 +95,13 @@ user_manager::User* FakeChromeUserManager::AddUserWithAffiliation(
       account_id, is_affiliated, user_manager::USER_TYPE_REGULAR, nullptr);
 }
 
+user_manager::User* FakeChromeUserManager::AddSamlUser(
+    const AccountId& account_id) {
+  user_manager::User* user = AddUser(account_id);
+  user->set_using_saml(true);
+  return user;
+}
+
 user_manager::User*
 FakeChromeUserManager::AddUserWithAffiliationAndTypeAndProfile(
     const AccountId& account_id,
@@ -118,12 +118,15 @@ FakeChromeUserManager::AddUserWithAffiliationAndTypeAndProfile(
           *ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(
               IDR_LOGIN_DEFAULT_USER)),
       user_manager::User::USER_IMAGE_PROFILE, false);
+  user_storage_.emplace_back(user);
   users_.push_back(user);
-  ProfileHelper::Get()->SetProfileToUserMappingForTesting(user);
 
   if (profile) {
     ProfileHelper::Get()->SetUserToProfileMappingForTesting(user, profile);
   }
+
+  NotifyUserAffiliationUpdated(*user);
+
   return user;
 }
 
@@ -132,6 +135,7 @@ user_manager::User* FakeChromeUserManager::AddKioskAppUser(
   user_manager::User* user = user_manager::User::CreateKioskAppUser(account_id);
   user->set_username_hash(
       user_manager::FakeUserManager::GetFakeUsernameHash(account_id));
+  user_storage_.emplace_back(user);
   users_.push_back(user);
   return user;
 }
@@ -142,6 +146,7 @@ user_manager::User* FakeChromeUserManager::AddArcKioskAppUser(
       user_manager::User::CreateArcKioskAppUser(account_id);
   user->set_username_hash(
       user_manager::FakeUserManager::GetFakeUsernameHash(account_id));
+  user_storage_.emplace_back(user);
   users_.push_back(user);
   return user;
 }
@@ -152,26 +157,25 @@ user_manager::User* FakeChromeUserManager::AddWebKioskAppUser(
       user_manager::User::CreateWebKioskAppUser(account_id);
   user->set_username_hash(
       user_manager::FakeUserManager::GetFakeUsernameHash(account_id));
+  user_storage_.emplace_back(user);
   users_.push_back(user);
   return user;
 }
 
 user_manager::User* FakeChromeUserManager::AddGuestUser() {
   user_manager::User* user =
-      user_manager::User::CreateGuestUser(GetGuestAccountId());
+      user_manager::User::CreateGuestUser(user_manager::GuestAccountId());
   user->set_username_hash(
       user_manager::FakeUserManager::GetFakeUsernameHash(user->GetAccountId()));
+  user_storage_.emplace_back(user);
   users_.push_back(user);
   return user;
 }
 
 user_manager::User* FakeChromeUserManager::AddPublicAccountUser(
-    const AccountId& account_id,
-    bool with_saml) {
+    const AccountId& account_id) {
   user_manager::User* user =
-      with_saml ? user_manager::User::CreatePublicAccountUserForTestingWithSAML(
-                      account_id)
-                : user_manager::User::CreatePublicAccountUser(account_id);
+      user_manager::User::CreatePublicAccountUser(account_id);
   user->set_username_hash(
       user_manager::FakeUserManager::GetFakeUsernameHash(account_id));
   user->SetStubImage(
@@ -179,22 +183,9 @@ user_manager::User* FakeChromeUserManager::AddPublicAccountUser(
           *ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(
               IDR_LOGIN_DEFAULT_USER)),
       user_manager::User::USER_IMAGE_PROFILE, false);
+  user_storage_.emplace_back(user);
   users_.push_back(user);
-  ProfileHelper::Get()->SetProfileToUserMappingForTesting(user);
   return user;
-}
-
-user_manager::User* FakeChromeUserManager::AddActiveDirectoryUser(
-    const AccountId& account_id) {
-  DCHECK(account_id.GetAccountType() == AccountType::ACTIVE_DIRECTORY);
-  return AddUserWithAffiliationAndTypeAndProfile(
-      account_id, /*is_affiliated=*/false,
-      user_manager::USER_TYPE_ACTIVE_DIRECTORY,
-      /*profile=*/nullptr);
-}
-
-bool FakeChromeUserManager::AreEphemeralUsersEnabled() const {
-  return fake_ephemeral_users_enabled_;
 }
 
 void FakeChromeUserManager::LoginUser(const AccountId& account_id,
@@ -203,8 +194,9 @@ void FakeChromeUserManager::LoginUser(const AccountId& account_id,
                user_manager::FakeUserManager::GetFakeUsernameHash(account_id),
                false /* browser_restart */, false /* is_child */);
 
-  if (!set_profile_created_flag)
+  if (!set_profile_created_flag) {
     return;
+  }
 
   // NOTE: This does not match production. See function comment.
   SimulateUserProfileLoad(account_id);
@@ -215,16 +207,13 @@ FakeChromeUserManager::GetMultiProfileUserController() {
   return multi_profile_user_controller_;
 }
 
-SupervisedUserManager* FakeChromeUserManager::GetSupervisedUserManager() {
-  return supervised_user_manager_.get();
-}
-
 UserImageManager* FakeChromeUserManager::GetUserImageManager(
     const AccountId& account_id) {
   UserImageManagerMap::iterator user_image_manager_it =
       user_image_managers_.find(account_id);
-  if (user_image_manager_it != user_image_managers_.end())
+  if (user_image_manager_it != user_image_managers_.end()) {
     return user_image_manager_it->second.get();
+  }
   if (mock_user_image_manager_enabled_) {
     auto mgr =
         std::make_unique<::testing::NiceMock<MockUserImageManager>>(account_id);
@@ -236,34 +225,6 @@ UserImageManager* FakeChromeUserManager::GetUserImageManager(
   UserImageManagerImpl* mgr_raw = mgr.get();
   user_image_managers_[account_id] = std::move(mgr);
   return mgr_raw;
-}
-
-void FakeChromeUserManager::SetUserFlow(const AccountId& account_id,
-                                        UserFlow* flow) {
-  ResetUserFlow(account_id);
-  specific_flows_[account_id] = flow;
-}
-
-UserFlow* FakeChromeUserManager::GetCurrentUserFlow() const {
-  if (!IsUserLoggedIn())
-    return GetDefaultUserFlow();
-  return GetUserFlow(GetActiveUser()->GetAccountId());
-}
-
-UserFlow* FakeChromeUserManager::GetUserFlow(
-    const AccountId& account_id) const {
-  FlowMap::const_iterator it = specific_flows_.find(account_id);
-  if (it != specific_flows_.end())
-    return it->second;
-  return GetDefaultUserFlow();
-}
-
-void FakeChromeUserManager::ResetUserFlow(const AccountId& account_id) {
-  FlowMap::iterator it = specific_flows_.find(account_id);
-  if (it != specific_flows_.end()) {
-    delete it->second;
-    specific_flows_.erase(it);
-  }
 }
 
 void FakeChromeUserManager::SwitchActiveUser(const AccountId& account_id) {
@@ -284,27 +245,26 @@ void FakeChromeUserManager::SwitchActiveUser(const AccountId& account_id) {
 
 void FakeChromeUserManager::OnSessionStarted() {}
 
-void FakeChromeUserManager::RemoveUser(
-    const AccountId& account_id,
-    user_manager::UserRemovalReason reason,
-    user_manager::RemoveUserDelegate* delegate) {}
+void FakeChromeUserManager::RemoveUser(const AccountId& account_id,
+                                       user_manager::UserRemovalReason reason) {
+  // TODO(b/278643115): Unify the implementation with the real one.
+  NotifyUserToBeRemoved(account_id);
+  RemoveUserFromList(account_id);
+  NotifyUserRemoved(account_id, reason);
+}
 
 void FakeChromeUserManager::RemoveUserFromList(const AccountId& account_id) {
   WallpaperControllerClientImpl* const wallpaper_client =
       WallpaperControllerClientImpl::Get();
   // `wallpaper_client` could be nullptr in tests.
-  if (wallpaper_client)
+  if (wallpaper_client) {
     wallpaper_client->RemoveUserWallpaper(account_id, base::DoNothing());
-  ProfileHelper::Get()->RemoveUserFromListForTesting(account_id);
+  }
 
   const user_manager::UserList::iterator it =
       base::ranges::find(users_, account_id, &user_manager::User::GetAccountId);
   if (it != users_.end()) {
-    if (primary_user_ == *it)
-      primary_user_ = nullptr;
-    if (active_user_ != *it)
-      delete *it;
-    users_.erase(it);
+    DeleteUser(*it);
   }
 }
 
@@ -328,23 +288,8 @@ user_manager::UserList FakeChromeUserManager::GetUsersAllowedForMultiProfile()
   return result;
 }
 
-UserFlow* FakeChromeUserManager::GetDefaultUserFlow() const {
-  if (!default_flow_.get())
-    default_flow_ = std::make_unique<DefaultUserFlow>();
-  return default_flow_.get();
-}
-
 void FakeChromeUserManager::SetOwnerId(const AccountId& account_id) {
   UserManagerBase::SetOwnerId(account_id);
-}
-
-const AccountId& FakeChromeUserManager::GetGuestAccountId() const {
-  return user_manager::GuestAccountId();
-}
-
-bool FakeChromeUserManager::IsFirstExecAfterBoot() const {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kFirstExecAfterBoot);
 }
 
 void FakeChromeUserManager::AsyncRemoveCryptohome(
@@ -352,35 +297,13 @@ void FakeChromeUserManager::AsyncRemoveCryptohome(
   NOTIMPLEMENTED();
 }
 
-bool FakeChromeUserManager::IsGuestAccountId(
-    const AccountId& account_id) const {
-  return account_id == user_manager::GuestAccountId();
-}
-
-bool FakeChromeUserManager::IsStubAccountId(const AccountId& account_id) const {
-  return account_id == user_manager::StubAccountId();
-}
-
 bool FakeChromeUserManager::IsDeprecatedSupervisedAccountId(
     const AccountId& account_id) const {
-  const policy::BrowserPolicyConnectorAsh* connector =
-      g_browser_process->platform_part()->browser_policy_connector_ash();
-  // Supervised accounts are not allowed on the Active Directory devices. It
-  // also makes sure "locally-managed.localhost" would work properly and would
-  // not be detected as supervised users.
-  if (connector->IsActiveDirectoryManaged())
-    return false;
   return gaia::ExtractDomainName(account_id.GetUserEmail()) ==
          user_manager::kSupervisedUserDomain;
 }
 
-bool FakeChromeUserManager::HasBrowserRestarted() const {
-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  return base::SysInfo::IsRunningOnChromeOS() &&
-         command_line->HasSwitch(switches::kLoginUser);
-}
-
-const gfx::ImageSkia& FakeChromeUserManager::GetResourceImagekiaNamed(
+const gfx::ImageSkia& FakeChromeUserManager::GetResourceImageSkiaNamed(
     int id) const {
   return *ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(id);
 }
@@ -445,8 +368,9 @@ void FakeChromeUserManager::UserLoggedIn(const AccountId& account_id,
       user->set_is_logged_in(true);
       logged_in_users_.push_back(user);
 
-      if (!primary_user_)
+      if (!primary_user_) {
         primary_user_ = user;
+      }
       break;
     }
   }
@@ -463,13 +387,15 @@ bool FakeChromeUserManager::IsKnownUser(const AccountId& account_id) const {
 
 const user_manager::User* FakeChromeUserManager::FindUser(
     const AccountId& account_id) const {
-  if (active_user_ != nullptr && active_user_->GetAccountId() == account_id)
+  if (active_user_ != nullptr && active_user_->GetAccountId() == account_id) {
     return active_user_;
+  }
 
   const user_manager::UserList& users = GetUsers();
   for (const auto* user : users) {
-    if (user->GetAccountId() == account_id)
+    if (user->GetAccountId() == account_id) {
       return user;
+    }
   }
 
   return nullptr;
@@ -477,13 +403,15 @@ const user_manager::User* FakeChromeUserManager::FindUser(
 
 user_manager::User* FakeChromeUserManager::FindUserAndModify(
     const AccountId& account_id) {
-  if (active_user_ != nullptr && active_user_->GetAccountId() == account_id)
+  if (active_user_ != nullptr && active_user_->GetAccountId() == account_id) {
     return active_user_;
+  }
 
   const user_manager::UserList& users = GetUsers();
   for (auto* user : users) {
-    if (user->GetAccountId() == account_id)
+    if (user->GetAccountId() == account_id) {
       return user;
+    }
   }
 
   return nullptr;
@@ -540,7 +468,12 @@ std::u16string FakeChromeUserManager::GetUserDisplayName(
 void FakeChromeUserManager::SaveUserDisplayEmail(
     const AccountId& account_id,
     const std::string& display_email) {
-  NOTREACHED();
+  user_manager::User* user = FindUserAndModify(account_id);
+  if (!user) {
+    LOG(ERROR) << "User not found: " << account_id.GetUserEmail();
+    return;
+  }
+  user->set_display_email(display_email);
 }
 
 void FakeChromeUserManager::SaveUserType(const user_manager::User* user) {
@@ -553,10 +486,6 @@ absl::optional<std::string> FakeChromeUserManager::GetOwnerEmail() {
 
 bool FakeChromeUserManager::IsCurrentUserOwner() const {
   return active_user_ && GetOwnerAccountId() == active_user_->GetAccountId();
-}
-
-bool FakeChromeUserManager::IsCurrentUserNew() const {
-  return current_user_new_;
 }
 
 bool FakeChromeUserManager::IsCurrentUserNonCryptohomeDataEphemeral() const {
@@ -583,7 +512,7 @@ bool FakeChromeUserManager::IsLoggedInAsChildUser() const {
   return current_user_child_;
 }
 
-bool FakeChromeUserManager::IsLoggedInAsPublicAccount() const {
+bool FakeChromeUserManager::IsLoggedInAsManagedGuestSession() const {
   const user_manager::User* active_user = GetActiveUser();
   return active_user
              ? active_user->GetType() == user_manager::USER_TYPE_PUBLIC_ACCOUNT
@@ -651,16 +580,13 @@ bool FakeChromeUserManager::IsUserAllowed(
          user.GetType() == user_manager::USER_TYPE_CHILD);
 
   if (user.GetType() == user_manager::USER_TYPE_GUEST &&
-      !IsGuestSessionAllowed())
+      !IsGuestSessionAllowed()) {
     return false;
-  if (user.HasGaiaAccount() && !IsGaiaUserAllowed(user))
+  }
+  if (user.HasGaiaAccount() && !IsGaiaUserAllowed(user)) {
     return false;
+  }
   return true;
-}
-
-void FakeChromeUserManager::CreateLocalState() {
-  local_state_ = std::make_unique<TestingPrefServiceSimple>();
-  ChromeUserManager::RegisterPrefs(local_state_->registry());
 }
 
 void FakeChromeUserManager::SimulateUserProfileLoad(
@@ -671,17 +597,6 @@ void FakeChromeUserManager::SimulateUserProfileLoad(
       break;
     }
   }
-}
-
-PrefService* FakeChromeUserManager::GetLocalState() const {
-  if (local_state_.get()) {
-    return local_state_.get();
-  }
-  return g_browser_process ? g_browser_process->local_state() : nullptr;
-}
-
-void FakeChromeUserManager::SetIsCurrentUserNew(bool is_new) {
-  NOTREACHED();
 }
 
 const std::string& FakeChromeUserManager::GetApplicationLocale() const {
@@ -696,10 +611,6 @@ void FakeChromeUserManager::LoadDeviceLocalAccounts(
 
 bool FakeChromeUserManager::IsEnterpriseManaged() const {
   return is_enterprise_managed_;
-}
-
-void FakeChromeUserManager::PerformPostUserListLoadingActions() {
-  NOTREACHED();
 }
 
 void FakeChromeUserManager::PerformPostUserLoggedInActions(
@@ -719,44 +630,39 @@ void FakeChromeUserManager::PublicAccountUserLoggedIn(
   NOTREACHED();
 }
 
-void FakeChromeUserManager::OnUserRemoved(const AccountId& account_id) {
-  NOTREACHED();
-}
-
 void FakeChromeUserManager::SetUserAffiliation(
     const AccountId& account_id,
-    const AffiliationIDSet& user_affiliation_ids) {}
+    const base::flat_set<std::string>& user_affiliation_ids) {}
 
-bool FakeChromeUserManager::IsFullManagementDisclosureNeeded(
-    policy::DeviceLocalAccountPolicyBroker* broker) const {
-  return true;
+void FakeChromeUserManager::SetUserAffiliationForTesting(
+    const AccountId& account_id,
+    bool is_affiliated) {
+  auto* user = FindUserAndModify(account_id);
+  if (!user) {
+    return;
+  }
+  user->SetAffiliation(is_affiliated);
+  NotifyUserAffiliationUpdated(*user);
 }
 
-void FakeChromeUserManager::CacheRemovedUser(
-    const std::string& user_email,
-    user_manager::UserRemovalReason reason) {
-  removed_user_cache_.push_back(std::make_pair(user_email, reason));
-}
-
-std::vector<std::pair<std::string, user_manager::UserRemovalReason>>
-FakeChromeUserManager::GetRemovedUserCache() const {
-  return removed_user_cache_;
-}
-
-void FakeChromeUserManager::MarkReporterInitialized() {
-  removed_user_cache_.clear();
+bool FakeChromeUserManager::IsEphemeralAccountIdByPolicy(
+    const AccountId& account_id) const {
+  return fake_ephemeral_mode_config_.IsAccountIdIncluded(account_id);
 }
 
 user_manager::User* FakeChromeUserManager::GetActiveUserInternal() const {
-  if (active_user_ != nullptr)
+  if (active_user_ != nullptr) {
     return active_user_;
+  }
 
-  if (users_.empty())
+  if (users_.empty()) {
     return nullptr;
+  }
   if (active_account_id_.is_valid()) {
     for (auto* user : users_) {
-      if (user->GetAccountId() == active_account_id_)
+      if (user->GetAccountId() == active_account_id_) {
         return user;
+      }
     }
   }
   return users_[0];

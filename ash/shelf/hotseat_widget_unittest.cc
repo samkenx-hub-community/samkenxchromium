@@ -44,6 +44,7 @@
 #include "ash/wm/window_state.h"
 #include "ash/wm/wm_event.h"
 #include "ash/wm/work_area_insets.h"
+#include "base/memory/raw_ptr.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/icu_test_util.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -105,16 +106,10 @@ class HotseatWidgetTest
   }
 
   virtual void SetupFeatureLists() {
-    std::vector<base::test::FeatureRef> enabled_features;
-    std::vector<base::test::FeatureRef> disabled_features;
-
-    if (navigation_buttons_shown_in_tablet_mode()) {
-      disabled_features.push_back(features::kHideShelfControlsInTabletMode);
-    } else {
-      enabled_features.push_back(features::kHideShelfControlsInTabletMode);
-    }
-    enabled_features.push_back(features::kShelfPalmRejectionSwipeOffset);
-    scoped_feature_list_.InitWithFeatures(enabled_features, disabled_features);
+    scoped_feature_list_.InitWithFeatureStates(
+        {{features::kHideShelfControlsInTabletMode,
+          !navigation_buttons_shown_in_tablet_mode()},
+         {features::kShelfPalmRejectionSwipeOffset, true}});
   }
 
   void TearDown() override {
@@ -232,17 +227,11 @@ class HotseatWidgetTest
 class StackedHotseatWidgetTest : public HotseatWidgetTest {
  public:
   void SetupFeatureLists() override {
-    std::vector<base::test::FeatureRef> enabled_features;
-    std::vector<base::test::FeatureRef> disabled_features;
-
-    if (navigation_buttons_shown_in_tablet_mode()) {
-      disabled_features.push_back(features::kHideShelfControlsInTabletMode);
-    } else {
-      enabled_features.push_back(features::kHideShelfControlsInTabletMode);
-    }
-    enabled_features.push_back(features::kShelfPalmRejectionSwipeOffset);
-    enabled_features.push_back(features::kShelfStackedHotseat);
-    scoped_feature_list_.InitWithFeatures(enabled_features, disabled_features);
+    scoped_feature_list_.InitWithFeatureStates(
+        {{features::kHideShelfControlsInTabletMode,
+          !navigation_buttons_shown_in_tablet_mode()},
+         {features::kShelfPalmRejectionSwipeOffset, true},
+         {features::kShelfStackedHotseat, true}});
   }
 };
 
@@ -280,7 +269,7 @@ class ShelfStateWatcher : public ShelfObserver {
   ~ShelfStateWatcher() override {
     AshTestBase::GetPrimaryShelf()->RemoveObserver(this);
   }
-  void WillChangeVisibilityState(ShelfVisibilityState new_state) override {
+  void OnShelfVisibilityStateChanged(ShelfVisibilityState new_state) override {
     state_change_count_++;
   }
   int state_change_count() const { return state_change_count_; }
@@ -346,7 +335,8 @@ class HotseatTransitionAnimationObserver
     int aborted;
   } observer_counts_ = {0};
   std::unique_ptr<base::RunLoop> run_loop_;
-  HotseatTransitionAnimator* hotseat_transition_animator_;
+  raw_ptr<HotseatTransitionAnimator, ExperimentalAsh>
+      hotseat_transition_animator_;
 };
 
 // Used to test the Hotseat, ScrollableShelf, and DenseShelf features.
@@ -371,6 +361,10 @@ INSTANTIATE_TEST_SUITE_P(
 // TODO(b:270757104) Set status are widget sizes.
 TEST_P(StackedHotseatWidgetTest, StackedHotseatShownOnSmallScreens) {
   UpdateDisplay("475x350");
+  base::HistogramTester histogram_tester;
+  // Nothing logged before entering the tablet mode.
+  histogram_tester.ExpectTotalCount("Ash.Shelf.ShowStackedHotseat", 0);
+
   TabletModeControllerTestApi().EnterTabletMode();
   GetAppListTestHelper()->CheckVisibility(true);
   const gfx::Rect hotseat_bounds = GetPrimaryShelf()
@@ -380,11 +374,20 @@ TEST_P(StackedHotseatWidgetTest, StackedHotseatShownOnSmallScreens) {
   ASSERT_EQ(hotseat_bounds.bottom(),
             350 - ShelfConfig::Get()->hotseat_bottom_padding() * 2 -
                 ShelfConfig::Get()->shelf_size());
+
+  // Showed stacked hostseat.
+  histogram_tester.ExpectBucketCount("Ash.Shelf.ShowStackedHotseat", true, 1);
+  histogram_tester.ExpectBucketCount("Ash.Shelf.ShowStackedHotseat", false, 0);
 }
 
 // TODO(b:270757104) Set status are widget sizes.
 TEST_P(StackedHotseatWidgetTest, StackedHotseatNotShownOnLargeScreens) {
   UpdateDisplay("800x600");
+
+  base::HistogramTester histogram_tester;
+  // Nothing logged before entering the tablet mode.
+  histogram_tester.ExpectTotalCount("Ash.Shelf.ShowStackedHotseat", 0);
+
   TabletModeControllerTestApi().EnterTabletMode();
   GetAppListTestHelper()->CheckVisibility(true);
   const gfx::Rect hotseat_bounds = GetPrimaryShelf()
@@ -393,6 +396,10 @@ TEST_P(StackedHotseatWidgetTest, StackedHotseatNotShownOnLargeScreens) {
                                        ->GetWindowBoundsInScreen();
   ASSERT_EQ(hotseat_bounds.bottom(),
             600 - ShelfConfig::Get()->hotseat_bottom_padding());
+
+  // Showed regular hotseat.
+  histogram_tester.ExpectBucketCount("Ash.Shelf.ShowStackedHotseat", true, 0);
+  histogram_tester.ExpectBucketCount("Ash.Shelf.ShowStackedHotseat", false, 1);
 }
 
 TEST_P(HotseatWidgetTest, LongPressHomeWithoutAppWindow) {
@@ -1707,7 +1714,8 @@ TEST_P(HotseatWidgetTest, DismissHotseatWhenStatusAreaTrayShows) {
 
 // Tests that the work area updates once each when going to/from tablet mode
 // with no windows open.
-TEST_P(HotseatWidgetTest, WorkAreaUpdatesClamshellToFromHomeLauncherNoWindows) {
+TEST_P(HotseatWidgetTest,
+       DISABLED_WorkAreaUpdatesClamshellToFromHomeLauncherNoWindows) {
   DisplayWorkAreaChangeCounter counter;
   TabletModeControllerTestApi().EnterTabletMode();
 

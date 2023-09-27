@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {AmbientModeAlbum, AmbientObserverInterface, AmbientObserverRemote, AmbientProviderInterface, AnimationTheme, TemperatureUnit, TopicSource} from 'chrome://personalization/js/personalization_app.js';
+import {AmbientModeAlbum, AmbientObserverInterface, AmbientObserverRemote, AmbientProviderInterface, AmbientTheme, TemperatureUnit, TopicSource} from 'chrome://personalization/js/personalization_app.js';
 import {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
 import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
 
@@ -45,7 +45,27 @@ export class TestAmbientProvider extends TestBrowserProxy implements
       topicSource: TopicSource.kGooglePhotos,
       url: {url: 'http://test_url3'},
     },
+    {
+      id: '4',
+      checked: true,
+      title: '4',
+      description: '4',
+      numberOfPhotos: 1,
+      topicSource: TopicSource.kVideo,
+      url: {url: 'http://test_url4'},
+    },
+    {
+      id: '5',
+      checked: false,
+      title: '5',
+      description: '5',
+      numberOfPhotos: 1,
+      topicSource: TopicSource.kVideo,
+      url: {url: 'http://test_url5'},
+    },
   ];
+
+  public shouldShowBanner: boolean = true;
 
   public previews: Url[] = [
     {url: 'http://preview0'},
@@ -59,13 +79,16 @@ export class TestAmbientProvider extends TestBrowserProxy implements
       'isAmbientModeEnabled',
       'setAmbientObserver',
       'setAmbientModeEnabled',
-      'setAnimationTheme',
+      'setAmbientTheme',
       'setPageViewed',
+      'setScreenSaverDuration',
       'setTopicSource',
       'setTemperatureUnit',
       'setAlbumSelected',
       'startScreenSaverPreview',
       'fetchSettingsAndAlbums',
+      'shouldShowTimeOfDayBanner',
+      'handleTimeOfDayBannerDismissed',
     ]);
   }
 
@@ -87,8 +110,7 @@ export class TestAmbientProvider extends TestBrowserProxy implements
         /*ambientModeEnabled=*/ true);
 
     this.ambientObserverRemote!.onAlbumsChanged(this.albums);
-    this.ambientObserverRemote!.onAnimationThemeChanged(
-        AnimationTheme.kSlideshow);
+    this.ambientObserverRemote!.onAmbientThemeChanged(AmbientTheme.kSlideshow);
     this.ambientObserverRemote!.onTopicSourceChanged(TopicSource.kArtGallery);
     this.ambientObserverRemote!.onTemperatureUnitChanged(
         TemperatureUnit.kFahrenheit);
@@ -99,8 +121,12 @@ export class TestAmbientProvider extends TestBrowserProxy implements
     this.methodCalled('setAmbientModeEnabled', ambientModeEnabled);
   }
 
-  setAnimationTheme(animationTheme: AnimationTheme) {
-    this.methodCalled('setAnimationTheme', animationTheme);
+  setAmbientTheme(ambientTheme: AmbientTheme) {
+    this.methodCalled('setAmbientTheme', ambientTheme);
+  }
+
+  setScreenSaverDuration(minutes: number): void {
+    this.methodCalled('setScreenSaverDuration', minutes);
   }
 
   setTopicSource(topicSource: TopicSource) {
@@ -125,5 +151,14 @@ export class TestAmbientProvider extends TestBrowserProxy implements
 
   fetchSettingsAndAlbums() {
     this.methodCalled('fetchSettingsAndAlbums');
+  }
+
+  shouldShowTimeOfDayBanner(): Promise<{shouldShowBanner: boolean}> {
+    this.methodCalled('shouldShowTimeOfDayBanner');
+    return Promise.resolve({shouldShowBanner: this.shouldShowBanner});
+  }
+
+  handleTimeOfDayBannerDismissed(): void {
+    this.methodCalled('handleTimeOfDayBannerDismissed');
   }
 }

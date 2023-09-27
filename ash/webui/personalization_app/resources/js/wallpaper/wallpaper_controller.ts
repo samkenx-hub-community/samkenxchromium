@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {FilePath} from 'chrome://resources/mojo/mojo/public/mojom/base/file_path.mojom-webui.js';
 import {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
 
-import {GooglePhotosAlbum, GooglePhotosEnablementState, GooglePhotosPhoto, WallpaperCollection, WallpaperLayout, WallpaperProviderInterface, WallpaperType} from '../../personalization_app.mojom-webui.js';
+import {CurrentWallpaper, GooglePhotosAlbum, GooglePhotosEnablementState, GooglePhotosPhoto, WallpaperCollection, WallpaperImage, WallpaperLayout, WallpaperProviderInterface, WallpaperType} from '../../personalization_app.mojom-webui.js';
 import {setErrorAction} from '../personalization_actions.js';
 import {PersonalizationStore} from '../personalization_store.js';
 import {isNonEmptyArray} from '../utils.js';
 
 import {DisplayableImage} from './constants.js';
-import {isDefaultImage, isFilePath, isGooglePhotosPhoto, isImageEqualToSelected, isWallpaperImage} from './utils.js';
+import {isDefaultImage, isFilePath, isGooglePhotosPhoto, isImageAMatchForKey, isImageEqualToSelected, isWallpaperImage} from './utils.js';
 import * as action from './wallpaper_actions.js';
 import {DailyRefreshType} from './wallpaper_state.js';
 
@@ -208,7 +208,7 @@ export async function fetchGooglePhotosSharedAlbums(
 }
 
 /** Fetches whether the user is allowed to access Google Photos. */
-async function fetchGooglePhotosEnabled(
+export async function fetchGooglePhotosEnabled(
     provider: WallpaperProviderInterface,
     store: PersonalizationStore): Promise<void> {
   // Whether access is allowed should only be fetched once.
@@ -263,6 +263,40 @@ export async function fetchGooglePhotosPhotos(
   }
 
   store.dispatch(action.appendGooglePhotosPhotosAction(photos, resumeToken));
+}
+
+export async function searchImageThumbnails(
+    query: string, store: PersonalizationStore): Promise<void> {
+  // TODO(b/300129209): use real API to search for thumbnails.
+  store.dispatch(action.beginSearchImageThumbnailsAction(query));
+  const images = [
+    {
+      id: BigInt(1),
+      url: {url: 'chrome://personalization/images/feel_the_breeze.png'},
+    },
+    {
+      id: BigInt(2),
+      url: {url: 'chrome://personalization/images/float_on_by.png'},
+    },
+    {
+      id: BigInt(3),
+      url: {url: 'chrome://personalization/images/slideshow.png'},
+    },
+    {
+      id: BigInt(4),
+      url: {url: 'chrome://personalization/images/feel_the_breeze.png'},
+    },
+  ];
+  if (!isNonEmptyArray(images)) {
+    console.warn('Failed to generate thumbnails.');
+  }
+  // Mock thumbnail loading by sleeping for 2s.
+  return new Promise(resolve => {
+    window.setTimeout(() => {
+      store.dispatch(action.setImageThumbnailsAction(query, images));
+      resolve();
+    }, 2000);
+  });
 }
 
 export async function getDefaultImageThumbnail(
@@ -383,6 +417,8 @@ export async function selectWallpaper(
   if (!success) {
     console.warn('Error setting wallpaper');
     store.dispatch(
+        action.setAttributionAction(store.data.wallpaper.attribution));
+    store.dispatch(
         action.setSelectedImageAction(store.data.wallpaper.currentSelected));
   }
   store.endBatchUpdate();
@@ -408,40 +444,65 @@ export async function setCurrentWallpaperLayout(
   await provider.setCurrentWallpaperLayout(layout);
 }
 
+// Do not trigger the loading UI if the currently selected wallpaper is a
+// matching type for the incoming selection and if the currently selected
+// wallpaper is in the chosen album.
+function dailyRefreshShouldTriggerLoading(
+    id: string, types: Set<WallpaperType>,
+    currentSelected: CurrentWallpaper|null,
+    imagesById:
+        Record<string, Array<WallpaperImage|GooglePhotosPhoto>|null|undefined>):
+    boolean {
+  if (!id) {
+    // No loading shown if clearing daily refresh state.
+    return false;
+  }
+  if (!currentSelected) {
+    return true;
+  }
+  if (types.has(currentSelected.type)) {
+    return !imagesById[id]?.some(
+        image => isImageAMatchForKey(image, currentSelected.key));
+  }
+  return true;
+}
+
 export async function setDailyRefreshCollectionId(
     collectionId: WallpaperCollection['id'],
     provider: WallpaperProviderInterface,
     store: PersonalizationStore): Promise<void> {
-  const {response} = await provider.setDailyRefreshCollectionId(collectionId);
-  // Only trigger the pending UI if this call successfully enables daily refresh
-  // and the wallpaper is going to be refreshed. Otherwise, update the daily
-  // refresh state immediately to prevent the users from seeing unnecessary
-  // loading UI.
-  if (!!collectionId && response.success && response.forceRefresh) {
+  if (dailyRefreshShouldTriggerLoading(
+          collectionId, new Set([WallpaperType.kOnline, WallpaperType.kDaily]),
+          store.data.wallpaper.currentSelected,
+          store.data.wallpaper.backdrop.images)) {
     store.dispatch(action.beginUpdateDailyRefreshImageAction());
-  } else {
-    getDailyRefreshState(provider, store);
   }
+  const {success} = await provider.setDailyRefreshCollectionId(collectionId);
+  if (!success) {
+    store.dispatch(
+        setErrorAction({message: loadTimeData.getString('setWallpaperError')}));
+  }
+  await getDailyRefreshState(provider, store);
 }
 
 export async function selectGooglePhotosAlbum(
     albumId: GooglePhotosAlbum['id'], provider: WallpaperProviderInterface,
     store: PersonalizationStore): Promise<void> {
-  const {response} = await provider.selectGooglePhotosAlbum(albumId);
-  // Only trigger the pending UI if this call successfully enables daily refresh
-  // and the wallpaper is going to be refreshed. Otherwise, update the daily
-  // refresh state immediately to prevent the users from seeing unnecessary
-  // loading UI. If the call fails due to Google Photos API call failure,
-  // displays an error message.
-  if (!!albumId && response.success && response.forceRefresh) {
+  if (dailyRefreshShouldTriggerLoading(
+          albumId, new Set([
+            WallpaperType.kOnceGooglePhotos,
+            WallpaperType.kDailyGooglePhotos,
+          ]),
+          store.data.wallpaper.currentSelected,
+          store.data.wallpaper.googlePhotos.photosByAlbumId)) {
     store.dispatch(action.beginUpdateDailyRefreshImageAction());
-  } else {
-    if (!response.success && response.forceRefresh) {
-      store.dispatch(setErrorAction(
-          {message: loadTimeData.getString('googlePhotosError')}));
-    }
-    getDailyRefreshState(provider, store);
   }
+  const {success} = await provider.selectGooglePhotosAlbum(albumId);
+  if (!success) {
+    store.dispatch(
+        setErrorAction({message: loadTimeData.getString('googlePhotosError')}));
+  }
+  await getDailyRefreshState(provider, store);
 }
 
 /**
@@ -478,6 +539,7 @@ export async function updateDailyRefreshWallpaper(
   if (success) {
     store.dispatch(action.setUpdatedDailyRefreshImageAction());
   } else {
+    const currentAttribution = store.data.wallpaper.attribution;
     const currentWallpaper = store.data.wallpaper.currentSelected;
     const dailyRefresh = store.data.wallpaper.dailyRefresh;
     // Displays error if daily refresh is activated for Google Photos album
@@ -488,6 +550,7 @@ export async function updateDailyRefreshWallpaper(
     // online wallpaper collections.
     if (!!dailyRefresh && dailyRefresh.type == DailyRefreshType.GOOGLE_PHOTOS) {
       store.dispatch(action.setUpdatedDailyRefreshImageAction());
+      store.dispatch(action.setAttributionAction(currentAttribution));
       store.dispatch(action.setSelectedImageAction(currentWallpaper));
       store.dispatch(setErrorAction(
           {message: loadTimeData.getString('googlePhotosError')}));
@@ -518,15 +581,6 @@ export async function initializeBackdropData(
     store: PersonalizationStore): Promise<void> {
   await fetchCollections(provider, store);
   await fetchAllImagesForCollections(provider, store);
-}
-
-// TODO(b:230635452): Remove this method since it is now just a thin wrapper.
-/** Fetches initial Google Photos data and saves it to the store. */
-export async function initializeGooglePhotosData(
-    provider: WallpaperProviderInterface,
-    store: PersonalizationStore): Promise<void> {
-  // Fetch whether the user is allowed to access Google Photos.
-  await fetchGooglePhotosEnabled(provider, store);
 }
 
 /**

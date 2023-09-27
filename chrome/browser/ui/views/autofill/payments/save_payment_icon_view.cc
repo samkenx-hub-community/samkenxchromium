@@ -15,9 +15,11 @@
 #include "chrome/browser/ui/views/autofill/payments/save_iban_bubble_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/autofill/core/common/autofill_payments_features.h"
+#include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/gfx/paint_vector_icon.h"
 
 namespace autofill {
@@ -42,6 +44,8 @@ SavePaymentIconView::SavePaymentIconView(
   }
   command_id_ = command_id;
   SetUpForInOutAnimation();
+  SetAccessibilityProperties(/*role*/ absl::nullopt,
+                             GetTextForTooltipAndAccessibleName());
 }
 
 SavePaymentIconView::~SavePaymentIconView() = default;
@@ -77,6 +81,8 @@ void SavePaymentIconView::UpdateImpl() {
       SetCommandEnabled(controller && controller->IsIconVisible());
   SetVisible(command_enabled);
 
+  SetAccessibleName(GetTextForTooltipAndAccessibleName());
+
   if (command_enabled && controller->ShouldShowSavingPaymentAnimation()) {
     SetEnabled(false);
     SetIsLoading(/*is_loading=*/true);
@@ -87,11 +93,7 @@ void SavePaymentIconView::UpdateImpl() {
   }
 
   if (command_enabled && controller->ShouldShowPaymentSavedLabelAnimation()) {
-    if (command_id_ == IDC_SAVE_CREDIT_CARD_FOR_PAGE) {
-      AnimateIn(IDS_AUTOFILL_CARD_SAVED);
-    } else if (command_id_ == IDC_SAVE_IBAN_FOR_PAGE) {
-      AnimateIn(IDS_AUTOFILL_IBAN_SAVED);
-    }
+    AnimateIn(controller->GetSaveSuccessAnimationStringId());
   }
 }
 
@@ -99,7 +101,9 @@ void SavePaymentIconView::OnExecuting(
     PageActionIconView::ExecuteSource execute_source) {}
 
 const gfx::VectorIcon& SavePaymentIconView::GetVectorIcon() const {
-  return kCreditCardIcon;
+  return OmniboxFieldTrial::IsChromeRefreshIconsEnabled()
+             ? kCreditCardChromeRefreshIcon
+             : kCreditCardIcon;
 }
 
 const gfx::VectorIcon& SavePaymentIconView::GetVectorIconBadge() const {
@@ -108,10 +112,6 @@ const gfx::VectorIcon& SavePaymentIconView::GetVectorIconBadge() const {
     return vector_icons::kBlockedBadgeIcon;
 
   return gfx::kNoneIcon;
-}
-
-const char* SavePaymentIconView::GetClassName() const {
-  return "SavePaymentIconView";
 }
 
 std::u16string SavePaymentIconView::GetTextForTooltipAndAccessibleName() const {
@@ -141,5 +141,8 @@ void SavePaymentIconView::AnimationEnded(const gfx::Animation* animation) {
   if (controller)
     controller->OnAnimationEnded();
 }
+
+BEGIN_METADATA(SavePaymentIconView, PageActionIconView)
+END_METADATA
 
 }  // namespace autofill

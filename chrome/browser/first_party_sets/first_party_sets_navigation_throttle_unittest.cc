@@ -16,6 +16,8 @@
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
 #include "content/public/common/content_features.h"
 #include "content/public/test/mock_navigation_handle.h"
+#include "net/base/features.h"
+#include "third_party/blink/public/common/features.h"
 
 namespace {
 
@@ -31,9 +33,15 @@ class FirstPartySetsNavigationThrottleTest
   FirstPartySetsNavigationThrottleTest()
       : ChromeRenderViewHostTestHarness(
             base::test::TaskEnvironment::TimeSource::MOCK_TIME) {
-    features_.InitAndEnableFeatureWithParameters(
-        features::kFirstPartySets,
-        {{features::kFirstPartySetsClearSiteDataOnChangedSets.name, "true"}});
+    features_.InitWithFeaturesAndParameters(
+        {
+            {features::kFirstPartySets,
+             {{features::kFirstPartySetsNavigationThrottleTimeout.name, "2s"},
+              {features::kFirstPartySetsClearSiteDataOnChangedSets.name,
+               "true"}}},
+            {net::features::kWaitForFirstPartySetsInit, {}},
+        },
+        {{blink::features::kStorageAccessAPI}});
   }
 
   void SetUp() override {
@@ -64,9 +72,9 @@ class FirstPartySetsNavigationThrottleTest
 
  private:
   base::test::ScopedFeatureList features_;
-  raw_ptr<content::RenderFrameHost> subframe_;
+  raw_ptr<content::RenderFrameHost, DanglingUntriaged> subframe_;
   ScopedMockFirstPartySetsHandler first_party_sets_handler_;
-  raw_ptr<FirstPartySetsPolicyService> service_;
+  raw_ptr<FirstPartySetsPolicyService, DanglingUntriaged> service_;
 };
 
 TEST_F(FirstPartySetsNavigationThrottleTest,
@@ -153,6 +161,8 @@ TEST_F(FirstPartySetsNavigationThrottleTest, WillStartRequest_Defer) {
 }
 
 TEST_F(FirstPartySetsNavigationThrottleTest, WillStartRequest_Proceed) {
+  base::HistogramTester histograms;
+
   // Create throttle for main frames.
   content::MockNavigationHandle handle(GURL(kExampleURL), main_rfh());
   ASSERT_TRUE(handle.IsInOutermostMainFrame());
@@ -167,6 +177,9 @@ TEST_F(FirstPartySetsNavigationThrottleTest, WillStartRequest_Proceed) {
           ->is_ready());
   EXPECT_EQ(content::NavigationThrottle::PROCEED,
             throttle->WillStartRequest().action());
+
+  histograms.ExpectTotalCount("FirstPartySets.NavigationThrottle.ResumeDelta",
+                              0);
 }
 
 TEST_F(FirstPartySetsNavigationThrottleTest, ResumeOnReady) {
@@ -188,6 +201,9 @@ TEST_F(FirstPartySetsNavigationThrottleTest, ResumeOnReady) {
   service()->InitForTesting();
 
   run_loop.Run();
+
+  histograms.ExpectTotalCount("FirstPartySets.NavigationThrottle.ResumeDelta",
+                              1);
 
   EXPECT_FALSE(throttle->GetTimerForTesting().IsRunning());
   histograms.ExpectUniqueSample(
@@ -222,6 +238,33 @@ TEST_F(FirstPartySetsNavigationThrottleTest, ResumeOnTimeout) {
   histograms.ExpectBucketCount(
       "FirstPartySets.NavigationThrottle.ResumeOnTimeout", false,
       /*expected_count=*/0);
+
+  histograms.ExpectTotalCount("FirstPartySets.NavigationThrottle.ResumeDelta",
+                              1);
+}
+
+class FirstPartySetsNavigationThrottleNoDelayTest
+    : public FirstPartySetsNavigationThrottleTest {
+ public:
+  FirstPartySetsNavigationThrottleNoDelayTest() {
+    features_.InitAndEnableFeatureWithParameters(
+        features::kFirstPartySets,
+        {
+            {features::kFirstPartySetsClearSiteDataOnChangedSets.name, "true"},
+            {features::kFirstPartySetsNavigationThrottleTimeout.name, "0s"},
+        });
+  }
+
+ private:
+  base::test::ScopedFeatureList features_;
+};
+
+TEST_F(FirstPartySetsNavigationThrottleNoDelayTest,
+       MaybeCreateNavigationThrottle) {
+  content::MockNavigationHandle handle(GURL(kExampleURL), main_rfh());
+  ASSERT_TRUE(handle.IsInOutermostMainFrame());
+  EXPECT_FALSE(
+      FirstPartySetsNavigationThrottle::MaybeCreateNavigationThrottle(&handle));
 }
 
 }  // namespace first_party_sets

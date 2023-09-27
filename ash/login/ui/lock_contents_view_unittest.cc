@@ -51,12 +51,13 @@
 #include "ash/system/status_area_widget.h"
 #include "ash/tray_action/test_tray_action_client.h"
 #include "ash/tray_action/tray_action.h"
+#include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/simple_test_tick_clock.h"
 #include "base/timer/mock_timer.h"
-#include "chromeos/ash/components/login/auth/auth_metrics_recorder.h"
+#include "chromeos/ash/components/login/auth/auth_events_recorder.h"
 #include "chromeos/dbus/power/fake_power_manager_client.h"
 #include "chromeos/dbus/power_manager/suspend.pb.h"
 #include "components/prefs/pref_service.h"
@@ -135,25 +136,12 @@ class LockContentsViewUnitTest : public LoginTestBase {
  public:
   LockContentsViewUnitTest() {
     set_start_session(true);
-    AuthMetricsRecorder::Get()->OnAuthenticationSurfaceChange(
-        AuthMetricsRecorder::AuthenticationSurface::kLogin);
+    AuthEventsRecorder::Get()->OnAuthenticationSurfaceChange(
+        AuthEventsRecorder::AuthenticationSurface::kLogin);
   }
   LockContentsViewUnitTest(LockContentsViewUnitTest&) = delete;
   LockContentsViewUnitTest& operator=(LockContentsViewUnitTest&) = delete;
   ~LockContentsViewUnitTest() override = default;
-
-  // Returns true if the easy unlock icon is displayed for |view|.
-  bool IsEasyUnlockIconShowing(LoginBigUserView* view) {
-    if (!view->auth_user()) {
-      return false;
-    }
-
-    views::View* icon =
-        LoginPasswordView::TestApi(
-            LoginAuthUserView::TestApi(view->auth_user()).password_view())
-            .easy_unlock_icon();
-    return icon->GetVisible();
-  }
 
   // Change the active LoginBigUserView by sending a mouse click event.
   void MakeAuthViewActive(LoginBigUserView* view) {
@@ -1015,11 +1003,6 @@ TEST_F(LockContentsViewUnitTest, ShowErrorBubbleOnAuthFailure) {
   base::RunLoop().RunUntilIdle();
 
   EXPECT_TRUE(test_api.auth_error_bubble()->GetVisible());
-
-  // The error bubble is expected to close on a user action - e.g. if they start
-  // typing the password again.
-  PressAndReleaseKey(ui::KeyboardCode::VKEY_B);
-  EXPECT_FALSE(test_api.auth_error_bubble()->GetVisible());
 }
 
 TEST_F(LockContentsViewUnitTest, AuthErrorLockscreenLearnMoreButton) {
@@ -1216,6 +1199,11 @@ TEST_F(LockContentsViewUnitTest, GaiaNeverShownAfterFirstFailedLoginAttempt) {
 
 // Gaia is shown in login on the 4th bad password attempt.
 TEST_F(LockContentsViewUnitTest, ShowGaiaAuthAfterManyFailedLoginAttempts) {
+  base::test::ScopedFeatureList feature_list;
+  // With recovery feature enabled, the online login is not forced after bad
+  // password attempts.
+  feature_list.InitAndDisableFeature(features::kCryptohomeRecovery);
+
   // Build lock screen with a single user.
   auto* contents = new LockContentsView(
       mojom::TrayActionState::kNotAvailable, LockScreen::ScreenType::kLogin,
@@ -1565,12 +1553,11 @@ TEST_F(LockContentsViewUnitTest, AuthErrorDoesNotRemoveDetachableBaseError) {
   EXPECT_TRUE(test_api.auth_error_bubble()->GetVisible());
   EXPECT_TRUE(test_api.detachable_base_error_bubble()->GetVisible());
 
-  // User action, like pressing a key should close the auth error bubble, but
-  // not the detachable base error bubble.
+  // User action, like pressing a key, should not close the detachable base
+  // error bubble.
   PressAndReleaseKey(ui::KeyboardCode::VKEY_A);
 
   EXPECT_TRUE(test_api.detachable_base_error_bubble()->GetVisible());
-  EXPECT_FALSE(test_api.auth_error_bubble()->GetVisible());
 }
 
 TEST_F(LockContentsViewKeyboardUnitTest, SwitchPinAndVirtualKeyboard) {
@@ -2691,7 +2678,7 @@ TEST_F(LockContentsViewUnitTest, RemoveUserFocusMovesBackToPrimaryUser) {
   PressAndReleaseKey(ui::KeyboardCode::VKEY_RETURN);
   base::RunLoop().RunUntilIdle();
   // Focus the remove user bubble, tap twice to remove the user.
-  user_test_api.remove_account_dialog()->RequestFocus();
+  secondary_test_api.remove_account_dialog()->RequestFocus();
   PressAndReleaseKey(ui::KeyboardCode::VKEY_RETURN);
   base::RunLoop().RunUntilIdle();
   PressAndReleaseKey(ui::KeyboardCode::VKEY_RETURN);
@@ -3162,7 +3149,6 @@ TEST_F(LockContentsViewUnitTest, UpdatingSmartLockStateSetsAuthMethod) {
       {SmartLockState::kPhoneFoundLockedAndProximate, true},
       {SmartLockState::kPhoneFoundUnlockedAndDistant, true},
       {SmartLockState::kPhoneAuthenticated, true},
-      {SmartLockState::kPasswordReentryRequired, true},
       {SmartLockState::kPrimaryUserAbsent, true}};
 
   for (const auto& it : state_and_is_auth_method_expected) {
@@ -3204,12 +3190,6 @@ TEST_F(LockContentsViewUnitTest, SmartLockStateHidesPasswordView) {
   DataDispatcher()->SetSmartLockState(account_id,
                                       SmartLockState::kPhoneAuthenticated);
   EXPECT_FALSE(auth_user_view->password_view()->GetVisible());
-
-  // Check that password view becomes visible when auth
-  // factor is in kErrorPermanent state.
-  DataDispatcher()->SetSmartLockState(account_id,
-                                      SmartLockState::kPasswordReentryRequired);
-  EXPECT_TRUE(auth_user_view->password_view()->GetVisible());
 }
 
 TEST_F(LockContentsViewUnitTest, SmartLockStateHidesAuthErrorMessage) {
@@ -3406,7 +3386,8 @@ class LockContentsViewWithKioskLicenseTest : public LoginTestBase {
     GetSessionControllerClient()->FlushForTest();
   }
 
-  LoginShelfView* login_shelf_view_ = nullptr;  // Unowned.
+  raw_ptr<LoginShelfView, DanglingUntriaged | ExperimentalAsh>
+      login_shelf_view_ = nullptr;  // Unowned.
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
@@ -3425,8 +3406,7 @@ TEST_F(LockContentsViewWithKioskLicenseTest,
   lock_contents_view->SetKioskLicenseModeForTesting(is_kiosk_license_mode);
   LockContentsViewTestApi test_api(lock_contents_view);
   SetUserCount(0);
-  std::unique_ptr<views::Widget> widget =
-      CreateWidgetWithContent(lock_contents_view);
+  SetWidget(CreateWidgetWithContent(lock_contents_view));
 
   NotifySessionStateChanged(session_manager::SessionState::LOGIN_PRIMARY);
   SetNumberOfKioskApps(1);
@@ -3448,8 +3428,7 @@ TEST_F(LockContentsViewWithKioskLicenseTest, ShouldHideKioskDefaultMessage) {
   lock_contents_view->SetKioskLicenseModeForTesting(is_kiosk_license_mode);
   LockContentsViewTestApi test_api(lock_contents_view);
   SetUserCount(0);
-  std::unique_ptr<views::Widget> widget =
-      CreateWidgetWithContent(lock_contents_view);
+  SetWidget(CreateWidgetWithContent(lock_contents_view));
 
   NotifySessionStateChanged(session_manager::SessionState::LOGIN_PRIMARY);
   SetNumberOfKioskApps(0);
@@ -3471,8 +3450,7 @@ TEST_F(LockContentsViewWithKioskLicenseTest,
   lock_contents_view->SetKioskLicenseModeForTesting(is_kiosk_license_mode);
   LockContentsViewTestApi test_api(lock_contents_view);
   SetUserCount(0);
-  std::unique_ptr<views::Widget> widget =
-      CreateWidgetWithContent(lock_contents_view);
+  SetWidget(CreateWidgetWithContent(lock_contents_view));
 
   NotifySessionStateChanged(session_manager::SessionState::LOGIN_PRIMARY);
   SetNumberOfKioskApps(0);
@@ -3495,8 +3473,7 @@ TEST_F(LockContentsViewWithKioskLicenseTest,
   lock_contents_view->SetKioskLicenseModeForTesting(is_kiosk_license_mode);
   LockContentsViewTestApi test_api(lock_contents_view);
   SetUserCount(1);
-  std::unique_ptr<views::Widget> widget =
-      CreateWidgetWithContent(lock_contents_view);
+  SetWidget(CreateWidgetWithContent(lock_contents_view));
 
   NotifySessionStateChanged(session_manager::SessionState::LOGIN_PRIMARY);
   SetNumberOfKioskApps(0);
@@ -3520,8 +3497,7 @@ TEST_F(LockContentsViewWithKioskLicenseTest,
   lock_contents_view->SetKioskLicenseModeForTesting(is_kiosk_license_mode);
   LockContentsViewTestApi test_api(lock_contents_view);
   SetUserCount(0);
-  std::unique_ptr<views::Widget> widget =
-      CreateWidgetWithContent(lock_contents_view);
+  SetWidget(CreateWidgetWithContent(lock_contents_view));
 
   NotifySessionStateChanged(session_manager::SessionState::LOGIN_PRIMARY);
   SetNumberOfKioskApps(0);

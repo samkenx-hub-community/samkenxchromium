@@ -20,6 +20,7 @@ ci.defaults.set(
     reclient_instance = reclient.instance.DEFAULT_TRUSTED,
     reclient_jobs = reclient.jobs.DEFAULT,
     service_account = ci.gpu.SERVICE_ACCOUNT,
+    shadow_service_account = ci.gpu.SHADOW_SERVICE_ACCOUNT,
     thin_tester_cores = 2,
 )
 
@@ -91,6 +92,7 @@ ci.thin_tester(
         category = "Android|Nexus5X|Chromium",
         short_name = "arm64",
     ),
+    contact_team_email = "angle-team@google.com",
 )
 
 ci.gpu.linux_builder(
@@ -173,6 +175,7 @@ ci.thin_tester(
         category = "Linux|Intel|Chromium",
         short_name = "x64",
     ),
+    contact_team_email = "angle-team@google.com",
 )
 
 ci.thin_tester(
@@ -202,6 +205,7 @@ ci.thin_tester(
         category = "Linux|NVIDIA|Chromium",
         short_name = "x64",
     ),
+    contact_team_email = "angle-team@google.com",
 )
 
 ci.gpu.mac_builder(
@@ -257,6 +261,7 @@ ci.thin_tester(
         category = "Mac|AMD|Chromium",
         short_name = "x64",
     ),
+    contact_team_email = "angle-team@google.com",
 )
 
 ci.thin_tester(
@@ -346,6 +351,7 @@ ci.thin_tester(
         category = "iOS|Intel|ANGLE",
         short_name = "x64",
     ),
+    contact_team_email = "angle-team@google.com",
 )
 
 ci.gpu.windows_builder(

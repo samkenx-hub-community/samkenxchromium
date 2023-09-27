@@ -4,20 +4,12 @@
 
 #include "chrome/browser/media/router/mojo/media_router_debugger_impl.h"
 
-#include "base/test/gmock_callback_support.h"
-#include "base/test/metrics/histogram_tester.h"
-#include "base/test/mock_callback.h"
-#include "chrome/browser/media/router/mojo/media_router_mojo_impl.h"
-#include "chrome/browser/media/router/test/provider_test_helpers.h"
+#include "base/test/scoped_feature_list.h"
+#include "chrome/browser/media/router/discovery/access_code/access_code_cast_feature.h"
 #include "chrome/test/base/testing_profile.h"
-#include "components/media_router/browser/media_router_debugger.h"
-#include "components/media_router/browser/test/mock_media_router.h"
-#include "components/media_router/common/issue.h"
-#include "components/media_router/common/media_route.h"
-#include "components/media_router/common/media_source.h"
+#include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "content/public/test/browser_task_environment.h"
 #include "media/base/media_switches.h"
-#include "media/cast/constants.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -27,114 +19,116 @@ namespace media_router {
 
 namespace {
 
-const char kDescription[] = "description";
-const char kSource[] = "source1";
-const char kMirroringSource[] = "urn:x-org.chromium.media:source:tab:*";
-const char kRouteId[] = "routeId";
-const char kSinkId[] = "sink";
-
-// Creates a media route whose ID is |kRouteId|.
-MediaRoute CreateMediaRoute() {
-  MediaRoute route(kRouteId, MediaSource(kSource), kSinkId, kDescription, true);
-  route.set_controller_type(RouteControllerType::kGeneric);
-  return route;
-}
-
-MediaRoute CreateTabMirroringMediaRoute() {
-  MediaRoute route(kRouteId, MediaSource(kMirroringSource), kSinkId,
-                   kDescription, true);
-  route.set_controller_type(RouteControllerType::kMirroring);
-  return route;
-}
-
-class StubMediaRouterMojoImpl : public MediaRouterMojoImpl {
- public:
-  explicit StubMediaRouterMojoImpl(content::BrowserContext* context)
-      : MediaRouterMojoImpl(context) {}
-  ~StubMediaRouterMojoImpl() override = default;
-
-  // media_router::MediaRouter:
-  base::Value::Dict GetState() const override {
-    NOTIMPLEMENTED();
-    return base::Value::Dict();
-  }
-
-  void GetProviderState(
-      mojom::MediaRouteProviderId provider_id,
-      mojom::MediaRouteProvider::GetStateCallback callback) const override {
-    NOTIMPLEMENTED();
-  }
-};
-
 class MockMirroringStatsObserver
     : public MediaRouterDebugger::MirroringStatsObserver {
  public:
   MOCK_METHOD(void, OnMirroringStatsUpdated, (const base::Value::Dict&));
 };
-
 }  // namespace
 
 class MediaRouterDebuggerImplTest : public ::testing::Test {
  public:
-  MediaRouterDebuggerImplTest()
-      : media_router_(std::make_unique<StubMediaRouterMojoImpl>(profile())),
-        debugger_(std::make_unique<MediaRouterDebuggerImpl>(*router())) {}
+  MediaRouterDebuggerImplTest() = default;
   MediaRouterDebuggerImplTest(const MediaRouterDebuggerImplTest&) = delete;
   ~MediaRouterDebuggerImplTest() override = default;
   MediaRouterDebuggerImplTest& operator=(const MediaRouterDebuggerImplTest&) =
       delete;
 
  protected:
-  void SetUp() override { debugger_->AddObserver(observer_); }
+  void SetUp() override {
+    debugger_ = std::make_unique<MediaRouterDebuggerImpl>(&profile_);
+    debugger_->AddObserver(observer_);
+  }
   void TearDown() override { debugger_->RemoveObserver(observer_); }
 
-  void UpdateRoutes(const std::vector<MediaRoute>& routes) {
-    debugger()->OnRoutesUpdated(routes);
-  }
-
-  Profile* profile() { return &profile_; }
-  MediaRouterMojoImpl* router() { return media_router_.get(); }
-  MediaRouterDebuggerImpl* debugger() { return debugger_.get(); }
-
-  content::BrowserTaskEnvironment task_environment_{
-      base::test::TaskEnvironment::TimeSource::MOCK_TIME};
-  TestingProfile profile_;
-  std::unique_ptr<MediaRouterMojoImpl> media_router_;
+  content::BrowserTaskEnvironment task_environment_;
   std::unique_ptr<MediaRouterDebuggerImpl> debugger_;
-
   testing::NiceMock<MockMirroringStatsObserver> observer_;
+  TestingProfile profile_;
 };
 
-TEST_F(MediaRouterDebuggerImplTest, ReportsNotEnabled) {
-  const std::vector<MediaRoute> routes{CreateMediaRoute()};
-  EXPECT_CALL(observer_, OnMirroringStatsUpdated(_)).Times(0);
-  UpdateRoutes(routes);
+TEST_F(MediaRouterDebuggerImplTest, ShouldFetchMirroringStats) {
+  // By default reports should be enabled.
+  debugger_->ShouldFetchMirroringStats(
+      base::BindOnce([](bool enabled) { EXPECT_TRUE(enabled); }));
 }
 
-TEST_F(MediaRouterDebuggerImplTest, NonMirroringRoutes) {
-  debugger()->EnableRtcpReports();
+TEST_F(MediaRouterDebuggerImplTest, ShouldFetchMirroringStatsFeatureDisabled) {
+  // If the feature is disabled, then stats can still be fetched by enabling
+  // them.
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(media::kEnableRtcpReporting);
 
-  const std::vector<MediaRoute> routes{CreateMediaRoute()};
   EXPECT_CALL(observer_, OnMirroringStatsUpdated(_)).Times(0);
-  UpdateRoutes(routes);
+  debugger_->NotifyGetMirroringStats(base::Value::Dict());
+
+  // Reports should now be disabled.
+  debugger_->ShouldFetchMirroringStats(
+      base::BindOnce([](bool enabled) { EXPECT_FALSE(enabled); }));
+
+  debugger_->EnableRtcpReports();
+  debugger_->ShouldFetchMirroringStats(
+      base::BindOnce([](bool enabled) { EXPECT_TRUE(enabled); }));
 }
 
-TEST_F(MediaRouterDebuggerImplTest, FetchMirroringStats) {
-  debugger()->EnableRtcpReports();
+TEST_F(MediaRouterDebuggerImplTest,
+       ShouldFetchMirroringStatsAccessCodeCastFeature) {
+  // If the feature is disabled, then fall back to the value of
+  // AccessCodeCastEnabled.
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(media::kEnableRtcpReporting);
+  profile_.GetTestingPrefService()->SetManagedPref(
+      prefs::kAccessCodeCastEnabled, std::make_unique<base::Value>(true));
+  auto debugger_with_feature =
+      std::make_unique<MediaRouterDebuggerImpl>(&profile_);
+  debugger_with_feature->ShouldFetchMirroringStats(
+      base::BindOnce([](bool enabled) { EXPECT_TRUE(enabled); }));
 
-  const std::vector<MediaRoute> routes{CreateTabMirroringMediaRoute()};
-  EXPECT_CALL(observer_, OnMirroringStatsUpdated(_)).Times(1);
+  // User settings should override policy pref.
+  debugger_with_feature->DisableRtcpReports();
+  debugger_with_feature->ShouldFetchMirroringStats(
+      base::BindOnce([](bool enabled) { EXPECT_FALSE(enabled); }));
+}
 
-  // Add a mirroring route and fast forward enough to trigger one loop of
-  // mirroing stats fetch.
-  UpdateRoutes(routes);
-  task_environment_.FastForwardBy(base::Seconds(5) +
-                                  media::cast::kRtcpReportInterval);
+TEST_F(MediaRouterDebuggerImplTest, OnMirroringStats) {
+  base::Value non_dict = base::Value("foo");
+  base::Value::Dict empty_dict = base::Value::Dict();
 
-  EXPECT_CALL(observer_, OnMirroringStatsUpdated(_)).Times(0);
-  // Remove the route after one loop has occurred to verify that fetching stops.
-  UpdateRoutes({});
-  task_environment_.RunUntilIdle();
+  base::Value::Dict dict = base::Value::Dict();
+  dict.Set("foo_key", "foo_value");
+
+  // Verify that a non dict value will call notify the observers with a newly
+  // constructed empty base::Value::Dict();
+  EXPECT_CALL(observer_, OnMirroringStatsUpdated)
+      .WillOnce(testing::Invoke([&](const base::Value::Dict& json_logs) {
+        EXPECT_EQ(empty_dict, json_logs);
+      }));
+  debugger_->OnMirroringStats(non_dict.Clone());
+
+  // Verify that a valid dict will notify observers of that value.
+  EXPECT_CALL(observer_, OnMirroringStatsUpdated)
+      .WillOnce(testing::Invoke([&](const base::Value::Dict& json_logs) {
+        EXPECT_EQ(dict, json_logs);
+      }));
+  debugger_->OnMirroringStats(base::Value(dict.Clone()));
+}
+
+TEST_F(MediaRouterDebuggerImplTest, GetMirroringStats) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(media::kEnableRtcpReporting);
+  EXPECT_TRUE(debugger_->GetMirroringStats().empty());
+
+  base::Value::Dict dict = base::Value::Dict();
+  dict.Set("foo_key", "foo_value");
+  debugger_->OnMirroringStats(base::Value(dict.Clone()));
+
+  // GetLogs should only work if logs have been enabled.
+  EXPECT_TRUE(debugger_->GetMirroringStats().empty());
+
+  debugger_->EnableRtcpReports();
+  debugger_->OnMirroringStats(base::Value(dict.Clone()));
+
+  EXPECT_EQ(dict, debugger_->GetMirroringStats());
 }
 
 }  // namespace media_router

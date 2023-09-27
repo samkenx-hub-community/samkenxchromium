@@ -134,16 +134,16 @@ class EditableComboboxTest : public ViewsTestBase {
   void OnContentChanged() { ++change_count_; }
 
   // The widget where the control will appear.
-  raw_ptr<Widget> widget_ = nullptr;
+  raw_ptr<Widget, AcrossTasksDanglingUntriaged> widget_ = nullptr;
 
   // |combobox_| and |dummy_focusable_view_| are allocated in
   // |InitEditableCombobox| and then owned by |widget_|.
-  raw_ptr<EditableCombobox> combobox_ = nullptr;
-  raw_ptr<View> dummy_focusable_view_ = nullptr;
+  raw_ptr<EditableCombobox, AcrossTasksDanglingUntriaged> combobox_ = nullptr;
+  raw_ptr<View, AcrossTasksDanglingUntriaged> dummy_focusable_view_ = nullptr;
 
   // We make |combobox_| a child of another View to test different removal
   // scenarios.
-  raw_ptr<View> parent_of_combobox_ = nullptr;
+  raw_ptr<View, AcrossTasksDanglingUntriaged> parent_of_combobox_ = nullptr;
 
   int change_count_ = 0;
 
@@ -885,6 +885,24 @@ TEST_F(EditableComboboxTest, DragToSelectDoesntOpenTheMenu) {
   PerformMouseEvent(widget_, end_point, ui::ET_MOUSE_RELEASED);
   ASSERT_EQ(u"abc", GetSelectedText());
   EXPECT_FALSE(IsMenuOpen());
+}
+
+TEST_F(EditableComboboxTest, AccessibleNameAndRole) {
+  InitEditableCombobox();
+
+  ui::AXNodeData data;
+  combobox_->GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.role, ax::mojom::Role::kComboBoxGrouping);
+  EXPECT_EQ(data.GetString16Attribute(ax::mojom::StringAttribute::kName),
+            u"abc");
+  EXPECT_EQ(combobox_->GetAccessibleName(), u"abc");
+
+  data = ui::AXNodeData();
+  combobox_->SetAccessibleName(u"New name");
+  combobox_->GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetString16Attribute(ax::mojom::StringAttribute::kName),
+            u"New name");
+  EXPECT_EQ(combobox_->GetAccessibleName(), u"New name");
 }
 
 using EditableComboboxDefaultTest = ViewsTestBase;

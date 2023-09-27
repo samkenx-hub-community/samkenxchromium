@@ -7,12 +7,6 @@
 #include "base/functional/callback.h"
 #include "build/build_config.h"
 #include "chrome/common/safe_browsing/archive_analyzer_results.h"
-#include "chrome/common/safe_browsing/seven_zip_analyzer.h"
-#include "chrome/common/safe_browsing/zip_analyzer.h"
-
-#if BUILDFLAG(IS_MAC)
-#include "chrome/utility/safe_browsing/mac/dmg_analyzer.h"
-#endif
 
 namespace {
 // The maximum duration of analysis, in milliseconds.
@@ -25,6 +19,7 @@ SafeArchiveAnalyzer::~SafeArchiveAnalyzer() = default;
 
 void SafeArchiveAnalyzer::AnalyzeZipFile(
     base::File zip_file,
+    const absl::optional<std::string>& password,
     mojo::PendingRemote<chrome::mojom::TemporaryFileGetter> temp_file_getter,
     AnalyzeZipFileCallback callback) {
   DCHECK(zip_file.IsValid());
@@ -40,18 +35,35 @@ void SafeArchiveAnalyzer::AnalyzeZipFile(
                               weak_factory_.GetWeakPtr());
   timeout_timer_.Start(FROM_HERE, kArchiveAnalysisTimeout, this,
                        &SafeArchiveAnalyzer::Timeout);
-  zip_analyzer_.Init(std::move(zip_file), base::FilePath(),
-                     std::move(analysis_finished_callback),
-                     std::move(temp_file_getter_callback), &results_);
+  zip_analyzer_.Analyze(std::move(zip_file), base::FilePath(), password,
+                        std::move(analysis_finished_callback),
+                        std::move(temp_file_getter_callback), &results_);
 }
 
-void SafeArchiveAnalyzer::AnalyzeDmgFile(base::File dmg_file,
-                                         AnalyzeDmgFileCallback callback) {
+void SafeArchiveAnalyzer::AnalyzeDmgFile(
+    base::File dmg_file,
+    mojo::PendingRemote<chrome::mojom::TemporaryFileGetter> temp_file_getter,
+    AnalyzeDmgFileCallback callback) {
 #if BUILDFLAG(IS_MAC)
   DCHECK(dmg_file.IsValid());
-  safe_browsing::ArchiveAnalyzerResults results;
-  safe_browsing::dmg::AnalyzeDMGFile(std::move(dmg_file), &results);
-  std::move(callback).Run(results);
+  temp_file_getter_.Bind(std::move(temp_file_getter));
+  callback_ = std::move(callback);
+  AnalysisFinishedCallback analysis_finished_callback =
+      base::BindOnce(&SafeArchiveAnalyzer::AnalysisFinished,
+                     weak_factory_.GetWeakPtr(), base::FilePath());
+
+  base::RepeatingCallback<void(GetTempFileCallback callback)>
+      temp_file_getter_callback =
+          base::BindRepeating(&SafeArchiveAnalyzer::RequestTemporaryFile,
+                              weak_factory_.GetWeakPtr());
+  timeout_timer_.Start(FROM_HERE, kArchiveAnalysisTimeout, this,
+                       &SafeArchiveAnalyzer::Timeout);
+  // TODO(crbug/1466287): Update DMG analyzer to use passwords and provide the
+  // password here.
+  dmg_analyzer_.Analyze(std::move(dmg_file), base::FilePath(),
+                        /*password=*/absl::nullopt,
+                        std::move(analysis_finished_callback),
+                        std::move(temp_file_getter_callback), &results_);
 #else
   NOTREACHED();
 #endif
@@ -59,6 +71,7 @@ void SafeArchiveAnalyzer::AnalyzeDmgFile(base::File dmg_file,
 
 void SafeArchiveAnalyzer::AnalyzeRarFile(
     base::File rar_file,
+    const absl::optional<std::string>& password,
     mojo::PendingRemote<chrome::mojom::TemporaryFileGetter> temp_file_getter,
     AnalyzeRarFileCallback callback) {
   DCHECK(rar_file.IsValid());
@@ -73,23 +86,34 @@ void SafeArchiveAnalyzer::AnalyzeRarFile(
                               weak_factory_.GetWeakPtr());
   timeout_timer_.Start(FROM_HERE, kArchiveAnalysisTimeout, this,
                        &SafeArchiveAnalyzer::Timeout);
-  rar_analyzer_.Init(std::move(rar_file), base::FilePath(),
-                     std::move(analysis_finished_callback),
-                     std::move(temp_file_getter_callback), &results_);
+  rar_analyzer_.Analyze(std::move(rar_file), base::FilePath(),
+                        /*password=*/password,
+                        std::move(analysis_finished_callback),
+                        std::move(temp_file_getter_callback), &results_);
 }
 
 void SafeArchiveAnalyzer::AnalyzeSevenZipFile(
     base::File seven_zip_file,
-    base::File temporary_file,
-    base::File temporary_file2,
+    mojo::PendingRemote<chrome::mojom::TemporaryFileGetter> temp_file_getter,
     AnalyzeSevenZipFileCallback callback) {
   DCHECK(seven_zip_file.IsValid());
-
-  safe_browsing::ArchiveAnalyzerResults results;
-  safe_browsing::seven_zip_analyzer::AnalyzeSevenZipFile(
-      std::move(seven_zip_file), std::move(temporary_file),
-      std::move(temporary_file2), &results);
-  std::move(callback).Run(results);
+  temp_file_getter_.Bind(std::move(temp_file_getter));
+  callback_ = std::move(callback);
+  AnalysisFinishedCallback analysis_finished_callback =
+      base::BindOnce(&SafeArchiveAnalyzer::AnalysisFinished,
+                     weak_factory_.GetWeakPtr(), base::FilePath());
+  base::RepeatingCallback<void(GetTempFileCallback callback)>
+      temp_file_getter_callback =
+          base::BindRepeating(&SafeArchiveAnalyzer::RequestTemporaryFile,
+                              weak_factory_.GetWeakPtr());
+  timeout_timer_.Start(FROM_HERE, kArchiveAnalysisTimeout, this,
+                       &SafeArchiveAnalyzer::Timeout);
+  // TODO(crbug/1466287): Update 7Z analyzer to use passwords and provide the
+  // password here.
+  seven_zip_analyzer_.Analyze(std::move(seven_zip_file), base::FilePath(),
+                              /*password=*/absl::nullopt,
+                              std::move(analysis_finished_callback),
+                              std::move(temp_file_getter_callback), &results_);
 }
 
 void SafeArchiveAnalyzer::RequestTemporaryFile(GetTempFileCallback callback) {

@@ -383,6 +383,7 @@ void MediaNotificationViewImpl::UpdateWithMediaMetadata(
       metadata.source_title.empty() ? default_app_name_ : metadata.source_title;
 
   if (header_row_) {
+    header_row_->SetAppNameElideBehavior(gfx::ELIDE_HEAD);
     header_row_->SetAppName(app_name);
     header_row_->SetSummaryText(metadata.album);
   } else {
@@ -477,10 +478,8 @@ void MediaNotificationViewImpl::UpdateWithVectorIcon(
     UpdateForegroundColor();
 }
 
-void MediaNotificationViewImpl::UpdateDeviceSelectorAvailability(
-    bool availability) {
-  GetMediaNotificationBackground()->UpdateDeviceSelectorAvailability(
-      availability);
+void MediaNotificationViewImpl::UpdateDeviceSelectorVisibility(bool visible) {
+  GetMediaNotificationBackground()->UpdateDeviceSelectorAvailability(visible);
 }
 
 void MediaNotificationViewImpl::OnThemeChanged() {
@@ -793,15 +792,10 @@ std::vector<views::View*> MediaNotificationViewImpl::GetButtons() {
   buttons.insert(buttons.cbegin(),
                  playback_button_container_->children().cbegin(),
                  playback_button_container_->children().cend());
-  buttons.erase(
-      std::remove_if(buttons.begin(), buttons.end(),
-                     [](views::View* view) {
-                       return !(view->GetClassName() ==
-                                    views::ImageButton::kViewClassName ||
-                                view->GetClassName() ==
-                                    views::ToggleImageButton::kViewClassName);
-                     }),
-      buttons.end());
+  base::EraseIf(buttons, [](views::View* view) {
+    return !(view->GetClassName() == views::ImageButton::kViewClassName ||
+             view->GetClassName() == views::ToggleImageButton::kViewClassName);
+  });
   return buttons;
 }
 

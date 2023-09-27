@@ -9,11 +9,12 @@ import android.content.Context;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 
+import org.chromium.base.ResettersForTesting;
 import org.chromium.chrome.browser.privacy_sandbox.v4.PrivacySandboxDialogConsentEEAV4;
 import org.chromium.chrome.browser.privacy_sandbox.v4.PrivacySandboxDialogNoticeEEAV4;
 import org.chromium.chrome.browser.privacy_sandbox.v4.PrivacySandboxDialogNoticeROWV4;
+import org.chromium.chrome.browser.privacy_sandbox.v4.PrivacySandboxDialogNoticeRestrictedV4;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.settings.SettingsLauncher;
 
@@ -57,6 +58,11 @@ public class PrivacySandboxDialogController {
                 dialog.show();
                 sDialog = new WeakReference<>(dialog);
                 return true;
+            case PromptType.M1_NOTICE_RESTRICTED:
+                dialog = new PrivacySandboxDialogNoticeRestrictedV4(context, settingsLauncher);
+                dialog.show();
+                sDialog = new WeakReference<>(dialog);
+                return true;
             case PromptType.NOTICE:
                 if (bottomSheetController == null || !showNewNotice()) return false;
                 new PrivacySandboxBottomSheetNotice(
@@ -94,27 +100,24 @@ public class PrivacySandboxDialogController {
         return (sShowNew != null) ? sShowNew : true;
     }
 
-    @VisibleForTesting
     static Dialog getDialogForTesting() {
         return sDialog != null ? sDialog.get() : null;
     }
 
-    @VisibleForTesting
     static void resetShowNewNoticeForTesting() {
         sShowNew = null;
     }
 
-    @VisibleForTesting
     static void setShowNewNoticeForTesting(boolean showNew) {
+        var oldValue = sShowNew;
         sShowNew = showNew;
+        ResettersForTesting.register(() -> sShowNew = oldValue);
     }
 
-    @VisibleForTesting
     static void disableAnimationsForTesting(boolean disable) {
         sDisableAnimations = disable;
     }
 
-    @VisibleForTesting
     static void disableEEANoticeForTesting(boolean disable) {
         sDisableEEANoticeForTesting = disable;
     }

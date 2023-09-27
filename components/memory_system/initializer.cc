@@ -26,8 +26,13 @@ Initializer& Initializer::SetProfilingClientParameters(
 
 Initializer& Initializer::SetDispatcherParameters(
     DispatcherParameters::PoissonAllocationSamplerInclusion
-        poisson_allocation_sampler_inclusion) {
-  dispatcher_parameters_.emplace(poisson_allocation_sampler_inclusion);
+        poisson_allocation_sampler_inclusion,
+    DispatcherParameters::AllocationTraceRecorderInclusion
+        allocation_trace_recorder_inclusion,
+    base::StringPiece process_type) {
+  dispatcher_parameters_.emplace(poisson_allocation_sampler_inclusion,
+                                 allocation_trace_recorder_inclusion,
+                                 process_type);
   return *this;
 }
 

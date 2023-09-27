@@ -42,14 +42,15 @@ class AppPlatformMetricsRetrieverTest
 
     // Configure the app platform metrics retriever.
     app_platform_metrics_retriever_ =
-        std::make_unique<AppPlatformMetricsRetriever>(profile());
+        std::make_unique<AppPlatformMetricsRetriever>(profile()->GetWeakPtr());
   }
 
   // Pointer to the `AppServiceProxy` used by the test.
   raw_ptr<::apps::AppServiceProxy> app_service_proxy_;
 
   // Pointer to the `AppPlatformMetricsService` used by the test.
-  raw_ptr<::apps::AppPlatformMetricsService> app_platform_metrics_service_;
+  raw_ptr<::apps::AppPlatformMetricsService, DanglingUntriaged>
+      app_platform_metrics_service_;
 
   // `AppPlatformMetrics` retriever used by the test.
   std::unique_ptr<AppPlatformMetricsRetriever> app_platform_metrics_retriever_;

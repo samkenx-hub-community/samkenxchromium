@@ -6,6 +6,7 @@
 load("//lib/args.star", "args")
 load("//lib/branches.star", "branches")
 load("//lib/builder_config.star", "builder_config")
+load("//lib/builder_health_indicators.star", "health_spec")
 load("//lib/builders.star", "reclient", "sheriff_rotations")
 load("//lib/ci.star", "ci")
 load("//lib/consoles.star", "consoles")
@@ -17,9 +18,11 @@ ci.defaults.set(
     sheriff_rotations = sheriff_rotations.CHROMIUM_GPU,
     tree_closing = True,
     execution_timeout = ci.DEFAULT_EXECUTION_TIMEOUT,
+    health_spec = health_spec.DEFAULT,
     reclient_instance = reclient.instance.DEFAULT_TRUSTED,
     reclient_jobs = reclient.jobs.DEFAULT,
     service_account = ci.DEFAULT_SERVICE_ACCOUNT,
+    shadow_service_account = ci.DEFAULT_SHADOW_SERVICE_ACCOUNT,
     thin_tester_cores = 2,
     tree_closing_notifiers = ci.gpu.TREE_CLOSING_NOTIFIERS,
 )
@@ -48,7 +51,7 @@ ci.gpu.linux_builder(
         chromium_config = builder_config.chromium_config(
             config = "android",
             apply_configs = [
-                "download_vr_test_apks",
+                "download_xr_test_apks",
                 "mb",
             ],
             build_config = builder_config.build_config.RELEASE,
@@ -64,6 +67,7 @@ ci.gpu.linux_builder(
         category = "Android",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.gpu.linux_builder(
@@ -90,6 +94,7 @@ ci.gpu.linux_builder(
         category = "Linux",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.gpu.linux_builder(
@@ -129,7 +134,6 @@ ci.gpu.mac_builder(
             config = "chromium",
             apply_configs = [
                 "mb",
-                "goma_use_local",  # to mitigate compile step timeout (crbug.com/1056935)
             ],
             build_config = builder_config.build_config.RELEASE,
             target_bits = 64,
@@ -141,6 +145,7 @@ ci.gpu.mac_builder(
         category = "Mac",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.gpu.mac_builder(
@@ -192,6 +197,7 @@ ci.gpu.windows_builder(
         category = "Windows",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )
 
@@ -270,6 +276,7 @@ ci.thin_tester(
         category = "Linux",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -311,7 +318,6 @@ ci.thin_tester(
             config = "chromium",
             apply_configs = [
                 "mb",
-                "goma_use_local",  # to mitigate compile step timeout (crbug.com/1056935)
             ],
             build_config = builder_config.build_config.RELEASE,
             target_bits = 64,
@@ -323,6 +329,7 @@ ci.thin_tester(
         category = "Mac",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -348,6 +355,7 @@ ci.thin_tester(
     console_view_entry = consoles.console_view_entry(
         category = "Mac",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -363,7 +371,6 @@ ci.thin_tester(
             config = "chromium",
             apply_configs = [
                 "mb",
-                "goma_use_local",  # to mitigate compile step timeout (crbug.com/1056935)
             ],
             build_config = builder_config.build_config.RELEASE,
             target_bits = 64,
@@ -375,6 +382,7 @@ ci.thin_tester(
         category = "Mac",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -399,6 +407,7 @@ ci.thin_tester(
     console_view_entry = consoles.console_view_entry(
         category = "Windows",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -428,4 +437,5 @@ ci.thin_tester(
         category = "Windows",
     ),
     cq_mirrors_console_view = "mirrors",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )

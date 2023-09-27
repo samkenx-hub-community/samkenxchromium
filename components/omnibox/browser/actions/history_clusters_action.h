@@ -11,7 +11,6 @@
 
 struct AutocompleteMatch;
 class AutocompleteResult;
-class PrefService;
 
 namespace gfx {
 struct VectorIcon;
@@ -46,20 +45,19 @@ GURL GetFullJourneysUrlForQuery(const std::string& query);
 // Made public for testing.
 class HistoryClustersAction : public OmniboxAction {
  public:
-  HistoryClustersAction(const std::string& query,
-                        const history::ClusterKeywordData& matched_keyword_data,
-                        bool takes_over_match);
+  HistoryClustersAction(
+      const std::string& query,
+      const history::ClusterKeywordData& matched_keyword_data);
 
   void RecordActionShown(size_t position, bool executed) const override;
   void Execute(ExecutionContext& context) const override;
-  int32_t GetID() const override;
+  OmniboxActionId ActionId() const override;
 #if defined(SUPPORT_PEDALS_VECTOR_ICONS)
   const gfx::VectorIcon& GetVectorIcon() const override;
 #endif
 #if BUILDFLAG(IS_ANDROID)
-  base::android::ScopedJavaGlobalRef<jobject> GetJavaObject() const override;
-
-  void CreateOrUpdateJavaObject(const std::string& query);
+  base::android::ScopedJavaLocalRef<jobject> GetOrCreateJavaObject(
+      JNIEnv* env) const override;
 #endif
 
  private:
@@ -71,17 +69,12 @@ class HistoryClustersAction : public OmniboxAction {
 
   // Used to open journeys in side panel with relevant clusters
   std::string query_;
-
-#if BUILDFLAG(IS_ANDROID)
-  base::android::ScopedJavaGlobalRef<jobject> j_omnibox_action_;
-#endif
 };
 
 // If the feature is enabled, attaches any necessary History Clusters actions
 // onto any relevant matches in `result`.
 void AttachHistoryClustersActions(
     history_clusters::HistoryClustersService* service,
-    PrefService* prefs,
     AutocompleteResult& result);
 
 }  // namespace history_clusters

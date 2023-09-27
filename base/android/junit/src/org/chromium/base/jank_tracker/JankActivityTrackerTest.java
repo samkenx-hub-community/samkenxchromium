@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -30,7 +30,6 @@ import org.chromium.base.test.BaseRobolectricTestRunner;
  */
 @RunWith(BaseRobolectricTestRunner.class)
 public class JankActivityTrackerTest {
-
     @Mock
     private Activity mActivity;
 
@@ -136,7 +135,7 @@ public class JankActivityTrackerTest {
         // Periodic metric reporting should be enabled.
         verify(mJankReportingScheduler).startReportingPeriodicMetrics();
         // Metric recording should be enabled.
-        verify(mFrameMetricsListener).setIsListenerRecording(true);
+        verify(mFrameMetricsListener, atLeastOnce()).setIsListenerRecording(true);
     }
 
     @Test
@@ -152,6 +151,7 @@ public class JankActivityTrackerTest {
         // Reporting task should be running and looping.
         verify(mJankReportingScheduler).startReportingPeriodicMetrics();
         // Metric recording should be enabled.
-        verify(mFrameMetricsListener).setIsListenerRecording(true);
+        verify(mFrameMetricsListener, atLeastOnce()).setIsListenerRecording(true);
+        verify(mFrameMetricsListener, atLeastOnce()).setIsListenerRecording(false);
     }
 }

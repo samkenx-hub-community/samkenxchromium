@@ -149,6 +149,7 @@ class TRIVIAL_ABI OnceCallback<R(Args...)> {
     internal::BindStateHolder holder = std::move(holder_);
     PolymorphicInvoke f =
         reinterpret_cast<PolymorphicInvoke>(holder.polymorphic_invoke());
+    CHECK(f);
     return f(holder.bind_state().get(), std::forward<Args>(args)...);
   }
 
@@ -165,7 +166,7 @@ class TRIVIAL_ABI OnceCallback<R(Args...)> {
   template <typename ThenR, typename... ThenArgs>
   OnceCallback<ThenR(Args...)> Then(OnceCallback<ThenR(ThenArgs...)> then) && {
     CHECK(then);
-    return BindOnce(
+    return base::BindOnce(
         internal::ThenHelper<
             OnceCallback, OnceCallback<ThenR(ThenArgs...)>>::CreateTrampoline(),
         std::move(*this), std::move(then));
@@ -178,7 +179,7 @@ class TRIVIAL_ABI OnceCallback<R(Args...)> {
   OnceCallback<ThenR(Args...)> Then(
       RepeatingCallback<ThenR(ThenArgs...)> then) && {
     CHECK(then);
-    return BindOnce(
+    return base::BindOnce(
         internal::ThenHelper<
             OnceCallback,
             RepeatingCallback<ThenR(ThenArgs...)>>::CreateTrampoline(),
@@ -330,6 +331,7 @@ class TRIVIAL_ABI RepeatingCallback<R(Args...)> {
 
     PolymorphicInvoke f =
         reinterpret_cast<PolymorphicInvoke>(holder_.polymorphic_invoke());
+    CHECK(f);
     return f(bind_state.get(), std::forward<Args>(args)...);
   }
 
@@ -345,6 +347,7 @@ class TRIVIAL_ABI RepeatingCallback<R(Args...)> {
     internal::BindStateHolder holder = std::move(holder_);
     PolymorphicInvoke f =
         reinterpret_cast<PolymorphicInvoke>(holder.polymorphic_invoke());
+    CHECK(f);
     return f(holder.bind_state().get(), std::forward<Args>(args)...);
   }
 

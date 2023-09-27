@@ -19,6 +19,8 @@
 #include "media/audio/audio_io.h"
 #include "media/audio/cras/audio_manager_cras_base.h"
 #include "media/audio/system_glitch_reporter.h"
+#include "media/base/amplitude_peak_detector.h"
+#include "media/base/audio_glitch_info.h"
 #include "media/base/audio_parameters.h"
 #include "media/base/media_export.h"
 
@@ -94,6 +96,13 @@ class MEDIA_EXPORT CrasInputStream : public AgcAudioStream<AudioInputStream>,
   // Return true to use AGC in CRAS for this input stream.
   inline bool UseCrasAgc() const;
 
+  // Return true to use client controlled voice isolation in CRAS for this
+  // input stream.
+  inline bool UseClientControlledVoiceIsolation() const;
+
+  // Return true to use voice isolation in CRAS for this input stream.
+  inline bool UseCrasVoiceIsolation() const;
+
   // Return true to allow AEC on DSP for this input stream.
   inline bool DspBasedAecIsAllowed() const;
 
@@ -102,6 +111,9 @@ class MEDIA_EXPORT CrasInputStream : public AgcAudioStream<AudioInputStream>,
 
   // Return true to allow AGC on DSP for this input stream.
   inline bool DspBasedAgcIsAllowed() const;
+
+  // Return true if UI Gains should be ignored for this input stream.
+  inline bool IgnoreUiGains() const;
 
   // Called from the dtor and when the stream is reset.
   void ReportAndResetStats();
@@ -171,6 +183,8 @@ class MEDIA_EXPORT CrasInputStream : public AgcAudioStream<AudioInputStream>,
   // text logs (when a stream ends).
   SystemGlitchReporter glitch_reporter_;
 
+  AudioGlitchInfo::Accumulator glitch_info_accumulator_;
+
   // Callback to send statistics info.
   const AudioManager::LogCallback log_callback_;
 
@@ -184,6 +198,8 @@ class MEDIA_EXPORT CrasInputStream : public AgcAudioStream<AudioInputStream>,
   // Dropped data are samples dropped from the input device's hardware buffer
   // due to too many samples.
   base::TimeDelta last_dropped_samples_duration_;
+
+  AmplitudePeakDetector peak_detector_;
 
   base::WeakPtrFactory<CrasInputStream> weak_factory_{this};
 };

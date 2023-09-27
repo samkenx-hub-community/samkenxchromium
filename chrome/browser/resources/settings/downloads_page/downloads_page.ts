@@ -10,15 +10,16 @@
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_shared_style.css.js';
 import 'chrome://resources/polymer/v3_0/iron-flex-layout/iron-flex-layout-classes.js';
-import '../controls/controlled_button.js';
-import '../controls/settings_toggle_button.js';
+import '/shared/settings/controls/controlled_button.js';
+import '/shared/settings/controls/settings_toggle_button.js';
 import '../settings_shared.css.js';
 
+import {PrefsMixin} from 'chrome://resources/cr_components/settings_prefs/prefs_mixin.js';
 import {WebUiListenerMixin} from 'chrome://resources/cr_elements/web_ui_listener_mixin.js';
 import {listenOnce} from 'chrome://resources/js/util_ts.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {PrefsMixin} from '../prefs/prefs_mixin.js';
+import {loadTimeData} from '../i18n_setup.js';
 
 import {DownloadsBrowserProxy, DownloadsBrowserProxyImpl} from './downloads_browser_proxy.js';
 import {getTemplate} from './downloads_page.html.js';
@@ -57,6 +58,18 @@ export class SettingsDownloadsPageElement extends
        */
       downloadLocation_: String,
       // </if>
+
+      /**
+       * Whether the user can toggle the option to display downloads when
+       * they're done.
+       */
+      downloadBubblePartialViewControlledByPref_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean(
+              'downloadBubblePartialViewControlledByPref');
+        },
+      },
     };
   }
 
@@ -74,6 +87,8 @@ export class SettingsDownloadsPageElement extends
   // <if expr="chromeos_ash">
   private downloadLocation_: string;
   // </if>
+
+  private downloadBubblePartialViewControlledByPref_: boolean;
 
   private browserProxy_: DownloadsBrowserProxy =
       DownloadsBrowserProxyImpl.getInstance();
@@ -106,7 +121,7 @@ export class SettingsDownloadsPageElement extends
   }
   // </if>
 
-  private onClearAutoOpenFileTypesTap_() {
+  private onClearAutoOpenFileTypesClick_() {
     this.browserProxy_.resetAutoOpenFileTypes();
   }
 }

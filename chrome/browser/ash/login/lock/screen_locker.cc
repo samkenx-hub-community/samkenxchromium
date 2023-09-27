@@ -22,8 +22,8 @@
 #include "base/task/current_thread.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
+#include "base/trace_event/trace_event.h"
 #include "chrome/browser/ash/accessibility/accessibility_manager.h"
-#include "chrome/browser/ash/authpolicy/authpolicy_helper.h"
 #include "chrome/browser/ash/login/hats_unlock_survey_trigger.h"
 #include "chrome/browser/ash/login/helper.h"
 #include "chrome/browser/ash/login/lock/views_screen_locker.h"
@@ -124,6 +124,7 @@ class ScreenLockObserver : public SessionManagerClient::StubDelegate,
 
   // session_manager::SessionManagerObserver:
   void OnSessionStateChanged() override {
+    TRACE_EVENT0("login", "ScreenLockObserver::OnSessionStateChanged");
     // Only set MarkStrongAuth for the first time session becomes active, which
     // is when user first sign-in.
     // For unlocking case which state changes from active->lock->active, it
@@ -170,13 +171,6 @@ chromeos::CertificateProviderService* GetLoginScreenCertProviderService() {
 
 // static
 ScreenLocker* ScreenLocker::screen_locker_ = nullptr;
-
-//////////////////////////////////////////////////////////////////////////////
-// ScreenLocker::Delegate, public:
-
-ScreenLocker::Delegate::Delegate() = default;
-
-ScreenLocker::Delegate::~Delegate() = default;
 
 //////////////////////////////////////////////////////////////////////////////
 // ScreenLocker, public:
@@ -227,9 +221,9 @@ void ScreenLocker::Init() {
   authenticator_ = UserSessionManager::GetInstance()->CreateAuthenticator(this);
   extended_authenticator_ = ExtendedAuthenticator::Create(this);
 
-  // Create delegate that calls into the views-based lock screen via mojo.
+  // Create ViewScreenLocker that calls into the views-based lock screen via
+  // mojo.
   views_screen_locker_ = std::make_unique<ViewsScreenLocker>(this);
-  delegate_ = views_screen_locker_.get();
 
   // Create and display lock screen.
   CHECK(LoginScreenClientImpl::HasInstance());
@@ -262,10 +256,10 @@ void ScreenLocker::OnAuthFailure(const AuthFailure& error) {
   // Don't enable signout button here as we're showing
   // MessageBubble.
 
-  delegate_->ShowErrorMessage(incorrect_passwords_count_++
-                                  ? IDS_LOGIN_ERROR_AUTHENTICATING_2ND_TIME
-                                  : IDS_LOGIN_ERROR_AUTHENTICATING,
-                              HelpAppLauncher::HELP_CANT_ACCESS_ACCOUNT);
+  views_screen_locker_->ShowErrorMessage(
+      incorrect_passwords_count_++ ? IDS_LOGIN_ERROR_AUTHENTICATING_2ND_TIME
+                                   : IDS_LOGIN_ERROR_AUTHENTICATING,
+      HelpAppLauncher::HELP_CANT_ACCESS_ACCOUNT);
 
   if (auth_status_consumer_)
     auth_status_consumer_->OnAuthFailure(error);
@@ -501,18 +495,6 @@ void ScreenLocker::OnPinAttemptDone(std::unique_ptr<UserContext> user_context,
 void ScreenLocker::ContinueAuthenticate(
     std::unique_ptr<UserContext> user_context) {
   DCHECK(!user_context->IsUsingPin());
-  if (user_context->GetAccountId().GetAccountType() ==
-          AccountType::ACTIVE_DIRECTORY &&
-      user_context->GetKey()->GetKeyType() == Key::KEY_TYPE_PASSWORD_PLAIN) {
-    // Try to get kerberos TGT while we have user's password typed on the lock
-    // screen. Failure to get TGT here is OK - that could mean e.g. Active
-    // Directory server is not reachable. AuthPolicyCredentialsManager regularly
-    // checks TGT status inside the user session.
-    AuthPolicyHelper::TryAuthenticateUser(
-        user_context->GetAccountId().GetUserEmail(),
-        user_context->GetAccountId().GetObjGuid(),
-        user_context->GetKey()->GetSecret());
-  }
   content::GetUIThreadTaskRunner({})->PostTask(
       FROM_HERE,
       base::BindOnce(&ScreenLocker::AttemptUnlock, weak_factory_.GetWeakPtr(),
@@ -520,7 +502,13 @@ void ScreenLocker::ContinueAuthenticate(
 }
 
 void ScreenLocker::AttemptUnlock(std::unique_ptr<UserContext> user_context) {
-  authenticator_->AuthenticateToUnlock(std::move(user_context));
+  DCHECK(user_context);
+  // Retrieve accountId before std::move(user_context).
+  const AccountId accountId = user_context->GetAccountId();
+
+  authenticator_->AuthenticateToUnlock(
+      user_manager::UserManager::Get()->IsEphemeralAccountId(accountId),
+      std::move(user_context));
 }
 
 const user_manager::User* ScreenLocker::FindUnlockUser(
@@ -538,18 +526,18 @@ void ScreenLocker::OnStartLockCallback(bool locked) {
   if (!locked)
     return;
 
-  delegate_->OnAshLockAnimationFinished();
+  views_screen_locker_->OnAshLockAnimationFinished();
 
   AccessibilityManager::Get()->PlayEarcon(
       Sound::kLock, PlaySoundOption::kOnlyIfSpokenFeedbackEnabled);
 }
 
 void ScreenLocker::ClearErrors() {
-  delegate_->ClearErrors();
+  views_screen_locker_->ClearErrors();
 }
 
 void ScreenLocker::Signout() {
-  delegate_->ClearErrors();
+  views_screen_locker_->ClearErrors();
   base::RecordAction(UserMetricsAction("ScreenLocker_Signout"));
   // We expect that this call will not wait for any user input.
   // If it changes at some point, we will need to force exit.
@@ -566,7 +554,7 @@ void ScreenLocker::EnableInput() {
 void ScreenLocker::ShowErrorMessage(int error_msg_id,
                                     HelpAppLauncher::HelpTopic help_topic_id,
                                     bool sign_out_only) {
-  delegate_->ShowErrorMessage(error_msg_id, help_topic_id);
+  views_screen_locker_->ShowErrorMessage(error_msg_id, help_topic_id);
 }
 
 user_manager::UserList ScreenLocker::GetUsersToShow() const {
@@ -966,8 +954,9 @@ void ScreenLocker::OnFingerprintAuthFailure(const user_manager::User& user) {
               << " unlock attempt.";
       LoginScreen::Get()->GetModel()->SetFingerprintState(
           user.GetAccountId(), FingerprintState::DISABLED_FROM_ATTEMPTS);
-      delegate_->ShowErrorMessage(IDS_LOGIN_ERROR_FINGERPRINT_MAX_ATTEMPT,
-                                  HelpAppLauncher::HELP_CANT_ACCESS_ACCOUNT);
+      views_screen_locker_->ShowErrorMessage(
+          IDS_LOGIN_ERROR_FINGERPRINT_MAX_ATTEMPT,
+          HelpAppLauncher::HELP_CANT_ACCESS_ACCOUNT);
     }
   }
 

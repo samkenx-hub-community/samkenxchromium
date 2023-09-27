@@ -11,6 +11,7 @@
 #include "components/ukm/test_ukm_recorder.h"
 #include "content/browser/preloading/preloading.h"
 #include "content/browser/preloading/preloading_config.h"
+#include "content/common/features.h"
 #include "content/public/browser/preloading.h"
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"

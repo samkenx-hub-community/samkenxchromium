@@ -176,19 +176,20 @@ AutofillWalletSyncBridge::CreateMetadataChangeList() {
                           change_processor()->GetWeakPtr()));
 }
 
-absl::optional<syncer::ModelError> AutofillWalletSyncBridge::MergeSyncData(
+absl::optional<syncer::ModelError> AutofillWalletSyncBridge::MergeFullSyncData(
     std::unique_ptr<syncer::MetadataChangeList> metadata_change_list,
     syncer::EntityChangeList entity_data) {
   // We want to notify the metadata bridge about all changes so that the
   // metadata bridge can track changes in the data bridge and react accordingly.
-  SetSyncData(entity_data, /*notify_metadata_bridge=*/true);
+  SetSyncData(entity_data, /*notify_webdata_backend=*/true);
 
   // TODO(crbug.com/853688): Update the AutofillTable API to know about write
   // errors and report them here.
   return absl::nullopt;
 }
 
-absl::optional<syncer::ModelError> AutofillWalletSyncBridge::ApplySyncChanges(
+absl::optional<syncer::ModelError>
+AutofillWalletSyncBridge::ApplyIncrementalSyncChanges(
     std::unique_ptr<syncer::MetadataChangeList> metadata_change_list,
     syncer::EntityChangeList entity_data) {
   // This bridge does not support incremental updates, so whenever this is
@@ -231,16 +232,14 @@ bool AutofillWalletSyncBridge::SupportsIncrementalUpdates() const {
   return false;
 }
 
-void AutofillWalletSyncBridge::ApplyStopSyncChanges(
+void AutofillWalletSyncBridge::ApplyDisableSyncChanges(
     std::unique_ptr<syncer::MetadataChangeList> delete_metadata_change_list) {
-  // If a metadata change list gets passed in, that means sync is actually
-  // disabled, so we want to delete the payments data.
-  if (delete_metadata_change_list) {
-    // Do not notify the metadata bridge because we do not want to upstream the
-    // deletions. The metadata bridge deletes its data independently when sync
-    // gets stopped.
-    SetSyncData(syncer::EntityChangeList(), /*notify_metadata_bridge=*/false);
-  }
+  // Sync is disabled, so we want to delete the payments data.
+
+  // Do not notify the metadata bridge because we do not want to upstream the
+  // deletions. The metadata bridge deletes its data independently when sync
+  // gets stopped.
+  SetSyncData(syncer::EntityChangeList(), /*notify_webdata_backend=*/false);
 }
 
 void AutofillWalletSyncBridge::GetAllDataForTesting(DataCallback callback) {
@@ -293,7 +292,7 @@ void AutofillWalletSyncBridge::GetAllDataImpl(DataCallback callback,
 
 void AutofillWalletSyncBridge::SetSyncData(
     const syncer::EntityChangeList& entity_data,
-    bool notify_metadata_bridge) {
+    bool notify_webdata_backend) {
   bool wallet_data_changed = false;
 
   // Extract the Autofill types from the sync |entity_data|.
@@ -305,9 +304,9 @@ void AutofillWalletSyncBridge::SetSyncData(
                                   &customer_data, &cloud_token_data);
 
   wallet_data_changed |=
-      SetWalletCards(std::move(wallet_cards), notify_metadata_bridge);
+      SetWalletCards(std::move(wallet_cards), notify_webdata_backend);
   wallet_data_changed |=
-      SetWalletAddresses(std::move(wallet_addresses), notify_metadata_bridge);
+      SetWalletAddresses(std::move(wallet_addresses), notify_webdata_backend);
   wallet_data_changed |= SetPaymentsCustomerData(std::move(customer_data));
   wallet_data_changed |=
       SetCreditCardCloudTokenData(std::move(cloud_token_data));
@@ -325,7 +324,7 @@ void AutofillWalletSyncBridge::SetSyncData(
 
 bool AutofillWalletSyncBridge::SetWalletCards(
     std::vector<CreditCard> wallet_cards,
-    bool notify_metadata_bridge) {
+    bool notify_webdata_backend) {
   // Users can set billing address of the server credit card locally, but that
   // information does not propagate to either Chrome Sync or Google Payments
   // server. To preserve user's preferred billing address and most recent use
@@ -349,7 +348,9 @@ bool AutofillWalletSyncBridge::SetWalletCards(
 
     table->SetServerCardsData(wallet_cards);
 
-    if (notify_metadata_bridge) {
+    if (notify_webdata_backend) {
+      // We are notifying Metadata and Wallet credential sync bridges for
+      // the card changes.
       for (const CreditCardChange& change : diff.changes)
         web_data_backend_->NotifyOfCreditCardChanged(change);
     }
@@ -361,7 +362,7 @@ bool AutofillWalletSyncBridge::SetWalletCards(
 
 bool AutofillWalletSyncBridge::SetWalletAddresses(
     std::vector<AutofillProfile> wallet_addresses,
-    bool notify_metadata_bridge) {
+    bool notify_webdata_backend) {
   // We do not have to CopyRelevantWalletMetadataFromDisk() because we will
   // never overwrite the same entity with different data (server_id is generated
   // based on content so addresses have the same server_id iff they have the
@@ -382,7 +383,7 @@ bool AutofillWalletSyncBridge::SetWalletAddresses(
 
   if (!diff.IsEmpty()) {
     table->SetServerAddressesData(wallet_addresses);
-    if (notify_metadata_bridge) {
+    if (notify_webdata_backend) {
       for (const AutofillProfileChange& change : diff.changes) {
         web_data_backend_->NotifyOfAutofillProfileChanged(change);
       }
@@ -480,7 +481,7 @@ AutofillWalletSyncBridge::ComputeAutofillWalletDiff(
     if (cmp < 0) {
       ++result.items_removed;
       result.changes.emplace_back(AutofillDataModelChange<Item>::REMOVE,
-                                  (*old_it)->server_id(), *old_it);
+                                  (*old_it)->server_id(), **old_it);
       ++old_it;
     } else if (cmp == 0) {
       ++old_it;
@@ -488,7 +489,7 @@ AutofillWalletSyncBridge::ComputeAutofillWalletDiff(
     } else {
       ++result.items_added;
       add_changes.emplace_back(AutofillDataModelChange<Item>::ADD,
-                               (*new_it)->server_id(), *new_it);
+                               (*new_it)->server_id(), **new_it);
       ++new_it;
     }
   }

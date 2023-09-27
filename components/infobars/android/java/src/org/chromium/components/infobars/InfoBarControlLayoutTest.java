@@ -5,11 +5,11 @@
 package org.chromium.components.infobars;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 import android.view.View.MeasureSpec;
 import android.view.ViewGroup.LayoutParams;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Assert;
@@ -32,7 +32,6 @@ public class InfoBarControlLayoutTest {
     private static final int SWITCH_ID_2 = 2;
     private static final int SWITCH_ID_3 = 3;
     private static final int SWITCH_ID_4 = 4;
-    private static final int SWITCH_ID_5 = 5;
     private static final int INFOBAR_WIDTH = 3200;
 
     private Context mContext;

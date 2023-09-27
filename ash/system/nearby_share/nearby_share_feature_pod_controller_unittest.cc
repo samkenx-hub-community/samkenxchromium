@@ -14,6 +14,7 @@
 #include "ash/system/unified/unified_system_tray_bubble.h"
 #include "ash/system/unified/unified_system_tray_controller.h"
 #include "ash/test/ash_test_base.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
@@ -96,8 +97,10 @@ class NearbyShareFeaturePodControllerTest
   std::unique_ptr<FeaturePodButton> button_;
   std::unique_ptr<FeatureTile> tile_;
 
-  TestNearbyShareDelegate* test_delegate_ = nullptr;
-  NearbyShareController* nearby_share_controller_ = nullptr;
+  raw_ptr<TestNearbyShareDelegate, DanglingUntriaged | ExperimentalAsh>
+      test_delegate_ = nullptr;
+  raw_ptr<NearbyShareController, DanglingUntriaged | ExperimentalAsh>
+      nearby_share_controller_ = nullptr;
 };
 
 INSTANTIATE_TEST_SUITE_P(QsRevamp,
@@ -120,7 +123,12 @@ TEST_P(NearbyShareFeaturePodControllerTest, ButtonVisibilityLoggedIn) {
 TEST_P(NearbyShareFeaturePodControllerTest, ButtonVisibilityLocked) {
   CreateUserSessions(1);
   BlockUserSession(UserSessionBlockReason::BLOCKED_BY_LOCK_SCREEN);
+
+  // Showing the lock screen closes the system tray bubble, so re-show it before
+  // setting up the button.
+  GetPrimaryUnifiedSystemTray()->ShowBubble();
   SetUpButton();
+
   // If locked, it should not be visible.
   EXPECT_FALSE(IsButtonVisible());
 }

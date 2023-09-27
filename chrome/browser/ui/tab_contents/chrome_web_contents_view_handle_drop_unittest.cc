@@ -16,10 +16,10 @@
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/enterprise/connectors/analysis/content_analysis_delegate.h"
-#include "chrome/browser/enterprise/connectors/analysis/fake_content_analysis_delegate.h"
 #include "chrome/browser/enterprise/connectors/connectors_service.h"
+#include "chrome/browser/enterprise/connectors/test/deep_scanning_test_utils.h"
+#include "chrome/browser/enterprise/connectors/test/fake_content_analysis_delegate.h"
 #include "chrome/browser/policy/dm_token_utils.h"
-#include "chrome/browser/safe_browsing/cloud_content_scanning/deep_scanning_test_utils.h"
 #include "chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
@@ -32,6 +32,78 @@
 #include "content/public/test/browser_task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+
+class DragDropTestContentAnalysisDelegate
+    : public enterprise_connectors::test::FakeContentAnalysisDelegate {
+ public:
+  DragDropTestContentAnalysisDelegate(base::RepeatingClosure delete_closure,
+                                      StatusCallback status_callback,
+                                      std::string dm_token,
+                                      content::WebContents* web_contents,
+                                      Data data,
+                                      CompletionCallback callback)
+      : enterprise_connectors::test::FakeContentAnalysisDelegate(
+            delete_closure,
+            std::move(status_callback),
+            std::move(dm_token),
+            web_contents,
+            std::move(data),
+            std::move(callback)) {}
+
+  static std::unique_ptr<ContentAnalysisDelegate> Create(
+      base::RepeatingClosure delete_closure,
+      StatusCallback status_callback,
+      std::string dm_token,
+      content::WebContents* web_contents,
+      Data data,
+      CompletionCallback callback) {
+    auto ret = std::make_unique<DragDropTestContentAnalysisDelegate>(
+        delete_closure, std::move(status_callback), std::move(dm_token),
+        web_contents, std::move(data), std::move(callback));
+    enterprise_connectors::FilesRequestHandler::SetFactoryForTesting(
+        base::BindRepeating(
+            &enterprise_connectors::test::FakeFilesRequestHandler::Create,
+            base::BindRepeating(&DragDropTestContentAnalysisDelegate::
+                                    FakeUploadFileForDeepScanning,
+                                base::Unretained(ret.get()))));
+    return ret;
+  }
+
+ private:
+  void UploadTextForDeepScanning(
+      std::unique_ptr<safe_browsing::BinaryUploadService::Request> request)
+      override {
+    ASSERT_EQ(request->reason(),
+              enterprise_connectors::ContentAnalysisRequest::DRAG_AND_DROP);
+
+    enterprise_connectors::test::FakeContentAnalysisDelegate::
+        UploadTextForDeepScanning(std::move(request));
+  }
+
+  void UploadImageForDeepScanning(
+      std::unique_ptr<safe_browsing::BinaryUploadService::Request> request)
+      override {
+    ASSERT_EQ(request->reason(),
+              enterprise_connectors::ContentAnalysisRequest::DRAG_AND_DROP);
+
+    enterprise_connectors::test::FakeContentAnalysisDelegate::
+        UploadImageForDeepScanning(std::move(request));
+  }
+
+  void FakeUploadFileForDeepScanning(
+      safe_browsing::BinaryUploadService::Result result,
+      const base::FilePath& path,
+      std::unique_ptr<safe_browsing::BinaryUploadService::Request> request,
+      enterprise_connectors::test::FakeFilesRequestHandler::
+          FakeFileRequestCallback callback) override {
+    ASSERT_EQ(request->reason(),
+              enterprise_connectors::ContentAnalysisRequest::DRAG_AND_DROP);
+
+    enterprise_connectors::test::FakeContentAnalysisDelegate::
+        FakeUploadFileForDeepScanning(result, path, std::move(request),
+                                      std::move(callback));
+  }
+};
 
 class ChromeWebContentsViewDelegateHandleOnPerformDrop : public testing::Test {
  public:
@@ -63,24 +135,24 @@ class ChromeWebContentsViewDelegateHandleOnPerformDrop : public testing::Test {
               ],
               "block_until_verdict": 1
           })";
-      safe_browsing::SetAnalysisConnector(
+      enterprise_connectors::test::SetAnalysisConnector(
           profile_->GetPrefs(), enterprise_connectors::FILE_ATTACHED, kEnabled);
-      safe_browsing::SetAnalysisConnector(
+      enterprise_connectors::test::SetAnalysisConnector(
           profile_->GetPrefs(), enterprise_connectors::BULK_DATA_ENTRY,
           kEnabled);
     } else {
-      safe_browsing::ClearAnalysisConnector(
+      enterprise_connectors::test::ClearAnalysisConnector(
           profile_->GetPrefs(), enterprise_connectors::FILE_ATTACHED);
-      safe_browsing::ClearAnalysisConnector(
+      enterprise_connectors::test::ClearAnalysisConnector(
           profile_->GetPrefs(), enterprise_connectors::BULK_DATA_ENTRY);
     }
 
     run_loop_ = std::make_unique<base::RunLoop>();
 
-    using FakeDelegate = enterprise_connectors::FakeContentAnalysisDelegate;
+    using FakeDelegate =
+        enterprise_connectors::test::FakeContentAnalysisDelegate;
 
-    policy::SetDMTokenForTesting(
-        policy::DMToken::CreateValidTokenForTesting("dm_token"));
+    policy::SetDMTokenForTesting(policy::DMToken::CreateValidToken("dm_token"));
     auto callback = base::BindLambdaForTesting(
         [this](const std::string& contents, const base::FilePath& path)
             -> enterprise_connectors::ContentAnalysisResponse {
@@ -118,9 +190,8 @@ class ChromeWebContentsViewDelegateHandleOnPerformDrop : public testing::Test {
           return response;
         });
     enterprise_connectors::ContentAnalysisDelegate::SetFactoryForTesting(
-        base::BindRepeating(
-            &enterprise_connectors::FakeContentAnalysisDelegate::Create,
-            run_loop_->QuitClosure(), callback, "dm_token"));
+        base::BindRepeating(&DragDropTestContentAnalysisDelegate::Create,
+                            run_loop_->QuitClosure(), callback, "dm_token"));
     enterprise_connectors::ContentAnalysisDelegate::DisableUIForTesting();
     enterprise_connectors::ContentAnalysisDelegate::
         SetOnAckAllRequestsCallbackForTesting(base::BindOnce(

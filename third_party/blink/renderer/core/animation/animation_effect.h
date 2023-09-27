@@ -151,7 +151,6 @@ class CORE_EXPORT AnimationEffect : public ScriptWrappable {
   // it will (if necessary) recalculate timings and (if necessary) call
   // UpdateChildrenAndEffects.
   void UpdateInheritedTime(absl::optional<AnimationTimeDelta> inherited_time,
-                           bool at_progress_timeline_boundary,
                            bool is_idle,
                            double inherited_playback_rate,
                            TimingUpdateReason) const;
@@ -168,9 +167,7 @@ class CORE_EXPORT AnimationEffect : public ScriptWrappable {
   // In web-animations-1, auto is treated as "the value zero for the purpose of
   // timing model calculations and for the result of the duration member
   // returned from getComputedTiming()".
-  virtual AnimationTimeDelta IntrinsicIterationDuration() const {
-    return AnimationTimeDelta();
-  }
+  virtual AnimationTimeDelta IntrinsicIterationDuration() const;
 
   virtual AnimationTimeDelta CalculateTimeToEffectChange(
       bool forwards,
@@ -190,7 +187,6 @@ class CORE_EXPORT AnimationEffect : public ScriptWrappable {
   mutable absl::optional<Timing::NormalizedTiming> normalized_;
   mutable bool needs_update_;
   mutable absl::optional<AnimationTimeDelta> last_update_time_;
-  mutable bool last_at_progress_timeline_boundary_ = false;
   mutable bool last_is_idle_ = false;
   AnimationTimeDelta cancel_time_;
   const Timing::CalculatedTiming& EnsureCalculated() const;

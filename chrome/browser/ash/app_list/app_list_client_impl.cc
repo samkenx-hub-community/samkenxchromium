@@ -9,17 +9,23 @@
 #include <utility>
 #include <vector>
 
+#include "ash/app_list/app_list_view_delegate.h"
+#include "ash/public/cpp/app_list/app_list_client.h"
 #include "ash/public/cpp/app_list/app_list_controller.h"
 #include "ash/public/cpp/app_list/app_list_types.h"
 #include "ash/public/cpp/new_window_delegate.h"
 #include "ash/public/cpp/tablet_mode.h"
 #include "ash/shell.h"
 #include "ash/system/federated/federated_service_controller_impl.h"
+#include "base/feature_list.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ref.h"
+#include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/metrics/user_metrics.h"
 #include "base/strings/strcat.h"
+#include "base/trace_event/trace_event.h"
 #include "chrome/browser/ash/app_list/app_list_controller_delegate.h"
 #include "chrome/browser/ash/app_list/app_list_model_updater.h"
 #include "chrome/browser/ash/app_list/app_list_notifier_impl.h"
@@ -32,8 +38,10 @@
 #include "chrome/browser/ash/app_list/search/search_controller_factory.h"
 #include "chrome/browser/ash/crosapi/browser_util.h"
 #include "chrome/browser/ash/crosapi/url_handler_ash.h"
+#include "chrome/browser/feature_engagement/tracker_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/scalable_iph/scalable_iph_factory.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/ui/app_list/app_list_util.h"
 #include "chrome/browser/ui/ash/shelf/app_shortcut_shelf_item_controller.h"
@@ -46,9 +54,13 @@
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/webui/chrome_web_ui_controller_factory.h"
-#include "chromeos/crosapi/cpp/gurl_os_handler_utils.h"
+#include "chromeos/ash/components/scalable_iph/scalable_iph.h"
+#include "components/feature_engagement/public/feature_constants.h"
+#include "components/feature_engagement/public/tracker.h"
 #include "components/session_manager/core/session_manager.h"
 #include "ui/base/page_transition_types.h"
+#include "ui/base/window_open_disposition.h"
+#include "ui/display/screen.h"
 #include "ui/display/types/display_constants.h"
 
 namespace {
@@ -59,6 +71,8 @@ AppListClientImpl* g_app_list_client_instance = nullptr;
 constexpr base::TimeDelta kTimeMetricsMin = base::Seconds(1);
 constexpr base::TimeDelta kTimeMetricsMax = base::Days(7);
 constexpr int kTimeMetricsBucketCount = 100;
+
+constexpr char kSearchBoxIphUrlPlaceholder[] = "https://www.google.com/";
 
 bool IsTabletMode() {
   return ash::TabletMode::IsInTabletMode();
@@ -116,6 +130,25 @@ ash::NewWindowDelegate::Disposition ConvertDisposition(
       return ash::NewWindowDelegate::Disposition::kSwitchToTab;
   }
 }
+
+class ScopedIphSessionImpl : public ash::ScopedIphSession {
+ public:
+  explicit ScopedIphSessionImpl(feature_engagement::Tracker* tracker,
+                                const base::Feature& iph_feature)
+      : tracker_(tracker), iph_feature_(iph_feature) {
+    CHECK(tracker_);
+  }
+
+  ~ScopedIphSessionImpl() override { tracker_->Dismissed(*iph_feature_); }
+
+  void NotifyEvent(const std::string& event) override {
+    tracker_->NotifyEvent(event);
+  }
+
+ private:
+  raw_ptr<feature_engagement::Tracker> tracker_;
+  const raw_ref<const base::Feature, ExperimentalAsh> iph_feature_;
+};
 
 }  // namespace
 
@@ -178,6 +211,11 @@ void AppListClientImpl::OnAppListControllerDestroyed() {
   if (current_model_updater_) {
     current_model_updater_->SetActive(false);
   }
+}
+
+std::vector<ash::AppListSearchControlCategory>
+AppListClientImpl::GetToggleableCategories() const {
+  return search_controller_->GetToggleableCategories();
 }
 
 void AppListClientImpl::StartSearch(const std::u16string& trimmed_query) {
@@ -307,19 +345,6 @@ void AppListClientImpl::InvokeSearchResultAction(
   }
 }
 
-void AppListClientImpl::ViewClosing() {
-  display_id_ = display::kInvalidDisplayId;
-}
-
-void AppListClientImpl::ViewShown(int64_t display_id) {
-  if (current_model_updater_) {
-    base::RecordAction(base::UserMetricsAction("Launcher_Show"));
-    base::UmaHistogramSparse("Apps.AppListBadgedAppsCount",
-                             current_model_updater_->BadgedItemCount());
-  }
-  display_id_ = display_id;
-}
-
 void AppListClientImpl::ActivateItem(int profile_id,
                                      const std::string& id,
                                      int event_flags,
@@ -356,6 +381,14 @@ void AppListClientImpl::ActivateItem(int profile_id,
     search_controller_->Train(std::move(launch_data));
   }
 
+  CHECK_EQ(requested_model_updater, current_model_updater_);
+  scalable_iph::ScalableIph* scalable_iph =
+      ScalableIphFactory::GetForBrowserContext(profile_);
+  if (scalable_iph) {
+    // `ScalableIph` is not available for some profiles.
+    scalable_iph->MaybeRecordAppListItemActivation(id);
+  }
+
   MaybeRecordLauncherAction(launched_from);
   requested_model_updater->ActivateChromeItem(id, event_flags);
 }
@@ -390,7 +423,7 @@ void AppListClientImpl::OnAppListVisibilityWillChange(bool visible) {
 void AppListClientImpl::OnAppListVisibilityChanged(bool visible) {
   app_list_visible_ = visible;
   if (visible) {
-    MaybeRecordViewShown();
+    RecordViewShown();
   } else if (current_model_updater_) {
     current_model_updater_->OnAppListHidden();
 
@@ -527,6 +560,7 @@ void AppListClientImpl::SetProfile(Profile* new_profile) {
 
   SetUpSearchUI();
   OnTemplateURLServiceChanged();
+  RecalculateWouldTriggerLauncherSearchIph();
 }
 
 void AppListClientImpl::SetUpSearchUI() {
@@ -558,6 +592,7 @@ void AppListClientImpl::InitializeAsIfNewUserLoginForTest() {
 }
 
 void AppListClientImpl::OnSessionStateChanged() {
+  TRACE_EVENT0("ui", "AppListClientImpl::OnSessionStateChanged");
   // Return early if the current user is not new or the session is not active.
   if (!user_manager::UserManager::Get()->IsCurrentUserNew() ||
       !IsSessionActive()) {
@@ -580,6 +615,7 @@ void AppListClientImpl::OnTemplateURLServiceChanged() {
           template_url_service->search_terms_data()) == SEARCH_ENGINE_GOOGLE;
 
   current_model_updater_->SetSearchEngineIsGoogle(is_google);
+  search_controller_->OnDefaultSearchIsGoogleSet(is_google);
 }
 
 void AppListClientImpl::ShowAppList(ash::AppListShowSource source) {
@@ -611,7 +647,13 @@ aura::Window* AppListClientImpl::GetAppListWindow() {
 }
 
 int64_t AppListClientImpl::GetAppListDisplayId() {
-  return display_id_;
+  aura::Window* const app_list_window = GetAppListWindow();
+  if (!app_list_window) {
+    return display::kInvalidDisplayId;
+  }
+  return display::Screen::GetScreen()
+      ->GetDisplayNearestWindow(app_list_window)
+      .id();
 }
 
 bool AppListClientImpl::IsAppPinned(const std::string& app_id) {
@@ -646,17 +688,11 @@ void AppListClientImpl::OpenURL(Profile* profile,
                                 const GURL& url,
                                 ui::PageTransition transition,
                                 WindowOpenDisposition disposition) {
-  if (crosapi::browser_util::IsLacrosPrimaryBrowser()) {
-    const GURL sanitized_url =
-        crosapi::gurl_os_handler_utils::SanitizeAshURL(url);
-    if (CanBeHandledAsSystemUrl(sanitized_url, transition)) {
-      crosapi::UrlHandlerAsh().OpenUrl(sanitized_url);
-    } else {
-      // Send the url to the current primary browser.
-      ash::NewWindowDelegate::GetPrimary()->OpenUrl(
-          url, ash::NewWindowDelegate::OpenUrlFrom::kUserInteraction,
-          ConvertDisposition(disposition));
-    }
+  if (crosapi::browser_util::IsLacrosEnabled()) {
+    // Send the url to the current primary browser.
+    ash::NewWindowDelegate::GetPrimary()->OpenUrl(
+        url, ash::NewWindowDelegate::OpenUrlFrom::kUserInteraction,
+        ConvertDisposition(disposition));
   } else {
     NavigateParams params(profile, url, transition);
     params.disposition = disposition;
@@ -666,6 +702,42 @@ void AppListClientImpl::OpenURL(Profile* profile,
 
 ash::AppListNotifier* AppListClientImpl::GetNotifier() {
   return app_list_notifier_.get();
+}
+
+void AppListClientImpl::RecalculateWouldTriggerLauncherSearchIph() {
+  // This can be called before a `Profile` is set to `AppListClientImpl`. If a
+  // `Profile` is not set yet, return here. `AppListClientImpl::SetProfile` will
+  // call this method once a `Profile` is set.
+  if (!current_model_updater_) {
+    return;
+  }
+
+  current_model_updater_->RecalculateWouldTriggerLauncherSearchIph();
+}
+
+std::unique_ptr<ash::ScopedIphSession>
+AppListClientImpl::CreateLauncherSearchIphSession() {
+  if (profile_ == nullptr) {
+    return nullptr;
+  }
+
+  feature_engagement::Tracker* tracker =
+      feature_engagement::TrackerFactory::GetForBrowserContext(profile_);
+  if (!tracker->ShouldTriggerHelpUI(
+          feature_engagement::kIPHLauncherSearchHelpUiFeature)) {
+    return nullptr;
+  }
+
+  // If we call `ShouldTriggerHelpUI` above, we must show an IPH, i.e. we must
+  // return `ScopedIphSessionImpl`.
+  return std::make_unique<ScopedIphSessionImpl>(
+      tracker, feature_engagement::kIPHLauncherSearchHelpUiFeature);
+}
+
+void AppListClientImpl::OpenSearchBoxIphUrl() {
+  OpenURL(profile_, GURL(kSearchBoxIphUrlPlaceholder),
+          ui::PageTransition::PAGE_TRANSITION_LINK,
+          WindowOpenDisposition::NEW_FOREGROUND_TAB);
 }
 
 void AppListClientImpl::LoadIcon(int profile_id, const std::string& app_id) {
@@ -688,12 +760,9 @@ ash::AppListSortOrder AppListClientImpl::GetPermanentSortingOrder() const {
       ->GetPermanentSortingOrder();
 }
 
-void AppListClientImpl::CommitTemporarySortOrder() {
-  DCHECK(current_model_updater_);
-  current_model_updater_->CommitTemporarySortOrder();
-}
+void AppListClientImpl::RecordViewShown() {
+  base::RecordAction(base::UserMetricsAction("Launcher_Show"));
 
-void AppListClientImpl::MaybeRecordViewShown() {
   // Record the time duration between session activation and the first launcher
   // showing if the current user is new.
 
@@ -798,11 +867,11 @@ void AppListClientImpl::RecordOpenedResultFromSearchBox(
 void AppListClientImpl::MaybeRecordLauncherAction(
     ash::AppListLaunchedFrom launched_from) {
   DCHECK(launched_from == ash::AppListLaunchedFrom::kLaunchedFromGrid ||
-         launched_from ==
-             ash::AppListLaunchedFrom::kLaunchedFromSuggestionChip ||
          launched_from == ash::AppListLaunchedFrom::kLaunchedFromRecentApps ||
          launched_from == ash::AppListLaunchedFrom::kLaunchedFromSearchBox ||
-         launched_from == ash::AppListLaunchedFrom::kLaunchedFromContinueTask);
+         launched_from == ash::AppListLaunchedFrom::kLaunchedFromContinueTask ||
+         launched_from ==
+             ash::AppListLaunchedFrom::kLaunchedFromQuickAppAccess);
 
   // Return early if the current user is not new.
   if (!user_manager::UserManager::Get()->IsCurrentUserNew()) {

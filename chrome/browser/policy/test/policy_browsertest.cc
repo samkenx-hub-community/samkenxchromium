@@ -69,14 +69,11 @@ const int kThreeHoursInMs = 180 * 60 * 1000;
 
 // Checks if WebGL is enabled in the given WebContents.
 bool IsWebGLEnabled(content::WebContents* contents) {
-  bool result = false;
-  EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-      contents,
-      "var canvas = document.createElement('canvas');"
-      "var context = canvas.getContext('webgl');"
-      "domAutomationController.send(context != null);",
-      &result));
-  return result;
+  return content::EvalJs(contents,
+                         "var canvas = document.createElement('canvas');"
+                         "var context = canvas.getContext('webgl');"
+                         "context != null;")
+      .ExtractBool();
 }
 
 }  // namespace
@@ -123,7 +120,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, MAYBE_Disable3DAPIs) {
 // TODO(crbug.com/1378338): Re-enable this flaky test on Linux
 // and lacros asan builder.
 #if BUILDFLAG(IS_LINUX) || \
-    BUILDFLAG(IS_CHROMEOS_LACROS) && defined(ADDRESS_SANITIZER)
+    (BUILDFLAG(IS_CHROMEOS) && defined(ADDRESS_SANITIZER))
 #define MAYBE_HomepageLocation DISABLED_HomepageLocation
 #else
 #define MAYBE_HomepageLocation HomepageLocation

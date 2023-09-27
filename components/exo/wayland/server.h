@@ -13,6 +13,7 @@
 #include "base/files/scoped_file.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/time/time.h"
 #include "components/exo/wayland/scoped_wl.h"
 #include "ui/display/display_observer.h"
@@ -26,6 +27,7 @@ class Display;
 
 namespace wayland {
 
+class ClientTracker;
 class SerialTracker;
 class UiControls;
 struct WaylandDataDeviceManager;
@@ -44,8 +46,8 @@ class WaylandWatcher;
 // requests are dispatched into the given Exosphere display.
 class Server : public display::DisplayObserver {
  public:
-  using StartCallback =
-      base::OnceCallback<void(bool, const base::FilePath& path)>;
+  using ServerGetter = base::RepeatingCallback<Server*(wl_display*)>;
+  using StartCallback = base::OnceCallback<void(bool)>;
 
   Server(Display* display, std::unique_ptr<SecurityDelegate> security_delegate);
 
@@ -63,19 +65,18 @@ class Server : public display::DisplayObserver {
       Display* display,
       std::unique_ptr<SecurityDelegate> security_delegate);
 
-  // In cases where the server was started asynchronously, this helper can be
-  // used to delete it asynchronously as well.
-  static void DestroyAsync(std::unique_ptr<Server> server);
+  // Gets the Server instance for a given wl_display.
+  static Server* GetServerForDisplay(wl_display* display);
 
-  // TODO(b/270254359): deprecate go/secure-exo-ids in favour of
-  // go/securer-exo-ids.
-  void StartAsync(StartCallback callback);
+  // Sets the callback used to find the Server instance for a given wl_display.
+  static void SetServerGetter(ServerGetter server_getter);
+
   void StartWithDefaultPath(StartCallback callback);
   void StartWithFdAsync(base::ScopedFD fd, StartCallback callback);
 
   void Initialize();
 
-  bool Open(bool default_path);
+  bool Open();
 
   bool OpenFd(base::ScopedFD fd);
 
@@ -100,22 +101,17 @@ class Server : public display::DisplayObserver {
   wl_resource* GetOutputResource(wl_client* client, int64_t display_id);
 
   Display* GetDisplay() { return display_; }
+  wl_display* GetWaylandDisplay() { return wl_display_.get(); }
 
-  // Public version of the protected accessor below, to be used in tests.
-  wl_display* GetWaylandDisplayForTesting() const {
-    return GetWaylandDisplay();
-  }
-
-  // Returns the path to the wayland socket used by this server. Returns "" if
-  // StarTWithDefaultPath() hasn't been called, or StartWithFd() was called.
-  const base::FilePath& socket_path() const { return socket_path_; }
+  // Returns whether a client associated with this server has started
+  // destruction.
+  bool IsClientDestroyed(wl_client* client) const;
 
  protected:
   friend class UiControls;
   friend class WestonTest;
   void AddWaylandOutput(int64_t id,
                         std::unique_ptr<WaylandDisplayOutput> output);
-  wl_display* GetWaylandDisplay() const { return wl_display_.get(); }
 
  private:
   friend class ScopedEventDispatchDisabler;
@@ -124,19 +120,17 @@ class Server : public display::DisplayObserver {
   // by clients to connect to the display server.
   bool AddSocket(const std::string& name);
 
-  // This has the server's socket inside it, so it must be deleted last.
-  base::ScopedTempDir socket_dir_;
-  Display* const display_;
+  const raw_ptr<Display, ExperimentalAsh> display_;
   std::unique_ptr<SecurityDelegate> security_delegate_;
   // Deleting wl_display depends on SerialTracker.
   std::unique_ptr<SerialTracker> serial_tracker_;
+  std::unique_ptr<SerialTracker> rotation_serial_tracker_;
   std::unique_ptr<wl_display, WlDisplayDeleter> wl_display_;
   base::flat_map<int64_t, std::unique_ptr<WaylandDisplayOutput>> outputs_;
   std::unique_ptr<WaylandDataDeviceManager> data_device_manager_data_;
   std::unique_ptr<WaylandSeat> seat_data_;
   display::ScopedDisplayObserver display_observer_{this};
   std::unique_ptr<wayland::WaylandWatcher> wayland_watcher_;
-  base::FilePath socket_path_;
   std::unique_ptr<WaylandDmabufFeedbackManager> wayland_feedback_manager_;
 
   std::unique_ptr<WaylandKeyboardExtension> zcr_keyboard_extension_data_;
@@ -144,8 +138,8 @@ class Server : public display::DisplayObserver {
   std::unique_ptr<WaylandTextInputExtension> zcr_text_input_extension_data_;
   std::unique_ptr<WaylandXdgShell> xdg_shell_data_;
   std::unique_ptr<WaylandRemoteShellData> remote_shell_data_;
-  std::unique_ptr<WestonTest> weston_test_holder_;
   std::unique_ptr<UiControls> ui_controls_holder_;
+  std::unique_ptr<ClientTracker> client_tracker_;
 };
 
 }  // namespace wayland

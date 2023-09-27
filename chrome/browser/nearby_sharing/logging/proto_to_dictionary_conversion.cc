@@ -76,7 +76,7 @@ base::Value::Dict PublicCertificateToReadableDictionary(
 }
 
 base::Value::Dict TimestampToReadableDictionary(
-    const nearbyshare::proto::Timestamp& timestamp) {
+    const ash::nearby::proto::Timestamp& timestamp) {
   base::Value::Dict dict;
   dict.Set("seconds", base::NumberToString(timestamp.seconds()));
   dict.Set("nanos", base::NumberToString(timestamp.nanos()));
@@ -167,7 +167,7 @@ base::Value::Dict ContactToReadableDictionary(
 }
 
 base::Value::Dict FieldMaskToReadableDictionary(
-    const nearbyshare::proto::FieldMask& mask) {
+    const ash::nearby::proto::FieldMask& mask) {
   base::Value::Dict dict;
   base::Value::List paths_list;
   for (const auto& path : mask.paths()) {
@@ -196,5 +196,6 @@ base::Value::Dict EncryptedMetadataToReadableDictionary(
   dict.Set("bluetooth_mac_address",
            TruncateString(Encode(data.bluetooth_mac_address())));
   dict.Set("obfuscated_gaia_id", data.obfuscated_gaia_id());
+  dict.Set("account_name", data.account_name());
   return dict;
 }

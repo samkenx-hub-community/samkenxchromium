@@ -17,7 +17,6 @@
 #include "android_webview/browser/aw_pdf_exporter.h"
 #include "android_webview/browser/aw_render_process.h"
 #include "android_webview/browser/aw_renderer_priority.h"
-#include "android_webview/browser/aw_resource_context.h"
 #include "android_webview/browser/aw_settings.h"
 #include "android_webview/browser/aw_web_contents_delegate.h"
 #include "android_webview/browser/gfx/aw_gl_functor.h"
@@ -60,6 +59,8 @@
 #include "base/supports_user_data.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/trace_event/trace_event.h"
+#include "base/trace_event/typed_macros.h"
 #include "components/android_autofill/browser/android_autofill_manager.h"
 #include "components/android_autofill/browser/autofill_provider_android.h"
 #include "components/autofill/content/browser/content_autofill_driver.h"
@@ -226,6 +227,8 @@ AwContents::AwContents(std::unique_ptr<WebContents> web_contents)
     : content::WebContentsObserver(web_contents.get()),
       browser_view_renderer_(this, content::GetUIThreadTaskRunner({})),
       web_contents_(std::move(web_contents)) {
+  TRACE_EVENT_BEGIN("android_webview.timeline", "WebView Instance",
+                    perfetto::Track::FromPointer(this));
   base::subtle::NoBarrier_AtomicIncrement(&g_instance_count, 1);
   icon_helper_ = std::make_unique<IconHelper>(web_contents_.get());
   icon_helper_->SetListener(this);
@@ -369,6 +372,11 @@ AwContents::~AwContents() {
   WebContentsObserver::Observe(nullptr);
   AwBrowserProcess::GetInstance()->visibility_metrics_logger()->RemoveClient(
       this);
+  // Corresponds to "WebView Instance" in AwContents's constructor.
+  TRACE_EVENT_END("android_webview.timeline",
+                  perfetto::Track::FromPointer(this));
+  // TODO(crbug.com/1021571): Remove this once fixed.
+  PERFETTO_INTERNAL_ADD_EMPTY_EVENT();
 }
 
 base::android::ScopedJavaLocalRef<jobject> AwContents::GetWebContents(
@@ -1384,11 +1392,10 @@ void AwContents::SetExtraHeadersForUrl(
   std::string extra_headers;
   if (jextra_headers)
     extra_headers = ConvertJavaStringToUTF8(env, jextra_headers);
-  AwResourceContext* resource_context = static_cast<AwResourceContext*>(
-      AwBrowserContext::FromWebContents(web_contents_.get())
-          ->GetResourceContext());
-  resource_context->SetExtraHeaders(GURL(ConvertJavaStringToUTF8(env, url)),
-                                    extra_headers);
+  auto* browser_context =
+      AwBrowserContext::FromWebContents(web_contents_.get());
+  browser_context->SetExtraHeaders(GURL(ConvertJavaStringToUTF8(env, url)),
+                                   extra_headers);
 }
 
 void AwContents::SetJsOnlineProperty(JNIEnv* env, jboolean network_up) {

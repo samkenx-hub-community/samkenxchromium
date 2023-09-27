@@ -37,7 +37,6 @@ public class TouchToFillCreditCardCoordinator implements TouchToFillCreditCardCo
             TouchToFillCreditCardComponent.Delegate delegate,
             BottomSheetFocusHelper bottomSheetFocusHelper) {
         mTouchToFillCreditCardModel = createModel(mMediator);
-
         mMediator.initialize(
                 context, delegate, mTouchToFillCreditCardModel, bottomSheetFocusHelper);
         setUpModelChangeProcessors(mTouchToFillCreditCardModel,
@@ -86,7 +85,6 @@ public class TouchToFillCreditCardCoordinator implements TouchToFillCreditCardCo
                 .build();
     }
 
-    @VisibleForTesting
     PropertyModel getModelForTesting() {
         return mTouchToFillCreditCardModel;
     }

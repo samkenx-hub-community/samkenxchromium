@@ -6,12 +6,9 @@ package org.chromium.components.browser_ui.widget.dragreorder;
 
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.Color;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 import androidx.core.graphics.ColorUtils;
-import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.ViewHolder;
@@ -29,8 +26,6 @@ import java.util.List;
  * @param <T> The type of item that inhabits this adapter's list
  */
 public abstract class DragReorderableListAdapter<T> extends RecyclerView.Adapter<ViewHolder> {
-    private static final int ANIMATION_DELAY_MS = 100;
-
     protected final Context mContext;
 
     // keep track of the list and list managers
@@ -136,14 +131,9 @@ public abstract class DragReorderableListAdapter<T> extends RecyclerView.Adapter
          * @param viewHolder The DraggableRowViewHolder that is holding this row's content.
          */
         private void updateVisualState(boolean dragged, ViewHolder viewHolder) {
-            // Animate background colors and elevations
-            ViewCompat.animate(viewHolder.itemView)
-                    .translationZ(dragged ? mDraggedElevation : 0)
-                    .withEndAction(
-                            ()
-                                    -> viewHolder.itemView.setBackgroundColor(
-                                            dragged ? mDraggedBackgroundColor : Color.TRANSPARENT))
-                    .setDuration(ANIMATION_DELAY_MS)
+            DragUtils
+                    .createViewDragAnimation(dragged, viewHolder.itemView, mDraggedBackgroundColor,
+                            mDraggedElevation)
                     .start();
         }
     }
@@ -168,12 +158,12 @@ public abstract class DragReorderableListAdapter<T> extends RecyclerView.Adapter
     public DragReorderableListAdapter(Context context) {
         mContext = context;
 
-        Resources resource = context.getResources();
+        Resources resources = context.getResources();
         // Set the alpha to 90% when dragging which is 230/255
         mDraggedBackgroundColor = ColorUtils.setAlphaComponent(
                 ChromeColors.getSurfaceColor(mContext, R.dimen.default_elevation_1),
-                resource.getInteger(R.integer.list_item_dragged_alpha));
-        mDraggedElevation = resource.getDimension(R.dimen.list_item_dragged_elevation);
+                resources.getInteger(R.integer.list_item_dragged_alpha));
+        mDraggedElevation = resources.getDimension(R.dimen.list_item_dragged_elevation);
     }
 
     @Override
@@ -287,7 +277,6 @@ public abstract class DragReorderableListAdapter<T> extends RecyclerView.Adapter
      * @param start The index of the ViewHolder that you want to drag.
      * @param end The index this ViewHolder should be dragged to and dropped at.
      */
-    @VisibleForTesting
     public void simulateDragForTests(int start, int end) {
         ViewHolder viewHolder = mRecyclerView.findViewHolderForAdapterPosition(start);
         mItemTouchHelper.startDrag(viewHolder);

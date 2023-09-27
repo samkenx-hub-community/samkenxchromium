@@ -26,6 +26,8 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/paint_recorder.h"
+#include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/views/focus/focus_search.h"
 #include "ui/views/widget/widget.h"
 
@@ -73,16 +75,14 @@ class UnifiedMessageCenterBubble::Border : public ui::LayerDelegate {
 
 UnifiedMessageCenterBubble::UnifiedMessageCenterBubble(UnifiedSystemTray* tray)
     : tray_(tray), border_(std::make_unique<Border>()) {
-  TrayBubbleView::InitParams init_params;
-  init_params.delegate = GetWeakPtr();
-  // Anchor within the overlay container.
-  init_params.parent_window = tray->GetBubbleWindowContainer();
-  init_params.anchor_mode = TrayBubbleView::AnchorMode::kRect;
-  init_params.preferred_width = kTrayMenuWidth;
+  auto init_params = CreateInitParamsForTrayBubble(tray);
   init_params.has_shadow = false;
   init_params.close_on_deactivate = false;
-  if (features::IsNotificationsRefreshEnabled())
-    init_params.translucent = true;
+  init_params.reroute_event_handler = false;
+
+  // Anchor rect and insets for this bubble is set in `UpdatePosition()`.
+  init_params.anchor_rect = gfx::Rect();
+  init_params.insets = gfx::Insets();
 
   bubble_view_ = new TrayBubbleView(init_params);
 
@@ -107,14 +107,6 @@ void UnifiedMessageCenterBubble::ShowBubble() {
       tray_->bubble()->GetBubbleWidget()->GetNativeWindow(),
       bubble_widget_->GetNativeWindow());
 
-  if (!features::IsNotificationsRefreshEnabled()) {
-    ui::Layer* content_layer = bubble_view_->layer();
-    float radius = kBubbleCornerRadius;
-    content_layer->SetRoundedCornerRadius({radius, radius, radius, radius});
-    content_layer->SetIsFastRoundedCorner(true);
-    content_layer->Add(border_->layer());
-  }
-
   if (features::IsSystemTrayShadowEnabled()) {
     // Create a shadow for bubble widget.
     shadow_ = SystemShadow::CreateShadowOnNinePatchLayerForWindow(
@@ -126,14 +118,16 @@ void UnifiedMessageCenterBubble::ShowBubble() {
   notification_center_view_->Init();
   UpdateBubbleState();
 
-  tray_->tray_event_filter()->AddBubble(this);
+  tray_event_filter_ = std::make_unique<TrayEventFilter>(
+      bubble_widget_, bubble_view_, /*tray_button=*/tray_);
   tray_->bubble()->unified_view()->AddObserver(this);
 }
 
 UnifiedMessageCenterBubble::~UnifiedMessageCenterBubble() {
   if (bubble_widget_) {
-    tray_->tray_event_filter()->RemoveBubble(this);
-    tray_->bubble()->unified_view()->RemoveObserver(this);
+    if (tray_->bubble()->unified_view()) {
+      tray_->bubble()->unified_view()->RemoveObserver(this);
+    }
     CHECK(notification_center_view_);
     notification_center_view_->RemoveObserver(this);
 
@@ -182,7 +176,8 @@ void UnifiedMessageCenterBubble::UpdatePosition() {
   // enlarges the layer bounds and this can break ARC notification rounded
   // corners. Apply the offset to the anchor rect.
   gfx::Rect anchor_rect = tray_->shelf()->GetSystemTrayAnchorRect();
-  gfx::Insets tray_bubble_insets = GetTrayBubbleInsets();
+  gfx::Insets tray_bubble_insets =
+      GetTrayBubbleInsets(tray_->GetBubbleWindowContainer());
 
   int offset;
   switch (tray_->shelf()->alignment()) {
@@ -209,11 +204,6 @@ void UnifiedMessageCenterBubble::UpdatePosition() {
   bubble_view_->ChangeAnchorRect(anchor_rect);
 
   notification_center_view_->UpdateNotificationBar();
-
-  if (!features::IsNotificationsRefreshEnabled()) {
-    bubble_view_->layer()->StackAtTop(border_->layer());
-    border_->layer()->SetBounds(notification_center_view_->GetContentsBounds());
-  }
 
   if (shadow_) {
     // When the last notification is removed, the content bounds of message
@@ -284,9 +274,24 @@ void UnifiedMessageCenterBubble::OnViewVisibilityChanged(
   bubble_view_->UpdateBubble();
 }
 
+void UnifiedMessageCenterBubble::OnViewIsDeleting(views::View* observed_view) {
+  CHECK(!features::IsQsRevampEnabled());
+  auto* system_tray_bubble = tray_->bubble();
+  // The `UnifiedSystemTray` drops its `UnifiedSystemTrayBubble` pointer during
+  // shutdown.
+  if (!system_tray_bubble) {
+    return;
+  }
+  auto* unified_view = system_tray_bubble->unified_view();
+  if (observed_view != unified_view) {
+    return;
+  }
+
+  unified_view->RemoveObserver(this);
+}
+
 void UnifiedMessageCenterBubble::OnWidgetDestroying(views::Widget* widget) {
   CHECK_EQ(bubble_widget_, widget);
-  tray_->tray_event_filter()->RemoveBubble(this);
   tray_->bubble()->unified_view()->RemoveObserver(this);
   notification_center_view_->RemoveObserver(this);
   bubble_widget_->RemoveObserver(this);
@@ -335,9 +340,10 @@ int UnifiedMessageCenterBubble::CalculateAvailableHeight() {
   if (!tray_->bubble())
     return 0;
 
-  return CalculateMaxTrayBubbleHeight() -
+  auto* window_container = tray_->GetBubbleWindowContainer();
+  return CalculateMaxTrayBubbleHeight(window_container) -
          tray_->bubble()->GetCurrentTrayHeight() -
-         GetBubbleInsetHotseatCompensation() -
+         GetBubbleInsetHotseatCompensation(window_container) -
          kUnifiedMessageCenterBubbleSpacing;
 }
 

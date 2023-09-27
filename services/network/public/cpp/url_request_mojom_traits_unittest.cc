@@ -82,6 +82,8 @@ TEST(URLRequestMojomTraitsTest, Roundtrips_ResourceRequest) {
   original.fetch_integrity = "dummy_fetch_integrity";
   original.keepalive = true;
   original.browsing_topics = true;
+  original.ad_auction_headers = true;
+  original.shared_storage_writable = true;
   original.has_user_gesture = false;
   original.enable_load_timing = true;
   original.enable_upload_progress = false;
@@ -106,7 +108,7 @@ TEST(URLRequestMojomTraitsTest, Roundtrips_ResourceRequest) {
           {net::SourceStream::SourceType::TYPE_BROTLI,
            net::SourceStream::SourceType::TYPE_GZIP,
            net::SourceStream::SourceType::TYPE_DEFLATE});
-  original.target_ip_address_space = mojom::IPAddressSpace::kLocal;
+  original.target_ip_address_space = mojom::IPAddressSpace::kPrivate;
   original.has_storage_access = false;
 
   original.trusted_params = ResourceRequest::TrustedParams();

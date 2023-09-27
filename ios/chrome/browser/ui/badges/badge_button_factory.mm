@@ -8,19 +8,16 @@
 
 #import "base/notreached.h"
 #import "build/build_config.h"
-#import "components/password_manager/core/common/password_manager_features.h"
+#import "components/autofill/core/browser/autofill_save_update_address_profile_delegate_ios.h"
+#import "ios/chrome/browser/infobars/infobar_ios.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/ui/badges/badge_button.h"
 #import "ios/chrome/browser/ui/badges/badge_constants.h"
 #import "ios/chrome/browser/ui/badges/badge_delegate.h"
 #import "ios/chrome/browser/ui/badges/badge_overflow_menu_util.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 // The identifier for the new popup menu action trigger.
@@ -37,7 +34,8 @@ const CGFloat kSymbolIncognitoFullScreenPointSize = 14.;
 
 @implementation BadgeButtonFactory
 
-- (BadgeButton*)badgeButtonForBadgeType:(BadgeType)badgeType {
+- (BadgeButton*)badgeButtonForBadgeType:(BadgeType)badgeType
+                           usingInfoBar:(InfoBarIOS*)infoBar {
   switch (badgeType) {
     case kBadgeTypePasswordSave:
       return [self passwordsSaveBadgeButton];
@@ -52,7 +50,7 @@ const CGFloat kSymbolIncognitoFullScreenPointSize = 14.;
     case kBadgeTypeOverflow:
       return [self overflowBadgeButton];
     case kBadgeTypeSaveAddressProfile:
-      return [self saveAddressProfileBadgeButton];
+      return [self saveAddressProfileBadgeButton:infoBar];
     case kBadgeTypePermissionsCamera:
       return [self permissionsCameraBadgeButton];
     case kBadgeTypePermissionsMicrophone:
@@ -68,11 +66,8 @@ const CGFloat kSymbolIncognitoFullScreenPointSize = 14.;
   UIImage* image =
       CustomSymbolWithPointSize(kPasswordSymbol, kInfobarSymbolPointSize);
 #if !BUILDFLAG(IS_IOS_MACCATALYST)
-  if (base::FeatureList::IsEnabled(
-          password_manager::features::kIOSShowPasswordStorageInSaveInfobar)) {
-    image = CustomSymbolWithPointSize(kMulticolorPasswordSymbol,
-                                      kInfobarSymbolPointSize);
-  }
+  image = CustomSymbolWithPointSize(kMulticolorPasswordSymbol,
+                                    kInfobarSymbolPointSize);
 #endif  // BUILDFLAG(IS_IOS_MACCATALYST)
   BadgeButton* button = [self createButtonForType:kBadgeTypePasswordSave
                                             image:image];
@@ -90,11 +85,8 @@ const CGFloat kSymbolIncognitoFullScreenPointSize = 14.;
   UIImage* image =
       CustomSymbolWithPointSize(kPasswordSymbol, kInfobarSymbolPointSize);
 #if !BUILDFLAG(IS_IOS_MACCATALYST)
-  if (base::FeatureList::IsEnabled(
-          password_manager::features::kIOSShowPasswordStorageInSaveInfobar)) {
-    image = CustomSymbolWithPointSize(kMulticolorPasswordSymbol,
-                                      kInfobarSymbolPointSize);
-  }
+  image = CustomSymbolWithPointSize(kMulticolorPasswordSymbol,
+                                    kInfobarSymbolPointSize);
 #endif  // BUILDFLAG(IS_IOS_MACCATALYST)
   BadgeButton* button = [self createButtonForType:kBadgeTypePasswordUpdate
                                             image:image];
@@ -201,9 +193,20 @@ const CGFloat kSymbolIncognitoFullScreenPointSize = 14.;
   return button;
 }
 
-- (BadgeButton*)saveAddressProfileBadgeButton {
+- (BadgeButton*)saveAddressProfileBadgeButton:(InfoBarIOS*)infoBar {
   UIImage* image =
       CustomSymbolWithPointSize(kLocationFillSymbol, kInfobarSymbolPointSize);
+
+  if (infoBar) {
+    autofill::AutofillSaveUpdateAddressProfileDelegateIOS* delegate =
+        static_cast<autofill::AutofillSaveUpdateAddressProfileDelegateIOS*>(
+            infoBar->delegate());
+    CHECK(delegate);
+    if (delegate->IsMigrationToAccount()) {
+      image = CustomSymbolWithPointSize(kCloudAndArrowUpSymbol,
+                                        kInfobarSymbolPointSize);
+    }
+  }
 
   BadgeButton* button = [self createButtonForType:kBadgeTypeSaveAddressProfile
                                             image:image];

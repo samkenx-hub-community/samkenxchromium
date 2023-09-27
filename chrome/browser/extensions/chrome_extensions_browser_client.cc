@@ -44,6 +44,7 @@
 #include "chrome/browser/extensions/menu_manager.h"
 #include "chrome/browser/extensions/updater/chrome_update_client_config.h"
 #include "chrome/browser/external_protocol/external_protocol_handler.h"
+#include "chrome/browser/media/webrtc/media_device_salt_service_factory.h"
 #include "chrome/browser/net/system_network_context_manager.h"
 #include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
@@ -52,6 +53,7 @@
 #include "chrome/browser/profiles/profile_selections.h"
 #include "chrome/browser/profiles/profiles_state.h"
 #include "chrome/browser/renderer_host/chrome_navigation_ui_data.h"
+#include "chrome/browser/safe_browsing/extension_telemetry/declarative_net_request_signal.h"
 #include "chrome/browser/safe_browsing/extension_telemetry/extension_telemetry_service.h"
 #include "chrome/browser/safe_browsing/extension_telemetry/extension_telemetry_service_factory.h"
 #include "chrome/browser/safe_browsing/extension_telemetry/remote_host_contacted_signal.h"
@@ -61,6 +63,8 @@
 #include "chrome/browser/usb/usb_chooser_context.h"
 #include "chrome/browser/usb/usb_chooser_context_factory.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_url_info.h"
+#include "chrome/browser/web_applications/web_app_command_scheduler.h"
+#include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/common/channel_info.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
@@ -75,6 +79,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/site_instance.h"
+#include "content/public/browser/storage_partition_config.h"
 #include "content/public/common/content_switches.h"
 #include "extensions/browser/api/content_settings/content_settings_service.h"
 #include "extensions/browser/api/core_extensions_browser_api_provider.h"
@@ -193,17 +198,15 @@ bool ChromeExtensionsBrowserClient::AreExtensionsDisabled(
          profile->GetPrefs()->GetBoolean(prefs::kDisableExtensions);
 }
 
-bool ChromeExtensionsBrowserClient::IsValidContext(
-    content::BrowserContext* context) {
+bool ChromeExtensionsBrowserClient::IsValidContext(void* context) {
   DCHECK(context);
   if (!g_browser_process) {
     LOG(ERROR) << "Unexpected null g_browser_process";
     NOTREACHED();
     return false;
   }
-  Profile* profile = static_cast<Profile*>(context);
   return g_browser_process->profile_manager() &&
-         g_browser_process->profile_manager()->IsValidProfile(profile);
+         g_browser_process->profile_manager()->IsValidProfile(context);
 }
 
 bool ChromeExtensionsBrowserClient::IsSameContext(
@@ -232,34 +235,49 @@ content::BrowserContext* ChromeExtensionsBrowserClient::GetOriginalContext(
 }
 
 content::BrowserContext*
-ChromeExtensionsBrowserClient::GetRedirectedContextInIncognito(
+ChromeExtensionsBrowserClient::GetContextRedirectedToOriginal(
     content::BrowserContext* context,
-    bool force_guest_profile,
-    bool force_system_profile) {
-  const ProfileSelections selections =
-      ProfileSelections::BuildRedirectedInIncognito(force_guest_profile,
-                                                    force_system_profile);
+    bool force_guest_profile) {
+  ProfileSelections::Builder builder;
+  builder.WithRegular(ProfileSelection::kRedirectedToOriginal);
+  if (force_guest_profile) {
+    builder.WithGuest(ProfileSelection::kRedirectedToOriginal);
+  }
+
+  const ProfileSelections selections = builder.Build();
+  return selections.ApplyProfileSelection(Profile::FromBrowserContext(context));
+}
+
+content::BrowserContext* ChromeExtensionsBrowserClient::GetContextOwnInstance(
+    content::BrowserContext* context,
+    bool force_guest_profile) {
+  ProfileSelections::Builder builder;
+  builder.WithRegular(ProfileSelection::kOwnInstance);
+  if (force_guest_profile) {
+    builder.WithGuest(ProfileSelection::kOwnInstance);
+  }
+
+  const ProfileSelections selections = builder.Build();
   return selections.ApplyProfileSelection(Profile::FromBrowserContext(context));
 }
 
 content::BrowserContext*
-ChromeExtensionsBrowserClient::GetContextForRegularAndIncognito(
+ChromeExtensionsBrowserClient::GetContextForOriginalOnly(
     content::BrowserContext* context,
-    bool force_guest_profile,
-    bool force_system_profile) {
-  const ProfileSelections selections =
-      ProfileSelections::BuildForRegularAndIncognito(force_guest_profile,
-                                                     force_system_profile);
+    bool force_guest_profile) {
+  ProfileSelections::Builder builder;
+  if (force_guest_profile) {
+    builder.WithGuest(ProfileSelection::kOriginalOnly);
+  }
+
+  ProfileSelections selections = builder.Build();
   return selections.ApplyProfileSelection(Profile::FromBrowserContext(context));
 }
 
-content::BrowserContext* ChromeExtensionsBrowserClient::GetRegularProfile(
-    content::BrowserContext* context,
-    bool force_guest_profile,
-    bool force_system_profile) {
-  const ProfileSelections selections = ProfileSelections::BuildDefault(
-      force_guest_profile, force_system_profile);
-  return selections.ApplyProfileSelection(Profile::FromBrowserContext(context));
+bool ChromeExtensionsBrowserClient::AreExtensionsDisabledForContext(
+    content::BrowserContext* context) {
+  return ChromeContentBrowserClientExtensionsPart::
+      AreExtensionsDisabledForProfile(Profile::FromBrowserContext(context));
 }
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -363,15 +381,19 @@ bool ChromeExtensionsBrowserClient::DidVersionUpdate(
 
   // Unit tests may not provide prefs; assume everything is up to date.
   ExtensionPrefs* extension_prefs = ExtensionPrefs::Get(profile);
-  if (!extension_prefs)
+  if (!extension_prefs) {
     return false;
+  }
 
-  if (g_did_chrome_update_for_testing)
+  if (g_did_chrome_update_for_testing) {
     return true;
+  }
 
   // If we're inside a browser test, then assume prefs are all up to date.
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(::switches::kTestType))
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          ::switches::kTestType)) {
     return false;
+  }
 
   PrefService* pref_service = extension_prefs->pref_service();
   base::Version last_version;
@@ -381,16 +403,18 @@ bool ChromeExtensionsBrowserClient::DidVersionUpdate(
     last_version = base::Version(last_version_str);
   }
 
-  std::string current_version_str = version_info::GetVersionNumber();
+  std::string current_version_str(version_info::GetVersionNumber());
   const base::Version& current_version = version_info::GetVersion();
   pref_service->SetString(pref_names::kLastChromeVersion, current_version_str);
 
   // If there was no version string in prefs, assume we're out of date.
-  if (!last_version.IsValid())
+  if (!last_version.IsValid()) {
     return true;
+  }
   // If the current version string is invalid, assume we didn't update.
-  if (!current_version.IsValid())
+  if (!current_version.IsValid()) {
     return false;
+  }
 
   return last_version < current_version;
 }
@@ -429,7 +453,7 @@ bool ChromeExtensionsBrowserClient::IsAppModeForcedForApp(
 }
 
 bool ChromeExtensionsBrowserClient::IsLoggedInAsPublicAccount() {
-  return profiles::IsPublicSession();
+  return profiles::IsManagedGuestSession();
 }
 
 ExtensionSystemProvider*
@@ -606,8 +630,9 @@ void ChromeExtensionsBrowserClient::GetTabAndWindowIdForWebContents(
 }
 
 KioskDelegate* ChromeExtensionsBrowserClient::GetKioskDelegate() {
-  if (!kiosk_delegate_)
+  if (!kiosk_delegate_) {
     kiosk_delegate_ = std::make_unique<ChromeKioskDelegate>();
+  }
   return kiosk_delegate_.get();
 }
 
@@ -659,8 +684,9 @@ std::string ChromeExtensionsBrowserClient::GetUserAgent() const {
 
 bool ChromeExtensionsBrowserClient::ShouldSchemeBypassNavigationChecks(
     const std::string& scheme) const {
-  if (scheme == chrome::kChromeSearchScheme)
+  if (scheme == chrome::kChromeSearchScheme) {
     return true;
+  }
 
   return ExtensionsBrowserClient::ShouldSchemeBypassNavigationChecks(scheme);
 }
@@ -727,10 +753,35 @@ bool ChromeExtensionsBrowserClient::IsExtensionTelemetryServiceEnabled(
   return telemetry_service && telemetry_service->enabled();
 }
 
+void ChromeExtensionsBrowserClient::NotifyExtensionApiDeclarativeNetRequest(
+    content::BrowserContext* context,
+    const ExtensionId& extension_id,
+    const std::vector<api::declarative_net_request::Rule>& rules) const {
+  auto* telemetry_service =
+      safe_browsing::ExtensionTelemetryServiceFactory::GetForProfile(
+          Profile::FromBrowserContext(context));
+  if (!telemetry_service || !telemetry_service->enabled()) {
+    return;
+  }
+
+  // The telemetry service will consume and release the signal object inside the
+  // `AddSignal()` call.
+  auto signal = std::make_unique<safe_browsing::DeclarativeNetRequestSignal>(
+      extension_id, rules);
+  telemetry_service->AddSignal(std::move(signal));
+}
+
 void ChromeExtensionsBrowserClient::NotifyExtensionRemoteHostContacted(
     content::BrowserContext* context,
     const ExtensionId& extension_id,
     const GURL& url) const {
+  // Collect only if new interception feature is disabled to avoid duplicates.
+  if (base::FeatureList::IsEnabled(
+          safe_browsing::
+              kExtensionTelemetryInterceptRemoteHostsContactedInRenderer)) {
+    return;
+  }
+
   safe_browsing::RemoteHostInfo::ProtocolType protocol =
       safe_browsing::RemoteHostInfo::UNSPECIFIED;
   if (base::FeatureList::IsEnabled(
@@ -815,8 +866,9 @@ void ChromeExtensionsBrowserClient::AddAdditionalAllowedHosts(
       // permission.
       bool is_chrome_favicon = pattern.scheme() == content::kChromeUIScheme &&
                                pattern.host() == chrome::kChromeUIFaviconHost;
-      if (is_chrome_favicon)
+      if (is_chrome_favicon) {
         new_patterns.AddPattern(pattern);
+      }
     }
     return new_patterns;
   };
@@ -895,23 +947,42 @@ void ChromeExtensionsBrowserClient::AddAPIActionOrEventToActivityLog(
   AddActionToExtensionActivityLog(browser_context, action);
 }
 
-content::StoragePartitionConfig
-ChromeExtensionsBrowserClient::GetWebViewStoragePartitionConfig(
+void ChromeExtensionsBrowserClient::GetWebViewStoragePartitionConfig(
     content::BrowserContext* browser_context,
     content::SiteInstance* owner_site_instance,
     const std::string& partition_name,
-    bool in_memory) {
+    bool in_memory,
+    base::OnceCallback<void(absl::optional<content::StoragePartitionConfig>)>
+        callback) {
   const GURL& owner_site_url = owner_site_instance->GetSiteURL();
   if (owner_site_url.SchemeIs(chrome::kIsolatedAppScheme)) {
     base::expected<web_app::IsolatedWebAppUrlInfo, std::string> url_info =
         web_app::IsolatedWebAppUrlInfo::Create(owner_site_url);
     DCHECK(url_info.has_value()) << url_info.error();
-    return url_info->GetStoragePartitionConfigForControlledFrame(
-        browser_context, partition_name, in_memory);
+
+    auto* profile = Profile::FromBrowserContext(browser_context);
+    auto* web_app_provider = web_app::WebAppProvider::GetForWebApps(profile);
+    CHECK(web_app_provider);
+    web_app_provider->scheduler().GetControlledFramePartition(
+        *url_info, partition_name, in_memory, std::move(callback));
+    return;
   }
 
-  return ExtensionsBrowserClient::GetWebViewStoragePartitionConfig(
-      browser_context, owner_site_instance, partition_name, in_memory);
+  ExtensionsBrowserClient::GetWebViewStoragePartitionConfig(
+      browser_context, owner_site_instance, partition_name, in_memory,
+      std::move(callback));
+}
+
+void ChromeExtensionsBrowserClient::CreatePasswordReuseDetectionManager(
+    content::WebContents* web_contents) const {
+  ChromePasswordReuseDetectionManagerClient::CreateForWebContents(web_contents);
+}
+
+media_device_salt::MediaDeviceSaltService*
+ChromeExtensionsBrowserClient::GetMediaDeviceSaltService(
+    content::BrowserContext* context) {
+  return MediaDeviceSaltServiceFactory::GetInstance()->GetForBrowserContext(
+      context);
 }
 
 }  // namespace extensions

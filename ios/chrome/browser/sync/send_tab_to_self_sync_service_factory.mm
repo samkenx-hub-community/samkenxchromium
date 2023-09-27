@@ -9,15 +9,11 @@
 #import "components/keyed_service/ios/browser_state_dependency_manager.h"
 #import "components/send_tab_to_self/send_tab_to_self_sync_service.h"
 #import "components/sync_device_info/device_info_sync_service.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/history/history_service_factory.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/sync/device_info_sync_service_factory.h"
 #import "ios/chrome/browser/sync/model_type_store_service_factory.h"
 #import "ios/chrome/common/channel_info.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using send_tab_to_self::SendTabToSelfSyncService;
 
@@ -40,7 +36,7 @@ std::unique_ptr<KeyedService> BuildSendTabToSelfService(
 
   return std::make_unique<SendTabToSelfSyncService>(
       GetChannel(), std::move(store_factory), history_service,
-      device_info_tracker);
+      browser_state->GetPrefs(), device_info_tracker);
 }
 
 // static

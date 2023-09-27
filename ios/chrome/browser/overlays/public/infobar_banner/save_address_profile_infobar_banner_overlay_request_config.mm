@@ -12,10 +12,6 @@
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace autofill_address_profile_infobar_overlays {
 
 OVERLAY_USER_DATA_SETUP_IMPL(SaveAddressProfileBannerRequestConfig);
@@ -32,6 +28,7 @@ SaveAddressProfileBannerRequestConfig::SaveAddressProfileBannerRequestConfig(
   description_ = delegate->GetDescription();
   is_update_banner_ = delegate->GetOriginalProfile() ? true : false;
   is_migration_to_account_ = delegate->IsMigrationToAccount();
+  is_profile_an_account_profile_ = delegate->IsProfileAnAccountProfile();
 }
 
 SaveAddressProfileBannerRequestConfig::

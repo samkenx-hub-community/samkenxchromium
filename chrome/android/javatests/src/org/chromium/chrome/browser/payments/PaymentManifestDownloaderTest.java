@@ -4,8 +4,7 @@
 
 package org.chromium.chrome.browser.payments;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.hamcrest.Matchers;
@@ -99,7 +98,8 @@ public class PaymentManifestDownloaderTest implements ManifestDownloadCallback {
     @Before
     public void setUp() throws Throwable {
         mActivityTestRule.startMainActivityOnBlankPage();
-        mServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         mActivityTestRule.runOnUiThread((Runnable) () -> {
             mDownloader.initialize(
                     mActivityTestRule.getActivity().getCurrentWebContents(), new CSPChecker() {
@@ -123,7 +123,6 @@ public class PaymentManifestDownloaderTest implements ManifestDownloadCallback {
     @After
     public void tearDown() throws Throwable {
         mActivityTestRule.runOnUiThread((Runnable) () -> mDownloader.destroy());
-        mServer.stopAndDestroyServer();
     }
 
     @Test
@@ -151,8 +150,9 @@ public class PaymentManifestDownloaderTest implements ManifestDownloadCallback {
         CriteriaHelper.pollInstrumentationThread(() -> mDownloadComplete);
 
         Assert.assertTrue("Web app manifest should not have been downloaded.", mDownloadFailure);
-        Assert.assertEquals(
-                "Unable to download payment manifest \"" + url.getSpec() + "\".", mErrorMessage);
+        Assert.assertEquals("Unable to download payment manifest \"" + url.getSpec()
+                        + "\". HTTP 404 Not Found.",
+                mErrorMessage);
     }
 
     @Test
@@ -183,8 +183,9 @@ public class PaymentManifestDownloaderTest implements ManifestDownloadCallback {
 
         Assert.assertTrue(
                 "Payment method manifest should have not have been downloaded.", mDownloadFailure);
-        Assert.assertEquals(
-                "Unable to download payment manifest \"" + url.getSpec() + "\".", mErrorMessage);
+        Assert.assertEquals("Unable to download payment manifest \"" + url.getSpec()
+                        + "\". HTTP 404 Not Found.",
+                mErrorMessage);
     }
 
     @Test

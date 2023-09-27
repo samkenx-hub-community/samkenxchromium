@@ -4,7 +4,7 @@
 
 import {assertNotReached} from 'chrome://resources/ash/common/assert.js';
 
-import {ProgressCenterItem, ProgressItemState, ProgressItemType} from '../../../common/js/progress_center_common.js';
+import {PolicyErrorType, ProgressCenterItem, ProgressItemState, ProgressItemType} from '../../../common/js/progress_center_common.js';
 import {str, strf, util} from '../../../common/js/util.js';
 import {ProgressCenterPanelInterface} from '../../../externs/progress_center_panel.js';
 import {DisplayPanel} from '../../elements/xf_display_panel.js';
@@ -44,10 +44,20 @@ export class ProgressCenterPanel {
     this.dismissErrorItemCallback = null;
 
     /**
-     * Timeout for hiding file operations in progress.
-     * @type {number}
+     * Defer showing in progress operation to avoid displaying quick
+     * operations, e.g. the notification panel only shows if the task is
+     * processing longer than this time.
+     * @private {number}
      */
     this.PENDING_TIME_MS_ = 2000;
+
+    /**
+     * Timeout for removing the notification panel, e.g. the notification
+     * panel will be removed after this time.
+     * @private {number}
+     */
+    this.TIMEOUT_TO_REMOVE_MS_ = 4000;
+
     if (window.IN_TEST) {
       this.PENDING_TIME_MS_ = 0;
     }
@@ -232,7 +242,22 @@ export class ProgressCenterPanel {
               strf('RESTORE_TRASH_MANY_ITEMS', count);
         }
         return item.message;
+      case ProgressItemState.PAUSED:
+        switch (item.type) {
+          case ProgressItemType.COPY:
+            return str('DLP_FILES_COPY_REVIEW_TITLE');
+          case ProgressItemType.MOVE:
+          case ProgressItemType.RESTORE_TO_DESTINATION:
+            return str('DLP_FILES_MOVE_REVIEW_TITLE');
+          default:
+            console.error('Unexpected operation type: ' + item.type);
+            return '';
+        }
       case ProgressItemState.ERROR:
+        if (item.policyError) {
+          return getStrForPolicyError(item);
+        }
+        // General error
         return item.message;
       case ProgressItemState.CANCELED:
         return '';
@@ -253,10 +278,60 @@ export class ProgressCenterPanel {
           strf('PREPARING_FILE_NAME_MY_DRIVE', source, destination) :
           strf('COPY_FILE_NAME_LONG', source, destination);
     }
+
+    function getStrForPolicyError(item) {
+      if (!item.policyError) {
+        console.warn('Policy error must be supplied');
+        return '';
+      }
+      switch (item.policyError) {
+        case PolicyErrorType.DLP:
+        case PolicyErrorType.ENTERPRISE_CONNECTORS:
+          if (!item.policyFileCount) {
+            console.warn('Policy file count missing');
+            return '';
+          }
+          switch (item.type) {
+            case ProgressItemType.COPY:
+              return item.policyFileCount === 1 ?
+                  str('DLP_FILES_COPY_BLOCKED_TITLE_SINGLE') :
+                  strf(
+                      'DLP_FILES_COPY_BLOCKED_TITLE_MULTIPLE',
+                      item.policyFileCount);
+            case ProgressItemType.MOVE:
+              return item.policyFileCount === 1 ?
+                  str('DLP_FILES_MOVE_BLOCKED_TITLE_SINGLE') :
+                  strf(
+                      'DLP_FILES_MOVE_BLOCKED_TITLE_MULTIPLE',
+                      item.policyFileCount);
+            default:
+              console.warn(`Unexpected task type: ${item.type}`);
+              return '';
+          }
+        case PolicyErrorType.DLP_WARNING_TIMEOUT:
+          switch (item.type) {
+            case ProgressItemType.COPY:
+              return str('DLP_FILES_COPY_TIMEOUT_TITLE');
+            case ProgressItemType.MOVE:
+              return str('DLP_FILES_MOVE_TIMEOUT_TITLE');
+            default:
+              console.warn(`Unexpected task type: ${item.type}`);
+              return '';
+          }
+        default:
+          console.warn(`Unexpected security error type: ${item.policyError}`);
+          return '';
+      }
+    }
   }
 
   /**
-   * Generates remaining time message with formatted time.
+   * Generates the secondary string to display on the feedback panel.
+   *
+   * The string can be empty in case of errors or tasks with no
+   * remaining time set. In case of data protection policy related
+   * notifications, the message provides more info about the state of the task.
+   * Otherwise the message shows formatted remaining task time.
    *
    * The time format in hour and minute and the durations more
    * than 24 hours also formatted in hour.
@@ -265,14 +340,81 @@ export class ProgressCenterPanel {
    * of time part is handled using Intl methods.
    *
    * @param {!ProgressCenterItem} item Item we're generating a message for.
-   * @return {!string} Remaining time message.
+   * @return {!string} Secondary string message.
+   * @private
    */
-  generateRemainingTimeMessage(item) {
+  generateSecondaryString_(item) {
+    if (item.state === ProgressItemState.PAUSED) {
+      if (!item.policyFileCount) {
+        console.warn('Policy file count missing');
+        return '';
+      }
+      if (item.policyFileCount === 1) {
+        if (!item.policyFileName) {
+          console.warn('Policy file name missing');
+          return '';
+        }
+        return strf('DLP_FILES_WARN_MESSAGE_SINGLE', item.policyFileName);
+      } else {
+        return strf('DLP_FILES_WARN_MESSAGE_MULTIPLE', item.policyFileCount);
+      }
+    }
+
+    if (item.state === ProgressItemState.ERROR) {
+      if (!item.policyError) {
+        // General error doesn't have secondary text.
+        return '';
+      }
+      switch (item.policyError) {
+        case PolicyErrorType.DLP:
+          if (!item.policyFileCount) {
+            console.warn('Policy file count missing');
+            return '';
+          }
+          if (item.policyFileCount === 1) {
+            if (!item.policyFileName) {
+              console.warn('Policy file name missing');
+              return '';
+            }
+            return strf(
+                'DLP_FILES_BLOCKED_MESSAGE_POLICY_SINGLE', item.policyFileName);
+          } else {
+            return str('DLP_FILES_BLOCKED_MESSAGE_MULTIPLE');
+          }
+        case PolicyErrorType.ENTERPRISE_CONNECTORS:
+          if (!item.policyFileCount) {
+            console.warn('Policy file count missing');
+            return '';
+          }
+          if (item.policyFileCount === 1) {
+            if (!item.policyFileName) {
+              console.warn('Policy file name missing');
+              return '';
+            }
+            return strf(
+                'DLP_FILES_BLOCKED_MESSAGE_CONTENT_SINGLE',
+                item.policyFileName);
+          } else {
+            return str('DLP_FILES_BLOCKED_MESSAGE_MULTIPLE');
+          }
+        case PolicyErrorType.DLP_WARNING_TIMEOUT:
+          switch (item.type) {
+            case ProgressItemType.COPY:
+              return str('DLP_FILES_COPY_TIMEOUT_MESSAGE');
+            case ProgressItemType.MOVE:
+              return str('DLP_FILES_MOVE_TIMEOUT_MESSAGE');
+            default:
+              console.warn(`Unexpected task type: ${item.type}`);
+              return '';
+          }
+      }
+    }
+
     const seconds = item.remainingTime;
 
     // Return empty string for unsupported operation (which didn't set
     // remaining time).
-    if (seconds == null) {
+    if (seconds === undefined) {
       return '';
     }
 
@@ -289,39 +431,7 @@ export class ProgressCenterPanel {
           '';
     }
 
-    const locale = util.getCurrentLocaleOrDefault();
-    let minutes = Math.ceil(seconds / 60);
-    if (minutes <= 1) {
-      // Less than one minute. Display remaining time in seconds.
-      const formatter = new Intl.NumberFormat(
-          locale, {style: 'unit', unit: 'second', unitDisplay: 'long'});
-      return strf(
-          'TIME_REMAINING_ESTIMATE', formatter.format(Math.ceil(seconds)));
-    }
-
-    const minuteFormatter = new Intl.NumberFormat(
-        locale, {style: 'unit', unit: 'minute', unitDisplay: 'long'});
-
-    const hours = Math.floor(minutes / 60);
-    if (hours == 0) {
-      // Less than one hour. Display remaining time in minutes.
-      return strf('TIME_REMAINING_ESTIMATE', minuteFormatter.format(minutes));
-    }
-
-    minutes -= hours * 60;
-
-    const hourFormatter = new Intl.NumberFormat(
-        locale, {style: 'unit', unit: 'hour', unitDisplay: 'long'});
-
-    if (minutes == 0) {
-      // Hours but no minutes.
-      return strf('TIME_REMAINING_ESTIMATE', hourFormatter.format(hours));
-    }
-
-    // Hours and minutes.
-    return strf(
-        'TIME_REMAINING_ESTIMATE_2', hourFormatter.format(hours),
-        minuteFormatter.format(minutes));
+    return util.secondsToRemainingTimeString(seconds);
   }
 
   /**
@@ -355,7 +465,7 @@ export class ProgressCenterPanel {
       }
 
       const primaryText = this.generatePrimaryString_(item, panelItem.userData);
-      panelItem.secondaryText = this.generateRemainingTimeMessage(item);
+      panelItem.secondaryText = this.generateSecondaryString_(item);
       panelItem.primaryText = primaryText;
       panelItem.setAttribute('data-progress-id', item.id);
 
@@ -370,6 +480,9 @@ export class ProgressCenterPanel {
         if (signal === 'cancel' && item.cancelCallback) {
           item.cancelCallback();
         } else if (signal === 'dismiss') {
+          if (item.dismissCallback) {
+            item.dismissCallback();
+          }
           this.feedbackHost_.removePanelItem(panelItem);
           this.dismissErrorItemCallback(item.id);
         } else if (
@@ -377,7 +490,10 @@ export class ProgressCenterPanel {
           extraButton.callback();
           this.feedbackHost_.removePanelItem(panelItem);
           // The extra-button currently acts as a dismissal to invoke the
-          // error item callback as well.
+          // dismiss and error item callbacks as well.
+          if (item.dismissCallback) {
+            item.dismissCallback();
+          }
           this.dismissErrorItemCallback(item.id);
         }
       };
@@ -423,12 +539,20 @@ export class ProgressCenterPanel {
             setTimeout(() => {
               this.feedbackHost_.removePanelItem(donePanelItem);
               delete this.items_[donePanelItem.id];
-            }, 4000);
+            }, this.TIMEOUT_TO_REMOVE_MS_);
           }
           // Drop through to remove the progress panel.
         case ProgressItemState.CANCELED:
           // Remove the feedback panel when complete.
           this.feedbackHost_.removePanelItem(panelItem);
+          break;
+        case ProgressItemState.PAUSED:
+          if (item.extraButton.has(ProgressItemState.PAUSED)) {
+            extraButton = item.extraButton.get(ProgressItemState.PAUSED);
+            panelItem.dataset.extraButtonText = extraButton.text;
+          }
+          panelItem.panelType = panelItem.panelTypeInfo;
+          this.feedbackHost_.attachPanelItem(panelItem);
           break;
         case ProgressItemState.ERROR:
           if (item.extraButton.has(ProgressItemState.ERROR)) {
@@ -436,8 +560,6 @@ export class ProgressCenterPanel {
             panelItem.dataset.extraButtonText = extraButton.text;
           }
           panelItem.panelType = panelItem.panelTypeError;
-          panelItem.primaryText = item.message;
-          panelItem.secondaryText = '';
           // Make sure the panel is attached so it shows immediately.
           this.feedbackHost_.attachPanelItem(panelItem);
           break;
@@ -455,17 +577,12 @@ export class ProgressCenterPanel {
     // Compares the current state and the new state to check if the update is
     // valid or not.
     const previousItem = this.items_[item.id];
-    if (previousItem?.isDestinationDrive) {
-      item.isDestinationDrive = true;
-    }
     switch (item.state) {
-      case ProgressItemState.PENDING:
-        this.items_[item.id] = item.clone();
-        break;
-
       case ProgressItemState.ERROR:
         if (previousItem &&
-            previousItem.state !== ProgressItemState.PROGRESSING) {
+            (previousItem.state !== ProgressItemState.PROGRESSING ||
+             previousItem.state !== ProgressItemState.PAUSED ||
+             previousItem.state !== ProgressItemState.SCANNING)) {
           return;
         }
         this.items_[item.id] = item.clone();
@@ -483,10 +600,28 @@ export class ProgressCenterPanel {
 
       case ProgressItemState.CANCELED:
         if (!previousItem ||
-            previousItem.state !== ProgressItemState.PROGRESSING) {
+            (previousItem.state !== ProgressItemState.PROGRESSING ||
+             previousItem.state !== ProgressItemState.PAUSED ||
+             previousItem.state !== ProgressItemState.SCANNING)) {
           return;
         }
         delete this.items_[item.id];
+        break;
+
+      case ProgressItemState.SCANNING:
+        // Enterprise Connectors scanning is usually triggered in the beginning
+        // except when DLP files restrictions are enabled as well. In this case,
+        // DLP may pause the IOTask to show a warning and the panel item is
+        // dismissed when the user proceeds or cancels.
+        this.items_[item.id] = item.clone();
+        break;
+
+      default:
+        if (this.items_[item.id] == null) {
+          console.warn(
+              'ProgressCenterItem not updated: ${item.id} state: ${item.state}');
+        }
+        break;
     }
   }
 
@@ -496,12 +631,6 @@ export class ProgressCenterPanel {
    */
   updateItem(item) {
     this.updateItemState_(item);
-
-    // Item hasn't been updated with information from its first IOTask event
-    // from the backend yet. Let's wait for that before proceeding.
-    if (item.state === ProgressItemState.PENDING) {
-      return;
-    }
 
     // Update an open view item.
     const newItem = this.items_[item.id] || null;

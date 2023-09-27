@@ -13,11 +13,11 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/time/time.h"
-#include "content/browser/service_worker/embedded_worker_status.h"
 #include "content/browser/service_worker/service_worker_context_wrapper.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/common/content_client.h"
+#include "third_party/blink/public/common/service_worker/embedded_worker_status.h"
 
 namespace content {
 
@@ -131,6 +131,10 @@ const char* EventTypeToSuffix(ServiceWorkerMetrics::EventType event_type) {
     case ServiceWorkerMetrics::EventType::
         BYPASS_ONLY_IF_SERVICE_WORKER_NOT_STARTED:
       return "_BYPASS_ONLY_IF_SERVICE_WORKER_NOT_STARTED";
+    case ServiceWorkerMetrics::EventType::WARM_UP:
+      return "_WARM_UP";
+    case ServiceWorkerMetrics::EventType::STATIC_ROUTER:
+      return "_STATIC_ROUTING";
   }
   return "_UNKNOWN";
 }
@@ -200,6 +204,10 @@ const char* ServiceWorkerMetrics::EventTypeToString(EventType event_type) {
     case ServiceWorkerMetrics::EventType::
         BYPASS_ONLY_IF_SERVICE_WORKER_NOT_STARTED:
       return "Bypass Only If ServiceWorker Is Not Started";
+    case ServiceWorkerMetrics::EventType::WARM_UP:
+      return "Warm Up";
+    case ServiceWorkerMetrics::EventType::STATIC_ROUTER:
+      return "Static Routing";
   }
   NOTREACHED() << "Got unexpected event type: " << static_cast<int>(event_type);
   return "error";
@@ -252,7 +260,7 @@ void ServiceWorkerMetrics::RecordStartInstalledWorkerStatus(
 }
 
 void ServiceWorkerMetrics::RecordRunAfterStartWorkerStatus(
-    EmbeddedWorkerStatus running_status,
+    blink::EmbeddedWorkerStatus running_status,
     EventType purpose) {
   UMA_HISTOGRAM_ENUMERATION("ServiceWorker.MaybeStartWorker.RunningStatus",
                             running_status);
@@ -405,6 +413,9 @@ void ServiceWorkerMetrics::RecordEventDuration(EventType event,
     case EventType::PUSH_SUBSCRIPTION_CHANGE:
       // Do nothing: the histogram has been removed.
       break;
+    case EventType::WARM_UP:
+      // Do nothing: the warm up should not be sent as an event.
+      break;
     case EventType::BYPASS_MAIN_RESOURCE:
     // The bypass main resource should not be sent as an event.
     case EventType::NAVIGATION_HINT:
@@ -414,6 +425,8 @@ void ServiceWorkerMetrics::RecordEventDuration(EventType event,
     case EventType::BYPASS_ONLY_IF_SERVICE_WORKER_NOT_STARTED:
     // The bypass_only_if_service_worker_not_started should not be sent as an
     // event.
+    case EventType::STATIC_ROUTER:
+    // Static Routing should not be sent as an event.
     case EventType::UNKNOWN:
       NOTREACHED() << "Invalid event type";
       break;

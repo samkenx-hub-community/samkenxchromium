@@ -19,9 +19,9 @@
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "components/sync/base/model_type.h"
 #include "components/sync/base/time.h"
-#include "components/sync/driver/sync_service_impl.h"
 #include "components/sync/protocol/entity_specifics.pb.h"
 #include "components/sync/protocol/sync_entity.pb.h"
+#include "components/sync/service/sync_service_impl.h"
 #include "components/sync/test/bookmark_entity_builder.h"
 #include "components/sync/test/entity_builder_factory.h"
 #include "components/sync/test/fake_server.h"
@@ -83,7 +83,7 @@ std::unique_ptr<syncer::LoopbackServerEntity> CreateBookmarkEntity(
           base::android::ConvertJavaStringToUTF8(env, title), converted_guid);
   bookmark_builder.SetParentId(
       base::android::ConvertJavaStringToUTF8(env, parent_id));
-  bookmark_builder.SetParentGuid(base::GUID::ParseLowercase(
+  bookmark_builder.SetParentGuid(base::Uuid::ParseLowercase(
       base::android::ConvertJavaStringToUTF8(env, parent_guid)));
   return bookmark_builder.BuildBookmark(gurl);
 }
@@ -251,7 +251,7 @@ static void JNI_FakeServerHelper_InjectBookmarkFolderEntity(
           base::android::ConvertJavaStringToUTF8(env, title));
   bookmark_builder.SetParentId(
       base::android::ConvertJavaStringToUTF8(env, parent_id));
-  bookmark_builder.SetParentGuid(base::GUID::ParseLowercase(
+  bookmark_builder.SetParentGuid(base::Uuid::ParseLowercase(
       base::android::ConvertJavaStringToUTF8(env, parent_guid)));
 
   fake_server_ptr->InjectEntity(bookmark_builder.BuildFolder());
@@ -296,7 +296,7 @@ static void JNI_FakeServerHelper_ModifyBookmarkFolderEntity(
           base::android::ConvertJavaStringToUTF8(env, guid));
   bookmark_builder.SetParentId(
       base::android::ConvertJavaStringToUTF8(env, parent_id));
-  bookmark_builder.SetParentGuid(base::GUID::ParseLowercase(
+  bookmark_builder.SetParentGuid(base::Uuid::ParseLowercase(
       base::android::ConvertJavaStringToUTF8(env, parent_guid)));
 
   sync_pb::SyncEntity proto;

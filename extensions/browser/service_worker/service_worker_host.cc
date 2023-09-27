@@ -10,10 +10,13 @@
 #include "content/public/browser/service_worker_external_request_result.h"
 #include "content/public/browser/storage_partition.h"
 #include "extensions/browser/bad_message.h"
+#include "extensions/browser/event_router.h"
+#include "extensions/browser/extension_function_dispatcher.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/process_map.h"
 #include "extensions/browser/service_worker_task_queue.h"
 #include "extensions/common/constants.h"
+#include "extensions/common/mojom/frame.mojom.h"
 
 namespace extensions {
 
@@ -25,6 +28,8 @@ ServiceWorkerHost::ServiceWorkerHost(
     content::RenderProcessHost* render_process_host)
     : render_process_host_(render_process_host) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  dispatcher_ =
+      std::make_unique<ExtensionFunctionDispatcher>(GetBrowserContext());
 }
 
 ServiceWorkerHost::~ServiceWorkerHost() = default;
@@ -55,7 +60,8 @@ void ServiceWorkerHost::BindReceiver(
 void ServiceWorkerHost::DidInitializeServiceWorkerContext(
     const ExtensionId& extension_id,
     int64_t service_worker_version_id,
-    int worker_thread_id) {
+    int worker_thread_id,
+    mojo::PendingAssociatedRemote<mojom::EventDispatcher> event_dispatcher) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   content::BrowserContext* browser_context = GetBrowserContext();
   if (!browser_context) {
@@ -84,6 +90,9 @@ void ServiceWorkerHost::DidInitializeServiceWorkerContext(
       ->DidInitializeServiceWorkerContext(render_process_id, extension_id,
                                           service_worker_version_id,
                                           worker_thread_id);
+  EventRouter::Get(browser_context)
+      ->BindServiceWorkerEventDispatcher(render_process_id, worker_thread_id,
+                                         std::move(event_dispatcher));
 }
 
 void ServiceWorkerHost::DidStartServiceWorkerContext(
@@ -142,51 +151,23 @@ void ServiceWorkerHost::DidStopServiceWorkerContext(
           service_worker_scope, service_worker_version_id, worker_thread_id);
 }
 
-void ServiceWorkerHost::IncrementServiceWorkerActivity(
-    int64_t service_worker_version_id,
-    const std::string& request_uuid) {
+void ServiceWorkerHost::RequestWorker(mojom::RequestParamsPtr params) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   if (!GetBrowserContext()) {
     return;
   }
 
-  active_request_uuids_.insert(request_uuid);
-  // The worker might have already stopped before we got here, so the increment
-  // below might fail legitimately. Therefore, we do not send bad_message to the
-  // worker even if it fails.
-  render_process_host_->GetStoragePartition()
-      ->GetServiceWorkerContext()
-      ->StartingExternalRequest(
-          service_worker_version_id,
-          content::ServiceWorkerExternalRequestTimeoutType::kDefault,
-          request_uuid);
+  dispatcher_->DispatchForServiceWorker(std::move(params),
+                                        render_process_host_->GetID());
 }
 
-void ServiceWorkerHost::DecrementServiceWorkerActivity(
-    int64_t service_worker_version_id,
-    const std::string& request_uuid) {
+void ServiceWorkerHost::WorkerResponseAck(const base::Uuid& request_uuid) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   if (!GetBrowserContext()) {
     return;
   }
 
-  content::ServiceWorkerExternalRequestResult result =
-      render_process_host_->GetStoragePartition()
-          ->GetServiceWorkerContext()
-          ->FinishedExternalRequest(service_worker_version_id, request_uuid);
-  if (result != content::ServiceWorkerExternalRequestResult::kOk) {
-    LOG(ERROR) << "ServiceWorkerContext::FinishedExternalRequest failed: "
-               << static_cast<int>(result);
-  }
-
-  bool erased = active_request_uuids_.erase(request_uuid) == 1;
-  // The worker may have already stopped before we got here, so only report
-  // a bad message if we didn't have an increment for the UUID.
-  if (!erased) {
-    bad_message::ReceivedBadMessage(
-        render_process_host_->GetID(),
-        bad_message::ESWMF_INVALID_DECREMENT_ACTIVITY);
-  }
+  dispatcher_->ProcessResponseAck(request_uuid);
 }
 
 content::BrowserContext* ServiceWorkerHost::GetBrowserContext() {

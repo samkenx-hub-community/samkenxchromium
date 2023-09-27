@@ -6,16 +6,19 @@
 #define CHROME_SERVICES_FILE_UTIL_SAFE_ARCHIVE_ANALYZER_H_
 
 #include "chrome/common/safe_browsing/archive_analyzer_results.h"
-#include "chrome/common/safe_browsing/rar_analyzer.h"
 #include "chrome/services/file_util/public/mojom/safe_archive_analyzer.mojom.h"
+#include "chrome/utility/safe_browsing/rar_analyzer.h"
+#include "chrome/utility/safe_browsing/seven_zip_analyzer.h"
+#include "chrome/utility/safe_browsing/zip_analyzer.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
+
+#if BUILDFLAG(IS_MAC)
+#include "chrome/utility/safe_browsing/mac/dmg_analyzer.h"
+#endif
 
 namespace base {
 class File;
-}
-
-namespace safe_browsing {
-class AnalyzeZipFile;
 }
 
 using AnalysisFinishedCallback = base::OnceCallback<void()>;
@@ -34,18 +37,22 @@ class SafeArchiveAnalyzer : public chrome::mojom::SafeArchiveAnalyzer {
   // chrome::mojom::SafeArchiveAnalyzer:
   void AnalyzeZipFile(
       base::File zip_file,
+      const absl::optional<std::string>& password,
       mojo::PendingRemote<chrome::mojom::TemporaryFileGetter> temp_file_getter,
       AnalyzeZipFileCallback callback) override;
-  void AnalyzeDmgFile(base::File dmg_file,
-                      AnalyzeDmgFileCallback callback) override;
+  void AnalyzeDmgFile(
+      base::File dmg_file,
+      mojo::PendingRemote<chrome::mojom::TemporaryFileGetter> temp_file_getter,
+      AnalyzeDmgFileCallback callback) override;
   void AnalyzeRarFile(
       base::File rar_file,
+      const absl::optional<std::string>& password,
       mojo::PendingRemote<chrome::mojom::TemporaryFileGetter> temp_file_getter,
       AnalyzeRarFileCallback callback) override;
-  void AnalyzeSevenZipFile(base::File seven_zip_file,
-                           base::File temporary_file,
-                           base::File temporary_file2,
-                           AnalyzeSevenZipFileCallback callback) override;
+  void AnalyzeSevenZipFile(
+      base::File seven_zip_file,
+      mojo::PendingRemote<chrome::mojom::TemporaryFileGetter> temp_file_getter,
+      AnalyzeSevenZipFileCallback callback) override;
 
   // Uses `temp_file_getter_` to supply a temporary file to callback.
   void RequestTemporaryFile(GetTempFileCallback callback);
@@ -60,6 +67,10 @@ class SafeArchiveAnalyzer : public chrome::mojom::SafeArchiveAnalyzer {
 
   safe_browsing::ZipAnalyzer zip_analyzer_;
   safe_browsing::RarAnalyzer rar_analyzer_;
+  safe_browsing::SevenZipAnalyzer seven_zip_analyzer_;
+#if BUILDFLAG(IS_MAC)
+  safe_browsing::dmg::DMGAnalyzer dmg_analyzer_;
+#endif
 
   // A timer to ensure no archive takes too long to unpack.
   base::OneShotTimer timeout_timer_;

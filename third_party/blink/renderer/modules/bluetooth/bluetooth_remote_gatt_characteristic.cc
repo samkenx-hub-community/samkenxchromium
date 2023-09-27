@@ -35,7 +35,8 @@ BluetoothRemoteGATTCharacteristic::BluetoothRemoteGATTCharacteristic(
     mojom::blink::WebBluetoothRemoteGATTCharacteristicPtr characteristic,
     BluetoothRemoteGATTService* service,
     BluetoothDevice* device)
-    : ExecutionContextLifecycleObserver(context),
+    : ActiveScriptWrappable<BluetoothRemoteGATTCharacteristic>({}),
+      ExecutionContextLifecycleObserver(context),
       characteristic_(std::move(characteristic)),
       service_(service),
       device_(device),
@@ -85,8 +86,7 @@ bool BluetoothRemoteGATTCharacteristic::HasPendingActivity() const {
 void BluetoothRemoteGATTCharacteristic::AddedEventListener(
     const AtomicString& event_type,
     RegisteredEventListener& registered_listener) {
-  EventTargetWithInlineData::AddedEventListener(event_type,
-                                                registered_listener);
+  EventTarget::AddedEventListener(event_type, registered_listener);
 }
 
 void BluetoothRemoteGATTCharacteristic::ReadValueCallback(
@@ -534,7 +534,7 @@ void BluetoothRemoteGATTCharacteristic::Trace(Visitor* visitor) const {
   visitor->Trace(receivers_);
   visitor->Trace(deferred_value_change_data_);
 
-  EventTargetWithInlineData::Trace(visitor);
+  EventTarget::Trace(visitor);
   ExecutionContextLifecycleObserver::Trace(visitor);
 }
 

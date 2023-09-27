@@ -125,6 +125,11 @@ class LabelTest : public test::BaseControlTestWidget {
   LabelTest& operator=(const LabelTest&) = delete;
   ~LabelTest() override = default;
 
+  void TearDown() override {
+    label_ = nullptr;
+    test::BaseControlTestWidget::TearDown();
+  }
+
  protected:
   void CreateWidgetContent(View* container) override {
     label_ = container->AddChildView(std::make_unique<Label>());
@@ -721,6 +726,13 @@ TEST_F(LabelTest, Accessibility) {
   label()->GetAccessibleNodeData(&node_data);
   EXPECT_EQ(label()->GetText(),
             node_data.GetString16Attribute(ax::mojom::StringAttribute::kName));
+
+  // If the displayed text is the source of the accessible name, and that text
+  // is cleared, the accessible name should also be cleared.
+  label()->SetText(u"");
+  label()->GetAccessibleNodeData(&node_data);
+  EXPECT_EQ(label()->GetText(),
+            node_data.GetString16Attribute(ax::mojom::StringAttribute::kName));
 }
 
 TEST_F(LabelTest, SetTextNotifiesAccessibilityEvent) {
@@ -756,6 +768,39 @@ TEST_F(LabelTest, TextChangeWithoutLayout) {
   label()->OnPaint(&canvas);
   EXPECT_TRUE(label()->display_text_);
   EXPECT_EQ(u"Altered", label()->display_text_->GetDisplayText());
+}
+
+TEST_F(LabelTest, AccessibleNameAndRole) {
+  label()->SetText(u"Text");
+  EXPECT_EQ(label()->GetAccessibleName(), u"Text");
+  EXPECT_EQ(label()->GetAccessibleRole(), ax::mojom::Role::kStaticText);
+
+  ui::AXNodeData data;
+  label()->GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetString16Attribute(ax::mojom::StringAttribute::kName),
+            u"Text");
+  EXPECT_EQ(data.role, ax::mojom::Role::kStaticText);
+
+  label()->SetTextContext(style::CONTEXT_DIALOG_TITLE);
+  EXPECT_EQ(label()->GetAccessibleName(), u"Text");
+  EXPECT_EQ(label()->GetAccessibleRole(), ax::mojom::Role::kTitleBar);
+
+  data = ui::AXNodeData();
+  label()->GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetString16Attribute(ax::mojom::StringAttribute::kName),
+            u"Text");
+  EXPECT_EQ(data.role, ax::mojom::Role::kTitleBar);
+
+  label()->SetText(u"New Text");
+  label()->SetAccessibleRole(ax::mojom::Role::kLink);
+  EXPECT_EQ(label()->GetAccessibleName(), u"New Text");
+  EXPECT_EQ(label()->GetAccessibleRole(), ax::mojom::Role::kLink);
+
+  data = ui::AXNodeData();
+  label()->GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetString16Attribute(ax::mojom::StringAttribute::kName),
+            u"New Text");
+  EXPECT_EQ(data.role, ax::mojom::Role::kLink);
 }
 
 TEST_F(LabelTest, EmptyLabelSizing) {
@@ -1124,18 +1169,6 @@ TEST_F(LabelTest, CanForceDirectionality) {
                            gfx::DirectionalityMode::DIRECTIONALITY_FORCE_RTL);
   EXPECT_EQ(base::i18n::TextDirection::RIGHT_TO_LEFT,
             ltr_text_force_rtl.GetTextDirectionForTesting());
-
-  SetRTL(true);
-  Label ltr_use_ui(u"0123456", 0, style::STYLE_PRIMARY,
-                   gfx::DirectionalityMode::DIRECTIONALITY_FROM_UI);
-  EXPECT_EQ(base::i18n::TextDirection::RIGHT_TO_LEFT,
-            ltr_use_ui.GetTextDirectionForTesting());
-
-  SetRTL(false);
-  Label rtl_use_ui(ToRTL("0123456"), 0, style::STYLE_PRIMARY,
-                   gfx::DirectionalityMode::DIRECTIONALITY_FROM_UI);
-  EXPECT_EQ(base::i18n::TextDirection::LEFT_TO_RIGHT,
-            rtl_use_ui.GetTextDirectionForTesting());
 }
 
 TEST_F(LabelTest, DefaultDirectionalityIsFromText) {

@@ -8,11 +8,8 @@
 #import "ios/chrome/browser/ui/authentication/signin/signin_constants.h"
 #import "ios/chrome/browser/ui/authentication/unified_consent/unified_consent_constants.h"
 #import "ios/chrome/browser/ui/settings/settings_table_view_controller_constants.h"
+#import "ios/chrome/common/ui/promo_style/constants.h"
 #import "ios/testing/earl_grey/earl_grey_test.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace chrome_test_util {
 
@@ -52,6 +49,33 @@ id<GREYMatcher> GoogleSyncSettingsButton() {
 
 id<GREYMatcher> UpgradeSigninPromoMatcher() {
   return grey_accessibilityID(kUnifiedConsentScrollViewIdentifier);
+}
+
+id<GREYMatcher> SettingsSignInRowMatcher() {
+  return grey_allOf(grey_accessibilityID(kSettingsSignInCellId),
+                    grey_sufficientlyVisible(), nil);
+}
+
+id<GREYMatcher> HistoryOptInPrimaryButtonMatcher() {
+  return grey_allOf(
+      grey_accessibilityID(kPromoStylePrimaryActionAccessibilityIdentifier),
+      grey_sufficientlyVisible(), nil);
+}
+
+id<GREYMatcher> HistoryOptInSecondaryButtonMatcher() {
+  return grey_allOf(
+      grey_accessibilityID(kPromoStyleSecondaryActionAccessibilityIdentifier),
+      grey_sufficientlyVisible(), nil);
+}
+
+id<GREYMatcher> HistoryOptInScrollViewMatcher() {
+  return grey_allOf(
+      grey_accessibilityID(kPromoStyleScrollViewAccessibilityIdentifier),
+      grey_sufficientlyVisible(), nil);
+}
+
+id<GREYAction> HistoryOptInScrollDown() {
+  return grey_scrollInDirection(kGREYDirectionDown, 200);
 }
 
 }  // namespace chrome_test_util

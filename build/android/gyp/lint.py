@@ -17,6 +17,7 @@ from xml.etree import ElementTree
 from util import build_utils
 from util import manifest_utils
 from util import server_utils
+import action_helpers  # build_utils adds //build to sys.path.
 
 _LINT_MD_URL = 'https://chromium.googlesource.com/chromium/src/+/main/build/android/docs/lint.md'  # pylint: disable=line-too-long
 
@@ -29,9 +30,11 @@ _DISABLED_ALWAYS = [
     "LintBaseline",  # Don't warn about using baseline.xml files.
     "MissingInflatedId",  # False positives https://crbug.com/1394222
     "MissingApplicationIcon",  # False positive for non-production targets.
+    "NetworkSecurityConfig",  # Breaks on library certificates b/269783280.
     "ObsoleteLintCustomCheck",  # We have no control over custom lint checks.
     "SwitchIntDef",  # Many C++ enums are not used at all in java.
     "Typos",  # Strings are committed in English first and later translated.
+    "VisibleForTests",  # Does not recognize "ForTesting" methods.
     "UniqueConstants",  # Chromium enums allow aliases.
     "UnusedAttribute",  # Chromium apks have various minSdkVersion values.
 ]
@@ -178,7 +181,7 @@ def _GenerateAndroidManifest(original_manifest_path, extra_manifest_paths,
 def _WriteXmlFile(root, path):
   logging.info('Writing xml file %s', path)
   build_utils.MakeDirectory(os.path.dirname(path))
-  with build_utils.AtomicOutput(path) as f:
+  with action_helpers.atomic_output(path) as f:
     # Although we can write it just with ElementTree.tostring, using minidom
     # makes it a lot easier to read as a human (also on code search).
     f.write(
@@ -352,17 +355,13 @@ def _RunLint(create_cache,
                                 stderr_filter=stderr_filter,
                                 fail_on_output=warnings_as_errors,
                                 fail_func=fail_func))
+  except build_utils.CalledProcessError as e:
+    # Do not output the python stacktrace because it is lengthy and is not
+    # relevant to the actual lint error.
+    sys.stderr.write(e.output)
   finally:
     # When not treating warnings as errors, display the extra footer.
     is_debug = os.environ.get('LINT_DEBUG', '0') != '0'
-
-    if failed:
-      print('- For more help with lint in Chrome:', _LINT_MD_URL)
-      if is_debug:
-        print('- DEBUG MODE: Here is the project.xml: {}'.format(
-            _SrcRelative(project_xml_path)))
-      else:
-        print('- Run with LINT_DEBUG=1 to enable lint configuration debugging')
 
     end = time.time() - start
     logging.info('Lint command took %ss', end)
@@ -372,12 +371,21 @@ def _RunLint(create_cache,
       shutil.rmtree(srcjar_root_dir, ignore_errors=True)
       os.unlink(project_xml_path)
 
+    if failed:
+      print('- For more help with lint in Chrome:', _LINT_MD_URL)
+      if is_debug:
+        print('- DEBUG MODE: Here is the project.xml: {}'.format(
+            _SrcRelative(project_xml_path)))
+      else:
+        print('- Run with LINT_DEBUG=1 to enable lint configuration debugging')
+      sys.exit(1)
+
   logging.info('Lint completed')
 
 
 def _ParseArgs(argv):
   parser = argparse.ArgumentParser()
-  build_utils.AddDepfileOption(parser)
+  action_helpers.add_depfile_arg(parser)
   parser.add_argument('--target-name', help='Fully qualified GN target name.')
   parser.add_argument('--skip-build-server',
                       action='store_true',
@@ -450,13 +458,14 @@ def _ParseArgs(argv):
                       'on new errors.')
 
   args = parser.parse_args(build_utils.ExpandFileArgs(argv))
-  args.sources = build_utils.ParseGnList(args.sources)
-  args.aars = build_utils.ParseGnList(args.aars)
-  args.srcjars = build_utils.ParseGnList(args.srcjars)
-  args.resource_sources = build_utils.ParseGnList(args.resource_sources)
-  args.extra_manifest_paths = build_utils.ParseGnList(args.extra_manifest_paths)
-  args.resource_zips = build_utils.ParseGnList(args.resource_zips)
-  args.classpath = build_utils.ParseGnList(args.classpath)
+  args.sources = action_helpers.parse_gn_list(args.sources)
+  args.aars = action_helpers.parse_gn_list(args.aars)
+  args.srcjars = action_helpers.parse_gn_list(args.srcjars)
+  args.resource_sources = action_helpers.parse_gn_list(args.resource_sources)
+  args.extra_manifest_paths = action_helpers.parse_gn_list(
+      args.extra_manifest_paths)
+  args.resource_zips = action_helpers.parse_gn_list(args.resource_zips)
+  args.classpath = action_helpers.parse_gn_list(args.classpath)
 
   if args.baseline:
     assert os.path.basename(args.baseline) == 'lint-baseline.xml', (
@@ -521,7 +530,7 @@ def main():
   build_utils.Touch(args.stamp)
 
   if args.depfile:
-    build_utils.WriteDepfile(args.depfile, args.stamp, depfile_deps)
+    action_helpers.write_depfile(args.depfile, args.stamp, depfile_deps)
 
 
 if __name__ == '__main__':

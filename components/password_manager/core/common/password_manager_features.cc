@@ -5,81 +5,17 @@
 #include "components/password_manager/core/common/password_manager_features.h"
 
 #include "base/feature_list.h"
+#include "build/blink_buildflags.h"
 #include "build/build_config.h"
 
 namespace password_manager::features {
 // NOTE: It is strongly recommended to use UpperCamelCase style for feature
 //       names, e.g. "MyGreatFeature".
 
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
-// Enables biometric authentication before form filling.
-BASE_FEATURE(kBiometricAuthenticationForFilling,
-             "BiometricAuthenticationForFilling",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
-
-#if BUILDFLAG(IS_MAC)
-// Enables biometric authentication in settings.
-BASE_FEATURE(kBiometricAuthenticationInSettings,
-             "BiometricAuthenticationInSettings",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
-
-// Enables Biometrics for the Touch To Fill feature. This only effects Android.
-BASE_FEATURE(kBiometricTouchToFill,
-             "BiometricTouchToFill",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enables the overwriting of prefilled username fields if the server predicted
 // the field to contain a placeholder value.
 BASE_FEATURE(kEnableOverwritingPlaceholderUsernames,
              "EnableOverwritingPlaceholderUsernames",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables a second, Gaia-account-scoped password store for users who are signed
-// in but not syncing.
-BASE_FEATURE(kEnablePasswordsAccountStorage,
-             "EnablePasswordsAccountStorage",
-#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
-             base::FEATURE_DISABLED_BY_DEFAULT
-#else
-             base::FEATURE_ENABLED_BY_DEFAULT
-#endif
-);
-
-BASE_FEATURE(kEnablePasswordGenerationForClearTextFields,
-             "EnablePasswordGenerationForClearTextFields",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// By default, Password Manager is enabled in fenced frames as part of
-// FencedFramesAPIChanges blink experiment.
-// This flag can be used via Finch to disable PasswordManager in the
-// FencedFramesAPIChanges blink experiment without affecting the other
-// features included in the experiment.
-// TODO(crbug.com/1294378): Remove once launched.
-BASE_FEATURE(kEnablePasswordManagerWithinFencedFrame,
-             "EnablePasswordManagerWithinFencedFrame",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enables filling password on a website when there is saved password on
-// affiliated website.
-BASE_FEATURE(kFillingAcrossAffiliatedWebsites,
-             "FillingAcrossAffiliatedWebsites",
-#if !BUILDFLAG(IS_ANDROID) // Desktop and iOS
-             base::FEATURE_ENABLED_BY_DEFAULT);
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
-// Enables the experiment for the password manager to only fill on account
-// selection, rather than autofilling on page load, with highlighting of fields.
-BASE_FEATURE(kFillOnAccountSelect,
-             "fill-on-account-select",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables logging the content of chrome://password-manager-internals to the
-// terminal.
-BASE_FEATURE(kPasswordManagerLogToTerminal,
-             "PasswordManagerLogToTerminal",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
@@ -90,12 +26,11 @@ BASE_FEATURE(kForceInitialSyncWhenDecryptionFails,
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
-// Enables finding a confirmation password field during saving by inspecting the
-// values of the fields. Used as a kill switch.
-// TODO(crbug.com/1164861): Remove once confirmed to be safe (around M92 or so).
-BASE_FEATURE(kInferConfirmationPasswordField,
-             "InferConfirmationPasswordField",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+// When enabled, username fields for forgot password flows are recognized
+// and filled.
+BASE_FEATURE(kForgotPasswordFormSupport,
+             "ForgotPasswordFormSupport",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_IOS)
 // Removes the list of passwords from the Settings UI and adds a separate
@@ -104,21 +39,10 @@ BASE_FEATURE(kIOSPasswordUISplit,
              "IOSPasswordUISplit",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables password saving and filling in cross-origin iframes on IOS.
-BASE_FEATURE(kIOSPasswordManagerCrossOriginIframeSupport,
-             "IOSPasswordManagerCrossOriginIframeSupport",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enables displaying and managing compromised, weak and reused credentials in
 // the Password Manager.
 BASE_FEATURE(kIOSPasswordCheckup,
              "IOSPasswordCheckup",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Feature flag to show local/account storage in save/update password infobar
-// subtitle.
-BASE_FEATURE(kIOSShowPasswordStorageInSaveInfobar,
-             "IOSShowPasswordStorageInSaveInfobar",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables password bottom sheet to be displayed (on iOS) when a user is
@@ -127,88 +51,53 @@ BASE_FEATURE(kIOSShowPasswordStorageInSaveInfobar,
 BASE_FEATURE(kIOSPasswordBottomSheet,
              "IOSPasswordBottomSheet",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// When enabled, eligible users will be given the possibility to bulk upload
+// local passwords in the iOS password settings.
+BASE_FEATURE(kIOSPasswordSettingsBulkUploadLocalPasswords,
+             "IOSPasswordSettingsBulkUploadLocalPasswords",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // IS_IOS
 
-// Enables memory mapping the word lists used in the zxcvbn library employed
-// for the password weakness check.
-#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)  // Desktop
-BASE_FEATURE(kMemoryMapWeaknessCheckDictionaries,
-             "MemoryMapWeaknessCheckDictionaries",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
-
-// Enables new regex for OTP fields.
-BASE_FEATURE(kNewRegexForOtpFields,
-             "NewRegexForOtpFields",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables the new password viewing subpage.
-BASE_FEATURE(kPasswordViewPageInSettings,
-             "PasswordViewPageInSettings",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+// Killswitch for changes regarding password issues in
+// `PasswordSpcificsMetadata`. Guards writing issues to metadata and preserving
+// the new notification field.
+BASE_FEATURE(kPasswordIssuesInSpecificsMetadata,
+             "PasswordIssuesInSpecificsMetadata",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables sending credentials from the settings UI.
 BASE_FEATURE(kSendPasswords,
              "SendPasswords",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables password leak detection for unauthenticated users.
-BASE_FEATURE(kLeakDetectionUnauthenticated,
-             "LeakDetectionUnauthenticated",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables .well-known based password change flow from leaked password dialog.
 BASE_FEATURE(kPasswordChangeWellKnown,
              "PasswordChangeWellKnown",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables import passwords flow from Chrome's settings page.
-BASE_FEATURE(kPasswordImport,
-             "PasswordImport",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
-BASE_FEATURE(kPasswordManagerRedesign,
-             "PasswordManagerRedesign",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
-
-#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 BASE_FEATURE(kPasswordsImportM2,
              "PasswordsImportM2",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables password reuse detection.
 BASE_FEATURE(kPasswordReuseDetectionEnabled,
              "PasswordReuseDetectionEnabled",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables requesting and saving passwords grouping information from the
-// affiliation service.
-// TODO(crbug.com/1359392): Remove once launched.
-BASE_FEATURE(kPasswordsGrouping,
-             "PasswordsGrouping",
+// Enables different experiments that modify content and behavior of the
+// existing generated password suggestion dropdown.
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)  // Desktop
+BASE_FEATURE(kPasswordGenerationExperiment,
+             "PasswordGenerationExperiment",
              base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
 
 // Enables showing UI which allows users to easily revert their choice to
 // never save passwords on a certain website.
 BASE_FEATURE(kRecoverFromNeverSaveAndroid,
-             "RecoverFromNeverSaveAndroid",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
-// Enables a revamped version of the password management bubble triggered by
-// manually clicking on the key icon in the omnibox.
-BASE_FEATURE(kRevampedPasswordManagementBubble,
-             "RevampedPasswordManagementBubble",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
-
-// Enables the password strength indicator.
-BASE_FEATURE(kPasswordStrengthIndicator,
-             "PasswordStrengthIndicator",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             "RecoverFromNeverSaveAndroid_LAUNCHED",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 // Displays at least the decryptable and never saved logins in the password
@@ -233,25 +122,41 @@ BASE_FEATURE(kPasswordGenerationBottomSheet,
              "PasswordGenerationBottomSheet",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kShowUPMErrorNotification,
-             "ShowUpmErrorNotification",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables the intent fetching for the credential manager in Google Mobile
-// Services. It does not enable launching the credential manager.
-BASE_FEATURE(kUnifiedCredentialManagerDryRun,
-             "UnifiedCredentialManagerDryRun",
+// Enables the refactored Password Suggestion bottom sheet (Touch-To-Fill).
+// The goal of the refactoring is to transfer the knowledge about the
+// Touch-To-Fill feature to the browser code completely and so to simplify the
+// renderer code. In the refactored version it will be decided inside the the
+// `ContentPasswordManagerDriver::ShowPasswordSuggestions` whether to show the
+// TTF to the user.
+BASE_FEATURE(kPasswordSuggestionBottomSheetV2,
+             "PasswordSuggestionBottomSheetV2",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables use of Google Mobile Services for password storage. Chrome's local
 // database will be unused but kept in sync for local passwords.
 BASE_FEATURE(kUnifiedPasswordManagerAndroid,
-             "UnifiedPasswordManagerAndroid",
+             "UnifiedPasswordManagerAndroid_LAUNCHED",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables showing contextual error messages when UPM encounters an auth error.
-BASE_FEATURE(kUnifiedPasswordManagerErrorMessages,
-             "UnifiedPasswordManagerErrorMessages",
+// Enables use of Google Mobile services for non-synced password storage.
+BASE_FEATURE(kUnifiedPasswordManagerLocalPasswordsAndroidWithMigration,
+             "kUnifiedPasswordManagerLocalPasswordsAndroidWithMigration",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables use of Google Mobile services for non-synced password storage that
+// contains no passwords, so no migration will be necessary.
+// UnifiedPasswordManagerLocalPasswordsAndroidWithMigration will replace this
+// feature once UPM starts to be rolled out to local users who have saved
+// passwords.
+BASE_FEATURE(kUnifiedPasswordManagerLocalPasswordsAndroidWithoutMigration,
+             "kUnifiedPasswordManagerLocalPasswordsAndroidWithoutMigration",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables showing the warning about UPM migrating local passwords.
+// The feature is limited to Canary/Dev/Beta by a check in
+// local_passwords_migration_warning_util::ShouldShowWarning.
+BASE_FEATURE(kUnifiedPasswordManagerLocalPasswordsMigrationWarning,
+             "UnifiedPasswordManagerLocalPasswordsMigrationWarning",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, the built-in sync functionality in PasswordSyncBridge becomes
@@ -262,22 +167,8 @@ BASE_FEATURE(kUnifiedPasswordManagerSyncUsingAndroidBackendOnly,
              "UnifiedPasswordManagerSyncUsingAndroidBackendOnly",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables automatic reenrollment into the Unified Password Manager for clients
-// that were previously evicted after experiencing errors.
-BASE_FEATURE(kUnifiedPasswordManagerReenrollment,
-             "UnifiedPasswordManagerReenrollment",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enables all UI branding changes related to Unified Password Manager:
-// the strings containing 'Password Manager' and the password manager
-// icon.
-BASE_FEATURE(kUnifiedPasswordManagerAndroidBranding,
-             "UnifiedPasswordManagerAndroidBranding",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enables new exploratory strings for the save/update password prompts.
-BASE_FEATURE(kExploratorySaveUpdatePasswordStrings,
-             "ExploratorySaveUpdatePasswordStrings",
+BASE_FEATURE(kPasswordsInCredMan,
+             "PasswordsInCredMan",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
@@ -290,49 +181,42 @@ BASE_FEATURE(kUsernameFirstFlowFallbackCrowdsourcing,
              "UsernameFirstFlowFallbackCrowdsourcing",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables previewing password generation suggestion in the target form in
-// cleartext.
-BASE_FEATURE(kPasswordGenerationPreviewOnHover,
-             "PasswordGenerationPreviewOnHover",
+// Enables suggesting username in the save/update prompt in the case of
+// autocomplete="username".
+BASE_FEATURE(kUsernameFirstFlowHonorAutocomplete,
+             "UsernameFirstFlowHonorAutocomplete",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables storing more possible username values in the LRU cache. Part of the
+// `kUsernameFirstFlowWithIntermediateValues` feature.
+BASE_FEATURE(kUsernameFirstFlowStoreSeveralValues,
+             "UsernameFirstFlowStoreSeveralValues",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables tolerating intermediate fields like OTP or CAPTCHA
+// between username and password fields in Username First Flow.
+BASE_FEATURE(kUsernameFirstFlowWithIntermediateValues,
+             "UsernameFirstFlowWithIntermediateValues",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)  // Desktop
+// Show, update, and delete GPM passkeys on the Chrome Password Manager.
+BASE_FEATURE(kPasswordManagerPasskeys,
+             "PasswordManagerPasskeys",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
+
 #if BUILDFLAG(IS_ANDROID)
-// Current migration version to Google Mobile Services. If version saved in pref
-// is lower than 'kMigrationVersion' passwords will be re-uploaded.
-extern const base::FeatureParam<int> kMigrationVersion = {
-    &kUnifiedPasswordManagerAndroid, "migration_version", 1};
 
-// The maximum possible number of reenrollments into the UPM. Needed to avoid a
-// patchy experience for users who experience errors in communication with
-// Google Mobile Services on a regular basis.
-extern const base::FeatureParam<int> kMaxUPMReenrollments = {
-    &kUnifiedPasswordManagerReenrollment, "max_reenrollments", 0};
-
-// The maximum possible number of reenrollment migration attempts. Needed to
-// avoid wasting resources of users who have persistent errors.
-extern const base::FeatureParam<int> kMaxUPMReenrollmentAttempts = {
-    &kUnifiedPasswordManagerReenrollment, "max_reenrollment_attempts", 0};
-
-// Whether to ignore the 24h timeout in between auth error messages as
-// well as the 30 mins distance to sync error messages.
-extern const base::FeatureParam<bool> kIgnoreAuthErrorMessageTimeouts = {
-    &kUnifiedPasswordManagerErrorMessages, "ignore_auth_error_message_timeouts",
-    false};
-
-// The maximum number of authentication error UI messages to show before
-// considering auth errors as unrecoverable and unenrolling the user from UPM.
-// If this param is set, unenrollment will happen even if the auth error is in
-// the ignore list.
-// By default, there is no limit to how many errors will be shown.
-extern const base::FeatureParam<int> kMaxShownUPMErrorsBeforeEviction = {
-    &kUnifiedPasswordManagerErrorMessages,
-    "max_shown_auth_errors_before_eviction", -1};
-
-// The string version to use for the save/update password prompts when the user
-// is syncing passwords. Version 1 is outdated, so the only supported versions
-// currently are 2 and 3.
-extern const base::FeatureParam<int> kSaveUpdatePromptSyncingStringVersion = {
-    &kExploratorySaveUpdatePasswordStrings, "syncing_string_version", 2};
+// The version of the password migration warning prefs. When the version
+// increases, the value of the pref LocalPasswordMigrationWarningPrefsVersion
+// increases and the affected prefs are reset. The affected prefs are:
+// LocalPasswordMigrationWarningShownAtStartup and
+// LocalPasswordsMigrationWarningShownTimestamp.
+extern const base::FeatureParam<int>
+    kLocalPasswordMigrationWarningPrefsVersion = {
+        &kUnifiedPasswordManagerLocalPasswordsMigrationWarning,
+        "pwd_migration_warning_prefs_version", 1};
 #endif
 
 // Field trial identifier for password generation requirements.
@@ -357,8 +241,9 @@ const char kGenerationRequirementsTimeout[] = "timeout";
 
 #if BUILDFLAG(IS_ANDROID)
 bool UsesUnifiedPasswordManagerUi() {
-  if (!base::FeatureList::IsEnabled(kUnifiedPasswordManagerAndroid))
+  if (!base::FeatureList::IsEnabled(kUnifiedPasswordManagerAndroid)) {
     return false;
+  }
   UpmExperimentVariation variation = kUpmExperimentVariationParam.Get();
   switch (variation) {
     case UpmExperimentVariation::kEnableForSyncingUsers:
@@ -372,14 +257,10 @@ bool UsesUnifiedPasswordManagerUi() {
   return false;
 }
 
-bool UsesUnifiedPasswordManagerBranding() {
-  return (UsesUnifiedPasswordManagerUi() ||
-          base::FeatureList::IsEnabled(kUnifiedPasswordManagerAndroidBranding));
-}
-
 bool RequiresMigrationForUnifiedPasswordManager() {
-  if (!base::FeatureList::IsEnabled(kUnifiedPasswordManagerAndroid))
+  if (!base::FeatureList::IsEnabled(kUnifiedPasswordManagerAndroid)) {
     return false;
+  }
   UpmExperimentVariation variation = kUpmExperimentVariationParam.Get();
   switch (variation) {
     case UpmExperimentVariation::kEnableForSyncingUsers:
@@ -393,28 +274,17 @@ bool RequiresMigrationForUnifiedPasswordManager() {
   return false;
 }
 
-bool ManagesLocalPasswordsInUnifiedPasswordManager() {
-  if (!base::FeatureList::IsEnabled(kUnifiedPasswordManagerAndroid))
-    return false;
-  UpmExperimentVariation variation = kUpmExperimentVariationParam.Get();
-  switch (variation) {
-    case UpmExperimentVariation::kEnableForSyncingUsers:
-    case UpmExperimentVariation::kShadowSyncingUsers:
-    case UpmExperimentVariation::kEnableOnlyBackendForSyncingUsers:
-      return false;
-    case UpmExperimentVariation::kEnableForAllUsers:
-      return true;
-  }
-  NOTREACHED()
-      << "Define explicitly whether local password management is supported!";
-  return false;
-}
 #endif  // IS_ANDROID
 
 #if BUILDFLAG(IS_IOS)
 bool IsPasswordCheckupEnabled() {
   return base::FeatureList::IsEnabled(
       password_manager::features::kIOSPasswordCheckup);
+}
+
+bool IsBulkUploadLocalPasswordsEnabled() {
+  return base::FeatureList::IsEnabled(
+      kIOSPasswordSettingsBulkUploadLocalPasswords);
 }
 #endif  // IS_IOS
 

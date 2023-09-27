@@ -18,13 +18,16 @@
 #include "base/android/scoped_java_ref.h"
 #include "base/check_op.h"
 #include "base/notreached.h"
+#include "base/types/cxx23_to_underlying.h"
 #include "components/android_autofill/browser/android_autofill_manager.h"
 #include "components/android_autofill/browser/autofill_provider_android.h"
 #include "components/autofill/core/browser/autofill_download_manager.h"
 #include "components/autofill/core/browser/payments/legal_message_line.h"
 #include "components/autofill/core/browser/ui/autofill_popup_delegate.h"
+#include "components/autofill/core/browser/ui/popup_item_ids.h"
 #include "components/autofill/core/browser/ui/suggestion.h"
 #include "components/autofill/core/browser/webdata/autofill_webdata_service.h"
+#include "components/autofill/core/common/aliases.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/pref_service_factory.h"
@@ -203,6 +206,16 @@ void AwAutofillClient::ConfirmSaveCreditCardLocally(
   NOTIMPLEMENTED();
 }
 
+void AwAutofillClient::ShowEditAddressProfileDialog(
+    const autofill::AutofillProfile& profile,
+    AddressProfileSavePromptCallback on_user_decision_callback) {
+  NOTREACHED();
+}
+
+void AwAutofillClient::ShowDeleteAddressProfileDialog() {
+  NOTREACHED();
+}
+
 void AwAutofillClient::ConfirmSaveCreditCardToCloud(
     const autofill::CreditCard& card,
     const autofill::LegalMessageLines& legal_message_lines,
@@ -235,26 +248,6 @@ bool AwAutofillClient::HasCreditCardScanFeature() {
 
 void AwAutofillClient::ScanCreditCard(CreditCardScanCallback callback) {
   NOTIMPLEMENTED();
-}
-
-bool AwAutofillClient::IsFastCheckoutSupported(
-    const autofill::FormData& form,
-    const autofill::FormFieldData& field,
-    const autofill::AutofillManager& autofill_manager) {
-  return false;
-}
-
-bool AwAutofillClient::TryToShowFastCheckout(
-    const autofill::FormData& form,
-    const autofill::FormFieldData& field,
-    base::WeakPtr<autofill::AutofillManager> autofill_manager) {
-  return false;
-}
-
-void AwAutofillClient::HideFastCheckout(bool allow_further_runs) {}
-
-bool AwAutofillClient::IsShowingFastCheckoutUI() {
-  return false;
 }
 
 bool AwAutofillClient::IsTouchToFillCreditCardSupported() {
@@ -306,15 +299,16 @@ void AwAutofillClient::PinPopupView() {
   NOTIMPLEMENTED();
 }
 
-autofill::AutofillClient::PopupOpenArgs AwAutofillClient::GetReopenPopupArgs()
-    const {
+autofill::AutofillClient::PopupOpenArgs AwAutofillClient::GetReopenPopupArgs(
+    autofill::AutofillSuggestionTriggerSource trigger_source) const {
   NOTIMPLEMENTED();
   return {};
 }
 
 void AwAutofillClient::UpdatePopup(
     const std::vector<autofill::Suggestion>& suggestions,
-    autofill::PopupType popup_type) {
+    autofill::PopupType popup_type,
+    autofill::AutofillSuggestionTriggerSource trigger_source) {
   NOTIMPLEMENTED();
 }
 
@@ -346,9 +340,10 @@ bool AwAutofillClient::IsPasswordManagerEnabled() {
   return false;
 }
 
-void AwAutofillClient::PropagateAutofillPredictions(
-    autofill::AutofillDriver* driver,
-    const std::vector<autofill::FormStructure*>& forms) {}
+void AwAutofillClient::DidFillOrPreviewForm(
+    autofill::mojom::AutofillActionPersistence action_persistence,
+    autofill::AutofillTriggerSource trigger_source,
+    bool is_refill) {}
 
 void AwAutofillClient::DidFillOrPreviewField(
     const std::u16string& autofilled_value,
@@ -370,10 +365,6 @@ bool AwAutofillClient::IsContextSecure() const {
          !net::IsCertStatusError(ssl_status.cert_status) &&
          !(ssl_status.content_status &
            content::SSLStatus::RAN_INSECURE_CONTENT);
-}
-
-void AwAutofillClient::ExecuteCommand(int id) {
-  NOTIMPLEMENTED();
 }
 
 void AwAutofillClient::OpenPromoCodeOfferDetailsURL(const GURL& url) {
@@ -401,7 +392,9 @@ void AwAutofillClient::SuggestionSelected(JNIEnv* env,
                                           const JavaParamRef<jobject>& object,
                                           jint position) {
   if (delegate_) {
-    delegate_->DidAcceptSuggestion(suggestions_[position], position);
+    delegate_->DidAcceptSuggestion(
+        suggestions_[position], position,
+        autofill::AutofillSuggestionTriggerSource::kAndroidWebView);
   }
 }
 
@@ -458,7 +451,8 @@ void AwAutofillClient::ShowAutofillPopupImpl(
       label = ConvertUTF16ToJavaString(env, suggestions[i].labels[0][0].value);
 
     Java_AwAutofillClient_addToAutofillSuggestionArray(
-        env, data_array, i, name, label, suggestions[i].frontend_id);
+        env, data_array, i, name, label,
+        base::to_underlying(suggestions[i].popup_item_id));
   }
   ui::ViewAndroid* view_android = GetWebContents().GetNativeView();
   if (!view_android)

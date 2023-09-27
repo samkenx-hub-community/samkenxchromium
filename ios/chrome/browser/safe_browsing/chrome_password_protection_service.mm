@@ -31,17 +31,17 @@
 #import "components/signin/public/identity_manager/identity_manager.h"
 #import "components/strings/grit/components_strings.h"
 #import "components/sync/base/model_type.h"
-#import "components/sync/driver/sync_service.h"
 #import "components/sync/protocol/user_event_specifics.pb.h"
+#import "components/sync/service/sync_service.h"
 #import "components/sync_user_events/user_event_service.h"
 #import "components/variations/service/variations_service.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/history/history_service_factory.h"
 #import "ios/chrome/browser/passwords/ios_chrome_account_password_store_factory.h"
 #import "ios/chrome/browser/passwords/ios_chrome_password_store_factory.h"
 #import "ios/chrome/browser/safe_browsing/user_population_helper.h"
 #import "ios/chrome/browser/safe_browsing/verdict_cache_manager_factory.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/signin/identity_manager_factory.h"
 #import "ios/chrome/browser/sync/ios_user_event_service_factory.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
@@ -52,10 +52,6 @@
 #import "ios/web/public/web_state.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using base::RecordAction;
 using base::UserMetricsAction;
@@ -371,7 +367,7 @@ AccountInfo ChromePasswordProtectionService::GetAccountInfo() const {
   if (!identity_manager)
     return AccountInfo();
   return identity_manager->FindExtendedAccountInfo(
-      identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSync));
+      identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin));
 }
 
 safe_browsing::ChromeUserPopulation::UserPopulation
@@ -468,10 +464,12 @@ bool ChromePasswordProtectionService::IsExtendedReporting() {
   return false;
 }
 
-bool ChromePasswordProtectionService::IsPrimaryAccountSyncing() const {
+bool ChromePasswordProtectionService::IsPrimaryAccountSyncingHistory() const {
   syncer::SyncService* sync =
       SyncServiceFactory::GetForBrowserState(browser_state_);
-  return sync && sync->IsSyncFeatureActive() && !sync->IsLocalSyncEnabled();
+  return sync &&
+         sync->GetActiveDataTypes().Has(syncer::HISTORY_DELETE_DIRECTIVES) &&
+         !sync->IsLocalSyncEnabled();
 }
 
 bool ChromePasswordProtectionService::IsPrimaryAccountSignedIn() const {

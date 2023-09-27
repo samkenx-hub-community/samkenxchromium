@@ -9,6 +9,7 @@
 #import "base/strings/sys_string_conversions.h"
 #import "ios/chrome/browser/metrics/metrics_app_interface.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_grid_constants.h"
+#import "ios/chrome/browser/ui/tab_switcher/test/query_title_server_util.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey_ui.h"
@@ -19,10 +20,6 @@
 #import "net/test/embedded_test_server/http_response.h"
 #import "net/test/embedded_test_server/request_handler_util.h"
 #import "ui/base/device_form_factor.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using chrome_test_util::CloseTabMenuButton;
 using chrome_test_util::TabGridDoneButton;
@@ -49,20 +46,8 @@ void SelectTab(NSString* title) {
                                               @"GridCell")),
                                           grey_accessibilityTrait(
                                               UIAccessibilityTraitStaticText),
-                                          nil)] performAction:grey_tap()];
-}
-
-// net::EmbeddedTestServer handler that responds with the request's query as the
-// title and body.
-std::unique_ptr<net::test_server::HttpResponse> HandleQueryTitle(
-    const net::test_server::HttpRequest& request) {
-  std::unique_ptr<net::test_server::BasicHttpResponse> http_response(
-      new net::test_server::BasicHttpResponse);
-  http_response->set_content_type("text/html");
-  http_response->set_content("<html><head><title>" + request.GetURL().query() +
-                             "</title></head><body>" +
-                             request.GetURL().query() + "</body></html>");
-  return std::move(http_response);
+                                          grey_hidden(NO), nil)]
+      performAction:grey_tap()];
 }
 
 // Expects that the total number of samples in histogram `histogram` grew by
@@ -117,16 +102,13 @@ void ExpectIdleHistogramBucketCount(const char* histogram,
 
 // Sets up the EmbeddedTestServer as needed for tests.
 - (void)setUpTestServer {
-  self.testServer->RegisterDefaultHandler(base::BindRepeating(
-      net::test_server::HandlePrefixedRequest, "/querytitle",
-      base::BindRepeating(&HandleQueryTitle)));
+  RegisterQueryTitleHandler(self.testServer);
   GREYAssertTrue(self.testServer->Start(), @"Test server failed to start");
 }
 
 // Returns the URL for a test page with the given `title`.
 - (GURL)makeURLForTitle:(NSString*)title {
-  return self.testServer->GetURL("/querytitle?" +
-                                 base::SysNSStringToUTF8(title));
+  return GetQueryTitleURL(self.testServer, title);
 }
 
 // Tests entering the tab switcher when one normal tab is open.
@@ -559,7 +541,7 @@ void ExpectIdleHistogramBucketCount(const char* histogram,
 
   [ChromeEarlGrey showTabSwitcher];
 
-  // Close a tab an open the current selected tab.
+  // Close tab #3 and open the current selected tab.
   [[EarlGrey selectElementWithMatcher:chrome_test_util::
                                           TabGridCloseButtonForCellAtIndex(1)]
       performAction:grey_tap()];

@@ -10,10 +10,6 @@
 #import "ios/chrome/browser/signin/test_constants.h"
 #import "ios/public/provider/chrome/browser/signin/signin_error_api.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 
 // Global used to store the +identity of FakeSystemIdentityInteractionManager.
@@ -21,22 +17,12 @@ id<SystemIdentity> gFakeSystemIdentityInteractionManagerIdentity = nil;
 
 }  // namespace
 
-@interface FakeAuthActivityViewController : UIViewController {
-  __weak FakeSystemIdentityInteractionManager* _manager;
-  UIButton* _cancelButton;
-}
-
-- (instancetype)initWithManager:(FakeSystemIdentityInteractionManager*)manager
-    NS_DESIGNATED_INITIALIZER;
-
-- (instancetype)initWithCoder:(NSCoder*)coder NS_UNAVAILABLE;
-
-- (instancetype)initWithNibName:(NSString*)nibNameOrNil
-                         bundle:(NSBundle*)nibBundleOrNil NS_UNAVAILABLE;
-
+@interface FakeAuthActivityViewController : UIViewController
 @end
 
-@implementation FakeAuthActivityViewController
+@implementation FakeAuthActivityViewController {
+  __weak FakeSystemIdentityInteractionManager* _manager;
+}
 
 - (instancetype)initWithManager:(FakeSystemIdentityInteractionManager*)manager {
   if ((self = [super initWithNibName:nil bundle:nil])) {
@@ -55,39 +41,46 @@ id<SystemIdentity> gFakeSystemIdentityInteractionManagerIdentity = nil;
   mainView.backgroundColor = [UIColor magentaColor];
   mainView.accessibilityIdentifier = kFakeAuthActivityViewIdentifier;
 
-  _cancelButton = [self addButtonWithTitle:@"Cancel"
-                                    action:@selector(didTapCancel:)
-                    accessibilitIdentifier:kFakeAuthCancelButtonIdentifier];
-}
-
-- (void)viewWillLayoutSubviews {
-  [super viewWillLayoutSubviews];
-
-  const CGRect bounds = self.view.bounds;
-  const CGFloat midX = CGRectGetMidX(bounds);
-  const CGFloat midY = CGRectGetMidY(bounds);
-
-  [self sizeButtonToFitWithCenter:CGPointMake(midX, midY) button:_cancelButton];
+  UIButton* addAccountButton =
+      [self createButtonWithTitle:@"Add Account"
+                           action:@selector(didTapAddAccount:)
+           accessibilitIdentifier:kFakeAuthAddAccountButtonIdentifier];
+  UIButton* cancelButton =
+      [self createButtonWithTitle:@"Cancel"
+                           action:@selector(didTapCancel:)
+           accessibilitIdentifier:kFakeAuthCancelButtonIdentifier];
+  // Container StackView
+  UIStackView* stackView = [[UIStackView alloc]
+      initWithArrangedSubviews:@[ addAccountButton, cancelButton ]];
+  stackView.axis = UILayoutConstraintAxisHorizontal;
+  stackView.translatesAutoresizingMaskIntoConstraints = false;
+  [self.view addSubview:stackView];
+  // Set up constraints.
+  NSMutableArray* constraints = [[NSMutableArray alloc] init];
+  [constraints addObject:[stackView.topAnchor
+                             constraintEqualToAnchor:self.view.topAnchor]];
+  [constraints addObject:[stackView.leadingAnchor
+                             constraintEqualToAnchor:self.view.leadingAnchor]];
+  [NSLayoutConstraint activateConstraints:constraints];
 }
 
 #pragma mark - Private methods
 
-- (UIButton*)addButtonWithTitle:(NSString*)title
-                         action:(SEL)action
-         accessibilitIdentifier:(NSString*)accessibilityIdentitier {
+- (UIButton*)createButtonWithTitle:(NSString*)title
+                            action:(SEL)action
+            accessibilitIdentifier:(NSString*)accessibilityIdentitier {
   UIButton* button = [UIButton buttonWithType:UIButtonTypeCustom];
   [button setTitle:title forState:UIControlStateNormal];
   [button setAccessibilityIdentifier:accessibilityIdentitier];
   [button addTarget:self
                 action:action
       forControlEvents:UIControlEventTouchUpInside];
-  [self.view addSubview:button];
+  [button sizeToFit];
   return button;
 }
 
-- (void)sizeButtonToFitWithCenter:(CGPoint)center button:(UIButton*)button {
-  [button setCenter:center];
-  [button sizeToFit];
+- (void)didTapAddAccount:(id)sender {
+  [_manager simulateDidTapAddAccount];
 }
 
 - (void)didTapCancel:(id)sender {
@@ -101,6 +94,7 @@ id<SystemIdentity> gFakeSystemIdentityInteractionManagerIdentity = nil;
   SigninCompletionBlock _signinCompletion;
   FakeAuthActivityViewController* _authActivityViewController;
   BOOL _isActivityViewPresented;
+  NSString* _lastStartAuthActivityUserEmail;
 }
 
 - (instancetype)initWithManager:
@@ -145,9 +139,14 @@ id<SystemIdentity> gFakeSystemIdentityInteractionManagerIdentity = nil;
                                   userEmail:(NSString*)userEmail
                                  completion:(SigninCompletionBlock)completion {
   DCHECK(completion);
+  _lastStartAuthActivityUserEmail = userEmail;
   _signinCompletion = completion;
   _authActivityViewController =
       [[FakeAuthActivityViewController alloc] initWithManager:self];
+  BOOL isIPad =
+      UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad;
+  _authActivityViewController.modalPresentationStyle =
+      isIPad ? UIModalPresentationFormSheet : UIModalPresentationFullScreen;
 
   __weak FakeSystemIdentityInteractionManager* weakSelf = self;
   [viewController presentViewController:_authActivityViewController
@@ -170,6 +169,10 @@ id<SystemIdentity> gFakeSystemIdentityInteractionManagerIdentity = nil;
 
 - (BOOL)isActivityViewPresented {
   return _isActivityViewPresented;
+}
+
+- (NSString*)lastStartAuthActivityUserEmail {
+  return _lastStartAuthActivityUserEmail;
 }
 
 + (id<SystemIdentity>)identity {

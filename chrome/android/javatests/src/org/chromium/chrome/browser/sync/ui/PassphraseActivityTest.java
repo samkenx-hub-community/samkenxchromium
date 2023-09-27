@@ -9,11 +9,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -23,7 +23,7 @@ import org.junit.runner.RunWith;
 import org.chromium.base.test.BaseJUnit4ClassRunner;
 import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.sync.FakeSyncServiceImpl;
-import org.chromium.chrome.browser.sync.SyncService;
+import org.chromium.chrome.browser.sync.SyncServiceFactory;
 import org.chromium.chrome.test.ChromeBrowserTestRule;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
@@ -39,12 +39,7 @@ public class PassphraseActivityTest {
 
     @Before
     public void setUp() {
-        mContext = InstrumentationRegistry.getTargetContext();
-    }
-
-    @After
-    public void tearDown() {
-        TestThreadUtils.runOnUiThreadBlocking(() -> SyncService.resetForTests());
+        mContext = ApplicationProvider.getApplicationContext();
     }
 
     /**
@@ -56,7 +51,7 @@ public class PassphraseActivityTest {
     public void testCallbackAfterBackgrounded() {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
         // Override before signing in, otherwise regular SyncService will be created.
-        overrideSyncService();
+        FakeSyncServiceImpl fakeSyncService = overrideSyncService();
         mChromeBrowserTestRule.addTestAccountThenSigninAndEnableSync();
 
         // Create the activity.
@@ -69,8 +64,7 @@ public class PassphraseActivityTest {
             InstrumentationRegistry.getInstrumentation().callActivityOnSaveInstanceState(
                     activity, bundle);
             // Fake sync's backend finishing its initialization.
-            FakeSyncServiceImpl syncService = (FakeSyncServiceImpl) SyncService.get();
-            syncService.setEngineInitialized(true);
+            fakeSyncService.setEngineInitialized(true);
         });
         // Nothing crashed; success!
 
@@ -94,10 +88,12 @@ public class PassphraseActivityTest {
                 monitor);
     }
 
-    private void overrideSyncService() {
-        TestThreadUtils.runOnUiThreadBlocking(() -> {
+    private FakeSyncServiceImpl overrideSyncService() {
+        return TestThreadUtils.runOnUiThreadBlockingNoException(() -> {
             // PSS has to be constructed on the UI thread.
-            SyncService.overrideForTests(new FakeSyncServiceImpl());
+            FakeSyncServiceImpl fakeSyncService = new FakeSyncServiceImpl();
+            SyncServiceFactory.setInstanceForTesting(fakeSyncService);
+            return fakeSyncService;
         });
     }
 }

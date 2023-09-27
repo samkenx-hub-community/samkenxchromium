@@ -10,6 +10,7 @@
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/layout/ng/geometry/ng_bfc_offset.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_item_result.h"
+#include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_item_text_index.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_block_break_token.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_layout_result.h"
 #include "third_party/blink/renderer/core/style/computed_style_base_constants.h"
@@ -30,6 +31,8 @@ class CORE_EXPORT NGLineInfo {
   STACK_ALLOCATED();
 
  public:
+  void Reset();
+
   const NGInlineItemsData& ItemsData() const {
     DCHECK(items_data_);
     return *items_data_;
@@ -91,6 +94,28 @@ class CORE_EXPORT NGLineInfo {
   void SetBreakToken(const NGInlineBreakToken* break_token) {
     break_token_ = break_token;
   }
+  // True if this line ends a paragraph; i.e., ends a block or has a forced
+  // break.
+  bool IsEndParagraph() const { return !BreakToken() || HasForcedBreak(); }
+
+  HeapVector<Member<const NGBreakToken>>& ParallelFlowBreakTokens() {
+    return parallel_flow_break_tokens_;
+  }
+  void PropagateParallelFlowBreakToken(const NGBreakToken* token) {
+    parallel_flow_break_tokens_.push_back(token);
+  }
+
+  absl::optional<LayoutUnit> MinimumSpaceShortage() const {
+    return minimum_space_shortage_;
+  }
+  void PropagateMinimumSpaceShortage(LayoutUnit shortage) {
+    DCHECK_GT(shortage, LayoutUnit());
+    if (minimum_space_shortage_) {
+      minimum_space_shortage_ = std::min(*minimum_space_shortage_, shortage);
+    } else {
+      minimum_space_shortage_ = shortage;
+    }
+  }
 
   void SetTextIndent(LayoutUnit indent) { text_indent_ = indent; }
   LayoutUnit TextIndent() const { return text_indent_; }
@@ -137,18 +162,23 @@ class CORE_EXPORT NGLineInfo {
   bool HasOverflow() const { return has_overflow_; }
   void SetHasOverflow(bool value = true) { has_overflow_ = value; }
 
+  // True if this line is hyphenated.
+  bool IsHyphenated() const;
+
   void SetBfcOffset(const NGBfcOffset& bfc_offset) { bfc_offset_ = bfc_offset; }
-  void SetAvailableWidth(LayoutUnit available_width) {
-    available_width_ = available_width;
-  }
   void SetWidth(LayoutUnit available_width, LayoutUnit width) {
     available_width_ = available_width;
     width_ = width;
   }
 
-  // Start text offset of this line.
-  unsigned StartOffset() const { return start_offset_; }
-  void SetStartOffset(unsigned offset) { start_offset_ = offset; }
+  // Start offset of this line.
+  const NGInlineItemTextIndex& Start() const { return start_; }
+  unsigned StartOffset() const { return start_.text_offset; }
+  void SetStart(const NGInlineItemTextIndex& index) { start_ = index; }
+  // End offset of this line. This is the same as the start offset of the next
+  // line, or the end of block if this is the last line.
+  NGInlineItemTextIndex End() const;
+  unsigned EndTextOffset() const;
   // End text offset of this line, excluding out-of-flow objects such as
   // floating or positioned.
   unsigned InflowEndOffset() const;
@@ -229,14 +259,17 @@ class CORE_EXPORT NGLineInfo {
       unsigned* end_offset_out = nullptr) const;
 
   const NGInlineItemsData* items_data_ = nullptr;
-  const ComputedStyle* line_style_ = nullptr;
+  const ComputedStyle* line_style_{nullptr};
   NGInlineItemResults results_;
 
   NGBfcOffset bfc_offset_;
 
   const NGInlineBreakToken* break_token_ = nullptr;
+  HeapVector<Member<const NGBreakToken>> parallel_flow_break_tokens_;
 
   const NGLayoutResult* block_in_inline_layout_result_ = nullptr;
+
+  absl::optional<LayoutUnit> minimum_space_shortage_;
 
   LayoutUnit available_width_;
   LayoutUnit width_;
@@ -247,7 +280,7 @@ class CORE_EXPORT NGLineInfo {
   LayoutUnit initial_letter_box_block_start_adjustment_;
   LayoutUnit initial_letter_box_block_size_;
 
-  unsigned start_offset_;
+  NGInlineItemTextIndex start_;
   unsigned end_item_index_;
   unsigned end_offset_for_justify_;
 
@@ -272,6 +305,8 @@ class CORE_EXPORT NGLineInfo {
   // when |NGInlineItemResult| to |results_|.
   bool may_have_text_combine_item_ = false;
   bool allow_hang_for_alignment_ = false;
+
+  // When adding fields, pelase ensure `Reset()` is in sync.
 };
 
 std::ostream& operator<<(std::ostream& ostream, const NGLineInfo& line_info);

@@ -25,10 +25,10 @@
 #import "components/strings/grit/components_strings.h"
 #import "components/sync/protocol/gaia_password_reuse.pb.h"
 #import "components/sync_user_events/fake_user_event_service.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/history/history_service_factory.h"
 #import "ios/chrome/browser/passwords/ios_chrome_password_store_factory.h"
 #import "ios/chrome/browser/safe_browsing/safe_browsing_metrics_collector_factory.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/sync/ios_user_event_service_factory.h"
 #import "ios/components/security_interstitials/safe_browsing/fake_safe_browsing_service.h"
 #import "ios/web/public/navigation/referrer.h"
@@ -41,10 +41,6 @@
 #import "ui/base/l10n/l10n_util.h"
 #import "ui/base/page_transition_types.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using ::testing::_;
 using password_manager::metrics_util::PasswordType;
@@ -205,7 +201,7 @@ class ChromePasswordProtectionServiceTest : public PlatformTest {
   CoreAccountInfo SetPrimaryAccount(const std::string& email) {
     identity_test_env_.MakeAccountAvailable(email);
     return identity_test_env_.SetPrimaryAccount(email,
-                                                signin::ConsentLevel::kSync);
+                                                signin::ConsentLevel::kSignin);
   }
 
   void SetUpSyncAccount(const std::string& hosted_domain,

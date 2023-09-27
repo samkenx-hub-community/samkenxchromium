@@ -14,14 +14,15 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.net.Uri;
-import android.support.test.InstrumentationRegistry;
 import android.util.Size;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.RemoteViews;
 
 import androidx.annotation.LayoutRes;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -76,7 +77,7 @@ public class QuickActionSearchWidgetProviderDelegateTest {
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
-        ChromeApplicationTestUtils.setUp(InstrumentationRegistry.getTargetContext());
+        ChromeApplicationTestUtils.setUp(ApplicationProvider.getApplicationContext());
         mContext = InstrumentationRegistry.getInstrumentation()
                            .getTargetContext()
                            .getApplicationContext();
@@ -110,7 +111,7 @@ public class QuickActionSearchWidgetProviderDelegateTest {
 
     @After
     public void tearDown() {
-        ChromeApplicationTestUtils.tearDown(InstrumentationRegistry.getTargetContext());
+        ChromeApplicationTestUtils.tearDown(ApplicationProvider.getApplicationContext());
     }
 
     @Test
@@ -192,9 +193,7 @@ public class QuickActionSearchWidgetProviderDelegateTest {
      * Test copy of {@link QuickActionSearchWidgetProvider#createDinoIntent}.
      */
     private static Intent createDinoIntent(final Context context) {
-        String chromeDinoUrl = UrlConstants.CHROME_DINO_URL + "/";
-
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(chromeDinoUrl));
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(UrlConstants.CHROME_DINO_URL));
         intent.setComponent(new ComponentName(context, ChromeLauncherActivity.class));
         intent.putExtra(WebappConstants.REUSE_URL_MATCHING_TAB_ELSE_NEW_TAB, true);
         intent.putExtra(IntentHandler.EXTRA_INVOKED_FROM_APP_WIDGET, true);

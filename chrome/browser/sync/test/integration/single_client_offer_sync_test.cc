@@ -14,8 +14,8 @@
 #include "components/autofill/core/browser/personal_data_manager.h"
 #include "components/autofill/core/browser/personal_data_manager_observer.h"
 #include "components/sync/base/model_type.h"
-#include "components/sync/driver/sync_service.h"
 #include "components/sync/protocol/model_type_state.pb.h"
+#include "components/sync/service/sync_service.h"
 #include "components/sync/test/fake_server.h"
 #include "content/public/test/browser_test.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -33,9 +33,6 @@ namespace {
 ACTION_P(QuitMessageLoop, loop) {
   loop->Quit();
 }
-
-const syncer::SyncFirstSetupCompleteSource kSetSourceFromTest =
-    syncer::SyncFirstSetupCompleteSource::BASIC_FLOW;
 
 }  // namespace
 
@@ -71,8 +68,7 @@ class SingleClientOfferSyncTest : public SyncTest {
   bool TriggerGetUpdatesAndWait() {
     const base::Time now = base::Time::Now();
     // Trigger a sync and wait for the new data to arrive.
-    TriggerSyncForModelTypes(
-        0, syncer::ModelTypeSet(syncer::AUTOFILL_WALLET_OFFER));
+    TriggerSyncForModelTypes(0, {syncer::AUTOFILL_WALLET_OFFER});
     return FullUpdateTypeProgressMarkerChecker(now, GetSyncService(0),
                                                syncer::AUTOFILL_WALLET_OFFER)
         .Wait();
@@ -102,20 +98,27 @@ IN_PROC_BROWSER_TEST_F(SingleClientOfferSyncTest, ClearOnDisableSync) {
   EXPECT_EQ(0uL, pdm->GetAutofillOffers().size());
 
   // Turn sync on again, the data should come back.
-  GetSyncService(0)->GetUserSettings()->SetSyncRequested(true);
+  GetSyncService(0)->SetSyncFeatureRequested();
+
+#if !BUILDFLAG(IS_CHROMEOS_ASH)
   // StopAndClear() also clears the "first setup complete" flag, so set it
   // again.
-  GetSyncService(0)->GetUserSettings()->SetFirstSetupComplete(
-      kSetSourceFromTest);
+  GetSyncService(0)->GetUserSettings()->SetInitialSyncFeatureSetupComplete(
+      syncer::SyncFirstSetupCompleteSource::BASIC_FLOW);
+#endif  // !BUILDFLAG(IS_CHROMEOS_ASH)
+
   // Wait until Sync restores the card and it arrives at PDM.
   WaitForNumberOfOffers(1, pdm);
   EXPECT_EQ(1uL, pdm->GetAutofillOffers().size());
 }
 
 // Ensures that offer data should get cleared from the database when sync is
-// (temporarily) stopped, e.g. due to the Sync feature toggle in Android
-// settings.
-IN_PROC_BROWSER_TEST_F(SingleClientOfferSyncTest, ClearOnStopSync) {
+// (temporarily) stopped, e.g. due to a persistent auth error.
+//
+// Excluded on Android because SyncServiceImplHarness doesn't have the ability
+// to mimic sync-paused on Android due to https://crbug.com/1373448.
+#if !BUILDFLAG(IS_ANDROID)
+IN_PROC_BROWSER_TEST_F(SingleClientOfferSyncTest, ClearOnSyncPaused) {
   GetFakeServer()->SetOfferData({CreateDefaultSyncCardLinkedOffer()});
   ASSERT_TRUE(SetupSync());
 
@@ -124,17 +127,18 @@ IN_PROC_BROWSER_TEST_F(SingleClientOfferSyncTest, ClearOnStopSync) {
   // Make sure the offer data is in the DB.
   ASSERT_EQ(1uL, pdm->GetAutofillOffers().size());
 
-  // Stop sync, the offer data should be gone.
-  GetSyncService(0)->GetUserSettings()->SetSyncRequested(false);
+  // Pause sync, the offer data should be gone.
+  GetClient(0)->EnterSyncPausedStateForPrimaryAccount();
   WaitForNumberOfOffers(0, pdm);
   EXPECT_EQ(0uL, pdm->GetAutofillOffers().size());
 
-  // Turn sync on again, the data should come back.
-  GetSyncService(0)->GetUserSettings()->SetSyncRequested(true);
+  // Resume (unpause) sync, the data should come back.
+  GetClient(0)->ExitSyncPausedStateForPrimaryAccount();
   // Wait until Sync restores the card and it arrives at PDM.
   WaitForNumberOfOffers(1, pdm);
   EXPECT_EQ(1uL, pdm->GetAutofillOffers().size());
 }
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 // ChromeOS does not sign out, so the test below does not apply.
 #if !BUILDFLAG(IS_CHROMEOS_ASH)
@@ -262,9 +266,9 @@ IN_PROC_BROWSER_TEST_F(SingleClientOfferSyncTest, ClearOnDisableWalletSync) {
   // Make sure the data is in the DB.
   ASSERT_EQ(1uL, pdm->GetAutofillOffers().size());
 
-  // Turn off autofill sync, the data should be gone.
+  // Turn off payments sync, the data should be gone.
   ASSERT_TRUE(
-      GetClient(0)->DisableSyncForType(syncer::UserSelectableType::kAutofill));
+      GetClient(0)->DisableSyncForType(syncer::UserSelectableType::kPayments));
   WaitForNumberOfOffers(0, pdm);
   EXPECT_EQ(0uL, pdm->GetAutofillOffers().size());
 }

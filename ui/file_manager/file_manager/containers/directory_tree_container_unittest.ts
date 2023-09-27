@@ -7,7 +7,6 @@ import {assertArrayEquals, assertEquals, assertFalse, assertTrue} from 'chrome:/
 
 import {MockVolumeManager} from '../background/js/mock_volume_manager.js';
 import {EntryList, FakeEntryImpl, VolumeEntry} from '../common/js/files_app_entry_types.js';
-import {metrics} from '../common/js/metrics.js';
 import {installMockChrome} from '../common/js/mock_chrome.js';
 import {MockFileSystem} from '../common/js/mock_entry.js';
 import {waitUntil} from '../common/js/test_error_reporting.js';
@@ -17,11 +16,10 @@ import {State} from '../externs/ts/state.js';
 import {MetadataItem} from '../foreground/js/metadata/metadata_item.js';
 import {MetadataModel} from '../foreground/js/metadata/metadata_model.js';
 import {MockMetadataModel} from '../foreground/js/metadata/mock_metadata.js';
-import {addVolume, removeVolume} from '../state/actions/volumes.js';
+import {convertEntryToFileData} from '../state/ducks/all_entries.js';
+import {addVolume, convertVolumeInfoAndMetadataToVolume, driveRootEntryListKey, removeVolume} from '../state/ducks/volumes.js';
 import {createFakeVolumeMetadata, setUpFileManagerOnWindow, setupStore} from '../state/for_tests.js';
-import {convertEntryToFileData} from '../state/reducers/all_entries.js';
-import {convertVolumeInfoAndMetadataToVolume, driveRootEntryListKey} from '../state/reducers/volumes.js';
-import {getEmptyState, getEntry, getStore} from '../state/store.js';
+import {getEmptyState, getEntry, getFileData, getStore} from '../state/store.js';
 import {XfTree} from '../widgets/xf_tree.js';
 
 import {DirectoryTreeContainer} from './directory_tree_container.js';
@@ -59,16 +57,8 @@ export function tearDown() {
   if (directoryTreeContainer) {
     getStore().unsubscribe(directoryTreeContainer);
   }
-  document.body.innerHTML = '';
+  document.body.innerHTML = window.trustedTypes!.emptyHTML;
 }
-
-/**
- * Mock metrics.
- */
-metrics.recordEnum = function() {};
-metrics.recordSmallCount = function() {};
-metrics.startInterval = function() {};
-metrics.recordInterval = function() {};
 
 /**
  * Returns a mock MetadataModel.
@@ -716,14 +706,11 @@ export async function testDirectoryTreeWithDriveDisabled(done: () => void) {
   // Add sub folders for them.
   myFilesFs.populate(['/folder1/']);
   driveFs.populate(['/root/folder1/']);
-  const driveRootEntryList =
-      getEntry(initialState, driveRootEntryListKey) as EntryList;
+  const driveRootEntryFileData =
+      getFileData(initialState, driveRootEntryListKey)!;
   // Disable the drive root entry.
-  driveRootEntryList.disabled = true;
-  const {volumeManager} = window.fileManager;
-  volumeManager.isDisabled = (volumeType) => {
-    return volumeType === VolumeManagerCommon.VolumeType.DRIVE;
-  };
+  driveRootEntryFileData.disabled = true;
+  (driveRootEntryFileData.entry as EntryList).disabled = true;
   // Store initialization will notify DirectoryTree.
   setupStore(initialState);
 
@@ -949,67 +936,6 @@ export async function testRemoveLastComputer(done: () => void) {
 }
 
 /**
- * Test private methods: isEntryInsideDrive_() and isEntryInsideMyDrive_(),
- * which should return true when inside My Drive and any of its sub-directories;
- * Should return false for everything else, including within Team Drive.
- */
-export async function testInsideMyDriveAndInsideDrive(done: () => void) {
-  const initialState = getEmptyState();
-  const directoryTree = directoryTreeContainer.tree;
-
-  // Add MyFiles and Drive to the store.
-  const {myFilesFs, driveFs} = await addMyFilesAndDriveToStore(initialState);
-  // Add sub folders for them.
-  myFilesFs.populate(['/folder1/']);
-  driveFs.populate(['/root/folder1']);
-  // Store initialization will notify DirectoryTree.
-  const store = setupStore(initialState);
-
-  // At top level, MyFiles and Drive should be listed.
-  await waitUntil(() => directoryTree.items.length === 2);
-  const myFilesItem = directoryTree.items[0]!;
-  const driveItem = directoryTree.items[1]!;
-
-  await waitUntil(() => {
-    // Under the drive item, there exist 3 entries. In MyFiles should
-    // exist 1 entry folder1.
-    return driveItem.items.length === 3 && myFilesItem.items.length === 1;
-  });
-
-  // Use [] to access private methods to bypass Typescript check.
-  const isEntryInsideDrive = directoryTreeContainer['isEntryInsideDrive_'].bind(
-      directoryTreeContainer);
-  const isEntryInsideMyDrive =
-      directoryTreeContainer['isEntryInsideMyDrive_'].bind(
-          directoryTreeContainer);
-
-  const driveRootEntryList =
-      getEntry(store.getState(), driveRootEntryListKey) as EntryList;
-  // insideMyDrive
-  assertFalse(isEntryInsideMyDrive(driveRootEntryList), 'Drive root');
-  assertTrue(isEntryInsideMyDrive(driveFs.entries['/root']), 'My Drive root');
-  assertFalse(
-      isEntryInsideMyDrive(driveFs.entries['/team_drives']),
-      'Team Drives root');
-  assertFalse(
-      isEntryInsideMyDrive(driveFs.entries['/Computers']), 'Offline root');
-  assertFalse(isEntryInsideMyDrive(myFilesFs.entries['/']), 'MyFiles root');
-  assertFalse(
-      isEntryInsideMyDrive(myFilesFs.entries['/folder1']), 'MyFiles folder1');
-  // insideDrive
-  assertTrue(isEntryInsideDrive(driveRootEntryList), 'Drive root');
-  assertTrue(isEntryInsideDrive(driveFs.entries['/root']), 'My Drive root');
-  assertTrue(
-      isEntryInsideDrive(driveFs.entries['/team_drives']), 'Team Drives root');
-  assertTrue(isEntryInsideDrive(driveFs.entries['/Computers']), 'Offline root');
-  assertFalse(isEntryInsideDrive(myFilesFs.entries['/']), 'MyFiles root');
-  assertFalse(
-      isEntryInsideDrive(myFilesFs.entries['/folder1']), 'MyFiles folder1');
-
-  done();
-}
-
-/**
  * Test adding FSPs.
  * Sub directories should be fetched for FSPs, but not for the Smb FSP.
  */
@@ -1181,6 +1107,38 @@ export async function testAriaExpanded(done: () => void) {
 
   // After clicking on expand-icon, aria-expanded should be set to false.
   assertEquals('false', treeItemElement.getAttribute('aria-expanded'));
+
+  done();
+}
+
+/** Test aria-description attribute for selected directory tree item. */
+export async function testAriaDescription(done: () => void) {
+  const initialState = getEmptyState();
+  const directoryTree = directoryTreeContainer.tree;
+
+  // Add MyFiles and Drive to the store.
+  await addMyFilesAndDriveToStore(initialState);
+  // Store initialization will notify DirectoryTree.
+  setupStore(initialState);
+
+  // At top level, MyFiles and Drive should be listed.
+  await waitUntil(() => directoryTree.items.length === 2);
+  const myFilesItem = directoryTree.items[0]!;
+  const driveItem = directoryTree.items[1]!;
+
+  // Select MyFiles and the aria-description should have value.
+  const ariaDescription = 'Current directory';
+  myFilesItem.selected = true;
+  await waitForElementUpdate(myFilesItem);
+  assertEquals(ariaDescription, myFilesItem.getAttribute('aria-description'));
+
+  // Select MyDrive.
+  driveItem.selected = true;
+  await waitForElementUpdate(driveItem);
+
+  // Now the aria-description on Drive should have value.
+  assertEquals(ariaDescription, driveItem.getAttribute('aria-description'));
+  assertFalse(myFilesItem.hasAttribute('aria-description'));
 
   done();
 }

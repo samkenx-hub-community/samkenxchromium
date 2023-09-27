@@ -12,9 +12,9 @@ import android.app.PendingIntent.CanceledException;
 import android.content.Context;
 import android.content.Intent;
 import android.service.notification.StatusBarNotification;
-import android.support.test.InstrumentationRegistry;
 import android.util.Pair;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.hamcrest.Matchers;
@@ -42,7 +42,7 @@ import org.chromium.chrome.browser.tabpersistence.TabStateDirectory;
 import org.chromium.chrome.browser.tabpersistence.TabStateFileManager;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
@@ -70,10 +70,10 @@ public class IncognitoNotificationServiceTest {
     }
 
     private void sendClearIncognitoIntent() throws CanceledException {
-        PendingIntent clearIntent =
-                IncognitoNotificationServiceImpl
-                        .getRemoveAllIncognitoTabsIntent(InstrumentationRegistry.getTargetContext())
-                        .getPendingIntent();
+        PendingIntent clearIntent = IncognitoNotificationServiceImpl
+                                            .getRemoveAllIncognitoTabsIntent(
+                                                    ApplicationProvider.getApplicationContext())
+                                            .getPendingIntent();
         clearIntent.send();
     }
 
@@ -137,7 +137,7 @@ public class IncognitoNotificationServiceTest {
     @MediumTest
     @DisabledTest(message = "crbug.com/1033835")
     public void testNoAliveProcess() throws Exception {
-        Context context = InstrumentationRegistry.getTargetContext();
+        Context context = ApplicationProvider.getApplicationContext();
         final TestTabModelDirectory tabbedModeDirectory = new TestTabModelDirectory(
                 context, "tabs", String.valueOf(0));
 
@@ -216,21 +216,21 @@ public class IncognitoNotificationServiceTest {
     @Test
     @MediumTest
     @Feature("Incognito")
-    @Features.EnableFeatures(ChromeFeatureList.CCT_INCOGNITO)
+    @EnableFeatures(ChromeFeatureList.CCT_INCOGNITO)
     public void testCloseAllIncognitoNotificationForIncognitoCCT_DoesNotCloseCCT()
             throws PendingIntent.CanceledException {
         launchIncognitoTabAndEnsureNotificationDisplayed();
 
         // Create an Incognito CCT now.
         Intent customTabIntent = CustomTabsIntentTestUtils.createMinimalIncognitoCustomTabIntent(
-                InstrumentationRegistry.getContext(), "about:blank");
+                ApplicationProvider.getApplicationContext(), "about:blank");
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(customTabIntent);
 
         // Click on "Close all Incognito tabs" notification.
-        PendingIntent clearIntent =
-                IncognitoNotificationServiceImpl
-                        .getRemoveAllIncognitoTabsIntent(InstrumentationRegistry.getTargetContext())
-                        .getPendingIntent();
+        PendingIntent clearIntent = IncognitoNotificationServiceImpl
+                                            .getRemoveAllIncognitoTabsIntent(
+                                                    ApplicationProvider.getApplicationContext())
+                                            .getPendingIntent();
         clearIntent.send();
 
         pollUiThreadForChromeActivityIncognitoTabCount(0);

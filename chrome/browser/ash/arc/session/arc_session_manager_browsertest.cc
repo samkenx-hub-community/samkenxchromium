@@ -17,6 +17,7 @@
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/strings/stringprintf.h"
@@ -26,18 +27,18 @@
 #include "chrome/browser/ash/arc/session/arc_session_manager_observer.h"
 #include "chrome/browser/ash/arc/test/arc_data_removed_waiter.h"
 #include "chrome/browser/ash/arc/test/test_arc_session_manager.h"
-#include "chrome/browser/ash/login/test/embedded_policy_test_server_mixin.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
+#include "chrome/browser/ash/policy/test_support/embedded_policy_test_server_mixin.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/certificate_provider/certificate_provider_service.h"
 #include "chrome/browser/certificate_provider/certificate_provider_service_factory.h"
 #include "chrome/browser/extensions/api/tabs/tabs_api.h"
-#include "chrome/browser/extensions/extension_function_test_utils.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/identity_test_environment_profile_adaptor.h"
+#include "chrome/browser/ui/browser.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/account_id/account_id.h"
@@ -54,6 +55,7 @@
 #include "components/user_manager/user_manager.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/test/browser_test.h"
+#include "extensions/browser/api_test_utils.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_builder.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -102,7 +104,9 @@ class ArcPlayStoreDisabledWaiter : public ArcSessionManagerObserver {
     }
   }
 
-  base::RunLoop* run_loop_ = nullptr;
+  // This field is not a raw_ptr<> because it was filtered by the rewriter
+  // for: #addr-of
+  RAW_PTR_EXCLUSION base::RunLoop* run_loop_ = nullptr;
 };
 
 class ArcSessionManagerTest : public MixinBasedInProcessBrowserTest {
@@ -288,10 +292,10 @@ IN_PROC_BROWSER_TEST_F(ArcSessionManagerTest, ArcDisabledInLockedFullscreen) {
           .Build());
   function->set_extension(extension.get());
 
-  std::unique_ptr<base::Value> value(
-      extension_function_test_utils::RunFunctionAndReturnSingleResult(
+  absl::optional<base::Value> value =
+      extensions::api_test_utils::RunFunctionAndReturnSingleResult(
           function.get(), base::StringPrintf(kStateLockedFullscreen, window_id),
-          browser()));
+          browser()->profile());
 
   ASSERT_EQ(ArcSessionManager::State::STOPPED,
             ArcSessionManager::Get()->state());

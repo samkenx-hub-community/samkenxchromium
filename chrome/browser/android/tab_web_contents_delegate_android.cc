@@ -32,9 +32,10 @@
 #include "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h"
 #include "chrome/browser/password_manager/chrome_password_manager_client.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
-#include "chrome/browser/prefetch/prefetch_prefs.h"
 #include "chrome/browser/preloading/prefetch/no_state_prefetch/no_state_prefetch_manager_factory.h"
+#include "chrome/browser/preloading/preloading_prefs.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/safe_browsing/chrome_password_reuse_detection_manager_client.h"
 #include "chrome/browser/safe_browsing/safe_browsing_navigation_observer_manager_factory.h"
 #include "chrome/browser/safe_browsing/safe_browsing_service.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_list.h"
@@ -157,10 +158,10 @@ void TabWebContentsDelegateAndroid::PortalWebContentsCreated(
   // helpers that are unprepared for portal activation to transition them.
   // See https://crbug.com/1042323
   autofill::ChromeAutofillClient::CreateForWebContents(portal_contents);
-  ChromePasswordManagerClient::CreateForWebContentsWithAutofillClient(
-      portal_contents,
-      autofill::ContentAutofillClient::FromWebContents(portal_contents));
+  ChromePasswordManagerClient::CreateForWebContents(portal_contents);
   HistoryTabHelper::CreateForWebContents(portal_contents);
+  ChromePasswordReuseDetectionManagerClient::CreateForWebContents(
+      portal_contents);
   infobars::ContentInfoBarManager::CreateForWebContents(portal_contents);
   PrefsTabHelper::CreateForWebContents(portal_contents);
   safe_browsing::SafeBrowsingNavigationObserver::MaybeCreateForWebContents(
@@ -439,7 +440,7 @@ TabWebContentsDelegateAndroid::IsPrerender2Supported(
     content::WebContents& web_contents) {
   Profile* profile =
       Profile::FromBrowserContext(web_contents.GetBrowserContext());
-  return prefetch::IsSomePreloadingEnabled(*profile->GetPrefs(), &web_contents);
+  return prefetch::IsSomePreloadingEnabled(*profile->GetPrefs());
 }
 
 std::unique_ptr<content::WebContents>

@@ -10,7 +10,9 @@
 
 #include "base/functional/callback.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/strings/string_piece.h"
 #include "chrome/browser/ash/settings/device_settings_service.h"
 #include "chromeos/ash/components/settings/cros_settings_provider.h"
 #include "components/ownership/owner_settings_service.h"
@@ -54,12 +56,12 @@ class DeviceSettingsProvider
   ~DeviceSettingsProvider() override;
 
   // Returns true if |path| is handled by this provider.
-  static bool IsDeviceSetting(const std::string& name);
+  static bool IsDeviceSetting(base::StringPiece name);
 
   // CrosSettingsProvider implementation.
-  const base::Value* Get(const std::string& path) const override;
+  const base::Value* Get(base::StringPiece path) const override;
   TrustedStatus PrepareTrustedValues(base::OnceClosure* callback) override;
-  bool HandlesSetting(const std::string& path) const override;
+  bool HandlesSetting(base::StringPiece path) const override;
 
   // Helper function that decodes policies from provided proto into the pref
   // map.
@@ -120,8 +122,8 @@ class DeviceSettingsProvider
   // Pending callbacks that need to be invoked after settings verification.
   std::vector<base::OnceClosure> callbacks_;
 
-  DeviceSettingsService* device_settings_service_;
-  PrefService* local_state_;
+  raw_ptr<DeviceSettingsService, ExperimentalAsh> device_settings_service_;
+  raw_ptr<PrefService, DanglingUntriaged | ExperimentalAsh> local_state_;
 
   mutable PrefValueMap migration_values_;
 

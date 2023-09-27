@@ -4,7 +4,7 @@
 
 #import "ios/chrome/browser/voice/text_to_speech_listener.h"
 
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/web/public/test/fakes/fake_web_client.h"
 #import "ios/web/public/test/scoped_testing_web_client.h"
 #import "ios/web/public/test/web_state_test_util.h"
@@ -13,10 +13,6 @@
 #import "testing/gtest/include/gtest/gtest.h"
 #import "testing/gtest_mac.h"
 #import "testing/platform_test.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 const char kExpectedDecodedData[] = "testaudo32oio";
@@ -101,11 +97,10 @@ class TextToSpeechListenerTest : public PlatformTest {
   void TestExtraction(NSString* html, NSData* expected_audio_data) {
     [delegate_ setExpectedAudioData:expected_audio_data];
     web::test::LoadHtml(html, web_state());
-    base::test::ios::WaitUntilCondition(
-        ^bool {
+    ASSERT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+        base::Seconds(1000), true, ^bool {
           return [delegate_ audioDataReceived];
-        },
-        true, base::Seconds(1000));
+        }));
   }
 
  private:

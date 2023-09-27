@@ -21,7 +21,6 @@ export interface SettingsRoutes {
   BASIC: Route;
   CAPTIONS: Route;
   CERTIFICATES: Route;
-  CHECK_PASSWORDS: Route;
   CHROME_CLEANUP: Route;
   CLEAR_BROWSER_DATA: Route;
   COOKIES: Route;
@@ -29,15 +28,16 @@ export interface SettingsRoutes {
   DOWNLOADS: Route;
   EDIT_DICTIONARY: Route;
   FONTS: Route;
+  // <if expr="_google_chrome">
+  GET_MOST_CHROME: Route;
+  // </if>
   IMPORT_DATA: Route;
   INCOMPATIBLE_APPLICATIONS: Route;
   LANGUAGES: Route;
   MANAGE_PROFILE: Route;
   ON_STARTUP: Route;
+  PAGE_CONTENT: Route;
   PASSKEYS: Route;
-  PASSWORDS: Route;
-  PASSWORD_VIEW: Route;
-  DEVICE_PASSWORDS: Route;
   PAYMENTS: Route;
   PEOPLE: Route;
   PERFORMANCE: Route;
@@ -51,6 +51,7 @@ export interface SettingsRoutes {
   RESET: Route;
   RESET_DIALOG: Route;
   SAFETY_CHECK: Route;
+  SAFETY_HUB: Route;
   SEARCH: Route;
   SEARCH_ENGINES: Route;
   SECURITY: Route;
@@ -62,6 +63,7 @@ export interface SettingsRoutes {
   SITE_SETTINGS_ALL: Route;
   SITE_SETTINGS_AR: Route;
   SITE_SETTINGS_AUTOMATIC_DOWNLOADS: Route;
+  SITE_SETTINGS_AUTO_PICTURE_IN_PICTURE: Route;
   SITE_SETTINGS_AUTO_VERIFY: Route;
   SITE_SETTINGS_BACKGROUND_SYNC: Route;
   SITE_SETTINGS_BLUETOOTH_DEVICES: Route;
@@ -88,10 +90,11 @@ export interface SettingsRoutes {
   SITE_SETTINGS_PDF_DOCUMENTS: Route;
   SITE_SETTINGS_POPUPS: Route;
   SITE_SETTINGS_PROTECTED_CONTENT: Route;
+  SITE_SETTINGS_SERIAL_PORTS: Route;
   SITE_SETTINGS_SITE_DATA: Route;
   SITE_SETTINGS_SITE_DETAILS: Route;
+  SITE_SETTINGS_STORAGE_ACCESS: Route;
   SITE_SETTINGS_USB_DEVICES: Route;
-  SITE_SETTINGS_SERIAL_PORTS: Route;
   SITE_SETTINGS_VR: Route;
   SITE_SETTINGS_WINDOW_MANAGEMENT: Route;
   SITE_SETTINGS_ZOOM_LEVELS: Route;
@@ -99,6 +102,7 @@ export interface SettingsRoutes {
   SYNC: Route;
   SYNC_ADVANCED: Route;
   SYSTEM: Route;
+  TRACKING_PROTECTION: Route;
   TRIGGERED_RESET_DIALOG: Route;
 }
 

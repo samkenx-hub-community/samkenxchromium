@@ -9,12 +9,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import android.support.test.InstrumentationRegistry;
+import android.graphics.Rect;
+import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.test.espresso.Espresso;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Before;
@@ -210,43 +212,103 @@ public class BottomSheetControllerTest {
                 mSheetController.getSheetState());
     }
 
+    /**
+     * Test that BottomSheet hide animation when user navigates page back cannot
+     * be reversed via a gesture.
+     */
     @Test
     @MediumTest
     @Feature({"BottomSheetController"})
-    public void testSheetPeekAfterTabSwitcher() throws TimeoutException {
+    public void testGestureCannotMoveSheetDuringHideAnimation() {
+        Rect visibleViewportRect = new Rect();
+        mActivity.getWindow().getDecorView().getWindowVisibleDisplayFrame(visibleViewportRect);
+
+        MotionEvent initialEvent = MotionEvent.obtain(0, 0, MotionEvent.ACTION_MOVE,
+                visibleViewportRect.left, visibleViewportRect.bottom, 0);
+        MotionEvent currentEvent = MotionEvent.obtain(0, 0, MotionEvent.ACTION_MOVE,
+                visibleViewportRect.left, visibleViewportRect.bottom - 1, 0);
+
+        requestContentInSheet(mNonPeekableContent, true);
+        expandSheet();
+        assertEquals("The bottom sheet should be expanded.", SheetState.HALF,
+                mSheetController.getSheetState());
+
+        // Check that gesture can be processed when sheet is expanded.
+        assertTrue("Gesture should move sheet",
+                mTestSupport.shouldGestureMoveSheet(initialEvent, currentEvent));
+
+        assertEquals("Back press event should be consumed", Boolean.TRUE, getBackPressState());
+        TestThreadUtils.runOnUiThreadBlocking(() -> { mTestSupport.handleBackPress(); });
+
+        // Check that gesture is not processed during a hide animation.
+        assertFalse("Gesture should not move sheet",
+                mTestSupport.shouldGestureMoveSheet(initialEvent, currentEvent));
+
+        // Check that the animation is still in progress.
+        assertTrue(mSheetController.isSheetOpen());
+
+        TestThreadUtils.runOnUiThreadBlocking(() -> { mTestSupport.endAllAnimations(); });
+        assertEquals("The bottom sheet should be hidden.", SheetState.HIDDEN,
+                mSheetController.getSheetState());
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"BottomSheetController"})
+    public void testSheetGoneAfterTabSwitcher() throws TimeoutException {
         requestContentInSheet(mLowPriorityContent, true);
         enterAndExitTabSwitcher();
-        BottomSheetTestSupport.waitForState(mSheetController, SheetState.PEEK);
-        assertEquals("The bottom sheet is showing incorrect content.", mLowPriorityContent,
+        BottomSheetTestSupport.waitForState(mSheetController, SheetState.HIDDEN);
+        assertNull("The bottom sheet is unexpectedly showing content.",
                 mSheetController.getCurrentSheetContent());
     }
 
     @Test
     @MediumTest
     @Feature({"BottomSheetController"})
-    public void testSheetHiddenAfterTabSwitcher() throws TimeoutException {
-        // Open a second tab and then reselect the original activity tab.
+    public void testSheetGoneAfterTransitioningToAndFromSwitcher() throws TimeoutException {
+        // Open a second tab.
         Tab tab1 = mActivity.getActivityTab();
         openNewTabInForeground();
         Tab tab2 = mActivity.getActivityTab();
 
         requestContentInSheet(mLowPriorityContent, true);
+        assertEquals("The tab bottom sheet should be visible.", SheetState.PEEK,
+                mSheetController.getSheetState());
+        assertEquals("The tab bottom sheet contains the incorrect content.", mLowPriorityContent,
+                mSheetController.getCurrentSheetContent());
 
-        // Enter the tab switcher and select a different tab.
+        // Enter the tab switcher.
         setTabSwitcherState(true);
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertEquals("The bottom sheet should be hidden.", SheetState.HIDDEN,
+            assertEquals("The tab bottom sheet should be hidden.", SheetState.HIDDEN,
                     mSheetController.getSheetState());
+            assertNull("The bottom sheet is unexpectedly showing content.",
+                    mSheetController.getCurrentSheetContent());
+        });
+
+        // Show a sheet in the tab switcher.
+        requestContentInSheet(mHighPriorityContent, true);
+        BottomSheetTestSupport.waitForState(mSheetController, SheetState.PEEK);
+
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            assertEquals("The GTS bottom sheet should be visible.", SheetState.PEEK,
+                    mSheetController.getSheetState());
+            assertEquals("The GTS bottom sheet contains the incorrect content.",
+                    mHighPriorityContent, mSheetController.getCurrentSheetContent());
             mActivity.getTabModelSelector().getCurrentModel().setIndex(
                     0, TabSelectionType.FROM_USER, false);
         });
 
+        // Exit tab switcher.
         setTabSwitcherState(false);
 
         BottomSheetTestSupport.waitForContentChange(mSheetController, null);
-        assertEquals("The bottom sheet still should be hidden.", SheetState.HIDDEN,
+        assertEquals("The GTS bottom sheet should be hidden.", SheetState.HIDDEN,
                 mSheetController.getSheetState());
+        assertNull("The bottom sheet is unexpectedly showing content.",
+                mSheetController.getCurrentSheetContent());
     }
 
     @Test
@@ -505,7 +567,7 @@ public class BottomSheetControllerTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @DisableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testHandleBackpress() {
         requestContentInSheet(mBackInterceptingContent, true);
 
@@ -530,7 +592,7 @@ public class BottomSheetControllerTest {
      */
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testHandleBackpress_Refactored() {
         requestContentInSheet(mBackInterceptingContent, true);
         mActivity.getBackPressManagerForTesting().resetLastCalledHandlerForTesting();
@@ -554,7 +616,7 @@ public class BottomSheetControllerTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @DisableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testHandleBackpress_sheetOpen() {
         requestContentInSheet(mBackInterceptingContent, true);
         expandSheet();
@@ -574,7 +636,7 @@ public class BottomSheetControllerTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testHandleBackpress_sheetOpen_Refactored() {
         requestContentInSheet(mBackInterceptingContent, true);
         mActivity.getBackPressManagerForTesting().resetLastCalledHandlerForTesting();
@@ -604,7 +666,7 @@ public class BottomSheetControllerTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @DisableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testHandleBackpress_noIntercept() {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> mBackInterceptingContent.setHandleBackPress(false));
@@ -621,7 +683,7 @@ public class BottomSheetControllerTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testHandleBackpress_noIntercept_Refactored() {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> mBackInterceptingContent.setHandleBackPress(false));
@@ -639,7 +701,7 @@ public class BottomSheetControllerTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @DisableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testHandleBackpress_noIntercept_sheetOpen() {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> mBackInterceptingContent.setHandleBackPress(false));
@@ -663,7 +725,7 @@ public class BottomSheetControllerTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testHandleBackpress_noIntercept_sheetOpen_Refactored() {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> mBackInterceptingContent.setHandleBackPress(false));

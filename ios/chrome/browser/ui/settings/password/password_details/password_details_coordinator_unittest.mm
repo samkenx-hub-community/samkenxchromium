@@ -7,19 +7,15 @@
 #import "base/test/scoped_feature_list.h"
 #import "base/test/task_environment.h"
 #import "components/password_manager/core/browser/ui/affiliated_group.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/credential_provider_promo/features.h"
-#import "ios/chrome/browser/main/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/credential_provider_promo_commands.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_handler.h"
 #import "ios/web/public/test/web_task_environment.h"
 #import "testing/platform_test.h"
 #import "third_party/ocmock/OCMock/OCMock.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 // Test fixture for testing the PasswordDetailsCoordinatorTest class.
 class PasswordDetailsCoordinatorTest : public PlatformTest {
@@ -36,8 +32,10 @@ class PasswordDetailsCoordinatorTest : public PlatformTest {
                                  browser:browser_.get()
                          affiliatedGroup:affiliateGroup
                             reauthModule:nil
-                    supportMoveToAccount:YES];
+                                 context:DetailsContext::kPasswordSettings];
   }
+
+  ~PasswordDetailsCoordinatorTest() override { [coordinator_ stop]; }
 
   web::WebTaskEnvironment task_environment_;
   std::unique_ptr<TestChromeBrowserState> browser_state_;

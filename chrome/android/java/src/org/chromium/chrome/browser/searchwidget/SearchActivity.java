@@ -6,6 +6,7 @@ package org.chromium.chrome.browser.searchwidget;
 
 import android.app.Activity;
 import android.app.SearchManager;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
@@ -25,18 +26,17 @@ import org.chromium.base.BuildInfo;
 import org.chromium.base.Callback;
 import org.chromium.base.IntentUtils;
 import org.chromium.base.Log;
-import org.chromium.base.jank_tracker.DummyJankTracker;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.supplier.ObservableSupplierImpl;
-import org.chromium.base.supplier.OneshotSupplierImpl;
 import org.chromium.base.supplier.UnownedUserDataSupplier;
 import org.chromium.blink.mojom.DisplayMode;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.WebContentsFactory;
-import org.chromium.chrome.browser.app.omnibox.ActionChipsDelegateImpl;
 import org.chromium.chrome.browser.app.tabmodel.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.back_press.BackPressManager;
+import org.chromium.chrome.browser.browserservices.intents.WebappConstants;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulatorFactory;
 import org.chromium.chrome.browser.crash.ChromePureJavaExceptionReporter;
 import org.chromium.chrome.browser.customtabs.CustomTabsConnection;
@@ -50,10 +50,16 @@ import org.chromium.chrome.browser.omnibox.OmniboxFeatures;
 import org.chromium.chrome.browser.omnibox.OverrideUrlLoadingDelegate;
 import org.chromium.chrome.browser.omnibox.SearchEngineLogoUtils;
 import org.chromium.chrome.browser.omnibox.UrlFocusChangeListener;
+import org.chromium.chrome.browser.omnibox.styles.OmniboxResourceProvider;
 import org.chromium.chrome.browser.omnibox.suggestions.OmniboxSuggestionsDropdownScrollListener;
+import org.chromium.chrome.browser.omnibox.suggestions.action.OmniboxActionDelegateImpl;
+import org.chromium.chrome.browser.omnibox.suggestions.history_clusters.HistoryClustersProcessor.OpenHistoryClustersDelegate;
 import org.chromium.chrome.browser.omnibox.voice.VoiceRecognitionHandler;
+import org.chromium.chrome.browser.password_manager.ManagePasswordsReferrer;
+import org.chromium.chrome.browser.password_manager.PasswordManagerLauncher;
 import org.chromium.chrome.browser.privacy.settings.PrivacyPreferencesManagerImpl;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.settings.SettingsLauncherImpl;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabBuilder;
 import org.chromium.chrome.browser.tab.TabDelegateFactory;
@@ -233,23 +239,47 @@ public class SearchActivity extends AsyncInitializationActivity
         }
         // clang-format off
         mLocationBarCoordinator = new LocationBarCoordinator(mSearchBox, mAnchorView,
-                mProfileSupplier, PrivacyPreferencesManagerImpl.getInstance(),
-                mSearchBoxDataProvider, null, new WindowDelegate(getWindow()), getWindowAndroid(),
-                /*activityTabSupplier=*/() -> null, getModalDialogManagerSupplier(),
-                /*shareDelegateSupplier=*/null, /*incognitoStateProvider=*/null,
-                getLifecycleDispatcher(), overrideUrlLoadingDelegate, /*backKeyBehavior=*/this,
-                SearchEngineLogoUtils.getInstance(),
-                /*pageInfoAction=*/(tab, pageInfoHighlight) -> {},
-                IntentHandler::bringTabToFront,
-                /*saveOfflineButtonState=*/(tab) -> false,
-                /*omniboxUma*/(url, transition, isNtp) -> {},
-                TabWindowManagerSingleton::getInstance, /*bookmarkState=*/(url) -> false,
-                VoiceToolbarButtonController::isToolbarMicEnabled, new DummyJankTracker(),
-                /*merchantTrustSignalsCoordinatorSupplier=*/null,
-                new ActionChipsDelegateImpl(this, new OneshotSupplierImpl<>(),
-                        getModalDialogManagerSupplier()), null,
-                ChromePureJavaExceptionReporter::reportJavaException, backPressManager,
-                /*OmniboxSuggestionsDropdownScrollListener=*/this);
+            mProfileSupplier, PrivacyPreferencesManagerImpl.getInstance(),
+            mSearchBoxDataProvider, null, new WindowDelegate(getWindow()), getWindowAndroid(),
+            /*activityTabSupplier=*/() -> null, getModalDialogManagerSupplier(),
+            /*shareDelegateSupplier=*/null, /*incognitoStateProvider=*/null,
+            getLifecycleDispatcher(), overrideUrlLoadingDelegate, /*backKeyBehavior=*/this,
+            SearchEngineLogoUtils.getInstance(),
+            /*pageInfoAction=*/(tab, pageInfoHighlight) -> {},
+            IntentHandler::bringTabToFront,
+            /*saveOfflineButtonState=*/(tab) -> false,
+            /*omniboxUma*/(url, transition, isNtp) -> {},
+            TabWindowManagerSingleton::getInstance, /*bookmarkState=*/(url) -> false,
+            VoiceToolbarButtonController::isToolbarMicEnabled,
+            /*merchantTrustSignalsCoordinatorSupplier=*/null,
+            new OmniboxActionDelegateImpl(this,
+                    () -> mSearchBoxDataProvider.getTab(),
+                    new SettingsLauncherImpl(),
+                    // TODO(ender): phase out callbacks when the modules below are components.
+                    // Open URL in an existing, else new regular tab.
+                    url -> {
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                        intent.setComponent(new ComponentName(
+                                getApplicationContext(), ChromeLauncherActivity.class));
+                        intent.putExtra(WebappConstants.REUSE_URL_MATCHING_TAB_ELSE_NEW_TAB, true);
+                        startActivity(intent);
+                    },
+                    // Open Incognito Tab callback:
+                    () -> startActivity(IntentHandler.createTrustedOpenNewTabIntent(this, true)),
+                    // Open Password Settings callback:
+                    () -> PasswordManagerLauncher.showPasswordSettings(this,
+                                    ManagePasswordsReferrer.CHROME_SETTINGS,
+                                    () -> getModalDialogManager(), /*managePasskeys=*/false),
+                    // Open History Clusters UI for Query:
+                    query -> {},
+                    // Open Quick Delete Dialog callback:
+                    null), null,
+            ChromePureJavaExceptionReporter::reportJavaException, backPressManager,
+            /*OmniboxSuggestionsDropdownScrollListener=*/this,
+            new OpenHistoryClustersDelegate() {
+                @Override
+                public void openHistoryClustersUi(String query) {}
+            }, /*tabModelSelectorSupplier=*/null);
         // clang-format on
         mLocationBarCoordinator.setUrlBarFocusable(true);
         mLocationBarCoordinator.setShouldShowMicButtonWhenUnfocused(true);
@@ -327,7 +357,7 @@ public class SearchActivity extends AsyncInitializationActivity
             }
         };
 
-        WebContents webContents = WebContentsFactory.createWebContents(profile, false);
+        WebContents webContents = WebContentsFactory.createWebContents(profile, false, false);
         mTab = new TabBuilder()
                        .setWindow(getWindowAndroid())
                        .setLaunchType(TabLaunchType.FROM_EXTERNAL_APP)
@@ -549,8 +579,7 @@ public class SearchActivity extends AsyncInitializationActivity
 
         if (OmniboxFeatures.shouldShowModernizeVisualUpdate(this)) {
             View toolbarView = contentView.findViewById(R.id.toolbar);
-            final int edgePadding =
-                    getResources().getDimensionPixelOffset(R.dimen.toolbar_edge_padding_modern);
+            final int edgePadding = OmniboxResourceProvider.getToolbarSidePadding(this);
             toolbarView.setPaddingRelative(edgePadding, toolbarView.getPaddingTop(), edgePadding,
                     toolbarView.getPaddingBottom());
             toolbarView.setBackground(new ColorDrawable(ChromeColors.getSurfaceColor(
@@ -588,12 +617,12 @@ public class SearchActivity extends AsyncInitializationActivity
     }
 
     /** See {@link #sDelegate}. */
-    @VisibleForTesting
     static void setDelegateForTests(SearchActivityDelegate delegate) {
+        var oldValue = sDelegate;
         sDelegate = delegate;
+        ResettersForTesting.register(() -> sDelegate = oldValue);
     }
 
-    @VisibleForTesting
     public View getAnchorViewForTesting() {
         return mAnchorView;
     }

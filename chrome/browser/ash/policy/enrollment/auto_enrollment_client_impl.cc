@@ -11,19 +11,17 @@
 #include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/guid.h"
-#include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/metrics/histogram_functions.h"
-#include "base/metrics/histogram_macros.h"
 #include "base/time/time.h"
+#include "base/uuid.h"
 #include "base/values.h"
 #include "chrome/browser/ash/policy/enrollment/auto_enrollment_state_message_processor.h"
 #include "chrome/browser/ash/policy/enrollment/psm/rlwe_dmserver_client.h"
 #include "chrome/browser/ash/policy/server_backed_state/server_backed_device_state.h"
-#include "chrome/common/chrome_content_client.h"
 #include "chrome/common/pref_names.h"
 #include "components/policy/core/common/cloud/device_management_service.h"
 #include "components/policy/core/common/cloud/dm_auth.h"
@@ -33,12 +31,10 @@
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
-#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/network_service_instance.h"
 #include "crypto/sha2.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-#include "url/gurl.h"
 
 namespace policy {
 
@@ -399,9 +395,10 @@ class AutoEnrollmentClientImpl::FREServerStateAvailabilityRequester
     }
   }
 
-  DeviceManagementService* device_management_service_;
+  raw_ptr<DeviceManagementService, DanglingUntriaged | ExperimentalAsh>
+      device_management_service_;
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
-  PrefService* local_state_;
+  raw_ptr<PrefService, ExperimentalAsh> local_state_;
   const std::string device_id_;
   const std::string uma_suffix_;
 
@@ -559,7 +556,7 @@ class AutoEnrollmentClientImpl::InitialServerStateAvailabilityRequester
   // related to PSM protocol with DMServer.
   std::unique_ptr<psm::RlweDmserverClient> psm_rlwe_dmserver_client_;
 
-  PrefService* local_state_;
+  raw_ptr<PrefService, ExperimentalAsh> local_state_;
 
   CompletionCallback completion_callback_;
 };
@@ -711,9 +708,10 @@ class AutoEnrollmentClientImpl::ServerStateRetriever {
     std::move(completion_callback_).Run(result);
   }
 
-  DeviceManagementService* device_management_service_;
+  raw_ptr<DeviceManagementService, DanglingUntriaged | ExperimentalAsh>
+      device_management_service_;
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
-  PrefService* local_state_;
+  raw_ptr<PrefService, ExperimentalAsh> local_state_;
   const std::string device_id_;
   const std::string uma_suffix_;
 
@@ -741,7 +739,8 @@ AutoEnrollmentClientImpl::FactoryImpl::CreateForFRE(
     const std::string& server_backed_state_key,
     int power_initial,
     int power_limit) {
-  const std::string device_id = base::GenerateGUID();
+  const std::string device_id =
+      base::Uuid::GenerateRandomV4().AsLowercaseString();
   return base::WrapUnique(new AutoEnrollmentClientImpl(
       progress_callback,
       std::make_unique<FREServerStateAvailabilityRequester>(
@@ -769,7 +768,8 @@ AutoEnrollmentClientImpl::FactoryImpl::CreateForInitialEnrollment(
           std::move(psm_rlwe_dmserver_client), local_state),
       std::make_unique<ServerStateRetriever>(
           device_management_service, url_loader_factory, local_state,
-          /*device_id=*/base::GenerateGUID(), kUMASuffixInitialEnrollment,
+          /*device_id=*/base::Uuid::GenerateRandomV4().AsLowercaseString(),
+          kUMASuffixInitialEnrollment,
           AutoEnrollmentStateMessageProcessor::CreateForInitialEnrollment(
               device_serial_number, device_brand_code))));
 }
@@ -797,8 +797,6 @@ AutoEnrollmentClientImpl::~AutoEnrollmentClientImpl() = default;
 void AutoEnrollmentClientImpl::Start() {
   DCHECK_EQ(state_, State::kIdle);
   DCHECK(!server_state_retriever_->GetAutoEnrollmentStateIfObtained());
-
-  network_connection_observer_.Observe(content::GetNetworkConnectionTracker());
 
   RequestServerStateAvailability();
 }
@@ -832,13 +830,6 @@ void AutoEnrollmentClientImpl::Retry() {
       NOTREACHED() << "kRequestServerStateAvailabilitySuccess supposed to "
                       "immediately resolve to kRequestingStateRetrieval.";
       break;
-  }
-}
-
-void AutoEnrollmentClientImpl::OnConnectionChanged(
-    network::mojom::ConnectionType type) {
-  if (type != network::mojom::ConnectionType::CONNECTION_NONE) {
-    Retry();
   }
 }
 

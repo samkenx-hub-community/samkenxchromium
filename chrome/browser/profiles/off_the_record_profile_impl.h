@@ -18,7 +18,6 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/zoom/chrome_zoom_level_prefs.h"
 #include "components/domain_reliability/clear_mode.h"
-#include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/host_zoom_map.h"
 
 namespace sync_preferences {
@@ -61,10 +60,9 @@ class OffTheRecordProfileImpl : public Profile {
   policy::SchemaRegistryService* GetPolicySchemaRegistryService() override;
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   policy::UserCloudPolicyManagerAsh* GetUserCloudPolicyManagerAsh() override;
-  policy::ActiveDirectoryPolicyManager* GetActiveDirectoryPolicyManager()
-      override;
 #else
   policy::UserCloudPolicyManager* GetUserCloudPolicyManager() override;
+  policy::ProfileCloudPolicyManager* GetProfileCloudPolicyManager() override;
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
   scoped_refptr<network::SharedURLLoaderFactory> GetURLLoaderFactory() override;
   bool IsSameOrParent(Profile* profile) override;

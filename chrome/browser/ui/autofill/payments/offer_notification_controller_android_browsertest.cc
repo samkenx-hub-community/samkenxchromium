@@ -11,6 +11,7 @@
 #include "chrome/browser/ui/autofill/payments/offer_notification_controller_android.h"
 #include "chrome/test/base/android/android_browser_test.h"
 #include "chrome/test/base/chrome_test_utils.h"
+#include "components/autofill/content/browser/content_autofill_client.h"
 #include "components/autofill/content/browser/content_autofill_driver.h"
 #include "components/autofill/core/browser/autofill_test_utils.h"
 #include "components/autofill/core/browser/data_model/autofill_offer_data.h"
@@ -33,7 +34,9 @@
 
 namespace autofill {
 
-const char kHostName[] = "example.com";
+namespace {
+constexpr char kHostName[] = "example.com";
+}
 
 class OfferNotificationControllerAndroidBrowserTest
     : public AndroidBrowserTest {
@@ -70,6 +73,9 @@ class OfferNotificationControllerAndroidBrowserTest
   // AndroidBrowserTest
   void SetUpOnMainThread() override {
     personal_data_ = PersonalDataManagerFactory::GetForProfile(GetProfile());
+    // Mimic the user is signed in so payments integration is considered
+    // enabled.
+    personal_data_->SetSyncingForTest(true);
     // Wait for Personal Data Manager to be fully loaded to prevent that
     // spurious notifications deceive the tests.
     WaitForPersonalDataManagerToBeLoaded(GetProfile());
@@ -100,10 +106,8 @@ class OfferNotificationControllerAndroidBrowserTest
   }
 
   AutofillOfferManager* GetOfferManager() {
-    return ContentAutofillDriver::GetForRenderFrameHost(
-               GetWebContents()->GetPrimaryMainFrame())
-        ->autofill_manager()
-        ->GetOfferManager();
+    return ContentAutofillClient::FromWebContents(GetWebContents())
+        ->GetAutofillOfferManager();
   }
 
   void SetShownOffer(int64_t id) {
@@ -124,9 +128,9 @@ class OfferNotificationControllerAndroidBrowserTest
   // CreditCard that is linked to the offer displayed in the offer notification.
   CreditCard card_;
   base::HistogramTester histogram_tester_;
-  base::test::ScopedFeatureList scoped_feature_list_;
 
  private:
+  test::AutofillBrowserTestEnvironment autofill_environment_;
   raw_ptr<PersonalDataManager> personal_data_;
 };
 
@@ -179,6 +183,9 @@ class OfferNotificationControllerAndroidBrowserTestForInfobar
         "Autofill.OfferNotificationInfoBarResult.CardLinkedOffer", metric,
         count);
   }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 IN_PROC_BROWSER_TEST_F(OfferNotificationControllerAndroidBrowserTestForInfobar,
@@ -263,6 +270,9 @@ class OfferNotificationControllerAndroidBrowserTestForMessagesUi
   }
 
   messages::MessagesTestHelper messages_test_helper_;
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 IN_PROC_BROWSER_TEST_F(

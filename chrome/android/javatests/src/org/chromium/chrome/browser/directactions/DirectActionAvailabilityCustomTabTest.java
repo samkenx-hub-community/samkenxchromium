@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 package org.chromium.chrome.browser.directactions;
-import static org.junit.Assert.assertThat;
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
 
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.hamcrest.Matchers;
@@ -43,7 +43,7 @@ public class DirectActionAvailabilityCustomTabTest {
     @Feature({"DirectActions"})
     public void testCoreDirectActionInCustomTabActivity() throws Exception {
         Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
-                InstrumentationRegistry.getTargetContext(), "about:blank");
+                ApplicationProvider.getApplicationContext(), "about:blank");
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(intent);
 
         assertThat(

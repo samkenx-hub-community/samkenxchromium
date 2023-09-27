@@ -20,7 +20,7 @@
 #include "components/autofill/core/browser/strike_databases/strike_database.h"
 #include "components/autofill/core/browser/ui/payments/card_unmask_prompt_options.h"
 #include "components/prefs/pref_service.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
 #import "ios/web/public/web_state.h"
 #import "ios/web_view/internal/autofill/cwv_autofill_client_ios_bridge.h"
 #include "ios/web_view/internal/web_view_browser_state.h"
@@ -101,18 +101,12 @@ class WebViewAutofillClientIOS : public AutofillClient {
       const AutofillProfile* original_profile,
       SaveAddressProfilePromptOptions options,
       AddressProfileSavePromptCallback callback) override;
+  void ShowEditAddressProfileDialog(
+      const AutofillProfile& profile,
+      AddressProfileSavePromptCallback on_user_decision_callback) override;
+  void ShowDeleteAddressProfileDialog() override;
   bool HasCreditCardScanFeature() override;
   void ScanCreditCard(CreditCardScanCallback callback) override;
-  bool TryToShowFastCheckout(
-      const FormData& form,
-      const FormFieldData& field,
-      base::WeakPtr<AutofillManager> autofill_manager) override;
-  void HideFastCheckout(bool allow_further_runs) override;
-  bool IsFastCheckoutSupported(
-      const FormData& form,
-      const FormFieldData& field,
-      const AutofillManager& autofill_manager) override;
-  bool IsShowingFastCheckoutUI() override;
   bool IsTouchToFillCreditCardSupported() override;
   bool ShowTouchToFillCreditCard(
       base::WeakPtr<TouchToFillDelegate> delegate,
@@ -126,19 +120,20 @@ class WebViewAutofillClientIOS : public AutofillClient {
       const std::vector<std::u16string>& labels) override;
   std::vector<Suggestion> GetPopupSuggestions() const override;
   void PinPopupView() override;
-  AutofillClient::PopupOpenArgs GetReopenPopupArgs() const override;
+  AutofillClient::PopupOpenArgs GetReopenPopupArgs(
+      AutofillSuggestionTriggerSource trigger_source) const override;
   void UpdatePopup(const std::vector<Suggestion>& suggestions,
-                   PopupType popup_type) override;
+                   PopupType popup_type,
+                   AutofillSuggestionTriggerSource trigger_source) override;
   void HideAutofillPopup(PopupHidingReason reason) override;
   bool IsAutocompleteEnabled() const override;
   bool IsPasswordManagerEnabled() override;
-  void PropagateAutofillPredictions(
-      AutofillDriver* driver,
-      const std::vector<FormStructure*>& forms) override;
+  void DidFillOrPreviewForm(mojom::AutofillActionPersistence action_persistence,
+                            AutofillTriggerSource trigger_source,
+                            bool is_refill) override;
   void DidFillOrPreviewField(const std::u16string& autofilled_value,
                              const std::u16string& profile_full_name) override;
   bool IsContextSecure() const override;
-  void ExecuteCommand(int id) override;
   void OpenPromoCodeOfferDetailsURL(const GURL& url) override;
   autofill::FormInteractionsFlowId GetCurrentFormInteractionsFlowId() override;
   bool IsLastQueriedField(FieldGlobalId field_id) override;

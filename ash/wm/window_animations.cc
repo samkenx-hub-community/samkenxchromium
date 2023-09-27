@@ -14,11 +14,13 @@
 #include "ash/shelf/shelf.h"
 #include "ash/shell.h"
 #include "ash/wm/pip/pip_positioner.h"
+#include "ash/wm/resize_shadow_controller.h"
 #include "ash/wm/window_util.h"
 #include "ash/wm/workspace_controller.h"
 #include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/i18n/rtl.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
@@ -160,7 +162,13 @@ class CrossFadeObserver : public aura::WindowObserver,
   }
 
   // ui::ImplicitAnimationObserver:
-  void OnImplicitAnimationsCompleted() override { delete this; }
+  void OnImplicitAnimationsCompleted() override {
+    if (auto* resize_shadow_controller =
+            Shell::Get()->resize_shadow_controller()) {
+      resize_shadow_controller->OnCrossFadeAnimationCompleted(window_);
+    }
+    delete this;
+  }
 
  protected:
   void StopAnimating() {
@@ -173,8 +181,8 @@ class CrossFadeObserver : public aura::WindowObserver,
   // The window and the associated layer this observer is watching. The window
   // layer may be recreated during the course of the animation so |layer_| will
   // be different |window_->layer()| after construction.
-  aura::Window* window_;
-  ui::Layer* layer_;
+  raw_ptr<aura::Window, ExperimentalAsh> window_;
+  raw_ptr<ui::Layer, ExperimentalAsh> layer_;
 
   std::unique_ptr<ui::LayerTreeOwner> layer_owner_;
 
@@ -242,7 +250,7 @@ class CrossFadeUpdateTransformObserver
   }
 
  private:
-  ui::Compositor* compositor_ = nullptr;
+  raw_ptr<ui::Compositor, ExperimentalAsh> compositor_ = nullptr;
 };
 
 // Internal implementation of a cross fade animation. If

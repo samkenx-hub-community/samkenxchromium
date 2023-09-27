@@ -4,7 +4,6 @@
 
 #import "ios/chrome/browser/ui/settings/password/password_manager_view_controller.h"
 
-#import "base/compiler_specific.h"
 #import "base/functional/bind.h"
 #import "base/strings/string_piece.h"
 #import "base/strings/sys_string_conversions.h"
@@ -12,6 +11,7 @@
 #import "base/test/bind.h"
 #import "base/test/ios/wait_util.h"
 #import "base/test/scoped_feature_list.h"
+#import "components/feature_engagement/public/feature_constants.h"
 #import "components/keyed_service/core/service_access_type.h"
 #import "components/password_manager/core/browser/affiliation/fake_affiliation_service.h"
 #import "components/password_manager/core/browser/mock_bulk_leak_check_service.h"
@@ -19,10 +19,8 @@
 #import "components/password_manager/core/browser/password_manager_test_utils.h"
 #import "components/password_manager/core/browser/test_password_store.h"
 #import "components/password_manager/core/common/password_manager_features.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/favicon/favicon_loader.h"
 #import "ios/chrome/browser/favicon/ios_chrome_favicon_loader_factory.h"
-#import "ios/chrome/browser/main/test_browser.h"
 #import "ios/chrome/browser/passwords/ios_chrome_affiliation_service_factory.h"
 #import "ios/chrome/browser/passwords/ios_chrome_bulk_leak_check_service_factory.h"
 #import "ios/chrome/browser/passwords/ios_chrome_password_check_manager.h"
@@ -30,9 +28,15 @@
 #import "ios/chrome/browser/passwords/ios_chrome_password_store_factory.h"
 #import "ios/chrome/browser/passwords/password_check_observer_bridge.h"
 #import "ios/chrome/browser/passwords/save_passwords_consumer.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_detail_text_item.h"
+#import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/chrome_table_view_controller_test.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
+#import "ios/chrome/browser/signin/chrome_account_manager_service_factory.h"
+#import "ios/chrome/browser/sync/sync_service_factory.h"
+#import "ios/chrome/browser/ui/settings/cells/inline_promo_item.h"
 #import "ios/chrome/browser/ui/settings/cells/settings_check_item.h"
 #import "ios/chrome/browser/ui/settings/password/password_manager_view_controller+private.h"
 #import "ios/chrome/browser/ui/settings/password/passwords_consumer.h"
@@ -41,7 +45,7 @@
 #import "ios/chrome/browser/ui/settings/password/passwords_table_view_constants.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/table_view/table_view_cells_constants.h"
-#import "ios/chrome/grit/ios_chromium_strings.h"
+#import "ios/chrome/grit/ios_branded_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/app/sync_test_util.h"
 #import "ios/chrome/test/scoped_key_window.h"
@@ -54,10 +58,6 @@
 #import "third_party/ocmock/gtest_support.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "ui/base/l10n/l10n_util_mac.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using password_manager::InsecureType;
 using password_manager::MockBulkLeakCheckService;
@@ -82,13 +82,20 @@ using ::testing::Return;
 
 namespace {
 
+// Returns the offset to take into account when expecting a certain number of
+// sections. Offset depends on whether or not the Password Manager widget promo
+// flag is enabled.
+int GetNumberOfSectionsOffset() {
+  return base::FeatureList::IsEnabled(
+      feature_engagement::kIPHiOSPromoPasswordManagerWidgetFeature);
+}
+
 // Use this test suite for tests that verify behaviors of
 // PasswordManagerViewController before loading the passwords for the first time
 // has finished. All other tests should go in PasswordManagerViewControllerTest.
-class BasePasswordManagerViewControllerTest
-    : public ChromeTableViewControllerTest {
+class PasswordManagerViewControllerTest : public ChromeTableViewControllerTest {
  protected:
-  BasePasswordManagerViewControllerTest() = default;
+  PasswordManagerViewControllerTest() = default;
 
   void SetUp() override {
     ChromeTableViewControllerTest::SetUp();
@@ -120,13 +127,11 @@ class BasePasswordManagerViewControllerTest
     mediator_ = [[TestPasswordsMediator alloc]
         initWithPasswordCheckManager:IOSChromePasswordCheckManagerFactory::
                                          GetForBrowserState(browserState)
-                    syncSetupService:nil
                        faviconLoader:IOSChromeFaviconLoaderFactory::
                                          GetForBrowserState(browserState)
-                     identityManager:IdentityManagerFactory::GetForBrowserState(
-                                         browserState)
                          syncService:SyncServiceFactory::GetForBrowserState(
-                                         browserState)];
+                                         browserState)
+                         prefService:browserState->GetPrefs()];
     mediator_.encryptionState = OnDeviceEncryptionStateNotShown;
 
     // Inject some fake passwords to pass the loading state.
@@ -134,7 +139,6 @@ class BasePasswordManagerViewControllerTest
         GetPasswordManagerViewController();
     passwords_controller.delegate = mediator_;
     mediator_.consumer = passwords_controller;
-    [passwords_controller setPasswords:{} blockedSites:{}];
 
     // Set up handler. Use strict mock to ensure `showPasswordCheckup (or
     // `showPasswordIssues` when kIOSPasswordCheckup is disabled) isn't called
@@ -142,6 +146,8 @@ class BasePasswordManagerViewControllerTest
     passwords_settings_commands_strict_mock_ =
         OCMStrictProtocolMock(@protocol(PasswordsSettingsCommands));
     passwords_controller.handler = passwords_settings_commands_strict_mock_;
+
+    WaitForPasswordsLoadingCompletion();
   }
 
   int GetSectionIndex(PasswordSectionIdentifier section) {
@@ -163,12 +169,39 @@ class BasePasswordManagerViewControllerTest
   }
 
   ChromeTableViewController* InstantiateController() override {
-    return
-        [[PasswordManagerViewController alloc] initWithBrowser:browser_.get()];
+    ChromeAccountManagerService* account_manager_service =
+        ChromeAccountManagerServiceFactory::GetForBrowserState(
+            browser_state_.get());
+    return [[PasswordManagerViewController alloc]
+        initWithChromeAccountManagerService:account_manager_service
+                                prefService:browser_state_.get()->GetPrefs()
+                     shouldOpenInSearchMode:NO];
   }
 
   PasswordManagerViewController* GetPasswordManagerViewController() {
     return static_cast<PasswordManagerViewController*>(controller());
+  }
+
+  PasswordManagerViewController* CreateControllerForPasswordSearch() {
+    ChromeAccountManagerService* account_manager_service =
+        ChromeAccountManagerServiceFactory::GetForBrowserState(
+            browser_state_.get());
+    PasswordManagerViewController* passwords_controller =
+        [[PasswordManagerViewController alloc]
+            initWithChromeAccountManagerService:account_manager_service
+                                    prefService:browser_state_.get()->GetPrefs()
+                         shouldOpenInSearchMode:YES];
+    passwords_controller.delegate = mediator_;
+    mediator_.consumer = passwords_controller;
+    passwords_controller.handler = passwords_settings_commands_strict_mock_;
+
+    // Wait for passwords loading completion.
+    EXPECT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+        base::test::ios::kWaitForUIElementTimeout, ^bool {
+          return [passwords_controller didReceivePasswords];
+        }));
+
+    return passwords_controller;
   }
 
   void ChangePasswordCheckState(PasswordCheckUIState state) {
@@ -263,7 +296,8 @@ class BasePasswordManagerViewControllerTest
     form->password_issues = {
         {insecure_type,
          password_manager::InsecurityMetadata(
-             base::Time::Now(), password_manager::IsMuted(is_muted))}};
+             base::Time::Now(), password_manager::IsMuted(is_muted),
+             password_manager::TriggerBackendNotification(false))}};
     AddPasswordForm(std::move(form));
   }
 
@@ -334,22 +368,6 @@ class BasePasswordManagerViewControllerTest
   id passwords_settings_commands_strict_mock_;
 };
 
-// Test suite for PasswordManagerViewController.
-// All tests are run after the passwords were set for the first time and the
-// loading spinner removed. Tests that verify behavior before the spinner is
-// removed must go in BasePasswordManagerViewControllerTest.
-class PasswordManagerViewControllerTest
-    : public BasePasswordManagerViewControllerTest {
- protected:
-  PasswordManagerViewControllerTest() = default;
-
-  void SetUp() override {
-    BasePasswordManagerViewControllerTest::SetUp();
-
-    WaitForPasswordsLoadingCompletion();
-  }
-};
-
 // Tests default case has no saved sites and no blocked sites.
 TEST_F(PasswordManagerViewControllerTest, TestInitialization) {
   CheckController();
@@ -361,7 +379,7 @@ TEST_F(PasswordManagerViewControllerTest, TestInitialization) {
 TEST_F(PasswordManagerViewControllerTest, AddSavedPasswords) {
   AddSavedForm1();
 
-  EXPECT_EQ(3, NumberOfSections());
+  EXPECT_EQ(4 + GetNumberOfSectionsOffset(), NumberOfSections());
   EXPECT_EQ(1, NumberOfItemsInSection(
                    GetSectionIndex(SectionIdentifierSavedPasswords)));
   [GetPasswordManagerViewController() settingsWillBeDismissed];
@@ -371,7 +389,7 @@ TEST_F(PasswordManagerViewControllerTest, AddSavedPasswords) {
 TEST_F(PasswordManagerViewControllerTest, AddBlockedPasswords) {
   AddBlockedForm1();
 
-  EXPECT_EQ(3, NumberOfSections());
+  EXPECT_EQ(4 + GetNumberOfSectionsOffset(), NumberOfSections());
   EXPECT_EQ(1,
             NumberOfItemsInSection(GetSectionIndex(SectionIdentifierBlocked)));
   [GetPasswordManagerViewController() settingsWillBeDismissed];
@@ -385,7 +403,7 @@ TEST_F(PasswordManagerViewControllerTest, AddSavedAndBlocked) {
   AddBlockedForm2();
 
   // There should be two sections added.
-  EXPECT_EQ(4, NumberOfSections());
+  EXPECT_EQ(5 + GetNumberOfSectionsOffset(), NumberOfSections());
 
   // There should be 1 row in saved password section.
   EXPECT_EQ(1, NumberOfItemsInSection(
@@ -401,30 +419,29 @@ TEST_F(PasswordManagerViewControllerTest, TestSavedPasswordsOrder) {
   AddSavedForm2();
 
   CheckURLCellTitleAndDetailText(
-      @"example2.com", @"test@egmail.com",
-      GetSectionIndex(SectionIdentifierSavedPasswords), 0);
+      @"example2.com", @"", GetSectionIndex(SectionIdentifierSavedPasswords),
+      0);
 
   AddSavedForm1();
   CheckURLCellTitleAndDetailText(
-      @"example.com", @"test@egmail.com",
-      GetSectionIndex(SectionIdentifierSavedPasswords), 0);
+      @"example.com", @"", GetSectionIndex(SectionIdentifierSavedPasswords), 0);
   CheckURLCellTitleAndDetailText(
-      @"example2.com", @"test@egmail.com",
-      GetSectionIndex(SectionIdentifierSavedPasswords), 1);
+      @"example2.com", @"", GetSectionIndex(SectionIdentifierSavedPasswords),
+      1);
   [GetPasswordManagerViewController() settingsWillBeDismissed];
 }
 
 // Tests the order in which the blocked passwords are displayed.
 TEST_F(PasswordManagerViewControllerTest, TestBlockedPasswordsOrder) {
   AddBlockedForm2();
-  CheckURLCellTitleAndDetailText(@"secret2.com", @"",
-                                 GetSectionIndex(SectionIdentifierBlocked), 0);
+  CheckURLCellTitle(@"secret2.com", GetSectionIndex(SectionIdentifierBlocked),
+                    /* item= */ 0);
 
   AddBlockedForm1();
-  CheckURLCellTitleAndDetailText(@"secret.com", @"",
-                                 GetSectionIndex(SectionIdentifierBlocked), 0);
-  CheckURLCellTitleAndDetailText(@"secret2.com", @"",
-                                 GetSectionIndex(SectionIdentifierBlocked), 1);
+  CheckURLCellTitle(@"secret.com", GetSectionIndex(SectionIdentifierBlocked),
+                    /* item= */ 0);
+  CheckURLCellTitle(@"secret2.com", GetSectionIndex(SectionIdentifierBlocked),
+                    /* item= */ 1);
   [GetPasswordManagerViewController() settingsWillBeDismissed];
 }
 
@@ -434,7 +451,7 @@ TEST_F(PasswordManagerViewControllerTest, AddSavedDuplicates) {
   AddSavedForm1();
   AddSavedForm1();
 
-  EXPECT_EQ(3, NumberOfSections());
+  EXPECT_EQ(4 + GetNumberOfSectionsOffset(), NumberOfSections());
   EXPECT_EQ(1, NumberOfItemsInSection(
                    GetSectionIndex(SectionIdentifierSavedPasswords)));
   [GetPasswordManagerViewController() settingsWillBeDismissed];
@@ -446,64 +463,9 @@ TEST_F(PasswordManagerViewControllerTest, AddBlockedDuplicates) {
   AddBlockedForm1();
   AddBlockedForm1();
 
-  EXPECT_EQ(3, NumberOfSections());
+  EXPECT_EQ(4 + GetNumberOfSectionsOffset(), NumberOfSections());
   EXPECT_EQ(1,
             NumberOfItemsInSection(GetSectionIndex(SectionIdentifierBlocked)));
-  [GetPasswordManagerViewController() settingsWillBeDismissed];
-}
-
-// Tests deleting items from saved passwords and blocked passwords sections.
-TEST_F(PasswordManagerViewControllerTest, DeleteItems) {
-  AddSavedForm1();
-  AddBlockedForm1();
-  AddBlockedForm2();
-  ASSERT_EQ(4, NumberOfSections());
-
-  // Delete item in save passwords section.
-  deleteItemAndWait(GetSectionIndex(SectionIdentifierSavedPasswords), 0);
-  EXPECT_EQ(3, NumberOfSections());
-
-  // The blocked passwords section should still have both its items.
-  EXPECT_EQ(2,
-            NumberOfItemsInSection(GetSectionIndex(SectionIdentifierBlocked)));
-
-  // Delete item in blocked passwords section.
-  deleteItemAndWait(GetSectionIndex(SectionIdentifierBlocked), 0);
-  EXPECT_EQ(1,
-            NumberOfItemsInSection(GetSectionIndex(SectionIdentifierBlocked)));
-
-  // There should be no password sections remaining and no search bar.
-  deleteItemAndWait(GetSectionIndex(SectionIdentifierBlocked), 0);
-  EXPECT_EQ(0, NumberOfSections());  // Empty state
-  [GetPasswordManagerViewController() settingsWillBeDismissed];
-}
-
-// Tests deleting items from saved passwords and blocked passwords sections
-// when there are duplicates in the store.
-TEST_F(PasswordManagerViewControllerTest, DeleteItemsWithDuplicates) {
-  AddSavedForm1();
-  AddSavedForm1();
-  AddBlockedForm1();
-  AddBlockedForm1();
-  AddBlockedForm2();
-  ASSERT_EQ(4, NumberOfSections());
-
-  // Delete item in save passwords section.
-  deleteItemAndWait(GetSectionIndex(SectionIdentifierSavedPasswords), 0);
-  EXPECT_EQ(3, NumberOfSections());
-
-  // The blocked passwords section should still have both its items.
-  EXPECT_EQ(2,
-            NumberOfItemsInSection(GetSectionIndex(SectionIdentifierBlocked)));
-
-  // Delete item in blocked passwords section.
-  deleteItemAndWait(GetSectionIndex(SectionIdentifierBlocked), 0);
-  EXPECT_EQ(1,
-            NumberOfItemsInSection(GetSectionIndex(SectionIdentifierBlocked)));
-
-  // There should be no password sections remaining and no search bar.
-  deleteItemAndWait(GetSectionIndex(SectionIdentifierBlocked), 0);
-  EXPECT_EQ(0, NumberOfSections());  // Empty state
   [GetPasswordManagerViewController() settingsWillBeDismissed];
 }
 
@@ -511,9 +473,6 @@ TEST_F(PasswordManagerViewControllerTest, DeleteItemsWithDuplicates) {
 // passwords sections.
 TEST_F(PasswordManagerViewControllerTest,
        DeleteAffiliatedGroupsAndBlockedPasswords) {
-  base::test::ScopedFeatureList scoped_feature_list(
-      password_manager::features::kPasswordsGrouping);
-
   AddSavedForm1();
   AddSavedForm1(u"test2@egmail.com");
   AddSavedForm2();
@@ -589,13 +548,15 @@ TEST_F(PasswordManagerViewControllerTest, TestChangePasswordsWhileSearching) {
         return presentation_finished;
       }));
 
-  EXPECT_EQ(3, NumberOfSections());
+  EXPECT_EQ(4 + GetNumberOfSectionsOffset(), NumberOfSections());
   EXPECT_TRUE([passwords_controller.tableViewModel
       hasSectionForSectionIdentifier:SectionIdentifierAddPasswordButton]);
   EXPECT_TRUE([passwords_controller.tableViewModel
       hasSectionForSectionIdentifier:SectionIdentifierPasswordCheck]);
   EXPECT_TRUE([passwords_controller.tableViewModel
       hasSectionForSectionIdentifier:SectionIdentifierSavedPasswords]);
+  EXPECT_TRUE([passwords_controller.tableViewModel
+      hasSectionForSectionIdentifier:SectionIdentifierManageAccountHeader]);
 
   passwords_controller.navigationItem.searchController.active = YES;
 
@@ -611,15 +572,17 @@ TEST_F(PasswordManagerViewControllerTest, TestChangePasswordsWhileSearching) {
   passwords_controller.navigationItem.searchController.active = NO;
 
   // Sections are restored after search is over.
-  EXPECT_EQ(3, NumberOfSections());
+  EXPECT_EQ(4 + GetNumberOfSectionsOffset(), NumberOfSections());
   EXPECT_TRUE([passwords_controller.tableViewModel
       hasSectionForSectionIdentifier:SectionIdentifierAddPasswordButton]);
   EXPECT_TRUE([passwords_controller.tableViewModel
       hasSectionForSectionIdentifier:SectionIdentifierPasswordCheck]);
   EXPECT_TRUE([passwords_controller.tableViewModel
       hasSectionForSectionIdentifier:SectionIdentifierSavedPasswords]);
+  EXPECT_TRUE([passwords_controller.tableViewModel
+      hasSectionForSectionIdentifier:SectionIdentifierManageAccountHeader]);
 
-  // Dismiss `view_controller_` and waits for the dismissal to finish.
+  // Dismiss the view controller and wait for the dismissal to finish.
   __block bool dismissal_finished = NO;
   [passwords_controller settingsWillBeDismissed];
   [root_view_controller_ dismissViewControllerAnimated:NO
@@ -665,7 +628,78 @@ TEST_F(PasswordManagerViewControllerTest,
   passwords_controller.navigationItem.searchController.active = NO;
   passwords_controller.navigationItem.searchController.active = NO;
 
-  // Dismiss `view_controller_` and waits for the dismissal to finish.
+  // Dismiss the view controller and wait for the dismissal to finish.
+  __block bool dismissal_finished = NO;
+  [passwords_controller settingsWillBeDismissed];
+  [root_view_controller_ dismissViewControllerAnimated:NO
+                                            completion:^{
+                                              dismissal_finished = YES;
+                                            }];
+  EXPECT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+      base::test::ios::kWaitForUIElementTimeout, ^bool {
+        return dismissal_finished;
+      }));
+}
+
+// Tests that opening the PasswordManagerViewController in search mode shows the
+// expected content.
+TEST_F(PasswordManagerViewControllerTest, TestOpenInSearchMode) {
+  // Call `settingsWillBeDismissed` on the initial view controller so that its
+  // observers are reset.
+  [GetPasswordManagerViewController() settingsWillBeDismissed];
+
+  root_view_controller_ = [[UIViewController alloc] init];
+  scoped_window_.Get().rootViewController = root_view_controller_;
+
+  PasswordManagerViewController* passwords_controller =
+      CreateControllerForPasswordSearch();
+
+  // Add a saved password so the empty state isn't shown.
+  AddSavedForm1();
+
+  // Present the view controller.
+  __block bool presentation_finished = NO;
+  UINavigationController* navigation_controller =
+      [[UINavigationController alloc]
+          initWithRootViewController:passwords_controller];
+  [root_view_controller_ presentViewController:navigation_controller
+                                      animated:NO
+                                    completion:^{
+                                      presentation_finished = YES;
+                                    }];
+  EXPECT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
+      base::test::ios::kWaitForUIElementTimeout, ^bool {
+        return presentation_finished;
+      }));
+
+  // Verify that the search controller is active and that the content of table
+  // view model is as expected in search mode.
+  RunUntilIdle();
+  EXPECT_TRUE(passwords_controller.navigationItem.searchController.active);
+  EXPECT_EQ(1, [[passwords_controller tableViewModel] numberOfSections]);
+  EXPECT_TRUE([passwords_controller.tableViewModel
+      hasSectionForSectionIdentifier:SectionIdentifierSavedPasswords]);
+  int savedPasswordsSectionIdentifier = [passwords_controller.tableViewModel
+      sectionForSectionIdentifier:SectionIdentifierSavedPasswords];
+  EXPECT_EQ(1, [[passwords_controller tableViewModel]
+                   numberOfItemsInSection:savedPasswordsSectionIdentifier]);
+
+  passwords_controller.navigationItem.searchController.active = NO;
+
+  // Verify that the content of table view model is as expected after leaving
+  // search mode.
+  EXPECT_EQ(4 + GetNumberOfSectionsOffset(),
+            [[passwords_controller tableViewModel] numberOfSections]);
+  EXPECT_TRUE([passwords_controller.tableViewModel
+      hasSectionForSectionIdentifier:SectionIdentifierAddPasswordButton]);
+  EXPECT_TRUE([passwords_controller.tableViewModel
+      hasSectionForSectionIdentifier:SectionIdentifierPasswordCheck]);
+  EXPECT_TRUE([passwords_controller.tableViewModel
+      hasSectionForSectionIdentifier:SectionIdentifierSavedPasswords]);
+  EXPECT_TRUE([passwords_controller.tableViewModel
+      hasSectionForSectionIdentifier:SectionIdentifierManageAccountHeader]);
+
+  // Dismiss the view controller and wait for the dismissal to finish.
   __block bool dismissal_finished = NO;
   [passwords_controller settingsWillBeDismissed];
   [root_view_controller_ dismissViewControllerAnimated:NO
@@ -715,7 +749,7 @@ TEST_F(PasswordManagerViewControllerTest, FilterItems) {
   AddBlockedForm1();
   AddBlockedForm2();
 
-  EXPECT_EQ(4, NumberOfSections());
+  EXPECT_EQ(5 + GetNumberOfSectionsOffset(), NumberOfSections());
 
   PasswordManagerViewController* passwords_controller =
       GetPasswordManagerViewController();
@@ -734,21 +768,7 @@ TEST_F(PasswordManagerViewControllerTest, FilterItems) {
   EXPECT_EQ(0,
             NumberOfItemsInSection(GetSectionIndex(SectionIdentifierBlocked)));
   CheckURLCellTitleAndDetailText(
-      @"example.com", @"test@egmail.com",
-      GetSectionIndex(SectionIdentifierSavedPasswords), 0);
-
-  [passwords_controller searchBar:bar textDidChange:@"test@egmail.com"];
-  // Only two items in saved passwords should remain.
-  EXPECT_EQ(2, NumberOfItemsInSection(
-                   GetSectionIndex(SectionIdentifierSavedPasswords)));
-  EXPECT_EQ(0,
-            NumberOfItemsInSection(GetSectionIndex(SectionIdentifierBlocked)));
-  CheckURLCellTitleAndDetailText(
-      @"example.com", @"test@egmail.com",
-      GetSectionIndex(SectionIdentifierSavedPasswords), 0);
-  CheckURLCellTitleAndDetailText(
-      @"example2.com", @"test@egmail.com",
-      GetSectionIndex(SectionIdentifierSavedPasswords), 1);
+      @"example.com", @"", GetSectionIndex(SectionIdentifierSavedPasswords), 0);
 
   [passwords_controller searchBar:bar textDidChange:@"secret"];
   // Only two blocked items should remain.
@@ -756,10 +776,10 @@ TEST_F(PasswordManagerViewControllerTest, FilterItems) {
                    GetSectionIndex(SectionIdentifierSavedPasswords)));
   EXPECT_EQ(2,
             NumberOfItemsInSection(GetSectionIndex(SectionIdentifierBlocked)));
-  CheckURLCellTitleAndDetailText(@"secret.com", @"",
-                                 GetSectionIndex(SectionIdentifierBlocked), 0);
-  CheckURLCellTitleAndDetailText(@"secret2.com", @"",
-                                 GetSectionIndex(SectionIdentifierBlocked), 1);
+  CheckURLCellTitle(@"secret.com", GetSectionIndex(SectionIdentifierBlocked),
+                    /* item= */ 0);
+  CheckURLCellTitle(@"secret2.com", GetSectionIndex(SectionIdentifierBlocked),
+                    /* item= */ 1);
 
   [passwords_controller searchBar:bar textDidChange:@""];
   // All items should be back.
@@ -775,14 +795,17 @@ TEST_F(PasswordManagerViewControllerTest, FilterItems) {
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateDisabledWithoutKIOSPasswordCheckup) {
   // Disable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndDisableFeature(
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
 
   ChangePasswordCheckState(PasswordCheckStateDisabled);
 
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
   CheckTextCellTextWithId(IDS_IOS_CHECK_PASSWORDS_NOW_BUTTON,
                           GetSectionIndex(SectionIdentifierPasswordCheck), 1);
   CheckDetailItemTextWithIds(
@@ -794,6 +817,10 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_FALSE(checkPassword.trailingImage);
   EXPECT_FALSE(checkPassword.accessoryType);
+
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_FALSE(checkNowButton.enabled);
 
   SetEditing(true);
   EXPECT_FALSE(checkPassword.enabled);
@@ -812,14 +839,16 @@ TEST_F(PasswordManagerViewControllerTest,
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateDisabledWithKIOSPasswordCheckup) {
   // Enable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
+  base::test::ScopedFeatureList feature_list(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
 
   ChangePasswordCheckState(PasswordCheckStateDisabled);
 
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
   CheckTextCellTextWithId(IDS_IOS_CHECK_PASSWORDS_NOW_BUTTON,
                           GetSectionIndex(SectionIdentifierPasswordCheck), 1);
   CheckDetailItemTextWithIds(
@@ -831,6 +860,10 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_FALSE(checkPassword.trailingImage);
   EXPECT_FALSE(checkPassword.accessoryType);
+
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_FALSE(checkNowButton.enabled);
 
   SetEditing(true);
   EXPECT_FALSE(checkPassword.enabled);
@@ -849,14 +882,17 @@ TEST_F(PasswordManagerViewControllerTest,
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateDefaultWithoutKIOSPasswordCheckup) {
   // Disable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndDisableFeature(
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
 
   ChangePasswordCheckState(PasswordCheckStateDefault);
 
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
   CheckTextCellTextWithId(IDS_IOS_CHECK_PASSWORDS_NOW_BUTTON,
                           GetSectionIndex(SectionIdentifierPasswordCheck), 1);
   CheckDetailItemTextWithIds(
@@ -868,6 +904,10 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_FALSE(checkPassword.trailingImage);
   EXPECT_FALSE(checkPassword.accessoryType);
+
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_TRUE(checkNowButton.enabled);
 
   SetEditing(true);
   EXPECT_FALSE(checkPassword.enabled);
@@ -886,14 +926,16 @@ TEST_F(PasswordManagerViewControllerTest,
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateDefaultWithKIOSPasswordCheckup) {
   // Enable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
+  base::test::ScopedFeatureList feature_list(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
 
   ChangePasswordCheckState(PasswordCheckStateDefault);
 
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
   CheckTextCellTextWithId(IDS_IOS_CHECK_PASSWORDS_NOW_BUTTON,
                           GetSectionIndex(SectionIdentifierPasswordCheck), 1);
   CheckDetailItemTextWithIds(
@@ -905,6 +947,10 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_FALSE(checkPassword.trailingImage);
   EXPECT_FALSE(checkPassword.accessoryType);
+
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_TRUE(checkNowButton.enabled);
 
   SetEditing(true);
   EXPECT_FALSE(checkPassword.enabled);
@@ -923,25 +969,34 @@ TEST_F(PasswordManagerViewControllerTest,
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateSafeWithoutKIOSPasswordCheckup) {
   // Disable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndDisableFeature(
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
 
   ChangePasswordCheckState(PasswordCheckStateSafe);
 
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
   CheckTextCellTextWithId(IDS_IOS_CHECK_PASSWORDS_NOW_BUTTON,
                           GetSectionIndex(SectionIdentifierPasswordCheck), 1);
   CheckDetailItemTextWithPluralIds(
-      IDS_IOS_CHECK_PASSWORDS, IDS_IOS_CHECK_PASSWORDS_COMPROMISED_COUNT, 0,
+      IDS_IOS_CHECK_PASSWORDS, IDS_IOS_PASSWORD_CHECKUP_COMPROMISED_COUNT, 0,
       GetSectionIndex(SectionIdentifierPasswordCheck), 0);
   SettingsCheckItem* checkPassword =
       GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 0);
   EXPECT_TRUE(checkPassword.enabled);
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_TRUE(checkPassword.trailingImage);
+  EXPECT_TRUE([checkPassword.trailingImageTintColor
+      isEqual:[UIColor colorNamed:kGreenColor]]);
   EXPECT_FALSE(checkPassword.accessoryType);
+
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_TRUE(checkNowButton.enabled);
 
   SetEditing(true);
   EXPECT_FALSE(checkPassword.enabled);
@@ -960,8 +1015,7 @@ TEST_F(PasswordManagerViewControllerTest,
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateSafeWithKIOSPasswordCheckup) {
   // Enable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
+  base::test::ScopedFeatureList feature_list(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
@@ -982,6 +1036,8 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_TRUE(checkPassword.enabled);
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_TRUE(checkPassword.trailingImage);
+  EXPECT_TRUE([checkPassword.trailingImageTintColor
+      isEqual:[UIColor colorNamed:kGreen500Color]]);
   EXPECT_TRUE(checkPassword.accessoryType);
 
   SetEditing(true);
@@ -1004,13 +1060,16 @@ TEST_F(
     PasswordManagerViewControllerTest,
     PasswordCheckStateUnmutedCompromisedPasswordsWithoutKIOSPasswordCheckup) {
   // Disable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndDisableFeature(
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedInsecureForm(InsecureType::kLeaked);
   ChangePasswordCheckState(PasswordCheckStateUnmutedCompromisedPasswords);
 
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
   CheckTextCellTextWithId(IDS_IOS_CHECK_PASSWORDS_NOW_BUTTON,
                           GetSectionIndex(SectionIdentifierPasswordCheck), 1);
   CheckDetailItemTextWithPluralIds(
@@ -1021,7 +1080,13 @@ TEST_F(
   EXPECT_TRUE(checkPassword.enabled);
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_TRUE(checkPassword.trailingImage);
+  EXPECT_TRUE([checkPassword.trailingImageTintColor
+      isEqual:[UIColor colorNamed:kRed500Color]]);
   EXPECT_TRUE(checkPassword.accessoryType);
+
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_TRUE(checkNowButton.enabled);
 
   SetEditing(true);
   EXPECT_FALSE(checkPassword.enabled);
@@ -1042,8 +1107,7 @@ TEST_F(
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateUnmutedCompromisedPasswordsWithKIOSPasswordCheckup) {
   // Enable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
+  base::test::ScopedFeatureList feature_list(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedInsecureForm(InsecureType::kLeaked);
@@ -1061,6 +1125,8 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_TRUE(checkPassword.enabled);
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_TRUE(checkPassword.trailingImage);
+  EXPECT_TRUE([checkPassword.trailingImageTintColor
+      isEqual:[UIColor colorNamed:kRed500Color]]);
   EXPECT_TRUE(checkPassword.accessoryType);
 
   SetEditing(true);
@@ -1080,8 +1146,7 @@ TEST_F(PasswordManagerViewControllerTest,
 // Test verifies reused state of password check cell.
 TEST_F(PasswordManagerViewControllerTest, PasswordCheckStateReusedPasswords) {
   // Enable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
+  base::test::ScopedFeatureList feature_list(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedInsecureForm(InsecureType::kReused);
@@ -1102,6 +1167,8 @@ TEST_F(PasswordManagerViewControllerTest, PasswordCheckStateReusedPasswords) {
   EXPECT_TRUE(checkPassword.enabled);
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_TRUE(checkPassword.trailingImage);
+  EXPECT_TRUE([checkPassword.trailingImageTintColor
+      isEqual:[UIColor colorNamed:kYellow500Color]]);
   EXPECT_TRUE(checkPassword.accessoryType);
 
   SetEditing(true);
@@ -1121,8 +1188,7 @@ TEST_F(PasswordManagerViewControllerTest, PasswordCheckStateReusedPasswords) {
 // Test verifies weak state of password check cell.
 TEST_F(PasswordManagerViewControllerTest, PasswordCheckStateWeakPasswords) {
   // Enable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
+  base::test::ScopedFeatureList feature_list(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedInsecureForm(InsecureType::kWeak);
@@ -1140,6 +1206,8 @@ TEST_F(PasswordManagerViewControllerTest, PasswordCheckStateWeakPasswords) {
   EXPECT_TRUE(checkPassword.enabled);
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_TRUE(checkPassword.trailingImage);
+  EXPECT_TRUE([checkPassword.trailingImageTintColor
+      isEqual:[UIColor colorNamed:kYellow500Color]]);
   EXPECT_TRUE(checkPassword.accessoryType);
 
   SetEditing(true);
@@ -1160,8 +1228,7 @@ TEST_F(PasswordManagerViewControllerTest, PasswordCheckStateWeakPasswords) {
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateDismissedPasswords) {
   // Enable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
+  base::test::ScopedFeatureList feature_list(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedInsecureForm(InsecureType::kLeaked, /*is_muted=*/true);
@@ -1179,6 +1246,8 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_TRUE(checkPassword.enabled);
   EXPECT_TRUE(checkPassword.indicatorHidden);
   EXPECT_TRUE(checkPassword.trailingImage);
+  EXPECT_TRUE([checkPassword.trailingImageTintColor
+      isEqual:[UIColor colorNamed:kYellow500Color]]);
   EXPECT_TRUE(checkPassword.accessoryType);
 
   SetEditing(true);
@@ -1200,14 +1269,17 @@ TEST_F(PasswordManagerViewControllerTest,
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateRunningWithoutKIOSPasswordCheckup) {
   // Disable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndDisableFeature(
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
 
   ChangePasswordCheckState(PasswordCheckStateRunning);
 
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
   CheckTextCellTextWithId(IDS_IOS_CHECK_PASSWORDS_NOW_BUTTON,
                           GetSectionIndex(SectionIdentifierPasswordCheck), 1);
   CheckDetailItemTextWithIds(
@@ -1219,6 +1291,10 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_FALSE(checkPassword.indicatorHidden);
   EXPECT_FALSE(checkPassword.trailingImage);
   EXPECT_FALSE(checkPassword.accessoryType);
+
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_FALSE(checkNowButton.enabled);
 
   SetEditing(true);
   EXPECT_FALSE(checkPassword.enabled);
@@ -1233,16 +1309,12 @@ TEST_F(PasswordManagerViewControllerTest,
 }
 
 // Test verifies running state of password check cell with kIOSPasswordCheckup
-// feature enabled. kPasswordsGrouping feature needs to also be enabled to get
-// the affiliated group count.
+// feature enabled.
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateRunningWithKIOSPasswordCheckup) {
-  // Enable Password Checkup and Password Grouping features.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitWithFeatures(
-      /*enabled_features=*/{password_manager::features::kIOSPasswordCheckup,
-                            password_manager::features::kPasswordsGrouping},
-      /*disabled_features=*/{});
+  // Enable Password Checkup feature.
+  base::test::ScopedFeatureList feature_list(
+      password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
   ChangePasswordCheckState(PasswordCheckStateRunning);
@@ -1279,14 +1351,17 @@ TEST_F(PasswordManagerViewControllerTest,
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateErrorWithoutKIOSPasswordCheckup) {
   // Disable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndDisableFeature(
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
 
   ChangePasswordCheckState(PasswordCheckStateError);
 
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
   CheckTextCellTextWithId(IDS_IOS_CHECK_PASSWORDS_NOW_BUTTON,
                           GetSectionIndex(SectionIdentifierPasswordCheck), 1);
   CheckDetailItemTextWithIds(
@@ -1299,6 +1374,10 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_FALSE(checkPassword.trailingImage);
   EXPECT_FALSE(checkPassword.infoButtonHidden);
   EXPECT_FALSE(checkPassword.accessoryType);
+
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_TRUE(checkNowButton.enabled);
 
   SetEditing(true);
   EXPECT_FALSE(checkPassword.enabled);
@@ -1318,14 +1397,16 @@ TEST_F(PasswordManagerViewControllerTest,
 TEST_F(PasswordManagerViewControllerTest,
        PasswordCheckStateErrorWithKIOSPasswordCheckup) {
   // Enable Password Checkup feature.
-  base::test::ScopedFeatureList featureList;
-  featureList.InitAndEnableFeature(
+  base::test::ScopedFeatureList feature_list(
       password_manager::features::kIOSPasswordCheckup);
 
   AddSavedForm1();
 
   ChangePasswordCheckState(PasswordCheckStateError);
 
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
   CheckTextCellTextWithId(IDS_IOS_CHECK_PASSWORDS_NOW_BUTTON,
                           GetSectionIndex(SectionIdentifierPasswordCheck), 1);
   CheckDetailItemTextWithIds(
@@ -1339,6 +1420,10 @@ TEST_F(PasswordManagerViewControllerTest,
   EXPECT_FALSE(checkPassword.infoButtonHidden);
   EXPECT_FALSE(checkPassword.accessoryType);
 
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_TRUE(checkNowButton.enabled);
+
   SetEditing(true);
   EXPECT_FALSE(checkPassword.enabled);
   EXPECT_TRUE(checkPassword.indicatorHidden);
@@ -1349,6 +1434,23 @@ TEST_F(PasswordManagerViewControllerTest,
 
   SelectCell(/*item=*/0,
              /*sectionIndex=*/GetSectionIndex(SectionIdentifierPasswordCheck));
+  [GetPasswordManagerViewController() settingsWillBeDismissed];
+}
+
+// Test verifies that the "Check Now" button is unavailable when the user is
+// signed out.
+TEST_F(PasswordManagerViewControllerTest, PasswordCheckStateSignedOutError) {
+  AddSavedForm1();
+
+  ChangePasswordCheckState(PasswordCheckStateSignedOut);
+
+  // Check button should be shown.
+  EXPECT_TRUE(
+      HasTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1));
+  TableViewTextItem* checkNowButton =
+      GetTableViewItem(GetSectionIndex(SectionIdentifierPasswordCheck), 1);
+  EXPECT_FALSE(checkNowButton.enabled);
+
   [GetPasswordManagerViewController() settingsWillBeDismissed];
 }
 
@@ -1386,6 +1488,42 @@ TEST_F(PasswordManagerViewControllerTest, PasswordStoreListener) {
   RunUntilIdle();
   EXPECT_EQ(1, NumberOfItemsInSection(
                    GetSectionIndex(SectionIdentifierSavedPasswords)));
+  [GetPasswordManagerViewController() settingsWillBeDismissed];
+}
+
+// Test verifies the content of the widget promo cell.
+TEST_F(PasswordManagerViewControllerTest, WidgetPromo) {
+  // Enable Password Manager widget promo feature.
+  base::test::ScopedFeatureList feature_list(
+      feature_engagement::kIPHiOSPromoPasswordManagerWidgetFeature);
+
+  AddSavedForm1();
+
+  GetPasswordManagerViewController().shouldShowPasswordManagerWidgetPromo = YES;
+  [GetPasswordManagerViewController() reloadData];
+
+  EXPECT_EQ(1, NumberOfItemsInSection(
+                   GetSectionIndex(SectionIdentifierSavedPasswords)));
+
+  InlinePromoItem* item = static_cast<InlinePromoItem*>(
+      GetTableViewItem(GetSectionIndex(SectionIdentifierWidgetPromo), 0));
+
+  EXPECT_NSEQ(item.promoImage, [UIImage imageNamed:kWidgetPromoImageName]);
+  EXPECT_NSEQ(item.promoText, l10n_util::GetNSString(
+                                  IDS_IOS_PASSWORD_MANAGER_WIDGET_PROMO_TEXT));
+  EXPECT_NSEQ(item.moreInfoButtonTitle,
+              l10n_util::GetNSString(
+                  IDS_IOS_PASSWORD_MANAGER_WIDGET_PROMO_BUTTON_TITLE));
+  EXPECT_TRUE(item.shouldShowCloseButton);
+  EXPECT_FALSE(GetPasswordManagerViewController().editing);
+  EXPECT_TRUE(item.enabled);
+
+  SetEditing(true);
+  EXPECT_FALSE(item.enabled);
+  EXPECT_NSEQ(item.promoImage,
+              [UIImage imageNamed:kWidgetPromoDisabledImageName]);
+  SetEditing(false);
+
   [GetPasswordManagerViewController() settingsWillBeDismissed];
 }
 

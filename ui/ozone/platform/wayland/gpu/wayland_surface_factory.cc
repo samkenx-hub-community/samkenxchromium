@@ -25,6 +25,9 @@
 #include "ui/ozone/platform/wayland/host/wayland_window_manager.h"
 
 #if defined(WAYLAND_GBM)
+#include "ui/gfx/buffer_format_util.h"
+#include "ui/gfx/linux/drm_util_linux.h"
+#include "ui/gfx/linux/gbm_device.h"  // nogncheck
 #include "ui/ozone/platform/wayland/gpu/gbm_pixmap_wayland.h"
 #include "ui/ozone/platform/wayland/gpu/gbm_surfaceless_wayland.h"
 #include "ui/ozone/public/ozone_platform.h"
@@ -77,8 +80,9 @@ class GLOzoneEGLWayland : public GLOzoneEGL {
   bool LoadGLES2Bindings(const gl::GLImplementationParts& impl) override;
 
  private:
-  const raw_ptr<WaylandConnection> connection_;
-  const raw_ptr<WaylandBufferManagerGpu> buffer_manager_;
+  const raw_ptr<WaylandConnection, AcrossTasksDanglingUntriaged> connection_;
+  const raw_ptr<WaylandBufferManagerGpu, AcrossTasksDanglingUntriaged>
+      buffer_manager_;
 };
 
 bool GLOzoneEGLWayland::CanImportNativePixmap() {
@@ -296,6 +300,37 @@ WaylandSurfaceFactory::GetPreferredFormatForSolidColor() const {
   if (!buffer_manager_->SupportsFormat(gfx::BufferFormat::RGBA_8888))
     return gfx::BufferFormat::BGRA_8888;
   return gfx::BufferFormat::RGBA_8888;
+}
+
+bool WaylandSurfaceFactory::SupportsDrmModifiersFilter() const {
+  return true;
+}
+
+void WaylandSurfaceFactory::SetDrmModifiersFilter(
+    std::unique_ptr<DrmModifiersFilter> filter) {
+  buffer_manager_->set_drm_modifiers_filter(std::move(filter));
+}
+
+std::vector<gfx::BufferFormat>
+WaylandSurfaceFactory::GetSupportedFormatsForTexturing() const {
+#if defined(WAYLAND_GBM)
+  GbmDevice* const gbm_device = buffer_manager_->GetGbmDevice();
+  if (!gbm_device) {
+    return {};
+  }
+
+  std::vector<gfx::BufferFormat> supported_buffer_formats;
+  for (int j = 0; j <= static_cast<int>(gfx::BufferFormat::LAST); ++j) {
+    const gfx::BufferFormat buffer_format = static_cast<gfx::BufferFormat>(j);
+    if (gbm_device->CanCreateBufferForFormat(
+            GetFourCCFormatFromBufferFormat(buffer_format))) {
+      supported_buffer_formats.push_back(buffer_format);
+    }
+  }
+  return supported_buffer_formats;
+#else
+  return {};
+#endif
 }
 
 }  // namespace ui

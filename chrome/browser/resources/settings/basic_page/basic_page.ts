@@ -11,15 +11,18 @@ import 'chrome://resources/cr_elements/cr_shared_style.css.js';
 import 'chrome://resources/cr_elements/cr_shared_vars.css.js';
 import 'chrome://resources/polymer/v3_0/iron-flex-layout/iron-flex-layout-classes.js';
 import '../appearance_page/appearance_page.js';
+import '../privacy_page/preloading_page.js';
 import '../privacy_page/privacy_guide/privacy_guide_promo.js';
 import '../privacy_page/privacy_page.js';
 import '../safety_check_page/safety_check_page.js';
+import '../safety_hub/safety_hub_entry_point.js';
 import '../autofill_page/autofill_page.js';
 import '../controls/settings_idle_load.js';
 import '../on_startup_page/on_startup_page.js';
 import '../people_page/people_page.js';
 import '../performance_page/battery_page.js';
 import '../performance_page/performance_page.js';
+import '../performance_page/speed_page.js';
 import '../reset_page/reset_profile_banner.js';
 import '../search_page/search_page.js';
 import '../settings_page/settings_section.js';
@@ -32,6 +35,8 @@ import '../languages_page/languages.js';
 
 // </if>
 
+import {PrefsMixin} from 'chrome://resources/cr_components/settings_prefs/prefs_mixin.js';
+import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {WebUiListenerMixin} from 'chrome://resources/cr_elements/web_ui_listener_mixin.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
 import {beforeNextRender, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
@@ -43,7 +48,6 @@ import {LanguageHelper, LanguagesModel} from '../languages_page/languages_types.
 // </if>
 import {PageVisibility} from '../page_visibility.js';
 import {PerformanceBrowserProxy, PerformanceBrowserProxyImpl} from '../performance_page/performance_browser_proxy.js';
-import {PrefsMixin} from '../prefs/prefs_mixin.js';
 import {PrivacyGuideAvailabilityMixin} from '../privacy_page/privacy_guide/privacy_guide_availability_mixin.js';
 import {MAX_PRIVACY_GUIDE_PROMO_IMPRESSION, PrivacyGuideBrowserProxy, PrivacyGuideBrowserProxyImpl} from '../privacy_page/privacy_guide/privacy_guide_browser_proxy.js';
 import {routes} from '../route.js';
@@ -54,8 +58,8 @@ import {MainPageMixin} from '../settings_page/main_page_mixin.js';
 import {getTemplate} from './basic_page.html.js';
 
 const SettingsBasicPageElementBase =
-    PrefsMixin(MainPageMixin(RouteObserverMixin(
-        PrivacyGuideAvailabilityMixin(WebUiListenerMixin(PolymerElement)))));
+    PrefsMixin(MainPageMixin(RouteObserverMixin(PrivacyGuideAvailabilityMixin(
+        WebUiListenerMixin(I18nMixin(PolymerElement))))));
 
 export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
   static get is() {
@@ -134,16 +138,6 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
         },
       },
 
-      // <if expr="not chromeos_ash">
-      enableDesktopDetailedLanguageSettings_: {
-        type: Boolean,
-        value() {
-          return loadTimeData.getBoolean(
-              'enableDesktopDetailedLanguageSettings');
-        },
-      },
-      // </if>
-
       /**
        * True if the basic page should currently display the privacy guide
        * promo.
@@ -171,6 +165,18 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
         type: Boolean,
         value: false,
       },
+
+      /**
+       * If the preloading section is under performance settings, this
+       * determines if the V2 UI with a toggle button is displayed.
+       */
+      showSpeedPageV2_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean(
+              'isPerformanceSettingsPreloadingSubpageV2Enabled');
+        },
+      },
     };
   }
 
@@ -183,7 +189,6 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
   // <if expr="not chromeos_ash">
   languages?: LanguagesModel;
   languageHelper: LanguageHelper;
-  private enableDesktopDetailedLanguageSettings_: boolean;
   // </if>
   pageVisibility: PageVisibility;
   inSearchMode: boolean;
@@ -213,13 +218,11 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
   override connectedCallback() {
     super.connectedCallback();
 
-    if (loadTimeData.getBoolean('batterySaverModeAvailable')) {
-      this.addWebUiListener(
-          'device-has-battery-changed',
-          this.onDeviceHasBatteryChanged_.bind(this));
-      this.performanceBrowserProxy_.getDeviceHasBattery().then(
-          this.onDeviceHasBatteryChanged_.bind(this));
-    }
+    this.addWebUiListener(
+        'device-has-battery-changed',
+        this.onDeviceHasBatteryChanged_.bind(this));
+    this.performanceBrowserProxy_.getDeviceHasBattery().then(
+        this.onDeviceHasBatteryChanged_.bind(this));
 
     this.currentRoute_ = Router.getInstance().getCurrentRoute();
   }
@@ -385,16 +388,35 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
   }
 
   private showPerformancePage_(visibility?: boolean): boolean {
-    return visibility !== false &&
-        loadTimeData.getBoolean('highEfficiencyModeAvailable');
+    return visibility !== false;
   }
 
   private showBatteryPage_(visibility?: boolean): boolean {
-    return visibility !== false &&
-        loadTimeData.getBoolean('batterySaverModeAvailable');
+    return visibility !== false;
+  }
+
+  private showSpeedPage_(visibility?: boolean): boolean {
+    return loadTimeData.getBoolean(
+               'isPerformanceSettingsPreloadingSubpageEnabled') &&
+        this.showPage_(visibility);
+  }
+
+  private showSafetyCheckPage_(visibility?: boolean): boolean {
+    return !loadTimeData.getBoolean('enableSafetyHub') &&
+        this.showPage_(visibility);
+  }
+
+  private showSafetyHubEntryPointPage_(visibility?: boolean): boolean {
+    return loadTimeData.getBoolean('enableSafetyHub') &&
+        this.showPage_(visibility);
   }
 
   // <if expr="_google_chrome">
+  private showGetMostChrome_(visibility?: boolean): boolean {
+    return visibility !== false &&
+        loadTimeData.getBoolean('showGetTheMostOutOfChromeSection');
+  }
+
   private onSendHighEfficiencyFeedbackClick_(e: Event) {
     e.stopPropagation();
     this.performanceBrowserProxy_.openHighEfficiencyFeedbackDialog();
@@ -404,7 +426,19 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
     e.stopPropagation();
     this.performanceBrowserProxy_.openBatterySaverFeedbackDialog();
   }
+
+  private onSendSpeedFeedbackClick_(e: Event) {
+    e.stopPropagation();
+    this.performanceBrowserProxy_.openSpeedFeedbackDialog();
+  }
   // </if>
+
+  private getPerformancePageTitle_(): string {
+    return loadTimeData.getBoolean(
+               'isPerformanceSettingsPreloadingSubpageEnabled') ?
+        this.i18n('memoryPageTitle') :
+        this.i18n('performancePageTitle');
+  }
 }
 
 declare global {

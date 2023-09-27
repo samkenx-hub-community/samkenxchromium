@@ -8,11 +8,12 @@ import android.app.Notification;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Looper;
-import android.support.test.InstrumentationRegistry;
 import android.util.Pair;
 import android.view.View;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.After;
@@ -26,7 +27,6 @@ import org.chromium.base.Callback;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.UrlUtils;
 import org.chromium.chrome.browser.download.DownloadTestRule.CustomMainActivityStart;
@@ -67,7 +67,6 @@ public class DownloadTest implements CustomMainActivityStart {
     @Rule
     public DownloadTestRule mDownloadTestRule = new DownloadTestRule(this);
 
-    private static final String TAG = "DownloadTest";
     private static final String SUPERBO_CONTENTS =
             "plain text response from a POST";
 
@@ -178,15 +177,14 @@ public class DownloadTest implements CustomMainActivityStart {
     public void setUp() {
         deleteTestFiles();
         Looper.prepare();
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         DownloadNotificationService.setInstanceForTests(new MockNotificationService());
     }
 
     @After
     public void tearDown() {
-        mTestServer.stopAndDestroyServer();
         deleteTestFiles();
-        DownloadNotificationService.setInstanceForTests(null);
     }
 
     @Override
@@ -221,7 +219,6 @@ public class DownloadTest implements CustomMainActivityStart {
     @Test
     @MediumTest
     @Feature({"Downloads"})
-    @DisabledTest(message = "https://crbug.com/1287296")
     public void testHttpGetDownload() throws Exception {
         mDownloadTestRule.loadUrl(mTestServer.getURL(TEST_DOWNLOAD_DIRECTORY + "get.html"));
         waitForFocus();
@@ -230,13 +227,12 @@ public class DownloadTest implements CustomMainActivityStart {
         int callCount = mDownloadTestRule.getChromeDownloadCallCount();
         TouchCommon.singleClickView(currentView);
         Assert.assertTrue(mDownloadTestRule.waitForChromeDownloadToFinish(callCount));
-        Assert.assertTrue(mDownloadTestRule.hasDownload(FILENAME_GZIP, null));
+        Assert.assertTrue(mDownloadTestRule.hasDownloaded(FILENAME_GZIP, null));
     }
 
     @Test
     @MediumTest
     @Feature({"Downloads"})
-    @DisabledTest(message = "https://crbug.com/1287296")
     public void testHttpPostDownload() throws Exception {
         mDownloadTestRule.loadUrl(mTestServer.getURL(TEST_DOWNLOAD_DIRECTORY + "post.html"));
         waitForFocus();
@@ -245,7 +241,7 @@ public class DownloadTest implements CustomMainActivityStart {
         int callCount = mDownloadTestRule.getChromeDownloadCallCount();
         TouchCommon.singleClickView(currentView);
         Assert.assertTrue(mDownloadTestRule.waitForChromeDownloadToFinish(callCount));
-        Assert.assertTrue(mDownloadTestRule.hasDownload(FILENAME_TEXT, SUPERBO_CONTENTS));
+        Assert.assertTrue(mDownloadTestRule.hasDownloaded(FILENAME_TEXT, SUPERBO_CONTENTS));
     }
 
     @Test
@@ -286,7 +282,6 @@ public class DownloadTest implements CustomMainActivityStart {
     @Test
     @MediumTest
     @Feature({"Downloads"})
-    @DisabledTest(message = "https://crbug.com/1287296")
     public void testUrlEscaping() throws Exception {
         mDownloadTestRule.loadUrl(mTestServer.getURL(TEST_DOWNLOAD_DIRECTORY + "urlescaping.html"));
         waitForFocus();
@@ -295,13 +290,12 @@ public class DownloadTest implements CustomMainActivityStart {
         int callCount = mDownloadTestRule.getChromeDownloadCallCount();
         TouchCommon.singleClickView(currentView);
         Assert.assertTrue(mDownloadTestRule.waitForChromeDownloadToFinish(callCount));
-        Assert.assertTrue(mDownloadTestRule.hasDownload(FILENAME_WALLPAPER, null));
+        Assert.assertTrue(mDownloadTestRule.hasDownloaded(FILENAME_WALLPAPER, null));
     }
 
     @Test
     @MediumTest
     @Feature({"Navigation"})
-    @DisabledTest(message = "crbug.com/1261941")
     public void testOMADownloadInterception() throws Exception {
         TestWebServer webServer = TestWebServer.start();
         try {
@@ -323,7 +317,7 @@ public class DownloadTest implements CustomMainActivityStart {
             CriteriaHelper.pollUiThread(() -> {
                 Criteria.checkThat(interceptor.mDownloadItem, Matchers.notNullValue());
                 Criteria.checkThat(
-                        interceptor.mDownloadItem.getDownloadInfo().getUrl(), Matchers.is(url));
+                        interceptor.mDownloadItem.getDownloadInfo().getUrl().getSpec(), Matchers.is(url));
             });
         } finally {
             webServer.shutdown();

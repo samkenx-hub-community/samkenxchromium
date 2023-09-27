@@ -21,9 +21,9 @@ import org.junit.runner.RunWith;
 import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
+import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.RequiresRestart;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
@@ -31,7 +31,6 @@ import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
 import org.chromium.chrome.test.util.OmniboxTestUtils;
-import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.chrome.test.util.browser.LocationSettingsTestUtil;
 import org.chromium.components.browser_ui.site_settings.PermissionInfo;
 import org.chromium.components.content_settings.ContentSettingValues;
@@ -44,7 +43,6 @@ import org.chromium.ui.test.util.DisableAnimationsTestRule;
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
-@DisableFeatures({ChromeFeatureList.OPTIMIZE_GEOLOCATION_HEADER_GENERATION})
 @Batch(Batch.PER_CLASS)
 public class GeolocationHeaderTest {
     public @ClassRule static ChromeTabbedActivityTestRule sActivityTestRule =
@@ -58,13 +56,10 @@ public class GeolocationHeaderTest {
 
     private static final String SEARCH_URL_1 = "https://www.google.com/search?q=potatoes";
     private static final String SEARCH_URL_2 = "https://www.google.co.jp/webhp?#q=dinosaurs";
-    private static final String DISABLE_FEATURES = "disable-features=";
-    private static final String ENABLE_FEATURES = "enable-features=";
     private static final String GOOGLE_BASE_URL_SWITCH = "google-base-url=https://www.google.com";
     private static final double LOCATION_LAT = 20.3;
     private static final double LOCATION_LONG = 155.8;
     private static final float LOCATION_ACCURACY = 20f;
-    private static final String TAG = "GeolocationHeaderTst";
 
     @Before
     public void setUp() throws InterruptedException {
@@ -173,6 +168,7 @@ public class GeolocationHeaderTest {
     @Test
     @SmallTest
     @Feature({"Location"})
+    @DisabledTest(message = "http://crbug/1479552")
     public void testGeolocationHeaderPrimingEnabledPermissionAllow() {
         setPermission(ContentSettingValues.ALLOW);
         checkHeaderPriming(true /* shouldPrimeHeader */);
@@ -181,6 +177,7 @@ public class GeolocationHeaderTest {
     @Test
     @SmallTest
     @Feature({"Location"})
+    @DisabledTest(message = "http://crbug/1479552")
     public void testGeolocationHeaderPrimingDisabledPermissionBlock() {
         setPermission(ContentSettingValues.BLOCK);
         checkHeaderPriming(false /* shouldPrimeHeader */);
@@ -189,6 +186,7 @@ public class GeolocationHeaderTest {
     @Test
     @SmallTest
     @Feature({"Location"})
+    @DisabledTest(message = "http://crbug/1479552")
     public void testGeolocationHeaderPrimingDisabledPermissionAsk() {
         setPermission(ContentSettingValues.ASK);
         checkHeaderPriming(false /* shouldPrimeHeader */);
@@ -198,6 +196,7 @@ public class GeolocationHeaderTest {
     @SmallTest
     @Feature({"Location"})
     @RequiresRestart(value = "Needs to reset cached geolocation from previous tests")
+    @DisabledTest(message = "http://crbug/1479552")
     public void testGeolocationHeaderPrimingDisabledOSPermissionBlocked() {
         setPermission(ContentSettingValues.ALLOW);
         LocationSettingsTestUtil.setSystemLocationSettingEnabled(false);

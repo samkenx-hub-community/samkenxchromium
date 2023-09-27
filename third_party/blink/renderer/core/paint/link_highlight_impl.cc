@@ -301,10 +301,11 @@ void LinkHighlightImpl::Paint(GraphicsContext& context) {
   bool use_rounded_rects = !node_->GetDocument()
                                 .GetSettings()
                                 ->GetMockGestureTapHighlightsEnabled() &&
-                           !object->FirstFragment().NextFragment();
+                           !object->IsFragmented();
 
   wtf_size_t index = 0;
-  for (FragmentDataIterator iterator(*object); !iterator.IsDone(); index++) {
+  for (AccompaniedFragmentIterator iterator(*object); !iterator.IsDone();
+       index++) {
     const auto* fragment = iterator.GetFragmentData();
     ScopedDisplayItemFragment scoped_fragment(context, fragment->FragmentID());
     Vector<PhysicalRect> rects = object->CollectOutlineRectsAndAdvance(
@@ -392,9 +393,7 @@ void LinkHighlightImpl::SetNeedsRepaintAndCompositingUpdate() {
   DCHECK(node_);
   if (auto* frame_view = node_->GetDocument().View()) {
     frame_view->SetVisualViewportOrOverlayNeedsRepaint();
-    frame_view->SetPaintArtifactCompositorNeedsUpdate(
-        PaintArtifactCompositorUpdateReason::
-            kLinkHighlightImplNeedsCompositingUpdate);
+    frame_view->SetPaintArtifactCompositorNeedsUpdate();
   }
 }
 

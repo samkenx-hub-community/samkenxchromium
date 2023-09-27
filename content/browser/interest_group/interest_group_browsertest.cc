@@ -4,14 +4,21 @@
 
 #include <stdint.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <sstream>
 #include <string>
+#include <tuple>
+#include <variant>
 #include <vector>
 
+#include "base/base64.h"
+#include "base/base64url.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
+#include "base/feature_list.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_forward.h"
 #include "base/json/json_reader.h"
@@ -19,6 +26,10 @@
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/escape.h"
+#include "base/strings/pattern.h"
+#include "base/strings/strcat.h"
+#include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/synchronization/lock.h"
 #include "base/test/bind.h"
@@ -33,17 +44,22 @@
 #include "components/web_package/web_bundle_builder.h"
 #include "content/browser/fenced_frame/fenced_frame.h"
 #include "content/browser/fenced_frame/fenced_frame_url_mapping.h"
+#include "content/browser/interest_group/ad_auction_page_data.h"
 #include "content/browser/interest_group/ad_auction_service_impl.h"
+#include "content/browser/interest_group/additional_bids_test_util.h"
 #include "content/browser/interest_group/interest_group_manager_impl.h"
+#include "content/browser/interest_group/test_interest_group_observer.h"
 #include "content/browser/private_aggregation/private_aggregation_manager_impl.h"
 #include "content/browser/private_aggregation/private_aggregation_test_utils.h"
 #include "content/browser/renderer_host/page_impl.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
 #include "content/browser/storage_partition_impl.h"
 #include "content/browser/web_contents/web_contents_impl.h"
+#include "content/common/features.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_features.h"
+#include "content/public/test/back_forward_cache_util.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/content_browser_test.h"
@@ -64,7 +80,10 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "net/test/embedded_test_server/request_handler_util.h"
+#include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
 #include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
+#include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/network_switches.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/mojom/fetch_api.mojom.h"
@@ -73,6 +92,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/features.h"
+#include "third_party/blink/public/common/features_generated.h"
 #include "third_party/blink/public/common/interest_group/ad_auction_constants.h"
 #include "third_party/blink/public/common/interest_group/ad_display_size_utils.h"
 #include "third_party/blink/public/common/interest_group/interest_group.h"
@@ -91,6 +111,9 @@ namespace {
 using ::testing::Eq;
 using ::testing::HasSubstr;
 using ::testing::Optional;
+
+constexpr char kLegitimateAdAuctionResponse[] =
+    "ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0=";
 
 // Returned by test Javascript code when join or leave promises complete without
 // throwing an exception.
@@ -112,6 +135,48 @@ const char kFeedPromise[] = R"(
   }
 )";
 
+const blink::InterestGroup::AdditionalBidKey kPublicKey1 = {
+    0xc7, 0xd1, 0x8d, 0x16, 0x57, 0x5c, 0xe7, 0x3a, 0x2c, 0x60, 0x22,
+    0xfb, 0x44, 0xe4, 0xc8, 0x5a, 0xb5, 0x41, 0xee, 0xf9, 0x34, 0xee,
+    0xf8, 0x11, 0x00, 0xf7, 0xfa, 0xf0, 0x7f, 0xfa, 0x30, 0x6f};
+
+const char kBase64PublicKey1[] = "x9GNFldc5zosYCL7ROTIWrVB7vk07vgRAPf68H/6MG8=";
+
+const uint8_t kPrivateKey1[] = {
+    0x44, 0x0a, 0xb0, 0x1f, 0xec, 0x87, 0x57, 0xce, 0x42, 0x17, 0x91,
+    0xa3, 0x67, 0xa4, 0x3f, 0x2b, 0xf6, 0x2c, 0xf5, 0xe3, 0x0a, 0x88,
+    0x4e, 0x22, 0x94, 0xf0, 0x59, 0x01, 0x1d, 0x53, 0x2b, 0xa0, 0xc7,
+    0xd1, 0x8d, 0x16, 0x57, 0x5c, 0xe7, 0x3a, 0x2c, 0x60, 0x22, 0xfb,
+    0x44, 0xe4, 0xc8, 0x5a, 0xb5, 0x41, 0xee, 0xf9, 0x34, 0xee, 0xf8,
+    0x11, 0x00, 0xf7, 0xfa, 0xf0, 0x7f, 0xfa, 0x30, 0x6f};
+
+const blink::InterestGroup::AdditionalBidKey kPublicKey2 = {
+    0xa6, 0x34, 0xb2, 0xd9, 0x67, 0x01, 0xc9, 0x8b, 0x19, 0xfc, 0x0a,
+    0xa8, 0x9a, 0x8f, 0x3c, 0xb6, 0x2a, 0xad, 0x14, 0xea, 0x4f, 0xa5,
+    0x17, 0x7e, 0xe3, 0x04, 0xed, 0x8d, 0x0d, 0xaf, 0x66, 0x11};
+
+const char kBase64PublicKey2[] = "pjSy2WcByYsZ/Aqomo88tiqtFOpPpRd+4wTtjQ2vZhE=";
+
+const uint8_t kPrivateKey2[] = {
+    0x6b, 0x42, 0xed, 0x42, 0x2e, 0x8d, 0x01, 0xf7, 0x6a, 0xc5, 0xc6,
+    0x26, 0x4a, 0xeb, 0xfb, 0xe5, 0xbc, 0x31, 0xd2, 0x49, 0x19, 0x92,
+    0x63, 0x5e, 0x95, 0x1c, 0x99, 0x7f, 0xf2, 0xd2, 0x77, 0x87, 0xa6,
+    0x34, 0xb2, 0xd9, 0x67, 0x01, 0xc9, 0x8b, 0x19, 0xfc, 0x0a, 0xa8,
+    0x9a, 0x8f, 0x3c, 0xb6, 0x2a, 0xad, 0x14, 0xea, 0x4f, 0xa5, 0x17,
+    0x7e, 0xe3, 0x04, 0xed, 0x8d, 0x0d, 0xaf, 0x66, 0x11};
+
+const blink::InterestGroup::AdditionalBidKey kPublicKeyWithNoMatchingSignature =
+    {0xf8, 0x11, 0x00, 0xf7, 0xfa, 0xf0, 0x7f, 0xfa, 0x30, 0x6f, 0xc7,
+     0xd1, 0x8d, 0x16, 0x57, 0x5c, 0xe7, 0x3a, 0x2c, 0x60, 0x22, 0xfb,
+     0x44, 0xe4, 0xc8, 0x5a, 0xb5, 0x41, 0xee, 0xf9, 0x34, 0xee};
+
+std::string base64Decode(base::StringPiece input) {
+  std::string bytes;
+  CHECK(base::Base64UrlDecode(
+      input, base::Base64UrlDecodePolicy::IGNORE_PADDING, &bytes));
+  return bytes;
+}
+
 // Convenience helper to parse JSON to a base::Value. CHECKs on failure, rather
 // than letting callers handle it.
 base::Value JsonToValue(const std::string& json) {
@@ -121,6 +186,15 @@ base::Value JsonToValue(const std::string& json) {
   return std::move(metadata).value();
 }
 
+base::Value::List AdAllowedReportingOriginsToList(
+    std::vector<url::Origin> origins) {
+  base::Value::List allowed_reporting_origins;
+  for (const auto& origin : origins) {
+    allowed_reporting_origins.Append(origin.Serialize());
+  }
+  return allowed_reporting_origins;
+}
+
 // Creates base::Value representations of ads and adComponents arrays from the
 // provided InterestGroup::Ads.
 base::Value::List MakeAdsValue(
@@ -128,12 +202,27 @@ base::Value::List MakeAdsValue(
   base::Value::List list;
   for (const auto& ad : ads) {
     base::Value::Dict entry;
-    entry.Set("renderUrl", ad.render_url.spec());
+    entry.Set("renderURL", ad.render_url.spec());
     if (ad.size_group) {
       entry.Set("sizeGroup", std::move(ad.size_group.value()));
     }
-    if (ad.metadata)
+    if (ad.buyer_reporting_id) {
+      entry.Set("buyerReportingId", *ad.buyer_reporting_id);
+    }
+    if (ad.buyer_and_seller_reporting_id) {
+      entry.Set("buyerAndSellerReportingId", *ad.buyer_and_seller_reporting_id);
+    }
+    if (ad.metadata) {
       entry.Set("metadata", JsonToValue(*ad.metadata));
+    }
+    if (ad.ad_render_id) {
+      entry.Set("adRenderId", std::move(ad.ad_render_id.value()));
+    }
+    if (ad.allowed_reporting_origins) {
+      entry.Set("allowedReportingOrigins",
+                AdAllowedReportingOriginsToList(
+                    ad.allowed_reporting_origins.value()));
+    }
     list.Append(std::move(entry));
   }
   return list;
@@ -211,6 +300,30 @@ base::Value::Dict SizeGroupsToDict(
   return dict;
 }
 
+base::Value::List AuctionServerRequestFlagsToList(
+    const blink::AuctionServerRequestFlags& flags) {
+  base::Value::List result;
+  if (flags.Has(blink::AuctionServerRequestFlagsEnum::kOmitAds)) {
+    result.Append("omit-ads");
+  }
+  if (flags.Has(blink::AuctionServerRequestFlagsEnum::kIncludeFullAds)) {
+    result.Append("include-full-ads");
+  }
+  return result;
+}
+
+bool IsErrorMessage(const content::WebContentsConsoleObserver::Message& msg) {
+  return msg.log_level == blink::mojom::ConsoleMessageLevel::kError;
+}
+
+// This convoluted way to validate the UUID is necessary because MatchesRegex
+// only support simple regular expressions, not PCRE.
+std::string ConvertUuidWithOnlyZeros(const std::string& uuid) {
+  std::string all_zeros;
+  base::ReplaceChars(uuid, "1234567890abcdef", "0", &all_zeros);
+  return all_zeros;
+}
+
 class AllowlistedOriginContentBrowserClient
     : public ContentBrowserTestContentBrowserClient {
  public:
@@ -239,6 +352,13 @@ class AllowlistedOriginContentBrowserClient
            allow_list_.contains(api_origin);
   }
 
+  bool IsPrivacySandboxReportingDestinationAttested(
+      content::BrowserContext* browser_context,
+      const url::Origin& destination_origin,
+      content::PrivacySandboxInvokingAPI invoking_api) override {
+    return allow_list_.contains(destination_origin);
+  }
+
  private:
   base::flat_set<url::Origin> allow_list_;
 };
@@ -249,15 +369,17 @@ class AllowlistedOriginContentBrowserClient
 constexpr char kDeferredUpdateResponsePath[] =
     "/interest_group/update_deferred.json";
 
-constexpr char kFledgeHeader[] = "X-Allow-FLEDGE";
+constexpr char kFledgeHeader[] = "Ad-Auction-Allowed";
 
 // Allows registering responses to network requests.
 class NetworkResponder {
  public:
   using ResponseHeaders = std::vector<std::pair<std::string, std::string>>;
 
-  explicit NetworkResponder(net::EmbeddedTestServer& server)
-      : controllable_response_(&server, kDeferredUpdateResponsePath) {
+  explicit NetworkResponder(
+      net::EmbeddedTestServer& server,
+      const std::string& relative_url = kDeferredUpdateResponsePath)
+      : controllable_response_(&server, relative_url) {
     server.RegisterRequestHandler(base::BindRepeating(
         &NetworkResponder::RequestHandler, base::Unretained(this)));
   }
@@ -327,8 +449,8 @@ class NetworkResponder {
         builder.AddExchange(response.subresource_url,
                             {{":status", "200"},
                              {"content-type", response.content_type},
-                             {"x-allow-fledge", "true"},
-                             {"x-fledge-auction-only", "true"},
+                             {"ad-auction-allowed", "true"},
+                             {"ad-auction-only", "true"},
                              {"access-control-allow-credentials", "true"},
                              {"access-control-allow-origin", allow_origin}},
                             response.payload);
@@ -370,8 +492,9 @@ class NetworkResponder {
     std::string script_tags;
     for (const SubresourceBundle& bundle : bundles) {
       base::Value::List subresources;
-      for (const SubresourceResponse& subresource : bundle.subresources)
+      for (const SubresourceResponse& subresource : bundle.subresources) {
         subresources.Append(subresource.subresource_url);
+      }
       script_tags += JsReplace(kScriptWebBundleTemplate, bundle.bundle_url,
                                std::move(subresources));
     }
@@ -416,6 +539,16 @@ function generateBid(
     controllable_response_.Done();
   }
 
+  // Wait for and get the received request.
+  const net::test_server::HttpRequest* GetRequest() {
+    controllable_response_.WaitForRequest();
+    return controllable_response_.http_request();
+  }
+
+  bool HasReceivedRequest() {
+    return controllable_response_.has_received_request();
+  }
+
  private:
   struct Response {
     std::string body;
@@ -427,8 +560,9 @@ function generateBid(
       const net::test_server::HttpRequest& request) {
     base::AutoLock auto_lock(response_map_lock_);
     const auto it = response_map_.find(request.GetURL().path());
-    if (it == response_map_.end())
+    if (it == response_map_.end()) {
       return nullptr;
+    }
     auto response = std::make_unique<net::test_server::BasicHttpResponse>();
     response->AddCustomHeader(kFledgeHeader, "true");
     response->set_code(net::HTTP_OK);
@@ -485,50 +619,58 @@ std::unique_ptr<net::test_server::HttpResponse> HandleWellKnownRequest(
     response->set_content(
         R"({"joinAdInterestGroup" : true, "leaveAdInterestGroup" : true})");
   } else {
-    NOTREACHED();
+    NOTREACHED() << "Unexpected host_header: " << host_header->second;
   }
   return response;
 }
 
-class InterestGroupTestObserver
-    : public InterestGroupManagerImpl::InterestGroupObserver {
- public:
-  using Entry =
-      std::tuple<InterestGroupManagerImpl::InterestGroupObserver::AccessType,
-                 url::Origin,
-                 std::string>;
-
-  void OnInterestGroupAccessed(
-      const base::Time& access_time,
-      InterestGroupManagerImpl::InterestGroupObserver::AccessType type,
-      const url::Origin& owner_origin,
-      const std::string& name) override {
-    accesses_.emplace_back(type, owner_origin, name);
-
-    if (run_loop_ && accesses_.size() >= expected_.size()) {
-      run_loop_->Quit();
-    }
+std::unique_ptr<net::test_server::HttpResponse> HandleAdditionalBids(
+    const net::test_server::HttpRequest& request) {
+  if (!base::StartsWith(request.relative_url, "/additionalBidsHandler?")) {
+    return nullptr;
+  }
+  std::vector<std::string> pieces =
+      base::SplitString(request.GetURL().query_piece(), "&",
+                        base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
+  if (pieces.size() < 2u) {
+    return nullptr;
   }
 
-  void WaitForAccesses(const std::vector<Entry>& expected) {
-    DCHECK(!run_loop_);
-    if (accesses_.size() < expected.size()) {
-      run_loop_ = std::make_unique<base::RunLoop>();
-      expected_ = expected;
-      run_loop_->Run();
-      run_loop_.reset();
-    }
-    EXPECT_EQ(expected, accesses_);
+  auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+  response->set_content_type("application/json");
+  response->set_content("{}");
 
-    // Clear accesses so can be reused.
-    accesses_.clear();
+  const std::string& nonce = pieces[0];
+  const std::string& fault_str = pieces[1];
+  SignedAdditionalBidFault fault = SignedAdditionalBidFault::kNone;
+  if (fault_str == "invalid-signed-base-64") {
+    fault = SignedAdditionalBidFault::kInvalidSignedBase64;
+  } else if (fault_str == "invalid-signed-json") {
+    fault = SignedAdditionalBidFault::kInvalidSignedJson;
+  } else if (fault_str == "invalid-signed-struct") {
+    fault = SignedAdditionalBidFault::kInvalidSignedBidStructure;
+  } else if (fault_str == "invalid-signature") {
+    fault = SignedAdditionalBidFault::kInvalidSignature;
+  } else if (fault_str == "one-invalid-signature") {
+    fault = SignedAdditionalBidFault::kOneInvalidSignature;
+  } else {
+    DCHECK_EQ(fault_str, "none");
   }
 
- private:
-  std::vector<Entry> accesses_;
-  std::vector<Entry> expected_;
-  std::unique_ptr<base::RunLoop> run_loop_;
-};
+  for (size_t i = 2; i < pieces.size(); ++i) {
+    std::string bid;
+    bool ok = base::Base64Decode(pieces[i], &bid,
+                                 base::Base64DecodePolicy::kForgiving);
+    CHECK(ok);
+    response->AddCustomHeader(
+        "Ad-Auction-Additional-Bid",
+        GenerateSignedAdditionalBidHeader(
+            fault, nonce, bid, {kPrivateKey1, kPrivateKey2},
+            {kBase64PublicKey1, kBase64PublicKey2}));
+  }
+
+  return response;
+}
 
 class InterestGroupBrowserTest : public ContentBrowserTest {
  public:
@@ -536,9 +678,14 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
     feature_list_.InitWithFeatures(
         /*`enabled_features`=*/
         {blink::features::kInterestGroupStorage,
+         blink::features::kFledgeBiddingAndAuctionServer,
+         features::kPrivacySandboxAdsAPIsOverride,
          blink::features::kAdInterestGroupAPI, blink::features::kParakeet,
          blink::features::kFledge, blink::features::kAllowURNsInIframes,
+         blink::features::kFledgeNegativeTargeting,
          blink::features::kBiddingAndScoringDebugReportingAPI,
+         blink::features::kFledgeDirectFromSellerSignalsHeaderAdSlot,
+         blink::features::kFencedFramesM119Features,
          features::kBackForwardCache},
         /*disabled_features=*/
         {blink::features::kFencedFrames});
@@ -555,11 +702,13 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
     https_server_->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
     https_server_->RegisterRequestHandler(
         base::BindRepeating(&HandleWellKnownRequest));
+    https_server_->RegisterRequestHandler(
+        base::BindRepeating(&HandleAdditionalBids));
     https_server_->AddDefaultHandlers(GetTestDataFilePath());
     https_server_->RegisterRequestMonitor(base::BindRepeating(
         &InterestGroupBrowserTest::OnHttpsTestServerRequestMonitor,
         base::Unretained(this)));
-    network_responder_ = std::make_unique<NetworkResponder>(*https_server_);
+    network_responder_ = CreateNetworkResponder();
     ASSERT_TRUE(https_server_->Start());
     manager_ = static_cast<InterestGroupManagerImpl*>(
         shell()
@@ -567,7 +716,6 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
             ->GetBrowserContext()
             ->GetDefaultStoragePartition()
             ->GetInterestGroupManager());
-    observer_ = std::make_unique<InterestGroupTestObserver>();
     content_browser_client_ =
         std::make_unique<AllowlistedOriginContentBrowserClient>();
     content_browser_client_->SetAllowList(
@@ -577,11 +725,28 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
          https_server_->GetOrigin("allow-join.a.test"),
          https_server_->GetOrigin("allow-leave.a.test"),
          https_server_->GetOrigin("no-cors.a.test"),
+         // Magic interest group origins used in other tests where we need
+         // InterestGroups from multiple join origins.
+         https_server_->GetOrigin("allow-join.b.test"),
+         https_server_->GetOrigin("allow-leave.b.test"),
+         https_server_->GetOrigin("no-cors.b.test"),
+         https_server_->GetOrigin("allow-join.c.test"),
+         https_server_->GetOrigin("allow-leave.c.test"),
+         https_server_->GetOrigin("no-cors.c.test"),
          // HTTP origins like those below aren't supported for FLEDGE -- some
          // tests verify that HTTP origins are rejected, even if somehow they
          // are allowed by the allowlist.
          https_server_->GetOrigin("a.test"), https_server_->GetOrigin("b.test"),
          https_server_->GetOrigin("c.test")});
+  }
+
+  void TearDownOnMainThread() override {
+    manager_ = nullptr;  // don't dangle once StoragePartition cleans it up.
+    ContentBrowserTest::TearDownOnMainThread();
+  }
+
+  virtual std::unique_ptr<NetworkResponder> CreateNetworkResponder() {
+    return std::make_unique<NetworkResponder>(*https_server_);
   }
 
   // Attempts to join the specified interest group. Returns kSuccess if the
@@ -679,8 +844,9 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
     dict.Set("priority", group.priority);
     dict.Set("enableBiddingSignalsPrioritization",
              group.enable_bidding_signals_prioritization);
-    if (group.priority_vector)
+    if (group.priority_vector) {
       dict.Set("priorityVector", StringDoubleMapToDict(*group.priority_vector));
+    }
     if (group.priority_signals_overrides) {
       dict.Set("prioritySignalsOverrides",
                StringDoubleMapToDict(*group.priority_signals_overrides));
@@ -688,27 +854,30 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
     dict.Set("sellerCapabilities",
              SellerCapabilitiesToDict(group.seller_capabilities,
                                       group.all_sellers_capabilities));
-    if (group.bidding_url)
-      dict.Set("biddingLogicUrl", group.bidding_url->spec());
-    if (group.bidding_wasm_helper_url)
-      dict.Set("biddingWasmHelperUrl", group.bidding_wasm_helper_url->spec());
+    if (group.bidding_url) {
+      dict.Set("biddingLogicURL", group.bidding_url->spec());
+    }
+    if (group.bidding_wasm_helper_url) {
+      dict.Set("biddingWasmHelperURL", group.bidding_wasm_helper_url->spec());
+    }
     if (group.update_url) {
       // It doesn't really make sense to set `update_url` without one of these
       // being true.
       DCHECK(set_update_url_ || set_daily_update_url_);
       if (set_update_url_) {
-        dict.Set("updateUrl", group.update_url->spec());
+        dict.Set("updateURL", group.update_url->spec());
       }
       if (set_daily_update_url_) {
         dict.Set("dailyUpdateUrl", group.update_url->spec());
       }
     }
     if (group.trusted_bidding_signals_url) {
-      dict.Set("trustedBiddingSignalsUrl",
+      dict.Set("trustedBiddingSignalsURL",
                group.trusted_bidding_signals_url->spec());
     }
-    if (group.user_bidding_signals)
+    if (group.user_bidding_signals) {
       dict.Set("userBiddingSignals", JsonToValue(*group.user_bidding_signals));
+    }
     if (group.trusted_bidding_signals_keys) {
       base::Value::List keys;
       for (const auto& key : *group.trusted_bidding_signals_keys) {
@@ -716,15 +885,22 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
       }
       dict.Set("trustedBiddingSignalsKeys", std::move(keys));
     }
-    if (group.ads)
+    if (group.ads) {
       dict.Set("ads", MakeAdsValue(*group.ads));
-    if (group.ad_components)
+    }
+    if (group.ad_components) {
       dict.Set("adComponents", MakeAdsValue(*group.ad_components));
+    }
     if (group.ad_sizes) {
       dict.Set("adSizes", AdSizesToDict(*group.ad_sizes));
     }
     if (group.size_groups) {
       dict.Set("sizeGroups", SizeGroupsToDict(*group.size_groups));
+    }
+    if (!group.auction_server_request_flags.Empty()) {
+      dict.Set(
+          "auctionServerRequestFlags",
+          AuctionServerRequestFlagsToList(group.auction_server_request_flags));
     }
     switch (group.execution_mode) {
       case blink::InterestGroup::ExecutionMode::kCompatibilityMode:
@@ -736,6 +912,10 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
       case blink::InterestGroup::ExecutionMode::kFrozenContext:
         dict.Set("executionMode", "frozenContext");
         break;
+    }
+    if (group.additional_bid_key) {
+      dict.Set("additionalBidKey",
+               base::Base64Encode(*group.additional_bid_key));
     }
 
     std::string interest_group_string;
@@ -878,8 +1058,9 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
 
   int GetJoinCount(const url::Origin& owner, const std::string& name) {
     absl::optional<StorageInterestGroup> group = GetInterestGroup(owner, name);
-    if (!group)
+    if (!group) {
       return 0;
+    }
     return group->bidding_browser_signals->join_count;
   }
 
@@ -946,23 +1127,23 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
           absl::nullopt,
       absl::optional<ToRenderFrameHost> execution_target = absl::nullopt) {
     return JoinInterestGroupAndVerify(
-        blink::InterestGroup(
-            /*expiry=*/base::Time(), owner, name, priority,
-            /*enable_bidding_signals_prioritization=*/false,
-            /*priority_vector=*/absl::nullopt,
-            /*priority_signals_overrides=*/absl::nullopt,
-            /*seller_capabilities=*/absl::nullopt,
-            /*all_sellers_capabilities=*/
-            {}, execution_mode, std::move(bidding_url),
-            /*bidding_wasm_helper_url=*/absl::nullopt,
-            /*update_url=*/absl::nullopt,
-            /*trusted_bidding_signals_url=*/absl::nullopt,
-            /*trusted_bidding_signals_keys=*/absl::nullopt,
-            /*user_bidding_signals=*/absl::nullopt, std::move(ads),
-            std::move(ad_components),
-            /*ad_sizes=*/{},
-            /*size_groups=*/{}),
+        blink::TestInterestGroupBuilder(owner, name)
+            .SetPriority(priority)
+            .SetExecutionMode(execution_mode)
+            .SetBiddingUrl(std::move(bidding_url))
+            .SetAds(std::move(ads))
+            .SetAdComponents(std::move(ad_components))
+            .Build(),
         execution_target);
+  }
+
+  [[nodiscard]] std::string CreateAuctionNonceAndWait() {
+    std::string auction_nonce =
+        EvalJs(shell(), "navigator.createAuctionNonce()").ExtractString();
+    // Validate nonce is in the correct format.
+    EXPECT_EQ("00000000-0000-0000-0000-000000000000",
+              ConvertUuidWithOnlyZeros(auction_nonce));
+    return auction_nonce;
   }
 
   // If `execution_target` is non-null, uses it as the target. Otherwise, uses
@@ -974,6 +1155,20 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
     return EvalJs(execution_target ? *execution_target : shell(),
                   base::StringPrintf(
                       R"(
+// Helper for setting up additional bids.
+// It returns a promise that resolves when a network request that receives the
+// additional bids as a header is received. additionalBids in an AuctionConfig
+// can be set to the returned value.
+function provideAdditionalBids(seller, nonce, bidStringList,
+                               injectFault = "none") {
+  let url = seller + "/additionalBidsHandler?" + nonce + "&" + injectFault;
+  for (bidString of bidStringList) {
+    url += "&" + btoa(bidString);
+  }
+
+  return fetch(url, {adAuctionHeaders: true});
+}
+
 (async function() {
   try {
     return await navigator.runAdAuction(%s);
@@ -1027,8 +1222,8 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
     auto result = RunAuctionAndWait(auction_config_json,
                                     /*execution_target=*/absl::nullopt);
     GURL urn_url = GURL(result.ExtractString());
-    EXPECT_TRUE(urn_url.is_valid());
-    EXPECT_EQ(url::kUrnScheme, urn_url.scheme_piece());
+    EXPECT_TRUE(urn_url.is_valid()) << result;
+    EXPECT_EQ(url::kUrnScheme, urn_url.scheme_piece()) << result;
 
     TestFencedFrameURLMappingResultObserver observer;
     ConvertFencedFrameURNToURL(urn_url, &observer);
@@ -1084,7 +1279,7 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
     }).then(ads => {
       return navigator.finalizeAd(ads, {
         seller: "https://example.site",
-        decisionLogicUrl: "https://example.site/script.js",
+        decisionLogicURL: "https://example.site/script.js",
         perBuyerSignals: {"example.site": { randomParam: "value1" }},
         auctionSignals: "pubCode123",
         sellerSignals: { someKey: "sellerValue" }
@@ -1102,8 +1297,9 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
       base::RepeatingCallback<bool(const std::vector<StorageInterestGroup>&)>
           condition) {
     while (true) {
-      if (condition.Run(GetInterestGroupsForOwner(owner)))
+      if (condition.Run(GetInterestGroupsForOwner(owner))) {
         break;
+      }
     }
   }
 
@@ -1119,8 +1315,9 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
 
     {
       base::AutoLock auto_lock(requests_lock_);
-      if (received_https_test_server_requests_.count(wait_for_url) > 0u)
+      if (received_https_test_server_requests_.count(wait_for_url) > 0u) {
         return;
+      }
       wait_for_url_ = wait_for_url;
       request_run_loop_ = std::make_unique<base::RunLoop>();
     }
@@ -1132,11 +1329,62 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
   void OnHttpsTestServerRequestMonitor(
       const net::test_server::HttpRequest& request) {
     base::AutoLock auto_lock(requests_lock_);
+
+    auto ad_auction_header = request.headers.find("Sec-Ad-Auction-Fetch");
+    if (ad_auction_header != request.headers.end()) {
+      request_path_ad_auction_header_map_[request.GetURL().path()] =
+          ad_auction_header->second;
+    }
+
     received_https_test_server_requests_.insert(request.GetURL());
     if (wait_for_url_ == request.GetURL()) {
       wait_for_url_ = GURL();
       request_run_loop_->Quit();
     }
+  }
+
+  absl::optional<std::string> GetAdAuctionHeaderForRequestPath(
+      const std::string& request_path) {
+    base::AutoLock auto_lock(requests_lock_);
+    auto it = request_path_ad_auction_header_map_.find(request_path);
+    if (it == request_path_ad_auction_header_map_.end()) {
+      return absl::nullopt;
+    }
+
+    return it->second;
+  }
+
+  bool WitnessedAuctionResultForOrigin(const url::Origin& origin,
+                                       const std::string& response) {
+    Page& page = web_contents()->GetPrimaryPage();
+
+    AdAuctionPageData* ad_auction_page_data =
+        PageUserData<AdAuctionPageData>::GetOrCreateForPage(page);
+
+    return ad_auction_page_data->WitnessedAuctionResultForOrigin(origin,
+                                                                 response);
+  }
+
+  const std::set<std::string>& GetAuctionSignalsForOrigin(
+      const url::Origin& origin) {
+    Page& page = web_contents()->GetPrimaryPage();
+
+    AdAuctionPageData* ad_auction_page_data =
+        PageUserData<AdAuctionPageData>::GetOrCreateForPage(page);
+
+    return ad_auction_page_data->GetAuctionSignalsForOrigin(origin);
+  }
+
+  std::vector<std::string> TakeAuctionAdditionalBidsForOriginAndNonce(
+      const url::Origin& origin,
+      const std::string& nonce) {
+    Page& page = web_contents()->GetPrimaryPage();
+
+    AdAuctionPageData* ad_auction_page_data =
+        PageUserData<AdAuctionPageData>::GetOrCreateForPage(page);
+
+    return ad_auction_page_data->TakeAuctionAdditionalBidsForOriginAndNonce(
+        origin, nonce);
   }
 
   void ClearReceivedRequests() {
@@ -1155,8 +1403,9 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
 
   bool HasServerSeenUrls(const std::vector<GURL>& urls) {
     for (const auto& url : urls) {
-      if (!HasServerSeenUrl(url))
+      if (!HasServerSeenUrl(url)) {
         return false;
+      }
     }
     return true;
   }
@@ -1224,7 +1473,7 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
                               R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$1],
 }
                               )",
@@ -1263,8 +1512,9 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
     EvalJsResult result =
         EvalJs(adapter, JsReplace("navigator.deprecatedURNToURL($1, $2)",
                                   urn_url, send_reports));
-    if (!result.error.empty() || result.value.is_none())
+    if (!result.error.empty() || result.value.is_none()) {
       return absl::nullopt;
+    }
     return GURL(result.ExtractString());
   }
 
@@ -1273,8 +1523,9 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
       const base::flat_map<std::string, std::string> replacements,
       std::string* error_out = nullptr) {
     base::Value::Dict replacement_value;
-    for (const auto& replacement : replacements)
+    for (const auto& replacement : replacements) {
       replacement_value.Set(replacement.first, replacement.second);
+    }
     EvalJsResult result = EvalJs(
         shell(), JsReplace(R"(
     (async function() {
@@ -1289,11 +1540,15 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
   }
 
   void AttachInterestGroupObserver() {
+    if (observer_) {
+      manager_->RemoveInterestGroupObserver(observer_.get());
+    }
+    observer_ = std::make_unique<TestInterestGroupObserver>();
     manager_->AddInterestGroupObserver(observer_.get());
   }
 
   void WaitForAccessObserved(
-      const std::vector<InterestGroupTestObserver::Entry>& expected) {
+      const std::vector<TestInterestGroupObserver::Entry>& expected) {
     observer_->WaitForAccesses(expected);
   }
 
@@ -1306,21 +1561,23 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
   base::test::ScopedFeatureList feature_list_;
   std::unique_ptr<AllowlistedOriginContentBrowserClient>
       content_browser_client_;
-  std::unique_ptr<InterestGroupTestObserver> observer_;
-  raw_ptr<InterestGroupManagerImpl, DanglingUntriaged> manager_;
+  std::unique_ptr<TestInterestGroupObserver> observer_;
+  raw_ptr<InterestGroupManagerImpl> manager_;
   base::Lock requests_lock_;
   std::set<GURL> received_https_test_server_requests_
+      GUARDED_BY(requests_lock_);
+  std::map<std::string, std::string> request_path_ad_auction_header_map_
       GUARDED_BY(requests_lock_);
   std::unique_ptr<base::RunLoop> request_run_loop_;
   GURL wait_for_url_ GUARDED_BY(requests_lock_);
   std::unique_ptr<NetworkResponder> network_responder_;
 
   // These determine, when joining an interest group in Javascript using a
-  // blink::InterestGroup with a non-null update_url field, whether `updateUrl`,
+  // blink::InterestGroup with a non-null update_url field, whether `updateURL`,
   // `dailyUpdateUrl`, or both are set on the Javascript `interestGroup` object.
   //
   // TODO(https://crbug.com/1420080): Remove these once support for
-  // `dailyUpdateUrl` has been removed, and always set `updateUrl` only.
+  // `dailyUpdateUrl` has been removed, and always set `updateURL` only.
   bool set_update_url_ = true;
   bool set_daily_update_url_ = false;
 };
@@ -1333,41 +1590,18 @@ class InterestGroupBrowserTest : public ContentBrowserTest {
 // with the option enabled. This fixture is parameterized over whether the test
 // should call `navigator.runAdAuction()` with a request to have the promise
 // resolve to a JS `FencedFrameConfig` object or a URN.
-class InterestGroupFencedFrameBrowserTest
-    : public InterestGroupBrowserTest,
-      public ::testing::WithParamInterface<bool> {
+class InterestGroupFencedFrameBrowserTest : public InterestGroupBrowserTest {
  public:
   InterestGroupFencedFrameBrowserTest() {
-    if (ResolveAuctionsToConfig()) {
-      feature_list_.InitWithFeaturesAndParameters(
-          {{blink::features::kFencedFrames, {}},
-           {features::kPrivacySandboxAdsAPIsOverride, {}},
-           {blink::features::kPrivateAggregationApi,
-            {{"fledge_extensions_enabled", "true"}}},
-           // This feature allows `runAdAuction()`'s promise to resolve to a
-           // `FencedFrameConfig` object upon developer request.
-           {blink::features::kFencedFramesAPIChanges, {}}},
-          /*disabled_features=*/{});
-    } else {
-      feature_list_.InitWithFeaturesAndParameters(
-          {{blink::features::kFencedFrames, {}},
-           {features::kPrivacySandboxAdsAPIsOverride, {}},
-           {blink::features::kPrivateAggregationApi,
-            {{"fledge_extensions_enabled", "true"}}}},
-          /*disabled_features=*/{});
-    }
-  }
-
-  bool ResolveAuctionsToConfig() const { return GetParam(); }
-
-  // Provides meaningful param names instead of /0 and /1.
-  static std::string DescribeParams(
-      const ::testing::TestParamInfo<ParamType>& info) {
-    if (info.param) {
-      return "ResolveAuctionsToConfig";
-    } else {
-      return "ResolveAuctionsToURN";
-    }
+    feature_list_.InitWithFeaturesAndParameters(
+        {{blink::features::kFencedFrames, {}},
+         {features::kPrivacySandboxAdsAPIsOverride, {}},
+         {blink::features::kPrivateAggregationApi, {}},
+         // This feature allows `runAdAuction()`'s promise to resolve to a
+         // `FencedFrameConfig` object upon developer request.
+         {blink::features::kFencedFramesAPIChanges, {}},
+         {blink::features::kFencedFramesDefaultMode, {}}},
+        /*disabled_features=*/{});
   }
 
   ~InterestGroupFencedFrameBrowserTest() override = default;
@@ -1384,65 +1618,40 @@ class InterestGroupFencedFrameBrowserTest
       const GURL& expected_ad_url,
       const std::string& auction_config_json,
       absl::optional<ToRenderFrameHost> execution_target = absl::nullopt) {
-    if (!execution_target)
+    if (!execution_target) {
       execution_target = shell();
+    }
 
-    // There are two paths, depending on the parameter for this test, that we
-    // take for running an ad auction and navigating a fenced frame element to
-    // its result, `runAdAuction()` resolves to a:
-    //   1. FencedFrameConfig object
-    //   2. URN
-    // For (1), we:
+    // For this test, we:
     //   1. Run the ad auction, specifically requesting that the returned
     //      promise resolve to a config object that we immediately navigate to
     //   2. Wait for the navigation to finish
-    // For (2), we:
-    //   1. Run the ad auction
-    //   2. Asynchronously later, navigate the fenced frame to the resulting URN
-    //   3. Wait for the navigation to finish
-    // The only real difference is that for (1) above, the auction and
-    // navigation happen separately.
-    if (ResolveAuctionsToConfig()) {
-      TestFrameNavigationObserver observer(
-          GetFencedFrameRenderFrameHost(*execution_target));
-      content::EvalJsResult eval_result =
-          EvalJs(execution_target ? *execution_target : shell(),
-                 base::StringPrintf(
-                     R"(
+    TestFrameNavigationObserver observer(
+        GetFencedFrameRenderFrameHost(*execution_target));
+    content::EvalJsResult eval_result =
+        EvalJs(execution_target ? *execution_target : shell(),
+               base::StringPrintf(
+                   R"(
 (async function() {
-  try {
-    const auction_config = %s;
-    auction_config.resolveToConfig = true;
+try {
+  const auction_config = %s;
+  auction_config.resolveToConfig = true;
 
-    const fenced_frame_config = await navigator.runAdAuction(auction_config);
-    if (!(fenced_frame_config instanceof FencedFrameConfig)) {
-      throw new Error('runAdAuction() did not return a FencedFrameConfig');
-    }
-
-    document.querySelector('fencedframe').config = fenced_frame_config;
-  } catch (e) {
-    return e.toString();
+  const fenced_frame_config = await navigator.runAdAuction(auction_config);
+  if (!(fenced_frame_config instanceof FencedFrameConfig)) {
+    throw new Error('runAdAuction() did not return a FencedFrameConfig');
   }
+
+  document.querySelector('fencedframe').config = fenced_frame_config;
+} catch (e) {
+  return e.toString();
+}
 })())",
-                     auction_config_json.c_str()));
+                   auction_config_json.c_str()));
 
-      ASSERT_TRUE(eval_result.value.is_none())
-          << "Expected string, but got " << eval_result.value;
-      WaitForFencedFrameNavigation(expected_ad_url, *execution_target,
-                                   observer);
-    } else {
-      content::EvalJsResult urn_url_string =
-          RunAuctionAndWait(auction_config_json, execution_target);
-      ASSERT_TRUE(urn_url_string.value.is_string())
-          << "Expected string, but got " << urn_url_string.value;
-
-      GURL urn_url(urn_url_string.ExtractString());
-      ASSERT_TRUE(urn_url.is_valid())
-          << "URL is not valid: " << urn_url_string.ExtractString();
-      EXPECT_EQ(url::kUrnScheme, urn_url.scheme_piece());
-
-      NavigateFencedFrameAndWait(urn_url, expected_ad_url, *execution_target);
-    }
+    ASSERT_TRUE(eval_result.value.is_none())
+        << "Expected string, but got " << eval_result.value;
+    WaitForFencedFrameNavigation(expected_ad_url, *execution_target, observer);
   }
 
   // Navigates the only fenced frame in `execution_target` to `url` and invokes
@@ -1453,9 +1662,10 @@ class InterestGroupFencedFrameBrowserTest
     TestFrameNavigationObserver observer(
         GetFencedFrameRenderFrameHost(execution_target));
 
-    EXPECT_TRUE(ExecJs(
-        execution_target,
-        JsReplace("document.querySelector('fencedframe').src = $1;", url)));
+    EXPECT_TRUE(ExecJs(execution_target,
+                       JsReplace("document.querySelector('fencedframe').config "
+                                 "= new FencedFrameConfig($1);",
+                                 url)));
 
     WaitForFencedFrameNavigation(expected_url, execution_target, observer);
   }
@@ -1474,8 +1684,13 @@ class InterestGroupFencedFrameBrowserTest
     if (expected_url.SchemeIs(url::kHttpsScheme)) {
       WaitForUrl(expected_url);
     } else {
-      // The only other URLs this should be used with are about:blank URLs.
-      ASSERT_EQ(GURL(url::kAboutBlankURL), expected_url);
+      // The only other URLs this should be used with are about:blank URLs or
+      // loopback http URLs.
+      if (expected_url.SchemeIs(url::kHttpScheme)) {
+        EXPECT_EQ("127.0.0.1", expected_url.host());
+      } else {
+        ASSERT_EQ(GURL(url::kAboutBlankURL), expected_url);
+      }
     }
 
     // Wait for the load to complete.
@@ -1517,6 +1732,7 @@ class InterestGroupFencedFrameBrowserTest
     return fenced_frames[0];
   }
 
+  // When using default bidding and decision logic:
   // Navigates the main frame, adds an interest group with a single component
   // URL, and runs an auction where an ad with that component URL wins.
   // Navigates a fenced frame to the winning render URL (which contains a nested
@@ -1525,8 +1741,11 @@ class InterestGroupFencedFrameBrowserTest
   // fenced frames.
   //
   // Writes URN for the component ad to `component_ad_urn`, if non-null.
-  void RunBasicAuctionWithAdComponents(const GURL& ad_component_url,
-                                       GURL* component_ad_urn = nullptr) {
+  void RunBasicAuctionWithAdComponents(
+      const GURL& ad_component_url,
+      GURL* component_ad_urn = nullptr,
+      std::string bidding_logic = "bidding_logic.js",
+      std::string decision_logic = "decision_logic.js") {
     GURL test_url =
         https_server_->GetURL("a.test", "/fenced_frames/basic.html");
     ASSERT_TRUE(NavigateToURL(shell(), test_url));
@@ -1540,21 +1759,22 @@ class InterestGroupFencedFrameBrowserTest
             /*priority=*/0.0, /*execution_mode=*/
             blink::InterestGroup::ExecutionMode::kCompatibilityMode,
             /*bidding_url=*/
-            https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
+            https_server_->GetURL("a.test", "/interest_group/" + bidding_logic),
             /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}},
             /*ad_components=*/
             {{{ad_component_url, /*metadata=*/absl::nullopt}}}));
 
     ASSERT_NO_FATAL_FAILURE(RunAuctionAndNavigateFencedFrame(
-        ad_url, JsReplace(
-                    R"({
-seller: $1,
-decisionLogicUrl: $2,
-interestGroupBuyers: [$1]
-                    })",
-                    url::Origin::Create(test_url),
-                    https_server_->GetURL(
-                        "a.test", "/interest_group/decision_logic.js"))));
+        ad_url,
+        JsReplace(R"({
+          seller: $1,
+          decisionLogicURL: $2,
+          interestGroupBuyers: [$1]
+        })",
+                  url::Origin::Create(test_url),
+                  https_server_->GetURL("a.test",
+                                        "/interest_group/" + decision_logic)),
+        /*execution_target=*/absl::nullopt));
 
     // Get first component URL from the fenced frame.
     RenderFrameHost* ad_frame = GetFencedFrameRenderFrameHost(shell());
@@ -1563,8 +1783,9 @@ interestGroupBuyers: [$1]
     ASSERT_TRUE(components);
     ASSERT_EQ(1u, components->size());
     EXPECT_EQ(url::kUrnScheme, (*components)[0].scheme_piece());
-    if (component_ad_urn)
+    if (component_ad_urn) {
       *component_ad_urn = (*components)[0];
+    }
 
     // Load the ad component in the nested fenced frame. The load should
     // succeed.
@@ -1579,14 +1800,16 @@ interestGroupBuyers: [$1]
         base::StringPrintf("navigator.adAuctionComponents(%i)", num_params));
     // Return nullopt if an exception was thrown, as should be the case for
     // loading pages that are not the result of an auction.
-    if (!result.error.empty())
+    if (!result.error.empty()) {
       return absl::nullopt;
+    }
 
     // Otherwise, adAuctionComponents should always return a list, since it
     // forces its input to be a number, and clamps it to the expected range.
     EXPECT_TRUE(result.value.is_list());
-    if (!result.value.is_list())
+    if (!result.value.is_list()) {
       return absl::nullopt;
+    }
 
     std::vector<GURL> out;
     for (const auto& value : result.value.GetList()) {
@@ -1627,8 +1850,9 @@ interestGroupBuyers: [$1]
       EXPECT_EQ(url::kUrnScheme, (*all_component_urls)[i].scheme_piece());
 
       // All ad component URLs should be unique.
-      for (size_t j = 0; j < i; ++j)
+      for (size_t j = 0; j < i; ++j) {
         EXPECT_NE((*all_component_urls)[i], (*all_component_urls)[j]);
+      }
 
       // Check URNs are mapped to the values in `expected_ad_component_urls`.
       TestFencedFrameURLMappingResultObserver observer;
@@ -1667,17 +1891,70 @@ interestGroupBuyers: [$1]
               GetAdAuctionComponentsInJS(render_frame_host, 32768));
   }
 
+  // Send a request that has the content "Basic request data" to the reporting
+  // destination. This function is used in negative test cases where a reporting
+  // beacon is expected not to be sent. For example:
+  // 1. A click without user gesture happened on ad component fenced frame, the
+  // reporting beacon should not be sent.
+  // 2. Call SendBasicRequest().
+  // 3. Verify the received request's content is from SendBasicRequest().
+  // This works because `ControllableHttpResponse` only handles one request.
+  void SendBasicRequest(GURL url) {
+    // Construct the resource request.
+    scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory =
+        web_contents()
+            ->GetPrimaryMainFrame()
+            ->GetStoragePartition()
+            ->GetURLLoaderFactoryForBrowserProcess();
+
+    auto request = std::make_unique<network::ResourceRequest>();
+
+    request->url = url;
+    request->credentials_mode = network::mojom::CredentialsMode::kOmit;
+    request->method = net::HttpRequestHeaders::kPostMethod;
+    request->trusted_params = network::ResourceRequest::TrustedParams();
+    request->trusted_params->isolation_info =
+        net::IsolationInfo::CreateTransient();
+
+    std::unique_ptr<network::SimpleURLLoader> simple_url_loader =
+        network::SimpleURLLoader::Create(std::move(request),
+                                         TRAFFIC_ANNOTATION_FOR_TESTS);
+
+    simple_url_loader->AttachStringForUpload(
+        "Basic request data",
+        /*upload_content_type=*/"text/plain;charset=UTF-8");
+    network::SimpleURLLoader* simple_url_loader_ptr = simple_url_loader.get();
+
+    // Send out the beacon.
+    simple_url_loader_ptr->DownloadHeadersOnly(
+        url_loader_factory.get(),
+        base::DoNothingWithBoundArgs(std::move(simple_url_loader)));
+  }
+
+  std::unique_ptr<NetworkResponder> CreateNetworkResponder() override {
+    // Fenced frame window.fence.reportEvent API requires a responder that
+    // handles beacons sent to the reporting url.
+    return std::make_unique<NetworkResponder>(*https_server_,
+                                              "/echoall?report_win_beacon");
+  }
+
  protected:
   base::test::ScopedFeatureList feature_list_;
 };
 
 // Make sure that FLEDGE has protections against making local network requests..
-class InterestGroupLocalNetworkBrowserTest : public InterestGroupBrowserTest {
+class InterestGroupPrivateNetworkBrowserTest : public InterestGroupBrowserTest {
  protected:
-  InterestGroupLocalNetworkBrowserTest()
+  InterestGroupPrivateNetworkBrowserTest()
       : remote_test_server_(net::test_server::EmbeddedTestServer::TYPE_HTTPS) {
-    feature_list_.InitAndEnableFeature(
-        features::kPrivateNetworkAccessRespectPreflightResults);
+    feature_list_.InitWithFeatures(
+        /*`enabled_features`=*/
+        {features::kPrivateNetworkAccessRespectPreflightResults},
+        /*disabled_features=*/
+        // TODO(https://crbug.com/1427145): Enable same-origin exemption when
+        // the initiator is fixed.
+        {network::features::
+             kLocalNetworkAccessAllowPotentiallyTrustworthySameOrigin});
 
     remote_test_server_.SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
     remote_test_server_.AddDefaultHandlers(GetTestDataFilePath());
@@ -1745,10 +2022,10 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   EXPECT_EQ(
       base::StringPrintf(
           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
-          "biddingUrl 'https://bid.a.test/' for AuctionAdInterestGroup with "
-          "owner '%s' and name 'bicycles' biddingUrl must have the same origin "
-          "as the InterestGroup owner and have no fragment identifier or "
-          "embedded credentials.",
+          "biddingLogicURL 'https://bid.a.test/' for AuctionAdInterestGroup "
+          "with owner '%s' and name 'bicycles' biddingLogicURL must have the "
+          "same origin as the InterestGroup owner and have no fragment "
+          "identifier or embedded credentials.",
           test_origin_a.Serialize().c_str()),
       JoinInterestGroupAndVerify(blink::TestInterestGroupBuilder(
                                      /*owner=*/test_origin_a,
@@ -1761,8 +2038,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   EXPECT_EQ(
       base::StringPrintf(
           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
-          "updateUrl 'https://update.a.test/' for AuctionAdInterestGroup with "
-          "owner '%s' and name 'tricycles' updateUrl must have the same origin "
+          "updateURL 'https://update.a.test/' for AuctionAdInterestGroup with "
+          "owner '%s' and name 'tricycles' updateURL must have the same origin "
           "as the InterestGroup owner and have no fragment identifier or "
           "embedded credentials.",
           test_origin_a.Serialize().c_str()),
@@ -1777,9 +2054,9 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   // origin as the trusted_bidding_signals_url, signals.a.test.
   EXPECT_EQ(base::StringPrintf(
                 "TypeError: Failed to execute 'joinAdInterestGroup' on "
-                "'Navigator': trustedBiddingSignalsUrl "
+                "'Navigator': trustedBiddingSignalsURL "
                 "'https://signals.a.test/' for AuctionAdInterestGroup with "
-                "owner '%s' and name 'four-wheelers' trustedBiddingSignalsUrl "
+                "owner '%s' and name 'four-wheelers' trustedBiddingSignalsURL "
                 "must have the same origin as the InterestGroup owner and have "
                 "no query string, fragment identifier or embedded credentials.",
                 test_origin_a.Serialize().c_str()),
@@ -1846,6 +2123,26 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   received_groups = GetAllInterestGroups();
   EXPECT_THAT(received_groups,
               testing::UnorderedElementsAreArray(expected_groups));
+}
+
+// Can't join or leave interest groups from http://localhost, even though it's
+// a "secure context" (since it's potentially trustworthy).
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, CantJoinLeaveHttpLocalhost) {
+  GURL test_url = embedded_test_server()->GetURL("/echo");
+  ASSERT_TRUE(test_url.SchemeIs(url::kHttpScheme));
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  EXPECT_EQ(
+      "SecurityError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+      "May only joinAdInterestGroup from an https origin.",
+      JoinInterestGroup(url::Origin::Create(GURL("https://example.org/")),
+                        "cars"));
+
+  EXPECT_EQ(
+      "SecurityError: Failed to execute 'leaveAdInterestGroup' on 'Navigator': "
+      "May only leaveAdInterestGroup from an https origin.",
+      LeaveInterestGroup(url::Origin::Create(GURL("https://example.org/")),
+                         "cars"));
 }
 
 // Test the case of a cross-origin iframe joining and leaving same-origin
@@ -2533,8 +2830,137 @@ navigator.joinAdInterestGroup(
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupUnsupportedFields) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ("done", EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          unsupportedField: 'In group',
+          ads: [{
+            renderURL: $2,
+            unsupportedField: 'In ad',
+            }],
+          adComponents: [{
+            renderURL: $2,
+            unsupportedField: 'In ad component',
+            }]
+        },
+        /*joinDurationSec=*/1000);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                              test_origin, url)));
+  WaitForAccessObserved({
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+  });
+  auto storage_groups = GetInterestGroupsForOwner(test_origin);
+  ASSERT_EQ(storage_groups.size(), 1u);
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupMissingLifetimeMs) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+      "Missing required field lifetimeMs",
+      EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+        });
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                url::Origin::Create(url))));
+  WaitForAccessObserved({});
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, JoinInterestGroupLifetimeMs) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ("done", EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          lifetimeMs: 1000000
+        });
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                              test_origin)));
+  WaitForAccessObserved({
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+  });
+  auto storage_groups = GetInterestGroupsForOwner(test_origin);
+  ASSERT_EQ(storage_groups.size(), 1u);
+  // Unfortunately, we can't use MOCK_TIME in browser tests, and blink code
+  // doesn't run in unit tests, so we can't verify the expiry time, since
+  // base::Time clocks can skew backwards.
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupLifetimeMsAndDeprecatedDuration) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ("done", EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          lifetimeMs: 1000000
+        },
+        /*joinDurationSec=*/1000);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                              test_origin)));
+  WaitForAccessObserved({
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+  });
+  auto storage_groups = GetInterestGroupsForOwner(test_origin);
+  ASSERT_EQ(storage_groups.size(), 1u);
+  // Unfortunately, we can't use MOCK_TIME in browser tests, and blink code
+  // doesn't run in unit tests, so we can't verify the expiry time, since
+  // base::Time clocks can skew backwards.
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        JoinInterestGroupInvalidOwner) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
@@ -2562,6 +2988,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
@@ -2591,6 +3018,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
@@ -2669,7 +3097,6 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   return 'done';
 })())",
                                               origin_string.c_str())));
-  WaitForAccessObserved({});
   EXPECT_TRUE(console_observer.Wait());
 
   WaitForInterestGroupsSatisfying(
@@ -2682,8 +3109,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         const auto& group = groups[0].interest_group;
         return group.all_sellers_capabilities ==
                    blink::SellerCapabilitiesType(
-                       blink::SellerCapabilities::kInterestGroupCounts,
-                       blink::SellerCapabilities::kLatencyStats) &&
+                       {blink::SellerCapabilities::kInterestGroupCounts,
+                        blink::SellerCapabilities::kLatencyStats}) &&
                group.execution_mode ==
                    blink::InterestGroup::ExecutionMode::kGroupedByOriginMode;
       }));
@@ -2712,14 +3139,12 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   return 'done';
 })())",
                                               origin_string.c_str())));
-  WaitForAccessObserved({});
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        JoinInterestGroupValidSellerCapabilities) {
   GURL url = https_server_->GetURL("a.test", "/echo");
   auto origin = url::Origin::Create(url);
-  std::string origin_string = origin.Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
 
   EXPECT_EQ(kSuccess,
@@ -2729,55 +3154,47 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                     /*name=*/"cars")
                     .SetSellerCapabilities(
                         {{{url::Origin::Create(GURL("https://example.test")),
-                           blink::SellerCapabilities::kInterestGroupCounts}}})
+                           {blink::SellerCapabilities::kInterestGroupCounts}}}})
                     .SetAllSellerCapabilities(
-                        blink::SellerCapabilities::kLatencyStats)
+                        {blink::SellerCapabilities::kLatencyStats})
                     .Build()));
-
-  WaitForAccessObserved({});
 
   std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
   ASSERT_EQ(groups.size(), 1u);
   const blink::InterestGroup& group = groups[0].interest_group;
   EXPECT_EQ(group.all_sellers_capabilities,
-            blink::SellerCapabilities::kLatencyStats);
+            blink::SellerCapabilitiesType(
+                {blink::SellerCapabilities::kLatencyStats}));
   ASSERT_TRUE(group.seller_capabilities);
   ASSERT_EQ(group.seller_capabilities->size(), 1u);
   EXPECT_EQ(group.seller_capabilities->at(
                 url::Origin::Create(GURL("https://example.test"))),
-            blink::SellerCapabilities::kInterestGroupCounts);
+            blink::SellerCapabilitiesType(
+                {blink::SellerCapabilities::kInterestGroupCounts}));
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        JoinInterestGroupValidSizeFields) {
   GURL url = https_server_->GetURL("a.test", "/echo");
   auto origin = url::Origin::Create(url);
-  std::string origin_string = origin.Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
 
   EXPECT_EQ(
       kSuccess,
       JoinInterestGroupAndVerify(
           blink::TestInterestGroupBuilder(origin, "cars")
-              .SetExpiry(base::Time())
-              .SetAllSellerCapabilities(
-                  blink::SellerCapabilities::kLatencyStats)
-              .SetExecutionMode(
-                  blink::InterestGroup::ExecutionMode::kCompatibilityMode)
-              .SetAds({{{GURL("https://example.com/render"),
-                         /*size_group=*/"group_1",
-                         /*metadata=*/absl::nullopt}}})
-              .SetAdComponents({{{GURL("https://example.com/component"),
-                                  /*size_group=*/"group_1",
-                                  /*metadata=*/absl::nullopt}}})
+              .SetAds(
+                  {{{GURL("https://example.com/render"),
+                     /*metadata=*/absl::nullopt, /*size_group=*/"group_1"}}})
+              .SetAdComponents(
+                  {{{GURL("https://example.com/component"),
+                     /*metadata=*/absl::nullopt, /*size_group=*/"group_1"}}})
               .SetAdSizes(
                   {{{"size_1",
                      blink::AdSize(150, blink::AdSize::LengthUnit::kPixels, 75,
                                    blink::AdSize::LengthUnit::kPixels)}}})
               .SetSizeGroups({{{"group_1", {"size_1"}}}})
               .Build()));
-
-  WaitForAccessObserved({});
 
   std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
   ASSERT_EQ(groups.size(), 1u);
@@ -2803,15 +3220,208 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupWithAuctionServerRequestFlags) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  auto origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/origin,
+                    /*name=*/"cars")
+                    .SetAuctionServerRequestFlags(
+                        {blink::AuctionServerRequestFlagsEnum::kOmitAds,
+                         blink::AuctionServerRequestFlagsEnum::kIncludeFullAds})
+                    .Build()));
+
+  std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
+  ASSERT_EQ(groups.size(), 1u);
+  const blink::InterestGroup& group = groups[0].interest_group;
+  EXPECT_TRUE(group.auction_server_request_flags.Has(
+      blink::AuctionServerRequestFlagsEnum::kOmitAds));
+  EXPECT_TRUE(group.auction_server_request_flags.Has(
+      blink::AuctionServerRequestFlagsEnum::kIncludeFullAds));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupValidReportingIds) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  auto origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+
+  EXPECT_EQ(
+      kSuccess,
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(origin, "cars")
+              .SetAds(
+                  {{{GURL("https://example.com/render"),
+                     /*metadata=*/absl::nullopt, /*size_group=*/absl::nullopt,
+                     /*buyer_reporting_id=*/"brid1",
+                     /*buyer_and_seller_reporting_id=*/"sh1",
+                     /*ad_render_id=*/absl::nullopt},
+                    {GURL("https://example.com/render2"),
+                     /*metadata=*/absl::nullopt, /*size_group=*/absl::nullopt,
+                     /*buyer_reporting_id=*/absl::nullopt,
+                     /*buyer_and_seller_reporting_id=*/"sh2",
+                     /*ad_render_id=*/absl::nullopt}}})
+              .Build()));
+
+  std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
+  ASSERT_EQ(groups.size(), 1u);
+  const blink::InterestGroup& group = groups[0].interest_group;
+  ASSERT_TRUE(group.ads.has_value());
+  ASSERT_EQ(group.ads->size(), 2u);
+  EXPECT_EQ(group.ads.value()[0].render_url,
+            GURL("https://example.com/render"));
+  EXPECT_EQ(group.ads.value()[0].buyer_reporting_id, "brid1");
+  EXPECT_EQ(group.ads.value()[0].buyer_and_seller_reporting_id, "sh1");
+
+  EXPECT_EQ(group.ads.value()[1].render_url,
+            GURL("https://example.com/render2"));
+  EXPECT_FALSE(group.ads.value()[1].buyer_reporting_id.has_value());
+  EXPECT_EQ(group.ads.value()[1].buyer_and_seller_reporting_id, "sh2");
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupValidAdRenderId) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  auto origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/origin,
+                    /*name=*/"cars")
+                    .SetAds({{{GURL("https://example.com/render"),
+                               /*metadata=*/absl::nullopt,
+                               /*size_group=*/absl::nullopt,
+                               /*buyer_reporting_id=*/absl::nullopt,
+                               /*buyer_and_seller_reporting_id=*/absl::nullopt,
+                               /*ad_render_id=*/"123abc"}}})
+                    .SetAdComponents(
+                        {{{GURL("https://example.com/component"),
+                           /*metadata=*/absl::nullopt,
+                           /*size_group=*/absl::nullopt,
+                           /*buyer_reporting_id=*/absl::nullopt,
+                           /*buyer_and_seller_reporting_id=*/absl::nullopt,
+                           /*ad_render_id=*/"456def"}}})
+                    .Build()));
+
+  std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
+  ASSERT_EQ(groups.size(), 1u);
+  const blink::InterestGroup& group = groups[0].interest_group;
+  ASSERT_TRUE(group.ads.has_value());
+  ASSERT_EQ(group.ads->size(), 1u);
+  EXPECT_EQ(group.ads.value()[0].render_url,
+            GURL("https://example.com/render"));
+  EXPECT_EQ(group.ads.value()[0].ad_render_id, "123abc");
+  ASSERT_EQ(group.ad_components->size(), 1u);
+  EXPECT_EQ(group.ad_components.value()[0].render_url,
+            GURL("https://example.com/component"));
+  EXPECT_EQ(group.ad_components.value()[0].ad_render_id, "456def");
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupValidAttestedAllowedReportingOrigins) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  auto origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+
+  url::Origin other_origin =
+      url::Origin::Create(https_server_->GetURL("b.test", "/echo"));
+  content_browser_client_->AddToAllowList({other_origin});
+  std::vector<url::Origin> allowed_reporting_origins = {other_origin};
+  EXPECT_EQ(
+      kSuccess,
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(
+              /*owner=*/origin,
+              /*name=*/"cars")
+              .SetAds(
+                  {{{GURL("https://example.com/render"),
+                     /*metadata=*/absl::nullopt,
+                     /*size_group=*/absl::nullopt,
+                     /*buyer_reporting_id=*/absl::nullopt,
+                     /*buyer_and_seller_reporting_id=*/absl::nullopt,
+                     /*ad_render_id=*/"123abc",
+                     /*allowed_reporting_origins=*/allowed_reporting_origins}}})
+              .Build()));
+
+  std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
+  ASSERT_EQ(groups.size(), 1u);
+  const blink::InterestGroup& group = groups[0].interest_group;
+  ASSERT_TRUE(group.ads.has_value());
+  ASSERT_EQ(group.ads->size(), 1u);
+  EXPECT_EQ(group.ads.value()[0].render_url,
+            GURL("https://example.com/render"));
+  EXPECT_EQ(group.ads.value()[0].ad_render_id, "123abc");
+  EXPECT_EQ(group.ads.value()[0].allowed_reporting_origins,
+            allowed_reporting_origins);
+}
+
+// Some of ad's fields are ignored in adComponents, such as
+// allowedReportingOrigins.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupAdComponentsIgnoredFields) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  url::Origin origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ("done", EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          lifetimeMs: 1000000,
+          ads: [{
+            renderURL: 'https://ad.com/render'
+          }],
+          adComponents: [{
+            renderURL: 'https://ad-components.com/render',
+            adRenderId: '123abc',
+            buyerReportingId: 'ignored',
+            buyerAndSellerReportingId: 'ignored_2',
+            allowedReportingOrigins: ['https://ignored.com']
+          }],
+        });
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                              origin)));
+  WaitForAccessObserved({
+      {TestInterestGroupObserver::kJoin, origin, "cars"},
+  });
+  std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
+  ASSERT_EQ(groups.size(), 1u);
+  const blink::InterestGroup& group = groups[0].interest_group;
+  ASSERT_TRUE(group.ad_components.has_value());
+  ASSERT_EQ(group.ad_components->size(), 1u);
+  const auto& ad_component = group.ad_components.value()[0];
+  EXPECT_EQ(ad_component.render_url, GURL("https://ad-components.com/render"));
+  EXPECT_EQ(ad_component.ad_render_id, "123abc");
+  EXPECT_FALSE(ad_component.buyer_reporting_id.has_value());
+  EXPECT_FALSE(ad_component.buyer_and_seller_reporting_id.has_value());
+  EXPECT_FALSE(ad_component.allowed_reporting_origins.has_value());
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        JoinInterestGroupInvalidBiddingLogicUrl) {
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
-          "biddingLogicUrl 'https://invalid^&' for AuctionAdInterestGroup with "
+          "biddingLogicURL 'https://invalid^&' for AuctionAdInterestGroup with "
           "owner '%s' and name 'cars' cannot be resolved to a valid URL.",
           origin_string.c_str()),
       EvalJs(shell(), JsReplace(R"(
@@ -2821,7 +3431,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          biddingLogicUrl: 'https://invalid^&',
+          biddingLogicURL: 'https://invalid^&',
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -2842,7 +3452,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          biddingWasmHelperUrl: 'https://invalid^&',
+          biddingWasmHelperURL: 'https://invalid^&',
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -2858,7 +3468,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   EXPECT_EQ(
       base::StringPrintf(
           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
-          "biddingWasmHelperUrl 'https://invalid^&' for AuctionAdInterestGroup "
+          "biddingWasmHelperURL 'https://invalid^&' for AuctionAdInterestGroup "
           "with owner '%s' and name 'cars' cannot be resolved to a valid URL.",
           origin_string.c_str()),
       EvalJs(shell(), JsReplace(kScriptTemplate, origin_string.c_str())));
@@ -2869,11 +3479,12 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
-          "updateUrl 'https://invalid^&' for AuctionAdInterestGroup with "
+          "updateURL 'https://invalid^&' for AuctionAdInterestGroup with "
           "owner '%s' and name 'cars' cannot be resolved to a valid URL.",
           origin_string.c_str()),
       EvalJs(shell(), JsReplace(R"(
@@ -2883,7 +3494,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          updateUrl: 'https://invalid^&',
+          updateURL: 'https://invalid^&',
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -2902,6 +3513,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -2931,15 +3543,16 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 // TODO(https://crbug.com/1420080): Remove one support for `dailyUpdateUrl` has
 // been removed.
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
-                       JoinInterestGroupDifferentUpdateUrlAndDailyUpdateUrl) {
+                       JoinInterestGroupDifferentUpdateURLAndDailyUpdateUrl) {
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
-          "updateUrl '%s' for AuctionAdInterestGroup with owner '%s' and name "
+          "updateURL '%s' for AuctionAdInterestGroup with owner '%s' and name "
           "'cars' must match dailyUpdateUrl, when both are present.",
           (origin_string + "/foo").c_str(), origin_string.c_str()),
       EvalJs(shell(), JsReplace(R"(
@@ -2949,7 +3562,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          updateUrl: $1 + '/foo',
+          updateURL: $1 + '/foo',
           dailyUpdateUrl:  $1 + '/bar',
         },
         /*joinDurationSec=*/1);
@@ -2967,10 +3580,11 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(base::StringPrintf(
                 "TypeError: Failed to execute 'joinAdInterestGroup' on "
-                "'Navigator': trustedBiddingSignalsUrl 'https://invalid^&' for "
+                "'Navigator': trustedBiddingSignalsURL 'https://invalid^&' for "
                 "AuctionAdInterestGroup with owner '%s' and name 'cars' cannot "
                 "be resolved to a valid URL.",
                 origin_string.c_str()),
@@ -2981,7 +3595,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          trustedBiddingSignalsUrl: 'https://invalid^&',
+          trustedBiddingSignalsURL: 'https://invalid^&',
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -2998,6 +3612,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3029,11 +3644,12 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
-          "ad renderUrl 'https://invalid^&' for AuctionAdInterestGroup with "
+          "ad renderURL 'https://invalid^&' for AuctionAdInterestGroup with "
           "owner '%s' and name 'cars' cannot be resolved to a valid URL.",
           origin_string.c_str()),
       EvalJs(shell(), JsReplace(R"(
@@ -3043,7 +3659,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          ads: [{renderUrl:"https://invalid^&"}],
+          ads: [{renderURL:"https://invalid^&"}],
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -3060,6 +3676,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3078,7 +3695,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          ads: [{renderUrl:"https://test.com", metadata:x}],
+          ads: [{renderURL:"https://test.com", metadata:x}],
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -3093,6 +3710,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        LeaveInterestGroupInvalidOwner) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'leaveAdInterestGroup' on 'Navigator': "
@@ -3120,6 +3738,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3134,7 +3753,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          ads: [{renderUrl: "https://test.com", sizeGroup: ""}],
+          ads: [{renderURL: "https://test.com", sizeGroup: ""}],
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -3151,6 +3770,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3166,7 +3786,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          ads: [{renderUrl: "https://test.com", sizeGroup: "nonexistent"}],
+          ads: [{renderURL: "https://test.com", sizeGroup: "nonexistent"}],
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -3184,6 +3804,7 @@ IN_PROC_BROWSER_TEST_F(
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3199,7 +3820,7 @@ IN_PROC_BROWSER_TEST_F(
         {
           name: 'cars',
           owner: $1,
-          ads: [{renderUrl: "https://test.com", sizeGroup: "nonexistent"}],
+          ads: [{renderURL: "https://test.com", sizeGroup: "nonexistent"}],
           adSizes: {"size_1": {"width": "50px", "height": "50px"}},
           sizeGroups: {"group_1": ["size_1"]},
         },
@@ -3218,6 +3839,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3232,7 +3854,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          ads: [{renderUrl: "https://test.com", sizeGroup: "group_1"}],
+          ads: [{renderURL: "https://test.com", sizeGroup: "group_1"}],
           sizeGroups: {"group_1": ["nonexistent"]},
         },
         /*joinDurationSec=*/1);
@@ -3250,6 +3872,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3264,7 +3887,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          adComponents: [{renderUrl: "https://test.com", sizeGroup: ""}],
+          adComponents: [{renderURL: "https://test.com", sizeGroup: ""}],
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -3282,6 +3905,7 @@ IN_PROC_BROWSER_TEST_F(
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3297,7 +3921,7 @@ IN_PROC_BROWSER_TEST_F(
         {
           name: 'cars',
           owner: $1,
-          adComponents: [{renderUrl: "https://test.com", sizeGroup: "nonexistent"}],
+          adComponents: [{renderURL: "https://test.com", sizeGroup: "nonexistent"}],
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -3315,6 +3939,7 @@ IN_PROC_BROWSER_TEST_F(
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3330,7 +3955,7 @@ IN_PROC_BROWSER_TEST_F(
         {
           name: 'cars',
           owner: $1,
-          adComponents: [{renderUrl: "https://test.com", sizeGroup: "nonexistent"}],
+          adComponents: [{renderURL: "https://test.com", sizeGroup: "nonexistent"}],
           adSizes: {"size_1": {"width": "50px", "height": "50px"}},
           sizeGroups: {"group_1": ["size_1"]},
         },
@@ -3349,6 +3974,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3363,7 +3989,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          adComponents: [{renderUrl: "https://test.com", sizeGroup: "group_1"}],
+          adComponents: [{renderURL: "https://test.com", sizeGroup: "group_1"}],
           sizeGroups: {"group_1": ["nonexistent"]},
         },
         /*joinDurationSec=*/1);
@@ -3381,6 +4007,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3413,6 +4040,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3445,6 +4073,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3477,6 +4106,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3491,7 +4121,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         {
           name: 'cars',
           owner: $1,
-          adSizes: {"size_1": {"width": "300 px", "height": "150 px"}},
+          adSizes: {"size_1": {"width": "300px", "height": "150px"}},
           sizeGroups: {"": ["size_1"]},
         },
         /*joinDurationSec=*/1);
@@ -3509,6 +4139,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   std::string origin_string = url::Origin::Create(url).Serialize();
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
@@ -3536,28 +4167,513 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   WaitForAccessObserved({});
 }
 
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupInvalidAdRenderId) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  std::string origin_string = url::Origin::Create(url).Serialize();
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ(
+      base::StringPrintf(
+          "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+          "ads[0].adRenderId 'ThisIsTooLong' for AuctionAdInterestGroup with "
+          "owner '%s' and name 'cars' The adRenderId is too long.",
+          origin_string.c_str()),
+      EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          ads: [{renderURL: "https://test.com", adRenderId: "ThisIsTooLong"}],
+        },
+        /*joinDurationSec=*/1);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                origin_string.c_str())));
+  WaitForAccessObserved({});
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupNonHttpsAllowedReportingOrigins) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  std::string origin_string = url::Origin::Create(url).Serialize();
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ(
+      base::StringPrintf(
+          "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+          "ad allowedReportingOrigins '' for AuctionAdInterestGroup with "
+          "owner '%s' and name 'cars' must all be https origins.",
+          origin_string.c_str()),
+      EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          ads: [{
+            renderURL: 'https://test.com',
+            adRenderId: '123abc',
+            allowedReportingOrigins: ['http://example.com']
+          }],
+        },
+        /*joinDurationSec=*/ 1);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                origin_string.c_str())));
+  WaitForAccessObserved({});
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupTooManyAllowedReportingOrigins) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  std::string origin_string = url::Origin::Create(url).Serialize();
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ(
+      base::StringPrintf(
+          "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+          "ads[0].allowedReportingOrigins '' for AuctionAdInterestGroup with "
+          "owner '%s' and name 'cars' allowedReportingOrigins cannot have more "
+          "than 10 elements.",
+          origin_string.c_str()),
+      EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          ads: [{
+            renderURL: 'https://test.com',
+            adRenderId: '123abc',
+            allowedReportingOrigins: [
+              'https://1', 'https://2', 'https://3', 'https://4', 'https://5',
+              'https://6', 'https://7', 'https://8', 'https://9', 'https://10',
+              'https://11'
+            ]
+          }],
+        },
+        /*joinDurationSec=*/ 1);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                origin_string.c_str())));
+  WaitForAccessObserved({});
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupWithValidAdditionalBidKey) {
+  constexpr blink::InterestGroup::AdditionalBidKey kAdditionalBidKey = {
+      0x10, 0x0f, 0xdf, 0x47, 0xfb, 0x94, 0xf1, 0x53, 0x6a, 0x4f, 0x7c,
+      0x3f, 0xda, 0x27, 0x38, 0x3f, 0xa0, 0x33, 0x75, 0xa8, 0xf5, 0x27,
+      0xc5, 0x37, 0xe6, 0xf1, 0x70, 0x3c, 0x47, 0xf9, 0x4f, 0x86};
+  constexpr char kAdditionalBidKeyBase64[] =
+      "EA/fR/uU8VNqT3w/2ic4P6Azdaj1J8U35vFwPEf5T4Y=";
+  constexpr char kAdditionalBidKeySloppyBase64[] =
+      " EA/fR/uU8VNqT3w/2ic4P6Azdaj1J8U35vFwPEf5T4Y";
+
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  url::Origin origin = url::Origin::Create(url);
+
+  for (bool require_forgiving_base64 : {false, true}) {
+    SCOPED_TRACE(require_forgiving_base64);
+    AttachInterestGroupObserver();
+
+    ASSERT_TRUE(NavigateToURL(shell(), url));
+
+    EXPECT_EQ("done",
+              EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          additionalBidKey: $2,
+        },
+        /*joinDurationSec=*/ 1000);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                        origin,
+                                        require_forgiving_base64
+                                            ? kAdditionalBidKeySloppyBase64
+                                            : kAdditionalBidKeyBase64)));
+    WaitForAccessObserved({
+        {TestInterestGroupObserver::kJoin, origin, "cars"},
+    });
+    std::vector<StorageInterestGroup> groups =
+        GetInterestGroupsForOwner(origin);
+    ASSERT_EQ(groups.size(), 1u);
+    const blink::InterestGroup& group = groups[0].interest_group;
+    ASSERT_TRUE(group.additional_bid_key.has_value());
+    EXPECT_EQ(*group.additional_bid_key, kAdditionalBidKey);
+  }
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupAdditionalBidKeyNotValidBase64) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  std::string origin_string = url::Origin::Create(url).Serialize();
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ(
+      base::StringPrintf(
+          "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+          "additionalBidKey 'EA/fR/uU8VNqT3w/2ic4P6Azdaj1J8U35vFwPEf5T4Y?' for "
+          "AuctionAdInterestGroup with owner '%s' and name 'cars' "
+          "cannot be base64 decoded.",
+          origin_string.c_str()),
+      EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          additionalBidKey: 'EA/fR/uU8VNqT3w/2ic4P6Azdaj1J8U35vFwPEf5T4Y?'
+        },
+        /*joinDurationSec=*/ 1000);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                origin_string.c_str())));
+  WaitForAccessObserved({});
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupAdditionalBidKeyInvalidLength) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  std::string origin_string = url::Origin::Create(url).Serialize();
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ(
+      base::StringPrintf(
+          "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+          "additionalBidKey '2ic4P6Az' for AuctionAdInterestGroup with owner "
+          "'%s' and name 'cars' must be exactly 32' bytes, was 6.",
+          origin_string.c_str()),
+      EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          additionalBidKey: '2ic4P6Az'
+        },
+        /*joinDurationSec=*/ 1000);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                origin_string.c_str())));
+  WaitForAccessObserved({});
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupWithBothAdditionalBidKeyAndAdsFails) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  std::string origin_string = url::Origin::Create(url).Serialize();
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  constexpr char kAdditionalBidKeyBase64[] =
+      "EA/fR/uU8VNqT3w/2ic4P6Azdaj1J8U35vFwPEf5T4Y=";
+  EXPECT_EQ(
+      base::StringPrintf(
+          "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+          "AuctionAdInterestGroup with owner '%s' and name 'cars' "
+          "Interest groups that provide a value of additionalBidKey for "
+          "negative targeting must not provide a value for ads.",
+          origin_string.c_str()),
+      EvalJs(shell(), JsReplace(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: $1,
+          additionalBidKey: $2,
+          ads: [{renderURL:"https://example.com/render", metadata:2}]
+        },
+        /*joinDurationSec=*/ 1000);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                origin_string, kAdditionalBidKeyBase64)));
+  WaitForAccessObserved({});
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupRenamedFields) {
+  const GURL kAdUrl("https://example.com/render");
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  url::Origin origin = url::Origin::Create(url);
+  std::string origin_string = origin.Serialize();
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+
+  const blink::InterestGroup kExpectedGroupAds =
+      blink::TestInterestGroupBuilder(/*owner=*/origin, /*name=*/"cars")
+          .SetAds({{{kAdUrl, /*metadata=*/absl::nullopt}}})
+          .Build();
+
+  const blink::InterestGroup kExpectedGroupAdComponents =
+      blink::TestInterestGroupBuilder(/*owner=*/origin, /*name=*/"cars")
+          .SetAdComponents({{{kAdUrl, /*metadata=*/absl::nullopt}}})
+          .Build();
+
+  const blink::InterestGroup kExpectedGroupBiddingLogicUrl =
+      blink::TestInterestGroupBuilder(/*owner=*/origin, /*name=*/"cars")
+          .SetBiddingUrl(
+              GURL(base::StringPrintf("%s/bidding.js", origin_string.c_str())))
+          .Build();
+
+  const blink::InterestGroup kExpectedGroupBiddingWasmHelperUrl =
+      blink::TestInterestGroupBuilder(/*owner=*/origin, /*name=*/"cars")
+          .SetBiddingWasmHelperUrl(GURL(
+              base::StringPrintf("%s/bidding.wasm", origin_string.c_str())))
+          .Build();
+
+  const blink::InterestGroup kExpectedGroupUpdateUrl =
+      blink::TestInterestGroupBuilder(/*owner=*/origin, /*name=*/"cars")
+          .SetUpdateUrl(
+              GURL(base::StringPrintf("%s/update.json", origin_string.c_str())))
+          .Build();
+
+  const blink::InterestGroup kExpectedGroupTrustedBiddingSignalsUrl =
+      blink::TestInterestGroupBuilder(/*owner=*/origin, /*name=*/"cars")
+          .SetTrustedBiddingSignalsUrl(GURL(
+              base::StringPrintf("%s/signals.json", origin_string.c_str())))
+          .Build();
+
+  struct TestCases {
+    const std::string join_dict_contents;
+    const std::string result;
+    const absl::optional<blink::InterestGroup> expected_group;
+  } kTestCases[] = {
+      // ***
+      // ads renderURL
+      // ***
+      {R"(ads: [{renderUrl: 'https://example.com/render'}])", "done",
+       kExpectedGroupAds},
+      {R"(ads: [{renderUrl: 'https://example.com/render',
+                 renderURL: 'https://example.com/render'}])",
+       "done", kExpectedGroupAds},
+      {R"(ads: [{renderUrl: 'https://example.com/render',
+                 renderURL: 'https://example.com/render2'}])",
+       "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': ad "
+       "renderUrl doesn't have the same value as ad renderURL ("
+       "'https://example.com/render' vs 'https://example.com/render2')",
+       absl::nullopt},
+      {R"(ads: [{}])",
+       "TypeError: Failed to execute 'joinAdInterestGroup' on "
+       "'Navigator': Missing required field ad renderURL",
+       absl::nullopt},
+      // ***
+      // adComponents renderURL
+      // ***
+      {R"(adComponents: [{renderUrl: 'https://example.com/render'}])", "done",
+       kExpectedGroupAdComponents},
+      {R"(adComponents: [{renderUrl: 'https://example.com/render',
+                 renderURL: 'https://example.com/render'}])",
+       "done", kExpectedGroupAdComponents},
+      {R"(adComponents: [{renderUrl: 'https://example.com/render',
+                 renderURL: 'https://example.com/render2'}])",
+       "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': ad "
+       "component renderUrl doesn't have the same value as ad component "
+       "renderURL ('https://example.com/render' vs "
+       "'https://example.com/render2')",
+       absl::nullopt},
+      {R"(adComponents: [{}])",
+       "TypeError: Failed to execute 'joinAdInterestGroup' on "
+       "'Navigator': Missing required field ad component renderURL",
+       absl::nullopt},
+      // ***
+      // biddingLogicURL
+      // ***
+      {base::StringPrintf(R"(biddingLogicUrl: '%s/bidding.js')",
+                          origin_string.c_str()),
+       "done", kExpectedGroupBiddingLogicUrl},
+      {base::StringPrintf(R"(biddingLogicURL: '%s/bidding.js')",
+                          origin_string.c_str()),
+       "done", kExpectedGroupBiddingLogicUrl},
+      {base::StringPrintf(R"(biddingLogicUrl: '%s/bidding.js',)"
+                          R"(biddingLogicURL: '%s/bidding.js')",
+                          origin_string.c_str(), origin_string.c_str()),
+       "done", kExpectedGroupBiddingLogicUrl},
+      {base::StringPrintf(R"(biddingLogicUrl: '%s/bidding.js',)"
+                          R"(biddingLogicURL: '%s/bidding2.js')",
+                          origin_string.c_str(), origin_string.c_str()),
+       base::StringPrintf(
+           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+           "interest group biddingLogicUrl doesn't have the same value as "
+           "interest group biddingLogicURL ('%s/bidding.js' vs "
+           "'%s/bidding2.js')",
+           origin_string.c_str(), origin_string.c_str()),
+       absl::nullopt},
+      // ***
+      // biddingWasmHelperURL
+      // ***
+      {base::StringPrintf(R"(biddingWasmHelperUrl: '%s/bidding.wasm')",
+                          origin_string.c_str()),
+       "done", kExpectedGroupBiddingWasmHelperUrl},
+      {base::StringPrintf(R"(biddingWasmHelperURL: '%s/bidding.wasm')",
+                          origin_string.c_str()),
+       "done", kExpectedGroupBiddingWasmHelperUrl},
+      {base::StringPrintf(R"(biddingWasmHelperUrl: '%s/bidding.wasm',)"
+                          R"(biddingWasmHelperURL: '%s/bidding.wasm')",
+                          origin_string.c_str(), origin_string.c_str()),
+       "done", kExpectedGroupBiddingWasmHelperUrl},
+      {base::StringPrintf(R"(biddingWasmHelperUrl: '%s/bidding.wasm',)"
+                          R"(biddingWasmHelperURL: '%s/bidding2.wasm')",
+                          origin_string.c_str(), origin_string.c_str()),
+       base::StringPrintf(
+           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+           "interest group biddingWasmHelperUrl doesn't have the same value as "
+           "interest group biddingWasmHelperURL ('%s/bidding.wasm' vs "
+           "'%s/bidding2.wasm')",
+           origin_string.c_str(), origin_string.c_str()),
+       absl::nullopt},
+      // ***
+      // updateURL
+      // ***
+      {base::StringPrintf(R"(updateUrl: '%s/update.json')",
+                          origin_string.c_str()),
+       "done", kExpectedGroupUpdateUrl},
+      {base::StringPrintf(R"(updateURL: '%s/update.json')",
+                          origin_string.c_str()),
+       "done", kExpectedGroupUpdateUrl},
+      {base::StringPrintf(R"(updateUrl: '%s/update.json',)"
+                          R"(updateURL: '%s/update.json')",
+                          origin_string.c_str(), origin_string.c_str()),
+       "done", kExpectedGroupUpdateUrl},
+      {base::StringPrintf(R"(updateUrl: '%s/update.json',)"
+                          R"(updateURL: '%s/update2.json')",
+                          origin_string.c_str(), origin_string.c_str()),
+       base::StringPrintf(
+           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+           "interest group updateUrl doesn't have the same value as "
+           "interest group updateURL ('%s/update.json' vs "
+           "'%s/update2.json')",
+           origin_string.c_str(), origin_string.c_str()),
+       absl::nullopt},
+      // ***
+      // trustedBiddingSignalsURL
+      // ***
+      {base::StringPrintf(R"(trustedBiddingSignalsUrl: '%s/signals.json')",
+                          origin_string.c_str()),
+       "done", kExpectedGroupTrustedBiddingSignalsUrl},
+      {base::StringPrintf(R"(trustedBiddingSignalsURL: '%s/signals.json')",
+                          origin_string.c_str()),
+       "done", kExpectedGroupTrustedBiddingSignalsUrl},
+      {base::StringPrintf(R"(trustedBiddingSignalsUrl: '%s/signals.json',)"
+                          R"(trustedBiddingSignalsURL: '%s/signals.json')",
+                          origin_string.c_str(), origin_string.c_str()),
+       "done", kExpectedGroupTrustedBiddingSignalsUrl},
+      {base::StringPrintf(R"(trustedBiddingSignalsUrl: '%s/signals.json',)"
+                          R"(trustedBiddingSignalsURL: '%s/signals2.json')",
+                          origin_string.c_str(), origin_string.c_str()),
+       base::StringPrintf(
+           "TypeError: Failed to execute 'joinAdInterestGroup' on 'Navigator': "
+           "interest group trustedBiddingSignalsUrl doesn't have the same "
+           "value as interest group trustedBiddingSignalsURL "
+           "('%s/signals.json' "
+           "vs '%s/signals2.json')",
+           origin_string.c_str(), origin_string.c_str()),
+       absl::nullopt},
+  };
+
+  for (const auto& test_case : kTestCases) {
+    SCOPED_TRACE(test_case.join_dict_contents);
+    EXPECT_EQ(test_case.result,
+              EvalJs(shell(),
+                     base::StringPrintf(R"(
+(async function() {
+  try {
+    await navigator.joinAdInterestGroup(
+        {
+          name: 'cars',
+          owner: '%s',
+          %s
+        },
+        /*joinDurationSec=*/1);
+  } catch (e) {
+    return e.toString();
+  }
+  return 'done';
+})())",
+                                        origin_string.c_str(),
+                                        test_case.join_dict_contents.c_str())));
+
+    // Check that the database has also been updated.
+    absl::optional<StorageInterestGroup> maybe_interest_group =
+        GetInterestGroup(/*owner=*/origin,
+                         /*name=*/"cars");
+    if (test_case.expected_group) {
+      ASSERT_TRUE(maybe_interest_group);
+      maybe_interest_group->interest_group.expiry =
+          test_case.expected_group->expiry;
+      EXPECT_TRUE(maybe_interest_group->interest_group.IsEqualForTesting(
+          *test_case.expected_group));
+    } else {
+      EXPECT_FALSE(maybe_interest_group);
+    }
+
+    // Cleanup between runs.
+    EXPECT_EQ(kSuccess, LeaveInterestGroupAndVerify(/*owner=*/origin,
+                                                    /*name=*/"cars"));
+  }
+}
+
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionInvalidSeller) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': seller "
       "'https://invalid^&' for AuctionAdConfig must be a valid https origin.",
       RunAuctionAndWait(R"({
       seller: 'https://invalid^&',
-      decisionLogicUrl: 'https://test.com/decision_logic'
+      decisionLogicURL: 'https://test.com/decision_logic'
   })"));
   WaitForAccessObserved({});
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionHttpSeller) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': seller "
       "'http://test.com' for AuctionAdConfig must be a valid https origin.",
       RunAuctionAndWait(R"({
       seller: 'http://test.com',
-      decisionLogicUrl: 'https://test.com/decision_logic'
+      decisionLogicURL: 'https://test.com/decision_logic'
   })"));
   WaitForAccessObserved({});
 }
@@ -3565,14 +4681,49 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionHttpSeller) {
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidDecisionLogicUrl) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "decisionLogicUrl 'https://invalid^&' for AuctionAdConfig with seller "
+      "decisionLogicURL 'https://invalid^&' for AuctionAdConfig with seller "
       "'https://test.com' cannot be resolved to a valid URL.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://invalid^&'
+      decisionLogicURL: 'https://invalid^&'
+  })"));
+  WaitForAccessObserved({});
+}
+
+// TODO(crbug.com/1441988): Remove test when old names are no longer supported.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionMissingDecisionLogicUrl) {
+  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': Missing "
+      "required field ad auction config decisionLogicURL or serverResponse",
+      RunAuctionAndWait(R"({
+      seller: 'https://test.com',
+  })"));
+  WaitForAccessObserved({});
+}
+
+// TODO(crbug.com/1441988): Remove test when old names are no longer supported.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionDecisionLogicUrlOldAndNewNamesDontMatch) {
+  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': ad auction "
+      "config decisionLogicUrl doesn't have the same value as ad auction "
+      "config decisionLogicURL ('https://test.com/decision2' vs "
+      "'https://test.com/decision1')",
+      RunAuctionAndWait(R"({
+      seller: 'https://test.com',
+      decisionLogicURL: 'https://test.com/decision1',
+      decisionLogicUrl: 'https://test.com/decision2'
   })"));
   WaitForAccessObserved({});
 }
@@ -3582,17 +4733,42 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL url = https_server_->GetURL("a.test", "/echo");
   url::Origin origin = url::Origin::Create(url);
   ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       base::StringPrintf(
           "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-          "trustedScoringSignalsUrl 'https://invalid^&' for AuctionAdConfig "
+          "trustedScoringSignalsURL 'https://invalid^&' for AuctionAdConfig "
           "with seller '%s' cannot be resolved to a valid URL.",
           origin.Serialize().c_str()),
       RunAuctionAndWait(JsReplace(R"({
       seller: $1,
-      decisionLogicUrl: $2,
-      trustedScoringSignalsUrl: 'https://invalid^&'
+      decisionLogicURL: $2,
+      trustedScoringSignalsURL: 'https://invalid^&'
+  })",
+                                  origin, url)));
+  WaitForAccessObserved({});
+}
+
+// TODO(crbug.com/1441988): Remove test when old names are no longer supported.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    RunAdAuctionTrustedScoringSignalsUrlOldAndNewNamesDontMatch) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  url::Origin origin = url::Origin::Create(url);
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  AttachInterestGroupObserver();
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': ad auction "
+      "config trustedScoringSignalsUrl doesn't have the same value as ad "
+      "auction config trustedScoringSignalsURL ('https://test.com/scoring2' vs "
+      "'https://test.com/scoring1')",
+      RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      trustedScoringSignalsURL: 'https://test.com/scoring1',
+      trustedScoringSignalsUrl: 'https://test.com/scoring2'
   })",
                                   origin, url)));
   WaitForAccessObserved({});
@@ -3607,11 +4783,11 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "decisionLogicUrl 'https://b.test/foo' for AuctionAdConfig with seller "
+      "decisionLogicURL 'https://b.test/foo' for AuctionAdConfig with seller "
       "'https://a.test/' must match seller origin.",
       RunAuctionAndWait(R"({
     seller: "https://a.test/",
-    decisionLogicUrl: "https://b.test/foo",
+    decisionLogicURL: "https://b.test/foo",
     interestGroupBuyers: ["https://c.test/"],
                         })"));
   WaitForAccessObserved({});
@@ -3627,12 +4803,12 @@ IN_PROC_BROWSER_TEST_F(
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "trustedScoringSignalsUrl 'https://b.test/foo' for AuctionAdConfig with "
+      "trustedScoringSignalsURL 'https://b.test/foo' for AuctionAdConfig with "
       "seller 'https://a.test/' must match seller origin.",
       RunAuctionAndWait(R"({
     seller: "https://a.test/",
-    decisionLogicUrl: "https://a.test/foo",
-    trustedScoringSignalsUrl: "https://b.test/foo",
+    decisionLogicURL: "https://a.test/foo",
+    trustedScoringSignalsURL: "https://b.test/foo",
     interestGroupBuyers: ["https://c.test/"],
                         })"));
   WaitForAccessObserved({});
@@ -3641,6 +4817,7 @@ IN_PROC_BROWSER_TEST_F(
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidInterestGroupBuyers) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
@@ -3648,7 +4825,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "with seller 'https://test.com' must be a valid https origin.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       interestGroupBuyers: ['https://invalid^&'],
   })"));
   WaitForAccessObserved({});
@@ -3657,6 +4834,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidInterestGroupBuyersStr) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': Failed to "
@@ -3664,7 +4842,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "provided value cannot be converted to a sequence.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       interestGroupBuyers: 'not an array',
   })"));
   WaitForAccessObserved({});
@@ -3673,10 +4851,11 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionNoInterestGroupBuyers) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(nullptr, RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
   })"));
   WaitForAccessObserved({});
 }
@@ -3684,10 +4863,11 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionEmptyInterestGroupBuyers) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(nullptr, RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       interestGroupBuyers: [],
   })"));
   WaitForAccessObserved({});
@@ -3695,18 +4875,27 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidAuctionSignals) {
-  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
-  EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "auctionSignals for AuctionAdConfig with seller 'https://test.com' must "
-      "be a JSON-serializable object.",
-      RunAuctionAndWait(R"({
-      seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      auctionSignals: alert
-  })"));
-  WaitForAccessObserved({});
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': auctionSignals for AuctionAdConfig with seller "
+      "'https://a.test:*' must be a JSON-serializable object.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      auctionSignals: alert,
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 // Exercise rejection path in the renderer for promise-delivered auction
@@ -3716,36 +4905,20 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       auctionSignals: new Promise((resolve, reject) => { setTimeout(
           () => { reject('boo'); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
-  WaitForAccessObserved({});
 }
 
 // Exercise error-handling path in the renderer for promise-delivered auction
@@ -3755,30 +4928,15 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       auctionSignals: new Promise((resolve, reject) => { setTimeout(
           () => { resolve(function() {}); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
   WebContentsConsoleObserver console_observer(shell()->web_contents());
   console_observer.SetPattern(
@@ -3790,23 +4948,31 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
   EXPECT_TRUE(console_observer.Wait());
-  WaitForAccessObserved({});
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidSellerSignals) {
-  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
-  EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "sellerSignals for AuctionAdConfig with seller 'https://test.com' must "
-      "be a JSON-serializable object.",
-      RunAuctionAndWait(R"({
-      seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      sellerSignals: function() {}
-  })"));
-  WaitForAccessObserved({});
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': sellerSignals for AuctionAdConfig with seller "
+      "'https://a.test:*' must be a JSON-serializable object.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      sellerSignals: function() {},
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 // Exercise rejection path in the renderer for promise-delivered seller signals.
@@ -3815,36 +4981,20 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       sellerSignals: new Promise((resolve, reject) => { setTimeout(
           () => { reject('boo'); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
-  WaitForAccessObserved({});
 }
 
 // Exercise error-handling path in the renderer for promise-delivered seller
@@ -3854,30 +5004,15 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       sellerSignals: new Promise((resolve, reject) => { setTimeout(
           () => { resolve(function() {}); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   WebContentsConsoleObserver console_observer(shell()->web_contents());
@@ -3889,7 +5024,6 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
   EXPECT_TRUE(console_observer.Wait());
-  WaitForAccessObserved({});
 }
 
 // Test rejection path in the renderer for promise-delivered perBuyerSignals.
@@ -3898,36 +5032,20 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       perBuyerSignals: new Promise((resolve, reject) => { setTimeout(
           () => { reject('boo'); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
-  WaitForAccessObserved({});
 }
 
 // Exercise error-handling path in the renderer for promise-delivered
@@ -3937,30 +5055,15 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       perBuyerSignals: new Promise((resolve, reject) => { setTimeout(
           () => { resolve(52); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   WebContentsConsoleObserver console_observer(shell()->web_contents());
@@ -3971,23 +5074,32 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
   EXPECT_TRUE(console_observer.Wait());
-  WaitForAccessObserved({});
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidPerBuyerSignalsOrigin) {
-  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
-  EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "perBuyerSignals buyer 'https://invalid^&' for AuctionAdConfig with "
-      "seller 'https://test.com' must be a valid https origin.",
-      RunAuctionAndWait(R"({
-      seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      perBuyerSignals: {'https://invalid^&': {a:1}}
-  })"));
-  WaitForAccessObserved({});
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': perBuyerSignals buyer 'https://invalid^&' for "
+      "AuctionAdConfig with seller 'https://a.test:*' must be a valid https "
+      "origin.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      perBuyerSignals: {'https://invalid^&': {a:1}},
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 // Test rejection path in the renderer for promise-delivered perBuyerTimeouts.
@@ -3996,36 +5108,20 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       perBuyerTimeouts: new Promise((resolve, reject) => { setTimeout(
           () => { reject('boo'); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
-  WaitForAccessObserved({});
 }
 
 // Exercise error-handling path in the renderer for promise-delivered
@@ -4035,30 +5131,15 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       perBuyerTimeouts: new Promise((resolve, reject) => { setTimeout(
           () => { resolve({'http://b.com': 52}); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   WebContentsConsoleObserver console_observer(shell()->web_contents());
@@ -4071,24 +5152,32 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
   EXPECT_TRUE(console_observer.Wait());
-  WaitForAccessObserved({});
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidPerBuyerTimeoutsOrigin) {
-  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
-  EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "perBuyerTimeouts buyer 'https://invalid^&' for AuctionAdConfig with "
-      "seller 'https://test.com' must be \"*\" (wildcard) or a valid https "
-      "origin.",
-      RunAuctionAndWait(R"({
-      seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      perBuyerTimeouts: {'https://invalid^&': 100}
-  })"));
-  WaitForAccessObserved({});
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': perBuyerTimeouts buyer 'https://invalid^&' for "
+      "AuctionAdConfig with seller 'https://a.test:*' must be \"*\" (wildcard) "
+      "or a valid https origin.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      perBuyerTimeouts: {'https://invalid^&': 100},
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 // Test rejection path in the renderer for promise-delivered
@@ -4098,36 +5187,20 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       perBuyerCumulativeTimeouts: new Promise((resolve, reject) => { setTimeout(
           () => { reject('boo'); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
-  WaitForAccessObserved({});
 }
 
 // Exercise error-handling path in the renderer for promise-delivered
@@ -4138,30 +5211,15 @@ IN_PROC_BROWSER_TEST_F(
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       perBuyerCumulativeTimeouts: new Promise((resolve, reject) => { setTimeout(
           () => { resolve({'http://b.com': 52}); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   WebContentsConsoleObserver console_observer(shell()->web_contents());
@@ -4174,24 +5232,97 @@ IN_PROC_BROWSER_TEST_F(
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
   EXPECT_TRUE(console_observer.Wait());
-  WaitForAccessObserved({});
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidPerBuyerCumulativeTimeoutsOrigin) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': perBuyerCumulativeTimeouts buyer "
+      "'https://invalid^&' for AuctionAdConfig with seller 'https://a.test:*' "
+      "must be \"*\" (wildcard) or a valid https origin.");
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      perBuyerCumulativeTimeouts: {'https://invalid^&': 100},
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionInvalidPerBuyerCurrenciesOrigin) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': perBuyerCurrencies buyer 'https://invalid^&' for "
+      "AuctionAdConfig with seller 'https://a.test:*' must be \"*\" (wildcard) "
+      "or a valid https origin.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      perBuyerCurrencies: {'https://invalid^&': 'USD'},
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionInvalidPerBuyerCurrenciesCurrency) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': perBuyerCurrencies currency 'usd' for "
+      "AuctionAdConfig with seller 'https://a.test:*' must be a 3-letter "
+      "uppercase currency code.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      perBuyerCurrencies: {'*': 'usd'},
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionInvalidSellerCurrency) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "perBuyerCumulativeTimeouts buyer 'https://invalid^&' for "
-      "AuctionAdConfig "
-      "with seller 'https://test.com' must be \"*\" (wildcard) or a valid "
-      "https "
-      "origin.",
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator':"
+      " sellerCurrency 'usd' for AuctionAdConfig with seller"
+      " 'https://test.com' must be a 3-letter uppercase currency code.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      perBuyerCumulativeTimeouts: {'https://invalid^&': 100}
+      decisionLogicURL: 'https://test.com',
+      sellerCurrency: 'usd'
   })"));
   WaitForAccessObserved({});
 }
@@ -4199,6 +5330,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidPerBuyerGroupLimitsValue) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
@@ -4206,7 +5338,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "seller 'https://test.com' must be greater than 0.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       perBuyerGroupLimits: {'https://test.com': 0}
   })"));
   WaitForAccessObserved({});
@@ -4215,6 +5347,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidPerBuyerGroupLimitsOrigin) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
@@ -4223,7 +5356,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "origin.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       perBuyerGroupLimits: {'https://invalid^&': 100}
   })"));
   WaitForAccessObserved({});
@@ -4232,6 +5365,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidPerBuyerPrioritySignals) {
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  AttachInterestGroupObserver();
 
   EXPECT_EQ(
       "TypeError: Failed to execute 'runAdAuction' on 'Navigator': Failed to "
@@ -4239,7 +5373,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "provided double value is non-finite.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       perBuyerPrioritySignals: {
           'https://foo.com/':{"key": "Values must be numbers"}
       }
@@ -4253,7 +5387,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "reserved \"browserSignals.\" prefix.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       perBuyerPrioritySignals: {
           'https://foo.com/':{"browserSignals.thisPrefixIsReserved": 1}
       }
@@ -4271,11 +5405,11 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "may only have one of 'interestGroupBuyers' or 'componentAuctions'.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       interestGroupBuyers: ['https://test.com'],
       componentAuctions: [{
           seller: 'https://test.com',
-          decisionLogicUrl: 'https://test.com',
+          decisionLogicURL: 'https://test.com',
           interestGroupBuyers: ['https://test.com']
       }]
   })"));
@@ -4291,7 +5425,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "provided value cannot be converted to a sequence.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       componentAuctions: ''
   })"));
 }
@@ -4306,7 +5440,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "The provided value is not of type 'AuctionAdConfig'.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       componentAuctions: ['test']
   })"));
 }
@@ -4320,10 +5454,10 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "'http://test.com' for AuctionAdConfig must be a valid https origin.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       componentAuctions: [{
         seller: 'http://test.com',
-        decisionLogicUrl: 'http://test.com'
+        decisionLogicURL: 'http://test.com'
       }]
   })"));
 }
@@ -4338,13 +5472,13 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       "componentAuctions.",
       RunAuctionAndWait(R"({
       seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
+      decisionLogicURL: 'https://test.com',
       componentAuctions: [{
         seller: 'https://test2.com',
-        decisionLogicUrl: 'https://test2.com',
+        decisionLogicURL: 'https://test2.com',
         componentAuctions: [{
           seller: 'https://test3.com',
-          decisionLogicUrl: 'https://test3.com',
+          decisionLogicURL: 'https://test3.com',
         }]
       }]
   })"));
@@ -4352,18 +5486,27 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidPerBuyerSignals) {
-  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
-  EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "perBuyerSignals for AuctionAdConfig with seller 'https://test.com' "
-      "must be a JSON-serializable object.",
-      RunAuctionAndWait(R"({
-      seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      perBuyerSignals: {'https://test.com': function() {}}
-  })"));
-  WaitForAccessObserved({});
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': perBuyerSignals for AuctionAdConfig with seller "
+      "'https://a.test:*' must be a JSON-serializable object.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      perBuyerSignals: {'https://test.com': function() {}},
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
@@ -4371,36 +5514,74 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       directFromSellerSignals: new Promise((resolve, reject) => { setTimeout(
           () => { reject('boo'); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
-  WaitForAccessObserved({});
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    RunAdAuctionRejectPromiseDirectFromSellerSignalsHeaderAdSlot) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+
+  const char kAuctionConfigTemplate[] = R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      directFromSellerSignalsHeaderAdSlot: new Promise((resolve, reject) => {
+        setTimeout(() => { reject('boo'); }, 10) }),
+      interestGroupBuyers: []
+  })";
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(
+                JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    RunAdAuctionMissingDirectFromSellerSignalsHeaderAdSlotLogged) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+
+  // Fetch a URL with adAuctionHeaders: true. The response has no
+  // Ad-Auction-Signals header, so signals aren't found. An error should be
+  // logged to devtools.
+  EXPECT_TRUE(ExecJs(
+      web_contents()->GetPrimaryMainFrame(),
+      content::JsReplace("fetch($1, {adAuctionHeaders: true})", test_url)));
+
+  const char kAuctionConfigTemplate[] = R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      directFromSellerSignalsHeaderAdSlot: "notFound",
+      interestGroupBuyers: []
+  })";
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Worklet error: When looking for directFromSellerSignalsHeaderAdSlot "
+      "notFound, failed to find a matching response.");
+  EXPECT_EQ(nullptr, RunAuctionAndWait(JsReplace(kAuctionConfigTemplate,
+                                                 test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
@@ -4408,30 +5589,15 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       directFromSellerSignals: new Promise((resolve, reject) => { setTimeout(
           () => { resolve('http://test.com/signals'); }, 10) }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   WebContentsConsoleObserver console_observer(shell()->web_contents());
@@ -4444,7 +5610,6 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
   EXPECT_TRUE(console_observer.Wait());
-  WaitForAccessObserved({});
 }
 
 IN_PROC_BROWSER_TEST_F(
@@ -4453,32 +5618,17 @@ IN_PROC_BROWSER_TEST_F(
   GURL test_url = https_server_->GetURL("a.test", "/echo");
   url::Origin test_origin = url::Origin::Create(test_url);
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
-  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
   GURL decision_url =
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
-  // Note: at present at least one bid must be made for promise checking to
-  // be guaranteed to happen; if the auction is (effectively) empty whether
-  // it happens or not is timing-dependent.
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0,
-          /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}}));
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       directFromSellerSignals: new Promise((resolve, reject) => {
         let o = { toString: () => { throw "Don't stringify me!"; } }
         resolve(o);
       }),
-      interestGroupBuyers: [$1]
+      interestGroupBuyers: []
   })";
 
   WebContentsConsoleObserver console_observer(shell()->web_contents());
@@ -4487,75 +5637,110 @@ IN_PROC_BROWSER_TEST_F(
             RunAuctionAndWait(
                 JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
   EXPECT_TRUE(console_observer.Wait());
-  WaitForAccessObserved({});
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidDirectFromSellerSignalsInvalidURL) {
-  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
-  EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "directFromSellerSignals 'https://invalid^&' for AuctionAdConfig with "
-      "seller 'https://test.com' cannot be resolved to a valid URL.",
-      RunAuctionAndWait(R"({
-      seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      directFromSellerSignals: 'https://invalid^&'
-  })"));
-  WaitForAccessObserved({});
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': directFromSellerSignals 'https://invalid^&' for "
+      "AuctionAdConfig with seller 'https://a.test:*' cannot be resolved to a "
+      "valid URL.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      directFromSellerSignals: 'https://invalid^&',
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidDirectFromSellerSignalsNotHttps) {
-  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
-  EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "directFromSellerSignals 'http://test.com/signals' for AuctionAdConfig "
-      "with seller 'https://test.com' must match seller origin; only https "
-      "scheme is supported.",
-      RunAuctionAndWait(R"({
-      seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      directFromSellerSignals: 'http://test.com/signals'
-  })"));
-  WaitForAccessObserved({});
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': directFromSellerSignals 'http://test.com/signals' "
+      "for AuctionAdConfig with seller 'https://a.test:*' must match seller "
+      "origin; only https scheme is supported.");
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      directFromSellerSignals: 'http://test.com/signals',
+      interestGroupBuyers: []
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionInvalidDirectFromSellerSignalsWrongOrigin) {
-  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
-  EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "directFromSellerSignals 'https://test2.com/signals' for AuctionAdConfig "
-      "with seller 'https://test.com' must match seller origin; only https "
-      "scheme is supported.",
-      RunAuctionAndWait(R"({
-      seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      directFromSellerSignals: 'https://test2.com/signals'
-  })"));
-  WaitForAccessObserved({});
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': directFromSellerSignals 'https://test2.com/signals' "
+      "for AuctionAdConfig with seller 'https://a.test:*' must match seller "
+      "origin; only https scheme is supported.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      directFromSellerSignals: 'https://test2.com/signals',
+      interestGroupBuyers: [$1]
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 IN_PROC_BROWSER_TEST_F(
     InterestGroupBrowserTest,
     RunAdAuctionInvalidDirectFromSellerSignalsHasQueryString) {
-  ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
-  EXPECT_EQ(
-      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-      "directFromSellerSignals 'https://test.com/signals?shouldntBeHere' for "
-      "AuctionAdConfig with seller 'https://test.com' URL prefix must not have "
-      "a query string.",
-      RunAuctionAndWait(R"({
-      seller: 'https://test.com',
-      decisionLogicUrl: 'https://test.com',
-      directFromSellerSignals: 'https://test.com/signals?shouldntBeHere'
-  })"));
-  WaitForAccessObserved({});
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Uncaught (in promise) TypeError: Failed to execute 'runAdAuction' on "
+      "'NavigatorAuction': directFromSellerSignals "
+      "'https://a.test:*/signals?shouldntBeHere' for AuctionAdConfig with "
+      "seller 'https://a.test:*' URL prefix must not have a query string.");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      directFromSellerSignals: $1 + '/signals?shouldntBeHere',
+      interestGroupBuyers: [$1]
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 // `bidder_origin` is used in per-buyer signals, but the bundle only has
@@ -4622,17 +5807,17 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 (async function() {
   return await navigator.runAdAuction({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       interestGroupBuyers: [$3],
       directFromSellerSignals: $4
   });
 })())",
-                     seller_origin.Serialize().c_str(),
+                     seller_origin,
                      https_server_->GetURL(
                          kSellerHost,
                          "/interest_group/"
                          "decision_no_direct_from_seller_signals_validator.js"),
-                     bidder_origin.Serialize().c_str(),
+                     bidder_origin,
                      https_server_->GetURL(kSellerHost,
                                            "/direct_from_seller_signals")))
               .ExtractString()),
@@ -4704,17 +5889,17 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 (async function() {
   return await navigator.runAdAuction({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       interestGroupBuyers: [$3],
       directFromSellerSignals: $4
   });
 })())",
-                     seller_origin.Serialize().c_str(),
+                     seller_origin,
                      https_server_->GetURL(
                          kSellerHost,
                          "/interest_group/"
                          "decision_no_direct_from_seller_signals_validator.js"),
-                     bidder_origin.Serialize().c_str(),
+                     bidder_origin,
                      https_server_->GetURL(kSellerHost,
                                            "/direct_from_seller_signals")))
               .ExtractString()),
@@ -4790,17 +5975,17 @@ IN_PROC_BROWSER_TEST_F(
 (async function() {
   return await navigator.runAdAuction({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       interestGroupBuyers: [$3],
       directFromSellerSignals: $4
   });
 })())",
-                     seller_origin.Serialize().c_str(),
+                     seller_origin,
                      https_server_->GetURL(
                          kSellerHost,
                          "/interest_group/"
                          "decision_no_direct_from_seller_signals_validator.js"),
-                     bidder_origin.Serialize().c_str(),
+                     bidder_origin,
                      https_server_->GetURL(kSellerHost,
                                            "/direct_from_seller_signals")))
               .ExtractString()),
@@ -4878,23 +6063,400 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 (async function() {
   return await navigator.runAdAuction({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       interestGroupBuyers: [$3],
       directFromSellerSignals: maybePromise($4)
   });
 })())",
-                     seller_origin.Serialize().c_str(),
+                     seller_origin,
                      https_server_->GetURL(kSellerHost,
                                            "/interest_group/"
                                            "decision_simple_direct_from_"
                                            "seller_signals_validator.js"),
-                     bidder_origin.Serialize().c_str(),
+                     bidder_origin,
                      https_server_->GetURL(kSellerHost,
                                            "/direct_from_seller_signals")))
                  .ExtractString()),
         &observer);
     EXPECT_EQ(GURL("https://example.com/render"), observer.mapped_url());
   }
+}
+
+// Create a cross origin iframe, and load header-based directFromSellerSignals
+// in that frame. Then, in the main frame, run an auction using the loaded
+// signals.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    DirectFromSellerSignalsHeaderAdSlotFromCrossOriginIframe) {
+  constexpr char kBidderHost[] = "a.test";
+  constexpr char kTopFrameHost[] = "c.test";
+  constexpr char kSellerHost[] = "b.test";
+  constexpr char kIframeHost[] = "d.test";
+  url::Origin seller_origin =
+      url::Origin::Create(https_server_->GetURL(kSellerHost, "/echo"));
+  url::Origin iframe_origin =
+      url::Origin::Create(https_server_->GetURL(kIframeHost, "/echo"));
+
+  GURL bidder_url = https_server_->GetURL(kBidderHost, "/echo");
+  ASSERT_TRUE(NavigateToURL(shell(), bidder_url));
+  url::Origin bidder_origin = url::Origin::Create(bidder_url);
+
+  ASSERT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                /*owner=*/bidder_origin, /*name=*/"cars", /*priority=*/0.0,
+                blink::InterestGroup::ExecutionMode::kCompatibilityMode,
+                /*bidding_url=*/
+                https_server_->GetURL(kBidderHost,
+                                      "/interest_group/bidding_logic.js"),
+                /*ads=*/
+                {{{GURL("https://example.com/render"),
+                   /*metadata=*/absl::nullopt}}}));
+
+  GURL top_frame_url = https_server_->GetURL(
+      kTopFrameHost,
+      base::StringPrintf(
+          "/cross_site_iframe_factory.html?%s(%s)", kTopFrameHost,
+          https_server_->GetURL(kIframeHost, "/echo").spec().c_str()));
+
+  ASSERT_TRUE(NavigateToURL(shell(), top_frame_url));
+  RenderFrameHost* const iframe_host =
+      ChildFrameAt(web_contents()->GetPrimaryMainFrame(), /*index=*/0);
+
+  const char kHeaderSignalsPath[] = "/header_direct_from_seller_signals.json";
+  // The actual body of the request is just an empty JSON dict for the test,
+  // but it could be any arbitrary payload that the server wants to deliver
+  // with the header signals.
+  const char kHeaderSignalsBodyResponse[] = "{}";
+  const char kHeaderSignalsResponse[] = R"([{
+      "adSlot": "adSlot1",
+      "sellerSignals": {"json": "for", "the": ["seller"]}
+    }])";
+  network_responder_->RegisterNetworkResponse(
+      kHeaderSignalsPath, kHeaderSignalsBodyResponse, "application/json",
+      /*extra_response_headers=*/
+      {{"Access-Control-Allow-Origin", iframe_origin.Serialize()},
+       {"Ad-Auction-Signals", kHeaderSignalsResponse}});
+  EXPECT_TRUE(ExecJs(iframe_host,
+                     content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                        https_server_->GetURL(
+                                            kSellerHost, kHeaderSignalsPath))));
+
+  TestFencedFrameURLMappingResultObserver observer;
+  ConvertFencedFrameURNToURL(
+      GURL(EvalJs(web_contents()->GetPrimaryMainFrame(),
+                  JsReplace(
+                      R"(
+(async function() {
+  return await navigator.runAdAuction({
+      seller: $1,
+      decisionLogicUrl: $2,
+      interestGroupBuyers: [$3],
+      directFromSellerSignalsHeaderAdSlot: "adSlot1"
+  });
+})())",
+                      seller_origin,
+                      https_server_->GetURL(kSellerHost,
+                                            "/interest_group/"
+                                            "decision_simple_direct_from_"
+                                            "seller_signals_validator.js"),
+                      bidder_origin))
+               .ExtractString()),
+      &observer);
+  EXPECT_EQ(GURL("https://example.com/render"), observer.mapped_url());
+}
+
+// Start an auction using directFromSellerSignalsHeaderAdSlot, but navigate away
+// immediately after starting the auction.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    DirectFromSellerSignalsHeaderAdSlotNavigateAwayDuringAuction) {
+  constexpr char kBidderHost[] = "a.test";
+  constexpr char kTopFrameHost[] = "c.test";
+  constexpr char kSellerHost[] = "b.test";
+  constexpr char kNewTopFrameHost[] = "d.test";
+  url::Origin seller_origin =
+      url::Origin::Create(https_server_->GetURL(kSellerHost, "/echo"));
+  const url::Origin top_frame_origin =
+      url::Origin::Create(https_server_->GetURL(kTopFrameHost, "/echo"));
+
+  GURL bidder_url = https_server_->GetURL(kBidderHost, "/echo");
+  ASSERT_TRUE(NavigateToURL(shell(), bidder_url));
+  url::Origin bidder_origin = url::Origin::Create(bidder_url);
+
+  ASSERT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                /*owner=*/bidder_origin, /*name=*/"cars", /*priority=*/0.0,
+                blink::InterestGroup::ExecutionMode::kCompatibilityMode,
+                /*bidding_url=*/
+                https_server_->GetURL(kBidderHost,
+                                      "/interest_group/bidding_logic.js"),
+                /*ads=*/
+                {{{GURL("https://example.com/render"),
+                   /*metadata=*/absl::nullopt}}}));
+
+  GURL top_frame_url = https_server_->GetURL(kTopFrameHost, "/echo");
+  ASSERT_TRUE(NavigateToURL(shell(), top_frame_url));
+
+  const char kHeaderSignalsPath[] = "/header_direct_from_seller_signals.json";
+  // The actual body of the request is just an empty JSON dict for the test,
+  // but it could be any arbitrary payload that the server wants to deliver
+  // with the header signals.
+  const char kHeaderSignalsBodyResponse[] = "{}";
+  const char kHeaderSignalsResponse[] = R"([{
+      "adSlot": "adSlot1",
+      "sellerSignals": {"json": "for", "the": ["seller"]}
+    }])";
+  network_responder_->RegisterNetworkResponse(
+      kHeaderSignalsPath, kHeaderSignalsBodyResponse, "application/json",
+      /*extra_response_headers=*/
+      {{"Access-Control-Allow-Origin", top_frame_origin.Serialize()},
+       {"Ad-Auction-Signals", kHeaderSignalsResponse}});
+  EXPECT_TRUE(ExecJs(web_contents()->GetPrimaryMainFrame(),
+                     content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                        https_server_->GetURL(
+                                            kSellerHost, kHeaderSignalsPath))));
+
+  ExecuteScriptAsync(web_contents()->GetPrimaryMainFrame(),
+                     JsReplace(
+                         R"(
+(async function() {
+  return await navigator.runAdAuction({
+      seller: $1,
+      decisionLogicUrl: $2,
+      interestGroupBuyers: [$3],
+      directFromSellerSignalsHeaderAdSlot: "adSlot1"
+  });
+})())",
+                         seller_origin,
+                         https_server_->GetURL(kSellerHost,
+                                               "/interest_group/"
+                                               "decision_simple_direct_from_"
+                                               "seller_signals_validator.js"),
+                         bidder_origin));
+
+  // Navigate away without waiting for the auction to complete. Nothing should
+  // crash.
+  ASSERT_TRUE(
+      NavigateToURL(shell(), https_server_->GetURL(kNewTopFrameHost, "/echo")));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       InvalidDirectFromSellerSignalsHeaderAdSlot) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern("Uncaught (in promise) Error!");
+
+  EXPECT_EQ("Promise argument rejected or resolved to invalid value.",
+            RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      directFromSellerSignalsHeaderAdSlot: Promise.resolve((() => {
+        function CantConvertToString() {}
+        CantConvertToString.prototype.toString = function () {
+          throw 'Error!';
+        };
+        return new CantConvertToString();
+      })()),
+      interestGroupBuyers: [$1]
+  })",
+                                        test_origin, decision_url)));
+  EXPECT_TRUE(console_observer.Wait());
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       InvalidDirectFromSellerSignalsHeaderAdSlotAndBundles) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': The auction "
+      "config fields directFromSellerSignals and "
+      "directFromSellerSignalsHeaderAdSlot must not both be specified for a "
+      "given component auction, top-level auction, or non-component auction.",
+      RunAuctionAndWait(JsReplace(R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      directFromSellerSignals: Promise.resolve($3),
+      directFromSellerSignalsHeaderAdSlot: Promise.resolve("adSlot1"),
+      interestGroupBuyers: [$1]
+  })",
+                                  test_origin, decision_url, test_origin)));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionInvalidAdditionalBidsNoNonce) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  const char kAuctionConfigTemplate[] = R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      additionalBids: Promise.resolve([1, 2, 3]),
+      interestGroupBuyers: [$1]
+  })";
+
+  EXPECT_EQ(base::StringPrintf(
+                "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
+                "additionalBids specified for AuctionAdConfig with seller '%s' "
+                "which does not have an auctionNonce.",
+                test_origin.Serialize().c_str()),
+            RunAuctionAndWait(
+                JsReplace(kAuctionConfigTemplate, test_origin, decision_url)));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionInvalidAdditionalBidsNoInterestGroupBuyers) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  const char kAuctionConfigTemplate[] = R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      additionalBids: Promise.resolve([1, 2, 3]),
+      auctionNonce: $3
+  })";
+
+  EXPECT_EQ(base::StringPrintf(
+                "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
+                "additionalBids specified for AuctionAdConfig with seller '%s' "
+                "which has no interestGroupBuyers. All additionalBid buyers "
+                "must be in interestGroupBuyers.",
+                test_origin.Serialize().c_str()),
+            RunAuctionAndWait(JsReplace(kAuctionConfigTemplate, test_origin,
+                                        decision_url, auction_nonce)));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    RunAdAuctionInvalidAdditionalBidsEmptyInterestGroupBuyers) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  const char kAuctionConfigTemplate[] = R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      additionalBids: Promise.resolve([1, 2, 3]),
+      interestGroupBuyers: [],
+      auctionNonce: $3
+  })";
+
+  EXPECT_EQ(base::StringPrintf(
+                "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
+                "additionalBids specified for AuctionAdConfig with seller '%s' "
+                "which has no interestGroupBuyers. All additionalBid buyers "
+                "must be in interestGroupBuyers.",
+                test_origin.Serialize().c_str()),
+            RunAuctionAndWait(JsReplace(kAuctionConfigTemplate, test_origin,
+                                        decision_url, auction_nonce)));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionInvalidSignedAdditionalBidsBase64) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "*Worklet error: Ignoring signed additional bid on auction with seller "
+      "'https://a.test:*' due to invalid base64.*");
+
+  const char kAuctionConfigTemplate[] = R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      additionalBids: provideAdditionalBids($1, $3, ["{}"],
+                                            "invalid-signed-base-64"),
+      interestGroupBuyers: [$1],
+      auctionNonce: $3
+  })";
+
+  EXPECT_EQ(nullptr,
+            RunAuctionAndWait(JsReplace(kAuctionConfigTemplate, test_origin,
+                                        decision_url, auction_nonce)));
+
+  EXPECT_TRUE(console_observer.Wait());
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionInvalidSignedAdditionalBidsJson) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "*Worklet error: Unable to parse signed additional bid as JSON*");
+
+  const char kAuctionConfigTemplate[] = R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      additionalBids: provideAdditionalBids($1, $3, ["{}"],
+                                            "invalid-signed-json"),
+      interestGroupBuyers: [$1],
+      auctionNonce: $3
+  })";
+
+  EXPECT_EQ(nullptr,
+            RunAuctionAndWait(JsReplace(kAuctionConfigTemplate, test_origin,
+                                        decision_url, auction_nonce)));
+
+  EXPECT_TRUE(console_observer.Wait());
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionInvalidSignedAdditionalBidsStructure) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL decision_url =
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "*Worklet error: Unable to decode signed additional bid: Signed "
+      "additional bid missing string 'bid' field.*");
+
+  const char kAuctionConfigTemplate[] = R"({
+      seller: $1,
+      decisionLogicURL: $2,
+      additionalBids: provideAdditionalBids($1, $3, ["{}"],
+                                            "invalid-signed-struct"),
+      interestGroupBuyers: [$1],
+      auctionNonce: $3
+  })";
+
+  EXPECT_EQ(nullptr,
+            RunAuctionAndWait(JsReplace(kAuctionConfigTemplate, test_origin,
+                                        decision_url, auction_nonce)));
+
+  EXPECT_TRUE(console_observer.Wait());
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
@@ -4906,7 +6468,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   EXPECT_EQ(nullptr, RunAuctionAndWait(JsReplace(
                          R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
                          })",
                          url::Origin::Create(test_url),
@@ -4921,15 +6483,11 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
   AttachInterestGroupObserver();
 
-  EXPECT_EQ(base::StringPrintf(
-                "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
-                "auctionReportBuyerKeys for AuctionAdConfig with seller "
-                "'%s': Not a BigInt",
-                url::Origin::Create(test_url).Serialize().c_str()),
+  EXPECT_EQ("TypeError: Cannot convert 3 to a BigInt",
             RunAuctionAndWait(JsReplace(
                 R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     auctionReportBuyerKeys: [3],
                          })",
                 url::Origin::Create(test_url),
@@ -4947,12 +6505,12 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   EXPECT_EQ(base::StringPrintf(
                 "TypeError: Failed to execute 'runAdAuction' on 'Navigator': "
                 "auctionReportBuyerKeys for AuctionAdConfig with seller '%s': "
-                "Too large BigInt; 64-bit words: 3, expected 2 or fewer",
+                "Too large BigInt; Must fit in 128 bits",
                 url::Origin::Create(test_url).Serialize().c_str()),
             RunAuctionAndWait(JsReplace(
                 R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     auctionReportBuyerKeys: [1n << 129n],
                          })",
                 url::Origin::Create(test_url),
@@ -4975,7 +6533,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
             RunAuctionAndWait(JsReplace(
                 R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     auctionReportBuyerKeys: [-1n],
                          })",
                 url::Origin::Create(test_url),
@@ -4994,7 +6552,7 @@ IN_PROC_BROWSER_TEST_F(
   EXPECT_EQ(nullptr, RunAuctionAndWait(JsReplace(
                          R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     auctionReportBuyerKeys: [1n],
     auctionReportBuyers: {
       unknownReportType: { bucket: 0n, scale: 1 },
@@ -5004,6 +6562,48 @@ IN_PROC_BROWSER_TEST_F(
                          https_server_->GetURL(
                              "a.test", "/interest_group/decision_logic.js"))));
   WaitForAccessObserved({});
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionAuctionReportBuyersIncompleteDictionary) {
+  GURL test_url = https_server_->GetURL("a.test", "/echo");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': Failed to "
+      "read the 'auctionReportBuyers' property from 'AuctionAdConfig': Failed "
+      "to read the 'scale' property from 'AuctionReportBuyersConfig': Required "
+      "member is undefined.",
+      RunAuctionAndWait(JsReplace(
+          R"({
+    seller: $1,
+    decisionLogicURL: $2,
+    auctionReportBuyerKeys: [1n],
+    auctionReportBuyers: {
+      bidCount: { bucket: 0n },
+    }
+                         })",
+          url::Origin::Create(test_url),
+          https_server_->GetURL("a.test",
+                                "/interest_group/decision_logic.js"))));
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': Failed to "
+      "read the 'auctionReportBuyers' property from 'AuctionAdConfig': Failed "
+      "to read the 'bucket' property from 'AuctionReportBuyersConfig': "
+      "Required member is undefined.",
+      RunAuctionAndWait(JsReplace(
+          R"({
+    seller: $1,
+    decisionLogicURL: $2,
+    auctionReportBuyerKeys: [1n],
+    auctionReportBuyers: {
+      bidCount: { scale: 1 },
+    }
+                         })",
+          url::Origin::Create(test_url),
+          https_server_->GetURL("a.test",
+                                "/interest_group/decision_logic.js"))));
 }
 
 IN_PROC_BROWSER_TEST_F(
@@ -5016,7 +6616,7 @@ IN_PROC_BROWSER_TEST_F(
   EXPECT_EQ(nullptr, RunAuctionAndWait(JsReplace(
                          R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     requiredSellerCapabilities: ['non-valid-capability'],
                          })",
                          url::Origin::Create(test_url),
@@ -5079,7 +6679,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                     .SetAds({{{ad2_url, /*metadata=*/absl::nullopt}}})
                     .SetUpdateUrl(update_url)
                     .SetAllSellerCapabilities(
-                        blink::SellerCapabilities::kInterestGroupCounts)
+                        {blink::SellerCapabilities::kInterestGroupCounts})
                     .Build()));
 
   // `ad2_url` wins, because "cars" is removed for not satisfying
@@ -5088,7 +6688,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     requiredSellerCapabilities: ['interest-group-counts'],
                 })",
@@ -5107,8 +6707,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
             for (const StorageInterestGroup& group : groups) {
               if (group.interest_group.all_sellers_capabilities !=
                   blink::SellerCapabilitiesType(
-                      blink::SellerCapabilities::kInterestGroupCounts,
-                      blink::SellerCapabilities::kLatencyStats)) {
+                      {blink::SellerCapabilities::kInterestGroupCounts,
+                       blink::SellerCapabilities::kLatencyStats})) {
                 return false;
               }
             }
@@ -5120,7 +6720,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     requiredSellerCapabilities: ['interest-group-counts'],
                 })",
@@ -5175,7 +6775,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                     .SetUpdateUrl(update_url)
                     .SetSellerCapabilities(
                         {{{test_origin,
-                           blink::SellerCapabilities::kInterestGroupCounts}}})
+                           {blink::SellerCapabilities::kInterestGroupCounts}}}})
                     .Build()));
 
   // `ad2_url` wins, because "cars" is removed for not satisfying
@@ -5184,7 +6784,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     requiredSellerCapabilities: ['interest-group-counts'],
                 })",
@@ -5212,8 +6812,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
               }
               if (it->second !=
                   blink::SellerCapabilitiesType(
-                      blink::SellerCapabilities::kInterestGroupCounts,
-                      blink::SellerCapabilities::kLatencyStats)) {
+                      {blink::SellerCapabilities::kInterestGroupCounts,
+                       blink::SellerCapabilities::kLatencyStats})) {
                 return false;
               }
             }
@@ -5225,7 +6825,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     requiredSellerCapabilities: ['interest-group-counts'],
                 })",
@@ -5284,7 +6884,7 @@ IN_PROC_BROWSER_TEST_F(
                     .SetUpdateUrl(update_url)
                     .SetSellerCapabilities(
                         {{{other_origin,
-                           blink::SellerCapabilities::kInterestGroupCounts}}})
+                           {blink::SellerCapabilities::kInterestGroupCounts}}}})
                     .Build()));
 
   // There is no winner, because "cars" is removed for not satisfying
@@ -5293,7 +6893,7 @@ IN_PROC_BROWSER_TEST_F(
   EXPECT_EQ(nullptr, RunAuctionAndWait(JsReplace(
                          R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     requiredSellerCapabilities: ['interest-group-counts'],
                 })",
@@ -5321,8 +6921,8 @@ IN_PROC_BROWSER_TEST_F(
               }
               if (it->second !=
                   blink::SellerCapabilitiesType(
-                      blink::SellerCapabilities::kInterestGroupCounts,
-                      blink::SellerCapabilities::kLatencyStats)) {
+                      {blink::SellerCapabilities::kInterestGroupCounts,
+                       blink::SellerCapabilities::kLatencyStats})) {
                 return false;
               }
             }
@@ -5334,7 +6934,7 @@ IN_PROC_BROWSER_TEST_F(
       JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     requiredSellerCapabilities: ['interest-group-counts'],
                 })",
@@ -5376,7 +6976,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
               .SetAds({{{ad1_url, /*metadata=*/absl::nullopt}}})
               .SetUpdateUrl(update_url)
               .SetAllSellerCapabilities(
-                  blink::SellerCapabilities::kInterestGroupCounts)
+                  {blink::SellerCapabilities::kInterestGroupCounts})
               .Build()));
   EXPECT_EQ(kSuccess,
             JoinInterestGroupAndVerify(
@@ -5398,7 +6998,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     requiredSellerCapabilities: ['interest-group-counts', 'latency-stats'],
                 })",
@@ -5417,8 +7017,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
             for (const StorageInterestGroup& group : groups) {
               if (group.interest_group.all_sellers_capabilities !=
                   blink::SellerCapabilitiesType(
-                      blink::SellerCapabilities::kInterestGroupCounts,
-                      blink::SellerCapabilities::kLatencyStats)) {
+                      {blink::SellerCapabilities::kInterestGroupCounts,
+                       blink::SellerCapabilities::kLatencyStats})) {
                 return false;
               }
             }
@@ -5430,7 +7030,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     requiredSellerCapabilities: ['interest-group-counts'],
                 })",
@@ -5471,7 +7071,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       RunAuctionAndWait(JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: {x: 1},
     sellerSignals: {yet: 'more', info: 1},
@@ -5493,7 +7093,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       received_https_test_server_requests_,
       https_server_->GetURL("/interest_group/decision_logic.js")));
   WaitForAccessObserved({
-      {InterestGroupTestObserver::kJoin, test_origin_a, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin_a, "cars"},
   });
 }
 
@@ -5542,7 +7142,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1, $3],
     auctionSignals: {x: 1},
     sellerSignals: {yet: 'more', info: 1},
@@ -5560,11 +7160,11 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       https_server_->GetURL(
           "/interest_group/bidding_logic_stop_bidding_after_win.js")));
   WaitForAccessObserved({
-      {InterestGroupTestObserver::kJoin, disabled_origin, "candy"},
-      {InterestGroupTestObserver::kJoin, test_origin, "cars"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin, "cars"},
-      {InterestGroupTestObserver::kWin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, disabled_origin, "candy"},
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin, "cars"},
+      {TestInterestGroupObserver::kWin, test_origin, "cars"},
   });
 }
 
@@ -5593,7 +7193,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionWithWinner) {
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: {x: 1},
     sellerSignals: {yet: 'more', info: 1},
@@ -5604,9 +7204,6 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionWithWinner) {
       test_origin,
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
-
-  // InterestGroupAccessObserver never was activated, so nothing was observed.
-  WaitForAccessObserved({});
 
   // Check ResourceRequest structs of requests issued by the worklet process.
   const struct ExpectedRequest {
@@ -5706,6 +7303,41 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   url::Origin test_origin = url::Origin::Create(test_url);
   GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
 
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic_with_size.js"))
+                    .SetAds(
+                        /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                   /*size_group=*/"group_1"}}})
+                    .SetAdSizes(
+                        {{{"size_1",
+                           blink::AdSize(
+                               100, blink::AdSize::LengthUnit::kScreenWidth, 50,
+                               blink::AdSize::LengthUnit::kScreenHeight)}}})
+                    .SetSizeGroups({{{"group_1", {"size_1"}}}})
+                    .Build()));
+
+  std::string auction_config = JsReplace(
+      R"({
+          seller: $1,
+          decisionLogicURL: $2,
+          interestGroupBuyers: [$1]
+        })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ForceReload) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+
   EXPECT_EQ(
       kSuccess,
       JoinInterestGroupAndVerify(
@@ -5713,38 +7345,135 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
               /*owner=*/test_origin,
               /*name=*/"cars")
               .SetBiddingUrl(https_server_->GetURL(
-                  "a.test", "/interest_group/bidding_logic_with_size.js"))
+                  "a.test", "/interest_group/bidding_logic.js"))
               .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
                   "a.test", "/interest_group/trusted_bidding_signals.json"))
               .SetTrustedBiddingSignalsKeys({{"key1"}})
-              .SetAds(/*ads=*/{
-                  {{ad_url, "group_1", R"({"ad":"metadata","here":[1,2]})"}}})
-              .SetAdSizes(
-                  {{{"size_1",
-                     blink::AdSize(100, blink::AdSize::LengthUnit::kScreenWidth,
-                                   50, blink::AdSize::LengthUnit::kPixels)}}})
-              .SetSizeGroups({{{"group_1", {"size_1"}}}})
+              .SetAds(/*ads=*/{{{ad_url, R"({"ad":"metadata","here":[1,2]})"}}})
               .Build()));
 
   std::string auction_config = JsReplace(
       R"({
-    seller: $1,
-    decisionLogicUrl: $2,
-    interestGroupBuyers: [$1],
-    auctionSignals: {x: 1},
-    sellerSignals: {yet: 'more', info: 1},
-    sellerTimeout: 200,
-    perBuyerSignals: {$1: {even: 'more', x: 4.5}},
-    perBuyerTimeouts: {$1: 100, '*': 150}
-                })",
+        seller: $1,
+        decisionLogicURL: $2,
+        interestGroupBuyers: [$1]})",
       test_origin,
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+
+  const std::vector<GURL> kExpectedRequests = {
+      https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
+      https_server_->GetURL(
+          "a.test",
+          "/interest_group/trusted_bidding_signals.json?"
+          "hostname=a.test&keys=key1&interestGroupNames=cars"),
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+  };
+  EXPECT_TRUE(HasServerSeenUrls(kExpectedRequests));
+
+  // Do a regular reload, and re-run the auction. Things should be cached.
+  ClearReceivedRequests();
+  ReloadBlockUntilNavigationsComplete(shell(), 1);
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+
+  for (const auto& expected_url : kExpectedRequests) {
+    EXPECT_FALSE(HasServerSeenUrl(expected_url));
+  }
+
+  // Now do a bypass-cache reload. Things should get requested again.
+  ClearReceivedRequests();
+  ReloadBypassingCacheBlockUntilNavigationsComplete(shell(), 1);
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+
+  EXPECT_TRUE(HasServerSeenUrls(kExpectedRequests));
+}
+
+// Runs an auction just like InterestGroupBrowserTest.RunAdAuctionWithWinner,
+// but where the render size is specified only in the interest group, not the
+// bid. When size is only specified in one place, the ads are considered
+// matching (as long as their urls are the same), but the auction proceeds as if
+// no size information was specified.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    RunAdAuctionWithSizeForInterestGroupWithWinnerNoMacroSubstitution) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL(
+      "c.test", "/echo?render_cars&size={%AD_WIDTH%}x{%AD_HEIGHT%}");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic.js"))
+                    .SetAds(
+                        /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                   /*size_group=*/"group_1"}}})
+                    .SetAdSizes(
+                        {{{"size_1",
+                           blink::AdSize(
+                               100, blink::AdSize::LengthUnit::kScreenWidth, 50,
+                               blink::AdSize::LengthUnit::kScreenHeight)}}})
+                    .SetSizeGroups({{{"group_1", {"size_1"}}}})
+                    .Build()));
+
+  std::string auction_config = JsReplace(
+      R"({
+          seller: $1,
+          decisionLogicURL: $2,
+          interestGroupBuyers: [$1]
+        })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
+  // Size is only specified in the interest group, ad size macro substitution
+  // should not happen.
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+}
+
+// Runs an auction just like InterestGroupBrowserTest.RunAdAuctionWithWinner,
+// but where the render size is specified only in the bid, not the interest
+// group. When size is only specified in one place, the ads are considered
+// matching (as long as their urls are the same), but the auction proceeds as if
+// no size information was specified.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    RunAdAuctionWithSizeForBidWithWinnerNoMacroSubstitution) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL(
+      "c.test", "/echo?render_cars&size={%AD_WIDTH%}x{%AD_HEIGHT%}");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic_with_size.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_config = JsReplace(
+      R"({
+          seller: $1,
+          decisionLogicURL: $2,
+          interestGroupBuyers: [$1]
+        })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
+  // Size is only specified in the bid, ad size macro substitution should not
+  // happen.
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
 }
 
 // Runs auction just like test InterestGroupBrowserTest.RunAdAuctionWithWinner,
 // but runs with the ads specified with sizes info. The ad url contains size
 // macros, which should be substituted with the size from the winning bid.
+// The size macros use the {%...%} format.
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                        RunAdAuctionWithSizeWithWinnerMacroSubstitution) {
   GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
@@ -5753,47 +7482,92 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   GURL ad_url = https_server_->GetURL(
       "c.test", "/echo?render_cars&size={%AD_WIDTH%}x{%AD_HEIGHT%}");
 
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          blink::TestInterestGroupBuilder(
-              /*owner=*/test_origin,
-              /*name=*/"cars")
-              .SetBiddingUrl(https_server_->GetURL(
-                  "a.test", "/interest_group/bidding_logic_with_size.js"))
-              .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
-                  "a.test", "/interest_group/trusted_bidding_signals.json"))
-              .SetTrustedBiddingSignalsKeys({{"key1"}})
-              .SetAds(/*ads=*/{
-                  {{ad_url, /*size_group=*/"group_1",
-                    /*metadata=*/R"({"ad":"metadata","here":[1,2]})"}}})
-              .SetAdSizes(
-                  {{{"size_1",
-                     blink::AdSize(100, blink::AdSize::LengthUnit::kScreenWidth,
-                                   50, blink::AdSize::LengthUnit::kPixels)}}})
-              .SetSizeGroups({{{"group_1", {"size_1"}}}})
-              .Build()));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic_with_size.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                       /*size_group=*/"group_1"}}})
+                    .SetAdSizes(
+                        {{{"size_1",
+                           blink::AdSize(
+                               100, blink::AdSize::LengthUnit::kScreenWidth, 50,
+                               blink::AdSize::LengthUnit::kScreenHeight)}}})
+                    .SetSizeGroups({{{"group_1", {"size_1"}}}})
+                    .Build()));
 
   std::string auction_config = JsReplace(
       R"({
-    seller: $1,
-    decisionLogicUrl: $2,
-    interestGroupBuyers: [$1],
-    auctionSignals: {x: 1},
-    sellerSignals: {yet: 'more', info: 1},
-    sellerTimeout: 200,
-    perBuyerSignals: {$1: {even: 'more', x: 4.5}},
-    perBuyerTimeouts: {$1: 100, '*': 150}
-                })",
+        seller: $1,
+        decisionLogicURL: $2,
+        interestGroupBuyers: [$1]
+      })",
       test_origin,
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
   int screen_width = static_cast<int>(display::Screen::GetScreen()
                                           ->GetPrimaryDisplay()
                                           .GetSizeInPixel()
                                           .width());
+  int screen_height = static_cast<int>(0.5 * display::Screen::GetScreen()
+                                                 ->GetPrimaryDisplay()
+                                                 .GetSizeInPixel()
+                                                 .height());
   GURL expected_url = https_server_->GetURL(
-      "c.test",
-      base::StringPrintf("/echo?render_cars&size=%ix50", screen_width));
+      "c.test", base::StringPrintf("/echo?render_cars&size=%ix%i", screen_width,
+                                   screen_height));
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, expected_url);
+}
+
+// Same as RunAdAuctionWithSizeWithWinnerMacroSubstitution, except the size
+// macros use the ${...} format.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    RunAdAuctionWithSizeWithWinnerMacroSubstitutionAlternateFormat) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL(
+      "c.test", "/echo?render_cars&size=${AD_WIDTH}x${AD_HEIGHT}");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic_with_size.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                       /*size_group=*/"group_1"}}})
+                    .SetAdSizes(
+                        {{{"size_1",
+                           blink::AdSize(
+                               100, blink::AdSize::LengthUnit::kScreenWidth, 50,
+                               blink::AdSize::LengthUnit::kScreenHeight)}}})
+                    .SetSizeGroups({{{"group_1", {"size_1"}}}})
+                    .Build()));
+
+  std::string auction_config = JsReplace(
+      R"({
+        seller: $1,
+        decisionLogicURL: $2,
+        interestGroupBuyers: [$1]
+      })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
+  int screen_width = static_cast<int>(display::Screen::GetScreen()
+                                          ->GetPrimaryDisplay()
+                                          .GetSizeInPixel()
+                                          .width());
+  int screen_height = static_cast<int>(0.5 * display::Screen::GetScreen()
+                                                 ->GetPrimaryDisplay()
+                                                 .GetSizeInPixel()
+                                                 .height());
+  GURL expected_url = https_server_->GetURL(
+      "c.test", base::StringPrintf("/echo?render_cars&size=%ix%i", screen_width,
+                                   screen_height));
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, expected_url);
 }
 
@@ -5821,7 +7595,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
       })",
       test_origin,
@@ -5901,7 +7675,7 @@ IN_PROC_BROWSER_TEST_F(
       JsReplace(
           R"({
             seller: $1,
-            decisionLogicUrl: $2,
+            decisionLogicURL: $2,
             interestGroupBuyers: [$1],
             perBuyerSignals: {$1: {a:1}, 'https://not_in_buyers.com': {a:1}},
             perBuyerTimeouts: {'https://not_in_buyers.com': 100}
@@ -5910,10 +7684,10 @@ IN_PROC_BROWSER_TEST_F(
           https_server_->GetURL("a.test", "/interest_group/decision_logic.js")),
       ad_url);
   WaitForAccessObserved(
-      {{InterestGroupTestObserver::kJoin, test_origin, "cars"},
-       {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-       {InterestGroupTestObserver::kBid, test_origin, "cars"},
-       {InterestGroupTestObserver::kWin, test_origin, "cars"}});
+      {{TestInterestGroupObserver::kJoin, test_origin, "cars"},
+       {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+       {TestInterestGroupObserver::kBid, test_origin, "cars"},
+       {TestInterestGroupObserver::kWin, test_origin, "cars"}});
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionCancel) {
@@ -5938,7 +7712,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionCancel) {
       let controller = new AbortController();
       const config = {
         seller: $1,
-        decisionLogicUrl: $2,
+        decisionLogicURL: $2,
         interestGroupBuyers: [$1],
         signal: controller.signal
       };
@@ -5979,7 +7753,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionCancelLate) {
       let controller = new AbortController();
       const config = {
         seller: $1,
-        decisionLogicUrl: $2,
+        decisionLogicURL: $2,
         interestGroupBuyers: [$1],
         signal: controller.signal
       };
@@ -6028,7 +7802,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionCancelBefore) {
       let controller = new AbortController();
       const config = {
         seller: $1,
-        decisionLogicUrl: $2,
+        decisionLogicURL: $2,
         interestGroupBuyers: [$1],
         signal: controller.signal
       };
@@ -6069,7 +7843,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionWithBidderWasm) {
   std::string auction_config = JsReplace(
       R"({
         seller: $1,
-        decisionLogicUrl: $2,
+        decisionLogicURL: $2,
         interestGroupBuyers: [$1],
       })",
       test_origin,
@@ -6125,7 +7899,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: {x: 1},
     sellerSignals: {yet: 'more', info: 1},
@@ -6228,7 +8002,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       RunAuctionAndWait(JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: {x: 1},
     sellerSignals: {yet: 'more', info: 1},
@@ -6257,11 +8031,138 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   }
 }
 
+// This test reproduces the crash reported in crbug.com/1451572.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionRepro1451572) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("a.test", "/echo?render_cars");
+
+  const std::string repro_script = JsReplace(
+      R"(
+(async function() {
+// The crash occurs only if the second bid is filtered out before the first bid
+// completes -- since the order this happens is arbitrary, the scenario is run
+// several times to increase the chances of reproing the crash scenario.
+//
+// Two interest groups *are* required to repro the crash, and it's also required
+// that only one of them has prioritization enabled and trusted signals set.
+
+  const ig_1= {
+    owner: $1,
+    name: "name_1",
+    biddingLogicURL: $3,
+    ads: [{renderURL: $1}],
+  };
+
+  const ig_2 = {
+    owner: $1,
+    name: "name_2",
+    // Intentionally use invalid bidding logic URL -- this results in the bid
+    // being filtered.
+    biddingLogicURL: $1,
+    ads: [{renderURL: $1}],
+    enableBiddingSignalsPrioritization: true,
+    trustedBiddingSignalsURL: $1
+  };
+
+  const config = {
+    seller: $1,
+    // Must have FLEDGE header and JS mime type.
+    decisionLogicURL: $2,
+    interestGroupBuyers: [$1]
+  };
+
+  for(let i = 0; i < 20; i++) {
+    await navigator.joinAdInterestGroup(ig_1, 200);
+    await navigator.joinAdInterestGroup(ig_2, 200);
+    await navigator.runAdAuction(config);
+  }
+})())",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"));
+
+  EXPECT_EQ(nullptr, EvalJs(shell(), repro_script));
+}
+
+// Test that the FLEDGE properly handles detached documents.
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
+                       DetachedDocumentDoesNotCrash) {
+  const char* kTestCases[] = {
+      R"(runAdAuction({
+        seller: "foo", // required
+        decisionLogicURL: "foo", // required
+      }, 0.0)
+    )",
+      R"(joinAdInterestGroup({
+        owner: "foo", // required
+        name: "foo", // required
+      })
+    )",
+      "leaveAdInterestGroup()",
+      "updateAdInterestGroups()",
+      "adAuctionComponents(1)",
+      R"(deprecatedURNToURL("foo")
+    )",
+      R"(deprecatedReplaceInURN("foo", {}))",
+      "canLoadAdAuctionFencedFrame()"};
+
+  GURL main_url = https_server_->GetURL("b.test", "/page_with_iframe.html");
+
+  for (const auto* test_case : kTestCases) {
+    ASSERT_TRUE(NavigateToURL(shell(), main_url));
+
+    EvalJsResult result = EvalJs(shell(), base::StringPrintf(R"(
+        try {
+          let child = document.getElementById("test_iframe");
+          const detachedNavigator = child.contentWindow.navigator;
+          child.remove();
+          detachedNavigator.%s;
+        } catch(e) {
+        }
+        "Did not crash"
+      )",
+                                                             test_case));
+    EXPECT_EQ("Did not crash", result) << test_case;
+  }
+}
+
+// Can't do zero-argument leave of interest groups from http://localhost, even
+// though it's a "secure context" (since it's potentially trustworthy).
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
+                       CantLeaveZeroArgHttpLocalhost) {
+  GURL test_url = embedded_test_server()->GetURL("/fenced_frames/basic.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  GURL resource_url = embedded_test_server()->GetURL(
+      "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  // This is to get the raw exception string rather than the nicer
+  // (but more complicated) error message.
+  const char kLeaveScript[] = R"(
+    (async function() {
+      try {
+        await navigator.leaveAdInterestGroup();
+        return "success";
+      } catch (e) {
+        return e.toString();
+      }
+    })()
+  )";
+
+  NavigateFencedFrameAndWait(resource_url, resource_url, shell());
+  EXPECT_EQ(
+      "SecurityError: Failed to execute 'leaveAdInterestGroup' on 'Navigator': "
+      "May only leaveAdInterestGroup from an https origin.",
+      EvalJs(GetFencedFrameRenderFrameHost(shell()), kLeaveScript));
+}
+
 // Runs auction just like test InterestGroupBrowserTest.RunAdAuctionWithWinner,
 // but runs with fenced frames enabled and expects to receive a URN URL to be
 // used. After the auction, loads the URL in a fenced frame, and expects the
 // correct URL is loaded.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        RunAdAuctionWithWinner) {
   URLLoaderMonitor url_loader_monitor;
 
@@ -6289,7 +8190,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
       ad_url, JsReplace(
                   R"({
 seller: $1,
-decisionLogicUrl: $2,
+decisionLogicURL: $2,
 interestGroupBuyers: [$1],
 auctionSignals: {x: 1},
 sellerSignals: {yet: 'more', info: 1},
@@ -6298,9 +8199,6 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
                   test_origin,
                   https_server_->GetURL("a.test",
                                         "/interest_group/decision_logic.js"))));
-
-  // InterestGroupAccessObserver never was activated, so nothing was observed.
-  WaitForAccessObserved({});
 
   // Check ResourceRequest structs of requests issued by the worklet process.
   const struct ExpectedRequest {
@@ -6391,7 +8289,153 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
                 ->trusted_params->isolation_info.network_isolation_key());
 }
 
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+// Runs auction just like test
+// InterestGroupBrowserTest.RunAdAuctionWithSizeWithWinner, but load the winning
+// ad in a fenced frame and verify the ad size.
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
+                       RunAdAuctionWithSizeWithWinner) {
+  GURL test_url = https_server_->GetURL("a.test", "/fenced_frames/basic.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL(
+      "c.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic_with_size.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                       /*size_group=*/"group_1"}}})
+                    .SetAdSizes(
+                        {{{"size_1",
+                           blink::AdSize(
+                               100, blink::AdSize::LengthUnit::kScreenWidth, 50,
+                               blink::AdSize::LengthUnit::kScreenHeight)}}})
+                    .SetSizeGroups({{{"group_1", {"size_1"}}}})
+                    .Build()));
+
+  std::string auction_config = JsReplace(
+      R"({
+          seller: $1,
+          decisionLogicURL: $2,
+          interestGroupBuyers: [$1]
+        })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
+  ASSERT_NO_FATAL_FAILURE(
+      RunAuctionAndNavigateFencedFrame(ad_url, auction_config));
+
+  // Verify the ad is loaded with the size specified in the winning bid.
+  int screen_width = static_cast<int>(display::Screen::GetScreen()
+                                          ->GetPrimaryDisplay()
+                                          .GetSizeInPixel()
+                                          .width());
+  int screen_height = static_cast<int>(0.5 * display::Screen::GetScreen()
+                                                 ->GetPrimaryDisplay()
+                                                 .GetSizeInPixel()
+                                                 .height());
+  RenderFrameHost* ad_frame = GetFencedFrameRenderFrameHost(shell());
+  EXPECT_TRUE(WaitForLoadStop(web_contents()));
+  // Force layout.
+  EXPECT_TRUE(
+      ExecJs(ad_frame, "getComputedStyle(document.documentElement).width;"));
+
+  EXPECT_TRUE(
+      PollUntilEvalToTrue(JsReplace("innerWidth == $1 && innerHeight == $2",
+                                    screen_width, screen_height),
+                          ad_frame));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
+                       RunAdAuctionWithAdComponentWithSize) {
+  GURL test_url = https_server_->GetURL("a.test", "/fenced_frames/basic.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  GURL ad_component_url = https_server_->GetURL(
+      "d.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  GURL ad_url = https_server_->GetURL("c.test", "/fenced_frames/basic.html");
+  EXPECT_EQ(
+      kSuccess,
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(
+              /*owner=*/url::Origin::Create(test_url),
+              /*name=*/"cars")
+              .SetBiddingUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/bidding_logic_with_size.js"))
+              .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                 /*size_group=*/"group_1"}}})
+              .SetAdComponents({{{ad_component_url, /*metadata=*/absl::nullopt,
+                                  /*size_group=*/"group_2"}}})
+              .SetAdSizes(
+                  {{{"size_1",
+                     blink::AdSize(100, blink::AdSize::LengthUnit::kScreenWidth,
+                                   50,
+                                   blink::AdSize::LengthUnit::kScreenHeight)},
+                    {"size_2",
+                     blink::AdSize(50, blink::AdSize::LengthUnit::kPixels, 25,
+                                   blink::AdSize::LengthUnit::kPixels)}}})
+              .SetSizeGroups(
+                  {{{"group_1", {"size_1"}}, {"group_2", {"size_2"}}}})
+              .Build()));
+
+  ASSERT_NO_FATAL_FAILURE(RunAuctionAndNavigateFencedFrame(
+      ad_url, JsReplace(
+                  R"({
+                      seller: $1,
+                      decisionLogicURL: $2,
+                      interestGroupBuyers: [$1]
+                    })",
+                  url::Origin::Create(test_url),
+                  https_server_->GetURL("a.test",
+                                        "/interest_group/decision_logic.js"))));
+
+  RenderFrameHost* ad_frame = GetFencedFrameRenderFrameHost(shell());
+
+  // Verify the ad is loaded with the size specified in the winning bid.
+  int screen_width = static_cast<int>(display::Screen::GetScreen()
+                                          ->GetPrimaryDisplay()
+                                          .GetSizeInPixel()
+                                          .width());
+  int screen_height = static_cast<int>(0.5 * display::Screen::GetScreen()
+                                                 ->GetPrimaryDisplay()
+                                                 .GetSizeInPixel()
+                                                 .height());
+  EXPECT_TRUE(WaitForLoadStop(web_contents()));
+  // Force layout.
+  EXPECT_TRUE(
+      ExecJs(ad_frame, "getComputedStyle(document.documentElement).width;"));
+  EXPECT_TRUE(
+      PollUntilEvalToTrue(JsReplace("innerWidth == $1 && innerHeight == $2",
+                                    screen_width, screen_height),
+                          ad_frame));
+
+  // Get the first component config from the fenced frame. Load it in the
+  // nested fenced frame. The load should succeed.
+  TestFrameNavigationObserver observer(GetFencedFrameRenderFrameHost(ad_frame));
+
+  EXPECT_TRUE(ExecJs(ad_frame, R"(
+        const configs = window.fence.getNestedConfigs();
+        document.querySelector('fencedframe').config = configs[0];
+      )"));
+
+  WaitForFencedFrameNavigation(ad_component_url, ad_frame, observer);
+
+  // Verify the ad component is loaded with the size specified in the winning
+  // bid.
+  RenderFrameHost* ad_component_frame = GetFencedFrameRenderFrameHost(ad_frame);
+  EXPECT_TRUE(WaitForLoadStop(web_contents()));
+  // Force layout.
+  EXPECT_TRUE(ExecJs(ad_component_frame,
+                     "getComputedStyle(document.documentElement).width;"));
+  EXPECT_TRUE(PollUntilEvalToTrue(
+      JsReplace("innerWidth == $1 && innerHeight == $2", 50, 25),
+      ad_component_frame));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        RunAdAuctionWithWinnerReplacedURN) {
   URLLoaderMonitor url_loader_monitor;
 
@@ -6421,7 +8465,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
       JsReplace(
           R"({
 seller: $1,
-decisionLogicUrl: $2,
+decisionLogicURL: $2,
 interestGroupBuyers: [$1],
 auctionSignals: {x: 1},
 sellerSignals: {yet: 'more', info: 1},
@@ -6448,7 +8492,7 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
 // succeed and are then loaded in separate fenced frames. Both auctions try to
 // leave the interest group, but only the one whose ad matches the joining
 // origin should succeed.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        RunTwoAdAuctionWithWinnerLeaveGroup) {
   URLLoaderMonitor url_loader_monitor;
 
@@ -6520,7 +8564,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
       JsReplace(
           R"({
 seller: $1,
-decisionLogicUrl: $2,
+decisionLogicURL: $2,
 interestGroupBuyers: [$1],
 auctionSignals: {x: 1},
 sellerSignals: {yet: 'more', info: 1},
@@ -6532,13 +8576,13 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
 
   // InterestGroupAccessObserver should see the join and auction.
   WaitForAccessObserved({
-      {InterestGroupTestObserver::kJoin, test_origin, "cars"},
-      {InterestGroupTestObserver::kJoin, test_origin, "trucks"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "trucks"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin, "trucks"},
-      {InterestGroupTestObserver::kWin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin, "trucks"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "trucks"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin, "trucks"},
+      {TestInterestGroupObserver::kWin, test_origin, "cars"},
   });
 
   // Try to leave the winning interest group, which should fail, since the ad is
@@ -6553,7 +8597,7 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
       JsReplace(
           R"({
 seller: $1,
-decisionLogicUrl: $2,
+decisionLogicURL: $2,
 interestGroupBuyers: [$1],
 auctionSignals: {x: 1},
 sellerSignals: {yet: 'more', info: 1},
@@ -6568,10 +8612,10 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
   // attempt, as updating the data is potentially racy with the navigation
   // committing, so the leave event could appear out of order.
   WaitForAccessObserved(
-      {{InterestGroupTestObserver::kLoaded, test_origin, "trucks"},
-       {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-       {InterestGroupTestObserver::kBid, test_origin, "trucks"},
-       {InterestGroupTestObserver::kWin, test_origin, "trucks"}});
+      {{TestInterestGroupObserver::kLoaded, test_origin, "trucks"},
+       {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+       {TestInterestGroupObserver::kBid, test_origin, "trucks"},
+       {TestInterestGroupObserver::kWin, test_origin, "trucks"}});
 
   // Try to leave the winning interest group, which should succeed this time. Do
   // it by calling Javascript directly instead of loading a page that does this
@@ -6579,7 +8623,7 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
   EXPECT_EQ(nullptr, EvalJs(GetFencedFrameRenderFrameHost(rfh2),
                             "navigator.leaveAdInterestGroup()"));
   WaitForAccessObserved(
-      {{InterestGroupTestObserver::kLeave, test_origin, "trucks"}});
+      {{TestInterestGroupObserver::kLeave, test_origin, "trucks"}});
 
   // Only the "truck" interest group should have been left.
   auto groups = GetAllInterestGroups();
@@ -6592,7 +8636,7 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
 // from a nested iframe.
 //
 // TODO(crbug.com/1320438): Re-enable the test.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        RunAdAuctionWithWinnerNestedLeaveGroup) {
   URLLoaderMonitor url_loader_monitor;
 
@@ -6629,7 +8673,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
       ad_url, JsReplace(
                   R"({
 seller: $1,
-decisionLogicUrl: $2,
+decisionLogicURL: $2,
 interestGroupBuyers: [$1],
 auctionSignals: {x: 1},
 sellerSignals: {yet: 'more', info: 1},
@@ -6641,10 +8685,10 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
 
   // InterestGroupAccessObserver should see the join and auction.
   WaitForAccessObserved(
-      {{InterestGroupTestObserver::kJoin, test_origin, "cars"},
-       {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-       {InterestGroupTestObserver::kBid, test_origin, "cars"},
-       {InterestGroupTestObserver::kWin, test_origin, "cars"}});
+      {{TestInterestGroupObserver::kJoin, test_origin, "cars"},
+       {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+       {TestInterestGroupObserver::kBid, test_origin, "cars"},
+       {TestInterestGroupObserver::kWin, test_origin, "cars"}});
 
   // Leave the interest group and wait to observe the event. Do this after the
   // above WaitForAccessObserved() call, as leaving is racy with recording the
@@ -6654,7 +8698,7 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
                                 ->current_frame_host(),
                             "navigator.leaveAdInterestGroup()"));
   WaitForAccessObserved(
-      {{InterestGroupTestObserver::kLeave, test_origin, "cars"}});
+      {{TestInterestGroupObserver::kLeave, test_origin, "cars"}});
 
   // The ad should have left the interest group when the page was shown.
   EXPECT_EQ(0u, GetAllInterestGroups().size());
@@ -6665,7 +8709,7 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
 // cross-origin navigation on itself, and the new document loads an iframe that
 // is same-origin to the interest group. We leave the interest group from the
 // iframe, and it should succeed.
-IN_PROC_BROWSER_TEST_P(
+IN_PROC_BROWSER_TEST_F(
     InterestGroupFencedFrameBrowserTest,
     RunAdAuctionWithWinnerLeaveGroupAfterRendererInitiatedNavigation) {
   URLLoaderMonitor url_loader_monitor;
@@ -6695,7 +8739,7 @@ IN_PROC_BROWSER_TEST_P(
       test_url, JsReplace(
                     R"({
 seller: $1,
-decisionLogicUrl: $2,
+decisionLogicURL: $2,
 interestGroupBuyers: [$1],
 auctionSignals: {x: 1},
 sellerSignals: {yet: 'more', info: 1},
@@ -6734,7 +8778,7 @@ perBuyerSignals: {$1: {even: 'more', x: 4.5}}
 
 // Creates a Fenced Frame and then tries to use the leaveAdInterestGroup API.
 // Leaving the interest group should silently fail.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        LeaveAdInterestGroupNoAuction) {
   URLLoaderMonitor url_loader_monitor;
 
@@ -6764,7 +8808,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
 
   // InterestGroupAccessObserver should see the join.
   WaitForAccessObserved(
-      {{InterestGroupTestObserver::kJoin, test_origin, "cars"}});
+      {{TestInterestGroupObserver::kJoin, test_origin, "cars"}});
 
   // The ad should not have left the interest group when the page was shown.
   EXPECT_EQ(1u, GetAllInterestGroups().size());
@@ -6772,7 +8816,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
 
 // Use different origins for publisher, bidder, and seller, and make sure
 // everything works as expected.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, CrossOrigin) {
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest, CrossOrigin) {
   const char kPublisher[] = "a.test";
   const char kBidder[] = "b.test";
   const char kSeller[] = "c.test";
@@ -6813,7 +8857,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, CrossOrigin) {
 function scoreAd(
     adMetadata, bid, auctionConfig, trustedScoringSignals, browserSignals) {
   // Reject bits if trustedScoringSignals is not received.
-  if (trustedScoringSignals.renderUrl[browserSignals.renderUrl] === "foo")
+  if (trustedScoringSignals.renderURL[browserSignals.renderURL] === "foo")
     return bid;
   return 0;
 }
@@ -6844,8 +8888,8 @@ function reportResult(
                   R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
-  trustedScoringSignalsUrl: $3,
+  decisionLogicURL: $2,
+  trustedScoringSignalsURL: $3,
   interestGroupBuyers: [$4],
 }
                   )",
@@ -6853,10 +8897,10 @@ function reportResult(
                   seller_signals_url, bidder_origin));
 
   WaitForAccessObserved({
-      {InterestGroupTestObserver::kJoin, bidder_origin, "cars"},
-      {InterestGroupTestObserver::kLoaded, bidder_origin, "cars"},
-      {InterestGroupTestObserver::kBid, bidder_origin, "cars"},
-      {InterestGroupTestObserver::kWin, bidder_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, bidder_origin, "cars"},
+      {TestInterestGroupObserver::kLoaded, bidder_origin, "cars"},
+      {TestInterestGroupObserver::kBid, bidder_origin, "cars"},
+      {TestInterestGroupObserver::kWin, bidder_origin, "cars"},
   });
 
   // Reporting urls should be fetched after an auction succeeded.
@@ -6900,7 +8944,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: {x: 1},
     sellerSignals: {yet: 'more', info: 1},
@@ -6911,10 +8955,10 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
 
   WaitForAccessObserved({
-      {InterestGroupTestObserver::kJoin, test_origin, "cars"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin, "cars"},
-      {InterestGroupTestObserver::kWin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin, "cars"},
+      {TestInterestGroupObserver::kWin, test_origin, "cars"},
   });
 
   // Wait for the component to load.
@@ -6988,7 +9032,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, TopFrameHostname) {
                                           R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$3],
   auctionSignals: {x: 1},
   sellerSignals: {yet: 'more', info: 1},
@@ -7003,7 +9047,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, TopFrameHostname) {
 
 // Test running auctions in cross-site iframes, and loading the winner into a
 // nested fenced frame.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, Iframe) {
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest, Iframe) {
   // Use different hostnames for each participant.
   const char kTopFrameHost[] = "a.test";
   const char kBidderHost[] = "b.test";
@@ -7054,7 +9098,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, Iframe) {
           R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$3]
 }
           )",
@@ -7116,7 +9160,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1, $3],
                 })",
       test_origin,
@@ -7178,7 +9222,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionAllGroupsLimited) {
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     perBuyerGroupLimits: {'*': 1},
                 })",
@@ -7187,14 +9231,14 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionAllGroupsLimited) {
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad1_url);
 
   WaitForAccessObserved({
-      {InterestGroupTestObserver::kJoin, test_origin, "cars"},
-      {InterestGroupTestObserver::kJoin, test_origin, "bikes"},
-      {InterestGroupTestObserver::kJoin, test_origin, "shoes"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "shoes"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "bikes"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin, "cars"},
-      {InterestGroupTestObserver::kWin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin, "bikes"},
+      {TestInterestGroupObserver::kJoin, test_origin, "shoes"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "shoes"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "bikes"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin, "cars"},
+      {TestInterestGroupObserver::kWin, test_origin, "cars"},
   });
 }
 
@@ -7281,7 +9325,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionOneGroupLimited) {
   std::string auction_config = JsReplace(
       R"({
     seller: $3,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1, $3],
     perBuyerGroupLimits: {$1: 1, '*': 2},
                 })",
@@ -7291,22 +9335,22 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionOneGroupLimited) {
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad1_url);
 
   WaitForAccessObserved({
-      {InterestGroupTestObserver::kJoin, test_origin, "cars"},
-      {InterestGroupTestObserver::kJoin, test_origin, "bikes"},
-      {InterestGroupTestObserver::kJoin, test_origin, "shoes"},
-      {InterestGroupTestObserver::kJoin, test_origin2, "cars"},
-      {InterestGroupTestObserver::kJoin, test_origin2, "bikes"},
-      {InterestGroupTestObserver::kJoin, test_origin2, "shoes"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "shoes"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "bikes"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-      {InterestGroupTestObserver::kLoaded, test_origin2, "shoes"},
-      {InterestGroupTestObserver::kLoaded, test_origin2, "bikes"},
-      {InterestGroupTestObserver::kLoaded, test_origin2, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin2, "bikes"},
-      {InterestGroupTestObserver::kBid, test_origin2, "cars"},
-      {InterestGroupTestObserver::kWin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin, "bikes"},
+      {TestInterestGroupObserver::kJoin, test_origin, "shoes"},
+      {TestInterestGroupObserver::kJoin, test_origin2, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin2, "bikes"},
+      {TestInterestGroupObserver::kJoin, test_origin2, "shoes"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "shoes"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "bikes"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+      {TestInterestGroupObserver::kLoaded, test_origin2, "shoes"},
+      {TestInterestGroupObserver::kLoaded, test_origin2, "bikes"},
+      {TestInterestGroupObserver::kLoaded, test_origin2, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin2, "bikes"},
+      {TestInterestGroupObserver::kBid, test_origin2, "cars"},
+      {TestInterestGroupObserver::kWin, test_origin, "cars"},
   });
 }
 
@@ -7394,7 +9438,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
     seller: $3,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1, $3],
     perBuyerGroupLimits: {$3: 3, '*': 1},
                 })",
@@ -7404,23 +9448,23 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad1_url);
 
   WaitForAccessObserved({
-      {InterestGroupTestObserver::kJoin, test_origin, "cars"},
-      {InterestGroupTestObserver::kJoin, test_origin, "bikes"},
-      {InterestGroupTestObserver::kJoin, test_origin, "shoes"},
-      {InterestGroupTestObserver::kJoin, test_origin2, "cars"},
-      {InterestGroupTestObserver::kJoin, test_origin2, "bikes"},
-      {InterestGroupTestObserver::kJoin, test_origin2, "shoes"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "shoes"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "bikes"},
-      {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-      {InterestGroupTestObserver::kLoaded, test_origin2, "shoes"},
-      {InterestGroupTestObserver::kLoaded, test_origin2, "bikes"},
-      {InterestGroupTestObserver::kLoaded, test_origin2, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin2, "bikes"},
-      {InterestGroupTestObserver::kBid, test_origin2, "cars"},
-      {InterestGroupTestObserver::kBid, test_origin2, "shoes"},
-      {InterestGroupTestObserver::kWin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin, "bikes"},
+      {TestInterestGroupObserver::kJoin, test_origin, "shoes"},
+      {TestInterestGroupObserver::kJoin, test_origin2, "cars"},
+      {TestInterestGroupObserver::kJoin, test_origin2, "bikes"},
+      {TestInterestGroupObserver::kJoin, test_origin2, "shoes"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "shoes"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "bikes"},
+      {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+      {TestInterestGroupObserver::kLoaded, test_origin2, "shoes"},
+      {TestInterestGroupObserver::kLoaded, test_origin2, "bikes"},
+      {TestInterestGroupObserver::kLoaded, test_origin2, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin2, "bikes"},
+      {TestInterestGroupObserver::kBid, test_origin2, "cars"},
+      {TestInterestGroupObserver::kBid, test_origin2, "shoes"},
+      {TestInterestGroupObserver::kWin, test_origin, "cars"},
   });
 }
 
@@ -7454,7 +9498,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     perBuyerGroupLimits: {'*': 3},
                 })",
@@ -7478,8 +9522,9 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
     // Some auctions will have no winner, depending on which interest groups
     // were chosen to participate. No need to do anything more for those.
-    if (result.value.is_none())
+    if (result.value.is_none()) {
       continue;
+    }
 
     // For other auctions, navigate iframe to winning URN to trigger reports.
     // This should happen exactly 4 times, so shouldn't slow the test down too
@@ -7551,7 +9596,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionMultipleAuctions) {
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1, $3],
   })",
       origin2,
@@ -7561,32 +9606,31 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionMultipleAuctions) {
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad1_url);
   // Wait for interest groups to be updated. Interest groups are updated
   // during/after commit, so this test is potentially racy without this.
-  WaitForAccessObserved({{InterestGroupTestObserver::kLoaded, origin2, "shoes"},
-                         {InterestGroupTestObserver::kLoaded, origin, "cars"},
-                         {InterestGroupTestObserver::kBid, origin, "cars"},
-                         {InterestGroupTestObserver::kBid, origin2, "shoes"},
-                         {InterestGroupTestObserver::kWin, origin, "cars"}});
+  WaitForAccessObserved({{TestInterestGroupObserver::kLoaded, origin2, "shoes"},
+                         {TestInterestGroupObserver::kLoaded, origin, "cars"},
+                         {TestInterestGroupObserver::kBid, origin, "cars"},
+                         {TestInterestGroupObserver::kBid, origin2, "shoes"},
+                         {TestInterestGroupObserver::kWin, origin, "cars"}});
 
   // `prev_wins` of `test_url`'s interest group cars is updated in storage.
   storage_interest_groups = GetInterestGroupsForOwner(origin);
   storage_interest_groups2 = GetInterestGroupsForOwner(origin2);
   // Remove the above two loads from the observer.
   WaitForAccessObserved(
-      {{InterestGroupTestObserver::kLoaded, origin, "cars"},
-       {InterestGroupTestObserver::kLoaded, origin2, "shoes"}});
+      {{TestInterestGroupObserver::kLoaded, origin, "cars"},
+       {TestInterestGroupObserver::kLoaded, origin2, "shoes"}});
   EXPECT_EQ(
       storage_interest_groups.front().bidding_browser_signals->prev_wins.size(),
       1u);
   EXPECT_EQ(storage_interest_groups2.front()
                 .bidding_browser_signals->prev_wins.size(),
             0u);
-  EXPECT_EQ(
-      storage_interest_groups.front()
-          .bidding_browser_signals->prev_wins.front()
-          ->ad_json,
-      JsReplace(
-          R"({"render_url":$1,"metadata":{"ad":"metadata","here":[1,2]}})",
-          ad1_url));
+  EXPECT_EQ(storage_interest_groups.front()
+                .bidding_browser_signals->prev_wins.front()
+                ->ad_json,
+            JsReplace(R"({"metadata":"{\"ad\":\"metadata\",\"here\":[1,2]}",)"
+                      R"("renderURL":$1})",
+                      ad1_url));
   EXPECT_EQ(storage_interest_groups.front().bidding_browser_signals->bid_count,
             1);
   EXPECT_EQ(storage_interest_groups2.front().bidding_browser_signals->bid_count,
@@ -7595,18 +9639,18 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionMultipleAuctions) {
   // Run auction again. Interest group shoes of owner `test_url2` wins.
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad2_url);
   // Need to wait again.
-  WaitForAccessObserved({{InterestGroupTestObserver::kLoaded, origin2, "shoes"},
-                         {InterestGroupTestObserver::kLoaded, origin, "cars"},
-                         {InterestGroupTestObserver::kBid, origin2, "shoes"},
-                         {InterestGroupTestObserver::kWin, origin2, "shoes"}});
+  WaitForAccessObserved({{TestInterestGroupObserver::kLoaded, origin2, "shoes"},
+                         {TestInterestGroupObserver::kLoaded, origin, "cars"},
+                         {TestInterestGroupObserver::kBid, origin2, "shoes"},
+                         {TestInterestGroupObserver::kWin, origin2, "shoes"}});
 
   // `test_url2`'s interest group shoes has one `prev_wins` in storage.
   storage_interest_groups = GetInterestGroupsForOwner(origin);
   storage_interest_groups2 = GetInterestGroupsForOwner(origin2);
   // Remove the above two loads from the observer.
   WaitForAccessObserved(
-      {{InterestGroupTestObserver::kLoaded, origin, "cars"},
-       {InterestGroupTestObserver::kLoaded, origin2, "shoes"}});
+      {{TestInterestGroupObserver::kLoaded, origin, "cars"},
+       {TestInterestGroupObserver::kLoaded, origin2, "shoes"}});
   EXPECT_EQ(
       storage_interest_groups.front().bidding_browser_signals->prev_wins.size(),
       1u);
@@ -7616,7 +9660,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionMultipleAuctions) {
   EXPECT_EQ(storage_interest_groups2.front()
                 .bidding_browser_signals->prev_wins.front()
                 ->ad_json,
-            JsReplace(R"({"render_url":$1})", ad2_url));
+            JsReplace(R"({"renderURL":$1})", ad2_url));
   // First interest group didn't bid this time.
   EXPECT_EQ(storage_interest_groups.front().bidding_browser_signals->bid_count,
             1);
@@ -7627,7 +9671,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionMultipleAuctions) {
   auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
                 })",
       origin2,
@@ -7635,9 +9679,9 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionMultipleAuctions) {
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad2_url);
   // Need to wait again.
   WaitForAccessObserved({
-      {InterestGroupTestObserver::kLoaded, origin2, "shoes"},
-      {InterestGroupTestObserver::kBid, origin2, "shoes"},
-      {InterestGroupTestObserver::kWin, origin2, "shoes"},
+      {TestInterestGroupObserver::kLoaded, origin2, "shoes"},
+      {TestInterestGroupObserver::kBid, origin2, "shoes"},
+      {TestInterestGroupObserver::kWin, origin2, "shoes"},
   });
 
   // `test_url2`'s interest group shoes has two `prev_wins` in storage.
@@ -7652,7 +9696,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionMultipleAuctions) {
   EXPECT_EQ(storage_interest_groups2.front()
                 .bidding_browser_signals->prev_wins.back()
                 ->ad_json,
-            JsReplace(R"({"render_url":$1})", ad2_url));
+            JsReplace(R"({"renderURL":$1})", ad2_url));
   // First interest group didn't bid this time.
   EXPECT_EQ(storage_interest_groups.front().bidding_browser_signals->bid_count,
             1);
@@ -7703,7 +9747,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ReportingMultipleAuctions) {
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1, $3],
   })",
       origin_b,
@@ -7730,7 +9774,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ReportingMultipleAuctions) {
   auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1, $3],
   })",
       origin_b,
@@ -7769,7 +9813,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ReportingMultipleAuctions) {
   auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     sellerSignals: {reportTo: $3},
                 })",
@@ -7852,7 +9896,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ReportingMultipleAuctions) {
   }
 }
 
-// Adding an interest group and then immediately running the ad acution, without
+// Adding an interest group and then immediately running the ad auction, without
 // waiting in between, should always work because although adding the interest
 // group is async (and intentionally without completion notification), it should
 // complete before the auction runs.
@@ -7878,7 +9922,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
     {
       name: $1,
       owner: $2,
-      biddingLogicUrl: $3,
+      biddingLogicURL: $3,
       ads: $4
     },
     /*joinDurationSec=*/ 300);
@@ -7893,7 +9937,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: {x: 1},
     sellerSignals: {yet: 'more', info: 1},
@@ -7914,7 +9958,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   EXPECT_EQ(nullptr, RunAuctionAndWait(JsReplace(
                          R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: {x: 1},
     sellerSignals: {yet: 'more', info: 1},
@@ -7946,7 +9990,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionWithInvalidAdUrl) {
   EXPECT_EQ(nullptr, RunAuctionAndWait(JsReplace(
                          R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
                          })",
                          test_origin,
@@ -7956,7 +10000,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, RunAdAuctionWithInvalidAdUrl) {
 
 // Test that when there are no ad components, an array of ad components is still
 // available, and they're all mapped to about:blank.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, NoAdComponents) {
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest, NoAdComponents) {
   GURL test_url = https_server_->GetURL("a.test", "/fenced_frames/basic.html");
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
 
@@ -7983,7 +10027,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, NoAdComponents) {
                   R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$1]
 }
                   )",
@@ -8011,7 +10055,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, NoAdComponents) {
 // Test with an ad component. Run an auction with an ad component, load the ad
 // in a fenced frame, and the ad component in a nested fenced frame. Fully
 // exercise navigator.adAuctionComponents() on the main ad's fenced frame.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, AdComponents) {
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest, AdComponents) {
   GURL ad_component_url = https_server_->GetURL(
       "d.test", "/set-header?Supports-Loading-Mode: fenced-frame");
   ASSERT_NO_FATAL_FAILURE(RunBasicAuctionWithAdComponents(ad_component_url));
@@ -8045,7 +10089,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, AdComponents) {
 // * The fenced frame the ad component is loaded in, though it will have a list
 //   of URNs that map to about:blank.
 // * The ad fenced frame itself, after a renderer-initiated navigation.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        AdComponentsNotLeaked) {
   GURL ad_component_url =
       https_server_->GetURL("d.test", "/fenced_frames/basic.html");
@@ -8108,7 +10152,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
 
 // Test with an ad component that tries to leave the group. Verify that leaving
 // the group from within an ad component has no effect
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, AdComponentsLeave) {
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest, AdComponentsLeave) {
   url::Origin test_origin =
       url::Origin::Create(https_server_->GetURL("a.test", "/"));
   GURL ad_component_url = https_server_->GetURL(
@@ -8120,10 +10164,10 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, AdComponentsLeave) {
   // InterestGroupAccessObserver should see the join and auction, but not the
   // implicit leave since it was blocked.
   WaitForAccessObserved(
-      {{InterestGroupTestObserver::kJoin, test_origin, "cars"},
-       {InterestGroupTestObserver::kLoaded, test_origin, "cars"},
-       {InterestGroupTestObserver::kBid, test_origin, "cars"},
-       {InterestGroupTestObserver::kWin, test_origin, "cars"}});
+      {{TestInterestGroupObserver::kJoin, test_origin, "cars"},
+       {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+       {TestInterestGroupObserver::kBid, test_origin, "cars"},
+       {TestInterestGroupObserver::kWin, test_origin, "cars"}});
 
   // The ad shouldn't have left the interest group when the component ad was
   // shown.
@@ -8133,7 +10177,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest, AdComponentsLeave) {
 // Test navigating multiple fenced frames to the same render URL from a single
 // auction, when the winning bid included ad components. All fenced frames
 // navigated to the URL should get ad component URLs from the winning bid.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        AdComponentsMainAdLoadedInMultipleFrames) {
   GURL ad_component_url = https_server_->GetURL(
       "d.test", "/set-header?Supports-Loading-Mode: fenced-frame");
@@ -8159,7 +10203,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
       R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$1]
 }
       )",
@@ -8197,7 +10241,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
 
 // Test with multiple ad components. Also checks that ad component metadata is
 // passed in correctly.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        MultipleAdComponents) {
   // Note that the extra "&1" and the like are added to make the URLs unique.
   // They have no impact on the returned result, since they aren't a
@@ -8234,9 +10278,9 @@ if (JSON.stringify(adComponents[2].metadata) !== '["3",{"4":"five"}]') {
 return {
   ad: 'ad',
   bid: 1,
-  render: interestGroup.ads[0].renderUrl,
-  adComponents: [interestGroup.adComponents[0].renderUrl,
-                 interestGroup.adComponents[2].renderUrl]
+  render: interestGroup.ads[0].renderURL,
+  adComponents: [interestGroup.adComponents[0].renderURL,
+                 interestGroup.adComponents[2].renderURL]
 };
   )";
   GURL bidding_url =
@@ -8256,7 +10300,7 @@ return {
       ad_url, JsReplace(
                   R"({
 seller: $1,
-decisionLogicUrl: $2,
+decisionLogicURL: $2,
 interestGroupBuyers: [$1]
                   })",
                   url::Origin::Create(test_url),
@@ -8318,7 +10362,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 (async function() {
   return await navigator.runAdAuction({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
   });
 })())",
@@ -8348,13 +10392,13 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ComponentAuction) {
   std::string auction_config = JsReplace(
       R"({
         seller: $1,
-        decisionLogicUrl: $2,
+        decisionLogicURL: $2,
         // Signal to the top-level seller to allow participation in a component
         // auction.
         auctionSignals: "sellerAllowsComponentAuction",
         componentAuctions: [{
           seller: $1,
-          decisionLogicUrl: $2,
+          decisionLogicURL: $2,
           interestGroupBuyers: [$1],
           // Signal to the bidder and component seller to allow participation in
           // a component auction.
@@ -8391,13 +10435,13 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
         seller: $1,
-        decisionLogicUrl: $2,
+        decisionLogicURL: $2,
         // Signal to the top-level seller to allow participation in a component
         // auction.
         auctionSignals: "sellerAllowsComponentAuction",
         componentAuctions: [{
           seller: $1,
-          decisionLogicUrl: $2,
+          decisionLogicURL: $2,
           interestGroupBuyers: [$1],
           // Signal to the component seller to allow participation in a
           // component auction.
@@ -8433,10 +10477,10 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
         seller: $1,
-        decisionLogicUrl: $2,
+        decisionLogicURL: $2,
         componentAuctions: [{
           seller: $1,
-          decisionLogicUrl: $2,
+          decisionLogicURL: $2,
           interestGroupBuyers: [$1],
           // Signal to the bidder and component seller to allow participation in
           // a component auction.
@@ -8473,13 +10517,13 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   std::string auction_config = JsReplace(
       R"({
         seller: $1,
-        decisionLogicUrl: $2,
+        decisionLogicURL: $2,
         // Signal to the top-level seller to allow participation in a component
         // auction.
         auctionSignals: "sellerAllowsComponentAuction",
         componentAuctions: [{
           seller: $1,
-          decisionLogicUrl: $2,
+          decisionLogicURL: $2,
           interestGroupBuyers: [$1],
           // Signal to the bidder to allow participation in a component auction.
           auctionSignals: "bidderAllowsComponentAuction"
@@ -8490,9 +10534,17 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   EXPECT_EQ(nullptr, RunAuctionAndWait(auction_config));
 }
 
+class InterestGroupWorkletValidationBrowserTest
+    : public InterestGroupBrowserTest,
+      public testing::WithParamInterface<bool> {
+ public:
+  bool UseHeaderDirectFromSellerSignals() const { return GetParam(); }
+};
+
 // Use bidder and seller worklet files that validate their arguments all have
 // the expected values.
-IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ValidateWorkletParameters) {
+IN_PROC_BROWSER_TEST_P(InterestGroupWorkletValidationBrowserTest,
+                       ValidateWorkletParameters) {
   // Use different hostnames for each participant, since
   // `trusted_bidding_signals` only checks the hostname of certain parameters.
   constexpr char kBidderHost[] = "a.test";
@@ -8530,75 +10582,103 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ValidateWorkletParameters) {
 
   ASSERT_EQ(
       kSuccess,
-      JoinInterestGroupAndVerify(blink::InterestGroup(
-          /*expiry=*/base::Time(),
-          /*owner=*/bidder_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0, /*enable_bidding_signals_prioritization=*/true,
-          /*priority_vector=*/{{{"foo", 2}, {"bar", -11}}},
-          /*priority_signals_overrides=*/{{{"foo", 1}}},
-          /*seller_capabilities=*/absl::nullopt,
-          /*all_sellers_capabilities=*/
-          {}, /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL(
-              kBidderHost, "/interest_group/bidding_argument_validator.js"),
-          /*bidding_wasm_helper_url=*/absl::nullopt,
-          /*update_url=*/
-          https_server_->GetURL(kBidderHost, "/not_found_update_url.json"),
-          /*trusted_bidding_signals_url=*/
-          https_server_->GetURL(kBidderHost,
-                                "/interest_group/trusted_bidding_signals.json"),
-          /*trusted_bidding_signals_keys=*/{{"key1"}},
-          /*user_bidding_signals=*/R"({"some":"json","stuff":{"here":[1,2]}})",
-          /*ads=*/
-          {{{GURL("https://example.com/render"),
-             R"({"ad":"metadata","here":[1,2,3]})"}}},
-          /*ad_components=*/
-          {{{GURL("https://example.com/render-component"),
-             /*metadata=*/absl::nullopt}}},
-          /*ad_sizes=*/{},
-          /*size_groups=*/{})));
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(/*owner=*/bidder_origin,
+                                          /*name=*/"cars")
+              .SetEnableBiddingSignalsPrioritization(true)
+              .SetPriorityVector({{{"foo", 2}, {"bar", -11}}})
+              .SetPrioritySignalsOverrides({{{"foo", 1}}})
+              .SetBiddingUrl(https_server_->GetURL(
+                  kBidderHost, "/interest_group/bidding_argument_validator.js"))
+              .SetUpdateUrl(https_server_->GetURL(kBidderHost,
+                                                  "/not_found_update_url.json"))
+              .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                  kBidderHost, "/interest_group/trusted_bidding_signals.json"))
+              .SetTrustedBiddingSignalsKeys({{"key1"}})
+              .SetUserBiddingSignals(
+                  R"({"some":"json","stuff":{"here":[1,2]}})")
+              .SetAds({{{GURL("https://example.com/render"),
+                         R"({"ad":"metadata","here":[1,2,3]})"}}})
+              .SetAdComponents({{{GURL("https://example.com/render-component"),
+                                  /*metadata=*/absl::nullopt}}})
+              .Build()));
 
-  // For `directFromSellerSignals` to work, we need to navigate to a page that
-  // declares the subresource bundle resources we pass to those fields.
   GURL seller_script_url = https_server_->GetURL(
       kSellerHost, "/interest_group/decision_argument_validator.js");
   url::Origin seller_origin = url::Origin::Create(seller_script_url);
-  std::vector<NetworkResponder::SubresourceResponse> subresource_responses = {
-      NetworkResponder::SubresourceResponse(
-          /*subresource_url=*/
-          "/direct_from_seller_signals?sellerSignals",
-          /*payload=*/
-          R"({"json": "for", "the": ["seller"]})"),
-      NetworkResponder::SubresourceResponse(
-          /*subresource_url=*/"/direct_from_seller_signals?auctionSignals",
-          /*payload=*/
-          R"({"json": "for", "all": ["parties"]})"),
-      NetworkResponder::DirectFromSellerPerBuyerSignals(
-          bidder_origin, /*payload=*/
-          R"({"json": "for", "buyer": [1]})"),
-      NetworkResponder::DirectFromSellerPerBuyerSignals(
-          second_bidder_origin, /*payload=*/
-          R"({"json": "for", "buyer": [2]})"),
-  };
-  std::vector<NetworkResponder::SubresourceBundle> bundles = {
-      NetworkResponder::SubresourceBundle(
-          /*bundle_url=*/https_server_->GetURL(kSellerHost,
-                                               "/generated_bundle.wbn"),
-          /*subresources=*/subresource_responses)};
 
-  network_responder_->RegisterDirectFromSellerSignalsResponse(
-      /*bundles=*/bundles,
-      /*allow_origin=*/top_frame_origin.Serialize());
-  constexpr char kPagePath[] = "/page-with-bundles.html";
-  network_responder_->RegisterHtmlWithSubresourceBundles(
-      /*bundles=*/bundles,
-      /*page_url=*/kPagePath);
+  if (UseHeaderDirectFromSellerSignals()) {
+    // For `directFromSellerSignalsHeaderAdSlot`, we need to make a network
+    // request to a resource that has signals in the Ad-Auction-Signals header
+    // value.
+    ASSERT_TRUE(
+        NavigateToURL(shell(), https_server_->GetURL(kTopFrameHost, "/echo")));
+    const char kHeaderSignalsPath[] = "/header_direct_from_seller_signals.json";
+    // The actual body of the request is just an empty JSON dict for the test,
+    // but it could be any arbitrary payload that the server wants to deliver
+    // with the header signals.
+    const char kHeaderSignalsBodyResponse[] = "{}";
+    const std::string kHeaderSignalsResponse =
+        base::StringPrintf(R"([{
+      "adSlot": "adSlot1",
+      "sellerSignals": {"json": "for", "the": ["seller"]},
+      "auctionSignals": {"json": "for", "all": ["parties"]},
+      "perBuyerSignals": {
+        "%s": {"json": "for", "buyer": [1]},
+        "%s": {"json": "for", "buyer": [2]}
+      }
+    }])",
+                           bidder_origin.Serialize().c_str(),
+                           second_bidder_origin.Serialize().c_str());
+    network_responder_->RegisterNetworkResponse(
+        kHeaderSignalsPath, kHeaderSignalsBodyResponse, "application/json",
+        /*extra_response_headers=*/
+        {{"Access-Control-Allow-Origin", top_frame_origin.Serialize()},
+         {"Ad-Auction-Signals", kHeaderSignalsResponse}});
+    EXPECT_TRUE(
+        ExecJs(web_contents()->GetPrimaryMainFrame(),
+               content::JsReplace(
+                   "fetch($1, {adAuctionHeaders: true})",
+                   https_server_->GetURL(kSellerHost, kHeaderSignalsPath))));
+  } else {
+    // For subresource bundle `directFromSellerSignals` to work, we need to
+    // navigate to a page that declares the subresource bundle resources we pass
+    // to those fields.
+    std::vector<NetworkResponder::SubresourceResponse> subresource_responses = {
+        NetworkResponder::SubresourceResponse(
+            /*subresource_url=*/
+            "/direct_from_seller_signals?sellerSignals",
+            /*payload=*/
+            R"({"json": "for", "the": ["seller"]})"),
+        NetworkResponder::SubresourceResponse(
+            /*subresource_url=*/"/direct_from_seller_signals?auctionSignals",
+            /*payload=*/
+            R"({"json": "for", "all": ["parties"]})"),
+        NetworkResponder::DirectFromSellerPerBuyerSignals(
+            bidder_origin, /*payload=*/
+            R"({"json": "for", "buyer": [1]})"),
+        NetworkResponder::DirectFromSellerPerBuyerSignals(
+            second_bidder_origin, /*payload=*/
+            R"({"json": "for", "buyer": [2]})"),
+    };
+    std::vector<NetworkResponder::SubresourceBundle> bundles = {
+        NetworkResponder::SubresourceBundle(
+            /*bundle_url=*/https_server_->GetURL(kSellerHost,
+                                                 "/generated_bundle.wbn"),
+            /*subresources=*/subresource_responses)};
 
-  ASSERT_TRUE(
-      NavigateToURL(shell(), https_server_->GetURL(kTopFrameHost, kPagePath)));
+    network_responder_->RegisterDirectFromSellerSignalsResponse(
+        /*bundles=*/bundles,
+        /*allow_origin=*/top_frame_origin.Serialize());
+    constexpr char kPagePath[] = "/page-with-bundles.html";
+    network_responder_->RegisterHtmlWithSubresourceBundles(
+        /*bundles=*/bundles,
+        /*page_url=*/kPagePath);
+
+    ASSERT_TRUE(NavigateToURL(shell(),
+                              https_server_->GetURL(kTopFrameHost, kPagePath)));
+  }
+
   TestFencedFrameURLMappingResultObserver observer;
   ConvertFencedFrameURNToURL(
       GURL(EvalJs(shell(),
@@ -8607,17 +10687,19 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ValidateWorkletParameters) {
 (async function() {
   return await navigator.runAdAuction({
     seller: $1,
-    decisionLogicUrl: $2,
-    trustedScoringSignalsUrl: $3,
+    decisionLogicURL: $2,
+    trustedScoringSignalsURL: $3,
     interestGroupBuyers: [$4, $5],
     auctionSignals: {so: 'I', hear: ['you', 'like', 'json']},
     sellerSignals: {signals: 'from', the: ['seller']},
-    directFromSellerSignals: $6,
+    $6: $7,
     sellerTimeout: 200,
     perBuyerSignals: {$4: {signalsForBuyer: 1}, $5: {signalsForBuyer: 2}},
     perBuyerTimeouts: {$4: 110, $5: 120, '*': 150},
     perBuyerCumulativeTimeouts: {$4: 13000, $5: 14000, '*': 16000},
-    perBuyerPrioritySignals: {$4: {foo: 1}, '*': {BaR: -2}}
+    perBuyerPrioritySignals: {$4: {foo: 1}, '*': {BaR: -2}},
+    perBuyerCurrencies: {$4: 'USD', $5: 'CAD', '*': 'EUR'},
+    sellerCurrency: 'EUR',
   });
 })())",
                       seller_origin, seller_script_url,
@@ -8625,8 +10707,15 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ValidateWorkletParameters) {
                           kSellerHost,
                           "/interest_group/trusted_scoring_signals.json"),
                       bidder_origin, second_bidder_origin,
-                      https_server_->GetURL(kSellerHost,
-                                            "/direct_from_seller_signals")))
+                      UseHeaderDirectFromSellerSignals()
+                          ? "directFromSellerSignalsHeaderAdSlot"
+                          : "directFromSellerSignals",
+                      UseHeaderDirectFromSellerSignals()
+                          ? "adSlot1"
+                          : https_server_
+                                ->GetURL(kSellerHost,
+                                         "/direct_from_seller_signals")
+                                .spec()))
                .ExtractString()),
       &observer);
   EXPECT_EQ(GURL("https://example.com/render"), observer.mapped_url());
@@ -8640,6 +10729,16 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ValidateWorkletParameters) {
   WaitForUrl(https_server_->GetURL(kSellerHost, "/echo?report_seller"));
   WaitForUrl(https_server_->GetURL(kSellerHost, "/echo?report_bidder"));
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    InterestGroupWorkletValidationBrowserTest,
+    testing::Bool(),
+    [](const testing::TestParamInfo<bool>& info) {
+      return base::StringPrintf(
+          "%s", info.param ? "header_direct_from_seller_signals"
+                           : "subresource_bundle_direct_from_seller_signals");
+    });
 
 // Same as above test, but leaves out the extra bidder and uses the older
 // version 1 bidding signals format.
@@ -8662,36 +10761,28 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
   ASSERT_EQ(
       kSuccess,
-      JoinInterestGroupAndVerify(blink::InterestGroup(
-          /*expiry=*/base::Time(),
-          /*owner=*/bidder_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0, /*enable_bidding_signals_prioritization=*/true,
-          /*priority_vector=*/{{{"foo", 2}, {"bar", -11}}},
-          /*priority_signals_overrides=*/{{{"foo", 1}}},
-          /*seller_capabilities=*/absl::nullopt,
-          /*all_sellers_capabilities=*/
-          {}, /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL(
-              kBidderHost, "/interest_group/bidding_argument_validator.js"),
-          /*bidding_wasm_helper_url=*/absl::nullopt,
-          /*update_url=*/
-          https_server_->GetURL(kBidderHost, "/not_found_update_url.json"),
-          /*trusted_bidding_signals_url=*/
-          https_server_->GetURL(
-              kBidderHost, "/interest_group/trusted_bidding_signals_v1.json"),
-          /*trusted_bidding_signals_keys=*/{{"key1"}},
-          /*user_bidding_signals=*/R"({"some":"json","stuff":{"here":[1,2]}})",
-          /*ads=*/
-          {{{GURL("https://example.com/render"),
-             R"({"ad":"metadata","here":[1,2,3]})"}}},
-          /*ad_components=*/
-          {{{GURL("https://example.com/render-component"),
-             /*metadata=*/absl::nullopt}}},
-          /*ad_sizes=*/{},
-          /*size_groups=*/{})));
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(
+              /*owner=*/bidder_origin,
+              /*name=*/"cars")
+              .SetEnableBiddingSignalsPrioritization(true)
+              .SetPriorityVector({{{"foo", 2}, {"bar", -11}}})
+              .SetPrioritySignalsOverrides({{{"foo", 1}}})
+              .SetBiddingUrl(https_server_->GetURL(
+                  kBidderHost, "/interest_group/bidding_argument_validator.js"))
+              .SetUpdateUrl(https_server_->GetURL(kBidderHost,
+                                                  "/not_found_update_url.json"))
+              .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                  kBidderHost,
+                  "/interest_group/trusted_bidding_signals_v1.json"))
+              .SetTrustedBiddingSignalsKeys({{"key1"}})
+              .SetUserBiddingSignals(
+                  R"({"some":"json","stuff":{"here":[1,2]}})")
+              .SetAds({{{GURL("https://example.com/render"),
+                         R"({"ad":"metadata","here":[1,2,3]})"}}})
+              .SetAdComponents({{{GURL("https://example.com/render-component"),
+                                  /*metadata=*/absl::nullopt}}})
+              .Build()));
 
   // For `directFromSellerSignals` to work, we need to navigate to a page that
   // declares the subresource bundle resources we pass to those fields.
@@ -8737,8 +10828,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 (async function() {
   return await navigator.runAdAuction({
     seller: $1,
-    decisionLogicUrl: $2,
-    trustedScoringSignalsUrl: $3,
+    decisionLogicURL: $2,
+    trustedScoringSignalsURL: $3,
     interestGroupBuyers: [$4, $5],
     auctionSignals: {so: 'I', hear: ['you', 'like', 'json']},
     sellerSignals: {signals: 'from', the: ['seller']},
@@ -8747,7 +10838,9 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
     perBuyerSignals: {$4: {signalsForBuyer: 1}, $5: {signalsForBuyer: 2}},
     perBuyerTimeouts: {$4: 110, $5: 120, '*': 150},
     perBuyerCumulativeTimeouts: {$4: 13000, $5: 14000, '*': 16000},
-    perBuyerPrioritySignals: {$4: {foo: 1}, '*': {BaR: -2}}
+    perBuyerPrioritySignals: {$4: {foo: 1}, '*': {BaR: -2}},
+    perBuyerCurrencies: {$4: 'USD', $5: 'CAD', '*': 'EUR'},
+    sellerCurrency: 'EUR'
   });
 })())",
                       seller_origin, seller_script_url,
@@ -8774,9 +10867,22 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   WaitForUrl(https_server_->GetURL(kSellerHost, "/echo?report_bidder"));
 }
 
+class InterestGroupComponentWorkletValidationBrowserTest
+    : public InterestGroupBrowserTest,
+      public testing::WithParamInterface<std::tuple<bool, bool>> {
+ public:
+  bool TopLevelUseHeaderDirectFromSellerSignals() const {
+    return std::get<0>(GetParam());
+  }
+
+  bool ComponentUseHeaderDirectFromSellerSignals() const {
+    return std::get<1>(GetParam());
+  }
+};
+
 // Use bidder and seller worklet files that validate their arguments all have
 // the expected values, in the case of an auction with one component auction.
-IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+IN_PROC_BROWSER_TEST_P(InterestGroupComponentWorkletValidationBrowserTest,
                        ComponentAuctionValidateWorkletParameters) {
   // Use different hostnames for each participant.
   //
@@ -8806,41 +10912,327 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                                                       /*name=*/"cars"));
     }
 
-    ASSERT_EQ(
-        kSuccess,
-        JoinInterestGroupAndVerify(blink::InterestGroup(
-            /*expiry=*/base::Time(),
-            /*owner=*/bidder_origin,
-            /*name=*/"cars",
-            /*priority=*/0.0, /*enable_bidding_signals_prioritization=*/false,
-            /*priority_vector=*/{{{"FOO", 2}}},
-            /*priority_signals_overrides=*/{{{"FOO", 1}}},
-            /*seller_capabilities=*/absl::nullopt,
-            /*all_sellers_capabilities=*/
-            {}, /*execution_mode=*/
-            blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-            /*bidding_url=*/
-            https_server_->GetURL(
-                kBidderHost,
-                "/interest_group/"
-                "component_auction_bidding_argument_validator.js"),
-            /*bidding_wasm_helper_url=*/absl::nullopt,
-            /*update_url=*/
-            https_server_->GetURL(kBidderHost, "/not_found_update_url.json"),
-            /*trusted_bidding_signals_url=*/
-            https_server_->GetURL(
-                kBidderHost, "/interest_group/trusted_bidding_signals.json"),
-            /*trusted_bidding_signals_keys=*/{{"key1"}},
-            /*user_bidding_signals=*/
-            R"({"some":"json","stuff":{"here":[1,2]}})",
-            /*ads=*/
-            {{{GURL("https://example.com/render"),
-               R"({"ad":"metadata","here":[1,2,3]})"}}},
-            /*ad_components=*/
-            {{{GURL("https://example.com/render-component"),
-               /*metadata=*/absl::nullopt}}},
-            /*ad_sizes=*/{},
-            /*size_groups=*/{})));
+    ASSERT_EQ(kSuccess,
+              JoinInterestGroupAndVerify(
+                  blink::TestInterestGroupBuilder(/*owner=*/bidder_origin,
+                                                  /*name=*/"cars")
+                      .SetPriorityVector({{{"FOO", 2}}})
+                      .SetPrioritySignalsOverrides({{{"FOO", 1}}})
+                      .SetBiddingUrl(https_server_->GetURL(
+                          kBidderHost,
+                          "/interest_group/"
+                          "component_auction_bidding_argument_validator.js"))
+                      .SetUpdateUrl(https_server_->GetURL(
+                          kBidderHost, "/not_found_update_url.json"))
+                      .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                          kBidderHost,
+                          "/interest_group/trusted_bidding_signals.json"))
+                      .SetTrustedBiddingSignalsKeys({{"key1"}})
+                      .SetUserBiddingSignals(
+                          R"({"some":"json","stuff":{"here":[1,2]}})")
+                      .SetAds({{{GURL("https://example.com/render"),
+                                 R"({"ad":"metadata","here":[1,2,3]})"}}})
+                      .SetAdComponents(
+                          {{{GURL("https://example.com/render-component"),
+                             /*metadata=*/absl::nullopt}}})
+                      .Build()));
+
+    GURL top_level_seller_script_url = https_server_->GetURL(
+        kTopLevelSellerHost,
+        "/interest_group/"
+        "component_auction_top_level_decision_argument_validator.js");
+    GURL component_seller_script_url = https_server_->GetURL(
+        kComponentSellerHost,
+        "/interest_group/"
+        "component_auction_component_decision_argument_validator.js");
+    const url::Origin top_level_seller_origin =
+        url::Origin::Create(top_level_seller_script_url);
+    const url::Origin component_seller_origin =
+        url::Origin::Create(component_seller_script_url);
+
+    // For subresource bundle `directFromSellerSignals` to work, we need to
+    // navigate to a page that declares the subresource bundle resources we pass
+    // to those fields.
+    std::vector<NetworkResponder::SubresourceResponse>
+        top_level_subresource_responses = {
+            NetworkResponder::SubresourceResponse(
+                /*subresource_url=*/
+                "/direct_from_seller_signals?sellerSignals",
+                /*payload=*/
+                R"({"json": "for", "the": ["seller"]})"),
+            NetworkResponder::SubresourceResponse(
+                /*subresource_url=*/"/direct_from_seller_signals?"
+                                    "auctionSignals",
+                /*payload=*/
+                R"({"json": "for", "all": ["parties"]})"),
+        };
+    std::vector<NetworkResponder::SubresourceResponse>
+        component_subresource_responses = {
+            NetworkResponder::SubresourceResponse(
+                /*subresource_url=*/
+                "/direct_from_seller_signals?sellerSignals",
+                /*payload=*/
+                R"({"from": "component", "json": "for", "the": ["seller"]})"),
+            NetworkResponder::SubresourceResponse(
+                /*subresource_url=*/"/direct_from_seller_signals?"
+                                    "auctionSignals",
+                /*payload=*/
+                R"({"from": "component", "json": "for", "all": ["parties"]})"),
+            NetworkResponder::DirectFromSellerPerBuyerSignals(
+                bidder_origin, /*payload=*/
+                R"({"from": "component", "json": "for", "buyer": [1]})"),
+        };
+    std::vector<NetworkResponder::SubresourceBundle> bundles = {
+        NetworkResponder::SubresourceBundle(
+            /*bundle_url=*/https_server_->GetURL(kTopLevelSellerHost,
+                                                 "/0generated_bundle.wbn"),
+            /*subresources=*/top_level_subresource_responses),
+        {NetworkResponder::SubresourceBundle(
+            /*bundle_url=*/https_server_->GetURL(kComponentSellerHost,
+                                                 "/1generated_bundle.wbn"),
+            /*subresources=*/component_subresource_responses)}};
+
+    network_responder_->RegisterDirectFromSellerSignalsResponse(
+        /*bundles=*/bundles,
+        /*allow_origin=*/top_frame_origin.Serialize());
+    constexpr char kPagePath[] = "/page-with-bundles.html";
+    network_responder_->RegisterHtmlWithSubresourceBundles(
+        /*bundles=*/bundles,
+        /*page_url=*/kPagePath);
+
+    ASSERT_TRUE(NavigateToURL(shell(),
+                              https_server_->GetURL(kTopFrameHost, kPagePath)));
+
+    // For `directFromSellerSignalsHeaderAdSlot`, we need to make a network
+    // request to a resource that has signals in the Ad-Auction-Signals header
+    // value. We do this for both the top-level seller and the component seller.
+    const char kTopLevelHeaderSignalsPath[] =
+        "/top_level_header_direct_from_seller_signals.json";
+    const char kComponentHeaderSignalsPath[] =
+        "/component_header_direct_from_seller_signals.json";
+    // The actual body of both requests is just an empty JSON dict for the test,
+    // but it could be any arbitrary payload that the server wants to deliver
+    // with the header signals.
+    const char kHeaderSignalsBodyResponse[] = "{}";
+    // Intentionally use the same adSlot name for both responses -- responses
+    // from different sellers shouldn't conflict.
+    const char kTopLevelHeaderSignalsResponse[] = R"([{
+      "adSlot": "adSlot1",
+      "sellerSignals": {"json": "for", "the": ["seller"]},
+      "auctionSignals": {"json": "for", "all": ["parties"]}
+    }])";
+    const std::string kComponentHeaderSignalsResponse =
+        base::StringPrintf(R"([{
+      "adSlot": "adSlot1",
+      "sellerSignals": {"from": "component", "json": "for", "the": ["seller"]},
+      "auctionSignals": {
+        "from": "component", "json": "for", "all": ["parties"]},
+      "perBuyerSignals": {
+        "%s": {"from": "component", "json": "for", "buyer": [1]}
+      }
+    }])",
+                           bidder_origin.Serialize().c_str());
+    network_responder_->RegisterNetworkResponse(
+        kTopLevelHeaderSignalsPath, kHeaderSignalsBodyResponse,
+        "application/json",
+        /*extra_response_headers=*/
+        {{"Access-Control-Allow-Origin", top_frame_origin.Serialize()},
+         {"Ad-Auction-Signals", kTopLevelHeaderSignalsResponse}});
+    network_responder_->RegisterNetworkResponse(
+        kComponentHeaderSignalsPath, kHeaderSignalsBodyResponse,
+        "application/json",
+        /*extra_response_headers=*/
+        {{"Access-Control-Allow-Origin", top_frame_origin.Serialize()},
+         {"Ad-Auction-Signals", kComponentHeaderSignalsResponse}});
+    EXPECT_TRUE(ExecJs(
+        web_contents()->GetPrimaryMainFrame(),
+        content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                           https_server_->GetURL(kTopLevelSellerHost,
+                                                 kTopLevelHeaderSignalsPath))));
+    EXPECT_TRUE(ExecJs(web_contents()->GetPrimaryMainFrame(),
+                       content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                          https_server_->GetURL(
+                                              kComponentSellerHost,
+                                              kComponentHeaderSignalsPath))));
+
+    // TODO(caraitto): Instead of StringPrintf(), we can pass a single large
+    // base::Value to JsReplace().
+    TestFencedFrameURLMappingResultObserver observer;
+    ConvertFencedFrameURNToURL(
+        GURL(
+            EvalJs(
+                shell(),
+                std::string(use_promise ? kFeedPromise : kFeedDirect) +
+                    base::StringPrintf(
+                        R"(
+(async function() {
+  const componentSeller = "%s";
+  const componentBuyer = "%s";
+  return await navigator.runAdAuction({
+    seller: "%s",
+    decisionLogicURL: "%s",
+    trustedScoringSignalsURL: "%s",
+    auctionSignals: maybePromise(["top-level auction signals"]),
+    sellerSignals: maybePromise(["top-level seller signals"]),
+    %s: maybePromise("%s"),
+    sellerTimeout: 300,
+    perBuyerSignals: maybePromise(
+        {[componentBuyer]: ["top-level buyer signals"]}),
+    perBuyerTimeouts: maybePromise({[componentBuyer]: 110, '*': 150}),
+    perBuyerCumulativeTimeouts: maybePromise(
+        {[componentBuyer]: 11100, '*': 15100}),
+    perBuyerPrioritySignals: {'*': {foo: 3}},
+    perBuyerCurrencies: {'*': 'MXN', [componentSeller]: 'CAD'},
+    componentAuctions: [{
+      seller: componentSeller,
+      decisionLogicURL: "%s",
+      trustedScoringSignalsURL: "%s",
+      interestGroupBuyers: [componentBuyer],
+      auctionSignals: maybePromise(["component auction signals"]),
+      sellerSignals: maybePromise(["component seller signals"]),
+      %s: maybePromise("%s"),
+      sellerTimeout: 200,
+      perBuyerSignals: maybePromise(
+          {[componentBuyer]: ["component buyer signals"]}),
+      perBuyerTimeouts: maybePromise({[componentBuyer]: 200}),
+      perBuyerCumulativeTimeouts: maybePromise({[componentBuyer]: 20100}),
+      perBuyerPrioritySignals: {[componentBuyer]: {bar: 1}, '*': {BaZ: -2}},
+      perBuyerCurrencies: maybePromise({[componentBuyer]: 'USD'}),
+      sellerCurrency: 'CAD',
+    }],
+  });
+})())",
+                        url::Origin::Create(component_seller_script_url)
+                            .Serialize()
+                            .c_str(),
+                        bidder_origin.Serialize().c_str(),
+                        top_level_seller_origin.Serialize().c_str(),
+                        top_level_seller_script_url.spec().c_str(),
+                        https_server_
+                            ->GetURL(
+                                kTopLevelSellerHost,
+                                "/interest_group/trusted_scoring_signals.json")
+                            .spec()
+                            .c_str(),
+                        TopLevelUseHeaderDirectFromSellerSignals()
+                            ? "directFromSellerSignalsHeaderAdSlot"
+                            : "directFromSellerSignals",
+                        TopLevelUseHeaderDirectFromSellerSignals()
+                            ? "adSlot1"
+                            : https_server_
+                                  ->GetURL(kTopLevelSellerHost,
+                                           "/direct_from_seller_signals")
+                                  .spec()
+                                  .c_str(),
+                        component_seller_script_url.spec().c_str(),
+                        https_server_
+                            ->GetURL(
+                                kComponentSellerHost,
+                                "/interest_group/trusted_scoring_signals2.json")
+                            .spec()
+                            .c_str(),
+                        ComponentUseHeaderDirectFromSellerSignals()
+                            ? "directFromSellerSignalsHeaderAdSlot"
+                            : "directFromSellerSignals",
+                        ComponentUseHeaderDirectFromSellerSignals()
+                            ? "adSlot1"
+                            : https_server_
+                                  ->GetURL(kComponentSellerHost,
+                                           "/direct_from_seller_signals")
+                                  .spec()
+                                  .c_str()))
+                .ExtractString()),
+        &observer);
+    EXPECT_EQ(GURL("https://example.com/render"), observer.mapped_url());
+
+    // Run URN to URL mapping callback manually to trigger sending reports, and
+    // validate the right URLs are requested. Do this instead of navigating to
+    // the URN because the validation logic checks a fixed URL for this test,
+    // and don't want to send a random request to port 80 on localhost, which is
+    // what example.com is mapped to.
+    observer.on_navigate_callback().Run();
+    WaitForUrl(https_server_->GetURL(kTopLevelSellerHost,
+                                     "/echo?report_top_level_seller"));
+    WaitForUrl(https_server_->GetURL(kComponentSellerHost,
+                                     "/echo?report_component_seller"));
+    WaitForUrl(https_server_->GetURL(kBidderHost, "/echo?report_bidder"));
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    InterestGroupComponentWorkletValidationBrowserTest,
+    testing::Combine(testing::Bool(), testing::Bool()),
+    [](const testing::TestParamInfo<std::tuple<bool, bool>>& info) {
+      return base::StringPrintf(
+          "%s_%s",
+          std::get<0>(info.param)
+              ? "top_level_header_direct_from_seller_signals"
+              : "top_level_subresource_bundle_direct_from_seller_signals",
+          std::get<1>(info.param)
+              ? "component_header_direct_from_seller_signals"
+              : "component_subresource_bundle_direct_from_seller_signals");
+    });
+
+// TODO(crbug.com/1441988): Remove this test once old names are no longer
+// supported.
+// Same as ComponentAuctionValidateWorkletParameters, but using deprecated names
+// like decisionLogicUrl.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    ComponentAuctionValidateWorkletParametersOldRunAdAuctionNames) {
+  // Use different hostnames for each participant.
+  //
+  // Match assignments in above test as closely as possible, to make scripts
+  // similar.
+  constexpr char kBidderHost[] = "a.test";
+  constexpr char kTopLevelSellerHost[] = "b.test";
+  constexpr char kTopFrameHost[] = "c.test";
+  constexpr char kComponentSellerHost[] = "d.test";
+
+  content_browser_client_->AddToAllowList(
+      {url::Origin::Create(https_server_->GetURL(kComponentSellerHost, "/"))});
+
+  for (bool use_promise : {false, true}) {
+    SCOPED_TRACE(use_promise);
+
+    const url::Origin top_frame_origin =
+        url::Origin::Create(https_server_->GetURL(kTopFrameHost, "/echo"));
+
+    GURL bidder_url = https_server_->GetURL(kBidderHost, "/echo");
+    ASSERT_TRUE(NavigateToURL(shell(), bidder_url));
+    url::Origin bidder_origin = url::Origin::Create(bidder_url);
+
+    if (use_promise) {
+      // Cleanup between runs, to reset the stats to expected values.
+      EXPECT_EQ(kSuccess, LeaveInterestGroupAndVerify(/*owner=*/bidder_origin,
+                                                      /*name=*/"cars"));
+    }
+
+    ASSERT_EQ(kSuccess,
+              JoinInterestGroupAndVerify(
+                  blink::TestInterestGroupBuilder(/*owner=*/bidder_origin,
+                                                  /*name=*/"cars")
+                      .SetPriorityVector({{{"FOO", 2}}})
+                      .SetPrioritySignalsOverrides({{{"FOO", 1}}})
+                      .SetBiddingUrl(https_server_->GetURL(
+                          kBidderHost,
+                          "/interest_group/"
+                          "component_auction_bidding_argument_validator.js"))
+                      .SetUpdateUrl(https_server_->GetURL(
+                          kBidderHost, "/not_found_update_url.json"))
+                      .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                          kBidderHost,
+                          "/interest_group/trusted_bidding_signals.json"))
+                      .SetTrustedBiddingSignalsKeys({{"key1"}})
+                      .SetUserBiddingSignals(
+                          R"({"some":"json","stuff":{"here":[1,2]}})")
+                      .SetAds({{{GURL("https://example.com/render"),
+                                 R"({"ad":"metadata","here":[1,2,3]})"}}})
+                      .SetAdComponents(
+                          {{{GURL("https://example.com/render-component"),
+                             /*metadata=*/absl::nullopt}}})
+                      .Build()));
 
     // For `directFromSellerSignals` to work, we need to navigate to a page that
     // declares the subresource bundle resources we pass to those fields.
@@ -8925,6 +11317,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
     perBuyerTimeouts: maybePromise({$8: 110, '*': 150}),
     perBuyerCumulativeTimeouts: maybePromise({$8: 11100, '*': 15100}),
     perBuyerPrioritySignals: {'*': {foo: 3}},
+    perBuyerCurrencies: {'*': 'MXN', $5: 'CAD'},
     componentAuctions: [{
       seller: $5,
       decisionLogicUrl: $6,
@@ -8938,6 +11331,207 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       perBuyerTimeouts: maybePromise({$8: 200}),
       perBuyerCumulativeTimeouts: maybePromise({$8: 20100}),
       perBuyerPrioritySignals: {$8: {bar: 1}, '*': {BaZ: -2}},
+      perBuyerCurrencies: maybePromise({$8: 'USD'}),
+      sellerCurrency: 'CAD',
+    }],
+  });
+})())",
+                     top_level_seller_origin, top_level_seller_script_url,
+                     https_server_->GetURL(
+                         kTopLevelSellerHost,
+                         "/interest_group/trusted_scoring_signals.json"),
+                     https_server_->GetURL(kTopLevelSellerHost,
+                                           "/direct_from_seller_signals"),
+                     url::Origin::Create(component_seller_script_url),
+                     component_seller_script_url,
+                     https_server_->GetURL(
+                         kComponentSellerHost,
+                         "/interest_group/trusted_scoring_signals2.json"),
+                     bidder_origin,
+                     https_server_->GetURL(kComponentSellerHost,
+                                           "/direct_from_seller_signals")))
+                 .ExtractString()),
+        &observer);
+    EXPECT_EQ(GURL("https://example.com/render"), observer.mapped_url());
+
+    // Run URN to URL mapping callback manually to trigger sending reports, and
+    // validate the right URLs are requested. Do this instead of navigating to
+    // the URN because the validation logic checks a fixed URL for this test,
+    // and don't want to send a random request to port 80 on localhost, which is
+    // what example.com is mapped to.
+    observer.on_navigate_callback().Run();
+    WaitForUrl(https_server_->GetURL(kTopLevelSellerHost,
+                                     "/echo?report_top_level_seller"));
+    WaitForUrl(https_server_->GetURL(kComponentSellerHost,
+                                     "/echo?report_component_seller"));
+    WaitForUrl(https_server_->GetURL(kBidderHost, "/echo?report_bidder"));
+  }
+}
+
+// TODO(crbug.com/1441988): Remove this test once old names are no longer
+// supported.
+// Same as ComponentAuctionValidateWorkletParameters, but using deprecated names
+// like decisionLogicUrl and new names like decisionLogicURL together, using the
+// same values for each.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    ComponentAuctionValidateWorkletParametersOldRunAdAuctionNamesAndNewNames) {
+  // Use different hostnames for each participant.
+  //
+  // Match assignments in above test as closely as possible, to make scripts
+  // similar.
+  constexpr char kBidderHost[] = "a.test";
+  constexpr char kTopLevelSellerHost[] = "b.test";
+  constexpr char kTopFrameHost[] = "c.test";
+  constexpr char kComponentSellerHost[] = "d.test";
+
+  content_browser_client_->AddToAllowList(
+      {url::Origin::Create(https_server_->GetURL(kComponentSellerHost, "/"))});
+
+  for (bool use_promise : {false, true}) {
+    SCOPED_TRACE(use_promise);
+
+    const url::Origin top_frame_origin =
+        url::Origin::Create(https_server_->GetURL(kTopFrameHost, "/echo"));
+
+    GURL bidder_url = https_server_->GetURL(kBidderHost, "/echo");
+    ASSERT_TRUE(NavigateToURL(shell(), bidder_url));
+    url::Origin bidder_origin = url::Origin::Create(bidder_url);
+
+    if (use_promise) {
+      // Cleanup between runs, to reset the stats to expected values.
+      EXPECT_EQ(kSuccess, LeaveInterestGroupAndVerify(/*owner=*/bidder_origin,
+                                                      /*name=*/"cars"));
+    }
+
+    ASSERT_EQ(kSuccess,
+              JoinInterestGroupAndVerify(
+                  blink::TestInterestGroupBuilder(/*owner=*/bidder_origin,
+                                                  /*name=*/"cars")
+                      .SetPriorityVector({{{"FOO", 2}}})
+                      .SetPrioritySignalsOverrides({{{"FOO", 1}}})
+                      .SetBiddingUrl(https_server_->GetURL(
+                          kBidderHost,
+                          "/interest_group/"
+                          "component_auction_bidding_argument_validator.js"))
+                      .SetUpdateUrl(https_server_->GetURL(
+                          kBidderHost, "/not_found_update_url.json"))
+                      .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                          kBidderHost,
+                          "/interest_group/trusted_bidding_signals.json"))
+                      .SetTrustedBiddingSignalsKeys({{"key1"}})
+                      .SetUserBiddingSignals(
+                          R"({"some":"json","stuff":{"here":[1,2]}})")
+                      .SetAds({{{GURL("https://example.com/render"),
+                                 R"({"ad":"metadata","here":[1,2,3]})"}}})
+                      .SetAdComponents(
+                          {{{GURL("https://example.com/render-component"),
+                             /*metadata=*/absl::nullopt}}})
+                      .Build()));
+
+    // For `directFromSellerSignals` to work, we need to navigate to a page that
+    // declares the subresource bundle resources we pass to those fields.
+    GURL top_level_seller_script_url = https_server_->GetURL(
+        kTopLevelSellerHost,
+        "/interest_group/"
+        "component_auction_top_level_decision_argument_validator.js");
+    GURL component_seller_script_url = https_server_->GetURL(
+        kComponentSellerHost,
+        "/interest_group/"
+        "component_auction_component_decision_argument_validator.js");
+    const url::Origin top_level_seller_origin =
+        url::Origin::Create(top_level_seller_script_url);
+    const url::Origin component_seller_origin =
+        url::Origin::Create(component_seller_script_url);
+    std::vector<NetworkResponder::SubresourceResponse>
+        top_level_subresource_responses = {
+            NetworkResponder::SubresourceResponse(
+                /*subresource_url=*/
+                "/direct_from_seller_signals?sellerSignals",
+                /*payload=*/
+                R"({"json": "for", "the": ["seller"]})"),
+            NetworkResponder::SubresourceResponse(
+                /*subresource_url=*/"/direct_from_seller_signals?"
+                                    "auctionSignals",
+                /*payload=*/
+                R"({"json": "for", "all": ["parties"]})"),
+        };
+    std::vector<NetworkResponder::SubresourceResponse>
+        component_subresource_responses = {
+            NetworkResponder::SubresourceResponse(
+                /*subresource_url=*/
+                "/direct_from_seller_signals?sellerSignals",
+                /*payload=*/
+                R"({"from": "component", "json": "for", "the": ["seller"]})"),
+            NetworkResponder::SubresourceResponse(
+                /*subresource_url=*/"/direct_from_seller_signals?"
+                                    "auctionSignals",
+                /*payload=*/
+                R"({"from": "component", "json": "for", "all": ["parties"]})"),
+            NetworkResponder::DirectFromSellerPerBuyerSignals(
+                bidder_origin, /*payload=*/
+                R"({"from": "component", "json": "for", "buyer": [1]})"),
+        };
+    std::vector<NetworkResponder::SubresourceBundle> bundles = {
+        NetworkResponder::SubresourceBundle(
+            /*bundle_url=*/https_server_->GetURL(kTopLevelSellerHost,
+                                                 "/0generated_bundle.wbn"),
+            /*subresources=*/top_level_subresource_responses),
+        {NetworkResponder::SubresourceBundle(
+            /*bundle_url=*/https_server_->GetURL(kComponentSellerHost,
+                                                 "/1generated_bundle.wbn"),
+            /*subresources=*/component_subresource_responses)}};
+
+    network_responder_->RegisterDirectFromSellerSignalsResponse(
+        /*bundles=*/bundles,
+        /*allow_origin=*/top_frame_origin.Serialize());
+    constexpr char kPagePath[] = "/page-with-bundles.html";
+    network_responder_->RegisterHtmlWithSubresourceBundles(
+        /*bundles=*/bundles,
+        /*page_url=*/kPagePath);
+
+    ASSERT_TRUE(NavigateToURL(shell(),
+                              https_server_->GetURL(kTopFrameHost, kPagePath)));
+
+    TestFencedFrameURLMappingResultObserver observer;
+    ConvertFencedFrameURNToURL(
+        GURL(EvalJs(
+                 shell(),
+                 JsReplace(
+                     std::string(use_promise ? kFeedPromise : kFeedDirect) + R"(
+(async function() {
+  return await navigator.runAdAuction({
+    seller: $1,
+    decisionLogicURL: $2,
+    decisionLogicUrl: $2,
+    trustedScoringSignalsURL: $3,
+    trustedScoringSignalsUrl: $3,
+    auctionSignals: maybePromise(["top-level auction signals"]),
+    sellerSignals: maybePromise(["top-level seller signals"]),
+    directFromSellerSignals: maybePromise($4),
+    sellerTimeout: 300,
+    perBuyerSignals: maybePromise({$8: ["top-level buyer signals"]}),
+    perBuyerTimeouts: maybePromise({$8: 110, '*': 150}),
+    perBuyerCumulativeTimeouts: maybePromise({$8: 11100, '*': 15100}),
+    perBuyerPrioritySignals: {'*': {foo: 3}},
+    perBuyerCurrencies: {'*': 'MXN', $5: 'CAD'},
+    componentAuctions: [{
+      seller: $5,
+      decisionLogicURL: $6,
+      decisionLogicUrl: $6,
+      trustedScoringSignalsURL: $7,
+      trustedScoringSignalsUrl: $7,
+      interestGroupBuyers: [$8],
+      auctionSignals: maybePromise(["component auction signals"]),
+      sellerSignals: maybePromise(["component seller signals"]),
+      directFromSellerSignals: maybePromise($9),
+      sellerTimeout: 200,
+      perBuyerSignals: maybePromise({$8: ["component buyer signals"]}),
+      perBuyerTimeouts: maybePromise({$8: 200}),
+      perBuyerCumulativeTimeouts: maybePromise({$8: 20100}),
+      perBuyerPrioritySignals: {$8: {bar: 1}, '*': {BaZ: -2}},
+      perBuyerCurrencies: maybePromise({$8: 'USD'}),
+      sellerCurrency: 'CAD',
     }],
   });
 })())",
@@ -9002,7 +11596,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 (async function() {
   return await navigator.runAdAuction({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
   });
 })())",
@@ -9041,7 +11635,7 @@ function generateBid(
   validatePerBuyerSignals(perBuyerSignals);
   validateTrustedBiddingSignals(trustedBiddingSignals);
   const ad = interestGroup.ads[0];
-  return {'ad': ad, 'bid': 1, 'render': ad.renderUrl};
+  return {'ad': ad, 'bid': 1, 'render': ad.renderURL};
 }
 
 function validateInterestGroup(interestGroup) {
@@ -9087,7 +11681,9 @@ function scoreAd(
 function validateAdMetadata(adMetadata) {
   const adMetadataJSON = JSON.stringify(adMetadata);
   if (adMetadataJSON !==
-      '{"renderUrl":"https://example.com/render","metadata":2}')
+      '{"renderURL":"https://example.com/render",' +
+      '"renderUrl":"https://example.com/render",' +
+      '"metadata":2}')
     throw 'Wrong adMetadata ' + adMetadataJSON;
 }
 
@@ -9124,11 +11720,11 @@ function validateAuctionConfig(auctionConfig) {
         {
           name: 'cars',
           owner: $1,
-          trustedBiddingSignalsUrl: $2,
+          trustedBiddingSignalsURL: $2,
           trustedBiddingSignalsKeys: ['key1'],
-          biddingLogicUrl: $3,
+          biddingLogicURL: $3,
           userBiddingSignals: 1,
-          ads: [{renderUrl:"https://example.com/render", metadata:2}],
+          ads: [{renderURL:"https://example.com/render", metadata:2}],
         },
         /*joinDurationSec=*/1);
   } catch (e) {
@@ -9148,7 +11744,7 @@ function validateAuctionConfig(auctionConfig) {
 (async function() {
   return await navigator.runAdAuction({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: 3,
     sellerSignals: 4,
@@ -9187,7 +11783,7 @@ function generateBid(
   if (perBuyerSignals !== 5)
     throw 'Wrong perBuyerSignals ' + JSON.stringify(perBuyerSignals);
   const ad = interestGroup.ads[0];
-  return {'ad': ad, 'bid': 1, 'render': ad.renderUrl};
+  return {'ad': ad, 'bid': 1, 'render': ad.renderURL};
 }
 
 function validateAuctionSignals(auctionSignals) {
@@ -9243,8 +11839,8 @@ function validateAuctionConfig(auctionConfig) {
         {
           name: 'cars',
           owner: $1,
-          biddingLogicUrl: $2,
-          ads: [{renderUrl:"https://example.com/render", metadata:2}],
+          biddingLogicURL: $2,
+          ads: [{renderURL:"https://example.com/render", metadata:2}],
         },
         /*joinDurationSec=*/100);
   } catch (e) {
@@ -9263,7 +11859,7 @@ function validateAuctionConfig(auctionConfig) {
 (async function() {
   return await navigator.runAdAuction({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: new Promise((resolve, reject) => {
       setTimeout(
@@ -9304,7 +11900,7 @@ function generateBid(
     unusedBrowserSignals) {
   validateAuctionSignals(auctionSignals);
   const ad = interestGroup.ads[0];
-  return {'ad': ad, 'bid': 1, 'render': ad.renderUrl};
+  return {'ad': ad, 'bid': 1, 'render': ad.renderURL};
 }
 
 function validateAuctionSignals(auctionSignals) {
@@ -9348,8 +11944,8 @@ function validateAuctionConfig(auctionConfig) {
         {
           name: 'cars',
           owner: $1,
-          biddingLogicUrl: $2,
-          ads: [{renderUrl:"https://example.com/render", metadata:2}],
+          biddingLogicURL: $2,
+          ads: [{renderURL:"https://example.com/render", metadata:2}],
         },
         /*joinDurationSec=*/100);
   } catch (e) {
@@ -9366,7 +11962,7 @@ function validateAuctionConfig(auctionConfig) {
           let controller = new AbortController();
           let adPromise =  navigator.runAdAuction({
             seller: $1,
-            decisionLogicUrl: $2,
+            decisionLogicURL: $2,
             interestGroupBuyers: [$1],
             auctionSignals: new Promise((resolve, reject) => {
               setTimeout(
@@ -9400,6 +11996,13 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, PromiseSignalsNothing) {
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
   url::Origin test_origin = url::Origin::Create(test_url);
 
+  // Need to fetch a URL with adAuctionHeaders: true for the auction to succeed
+  // when using directFromSellerSignalsHeaderAdSlot -- it doesn't matter which
+  // resource is fetched.
+  EXPECT_TRUE(ExecJs(
+      web_contents()->GetPrimaryMainFrame(),
+      content::JsReplace("fetch($1, {adAuctionHeaders: true})", test_url)));
+
   constexpr char kBiddingLogicScript[] = R"(
 function generateBid(
     interestGroup, auctionSignals, perBuyerSignals, trustedBiddingSignals,
@@ -9409,7 +12012,7 @@ function generateBid(
   const ad = interestGroup.ads[0];
   if (perBuyerSignals !== null)
     throw 'perBuyerSignals in generateBid not null!';
-  return {'ad': ad, 'bid': 1, 'render': ad.renderUrl};
+  return {'ad': ad, 'bid': 1, 'render': ad.renderURL};
 }
 
 function validateAuctionSignals(auctionSignals) {
@@ -9485,8 +12088,8 @@ function validateDirectFromSellerSignals(directFromSellerSignals) {
         {
           name: 'cars',
           owner: $1,
-          biddingLogicUrl: $2,
-          ads: [{renderUrl:"https://example.com/render", metadata:2}],
+          biddingLogicURL: $2,
+          ads: [{renderURL:"https://example.com/render", metadata:2}],
         },
         /*joinDurationSec=*/100);
   } catch (e) {
@@ -9497,15 +12100,17 @@ function validateDirectFromSellerSignals(directFromSellerSignals) {
                           test_origin,
                           https_server_->GetURL("a.test", kBiddingLogicPath))));
 
-  TestFencedFrameURLMappingResultObserver observer;
-  ConvertFencedFrameURNToURL(
-      GURL(EvalJs(shell(),
-                  JsReplace(
-                      R"(
+  for (bool header_direct_from_seller_signals : {false, true}) {
+    SCOPED_TRACE(header_direct_from_seller_signals);
+    TestFencedFrameURLMappingResultObserver observer;
+    ConvertFencedFrameURNToURL(
+        GURL(EvalJs(shell(),
+                    JsReplace(
+                        R"(
 (async function() {
   return await navigator.runAdAuction({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: new Promise((resolve, reject) => {
       setTimeout(
@@ -9519,18 +12124,22 @@ function validateDirectFromSellerSignals(directFromSellerSignals) {
       setTimeout(
           () => { resolve(undefined); }, 1)
     }),
-    directFromSellerSignals: new Promise((resolve, reject) => {
+    $3: new Promise((resolve, reject) => {
       setTimeout(
-          () => { resolve("null"); }, 1)
+          () => { resolve(null); }, 1)
     }),
   });
 })())",
-                      test_origin,
-                      https_server_->GetURL("a.test", kDecisionLogicPath)))
-               .ExtractString()),
-      &observer);
+                        test_origin,
+                        https_server_->GetURL("a.test", kDecisionLogicPath),
+                        header_direct_from_seller_signals
+                            ? "directFromSellerSignalsHeaderAdSlot"
+                            : "directFromSellerSignals"))
+                 .ExtractString()),
+        &observer);
 
-  EXPECT_EQ(GURL("https://example.com/render"), observer.mapped_url());
+    EXPECT_EQ(GURL("https://example.com/render"), observer.mapped_url());
+  }
 }
 
 // Test for perBuyerTimeouts and perBuyerCumulativeTimeouts being passed to
@@ -9555,7 +12164,7 @@ function generateBid(
     interestGroup, auctionSignals, perBuyerSignals, trustedBiddingSignals,
     unusedBrowserSignals) {
   const ad = interestGroup.ads[0];
-  return {'ad': ad, 'bid': 1, 'render': ad.renderUrl};
+  return {'ad': ad, 'bid': 1, 'render': ad.renderURL};
 }
 
 )";
@@ -9629,8 +12238,8 @@ function validatePerBuyerCumulativeTimeouts(perBuyerCumulativeTimeouts) {
         {
           name: 'cars',
           owner: $1,
-          biddingLogicUrl: $2,
-          ads: [{renderUrl:"https://example.com/render", metadata:2}],
+          biddingLogicURL: $2,
+          ads: [{renderURL:"https://example.com/render", metadata:2}],
         },
         /*joinDurationSec=*/100);
   } catch (e) {
@@ -9649,7 +12258,7 @@ function validatePerBuyerCumulativeTimeouts(perBuyerCumulativeTimeouts) {
 (async function() {
   return await navigator.runAdAuction({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     perBuyerTimeouts: new Promise((resolve, reject) => {
       setTimeout(
@@ -9691,7 +12300,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, QuitWithRunningAuction) {
   ExecuteScriptAsync(shell(), JsReplace(R"(
 navigator.runAdAuction({
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$1]
 });
                                         )",
@@ -9700,7 +12309,7 @@ navigator.runAdAuction({
   WaitForUrl(https_server_->GetURL("/hung"));
 }
 
-// These tests validate the `updateUrl` and navigator.updateAdInterestGroups()
+// These tests validate the `updateURL` and navigator.updateAdInterestGroups()
 // functionality.
 
 // The server JSON updates a number of updatable fields.
@@ -9713,12 +12322,12 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, Update) {
   constexpr char kUpdateUrlPath[] = "/interest_group/update_partial.json";
   network_responder_->RegisterNetworkResponse(
       kUpdateUrlPath, base::StringPrintf(R"({
-"biddingLogicUrl": "%s/interest_group/new_bidding_logic.js",
-"trustedBiddingSignalsUrl":
+"biddingLogicURL": "%s/interest_group/new_bidding_logic.js",
+"trustedBiddingSignalsURL":
   "%s/interest_group/new_trusted_bidding_signals_url.json",
 "trustedBiddingSignalsKeys": ["new_key"],
 "executionMode": "group-by-origin",
-"ads": [{"renderUrl": "%s/new_ad_render_url",
+"ads": [{"renderURL": "%s/new_ad_render_url",
          "metadata": {"new_a": "b"}
         }]
 })",
@@ -9728,33 +12337,22 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, Update) {
 
   ASSERT_EQ(
       kSuccess,
-      JoinInterestGroupAndVerify(blink::InterestGroup(
-          /*expiry=*/base::Time(),
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0, /*enable_bidding_signals_prioritization=*/false,
-          /*priority_vector=*/{{{"one", 1}}},
-          /*priority_signals_overrides=*/{{{"two", 2}}},
-          /*seller_capabilities=*/absl::nullopt,
-          /*all_sellers_capabilities=*/
-          {}, /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*bidding_wasm_helper_url=*/absl::nullopt,
-          /*update_url=*/
-          https_server_->GetURL("a.test", kUpdateUrlPath),
-          /*trusted_bidding_signals_url=*/
-          https_server_->GetURL("a.test",
-                                "/interest_group/trusted_bidding_signals.json"),
-          /*trusted_bidding_signals_keys=*/{{"key1"}},
-          /*user_bidding_signals=*/R"({"some":"json","stuff":{"here":[1,2]}})",
-          /*ads=*/
-          {{{GURL("https://example.com/render"),
-             R"({"ad":"metadata","here":[1,2,3]})"}}},
-          /*ad_components=*/absl::nullopt,
-          /*ad_sizes=*/{},
-          /*size_groups=*/{})));
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(/*owner=*/test_origin,
+                                          /*name=*/"cars")
+              .SetPriorityVector({{{"one", 1}}})
+              .SetPrioritySignalsOverrides({{{"two", 2}}})
+              .SetBiddingUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/bidding_logic.js"))
+              .SetUpdateUrl(https_server_->GetURL("a.test", kUpdateUrlPath))
+              .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/trusted_bidding_signals.json"))
+              .SetTrustedBiddingSignalsKeys({{"key1"}})
+              .SetUserBiddingSignals(
+                  R"({"some":"json","stuff":{"here":[1,2]}})")
+              .SetAds({{{GURL("https://example.com/render"),
+                         R"({"ad":"metadata","here":[1,2,3]})"}}})
+              .Build()));
 
   EXPECT_EQ("done", UpdateInterestGroupsInJS());
 
@@ -9801,12 +12399,12 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, DeprecatedDailyUpdateUrl) {
   constexpr char kUpdateUrlPath[] = "/interest_group/update_partial.json";
   network_responder_->RegisterNetworkResponse(
       kUpdateUrlPath, base::StringPrintf(R"({
-"biddingLogicUrl": "%s/interest_group/new_bidding_logic.js",
-"trustedBiddingSignalsUrl":
+"biddingLogicURL": "%s/interest_group/new_bidding_logic.js",
+"trustedBiddingSignalsURL":
   "%s/interest_group/new_trusted_bidding_signals_url.json",
 "trustedBiddingSignalsKeys": ["new_key"],
 "executionMode": "groupByOrigin",
-"ads": [{"renderUrl": "%s/new_ad_render_url",
+"ads": [{"renderURL": "%s/new_ad_render_url",
          "metadata": {"new_a": "b"}
         }]
 })",
@@ -9816,33 +12414,22 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, DeprecatedDailyUpdateUrl) {
 
   ASSERT_EQ(
       kSuccess,
-      JoinInterestGroupAndVerify(blink::InterestGroup(
-          /*expiry=*/base::Time(),
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0, /*enable_bidding_signals_prioritization=*/false,
-          /*priority_vector=*/{{{"one", 1}}},
-          /*priority_signals_overrides=*/{{{"two", 2}}},
-          /*seller_capabilities=*/absl::nullopt,
-          /*all_sellers_capabilities=*/
-          {}, /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*bidding_wasm_helper_url=*/absl::nullopt,
-          /*update_url=*/
-          https_server_->GetURL("a.test", kUpdateUrlPath),
-          /*trusted_bidding_signals_url=*/
-          https_server_->GetURL("a.test",
-                                "/interest_group/trusted_bidding_signals.json"),
-          /*trusted_bidding_signals_keys=*/{{"key1"}},
-          /*user_bidding_signals=*/R"({"some":"json","stuff":{"here":[1,2]}})",
-          /*ads=*/
-          {{{GURL("https://example.com/render"),
-             R"({"ad":"metadata","here":[1,2,3]})"}}},
-          /*ad_components=*/absl::nullopt,
-          /*ad_sizes=*/{},
-          /*size_groups=*/{})));
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(/*owner=*/test_origin,
+                                          /*name=*/"cars")
+              .SetPriorityVector({{{"one", 1}}})
+              .SetPrioritySignalsOverrides({{{"two", 2}}})
+              .SetBiddingUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/bidding_logic.js"))
+              .SetUpdateUrl(https_server_->GetURL("a.test", kUpdateUrlPath))
+              .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/trusted_bidding_signals.json"))
+              .SetTrustedBiddingSignalsKeys({{"key1"}})
+              .SetUserBiddingSignals(
+                  R"({"some":"json","stuff":{"here":[1,2]}})")
+              .SetAds({{{GURL("https://example.com/render"),
+                         R"({"ad":"metadata","here":[1,2,3]})"}}})
+              .Build()));
 
   EXPECT_EQ("done", UpdateInterestGroupsInJS());
 
@@ -9850,8 +12437,9 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, DeprecatedDailyUpdateUrl) {
       test_origin,
       base::BindLambdaForTesting([](const std::vector<StorageInterestGroup>&
                                         groups) {
-        if (groups.size() != 1)
+        if (groups.size() != 1) {
           return false;
+        }
         const auto& group = groups[0].interest_group;
         return group.name == "cars" && group.priority == 0.0 &&
                group.execution_mode ==
@@ -9872,7 +12460,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, DeprecatedDailyUpdateUrl) {
 }
 
 // The server JSON updates a number of updatable fields, using the deprecated
-// `dailyUpdateUrl` field, and the `updateUrl` field. Both have the same value.
+// `dailyUpdateUrl` field, and the `updateURL` field. Both have the same value.
 // This is what consumers are expected to due during migration from one name to
 // the other, so best to make sure it works.
 //
@@ -9891,12 +12479,12 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   constexpr char kUpdateUrlPath[] = "/interest_group/update_partial.json";
   network_responder_->RegisterNetworkResponse(
       kUpdateUrlPath, base::StringPrintf(R"({
-"biddingLogicUrl": "%s/interest_group/new_bidding_logic.js",
-"trustedBiddingSignalsUrl":
+"biddingLogicURL": "%s/interest_group/new_bidding_logic.js",
+"trustedBiddingSignalsURL":
   "%s/interest_group/new_trusted_bidding_signals_url.json",
 "trustedBiddingSignalsKeys": ["new_key"],
 "executionMode": "groupByOrigin",
-"ads": [{"renderUrl": "%s/new_ad_render_url",
+"ads": [{"renderURL": "%s/new_ad_render_url",
          "metadata": {"new_a": "b"}
         }]
 })",
@@ -9906,33 +12494,22 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
   ASSERT_EQ(
       kSuccess,
-      JoinInterestGroupAndVerify(blink::InterestGroup(
-          /*expiry=*/base::Time(),
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0, /*enable_bidding_signals_prioritization=*/false,
-          /*priority_vector=*/{{{"one", 1}}},
-          /*priority_signals_overrides=*/{{{"two", 2}}},
-          /*seller_capabilities=*/absl::nullopt,
-          /*all_sellers_capabilities=*/
-          {}, /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*bidding_wasm_helper_url=*/absl::nullopt,
-          /*update_url=*/
-          https_server_->GetURL("a.test", kUpdateUrlPath),
-          /*trusted_bidding_signals_url=*/
-          https_server_->GetURL("a.test",
-                                "/interest_group/trusted_bidding_signals.json"),
-          /*trusted_bidding_signals_keys=*/{{"key1"}},
-          /*user_bidding_signals=*/R"({"some":"json","stuff":{"here":[1,2]}})",
-          /*ads=*/
-          {{{GURL("https://example.com/render"),
-             R"({"ad":"metadata","here":[1,2,3]})"}}},
-          /*ad_components=*/absl::nullopt,
-          /*ad_sizes=*/{},
-          /*size_groups=*/{})));
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(/*owner=*/test_origin,
+                                          /*name=*/"cars")
+              .SetPriorityVector({{{"one", 1}}})
+              .SetPrioritySignalsOverrides({{{"two", 2}}})
+              .SetBiddingUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/bidding_logic.js"))
+              .SetUpdateUrl(https_server_->GetURL("a.test", kUpdateUrlPath))
+              .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/trusted_bidding_signals.json"))
+              .SetTrustedBiddingSignalsKeys({{"key1"}})
+              .SetUserBiddingSignals(
+                  R"({"some":"json","stuff":{"here":[1,2]}})")
+              .SetAds({{{GURL("https://example.com/render"),
+                         R"({"ad":"metadata","here":[1,2,3]})"}}})
+              .Build()));
 
   EXPECT_EQ("done", UpdateInterestGroupsInJS());
 
@@ -9975,7 +12552,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   constexpr char kUpdateUrlPath[] = "/interest_group/update_partial.json";
   network_responder_->RegisterNetworkResponse(
       kUpdateUrlPath, base::StringPrintf(R"({
-"ads": [{"renderUrl": "%s/new_ad_render_url",
+"ads": [{"renderURL": "%s/new_ad_render_url",
          "metadata": {"new_a": "b"}
         }]
 })",
@@ -9983,33 +12560,20 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
   ASSERT_EQ(
       kSuccess,
-      JoinInterestGroupAndVerify(blink::InterestGroup(
-          /*expiry=*/base::Time(),
-          /*owner=*/test_origin,
-          /*name=*/"cars",
-          /*priority=*/0.0, /*enable_bidding_signals_prioritization=*/false,
-          /*priority_vector=*/absl::nullopt,
-          /*priority_signals_overrides=*/absl::nullopt,
-          /*seller_capabilities=*/absl::nullopt,
-          /*all_sellers_capabilities=*/
-          {}, /*execution_mode=*/
-          blink::InterestGroup::ExecutionMode::kCompatibilityMode,
-          /*bidding_url=*/
-          https_server_->GetURL("a.test", "/interest_group/bidding_logic.js"),
-          /*bidding_wasm_helper_url=*/absl::nullopt,
-          /*update_url=*/
-          https_server_->GetURL("a.test", kUpdateUrlPath),
-          /*trusted_bidding_signals_url=*/
-          https_server_->GetURL("a.test",
-                                "/interest_group/trusted_bidding_signals.json"),
-          /*trusted_bidding_signals_keys=*/{{"key1"}},
-          /*user_bidding_signals=*/R"({"some":"json","stuff":{"here":[1,2]}})",
-          /*ads=*/
-          {{{GURL("https://example.com/render"),
-             R"({"ad":"metadata","here":[1,2,3]})"}}},
-          /*ad_components=*/absl::nullopt,
-          /*ad_sizes=*/{},
-          /*size_groups=*/{})));
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(/*owner=*/test_origin,
+                                          /*name=*/"cars")
+              .SetBiddingUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/bidding_logic.js"))
+              .SetUpdateUrl(https_server_->GetURL("a.test", kUpdateUrlPath))
+              .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/trusted_bidding_signals.json"))
+              .SetTrustedBiddingSignalsKeys({{"key1"}})
+              .SetUserBiddingSignals(
+                  R"({"some":"json","stuff":{"here":[1,2]}})")
+              .SetAds({{{GURL("https://example.com/render"),
+                         R"({"ad":"metadata","here":[1,2,3]})"}}})
+              .Build()));
 
   EXPECT_EQ("done", UpdateInterestGroupsInJS());
 
@@ -10021,8 +12585,9 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       test_origin,
       base::BindLambdaForTesting(
           [](const std::vector<StorageInterestGroup>& groups) {
-            if (groups.size() != 1)
+            if (groups.size() != 1) {
               return false;
+            }
             const auto& group = groups[0].interest_group;
             return group.name == "cars" && group.bidding_url.has_value() &&
                    group.bidding_url->path() ==
@@ -10107,7 +12672,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
     std::string auction_config = JsReplace(
         R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       interestGroupBuyers: [$1, $3],
                   )",
         bidder_a_origin,
@@ -10148,7 +12713,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
       RunAuctionAndWait(JsReplace(
           R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     sellerTimeout: 1,
                 })",
@@ -10190,8 +12755,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
   const char kAuctionConfigTemplate[] = R"({
     seller: $1,
-    decisionLogicUrl: $2,
-    trustedScoringSignalsUrl: $3,
+    decisionLogicURL: $2,
+    trustedScoringSignalsURL: $3,
     interestGroupBuyers: [$4],
     sellerExperimentGroupId: 8349,
     perBuyerExperimentGroupIds: {'*': 3498},
@@ -10268,7 +12833,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
   const char kAuctionConfigTemplate[] = R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$3, $4],
     perBuyerExperimentGroupIds: {'*': 3498,
                                  $4: 1203},
@@ -10311,8 +12876,8 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, FinalizeAdWorks) {
 
 // The bidder worklet is served from a private network, everything else from a
 // public network. The auction should fail.
-IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
-                       BidderOnLocalNetwork) {
+IN_PROC_BROWSER_TEST_F(InterestGroupPrivateNetworkBrowserTest,
+                       BidderOnPrivateNetwork) {
   URLLoaderMonitor url_loader_monitor;
 
   // Learn the bidder IG, served from the local server.
@@ -10338,7 +12903,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
                          R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$3]
 }
                          )",
@@ -10362,12 +12927,12 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
   EXPECT_THAT(bidder_status.cors_error_status,
               Optional(network::CorsErrorStatus(
                   network::mojom::CorsError::kPreflightMissingAllowOriginHeader,
-                  network::mojom::IPAddressSpace::kLoopback,
+                  network::mojom::IPAddressSpace::kLocal,
                   network::mojom::IPAddressSpace::kUnknown)));
 }
 
-IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
-                       SellerOnLocalNetwork) {
+IN_PROC_BROWSER_TEST_F(InterestGroupPrivateNetworkBrowserTest,
+                       SellerOnPrivateNetwork) {
   GURL seller_url =
       https_server_->GetURL("b.test", "/interest_group/decision_logic.js");
 
@@ -10398,7 +12963,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
                 R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$3]
 }
                 )",
@@ -10418,14 +12983,14 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
   EXPECT_THAT(seller_status.cors_error_status,
               Optional(network::CorsErrorStatus(
                   network::mojom::CorsError::kPreflightMissingAllowOriginHeader,
-                  network::mojom::IPAddressSpace::kLoopback,
+                  network::mojom::IPAddressSpace::kLocal,
                   network::mojom::IPAddressSpace::kUnknown)));
 }
 
 // Have the auction and worklets server from public IPs, but send reports to a
-// local network. The reports should be blocked.
-IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
-                       ReportToLocalNetwork) {
+// private network. The reports should be blocked.
+IN_PROC_BROWSER_TEST_F(InterestGroupPrivateNetworkBrowserTest,
+                       ReportToPrivateNetwork) {
   // Use `remote_test_server_` exclusively with hostname "a.test" for root page
   // and script URLs.
   GURL test_url =
@@ -10463,7 +13028,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
           R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$1],
   sellerSignals: {reportTo: $3},
 }
@@ -10495,7 +13060,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
         report_status.cors_error_status,
         Optional(network::CorsErrorStatus(
             network::mojom::CorsError::kPreflightMissingAllowOriginHeader,
-            network::mojom::IPAddressSpace::kLoopback,
+            network::mojom::IPAddressSpace::kLocal,
             network::mojom::IPAddressSpace::kUnknown)));
   }
 }
@@ -10503,7 +13068,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
 // Have all requests for an auction served from a public network, and all
 // reports send there as well. The auction should succeed, and all reports
 // should be sent.
-IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupPrivateNetworkBrowserTest,
                        ReportToPublicNetwork) {
   // Use `remote_test_server_` exclusively with hostname "a.test" for root page
   // and script URLs.
@@ -10557,7 +13122,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
       R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$1],
   sellerSignals: {reportTo: $3},
 }
@@ -10606,10 +13171,10 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
 // respected for the update request. Does this by adding an interest group,
 // trying to update it from a public page, and expecting the request to be
 // blocked, and then adding another interest group and updating it from a
-// local page, which should succeed. Have to use two interest groups to avoid
+// private page, which should succeed. Have to use two interest groups to avoid
 // the delay between updates.
-IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
-                       UpdatePublicVsLocalNetwork) {
+IN_PROC_BROWSER_TEST_F(InterestGroupPrivateNetworkBrowserTest,
+                       UpdatePublicVsPrivateNetwork) {
   const char kPubliclyUpdateGroupName[] = "Publicly updated group";
   const char kLocallyUpdateGroupName[] = "Locally updated group";
 
@@ -10620,11 +13185,11 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
   GURL new_bidding_url =
       https_server_->GetURL("a.test", "/interest_group/new_bidding_logic.js");
 
-  // The server JSON updates biddingLogicUrl only.
+  // The server JSON updates biddingLogicURL only.
   network_responder_->RegisterNetworkResponse(update_url.path(),
                                               JsReplace(R"(
 {
-  "biddingLogicUrl": $1
+  "biddingLogicURL": $1
 }
                                                         )",
                                                         new_bidding_url));
@@ -10636,7 +13201,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
     GURL test_url;
     std::string group_name;
     if (public_address_space) {
-      // This header treats a response from a server on a local IP as if the
+      // This header treats a response from a server on a private IP as if the
       // server were on public address space.
       test_url = https_server_->GetURL(
           "a.test",
@@ -10671,7 +13236,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
           request.trusted_params->client_security_state->ip_address_space);
     } else {
       EXPECT_EQ(
-          network::mojom::IPAddressSpace::kLoopback,
+          network::mojom::IPAddressSpace::kLocal,
           request.trusted_params->client_security_state->ip_address_space);
     }
     // Not the main purpose of this test, but it should be using a transient
@@ -10717,14 +13282,14 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
 }
 
 // Create three interest groups, each belonging to different origins. Update one
-// on a local network, but delay its server response. Update the second on a
+// on a private network, but delay its server response. Update the second on a
 // public network (thus expecting the request to be blocked). Update the final
-// interest group on a local interest group -- it should be updated after the
+// interest group on a private interest group -- it should be updated after the
 // first two. After the server responds to the first update request, all updates
 // should proceed -- the first should succeed, and the second should be blocked
 // since the page is on a public network, and the third should succeed.
-IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
-                       LocalNetProtectionsApplyToSubsequentUpdates) {
+IN_PROC_BROWSER_TEST_F(InterestGroupPrivateNetworkBrowserTest,
+                       PrivateNetProtectionsApplyToSubsequentUpdates) {
   constexpr char kLocallyUpdateGroupName[] = "Locally updated group";
   constexpr char kPubliclyUpdateGroupName[] = "Publicly updated group";
 
@@ -10754,10 +13319,10 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
   const GURL new_bidding_url_c =
       https_server_->GetURL("c.test", kNewBiddingPath);
 
-  // The server JSON updates biddingLogicUrl only.
+  // The server JSON updates biddingLogicURL only.
   constexpr char kUpdateContentTemplate[] = R"(
 {
-  "biddingLogicUrl": $1
+  "biddingLogicURL": $1
 }
 )";
   // a.test's response is delayed until later.
@@ -10769,7 +13334,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
       JsReplace(kUpdateContentTemplate, new_bidding_url_c));
 
   // First, create an interest group in a.test and start updating it from a
-  // local site. The update doesn't finish yet because the network response
+  // private site. The update doesn't finish yet because the network response
   // is delayed.
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("a.test", "/echo")));
 
@@ -10809,7 +13374,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
 
   EXPECT_EQ("done", UpdateInterestGroupsInJS());
 
-  // Finally, create and update the last interest group on a local network --
+  // Finally, create and update the last interest group on a private network --
   // this update shouldn't be blocked.
   ASSERT_TRUE(NavigateToURL(shell(), https_server_->GetURL("c.test", "/echo")));
 
@@ -10857,20 +13422,20 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
   EXPECT_EQ(b_groups[0].interest_group.bidding_url, initial_bidding_url_b);
 }
 
-// Join interest groups with local update URLs, and run auctions from
-// both a a main frame loaded with public address space, and with a local
+// Join interest groups with local (private) update URLs, and run auctions from
+// both a a main frame loaded with public address space, and with a private
 // address space. The auctions trigger updates the interest groups, but only the
-// frame using a local address space successfully updates the IG, since frames
+// frame using a private address space successfully updates the IG, since frames
 // from public address spaces are blocked from making requests to servers with
-// local addresses.
+// private addresses.
 //
 // Different interest groups (with different origins) are used for the public
-// and local auction, to avoid running into update rate limits.
-IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
-                       LocalNetProtectionsApplyToPostAuctionUpdates) {
+// and private auction, to avoid running into update rate limits.
+IN_PROC_BROWSER_TEST_F(InterestGroupPrivateNetworkBrowserTest,
+                       PrivateNetProtectionsApplyToPostAuctionUpdates) {
   // Fetches for the interest group-related scripts and updates are always
   // local, it's where they're updated from that matters. Interest group A will
-  // be updated from an auction on a public origin, and B from a local one.
+  // be updated from an auction on a public origin, and B from a private one.
   // Only the second update will succeed.
   //
   // It's important to do the successful update last, so that the first update
@@ -10889,7 +13454,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
   constexpr char kUpdatePath[] = "/interest_group/update_partial_a.json";
   constexpr char kUpdateResponse[] = R"(
 {
-"ads": [{"renderUrl": "https://example.com/render2"
+"ads": [{"renderURL": "https://example.com/render2"
         }]
 })";
   // The server JSON updates the ads only. Both update URLs use the same path,
@@ -10910,7 +13475,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
   } kTestCases[] = {
       {interest_group_a_origin,
        /*run_auction_from_public_address_space=*/true,
-       // This header treats a response from a server on a local IP as if the
+       // This header treats a response from a server on a private IP as if the
        // server were on public address space.
        https_server_->GetURL(
            "c.test",
@@ -10949,7 +13514,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
 (async function() {
   return await navigator.runAdAuction({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$3],
   });
 })())",
@@ -10981,7 +13546,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupLocalNetworkBrowserTest,
           url_loader_monitor.WaitForRequestCompletion(update_url).error_code);
     } else {
       EXPECT_EQ(
-          network::mojom::IPAddressSpace::kLoopback,
+          network::mojom::IPAddressSpace::kLocal,
           request.trusted_params->client_security_state->ip_address_space);
       EXPECT_EQ(
           net::OK,
@@ -11104,7 +13669,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                       R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$1],
 }
                               )",
@@ -11266,7 +13831,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupRestrictedPermissionsPolicyBrowserTest,
                       R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$1],
 }
                               )",
@@ -11322,7 +13887,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
 
   const char kAuctionConfigTemplate[] = R"({
       seller: $1,
-      decisionLogicUrl: $2,
+      decisionLogicURL: $2,
       perBuyerCumulativeTimeouts: {$1: 1, $3: 50},
       interestGroupBuyers: [$1, $3]
   })";
@@ -11439,7 +14004,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupRestrictedPermissionsPolicyBrowserTest,
                     R"(
 {
   seller: $1,
-  decisionLogicUrl: $2,
+  decisionLogicURL: $2,
   interestGroupBuyers: [$1],
 }
                             )",
@@ -11530,7 +14095,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, DeprecatedURNToURLValidURN) {
     std::string auction_config = JsReplace(
         R"({
           seller: $1,
-          decisionLogicUrl: $2,
+          decisionLogicURL: $2,
           interestGroupBuyers: [$1]
         })",
         test_origin,
@@ -11611,7 +14176,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ExecutionModeGroupByOrigin) {
         RunAuctionAndWaitForUrl(JsReplace(
             R"({
                     seller: $1,
-                    decisionLogicUrl: $2,
+                    decisionLogicURL: $2,
                     interestGroupBuyers: [$1],
                   })",
             test_origin,
@@ -11620,10 +14185,476 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, ExecutionModeGroupByOrigin) {
   }
 }
 
-// Runs auction like Just like
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchCrossOrigin_AdAuctionHeadersEligible_HasAdAuctionResultResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Result: ", kLegitimateAdAuctionResponse})));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  GURL fetch_url = https_server_->GetURL(
+      "b.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  EXPECT_TRUE(ExecJs(
+      web_contents()->GetPrimaryMainFrame(),
+      content::JsReplace("fetch($1, {adAuctionHeaders: true})", fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_TRUE(ad_auction_header_value);
+  EXPECT_EQ(*ad_auction_header_value, "?1");
+
+  EXPECT_TRUE(WitnessedAuctionResultForOrigin(
+      url::Origin::Create(fetch_url),
+      base64Decode(kLegitimateAdAuctionResponse)));
+
+  const std::set<std::string>& signals =
+      GetAuctionSignalsForOrigin(url::Origin::Create(fetch_url));
+  EXPECT_THAT(signals, ::testing::IsEmpty());
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchSameOrigin_AdAuctionHeadersEligible_HasBothAdAuctionResultAndSignalsResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Result: ", kLegitimateAdAuctionResponse,
+                    "\nAd-Auction-Signals: ", "{}"})));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  GURL fetch_url = https_server_->GetURL(
+      "a.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  // Verify that the JavaScript doesn't see the response header
+  //  `Ad-Auction-Signals`. In contrast, it should see `Ad-Auction-Result`.
+  EXPECT_TRUE(ExecJs(web_contents()->GetPrimaryMainFrame(),
+                     content::JsReplace(R"(
+        fetch($1, {adAuctionHeaders: true}).then((response) => {
+          if (!response.headers.get('Ad-Auction-Result')) {
+            throw 'Did not receive `Ad-Auction-Result` header';
+          }
+
+          if (response.headers.get('Ad-Auction-Signals')) {
+            throw 'Unexpectedly received `Ad-Auction-Signals` header';
+          }
+
+        });
+    )",
+                                        fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_TRUE(ad_auction_header_value);
+  EXPECT_EQ(*ad_auction_header_value, "?1");
+
+  EXPECT_TRUE(WitnessedAuctionResultForOrigin(
+      url::Origin::Create(fetch_url),
+      base64Decode(kLegitimateAdAuctionResponse)));
+
+  const std::set<std::string>& signals =
+      GetAuctionSignalsForOrigin(url::Origin::Create(fetch_url));
+  EXPECT_THAT(signals, ::testing::UnorderedElementsAre("{}"));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchCrossOrigin_AdAuctionHeadersEligible_HasBothAdAuctionResultAndSignalsResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Result: ", kLegitimateAdAuctionResponse,
+                    "\nAd-Auction-Signals: ", "{}"})));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  GURL fetch_url = https_server_->GetURL(
+      "b.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  // Verify that the JavaScript doesn't see the `Ad-Auction-Signals` or
+  // `Ad-Auction-Result` response header, as they are not CORS-safelisted.
+  EXPECT_TRUE(ExecJs(web_contents()->GetPrimaryMainFrame(),
+                     content::JsReplace(R"(
+        fetch($1, {adAuctionHeaders: true}).then((response) => {
+          if (response.headers.get('Ad-Auction-Result')) {
+            throw 'Unexpectedly received `Ad-Auction-Result` header';
+          }
+
+          if (response.headers.get('Ad-Auction-Signals')) {
+            throw 'Unexpectedly received `Ad-Auction-Signals` header';
+          }
+
+        });
+    )",
+                                        fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_TRUE(ad_auction_header_value);
+  EXPECT_EQ(*ad_auction_header_value, "?1");
+
+  EXPECT_TRUE(WitnessedAuctionResultForOrigin(
+      url::Origin::Create(fetch_url),
+      base64Decode(kLegitimateAdAuctionResponse)));
+
+  const std::set<std::string>& signals =
+      GetAuctionSignalsForOrigin(url::Origin::Create(fetch_url));
+  EXPECT_THAT(signals, ::testing::UnorderedElementsAre("{}"));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchCrossOrigin_AdAuctionHeadersNotEligible_HasAdAuctionResultResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Result: ", kLegitimateAdAuctionResponse})));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  // "d.test" is not allowlisted for the API. Thus the request isn't eligible
+  // for ad auction headers.
+  GURL fetch_url = https_server_->GetURL(
+      "d.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  EXPECT_TRUE(ExecJs(
+      web_contents()->GetPrimaryMainFrame(),
+      content::JsReplace("fetch($1, {adAuctionHeaders: true})", fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_FALSE(ad_auction_header_value);
+
+  EXPECT_FALSE(WitnessedAuctionResultForOrigin(
+      url::Origin::Create(fetch_url),
+      base64Decode(kLegitimateAdAuctionResponse)));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchCrossOrigin_AdAuctionHeadersEligible_HasNoAdAuctionResultResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair("{{AD_AUCTION_HEADERS}}", ""));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  // "d.test" is not allowlisted for the API. Thus the request isn't eligible
+  // for ad auction headers.
+  GURL fetch_url = https_server_->GetURL(
+      "b.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  EXPECT_TRUE(ExecJs(
+      web_contents()->GetPrimaryMainFrame(),
+      content::JsReplace("fetch($1, {adAuctionHeaders: true})", fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_TRUE(ad_auction_header_value);
+  EXPECT_EQ(*ad_auction_header_value, "?1");
+
+  EXPECT_FALSE(WitnessedAuctionResultForOrigin(
+      url::Origin::Create(fetch_url),
+      base64Decode(kLegitimateAdAuctionResponse)));
+}
+
+// On site a.test, test fetch request to b.test that gets redirected to c.test.
+// Only the initial ad auction request header "?1" is expected -- its response
+// will be ignored and the redirect request is also ineligible for ad auction
+// headers handling.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchCrossOrigin_HasRedirect_AdAuctionHeadersNotEligible) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs redirect_replacement;
+  redirect_replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  redirect_replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Result: ", kLegitimateAdAuctionResponse,
+                    "\nAd-Auction-Signals: ", "{}",
+                    "\nAd-Auction-Additional-Bid: ",
+                    "00000000-0000-0000-0000-000000000000:e30="})));
+  redirect_replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  GURL redirect_url = https_server_->GetURL(
+      "c.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header2.html",
+                    redirect_replacement));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(
+      std::make_pair("{{STATUS}}", "301 Moved Permanently"));
+  replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Result: ", kLegitimateAdAuctionResponse,
+                    "\nAd-Auction-Signals: ", "{}",
+                    "\nAd-Auction-Additional-Bid: ",
+                    "00000000-0000-0000-0000-000000000000:e30="})));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}",
+                                          "Location: " + redirect_url.spec()));
+
+  GURL fetch_url = https_server_->GetURL(
+      "b.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  EXPECT_TRUE(ExecJs(
+      web_contents()->GetPrimaryMainFrame(),
+      content::JsReplace("fetch($1, {adAuctionHeaders: true})", fetch_url)));
+
+  {
+    absl::optional<std::string> ad_auction_header_value =
+        GetAdAuctionHeaderForRequestPath(
+            "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+    EXPECT_TRUE(ad_auction_header_value);
+    EXPECT_EQ(*ad_auction_header_value, "?1");
+  }
+  {
+    absl::optional<std::string> ad_auction_header_value =
+        GetAdAuctionHeaderForRequestPath(
+            "/interest_group/page_with_custom_ad_auction_result_header2.html");
+
+    EXPECT_FALSE(ad_auction_header_value);
+  }
+
+  url::Origin request_origin = url::Origin::Create(fetch_url);
+
+  EXPECT_FALSE(WitnessedAuctionResultForOrigin(
+      request_origin, base64Decode(kLegitimateAdAuctionResponse)));
+
+  const std::set<std::string>& signals =
+      GetAuctionSignalsForOrigin(request_origin);
+  EXPECT_THAT(signals, ::testing::IsEmpty());
+
+  EXPECT_THAT(TakeAuctionAdditionalBidsForOriginAndNonce(
+                  request_origin, "00000000-0000-0000-0000-000000000000"),
+              ::testing::IsEmpty());
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchSameOrigin_AdAuctionHeadersEligible_HasAdAuctionAdditionalBidResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Additional-Bid: ",
+                    "00000000-0000-0000-0000-000000000000:e30="})));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  GURL fetch_url = https_server_->GetURL(
+      "a.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  // Verify that the JavaScript doesn't see the response header
+  // `Ad-Auction-Additional-Bid`.
+  EXPECT_TRUE(ExecJs(web_contents()->GetPrimaryMainFrame(),
+                     content::JsReplace(R"(
+        fetch($1, {adAuctionHeaders: true}).then((response) => {
+          if (response.headers.get('Ad-Auction-Additional-Bid')) {
+            throw 'Unexpectedly received `Ad-Auction-Additional-Bid` header';
+          }
+        });
+    )",
+                                        fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_TRUE(ad_auction_header_value);
+  EXPECT_EQ(*ad_auction_header_value, "?1");
+
+  url::Origin request_origin = url::Origin::Create(fetch_url);
+  EXPECT_THAT(TakeAuctionAdditionalBidsForOriginAndNonce(
+                  request_origin, "00000000-0000-0000-0000-000000000000"),
+              ::testing::ElementsAre("e30="));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchCrossOrigin_AdAuctionHeadersEligible_HasAdAuctionAdditionalBidResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Additional-Bid: ",
+                    "00000000-0000-0000-0000-000000000000:e30="})));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  GURL fetch_url = https_server_->GetURL(
+      "b.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  // Verify that the JavaScript doesn't see the response header
+  // `Ad-Auction-Additional-Bid`.
+  EXPECT_TRUE(ExecJs(web_contents()->GetPrimaryMainFrame(),
+                     content::JsReplace(R"(
+        fetch($1, {adAuctionHeaders: true}).then((response) => {
+          if (response.headers.get('Ad-Auction-Additional-Bid')) {
+            throw 'Unexpectedly received `Ad-Auction-Additional-Bid` header';
+          }
+        });
+    )",
+                                        fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_TRUE(ad_auction_header_value);
+  EXPECT_EQ(*ad_auction_header_value, "?1");
+
+  url::Origin request_origin = url::Origin::Create(fetch_url);
+  EXPECT_THAT(TakeAuctionAdditionalBidsForOriginAndNonce(
+                  request_origin, "00000000-0000-0000-0000-000000000000"),
+              ::testing::ElementsAre("e30="));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchCrossOrigin_AdAuctionHeadersEligible_HasNoAdAuctionAdditionalBidResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair("{{AD_AUCTION_HEADERS}}", ""));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  GURL fetch_url = https_server_->GetURL(
+      "b.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  EXPECT_TRUE(ExecJs(
+      web_contents()->GetPrimaryMainFrame(),
+      content::JsReplace("fetch($1, {adAuctionHeaders: true})", fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_TRUE(ad_auction_header_value);
+  EXPECT_EQ(*ad_auction_header_value, "?1");
+
+  url::Origin request_origin = url::Origin::Create(fetch_url);
+  EXPECT_THAT(TakeAuctionAdditionalBidsForOriginAndNonce(
+                  request_origin, "00000000-0000-0000-0000-000000000000"),
+              ::testing::IsEmpty());
+}
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    FetchCrossOrigin_AdAuctionHeadersNotEligible_HasAdAuctionAdditionalBidResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Additional-Bid: ",
+                    "00000000-0000-0000-0000-000000000000:e30="})));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  // "d.test" is not allowlisted for the API. Thus the request isn't eligible
+  // for ad auction headers.
+  GURL fetch_url = https_server_->GetURL(
+      "d.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  EXPECT_TRUE(ExecJs(
+      web_contents()->GetPrimaryMainFrame(),
+      content::JsReplace("fetch($1, {adAuctionHeaders: true})", fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_FALSE(ad_auction_header_value);
+
+  url::Origin request_origin = url::Origin::Create(fetch_url);
+  EXPECT_THAT(TakeAuctionAdditionalBidsForOriginAndNonce(
+                  request_origin, "00000000-0000-0000-0000-000000000000"),
+              ::testing::IsEmpty());
+}
+
+// Runs an ad auction similar to the one in
 // InterestGroupFencedFrameBrowserTest.RunAdAuctionWithWinner but also registers
 // an ad beacon that is sent by the render URL.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        RunAdAuctionWithWinnerRegisterAdBeaconBuyer) {
   URLLoaderMonitor url_loader_monitor;
 
@@ -11651,6 +14682,117 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
       ad_url, JsReplace(
                   R"({
 seller: $1,
+decisionLogicURL: $2,
+interestGroupBuyers: [$1],
+                  })",
+                  test_origin,
+                  https_server_->GetURL("a.test",
+                                        "/interest_group/decision_logic.js"))));
+
+  absl::optional<network::ResourceRequest> request =
+      url_loader_monitor.WaitForUrl(
+          https_server_->GetURL("b.test", "/echoall?report_win_beacon"));
+  ASSERT_TRUE(request);
+  EXPECT_EQ(net::HttpRequestHeaders::kPostMethod, request->method);
+}
+
+// Runs auction like Just like
+// InterestGroupFencedFrameBrowserTest.RunAdAuctionWithWinner but also registers
+// an ad beacon that is sent by the render URL. The ad beacon will not be sent
+// out because the origin the beacon is being sent to (b.test) is not enrolled.
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
+                       RunAdAuctionWithWinnerRegisterUnenrolledAdBeaconBuyer) {
+  // Un-enroll 'b.test' from Privacy Sandbox. Keep the other origins to allow
+  // the ad auction to run properly.
+  content_browser_client_->SetAllowList({
+      url::Origin::Create(https_server_->GetURL("a.test", "/")),
+      url::Origin::Create(https_server_->GetURL("c.test", "/")),
+  });
+
+  URLLoaderMonitor url_loader_monitor;
+
+  GURL test_url = https_server_->GetURL("a.test", "/fenced_frames/basic.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+
+  GURL ad_url = https_server_->GetURL(
+      "c.test", "/fenced_frames/ad_with_fenced_frame_reporting.html");
+  EXPECT_EQ(
+      kSuccess,
+      JoinInterestGroupAndVerify(
+          blink::TestInterestGroupBuilder(
+              /*owner=*/test_origin,
+              /*name=*/"cars")
+              .SetBiddingUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/bidding_logic.js"))
+              .SetTrustedBiddingSignalsUrl(https_server_->GetURL(
+                  "a.test", "/interest_group/trusted_bidding_signals.json"))
+              .SetTrustedBiddingSignalsKeys({{"key1"}})
+              .SetAds({{{ad_url, R"({"ad":"metadata","here":[1,2]})"}}})
+              .Build()));
+
+  ASSERT_NO_FATAL_FAILURE(RunAuctionAndNavigateFencedFrame(
+      ad_url, JsReplace(
+                  R"({
+                    seller: $1,
+                    decisionLogicURL: $2,
+                    interestGroupBuyers: [$1],
+                  })",
+                  test_origin,
+                  https_server_->GetURL("a.test",
+                                        "/interest_group/decision_logic.js"))));
+
+  // Send a basic request to the reporting destination.
+  GURL reporting_url =
+      https_server_->GetURL("b.test", "/echoall?report_win_beacon");
+  SendBasicRequest(reporting_url);
+
+  // Verify the request received is the basic request, which implies the
+  // beacon was not sent, as expected.
+  EXPECT_EQ(network_responder_->GetRequest()->content, "Basic request data");
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Runs an ad auction similar to the one in
+// InterestGroupFencedFrameBrowserTest.RunAdAuctionWithWinner but also registers
+// ad macros. The destination URL's ${} template is substituted with the ad
+// macro's value if there is one, otherwise unsubstituted. A report is sent to
+// the new destination URL.
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
+                       RunAdAuctionWithWinnerRegisterAdMacro) {
+  URLLoaderMonitor url_loader_monitor;
+
+  GURL test_url = https_server_->GetURL("a.test", "/fenced_frames/basic.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+
+  GURL ad_url = https_server_->GetURL(
+      "c.test", "/fenced_frames/ad_with_3pat_macro_reporting.html");
+  url::Origin allowed_origin = url::Origin::Create(GURL("https://b.test"));
+  content_browser_client_->AddToAllowList({allowed_origin});
+  std::vector<url::Origin> allowed_reporting_origins = {allowed_origin};
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test",
+                        "/interest_group/bidding_logic_register_ad_macro.js"))
+                    .SetAds({{{ad_url,
+                               /*metadata=*/absl::nullopt,
+                               /*size_group=*/absl::nullopt,
+                               /*buyer_reporting_id=*/absl::nullopt,
+                               /*buyer_and_seller_reporting_id=*/absl::nullopt,
+                               /*ad_render_id=*/absl::nullopt,
+                               /*allowed_reporting_origins=*/
+                               std::move(allowed_reporting_origins)}}})
+                    .Build()));
+
+  ASSERT_NO_FATAL_FAILURE(RunAuctionAndNavigateFencedFrame(
+      ad_url, JsReplace(
+                  R"({
+seller: $1,
 decisionLogicUrl: $2,
 interestGroupBuyers: [$1],
                   })",
@@ -11660,15 +14802,15 @@ interestGroupBuyers: [$1],
 
   absl::optional<network::ResourceRequest> request =
       url_loader_monitor.WaitForUrl(
-          https_server_->GetURL("d.test", "/echoall?report_win_beacon"));
+          GURL("https://b.test/echo?a=value_a&b=value_b&c=${NOT_REGISTERED}"));
   ASSERT_TRUE(request);
-  EXPECT_EQ(net::HttpRequestHeaders::kPostMethod, request->method);
+  EXPECT_EQ(net::HttpRequestHeaders::kGetMethod, request->method);
 }
 
 // Runs an auction similar to
 // InterestGroupFencedFrameBrowserTest.RunAdAuctionWithWinner, but also triggers
 // sending a *private aggregation* event using `window.fence.reportEvent`.
-IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
+IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                        RunAdAuctionWithWinnerRegisterPrivateAggregationBuyer) {
   URLLoaderMonitor url_loader_monitor;
 
@@ -11689,8 +14831,11 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
                                         /*storage_partition=*/nullptr) {}
   };
 
-  base::MockRepeatingCallback<void(AggregatableReportRequest,
-                                   PrivateAggregationBudgetKey)>
+  base::MockRepeatingCallback<void(
+      PrivateAggregationHost::ReportRequestGenerator,
+      std::vector<blink::mojom::AggregatableReportHistogramContribution>,
+      PrivateAggregationBudgetKey,
+      PrivateAggregationBudgeter::BudgetDeniedBehavior)>
       mock_callback;
 
   auto* storage_partition_impl =
@@ -11711,16 +14856,25 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
   // so that it is guaranteed to detect when the private aggregation event is
   // sent.
   EXPECT_CALL(mock_callback, Run)
-      .WillRepeatedly(
-          testing::Invoke([&](AggregatableReportRequest request,
-                              PrivateAggregationBudgetKey budget_key) {
+      .WillRepeatedly(testing::Invoke(
+          [&](PrivateAggregationHost::ReportRequestGenerator generator,
+              std::vector<blink::mojom::AggregatableReportHistogramContribution>
+                  contributions,
+              PrivateAggregationBudgetKey budget_key,
+              PrivateAggregationBudgeter::BudgetDeniedBehavior
+                  budget_denied_behavior) {
+            AggregatableReportRequest request =
+                std::move(generator).Run(contributions);
             ASSERT_EQ(request.payload_contents().contributions.size(), 1u);
             EXPECT_EQ(request.payload_contents().contributions[0].bucket, 3);
             EXPECT_EQ(request.payload_contents().contributions[0].value, 5);
             EXPECT_EQ(request.shared_info().reporting_origin, test_origin);
             EXPECT_EQ(budget_key.api(),
-                      PrivateAggregationBudgetKey::Api::kFledge);
+                      PrivateAggregationBudgetKey::Api::kProtectedAudience);
             EXPECT_EQ(budget_key.origin(), test_origin);
+            EXPECT_EQ(budget_denied_behavior,
+                      PrivateAggregationBudgeter::BudgetDeniedBehavior::
+                          kDontSendReport);
             run_loop.Quit();
           }));
 
@@ -11745,7 +14899,7 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
       ad_url, JsReplace(
                   R"({
                       seller: $1,
-                      decisionLogicUrl: $2,
+                      decisionLogicURL: $2,
                       interestGroupBuyers: [$1],
                   })",
                   test_origin,
@@ -11754,11 +14908,6 @@ IN_PROC_BROWSER_TEST_P(InterestGroupFencedFrameBrowserTest,
 
   run_loop.Run();
 }
-
-INSTANTIATE_TEST_SUITE_P(All,
-                         InterestGroupFencedFrameBrowserTest,
-                         ::testing::Values(false, true),
-                         &InterestGroupFencedFrameBrowserTest::DescribeParams);
 
 class InterestGroupAuctionLimitBrowserTest : public InterestGroupBrowserTest {
  public:
@@ -11815,7 +14964,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupAuctionLimitBrowserTest,
             RunAuctionAndWaitForUrl(JsReplace(
                 R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
                 })",
                 test_origin,
@@ -11835,7 +14984,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupAuctionLimitBrowserTest,
             RunAuctionAndWaitForUrl(JsReplace(
                 R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
                 })",
                 test_origin,
@@ -11847,7 +14996,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupAuctionLimitBrowserTest,
   EXPECT_EQ(nullptr, RunAuctionAndWait(JsReplace(
                          R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
                 })",
                          test_origin,
@@ -11886,7 +15035,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupAuctionLimitBrowserTest,
             RunAuctionAndWaitForUrl(JsReplace(
                 R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
                 })",
                 test_origin,
@@ -11899,7 +15048,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupAuctionLimitBrowserTest,
                 JsReplace(
                     R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
                 })",
                     test_origin,
@@ -11914,7 +15063,7 @@ IN_PROC_BROWSER_TEST_F(InterestGroupAuctionLimitBrowserTest,
       RunAuctionAndWait(JsReplace(
                             R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
                 })",
                             test_origin,
@@ -11973,7 +15122,7 @@ IN_PROC_BROWSER_TEST_F(
   std::string auction_config = JsReplace(
       R"({
     seller: $1,
-    decisionLogicUrl: $2,
+    decisionLogicURL: $2,
     interestGroupBuyers: [$1],
     auctionSignals: {x: 1},
     sellerSignals: {yet: 'more', info: 1},
@@ -12008,6 +15157,3086 @@ IN_PROC_BROWSER_TEST_F(
   for (const auto& debugging_report_url : kDebuggingReportUrls) {
     EXPECT_FALSE(HasServerSeenUrl(debugging_report_url));
   }
+}
+
+// Test event-level reporting of ad component fenced frame. This test class is
+// parameterized so that it tests the following scenarios, for an ad auction
+// that results in a winning ad and a winning ad component.
+// 1. Ad in fenced frame, ad component in a nested fenced frame.
+// 2. Ad in fenced frame, ad component in a nested iframe.
+// 3. Ad in iframe, ad component in a nested fenced frame.
+// 4. Ad in iframe, ad component in a nested iframe.
+// TODO(crbug.com/1355857): Once urn iframes are no longer supported, this test
+// should only test scenario 1.
+class InterestGroupAdComponentAutomaticBeaconBrowserTest
+    : public InterestGroupFencedFrameBrowserTest,
+      public testing::WithParamInterface<std::tuple<bool, bool>> {
+ public:
+  std::unique_ptr<NetworkResponder> CreateNetworkResponder() override {
+    // Fenced frame window.fence.reportEvent API requires a responder that
+    // handles beacons sent to the reporting url.
+    return std::make_unique<NetworkResponder>(*https_server_,
+                                              "/report_event.html");
+  }
+
+  // Return true if the ad from the auction is loaded in a fenced frame, false
+  // if loaded in an iframe.
+  bool IsAdLoadedInFencedFrame() const { return std::get<0>(GetParam()); }
+
+  // Return true if the ad component from the auction is loaded in a fenced
+  // frame, false if loaded in an iframe.
+  bool IsAdComponentLoadedInFencedFrame() const {
+    return std::get<1>(GetParam());
+  }
+
+  // Get the render frame host of the fenced frame or the iframe that renders
+  // the ad from the auction. This function assumes there is only one such frame
+  // within `execution_target`.
+  RenderFrameHost* GetAdRenderFrameHost(
+      const ToRenderFrameHost& execution_target,
+      bool is_fenced_frame) {
+    if (is_fenced_frame) {
+      return GetFencedFrameRenderFrameHost(execution_target);
+    }
+
+    FrameTreeNode* ad_frame_node =
+        FrameTreeNode::From(execution_target.render_frame_host());
+    EXPECT_EQ(ad_frame_node->child_count(), 1u);
+    FrameTreeNode* ad_component_frame_node = ad_frame_node->child_at(0);
+    return ad_component_frame_node->current_frame_host();
+  }
+
+  // Run an ad auction with an ad component. The ad is loaded in a fenced frame
+  // or an iframe according to the return value of `IsAdLoadedInFencedFrame()`.
+  // Similarly the ad component is loaded in a nested fenced frame or a nested
+  // iframe according to the return value of
+  // `IsAdComponentLoadedInFencedFrame()`.
+  void RunAdAuctionAndLoadAdComponent() {
+    std::string fenced_frame_url = "/fenced_frames/basic.html";
+    std::string iframe_url = "/fenced_frames/basic_iframe.html";
+
+    GURL test_url = https_server_->GetURL(
+        "a.test", IsAdLoadedInFencedFrame() ? fenced_frame_url : iframe_url);
+    ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+    GURL ad_component_url = https_server_->GetURL(
+        "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+    // The ad url contains a fenced frame or an iframe, which is used to load
+    // the ad component.
+    GURL ad_url = https_server_->GetURL(
+        "c.test",
+        IsAdComponentLoadedInFencedFrame() ? fenced_frame_url : iframe_url);
+    EXPECT_EQ(kSuccess,
+              JoinInterestGroupAndVerify(
+                  /*owner=*/url::Origin::Create(test_url),
+                  /*name=*/"cars",
+                  /*priority=*/0.0, /*execution_mode=*/
+                  blink::InterestGroup::ExecutionMode::kCompatibilityMode,
+                  /*bidding_url=*/
+                  https_server_->GetURL(
+                      "a.test",
+                      "/interest_group/bidding_logic_register_ad_beacon.js"),
+                  /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}},
+                  /*ad_components=*/
+                  {{{ad_component_url, /*metadata=*/absl::nullopt}}}));
+
+    if (IsAdLoadedInFencedFrame()) {
+      ASSERT_NO_FATAL_FAILURE(RunAuctionAndNavigateFencedFrame(
+          ad_url,
+          JsReplace(
+              R"({
+                seller: $1,
+                decisionLogicURL: $2,
+                interestGroupBuyers: [$1]
+              })",
+              url::Origin::Create(test_url),
+              https_server_->GetURL(
+                  "a.test",
+                  "/interest_group/decision_logic_register_ad_beacon.js")),
+          /*execution_target=*/absl::nullopt));
+    } else {
+      ASSERT_NO_FATAL_FAILURE(RunAuctionAndWaitForURLAndNavigateIframe(
+          JsReplace(
+              R"({
+                seller: $1,
+                decisionLogicURL: $2,
+                interestGroupBuyers: [$1]
+              })",
+              url::Origin::Create(test_url),
+              https_server_->GetURL(
+                  "a.test",
+                  "/interest_group/decision_logic_register_ad_beacon.js")),
+          ad_url));
+    }
+
+    // Get the render frame host of the frame that renders the ad.
+    RenderFrameHost* ad_frame =
+        GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                             IsAdLoadedInFencedFrame());
+
+    // Validate the ad components from the ad frame.
+    absl::optional<std::vector<GURL>> components =
+        GetAdAuctionComponentsInJS(ad_frame, 1);
+    ASSERT_TRUE(components);
+    ASSERT_EQ(1u, components->size());
+    EXPECT_EQ(url::kUrnScheme, (*components)[0].scheme_piece());
+
+    // Load the ad component.
+    if (IsAdComponentLoadedInFencedFrame()) {
+      NavigateFencedFrameAndWait((*components)[0], ad_component_url, ad_frame);
+    } else {
+      RenderFrameHost* ad_component_frame =
+          GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+      TestFrameNavigationObserver observer(ad_component_frame);
+
+      EXPECT_TRUE(ExecJs(ad_frame,
+                         JsReplace("document.querySelector('iframe').src = $1",
+                                   (*components)[0])));
+      observer.Wait();
+
+      EXPECT_EQ(ad_component_url, observer.last_committed_url());
+      EXPECT_TRUE(observer.last_navigation_succeeded());
+    }
+  }
+};
+
+// Test window.fence.reportEvent from an ad component frame is disallowed:
+// 1. Run an auction with an ad component.
+// 2. Load the ad in a top-level frame.
+// 3. Load the ad component in the nested frame.
+// 4. Invoke window.fence.reportEvent from the nested ad component frame.
+// 5. Expect reportEvent to fail because it is not allowed from an ad component.
+// For an ad component, only reserved.top_navigation beacon is allowed.
+IN_PROC_BROWSER_TEST_P(InterestGroupAdComponentAutomaticBeaconBrowserTest,
+                       AdComponentReportEventNotAllowed) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent());
+
+  RenderFrameHost* ad_frame =
+      GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                           IsAdLoadedInFencedFrame());
+  RenderFrameHost* ad_component_frame =
+      GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+
+  // Monitor the console errors.
+  WebContentsConsoleObserver console_observer(web_contents());
+  console_observer.SetFilter(base::BindRepeating(IsErrorMessage));
+  console_observer.SetPattern(
+      "This frame is an ad component. It is not allowed to call "
+      "fence.reportEvent.");
+
+  // Invoke window.fence.reportEvent from the ad component frame. This should
+  // fail because only reserved.top_navigation event beacon is allowed from an
+  // ad component.
+  EXPECT_TRUE(ExecJs(ad_component_frame, R"(
+                        window.fence.reportEvent(
+                          {
+                            eventType: 'click',
+                            eventData: 'some data',
+                            destination: ['seller']
+                          }
+                        );
+                      )"));
+
+  // Verify the expected error is logged to the console.
+  ASSERT_TRUE(console_observer.Wait());
+  EXPECT_EQ(console_observer.messages().size(), 1u);
+
+  // Send a basic request to the reporting destination.
+  GURL reporting_url = https_server_->GetURL("a.test", "/report_event.html");
+  SendBasicRequest(reporting_url);
+
+  // Verify the request received is the basic request, which implies the
+  // reportEvent beacon was not sent, as expected.
+  EXPECT_EQ(network_responder_->GetRequest()->content, "Basic request data");
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Test window.fence.reportEvent from an iframe nested under an ad component
+// frame is also disallowed:
+// 1. Run an auction with an ad component.
+// 2. Load the ad in a top-level frame.
+// 3. Load the ad component in the nested frame.
+// 4. Navigate the iframe nested under the ad component frame.
+// 5. Invoke window.fence.reportEvent from the nested iframe under the ad
+// component frame.
+// 6. Expect reportEvent to fail because it is not allowed from an iframe nested
+// under an ad component frame.
+// For such a frame, only reserved.top_navigation beacon is allowed.
+IN_PROC_BROWSER_TEST_P(InterestGroupAdComponentAutomaticBeaconBrowserTest,
+                       ReportEventNotAllowedInNestedIframeUnderAdComponent) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent());
+
+  RenderFrameHost* ad_frame =
+      GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                           IsAdLoadedInFencedFrame());
+  RenderFrameHost* ad_component_frame =
+      GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+
+  // Add a nested iframe under the ad component frame.
+  EXPECT_TRUE(ExecJs(ad_component_frame,
+                     "var nested_iframe = document.createElement('iframe');"
+                     "document.body.appendChild(nested_iframe);"));
+  EXPECT_EQ(
+      1U, static_cast<RenderFrameHostImpl*>(ad_component_frame)->child_count());
+  auto* nested_iframe =
+      static_cast<RenderFrameHostImpl*>(ad_component_frame)->child_at(0);
+
+  // Navigate the added nested iframe.
+  GURL nested_iframe_url =
+      https_server_->GetURL("a.test", "/fenced_frames/title0.html");
+  TestFrameNavigationObserver observer(nested_iframe->current_frame_host());
+  EXPECT_TRUE(ExecJs(ad_component_frame,
+                     JsReplace("nested_iframe.src = $1", nested_iframe_url)));
+  observer.Wait();
+
+  EXPECT_EQ(nested_iframe_url,
+            nested_iframe->current_frame_host()->GetLastCommittedURL());
+
+  // Monitor the console errors.
+  WebContentsConsoleObserver console_observer(web_contents());
+  console_observer.SetFilter(base::BindRepeating(IsErrorMessage));
+  console_observer.SetPattern(
+      "This frame is an ad component. It is not allowed to call "
+      "fence.reportEvent.");
+
+  // Invoke window.fence.reportEvent from the nested iframe. This should fail
+  // because only reserved.top_navigation event beacon is allowed from an
+  // ad component.
+  EXPECT_TRUE(ExecJs(nested_iframe->current_frame_host(), R"(
+                        window.fence.reportEvent(
+                          {
+                            eventType: 'click',
+                            eventData: 'some data',
+                            destination: ['seller']
+                          }
+                        );
+                      )"));
+
+  // Verify the expected error is logged to the console.
+  ASSERT_TRUE(console_observer.Wait());
+  EXPECT_EQ(console_observer.messages().size(), 1u);
+
+  // Send a basic request to the reporting destination.
+  GURL reporting_url = https_server_->GetURL("a.test", "/report_event.html");
+  SendBasicRequest(reporting_url);
+
+  // Verify the request received is the basic request, which implies the
+  // reportEvent beacon was not sent, as expected.
+  EXPECT_EQ(network_responder_->GetRequest()->content, "Basic request data");
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Test `reserved.top_navigation` beacon from an ad component frame nested in
+// the main ad frame:
+// 1. Run an auction with an ad component.
+// 2. Load the ad in a top-level frame.
+// 3. Load the ad component in the nested frame.
+// 4. Register the automatic beacon data.
+// 5. Navigate to a same-origin url.
+// 6. The automatic beacon from ad component is sent successfully.
+IN_PROC_BROWSER_TEST_P(InterestGroupAdComponentAutomaticBeaconBrowserTest,
+                       AdComponentSameOriginNavigation) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent());
+
+  RenderFrameHost* ad_frame =
+      GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                           IsAdLoadedInFencedFrame());
+  RenderFrameHost* ad_component_frame =
+      GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+
+  // Set automatic beacon data for ad component.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: 'should be igonred',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a same-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Test `reserved.top_navigation` beacon from an ad component frame nested in
+// the main ad frame:
+// 1. Run an auction with an ad component.
+// 2. Load the ad in a top-level frame.
+// 3. Load the ad component in the nested frame.
+// 4. Register the automatic beacon data.
+// 5. Navigate to a cross-origin url.
+// 6. The automatic beacon from ad component is sent successfully.
+IN_PROC_BROWSER_TEST_P(InterestGroupAdComponentAutomaticBeaconBrowserTest,
+                       AdComponentCrossOriginNavigation) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent());
+
+  RenderFrameHost* ad_frame =
+      GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                           IsAdLoadedInFencedFrame());
+  RenderFrameHost* ad_component_frame =
+      GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+
+  // Set automatic beacon data for ad component.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: 'should be igonred',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a cross-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Just like `AdComponentCrossOriginNavigation`, but with BackForwardCache
+// disabled.
+IN_PROC_BROWSER_TEST_P(InterestGroupAdComponentAutomaticBeaconBrowserTest,
+                       AdComponentBFCacheDisabled) {
+  DisableBackForwardCacheForTesting(shell()->web_contents(),
+                                    BackForwardCache::TEST_REQUIRES_NO_CACHING);
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent());
+
+  RenderFrameHost* ad_frame =
+      GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                           IsAdLoadedInFencedFrame());
+  RenderFrameHost* ad_component_frame =
+      GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+
+  // Set automatic beacon data for ad component.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: 'should be igonred',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a cross-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// No beacon is sent if `setReportEventDataForAutomaticBeacons` is not invoked
+// to register automatic beacon data in ad component.
+IN_PROC_BROWSER_TEST_P(InterestGroupAdComponentAutomaticBeaconBrowserTest,
+                       AdComponentNoBeaconDataRegistered) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent());
+
+  RenderFrameHost* ad_frame =
+      GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                           IsAdLoadedInFencedFrame());
+  RenderFrameHost* ad_component_frame =
+      GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+
+  // Perform a cross-origin `_unfencedTop` navigation, without registering any
+  // automatic beacon data.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Send a basic request to the reporting destination.
+  GURL reporting_url = https_server_->GetURL("a.test", "/report_event.html");
+  SendBasicRequest(reporting_url);
+
+  // Verify the request received is the basic request, which implies the
+  // automatic beacon was not sent, as expected.
+  EXPECT_EQ(network_responder_->GetRequest()->content, "Basic request data");
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Set the event data to an empty string. The beacon should be sent.
+IN_PROC_BROWSER_TEST_P(InterestGroupAdComponentAutomaticBeaconBrowserTest,
+                       AdComponentEmptyEventData) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent());
+
+  RenderFrameHost* ad_frame =
+      GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                           IsAdLoadedInFencedFrame());
+  RenderFrameHost* ad_component_frame =
+      GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+
+  // Set automatic beacon data for ad component, with the eventData field being
+  // an empty string.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: '',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a cross-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// No beacon is sent if the navigation is without user activation.
+IN_PROC_BROWSER_TEST_P(InterestGroupAdComponentAutomaticBeaconBrowserTest,
+                       AdComponentNoUserActivation) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent());
+
+  RenderFrameHost* ad_frame =
+      GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                           IsAdLoadedInFencedFrame());
+  RenderFrameHost* ad_component_frame =
+      GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+
+  // Set automatic beacon data for ad component, this step must be done without
+  // user gesture. Otherwise later the '_unfencedTop' navigation will find there
+  // exists an user gesture.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            eventData: 'should be igonred',
+                            destination: ['seller']
+                          }
+                        );
+                      )"),
+                     EXECUTE_SCRIPT_NO_USER_GESTURE));
+
+  // Perform a cross-origin `_unfencedTop` navigation without user activation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url),
+             EXECUTE_SCRIPT_NO_USER_GESTURE));
+
+  // Send a basic request to the reporting destination.
+  GURL reporting_url = https_server_->GetURL("a.test", "/report_event.html");
+  SendBasicRequest(reporting_url);
+
+  // Verify the request received is the basic request, which implies the
+  // automatic beacon was not sent, as expected.
+  EXPECT_EQ(network_responder_->GetRequest()->content, "Basic request data");
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+// Call `setReportEventDataForAutomaticBeacons` without `eventData` field. The
+// beacon should be sent with empty event data.
+IN_PROC_BROWSER_TEST_P(InterestGroupAdComponentAutomaticBeaconBrowserTest,
+                       AdComponentNoEventData) {
+  GURL ad_component_url = https_server_->GetURL(
+      "a.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+
+  ASSERT_NO_FATAL_FAILURE(RunAdAuctionAndLoadAdComponent());
+
+  RenderFrameHost* ad_frame =
+      GetAdRenderFrameHost(shell()->web_contents()->GetPrimaryMainFrame(),
+                           IsAdLoadedInFencedFrame());
+  RenderFrameHost* ad_component_frame =
+      GetAdRenderFrameHost(ad_frame, IsAdComponentLoadedInFencedFrame());
+
+  // Set automatic beacon data for ad component without the eventData field.
+  EXPECT_TRUE(ExecJs(ad_component_frame, (R"(
+                        window.fence.setReportEventDataForAutomaticBeacons(
+                          {
+                            eventType: 'reserved.top_navigation',
+                            destination: ['seller']
+                          }
+                        );
+                      )")));
+
+  // Perform a cross-origin `_unfencedTop` navigation.
+  GURL navigation_url = https_server_->GetURL(
+      "b.test", "/set-header?Supports-Loading-Mode: fenced-frame");
+  EXPECT_TRUE(
+      ExecJs(ad_component_frame,
+             JsReplace("window.open($1, '_unfencedTop');", navigation_url)));
+
+  // Expect automatic beacon being sent successfully with empty event data.
+  EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
+  EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    InterestGroupAdComponentAutomaticBeaconBrowserTest,
+    testing::Combine(testing::Bool(), testing::Bool()),
+    [](const testing::TestParamInfo<std::tuple<bool, bool>>& info) {
+      return base::StringPrintf(
+          "%s_%s", std::get<0>(info.param) ? "Ad_fenced_frame" : "Ad_iframe",
+          std::get<1>(info.param) ? "ad_component_fenced_frame"
+                                  : "ad_component_iframe");
+    });
+
+class InterestGroupBiddingAndAuctionServerDisabledBrowserTest
+    : public InterestGroupBrowserTest {
+ public:
+  InterestGroupBiddingAndAuctionServerDisabledBrowserTest() {
+    feature_list_.InitAndDisableFeature(
+        blink::features::kFledgeBiddingAndAuctionServer);
+  }
+
+ protected:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBiddingAndAuctionServerDisabledBrowserTest,
+    FetchSameOrigin_AdAuctionHeadersEligible_HasBothAdAuctionResultAndSignalsResponseHeader) {
+  GURL main_frame_url =
+      https_server_->GetURL("a.test", "/interest_group/empty.html");
+  ASSERT_TRUE(NavigateToURL(shell(), main_frame_url));
+
+  base::StringPairs replacement;
+  replacement.emplace_back(std::make_pair("{{STATUS}}", "200 OK"));
+  replacement.emplace_back(std::make_pair(
+      "{{AD_AUCTION_HEADERS}}",
+      base::StrCat({"Ad-Auction-Result: ", kLegitimateAdAuctionResponse,
+                    "\nAd-Auction-Signals: ", "{}"})));
+  replacement.emplace_back(std::make_pair("{{REDIRECT_HEADER}}", ""));
+
+  GURL fetch_url = https_server_->GetURL(
+      "a.test", net::test_server::GetFilePathWithReplacements(
+                    "/interest_group/"
+                    "page_with_custom_ad_auction_result_header.html",
+                    replacement));
+
+  // Verify that the JavaScript doesn't see the response header
+  //  `Ad-Auction-Signals`. In contrast, it should see `Ad-Auction-Result`.
+  EXPECT_TRUE(ExecJs(web_contents()->GetPrimaryMainFrame(),
+                     content::JsReplace(R"(
+        fetch($1, {adAuctionHeaders: true}).then((response) => {
+          if (!response.headers.get('Ad-Auction-Result')) {
+            throw 'Did not receive `Ad-Auction-Result` header';
+          }
+
+          if (response.headers.get('Ad-Auction-Signals')) {
+            throw 'Unexpectedly received `Ad-Auction-Signals` header';
+          }
+
+        });
+    )",
+                                        fetch_url)));
+
+  absl::optional<std::string> ad_auction_header_value =
+      GetAdAuctionHeaderForRequestPath(
+          "/interest_group/page_with_custom_ad_auction_result_header.html");
+
+  EXPECT_TRUE(ad_auction_header_value);
+  EXPECT_EQ(*ad_auction_header_value, "?1");
+
+  // No witness is stored as `kFledgeBiddingAndAuctionServer` is disabled.
+  EXPECT_FALSE(WitnessedAuctionResultForOrigin(
+      url::Origin::Create(fetch_url),
+      base64Decode(kLegitimateAdAuctionResponse)));
+
+  const std::set<std::string>& signals =
+      GetAuctionSignalsForOrigin(url::Origin::Create(fetch_url));
+  EXPECT_THAT(signals, ::testing::UnorderedElementsAre("{}"));
+}
+
+class AdsAPIsOriginTrialBrowserTest : public ContentBrowserTest {
+ public:
+  AdsAPIsOriginTrialBrowserTest() {
+    // Disable `kFledgeBiddingAndAuctionServer` to show that it won't affect the
+    // exposure of the `adAuctionHeaders` fetch param.
+    feature_list_.InitWithFeatures(
+        /*enabled_features=*/{blink::features::kPrivacySandboxAdsAPIs,
+                              blink::features::kInterestGroupStorage},
+        /*disabled_features=*/{
+            blink::features::kFledgeBiddingAndAuctionServer});
+  }
+
+  void SetUpOnMainThread() override {
+    ContentBrowserTest::SetUpOnMainThread();
+
+    constexpr char kBaseDataDir[] = "content/test/data/interest_group/";
+
+    // We use a URLLoaderInterceptor, rather than the EmbeddedTestServer, since
+    // the origin trial token in the response is associated with a fixed
+    // origin, whereas EmbeddedTestServer serves content on a random port.
+    url_loader_interceptor_ =
+        std::make_unique<URLLoaderInterceptor>(base::BindLambdaForTesting(
+            [&](URLLoaderInterceptor::RequestParams* params) -> bool {
+              last_request_is_ad_auction_header_request_ =
+                  params->url_request.ad_auction_headers;
+
+              URLLoaderInterceptor::WriteResponse(
+                  base::StrCat(
+                      {kBaseDataDir, params->url_request.url.path_piece()}),
+                  params->client.get());
+
+              return true;
+            }));
+  }
+
+  void TearDownOnMainThread() override { url_loader_interceptor_.reset(); }
+
+  WebContents* web_contents() { return shell()->web_contents(); }
+
+  FrameTreeNode* root() {
+    return static_cast<WebContentsImpl*>(web_contents())
+        ->GetPrimaryFrameTree()
+        .root();
+  }
+
+  bool last_request_is_ad_auction_header_request() const {
+    return last_request_is_ad_auction_header_request_;
+  }
+
+ private:
+  bool last_request_is_ad_auction_header_request_ = false;
+
+  std::unique_ptr<URLLoaderInterceptor> url_loader_interceptor_;
+
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(AdsAPIsOriginTrialBrowserTest,
+                       AdsAPIsOriginTrial_AdAuctionHeadersAllowedForFetch) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ads_apis_ot.html")));
+
+  EXPECT_TRUE(
+      ExecJs(shell()->web_contents(),
+             content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                GURL("https://example.test/empty.html"))));
+
+  EXPECT_TRUE(last_request_is_ad_auction_header_request());
+}
+
+IN_PROC_BROWSER_TEST_F(
+    AdsAPIsOriginTrialBrowserTest,
+    NotInAdsAPIsOriginTrial_AdAuctionHeadersNotAllowedForFetch) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ba_server_ot.html")));
+
+  EXPECT_TRUE(
+      ExecJs(shell()->web_contents(),
+             content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                GURL("https://example.test/empty.html"))));
+
+  EXPECT_FALSE(last_request_is_ad_auction_header_request());
+}
+
+IN_PROC_BROWSER_TEST_F(
+    AdsAPIsOriginTrialBrowserTest,
+    AdsAPIsOriginTrial_NoFetchParam_AdAuctionHeadersNotAllowedForFetch) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ads_apis_ot.html")));
+
+  EXPECT_TRUE(
+      ExecJs(shell()->web_contents(),
+             content::JsReplace("fetch($1)",
+                                GURL("https://example.test/empty.html"))));
+
+  EXPECT_FALSE(last_request_is_ad_auction_header_request());
+}
+
+class AdsAPIsOriginTrialWithMainFledgeFeatureDisabledBrowserTest
+    : public AdsAPIsOriginTrialBrowserTest {
+ public:
+  AdsAPIsOriginTrialWithMainFledgeFeatureDisabledBrowserTest() {
+    feature_list_.InitWithFeatures(
+        /*enabled_features=*/{blink::features::kPrivacySandboxAdsAPIs},
+        /*disabled_features=*/{blink::features::kInterestGroupStorage});
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(
+    AdsAPIsOriginTrialWithMainFledgeFeatureDisabledBrowserTest,
+    AdsAPIsOriginTrial_AdAuctionHeadersNotAllowedForFetch) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ads_apis_ot.html")));
+
+  EXPECT_TRUE(
+      ExecJs(shell()->web_contents(),
+             content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                GURL("https://example.test/empty.html"))));
+
+  EXPECT_FALSE(last_request_is_ad_auction_header_request());
+}
+
+class BiddingAndAuctionServerAPIsOriginTrialBrowserTest
+    : public AdsAPIsOriginTrialBrowserTest {
+ public:
+  BiddingAndAuctionServerAPIsOriginTrialBrowserTest() {
+    feature_list_.InitWithFeatures(
+        /*enabled_features=*/{blink::features::kFledge,
+                              blink::features::kInterestGroupStorage,
+                              blink::features::kFledgeBiddingAndAuctionServer},
+        {});
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(BiddingAndAuctionServerAPIsOriginTrialBrowserTest,
+                       RightOTFeatureEnabled) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ba_server_ot.html")));
+
+  EXPECT_EQ(true, EvalJs(shell()->web_contents(),
+                         "'getInterestGroupAdAuctionData' in navigator"));
+}
+
+IN_PROC_BROWSER_TEST_F(BiddingAndAuctionServerAPIsOriginTrialBrowserTest,
+                       WrongOTFeatureDisabled) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ads_apis_ot.html")));
+
+  EXPECT_EQ(false, EvalJs(shell()->web_contents(),
+                          "'getInterestGroupAdAuctionData' in navigator"));
+}
+
+class InterestGroupBiddingAndAuctionServerBrowserTest
+    : public InterestGroupBrowserTest {
+ public:
+  InterestGroupBiddingAndAuctionServerBrowserTest() {
+    feature_list_.InitWithFeatures(
+        {blink::features::kFledgeBiddingAndAuctionServer,
+         blink::features::kFledgeBiddingAndAuctionServerAPI},
+        {});
+  }
+
+  // Attempts to get the auction blob for seller.  Returns kSuccess if the
+  // operation claims to have succeeded, and the exception message on failure.
+  //
+  // If `execution_target` is non-null, uses it as the target. Otherwise, uses
+  // shell().
+  [[nodiscard]] std::string GetInterestGroupAdAuctionData(
+      url::Origin seller,
+      absl::optional<std::string> coordinator,
+      absl::optional<ToRenderFrameHost> execution_target = absl::nullopt) {
+    return EvalJs(execution_target ? *execution_target : shell(),
+                  JsReplace(R"(
+    let config = {seller: $1}
+    if ($2) {
+      config.coordinator = $2;
+    }
+    (async function() {
+      try {
+        let data = await navigator.getInterestGroupAdAuctionData(config);
+        return btoa(String.fromCharCode.apply(null, data.request)) + '|' +
+          data.requestId;
+      } catch (e) {
+        return e.toString();
+      }
+    })())",
+                            seller, coordinator.value_or("")))
+        .ExtractString();
+  }
+
+ protected:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBiddingAndAuctionServerBrowserTest,
+                       TestEmpty) {
+  GURL test_url = https_server_->GetURL("a.test", "/interest_group/empty.html");
+  url::Origin test_origin = url::Origin::Create(test_url);
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  EXPECT_EQ("|", GetInterestGroupAdAuctionData(test_origin, "gcp"));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBiddingAndAuctionServerBrowserTest,
+                       TestInvalidSeller) {
+  GURL test_url = https_server_->GetURL("a.test", "/interest_group/empty.html");
+  url::Origin test_origin = url::Origin::Create(test_url);
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'getInterestGroupAdAuctionData' on "
+      "'Navigator': seller 'null' for AdAuctionDataConfig must be a valid "
+      "https origin.",
+      GetInterestGroupAdAuctionData(url::Origin(), "gcp"));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBiddingAndAuctionServerBrowserTest,
+                       TestInvalidCoordinator) {
+  GURL test_url = https_server_->GetURL("a.test", "/interest_group/empty.html");
+  url::Origin test_origin = url::Origin::Create(test_url);
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'getInterestGroupAdAuctionData' on "
+      "'Navigator': Failed to read the 'coordinator' property from "
+      "'AdAuctionDataConfig': The provided value 'foo' is not a valid enum "
+      "value of type AdAuctionCoordinator.",
+      GetInterestGroupAdAuctionData(test_origin, "foo"));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBiddingAndAuctionServerBrowserTest,
+                       ChecksPermissionPolicyWarning) {
+  // TODO(behamilton): Merge with
+  // InterestGroupBrowserTest.FeaturesEnabledForAllByPermissionsPolicy once this
+  // feature has been released.
+  GURL test_url = https_server_->GetURL(
+      "a.test",
+      "/cross_site_iframe_factory.html?a.test("
+      "a.test,"
+      "b.test("
+      "c.test{allow-join-ad-interest-group;run-ad-auction},"
+      "a.test{allow-join-ad-interest-group;run-ad-auction},"
+      "a.test{allow-join-ad-interest-group;run-ad-auction}"
+      ")"
+      ")");
+  url::Origin test_origin = url::Origin::Create(test_url);
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  RenderFrameHost* main_frame = web_contents()->GetPrimaryMainFrame();
+  RenderFrameHost* same_origin_iframe = ChildFrameAt(main_frame, 0);
+  RenderFrameHost* cross_origin_iframe = ChildFrameAt(main_frame, 1);
+  RenderFrameHost* inner_cross_origin_iframe =
+      ChildFrameAt(cross_origin_iframe, 0);
+  RenderFrameHost* same_origin_iframe_in_cross_origin_iframe =
+      ChildFrameAt(cross_origin_iframe, 1);
+  RenderFrameHost* same_origin_iframe_in_cross_origin_iframe2 =
+      ChildFrameAt(cross_origin_iframe, 2);
+
+  RenderFrameHost* execution_targets[] = {
+      main_frame,
+      same_origin_iframe,
+      cross_origin_iframe,
+      inner_cross_origin_iframe,
+      same_origin_iframe_in_cross_origin_iframe,
+      same_origin_iframe_in_cross_origin_iframe2};
+
+  for (auto* execution_target : execution_targets) {
+    SCOPED_TRACE(execution_target->GetLastCommittedURL().spec());
+    WebContentsConsoleObserver console_observer(shell()->web_contents());
+    console_observer.SetPattern(WarningPermissionsPolicy("*", "*"));
+
+    EXPECT_EQ("|", GetInterestGroupAdAuctionData(test_origin, "gcp",
+                                                 execution_target));
+#if BUILDFLAG(IS_ANDROID)
+    RenderFrameHost* execution_targets_with_message[] = {cross_origin_iframe};
+#else
+    RenderFrameHost* execution_targets_with_message[] = {
+        cross_origin_iframe, inner_cross_origin_iframe,
+        same_origin_iframe_in_cross_origin_iframe};
+#endif  // BUILDFLAG(IS_ANDROID)
+    if (base::Contains(execution_targets_with_message, execution_target)) {
+      EXPECT_EQ(WarningPermissionsPolicy("run-ad-auction",
+                                         "getInterestGroupAdAuctionData"),
+                console_observer.GetMessageAt(0));
+    } else {
+      EXPECT_TRUE(console_observer.messages().empty());
+    }
+  }
+}
+
+// Check that the renderer doesn't crash if we don't have a decision logic URL.
+IN_PROC_BROWSER_TEST_F(InterestGroupBiddingAndAuctionServerBrowserTest,
+                       DecisionLogicURLNotRequired) {
+  GURL test_url = https_server_->GetURL("a.test", "/interest_group/empty.html");
+
+  std::string auction_config = R"({
+    seller: "https://seller.example.com",
+    interestGroupBuyers: ["https://buyer.example.com"],
+    serverResponse: new Uint8Array(20),
+    requestId: "00000000-0000-0000-0000-000000000000",
+  })";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  EXPECT_EQ(nullptr, RunAuctionAndWait(auction_config));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBiddingAndAuctionServerBrowserTest,
+                       DecisionLogicURLRequiredForComponent) {
+  GURL test_url = https_server_->GetURL("a.test", "/interest_group/empty.html");
+
+  std::string auction_config = R"({
+    seller: "https://seller.example.com",
+    serverResponse: new Uint8Array(20),
+    requestId: "00000000-0000-0000-0000-000000000000",
+    componentAuctions: [{
+      seller: "https://seller2.example.com",
+      // No decision logic.
+      interestGroupBuyers: ["https://buyer.example.com"],
+      serverResponse: new Uint8Array(20),
+      requestId: "00000000-0000-0000-0000-000000000000",
+    }]
+  })";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  EXPECT_EQ(
+      "TypeError: Failed to execute 'runAdAuction' on 'Navigator': Missing "
+      "required field ad auction config decisionLogicURL or serverResponse",
+      RunAuctionAndWait(auction_config));
+}
+
+// TODO(crbug.com/1474303): Re-enable this test
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest, AuctionNonceIsValid) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/test_origin,
+                              /*name=*/"cars")
+                              .SetBiddingUrl(https_server_->GetURL(
+                                  "a.test", "/interest_group/bidding_logic.js"))
+                              .SetAds({{{ad_url, /*metadata=*/absl::nullopt}}})
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  std::string auction_config = JsReplace(
+      R"({
+        seller: $1,
+        decisionLogicURL: $2,
+        interestGroupBuyers: [$1],
+        auctionNonce: $3,
+      })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      auction_nonce);
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       AuctionNonceOnComponentIsValid) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/test_origin,
+                              /*name=*/"cars")
+                              .SetBiddingUrl(https_server_->GetURL(
+                                  "a.test", "/interest_group/bidding_logic.js"))
+                              .SetAds({{{ad_url, /*metadata=*/absl::nullopt}}})
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  std::string auction_config = JsReplace(
+      R"({
+        seller: $1,
+        decisionLogicURL: $2,
+        // Signal to the top-level seller to allow participation in a component
+        // auction.
+        auctionSignals: "sellerAllowsComponentAuction",
+        componentAuctions: [{
+          seller: $1,
+          decisionLogicURL: $2,
+          interestGroupBuyers: [$1],
+          // Signal to the bidder and component seller to allow participation in
+          // a component auction.
+          auctionSignals: "bidderAllowsComponentAuction,"+
+                          "sellerAllowsComponentAuction",
+          auctionNonce: $3,
+        }]
+      })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      auction_nonce);
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+}
+
+// TODO(https://crbug.com/1464874): When negative targeting is fully
+// implemented, we can directly observe that the auction or component auction
+// that specified the invalid nonce isn't eligible to participate in the
+// auction. Until then, we use the error emitted by the AuctionNonceManager to
+// infer that it caught the invalid nonce.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       AuctionNonceNotFromCreateAuctionNonce) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  std::string auction_config = JsReplace(
+      R"({
+        seller: $1,
+        decisionLogicUrl: $2,
+        interestGroupBuyers: [$1],
+        auctionNonce: $3,
+      })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      ConvertUuidWithOnlyZeros(auction_nonce));
+
+  // Monitor the console errors.
+  WebContentsConsoleObserver console_observer(web_contents());
+  console_observer.SetFilter(base::BindRepeating(IsErrorMessage));
+  console_observer.SetPattern(
+      "Invalid AuctionConfig. The config provided an auctionNonce value "
+      "that was _not_ created by a previous call to createAuctionNonce.");
+
+  EXPECT_EQ(nullptr, RunAuctionAndWait(auction_config));
+
+  // Verify the expected error is logged to the console.
+  ASSERT_TRUE(console_observer.Wait());
+  EXPECT_EQ(console_observer.messages().size(), 1u);
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       AuctionNonceOnComponentNotFromCreateAuctionNonce) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  std::string auction_config = JsReplace(
+      R"({
+        seller: $1,
+        decisionLogicURL: $2,
+        // Signal to the top-level seller to allow participation in a component
+        // auction.
+        auctionSignals: "sellerAllowsComponentAuction",
+        componentAuctions: [{
+          seller: $1,
+          decisionLogicURL: $2,
+          interestGroupBuyers: [$1],
+          // Signal to the bidder and component seller to allow participation in
+          // a component auction.
+          auctionSignals: "bidderAllowsComponentAuction,"+
+                          "sellerAllowsComponentAuction",
+          auctionNonce: $3,
+        }]
+      })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      ConvertUuidWithOnlyZeros(auction_nonce));
+
+  // Monitor the console errors.
+  WebContentsConsoleObserver console_observer(web_contents());
+  console_observer.SetFilter(base::BindRepeating(IsErrorMessage));
+  console_observer.SetPattern(
+      "Invalid AuctionConfig. The config provided an auctionNonce value "
+      "that was _not_ created by a previous call to createAuctionNonce.");
+
+  EXPECT_EQ(nullptr, RunAuctionAndWait(auction_config));
+
+  // Verify the expected error is logged to the console.
+  ASSERT_TRUE(console_observer.Wait());
+  EXPECT_EQ(console_observer.messages().size(), 1u);
+}
+
+class InterestGroupKAnonmityEnforcedBrowserTest
+    : public InterestGroupBrowserTest {
+ public:
+  InterestGroupKAnonmityEnforcedBrowserTest() {
+    feature_list_.InitWithFeatures({blink::features::kEnforceAnonymityExposure,
+                                    blink::features::kFledgeEnforceKAnonymity},
+                                   {});
+  }
+
+ protected:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(InterestGroupKAnonmityEnforcedBrowserTest,
+                       DeprecatedKAnonEnforced) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  std::string script = R"(
+(function() {
+  return navigator.deprecatedRunAdAuctionEnforcesKAnonymity;
+})())";
+
+  EXPECT_EQ(true, EvalJs(shell(), script).ExtractBool());
+}
+
+class InterestGroupKAnonmityNotEnforcedBrowserTest
+    : public InterestGroupBrowserTest {
+ public:
+  InterestGroupKAnonmityNotEnforcedBrowserTest() {
+    feature_list_.InitWithFeatures({blink::features::kEnforceAnonymityExposure},
+                                   {blink::features::kFledgeEnforceKAnonymity});
+  }
+
+ protected:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(InterestGroupKAnonmityNotEnforcedBrowserTest,
+                       DeprecatedKAnonNotEnforced) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  std::string script = R"(
+(function() {
+  return navigator.deprecatedRunAdAuctionEnforcesKAnonymity;
+})())";
+
+  EXPECT_EQ(false, EvalJs(shell(), script).ExtractBool());
+}
+
+class InterestGroupKAnonmityEnforceAnonymityExposureDisabledTest
+    : public InterestGroupBrowserTest {
+ public:
+  InterestGroupKAnonmityEnforceAnonymityExposureDisabledTest() {
+    feature_list_.InitWithFeatures(
+        {}, {blink::features::kEnforceAnonymityExposure});
+  }
+
+ protected:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupKAnonmityEnforceAnonymityExposureDisabledTest,
+    EnforceAnonymityExposureDisabled) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+  std::string script = R"(
+(function() {
+  return navigator.deprecatedRunAdAuctionEnforcesKAnonymity;
+})())";
+
+  EXPECT_EQ(nullptr, EvalJs(shell(), script));
+}
+
+class InterestGroupBiddingAndAuctionServerRestrictedPermissionsPolicyBrowserTest
+    : public InterestGroupBiddingAndAuctionServerBrowserTest {
+ public:
+  InterestGroupBiddingAndAuctionServerRestrictedPermissionsPolicyBrowserTest() {
+    feature_list_.InitAndEnableFeature(
+        blink::features::kAdInterestGroupAPIRestrictedPolicyByDefault);
+  }
+
+ protected:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBiddingAndAuctionServerRestrictedPermissionsPolicyBrowserTest,
+    ChecksPermissionPolicyEnforce) {
+  // TODO(behamilton): Merge with
+  // InterestGroupBrowserTest.EnabledByPermissionsPolicy once this feature has
+  // been released.
+  GURL test_url = https_server_->GetURL(
+      "a.test",
+      "/cross_site_iframe_factory.html?a.test("
+      "a.test,"
+      "b.test("
+      "c.test{allow-join-ad-interest-group;run-ad-auction},"
+      "a.test{allow-join-ad-interest-group;run-ad-auction},"
+      "a.test{allow-join-ad-interest-group;run-ad-auction}"
+      ")"
+      ")");
+  url::Origin test_origin = url::Origin::Create(test_url);
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+
+  RenderFrameHost* main_frame = web_contents()->GetPrimaryMainFrame();
+  RenderFrameHost* same_origin_iframe = ChildFrameAt(main_frame, 0);
+  RenderFrameHost* cross_origin_iframe = ChildFrameAt(main_frame, 1);
+  RenderFrameHost* inner_cross_origin_iframe =
+      ChildFrameAt(cross_origin_iframe, 0);
+  RenderFrameHost* same_origin_iframe_in_cross_origin_iframe =
+      ChildFrameAt(cross_origin_iframe, 1);
+  RenderFrameHost* same_origin_iframe_in_cross_origin_iframe2 =
+      ChildFrameAt(cross_origin_iframe, 2);
+
+  RenderFrameHost* execution_targets[] = {
+      main_frame,
+      same_origin_iframe,
+      cross_origin_iframe,
+      inner_cross_origin_iframe,
+      same_origin_iframe_in_cross_origin_iframe,
+      same_origin_iframe_in_cross_origin_iframe2};
+
+  for (auto* execution_target : execution_targets) {
+    SCOPED_TRACE(execution_target->GetLastCommittedURL().spec());
+    RenderFrameHost* execution_targets_with_message[] = {
+        cross_origin_iframe, inner_cross_origin_iframe,
+        same_origin_iframe_in_cross_origin_iframe,
+        same_origin_iframe_in_cross_origin_iframe2};
+    if (base::Contains(execution_targets_with_message, execution_target)) {
+      EXPECT_EQ(
+          "NotAllowedError: Failed to execute 'getInterestGroupAdAuctionData' "
+          "on 'Navigator': "
+          "Feature run-ad-auction is not enabled by Permissions Policy",
+          GetInterestGroupAdAuctionData(test_origin, "gcp", execution_target));
+    } else {
+      EXPECT_EQ("|", GetInterestGroupAdAuctionData(test_origin, "gcp",
+                                                   execution_target));
+    }
+  }
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionWithAdditionalBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  for (bool should_win : {true, false}) {
+    SCOPED_TRACE(should_win);
+    AttachInterestGroupObserver();
+    ClearReceivedRequests();
+    ASSERT_TRUE(NavigateToURL(shell(), test_url));
+    std::string auction_nonce = CreateAuctionNonceAndWait();
+
+    GURL additional_bid_logic_url = https_server_->GetURL(
+        "b.test", "/interest_group/bidding_logic_additional_bid.js");
+    url::Origin additional_bid_origin =
+        url::Origin::Create(additional_bid_logic_url);
+
+    std::string auction_config = JsReplace(
+        R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1, $6],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: $7,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+      })])})",
+        test_origin,
+        https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+        auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+        additional_bid_origin, should_win ? 1.99 : 0.1);
+
+    RunAuctionAndWaitForURLAndNavigateIframe(
+        auction_config, should_win ? additional_bid_ad_url : ad_url);
+    WaitForUrl(https_server_->GetURL("a.test", "/echoall?report_seller"));
+    if (should_win) {
+      WaitForUrl(
+          https_server_->GetURL("a.test", "/echoall?report_bidder_additional"));
+      EXPECT_FALSE(HasServerSeenUrl(
+          https_server_->GetURL("a.test", "/echoall?report_bidder")));
+      WaitForAccessObserved({
+          {TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+          {TestInterestGroupObserver::kBid, test_origin, "cars"},
+          {TestInterestGroupObserver::kAdditionalBid, additional_bid_origin,
+           "campaign123"},
+          {TestInterestGroupObserver::kAdditionalBidWin, additional_bid_origin,
+           "campaign123"},
+      });
+    } else {
+      WaitForUrl(https_server_->GetURL("a.test", "/echoall?report_bidder"));
+      EXPECT_FALSE(HasServerSeenUrl(https_server_->GetURL(
+          "a.test", "/echoall?report_bidder_additional")));
+      WaitForAccessObserved(
+          {{TestInterestGroupObserver::kLoaded, test_origin, "cars"},
+           {TestInterestGroupObserver::kBid, test_origin, "cars"},
+           {TestInterestGroupObserver::kAdditionalBid, additional_bid_origin,
+            "campaign123"},
+           {TestInterestGroupObserver::kWin, test_origin, "cars"}});
+    }
+  }
+}
+
+// Two additional bids, second one of which wins.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionWithWinningAdditionalBidFromTwo) {
+  URLLoaderMonitor url_loader_monitor;
+
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  GURL second_additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_zebras");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      "a.test", "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+      }), JSON.stringify({
+        interestGroup: {
+          name: 'campaign234',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 3.99,
+          render: $7,
+        },
+        auctionNonce: $3,
+        seller: $1,
+      })])})",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      second_additional_bid_ad_url);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           second_additional_bid_ad_url);
+  WaitForUrl(https_server_->GetURL("a.test", "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL("a.test", "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL("a.test", "/echoall?report_bidder")));
+}
+
+// Two additional bids, the lower one of which wins since the upper one is
+// disabled by negative targeting.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionWithWinningAdditionalBidFromTwoWithNT) {
+  URLLoaderMonitor url_loader_monitor;
+
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  GURL second_additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_zebras");
+  constexpr char kNegativeInterestGroupName[] = "current-zebra-owner";
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName)
+                              .SetAdditionalBidKey(kPublicKey1)
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      "a.test", "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+      }), JSON.stringify({
+        interestGroup: {
+          name: 'campaign234',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 3.99,
+          render: $7,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroup: $8
+      })])})",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      second_additional_bid_ad_url, kNegativeInterestGroupName);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+  WaitForUrl(https_server_->GetURL("a.test", "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL("a.test", "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL("a.test", "/echoall?report_bidder")));
+}
+
+// If additional bid's script doesn't have necessary CORS permissions, it can
+// still win, but the reporting worklet won't happen.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionWithWinningAdditionalBidNoCors) {
+  URLLoaderMonitor url_loader_monitor;
+
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      "b.test", "/interest_group/bidding_logic_additional_bid_no_cors.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1, $6],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+      })])})",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url));
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+  WaitForUrl(https_server_->GetURL("a.test", "/echoall?report_seller"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL("a.test", "/echoall?report_bidder_additional")));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL("a.test", "/echoall?report_bidder")));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionWithWrongCurrencyAdditionalBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      "a.test", "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    perBuyerCurrencies: {
+      $6: 'CAD'
+    },
+    additionalBids: provideAdditionalBids($1, $3, [
+      JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          bidCurrency: 'USD',
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+      }),
+    ])})",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url));
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern(
+      "Worklet error: Rejecting an additionalBid due to currency mismatch.");
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+  EXPECT_TRUE(console_observer.Wait());
+  WaitForUrl(https_server_->GetURL("a.test", "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL("a.test", "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL("a.test", "/echoall?report_bidder_additional")));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionWithBrokenAdditionalBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      "a.test", "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, ['"boo'])
+      })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url));
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern("*Unable to parse additional bid as JSON*");
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+  EXPECT_TRUE(console_observer.Wait());
+  WaitForUrl(https_server_->GetURL("a.test", "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL("a.test", "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL("a.test", "/echoall?report_bidder_additional")));
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       RunAdAuctionWithNoIGsAndEmptyAdditionalBids) {
+  URLLoaderMonitor url_loader_monitor;
+
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      "a.test", "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [])})",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url));
+
+  EXPECT_EQ(nullptr, RunAuctionAndWait(auction_config));
+}
+
+// Basic negative IG test: one negative IG specified in the additional bid,
+// and it's present on the user's device, so it suppresses the additional bid.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithOneValidAndPresentNegativeIGDoesNotBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName[] = "current-horse-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName)
+                              .SetAdditionalBidKey(kPublicKey1)
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroup: $7
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      kNegativeInterestGroupName);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional")));
+}
+
+// Same as AdditionalBidWithOneValidAndPresentNegativeIGDoesNotBid,
+// but with IG bid and additional bid from different buyers.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidFromDifferentBuyerAndOnePresentAndValidNegativeIGDoesNotBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "allow-join.a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+
+  constexpr char kTestAdditionalBidOrigin[] = "allow-join.b.test";
+  GURL additional_bid_logic_url =
+      https_server_->GetURL(kTestAdditionalBidOrigin,
+                            "/interest_group/bidding_logic_additional_bid.js");
+
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName[] = "current-horse-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(additional_bid_logic_url),
+                    /*name=*/kNegativeInterestGroupName)
+                    .SetAdditionalBidKey(kPublicKey1)
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1, $6],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroup: $7
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      kNegativeInterestGroupName);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional")));
+}
+
+// Additional bid buyers must be specified in interestGroupBuyers for the bid
+// to participate in the auction.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithBuyerNotIncludedInInterestGroupBuyersDoesNotBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "allow-join.a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+
+  constexpr char kTestAdditionalBidOrigin[] = "allow-join.b.test";
+  GURL additional_bid_logic_url =
+      https_server_->GetURL(kTestAdditionalBidOrigin,
+                            "/interest_group/bidding_logic_additional_bid.js");
+
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName[] = "current-horse-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(additional_bid_logic_url),
+                    /*name=*/kNegativeInterestGroupName)
+                    .SetAdditionalBidKey(kPublicKey1)
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],  // Here, we intentionally omit b.test
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroup: $7
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      kNegativeInterestGroupName);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional")));
+}
+
+// One negative IG specified in the additional bid, but it's not present on the
+// user's device, so the additional bid participates in the auction and wins.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       AdditionalBidWithOneNotPresentNegativeIGSoDoesBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName[] = "current-horse-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroup: $7
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      kNegativeInterestGroupName);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder")));
+}
+
+// Two negative IGs are specified in the additional bid, one is present
+// on the user's device, the other is not, but because multiple negative IGs
+// are interpreted as "suppress if any of these are present", the additional bid
+// is suppressed.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithMultipleNegativeIGsAndEvenOnePresentSoDoesNotBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName[] = "current-horse-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName)
+                              .SetAdditionalBidKey(kPublicKey1)
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroups: {
+          joiningOrigin: $7,
+          interestGroupNames: [
+            $8,
+            "some-negative-ig-this-user-is-not-a-member-of"
+          ]
+        }
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      url::Origin::Create(test_url), kNegativeInterestGroupName);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional")));
+}
+
+// Like above, two negative IGs are specified in the additional bid, but this
+// time both are present, giving it two reasons to suppress the additional bid.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithMultipleNegativeIGsAndMultiplePresentSoStillDoesNotBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName1[] = "current-horse-owner";
+  constexpr char kNegativeInterestGroupName2[] = "current-buggy-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName1)
+                              .SetAdditionalBidKey(kPublicKey1)
+                              .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName2)
+                              .SetAdditionalBidKey(kPublicKey2)
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroups: {
+          joiningOrigin: $7,
+          interestGroupNames: [
+            $8,
+            $9
+          ]
+        }
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      url::Origin::Create(test_url), kNegativeInterestGroupName1,
+      kNegativeInterestGroupName2);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional")));
+}
+
+// Again, two negative IGs are specified in the additional bid, but this time,
+// neither is present on the user's device, and so the additional bid
+// participates in the auction and wins.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithMultipleNegativeIGsButNeitherPresentSoDoesBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName1[] = "current-horse-owner";
+  constexpr char kNegativeInterestGroupName2[] = "current-buggy-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroups: {
+          joiningOrigin: $7,
+          interestGroupNames: [
+            $8,
+            $9
+          ]
+        }
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      url::Origin::Create(test_url), kNegativeInterestGroupName1,
+      kNegativeInterestGroupName2);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder")));
+}
+
+// An error scenario: One negative IG specified in the additional bid, but the
+// signature associated with the key of that InterestGroup is invalid. (The
+// signature is present, but can't be validated against the key specified.)
+// As such, the negative IG is ignored, and so the bid participates in the
+// auction and wins.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithAPresentNegativeIGWithABadSignatureSoDoesBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName[] = "current-horse-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName)
+                              .SetAdditionalBidKey(kPublicKey1)
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroup: $7
+      })],
+                                          "invalid-signature")})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      kNegativeInterestGroupName);
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern("*Warning:*additional bid*");
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+
+  EXPECT_TRUE(console_observer.Wait());
+  ASSERT_EQ(console_observer.messages().size(), static_cast<size_t>(2));
+
+  // We get this error because some of the signatures on the signed additional
+  // bid were bad, i.e. the signature could not be verified against the given
+  // key for the given bid string.
+  EXPECT_TRUE(base::MatchPattern(
+      console_observer.GetMessageAt(0),
+      "*Some signatures on an additional bid*failed to verify."))
+      << "Actual message: " << console_observer.GetMessageAt(0);
+
+  // But we also get this error because the negative InterestGroup has no
+  // corresponding valid signature, so we have to ignore it.
+  EXPECT_TRUE(base::MatchPattern(
+      console_observer.GetMessageAt(1),
+      "*Ignoring negative targeting group 'current-horse-owner'*"
+      "since its key does not correspond to a valid signature."))
+      << "Actual message: " << console_observer.GetMessageAt(1);
+
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder")));
+}
+
+// An error scenario: One negative IG specified in the additional bid, but the
+// IG specifies a key for which there is no signature present on the signed
+// additional bid. (A valid signature is present, but not one that can be used
+// to validate that particular negative IG.) As such, the negative IG is
+// ignored, and so the bid participates in the auction and wins.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithAPresentNegativeIGWithNoMatchingSignagtureSoDoesBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName[] = "current-horse-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/kNegativeInterestGroupName)
+                    .SetAdditionalBidKey(kPublicKeyWithNoMatchingSignature)
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroup: $7
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      kNegativeInterestGroupName);
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  // Here, there are valid signatures, but none matching for this IG.
+  console_observer.SetPattern(
+      "*Warning: Ignoring negative targeting group 'current-horse-owner'*"
+      "since its key does not correspond to a valid signature.");
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+  EXPECT_TRUE(console_observer.Wait());
+
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder")));
+}
+
+// An error scenario: the additional bid specifies multiple negative IGs, both
+// present. One has a bad signature, but the other is valid. Since only one
+// valid negative IG is needed to suppress an additional bid, it's suppressed.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithMultipleNegativeIGsOneValidAndOneBadSignatureSoDoesNotBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName1[] = "current-horse-owner";
+  constexpr char kNegativeInterestGroupName2[] = "current-buggy-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName1)
+                              .SetAdditionalBidKey(kPublicKey1)
+                              .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName2)
+                              .SetAdditionalBidKey(kPublicKey2)
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroups: {
+          joiningOrigin: $7,
+          interestGroupNames: [
+            $8,
+            $9
+          ]
+        }
+      })],
+                                          "one-invalid-signature")})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      url::Origin::Create(test_url), kNegativeInterestGroupName1,
+      kNegativeInterestGroupName2);
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern("*Warning:*additional bid*");
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+
+  EXPECT_TRUE(console_observer.Wait());
+  ASSERT_EQ(console_observer.messages().size(), static_cast<size_t>(2));
+
+  // We get this error because some of the signatures on the signed additional
+  // bid were bad, i.e. the signature could not be verified against the given
+  // key for the given bid string.
+  EXPECT_TRUE(base::MatchPattern(
+      console_observer.GetMessageAt(0),
+      "*Some signatures on an additional bid*failed to verify."))
+      << "Actual message: " << console_observer.GetMessageAt(0);
+
+  // But we also get this error because the negative InterestGroup has no
+  // corresponding valid signature, so we have to ignore it.
+  EXPECT_TRUE(base::MatchPattern(
+      console_observer.GetMessageAt(1),
+      "*Ignoring negative targeting group 'current-horse-owner'*"
+      "since its key does not correspond to a valid signature."))
+      << "Actual message: " << console_observer.GetMessageAt(1);
+
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional")));
+}
+
+// An error scenario: the additional bid specifies multiple negative IGs, both
+// present. This time, both have bad signatures. With all negative IGs ignored,
+// the additional bid participates in the auction and wins.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithMultipleNegativeIGsWithBadSignatureOnAllDoesBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName1[] = "current-horse-owner";
+  constexpr char kNegativeInterestGroupName2[] = "current-buggy-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName1)
+                              .SetAdditionalBidKey(kPublicKey1)
+                              .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName2)
+                              .SetAdditionalBidKey(kPublicKey2)
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroups: {
+          joiningOrigin: $7,
+          interestGroupNames: [
+            $8,
+            $9
+          ]
+        }
+      })],
+                                          "invalid-signature")})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      url::Origin::Create(test_url), kNegativeInterestGroupName1,
+      kNegativeInterestGroupName2);
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern("*Warning:*additional bid*");
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+  EXPECT_TRUE(console_observer.Wait());
+  ASSERT_EQ(console_observer.messages().size(), static_cast<size_t>(3));
+
+  // We get this error because some of the signatures on the signed additional
+  // bid were bad, i.e. the signature could not be verified against the given
+  // key for the given bid string.
+  EXPECT_TRUE(base::MatchPattern(
+      console_observer.GetMessageAt(0),
+      "*Some signatures on an additional bid*failed to verify."))
+      << "Actual message: " << console_observer.GetMessageAt(0);
+
+  // But we also get these errors because the negative InterestGroups have no
+  // corresponding valid signature, so we have to ignore them.
+  EXPECT_TRUE(base::MatchPattern(
+      console_observer.GetMessageAt(1),
+      "*Ignoring negative targeting group 'current-horse-owner'*"
+      "since its key does not correspond to a valid signature."))
+      << "Actual message: " << console_observer.GetMessageAt(1);
+  EXPECT_TRUE(base::MatchPattern(
+      console_observer.GetMessageAt(2),
+      "*Ignoring negative targeting group 'current-buggy-owner'*"
+      "since its key does not correspond to a valid signature."))
+      << "Actual message: " << console_observer.GetMessageAt(2);
+
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder")));
+}
+
+// Two negative IGs, one with a joining origin that does match that identified
+// in the additional bid, and one that does not. The negative targeting code
+// ignores the negative IG with the bad joining origin, but still suppresses
+// the additional bid because of the presence and validity of the other negative
+// IG.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithMultipleNegativeIGsOneWithWrongJoiningOriginDoesNotBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "allow-join.a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName1[] = "current-horse-owner";
+  constexpr char kNegativeInterestGroupName2[] = "current-buggy-owner";
+
+  GURL first_ig_joining_origin_url =
+      https_server_->GetURL("allow-join.b.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), first_ig_joining_origin_url));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName1)
+                              .SetAdditionalBidKey(kPublicKey1)
+                              .Build()));
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName2)
+                              .SetAdditionalBidKey(kPublicKey2)
+                              .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroups: {
+          joiningOrigin: $7,
+          interestGroupNames: [
+            $8,
+            $9
+          ]
+        }
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      url::Origin::Create(test_url), kNegativeInterestGroupName1,
+      kNegativeInterestGroupName2);
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  // Here, there are valid signatures, but none matching for this IG.
+  console_observer.SetPattern(
+      "*Warning: Ignoring negative targeting group 'current-horse-owner'*"
+      "since it does not have the expected joining origin.");
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+  EXPECT_TRUE(console_observer.Wait());
+
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional")));
+}
+
+// Two negative IGs, both with a joining origins that do match that identified
+// in the additional bid. The negative targeting code thus ignores both negative
+// IGs, and the additional bid participates in the auction and wins.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidWithMultipleNegativeIGsAllWithWrongJoiningOriginDoesBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "allow-join.a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName1[] = "current-horse-owner";
+  constexpr char kNegativeInterestGroupName2[] = "current-buggy-owner";
+
+  GURL joining_origin_url =
+      https_server_->GetURL("allow-join.b.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), joining_origin_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName1)
+                              .SetAdditionalBidKey(kPublicKey1)
+                              .Build()));
+  EXPECT_EQ(kSuccess, JoinInterestGroupAndVerify(
+                          blink::TestInterestGroupBuilder(
+                              /*owner=*/url::Origin::Create(test_url),
+                              /*name=*/kNegativeInterestGroupName2)
+                              .SetAdditionalBidKey(kPublicKey2)
+                              .Build()));
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+    seller: $1,
+    decisionLogicUrl: $2,
+    interestGroupBuyers: [$1],
+    auctionNonce: $3,
+    additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+        interestGroup: {
+          name: 'campaign123',
+          biddingLogicURL: $5,
+          owner:$6
+        },
+        bid: {
+          ad: ['ad'],
+          bid: 1.99,
+          render: $4,
+        },
+        auctionNonce: $3,
+        seller: $1,
+        negativeInterestGroups: {
+          joiningOrigin: $7,
+          interestGroupNames: [
+            $8,
+            $9
+          ]
+        }
+      })])})",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      url::Origin::Create(test_url), kNegativeInterestGroupName1,
+      kNegativeInterestGroupName2);
+
+  WebContentsConsoleObserver console_observer(shell()->web_contents());
+  console_observer.SetPattern("*Warning:*additional bid*");
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+  EXPECT_TRUE(console_observer.Wait());
+  ASSERT_EQ(console_observer.messages().size(), static_cast<size_t>(2));
+
+  EXPECT_TRUE(base::MatchPattern(
+      console_observer.GetMessageAt(0),
+      "*Ignoring negative targeting group 'current-horse-owner'*"
+      "since it does not have the expected joining origin."))
+      << "Actual message: " << console_observer.GetMessageAt(0);
+  EXPECT_TRUE(base::MatchPattern(
+      console_observer.GetMessageAt(1),
+      "*Ignoring negative targeting group 'current-buggy-owner'*"
+      "since it does not have the expected joining origin."))
+      << "Actual message: " << console_observer.GetMessageAt(1);
+
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder")));
+}
+
+// No additional bids is also fine. The additional bid always participates.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       AdditionalBidWithNoNegativeIGSAlwaysBids) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+  constexpr char kNegativeInterestGroupName[] = "current-horse-owner";
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+        seller: $1,
+        decisionLogicUrl: $2,
+        interestGroupBuyers: [$1],
+        auctionNonce: $3,
+        additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+          interestGroup: {
+            name: 'campaign123',
+            biddingLogicURL: $5,
+            owner:$6
+          },
+          bid: {
+            ad: ['ad'],
+            bid: 1.99,
+            render: $4,
+          },
+          auctionNonce: $3,
+          seller: $1,
+        })])
+      })",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url),
+      kNegativeInterestGroupName);
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder")));
+}
+
+// If the additional bid is missing a topLevelSeller in a component auction, it
+// does not bid.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    AdditionalBidOnComponentAuctionMissingTopLevelSellerDoesNotBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+        seller: $1,
+        decisionLogicURL: $2,
+        // Signal to the top-level seller to allow participation in a component
+        // auction.
+        auctionSignals: "sellerAllowsComponentAuction",
+        componentAuctions: [{
+          seller: $1,
+          decisionLogicURL: $2,
+          interestGroupBuyers: [$1],
+          // Signal to the bidder and component seller to allow participation in
+          // a component auction.
+          auctionSignals: "bidderAllowsComponentAuction,"+
+                          "sellerAllowsComponentAuction",
+          auctionNonce: $3,
+          additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+            interestGroup: {
+              name: 'campaign123',
+              biddingLogicURL: $5,
+              owner:$6
+            },
+            bid: {
+              ad: ['ad'],
+              bid: 1.99,
+              render: $4,
+            },
+            auctionNonce: $3,
+            seller: $1,
+          })])
+        }]
+      })",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url));
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_bidder"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional")));
+}
+
+// Here, the additional bid is on a component auction, and has no negative IG,
+// so it does bid and win.
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       AdditionalBidOnComponentAuctionWithNoNegativeIGDoesBid) {
+  URLLoaderMonitor url_loader_monitor;
+
+  constexpr char kTestOrigin[] = "a.test";
+  GURL test_url = https_server_->GetURL(kTestOrigin, "/page_with_iframe.html");
+  GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
+  GURL additional_bid_ad_url =
+      https_server_->GetURL("c.test", "/echo?render_horses");
+
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/url::Origin::Create(test_url),
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        kTestOrigin, "/interest_group/bidding_logic.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_nonce = CreateAuctionNonceAndWait();
+
+  GURL additional_bid_logic_url = https_server_->GetURL(
+      kTestOrigin, "/interest_group/bidding_logic_additional_bid.js");
+
+  std::string auction_config = JsReplace(
+      R"({
+        seller: $1,
+        decisionLogicURL: $2,
+        // Signal to the top-level seller to allow participation in a component
+        // auction.
+        auctionSignals: "sellerAllowsComponentAuction",
+        componentAuctions: [{
+          seller: $1,
+          decisionLogicURL: $2,
+          interestGroupBuyers: [$1],
+          // Signal to the bidder and component seller to allow participation in
+          // a component auction.
+          auctionSignals: "bidderAllowsComponentAuction,"+
+                          "sellerAllowsComponentAuction",
+          auctionNonce: $3,
+          additionalBids: provideAdditionalBids($1, $3, [JSON.stringify({
+            interestGroup: {
+              name: 'campaign123',
+              biddingLogicURL: $5,
+              owner:$6
+            },
+            bid: {
+              ad: ['ad'],
+              bid: 1.99,
+              render: $4,
+            },
+            auctionNonce: $3,
+            seller: $1,
+            topLevelSeller: $1,
+          })])
+        }]
+      })",
+      url::Origin::Create(test_url),
+      https_server_->GetURL(kTestOrigin, "/interest_group/decision_logic.js"),
+      auction_nonce, additional_bid_ad_url, additional_bid_logic_url,
+      url::Origin::Create(additional_bid_logic_url));
+
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config,
+                                           additional_bid_ad_url);
+  WaitForUrl(https_server_->GetURL(kTestOrigin, "/echoall?report_seller"));
+  WaitForUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder_additional"));
+  EXPECT_FALSE(HasServerSeenUrl(
+      https_server_->GetURL(kTestOrigin, "/echoall?report_bidder")));
 }
 
 }  // namespace

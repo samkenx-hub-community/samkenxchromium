@@ -155,7 +155,8 @@ export function initialiseEmojiPickerForTest(
   });
 
   // Reset DOM state.
-  document.body.innerHTML = '';
+  assert(window.trustedTypes);
+  document.body.innerHTML = window.trustedTypes.emptyHTML;
   window.localStorage.clear();
 
   for (const {key, value} of localStorage) {
@@ -166,6 +167,14 @@ export function initialiseEmojiPickerForTest(
 
   const findInEmojiPicker = (...path: string[]) =>
       deepQuerySelector(emojiPicker, path);
+
+  const waitUntilFindInEmojiPicker = async(...path: string[]):
+      Promise<HTMLElement> => {
+        await waitForCondition(
+            () => findInEmojiPicker(...path) !== null,
+            'element should not be null');
+        return findInEmojiPicker(...path)!;
+      };
 
   const findEmojiFirstButton = (...path: string[]) => {
     const emojiElement = findInEmojiPicker(...path);
@@ -202,6 +211,7 @@ export function initialiseEmojiPickerForTest(
   return {
     emojiPicker,
     findInEmojiPicker,
+    waitUntilFindInEmojiPicker,
     findEmojiFirstButton,
     readyPromise,
     scrollDown,

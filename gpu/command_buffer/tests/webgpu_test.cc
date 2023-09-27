@@ -5,6 +5,8 @@
 #include "gpu/command_buffer/tests/webgpu_test.h"
 
 #include <dawn/dawn_proc.h>
+#include <dawn/dawn_thread_dispatch_proc.h>
+#include <dawn/native/DawnNative.h>
 #include <dawn/webgpu.h>
 
 #include "base/command_line.h"
@@ -54,6 +56,11 @@ bool WebGPUTest::WebGPUSupported() const {
     return false;
   }
 
+  // Pixel 2 does not support WebGPU
+  if (GPUTestBotConfig::CurrentConfigMatches("Android Qualcomm 0x5040001")) {
+    return false;
+  }
+
   return true;
 }
 
@@ -88,6 +95,16 @@ void WebGPUTest::Initialize(const Options& options) {
   // this device has been marked as not supporting WebGPU.
   if (!WebGPUSupported()) {
     return;
+  }
+
+  // The test will run both service and client in the same process, so we need
+  // to set dawn procs for both.
+  dawnProcSetProcs(&dawnThreadDispatchProcTable);
+
+  {
+    // Use the native procs as default procs for all threads. It will be used
+    // for GPU service side threads.
+    dawnProcSetDefaultThreadProcs(&dawn::native::GetProcs());
   }
 
   gpu::GpuPreferences gpu_preferences;
@@ -126,12 +143,17 @@ void WebGPUTest::Initialize(const Options& options) {
   webgpu_impl()->SetLostContextCallback(base::BindLambdaForTesting(
       []() { GTEST_FAIL() << "Context lost unexpectedly."; }));
 
-  DawnProcTable procs = webgpu()->GetAPIChannel()->GetProcs();
-  dawnProcSetProcs(&procs);
+  {
+    // Use the wire procs for the test main thread.
+    DawnProcTable procs = webgpu()->GetAPIChannel()->GetProcs();
+    dawnProcSetPerThreadProcs(&procs);
+  }
+
   instance_ = wgpu::Instance(webgpu()->GetAPIChannel()->GetWGPUInstance());
 
   wgpu::RequestAdapterOptions ra_options = {};
   ra_options.forceFallbackAdapter = options.force_fallback_adapter;
+  ra_options.compatibilityMode = options.compatibility_mode;
 
   bool done = false;
   auto* callback = webgpu::BindWGPUOnceCallback(
@@ -386,7 +408,11 @@ TEST_F(WebGPUTest, RequestDeviceWithUnsupportedFeature) {
 
   DCHECK(adapter_);
   wgpu::DeviceDescriptor device_desc = {};
+#ifdef WGPU_BREAKING_CHANGE_COUNT_RENAME
+  device_desc.requiredFeatureCount = 1;
+#else
   device_desc.requiredFeaturesCount = 1;
+#endif
   device_desc.requiredFeatures = &invalid_feature;
 
   adapter_.RequestDevice(&device_desc, callback->UnboundCallback(),
@@ -461,6 +487,38 @@ TEST_F(WebGPUTest, ImplicitFallbackAdapterIsDisallowed) {
     // If we got an Adapter, it must not be a CPU adapter.
     EXPECT_NE(properties.adapterType, wgpu::AdapterType::CPU);
   }
+}
+
+TEST_F(WebGPUTest, CompatibilityMode) {
+  auto options = WebGPUTest::Options();
+  options.compatibility_mode = true;
+  options.enable_unsafe_webgpu = true;
+  // Initialize attempts to create an adapter.
+  Initialize(options);
+
+  // Compatibility adapter should be available.
+  EXPECT_NE(adapter_, nullptr);
+
+  wgpu::AdapterProperties properties;
+  adapter_.GetProperties(&properties);
+
+  EXPECT_TRUE(properties.compatibilityMode);
+}
+
+TEST_F(WebGPUTest, NonCompatibilityMode) {
+  auto options = WebGPUTest::Options();
+  options.compatibility_mode = false;
+  options.enable_unsafe_webgpu = true;
+  // Initialize attempts to create an adapter.
+  Initialize(options);
+
+  // Non-compatibility adapter should be available.
+  EXPECT_NE(adapter_, nullptr);
+
+  wgpu::AdapterProperties properties;
+  adapter_.GetProperties(&properties);
+
+  EXPECT_FALSE(properties.compatibilityMode);
 }
 
 }  // namespace gpu

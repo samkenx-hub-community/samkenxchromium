@@ -5,9 +5,8 @@
 #include "chrome/browser/ash/login/saml/in_session_password_sync_manager.h"
 #include <memory>
 
-#include "ash/constants/ash_features.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
-#include "base/time/default_clock.h"
 #include "base/time/time.h"
 #include "chrome/browser/ash/login/login_pref_names.h"
 #include "chrome/browser/ash/login/saml/mock_lock_handler.h"
@@ -66,10 +65,11 @@ class InSessionPasswordSyncManagerTest : public testing::Test {
       base::test::TaskEnvironment::MainThreadType::UI,
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   TestingProfileManager profile_manager_{TestingBrowserProcess::GetGlobal()};
-  TestingProfile* primary_profile_ = nullptr;
-  TestingProfile* secondary_profile_ = nullptr;
+  raw_ptr<TestingProfile, ExperimentalAsh> primary_profile_ = nullptr;
+  raw_ptr<TestingProfile, ExperimentalAsh> secondary_profile_ = nullptr;
 
-  FakeChromeUserManager* user_manager_ = nullptr;
+  raw_ptr<FakeChromeUserManager, DanglingUntriaged | ExperimentalAsh>
+      user_manager_ = nullptr;
   std::unique_ptr<user_manager::ScopedUserManager> scoped_user_manager_;
   std::unique_ptr<MockLockHandler> lock_handler_;
   std::unique_ptr<InSessionPasswordSyncManager> manager_;

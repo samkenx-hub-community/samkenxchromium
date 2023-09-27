@@ -15,36 +15,13 @@
 #include "components/autofill/core/browser/metrics/autofill_metrics_test_base.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
-using ::base::Bucket;
-using ::base::BucketsAre;
-using ::testing::NiceMock;
-using ::testing::TestWithParam;
-
 namespace autofill::autofill_metrics {
 
-class MockFastCheckoutClient : public FastCheckoutClient {
- public:
-  MockFastCheckoutClient() = default;
-  ~MockFastCheckoutClient() override = default;
-  MOCK_METHOD(bool,
-              TryToStart,
-              (const GURL&,
-               const autofill::FormData&,
-               const autofill::FormFieldData&,
-               base::WeakPtr<autofill::AutofillManager>),
-              (override));
-  MOCK_METHOD(void, Stop, (bool), (override));
-  MOCK_METHOD(bool, IsRunning, (), (const, override));
-  MOCK_METHOD(bool, IsShowing, (), (const, override));
-  MOCK_METHOD(void, OnNavigation, (const GURL&, bool), (override));
-  MOCK_METHOD(bool,
-              IsSupported,
-              (const autofill::FormData&,
-               const autofill::FormFieldData&,
-               const autofill::AutofillManager&),
-              (override));
-  MOCK_METHOD(bool, IsNotShownYet, (), (const, override));
-};
+using ::base::Bucket;
+using ::base::BucketsAre;
+using test::CreateTestFormField;
+using ::testing::NiceMock;
+using ::testing::TestWithParam;
 
 struct TouchToFillForCreditCardsTestCase {
   std::vector<ServerFieldType> field_types;
@@ -63,11 +40,13 @@ class TouchToFillForCreditCardsTest
         .WillByDefault(testing::Return(true));
     ON_CALL(*autofill_client_, IsTouchToFillCreditCardSupported)
         .WillByDefault(testing::Return(true));
-    ON_CALL(fast_checkout_client_, IsNotShownYet)
+    MockFastCheckoutClient* fast_checkout_client =
+        static_cast<MockFastCheckoutClient*>(
+            autofill_client_->GetFastCheckoutClient());
+    ON_CALL(*fast_checkout_client, IsNotShownYet)
         .WillByDefault(testing::Return(true));
     autofill_manager().set_touch_to_fill_delegate(
-        std::make_unique<TouchToFillDelegateImpl>(&autofill_manager(),
-                                                  &fast_checkout_client_));
+        std::make_unique<TouchToFillDelegateAndroidImpl>(&autofill_manager()));
   }
 
   void TearDown() override { TearDownHelper(); }
@@ -81,18 +60,19 @@ class TouchToFillForCreditCardsTest
       switch (type) {
         case CREDIT_CARD_NAME_FULL:
           fields_to_return.emplace_back(
-              CreateField("Name on card", "cardName", "", "text"));
+              CreateTestFormField("Name on card", "cardName", "", "text"));
           break;
         case CREDIT_CARD_NUMBER:
-          fields_to_return.emplace_back(
-              CreateField("Credit card number", "cardNumber", "", "text"));
+          fields_to_return.emplace_back(CreateTestFormField(
+              "Credit card number", "cardNumber", "", "text"));
           break;
         case CREDIT_CARD_EXP_MONTH:
           fields_to_return.push_back(
-              CreateField("Expiration date", "cc_exp", "", "text"));
+              CreateTestFormField("Expiration date", "cc_exp", "", "text"));
           break;
         case CREDIT_CARD_VERIFICATION_CODE:
-          fields_to_return.emplace_back(CreateField("CVC", "CVC", "", "text"));
+          fields_to_return.emplace_back(
+              CreateTestFormField("CVC", "CVC", "", "text"));
           break;
         default:
           NOTREACHED();
@@ -119,13 +99,10 @@ class TouchToFillForCreditCardsTest
     }
   }
 
-  TouchToFillDelegateImpl& touch_to_fill_delegate() {
-    return *static_cast<TouchToFillDelegateImpl*>(
+  TouchToFillDelegateAndroidImpl& touch_to_fill_delegate() {
+    return *static_cast<TouchToFillDelegateAndroidImpl*>(
         autofill_manager().touch_to_fill_delegate());
   }
-
- private:
-  NiceMock<MockFastCheckoutClient> fast_checkout_client_;
 };
 
 // The test workflow:
@@ -149,9 +126,9 @@ TEST_P(TouchToFillForCreditCardsTest,
   FormData form = CreateForm(GetFields(test_case.field_types));
 
   SeeForm(form);
-  autofill_manager().OnAskForValuesToFillTest(form, form.fields[0], {},
-                                              AutoselectFirstSuggestion(false),
-                                              FormElementWasClicked(true));
+  autofill_manager().OnAskForValuesToFillTest(
+      form, form.fields[0], {},
+      AutofillSuggestionTriggerSource::kFormControlElementClicked);
 
   base::HistogramTester histogram_tester;
   // Simulate user selection in the payments bottom sheet.

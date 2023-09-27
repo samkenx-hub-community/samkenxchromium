@@ -9,9 +9,9 @@
 
 #import "base/check.h"
 #import "base/notreached.h"
+#import "ios/chrome/browser/shared/ui/elements/top_aligned_image_view.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
-#import "ios/chrome/browser/ui/elements/top_aligned_image_view.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/grid_constants.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
@@ -19,17 +19,10 @@
 #import "ui/base/l10n/l10n_util.h"
 #import "ui/gfx/ios/uikit_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 
 // The size of symbol icons.
 NSInteger kIconSymbolPointSize = 13;
-
-// Specific symbol image used as a badge for unslected tabs.
-NSString* kCircleSymbol = @"circle";
 
 // Size of activity indicator replacing fav icon when active.
 const CGFloat kIndicatorSize = 16.0;
@@ -210,7 +203,6 @@ void PositionView(UIView* view, CGPoint point) {
 
 - (void)prepareForReuse {
   [super prepareForReuse];
-  self.itemIdentifier = nil;
   self.title = nil;
   self.titleHidden = NO;
   self.icon = nil;
@@ -252,8 +244,6 @@ void PositionView(UIView* view, CGPoint point) {
 - (void)setTheme:(GridTheme)theme {
   if (_theme == theme)
     return;
-
-  self.iconView.backgroundColor = UIColor.clearColor;
 
   self.overrideUserInterfaceStyle = (theme == GridThemeDark)
                                         ? UIUserInterfaceStyleDark
@@ -372,6 +362,8 @@ void PositionView(UIView* view, CGPoint point) {
   iconView.contentMode = UIViewContentModeScaleAspectFill;
   iconView.layer.cornerRadius = kGridCellIconCornerRadius;
   iconView.layer.masksToBounds = YES;
+  iconView.backgroundColor = UIColor.clearColor;
+  iconView.tintColor = [UIColor colorNamed:kGrey400Color];
 
   CGRect indicatorFrame = CGRectMake(0, 0, kIndicatorSize, kIndicatorSize);
   MDCActivityIndicator* activityIndicator =

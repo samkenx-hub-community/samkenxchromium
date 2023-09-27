@@ -13,6 +13,7 @@
 #include "ash/components/arc/mojom/file_system.mojom.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/string_util.h"
 #include "chrome/browser/ash/arc/arc_util.h"
@@ -118,7 +119,7 @@ class RecentArcMediaSource::MediaRoot {
 
   // Set in the constructor.
   const std::string root_id_;
-  Profile* const profile_;
+  const raw_ptr<Profile, ExperimentalAsh> profile_;
   const base::FilePath relative_mount_path_;
 
   // Set at the beginning of GetRecentFiles().
@@ -251,13 +252,16 @@ void RecentArcMediaSource::MediaRoot::OnReadDirectory(
   for (const auto& file : files) {
     base::FilePath subpath = path.Append(file.name);
     if (file.is_directory) {
-      ScanDirectory(subpath);
+      if (!params_->IsLate()) {
+        ScanDirectory(subpath);
+      }
       continue;
     }
 
     auto iter = document_id_to_file_.find(file.document_id);
-    if (iter == document_id_to_file_.end())
+    if (iter == document_id_to_file_.end()) {
       continue;
+    }
 
     // Update |document_id_to_file_|.
     // We keep the lexicographically smallest URL to stabilize the results when
@@ -265,15 +269,17 @@ void RecentArcMediaSource::MediaRoot::OnReadDirectory(
     auto url = BuildDocumentsProviderUrl(subpath);
     absl::optional<RecentFile>& entry = iter->second;
     if (!entry.has_value() ||
-        storage::FileSystemURL::Comparator()(url, entry.value().url()))
+        storage::FileSystemURL::Comparator()(url, entry.value().url())) {
       entry = RecentFile(url, file.last_modified);
+    }
   }
 
   --num_inflight_readdirs_;
   DCHECK_LE(0, num_inflight_readdirs_);
 
-  if (num_inflight_readdirs_ == 0)
+  if (num_inflight_readdirs_ == 0) {
     OnComplete();
+  }
 }
 
 void RecentArcMediaSource::MediaRoot::OnComplete() {
@@ -284,8 +290,9 @@ void RecentArcMediaSource::MediaRoot::OnComplete() {
   std::vector<RecentFile> files;
   for (const auto& entry : document_id_to_file_) {
     const absl::optional<RecentFile>& file = entry.second;
-    if (file.has_value())
+    if (file.has_value()) {
       files.emplace_back(file.value());
+    }
   }
   document_id_to_file_.clear();
 
@@ -328,8 +335,9 @@ bool RecentArcMediaSource::MediaRoot::MatchesFileType(
 RecentArcMediaSource::RecentArcMediaSource(Profile* profile)
     : profile_(profile) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  for (const char* root_id : kMediaDocumentsProviderRootIds)
+  for (const char* root_id : kMediaDocumentsProviderRootIds) {
     roots_.emplace_back(std::make_unique<MediaRoot>(root_id, profile_));
+  }
 }
 
 RecentArcMediaSource::~RecentArcMediaSource() {
@@ -370,7 +378,7 @@ void RecentArcMediaSource::GetRecentFiles(Params params) {
     root->GetRecentFiles(
         Params(params_.value().file_system_context(), params_.value().origin(),
                params_.value().max_files(), params_.value().cutoff_time(),
-               params_.value().file_type(),
+               params_.value().end_time(), params_.value().file_type(),
                base::BindOnce(&RecentArcMediaSource::OnGetRecentFilesForRoot,
                               weak_ptr_factory_.GetWeakPtr())));
   }
@@ -385,8 +393,9 @@ void RecentArcMediaSource::OnGetRecentFilesForRoot(
                 std::make_move_iterator(files.end()));
 
   --num_inflight_roots_;
-  if (num_inflight_roots_ == 0)
+  if (num_inflight_roots_ == 0) {
     OnComplete();
+  }
 }
 
 void RecentArcMediaSource::OnComplete() {
@@ -413,8 +422,9 @@ bool RecentArcMediaSource::WillArcFileSystemOperationsRunImmediately() {
       arc::ArcFileSystemOperationRunner::GetForBrowserContext(profile_);
 
   // If ARC is not allowed the user, |runner| is nullptr.
-  if (!runner)
+  if (!runner) {
     return false;
+  }
 
   return !runner->WillDefer();
 }

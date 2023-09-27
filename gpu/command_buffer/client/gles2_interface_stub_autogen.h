@@ -871,6 +871,24 @@ void ReadbackARGBImagePixelsINTERNAL(const GLbyte* mailbox,
                                      GLint src_y,
                                      GLint plane_index,
                                      void* pixels) override;
+void WritePixelsYUVINTERNAL(const GLbyte* mailbox,
+                            GLuint src_size_plane1,
+                            GLuint src_size_plane2,
+                            GLuint src_size_plane3,
+                            GLuint src_size_plane4,
+                            GLuint src_width,
+                            GLuint src_height,
+                            GLuint src_plane_config,
+                            GLuint src_subsampling,
+                            GLuint src_datatype,
+                            GLuint src_row_bytes_plane1,
+                            GLuint src_row_bytes_plane2,
+                            GLuint src_row_bytes_plane3,
+                            GLuint src_row_bytes_plane4,
+                            const void* src_pixels_plane1,
+                            const void* src_pixels_plane2,
+                            const void* src_pixels_plane3,
+                            const void* src_pixels_plane4) override;
 void EnableiOES(GLenum target, GLuint index) override;
 void DisableiOES(GLenum target, GLuint index) override;
 void BlendEquationiOES(GLuint buf, GLenum mode) override;
@@ -906,10 +924,17 @@ void FramebufferPixelLocalClearValueuivANGLE(GLint plane,
 void BeginPixelLocalStorageANGLE(GLsizei count, const GLenum* loadops) override;
 void EndPixelLocalStorageANGLE(GLsizei count, const GLenum* storeops) override;
 void PixelLocalStorageBarrierANGLE() override;
+void FramebufferPixelLocalStorageInterruptANGLE() override;
+void FramebufferPixelLocalStorageRestoreANGLE() override;
 void GetFramebufferPixelLocalStorageParameterfvANGLE(GLint plane,
                                                      GLenum pname,
                                                      GLfloat* params) override;
 void GetFramebufferPixelLocalStorageParameterivANGLE(GLint plane,
                                                      GLenum pname,
                                                      GLint* params) override;
+void ClipControlEXT(GLenum origin, GLenum depth) override;
+void PolygonModeANGLE(GLenum face, GLenum mode) override;
+void PolygonOffsetClampEXT(GLfloat factor,
+                           GLfloat units,
+                           GLfloat clamp) override;
 #endif  // GPU_COMMAND_BUFFER_CLIENT_GLES2_INTERFACE_STUB_AUTOGEN_H_

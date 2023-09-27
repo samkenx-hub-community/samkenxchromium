@@ -105,7 +105,10 @@ class AX_BASE_EXPORT AXMode {
 
   bool is_mode_off() const { return flags_ == 0; }
 
-  bool operator!=(AXMode rhs) const { return !(*this == rhs); }
+  bool operator!=(AXMode rhs) const {
+    return flags_ != rhs.flags_ ||
+           experimental_flags_ != rhs.experimental_flags_;
+  }
 
   AXMode& operator|=(const AXMode& rhs) {
     flags_ |= rhs.flags_;
@@ -135,6 +138,25 @@ class AX_BASE_EXPORT AXMode {
     // This must always be the last enum. It's okay for its value to
     // increase, but none of the other enum values may change.
     UMA_AX_MODE_MAX
+  };
+
+  // IMPORTANT!
+  // These values are written to logs. Do not renumber or delete
+  // existing items; add new entries to the end of the list.
+  enum class BundleHistogramValue {
+    // The unnamed bucket is a catch all for modes that do not match one of the
+    // named sets.
+    kUnnamed = 0,
+    // See static constants below for a description of each context.
+    kBasic = 1,
+    kWebContentsOnly = 2,
+    kComplete = 3,
+    kCompleteNoHTML = 4,
+    kFormControls = 5,
+
+    // This must always be the last enum. It's okay for its value to
+    // increase, but none of the other enum values may change.
+    kMaxValue = 5
   };
 
   // Experimental Flags
@@ -183,6 +205,8 @@ static constexpr AXMode kAXModeFormControls(AXMode::kNativeAPIs |
                                                 AXMode::kWebContents |
                                                 AXMode::kHTML,
                                             AXMode::kExperimentalFormControls);
+
+// If adding a new named set of mode flags, please update BundleHistogramValue.
 
 // For debugging, test assertions, etc.
 AX_BASE_EXPORT std::ostream& operator<<(std::ostream& stream,

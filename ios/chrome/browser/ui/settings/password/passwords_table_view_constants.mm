@@ -4,21 +4,9 @@
 
 #import "ios/chrome/browser/ui/settings/password/passwords_table_view_constants.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 NSString* const kPasswordsTableViewId = @"PasswordsTableViewId";
-NSString* const kPasswordsExportConfirmViewId = @"PasswordsExportConfirmViewId";
 NSString* const kPasswordsSearchBarId = @"PasswordsSearchBar";
 NSString* const kPasswordsScrimViewId = @"PasswordsScrimViewId";
-
-NSString* const kOnDeviceEncryptionOptInId = @"OnDeviceEncryptionSuggestion";
-NSString* const kOnDeviceEncryptionLearnMoreId =
-    @"OnDeviceEncryptionLearnMoreId";
-NSString* const kOnDeviceEncryptionSetUpId = @"OnDeviceEncryptionSetUpId";
-NSString* const kOnDeviceEncryptionOptedInTextId =
-    @"OnDeviceEncryptionOptedInTextId";
 
 NSString* const kPasswordDetailsTableViewId = @"PasswordDetailsTableViewId";
 NSString* const kPasswordDetailsDeletionAlertViewId =
@@ -28,19 +16,28 @@ NSString* const kPasswordsAddPasswordSaveButtonId =
 NSString* const kPasswordsAddPasswordCancelButtonId =
     @"PasswordsAddPasswordCancelButtonId";
 
-NSString* const kSavePasswordSwitchTableViewId =
-    @"kSavePasswordSwitchTableViewId";
-NSString* const kSavePasswordManagedTableViewId =
-    @"kSavePasswordSwitchTableViewId";
-
-NSString* const kSettingsPasswordsInOtherAppsCellId =
-    @"kSettingsPasswordsInOtherAppsCellId";
-
 NSString* const kAddPasswordButtonId = @"addPasswordItem";
 
 NSString* const kPasswordIssuesTableViewId = @"kPasswordIssuesTableViewId";
+
+NSString* const kDismissedWarningsCellId = @"DismissedWarningsCellId";
+
+NSString* const kUsernameTextfieldForPasswordDetailsId =
+    @"kUsernameTextfieldForPasswordDetailsId";
+
+NSString* const kPasswordTextfieldForPasswordDetailsId =
+    @"kPasswordTextfieldForPasswordDetailsId";
 
 NSString* const kDeleteButtonForPasswordDetailsId =
     @"kDeleteButtonForPasswordDetailsId";
 
 NSString* const kLocalOnlyPasswordIconId = @"kLocalOnlyPasswordIconId";
+
+NSString* const kWidgetPromoImageName = @"password_manager_widget_promo";
+
+NSString* const kWidgetPromoDisabledImageName =
+    @"password_manager_widget_promo_disabled";
+
+NSString* const kWidgetPromoId = @"WidgetPromoId";
+
+NSString* const kWidgetPromoCloseButtonId = @"WidgetPromoCloseButtonId";

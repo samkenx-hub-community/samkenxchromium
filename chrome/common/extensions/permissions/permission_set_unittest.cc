@@ -30,7 +30,6 @@
 #include "extensions/common/permissions/permissions_data.h"
 #include "extensions/common/permissions/permissions_info.h"
 #include "extensions/common/permissions/socket_permission.h"
-#include "extensions/common/value_builder.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/l10n/l10n_util.h"
 
@@ -756,7 +755,6 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermissionID::kBrowsingData);
   skip.insert(APIPermissionID::kCommandsAccessibility);
   skip.insert(APIPermissionID::kContextMenus);
-  skip.insert(APIPermissionID::kDesktopCapturePrivate);
   skip.insert(APIPermissionID::kDiagnostics);
   skip.insert(APIPermissionID::kDns);
   skip.insert(APIPermissionID::kDownloadsShelf);
@@ -802,6 +800,7 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermissionID::kProxy);
   skip.insert(APIPermissionID::kScripting);
   skip.insert(APIPermissionID::kTabCapture);
+  skip.insert(APIPermissionID::kUserScripts);
   skip.insert(APIPermissionID::kWebRequest);
   skip.insert(APIPermissionID::kWebRequestBlocking);
   skip.insert(APIPermissionID::kWebRequestAuthProvider);
@@ -824,6 +823,7 @@ TEST(PermissionsTest, PermissionMessages) {
 
   // These are private.
   skip.insert(APIPermissionID::kAccessibilityPrivate);
+  skip.insert(APIPermissionID::kAccessibilityServicePrivate);
   skip.insert(APIPermissionID::kArcAppsPrivate);
   skip.insert(APIPermissionID::kAutoTestPrivate);
   skip.insert(APIPermissionID::kBrailleDisplayPrivate);
@@ -838,7 +838,7 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermissionID::kFileManagerPrivate);
   skip.insert(APIPermissionID::kFirstRunPrivate);
   skip.insert(APIPermissionID::kSharedStoragePrivate);
-  skip.insert(APIPermissionID::kIdentityPrivate);
+  skip.insert(APIPermissionID::kImageLoaderPrivate);
   skip.insert(APIPermissionID::kInputMethodPrivate);
   skip.insert(APIPermissionID::kLanguageSettingsPrivate);
   skip.insert(APIPermissionID::kLockWindowFullscreenPrivate);
@@ -1170,7 +1170,7 @@ TEST(PermissionsTest, GetWarningMessages_CombinedSessions) {
     EXPECT_TRUE(VerifyOnePermissionMessage(
         permissions, Manifest::TYPE_EXTENSION,
         l10n_util::GetStringUTF16(
-            IDS_EXTENSION_PROMPT_WARNING_HISTORY_READ_AND_SESSIONS)));
+            IDS_EXTENSION_PROMPT_WARNING_HISTORY_READ_ON_ALL_DEVICES)));
   }
   {
     APIPermissionSet api_permissions;
@@ -1186,7 +1186,7 @@ TEST(PermissionsTest, GetWarningMessages_CombinedSessions) {
     EXPECT_TRUE(VerifyOnePermissionMessage(
         permissions, Manifest::TYPE_EXTENSION,
         l10n_util::GetStringUTF16(
-            IDS_EXTENSION_PROMPT_WARNING_HISTORY_WRITE_AND_SESSIONS)));
+            IDS_EXTENSION_PROMPT_WARNING_HISTORY_WRITE_ON_ALL_DEVICES)));
   }
 }
 

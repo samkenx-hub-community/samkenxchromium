@@ -29,6 +29,7 @@
 #include "base/check.h"
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/notreached.h"
@@ -99,6 +100,16 @@ void SetDisplayPropertiesOnHost(AshWindowTreeHost* ash_host,
 
   host->SetDisplayTransformHint(
       display::DisplayRotationToOverlayTransform(effective_rotation));
+
+  const display::ManagedDisplayInfo& display_info =
+      GetDisplayManager()->GetDisplayInfo(display.id());
+  absl::optional<base::TimeDelta> max_vrr_interval = absl::nullopt;
+  if (display_info.variable_refresh_rate_state() == display::kVrrEnabled &&
+      display_info.vsync_rate_min().has_value() &&
+      display_info.vsync_rate_min() > 0) {
+    max_vrr_interval = base::Hertz(display_info.vsync_rate_min().value());
+  }
+  host->compositor()->SetMaxVrrInterval(max_vrr_interval);
 
   // Just moving the display requires the full redraw.
   // chrome-os-partner:33558.
@@ -218,12 +229,12 @@ class FocusActivationStore {
   }
 
  private:
-  ::wm::ActivationClient* activation_client_;
-  aura::client::CaptureClient* capture_client_;
-  aura::client::FocusClient* focus_client_;
+  raw_ptr<::wm::ActivationClient, ExperimentalAsh> activation_client_;
+  raw_ptr<aura::client::CaptureClient, ExperimentalAsh> capture_client_;
+  raw_ptr<aura::client::FocusClient, ExperimentalAsh> focus_client_;
   aura::WindowTracker tracker_;
-  aura::Window* focused_;
-  aura::Window* active_;
+  raw_ptr<aura::Window, DanglingUntriaged | ExperimentalAsh> focused_;
+  raw_ptr<aura::Window, DanglingUntriaged | ExperimentalAsh> active_;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -666,9 +677,19 @@ void WindowTreeHostManager::OnDisplayRemoved(const display::Display& display) {
     GetRootWindowSettings(GetWindow(primary_host))->display_id =
         primary_display_id;
 
-    OnDisplayMetricsChanged(
-        GetDisplayManager()->GetDisplayForId(primary_display_id),
-        DISPLAY_METRIC_BOUNDS);
+    // Ensure that color spaces for the root windows reflect those of their new
+    // displays. If these go out of sync, we can lose the ability to composite
+    // HDR content.
+    const display::Display& new_primary_display =
+        GetDisplayManager()->GetDisplayForId(primary_display_id);
+    primary_host->AsWindowTreeHost()->compositor()->SetDisplayColorSpaces(
+        new_primary_display.GetColorSpaces());
+
+    // Since window tree hosts have been swapped between displays, we need to
+    // update the WTH the RoundedDisplayProviders are attached to.
+    UpdateHostOfDisplayProviders();
+
+    OnDisplayMetricsChanged(new_primary_display, DISPLAY_METRIC_BOUNDS);
   }
 
   DeleteHost(host_to_delete);
@@ -683,7 +704,7 @@ void WindowTreeHostManager::OnDisplayMetricsChanged(
     const display::Display& display,
     uint32_t metrics) {
   if (!(metrics & (DISPLAY_METRIC_BOUNDS | DISPLAY_METRIC_ROTATION |
-                   DISPLAY_METRIC_DEVICE_SCALE_FACTOR))) {
+                   DISPLAY_METRIC_DEVICE_SCALE_FACTOR | DISPLAY_METRIC_VRR))) {
     return;
   }
 
@@ -733,7 +754,7 @@ void WindowTreeHostManager::AddRoundedDisplayProviderIfNeeded(
   const display::ManagedDisplayInfo& display_info =
       GetDisplayManager()->GetDisplayInfo(display.id());
 
-  const gfx::RoundedCornersF panel_radii = display_info.rounded_corners_radii();
+  const gfx::RoundedCornersF panel_radii = display_info.panel_corners_radii();
 
   if (panel_radii.IsEmpty() || GetRoundedDisplayProvider(display.id())) {
     return;
@@ -750,6 +771,16 @@ void WindowTreeHostManager::AddRoundedDisplayProviderIfNeeded(
 void WindowTreeHostManager::RemoveRoundedDisplayProvider(
     const display::Display& display) {
   rounded_display_providers_map_.erase(display.id());
+}
+
+void WindowTreeHostManager::UpdateHostOfDisplayProviders() {
+  for (auto& pair : window_tree_hosts_) {
+    RoundedDisplayProvider* rounded_display_provider =
+        GetRoundedDisplayProvider(pair.first);
+    if (rounded_display_provider) {
+      rounded_display_provider->UpdateHostParent();
+    }
+  }
 }
 
 void WindowTreeHostManager::OnHostResized(aura::WindowTreeHost* host) {
@@ -866,9 +897,9 @@ void WindowTreeHostManager::SetPrimaryDisplayId(int64_t id) {
   // displays. If these go out of sync, we can lose the ability to composite
   // HDR content.
   primary_host->AsWindowTreeHost()->compositor()->SetDisplayColorSpaces(
-      new_primary_display.color_spaces());
+      new_primary_display.GetColorSpaces());
   non_primary_host->AsWindowTreeHost()->compositor()->SetDisplayColorSpaces(
-      old_primary_display.color_spaces());
+      old_primary_display.GetColorSpaces());
 
   std::u16string old_primary_title = primary_window->GetTitle();
   primary_window->SetTitle(non_primary_window->GetTitle());
@@ -895,21 +926,9 @@ void WindowTreeHostManager::SetPrimaryDisplayId(int64_t id) {
   UpdateWorkAreaOfDisplayNearestWindow(GetWindow(non_primary_host),
                                        new_primary_display.GetWorkAreaInsets());
 
-  RoundedDisplayProvider* old_primary_rounded_display_provider =
-      GetRoundedDisplayProvider(old_primary_display.id());
-  RoundedDisplayProvider* new_primary_rounded_display_provider =
-      GetRoundedDisplayProvider(new_primary_display.id());
-
-  // We need to update the host window surfaces of the swapped display to ensure
-  // that host_windows are parented to correct root_windows, and therefore the
-  // display textures are rendered to correct display.
-  if (old_primary_rounded_display_provider) {
-    old_primary_rounded_display_provider->UpdateHostParent();
-  }
-
-  if (new_primary_rounded_display_provider) {
-    new_primary_rounded_display_provider->UpdateHostParent();
-  }
+  // Since window tree hosts have been swapped, we need to update the WTH
+  // that RoundedDisplayProviders are attached to.
+  UpdateHostOfDisplayProviders();
 
   // Update the display manager with new display info.
   GetDisplayManager()->set_force_bounds_changed(true);

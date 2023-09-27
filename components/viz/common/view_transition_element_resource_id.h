@@ -5,6 +5,9 @@
 #ifndef COMPONENTS_VIZ_COMMON_VIEW_TRANSITION_ELEMENT_RESOURCE_ID_H_
 #define COMPONENTS_VIZ_COMMON_VIEW_TRANSITION_ELEMENT_RESOURCE_ID_H_
 
+#include <stdint.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
 

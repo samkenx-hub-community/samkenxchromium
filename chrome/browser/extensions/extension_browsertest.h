@@ -40,6 +40,11 @@
 
 class Profile;
 
+namespace content {
+class BrowserContext;
+class ServiceWorkerContext;
+}  // namespace content
+
 namespace extensions {
 class ExtensionCacheFake;
 class ExtensionService;
@@ -334,21 +339,39 @@ class ExtensionBrowserTest : virtual public InProcessBrowserTest,
                                   const std::string& path,
                                   int expected_hosts);
 
-  // Returns
-  // browsertest_util::ExecuteScriptInBackgroundPage(profile(),
-  // extension_id, script).
-  std::string ExecuteScriptInBackgroundPage(
+  // Waits until `script` calls "chrome.test.sendScriptResult(result)",
+  // where `result` is a serializable value, and returns `result`. Fails
+  // the test and returns an empty base::Value if `extension_id` isn't
+  // installed in the test's profile or doesn't have a background page, or
+  // if executing the script fails. The argument `script_user_activation`
+  // determines if the script should be executed after a user activation.
+  base::Value ExecuteScriptInBackgroundPage(
       const std::string& extension_id,
       const std::string& script,
-      extensions::browsertest_util::ScriptUserActivation
-          script_user_activation =
-              extensions::browsertest_util::ScriptUserActivation::kActivate);
+      browsertest_util::ScriptUserActivation script_user_activation =
+          browsertest_util::ScriptUserActivation::kDontActivate);
 
-  // Returns
-  // browsertest_util::ExecuteScriptInBackgroundPageNoWait(
-  // profile(), extension_id, script).
+  // Waits until |script| calls "window.domAutomationController.send(result)",
+  // where |result| is a string, and returns |result|. Fails the test and
+  // returns an empty base::Value if |extension_id| isn't installed in test's
+  // profile or doesn't have a background page, or if executing the script
+  // fails. The argument |script_user_activation| determines if the script
+  // should be executed after a user activation.
+  std::string ExecuteScriptInBackgroundPageDeprecated(
+      const std::string& extension_id,
+      const std::string& script,
+      browsertest_util::ScriptUserActivation script_user_activation =
+          browsertest_util::ScriptUserActivation::kDontActivate);
+
   bool ExecuteScriptInBackgroundPageNoWait(const std::string& extension_id,
                                            const std::string& script);
+
+  // Get the ServiceWorkerContext for the default browser's profile.
+  content::ServiceWorkerContext* GetServiceWorkerContext();
+
+  // Get the ServiceWorkerContext for the `browser_context`.
+  static content::ServiceWorkerContext* GetServiceWorkerContext(
+      content::BrowserContext* browser_context);
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   // True if the command line should be tweaked as if ChromeOS user is
@@ -412,7 +435,13 @@ class ExtensionBrowserTest : virtual public InProcessBrowserTest,
       bool wait_for_idle,
       bool grant_permissions);
 
-  // Make the current channel "dev" for the duration of the test.
+  // Used for setting the default scoped current channel for extension browser
+  // tests to UNKNOWN (trunk), in order to enable channel restricted features.
+  // TODO(crbug/1427323): We should remove this and have the current channel
+  // respect what is defined on the builder. If a test requires a specific
+  // channel for a channel restricted feature, it should be defining its own
+  // scoped channel override. As this stands, it means we don't really have
+  // non-trunk coverage for most extension browser tests.
   ScopedCurrentChannel current_channel_;
 
   // Disable external install UI.
@@ -428,7 +457,7 @@ class ExtensionBrowserTest : virtual public InProcessBrowserTest,
 #endif
 
   // The default profile to be used.
-  raw_ptr<Profile, DanglingUntriaged> profile_;
+  raw_ptr<Profile, AcrossTasksDanglingUntriaged> profile_;
 
   // Cache cache implementation.
   std::unique_ptr<ExtensionCacheFake> test_extension_cache_;

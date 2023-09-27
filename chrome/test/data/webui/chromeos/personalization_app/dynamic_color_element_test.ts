@@ -5,7 +5,6 @@
 /** @fileoverview Test suite for dynamic-color-element component.  */
 
 import 'chrome://personalization/strings.m.js';
-import 'chrome://webui-test/mojo_webui_test_support.js';
 
 import {ColorScheme, DynamicColorElement, emptyState, SetColorSchemeAction, SetSampleColorSchemesAction, SetStaticColorAction, ThemeActionName, ThemeObserver} from 'chrome://personalization/js/personalization_app.js';
 import {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_button.js';
@@ -90,10 +89,18 @@ suite('DynamicColorElementTest', function() {
   test('displays content', async () => {
     await initDynamicColorElement();
 
+    const title = dynamicColorElement!.shadowRoot!.getElementById('themeTitle');
+    assertTrue(!!title);
     assertEquals(
-        '[temp]Theme color[temp]Auto',
-        dynamicColorElement!.shadowRoot!.getElementById(
-                                            'themeHeader')!.textContent);
+        dynamicColorElement!.i18n('dynamicColorLabel'), title.textContent);
+
+    const description = dynamicColorElement!.shadowRoot!.getElementById(
+        'dynamicColorToggleDescription');
+    assertTrue(!!description);
+    assertEquals(
+        dynamicColorElement!.i18n('dynamicColorDescription'),
+        description.textContent);
+
     assertTrue(getToggleButton().checked, 'default toggle should be on');
     assertFalse(
         getColorSchemeSelector().hidden,
@@ -193,9 +200,9 @@ suite('DynamicColorElementTest', function() {
     assertTrue(
         getStaticColorSelector().hidden,
         'when the toggle is on, the static color buttons should be hidden.');
-    const checkedButton = getColorSchemeSelector().querySelector(
+    const pressedButton = getColorSchemeSelector().querySelector(
                               'cr-button[aria-checked="true"]') as HTMLElement;
-    assertEquals(String(colorScheme), checkedButton.dataset['colorSchemeId']);
+    assertEquals(String(colorScheme), pressedButton.dataset['colorSchemeId']);
   });
 
   test('displays static color on load', async () => {
@@ -211,9 +218,10 @@ suite('DynamicColorElementTest', function() {
     assertFalse(
         getStaticColorSelector().hidden,
         'when the toggle is off, the static color buttons should be visible.');
-    const checkedButton = getStaticColorSelector().querySelector(
+    const pressedButton = getStaticColorSelector().querySelector(
                               'cr-button[aria-checked="true"]') as HTMLElement;
-    assertEquals(staticColorHex, checkedButton.dataset['staticColor']);
+    assertTrue(pressedButton.getElementsByTagName('circle')[0]!
+                   .getAttribute('style')!.includes(staticColorHex));
   });
 
   test('flips toggle', async () => {
@@ -327,9 +335,13 @@ suite('DynamicColorElementTest', function() {
         await personalizationStore.waitForAction(
             ThemeActionName.SET_STATIC_COLOR) as SetStaticColorAction;
     assertTrue(!!action.staticColor);
+    // Gets the style attribute of the circle, uses regex to search for the hex
+    // string, and then converts it to an SkColor.
+    const buttonSkColor = hexColorToSkColor(
+        button.getElementsByTagName('circle')[0]!.getAttribute('style')!.match(
+            '#.{6}')![0]);
     assertDeepEquals(
-        hexColorToSkColor(button.dataset['staticColor']!),
-        personalizationStore.data.theme.staticColorSelected);
+        buttonSkColor, personalizationStore.data.theme.staticColorSelected);
     assertEquals(button.getAttribute('aria-checked'), 'true');
   });
 

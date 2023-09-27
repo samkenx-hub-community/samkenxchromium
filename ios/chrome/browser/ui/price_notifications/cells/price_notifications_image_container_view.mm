@@ -7,14 +7,8 @@
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 
-// The width and height of the Price Notifications ImageView.
-const CGFloat kPriceNotificationsImageLength = 64;
 // Corner radius of the Price Notifications ImageView.
 const CGFloat kPriceNotificationsCornerRadius = 13.0;
 
@@ -39,13 +33,13 @@ const CGFloat kPriceNotificationsCornerRadius = 13.0;
     _priceNotificationsImageView.contentMode = UIViewContentModeScaleAspectFit;
     [self addSubview:_priceNotificationsImageView];
     _priceNotificationsImageView.translatesAutoresizingMaskIntoConstraints = NO;
-    _priceNotificationsImageView.backgroundColor =
-        [UIColor colorNamed:kGrey100Color];
+    _priceNotificationsImageView.backgroundColor = UIColor.whiteColor;
 
     AddSameConstraints(self, _priceNotificationsImageView);
     [NSLayoutConstraint activateConstraints:@[
       [self.heightAnchor
-          constraintEqualToConstant:kPriceNotificationsImageLength],
+          constraintEqualToConstant:PriceNotificationsImageView::
+                                        kPriceNotificationsImageLength],
       [self.widthAnchor constraintEqualToAnchor:self.heightAnchor],
     ]];
   }

@@ -885,8 +885,8 @@ void DecodeURLEscapeSequences(const char* input,
       // character.
       size_t next_character = i;
       base_icu::UChar32 code_point;
-      if (ReadUTFChar(unescaped_chars.data(), &next_character, unescaped_length,
-                      &code_point)) {
+      if (ReadUTFCharLossy(unescaped_chars.data(), &next_character,
+                           unescaped_length, &code_point)) {
         // Valid UTF-8 character, convert to UTF-16.
         AppendUTF16Value(code_point, output);
         i = next_character;
@@ -918,6 +918,10 @@ void EncodeURIComponent(const char* input, int length, CanonOutput* output) {
   }
 }
 
+bool IsURIComponentChar(char c) {
+  return IsComponentChar(c);
+}
+
 bool CompareSchemeComponent(const char* spec,
                             const Component& component,
                             const char* compare_to) {
@@ -928,6 +932,18 @@ bool CompareSchemeComponent(const char16_t* spec,
                             const Component& component,
                             const char* compare_to) {
   return DoCompareSchemeComponent(spec, component, compare_to);
+}
+
+bool HasInvalidURLEscapeSequences(std::string_view input) {
+  for (size_t i = 0; i < input.size(); i++) {
+    if (input[i] == '%') {
+      unsigned char ch;
+      if (!DecodeEscaped(input.data(), &i, input.size(), &ch)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 }  // namespace url

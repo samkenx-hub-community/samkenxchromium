@@ -379,6 +379,7 @@
   GLES2_GET_FUN(CopySharedImageToTextureINTERNAL)
 #define glReadbackARGBImagePixelsINTERNAL \
   GLES2_GET_FUN(ReadbackARGBImagePixelsINTERNAL)
+#define glWritePixelsYUVINTERNAL GLES2_GET_FUN(WritePixelsYUVINTERNAL)
 #define glEnableiOES GLES2_GET_FUN(EnableiOES)
 #define glDisableiOES GLES2_GET_FUN(DisableiOES)
 #define glBlendEquationiOES GLES2_GET_FUN(BlendEquationiOES)
@@ -402,9 +403,16 @@
 #define glEndPixelLocalStorageANGLE GLES2_GET_FUN(EndPixelLocalStorageANGLE)
 #define glPixelLocalStorageBarrierANGLE \
   GLES2_GET_FUN(PixelLocalStorageBarrierANGLE)
+#define glFramebufferPixelLocalStorageInterruptANGLE \
+  GLES2_GET_FUN(FramebufferPixelLocalStorageInterruptANGLE)
+#define glFramebufferPixelLocalStorageRestoreANGLE \
+  GLES2_GET_FUN(FramebufferPixelLocalStorageRestoreANGLE)
 #define glGetFramebufferPixelLocalStorageParameterfvANGLE \
   GLES2_GET_FUN(GetFramebufferPixelLocalStorageParameterfvANGLE)
 #define glGetFramebufferPixelLocalStorageParameterivANGLE \
   GLES2_GET_FUN(GetFramebufferPixelLocalStorageParameterivANGLE)
+#define glClipControlEXT GLES2_GET_FUN(ClipControlEXT)
+#define glPolygonModeANGLE GLES2_GET_FUN(PolygonModeANGLE)
+#define glPolygonOffsetClampEXT GLES2_GET_FUN(PolygonOffsetClampEXT)
 
 #endif  // GPU_GLES2_GL2CHROMIUM_AUTOGEN_H_

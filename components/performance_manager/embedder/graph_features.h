@@ -42,18 +42,18 @@ class GraphFeatures {
       // (3) Add the feature to the implementation of ConfigureGraph().
       bool execution_context_priority_decorator : 1;
       bool execution_context_registry : 1;
-      bool frame_node_impl_describer : 1;
       bool frame_visibility_decorator : 1;
       bool freezing_vote_decorator : 1;
       bool metrics_collector : 1;
+      bool node_impl_describers : 1;
       bool page_load_tracker_decorator : 1;
-      bool page_node_impl_describer : 1;
       bool process_hosted_content_types_aggregator : 1;
-      bool process_node_impl_describer : 1;
+      bool resource_attribution_registries : 1;
       bool site_data_recorder : 1;
+      bool tab_connectedness_decorator : 1;
+      bool tab_page_decorator : 1;
       bool tab_properties_decorator : 1;
       bool v8_context_tracker : 1;
-      bool worker_node_impl_describer : 1;
     };
   };
 
@@ -63,6 +63,7 @@ class GraphFeatures {
 
   constexpr GraphFeatures& EnableExecutionContextPriorityDecorator() {
     EnableExecutionContextRegistry();
+    EnableFrameVisibilityDecorator();
     flags_.execution_context_priority_decorator = true;
     return *this;
   }
@@ -72,8 +73,8 @@ class GraphFeatures {
     return *this;
   }
 
-  constexpr GraphFeatures& EnableFrameNodeImplDescriber() {
-    flags_.frame_node_impl_describer = true;
+  constexpr GraphFeatures& EnableNodeImplDescribers() {
+    flags_.node_impl_describers = true;
     return *this;
   }
 
@@ -97,18 +98,13 @@ class GraphFeatures {
     return *this;
   }
 
-  constexpr GraphFeatures& EnablePageNodeImplDescriber() {
-    flags_.page_node_impl_describer = true;
-    return *this;
-  }
-
   constexpr GraphFeatures& EnableProcessHostedContentTypesAggregator() {
     flags_.process_hosted_content_types_aggregator = true;
     return *this;
   }
 
-  constexpr GraphFeatures& EnableProcessNodeImplDescriber() {
-    flags_.process_node_impl_describer = true;
+  constexpr GraphFeatures& EnableResourceAttributionRegistries() {
+    flags_.resource_attribution_registries = true;
     return *this;
   }
 
@@ -116,6 +112,17 @@ class GraphFeatures {
   // there.
   constexpr GraphFeatures& EnableSiteDataRecorder() {
     flags_.site_data_recorder = true;
+    return *this;
+  }
+
+  constexpr GraphFeatures& EnableTabConnectednessDecorator() {
+    EnableTabPageDecorator();
+    flags_.tab_connectedness_decorator = true;
+    return *this;
+  }
+
+  constexpr GraphFeatures& EnableTabPageDecorator() {
+    flags_.tab_page_decorator = true;
     return *this;
   }
 
@@ -127,11 +134,6 @@ class GraphFeatures {
   constexpr GraphFeatures& EnableV8ContextTracker() {
     EnableExecutionContextRegistry();
     flags_.v8_context_tracker = true;
-    return *this;
-  }
-
-  constexpr GraphFeatures& EnableWorkerNodeImplDescriber() {
-    flags_.worker_node_impl_describer = true;
     return *this;
   }
 
@@ -147,18 +149,19 @@ class GraphFeatures {
   // from production code.
   constexpr GraphFeatures& EnableDefault() {
     EnableExecutionContextRegistry();
-    EnableFrameNodeImplDescriber();
     EnableFrameVisibilityDecorator();
     EnableFreezingVoteDecorator();
     EnableMetricsCollector();
+    EnableNodeImplDescribers();
     EnablePageLoadTrackerDecorator();
-    EnablePageNodeImplDescriber();
     EnableProcessHostedContentTypesAggregator();
-    EnableProcessNodeImplDescriber();
+    EnableResourceAttributionRegistries();
     EnableSiteDataRecorder();
     EnableTabPropertiesDecorator();
     EnableV8ContextTracker();
-    EnableWorkerNodeImplDescriber();
+    EnableExecutionContextPriorityDecorator();
+    EnableTabPageDecorator();
+    EnableTabConnectednessDecorator();
     return *this;
   }
 

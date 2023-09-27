@@ -35,6 +35,14 @@
 // and accessibility trait UIAccessibilityTraitButton.
 + (id<GREYMatcher>)buttonWithAccessibilityLabelID:(int)messageID;
 
+// Matcher for context menu items with accessibility label
+// corresponding to `label`.
++ (id<GREYMatcher>)contextMenuItemWithAccessibilityLabel:(NSString*)label;
+
+// Matcher for context menu items with accessibility label
+// corresponding to `messageID`.
++ (id<GREYMatcher>)contextMenuItemWithAccessibilityLabelID:(int)messageID;
+
 // Matcher for element with an image corresponding to `image`.
 + (id<GREYMatcher>)imageViewWithImage:(UIImage*)image;
 
@@ -117,6 +125,9 @@
 
 // Returns matcher for `text` being a substring of the text in the omnibox.
 + (id<GREYMatcher>)omniboxContainingText:(NSString*)text;
+
+// Returns matcher for omniboxAutocomplete label in the omnibox.
++ (id<GREYMatcher>)omniboxAutocompleteLabel;
 
 // Returns matcher for `text` being a substring of the text in the location
 // view.
@@ -234,6 +245,9 @@
 // Returns matcher for the omnibox popup list row views.
 + (id<GREYMatcher>)omniboxPopupRow;
 
+// Returns a matcher for a popup row containing `string` as accessibility label.
++ (id<GREYMatcher>)omniboxPopupRowWithString:(NSString*)string;
+
 // Returns matcher for the omnibox popup list view.
 + (id<GREYMatcher>)omniboxPopupList;
 
@@ -275,8 +289,14 @@
 // Returns matcher for the privacy safe browsing table view.
 + (id<GREYMatcher>)settingsPrivacySafeBrowsingTableView;
 
-// Returns matcher for the price notifications table view.
-+ (id<GREYMatcher>)settingsPriceNotificationsTableView;
+// Returns matcher for the notifications table view.
++ (id<GREYMatcher>)settingsNotificationsTableView;
+
+// Returns matcher for the inactive tabs table view.
++ (id<GREYMatcher>)settingsInactiveTabsTableView;
+
+// Returns matcher for the tabs table view.
++ (id<GREYMatcher>)settingsTabsTableView;
 
 // Returns matcher for the tracking price table view.
 + (id<GREYMatcher>)settingsTrackingPriceTableView;
@@ -287,6 +307,17 @@
 // Returns matcher for the Google Services Settings button on the main Settings
 // screen.
 + (id<GREYMatcher>)googleServicesSettingsButton;
+
+// Returns matcher for the Inactive Tabs Settings button on the Tabs Settings
+// screen.
++ (id<GREYMatcher>)inactiveTabsSettingsButton;
+
+// Returns matcher for the Tab Pickup Settings button on the Tabs Settings
+// screen.
++ (id<GREYMatcher>)tabPickupSettingsButton;
+
+// Returns matcher for the Tabs Settings button on the main Settings screen.
++ (id<GREYMatcher>)tabsSettingsButton;
 
 // Returns matcher for the Manage Sync Settings button on the main Settings
 // screen.
@@ -305,8 +336,8 @@
 // Returns matcher for the Privacy cell on the main Settings screen.
 + (id<GREYMatcher>)settingsMenuPrivacyButton;
 
-// Returns matcher for the Price Notifications cell on the main Settings screen.
-+ (id<GREYMatcher>)settingsMenuPriceNotificationsButton;
+// Returns matcher for the Notifications cell on the main Settings screen.
++ (id<GREYMatcher>)settingsMenuNotificationsButton;
 
 // Returns matcher for the Save passwords cell on the main Settings screen.
 + (id<GREYMatcher>)settingsMenuPasswordsButton;
@@ -506,6 +537,9 @@
 // Returns a matcher for the search engine button in the main settings view.
 + (id<GREYMatcher>)settingsSearchEngineButton;
 
+// Returns a matcher for the address bar button in the main settings view.
++ (id<GREYMatcher>)settingsAddressBarButton;
+
 // Returns a matcher for an autofill suggestion view.
 + (id<GREYMatcher>)autofillSuggestionViewMatcher;
 
@@ -522,6 +556,15 @@
 // Returns a matcher matching cells that can be swiped-to-dismiss.
 + (id<GREYMatcher>)cellCanBeSwipedToDismissed;
 
+// Returns a matcher to password table view.
++ (id<GREYMatcher>)passwordsTableViewMatcher;
+
+// Returns a matcher to default browser settings table view.
++ (id<GREYMatcher>)defaultBrowserSettingsTableViewMatcher;
+
+// Returns a matcher to safety check table view.
++ (id<GREYMatcher>)safetyCheckTableViewMatcher;
+
 #pragma mark - Overflow Menu Destinations
 
 // Returns matcher for the bookmarks destination button in the overflow menu
@@ -535,6 +578,10 @@
 // Returns matcher for the passwords destination button in the overflow menu
 // carousel.
 + (id<GREYMatcher>)passwordsDestinationButton;
+
+// Returns matcher for the price notifications destination button in the
+// overflow menu carousel.
++ (id<GREYMatcher>)priceNotificationsDestinationButton;
 
 // Returns matcher for the reading list destination button in the overflow menu
 // carousel.
@@ -555,6 +602,10 @@
 // Returns matcher for the downloads destination button in the overflow menu
 // carousel.
 + (id<GREYMatcher>)downloadsDestinationButton;
+
+// Returns matcher for the What's New destination button in the overflow menu
+// carousel.
++ (id<GREYMatcher>)whatsNewDestinationButton;
 
 #pragma mark - Overflow Menu Actions
 

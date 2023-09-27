@@ -56,6 +56,20 @@ class COMPONENT_EXPORT(LORGNETTE_MANAGER) LorgnetteManagerClient
       chromeos::DBusMethodCallback<lorgnette::ScannerCapabilities>
           callback) = 0;
 
+  // Opens the scanner described by |request| and returns the result using the
+  // provided |callback|.
+  virtual void OpenScanner(
+      const lorgnette::OpenScannerRequest& request,
+      chromeos::DBusMethodCallback<lorgnette::OpenScannerResponse>
+          callback) = 0;
+
+  // Closes the scanner described by |request| and returns the result using the
+  // provided |callback|.
+  virtual void CloseScanner(
+      const lorgnette::CloseScannerRequest& request,
+      chromeos::DBusMethodCallback<lorgnette::CloseScannerResponse>
+          callback) = 0;
+
   // Request a scanned image using lorgnette's StartScan API. As each page is
   // completed, calls |page_callback| with the page number and a string
   // containing the image data. Calls |completion_callback| when the scan has
@@ -82,6 +96,22 @@ class COMPONENT_EXPORT(LORGNETTE_MANAGER) LorgnetteManagerClient
   // This function makes the assumption that LorgnetteManagerClient only has one
   // scan running at a time.
   virtual void CancelScan(chromeos::VoidDBusMethodCallback cancel_callback) = 0;
+
+  // Starts a new scanner discovery session.  A handle to the session is
+  // returned in the response.  While the session is active, device update
+  // callbacks will be made.
+  virtual void StartScannerDiscovery(
+      const lorgnette::StartScannerDiscoveryRequest& request,
+      base::RepeatingCallback<void(lorgnette::ScannerListChangedSignal)>
+          signal_callback,
+      chromeos::DBusMethodCallback<lorgnette::StartScannerDiscoveryResponse>
+          response_callback) = 0;
+
+  // Stops an existing scanner discovery session.
+  virtual void StopScannerDiscovery(
+      const lorgnette::StopScannerDiscoveryRequest& request,
+      chromeos::DBusMethodCallback<lorgnette::StopScannerDiscoveryResponse>
+          callback) = 0;
 
  protected:
   friend class LorgnetteManagerClientTest;

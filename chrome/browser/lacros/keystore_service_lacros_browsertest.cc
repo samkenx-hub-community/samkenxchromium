@@ -18,7 +18,7 @@
 #include "chromeos/crosapi/mojom/keystore_service.mojom-test-utils.h"
 #include "chromeos/crosapi/mojom/keystore_service.mojom.h"
 #include "chromeos/lacros/lacros_service.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/test/browser_test.h"
 #include "net/cert/nss_cert_database.h"
 #include "net/cert/scoped_nss_types.h"
@@ -170,11 +170,11 @@ IN_PROC_BROWSER_TEST_F(KeystoreServiceLacrosBrowserTest, WrongFormattingUser) {
 
   ASSERT_TRUE(result->is_error_message());
 
-  // TODO(https://crbug.com/1134349): Currently this errors out because remote
-  // attestation is disabled. We want this to error out because of a poorly
-  // formatted attestation message.
+  // TODO(https://crbug.com/1134349): Currently this errors out because the
+  // device is not enterprise enrolled. We want this to error out because of a
+  // poorly formatted attestation message.
   const char expected_error_message[] =
-      "Remote attestation is not enabled for your account.";
+      "Failed to get Enterprise certificate. Error code = 2";
   EXPECT_EQ(expected_error_message, result->get_error_message());
 }
 

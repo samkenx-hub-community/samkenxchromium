@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "ash/constants/ash_features.h"
+#include <array>
+#include <string>
+
 #include "ash/constants/ash_switches.h"
+#include "base/memory/raw_ptr.h"
 #include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
+#include "build/build_config.h"
 #include "chrome/browser/ash/login/lock/screen_locker_tester.h"
 #include "chrome/browser/ash/login/saml/fake_saml_idp_mixin.h"
 #include "chrome/browser/ash/login/saml/lockscreen_reauth_dialog_test_helper.h"
@@ -17,27 +21,29 @@
 #include "chrome/browser/ash/login/test/js_checker.h"
 #include "chrome/browser/ash/login/test/logged_in_user_mixin.h"
 #include "chrome/browser/ash/login/test/test_condition_waiter.h"
-#include "chrome/browser/ash/login/users/test_users.h"
 #include "chrome/browser/ash/policy/affiliation/affiliation_test_helper.h"
 #include "chrome/browser/ash/policy/core/device_policy_cros_browser_test.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/chrome_notification_types.h"
+#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/login/login_handler.h"
 #include "chrome/test/base/mixin_based_in_process_browser_test.h"
+#include "chromeos/ash/components/browser_context_helper/browser_context_helper.h"
 #include "chromeos/ash/components/dbus/session_manager/fake_session_manager_client.h"
 #include "chromeos/ash/components/dbus/shill/fake_shill_manager_client.h"
 #include "chromeos/ash/components/network/network_connection_handler.h"
 #include "chromeos/ash/components/network/network_handler.h"
-#include "chromeos/ash/components/network/network_handler_callbacks.h"
 #include "chromeos/ash/components/network/network_handler_test_helper.h"
 #include "chromeos/ash/components/network/network_state_handler.h"
 #include "chromeos/ash/components/network/network_state_test_helper.h"
 #include "chromeos/ash/components/network/proxy/proxy_config_handler.h"
 #include "components/account_id/account_id.h"
 #include "components/network_session_configurator/common/network_switches.h"
+#include "components/policy/core/common/policy_pref_names.h"
 #include "components/proxy_config/proxy_config_dictionary.h"
+#include "components/strings/grit/components_strings.h"
+#include "content/public/browser/notification_service.h"
 #include "content/public/browser/storage_partition.h"
-#include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/test_utils.h"
 #include "google_apis/gaia/gaia_urls.h"
@@ -46,6 +52,7 @@
 #include "net/test/spawned_test_server/spawned_test_server.h"
 #include "services/network/public/mojom/cookie_manager.mojom.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "ui/base/l10n/l10n_util.h"
 
 namespace ash {
 namespace {
@@ -60,7 +67,12 @@ constexpr char kEthServicePath[] = "/service/eth1";
 
 constexpr char kSAMLIdPCookieName[] = "saml";
 constexpr char kSAMLIdPCookieValue[] = "value";
-constexpr char kAffiliationID[] = "test id";
+constexpr base::StringPiece kAffiliationID = "test id";
+
+constexpr char kSAMLLink[] = "link";
+constexpr char kSAMLLinkedPageURLPattern[] =
+    "*"
+    "/linked";
 
 void ErrorCallbackFunction(base::OnceClosure run_loop_quit_closure,
                            const std::string& error_name,
@@ -115,8 +127,8 @@ class LockscreenWebUiTest : public MixinBasedInProcessBrowserTest {
     fake_gaia_mixin()->fake_gaia()->RegisterSamlUser(
         FakeGaiaMixin::kEnterpriseUser1, fake_saml_idp_.GetSamlPageUrl());
 
-    fake_gaia_mixin()->set_initialize_fake_merge_session(false);
-    fake_gaia_mixin()->fake_gaia()->SetFakeMergeSessionParams(
+    fake_gaia_mixin()->set_initialize_configuration(false);
+    fake_gaia_mixin()->fake_gaia()->SetConfigurationHelper(
         FakeGaiaMixin::kEnterpriseUser1, kTestAuthSIDCookie1,
         kTestAuthLSIDCookie1);
     fake_gaia_mixin()->SetupFakeGaiaForLogin(FakeGaiaMixin::kEnterpriseUser1,
@@ -327,7 +339,7 @@ IN_PROC_BROWSER_TEST_F(LockscreenWebUiTest, ScrapedSingle) {
       reauth_dialog_helper->DialogWebContents());
 
   // Make sure that the password is scraped correctly.
-  ASSERT_TRUE(content::ExecuteScript(
+  ASSERT_TRUE(content::ExecJs(
       reauth_dialog_helper->DialogWebContents(),
       "$('main-element').authenticator_.addEventListener('authCompleted',"
       "    function(e) {"
@@ -481,7 +493,7 @@ IN_PROC_BROWSER_TEST_F(LockscreenWebUiTest, MAYBE_ScrapedNone) {
 #define MAYBE_VerifyAgainFlow VerifyAgainFlow
 #endif
 IN_PROC_BROWSER_TEST_F(LockscreenWebUiTest, MAYBE_VerifyAgainFlow) {
-  fake_gaia_mixin()->fake_gaia()->SetFakeMergeSessionParams(
+  fake_gaia_mixin()->fake_gaia()->SetConfigurationHelper(
       FakeGaiaMixin::kEnterpriseUser2, kTestAuthSIDCookie1,
       kTestAuthLSIDCookie1);
 
@@ -497,7 +509,7 @@ IN_PROC_BROWSER_TEST_F(LockscreenWebUiTest, MAYBE_VerifyAgainFlow) {
 
   // Authenticate in the IdP with another account other than the one used in
   // sign in.
-  fake_gaia_mixin()->fake_gaia()->SetFakeMergeSessionParams(
+  fake_gaia_mixin()->fake_gaia()->SetConfigurationHelper(
       FakeGaiaMixin::kEnterpriseUser2, kTestAuthSIDCookie2,
       kTestAuthLSIDCookie2);
   test::JSChecker signin_frame_js = reauth_dialog_helper->SigninFrameJS();
@@ -542,8 +554,8 @@ IN_PROC_BROWSER_TEST_F(LockscreenWebUiTest, MAYBE_ShowNetworkDialog) {
   reauth_dialog_helper->ExpectVerifyAccountScreenHidden();
 }
 
-// TODO(crbug.com/1414002): Flaky on ChromeOS MSAN.
-#if defined(MEMORY_SANITIZER)
+// TODO(crbug.com/1414002): Flaky on ChromeOS MSAN and linux-chromeos-rel.
+#if defined(MEMORY_SANITIZER) || BUILDFLAG(IS_CHROMEOS)
 #define MAYBE_TriggerDialogOnNetworkOff DISABLED_TriggerDialogOnNetworkOff
 #else
 #define MAYBE_TriggerDialogOnNetworkOff TriggerDialogOnNetworkOff
@@ -659,7 +671,7 @@ IN_PROC_BROWSER_TEST_F(LockscreenWebUiTest, CaptivePortal) {
 }
 
 // TODO(crbug.com/1414002): Flaky on ChromeOS MSAN.
-#if defined(MEMORY_SANITIZER)
+#if BUILDFLAG(IS_CHROMEOS) || defined(MEMORY_SANITIZER)
 #define MAYBE_TriggerAndHideCaptivePortalDialog \
   DISABLED_TriggerAndHideCaptivePortalDialog
 #else
@@ -732,7 +744,7 @@ IN_PROC_BROWSER_TEST_F(LockscreenWebUiTest, MAYBE_LoadAbort) {
 
   // Make gaia landing page unreachable
   fake_gaia_mixin()->fake_gaia()->SetFixedResponse(
-      GaiaUrls::GetInstance()->embedded_setup_chromeos_url(2),
+      GaiaUrls::GetInstance()->embedded_setup_chromeos_url(),
       net::HTTP_NOT_FOUND);
 
   // Lock the screen and trigger the lock screen SAML reauth dialog.
@@ -749,6 +761,43 @@ IN_PROC_BROWSER_TEST_F(LockscreenWebUiTest, MAYBE_LoadAbort) {
 
   // Close dialog at the end of the test - otherwise test will crash on exit
   reauth_dialog_helper->ClickCloseNetworkButton();
+}
+
+IN_PROC_BROWSER_TEST_F(LockscreenWebUiTest, SAMLBlocklistNavigationDisallowed) {
+  fake_saml_idp()->SetLoginHTMLTemplate("saml_login_link.html");
+
+  Login();
+  ScreenLockerTester().Lock();
+
+  absl::optional<LockScreenReauthDialogTestHelper> reauth_dialog_helper =
+      LockScreenReauthDialogTestHelper::StartSamlAndWaitForIdpPageLoad();
+
+  ASSERT_TRUE(reauth_dialog_helper);
+
+  // TODO(https://issuetracker.google.com/290830337): Make this test class
+  // support propagating device policies to prefs with the logic in
+  // `LoginProfilePolicyProvider`, and instead of setting prefs here directly,
+  // just set the right device policies using
+  // `DeviceStateMixin::RequestDevicePolicyUpdate`.
+  // TODO(https://issuetracker.google.com/290821299): Add browser tests for
+  // allowlisting.
+  Profile::FromBrowserContext(
+      BrowserContextHelper::Get()->GetLockScreenBrowserContext())
+      ->GetPrefs()
+      ->SetList(policy::policy_prefs::kUrlBlocklist,
+                base::Value::List().Append(kSAMLLinkedPageURLPattern));
+
+  test::JSChecker signin_frame_js = reauth_dialog_helper->SigninFrameJS();
+  signin_frame_js.CreateVisibilityWaiter(true, kSAMLLink)->Wait();
+  signin_frame_js.TapOn(kSAMLLink);
+  WaitForLoadStop(signin_frame_js.web_contents());
+
+  signin_frame_js
+      .CreateElementTextContentWaiter(
+          l10n_util::GetStringUTF8(
+              IDS_ERRORPAGES_SUMMARY_BLOCKED_BY_ADMINISTRATOR),
+          {"main-frame-error"})
+      ->Wait();
 }
 
 // Sets up proxy server which requires authentication.
@@ -824,7 +873,7 @@ class ProxyAuthLockscreenWebUiTest : public LockscreenWebUiTest {
   net::SpawnedTestServer proxy_server_;
   std::unique_ptr<content::WindowedNotificationObserver> auth_needed_observer_;
   // Used for proxy server authentication.
-  LoginHandler* login_handler_;
+  raw_ptr<LoginHandler, DanglingUntriaged | ExperimentalAsh> login_handler_;
 };
 
 IN_PROC_BROWSER_TEST_F(ProxyAuthLockscreenWebUiTest, SwitchToProxyNetwork) {
@@ -880,7 +929,9 @@ IN_PROC_BROWSER_TEST_F(ProxyAuthLockscreenWebUiTest, SwitchToProxyNetwork) {
 }
 
 // TODO(crbug.com/1414002): Flaky on ChromeOS MSAN.
-#if defined(MEMORY_SANITIZER)
+// TODO(crbug.com/1455506): Flaky on linux-chromeos-rel.
+#if defined(MEMORY_SANITIZER) || \
+    (defined(NDEBUG) && !defined(ADDRESS_SANITIZER))
 #define MAYBE_ProxyAuthCanBeCancelled DISABLED_ProxyAuthCanBeCancelled
 #else
 #define MAYBE_ProxyAuthCanBeCancelled ProxyAuthCanBeCancelled
@@ -951,14 +1002,13 @@ class SAMLCookieTransferTest : public LockscreenWebUiTest {
         ->set_transfer_saml_cookies(true);
     // Make user affiliated - this is another condition required to transfer
     // saml cookies.
-    const std::set<std::string> device_affiliation_ids = {kAffiliationID};
     auto affiliation_helper = policy::AffiliationTestHelper::CreateForCloud(
         FakeSessionManagerClient::Get());
-    ASSERT_NO_FATAL_FAILURE((affiliation_helper.SetDeviceAffiliationIDs(
-        &device_policy_test_helper, device_affiliation_ids)));
+    ASSERT_NO_FATAL_FAILURE(affiliation_helper.SetDeviceAffiliationIDs(
+        &device_policy_test_helper, std::array{kAffiliationID}));
     policy::UserPolicyBuilder user_policy_builder;
-    ASSERT_NO_FATAL_FAILURE((affiliation_helper.SetUserAffiliationIDs(
-        &user_policy_builder, GetAccountId(), device_affiliation_ids)));
+    ASSERT_NO_FATAL_FAILURE(affiliation_helper.SetUserAffiliationIDs(
+        &user_policy_builder, GetAccountId(), std::array{kAffiliationID}));
   }
 
   // Add some random cookie to user partition. This is needed because during
@@ -1057,14 +1107,13 @@ class SamlSsoProfileTest : public LockscreenWebUiTest {
 
     // Set affiliation and user policies - this is needed for login in tests to
     // work correctly
-    const std::set<std::string> device_affiliation_ids = {kAffiliationID};
     auto affiliation_helper = policy::AffiliationTestHelper::CreateForCloud(
         FakeSessionManagerClient::Get());
-    ASSERT_NO_FATAL_FAILURE((affiliation_helper.SetDeviceAffiliationIDs(
-        &device_policy_test_helper, device_affiliation_ids)));
+    ASSERT_NO_FATAL_FAILURE(affiliation_helper.SetDeviceAffiliationIDs(
+        &device_policy_test_helper, std::array{kAffiliationID}));
     policy::UserPolicyBuilder user_policy_builder;
-    ASSERT_NO_FATAL_FAILURE((affiliation_helper.SetUserAffiliationIDs(
-        &user_policy_builder, GetAccountId(), device_affiliation_ids)));
+    ASSERT_NO_FATAL_FAILURE(affiliation_helper.SetUserAffiliationIDs(
+        &user_policy_builder, GetAccountId(), std::array{kAffiliationID}));
   }
 
  private:

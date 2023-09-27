@@ -8,7 +8,7 @@
 
 #include "base/containers/flat_set.h"
 #include "base/functional/bind.h"
-#include "base/task/single_thread_task_runner.h"
+#include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/browser_process.h"
 #include "components/webapps/services/web_app_origin_association/public/mojom/web_app_origin_association_parser.mojom.h"
 #include "components/webapps/services/web_app_origin_association/web_app_origin_association_fetcher.h"
@@ -86,7 +86,7 @@ void WebAppOriginAssociationManager::Task::OnAssociationParsed(
   auto& scope_extension = GetCurrentScopeExtension();
   for (auto& associated_app : association->apps) {
     if (associated_app->web_app_identity == web_app_identity_) {
-      result_.push_back(scope_extension);
+      result_.insert(scope_extension);
       scope_extension.Reset();
       // Only information in the first valid app is saved.
       break;
@@ -112,7 +112,7 @@ void WebAppOriginAssociationManager::Task::MaybeStartNextScopeExtension() {
 void WebAppOriginAssociationManager::Task::Finalize() {
   ScopeExtensions result = std::move(result_);
   result_.clear();
-  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(std::move(callback_), std::move(result)));
   owner_->OnTaskCompleted();
 }

@@ -132,32 +132,44 @@ export class SiteListEntryElement extends SiteListEntryElementBase {
     this.fire('show-tooltip', {target: tooltip, text});
   }
 
-  private shouldHideResetButton_(): boolean {
-    if (this.model === undefined) {
-      return false;
-    }
-
-    return this.model.enforcement ===
-        chrome.settingsPrivate.Enforcement.ENFORCED ||
-        !(this.readOnlyList || !!this.model.embeddingOrigin ||
-          !!this.model.isolatedWebAppName);
+  private isIsolatedWebApp_(): boolean {
+    return this.model.origin.startsWith('isolated-app://');
   }
 
-  private shouldHideActionMenu_(): boolean {
+  /**
+   * Returns true if this site exception can be edited by the user. Note that
+   * this is not the same as readonly; an exception can be removable but not
+   * editable.
+   */
+  private isUserEditable_(): boolean {
+    return !this.readOnlyList && !this.model.embeddingOrigin &&
+        !this.isIsolatedWebApp_();
+  }
+
+  private shouldShowResetButton_(): boolean {
     if (this.model === undefined) {
       return false;
     }
 
-    return this.model.enforcement ===
-        chrome.settingsPrivate.Enforcement.ENFORCED ||
-        this.readOnlyList || !!this.model.embeddingOrigin ||
-        !!this.model.isolatedWebAppName;
+    return this.model.enforcement !==
+        chrome.settingsPrivate.Enforcement.ENFORCED &&
+        !this.isUserEditable_();
+  }
+
+  private shouldShowActionMenu_(): boolean {
+    if (this.model === undefined) {
+      return false;
+    }
+
+    return this.model.enforcement !==
+        chrome.settingsPrivate.Enforcement.ENFORCED &&
+        this.isUserEditable_();
   }
 
   /**
    * A handler for selecting a site (by clicking on the origin).
    */
-  private onOriginTap_() {
+  private onOriginClick_() {
     if (!this.allowNavigateToSiteDetail_) {
       return;
     }
@@ -172,9 +184,6 @@ export class SiteListEntryElement extends SiteListEntryElementBase {
    * or the website whose third parties are also affected.
    */
   private computeDisplayName_(): string {
-    if (this.model.isolatedWebAppName) {
-      return this.model.isolatedWebAppName;
-    }
     if (this.model.embeddingOrigin &&
         this.model.category === ContentSettingsTypes.COOKIES &&
         this.model.origin.trim() === SITE_EXCEPTION_WILDCARD) {
@@ -204,7 +213,12 @@ export class SiteListEntryElement extends SiteListEntryElementBase {
   private computeSiteDescription_(): string {
     let description = '';
 
-    if (this.model.isEmbargoed) {
+    // If a description has been set by the handler, have it override others.
+    // TODO(crbug.com/1467504): Move all possible descriptions in to this
+    // field C++ side so this function can be greatly simplified.
+    if (this.model.description) {
+      description = this.model.description;
+    } else if (this.model.isEmbargoed) {
       assert(
           !this.model.embeddingOrigin,
           'Embedding origin should be empty for embargoed origin.');
@@ -226,13 +240,6 @@ export class SiteListEntryElement extends SiteListEntryElementBase {
       description = loadTimeData.getString('embeddedOnAnyHost');
     }
 
-    // <if expr="chromeos_ash">
-    if (this.model.category === ContentSettingsTypes.NOTIFICATIONS &&
-        this.model.showAndroidSmsNote) {
-      description = loadTimeData.getString('androidSmsNote');
-    }
-    // </if>
-
     try {
       const url = new URL(this.model.origin);
       if (url.protocol === 'chrome-extension:') {
@@ -250,7 +257,7 @@ export class SiteListEntryElement extends SiteListEntryElementBase {
         !!this.model.controlledBy;
   }
 
-  private onResetButtonTap_() {
+  private onResetButtonClick_() {
     // Use the appropriate method to reset a chooser exception.
     if (this.chooserType !== ChooserType.NONE && this.chooserObject !== null) {
       this.browserProxy.resetChooserExceptionForSite(
@@ -263,7 +270,7 @@ export class SiteListEntryElement extends SiteListEntryElementBase {
         this.model.incognito);
   }
 
-  private onShowActionMenuTap_() {
+  private onShowActionMenuClick_() {
     // Chooser exceptions do not support the action menu, so do nothing.
     if (this.chooserType !== ChooserType.NONE) {
       return;

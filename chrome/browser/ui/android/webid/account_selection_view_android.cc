@@ -9,12 +9,14 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
 #include "base/strings/string_piece.h"
-#include "chrome/browser/ui/android/webid/jni_headers/AccountSelectionBridge_jni.h"
+#include "chrome/browser/ui/android/webid/internal/jni/AccountSelectionBridge_jni.h"
 #include "chrome/browser/ui/android/webid/jni_headers/Account_jni.h"
 #include "chrome/browser/ui/android/webid/jni_headers/ClientIdMetadata_jni.h"
+#include "chrome/browser/ui/android/webid/jni_headers/IdentityCredentialTokenError_jni.h"
 #include "chrome/browser/ui/android/webid/jni_headers/IdentityProviderMetadata_jni.h"
 #include "chrome/browser/ui/webid/account_selection_view.h"
 #include "content/public/browser/identity_request_dialog_controller.h"
+#include "third_party/blink/public/mojom/webid/federated_auth_request.mojom.h"
 #include "ui/android/color_utils_android.h"
 #include "ui/android/window_android.h"
 #include "url/android/gurl_android.h"
@@ -51,6 +53,15 @@ ScopedJavaLocalRef<jobject> ConvertToJavaIdentityProviderMetadata(
       ui::OptionalSkColorToJavaColor(metadata.brand_background_color),
       java_brand_icon_url,
       url::GURLAndroid::FromNativeGURL(env, metadata.config_url));
+}
+
+ScopedJavaLocalRef<jobject> ConvertToJavaIdentityCredentialTokenError(
+    JNIEnv* env,
+    const absl::optional<TokenError>& error) {
+  return Java_IdentityCredentialTokenError_Constructor(
+      env,
+      base::android::ConvertUTF8ToJavaString(env, error ? error->code : ""),
+      url::GURLAndroid::FromNativeGURL(env, error ? error->url : GURL()));
 }
 
 ScopedJavaLocalRef<jobject> ConvertToJavaClientIdMetadata(
@@ -94,7 +105,33 @@ Account ConvertFieldsToAccount(
       is_sign_in ? Account::LoginState::kSignIn : Account::LoginState::kSignUp;
 
   GURL picture_url = *url::GURLAndroid::ToNativeGURL(env, picture_url_obj);
-  return Account(account_id, email, name, given_name, picture_url, login_state);
+
+  // The login hints and hosted domains are only used before account selection.
+  std::vector<std::string> login_hints;
+  std::vector<std::string> hosted_domains;
+  return Account(account_id, email, name, given_name, picture_url,
+                 std::move(login_hints), std::move(hosted_domains),
+                 login_state);
+}
+
+ScopedJavaLocalRef<jstring> ConvertRpContextToJavaString(
+    JNIEnv* env,
+    blink::mojom::RpContext rp_context) {
+  std::string rp_context_string;
+  switch (rp_context) {
+    case blink::mojom::RpContext::kSignUp:
+      rp_context_string = "signup";
+      break;
+    case blink::mojom::RpContext::kUse:
+      rp_context_string = "use";
+      break;
+    case blink::mojom::RpContext::kContinue:
+      rp_context_string = "continue";
+      break;
+    default:
+      rp_context_string = "signin";
+  }
+  return ConvertUTF8ToJavaString(env, rp_context_string);
 }
 
 }  // namespace
@@ -113,11 +150,11 @@ AccountSelectionViewAndroid::~AccountSelectionViewAndroid() {
 
 void AccountSelectionViewAndroid::Show(
     const std::string& top_frame_for_display,
-    const absl::optional<std::string>& iframe_url_for_display,
+    const absl::optional<std::string>& iframe_for_display,
     const std::vector<content::IdentityProviderData>& identity_provider_data,
     Account::SignInMode sign_in_mode,
     bool show_auto_reauthn_checkbox) {
-  if (!RecreateJavaObject()) {
+  if (!MaybeCreateJavaObject()) {
     // It's possible that the constructor cannot access the bottom sheet clank
     // component. That case may be temporary but we can't let users in a
     // waiting state so report that AccountSelectionView is dismissed instead.
@@ -139,20 +176,102 @@ void AccountSelectionViewAndroid::Show(
   ScopedJavaLocalRef<jobject> client_id_metadata_obj =
       ConvertToJavaClientIdMetadata(env,
                                     identity_provider_data[0].client_metadata);
+
   Java_AccountSelectionBridge_showAccounts(
       env, java_object_internal_,
       ConvertUTF8ToJavaString(env, top_frame_for_display),
-      ConvertUTF8ToJavaString(env, iframe_url_for_display.value_or("")),
+      ConvertUTF8ToJavaString(env, iframe_for_display.value_or("")),
       ConvertUTF8ToJavaString(env, identity_provider_data[0].idp_for_display),
       accounts_obj, idp_metadata_obj, client_id_metadata_obj,
-      sign_in_mode == Account::SignInMode::kAuto);
+      sign_in_mode == Account::SignInMode::kAuto,
+      ConvertRpContextToJavaString(env, identity_provider_data[0].rp_context));
 }
 
 void AccountSelectionViewAndroid::ShowFailureDialog(
     const std::string& top_frame_for_display,
+    const absl::optional<std::string>& iframe_for_display,
     const std::string& idp_for_display,
+    const blink::mojom::RpContext& rp_context,
     const content::IdentityProviderMetadata& idp_metadata) {
-  // TODO(crbug.com/1357790): add support on Android.
+  if (!MaybeCreateJavaObject()) {
+    // It's possible that the constructor cannot access the bottom sheet clank
+    // component. That case may be temporary but we can't let users in a
+    // waiting state so report that AccountSelectionView is dismissed instead.
+    delegate_->OnDismiss(DismissReason::kOther);
+    return;
+  }
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jobject> idp_metadata_obj =
+      ConvertToJavaIdentityProviderMetadata(env, idp_metadata);
+  Java_AccountSelectionBridge_showFailureDialog(
+      env, java_object_internal_,
+      ConvertUTF8ToJavaString(env, top_frame_for_display),
+      ConvertUTF8ToJavaString(env, iframe_for_display.value_or("")),
+      ConvertUTF8ToJavaString(env, idp_for_display), idp_metadata_obj,
+      ConvertRpContextToJavaString(env, rp_context));
+}
+
+void AccountSelectionViewAndroid::ShowErrorDialog(
+    const std::string& top_frame_for_display,
+    const absl::optional<std::string>& iframe_for_display,
+    const std::string& idp_for_display,
+    const blink::mojom::RpContext& rp_context,
+    const content::IdentityProviderMetadata& idp_metadata,
+    const absl::optional<TokenError>& error) {
+  if (!MaybeCreateJavaObject()) {
+    // It's possible that the constructor cannot access the bottom sheet clank
+    // component. That case may be temporary but we can't let users in a
+    // waiting state so report that AccountSelectionView is dismissed instead.
+    delegate_->OnDismiss(DismissReason::kOther);
+    return;
+  }
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jobject> idp_metadata_obj =
+      ConvertToJavaIdentityProviderMetadata(env, idp_metadata);
+  Java_AccountSelectionBridge_showErrorDialog(
+      env, java_object_internal_,
+      ConvertUTF8ToJavaString(env, top_frame_for_display),
+      ConvertUTF8ToJavaString(env, iframe_for_display.value_or("")),
+      ConvertUTF8ToJavaString(env, idp_for_display), idp_metadata_obj,
+      ConvertRpContextToJavaString(env, rp_context),
+      ConvertToJavaIdentityCredentialTokenError(env, error));
+}
+
+std::string AccountSelectionViewAndroid::GetTitle() const {
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jstring> title =
+      Java_AccountSelectionBridge_getTitle(env, java_object_internal_);
+  CHECK(title);
+  return ConvertJavaStringToUTF8(title);
+}
+
+absl::optional<std::string> AccountSelectionViewAndroid::GetSubtitle() const {
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jstring> subtitle =
+      Java_AccountSelectionBridge_getSubtitle(env, java_object_internal_);
+  if (!subtitle) {
+    return absl::nullopt;
+  }
+  return ConvertJavaStringToUTF8(subtitle);
+}
+
+content::WebContents* AccountSelectionViewAndroid::ShowModalDialog(
+    const GURL& url) {
+  JNIEnv* env = AttachCurrentThread();
+  return content::WebContents::FromJavaWebContents(
+      Java_AccountSelectionBridge_showModalDialog(
+          env, java_object_internal_,
+          url::GURLAndroid::FromNativeGURL(env, url)));
+}
+
+void AccountSelectionViewAndroid::CloseModalDialog() {
+  // The Java object needs to be recreated, as this is invoked for the
+  // CCT that was closed.
+  if (!MaybeCreateJavaObject()) {
+    return;
+  }
+  JNIEnv* env = AttachCurrentThread();
+  Java_AccountSelectionBridge_closeModalDialog(env, java_object_internal_);
 }
 
 void AccountSelectionViewAndroid::OnAccountSelected(
@@ -174,17 +293,21 @@ void AccountSelectionViewAndroid::OnDismiss(JNIEnv* env, jint dismiss_reason) {
   delegate_->OnDismiss(static_cast<DismissReason>(dismiss_reason));
 }
 
-bool AccountSelectionViewAndroid::RecreateJavaObject() {
+void AccountSelectionViewAndroid::OnSignInToIdp(JNIEnv* env) {
+  delegate_->OnSigninToIdP();
+}
+
+bool AccountSelectionViewAndroid::MaybeCreateJavaObject() {
   if (delegate_->GetNativeView() == nullptr ||
       delegate_->GetNativeView()->GetWindowAndroid() == nullptr) {
     return false;  // No window attached (yet or anymore).
   }
   if (java_object_internal_) {
-    Java_AccountSelectionBridge_destroy(AttachCurrentThread(),
-                                        java_object_internal_);
+    return true;
   }
   java_object_internal_ = Java_AccountSelectionBridge_create(
       AttachCurrentThread(), reinterpret_cast<intptr_t>(this),
+      delegate_->GetWebContents()->GetJavaWebContents(),
       delegate_->GetNativeView()->GetWindowAndroid()->GetJavaObject());
   return !!java_object_internal_;
 }

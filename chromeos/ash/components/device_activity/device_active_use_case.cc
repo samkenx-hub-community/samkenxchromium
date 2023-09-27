@@ -4,13 +4,14 @@
 
 #include "chromeos/ash/components/device_activity/device_active_use_case.h"
 
+#include "base/i18n/time_formatting.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
-#include "base/strings/stringprintf.h"
 #include "chromeos/ash/components/system/statistics_provider.h"
 #include "components/prefs/pref_service.h"
 #include "components/version_info/version_info.h"
 #include "crypto/hmac.h"
+#include "third_party/icu/source/i18n/unicode/timezone.h"
 #include "third_party/private_membership/src/private_membership_rlwe_client.h"
 
 namespace ash::device_activity {
@@ -123,10 +124,8 @@ DeviceActiveUseCase::GetPsmIdentifier() const {
 }
 
 std::string DeviceActiveUseCase::GenerateWindowIdentifier(base::Time ts) const {
-  base::Time::Exploded exploded;
-  ts.UTCExplode(&exploded);
-  return base::StringPrintf("%04d%02d%02d", exploded.year, exploded.month,
-                            exploded.day_of_month);
+  return base::UnlocalizedTimeFormatWithPattern(ts, "yyyyMMdd",
+                                                icu::TimeZone::getGMT());
 }
 
 void DeviceActiveUseCase::SetChurnActiveStatus(
@@ -162,6 +161,15 @@ void DeviceActiveUseCase::SetPsmIdentifiersToQuery() {
   for (auto kv : psm_id_to_date_) {
     psm_rlwe::RlwePlaintextId psm_rlwe_id;
     psm_rlwe_id.set_sensitive_id(kv.first);
+
+    if (GetPsmUseCase() != psm_rlwe::RlweUseCase::CROS_FRESNEL_DAILY) {
+      VLOG(1) << "Daily use case should not attach the non sensitive id "
+              << "apart of the hashed query plaintext id. "
+              << "Import and Query must be consistent when sending "
+              << "sensitive_id and non_sensitive_id.";
+      psm_rlwe_id.set_non_sensitive_id(GenerateWindowIdentifier(kv.second));
+    }
+
     psm_ids_to_query_.push_back(psm_rlwe_id);
   }
 }
@@ -191,9 +199,11 @@ std::vector<FresnelImportData> DeviceActiveUseCase::GetImportData() const {
 
 base::Time DeviceActiveUseCase::RetrievePsmIdDate(
     private_membership::rlwe::RlwePlaintextId id) {
-  if (psm_id_to_date_.find(id.sensitive_id()) == psm_id_to_date_.end())
+  auto it = psm_id_to_date_.find(id.sensitive_id());
+  if (it == psm_id_to_date_.end()) {
     return base::Time::UnixEpoch();
-  return psm_id_to_date_.at(id.sensitive_id());
+  }
+  return it->second;
 }
 
 std::string DeviceActiveUseCase::GetDigestString(
@@ -245,15 +255,8 @@ void DeviceActiveUseCase::SetPsmRlweClient(
 
 
 std::string DeviceActiveUseCase::FormatPTDateString(base::Time ts) {
-  base::Time::Exploded exploded;
-  ts.UTCExplode(&exploded);
-  return base::StringPrintf("%04d-%02d-%02d %02d:%02d:%02d.%03d GMT",
-                            exploded.year, exploded.month,
-                            exploded.day_of_month,
-                            /* hour */ 0,
-                            /* minute */ 0,
-                            /* second */ 0,
-                            /* millisecond */ 0);
+  return base::UnlocalizedTimeFormatWithPattern(ts, "yyyy-MM-dd 00:00:00.000 z",
+                                                icu::TimeZone::getGMT());
 }
 
 absl::optional<psm_rlwe::RlwePlaintextId>

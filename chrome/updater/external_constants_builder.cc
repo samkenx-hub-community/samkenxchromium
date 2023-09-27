@@ -64,6 +64,28 @@ ExternalConstantsBuilder& ExternalConstantsBuilder::ClearUpdateURL() {
   return *this;
 }
 
+ExternalConstantsBuilder& ExternalConstantsBuilder::SetCrashUploadURL(
+    const std::string& url) {
+  overrides_.Set(kDevOverrideKeyCrashUploadUrl, url);
+  return *this;
+}
+
+ExternalConstantsBuilder& ExternalConstantsBuilder::ClearCrashUploadURL() {
+  overrides_.Remove(kDevOverrideKeyCrashUploadUrl);
+  return *this;
+}
+
+ExternalConstantsBuilder& ExternalConstantsBuilder::SetDeviceManagementURL(
+    const std::string& url) {
+  overrides_.Set(kDevOverrideKeyDeviceManagementUrl, url);
+  return *this;
+}
+
+ExternalConstantsBuilder& ExternalConstantsBuilder::ClearDeviceManagementURL() {
+  overrides_.Remove(kDevOverrideKeyDeviceManagementUrl);
+  return *this;
+}
+
 ExternalConstantsBuilder& ExternalConstantsBuilder::SetUseCUP(bool use_cup) {
   overrides_.Set(kDevOverrideKeyUseCUP, use_cup);
   return *this;
@@ -128,6 +150,37 @@ ExternalConstantsBuilder& ExternalConstantsBuilder::SetOverinstallTimeout(
   return *this;
 }
 
+ExternalConstantsBuilder& ExternalConstantsBuilder::ClearOverinstallTimeout() {
+  overrides_.Remove(kDevOverrideKeyOverinstallTimeout);
+  return *this;
+}
+
+ExternalConstantsBuilder& ExternalConstantsBuilder::SetIdleCheckPeriod(
+    const base::TimeDelta& idle_check_period) {
+  overrides_.Set(kDevOverrideKeyIdleCheckPeriodSeconds,
+                 static_cast<int>(idle_check_period.InSeconds()));
+  return *this;
+}
+
+ExternalConstantsBuilder& ExternalConstantsBuilder::ClearIdleCheckPeriod() {
+  overrides_.Remove(kDevOverrideKeyIdleCheckPeriodSeconds);
+  return *this;
+}
+
+ExternalConstantsBuilder& ExternalConstantsBuilder::SetMachineManaged(
+    const absl::optional<bool>& is_managed_device) {
+  if (is_managed_device.has_value()) {
+    overrides_.Set(kDevOverrideKeyManagedDevice, is_managed_device.value());
+  }
+
+  return *this;
+}
+
+ExternalConstantsBuilder& ExternalConstantsBuilder::ClearMachineManaged() {
+  overrides_.Remove(kDevOverrideKeyManagedDevice);
+  return *this;
+}
+
 bool ExternalConstantsBuilder::Overwrite() {
   const absl::optional<base::FilePath> override_path =
       GetOverrideFilePath(GetUpdaterScope());
@@ -154,6 +207,13 @@ bool ExternalConstantsBuilder::Modify() {
 
   if (!overrides_.contains(kDevOverrideKeyUrl))
     SetUpdateURL(StringVectorFromGURLVector(verifier->UpdateURL()));
+  if (!overrides_.contains(kDevOverrideKeyCrashUploadUrl)) {
+    SetCrashUploadURL(verifier->CrashUploadURL().possibly_invalid_spec());
+  }
+  if (!overrides_.contains(kDevOverrideKeyDeviceManagementUrl)) {
+    SetDeviceManagementURL(
+        verifier->DeviceManagementURL().possibly_invalid_spec());
+  }
   if (!overrides_.contains(kDevOverrideKeyUseCUP))
     SetUseCUP(verifier->UseCUP());
   if (!overrides_.contains(kDevOverrideKeyInitialDelay))
@@ -166,6 +226,12 @@ bool ExternalConstantsBuilder::Modify() {
     SetGroupPolicies(verifier->GroupPolicies());
   if (!overrides_.contains(kDevOverrideKeyOverinstallTimeout))
     SetOverinstallTimeout(verifier->OverinstallTimeout());
+  if (!overrides_.contains(kDevOverrideKeyIdleCheckPeriodSeconds)) {
+    SetIdleCheckPeriod(verifier->IdleCheckPeriod());
+  }
+  if (!overrides_.contains(kDevOverrideKeyManagedDevice)) {
+    SetMachineManaged(verifier->IsMachineManaged());
+  }
 
   return Overwrite();
 }

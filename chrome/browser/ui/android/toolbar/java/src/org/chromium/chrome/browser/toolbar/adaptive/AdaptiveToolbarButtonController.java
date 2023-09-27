@@ -12,7 +12,6 @@ import android.content.res.Configuration;
 import android.view.View;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Callback;
 import org.chromium.base.FeatureList;
@@ -41,6 +40,7 @@ import org.chromium.ui.permissions.AndroidPermissionDelegate;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 /** Meta {@link ButtonDataProvider} which chooses the optional button variant that will be shown. */
 public class AdaptiveToolbarButtonController
@@ -76,8 +76,8 @@ public class AdaptiveToolbarButtonController
     private final AdaptiveButtonActionMenuCoordinator mMenuCoordinator;
     private int mScreenWidthDp;
 
-    @AdaptiveToolbarButtonVariant
-    private int mSessionButtonVariant = AdaptiveToolbarButtonVariant.UNKNOWN;
+    private @AdaptiveToolbarButtonVariant int mSessionButtonVariant =
+            AdaptiveToolbarButtonVariant.UNKNOWN;
     private CurrentTabObserver mPageLoadMetricsRecorder;
 
     /**
@@ -196,7 +196,7 @@ public class AdaptiveToolbarButtonController
         mButtonData.setEnabled(receivedButtonData.isEnabled());
         final ButtonSpec receivedButtonSpec = receivedButtonData.getButtonSpec();
         // ButtonSpec is immutable, so we keep the previous value when noting changes.
-        if (receivedButtonSpec != mOriginalButtonSpec) {
+        if (!Objects.equals(receivedButtonSpec, mOriginalButtonSpec)) {
             assert receivedButtonSpec.getOnLongClickListener()
                     == null
                 : "adaptive button variants are expected to not set a long click listener";
@@ -211,7 +211,9 @@ public class AdaptiveToolbarButtonController
                     receivedButtonSpec.getSupportsTinting(),
                     receivedButtonSpec.getIPHCommandBuilder(),
                     receivedButtonSpec.getButtonVariant(),
-                    receivedButtonSpec.getActionChipLabelResId()));
+                    receivedButtonSpec.getActionChipLabelResId(),
+                    receivedButtonSpec.getHoverTooltipTextId(),
+                    receivedButtonSpec.getShouldShowHoverHighlight()));
         }
         return mButtonData;
     }
@@ -272,7 +274,6 @@ public class AdaptiveToolbarButtonController
 
     /** Returns the {@link ButtonDataProvider} used in a single-variant mode. */
     @Nullable
-    @VisibleForTesting
     public ButtonDataProvider getSingleProviderForTesting() {
         return mSingleProvider;
     }

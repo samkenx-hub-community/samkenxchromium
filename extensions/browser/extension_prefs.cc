@@ -28,6 +28,8 @@
 #include "components/crx_file/id_util.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/prefs/pref_service.h"
+#include "components/supervised_user/core/common/buildflags.h"
+#include "components/supervised_user/core/common/pref_names.h"
 #include "extensions/browser/api/declarative_net_request/utils.h"
 #include "extensions/browser/app_sorting.h"
 #include "extensions/browser/blocklist_extension_prefs.h"
@@ -41,8 +43,10 @@
 #include "extensions/browser/extension_util.h"
 #include "extensions/browser/install_flag.h"
 #include "extensions/browser/pref_names.h"
+#include "extensions/common/api/types.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension_features.h"
+#include "extensions/common/extension_id.h"
 #include "extensions/common/manifest.h"
 #include "extensions/common/manifest_handlers/app_display_info.h"
 #include "extensions/common/permissions/permission_set.h"
@@ -334,7 +338,7 @@ class ScopedExtensionPrefUpdate : public prefs::ScopedDictionaryPrefUpdate {
   }
 
  private:
-  const std::string extension_id_;
+  const ExtensionId extension_id_;
 };
 
 // Whether SetAlertSystemFirstRun() should always return true, so that alerts
@@ -401,7 +405,7 @@ base::Value::List* ExtensionPrefs::ScopedListUpdate::Ensure() {
 //
 
 // static
-ExtensionPrefs* ExtensionPrefs::Create(
+std::unique_ptr<ExtensionPrefs> ExtensionPrefs::Create(
     content::BrowserContext* browser_context,
     PrefService* prefs,
     const base::FilePath& root_dir,
@@ -414,7 +418,7 @@ ExtensionPrefs* ExtensionPrefs::Create(
 }
 
 // static
-ExtensionPrefs* ExtensionPrefs::Create(
+std::unique_ptr<ExtensionPrefs> ExtensionPrefs::Create(
     content::BrowserContext* browser_context,
     PrefService* pref_service,
     const base::FilePath& root_dir,
@@ -422,9 +426,9 @@ ExtensionPrefs* ExtensionPrefs::Create(
     bool extensions_disabled,
     const std::vector<EarlyExtensionPrefsObserver*>& early_observers,
     base::Clock* clock) {
-  return new ExtensionPrefs(browser_context, pref_service, root_dir,
-                            extension_pref_value_map, clock,
-                            extensions_disabled, early_observers);
+  return std::make_unique<ExtensionPrefs>(
+      browser_context, pref_service, root_dir, extension_pref_value_map, clock,
+      extensions_disabled, early_observers);
 }
 
 ExtensionPrefs::~ExtensionPrefs() {
@@ -2199,10 +2203,6 @@ AppSorting* ExtensionPrefs::app_sorting() const {
   return ExtensionSystem::Get(browser_context_)->app_sorting();
 }
 
-void ExtensionPrefs::SetNeedsStorageGarbageCollection(bool value) {
-  prefs_->SetBoolean(pref_names::kStorageGarbageCollect, value);
-}
-
 bool ExtensionPrefs::NeedsStorageGarbageCollection() const {
   return prefs_->GetBoolean(pref_names::kStorageGarbageCollect);
 }
@@ -2218,6 +2218,7 @@ void ExtensionPrefs::RegisterProfilePrefs(
   registry->RegisterListPref(pref_names::kInstallAllowList);
   registry->RegisterListPref(pref_names::kInstallDenyList);
   registry->RegisterDictionaryPref(pref_names::kInstallForceList);
+  registry->RegisterDictionaryPref(pref_names::kOAuthRedirectUrls);
   registry->RegisterListPref(pref_names::kAllowedTypes);
   registry->RegisterIntegerPref(pref_names::kManifestV2Availability, 0);
   registry->RegisterBooleanPref(pref_names::kStorageGarbageCollect, false);
@@ -2227,10 +2228,6 @@ void ExtensionPrefs::RegisterProfilePrefs(
   registry->RegisterListPref(kExternalUninstalls);
   registry->RegisterListPref(
       pref_names::kExtendedBackgroundLifetimeForPortConnectionsToUrls);
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
-    BUILDFLAG(IS_FUCHSIA)
-  registry->RegisterBooleanPref(pref_names::kChromeAppsEnabled, false);
-#endif
   registry->RegisterBooleanPref(
       pref_names::kChromeAppsWebViewPermissiveBehaviorAllowed, false);
 
@@ -2241,6 +2238,14 @@ void ExtensionPrefs::RegisterProfilePrefs(
   // TODO(archanasimha): move pref registration to where the variable is
   // defined.
   registry->RegisterIntegerPref(kCorruptedDisableCount.name, 0);
+
+#if BUILDFLAG(ENABLE_SUPERVISED_USERS)
+  registry->RegisterBooleanPref(
+      prefs::kSupervisedUserExtensionsMayRequestPermissions, false);
+  registry->RegisterDictionaryPref(
+      prefs::kSupervisedUserApprovedExtensions,
+      user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+#endif  // #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
 
 #if !BUILDFLAG(IS_MAC)
   registry->RegisterBooleanPref(pref_names::kAppFullscreenAllowed, true);
@@ -2398,12 +2403,13 @@ void ExtensionPrefs::InitExtensionControlledPrefs(
       observer.OnExtensionRegistered(extension_id, install_time, is_enabled);
 
     // Set regular extension controlled prefs.
-    LoadExtensionControlledPrefs(extension_id, kExtensionPrefsScopeRegular);
+    LoadExtensionControlledPrefs(extension_id, ChromeSettingScope::kRegular);
     // Set incognito extension controlled prefs.
     LoadExtensionControlledPrefs(extension_id,
-                                 kExtensionPrefsScopeIncognitoPersistent);
+                                 ChromeSettingScope::kIncognitoPersistent);
     // Set regular-only extension controlled prefs.
-    LoadExtensionControlledPrefs(extension_id, kExtensionPrefsScopeRegularOnly);
+    LoadExtensionControlledPrefs(extension_id,
+                                 ChromeSettingScope::kRegularOnly);
 
     for (auto& observer : observer_list_)
       observer.OnExtensionPrefsLoaded(extension_id, this);
@@ -2412,7 +2418,7 @@ void ExtensionPrefs::InitExtensionControlledPrefs(
 
 void ExtensionPrefs::LoadExtensionControlledPrefs(
     const ExtensionId& extension_id,
-    ExtensionPrefsScope scope) {
+    ChromeSettingScope scope) {
   std::string scope_string;
   if (!pref_names::ScopeToPrefName(scope, &scope_string))
     return;

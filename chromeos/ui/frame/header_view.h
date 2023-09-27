@@ -11,13 +11,12 @@
 
 #include "base/component_export.h"
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/scoped_observation.h"
 #include "chromeos/ui/frame/frame_header.h"
 #include "chromeos/ui/frame/immersive/immersive_fullscreen_controller_delegate.h"
-#include "third_party/skia/include/core/SkColor.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_observer.h"
-#include "ui/base/ui_base_types.h"
 #include "ui/display/display_observer.h"
 #include "ui/views/view.h"
 
@@ -93,6 +92,8 @@ class COMPONENT_EXPORT(CHROMEOS_UI_FRAME) HeaderView
 
   void SetWidthInPixels(int width_in_pixels);
 
+  void SetHeaderCornerRadius(int radius);
+
   // views::View:
   void Layout() override;
   void ChildPreferredSizeChanged(views::View* child) override;
@@ -145,26 +146,23 @@ class COMPONENT_EXPORT(CHROMEOS_UI_FRAME) HeaderView
   void UpdateCaptionButtonsVisibility();
 
   // The widget that the caption buttons act on.
-  views::Widget* target_widget_;
+  raw_ptr<views::Widget, ExperimentalAsh> target_widget_;
 
   // A callback to run when |in_immersive_mode_| changes.
   base::RepeatingClosure immersive_mode_changed_callback_;
 
-  // Helper for painting the header. The exact type of FrameHeader will depend
-  // on the type of window: In Mash, Chrome Browser windows use
-  // CustomFrameHeader which is aware of theming. In classic Ash, Chrome Browser
-  // windows won't use HeaderView at all. In either configuration, non Browser
-  // windows will use DefaultFrameHeader.
+  // Helper for painting the header.
   std::unique_ptr<chromeos::DefaultFrameHeader> frame_header_;
 
-  views::ImageView* avatar_icon_ = nullptr;
+  raw_ptr<views::ImageView, DanglingUntriaged | ExperimentalAsh> avatar_icon_ =
+      nullptr;
 
   // View which draws the content of the frame.
-  HeaderContentView* header_content_view_ = nullptr;
+  raw_ptr<HeaderContentView, ExperimentalAsh> header_content_view_ = nullptr;
 
   // View which contains the window caption buttons.
-  chromeos::FrameCaptionButtonContainerView* caption_button_container_ =
-      nullptr;
+  raw_ptr<chromeos::FrameCaptionButtonContainerView, ExperimentalAsh>
+      caption_button_container_ = nullptr;
 
   // The fraction of the header's height which is visible while in fullscreen.
   // This value is meaningless when not in fullscreen.

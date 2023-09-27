@@ -7,8 +7,6 @@
 
 #import <Foundation/Foundation.h>
 
-#include "base/compiler_specific.h"
-
 // Test specific helpers for settings_egtest.mm.
 @interface SettingsAppInterface : NSObject
 
@@ -46,6 +44,9 @@
 // 127.0.0.1:<port>/<host>.
 + (void)addURLRewriterForHosts:(NSArray<NSString*>*)hosts
                         onPort:(NSString*)port;
+
+// Resets the address bar preference.
++ (void)resetAddressBarPreference;
 
 @end
 

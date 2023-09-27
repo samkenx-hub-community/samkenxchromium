@@ -9,13 +9,13 @@
 
 #include "base/location.h"
 #include "base/memory/ptr_util.h"
+#include "base/task/bind_post_task.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/types/expected.h"
-#include "components/sync/base/bind_to_task_runner.h"
 #include "components/trusted_vault/trusted_vault_access_token_fetcher.h"
 #include "components/trusted_vault/trusted_vault_access_token_fetcher_frontend.h"
 
-namespace syncer {
+namespace trusted_vault {
 
 namespace {
 
@@ -56,7 +56,7 @@ void TrustedVaultAccessTokenFetcherImpl::FetchAccessToken(
   ui_thread_task_runner_->PostTask(
       FROM_HERE,
       base::BindOnce(FetchAccessTokenOnUIThread, frontend_, account_id,
-                     BindToCurrentSequence(std::move(callback))));
+                     base::BindPostTaskToCurrentDefault(std::move(callback))));
 }
 
 std::unique_ptr<TrustedVaultAccessTokenFetcher>
@@ -65,4 +65,4 @@ TrustedVaultAccessTokenFetcherImpl::Clone() {
       frontend_, ui_thread_task_runner_));
 }
 
-}  // namespace syncer
+}  // namespace trusted_vault

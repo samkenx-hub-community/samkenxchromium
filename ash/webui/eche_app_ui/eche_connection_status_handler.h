@@ -33,7 +33,9 @@ class EcheConnectionStatusHandler : public mojom::ConnectionStatusObserver {
 
     virtual void OnRequestBackgroundConnectionAttempt();
 
-    virtual void OnPhoneHubDisconnected();
+    virtual void OnRequestCloseConnection();
+
+    virtual void OnConnectionClosed();
   };
 
   EcheConnectionStatusHandler();
@@ -61,7 +63,16 @@ class EcheConnectionStatusHandler : public mojom::ConnectionStatusObserver {
   // EcheFeatureStatusProvider::Observer:
   void OnFeatureStatusChanged(FeatureStatus feature_status);
 
+  // Proxy to request that the webui shut down the connection.
+  void NotifyRequestCloseConnection();
+
+  void NotifyConnectionClosed();
+
   void Bind(mojo::PendingReceiver<mojom::ConnectionStatusObserver> receiver);
+
+  mojom::ConnectionStatus connection_status_for_ui() const {
+    return connection_status_for_ui_;
+  }
 
  private:
   friend class EcheConnectionStatusHandlerTest;
@@ -71,18 +82,24 @@ class EcheConnectionStatusHandler : public mojom::ConnectionStatusObserver {
       mojom::ConnectionStatus connection_status);
   void NotifyRequestBackgroundConnectionAttempt();
 
+  void TriggerBackgroundConnectionIfNecessary();
   void ResetConnectionStatus();
 
   void set_feature_status_for_test(FeatureStatus feature_status) {
     feature_status_ = feature_status;
   }
-  mojom::ConnectionStatus get_connection_status_for_ui_for_test() const {
-    return connection_status_for_ui_;
+  bool is_connecting_or_connected_for_test() {
+    return is_connecting_or_connected_;
   }
 
   mojom::ConnectionStatus connection_status_for_ui_ =
       mojom::ConnectionStatus::kConnectionStatusDisconnected;
   base::Time last_update_timestamp_ = base::Time();
+
+  // Tracks the current status of the eche connection (app stream or
+  // background).
+  bool is_connecting_or_connected_ = false;
+
   std::unique_ptr<base::OneShotTimer> status_check_delay_timer_{};
   FeatureStatus feature_status_ = FeatureStatus::kDisconnected;
   mojo::Receiver<mojom::ConnectionStatusObserver> connection_status_receiver_{

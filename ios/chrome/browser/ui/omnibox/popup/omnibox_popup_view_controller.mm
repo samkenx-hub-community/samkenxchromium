@@ -4,21 +4,22 @@
 
 #import "ios/chrome/browser/ui/omnibox/popup/omnibox_popup_view_controller.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/format_macros.h"
 #import "base/logging.h"
-#import "base/mac/foundation_util.h"
 #import "base/metrics/histogram_macros.h"
 #import "base/time/time.h"
 #import "components/favicon/core/large_icon_service.h"
 #import "components/omnibox/common/omnibox_features.h"
-#import "ios/chrome/browser/flags/system_flags.h"
 #import "ios/chrome/browser/net/crurl.h"
+#import "ios/chrome/browser/shared/public/features/system_flags.h"
+#import "ios/chrome/browser/shared/ui/elements/self_sizing_table_view.h"
 #import "ios/chrome/browser/shared/ui/util/keyboard_observer_helper.h"
 #import "ios/chrome/browser/shared/ui/util/layout_guide_names.h"
-#import "ios/chrome/browser/shared/ui/util/named_guide.h"
+#import "ios/chrome/browser/shared/ui/util/rtl_geometry.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
+#import "ios/chrome/browser/shared/ui/util/util_swift.h"
 #import "ios/chrome/browser/ui/content_suggestions/cells/content_suggestions_tile_layout_util.h"
-#import "ios/chrome/browser/ui/elements/self_sizing_table_view.h"
 #import "ios/chrome/browser/ui/favicon/favicon_attributes_provider.h"
 #import "ios/chrome/browser/ui/favicon/favicon_attributes_with_payload.h"
 #import "ios/chrome/browser/ui/omnibox/omnibox_constants.h"
@@ -29,6 +30,7 @@
 #import "ios/chrome/browser/ui/omnibox/popup/omnibox_popup_accessibility_identifier_constants.h"
 #import "ios/chrome/browser/ui/omnibox/popup/omnibox_popup_carousel_cell.h"
 #import "ios/chrome/browser/ui/omnibox/popup/omnibox_popup_row_cell.h"
+#import "ios/chrome/browser/ui/omnibox/popup/omnibox_popup_row_cell_experimental.h"
 #import "ios/chrome/browser/ui/omnibox/popup/popup_match_preview_delegate.h"
 #import "ios/chrome/browser/ui/toolbar/buttons/toolbar_configuration.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
@@ -36,14 +38,10 @@
 #import "ios/chrome/common/ui/util/device_util.h"
 #import "ui/base/device_form_factor.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 const CGFloat kTopPadding = 8.0;
 const CGFloat kBottomPadding = 8.0;
-const CGFloat kFooterHeight = 12.0;
+const CGFloat kFooterHeight = 4.0;
 /// Percentage of the suggestion height that needs to be visible in order to
 /// consider the suggestion as visible.
 const CGFloat kVisibleSuggestionThreshold = 0.6;
@@ -52,10 +50,15 @@ const CGFloat kMinTileFaviconSize = 32.0f;
 /// Maximum size of the fetched favicon for tiles.
 const CGFloat kMaxTileFaviconSize = 48.0f;
 
+// Default offset to align the suggestions with the omnibox leading image.
+const CGFloat kDefaultSuggestionLeadingOffset = -10.0f;
+
 /// Bottom padding for table view headers.
 const CGFloat kHeaderPaddingBottom = 10.0f;
-/// Leading, trailing, and top padding for table view headers.
+/// Leading and trailing padding for table view headers.
 const CGFloat kHeaderPadding = 2.0f;
+/// Top padding for table view headers.
+const CGFloat kHeaderTopPadding = 16.0f;
 
 /// Returns whether the keyboard is dismissed when scrolling suggestions.
 BOOL ShouldDismissKeyboardOnScroll() {
@@ -65,10 +68,10 @@ BOOL ShouldDismissKeyboardOnScroll() {
 
 }  // namespace
 
-@interface OmniboxPopupViewController () <UITableViewDataSource,
-                                          UITableViewDelegate,
-                                          OmniboxPopupCarouselCellDelegate,
-                                          OmniboxPopupRowCellDelegate>
+@interface OmniboxPopupViewController () <OmniboxPopupCarouselCellDelegate,
+                                          OmniboxPopupRowCellDelegate,
+                                          UITableViewDataSource,
+                                          UITableViewDelegate>
 
 /// Index path of currently highlighted row. The rows can be highlighted by
 /// tapping and holding on them or by using arrow keys on a hardware keyboard.
@@ -128,9 +131,16 @@ BOOL ShouldDismissKeyboardOnScroll() {
 /// content inset.
 @property(nonatomic, assign) CGFloat cachedContentHeight;
 
+/// Layout guide that tracks the position of the omnibox in the top toolbar.
+/// This is useful to add constraints to, or to derive manual layout values off
+/// of.
+@property(nonatomic, readonly) UILayoutGuide* omniboxGuide;
+
 @end
 
 @implementation OmniboxPopupViewController
+
+@synthesize omniboxGuide = _omniboxGuide;
 
 - (instancetype)init {
   if (self = [super initWithNibName:nil bundle:nil]) {
@@ -168,7 +178,7 @@ BOOL ShouldDismissKeyboardOnScroll() {
 
 - (void)loadView {
   // TODO(crbug.com/1365374): Check why largeIconService not available in
-  // icognito.
+  // incognito.
   if (self.largeIconService) {
     _carouselAttributeProvider = [[FaviconAttributesProvider alloc]
         initWithFaviconSize:kMaxTileFaviconSize
@@ -253,6 +263,14 @@ BOOL ShouldDismissKeyboardOnScroll() {
   }
   self.tableView.contentInsetAdjustmentBehavior =
       UIScrollViewContentInsetAdjustmentAutomatic;
+  if (base::FeatureList::IsEnabled(kOmniboxSuggestionsRTLImprovements) &&
+      ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
+    /// The popup view in multitasking displays suggestion icons outside of the
+    /// safe area (too close to the leading edge). This is ok because the entire
+    /// rows act as touch targets.
+    self.viewRespectsSystemMinimumLayoutMargins = NO;
+  }
+
   [self.tableView setDirectionalLayoutMargins:NSDirectionalEdgeInsetsMake(
                                                   0, 0, kBottomPadding, 0)];
   self.tableView.contentInset = UIEdgeInsetsMake(kTopPadding, 0, 0, 0);
@@ -263,8 +281,13 @@ BOOL ShouldDismissKeyboardOnScroll() {
   self.tableView.rowHeight = UITableViewAutomaticDimension;
   self.tableView.estimatedRowHeight = kOmniboxPopupCellMinimumHeight;
 
-  [self.tableView registerClass:[OmniboxPopupRowCell class]
-         forCellReuseIdentifier:OmniboxPopupRowCellReuseIdentifier];
+  if (base::FeatureList::IsEnabled(kOmniboxSuggestionsRTLImprovements)) {
+    [self.tableView registerClass:[OmniboxPopupRowCellExperimental class]
+           forCellReuseIdentifier:OmniboxPopupRowCellReuseIdentifier];
+  } else {
+    [self.tableView registerClass:[OmniboxPopupRowCell class]
+           forCellReuseIdentifier:OmniboxPopupRowCellReuseIdentifier];
+  }
   [self.tableView registerClass:[UITableViewHeaderFooterView class]
       forHeaderFooterViewReuseIdentifier:NSStringFromClass(
                                              [UITableViewHeaderFooterView
@@ -314,15 +337,11 @@ BOOL ShouldDismissKeyboardOnScroll() {
 }
 
 - (void)adjustMarginsToMatchOmniboxWidth {
-  NamedGuide* layoutGuide = [NamedGuide guideWithName:kOmniboxGuide
-                                                 view:self.view];
-  if (!layoutGuide) {
+  if (!self.omniboxGuide) {
     return;
   }
 
-  CGRect omniboxFrame = [layoutGuide.constrainedView
-      convertRect:layoutGuide.constrainedView.bounds
-           toView:self.view];
+  CGRect omniboxFrame = self.omniboxGuide.layoutFrame;
   CGFloat leftMargin =
       IsRegularXRegularSizeClass(self) ? omniboxFrame.origin.x : 0;
   CGFloat rightMargin = IsRegularXRegularSizeClass(self)
@@ -336,6 +355,25 @@ BOOL ShouldDismissKeyboardOnScroll() {
     UIEdgeInsets margins = self.carouselCell.layoutMargins;
     self.carouselCell.layoutMargins =
         UIEdgeInsetsMake(margins.top, leftMargin, margins.bottom, rightMargin);
+  }
+  // Update the headers padding.
+  for (NSInteger i = 0; i < self.tableView.numberOfSections; ++i) {
+    UITableViewHeaderFooterView* headerView =
+        [self.tableView headerViewForSection:i];
+    [headerView setNeedsUpdateConfiguration];
+  }
+
+  if (base::FeatureList::IsEnabled(kOmniboxSuggestionsRTLImprovements) &&
+      ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
+    CGFloat leadingPadding = kDefaultSuggestionLeadingOffset;
+    if (IsRegularXRegularSizeClass(self)) {
+      leadingPadding += CGRectGetMinX(omniboxFrame);
+    }
+
+    self.tableView.contentInset =
+        UIEdgeInsetsMakeDirected(0, leadingPadding, kBottomPadding, 0);
+    self.tableView.directionalLayoutMargins =
+        NSDirectionalEdgeInsetsMake(0, leadingPadding, kBottomPadding, 0);
   }
 }
 
@@ -374,7 +412,12 @@ BOOL ShouldDismissKeyboardOnScroll() {
   UITapGestureRecognizer* debugGestureRecognizer =
       [[UITapGestureRecognizer alloc] initWithTarget:self
                                               action:@selector(showDebugUI)];
+#if TARGET_OS_SIMULATOR
+  // One tap for easy trigger on simulator.
+  debugGestureRecognizer.numberOfTapsRequired = 1;
+#else
   debugGestureRecognizer.numberOfTapsRequired = 2;
+#endif
   debugGestureRecognizer.numberOfTouchesRequired = 2;
   [self.view addGestureRecognizer:debugGestureRecognizer];
 }
@@ -582,14 +625,14 @@ BOOL ShouldDismissKeyboardOnScroll() {
   [self.acceptReturnDelegate omniboxReturnPressed:sender];
 }
 
-#pragma mark - Table view delegate
+#pragma mark - UITableViewDelegate
 
 - (void)tableView:(UITableView*)tableView
       willDisplayCell:(UITableViewCell*)cell
     forRowAtIndexPath:(NSIndexPath*)indexPath {
-  if ([cell isKindOfClass:[OmniboxPopupRowCell class]]) {
-    OmniboxPopupRowCell* rowCell =
-        base::mac::ObjCCastStrict<OmniboxPopupRowCell>(cell);
+  if ([cell isKindOfClass:[OmniboxPopupRowCell class]] ||
+      [cell isKindOfClass:[OmniboxPopupRowCellExperimental class]]) {
+    OmniboxPopupRowCell* rowCell = id(cell);
     // This has to be set here because the cell's content view has its
     // semantic content attribute reset before the cell is displayed (and before
     // this method is called).
@@ -609,12 +652,12 @@ BOOL ShouldDismissKeyboardOnScroll() {
     didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
   NSUInteger row = indexPath.row;
   NSUInteger section = indexPath.section;
-  DCHECK_LT(section, self.currentResult.count);
-  DCHECK_LT(row, self.currentResult[indexPath.section].suggestions.count);
 
-  // Crash reports tell us that `section` and `row` are sometimes indexed past
-  // the end of the results array. In those cases, just ignore the request and
-  // return early. See crbug.com/1378590.
+  // In rare cases when the device is slow, user might be able to tap a
+  // suggestion row twice before the event is being delivered. In this case, on
+  // the second touch, the popup will already be cleared, but the table view
+  // will still dispatch a didSelectRowAtIndexPath event for a non-existent
+  // index path. Ignore these double touches.
   if (section >= self.currentResult.count ||
       row >= self.currentResult[indexPath.section].suggestions.count)
     return;
@@ -663,8 +706,9 @@ BOOL ShouldDismissKeyboardOnScroll() {
   UIView* footer = [[UIView alloc] init];
   footer.backgroundColor = tableView.backgroundColor;
   UIView* hairline = [[UIView alloc]
-      initWithFrame:CGRectMake(0, 8, tableView.bounds.size.width,
+      initWithFrame:CGRectMake(0, 0, tableView.bounds.size.width,
                                2 / tableView.window.screen.scale)];
+
   hairline.backgroundColor =
       self.incognito ? [UIColor.whiteColor colorWithAlphaComponent:0.12]
                      : [UIColor.blackColor colorWithAlphaComponent:0.12];
@@ -674,7 +718,7 @@ BOOL ShouldDismissKeyboardOnScroll() {
   return footer;
 }
 
-#pragma mark - Table view data source
+#pragma mark - UITableViewDataSource
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)tableView {
   return self.currentResult.count;
@@ -754,28 +798,32 @@ BOOL ShouldDismissKeyboardOnScroll() {
   contentConfiguration.textProperties.transform =
       UIListContentTextTransformUppercase;
   contentConfiguration.directionalLayoutMargins = NSDirectionalEdgeInsetsMake(
-      kHeaderPadding, kHeaderPadding, kHeaderPaddingBottom,
-      kHeaderPadding);
+      kHeaderTopPadding, kHeaderPadding, kHeaderPaddingBottom, kHeaderPadding);
 
-  // Inset the header to match the omnibox width, similar to
-  // `adjustMarginsToMatchOmniboxWidth` method.
-  if (IsRegularXRegularSizeClass(self)) {
-    NamedGuide* layoutGuide = [NamedGuide guideWithName:kOmniboxGuide
-                                                   view:self.view];
-    if (layoutGuide) {
-      CGRect omniboxFrame = [layoutGuide.constrainedView
-          convertRect:layoutGuide.constrainedView.bounds
-               toView:self.view];
-      CGFloat leftMargin = omniboxFrame.origin.x;
+  __weak __typeof__(self) weakSelf = self;
+  UITableViewHeaderFooterViewConfigurationUpdateHandler configurationUpdater =
+      ^void(__kindof UITableViewHeaderFooterView* headerView,
+            UIViewConfigurationState* state) {
+        __typeof__(self) strongSelf = weakSelf;
+        if (!strongSelf) {
+          return;
+        }
+        // Inset the header to match the omnibox width, similar to
+        // `adjustMarginsToMatchOmniboxWidth` method.
+        CGFloat leadingPadding = kHeaderPadding;
+        if (IsRegularXRegularSizeClass(strongSelf) && strongSelf.omniboxGuide) {
+          leadingPadding += CGRectGetMinX(weakSelf.omniboxGuide.layoutFrame);
+        }
 
-      contentConfiguration.directionalLayoutMargins =
-          NSDirectionalEdgeInsetsMake(
-              kHeaderPadding, kHeaderPadding + leftMargin,
-              kHeaderPaddingBottom, kHeaderPadding);
-    }
-  }
-
+        UIListContentConfiguration* configurationCopy =
+            (UIListContentConfiguration*)headerView.contentConfiguration;
+        configurationCopy.directionalLayoutMargins =
+            NSDirectionalEdgeInsetsMake(kHeaderTopPadding, leadingPadding,
+                                        kHeaderPaddingBottom, kHeaderPadding);
+        headerView.contentConfiguration = configurationCopy;
+      };
   header.contentConfiguration = contentConfiguration;
+  header.configurationUpdateHandler = configurationUpdater;
   return header;
 }
 
@@ -902,7 +950,8 @@ BOOL ShouldDismissKeyboardOnScroll() {
 /// class.
 - (void)updateBackgroundColor {
   ToolbarConfiguration* configuration = [[ToolbarConfiguration alloc]
-      initWithStyle:self.incognito ? INCOGNITO : NORMAL];
+      initWithStyle:self.incognito ? ToolbarStyle::kIncognito
+                                   : ToolbarStyle::kNormal];
 
   if (IsRegularXRegularSizeClass(self)) {
     self.view.backgroundColor = configuration.backgroundColor;
@@ -918,9 +967,9 @@ BOOL ShouldDismissKeyboardOnScroll() {
   _semanticContentAttribute = semanticContentAttribute;
   // If there are any visible cells, update them right away.
   for (UITableViewCell* cell in self.tableView.visibleCells) {
-    if ([cell isKindOfClass:[OmniboxPopupRowCell class]]) {
-      OmniboxPopupRowCell* rowCell =
-          base::mac::ObjCCastStrict<OmniboxPopupRowCell>(cell);
+    if ([cell isKindOfClass:[OmniboxPopupRowCell class]] ||
+        [cell isKindOfClass:[OmniboxPopupRowCellExperimental class]]) {
+      OmniboxPopupRowCell* rowCell = (id)cell;
       // This has to be set here because the cell's content view has its
       // semantic content attribute reset before the cell is displayed (and
       // before this method is called).
@@ -1089,6 +1138,15 @@ BOOL ShouldDismissKeyboardOnScroll() {
   [self presentViewController:self.debugInfoViewController
                      animated:YES
                    completion:nil];
+}
+
+- (UILayoutGuide*)omniboxGuide {
+  if (!_omniboxGuide) {
+    _omniboxGuide =
+        [self.layoutGuideCenter makeLayoutGuideNamed:kTopOmniboxGuide];
+    [self.view addLayoutGuide:_omniboxGuide];
+  }
+  return _omniboxGuide;
 }
 
 @end

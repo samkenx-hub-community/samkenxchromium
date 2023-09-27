@@ -73,12 +73,6 @@ class PersonalDataManagerCleaner {
     return DeleteDisusedCreditCards();
   }
 
-  // A wrapper around |ClearProfileNonSettingsOrigins()| used for testing
-  // purposes.
-  void ClearProfileNonSettingsOriginsForTesting() {
-    ClearProfileNonSettingsOrigins();
-  }
-
   // A wrapper around |ClearCreditCardNonSettingsOrigins()| used for testing
   // purposes.
   void ClearCreditCardNonSettingsOriginsForTesting() {
@@ -98,10 +92,6 @@ class PersonalDataManagerCleaner {
 
   // Applies various fixes and cleanups on autofill credit cards.
   void ApplyCardFixesAndCleanups();
-
-  // Runs the routine that removes the orphan rows in the autofill tables if
-  // it's never been done.
-  void RemoveOrphanAutofillTableRows();
 
   // Removes settings-inaccessible profiles values from all profiles stored in
   // the |personal_data_manager_|.
@@ -141,9 +131,8 @@ class PersonalDataManagerCleaner {
   // feature is enabled.
   bool DeleteDisusedCreditCards();
 
-  // Clears the value of the origin field of the autofill profiles or cards that
-  // were not created from the settings page.
-  void ClearProfileNonSettingsOrigins();
+  // Clears the value of the origin field of cards that were not created from
+  // the settings page.
   void ClearCreditCardNonSettingsOrigins();
 
   // True if autofill profile cleanup needs to be performed.
@@ -169,8 +158,8 @@ class PersonalDataManagerCleaner {
   // `SyncStarted()` event has triggered yet.
   // TODO(crbug.com/1348294): Remove once the AUTOFILL_PROFILE sync bridge is
   // deprecated.
-  bool autofill_profile_sync_started = false;
-  bool contact_info_sync_started = false;
+  bool autofill_profile_sync_started_ = false;
+  bool contact_info_sync_started_ = false;
 
   // base::WeakPtr ensures that the callback bound to the object is canceled
   // when that object is destroyed.

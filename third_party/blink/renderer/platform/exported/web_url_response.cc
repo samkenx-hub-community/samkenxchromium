@@ -32,13 +32,15 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "base/memory/ptr_util.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/ranges/algorithm.h"
 #include "net/ssl/ssl_info.h"
 #include "services/network/public/cpp/is_potentially_trustworthy.h"
-#include "services/network/public/cpp/trigger_attestation.h"
+#include "services/network/public/cpp/trigger_verification.h"
+#include "services/network/public/mojom/cors.mojom-shared.h"
 #include "services/network/public/mojom/ip_address_space.mojom-shared.h"
 #include "services/network/public/mojom/load_timing_info.mojom.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
@@ -48,6 +50,7 @@
 #include "third_party/blink/renderer/platform/loader/fetch/resource_load_timing.h"
 #include "third_party/blink/renderer/platform/loader/fetch/resource_response.h"
 #include "third_party/blink/renderer/platform/wtf/allocator/allocator.h"
+#include "third_party/blink/renderer/platform/wtf/vector.h"
 
 namespace blink {
 
@@ -143,6 +146,7 @@ WebURLResponse WebURLResponse::Create(
   response.SetConnectionReused(head.load_timing.socket_reused);
   response.SetWasFetchedViaSPDY(head.was_fetched_via_spdy);
   response.SetWasFetchedViaServiceWorker(head.was_fetched_via_service_worker);
+  response.SetDidUseSharedDictionary(head.did_use_shared_dictionary);
   response.SetServiceWorkerResponseSource(head.service_worker_response_source);
   response.SetType(head.response_type);
   response.SetPadding(head.padding);
@@ -165,6 +169,8 @@ WebURLResponse WebURLResponse::Create(
   response.SetRemoteIPEndpoint(head.remote_endpoint);
   response.SetAddressSpace(head.response_address_space);
   response.SetClientAddressSpace(head.client_address_space);
+  response.SetPrivateNetworkAccessPreflightResult(
+      head.private_network_access_preflight_result);
 
   WebVector<WebString> cors_exposed_header_names(
       head.cors_exposed_header_names.size());
@@ -198,7 +204,7 @@ WebURLResponse WebURLResponse::Create(
   response.SetWasCookieInRequest(head.was_cookie_in_request);
   response.SetRecursivePrefetchToken(head.recursive_prefetch_token);
   response.SetWebBundleURL(KURL(head.web_bundle_url));
-  response.SetTriggerAttestation(head.trigger_attestation);
+  response.SetTriggerVerifications(head.trigger_verifications);
 
   SetSecurityStyleAndDetails(GURL(KURL(url)), head, &response,
                              report_security_info);
@@ -340,9 +346,13 @@ void WebURLResponse::SetLoadTiming(
   resource_response_->SetResourceLoadTiming(std::move(timing));
 }
 
-void WebURLResponse::SetTriggerAttestation(
-    const absl::optional<network::TriggerAttestation>& trigger_attestation) {
-  resource_response_->SetTriggerAttestation(trigger_attestation);
+void WebURLResponse::SetTriggerVerifications(
+    const std::vector<network::TriggerVerification>& trigger_verifications) {
+  WTF::Vector<network::TriggerVerification> verifications;
+  for (const auto& verification : trigger_verifications) {
+    verifications.push_back(verification);
+  }
+  resource_response_->SetTriggerVerifications(std::move(verifications));
 }
 
 base::Time WebURLResponse::ResponseTime() const {
@@ -500,6 +510,10 @@ void WebURLResponse::SetServiceWorkerResponseSource(
   resource_response_->SetServiceWorkerResponseSource(value);
 }
 
+void WebURLResponse::SetDidUseSharedDictionary(bool did_use_shared_dictionary) {
+  resource_response_->SetDidUseSharedDictionary(did_use_shared_dictionary);
+}
+
 void WebURLResponse::SetType(network::mojom::FetchResponseType value) {
   resource_response_->SetType(value);
 }
@@ -580,6 +594,16 @@ network::mojom::IPAddressSpace WebURLResponse::ClientAddressSpace() const {
 void WebURLResponse::SetClientAddressSpace(
     network::mojom::IPAddressSpace client_address_space) {
   resource_response_->SetClientAddressSpace(client_address_space);
+}
+
+network::mojom::PrivateNetworkAccessPreflightResult
+WebURLResponse::PrivateNetworkAccessPreflightResult() const {
+  return resource_response_->PrivateNetworkAccessPreflightResult();
+}
+
+void WebURLResponse::SetPrivateNetworkAccessPreflightResult(
+    network::mojom::PrivateNetworkAccessPreflightResult result) {
+  resource_response_->SetPrivateNetworkAccessPreflightResult(result);
 }
 
 void WebURLResponse::SetIsValidated(bool is_validated) {

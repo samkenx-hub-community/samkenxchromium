@@ -24,13 +24,11 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
-#include "base/metrics/histogram_functions.h"
-#include "base/metrics/histogram_macros.h"
 #include "base/metrics/user_metrics.h"
 #include "base/metrics/user_metrics_action.h"
 #include "base/path_service.h"
+#include "base/strings/strcat_win.h"
 #include "base/strings/string_util.h"
-#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
 #include "base/threading/platform_thread.h"
@@ -61,12 +59,12 @@ namespace shell_integration {
 
 namespace {
 
-BASE_FEATURE(kWin10UnattendedDefault,
-             "Win10UnattendedDefault",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kWin10UnattendedDefaultExportDerived,
+             "Win10UnattendedDefaultExportDerived",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 bool CanSetAsDefaultDirectly() {
-  return base::FeatureList::IsEnabled(kWin10UnattendedDefault);
+  return base::FeatureList::IsEnabled(kWin10UnattendedDefaultExportDerived);
 }
 
 // Helper function for GetAppId to generates profile id
@@ -341,31 +339,21 @@ class OpenSystemSettingsHelper {
   }
 
  private:
-  // The reason the settings interaction concluded. Do not modify the ordering
-  // because it is used for UMA.
-  enum ConcludeReason { REGISTRY_WATCHER, TIMEOUT, NUM_CONCLUDE_REASON_TYPES };
-
   OpenSystemSettingsHelper(const wchar_t* const schemes[],
                            base::OnceClosure on_finished_callback)
       : on_finished_callback_(std::move(on_finished_callback)) {
-    static const wchar_t kUrlAssociationFormat[] =
-        L"SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\"
-        L"%ls\\UserChoice";
-
-    // Remember the start time.
-    start_time_ = base::TimeTicks::Now();
-
     for (const wchar_t* const* scan = &schemes[0]; *scan != nullptr; ++scan) {
-      AddRegistryKeyWatcher(
-          base::StringPrintf(kUrlAssociationFormat, *scan).c_str());
+      AddRegistryKeyWatcher(base::StrCat({L"SOFTWARE\\Microsoft\\Windows\\Shell"
+                                          L"\\Associations\\UrlAssociations\\",
+                                          *scan, L"\\UserChoice"})
+                                .c_str());
     }
     // Only the watchers that were succesfully initialized are counted.
     registry_watcher_count_ = registry_key_watchers_.size();
 
     timer_.Start(FROM_HERE, base::Minutes(2),
                  base::BindOnce(&OpenSystemSettingsHelper::ConcludeInteraction,
-                                weak_ptr_factory_.GetWeakPtr(),
-                                ConcludeReason::TIMEOUT));
+                                weak_ptr_factory_.GetWeakPtr()));
   }
 
   ~OpenSystemSettingsHelper() {
@@ -380,23 +368,16 @@ class OpenSystemSettingsHelper {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
     // Make sure all the registry watchers have fired.
     if (--registry_watcher_count_ == 0) {
-      base::UmaHistogramMediumTimes(
-          "DefaultBrowser.SettingsInteraction.RegistryWatcherDuration",
-          base::TimeTicks::Now() - start_time_);
-
-      ConcludeInteraction(ConcludeReason::REGISTRY_WATCHER);
+      ConcludeInteraction();
     }
   }
 
   // Ends the monitoring with the system settings. Will call
   // |on_finished_callback_| and then dispose of this class instance to make
   // sure the callback won't get called subsequently.
-  void ConcludeInteraction(ConcludeReason conclude_reason) {
+  void ConcludeInteraction() {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-    base::UmaHistogramEnumeration(
-        "DefaultBrowser.SettingsInteraction.ConcludeReason", conclude_reason,
-        NUM_CONCLUDE_REASON_TYPES);
     std::move(on_finished_callback_).Run();
     delete instance_;
     instance_ = nullptr;
@@ -434,9 +415,6 @@ class OpenSystemSettingsHelper {
 
   base::OneShotTimer timer_;
 
-  // Records the time it takes for the final registry watcher to get signaled.
-  base::TimeTicks start_time_;
-
   SEQUENCE_CHECKER(sequence_checker_);
 
   // Weak ptrs are used to bind this class to the callbacks of the timer and the
@@ -458,38 +436,30 @@ class IsPinnedToTaskbarHelper {
   IsPinnedToTaskbarHelper(const IsPinnedToTaskbarHelper&) = delete;
   IsPinnedToTaskbarHelper& operator=(const IsPinnedToTaskbarHelper&) = delete;
 
-  static void GetState(ErrorCallback error_callback,
-                       ResultCallback result_callback);
+  static void GetState(ResultCallback result_callback);
 
  private:
-  IsPinnedToTaskbarHelper(ErrorCallback error_callback,
-                          ResultCallback result_callback);
+  explicit IsPinnedToTaskbarHelper(ResultCallback result_callback);
 
   void OnConnectionError();
   void OnIsPinnedToTaskbarResult(bool succeeded, bool is_pinned_to_taskbar);
 
   mojo::Remote<chrome::mojom::UtilWin> remote_util_win_;
 
-  ErrorCallback error_callback_;
   ResultCallback result_callback_;
 
   SEQUENCE_CHECKER(sequence_checker_);
 };
 
 // static
-void IsPinnedToTaskbarHelper::GetState(ErrorCallback error_callback,
-                                       ResultCallback result_callback) {
+void IsPinnedToTaskbarHelper::GetState(ResultCallback result_callback) {
   // Self-deleting when the ShellHandler completes.
-  new IsPinnedToTaskbarHelper(std::move(error_callback),
-                              std::move(result_callback));
+  new IsPinnedToTaskbarHelper(std::move(result_callback));
 }
 
-IsPinnedToTaskbarHelper::IsPinnedToTaskbarHelper(ErrorCallback error_callback,
-                                                 ResultCallback result_callback)
+IsPinnedToTaskbarHelper::IsPinnedToTaskbarHelper(ResultCallback result_callback)
     : remote_util_win_(LaunchUtilWinServiceInstance()),
-      error_callback_(std::move(error_callback)),
       result_callback_(std::move(result_callback)) {
-  DCHECK(error_callback_);
   DCHECK(result_callback_);
 
   // |remote_util_win_| owns the callbacks and is guaranteed to be destroyed
@@ -503,7 +473,6 @@ IsPinnedToTaskbarHelper::IsPinnedToTaskbarHelper(ErrorCallback error_callback,
 
 void IsPinnedToTaskbarHelper::OnConnectionError() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  std::move(error_callback_).Run();
   delete this;
 }
 
@@ -527,8 +496,6 @@ class UnpinShortcutsHelper {
                       base::OnceClosure completion_callback);
 
  private:
-  static void RecordUnpinShortcutProcessError(bool error);
-
   UnpinShortcutsHelper(const std::vector<base::FilePath>& shortcuts,
                        base::OnceClosure completion_callback);
 
@@ -541,11 +508,6 @@ class UnpinShortcutsHelper {
 
   SEQUENCE_CHECKER(sequence_checker_);
 };
-
-// static
-void UnpinShortcutsHelper::RecordUnpinShortcutProcessError(bool error) {
-  base::UmaHistogramBoolean("Windows.UnpinShortcut.ProcessError", error);
-}
 
 // static
 void UnpinShortcutsHelper::DoUnpin(const std::vector<base::FilePath>& shortcuts,
@@ -572,7 +534,6 @@ UnpinShortcutsHelper::UnpinShortcutsHelper(
 
 void UnpinShortcutsHelper::OnConnectionError() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  RecordUnpinShortcutProcessError(true);
   std::move(completion_callback_).Run();
   delete this;
 }
@@ -580,7 +541,6 @@ void UnpinShortcutsHelper::OnConnectionError() {
 void UnpinShortcutsHelper::OnUnpinShortcutResult() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  RecordUnpinShortcutProcessError(false);
   std::move(completion_callback_).Run();
   delete this;
 }
@@ -881,9 +841,11 @@ void MigrateTaskbarPins(base::OnceClosure completion_callback) {
   // BEST_EFFORT means it will be scheduled after higher-priority tasks, but
   // MUST_USE_FOREGROUND means that when it is scheduled it will run in the
   // foregound.
+  // SKIP_ON_SHUTDOWN means the task won't start after shutdown has started.
   base::ThreadPool::CreateCOMSTATaskRunner(
       {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
-       base::ThreadPolicy::MUST_USE_FOREGROUND})
+       base::ThreadPolicy::MUST_USE_FOREGROUND,
+       base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN})
       ->PostTaskAndReply(
           FROM_HERE, base::BindOnce([]() {
             base::FilePath taskbar_path;
@@ -920,10 +882,8 @@ void MigrateTaskbarPinsCallback(const base::FilePath& taskbar_path,
   }
 }
 
-void GetIsPinnedToTaskbarState(ConnectionErrorCallback on_error_callback,
-                               IsPinnedToTaskbarCallback result_callback) {
-  IsPinnedToTaskbarHelper::GetState(std::move(on_error_callback),
-                                    std::move(result_callback));
+void GetIsPinnedToTaskbarState(IsPinnedToTaskbarCallback result_callback) {
+  IsPinnedToTaskbarHelper::GetState(std::move(result_callback));
 }
 
 int MigrateShortcutsInPathInternal(const base::FilePath& chrome_exe,
@@ -953,9 +913,8 @@ int MigrateShortcutsInPathInternal(const base::FilePath& chrome_exe,
                                                 target_path.value())) {
       continue;
     }
-    base::CommandLine command_line(
-        base::CommandLine::FromString(base::StringPrintf(
-            L"\"%ls\" %ls", target_path.value().c_str(), arguments.c_str())));
+    base::CommandLine command_line(base::CommandLine::FromString(
+        base::StrCat({L"\"", target_path.value(), L"\" ", arguments})));
 
     // Get the expected AppId for this Chrome shortcut.
     std::wstring expected_app_id(

@@ -117,6 +117,7 @@ int SendCancelToSDK(
 absl::optional<content_analysis::sdk::ContentAnalysisResponse> SendRequestToSDK(
     scoped_refptr<ContentAnalysisSdkManager::WrappedClient> wrapped,
     content_analysis::sdk::ContentAnalysisRequest sdk_request) {
+  DVLOG(1) << __func__ << ": token=" << sdk_request.request_token();
   base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
                                                 base::BlockingType::MAY_BLOCK);
 
@@ -132,18 +133,18 @@ absl::optional<content_analysis::sdk::ContentAnalysisResponse> SendRequestToSDK(
 #if defined(_DEBUG)
 void DumpSdkAnalysisResponse(
     const char* prefix,
-    LocalBinaryUploadService::RequestKey key,
+    LocalBinaryUploadService::Request::Id id,
     const content_analysis::sdk::ContentAnalysisResponse& response) {
-  DVLOG(1) << prefix << " key=" << key << " token=" << response.request_token();
-  DVLOG(1) << prefix << " key=" << key
+  DVLOG(1) << prefix << " id=" << id << " token=" << response.request_token();
+  DVLOG(1) << prefix << " id=" << id
            << " result count=" << response.results().size();
 
   for (const auto& result : response.results()) {
     if (result.has_status()) {
-      DVLOG(1) << prefix << " key=" << key
+      DVLOG(1) << prefix << " id=" << id
                << "   result status=" << result.status();
     } else {
-      DVLOG(1) << prefix << " key=" << key << "   result status=<no status>";
+      DVLOG(1) << prefix << " id=" << id << "   result status=<no status>";
     }
 
     if (!result.has_status() ||
@@ -152,33 +153,32 @@ void DumpSdkAnalysisResponse(
       continue;
     }
 
-    DVLOG(1) << prefix << " key=" << key
+    DVLOG(1) << prefix << " id=" << id
              << "   rules count=" << result.triggered_rules().size();
 
     for (const auto& rule : result.triggered_rules()) {
-      DVLOG(1) << prefix << " key=" << key
-               << "     rule action=" << rule.action()
+      DVLOG(1) << prefix << " id=" << id << "     rule action=" << rule.action()
                << " tag=" << result.tag();
     }
   }
 }
 
 void DumpAnalysisResponse(const char* prefix,
-                          LocalBinaryUploadService::RequestKey key,
+                          LocalBinaryUploadService::Request::Id id,
                           const ContentAnalysisResponse& response) {
   auto final_action = TriggeredRule::ACTION_UNSPECIFIED;
   std::string tag;
 
-  DVLOG(1) << prefix << " key=" << key << " token=" << response.request_token();
-  DVLOG(1) << prefix << " key=" << key
+  DVLOG(1) << prefix << " id=" << id << " token=" << response.request_token();
+  DVLOG(1) << prefix << " id=" << id
            << " result count=" << response.results().size();
 
   for (const auto& result : response.results()) {
     if (result.has_status()) {
-      DVLOG(1) << prefix << " key=" << key
+      DVLOG(1) << prefix << " id=" << id
                << "   result status=" << result.status();
     } else {
-      DVLOG(1) << prefix << " key=" << key << "   result status=<no status>";
+      DVLOG(1) << prefix << " id=" << id << "   result status=<no status>";
     }
 
     if (!result.has_status() ||
@@ -186,14 +186,13 @@ void DumpAnalysisResponse(const char* prefix,
       continue;
     }
 
-    DVLOG(1) << prefix << " key=" << key
+    DVLOG(1) << prefix << " id=" << id
              << "   rules count=" << result.triggered_rules().size();
 
     for (const auto& rule : result.triggered_rules()) {
       auto higher_precedence_action =
           GetHighestPrecedenceAction(final_action, rule.action());
-      DVLOG(1) << prefix << " key=" << key
-               << "     rule action=" << rule.action()
+      DVLOG(1) << prefix << " id=" << id << "     rule action=" << rule.action()
                << " tag=" << result.tag();
 
       if (higher_precedence_action != final_action) {
@@ -203,7 +202,7 @@ void DumpAnalysisResponse(const char* prefix,
     }
   }
 
-  DVLOG(1) << prefix << " key=" << key << " final action=" << final_action;
+  DVLOG(1) << prefix << " id=" << id << " final action=" << final_action;
 }
 #endif
 
@@ -240,27 +239,28 @@ void LocalBinaryUploadService::MaybeUploadForDeepScanning(
     std::unique_ptr<Request> request) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
-  // If there have been too may consecutive failures accessing the agent,
-  // just fail the request immediately.  Chrome will apply the default verdict.
-  if (retry_count_ >= kMaxRetryCount) {
-    DVLOG(1) << __func__ << ": aborting, too many errors";
-    request->FinishRequest(Result::UPLOAD_FAILURE, ContentAnalysisResponse());
-    return;
-  }
-
   // Builds a request context to keep track of this request.  This starts
   // a timer that will fire if no response is received from the agent within
   // the specified timeout.  This timer remains active as the request moves
   // from the pending list to the active list (and possibly back and forth in
   // the case of agent errors).
-  RequestKey key = request.get();
+  Request::Id id = request_id_generator_.GenerateNextId();
+  request->set_id(id);
   auto info = RequestInfo(std::move(request),
                           base::BindOnce(&LocalBinaryUploadService::OnTimeout,
-                                         factory_.GetWeakPtr(), key));
-  DVLOG(1) << __func__ << ": key=" << key
-           << " active-size=" << active_requests_.size();
+                                         factory_.GetWeakPtr(), id));
   pending_requests_.push_back(std::move(info));
-  if (active_requests_.size() < kMaxActiveCount) {
+
+  bool connection_retry_in_progress = ConnectionRetryInProgress();
+
+  DVLOG(1) << __func__ << ": id=" << id
+           << " active-size=" << active_requests_.size()
+           << " retry-in-prog=" << connection_retry_in_progress;
+
+  // If the active list is not full and the service is not in the process
+  // of reconnecting to the agent, process it now.
+  if (active_requests_.size() < kMaxActiveCount &&
+      !connection_retry_in_progress) {
     ProcessNextPendingRequest();
   }
 }
@@ -275,31 +275,31 @@ void LocalBinaryUploadService::MaybeAcknowledge(std::unique_ptr<Ack> ack) {
 
 void LocalBinaryUploadService::MaybeCancelRequests(
     std::unique_ptr<CancelRequests> cancel) {
-  // Cancel all active requests.  If the agent returns a response for any,
-  // they will be ignored.
-  for (auto it = active_requests_.begin(); it != active_requests_.end();) {
-    if (it->second.request->user_action_id() == cancel->get_user_action_id()) {
-      it = active_requests_.erase(it);
-    } else {
-      ++it;
-    }
-  }
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   // Cancel all pending requests.
   for (auto it = pending_requests_.begin(); it != pending_requests_.end();) {
     if (it->request->user_action_id() == cancel->get_user_action_id()) {
+      // This does not calls the `FinishRequest()` method because it would
+      // invalidate the iterator.
+      it->request->FinishRequest(Result::UPLOAD_FAILURE,
+                                 ContentAnalysisResponse());
       it = pending_requests_.erase(it);
     } else {
       ++it;
     }
   }
 
-  // Tell agent to cancel requests.  This is a best effort only on the part of
-  // the agent.
-  auto* cancel_ptr = cancel.get();
-  DoSendCancel(ContentAnalysisSdkManager::Get()->GetClient(
-                   SDKConfigFromCancel(cancel_ptr)),
-               std::move(cancel));
+  pending_cancel_requests_.insert(std::move(cancel));
+  SendCancelRequestsIfNeeded();
+}
+
+device_signals::mojom::SystemSignalsService*
+LocalBinaryUploadService::GetSystemSignalsService() {
+  auto* host =
+      enterprise_signals::SystemSignalsServiceHostFactory::GetForProfile(
+          profile_);
+  return host ? host->GetService() : nullptr;
 }
 
 void LocalBinaryUploadService::StartAgentVerification(
@@ -308,16 +308,11 @@ void LocalBinaryUploadService::StartAgentVerification(
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   DVLOG(1) << __func__;
 
-  auto* host =
-      enterprise_signals::SystemSignalsServiceHostFactory::GetForProfile(
-          profile_);
-  auto* service = host ? host->GetService() : nullptr;
-
   // If the service is not available, fail open.
-  // TODO: can the state of the SystemSignalsServiceHost change at runtime?
+  auto* service = GetSystemSignalsService();
   if (!service) {
     DVLOG(1) << __func__ << ": SystemSignalsServiceHost not avaiable";
-    is_agent_verified_[config] = true;
+    OnFileSystemSignals(config, base::span<const char* const>(), {});
     return;
   }
 
@@ -328,7 +323,7 @@ void LocalBinaryUploadService::StartAgentVerification(
   }
 
   // If the agent is already in the process of being verified, just wait.
-  if (IsAgentVerified(config)) {
+  if (IsAgentBeingVerified(config)) {
     return;
   }
 
@@ -396,11 +391,9 @@ void LocalBinaryUploadService::OnFileSystemSignals(
                            : std::string("<Agent path unknown>");
     SYSLOG(ERROR) << "Cannot verify content analysis agent: " << path;
 
-    ResetClient(config);
-
     // Force all active requests to fail.
     retry_count_ = kMaxRetryCount;
-    RetryActiveRequestsSoonOrFailAllRequests();
+    RetryActiveRequestsSoonOrFailAllRequests(config);
   }
 }
 
@@ -411,32 +404,33 @@ bool LocalBinaryUploadService::IsAgentVerified(
   return it != is_agent_verified_.end() && it->second;
 }
 
+bool LocalBinaryUploadService::IsAgentBeingVerified(
+    const content_analysis::sdk::Client::Config& config) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  return is_agent_verified_.find(config) != is_agent_verified_.end();
+}
+
 void LocalBinaryUploadService::ResetClient(
     const content_analysis::sdk::Client::Config& config) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  DVLOG(1) << __func__;
 
   ContentAnalysisSdkManager::Get()->ResetClient(config);
   is_agent_verified_.erase(config);
-  // Temporary code(b/268532118): If the config name is "path_system" and the
-  // config is not user specific, try again with a different name.  The plan
-  // is to remove this in m115.
-  if (config.name == "brcm_chrm_cas" && !config.user_specific) {
-    is_agent_verified_.erase({"path_system", config.user_specific});
-  }
 }
 
-void LocalBinaryUploadService::DoLocalContentAnalysis(RequestKey key,
+void LocalBinaryUploadService::DoLocalContentAnalysis(Request::Id id,
                                                       Result result,
                                                       Request::Data data) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DVLOG(1) << __func__ << ": key=" << key;
+  DVLOG(1) << __func__ << ": id=" << id;
 
   if (LocalResultIsFailure(result)) {
-    FinishRequest(key, result, ContentAnalysisResponse());
+    FinishRequest(id, result, ContentAnalysisResponse());
     return;
   }
 
-  auto it = active_requests_.find(key);
+  auto it = active_requests_.find(id);
   if (it == active_requests_.end())
     return;
 
@@ -446,10 +440,10 @@ void LocalBinaryUploadService::DoLocalContentAnalysis(RequestKey key,
   // it again.
   if (info.request->request_token().empty()) {
     info.request->SetRandomRequestToken();
-    DVLOG(1) << __func__ << ": key=" << key
+    DVLOG(1) << __func__ << ": id=" << id
              << " new request_token=" << info.request->request_token();
   } else {
-    DVLOG(1) << __func__ << ": key=" << key
+    DVLOG(1) << __func__ << ": id=" << id
              << " existing request_token=" << info.request->request_token();
   }
 
@@ -468,7 +462,7 @@ void LocalBinaryUploadService::DoLocalContentAnalysis(RequestKey key,
     sdk_request.set_text_content(std::move(data.contents));
   } else if (!data.path.empty()) {
     sdk_request.set_file_path(data.path.AsUTF8Unsafe());
-    DVLOG(1) << __func__ << ": key=" << key
+    DVLOG(1) << __func__ << ": id=" << id
              << " file=" << data.path.AsUTF8Unsafe();
   } else if (data.page.IsValid()) {
 #if BUILDFLAG(IS_WIN)
@@ -501,16 +495,12 @@ void LocalBinaryUploadService::HandleResponse(
     absl::optional<content_analysis::sdk::ContentAnalysisResponse>
         sdk_response) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  DVLOG(1) << __func__;
 
   if (!sdk_response.has_value()) {
-    DVLOG(1) << __func__ << ": reset client";
-    // An error occurred trying to send to agent.  Reset the client so that the
-    // next request attempts to reconnect to the agent.
-    ResetClient(wrapped->client()->GetConfig());
-
     // Put the request into the pending queue.  Queue up a call to retry
     // connecting to the agent in order to start processing requests again.
-    RetryActiveRequestsSoonOrFailAllRequests();
+    RetryActiveRequestsSoonOrFailAllRequests(wrapped->client()->GetConfig());
     return;
   }
 
@@ -519,15 +509,18 @@ void LocalBinaryUploadService::HandleResponse(
   // Find the request that corresponds to this response.  It's possible the
   // request is not found if for example it was cancelled by the user or it
   // timed out.
-  RequestKey key = FindRequestByToken(sdk_response.value());
-  if (key != nullptr) {
+  Request::Id id = FindRequestByToken(sdk_response.value());
+  if (id) {
 #if defined(_DEBUG)
-    DumpSdkAnalysisResponse(__func__, key, sdk_response.value());
+    DumpSdkAnalysisResponse(__func__, id, sdk_response.value());
 #endif
 
     auto response = ConvertSDKResponseToChromeResponse(sdk_response.value());
-    FinishRequest(key, Result::SUCCESS, std::move(response));
+    FinishRequest(id, Result::SUCCESS, std::move(response));
     ProcessNextPendingRequest();
+  } else {
+    DVLOG(1) << __func__
+             << ": id not found token=" << sdk_response.value().request_token();
   }
 }
 
@@ -544,7 +537,7 @@ void LocalBinaryUploadService::DoSendAck(
       FROM_HERE,
       {base::MayBlock(), base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
       base::BindOnce(&SendAckToSDK, wrapped, std::move(sdk_ack)),
-      base::BindOnce(&LocalBinaryUploadService::HandleAckOrCancelResponse,
+      base::BindOnce(&LocalBinaryUploadService::HandleAckResponse,
                      factory_.GetWeakPtr(), wrapped));
 }
 
@@ -556,6 +549,8 @@ void LocalBinaryUploadService::DoSendCancel(
     return;
   }
 
+  DVLOG(1) << __func__ << ": action_id=" << cancel->get_user_action_id();
+
   content_analysis::sdk::ContentAnalysisCancelRequests sdk_cancel;
   sdk_cancel.set_user_action_id(cancel->get_user_action_id());
 
@@ -563,11 +558,11 @@ void LocalBinaryUploadService::DoSendCancel(
       FROM_HERE,
       {base::MayBlock(), base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
       base::BindOnce(&SendCancelToSDK, wrapped, std::move(sdk_cancel)),
-      base::BindOnce(&LocalBinaryUploadService::HandleAckOrCancelResponse,
-                     factory_.GetWeakPtr(), wrapped));
+      base::BindOnce(&LocalBinaryUploadService::HandleCancelResponse,
+                     factory_.GetWeakPtr(), wrapped, std::move(cancel)));
 }
 
-void LocalBinaryUploadService::HandleAckOrCancelResponse(
+void LocalBinaryUploadService::HandleAckResponse(
     scoped_refptr<ContentAnalysisSdkManager::WrappedClient> wrapped,
     int status) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
@@ -577,7 +572,20 @@ void LocalBinaryUploadService::HandleAckOrCancelResponse(
   }
 }
 
-LocalBinaryUploadService::RequestKey
+void LocalBinaryUploadService::HandleCancelResponse(
+    scoped_refptr<ContentAnalysisSdkManager::WrappedClient> wrapped,
+    std::unique_ptr<safe_browsing::BinaryUploadService::CancelRequests> cancel,
+    int status) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+
+  OnCancelRequestSent(std::move(cancel));
+
+  if (status != 0) {
+    ResetClient(wrapped->client()->GetConfig());
+  }
+}
+
+LocalBinaryUploadService::Request::Id
 LocalBinaryUploadService::FindRequestByToken(
     const content_analysis::sdk::ContentAnalysisResponse& sdk_response) {
   // Request must be currently active.
@@ -587,7 +595,7 @@ LocalBinaryUploadService::FindRequestByToken(
                            return request_token ==
                                   value_type.second.request->request_token();
                          });
-  return it != active_requests_.end() ? it->first : nullptr;
+  return it != active_requests_.end() ? it->first : Request::Id();
 }
 
 void LocalBinaryUploadService::ProcessNextPendingRequest() {
@@ -596,22 +604,22 @@ void LocalBinaryUploadService::ProcessNextPendingRequest() {
   if (pending_requests_.size() > 0) {
     auto info = std::move(pending_requests_.front());
     pending_requests_.erase(pending_requests_.begin());
-    RequestKey key = info.request.get();
-    active_requests_.emplace(key, std::move(info));
-    ProcessRequest(key);
+    Request::Id id = info.request->id();
+    active_requests_.emplace(id, std::move(info));
+    ProcessRequest(id);
   }
 }
 
-bool LocalBinaryUploadService::ProcessRequest(RequestKey key) {
+bool LocalBinaryUploadService::ProcessRequest(Request::Id id) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DVLOG(1) << __func__ << ": key=" << key;
-  DCHECK_GT(active_requests_.count(key), 0u);
-  const auto& info = active_requests_.at(key);
+  DVLOG(1) << __func__ << ": id=" << id;
+  DCHECK_GT(active_requests_.count(id), 0u);
+  const auto& info = active_requests_.at(id);
   auto config = SDKConfigFromRequest(info.request.get());
 
   auto wrapped = ContentAnalysisSdkManager::Get()->GetClient(config);
   if (!wrapped || !wrapped->client()) {
-    RetryActiveRequestsSoonOrFailAllRequests();
+    RetryActiveRequestsSoonOrFailAllRequests(config);
     return false;
   }
 
@@ -624,43 +632,75 @@ bool LocalBinaryUploadService::ProcessRequest(RequestKey key) {
   info.request->StartRequest();
   info.request->GetRequestData(
       base::BindOnce(&LocalBinaryUploadService::DoLocalContentAnalysis,
-                     factory_.GetWeakPtr(), key));
+                     factory_.GetWeakPtr(), id));
   return true;
 }
 
-void LocalBinaryUploadService::FinishRequest(RequestKey key,
+void LocalBinaryUploadService::FinishRequest(Request::Id id,
                                              Result result,
                                              ContentAnalysisResponse response) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 #if defined(_DEBUG)
-  DumpAnalysisResponse(__func__, key, response);
+  DumpAnalysisResponse(__func__, id, response);
 #endif
 
-  auto it = active_requests_.find(key);
+  auto it = active_requests_.find(id);
   if (it != active_requests_.end()) {
     const auto& info = it->second;
     RecordRequestMetrics(info, result, response);
     info.request->FinishRequest(result, response);
-    active_requests_.erase(key);
+    active_requests_.erase(id);
   } else {
-    DVLOG(1) << __func__ << ": key=" << key << " not active";
+    DVLOG(1) << __func__ << ": id=" << id << " not active";
   }
 
   auto it2 = base::ranges::find(
-      pending_requests_, key,
-      [](const RequestInfo& info) { return info.request.get(); });
+      pending_requests_, id,
+      [](const RequestInfo& info) { return info.request->id(); });
   if (it2 != pending_requests_.end()) {
     it2->request->FinishRequest(result, response);
     pending_requests_.erase(it2);
   }
+
+  SendCancelRequestsIfNeeded();
 }
 
-void LocalBinaryUploadService::OnTimeout(RequestKey key) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DVLOG(1) << __func__ << ": key=" << key;
+void LocalBinaryUploadService::SendCancelRequestsIfNeeded() {
+  DVLOG(1) << __func__;
 
-  if (active_requests_.count(key) > 0) {
-    const auto& info = active_requests_.at(key);
+  for (auto it = pending_cancel_requests_.begin();
+       it != pending_cancel_requests_.end();) {
+    bool cancel_now = true;
+    for (auto& pair : active_requests_) {
+      if (pair.second.request->user_action_id() ==
+          (*it)->get_user_action_id()) {
+        cancel_now = false;
+        break;
+      }
+    }
+
+    if (cancel_now) {
+      auto curr = it++;
+      auto cancel = std::move(pending_cancel_requests_.extract(curr).value());
+
+      // Tell agent to cancel requests.  This is best effort only on the part
+      // of the agent.
+      auto* cancel_ptr = cancel.get();
+      DoSendCancel(ContentAnalysisSdkManager::Get()->GetClient(
+                       SDKConfigFromCancel(cancel_ptr)),
+                   std::move(cancel));
+    } else {
+      ++it;
+    }
+  }
+}
+
+void LocalBinaryUploadService::OnTimeout(Request::Id id) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  DVLOG(1) << __func__ << ": id=" << id;
+
+  if (active_requests_.count(id) > 0) {
+    const auto& info = active_requests_.at(id);
     RecordRequestMetrics(info, Result::TIMEOUT, ContentAnalysisResponse());
 
     std::unique_ptr<Ack> ack =
@@ -673,14 +713,24 @@ void LocalBinaryUploadService::OnTimeout(RequestKey key) {
               std::move(ack));
   }
 
-  FinishRequest(key, BinaryUploadService::Result::TIMEOUT,
+  FinishRequest(id, BinaryUploadService::Result::TIMEOUT,
                 ContentAnalysisResponse());
   ProcessNextPendingRequest();
 }
 
-void LocalBinaryUploadService::RetryActiveRequestsSoonOrFailAllRequests() {
+void LocalBinaryUploadService::RetryActiveRequestsSoonOrFailAllRequests(
+    const content_analysis::sdk::Client::Config& config) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   DVLOG(1) << __func__ << ": current-retry-count=" << retry_count_;
+
+  if (ConnectionRetryInProgress()) {
+    DVLOG(1) << __func__ << ": retry already in progress, ignore";
+    return;
+  }
+
+  // An error occurred talking to the agent.  Reset the client so that the
+  // next request attempts to reconnect to the agent.
+  ResetClient(config);
 
   // True if requests should be marked as failed.  Otherwise active requests
   // should be moved to the pending list.
@@ -700,7 +750,7 @@ void LocalBinaryUploadService::RetryActiveRequestsSoonOrFailAllRequests() {
   if (fail_requests) {
     for (auto it = pending_requests_.begin(); it != pending_requests_.end();
          it = pending_requests_.begin()) {
-      FinishRequest(it->request.get(),
+      FinishRequest(it->request->id(),
                     BinaryUploadService::Result::UPLOAD_FAILURE,
                     ContentAnalysisResponse());
     }
@@ -711,10 +761,10 @@ void LocalBinaryUploadService::RetryActiveRequestsSoonOrFailAllRequests() {
 
 void LocalBinaryUploadService::StartConnectionRetry() {
   DVLOG(1) << __func__;
-  if (!connection_retry_timer_.IsRunning()) {
+  if (!ConnectionRetryInProgress()) {
     ++retry_count_;
     connection_retry_timer_.Start(
-        FROM_HERE, retry_count_ * base::Seconds(1),
+        FROM_HERE, retry_count_ * base::Milliseconds(100),
         base::BindOnce(&LocalBinaryUploadService::OnConnectionRetry,
                        factory_.GetWeakPtr()));
   }
@@ -734,6 +784,10 @@ void LocalBinaryUploadService::OnConnectionRetry() {
   for (size_t i = 0; i < num_requests_to_process; ++i) {
     ProcessNextPendingRequest();
   }
+}
+
+bool LocalBinaryUploadService::ConnectionRetryInProgress() {
+  return connection_retry_timer_.IsRunning();
 }
 
 void LocalBinaryUploadService::RecordRequestMetrics(

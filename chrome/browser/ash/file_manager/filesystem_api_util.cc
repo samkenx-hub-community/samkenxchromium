@@ -26,6 +26,7 @@
 #include "chrome/browser/ash/file_manager/fileapi_util.h"
 #include "chrome/browser/ash/file_system_provider/mount_path_util.h"
 #include "chrome/browser/ash/file_system_provider/provided_file_system_interface.h"
+#include "chrome/browser/ash/fileapi/file_system_backend.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/profiles/profile.h"
 #include "components/drive/file_errors.h"
@@ -35,7 +36,6 @@
 #include "content/public/browser/storage_partition.h"
 #include "google_apis/common/task_util.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
-#include "storage/browser/file_system/file_system_backend.h"
 #include "storage/browser/file_system/file_system_context.h"
 #include "url/gurl.h"
 
@@ -179,21 +179,6 @@ void PrepareFileOnIOThread(
 
 }  // namespace
 
-bool IsNonNativeFileSystemType(storage::FileSystemType type) {
-  switch (type) {
-    case storage::kFileSystemTypeLocal:
-    case storage::kFileSystemTypeRestrictedLocal:
-    case storage::kFileSystemTypeDriveFs:
-    case storage::kFileSystemTypeSmbFs:
-    case storage::kFileSystemTypeFuseBox:
-      return false;
-    default:
-      // The path indeed corresponds to a mount point not associated with a
-      // native local path.
-      return true;
-  }
-}
-
 bool IsUnderNonNativeLocalPath(Profile* profile, const base::FilePath& path) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
@@ -206,10 +191,11 @@ bool IsUnderNonNativeLocalPath(Profile* profile, const base::FilePath& path) {
   storage::FileSystemURL filesystem_url =
       GetFileSystemContextForSourceURL(profile, GetFileManagerURL())
           ->CrackURLInFirstPartyContext(url);
-  if (!filesystem_url.is_valid())
+  if (!filesystem_url.is_valid()) {
     return false;
+  }
 
-  return IsNonNativeFileSystemType(filesystem_url.type());
+  return !filesystem_url.TypeImpliesPathIsReal();
 }
 
 bool IsDriveLocalPath(Profile* profile, const base::FilePath& path) {
@@ -224,8 +210,9 @@ bool IsDriveLocalPath(Profile* profile, const base::FilePath& path) {
   storage::FileSystemURL filesystem_url =
       GetFileSystemContextForSourceURL(profile, GetFileManagerURL())
           ->CrackURLInFirstPartyContext(url);
-  if (!filesystem_url.is_valid())
+  if (!filesystem_url.is_valid()) {
     return false;
+  }
 
   return filesystem_url.type() == storage::kFileSystemTypeDriveFs;
 }
@@ -378,8 +365,7 @@ void PrepareNonNativeLocalFileForWritableApp(
   scoped_refptr<storage::FileSystemContext> const file_system_context =
       GetFileManagerFileSystemContext(profile);
   DCHECK(file_system_context);
-  storage::ExternalFileSystemBackend* const backend =
-      file_system_context->external_backend();
+  auto* const backend = ash::FileSystemBackend::Get(*file_system_context);
   DCHECK(backend);
   const storage::FileSystemURL internal_url =
       backend->CreateInternalURL(file_system_context.get(), path);

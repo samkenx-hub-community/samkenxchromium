@@ -13,7 +13,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/values.h"
 #include "chrome/browser/web_applications/commands/web_app_command.h"
-#include "chrome/browser/web_applications/locks/full_system_lock.h"
+#include "chrome/browser/web_applications/locks/all_apps_lock.h"
 
 class Profile;
 
@@ -23,14 +23,14 @@ class Origin;
 
 namespace web_app {
 
-class FullSystemLock;
-class FullSystemLockDescription;
+class AllAppsLock;
+class AllAppsLockDescription;
 class LockDescription;
 
 // Computes the total browsing data usage in bytes of every installed Isolated
 // Web App.
 class GetIsolatedWebAppBrowsingDataCommand
-    : public WebAppCommandTemplate<FullSystemLock> {
+    : public WebAppCommandTemplate<AllAppsLock> {
  public:
   using BrowsingDataCallback =
       base::OnceCallback<void(base::flat_map<url::Origin, int64_t>)>;
@@ -39,22 +39,21 @@ class GetIsolatedWebAppBrowsingDataCommand
                                        BrowsingDataCallback callback);
   ~GetIsolatedWebAppBrowsingDataCommand() override;
 
-  // WebAppCommandTemplate<FullSystemLock>:
+  // WebAppCommandTemplate<AllAppsLock>:
   const LockDescription& lock_description() const override;
   base::Value ToDebugValue() const override;
-  void StartWithLock(std::unique_ptr<FullSystemLock> lock) override;
+  void StartWithLock(std::unique_ptr<AllAppsLock> lock) override;
   void OnShutdown() override;
-  void OnSyncSourceRemoved() override {}
 
  private:
   void StoragePartitionSizeFetched(const url::Origin& iwa_origin, int64_t size);
   void MaybeCompleteCommand();
 
-  base::raw_ptr<Profile> profile_;
+  raw_ptr<Profile> profile_ = nullptr;
   BrowsingDataCallback callback_;
 
-  std::unique_ptr<FullSystemLockDescription> lock_description_;
-  std::unique_ptr<FullSystemLock> lock_;
+  std::unique_ptr<AllAppsLockDescription> lock_description_;
+  std::unique_ptr<AllAppsLock> lock_;
 
   int pending_task_count_ = 0;
   base::flat_map<url::Origin, int64_t> browsing_data_;

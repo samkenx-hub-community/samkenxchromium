@@ -38,7 +38,7 @@ class ExtensionInstallEventRouter
   void StartObserving();
 
  private:
-  raw_ptr<enterprise_connectors::RealtimeReportingClient, DanglingUntriaged>
+  raw_ptr<RealtimeReportingClient, AcrossTasksDanglingUntriaged>
       reporting_client_ = nullptr;
   raw_ptr<extensions::ExtensionRegistry, DanglingUntriaged>
       extension_registry_ = nullptr;

@@ -40,13 +40,24 @@ const NGLayoutResult* NGTableRowLayoutAlgorithm::Layout() {
 
   auto CreateCellConstraintSpace =
       [this, &table_data](
-          NGBlockNode cell, const NGTableConstraintSpaceData::Cell& cell_data,
+          NGBlockNode cell, const NGBlockBreakToken* cell_break_token,
+          const NGTableConstraintSpaceData::Cell& cell_data,
           LayoutUnit row_block_size, absl::optional<LayoutUnit> row_baseline,
           bool min_block_size_should_encompass_intrinsic_size) {
-        const LayoutUnit cell_block_size =
-            cell_data.rowspan_block_size != kIndefiniteSize
-                ? cell_data.rowspan_block_size
-                : row_block_size;
+        bool has_rowspan = cell_data.rowspan_block_size != kIndefiniteSize;
+        LayoutUnit cell_block_size =
+            has_rowspan ? cell_data.rowspan_block_size : row_block_size;
+
+        if (IsBreakInside(cell_break_token) && IsBreakInside(BreakToken()) &&
+            !has_rowspan) {
+          // The table row may have consumed more space than the cell, if some
+          // sibling cell has overflowed the fragmentainer. Subtract this
+          // difference, so that this cell won't overflow the row - unless the
+          // cell is rowspanned. In that case it doesn't make sense to
+          // compensate against just the current row.
+          cell_block_size -= BreakToken()->ConsumedBlockSize() -
+                             cell_break_token->ConsumedBlockSize();
+        }
 
         DCHECK_EQ(table_data.table_writing_direction.GetWritingMode(),
                   ConstraintSpace().GetWritingMode());
@@ -114,15 +125,16 @@ const NGLayoutResult* NGTableRowLayoutAlgorithm::Layout() {
   EBreakBetween row_break_after;
   NGRowBaselineTabulator row_baseline_tabulator;
   HeapVector<ResultWithOffset> results;
-  auto PlaceCells =
-      [&](LayoutUnit row_block_size,
-          absl::optional<LayoutUnit> row_baseline) -> NGLayoutResult::EStatus {
+  bool has_inflow_break_inside = false;
+  auto PlaceCells = [&](LayoutUnit row_block_size,
+                        absl::optional<LayoutUnit> row_baseline) {
     // Reset our state.
     max_cell_block_size = LayoutUnit();
     row_break_before = EBreakBetween::kAuto;
     row_break_after = EBreakBetween::kAuto;
     row_baseline_tabulator = NGRowBaselineTabulator();
     results.clear();
+    has_inflow_break_inside = false;
 
     NGBlockChildIterator child_iterator(Node().FirstChild(), BreakToken(),
                                         /* calculate_child_idx */ true);
@@ -139,20 +151,10 @@ const NGLayoutResult* NGTableRowLayoutAlgorithm::Layout() {
           MinBlockSizeShouldEncompassIntrinsicSize(cell, cell_data);
 
       const auto cell_space = CreateCellConstraintSpace(
-          cell, cell_data, row_block_size, row_baseline,
+          cell, cell_break_token, cell_data, row_block_size, row_baseline,
           min_block_size_should_encompass_intrinsic_size);
       const NGLayoutResult* cell_result =
           cell.Layout(cell_space, cell_break_token);
-
-      if (cell_result->Status() == NGLayoutResult::kOutOfFragmentainerSpace) {
-        DCHECK(has_block_fragmentation);
-        // If the cell establishes a multicol container (and we're already
-        // inside another fragmentation context), it may have failed to produce
-        // a fragment, because there wasn't enough space. We now need to
-        // propagate the failure, to make some ancestor algorithm handle the
-        // problem. We need to break before something further up.
-        return NGLayoutResult::kOutOfFragmentainerSpace;
-      }
       DCHECK_EQ(cell_result->Status(), NGLayoutResult::kSuccess);
 
       const LogicalOffset offset(
@@ -176,9 +178,10 @@ const NGLayoutResult* NGTableRowLayoutAlgorithm::Layout() {
       }
 
       bool has_rowspan = cell_data.rowspan_block_size != kIndefiniteSize;
-      const NGBoxFragment fragment(
-          table_data.table_writing_direction,
-          To<NGPhysicalBoxFragment>(cell_result->PhysicalFragment()));
+      const auto& physical_fragment =
+          To<NGPhysicalBoxFragment>(cell_result->PhysicalFragment());
+      const NGBoxFragment fragment(table_data.table_writing_direction,
+                                   physical_fragment);
       row_baseline_tabulator.ProcessCell(
           fragment,
           NGTableAlgorithmUtils::IsBaseline(cell_style.VerticalAlign()),
@@ -188,9 +191,12 @@ const NGLayoutResult* NGTableRowLayoutAlgorithm::Layout() {
         max_cell_block_size =
             std::max(max_cell_block_size, fragment.BlockSize());
       }
-    }
 
-    return NGLayoutResult::kSuccess;
+      if (const auto* outgoing_break_token = physical_fragment.BreakToken();
+          outgoing_break_token && !has_inflow_break_inside && !has_rowspan) {
+        has_inflow_break_inside = !outgoing_break_token->IsAtBlockEnd();
+      }
+    }
   };
 
   // Determine the baseline for the table-row if we haven't been provided a
@@ -208,12 +214,7 @@ const NGLayoutResult* NGTableRowLayoutAlgorithm::Layout() {
     }
   }
 
-  {
-    NGLayoutResult::EStatus status = PlaceCells(row.block_size, row_baseline);
-    if (status == NGLayoutResult::kOutOfFragmentainerSpace)
-      return container_builder_.Abort(status);
-    DCHECK_EQ(status, NGLayoutResult::kSuccess);
-  }
+  PlaceCells(row.block_size, row_baseline);
 
   LayoutUnit previous_consumed_row_block_size;
   if (IsBreakInside(BreakToken())) {
@@ -233,11 +234,7 @@ const NGLayoutResult* NGTableRowLayoutAlgorithm::Layout() {
   if (has_block_fragmentation) {
     // If we've expanded due to fragmentation, relayout with the new block-size.
     if (row.block_size != row_block_size) {
-      NGLayoutResult::EStatus status =
-          PlaceCells(row_block_size, absl::nullopt);
-      if (status == NGLayoutResult::kOutOfFragmentainerSpace)
-        return container_builder_.Abort(status);
-      DCHECK_EQ(status, NGLayoutResult::kSuccess);
+      PlaceCells(row_block_size, absl::nullopt);
     }
 
     for (auto& result : results)
@@ -249,6 +246,8 @@ const NGLayoutResult* NGTableRowLayoutAlgorithm::Layout() {
   // separately), we have seen all children by now.
   container_builder_.SetHasSeenAllChildren();
 
+  container_builder_.SetIsKnownToFitInFragmentainer(!has_inflow_break_inside);
+  container_builder_.SetIntrinsicBlockSize(max_cell_block_size);
   container_builder_.SetFragmentsTotalBlockSize(row_block_size);
   if (row.is_collapsed)
     container_builder_.SetIsHiddenForPaint(true);

@@ -11,8 +11,7 @@
 <div class="fragment-content">
   <settings-radio-group id="cookiesRadioGroup"
       pref="{{prefs.generated.cookie_primary_setting}}"
-      selectable-elements="settings-collapse-radio-button"
-      on-keydown="onRadioGroupKeyDown_">
+      selectable-elements="settings-collapse-radio-button">
     <settings-collapse-radio-button id="block3PIncognito"
         pref="[[prefs.generated.cookie_primary_setting]]"
         name="[[cookiePrimarySettingEnum_.BLOCK_THIRD_PARTY_INCOGNITO]]"
@@ -22,7 +21,7 @@
         on-click="onCookies3pIncognitoClick_">
       <div slot="collapse" class="description-wrapper-radio two-column">
         <div class="description-column description-column-first">
-          <div class=description-header>
+          <div class="description-header">
             $i18n{privacyGuideFeatureDescriptionHeader}
           </div>
           <div role="list">
@@ -39,7 +38,7 @@
           </div>
         </div>
         <div class="description-column">
-          <div class=description-header>
+          <div class="description-header">
             $i18n{privacyGuideThingsToConsider}
           </div>
           <div role="list">
@@ -65,7 +64,7 @@
         on-click="onCookies3pClick_">
       <div slot="collapse" class="description-wrapper-radio two-column">
         <div class="description-column description-column-first">
-          <div class=description-header>
+          <div class="description-header">
             $i18n{privacyGuideFeatureDescriptionHeader}
           </div>
           <div role="list">
@@ -82,7 +81,7 @@
           </div>
         </div>
         <div class="description-column">
-          <div class=description-header>
+          <div class="description-header">
             $i18n{privacyGuideThingsToConsider}
           </div>
           <div role="list">

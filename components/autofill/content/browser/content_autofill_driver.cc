@@ -16,19 +16,23 @@
 #include "build/build_config.h"
 #include "components/autofill/content/browser/bad_message.h"
 #include "components/autofill/content/browser/content_autofill_driver_factory.h"
-#include "components/autofill/content/browser/content_autofill_router.h"
 #include "components/autofill/core/browser/autofill_client.h"
+#include "components/autofill/core/browser/autofill_driver_router.h"
 #include "components/autofill/core/browser/form_structure.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/autofill_util.h"
 #include "components/autofill/core/common/form_data_predictions.h"
+#include "content/public/browser/global_routing_id.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
-#include "content/public/browser/render_widget_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
+#include "third_party/blink/public/common/permissions_policy/permissions_policy_features.h"
+#include "third_party/blink/public/common/tokens/tokens.h"
+#include "third_party/blink/public/mojom/permissions_policy/permissions_policy_feature.mojom-shared.h"
 #include "url/origin.h"
 
 namespace autofill {
@@ -54,34 +58,31 @@ const std::vector<FormData>& WithNewVersion(
   return forms;
 }
 
+// ContentAutofillDriver::router() must only route among ContentAutofillDrivers.
+// Therefore, we can safely cast AutofillDriverRouter's AutofillDrivers to
+// ContentAutofillDrivers.
+ContentAutofillDriver* cast(autofill::AutofillDriver* driver) {
+  return static_cast<ContentAutofillDriver*>(driver);
+}
+
 }  // namespace
 
 ContentAutofillDriver::ContentAutofillDriver(
     content::RenderFrameHost* render_frame_host,
-    ContentAutofillRouter* autofill_router)
-    : render_frame_host_(render_frame_host),
-      autofill_router_(autofill_router),
-      suppress_showing_ime_callback_(base::BindRepeating(
-          [](const ContentAutofillDriver* driver) {
-            return driver->should_suppress_keyboard_;
-          },
-          base::Unretained(this))) {
-  render_frame_host_->GetRenderWidgetHost()->AddSuppressShowingImeCallback(
-      suppress_showing_ime_callback_);
-}
+    ContentAutofillDriverFactory* owner)
+    : render_frame_host_(*render_frame_host), owner_(*owner) {}
 
 ContentAutofillDriver::~ContentAutofillDriver() {
-  autofill_router_->UnregisterDriver(this);
-  render_frame_host_->GetRenderWidgetHost()->RemoveSuppressShowingImeCallback(
-      suppress_showing_ime_callback_);
+  owner_->router().UnregisterDriver(this,
+                                    /*driver_is_dying=*/true);
 }
 
-void ContentAutofillDriver::TriggerReparse() {
-  GetAutofillAgent()->TriggerReparse();
+void ContentAutofillDriver::TriggerFormExtraction() {
+  GetAutofillAgent()->TriggerFormExtraction();
 }
 
-void ContentAutofillDriver::TriggerReparseInAllFrames(
-    base::OnceCallback<void(bool success)> trigger_reparse_finished_callback) {
+void ContentAutofillDriver::TriggerFormExtractionInAllFrames(
+    base::OnceCallback<void(bool success)> form_extraction_finished_callback) {
   std::vector<ContentAutofillDriver*> drivers;
   render_frame_host()->GetMainFrame()->ForEachRenderFrameHost(
       [&drivers](content::RenderFrameHost* rfh) {
@@ -95,15 +96,23 @@ void ContentAutofillDriver::TriggerReparseInAllFrames(
       drivers.size(),
       base::BindOnce(
           [](base::OnceCallback<void(bool success)>
-                 trigger_reparse_finished_callback,
+                 form_extraction_finished_callback,
              const std::vector<bool>& successes) {
-            std::move(trigger_reparse_finished_callback)
+            std::move(form_extraction_finished_callback)
                 .Run(base::ranges::all_of(successes, base::identity()));
           },
-          std::move(trigger_reparse_finished_callback)));
+          std::move(form_extraction_finished_callback)));
   for (ContentAutofillDriver* driver : drivers) {
-    driver->GetAutofillAgent()->TriggerReparseWithResponse(barrier_callback);
+    driver->GetAutofillAgent()->TriggerFormExtractionWithResponse(
+        barrier_callback);
   }
+}
+
+void ContentAutofillDriver::GetFourDigitCombinationsFromDOM(
+    base::OnceCallback<void(const std::vector<std::string>&)>
+        potential_matches) {
+  GetAutofillAgent()->GetPotentialLastFourCombinationsForStandaloneCvc(
+      std::move(potential_matches));
 }
 
 // static
@@ -120,12 +129,46 @@ void ContentAutofillDriver::BindPendingReceiver(
   receiver_.Bind(std::move(pending_receiver));
 }
 
+LocalFrameToken ContentAutofillDriver::GetFrameToken() const {
+  return LocalFrameToken(render_frame_host_->GetFrameToken().value());
+}
+
+ContentAutofillDriver* ContentAutofillDriver::GetParent() {
+  content::RenderFrameHost* parent_rfh = render_frame_host_->GetParent();
+  if (!parent_rfh) {
+    return nullptr;
+  }
+  return owner_->DriverForFrame(parent_rfh);
+}
+
+AutofillManager& ContentAutofillDriver::GetAutofillManager() {
+  return *autofill_manager_;
+}
+
+absl::optional<LocalFrameToken> ContentAutofillDriver::Resolve(
+    FrameToken query) {
+  if (absl::holds_alternative<LocalFrameToken>(query)) {
+    return absl::get<LocalFrameToken>(query);
+  }
+  DCHECK(absl::holds_alternative<RemoteFrameToken>(query));
+  content::RenderProcessHost* rph = render_frame_host_->GetProcess();
+  blink::RemoteFrameToken blink_remote_token(
+      absl::get<RemoteFrameToken>(query).value());
+  content::RenderFrameHost* remote_rfh =
+      content::RenderFrameHost::FromPlaceholderToken(rph->GetID(),
+                                                     blink_remote_token);
+  if (!remote_rfh) {
+    return absl::nullopt;
+  }
+  return LocalFrameToken(remote_rfh->GetFrameToken().value());
+}
+
 bool ContentAutofillDriver::IsInActiveFrame() const {
   return render_frame_host_->IsActive();
 }
 
 bool ContentAutofillDriver::IsInAnyMainFrame() const {
-  return render_frame_host_->GetMainFrame() == render_frame_host_;
+  return render_frame_host_->GetMainFrame() == render_frame_host();
 }
 
 bool ContentAutofillDriver::IsPrerendering() const {
@@ -133,15 +176,16 @@ bool ContentAutofillDriver::IsPrerendering() const {
       content::RenderFrameHost::LifecycleState::kPrerendering);
 }
 
+bool ContentAutofillDriver::HasSharedAutofillPermission() const {
+  return render_frame_host_->IsFeatureEnabled(
+      blink::mojom::PermissionsPolicyFeature::kSharedAutofill);
+}
+
 bool ContentAutofillDriver::CanShowAutofillUi() const {
   // Don't show AutofillUi for inactive RenderFrameHost. Here it is safe to
   // ignore the calls from inactive RFH as the renderer is not expecting a reply
   // and it doesn't lead to browser-renderer consistency issues.
   return render_frame_host_->IsActive();
-}
-
-ui::AXTreeID ContentAutofillDriver::GetAxTreeId() const {
-  return render_frame_host_->GetAXTreeID();
 }
 
 bool ContentAutofillDriver::RendererIsAvailable() {
@@ -173,18 +217,24 @@ net::IsolationInfo ContentAutofillDriver::IsolationInfo() {
   return render_frame_host_->GetIsolationInfoForSubresources();
 }
 
-std::vector<FieldGlobalId> ContentAutofillDriver::FillOrPreviewForm(
-    mojom::RendererFormDataAction action,
-    const FormData& data,
+std::vector<FieldGlobalId> ContentAutofillDriver::ApplyAutofillAction(
+    mojom::AutofillActionType action_type,
+    mojom::AutofillActionPersistence action_persistence,
+    const FormData& form,
     const url::Origin& triggered_origin,
     const base::flat_map<FieldGlobalId, ServerFieldType>& field_type_map) {
-  return autofill_router().FillOrPreviewForm(
-      this, action, data, triggered_origin, field_type_map,
-      [](ContentAutofillDriver* target, mojom::RendererFormDataAction action,
-         const FormData& data) {
-        if (!target->RendererIsAvailable())
+  return router().ApplyAutofillAction(
+      this, action_type, action_persistence, form, triggered_origin,
+      field_type_map,
+      [](autofill::AutofillDriver* target,
+         mojom::AutofillActionType action_type,
+         mojom::AutofillActionPersistence action_persistence,
+         const FormData& form) {
+        if (!cast(target)->RendererIsAvailable()) {
           return;
-        target->GetAutofillAgent()->FillOrPreviewForm(data, action);
+        }
+        cast(target)->GetAutofillAgent()->ApplyAutofillAction(
+            action_type, action_persistence, form);
       });
 }
 
@@ -194,96 +244,122 @@ void ContentAutofillDriver::SendAutofillTypePredictionsToRenderer(
       FormStructure::GetFieldTypePredictions(forms);
   // TODO(crbug.com/1185232) Send the FormDataPredictions object only if the
   // debugging flag is enabled.
-  autofill_router().SendAutofillTypePredictionsToRenderer(
+  router().SendAutofillTypePredictionsToRenderer(
       this, type_predictions,
-      [](ContentAutofillDriver* target,
+      [](autofill::AutofillDriver* target,
          const std::vector<FormDataPredictions>& type_predictions) {
-        if (!target->RendererIsAvailable())
+        if (!cast(target)->RendererIsAvailable()) {
           return;
-        target->GetAutofillAgent()->FieldTypePredictionsAvailable(
+        }
+        cast(target)->GetAutofillAgent()->FieldTypePredictionsAvailable(
             type_predictions);
       });
 }
 
 void ContentAutofillDriver::SendFieldsEligibleForManualFillingToRenderer(
     const std::vector<FieldGlobalId>& fields) {
-  autofill_router().SendFieldsEligibleForManualFillingToRenderer(
+  router().SendFieldsEligibleForManualFillingToRenderer(
       this, fields,
-      [](ContentAutofillDriver* target,
+      [](autofill::AutofillDriver* target,
          const std::vector<FieldRendererId>& fields) {
-        if (!target->RendererIsAvailable())
+        if (!cast(target)->RendererIsAvailable()) {
           return;
-        target->GetAutofillAgent()->SetFieldsEligibleForManualFilling(fields);
+        }
+        cast(target)->GetAutofillAgent()->SetFieldsEligibleForManualFilling(
+            fields);
       });
 }
 
 void ContentAutofillDriver::RendererShouldAcceptDataListSuggestion(
     const FieldGlobalId& field,
     const std::u16string& value) {
-  autofill_router().RendererShouldAcceptDataListSuggestion(
+  router().RendererShouldAcceptDataListSuggestion(
       this, field, value,
-      [](ContentAutofillDriver* target, const FieldRendererId& field,
+      [](autofill::AutofillDriver* target, const FieldRendererId& field,
          const std::u16string& value) {
-        if (!target->RendererIsAvailable())
+        if (!cast(target)->RendererIsAvailable()) {
           return;
-        target->GetAutofillAgent()->AcceptDataListSuggestion(field, value);
+        }
+        cast(target)->GetAutofillAgent()->AcceptDataListSuggestion(field,
+                                                                   value);
       });
 }
 
 void ContentAutofillDriver::RendererShouldClearFilledSection() {
-  autofill_router().RendererShouldClearFilledSection(
-      this, [](ContentAutofillDriver* target) {
-        if (!target->RendererIsAvailable())
+  router().RendererShouldClearFilledSection(
+      this, [](autofill::AutofillDriver* target) {
+        if (!cast(target)->RendererIsAvailable()) {
           return;
-        target->GetAutofillAgent()->ClearSection();
+        }
+        cast(target)->GetAutofillAgent()->ClearSection();
       });
 }
 
 void ContentAutofillDriver::RendererShouldClearPreviewedForm() {
-  autofill_router().RendererShouldClearPreviewedForm(
-      this, [](ContentAutofillDriver* target) {
-        if (!target->RendererIsAvailable())
+  router().RendererShouldClearPreviewedForm(
+      this, [](autofill::AutofillDriver* target) {
+        if (!cast(target)->RendererIsAvailable()) {
           return;
-        target->GetAutofillAgent()->ClearPreviewedForm();
+        }
+        cast(target)->GetAutofillAgent()->ClearPreviewedForm();
+      });
+}
+
+void ContentAutofillDriver::RendererShouldTriggerSuggestions(
+    const FieldGlobalId& field,
+    AutofillSuggestionTriggerSource trigger_source) {
+  router().RendererShouldTriggerSuggestions(
+      this, field, trigger_source,
+      [](autofill::AutofillDriver* target, const FieldRendererId& field,
+         AutofillSuggestionTriggerSource trigger_source) {
+        if (!cast(target)->RendererIsAvailable()) {
+          return;
+        }
+        cast(target)->GetAutofillAgent()->TriggerSuggestions(field,
+                                                             trigger_source);
       });
 }
 
 void ContentAutofillDriver::RendererShouldFillFieldWithValue(
     const FieldGlobalId& field,
     const std::u16string& value) {
-  autofill_router().RendererShouldFillFieldWithValue(
+  router().RendererShouldFillFieldWithValue(
       this, field, value,
-      [](ContentAutofillDriver* target, const FieldRendererId& field,
+      [](autofill::AutofillDriver* target, const FieldRendererId& field,
          const std::u16string& value) {
-        if (!target->RendererIsAvailable())
+        if (!cast(target)->RendererIsAvailable()) {
           return;
-        target->GetAutofillAgent()->FillFieldWithValue(field, value);
+        }
+        cast(target)->GetAutofillAgent()->FillFieldWithValue(field, value);
       });
 }
 
 void ContentAutofillDriver::RendererShouldPreviewFieldWithValue(
     const FieldGlobalId& field,
     const std::u16string& value) {
-  autofill_router().RendererShouldPreviewFieldWithValue(
+  router().RendererShouldPreviewFieldWithValue(
       this, field, value,
-      [](ContentAutofillDriver* target, const FieldRendererId& field,
+      [](autofill::AutofillDriver* target, const FieldRendererId& field,
          const std::u16string& value) {
-        if (!target->RendererIsAvailable())
+        if (!cast(target)->RendererIsAvailable()) {
           return;
-        target->GetAutofillAgent()->PreviewFieldWithValue(field, value);
+        }
+        cast(target)->GetAutofillAgent()->PreviewFieldWithValue(field, value);
       });
 }
 
 void ContentAutofillDriver::RendererShouldSetSuggestionAvailability(
     const FieldGlobalId& field,
     const mojom::AutofillState state) {
-  autofill_router().RendererShouldSetSuggestionAvailability(
+  router().RendererShouldSetSuggestionAvailability(
       this, field, state,
-      [](ContentAutofillDriver* target, const FieldRendererId& field,
+      [](autofill::AutofillDriver* target, const FieldRendererId& field,
          const mojom::AutofillState state) {
-        if (!target->RendererIsAvailable())
+        if (!cast(target)->RendererIsAvailable()) {
           return;
-        target->GetAutofillAgent()->SetSuggestionAvailability(field, state);
+        }
+        cast(target)->GetAutofillAgent()->SetSuggestionAvailability(field,
+                                                                    state);
       });
 }
 
@@ -301,15 +377,16 @@ void ContentAutofillDriver::ProbablyFormSubmitted(
 
 void ContentAutofillDriver::SetFormToBeProbablySubmitted(
     const absl::optional<FormData>& form) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
-  autofill_router().SetFormToBeProbablySubmitted(
+  }
+  router().SetFormToBeProbablySubmitted(
       this,
       form ? absl::make_optional<FormData>(
                  GetFormWithFrameAndFormMetaData(*form))
            : absl::nullopt,
-      [](ContentAutofillDriver* target, const FormData* optional_form) {
-        target->potentially_submitted_form_ =
+      [](autofill::AutofillDriver* target, const FormData* optional_form) {
+        cast(target)->potentially_submitted_form_ =
             base::OptionalFromPtr(optional_form);
       });
 }
@@ -317,38 +394,38 @@ void ContentAutofillDriver::SetFormToBeProbablySubmitted(
 void ContentAutofillDriver::FormsSeen(
     const std::vector<FormData>& raw_updated_forms,
     const std::vector<FormRendererId>& raw_removed_forms) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
+  }
   std::vector<FormData> updated_forms = raw_updated_forms;
   for (FormData& form : updated_forms)
     SetFrameAndFormMetaData(form, nullptr);
 
-  LocalFrameToken frame_token(render_frame_host_->GetFrameToken().value());
   std::vector<FormGlobalId> removed_forms;
   removed_forms.reserve(raw_removed_forms.size());
   for (FormRendererId form_id : raw_removed_forms)
-    removed_forms.push_back({frame_token, form_id});
+    removed_forms.push_back({GetFrameToken(), form_id});
 
-  autofill_router().FormsSeen(
-      this, std::move(updated_forms), removed_forms,
-      [](ContentAutofillDriver* target,
-         const std::vector<FormData>& updated_forms,
-         const std::vector<FormGlobalId>& removed_forms) {
-        target->autofill_manager_->OnFormsSeen(WithNewVersion(updated_forms),
-                                               removed_forms);
-      });
+  router().FormsSeen(this, std::move(updated_forms), removed_forms,
+                     [](autofill::AutofillDriver* target,
+                        const std::vector<FormData>& updated_forms,
+                        const std::vector<FormGlobalId>& removed_forms) {
+                       target->GetAutofillManager().OnFormsSeen(
+                           WithNewVersion(updated_forms), removed_forms);
+                     });
 }
 
 void ContentAutofillDriver::FormSubmitted(
     const FormData& raw_form,
     bool known_success,
     mojom::SubmissionSource submission_source) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
-  autofill_router().FormSubmitted(
+  }
+  router().FormSubmitted(
       this, GetFormWithFrameAndFormMetaData(raw_form), known_success,
       submission_source,
-      [](ContentAutofillDriver* target, const FormData& form,
+      [](autofill::AutofillDriver* target, const FormData& form,
          bool known_success, mojom::SubmissionSource submission_source) {
         // Omit duplicate form submissions. It may be reasonable to take
         // |source| into account here as well.
@@ -357,10 +434,10 @@ void ContentAutofillDriver::FormSubmitted(
                 features::kAutofillProbableFormSubmissionInBrowser) &&
             !base::FeatureList::IsEnabled(
                 features::kAutofillAllowDuplicateFormSubmissions) &&
-            !target->submitted_forms_.insert(form.global_id()).second) {
+            !cast(target)->submitted_forms_.insert(form.global_id()).second) {
           return;
         }
-        target->autofill_manager_->OnFormSubmitted(
+        target->GetAutofillManager().OnFormSubmitted(
             WithNewVersion(form), known_success, submission_source);
       });
 }
@@ -369,18 +446,19 @@ void ContentAutofillDriver::TextFieldDidChange(const FormData& raw_form,
                                                const FormFieldData& raw_field,
                                                const gfx::RectF& bounding_box,
                                                base::TimeTicks timestamp) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
+  }
   FormData form = raw_form;
   FormFieldData field = raw_field;
   SetFrameAndFormMetaData(form, &field);
-  autofill_router().TextFieldDidChange(
+  router().TextFieldDidChange(
       this, std::move(form), field,
       TransformBoundingBoxToViewportCoordinates(bounding_box), timestamp,
-      [](ContentAutofillDriver* target, const FormData& form,
+      [](autofill::AutofillDriver* target, const FormData& form,
          const FormFieldData& field, const gfx::RectF& bounding_box,
          base::TimeTicks timestamp) {
-        target->autofill_manager_->OnTextFieldDidChange(
+        target->GetAutofillManager().OnTextFieldDidChange(
             WithNewVersion(form), field, bounding_box, timestamp);
       });
 }
@@ -388,18 +466,19 @@ void ContentAutofillDriver::TextFieldDidChange(const FormData& raw_form,
 void ContentAutofillDriver::TextFieldDidScroll(const FormData& raw_form,
                                                const FormFieldData& raw_field,
                                                const gfx::RectF& bounding_box) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
+  }
   FormData form = raw_form;
   FormFieldData field = raw_field;
   SetFrameAndFormMetaData(form, &field);
-  autofill_router().TextFieldDidScroll(
+  router().TextFieldDidScroll(
       this, std::move(form), field,
       TransformBoundingBoxToViewportCoordinates(bounding_box),
-      [](ContentAutofillDriver* target, const FormData& form,
+      [](autofill::AutofillDriver* target, const FormData& form,
          const FormFieldData& field, const gfx::RectF& bounding_box) {
-        target->autofill_manager_->OnTextFieldDidScroll(WithNewVersion(form),
-                                                        field, bounding_box);
+        target->GetAutofillManager().OnTextFieldDidScroll(WithNewVersion(form),
+                                                          field, bounding_box);
       });
 }
 
@@ -407,17 +486,18 @@ void ContentAutofillDriver::SelectControlDidChange(
     const FormData& raw_form,
     const FormFieldData& raw_field,
     const gfx::RectF& bounding_box) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
+  }
   FormData form = raw_form;
   FormFieldData field = raw_field;
   SetFrameAndFormMetaData(form, &field);
-  autofill_router().SelectControlDidChange(
+  router().SelectControlDidChange(
       this, std::move(form), field,
       TransformBoundingBoxToViewportCoordinates(bounding_box),
-      [](ContentAutofillDriver* target, const FormData& form,
+      [](autofill::AutofillDriver* target, const FormData& form,
          const FormFieldData& field, const gfx::RectF& bounding_box) {
-        target->autofill_manager_->OnSelectControlDidChange(
+        target->GetAutofillManager().OnSelectControlDidChange(
             WithNewVersion(form), field, bounding_box);
       });
 }
@@ -426,110 +506,102 @@ void ContentAutofillDriver::AskForValuesToFill(
     const FormData& raw_form,
     const FormFieldData& raw_field,
     const gfx::RectF& bounding_box,
-    AutoselectFirstSuggestion autoselect_first_suggestion,
-    FormElementWasClicked form_element_was_clicked) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+    AutofillSuggestionTriggerSource trigger_source) {
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
+  }
   FormData form = raw_form;
   FormFieldData field = raw_field;
   SetFrameAndFormMetaData(form, &field);
-  autofill_router().AskForValuesToFill(
+  router().AskForValuesToFill(
       this, std::move(form), field,
-      TransformBoundingBoxToViewportCoordinates(bounding_box),
-      autoselect_first_suggestion, form_element_was_clicked,
-      [](ContentAutofillDriver* target, const FormData& form,
+      TransformBoundingBoxToViewportCoordinates(bounding_box), trigger_source,
+      [](autofill::AutofillDriver* target, const FormData& form,
          const FormFieldData& field, const gfx::RectF& bounding_box,
-         AutoselectFirstSuggestion autoselect_first_suggestion,
-         FormElementWasClicked form_element_was_clicked) {
-        target->autofill_manager_->OnAskForValuesToFill(
-            WithNewVersion(form), field, bounding_box,
-            autoselect_first_suggestion, form_element_was_clicked);
+         AutofillSuggestionTriggerSource trigger_source) {
+        target->GetAutofillManager().OnAskForValuesToFill(
+            WithNewVersion(form), field, bounding_box, trigger_source);
       });
 }
 
 void ContentAutofillDriver::HidePopup() {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
-  autofill_router().HidePopup(this, [](ContentAutofillDriver* target) {
+  }
+  router().HidePopup(this, [](autofill::AutofillDriver* target) {
     DCHECK(!target->IsPrerendering())
         << "We should never affect UI while prerendering";
-    target->autofill_manager_->OnHidePopup();
+    target->GetAutofillManager().OnHidePopup();
   });
 }
 
-void ContentAutofillDriver::FocusNoLongerOnFormCallback(
-    bool had_interacted_form) {
-  autofill_manager_->OnFocusNoLongerOnForm(had_interacted_form);
-}
-
 void ContentAutofillDriver::FocusNoLongerOnForm(bool had_interacted_form) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
-  autofill_router().FocusNoLongerOnForm(
+  }
+  router().FocusNoLongerOnForm(
       this, had_interacted_form,
-      [](ContentAutofillDriver* target, bool had_interacted_form) {
-        target->FocusNoLongerOnFormCallback(had_interacted_form);
+      [](autofill::AutofillDriver* target, bool had_interacted_form) {
+        target->GetAutofillManager().OnFocusNoLongerOnForm(had_interacted_form);
       });
 }
 
 void ContentAutofillDriver::FocusOnFormField(const FormData& raw_form,
                                              const FormFieldData& raw_field,
                                              const gfx::RectF& bounding_box) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
+  }
   FormData form = raw_form;
   FormFieldData field = raw_field;
   SetFrameAndFormMetaData(form, &field);
-  autofill_router().FocusOnFormField(
+  router().FocusOnFormField(
       this, std::move(form), field,
       TransformBoundingBoxToViewportCoordinates(bounding_box),
-      [](ContentAutofillDriver* target, const FormData& form,
+      [](autofill::AutofillDriver* target, const FormData& form,
          const FormFieldData& field, const gfx::RectF& bounding_box) {
-        target->autofill_manager_->OnFocusOnFormField(WithNewVersion(form),
-                                                      field, bounding_box);
+        target->GetAutofillManager().OnFocusOnFormField(WithNewVersion(form),
+                                                        field, bounding_box);
+      },
+      [](autofill::AutofillDriver* target) {
+        target->GetAutofillManager().OnFocusNoLongerOnForm(true);
       });
 }
 
 void ContentAutofillDriver::DidFillAutofillFormData(const FormData& raw_form,
                                                     base::TimeTicks timestamp) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
-  autofill_router().DidFillAutofillFormData(
+  }
+  router().DidFillAutofillFormData(
       this, GetFormWithFrameAndFormMetaData(raw_form), timestamp,
-      [](ContentAutofillDriver* target, const FormData& form,
+      [](autofill::AutofillDriver* target, const FormData& form,
          base::TimeTicks timestamp) {
-        target->autofill_manager_->OnDidFillAutofillFormData(
+        target->GetAutofillManager().OnDidFillAutofillFormData(
             WithNewVersion(form), timestamp);
       });
 }
 
-void ContentAutofillDriver::DidPreviewAutofillFormData() {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
-    return;
-  autofill_router().DidPreviewAutofillFormData(
-      this, [](ContentAutofillDriver* target) {
-        target->autofill_manager_->OnDidPreviewAutofillFormData();
-      });
-}
-
 void ContentAutofillDriver::DidEndTextFieldEditing() {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
-  autofill_router().DidEndTextFieldEditing(
-      this, [](ContentAutofillDriver* target) {
-        target->autofill_manager_->OnDidEndTextFieldEditing();
-      });
+  }
+  router().DidEndTextFieldEditing(this, [](autofill::AutofillDriver* target) {
+    target->GetAutofillManager().OnDidEndTextFieldEditing();
+  });
 }
 
-void ContentAutofillDriver::SelectFieldOptionsDidChange(
+void ContentAutofillDriver::SelectOrSelectListFieldOptionsDidChange(
     const FormData& raw_form) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
-  autofill_router().SelectFieldOptionsDidChange(
+  }
+  router().SelectOrSelectListFieldOptionsDidChange(
       this, GetFormWithFrameAndFormMetaData(raw_form),
-      [](ContentAutofillDriver* target, const FormData& form) {
-        target->autofill_manager_->OnSelectFieldOptionsDidChange(
-            WithNewVersion(form));
+      [](autofill::AutofillDriver* target, const FormData& form) {
+        cast(target)
+            ->GetAutofillManager()
+            .OnSelectOrSelectListFieldOptionsDidChange(WithNewVersion(form));
       });
 }
 
@@ -537,65 +609,39 @@ void ContentAutofillDriver::JavaScriptChangedAutofilledValue(
     const FormData& raw_form,
     const FormFieldData& raw_field,
     const std::u16string& old_value) {
-  if (!bad_message::CheckFrameNotPrerendering(render_frame_host_))
+  if (!bad_message::CheckFrameNotPrerendering(render_frame_host())) {
     return;
+  }
   FormData form = raw_form;
   FormFieldData field = raw_field;
   SetFrameAndFormMetaData(form, &field);
-  autofill_router().JavaScriptChangedAutofilledValue(
+  router().JavaScriptChangedAutofilledValue(
       this, std::move(form), field, old_value,
-      [](ContentAutofillDriver* target, const FormData& form,
+      [](autofill::AutofillDriver* target, const FormData& form,
          const FormFieldData& field, const std::u16string& old_value) {
-        target->autofill_manager_->OnJavaScriptChangedAutofilledValue(
+        target->GetAutofillManager().OnJavaScriptChangedAutofilledValue(
             WithNewVersion(form), field, old_value);
       });
-}
-
-void ContentAutofillDriver::OnContextMenuShownInFieldCallback(
-    const FormGlobalId& form_global_id,
-    const FieldGlobalId& field_global_id) {
-  autofill_manager_->OnContextMenuShownInField(form_global_id, field_global_id);
 }
 
 void ContentAutofillDriver::OnContextMenuShownInField(
     const FormGlobalId& form_global_id,
     const FieldGlobalId& field_global_id) {
-  autofill_router().OnContextMenuShownInField(
+  router().OnContextMenuShownInField(
       this, form_global_id, field_global_id,
-      [](ContentAutofillDriver* target, const FormGlobalId& form_global_id,
+      [](autofill::AutofillDriver* target, const FormGlobalId& form_global_id,
          const FieldGlobalId& field_global_id) {
-        target->OnContextMenuShownInFieldCallback(form_global_id,
-                                                  field_global_id);
+        target->GetAutofillManager().OnContextMenuShownInField(form_global_id,
+                                                               field_global_id);
       });
 }
 
-void ContentAutofillDriver::DidNavigateFrame(
-    content::NavigationHandle* navigation_handle) {
-  if (navigation_handle->IsSameDocument()) {
-    return;
-  }
-
-  // If the navigation happened in the main frame and the BrowserAutofillManager
-  // exists (not in Android Webview), and the AutofillOfferManager exists (not
-  // in Incognito windows), notifies the navigation event.
-  if (navigation_handle->IsInPrimaryMainFrame() &&
-      autofill_manager_->GetOfferManager()) {
-    autofill_manager_->GetOfferManager()->OnDidNavigateFrame(
-        autofill_manager_->client());
-  }
-
-  // When IsServedFromBackForwardCache or IsPrerendererdPageActivation, the form
-  // data is not parsed again. So, we should keep and use the autofill manager's
-  // form_structures from BFCache or prerendering page for form submit.
-  if (navigation_handle->IsServedFromBackForwardCache() ||
-      navigation_handle->IsPrerenderedPageActivation()) {
-    return;
-  }
-
+void ContentAutofillDriver::Reset() {
   // The driver's RenderFrameHost may be used for the page we're navigating to.
   // Therefore, we need to forget all forms of the page we're navigating from.
   submitted_forms_.clear();
-  autofill_router_->UnregisterDriver(this);
+  owner_->router().UnregisterDriver(this,
+                                    /*driver_is_dying=*/false);
   autofill_manager_->Reset();
 }
 
@@ -609,50 +655,10 @@ ContentAutofillDriver::GetAutofillAgent() {
   return autofill_agent_;
 }
 
-void ContentAutofillDriver::UnsetKeyPressHandlerCallback() {
-  if (key_press_handler_.is_null())
-    return;
-  render_frame_host_->GetRenderWidgetHost()->RemoveKeyPressEventCallback(
-      key_press_handler_);
-  key_press_handler_.Reset();
-}
-
-void ContentAutofillDriver::SetShouldSuppressKeyboardCallback(bool suppress) {
-  should_suppress_keyboard_ = suppress;
-}
-
-void ContentAutofillDriver::SetKeyPressHandler(
-    const content::RenderWidgetHost::KeyPressEventCallback& handler) {
-  autofill_router().SetKeyPressHandler(
-      this, handler,
-      [](ContentAutofillDriver* target,
-         const content::RenderWidgetHost::KeyPressEventCallback& handler) {
-        target->UnsetKeyPressHandlerCallback();
-        target->render_frame_host_->GetRenderWidgetHost()
-            ->AddKeyPressEventCallback(handler);
-        target->key_press_handler_ = handler;
-      });
-}
-
-void ContentAutofillDriver::UnsetKeyPressHandler() {
-  autofill_router().UnsetKeyPressHandler(
-      this, [](ContentAutofillDriver* target) {
-        target->UnsetKeyPressHandlerCallback();
-      });
-}
-
-void ContentAutofillDriver::SetShouldSuppressKeyboard(bool suppress) {
-  autofill_router().SetShouldSuppressKeyboard(
-      this, suppress, [](ContentAutofillDriver* target, bool suppress) {
-        target->SetShouldSuppressKeyboardCallback(suppress);
-      });
-}
-
 void ContentAutofillDriver::SetFrameAndFormMetaData(
     FormData& form,
     FormFieldData* optional_field) const {
-  form.host_frame =
-      LocalFrameToken(render_frame_host_->GetFrameToken().value());
+  form.host_frame = GetFrameToken();
 
   // GetLastCommittedURL doesn't include URL updates due to document.open() and
   // so it might be about:blank or about:srcdoc. In this case fallback to
@@ -690,9 +696,9 @@ FormData ContentAutofillDriver::GetFormWithFrameAndFormMetaData(
   return form;
 }
 
-ContentAutofillRouter& ContentAutofillDriver::autofill_router() {
+AutofillDriverRouter& ContentAutofillDriver::router() {
   DCHECK(!IsPrerendering());
-  return *autofill_router_;
+  return owner_->router();
 }
 
 }  // namespace autofill

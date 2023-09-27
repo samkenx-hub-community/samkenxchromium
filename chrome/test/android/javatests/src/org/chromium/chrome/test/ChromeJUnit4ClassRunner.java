@@ -5,8 +5,9 @@
 package org.chromium.chrome.test;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 import android.text.TextUtils;
+
+import androidx.test.core.app.ApplicationProvider;
 
 import org.junit.rules.TestRule;
 import org.junit.runners.model.InitializationError;
@@ -47,7 +48,7 @@ public class ChromeJUnit4ClassRunner extends ContentJUnit4ClassRunner {
     @Override
     protected List<SkipCheck> getSkipChecks() {
         return addToList(super.getSkipChecks(),
-                new ChromeRestrictionSkipCheck(InstrumentationRegistry.getTargetContext()));
+                new ChromeRestrictionSkipCheck(ApplicationProvider.getApplicationContext()));
     }
 
     @Override

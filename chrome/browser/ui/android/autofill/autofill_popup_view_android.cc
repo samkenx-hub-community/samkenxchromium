@@ -15,20 +15,21 @@
 #include "base/memory/weak_ptr.h"
 #include "base/strings/strcat.h"
 #include "base/time/time.h"
+#include "base/types/cxx23_to_underlying.h"
 #include "chrome/android/chrome_jni_headers/AutofillPopupBridge_jni.h"
 #include "chrome/browser/android/resource_mapper.h"
-#include "chrome/browser/autofill/autofill_popup_controller_utils.h"
 #include "chrome/browser/ui/android/autofill/autofill_accessibility_utils.h"
 #include "chrome/browser/ui/android/autofill/autofill_keyboard_accessory_view.h"
 #include "chrome/browser/ui/autofill/autofill_keyboard_accessory_adapter.h"
 #include "chrome/browser/ui/autofill/autofill_popup_controller.h"
+#include "components/autofill/core/browser/ui/autofill_resource_utils.h"
 #include "components/autofill/core/browser/ui/popup_item_ids.h"
 #include "components/autofill/core/browser/ui/suggestion.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/autofill_payments_features.h"
 #include "components/autofill/core/common/autofill_util.h"
 #include "components/security_state/core/security_state.h"
-#include "content/public/browser/native_web_keyboard_event.h"
+#include "content/public/common/input/native_web_keyboard_event.h"
 #include "ui/android/view_android.h"
 #include "ui/android/window_android.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -47,9 +48,10 @@ AutofillPopupViewAndroid::AutofillPopupViewAndroid(
 
 AutofillPopupViewAndroid::~AutofillPopupViewAndroid() {}
 
-void AutofillPopupViewAndroid::Show(
+bool AutofillPopupViewAndroid::Show(
     AutoselectFirstSuggestion autoselect_first_suggestion) {
   OnSuggestionsChanged();
+  return true;
 }
 
 void AutofillPopupViewAndroid::Hide() {
@@ -61,6 +63,10 @@ void AutofillPopupViewAndroid::Hide() {
     // Hide() should delete |this| either via Java dismiss or directly.
     delete this;
   }
+}
+
+bool AutofillPopupViewAndroid::OverlapsWithPictureInPictureWindow() const {
+  return false;
 }
 
 bool AutofillPopupViewAndroid::HandleKeyPressEvent(
@@ -132,10 +138,9 @@ void AutofillPopupViewAndroid::OnSuggestionsChanged() {
     bool is_deletable =
         controller_->GetRemovalConfirmationText(i, nullptr, nullptr);
     bool is_label_multiline =
-        suggestion.frontend_id ==
-            POPUP_ITEM_ID_INSECURE_CONTEXT_PAYMENT_DISABLED_MESSAGE ||
-        suggestion.frontend_id == POPUP_ITEM_ID_CREDIT_CARD_SIGNIN_PROMO ||
-        suggestion.frontend_id == POPUP_ITEM_ID_MIXED_FORM_MESSAGE;
+        suggestion.popup_item_id ==
+            PopupItemId::kInsecureContextPaymentDisabledMessage ||
+        suggestion.popup_item_id == PopupItemId::kMixedFormMessage;
 
     Java_AutofillPopupBridge_addToAutofillSuggestionArray(
         env, java_object_, data_array, i,
@@ -144,7 +149,8 @@ void AutofillPopupViewAndroid::OnSuggestionsChanged() {
         base::android::ConvertUTF16ToJavaString(env, sublabel),
         base::android::ConvertUTF16ToJavaString(env, secondary_sublabel),
         base::android::ConvertUTF16ToJavaString(env, item_tag), android_icon_id,
-        suggestion.is_icon_at_start, suggestion.frontend_id, is_deletable,
+        suggestion.is_icon_at_start,
+        base::to_underlying(suggestion.popup_item_id), is_deletable,
         is_label_multiline, /*isLabelBold*/ false,
         url::GURLAndroid::FromNativeGURL(env, suggestion.custom_icon_url));
   }
@@ -166,6 +172,12 @@ base::WeakPtr<AutofillPopupView> AutofillPopupViewAndroid::GetWeakPtr() {
   return weak_ptr_factory_.GetWeakPtr();
 }
 
+base::WeakPtr<AutofillPopupView> AutofillPopupViewAndroid::CreateSubPopupView(
+    base::WeakPtr<AutofillPopupController> controller) {
+  NOTIMPLEMENTED() << "No sub-popups on Android";
+  return nullptr;
+}
+
 void AutofillPopupViewAndroid::SuggestionSelected(
     JNIEnv* env,
     const JavaParamRef<jobject>& obj,
@@ -175,12 +187,7 @@ void AutofillPopupViewAndroid::SuggestionSelected(
     return;
   }
 
-  if (base::FeatureList::IsEnabled(
-          features::kAutofillPopupUseThresholdForKeyboardAndMobileAccept)) {
-    controller_->AcceptSuggestion(list_index);
-  } else {
-    controller_->AcceptSuggestionWithoutThreshold(list_index);
-  }
+  controller_->AcceptSuggestion(list_index, base::TimeTicks::Now());
 }
 
 void AutofillPopupViewAndroid::DeletionRequested(
@@ -257,24 +264,15 @@ bool AutofillPopupViewAndroid::WasSuppressed() {
 // static
 base::WeakPtr<AutofillPopupView> AutofillPopupView::Create(
     base::WeakPtr<AutofillPopupController> controller) {
-  if (IsKeyboardAccessoryEnabled()) {
-    auto adapter =
-        std::make_unique<AutofillKeyboardAccessoryAdapter>(controller);
-    auto accessory_view = std::make_unique<AutofillKeyboardAccessoryView>(
-        adapter->GetWeakPtrToAdapter());
-    if (!accessory_view->Initialize()) {
-      return nullptr;  // Don't create an adapter without initialized view.
-    }
-
-    adapter->SetAccessoryView(std::move(accessory_view));
-    return adapter.release()->GetWeakPtr();
+  auto adapter = std::make_unique<AutofillKeyboardAccessoryAdapter>(controller);
+  auto accessory_view = std::make_unique<AutofillKeyboardAccessoryView>(
+      adapter->GetWeakPtrToAdapter());
+  if (!accessory_view->Initialize()) {
+    return nullptr;  // Don't create an adapter without initialized view.
   }
 
-  auto popup_view = std::make_unique<AutofillPopupViewAndroid>(controller);
-  if (!popup_view->Init() || popup_view->WasSuppressed()) {
-    return nullptr;
-  }
-  return popup_view.release()->GetWeakPtr();
+  adapter->SetAccessoryView(std::move(accessory_view));
+  return adapter.release()->GetWeakPtr();
 }
 
 }  // namespace autofill

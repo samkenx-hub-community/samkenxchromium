@@ -21,17 +21,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import static org.chromium.chrome.browser.toolbar.top.ButtonHighlightMatcher.withHighlight;
-import static org.chromium.ui.test.util.ViewUtils.waitForView;
 
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 
 import androidx.test.espresso.ViewInteraction;
 import androidx.test.espresso.matcher.RootMatchers;
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matcher;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -46,7 +44,6 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.base.test.util.Restriction;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -55,12 +52,14 @@ import org.chromium.chrome.browser.offlinepages.RequestCoordinatorBridgeJni;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.contextmenu.ContextMenuUtils;
 import org.chromium.components.feature_engagement.FeatureConstants;
 import org.chromium.components.feature_engagement.Tracker;
 import org.chromium.components.feature_engagement.TriggerDetails;
 import org.chromium.net.test.EmbeddedTestServerRule;
 import org.chromium.ui.test.util.UiRestriction;
+import org.chromium.ui.test.util.ViewUtils;
 
 /** Integration tests for showing IPH bubbles for read later. */
 @RunWith(ChromeJUnit4ClassRunner.class)
@@ -101,11 +100,6 @@ public class ReadLaterContextMenuTest {
                 .thenReturn(new TriggerDetails(false, false));
         mActivityTestRule.startMainActivityOnBlankPage();
         mocker.mock(RequestCoordinatorBridgeJni.TEST_HOOKS, mRequestCoordinatorBridgeJniMock);
-    }
-
-    @After
-    public void tearDown() throws Exception {
-        TrackerFactory.setTrackerForTests(null);
     }
 
     @Test
@@ -149,6 +143,6 @@ public class ReadLaterContextMenuTest {
         View mainDecorView = mActivityTestRule.getActivity().getWindow().getDecorView();
         return onView(isRoot())
                 .inRoot(RootMatchers.withDecorView(not(is(mainDecorView))))
-                .check(waitForView(matcher));
+                .check(ViewUtils.isEventuallyVisible(matcher));
     }
 }

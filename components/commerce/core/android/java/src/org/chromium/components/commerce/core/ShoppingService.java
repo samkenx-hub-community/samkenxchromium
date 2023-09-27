@@ -11,6 +11,8 @@ import org.chromium.base.ObserverList;
 import org.chromium.base.annotations.CalledByNative;
 import org.chromium.base.annotations.JNINamespace;
 import org.chromium.base.annotations.NativeMethods;
+import org.chromium.components.bookmarks.BookmarkId;
+import org.chromium.components.bookmarks.BookmarkType;
 import org.chromium.url.GURL;
 
 import java.util.ArrayList;
@@ -24,15 +26,15 @@ public class ShoppingService {
     public static final class ProductInfo {
         public final String title;
         public final GURL imageUrl;
-        public final long productClusterId;
-        public final long offerId;
+        public final Optional<Long> productClusterId;
+        public final Optional<Long> offerId;
         public final String currencyCode;
         public final long amountMicros;
         public final Optional<Long> previousAmountMicros;
         public final String countryCode;
 
-        public ProductInfo(String title, GURL imageUrl, long productClusterId, long offerId,
-                String currencyCode, long amountMicros, String countryCode,
+        public ProductInfo(String title, GURL imageUrl, Optional<Long> productClusterId,
+                Optional<Long> offerId, String currencyCode, long amountMicros, String countryCode,
                 Optional<Long> previousAmountMicros) {
             this.title = title;
             this.imageUrl = imageUrl;
@@ -209,6 +211,25 @@ public class ShoppingService {
         mSubscriptionsObservers.removeObserver(observer);
     }
 
+    public void getAllPriceTrackedBookmarks(Callback<List<BookmarkId>> callback) {
+        if (mNativeShoppingServiceAndroid == 0) {
+            return;
+        }
+        ShoppingServiceJni.get().getAllPriceTrackedBookmarks(
+                mNativeShoppingServiceAndroid, this, callback);
+    }
+
+    @CalledByNative
+    private static void runGetAllPriceTrackedBookmarksCallback(
+            Callback<List<BookmarkId>> callback, long[] trackedBookmarkIds) {
+        ArrayList<BookmarkId> bookmarks = new ArrayList<>();
+        for (int i = 0; i < trackedBookmarkIds.length; i++) {
+            // All product bookmarks will have a "Normal" type.
+            bookmarks.add(new BookmarkId(trackedBookmarkIds[i], BookmarkType.NORMAL));
+        }
+        callback.onResult(bookmarks);
+    }
+
     /**
      * This is a feature check for the "shopping list". This will only return true if the user has
      * the feature flag enabled, is signed-in, has MSBB enabled, has webapp activity enabled, is
@@ -233,6 +254,15 @@ public class ShoppingService {
                 mNativeShoppingServiceAndroid, this);
     }
 
+    // This is a feature check for the "price tracking", which will return true if the user has the
+    // feature flag enabled or (if applicable) is in an eligible country and locale.
+    public boolean isCommercePriceTrackingEnabled() {
+        if (mNativeShoppingServiceAndroid == 0) return false;
+
+        return ShoppingServiceJni.get().isCommercePriceTrackingEnabled(
+                mNativeShoppingServiceAndroid, this);
+    }
+
     @CalledByNative
     private void destroy() {
         mNativeShoppingServiceAndroid = 0;
@@ -245,17 +275,17 @@ public class ShoppingService {
     }
 
     @CalledByNative
-    private static ProductInfo createProductInfo(String title, GURL imageUrl, long productClusterId,
-            long offerId, String currencyCode, long amountMicros, String countryCode,
-            boolean hasPreviousPrice, long previousAmountMicros) {
-        Optional<Long> previousPrice;
-        if (hasPreviousPrice) {
-            previousPrice = Optional.empty();
-        } else {
-            previousPrice = Optional.of(previousAmountMicros);
-        }
-        return new ProductInfo(title, imageUrl, productClusterId, offerId, currencyCode,
-                amountMicros, countryCode, previousPrice);
+    private static ProductInfo createProductInfo(String title, GURL imageUrl,
+            boolean hasProductClusterId, long productClusterId, boolean hasOfferId, long offerId,
+            String currencyCode, long amountMicros, String countryCode, boolean hasPreviousPrice,
+            long previousAmountMicros) {
+        Optional<Long> offer = !hasOfferId ? Optional.empty() : Optional.of(offerId);
+        Optional<Long> cluster =
+                !hasProductClusterId ? Optional.empty() : Optional.of(productClusterId);
+        Optional<Long> previousPrice =
+                !hasPreviousPrice ? Optional.empty() : Optional.of(previousAmountMicros);
+        return new ProductInfo(title, imageUrl, cluster, offer, currencyCode, amountMicros,
+                countryCode, previousPrice);
     }
 
     @CalledByNative
@@ -279,27 +309,22 @@ public class ShoppingService {
     }
 
     @CalledByNative
-    private List<CommerceSubscription> createSubscriptionAndAddToList(
-            List<CommerceSubscription> subs, int type, int idType, int managementType, String id) {
-        if (subs == null) {
-            subs = new ArrayList<>();
-        }
-        CommerceSubscription sub = new CommerceSubscription(type, idType, id, managementType, null);
-        subs.add(sub);
-        return subs;
+    private static CommerceSubscription createSubscription(
+            int type, int idType, int managementType, String id) {
+        return new CommerceSubscription(type, idType, id, managementType, null);
     }
 
     @CalledByNative
-    private void onSubscribe(List<CommerceSubscription> subs, boolean succeeded) {
+    private void onSubscribe(CommerceSubscription sub, boolean succeeded) {
         for (SubscriptionsObserver o : mSubscriptionsObservers) {
-            o.onSubscribe(subs, succeeded);
+            o.onSubscribe(sub, succeeded);
         }
     }
 
     @CalledByNative
-    private void onUnsubscribe(List<CommerceSubscription> subs, boolean succeeded) {
+    private void onUnsubscribe(CommerceSubscription sub, boolean succeeded) {
         for (SubscriptionsObserver o : mSubscriptionsObservers) {
-            o.onUnsubscribe(subs, succeeded);
+            o.onUnsubscribe(sub, succeeded);
         }
     }
 
@@ -322,7 +347,11 @@ public class ShoppingService {
                 int idType, int managementType, String id, Callback<Boolean> callback);
         boolean isSubscribedFromCache(long nativeShoppingServiceAndroid, ShoppingService caller,
                 int type, int idType, int managementType, String id);
+        void getAllPriceTrackedBookmarks(long nativeShoppingServiceAndroid, ShoppingService caller,
+                Callback<List<BookmarkId>> callback);
         boolean isShoppingListEligible(long nativeShoppingServiceAndroid, ShoppingService caller);
         boolean isMerchantViewerEnabled(long nativeShoppingServiceAndroid, ShoppingService caller);
+        boolean isCommercePriceTrackingEnabled(
+                long nativeShoppingServiceAndroid, ShoppingService caller);
     }
 }

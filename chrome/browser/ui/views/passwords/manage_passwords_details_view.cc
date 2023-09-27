@@ -35,6 +35,7 @@
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/layout/flex_layout_view.h"
 #include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 #include "ui/views/vector_icons.h"
 
 namespace {
@@ -50,9 +51,26 @@ constexpr int kIconSize = 16;
 constexpr int kDetailRowHeight = 44;
 constexpr int kMaxLinesVisibleFromPasswordNote = 7;
 
-void WriteToClipboard(const std::u16string& text) {
+void WriteToClipboard(const std::u16string& text, bool is_confidential) {
   ui::ScopedClipboardWriter scw(ui::ClipboardBuffer::kCopyPaste);
   scw.WriteText(text);
+  if (is_confidential) {
+    scw.MarkAsConfidential();
+  }
+}
+
+// Computes the margins of each row. This adjusts the left margin equal to the
+// dialog left margin + the back button insets to make sure all icons are
+// vertically aligned with the back button.
+gfx::Insets ComputeRowMargins() {
+  const auto* const layout_provider = ChromeLayoutProvider::Get();
+  gfx::Insets margins = layout_provider->GetInsetsMetric(views::INSETS_DIALOG);
+  margins.set_top_bottom(0, 0);
+  margins.set_left(
+      margins.left() +
+      layout_provider->GetInsetsMetric(views::INSETS_VECTOR_IMAGE_BUTTON)
+          .left());
+  return margins;
 }
 
 std::unique_ptr<views::View> CreateIconView(
@@ -90,6 +108,42 @@ std::unique_ptr<views::Label> CreateErrorLabel(std::u16string error_msg) {
       .Build();
 }
 
+// Vertically aligns `textfield` in the middle of the row, such that the text
+// inside `textfield` is aligned with the icon in the row. In case of a
+// multiline textarea, the first line in the contents is vertically aligned with
+// the icon.
+void AlignTextfieldWithRowIcon(views::Textfield* textfield) {
+  int line_height = views::TypographyProvider::Get().GetLineHeight(
+      views::style::CONTEXT_TEXTFIELD, views::style::STYLE_PRIMARY);
+  int vertical_padding_inside_textfield =
+      2 * ChromeLayoutProvider::Get()->GetDistanceMetric(
+              views::DISTANCE_CONTROL_VERTICAL_TEXT_PADDING);
+  int remaining_vertical_space =
+      kDetailRowHeight - line_height - vertical_padding_inside_textfield;
+  if (remaining_vertical_space <= 0) {
+    return;
+  }
+  textfield->SetProperty(views::kMarginsKey,
+                         gfx::Insets().set_top((remaining_vertical_space / 2)));
+}
+
+// Aligns `error_label` such that the error message is vertically aligned with
+// the text in the corropsnding textfield/textarea.
+void AlignErrorLabelWithTextFieldContents(views::Label* error_label) {
+  // Create a border around the error message that has the left insets matching
+  // the inner padding in the textarea above to align the error message with the
+  // text in the textarea. The border has zero insets on all other sides.
+  gfx::Insets insets;
+  int textfield_inner_padding = ChromeLayoutProvider::Get()->GetDistanceMetric(
+      views::DISTANCE_TEXTFIELD_HORIZONTAL_TEXT_PADDING);
+  if (base::i18n::IsRTL()) {
+    insets.set_right(textfield_inner_padding);
+  } else {
+    insets.set_left(textfield_inner_padding);
+  }
+  error_label->SetBorder(views::CreateEmptyBorder(insets));
+}
+
 // Creates a view of the same height as the height of the each row in the table,
 // and vertically centers the child view inside it. This is used to wrap icons
 // and image buttons to ensure the icons are vertically aligned with the center
@@ -120,6 +174,7 @@ std::unique_ptr<views::FlexLayoutView> CreateDetailsRow(
     std::unique_ptr<views::View> detail_view) {
   auto row = std::make_unique<views::FlexLayoutView>();
   row->SetCollapseMargins(true);
+  row->SetInteriorMargin(ComputeRowMargins());
   row->SetDefault(
       views::kMarginsKey,
       gfx::Insets::VH(0, ChromeLayoutProvider::Get()->GetDistanceMetric(
@@ -203,19 +258,93 @@ std::unique_ptr<views::View> CreatePasswordLabelWithEyeIconView(
   return password_label_with_eye_icon_view;
 }
 
+// Creates the label for the note with custom logic for logging
+// metrics for selecting and copying text of the note.
+class NoteLabel : public views::Label {
+ public:
+  explicit NoteLabel(std::u16string note)
+      : views::Label(note,
+                     views::style::CONTEXT_DIALOG_BODY_TEXT,
+                     views::style::STYLE_SECONDARY),
+        note_(std::move(note)) {
+    std::u16string note_to_display =
+        note_.empty()
+            ? l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_EMPTY_NOTE)
+            : note_;
+    if (note_.empty()) {
+      SetText(note_to_display);
+    }
+    SetAccessibleName(l10n_util::GetStringFUTF16(
+        IDS_MANAGE_PASSWORDS_NOTE_ACCESSIBLE_NAME, note_to_display));
+  }
+
+ public:
+  void ExecuteCommand(int command_id, int event_flags) override {
+    views::Label::ExecuteCommand(command_id, event_flags);
+    if (note_.empty()) {
+      return;
+    }
+
+    if (command_id == MenuCommands::kCopy && HasSelection()) {
+      LogUserInteractionsInPasswordManagementBubble(
+          HasFullSelection()
+              ? PasswordManagementBubbleInteractions::kNoteFullyCopied
+              : PasswordManagementBubbleInteractions::kNotePartiallyCopied);
+    }
+
+    if (command_id == MenuCommands::kSelectAll) {
+      LogUserInteractionsInPasswordManagementBubble(
+          PasswordManagementBubbleInteractions::kNoteFullySelected);
+    }
+  }
+
+ protected:
+  bool OnKeyPressed(const ui::KeyEvent& event) override {
+    if (note_.empty()) {
+      return views::Label::OnKeyPressed(event);
+    }
+
+    const bool alt = event.IsAltDown() || event.IsAltGrDown();
+    const bool control = event.IsControlDown() || event.IsCommandDown();
+
+    if (control && !alt) {
+      if (event.key_code() == ui::VKEY_A) {
+        LogUserInteractionsInPasswordManagementBubble(
+            PasswordManagementBubbleInteractions::kNoteFullySelected);
+      }
+
+      if (event.key_code() == ui::VKEY_C && HasSelection()) {
+        LogUserInteractionsInPasswordManagementBubble(
+            HasFullSelection()
+                ? PasswordManagementBubbleInteractions::kNoteFullyCopied
+                : PasswordManagementBubbleInteractions::kNotePartiallyCopied);
+      }
+    }
+
+    return views::Label::OnKeyPressed(event);
+  }
+
+  void OnMouseReleased(const ui::MouseEvent& event) override {
+    views::Label::OnMouseReleased(event);
+    if (note_.empty() || !HasSelection()) {
+      return;
+    }
+
+    LogUserInteractionsInPasswordManagementBubble(
+        HasFullSelection()
+            ? PasswordManagementBubbleInteractions::kNoteFullySelected
+            : PasswordManagementBubbleInteractions::kNotePartiallySelected);
+  }
+
+ private:
+  std::u16string note_;
+};
+
 std::unique_ptr<views::View> CreateNoteLabel(
     const password_manager::PasswordForm& form) {
-  std::u16string note = form.GetNoteWithEmptyUniqueDisplayName();
-  std::u16string note_to_display =
-      note.empty() ? l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_EMPTY_NOTE)
-                   : note;
-
-  auto note_label = std::make_unique<views::Label>(
-      note_to_display, views::style::CONTEXT_DIALOG_BODY_TEXT,
-      views::style::STYLE_SECONDARY);
+  auto note_label =
+      std::make_unique<NoteLabel>(form.GetNoteWithEmptyUniqueDisplayName());
   note_label->SetMultiLine(true);
-  note_label->SetAccessibleName(l10n_util::GetStringFUTF16(
-      IDS_MANAGE_PASSWORDS_NOTE_ACCESSIBLE_NAME, note_to_display));
   note_label->SetVerticalAlignment(gfx::VerticalAlignment::ALIGN_TOP);
   note_label->SetHorizontalAlignment(gfx::HorizontalAlignment::ALIGN_LEFT);
   note_label->SetSelectable(true);
@@ -227,8 +356,8 @@ std::unique_ptr<views::View> CreateNoteLabel(
   note_label->SetMaximumWidth(kNoteLabelMaxWidth);
   note_label->SetID(static_cast<int>(ManagePasswordsViewIDs::kNoteLabel));
 
-  int line_height = views::style::GetLineHeight(note_label->GetTextContext(),
-                                                note_label->GetTextStyle());
+  int line_height = views::TypographyProvider::Get().GetLineHeight(
+      note_label->GetTextContext(), note_label->GetTextStyle());
   int vertical_margin = (kDetailRowHeight - line_height) / 2;
   auto scroll_view = std::make_unique<views::ScrollView>(
       views::ScrollView::ScrollWithLayers::kEnabled);
@@ -245,11 +374,13 @@ std::unique_ptr<views::View> CreateEditUsernameRow(
     raw_ptr<views::Textfield>* textfield,
     raw_ptr<views::Label>* error_label) {
   DCHECK(form.username_value.empty());
+  const auto* const layout_provider = ChromeLayoutProvider::Get();
   auto row = std::make_unique<views::FlexLayoutView>();
   row->SetCollapseMargins(true);
+  row->SetInteriorMargin(ComputeRowMargins());
   row->SetDefault(
       views::kMarginsKey,
-      gfx::Insets::VH(0, ChromeLayoutProvider::Get()->GetDistanceMetric(
+      gfx::Insets::VH(0, layout_provider->GetDistanceMetric(
                              views::DISTANCE_RELATED_CONTROL_HORIZONTAL)));
   row->SetCrossAxisAlignment(views::LayoutAlignment::kStart);
   row->AddChildView(CreateWrappedView(CreateIconView(kAccountCircleIcon)));
@@ -257,6 +388,9 @@ std::unique_ptr<views::View> CreateEditUsernameRow(
       row->AddChildView(std::make_unique<views::BoxLayoutView>());
   username_with_error_label_view->SetOrientation(
       views::BoxLayout::Orientation::kVertical);
+  username_with_error_label_view->SetBetweenChildSpacing(
+      layout_provider->GetDistanceMetric(
+          DISTANCE_CONTENT_LIST_VERTICAL_SINGLE));
   username_with_error_label_view->SetProperty(
       views::kFlexBehaviorKey,
       views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
@@ -268,11 +402,13 @@ std::unique_ptr<views::View> CreateEditUsernameRow(
           l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_USERNAME_TEXTFIELD));
   (*textfield)
       ->SetID(static_cast<int>(ManagePasswordsViewIDs::kUsernameTextField));
+  AlignTextfieldWithRowIcon(*textfield);
   *error_label = username_with_error_label_view->AddChildView(
       CreateErrorLabel(l10n_util::GetStringFUTF16(
-          IDS_SETTINGS_PASSWORD_USERNAME_ALREADY_USED,
+          IDS_PASSWORD_MANAGER_UI_USERNAME_ALREADY_USED,
           base::UTF8ToUTF16(password_manager::GetShownOrigin(
               url::Origin::Create(form.url))))));
+  AlignErrorLabelWithTextFieldContents(*error_label);
   return row;
 }
 
@@ -280,11 +416,13 @@ std::unique_ptr<views::View> CreateEditNoteRow(
     const password_manager::PasswordForm& form,
     raw_ptr<views::Textarea>* textarea,
     raw_ptr<views::Label>* error_label) {
+  const auto* const layout_provider = ChromeLayoutProvider::Get();
   auto row = std::make_unique<views::FlexLayoutView>();
   row->SetCollapseMargins(true);
+  row->SetInteriorMargin(ComputeRowMargins());
   row->SetDefault(
       views::kMarginsKey,
-      gfx::Insets::VH(0, ChromeLayoutProvider::Get()->GetDistanceMetric(
+      gfx::Insets::VH(0, layout_provider->GetDistanceMetric(
                              views::DISTANCE_RELATED_CONTROL_HORIZONTAL)));
   row->SetCrossAxisAlignment(views::LayoutAlignment::kStart);
 
@@ -293,6 +431,9 @@ std::unique_ptr<views::View> CreateEditNoteRow(
       row->AddChildView(std::make_unique<views::BoxLayoutView>());
   note_with_error_label_view->SetOrientation(
       views::BoxLayout::Orientation::kVertical);
+  note_with_error_label_view->SetBetweenChildSpacing(
+      layout_provider->GetDistanceMetric(
+          DISTANCE_CONTENT_LIST_VERTICAL_SINGLE));
   note_with_error_label_view->SetProperty(
       views::kFlexBehaviorKey,
       views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
@@ -303,19 +444,21 @@ std::unique_ptr<views::View> CreateEditNoteRow(
   (*textarea)->SetText(form.GetNoteWithEmptyUniqueDisplayName());
   (*textarea)->SetAccessibleName(
       l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_NOTE_TEXTFIELD));
-  int line_height = views::style::GetLineHeight(views::style::CONTEXT_TEXTFIELD,
-                                                views::style::STYLE_PRIMARY);
+  int line_height = views::TypographyProvider::Get().GetLineHeight(
+      views::style::CONTEXT_TEXTFIELD, views::style::STYLE_PRIMARY);
   (*textarea)->SetPreferredSize(
       gfx::Size(0, kMaxLinesVisibleFromPasswordNote * line_height +
                        2 * ChromeLayoutProvider::Get()->GetDistanceMetric(
                                views::DISTANCE_CONTROL_VERTICAL_TEXT_PADDING)));
 
   (*textarea)->SetID(static_cast<int>(ManagePasswordsViewIDs::kNoteTextarea));
+  AlignTextfieldWithRowIcon(*textarea);
   *error_label = note_with_error_label_view->AddChildView(
       CreateErrorLabel(l10n_util::GetStringFUTF16(
           IDS_PASSWORD_MANAGER_UI_NOTE_CHARACTER_COUNT_WARNING,
           base::NumberToString16(
               password_manager::constants::kMaxPasswordNoteLength))));
+  AlignErrorLabelWithTextFieldContents(*error_label);
   return row;
 }
 
@@ -325,12 +468,19 @@ std::unique_ptr<views::View> CreateEditNoteRow(
 std::unique_ptr<views::View> ManagePasswordsDetailsView::CreateTitleView(
     const password_manager::PasswordForm& password_form,
     base::RepeatingClosure on_back_clicked_callback) {
-  ChromeLayoutProvider* layout_provider = ChromeLayoutProvider::Get();
+  const auto* const layout_provider = ChromeLayoutProvider::Get();
   auto header = std::make_unique<views::BoxLayoutView>();
-  // Set the space between the icons and title similar to the default behavior
-  // in BubbleFrameView::Layout().
+  // Set the space between the icon and title similar to the space in the row
+  // below to make sure the bubble title and the labels below are vertically
+  // aligned. In the rows below the distance between the icon and the text is
+  // DISTANCE_RELATED_CONTROL_HORIZONTAL. But the icon in the title has a border
+  // of size INSETS_VECTOR_IMAGE_BUTTON to have space for the focus ring, and
+  // hence this is subtracted here.
   header->SetBetweenChildSpacing(
-      layout_provider->GetInsetsMetric(views::INSETS_DIALOG_TITLE).left());
+      layout_provider->GetDistanceMetric(
+          views::DISTANCE_RELATED_CONTROL_HORIZONTAL) -
+      layout_provider->GetInsetsMetric(views::INSETS_VECTOR_IMAGE_BUTTON)
+          .right());
 
   auto back_button = views::CreateVectorImageButtonWithNativeTheme(
       on_back_clicked_callback, vector_icons::kArrowBackIcon);
@@ -367,7 +517,8 @@ ManagePasswordsDetailsView::ManagePasswordsDetailsView(
                                  username_label->GetText()));
   if (!password_form.username_value.empty()) {
     auto copy_username_button_callback =
-        base::BindRepeating(&WriteToClipboard, password_form.username_value)
+        base::BindRepeating(&WriteToClipboard, password_form.username_value,
+                            /*is_confidential=*/false)
             .Then(on_activity_callback_)
             .Then(base::BindRepeating(
                 &password_manager::metrics_util::
@@ -375,8 +526,7 @@ ManagePasswordsDetailsView::ManagePasswordsDetailsView(
                 PasswordManagementBubbleInteractions::
                     kUsernameCopyButtonClicked));
     AddChildView(CreateDetailsRowWithActionButton(
-        kAccountCircleIcon, std::move(username_label),
-        vector_icons::kContentCopyIcon,
+        kAccountCircleIcon, std::move(username_label), kCopyIcon,
         l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_UI_COPY_USERNAME),
         std::move(copy_username_button_callback),
         ManagePasswordsViewIDs::kCopyUsernameButton));
@@ -407,7 +557,8 @@ ManagePasswordsDetailsView::ManagePasswordsDetailsView(
     return;
   }
   auto copy_password_button_callback =
-      base::BindRepeating(&WriteToClipboard, password_form.password_value)
+      base::BindRepeating(&WriteToClipboard, password_form.password_value,
+                          /*is_confidential=*/true)
           .Then(on_activity_callback_)
           .Then(base::BindRepeating(
               &password_manager::metrics_util::
@@ -418,7 +569,7 @@ ManagePasswordsDetailsView::ManagePasswordsDetailsView(
       kKeyIcon,
       CreatePasswordLabelWithEyeIconView(std::move(password_label),
                                          on_activity_callback_),
-      vector_icons::kContentCopyIcon,
+      kCopyIcon,
       l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_UI_COPY_PASSWORD),
       std::move(copy_password_button_callback),
       ManagePasswordsViewIDs::kCopyPasswordButton));
@@ -438,6 +589,8 @@ ManagePasswordsDetailsView::ManagePasswordsDetailsView(
       base::BindRepeating(&ManagePasswordsDetailsView::OnUserInputChanged,
                           base::Unretained(this))));
   edit_note_row_->SetVisible(false);
+
+  SetProperty(views::kElementIdentifierKey, kTopView);
 }
 
 ManagePasswordsDetailsView::~ManagePasswordsDetailsView() = default;
@@ -475,10 +628,6 @@ void ManagePasswordsDetailsView::SwitchToEditUsernameMode() {
   on_activity_callback_.Run();
   LogUserInteractionsInPasswordManagementBubble(
       PasswordManagementBubbleInteractions::kUsernameEditButtonClicked);
-  // Invoke OnUserInputChanged() to validate the current input. Relevant only
-  // for empty username to make sure the bubble is opened showing the username
-  // as invalid.
-  OnUserInputChanged();
 }
 
 void ManagePasswordsDetailsView::SwitchToEditNoteMode() {
@@ -497,13 +646,10 @@ void ManagePasswordsDetailsView::OnUserInputChanged() {
   on_activity_callback_.Run();
   bool is_username_invalid = false;
   if (username_textfield_ && username_textfield_->IsDrawn()) {
-    bool username_empty = username_textfield_->GetText().empty();
-    bool username_exists =
-        username_empty
-            ? false
-            : username_exists_callback_.Run(username_textfield_->GetText());
-    username_error_label_->SetVisible(username_exists);
-    is_username_invalid = username_empty || username_exists;
+    is_username_invalid =
+        !username_textfield_->GetText().empty() &&
+        username_exists_callback_.Run(username_textfield_->GetText());
+    username_error_label_->SetVisible(is_username_invalid);
     username_textfield_->SetInvalid(is_username_invalid);
   }
 
@@ -526,3 +672,5 @@ void ManagePasswordsDetailsView::OnUserInputChanged() {
 
   on_input_validation_callback_.Run(is_username_invalid || is_note_invalid);
 }
+
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(ManagePasswordsDetailsView, kTopView);

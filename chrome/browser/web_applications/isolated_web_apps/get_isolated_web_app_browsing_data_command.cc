@@ -9,6 +9,7 @@
 #include "base/barrier_closure.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.h"
@@ -16,10 +17,10 @@
 #include "chrome/browser/browsing_data/local_data_container.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_observer.h"
-#include "chrome/browser/web_applications/locks/full_system_lock.h"
-#include "chrome/browser/web_applications/web_app_id.h"
+#include "chrome/browser/web_applications/locks/all_apps_lock.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "components/browsing_data/content/browsing_data_model.h"
+#include "components/webapps/common/web_app_id.h"
 #include "content/public/browser/storage_partition_config.h"
 #include "ui/base/models/tree_model.h"
 #include "url/origin.h"
@@ -114,17 +115,6 @@ class StoragePartitionSizeEstimator : private CookiesTreeModel::Observer,
     model_loaded_closure_.Run();
   }
 
-  void TreeNodesAdded(ui::TreeModel* model,
-                      ui::TreeModelNode* parent,
-                      size_t start,
-                      size_t count) override {}
-  void TreeNodesRemoved(ui::TreeModel* model,
-                        ui::TreeModelNode* parent,
-                        size_t start,
-                        size_t count) override {}
-  void TreeNodeChanged(ui::TreeModel* model, ui::TreeModelNode* node) override {
-  }
-
   // ProfileObserver:
   void OnProfileWillBeDestroyed(Profile* profile) override {
     // Abort if the Profile is being deleted. |complete_callback_| owns the
@@ -132,7 +122,7 @@ class StoragePartitionSizeEstimator : private CookiesTreeModel::Observer,
     complete_callback_.Reset();
   }
 
-  Profile* profile_;
+  raw_ptr<Profile> profile_ = nullptr;
   base::OnceCallback<void(int64_t)> complete_callback_;
   base::RepeatingClosure model_loaded_closure_;
   std::unique_ptr<BrowsingDataModel> browsing_data_model_;
@@ -145,11 +135,11 @@ class StoragePartitionSizeEstimator : private CookiesTreeModel::Observer,
 GetIsolatedWebAppBrowsingDataCommand::GetIsolatedWebAppBrowsingDataCommand(
     Profile* profile,
     BrowsingDataCallback callback)
-    : WebAppCommandTemplate<FullSystemLock>(
+    : WebAppCommandTemplate<AllAppsLock>(
           "GetIsolatedWebAppBrowsingDataCommand"),
       profile_(profile),
       callback_(std::move(callback)),
-      lock_description_(std::make_unique<FullSystemLockDescription>()),
+      lock_description_(std::make_unique<AllAppsLockDescription>()),
       browsing_data_({}) {
   debug_data_.Set("profile", profile_->GetDebugName());
 }
@@ -167,19 +157,22 @@ base::Value GetIsolatedWebAppBrowsingDataCommand::ToDebugValue() const {
 }
 
 void GetIsolatedWebAppBrowsingDataCommand::StartWithLock(
-    std::unique_ptr<FullSystemLock> lock) {
+    std::unique_ptr<AllAppsLock> lock) {
   lock_ = std::move(lock);
 
   pending_task_count_++;
   const WebAppRegistrar& web_app_registrar = lock_->registrar();
   for (const WebApp& web_app : web_app_registrar.GetApps()) {
-    const AppId& app_id = web_app.app_id();
+    const webapps::AppId& app_id = web_app.app_id();
     if (!web_app_registrar.IsIsolated(app_id)) {
       continue;
     }
     url::Origin iwa_origin = url::Origin::Create(web_app.scope());
     for (const content::StoragePartitionConfig& storage_partition_config :
          web_app_registrar.GetIsolatedWebAppStoragePartitionConfigs(app_id)) {
+      if (storage_partition_config.in_memory()) {
+        continue;
+      }
       pending_task_count_++;
       debug_data_.EnsureDict(kDebugOriginKey)->Set(iwa_origin.Serialize(), -1);
       StoragePartitionSizeEstimator::EstimateSize(

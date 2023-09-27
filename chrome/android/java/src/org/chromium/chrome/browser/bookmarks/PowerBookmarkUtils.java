@@ -13,8 +13,10 @@ import androidx.annotation.Nullable;
 import com.google.common.primitives.UnsignedLongs;
 
 import org.chromium.base.Callback;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.commerce.PriceTrackingUtils;
+import org.chromium.chrome.browser.commerce.ShoppingFeatures;
 import org.chromium.chrome.browser.commerce.ShoppingServiceFactory;
 import org.chromium.chrome.browser.price_tracking.PriceDropNotificationManagerFactory;
 import org.chromium.chrome.browser.profiles.Profile;
@@ -42,6 +44,12 @@ public class PowerBookmarkUtils {
     private static Boolean sPriceTrackingEligibleForTesting;
     private static PowerBookmarkMeta sPowerBookmarkMetaForTesting;
 
+    /** Returns whether the given meta is a shopping list item. */
+    public static boolean isShoppingListItem(PowerBookmarkMeta meta) {
+        return ShoppingFeatures.isShoppingListEligible() && meta != null
+                && meta.hasShoppingSpecifics();
+    }
+
     /**
      * Checks if the given tab is price-trackable.
      * @param tab The tab to check for price-tracking eligibility.
@@ -55,7 +63,9 @@ public class PowerBookmarkUtils {
                 ShoppingServiceFactory.getForProfile(Profile.getLastUsedRegularProfile());
         if (service == null) return false;
 
-        return service.getAvailableProductInfoForUrl(tab.getUrl()) != null;
+        ShoppingService.ProductInfo info = service.getAvailableProductInfoForUrl(tab.getUrl());
+
+        return info != null && info.productClusterId.isPresent();
     }
 
     /**
@@ -66,7 +76,18 @@ public class PowerBookmarkUtils {
      */
     public static @NonNull CommerceSubscription createCommerceSubscriptionForPowerBookmarkMeta(
             @NonNull PowerBookmarkMeta meta) {
-        ShoppingSpecifics shoppingSpecifics = meta.getShoppingSpecifics();
+        return createCommerceSubscriptionForShoppingSpecifics(meta.getShoppingSpecifics());
+    }
+
+    /**
+     * Unified way to get the associated {@link CommerceSubscription} for a {@link
+     * ShoppingSpecifics}.
+     * @param shoppingSpecifics The {@link ShoppingSpecifics} to create the {@link
+     *         CommerceSubscription} for.
+     * @return The {@link CommerceSubsription} for the given {@link ShoppingSpecifics}
+     */
+    public static @NonNull CommerceSubscription createCommerceSubscriptionForShoppingSpecifics(
+            @NonNull ShoppingSpecifics shoppingSpecifics) {
         // Use UnsignedLongs to convert ProductClusterId to avoid overflow.
         UserSeenOffer seenOffer =
                 new UserSeenOffer(UnsignedLongs.toString(shoppingSpecifics.getOfferId()),
@@ -87,19 +108,20 @@ public class PowerBookmarkUtils {
      * @param snackbarManager Manages snackbars, non-null if a message should be sent to alert the
      *         users of price-tracking events.
      * @param resources Used to retrieve resources.
+     * @param profile The current profile.
      * @param callback The status callback, may be called multiple times depending if the user
      *         retries on failure.
      */
     public static void setPriceTrackingEnabledWithSnackbars(@NonNull BookmarkModel bookmarkModel,
             @Nullable BookmarkId bookmarkId, boolean enabled, SnackbarManager snackbarManager,
-            Resources resources, Callback<Boolean> callback) {
+            Resources resources, Profile profile, Callback<Boolean> callback) {
         // Action to retry the subscription request on failure.
         SnackbarManager.SnackbarController retrySnackbarControllerAction =
                 new SnackbarManager.SnackbarController() {
                     @Override
                     public void onAction(Object actionData) {
                         setPriceTrackingEnabledWithSnackbars(bookmarkModel, bookmarkId, enabled,
-                                snackbarManager, resources, callback);
+                                snackbarManager, resources, profile, callback);
                     }
                 };
         // Wrapper which shows a snackbar and forwards the result.
@@ -130,7 +152,7 @@ public class PowerBookmarkUtils {
             PriceDropNotificationManagerFactory.create().createNotificationChannel();
         }
         PriceTrackingUtils.setPriceTrackingStateForBookmark(
-                Profile.getLastUsedRegularProfile(), bookmarkId.getId(), enabled, wrapperCallback);
+                profile, bookmarkId.getId(), enabled, wrapperCallback);
     }
 
     /**
@@ -171,10 +193,12 @@ public class PowerBookmarkUtils {
     /** Sets the price-tracking eligibility to the test value given. */
     public static void setPriceTrackingEligibleForTesting(@Nullable Boolean enabled) {
         sPriceTrackingEligibleForTesting = enabled;
+        ResettersForTesting.register(() -> sPriceTrackingEligibleForTesting = null);
     }
 
     /** Sets the current page meta to the test value given. */
     public static void setPowerBookmarkMetaForTesting(@Nullable PowerBookmarkMeta meta) {
         sPowerBookmarkMetaForTesting = meta;
+        ResettersForTesting.register(() -> sPowerBookmarkMetaForTesting = null);
     }
 }

@@ -341,9 +341,11 @@ IN_PROC_BROWSER_TEST_F(TranslateModelServiceBrowserTest,
 
 // Disabled on linux+ASAN, macOS+ASAN, chromeOS+ASAN and windows due to high
 // failure rate: crbug.com/1199854 crbug.com/1297485.
-#if ((BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_CHROMEOS)) && \
-     defined(ADDRESS_SANITIZER)) ||                                          \
-    BUILDFLAG(IS_WIN)
+// TODO(crbug.com/1434848): Re-enable this test
+#if (BUILDFLAG(IS_CHROMEOS) && !defined(NDEBUG)) ||        \
+    (BUILDFLAG(IS_LINUX) && BUILDFLAG(IS_MAC)) ||          \
+    (BUILDFLAG(IS_LINUX) && defined(ADDRESS_SANITIZER)) || \
+    (BUILDFLAG(IS_MAC) && defined(ADDRESS_SANITIZER)) || BUILDFLAG(IS_WIN)
 #define MAYBE_LanguageDetectionWithBackgroundTab \
   DISABLED_LanguageDetectionWithBackgroundTab
 #else
@@ -368,7 +370,7 @@ IN_PROC_BROWSER_TEST_F(TranslateModelServiceBrowserTest,
 
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), english_url(), WindowOpenDisposition::NEW_BACKGROUND_TAB,
-      ui_test_utils::BROWSER_TEST_NONE);
+      ui_test_utils::BROWSER_TEST_NO_WAIT);
 
   // Opening the browser causes the first model deferral event. The second
   // is due to the background tab.

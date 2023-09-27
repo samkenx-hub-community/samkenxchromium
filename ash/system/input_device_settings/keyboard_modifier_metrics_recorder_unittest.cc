@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "ash/constants/ash_features.h"
 #include "ash/public/cpp/ash_prefs.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
@@ -16,11 +17,12 @@
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "base/test/scoped_feature_list.h"
 #include "components/account_id/account_id.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/testing_pref_service.h"
-#include "ui/chromeos/events/mojom/modifier_key.mojom.h"
-#include "ui/chromeos/events/pref_names.h"
+#include "ui/events/ash/mojom/modifier_key.mojom.h"
+#include "ui/events/ash/pref_names.h"
 
 namespace ash {
 
@@ -86,6 +88,7 @@ class KeyboardModifierMetricsRecorderTest : public AshTestBase {
   ~KeyboardModifierMetricsRecorderTest() override = default;
 
   void SetUp() override {
+    feature_list_.InitAndDisableFeature(features::kInputDeviceSettingsSplit);
     AshTestBase::SetUp();
     ResetHistogramTester();
     recorder_ = Shell::Get()->keyboard_modifier_metrics_recorder();
@@ -101,8 +104,10 @@ class KeyboardModifierMetricsRecorderTest : public AshTestBase {
   }
 
  protected:
-  raw_ptr<KeyboardModifierMetricsRecorder> recorder_;
+  raw_ptr<KeyboardModifierMetricsRecorder, DanglingUntriaged | ExperimentalAsh>
+      recorder_;
   std::unique_ptr<base::HistogramTester> histogram_tester_;
+  base::test::ScopedFeatureList feature_list_;
 };
 
 class KeyboardModifierMetricsRecorderPrefChangedTest
@@ -124,7 +129,7 @@ class KeyboardModifierMetricsRecorderPrefChangedTest
   }
 
  protected:
-  raw_ptr<PrefService> pref_service_;
+  raw_ptr<PrefService, DanglingUntriaged | ExperimentalAsh> pref_service_;
 
   KeyboardModifierMetricsRecorderTestData data_;
   ui::mojom::ModifierKey modifier_key_from_;
@@ -222,11 +227,13 @@ TEST_P(KeyboardModifierMetricsRecorderPrefStartedTest, InitializeTest) {
 
   std::unique_ptr<TestingPrefServiceSimple> pref_service1 =
       std::make_unique<TestingPrefServiceSimple>();
-  ash::RegisterUserProfilePrefs(pref_service1->registry(), true);
+  ash::RegisterUserProfilePrefs(pref_service1->registry(), /*country=*/"",
+                                true);
 
   std::unique_ptr<TestingPrefServiceSimple> pref_service2 =
       std::make_unique<TestingPrefServiceSimple>();
-  ash::RegisterUserProfilePrefs(pref_service2->registry(), true);
+  ash::RegisterUserProfilePrefs(pref_service2->registry(), /*country=*/"",
+                                true);
 
   pref_service1->SetInteger(data_.pref_name, static_cast<int>(modifier_key_));
   pref_service2->SetInteger(data_.pref_name, static_cast<int>(modifier_key_));
@@ -362,11 +369,13 @@ TEST_P(KeyboardModifierMetricsRecorderHashTest, HashTest) {
 
   std::unique_ptr<TestingPrefServiceSimple> pref_service1 =
       std::make_unique<TestingPrefServiceSimple>();
-  ash::RegisterUserProfilePrefs(pref_service1->registry(), true);
+  ash::RegisterUserProfilePrefs(pref_service1->registry(), /*country=*/"",
+                                true);
 
   std::unique_ptr<TestingPrefServiceSimple> pref_service2 =
       std::make_unique<TestingPrefServiceSimple>();
-  ash::RegisterUserProfilePrefs(pref_service2->registry(), true);
+  ash::RegisterUserProfilePrefs(pref_service2->registry(), /*country=*/"",
+                                true);
 
   for (const auto& [pref, remapping] : data_.modifier_remappings) {
     pref_service1->SetInteger(pref, static_cast<int>(remapping));

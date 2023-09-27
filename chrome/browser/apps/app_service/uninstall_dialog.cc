@@ -4,6 +4,7 @@
 
 #include "chrome/browser/apps/app_service/uninstall_dialog.h"
 
+#include "base/functional/bind.h"
 #include "base/metrics/histogram_macros.h"
 #include "chrome/browser/apps/app_service/app_icon/app_icon_factory.h"
 #include "chrome/browser/apps/app_service/publishers/extension_apps_chromeos.h"
@@ -11,12 +12,7 @@
 #include "components/services/app_service/public/cpp/icon_loader.h"
 #include "extensions/browser/uninstall_reason.h"
 #include "ui/views/native_window_tracker.h"
-
-namespace {
-
-constexpr int32_t kUninstallIconSize = 48;
-
-}  // namespace
+#include "ui/views/widget/widget.h"
 
 namespace apps {
 
@@ -39,7 +35,8 @@ UninstallDialog::UninstallDialog(Profile* profile,
 UninstallDialog::~UninstallDialog() = default;
 
 void UninstallDialog::PrepareToShow(IconKey icon_key,
-                                    apps::IconLoader* icon_loader) {
+                                    apps::IconLoader* icon_loader,
+                                    int32_t icon_size) {
   if (app_type_ == AppType::kCrostini) {
     // Crostini icons might be a big image, and not fit the size, so add the
     // resize icon effect, to resize the image.
@@ -56,10 +53,19 @@ void UninstallDialog::PrepareToShow(IconKey icon_key,
 
   // Currently ARC apps only support 48*48 native icon.
   icon_loader->LoadIconFromIconKey(
-      app_type_, app_id_, icon_key, IconType::kStandard, kUninstallIconSize,
+      app_id_, icon_key, IconType::kStandard, icon_size,
       /*allow_placeholder_icon=*/false,
       base::BindOnce(&UninstallDialog::OnLoadIcon,
                      weak_ptr_factory_.GetWeakPtr()));
+}
+
+void UninstallDialog::CloseDialog() {
+  if (widget_) {
+    widget_->CloseWithReason(views::Widget::ClosedReason::kUnspecified);
+    return;
+  }
+
+  OnDialogClosed(false, false, false);
 }
 
 views::Widget* UninstallDialog::GetWidget() {
@@ -69,6 +75,7 @@ views::Widget* UninstallDialog::GetWidget() {
 void UninstallDialog::OnDialogClosed(bool uninstall,
                                      bool clear_site_data,
                                      bool report_abuse) {
+  CHECK(uninstall_callback_);
   std::move(uninstall_callback_)
       .Run(uninstall, clear_site_data, report_abuse, this);
 }
@@ -90,12 +97,16 @@ void UninstallDialog::OnLoadIcon(IconValuePtr icon_value) {
     return;
   }
 
-  widget_ = UiBase::Create(profile_, app_type_, app_id_, app_name_,
-                           icon_value->uncompressed, parent_window_, this);
+  UiBase::Create(profile_, app_type_, app_id_, app_name_,
+                 icon_value->uncompressed, parent_window_,
+                 base::BindOnce(&UninstallDialog::OnUninstallDialogCreated,
+                                weak_ptr_factory_.GetWeakPtr()),
+                 this);
+}
 
-  // For browser tests, if the callback is set, run the callback to stop the run
-  // loop.
-  if (!uninstall_dialog_created_callback_.is_null()) {
+void UninstallDialog::OnUninstallDialogCreated(views::Widget* widget) {
+  widget_ = widget;
+  if (uninstall_dialog_created_callback_) {
     std::move(uninstall_dialog_created_callback_).Run(true);
   }
 }

@@ -27,9 +27,9 @@ import {DomRepeatEvent, PolymerElement} from 'chrome://resources/polymer/v3_0/po
 import {MetricsBrowserProxy, MetricsBrowserProxyImpl, SafetyCheckUnusedSitePermissionsModuleInteractions} from '../metrics_browser_proxy.js';
 import {routes} from '../route.js';
 import {Route, RouteObserverMixin} from '../router.js';
+import {SafetyHubBrowserProxy, SafetyHubBrowserProxyImpl, SafetyHubEvent, UnusedSitePermissions} from '../safety_hub/safety_hub_browser_proxy.js';
 import {ContentSettingsTypes, MODEL_UPDATE_DELAY_MS} from '../site_settings/constants.js';
 import {SiteSettingsMixin} from '../site_settings/site_settings_mixin.js';
-import {SiteSettingsPermissionsBrowserProxy, SiteSettingsPermissionsBrowserProxyImpl, UnusedSitePermissions} from '../site_settings/site_settings_permissions_browser_proxy.js';
 import {TooltipMixin} from '../tooltip_mixin.js';
 
 import {getLocalizationStringForContentType} from './site_settings_page_util.js';
@@ -128,8 +128,8 @@ export class SettingsUnusedSitePermissionsElement extends
     };
   }
 
-  private browserProxy_: SiteSettingsPermissionsBrowserProxy =
-      SiteSettingsPermissionsBrowserProxyImpl.getInstance();
+  private browserProxy_: SafetyHubBrowserProxy =
+      SafetyHubBrowserProxyImpl.getInstance();
   private eventTracker_: EventTracker = new EventTracker();
   private headerString_: string;
   private lastUnusedSitePermissionsAllowedAgain_: UnusedSitePermissions|null;
@@ -148,7 +148,7 @@ export class SettingsUnusedSitePermissionsElement extends
 
   override async connectedCallback() {
     this.addWebUiListener(
-        'unused-permission-review-list-maybe-changed',
+        SafetyHubEvent.UNUSED_PERMISSIONS_MAYBE_CHANGED,
         (sites: UnusedSitePermissions[]) =>
             this.onUnusedSitePermissionListChanged_(sites));
 
@@ -213,8 +213,7 @@ export class SettingsUnusedSitePermissionsElement extends
     const permissionsI18n = permissions.map(permission => {
       const localizationString =
           getLocalizationStringForContentType(permission);
-      assert(localizationString !== null);
-      return this.i18n(localizationString);
+      return localizationString ? this.i18n(localizationString) : '';
     });
 
     if (permissionsI18n.length === 1) {

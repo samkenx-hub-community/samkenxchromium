@@ -15,6 +15,7 @@ source_set("omnibox_popup") {
   ]
   deps = [
     "//ios/chrome/browser/net:crurl",
+    "//ios/chrome/browser/shared/ui/symbols",
     "//ios/chrome/browser/shared/ui/util",
     "//ios/chrome/browser/ui/omnibox:omnibox_suggestion_icon_util",
     "//ios/chrome/browser/ui/omnibox/popup:popup_internal",
@@ -26,5 +27,4 @@ source_set("omnibox_popup") {
     "//url",
   ]
   frameworks = [ "UIKit.framework" ]
-  configs += [ "//build/config/compiler:enable_arc" ]
 }

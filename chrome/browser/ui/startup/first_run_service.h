@@ -8,18 +8,20 @@
 #include <memory>
 
 #include "base/functional/callback_forward.h"
+#include "base/gtest_prod_util.h"
 #include "base/metrics/field_trial.h"
 #include "base/no_destructor.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/profiles/profile_keyed_service_factory.h"
-#include "chrome/browser/ui/profile_picker.h"
+#include "chrome/browser/ui/profiles/profile_picker.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/signin/public/base/signin_buildflags.h"
 
 class PrefRegistrySimple;
 class Profile;
 class SilentSyncEnabler;
+class ProfileNameResolver;
 
 namespace base {
 class FeatureList;
@@ -27,6 +29,10 @@ class FeatureList;
 
 namespace version_info {
 enum class Channel;
+}
+
+namespace signin {
+class IdentityManager;
 }
 
 // Task to run after the FRE is exited, with `proceed` indicating whether it
@@ -37,6 +43,8 @@ using ResumeTaskCallback = base::OnceCallback<void(bool proceed)>;
 // It is not available on the other profiles.
 class FirstRunService : public KeyedService {
  public:
+  static constexpr char kSyntheticTrialName[] = "ForYouFreSynthetic";
+
   // These values are persisted to logs. Entries should not be renumbered and
   // numeric values should never be reused.
   enum class EntryPoint {
@@ -51,6 +59,18 @@ class FirstRunService : public KeyedService {
     kWebAppContextMenu = 3,
 
     kMaxValue = kWebAppContextMenu
+  };
+
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  enum class FinishedReason {
+#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+    kExperimentCounterfactual = 0,
+#endif
+    kFinishedFlow = 1,
+    kProfileAlreadySetUp = 2,
+    kSkippedByPolicies = 3,
+    kMaxValue = kSkippedByPolicies,
   };
 
   static void RegisterLocalStatePrefs(PrefRegistrySimple* registry);
@@ -74,7 +94,7 @@ class FirstRunService : public KeyedService {
   static void EnsureStickToFirstRunCohort();
 #endif
 
-  explicit FirstRunService(Profile* profile);
+  FirstRunService(Profile& profile, signin::IdentityManager& identity_manager);
   ~FirstRunService() override;
 
   // Runs `::ShouldOpenFirstRun(Profile*)` with the profile associated with this
@@ -107,6 +127,9 @@ class FirstRunService : public KeyedService {
  private:
   friend class FirstRunServiceFactory;
   FRIEND_TEST_ALL_PREFIXES(FirstRunFieldTrialCreatorTest, SetUpFromClientSide);
+  FRIEND_TEST_ALL_PREFIXES(FirstRunCohortSetupTest, JoinFirstRunCohort);
+  FRIEND_TEST_ALL_PREFIXES(FirstRunServiceTest,
+                           ShouldPopulateProfileNameFromPrimaryAccount);
 
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
   // Internal interface for `SetUpClientSideFieldTrialIfNeeded()`, exposed to
@@ -147,19 +170,33 @@ class FirstRunService : public KeyedService {
   // Processes the outcome from the FRE and resumes the user's interrupted task.
   void OnFirstRunHasExited(ProfilePicker::FirstRunExitStatus status);
 
+  // Marks the first run as finished and updates the profile entry based on
+  // the info obtained during the first run.
+  // Noting that the latter part is done by calling `FinishProfileSetUp()`,
+  // which will be done asynchronously in most cases.
+  void FinishFirstRun(FinishedReason reason);
+
+  void FinishProfileSetUp(std::u16string profile_name);
+
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   void StartSilentSync(base::OnceClosure callback);
   void ClearSilentSyncEnabler();
 #endif
 
   // Owns of this instance via the KeyedService mechanism.
-  const raw_ptr<Profile> profile_;
+  const raw_ref<Profile> profile_;
+
+  // KeyedService(s) this service depends on:
+  const raw_ref<signin::IdentityManager> identity_manager_;
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   std::unique_ptr<SilentSyncEnabler> silent_sync_enabler_;
 #endif
 
+  std::unique_ptr<ProfileNameResolver> profile_name_resolver_;
+
   ResumeTaskCallback resume_task_callback_;
+
   base::WeakPtrFactory<FirstRunService> weak_ptr_factory_{this};
 };
 
@@ -178,12 +215,12 @@ class FirstRunServiceFactory : public ProfileKeyedServiceFactory {
 
  private:
   friend class base::NoDestructor<FirstRunServiceFactory>;
-  friend class FirstRunServiceBrowserTest;
+  friend class FirstRunServiceBrowserTestBase;
 
   FirstRunServiceFactory();
   ~FirstRunServiceFactory() override;
 
-  KeyedService* BuildServiceInstanceFor(
+  std::unique_ptr<KeyedService> BuildServiceInstanceForBrowserContext(
       content::BrowserContext* context) const override;
   bool ServiceIsCreatedWithBrowserContext() const override;
 };

@@ -13,16 +13,18 @@
 #include "ash/wm/overview/overview_delegate.h"
 #include "ash/wm/overview/overview_metrics.h"
 #include "ash/wm/overview/overview_observer.h"
-#include "ash/wm/overview/overview_session.h"
 #include "ash/wm/overview/overview_types.h"
+#include "base/cancelable_callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/time/time.h"
 #include "ui/aura/window_occlusion_tracker.h"
 #include "ui/views/widget/widget.h"
+#include "ui/wm/public/activation_change_observer.h"
 
 namespace ash {
 
+class OverviewSession;
 class OverviewWallpaperController;
 
 // Manages a overview session which displays an overview of all windows and
@@ -49,6 +51,12 @@ class ASH_EXPORT OverviewController : public OverviewDelegate,
 
   // Returns true if overview mode is active.
   bool InOverviewSession() const;
+
+  // Receives a continuous scroll event from the gesture handler and either
+  // initializes overview mode in preparation for future continuous scrolls, or
+  // immediately calls `OverviewGrid::PositionWindowsForContinuousScrolls()` if
+  // overview mode has already been initialized.
+  bool HandleContinuousScroll(float y_offset, OverviewEnterExitType type);
 
   // Moves the current selection forward or backward.
   void IncrementSelection(bool forward);
@@ -99,6 +107,10 @@ class ASH_EXPORT OverviewController : public OverviewDelegate,
     return disable_app_id_check_for_saved_desks_;
   }
 
+  bool is_continuous_scroll_in_progress() const {
+    return is_continuous_scroll_in_progress_;
+  }
+
   void set_occlusion_pause_duration_for_end_for_test(base::TimeDelta duration) {
     occlusion_pause_duration_for_end_ = duration;
   }
@@ -146,6 +158,13 @@ class ASH_EXPORT OverviewController : public OverviewDelegate,
   // Indicates that overview shall gain focus when the starting animations have
   // completed.
   bool should_focus_overview_ = false;
+
+  // Used when feature ContinuousOverviewScrollAnimation is enabled to
+  // determine the start/end positions of overview items as well as their shadow
+  // bounds and corner radii during a continuous scroll. It's true only if the
+  // last scroll event was the start of a continuous scroll or a continuous
+  // scroll update that is within the threshold.
+  bool is_continuous_scroll_in_progress_ = false;
 
   std::unique_ptr<aura::WindowOcclusionTracker::ScopedPause>
       occlusion_tracker_pauser_;

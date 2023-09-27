@@ -20,11 +20,6 @@ namespace {
 constexpr int kMaxFrameRate = 60;
 constexpr auto kPixelFormat = media::VideoPixelFormat::PIXEL_FORMAT_ARGB;
 constexpr bool kAutoThrottle = false;
-// The range of acceptable resolutions the capture service can send us.
-// The capture service will choose the capture resolution from inside this
-// range, based on the display's resolution.
-constexpr auto kMinResolution = gfx::Size(320, 180);
-constexpr auto kMaxResolution = gfx::Size(3840, 2160);
 
 const char kUmaKeyForCapturerCreated[] =
     "Enterprise.DeviceRemoteCommand.Crd.Capturer.FrameSink.Created";
@@ -33,6 +28,10 @@ const char kUmaKeyForCapturerDestroyed[] =
 
 void SendEventToUma(const char* event_name) {
   base::UmaHistogramBoolean(event_name, true);
+}
+
+bool IsEqual(gfx::Size lhs, webrtc::DesktopSize rhs) {
+  return (lhs.width() == rhs.width()) && (lhs.height() == rhs.height());
 }
 
 }  // namespace
@@ -61,8 +60,6 @@ void FrameSinkDesktopCapturer::Start(DesktopCapturer::Callback* callback) {
   video_capturer_.emplace(base::BindRepeating(
       &FrameSinkDesktopCapturer::BindRemote, base::Unretained(this)));
 
-  video_capturer_->SetResolutionConstraints(kMinResolution, kMaxResolution,
-                                            /*use_fixed_aspect_ratio=*/false);
   video_capturer_->SetFormat(kPixelFormat);
   video_capturer_->SetMinCapturePeriod(base::Hertz(kMaxFrameRate));
   // Allow changing of resolution at any time, otherwise the capturer would not
@@ -72,21 +69,20 @@ void FrameSinkDesktopCapturer::Start(DesktopCapturer::Callback* callback) {
   // Disable auto-throttling so the capturer will always use the real resolution
   // of the display we're capturing.
   video_capturer_->SetAutoThrottlingEnabled(kAutoThrottle);
+  SelectSource(ash_->GetPrimaryDisplayId());
   video_capturer_->Start(&video_consumer_,
                          viz::mojom::BufferFormatPreference::kDefault);
-
-  SelectSource(ash_.GetPrimaryDisplayId());
 }
 
 void FrameSinkDesktopCapturer::BindRemote(
     mojo::PendingReceiver<FrameSinkVideoCapturer> pending_receiver) {
   DCHECK(callback_) << "BindRemote must be called after Start()";
 
-  ash_.CreateVideoCapturer(std::move(pending_receiver));
+  ash_->CreateVideoCapturer(std::move(pending_receiver));
 }
 
 void FrameSinkDesktopCapturer::CaptureFrame() {
-  const display::Display* source = ash_.GetDisplayForId(source_display_id_);
+  const display::Display* source = ash_->GetDisplayForId(source_display_id_);
   if (!source) {
     callback_->OnCaptureResult(Result::ERROR_TEMPORARY, nullptr);
     return;
@@ -96,6 +92,11 @@ void FrameSinkDesktopCapturer::CaptureFrame() {
       video_consumer_.GetLatestFrame(source->bounds().origin());
 
   if (!frame) {
+    callback_->OnCaptureResult(Result::ERROR_TEMPORARY, nullptr);
+    return;
+  }
+  if (!IsEqual(source->GetSizeInPixel(), frame->size())) {
+    SelectSource(source_display_id_);
     callback_->OnCaptureResult(Result::ERROR_TEMPORARY, nullptr);
     return;
   }
@@ -109,24 +110,28 @@ bool FrameSinkDesktopCapturer::GetSourceList(SourceList* sources) {
 }
 
 bool FrameSinkDesktopCapturer::SelectSource(SourceId id) {
-  if (!ash_.GetDisplayForId(id)) {
+  if (!ash_->GetDisplayForId(id)) {
     return false;
   }
 
   source_display_id_ = id;
 
   scoped_window_capture_request_ =
-      ash_.MakeDisplayCapturable(source_display_id_);
+      ash_->MakeDisplayCapturable(source_display_id_);
 
+  video_capturer_->SetResolutionConstraints(
+      GetSourceDisplay()->GetSizeInPixel(),
+      GetSourceDisplay()->GetSizeInPixel(),
+      /*use_fixed_aspect_ratio=*/false);
   video_capturer_->ChangeTarget(
-      viz::VideoCaptureTarget(ash_.GetFrameSinkId(source_display_id_),
+      viz::VideoCaptureTarget(ash_->GetFrameSinkId(source_display_id_),
                               scoped_window_capture_request_.GetCaptureId()),
       /*crop_version=*/0);
   return true;
 }
 
 const display::Display* FrameSinkDesktopCapturer::GetSourceDisplay() {
-  return ash_.GetDisplayForId(source_display_id_);
+  return ash_->GetDisplayForId(source_display_id_);
 }
 
 }  // namespace remoting

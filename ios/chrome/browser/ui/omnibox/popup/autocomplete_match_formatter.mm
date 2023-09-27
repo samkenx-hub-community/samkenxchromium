@@ -20,10 +20,6 @@
 #import "ios/chrome/browser/ui/omnibox/popup/popup_swift.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 
 /// The color of the main text of a suggest cell.
@@ -198,11 +194,28 @@ UIColor* DimColorIncognito() {
     UIColor* suggestionTextColor = SuggestionTextColor();
     UIColor* dimColor = self.incognito ? DimColorIncognito() : DimColor();
 
-    return [self attributedStringWithString:text
-                            classifications:textClassifications
-                                  smallFont:NO
-                                      color:suggestionTextColor
-                                   dimColor:dimColor];
+    NSAttributedString* attributedText =
+        [self attributedStringWithString:text
+                         classifications:textClassifications
+                               smallFont:NO
+                                   color:suggestionTextColor
+                                dimColor:dimColor];
+
+    if (self.isTailSuggestion) {
+      NSMutableAttributedString* mutableString =
+          [[NSMutableAttributedString alloc] init];
+      NSAttributedString* tailSuggestPrefix =
+          // TODO(crbug.com/1432987): Do we want to localize the ellipsis ?
+          [self attributedStringWithString:@"... "
+                           classifications:NULL
+                                 smallFont:NO
+                                     color:suggestionTextColor
+                                  dimColor:dimColor];
+      [mutableString appendAttributedString:tailSuggestPrefix];
+      [mutableString appendAttributedString:attributedText];
+      attributedText = mutableString;
+    }
+    return attributedText;
   }
 }
 

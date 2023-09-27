@@ -43,6 +43,7 @@
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/safe_browsing/buildflags.h"
+#include "components/safe_browsing/core/common/safe_browsing_prefs.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/download_manager.h"
 #include "content/public/browser/render_view_host.h"
@@ -57,7 +58,6 @@
 #include "extensions/browser/install/crx_install_error.h"
 #include "extensions/browser/install/sandboxed_unpacker_failure_reason.h"
 #include "extensions/browser/management_policy.h"
-#include "extensions/browser/notification_types.h"
 #include "extensions/browser/permissions_manager.h"
 #include "extensions/browser/renderer_startup_helper.h"
 #include "extensions/browser/test_extension_registry_observer.h"
@@ -103,7 +103,7 @@ class MockPromptProxy {
   ~MockPromptProxy();
 
   bool did_succeed() const { return !extension_id_.empty(); }
-  const std::string& extension_id() { return extension_id_; }
+  const ExtensionId& extension_id() { return extension_id_; }
   bool confirmation_requested() const { return confirmation_requested_; }
   const std::u16string& error() const { return error_; }
 
@@ -121,7 +121,7 @@ class MockPromptProxy {
 
   // Data reported back to us by the prompt we created.
   bool confirmation_requested_;
-  std::string extension_id_;
+  ExtensionId extension_id_;
   std::u16string error_;
 
   std::unique_ptr<ScopedTestDialogAutoConfirm> auto_confirm;
@@ -147,7 +147,7 @@ class MockInstallPrompt : public ExtensionInstallPrompt {
   }
 
  private:
-  raw_ptr<MockPromptProxy, DanglingUntriaged> proxy_;
+  raw_ptr<MockPromptProxy, AcrossTasksDanglingUntriaged> proxy_;
 };
 
 MockPromptProxy::MockPromptProxy(
@@ -257,11 +257,10 @@ class ExtensionCrxInstallerTest : public ExtensionBrowserTest {
     ASSERT_TRUE(AddFileToDirectory(temp_dir.GetPath(), bar_html, "world"));
 
     ExtensionBuilder builder;
-    builder.SetManifest(DictionaryBuilder()
+    builder.SetManifest(base::Value::Dict()
                             .Set("name", "My First Extension")
                             .Set("version", version)
-                            .Set("manifest_version", 2)
-                            .Build());
+                            .Set("manifest_version", 2));
     builder.SetID(extension_id);
     builder.SetPath(temp_dir.GetPath());
     extension_service()->AddExtension(builder.Build().get());
@@ -490,7 +489,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionCrxInstallerTest,
   TestExtensionRegistryObserver registry_observer(extension_registry());
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), url, WindowOpenDisposition::CURRENT_TAB,
-      ui_test_utils::BROWSER_TEST_NONE);
+      ui_test_utils::BROWSER_TEST_NO_WAIT);
 
   EXPECT_TRUE(registry_observer.WaitForExtensionInstalled());
   EXPECT_TRUE(mock_prompt->confirmation_requested());
@@ -664,6 +663,25 @@ IN_PROC_BROWSER_TEST_F(ExtensionCrxInstallerTest, Blocklist) {
             installation_failure.failure_reason);
   EXPECT_EQ(CrxInstallErrorDetail::EXTENSION_IS_BLOCKLISTED,
             installation_failure.install_error_detail);
+}
+
+// TODO(alexwchen): Update this test to use a non-theme crx
+IN_PROC_BROWSER_TEST_F(ExtensionCrxInstallerTest, BlocklistPolicyDisabled) {
+  // Disable policy which should prevent blocklist from blocking installation of
+  // unsafe Crx
+  browser()->profile()->GetPrefs()->SetBoolean(
+      prefs::kSafeBrowsingExtensionProtectionAllowedByPolicy, false);
+
+  scoped_refptr<FakeSafeBrowsingDatabaseManager> blocklist_db(
+      base::MakeRefCounted<FakeSafeBrowsingDatabaseManager>(true));
+  ScopedDatabaseManagerForTest scoped_blocklist_db(blocklist_db);
+
+  const std::string extension_id = "gllekhaobjnhgeagipipnkpmmmpchacm";
+  blocklist_db->SetUnsafe(extension_id);
+
+  base::FilePath crx_path = test_data_dir_.AppendASCII("theme_hidpi_crx")
+                                .AppendASCII("theme_hidpi.crx");
+  EXPECT_TRUE(InstallExtension(crx_path, 1));
 }
 #endif
 

@@ -15,10 +15,10 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.annotation.Nullable;
 import androidx.preference.TwoStatePreference;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.espresso.contrib.RecyclerViewActions;
 
 import org.junit.Assert;
@@ -28,28 +28,26 @@ import org.junit.runners.model.Statement;
 import org.chromium.base.IntentUtils;
 import org.chromium.base.Promise;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.autofill.PersonalDataManager;
 import org.chromium.chrome.browser.autofill.PersonalDataManager.CreditCard;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.UnifiedConsentServiceBridge;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.signin.AccountManagerTestRule;
 import org.chromium.chrome.test.util.browser.signin.SigninTestRule;
 import org.chromium.chrome.test.util.browser.signin.SigninTestUtil;
 import org.chromium.chrome.test.util.browser.sync.SyncTestUtil;
 import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
-import org.chromium.components.sync.UserSelectableType;
+import org.chromium.components.sync.SyncService;
 import org.chromium.components.sync.protocol.AutofillWalletSpecifics;
 import org.chromium.components.sync.protocol.EntitySpecifics;
 import org.chromium.components.sync.protocol.SyncEntity;
 import org.chromium.components.sync.protocol.WalletMaskedCreditCard;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -59,13 +57,6 @@ import java.util.concurrent.Callable;
  * TODO(crbug.com/1168590): Support batching tests with SyncTestRule.
  */
 public class SyncTestRule extends ChromeTabbedActivityTestRule {
-    private static final String TAG = "SyncTestBase";
-
-    private static final Set<Integer> USER_SELECTABLE_TYPES = new HashSet<Integer>(
-            Arrays.asList(new Integer[] {UserSelectableType.AUTOFILL, UserSelectableType.BOOKMARKS,
-                    UserSelectableType.PASSWORDS, UserSelectableType.PREFERENCES,
-                    UserSelectableType.TABS, UserSelectableType.HISTORY}));
-
     /**
      * Simple activity that mimics a trusted vault key retrieval flow that succeeds immediately.
      */
@@ -131,7 +122,7 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
 
         @Override
         public Promise<PendingIntent> createKeyRetrievalIntent(CoreAccountInfo accountInfo) {
-            Context context = InstrumentationRegistry.getContext();
+            Context context = ApplicationProvider.getApplicationContext();
             Intent intent = new Intent(context, DummyKeyRetrievalActivity.class);
             return Promise.fulfilled(PendingIntent.getActivity(context, 0 /* requestCode */, intent,
                     IntentUtils.getPendingIntentMutabilityFlag(false)));
@@ -156,7 +147,7 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
         @Override
         public Promise<PendingIntent> createRecoverabilityDegradedIntent(
                 CoreAccountInfo accountInfo) {
-            Context context = InstrumentationRegistry.getContext();
+            Context context = ApplicationProvider.getApplicationContext();
             Intent intent = new Intent(context, DummyRecoverabilityDegradedFixActivity.class);
             return Promise.fulfilled(PendingIntent.getActivity(context, 0 /* requestCode */, intent,
                     IntentUtils.getPendingIntentMutabilityFlag(false)));
@@ -180,7 +171,6 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
         }
     }
 
-    private Context mContext;
     private FakeServerHelper mFakeServerHelper;
     private SyncService mSyncService;
     private final SigninTestRule mSigninTestRule = new SigninTestRule();
@@ -191,11 +181,9 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
 
     private void ruleTearDown() {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            mSyncService.setSyncRequested(false);
+            mSyncService = null;
             mFakeServerHelper = null;
             FakeServerHelper.destroyInstance();
-            SyncService.resetForTests();
-            mSyncService = null;
         });
     }
 
@@ -203,7 +191,7 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
 
     /**Getters for Test variables */
     public Context getTargetContext() {
-        return mContext;
+        return ApplicationProvider.getApplicationContext();
     }
 
     public FakeServerHelper getFakeServerHelper() {
@@ -277,24 +265,8 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
     public CoreAccountInfo setUpTestAccountAndSignInWithSyncSetupAsIncomplete() {
         CoreAccountInfo accountInfo = mSigninTestRule.addTestAccountThenSigninAndEnableSync(
                 /* syncService= */ null);
-        // Enable UKM when enabling sync as it is done by the sync confirmation UI.
-        enableUKM();
         SyncTestUtil.waitForSyncTransportActive();
         return accountInfo;
-    }
-
-    public void startSync() {
-        TestThreadUtils.runOnUiThreadBlocking(() -> { mSyncService.setSyncRequested(true); });
-    }
-
-    public void startSyncAndWait() {
-        startSync();
-        SyncTestUtil.waitForSyncFeatureActive();
-    }
-
-    public void stopSync() {
-        TestThreadUtils.runOnUiThreadBlocking(() -> { mSyncService.setSyncRequested(false); });
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
     }
 
     public void signinAndEnableSync(final CoreAccountInfo accountInfo) {
@@ -320,7 +292,7 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
         // tests do.
         SyncTestUtil.triggerSync();
         CriteriaHelper.pollUiThread(() -> {
-            return !SyncService.get().isSyncFeatureEnabled();
+            return !SyncServiceFactory.get().isSyncFeatureEnabled();
         }, SyncTestUtil.TIMEOUT_MS, SyncTestUtil.INTERVAL_MS);
     }
 
@@ -341,14 +313,6 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
     public void setSelectedTypes(boolean syncEverything, Set<Integer> selectedTypes) {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> { mSyncService.setSelectedTypes(syncEverything, selectedTypes); });
-    }
-
-    /*
-     * Sets payments integration to |enabled|.
-     */
-    public void setPaymentsIntegrationEnabled(final boolean enabled) {
-        TestThreadUtils.runOnUiThreadBlocking(
-                () -> PersonalDataManager.setPaymentsIntegrationEnabled(enabled));
     }
 
     /*
@@ -383,13 +347,11 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
                 startMainActivityForSyncTest();
 
                 TestThreadUtils.runOnUiThreadBlocking(() -> {
-                    SyncServiceImpl syncService = createSyncServiceImpl();
+                    SyncService syncService = createSyncServiceImpl();
                     if (syncService != null) {
-                        SyncService.overrideForTests(syncService);
+                        SyncServiceFactory.setInstanceForTesting(syncService);
                     }
-                    mSyncService = SyncService.get();
-
-                    mContext = InstrumentationRegistry.getTargetContext();
+                    mSyncService = SyncServiceFactory.get();
                     mFakeServerHelper = FakeServerHelper.createInstanceAndGet();
                 });
 
@@ -457,9 +419,9 @@ public class SyncTestRule extends ChromeTabbedActivityTestRule {
     }
 
     /**
-     * Returns an instance of SyncServiceImpl that can be overridden by subclasses.
+     * Returns an instance of SyncService that can be overridden by subclasses.
      */
-    protected SyncServiceImpl createSyncServiceImpl() {
+    protected SyncService createSyncServiceImpl() {
         return null;
     }
 

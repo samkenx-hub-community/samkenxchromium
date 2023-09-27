@@ -4,6 +4,7 @@
 
 #include <fuchsia/web/cpp/fidl.h>
 
+#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_forward.h"
 #include "base/logging.h"
@@ -16,12 +17,12 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "fuchsia_web/common/test/frame_for_test.h"
 #include "fuchsia_web/common/test/frame_test_util.h"
 #include "fuchsia_web/common/test/test_navigation_listener.h"
 #include "fuchsia_web/webengine/browser/context_impl.h"
 #include "fuchsia_web/webengine/browser/frame_impl.h"
 #include "fuchsia_web/webengine/browser/frame_impl_browser_test_base.h"
-#include "fuchsia_web/webengine/test/frame_for_test.h"
 #include "fuchsia_web/webengine/test/test_data.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
@@ -164,9 +165,8 @@ IN_PROC_BROWSER_TEST_F(ClientHintsTest, InvalidClientHint) {
 IN_PROC_BROWSER_TEST_F(ClientHintsTest, LowEntropyClientHintsAreSentByDefault) {
   GetAndVerifyClientHint(
       kUserAgentCH, base::BindRepeating([](std::string& str) {
-        EXPECT_TRUE(str.find("Chromium") != std::string::npos);
-        EXPECT_TRUE(str.find(version_info::GetMajorVersionNumber()) !=
-                    std::string::npos);
+        EXPECT_TRUE(base::Contains(str, "Chromium"));
+        EXPECT_TRUE(base::Contains(str, version_info::GetMajorVersionNumber()));
       }));
 }
 
@@ -175,9 +175,8 @@ IN_PROC_BROWSER_TEST_F(ClientHintsTest,
   SetClientHintsForTestServerToRequest(kUserAgentCH);
   GetAndVerifyClientHint(
       kUserAgentCH, base::BindRepeating([](std::string& str) {
-        EXPECT_TRUE(str.find("Chromium") != std::string::npos);
-        EXPECT_TRUE(str.find(version_info::GetMajorVersionNumber()) !=
-                    std::string::npos);
+        EXPECT_TRUE(base::Contains(str, "Chromium"));
+        EXPECT_TRUE(base::Contains(str, version_info::GetMajorVersionNumber()));
       }));
 }
 
@@ -194,9 +193,8 @@ IN_PROC_BROWSER_TEST_F(ClientHintsTest,
   SetClientHintsForTestServerToRequest(kFullVersionListCH);
   GetAndVerifyClientHint(
       kFullVersionListCH, base::BindRepeating([](std::string& str) {
-        EXPECT_TRUE(str.find("Chromium") != std::string::npos);
-        EXPECT_TRUE(str.find(version_info::GetVersionNumber()) !=
-                    std::string::npos);
+        EXPECT_TRUE(base::Contains(str, "Chromium"));
+        EXPECT_TRUE(base::Contains(str, version_info::GetVersionNumber()));
       }));
 }
 

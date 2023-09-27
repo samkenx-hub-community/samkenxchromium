@@ -6,15 +6,16 @@
 
 #import <utility>
 
+#import "base/apple/foundation_util.h"
 #import "base/check.h"
 #import "base/feature_list.h"
-#import "base/mac/foundation_util.h"
 #import "base/strings/string_number_conversions.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/send_tab_to_self/features.h"
 #import "components/send_tab_to_self/send_tab_to_self_model.h"
 #import "components/send_tab_to_self/target_device_info.h"
 #import "components/sync_device_info/device_info.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_detail_icon_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_button_item.h"
@@ -22,7 +23,6 @@
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_url_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/chrome_table_view_styler.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
 #import "ios/chrome/browser/ui/send_tab_to_self/send_tab_to_self_image_detail_text_item.h"
 #import "ios/chrome/browser/ui/send_tab_to_self/send_tab_to_self_manage_devices_item.h"
 #import "ios/chrome/browser/ui/send_tab_to_self/send_tab_to_self_modal_delegate.h"
@@ -30,10 +30,6 @@
 #import "ios/chrome/common/ui/table_view/table_view_cells_constants.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -180,7 +176,7 @@ typedef NS_ENUM(NSInteger, ItemType) {
 
   if (itemType == ItemTypeSend) {
     TableViewTextButtonCell* tableViewTextButtonCell =
-        base::mac::ObjCCastStrict<TableViewTextButtonCell>(cell);
+        base::apple::ObjCCastStrict<TableViewTextButtonCell>(cell);
     [tableViewTextButtonCell.button addTarget:self
                                        action:@selector(sendTabWhenPressed:)
                              forControlEvents:UIControlEventTouchUpInside];
@@ -203,7 +199,7 @@ typedef NS_ENUM(NSInteger, ItemType) {
   DCHECK(item);
   if (item.type == ItemTypeDevice) {
     SendTabToSelfImageDetailTextItem* imageDetailTextItem =
-        base::mac::ObjCCastStrict<SendTabToSelfImageDetailTextItem>(item);
+        base::apple::ObjCCastStrict<SendTabToSelfImageDetailTextItem>(item);
     if (imageDetailTextItem == self.selectedItem) {
       [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
       return;

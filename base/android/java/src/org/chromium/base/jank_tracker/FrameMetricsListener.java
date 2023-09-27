@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -11,27 +11,26 @@ import android.view.Window.OnFrameMetricsAvailableListener;
 
 import androidx.annotation.RequiresApi;
 
+import org.chromium.base.TraceEvent;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * This class receives  OnFrameMetricsAvailableListener.onFrameMetricsAvailable() callbacks and
- * records frame durations in a FrameMetricsStore instance. Recording can be toggled from any
- * thread, but the actual recording occurs in the thread specified when this is attached to a window
- * with addOnFrameMetricsAvailableListener(). This class only adds data to the provided
- * FrameMetricsStore instance, its owner must clear it to avoid OOMs.
+ * This class receives OnFrameMetricsAvailableListener.onFrameMetricsAvailable() callbacks and
+ * records frame durations in a FrameMetricsStore instance.
  */
 @RequiresApi(api = VERSION_CODES.N)
-class FrameMetricsListener implements OnFrameMetricsAvailableListener {
+public class FrameMetricsListener implements OnFrameMetricsAvailableListener {
     private final FrameMetricsStore mFrameMetricsStore;
-    private final AtomicBoolean mIsRecording;
+    private AtomicBoolean mIsRecording = new AtomicBoolean(false);
 
-    FrameMetricsListener(FrameMetricsStore frameMetricsStore) {
+    public FrameMetricsListener(FrameMetricsStore frameMetricsStore) {
         mFrameMetricsStore = frameMetricsStore;
-        mIsRecording = new AtomicBoolean(false);
     }
 
     /**
-     * Toggles recording into JankMetricsStore, can be invoked from any thread.
+     * Toggles recording into FrameMetricsStore. When recording is stopped, reports accumulated
+     * metrics.
      * @param isRecording
      */
     public void setIsListenerRecording(boolean isRecording) {
@@ -47,12 +46,14 @@ class FrameMetricsListener implements OnFrameMetricsAvailableListener {
         }
 
         long frameTotalDurationNs = frameMetrics.getMetric(FrameMetrics.TOTAL_DURATION);
+        long frame_start_vsync_ts = frameMetrics.getMetric(FrameMetrics.VSYNC_TIMESTAMP);
 
-        // The total frame duration is considered from the intended VSYNC time till the actual
-        // presentation time.
-        long timestampNs = frameMetrics.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP);
-
-        mFrameMetricsStore.addFrameMeasurement(
-                timestampNs, frameTotalDurationNs, dropCountSinceLastInvocation);
+        try (TraceEvent e = TraceEvent.scoped(
+                     "onFrameMetricsAvailable", Long.toString(frameTotalDurationNs))) {
+            long deadlineNs = frameMetrics.getMetric(FrameMetrics.DEADLINE);
+            boolean isJanky = frameTotalDurationNs >= deadlineNs;
+            mFrameMetricsStore.addFrameMeasurement(
+                    frameTotalDurationNs, isJanky, frame_start_vsync_ts);
+        }
     }
 }

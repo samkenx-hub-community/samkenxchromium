@@ -4,6 +4,7 @@
 
 #include "components/user_manager/user_directory_integrity_manager.h"
 
+#include "base/logging.h"
 #include "base/notreached.h"
 #include "components/prefs/pref_service.h"
 #include "components/user_manager/known_user.h"
@@ -32,17 +33,19 @@ void UserDirectoryIntegrityManager::RegisterLocalStatePrefs(
 
 void UserDirectoryIntegrityManager::RecordCreatingNewUser(
     const AccountId& account_id) {
+  LOG(WARNING) << "Creating new user, don't have credentials yet.";
   local_state_->SetString(kUserDirectoryIntegrityAccountPref,
                           account_id.GetUserEmail());
   local_state_->CommitPendingWrite();
 }
 
 void UserDirectoryIntegrityManager::RemoveUser(const AccountId& account_id) {
-  UserManager::Get()->RemoveUser(
-      account_id, UserRemovalReason::MISCONFIGURED_USER, /*delegate=*/nullptr);
+  UserManager::Get()->RemoveUser(account_id,
+                                 UserRemovalReason::MISCONFIGURED_USER);
 }
 
 void UserDirectoryIntegrityManager::ClearPrefs() {
+  LOG(WARNING) << "Created user have credentials now.";
   local_state_->ClearPref(kUserDirectoryIntegrityAccountPref);
   local_state_->CommitPendingWrite();
 }

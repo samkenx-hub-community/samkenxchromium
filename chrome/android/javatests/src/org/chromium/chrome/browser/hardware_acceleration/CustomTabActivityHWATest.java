@@ -4,8 +4,7 @@
 
 package org.chromium.chrome.browser.hardware_acceleration;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Rule;
@@ -32,7 +31,7 @@ public class CustomTabActivityHWATest {
     public void testHardwareAcceleration() throws Exception {
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(
                 CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
-                        InstrumentationRegistry.getTargetContext(), "about:blank"));
+                        ApplicationProvider.getApplicationContext(), "about:blank"));
         Utils.assertHardwareAcceleration(mCustomTabActivityTestRule.getActivity());
     }
 }

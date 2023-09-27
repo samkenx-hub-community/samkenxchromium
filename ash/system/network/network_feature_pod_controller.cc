@@ -25,6 +25,7 @@
 #include "base/notreached.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chromeos/services/network_config/public/cpp/cros_network_config_util.h"
+#include "components/device_event_log/device_event_log.h"
 #include "components/onc/onc_constants.h"
 #include "third_party/cros_system_api/dbus/service_constants.h"
 #include "third_party/cros_system_api/dbus/shill/dbus-constants.h"
@@ -92,11 +93,16 @@ std::u16string GetSubLabelForConnectedNetwork(
       return l10n_util::GetStringUTF16(
           IDS_ASH_STATUS_TRAY_NETWORK_CELLULAR_TYPE_LTE_PLUS);
     }
+    if (cellular->network_technology == onc::cellular::kTechnology5gNr) {
+      return l10n_util::GetStringUTF16(
+          IDS_ASH_STATUS_TRAY_NETWORK_CELLULAR_TYPE_FIVE_G);
+    }
 
     // All connectivity types exposed by Shill should be covered above. However,
     // as a fail-safe, return the default "Connected" string here to protect
     // against Shill providing an unexpected value.
-    NOTREACHED();
+    NET_LOG(ERROR) << "Unexpected cellular network technology: "
+                   << cellular->network_technology;
     return l10n_util::GetStringUTF16(
         IDS_ASH_STATUS_TRAY_NETWORK_STATUS_CONNECTED);
   }
@@ -118,9 +124,6 @@ std::u16string GetSubLabelForConnectedNetwork(
       return l10n_util::GetStringUTF16(
           IDS_ASH_STATUS_TRAY_NETWORK_SIGNAL_STRONG_SUBLABEL);
   }
-  NOTREACHED();
-  return l10n_util::GetStringUTF16(
-      IDS_ASH_STATUS_TRAY_NETWORK_STATUS_CONNECTED);
 }
 
 // Returns |true| if the network type can be toggled to state |enabled|.
@@ -188,14 +191,14 @@ std::unique_ptr<FeatureTile> NetworkFeaturePodController::CreateTile(
   DCHECK(features::IsQsRevampEnabled());
   auto tile = std::make_unique<NetworkFeatureTile>(
       /*delegate=*/this,
-      base::BindRepeating(&FeaturePodControllerBase::OnIconPressed,
+      base::BindRepeating(&FeaturePodControllerBase::OnLabelPressed,
                           weak_ptr_factory_.GetWeakPtr()));
   tile_ = tile.get();
-  tile_->CreateDrillInButton(
-      base::BindRepeating(&FeaturePodControllerBase::OnLabelPressed,
-                          weak_ptr_factory_.GetWeakPtr()),
-      l10n_util::GetStringFUTF16(IDS_ASH_STATUS_TRAY_NETWORK_SETTINGS_TOOLTIP,
-                                 std::u16string()));
+  tile_->SetIconClickable(true);
+  tile_->SetIconClickCallback(
+      base::BindRepeating(&FeaturePodControllerBase::OnIconPressed,
+                          weak_ptr_factory_.GetWeakPtr()));
+  tile_->CreateDecorativeDrillInArrow();
   UpdateButtonStateIfExists();
   TrackVisibilityUMA();
   return tile;
@@ -254,7 +257,7 @@ void NetworkFeaturePodController::UpdateButtonStateIfExists() {
 
   // Check button exists here so that calling functions don't need to.
   if (is_qs_revamp_enabled) {
-    if (!tile_) {
+    if (!tile_ || !tile_->GetColorProvider()) {
       return;
     }
   } else {
@@ -289,22 +292,24 @@ void NetworkFeaturePodController::UpdateButtonStateIfExists() {
     tile_->SetEnabled(!Shell::Get()->session_controller()->IsScreenLocked());
     tile_->SetImage(
         tile_->GetEnabled()
-            ? active_network_icon->GetImage(ActiveNetworkIcon::Type::kSingle,
+            ? active_network_icon->GetImage(tile_->GetColorProvider(),
+                                            ActiveNetworkIcon::Type::kSingle,
                                             icon_type, &image_animating)
             : active_network_icon->GetImage(
-                  ActiveNetworkIcon::Type::kSingle,
+                  tile_->GetColorProvider(), ActiveNetworkIcon::Type::kSingle,
                   network_icon::ICON_TYPE_FEATURE_POD_DISABLED,
                   &image_animating));
   } else {
     button_->SetEnabled(!Shell::Get()->session_controller()->IsScreenLocked());
     button_->icon_button()->SetImage(
         views::Button::STATE_NORMAL,
-        active_network_icon->GetImage(ActiveNetworkIcon::Type::kSingle,
+        active_network_icon->GetImage(/*color_provider=*/nullptr,
+                                      ActiveNetworkIcon::Type::kSingle,
                                       icon_type, &image_animating));
     button_->icon_button()->SetImage(
         views::Button::STATE_DISABLED,
         active_network_icon->GetImage(
-            ActiveNetworkIcon::Type::kSingle,
+            /*color_provider=*/nullptr, ActiveNetworkIcon::Type::kSingle,
             network_icon::ICON_TYPE_FEATURE_POD_DISABLED, &image_animating));
   }
 
@@ -327,7 +332,7 @@ void NetworkFeaturePodController::UpdateButtonStateIfExists() {
     tile_->SetSubLabel(ComputeButtonSubLabel(default_network));
     if (!tile_->GetEnabled()) {
       tile_->SetTooltipText(tooltip);
-      tile_->SetDrillInButtonTooltipText(tooltip);
+      tile_->SetIconButtonTooltipText(tooltip);
       return;
     }
   } else {
@@ -346,7 +351,7 @@ void NetworkFeaturePodController::UpdateButtonStateIfExists() {
       const std::u16string tooltip_text = l10n_util::GetStringFUTF16(
           IDS_ASH_STATUS_TRAY_NETWORK_SETTINGS_TOOLTIP, tooltip);
       tile_->SetTooltipText(tooltip_text);
-      tile_->SetDrillInButtonTooltipText(tooltip_text);
+      tile_->SetIconButtonTooltipText(tooltip_text);
     } else {
       button_->SetIconAndLabelTooltips(l10n_util::GetStringFUTF16(
           IDS_ASH_STATUS_TRAY_NETWORK_SETTINGS_TOOLTIP, tooltip));
@@ -355,7 +360,7 @@ void NetworkFeaturePodController::UpdateButtonStateIfExists() {
   }
 
   if (is_qs_revamp_enabled) {
-    tile_->SetTooltipText(l10n_util::GetStringFUTF16(
+    tile_->SetIconButtonTooltipText(l10n_util::GetStringFUTF16(
         IDS_ASH_STATUS_TRAY_NETWORK_TOGGLE_TOOLTIP, tooltip));
   } else {
     button_->SetIconTooltip(l10n_util::GetStringFUTF16(
@@ -365,7 +370,7 @@ void NetworkFeaturePodController::UpdateButtonStateIfExists() {
   // Make sure the tooltip indicates the network type will be toggled by
   // pressing the label if the network type is disabled.
   if (is_qs_revamp_enabled) {
-    tile_->SetDrillInButtonTooltipText(l10n_util::GetStringFUTF16(
+    tile_->SetTooltipText(l10n_util::GetStringFUTF16(
         toggled ? IDS_ASH_STATUS_TRAY_NETWORK_SETTINGS_TOOLTIP
                 : IDS_ASH_STATUS_TRAY_NETWORK_TOGGLE_TOOLTIP,
         tooltip));

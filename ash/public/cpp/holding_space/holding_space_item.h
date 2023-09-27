@@ -11,15 +11,16 @@
 
 #include "ash/public/cpp/ash_public_export.h"
 #include "ash/public/cpp/holding_space/holding_space_constants.h"
+#include "ash/public/cpp/holding_space/holding_space_file.h"
 #include "ash/public/cpp/holding_space/holding_space_progress.h"
 #include "base/callback_list.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/values.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/color/color_id.h"
 #include "ui/gfx/vector_icon_types.h"
-#include "url/gurl.h"
 
 namespace cros_styles {
 enum class ColorName;
@@ -61,7 +62,7 @@ class ASH_PUBLIC_EXPORT HoldingSpaceItem {
     int label_id;
 
     // The icon to be displayed for the command.
-    const gfx::VectorIcon* icon;
+    raw_ptr<const gfx::VectorIcon, ExperimentalAsh> icon;
 
     // The handler to be invoked to perform command execution.
     Handler handler;
@@ -104,32 +105,34 @@ class ASH_PUBLIC_EXPORT HoldingSpaceItem {
   using ImageResolver = base::OnceCallback<
       std::unique_ptr<HoldingSpaceImage>(Type, const base::FilePath&)>;
 
-  // Creates a HoldingSpaceItem that's backed by a file system URL.
-  // NOTE: `file_system_url` is expected to be non-empty.
+  // Creates a HoldingSpaceItem that's backed by a `file`.
+  // NOTE: `file` system URL is expected to be non-empty.
   static std::unique_ptr<HoldingSpaceItem> CreateFileBackedItem(
       Type type,
-      const base::FilePath& file_path,
-      const GURL& file_system_url,
+      const HoldingSpaceFile& file,
       ImageResolver image_resolver);
 
-  // Creates a HoldingSpaceItem that's backed by a file system URL.
-  // NOTE: `file_system_url` is expected to be non-empty.
+  // Creates a HoldingSpaceItem that's backed by a `file`.
+  // NOTE: `file` system URL is expected to be non-empty.
   static std::unique_ptr<HoldingSpaceItem> CreateFileBackedItem(
       Type type,
-      const base::FilePath& file_path,
-      const GURL& file_system_url,
+      const HoldingSpaceFile& file,
       const HoldingSpaceProgress& progress,
       ImageResolver image_resolver);
 
+  // Returns `true` if `type` is a Camera app type, `false` otherwise.
+  static bool IsCameraAppType(HoldingSpaceItem::Type type);
+
   // Returns `true` if `type` is a download type, `false` otherwise.
-  static bool IsDownload(HoldingSpaceItem::Type type);
+  static bool IsDownloadType(HoldingSpaceItem::Type type);
 
   // Returns `true` if `type` is a screen capture type, `false` otherwise.
-  static bool IsScreenCapture(HoldingSpaceItem::Type type);
+  static bool IsScreenCaptureType(HoldingSpaceItem::Type type);
 
   // Returns `true` if `type` is a suggestion type, `false` otherwise.
-  static bool IsSuggestion(HoldingSpaceItem::Type type);
+  static bool IsSuggestionType(HoldingSpaceItem::Type type);
 
+  // TODO(http://b/288471183): Update comment after removing file system URL.
   // Deserializes from `base::Value::Dict` to `HoldingSpaceItem`.
   // This creates a partially initialized item with an empty file system URL.
   // The item should be fully initialized using `Initialize()`.
@@ -140,7 +143,7 @@ class ASH_PUBLIC_EXPORT HoldingSpaceItem {
   // Deserializes `id_` from a serialized `HoldingSpaceItem`.
   static const std::string& DeserializeId(const base::Value::Dict& dict);
 
-  // Deserializes `file_path_` from a serialized `HoldingSpaceItem`.
+  // Deserializes file path from a serialized `HoldingSpaceItem`.
   static base::FilePath DeserializeFilePath(const base::Value::Dict& dict);
 
   // Deserializes `type_` from a serialized `HoldingSpaceItem`.
@@ -160,12 +163,11 @@ class ASH_PUBLIC_EXPORT HoldingSpaceItem {
 
   // Used to fully initialize partially initialized items created by
   // `Deserialize()`.
-  void Initialize(const GURL& file_system_url);
+  void Initialize(const HoldingSpaceFile& file);
 
-  // Sets the file backing the item to `file_path` and `file_system_url`,
-  // returning `true` if a change occurred or `false` to indicate no-op.
-  bool SetBackingFile(const base::FilePath& file_path,
-                      const GURL& file_system_url);
+  // Sets the `file` backing the item, returning `true` if a change occurred or
+  // `false` to indicate no-op.
+  bool SetBackingFile(const HoldingSpaceFile& file);
 
   // Returns `text_`, falling back to the lossy display name of the item's
   // backing file if absent.
@@ -225,9 +227,7 @@ class ASH_PUBLIC_EXPORT HoldingSpaceItem {
 
   const HoldingSpaceImage& image() const { return *image_; }
 
-  const base::FilePath& file_path() const { return file_path_; }
-
-  const GURL& file_system_url() const { return file_system_url_; }
+  const HoldingSpaceFile& file() const { return file_; }
 
   const HoldingSpaceProgress& progress() const { return progress_; }
 
@@ -241,8 +241,7 @@ class ASH_PUBLIC_EXPORT HoldingSpaceItem {
   // Constructor for file backed items.
   HoldingSpaceItem(Type type,
                    const std::string& id,
-                   const base::FilePath& file_path,
-                   const GURL& file_system_url,
+                   const HoldingSpaceFile& file,
                    std::unique_ptr<HoldingSpaceImage> image,
                    const HoldingSpaceProgress& progress);
 
@@ -251,11 +250,8 @@ class ASH_PUBLIC_EXPORT HoldingSpaceItem {
   // The holding space item ID assigned to the item.
   std::string id_;
 
-  // The file path by which the item is backed.
-  base::FilePath file_path_;
-
-  // The file system URL of the file that backs the item.
-  GURL file_system_url_;
+  // The file that backs the item.
+  HoldingSpaceFile file_;
 
   // If set, the text that should be shown for the item.
   absl::optional<std::u16string> text_;

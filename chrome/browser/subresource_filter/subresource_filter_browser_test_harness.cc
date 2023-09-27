@@ -200,15 +200,13 @@ void SubresourceFilterBrowserTest::ExpectFramesIncludedInLayout(
 bool SubresourceFilterBrowserTest::IsDynamicScriptElementLoaded(
     content::RenderFrameHost* rfh) {
   DCHECK(rfh);
-  return content::EvalJs(rfh, "insertScriptElementAndReportSuccess()",
-                         content::EXECUTE_SCRIPT_USE_MANUAL_REPLY)
+  return content::EvalJs(rfh, "insertScriptElementAndReportSuccess()")
       .ExtractBool();
 }
 
 void SubresourceFilterBrowserTest::InsertDynamicFrameWithScript() {
   EXPECT_EQ(true, content::EvalJs(web_contents()->GetPrimaryMainFrame(),
-                                  "insertFrameWithScriptAndNotify()",
-                                  content::EXECUTE_SCRIPT_USE_MANUAL_REPLY));
+                                  "insertFrameWithScriptAndNotify()"));
 }
 
 void SubresourceFilterBrowserTest::NavigateFromRendererSide(const GURL& url) {
@@ -315,7 +313,7 @@ SubresourceFilterPrerenderingBrowserTest::
     ~SubresourceFilterPrerenderingBrowserTest() = default;
 
 void SubresourceFilterPrerenderingBrowserTest::SetUp() {
-  prerender_helper_.SetUp(embedded_test_server());
+  prerender_helper_.RegisterServerRequestMonitor(embedded_test_server());
   SubresourceFilterListInsertingBrowserTest::SetUp();
 }
 

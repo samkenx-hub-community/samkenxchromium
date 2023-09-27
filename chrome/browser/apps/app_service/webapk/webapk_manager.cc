@@ -61,7 +61,7 @@ WebApkManager::WebApkManager(Profile* profile)
   // Always observe AppListPrefs, even when the rest of WebAPKs is not enabled,
   // so that we can detect WebAPK uninstalls that happen when the feature is
   // disabled.
-  arc_app_list_prefs_observer_.Observe(app_list_prefs_);
+  arc_app_list_prefs_observer_.Observe(app_list_prefs_.get());
   arc::ArcSessionManager::Get()->AddObserver(this);
   pref_change_registrar_->Init(profile_->GetPrefs());
   pref_change_registrar_->Add(
@@ -90,7 +90,10 @@ void WebApkManager::StartOrStopObserving() {
 
   if (arc_enabled && policy_enabled) {
     auto* cache = &proxy_->AppRegistryCache();
-    Observe(cache);
+    if (!app_registry_cache_observer_.IsObservingSource(cache)) {
+      app_registry_cache_observer_.Reset();
+      app_registry_cache_observer_.Observe(cache);
+    }
 
     if (cache->IsAppTypeInitialized(AppType::kWeb)) {
       Synchronize();
@@ -98,7 +101,7 @@ void WebApkManager::StartOrStopObserving() {
     return;
   }
 
-  Observe(nullptr);
+  app_registry_cache_observer_.Reset();
   initialized_ = false;
 
   if (!policy_enabled) {
@@ -185,7 +188,7 @@ void WebApkManager::OnAppTypeInitialized(AppType type) {
 }
 
 void WebApkManager::OnAppRegistryCacheWillBeDestroyed(AppRegistryCache* cache) {
-  Observe(nullptr);
+  app_registry_cache_observer_.Reset();
 }
 
 void WebApkManager::OnPackageListInitialRefreshed() {

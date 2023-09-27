@@ -42,6 +42,7 @@ import org.chromium.base.SysUtils;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.UmaRecorderHolder;
 import org.chromium.base.test.BaseRobolectricTestRunner;
+import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.chrome.browser.browserservices.verification.ChromeOriginVerifier;
 import org.chromium.chrome.browser.browserservices.verification.ChromeOriginVerifierFactoryImpl;
@@ -56,6 +57,7 @@ import org.chromium.components.embedder_support.util.ShadowUrlUtilities;
 
 /** Tests for ClientManager. */
 @RunWith(BaseRobolectricTestRunner.class)
+@Batch(Batch.UNIT_TESTS)
 @Config(manifest = Config.NONE,
         shadows = {ShadowUrlUtilities.class, ShadowPackageManager.class,
                 ClientManagerTest.ShadowSysUtils.class})
@@ -166,7 +168,7 @@ public class ClientManagerTest {
     @Test
     @SmallTest
     public void testValidSessionNoWarmup() {
-        mClientManager.newSession(mSession, mUid, null, null, null);
+        mClientManager.newSession(mSession, mUid, null, null, null, null);
         Assert.assertEquals(ClientManager.CalledWarmup.SESSION_NO_WARMUP_NOT_CALLED,
                 mClientManager.getWarmupState(mSession));
     }
@@ -175,7 +177,7 @@ public class ClientManagerTest {
     @SmallTest
     public void testValidSessionOtherWarmup() {
         mClientManager.recordUidHasCalledWarmup(mUid + 1);
-        mClientManager.newSession(mSession, mUid, null, null, null);
+        mClientManager.newSession(mSession, mUid, null, null, null, null);
         Assert.assertEquals(ClientManager.CalledWarmup.SESSION_NO_WARMUP_ALREADY_CALLED,
                 mClientManager.getWarmupState(mSession));
     }
@@ -184,7 +186,7 @@ public class ClientManagerTest {
     @SmallTest
     public void testValidSessionWarmup() {
         mClientManager.recordUidHasCalledWarmup(mUid);
-        mClientManager.newSession(mSession, mUid, null, null, null);
+        mClientManager.newSession(mSession, mUid, null, null, null, null);
         Assert.assertEquals(
                 ClientManager.CalledWarmup.SESSION_WARMUP, mClientManager.getWarmupState(mSession));
     }
@@ -193,12 +195,12 @@ public class ClientManagerTest {
     @SmallTest
     public void testValidSessionWarmupSeveralCalls() {
         mClientManager.recordUidHasCalledWarmup(mUid);
-        mClientManager.newSession(mSession, mUid, null, null, null);
+        mClientManager.newSession(mSession, mUid, null, null, null, null);
         Assert.assertEquals(
                 ClientManager.CalledWarmup.SESSION_WARMUP, mClientManager.getWarmupState(mSession));
 
         CustomTabsSessionToken token = CustomTabsSessionToken.createMockSessionTokenForTesting();
-        mClientManager.newSession(token, mUid, null, null, null);
+        mClientManager.newSession(token, mUid, null, null, null, null);
         Assert.assertEquals(
                 ClientManager.CalledWarmup.SESSION_WARMUP, mClientManager.getWarmupState(token));
     }
@@ -206,7 +208,7 @@ public class ClientManagerTest {
     @Test
     @SmallTest
     public void testPredictionOutcomeSuccess() {
-        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null));
+        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null, null));
         Assert.assertTrue(
                 mClientManager.updateStatsAndReturnWhetherAllowed(mSession, mUid, URL, false));
         Assert.assertEquals(ClientManager.PredictionStatus.GOOD,
@@ -216,7 +218,7 @@ public class ClientManagerTest {
     @Test
     @SmallTest
     public void testPredictionOutcomeNoPrediction() {
-        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null));
+        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.recordUidHasCalledWarmup(mUid);
         Assert.assertEquals(ClientManager.PredictionStatus.NONE,
                 mClientManager.getPredictionOutcome(mSession, URL));
@@ -225,7 +227,7 @@ public class ClientManagerTest {
     @Test
     @SmallTest
     public void testPredictionOutcomeBadPrediction() {
-        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null));
+        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null, null));
         Assert.assertTrue(
                 mClientManager.updateStatsAndReturnWhetherAllowed(mSession, mUid, URL, false));
         Assert.assertEquals(ClientManager.PredictionStatus.BAD,
@@ -235,7 +237,7 @@ public class ClientManagerTest {
     @Test
     @SmallTest
     public void testPredictionOutcomeIgnoreFragment() {
-        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null));
+        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null, null));
         Assert.assertTrue(
                 mClientManager.updateStatsAndReturnWhetherAllowed(mSession, mUid, URL, false));
         mClientManager.setIgnoreFragmentsForSession(mSession, true);
@@ -253,20 +255,20 @@ public class ClientManagerTest {
         PostMessageServiceConnection serviceConnection =
                 new PostMessageServiceConnection(mSession) {};
         Assert.assertTrue(cm.newSession(
-                mSession, mUid, null, MockPostMessageHandler.create(), serviceConnection));
+                mSession, mUid, null, MockPostMessageHandler.create(), serviceConnection, null));
         // Should always start with no origin.
         Assert.assertNull(cm.getPostMessageOriginForSessionForTesting(mSession));
 
         // With no prepopulated origins, this verification should fail.
         cm.verifyAndInitializeWithPostMessageOriginForSession(
-                mSession, Origin.create(URL), CustomTabsService.RELATION_USE_AS_ORIGIN);
+                mSession, Origin.create(URL), null, CustomTabsService.RELATION_USE_AS_ORIGIN);
         shadowOf(getMainLooper()).idle();
         Assert.assertNull(cm.getPostMessageOriginForSessionForTesting(mSession));
 
         // If there is a prepopulated origin, we should get a synchronous verification.
         addVerification(PACKAGE_NAME, Origin.create(URL), CustomTabsService.RELATION_USE_AS_ORIGIN);
         cm.verifyAndInitializeWithPostMessageOriginForSession(
-                mSession, Origin.create(URL), CustomTabsService.RELATION_USE_AS_ORIGIN);
+                mSession, Origin.create(URL), null, CustomTabsService.RELATION_USE_AS_ORIGIN);
         shadowOf(getMainLooper()).idle();
 
         Assert.assertNotNull(cm.getPostMessageOriginForSessionForTesting(mSession));
@@ -276,8 +278,9 @@ public class ClientManagerTest {
 
         // initializeWithPostMessageOriginForSession should override without checking
         // origin.
-        cm.initializeWithPostMessageOriginForSession(mSession, null);
+        cm.initializeWithPostMessageOriginForSession(mSession, null, null);
         Assert.assertNull(cm.getPostMessageOriginForSessionForTesting(mSession));
+        Assert.assertNull(cm.getPostMessageTargetOriginForSessionForTesting(mSession));
     }
 
     @Test
@@ -287,7 +290,7 @@ public class ClientManagerTest {
         PostMessageServiceConnection serviceConnection =
                 new PostMessageServiceConnection(mSession) {};
         Assert.assertTrue(cm.newSession(
-                mSession, mUid, null, MockPostMessageHandler.create(), serviceConnection));
+                mSession, mUid, null, MockPostMessageHandler.create(), serviceConnection, null));
 
         Origin origin = Origin.create(URL);
         when(mInstalledAppProviderWrapper.isAppInstalledAndAssociatedWithOrigin(any(), eq(origin)))
@@ -298,7 +301,7 @@ public class ClientManagerTest {
 
         // With no prepopulated origins, this verification should fail.
         cm.verifyAndInitializeWithPostMessageOriginForSession(
-                mSession, origin, CustomTabsService.RELATION_USE_AS_ORIGIN);
+                mSession, origin, null, CustomTabsService.RELATION_USE_AS_ORIGIN);
         Assert.assertNull(cm.getPostMessageOriginForSessionForTesting(mSession));
 
         // Prepopulated origins should depend on the relation used.
@@ -307,14 +310,14 @@ public class ClientManagerTest {
         Assert.assertFalse(cm.isFirstPartyOriginForSession(mSession, origin));
 
         cm.verifyAndInitializeWithPostMessageOriginForSession(
-                mSession, origin, CustomTabsService.RELATION_HANDLE_ALL_URLS);
+                mSession, origin, null, CustomTabsService.RELATION_HANDLE_ALL_URLS);
 
         //        TestThreadUtils.runOnUiThreadBlocking(() -> {
         Uri verifiedOrigin = cm.getPostMessageOriginForSessionForTesting(mSession);
         Assert.assertEquals(IntentUtils.ANDROID_APP_REFERRER_SCHEME, verifiedOrigin.getScheme());
         // initializeWithPostMessageOriginForSession should override without checking
         // origin.
-        cm.initializeWithPostMessageOriginForSession(mSession, null);
+        cm.initializeWithPostMessageOriginForSession(mSession, null, null);
         Assert.assertNull(cm.getPostMessageOriginForSessionForTesting(mSession));
         //        });
     }
@@ -322,7 +325,7 @@ public class ClientManagerTest {
     @Test
     @SmallTest
     public void testFirstLowConfidencePredictionIsNotThrottled() {
-        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null));
+        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null, null));
 
         // Two low confidence in a row is OK.
         Assert.assertTrue(
@@ -352,7 +355,7 @@ public class ClientManagerTest {
     @SmallTest
     public void testMayLaunchUrlAccounting() {
         String name = "CustomTabs.MayLaunchUrlType";
-        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null));
+        Assert.assertTrue(mClientManager.newSession(mSession, mUid, null, null, null, null));
 
         // No prediction;
         mClientManager.registerLaunch(mSession, URL);
@@ -402,12 +405,41 @@ public class ClientManagerTest {
 
     @Test
     @SmallTest
+    public void testPostMessageWithTargetOrigin() {
+        final ClientManager cm = mClientManager;
+
+        PostMessageServiceConnection serviceConnection =
+                new PostMessageServiceConnection(mSession) {};
+        Assert.assertTrue(cm.newSession(
+                mSession, mUid, null, MockPostMessageHandler.create(), serviceConnection, null));
+        // Should always start with no origin.
+        Assert.assertNull(cm.getPostMessageOriginForSessionForTesting(mSession));
+        Assert.assertNull(cm.getPostMessageTargetOriginForSessionForTesting(mSession));
+
+        // If there is a prepopulated origin, we should get a synchronous verification.
+        addVerification(PACKAGE_NAME, Origin.create(URL), CustomTabsService.RELATION_USE_AS_ORIGIN);
+        cm.verifyAndInitializeWithPostMessageOriginForSession(mSession, Origin.create(URL),
+                Origin.create(URL), CustomTabsService.RELATION_USE_AS_ORIGIN);
+        shadowOf(getMainLooper()).idle();
+
+        Assert.assertEquals(
+                URL, cm.getPostMessageTargetOriginForSessionForTesting(mSession).toString());
+
+        // initializeWithPostMessageOriginForSession should override without checking
+        // origin.
+        cm.initializeWithPostMessageOriginForSession(mSession, null, null);
+        Assert.assertNull(cm.getPostMessageOriginForSessionForTesting(mSession));
+        Assert.assertNull(cm.getPostMessageTargetOriginForSessionForTesting(mSession));
+    }
+
+    @Test
+    @SmallTest
     public void testLogConnectionClosedCTForeground() {
         String histogramName = "CustomTabs.SessionDisconnectStatus";
         ShadowSysUtils.sIsLowMemory = false;
 
         Assert.assertTrue("A new session should have been created.",
-                mClientManager.newSession(mSession, mUid, null, null, null));
+                mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.setCustomTabIsInForeground(mSession, true);
         mClientManager.dontKeepAliveForSession(mSession);
 
@@ -427,7 +459,7 @@ public class ClientManagerTest {
                 ApplicationProvider.getApplicationContext(), ChromeLauncherActivity.class));
 
         Assert.assertTrue("A new session should have been created.",
-                mClientManager.newSession(mSession, mUid, null, null, null));
+                mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.setCustomTabIsInForeground(mSession, true);
         mClientManager.keepAliveForSession(mSession, intent);
 
@@ -445,7 +477,7 @@ public class ClientManagerTest {
         ShadowSysUtils.sIsLowMemory = false;
 
         Assert.assertTrue("A new session should have been created.",
-                mClientManager.newSession(mSession, mUid, null, null, null));
+                mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.setCustomTabIsInForeground(mSession, false);
         mClientManager.dontKeepAliveForSession(mSession);
 
@@ -465,7 +497,7 @@ public class ClientManagerTest {
                 ApplicationProvider.getApplicationContext(), ChromeLauncherActivity.class));
 
         Assert.assertTrue("A new session should have been created.",
-                mClientManager.newSession(mSession, mUid, null, null, null));
+                mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.setCustomTabIsInForeground(mSession, false);
         mClientManager.keepAliveForSession(mSession, intent);
 
@@ -483,7 +515,7 @@ public class ClientManagerTest {
         ShadowSysUtils.sIsLowMemory = true;
 
         Assert.assertTrue("A new session should have been created.",
-                mClientManager.newSession(mSession, mUid, null, null, null));
+                mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.setCustomTabIsInForeground(mSession, true);
         mClientManager.dontKeepAliveForSession(mSession);
 
@@ -503,7 +535,7 @@ public class ClientManagerTest {
                 ApplicationProvider.getApplicationContext(), ChromeLauncherActivity.class));
 
         Assert.assertTrue("A new session should have been created.",
-                mClientManager.newSession(mSession, mUid, null, null, null));
+                mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.setCustomTabIsInForeground(mSession, true);
         mClientManager.keepAliveForSession(mSession, intent);
 
@@ -521,7 +553,7 @@ public class ClientManagerTest {
         ShadowSysUtils.sIsLowMemory = true;
 
         Assert.assertTrue("A new session should have been created.",
-                mClientManager.newSession(mSession, mUid, null, null, null));
+                mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.setCustomTabIsInForeground(mSession, false);
         mClientManager.dontKeepAliveForSession(mSession);
 
@@ -541,7 +573,7 @@ public class ClientManagerTest {
                 ApplicationProvider.getApplicationContext(), ChromeLauncherActivity.class));
 
         Assert.assertTrue("A new session should have been created.",
-                mClientManager.newSession(mSession, mUid, null, null, null));
+                mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.setCustomTabIsInForeground(mSession, false);
         mClientManager.keepAliveForSession(mSession, intent);
 
@@ -559,7 +591,7 @@ public class ClientManagerTest {
         ShadowSysUtils.sIsLowMemory = false;
 
         Assert.assertTrue("A new session should have been created.",
-                mClientManager.newSession(mSession, mUid, null, null, null));
+                mClientManager.newSession(mSession, mUid, null, null, null, null));
         mClientManager.setCustomTabIsInForeground(mSession, true);
         mClientManager.dontKeepAliveForSession(mSession);
 

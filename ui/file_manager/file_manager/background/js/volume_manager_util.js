@@ -5,7 +5,7 @@
 import {str, util} from '../../common/js/util.js';
 import {VolumeManagerCommon} from '../../common/js/volume_manager_types.js';
 import {VolumeInfo} from '../../externs/volume_info.js';
-import {addVolume} from '../../state/actions/volumes.js';
+import {addVolume} from '../../state/ducks/volumes.js';
 import {getStore} from '../../state/store.js';
 
 import {VolumeInfoImpl} from './volume_info_impl.js';
@@ -140,10 +140,12 @@ volumeManagerUtil.createVolumeInfo = async volumeMetadata => {
             volumeMetadata.vmType);
       })
       .then(async (volumeInfo) => {
-        if (util.isFilesAppExperimental()) {
-          await volumeInfo.resolveDisplayRoot();
+        // resolveDisplayRoot() is a promise, but instead of using await here,
+        // we just pass a onSuccess function to it, because we don't want to it
+        // to interfere the startup time.
+        volumeInfo.resolveDisplayRoot(() => {
           getStore().dispatch(addVolume({volumeMetadata, volumeInfo}));
-        }
+        });
         return volumeInfo;
       })
       .catch(

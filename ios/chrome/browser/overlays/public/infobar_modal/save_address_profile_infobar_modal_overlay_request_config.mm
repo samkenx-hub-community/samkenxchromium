@@ -12,10 +12,6 @@
 #import "ios/chrome/browser/overlays/public/common/infobars/infobar_overlay_request_config.h"
 #import "ios/chrome/browser/ui/autofill/autofill_ui_type_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace autofill_address_profile_infobar_overlays {
 
 OVERLAY_USER_DATA_SETUP_IMPL(SaveAddressProfileModalRequestConfig);
@@ -40,6 +36,11 @@ SaveAddressProfileModalRequestConfig::SaveAddressProfileModalRequestConfig(
   }
 
   current_address_profile_saved_ = infobar->accepted();
+  is_migration_to_account_ = delegate->IsMigrationToAccount();
+  user_email_ = delegate->UserAccountEmail();
+  is_profile_an_account_profile_ = delegate->IsProfileAnAccountProfile();
+  profile_description_for_migration_prompt_ =
+      delegate->GetProfileDescriptionForMigrationPrompt();
 }
 
 SaveAddressProfileModalRequestConfig::~SaveAddressProfileModalRequestConfig() =
@@ -75,6 +76,14 @@ NSDictionary* SaveAddressProfileModalRequestConfig::GetProfileInfo() {
                          numberWithInt:AutofillUITypeFromAutofillType(type)]];
   }
   return items;
+}
+
+const autofill::AutofillProfile*
+SaveAddressProfileModalRequestConfig::GetProfile() {
+  autofill::AutofillSaveUpdateAddressProfileDelegateIOS* delegate =
+      static_cast<autofill::AutofillSaveUpdateAddressProfileDelegateIOS*>(
+          infobar_->delegate());
+  return delegate->GetProfile();
 }
 
 void SaveAddressProfileModalRequestConfig::CreateAuxiliaryData(

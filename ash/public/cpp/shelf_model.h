@@ -10,6 +10,7 @@
 
 #include "ash/public/cpp/ash_public_export.h"
 #include "ash/public/cpp/shelf_item.h"
+#include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 
 class AppWindowShelfItemController;
@@ -48,7 +49,7 @@ class ASH_PUBLIC_EXPORT ShelfModel {
     }
 
    private:
-    ShelfModel* model_ = nullptr;
+    raw_ptr<ShelfModel, ExperimentalAsh> model_ = nullptr;
   };
 
   // Some classes in ash have the ability to insert an item into the ShelfModel,
@@ -164,8 +165,6 @@ class ASH_PUBLIC_EXPORT ShelfModel {
     return current_mutation_is_user_triggered_ > 0;
   }
 
-  bool in_shelf_party() const { return in_shelf_party_; }
-
   // Sets |shelf_id| to be the newly active shelf item.
   void SetActiveShelfID(const ShelfID& shelf_id);
 
@@ -180,8 +179,6 @@ class ASH_PUBLIC_EXPORT ShelfModel {
   // Notifies observers that an item that was dragged off the shelf has been
   // dragged back onto the shelf (it is still being dragged).
   void OnItemReturnedFromRipOff(int index);
-
-  void ToggleShelfParty();
 
   // Update the ShelfItem with |app_id| to set whether the item currently has a
   // notification.
@@ -238,7 +235,8 @@ class ASH_PUBLIC_EXPORT ShelfModel {
   ShelfItems items_;
 
   // This pointer must outlive this class.
-  ShelfItemFactory* shelf_item_factory_ = nullptr;
+  raw_ptr<ShelfItemFactory, DanglingUntriaged | ExperimentalAsh>
+      shelf_item_factory_ = nullptr;
 
   // The shelf ID of the currently active shelf item, or an empty ID if
   // nothing is active.
@@ -249,8 +247,6 @@ class ASH_PUBLIC_EXPORT ShelfModel {
   // is added once an app has been installed, it is not considered a direct
   // user interaction.
   int current_mutation_is_user_triggered_ = 0;
-
-  bool in_shelf_party_ = false;
 
   base::ObserverList<ShelfModelObserver>::Unchecked observers_;
 

@@ -50,15 +50,15 @@ class TestRenderViewContextMenu : public RenderViewContextMenu {
   // Use the constructor if you want to create menu with fine-grained params.
   static std::unique_ptr<TestRenderViewContextMenu> Create(
       content::WebContents* web_contents,
-      const GURL& page_url,
-      const GURL& link_url,
-      const GURL& frame_url);
+      const GURL& frame_url,
+      const GURL& link_url = GURL(),
+      bool is_subframe = false);
 
   static std::unique_ptr<TestRenderViewContextMenu> Create(
       content::RenderFrameHost* render_frame_host,
-      const GURL& page_url,
-      const GURL& link_url,
-      const GURL& frame_url);
+      const GURL& frame_url,
+      const GURL& link_url = GURL(),
+      bool is_subframe = false);
 
   // Returns true if the command specified by |command_id| is present
   // in the menu.
@@ -127,7 +127,8 @@ class TestRenderViewContextMenu : public RenderViewContextMenu {
   raw_ptr<Browser> browser_ = nullptr;
 
 #if BUILDFLAG(IS_CHROMEOS)
-  policy::DlpRulesManager* dlp_rules_manager_ = nullptr;
+  raw_ptr<policy::DlpRulesManager, ExperimentalAsh> dlp_rules_manager_ =
+      nullptr;
 #endif
 };
 

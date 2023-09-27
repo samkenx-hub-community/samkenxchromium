@@ -7,9 +7,14 @@
 
 #import <UIKit/UIKit.h>
 
+#import <set>
+
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_collection_commands.h"
 
 @class GridViewController;
+namespace web {
+class WebStateID;
+}  // namespace web
 
 // Commands issued to a model backing a grid UI.
 @protocol GridCommands <TabCollectionCommands>
@@ -20,19 +25,16 @@
 - (void)insertNewItemAtIndex:(NSUInteger)index;
 // Tells the receiver to select the item with identifier `itemID`. If there is
 // no item with that identifier, no change in selection should be made.
-- (BOOL)isItemWithIDSelected:(NSString*)itemID;
+- (BOOL)isItemWithIDSelected:(web::WebStateID)itemID;
 // Tells the receiver to move the item with identifier `itemID` to `index`. If
 // there is no item with that identifier, no move should be made. It is an error
 // to pass a value for `index` outside of the bounds of the items array.
-- (void)moveItemWithID:(NSString*)itemID toIndex:(NSUInteger)index;
+- (void)moveItemWithID:(web::WebStateID)itemID toIndex:(NSUInteger)index;
 // Tells the receiver to close the items with the identifiers in `itemIDs`.
 // ItemIDs which are not associated with any item are ignored.
-- (void)closeItemsWithIDs:(NSArray<NSString*>*)itemIDs;
+- (void)closeItemsWithIDs:(const std::set<web::WebStateID>&)itemIDs;
 // Tells the receiver to close all items.
 - (void)closeAllItems;
-// Tells the receiver to save all non-pinned items for an undo operation, then
-// close all items.
-- (void)saveAndCloseNonPinnedItems;
 // Tells the receiver to save all items for an undo operation, then close all
 // items.
 - (void)saveAndCloseAllItems;
@@ -44,21 +46,16 @@
 - (void)discardSavedClosedItems;
 // Shows an action sheet, anchored to the UIBarButtonItem, that asks for
 // confirmation when 'Close Items' button is tapped.
-- (void)
-    showCloseItemsConfirmationActionSheetWithItems:(NSArray<NSString*>*)items
-                                            anchor:
-                                                (UIBarButtonItem*)buttonAnchor;
-// Shows an action sheet, anchored to the UIBarButtonItem, that asks for
-// confirmation to close all or just non-pinned tabs when 'Close All Tabs'
-// button is tapped.
-- (void)showCloseAllItemsConfirmationActionSheetWithAnchor:
-    (UIBarButtonItem*)buttonAnchor;
+- (void)showCloseItemsConfirmationActionSheetWithItems:
+            (const std::set<web::WebStateID>&)itemIDs
+                                                anchor:(UIBarButtonItem*)
+                                                           buttonAnchor;
 // Shows a share sheet to share `items`, anchored to the `buttonAnchor`.
-- (void)shareItems:(NSArray<NSString*>*)items
+- (void)shareItems:(const std::set<web::WebStateID>&)itemIDs
             anchor:(UIBarButtonItem*)buttonAnchor;
 // Returns the menu to display when the Add To button is selected for `items`.
 - (NSArray<UIMenuElement*>*)addToButtonMenuElementsForItems:
-    (NSArray<NSString*>*)items;
+    (const std::set<web::WebStateID>&)itemIDs;
 
 // Tells the receiver to perform a search using `searchText` and update the list
 // of visible items based on the result.

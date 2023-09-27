@@ -10,8 +10,8 @@
 #include "base/strings/stringprintf.h"
 #include "base/time/time.h"
 #include "components/signin/public/identity_manager/access_token_info.h"
-#include "components/sync/driver/trusted_vault_histograms.h"
 #include "components/trusted_vault/trusted_vault_access_token_fetcher.h"
+#include "components/trusted_vault/trusted_vault_histograms.h"
 #include "components/trusted_vault/trusted_vault_server_constants.h"
 #include "google_apis/credentials_mode.h"
 #include "google_apis/gaia/core_account_id.h"
@@ -25,7 +25,7 @@
 #include "services/network/public/cpp/simple_url_loader.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
 
-namespace syncer {
+namespace trusted_vault {
 
 namespace {
 
@@ -61,29 +61,29 @@ net::NetworkTrafficAnnotationTag CreateTrafficAnnotationTag() {
   return net::DefineNetworkTrafficAnnotation("trusted_vault_request",
                                              R"(
       semantics {
-        sender: "Chrome Sync"
+        sender: "Trusted Vault Service"
         description:
           "Request to vault service in order to retrieve, change or support "
-          "future retrieval or change of Sync encryption keys."
+          "future retrieval or change of encryption keys for Chrome or "
+          "Chrome OS features (such as Chrome Sync)."
         trigger:
           "Periodically/upon certain non-user controlled events after user "
           "signs in Chrome profile."
         data:
-          "An OAuth2 access token, sync metadata associated with encryption "
-          "keys: encrypted encryption keys, public counterpart of encryption "
-          "keys."
+          "An OAuth2 access token, metadata associated with encryption keys: "
+          "encrypted encryption keys, public counterpart of encryption keys."
         destination: GOOGLE_OWNED_SERVICE
       }
       policy {
         cookies_allowed: NO
         setting:
-          "Users can disable Chrome Sync by going into the profile settings "
-          "and choosing to sign out."
+          "This feature cannot be disabled in settings, but if user signs "
+          "out of Chrome, this request would not be made."
         chrome_policy {
-            SyncDisabled {
-               policy_options {mode: MANDATORY}
-               SyncDisabled: false
-            }
+          SigninAllowed {
+            policy_options {mode: MANDATORY}
+            SigninAllowed: false
+          }
         }
       })");
 }
@@ -189,9 +189,9 @@ void TrustedVaultRequest::OnURLLoadComplete(
     http_response_code = url_loader_->ResponseInfo()->headers->response_code();
   }
 
-  RecordTrustedVaultURLFetchResponse(/*http_response_code=*/http_response_code,
-                                     /*net_error=*/url_loader_->NetError(),
-                                     reason_for_uma_);
+  RecordTrustedVaultURLFetchResponse(
+      /*http_response_code=*/http_response_code,
+      /*net_error=*/url_loader_->NetError(), reason_for_uma_);
 
   std::string response_content = response_body ? *response_body : std::string();
   if (http_response_code == 0) {
@@ -289,4 +289,4 @@ void TrustedVaultRequest::RunCompletionCallbackAndMaybeDestroySelf(
   std::move(completion_callback_).Run(status, response_body);
 }
 
-}  // namespace syncer
+}  // namespace trusted_vault

@@ -12,9 +12,10 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.After;
@@ -34,6 +35,7 @@ import org.chromium.base.task.TaskTraits;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
+import org.chromium.base.test.util.DisabledTest;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.app.metrics.LaunchCauseMetrics;
@@ -51,7 +53,7 @@ import org.chromium.chrome.browser.tab.TabObserver;
 import org.chromium.chrome.browser.tab.TabTestUtils;
 import org.chromium.chrome.browser.theme.TopUiThemeColorProvider;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.chrome.test.util.browser.LocationSettingsTestUtil;
 import org.chromium.content_public.browser.test.util.DOMUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
@@ -108,11 +110,6 @@ public class TabReparentingTest {
     @After
     public void tearDown() {
         TestThreadUtils.runOnUiThreadBlocking(() -> FirstRunStatus.setFirstRunFlowComplete(false));
-
-        if (mTestServer != null) {
-            mTestServer.stopAndDestroyServer();
-            mTestServer = null;
-        }
     }
 
     private CustomTabActivity getActivity() {
@@ -124,7 +121,7 @@ public class TabReparentingTest {
      */
     private Intent createMinimalCustomTabIntent() {
         return CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
-                InstrumentationRegistry.getTargetContext(), mTestPage);
+                ApplicationProvider.getApplicationContext(), mTestPage);
     }
 
     private ChromeActivity reparentAndVerifyTab() {
@@ -141,8 +138,7 @@ public class TabReparentingTest {
         };
         TestThreadUtils.runOnUiThreadBlocking(() -> tabToBeReparented.addObserver(observer));
         PostTask.postTask(TaskTraits.UI_DEFAULT, () -> {
-            getActivity().getComponent().resolveNavigationController().openCurrentUrlInBrowser(
-                    true);
+            getActivity().getComponent().resolveNavigationController().openCurrentUrlInBrowser();
             assertNull(getActivity().getActivityTab());
         });
         // Use the extended CriteriaHelper timeout to make sure we get an activity
@@ -182,6 +178,7 @@ public class TabReparentingTest {
      */
     @Test
     @SmallTest
+    @DisabledTest(message = "crbug.com/1434800")
     public void testTabReparentingBasic() {
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(createMinimalCustomTabIntent());
         assertEquals(1,
@@ -200,12 +197,12 @@ public class TabReparentingTest {
      */
     @Test
     @SmallTest
-    @Features.DisableFeatures({ChromeFeatureList.MESSAGES_FOR_ANDROID_INFRASTRUCTURE})
+    @DisableFeatures({ChromeFeatureList.MESSAGES_FOR_ANDROID_INFRASTRUCTURE})
     public void testTabReparentingInfoBar() {
         LocationSettingsTestUtil.setSystemLocationSettingEnabled(true);
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(
                 CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
-                        InstrumentationRegistry.getTargetContext(),
+                        ApplicationProvider.getApplicationContext(),
                         mTestServer.getURL(POPUP_PAGE)));
         CriteriaHelper.pollUiThread(
                 () -> isInfoBarSizeOne(mCustomTabActivityTestRule.getActivity().getActivityTab()));
@@ -231,7 +228,7 @@ public class TabReparentingTest {
         LocationSettingsTestUtil.setSystemLocationSettingEnabled(true);
         mCustomTabActivityTestRule.startCustomTabActivityWithIntent(
                 CustomTabsIntentTestUtils.createMinimalCustomTabIntent(
-                        InstrumentationRegistry.getTargetContext(),
+                        ApplicationProvider.getApplicationContext(),
                         mTestServer.getURL(SELECT_POPUP_PAGE)));
         CriteriaHelper.pollUiThread(() -> {
             Tab currentTab = mCustomTabActivityTestRule.getActivity().getActivityTab();

@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "base/strings/abseil_string_conversions.h"
 #include "base/strings/escape.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -15,6 +14,7 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/time/time.h"
+#include "net/base/features.h"
 #include "net/base/load_flags.h"
 #include "net/base/url_util.h"
 #include "net/http/http_request_headers.h"
@@ -22,10 +22,19 @@
 #include "net/http/http_response_headers.h"
 #include "net/http/http_response_info.h"
 #include "net/http/http_util.h"
+#include "net/quic/quic_http_utils.h"
+#include "net/third_party/quiche/src/quiche/quic/core/quic_stream_priority.h"
 
 namespace net {
 
+const char* const kHttp2PriorityHeader = "priority";
+
 namespace {
+
+// The number of bytes to reserve for the raw headers string to avoid having to
+// do reallocations most of the time. Equal to the 99th percentile of header
+// sizes in ricea@'s cache on 3 Aug 2023.
+constexpr size_t kExpectedRawHeaderSize = 4035;
 
 void AddSpdyHeader(const std::string& name,
                    const std::string& value,
@@ -48,11 +57,15 @@ int SpdyHeadersToHttpResponse(const spdy::Http2HeaderBlock& headers,
   if (it == headers.end())
     return ERR_INCOMPLETE_HTTP2_HEADERS;
 
-  const auto status = base::StringViewToStringPiece(it->second);
+  const auto status = it->second;
+
+  // TODO(ricea): Add a constructor to HttpResponseHeaders like (HttpVersion,
+  // int response_code, std::span<const std::pair<std::string_view,
+  // std::string_view>>) so that this function can be made efficient.
   std::string raw_headers =
       base::StrCat({"HTTP/1.1 ", status, base::StringPiece("\0", 1)});
-  for (it = headers.begin(); it != headers.end(); ++it) {
-    const auto name = base::StringViewToStringPiece(it->first);
+  raw_headers.reserve(kExpectedRawHeaderSize);
+  for (const auto& [name, value] : headers) {
     DCHECK_GT(name.size(), 0u);
     if (name[0] == ':') {
       // https://tools.ietf.org/html/rfc7540#section-8.1.2.4
@@ -67,7 +80,6 @@ int SpdyHeadersToHttpResponse(const spdy::Http2HeaderBlock& headers,
     // becomes
     //    Set-Cookie: foo\0
     //    Set-Cookie: bar\0
-    const auto value = base::StringViewToStringPiece(it->second);
     size_t start = 0;
     size_t end = 0;
     do {
@@ -97,6 +109,7 @@ int SpdyHeadersToHttpResponse(const spdy::Http2HeaderBlock& headers,
 }
 
 void CreateSpdyHeadersFromHttpRequest(const HttpRequestInfo& info,
+                                      absl::optional<RequestPriority> priority,
                                       const HttpRequestHeaders& request_headers,
                                       spdy::Http2HeaderBlock* headers) {
   (*headers)[spdy::kHttp2MethodHeader] = info.method;
@@ -117,6 +130,19 @@ void CreateSpdyHeadersFromHttpRequest(const HttpRequestInfo& info,
       continue;
     }
     AddSpdyHeader(name, it.value(), headers);
+  }
+
+  // Add the priority header if there is not already one set. This uses the
+  // quic helpers but the header values for HTTP extensible priorities are
+  // independent of quic.
+  if (priority &&
+      base::FeatureList::IsEnabled(net::features::kPriorityHeader) &&
+      headers->find(kHttp2PriorityHeader) == headers->end()) {
+    uint8_t urgency = ConvertRequestPriorityToQuicPriority(priority.value());
+    bool incremental = info.priority_incremental;
+    quic::HttpStreamPriority quic_priority{urgency, incremental};
+    AddSpdyHeader(kHttp2PriorityHeader,
+                  quic::SerializePriorityFieldValue(quic_priority), headers);
   }
 }
 
@@ -167,13 +193,12 @@ NET_EXPORT_PRIVATE void ConvertHeaderBlockToHttpRequestHeaders(
     const spdy::Http2HeaderBlock& spdy_headers,
     HttpRequestHeaders* http_headers) {
   for (const auto& it : spdy_headers) {
-    base::StringPiece key = base::StringViewToStringPiece(it.first);
+    base::StringPiece key = it.first;
     if (key[0] == ':') {
       key.remove_prefix(1);
     }
-    std::vector<base::StringPiece> values =
-        base::SplitStringPiece(base::StringViewToStringPiece(it.second), "\0",
-                               base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
+    std::vector<base::StringPiece> values = base::SplitStringPiece(
+        it.second, "\0", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
     for (const auto& value : values) {
       http_headers->SetHeader(key, value);
     }

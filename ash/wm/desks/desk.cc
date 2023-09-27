@@ -4,6 +4,7 @@
 
 #include "ash/wm/desks/desk.h"
 
+#include <absl/cleanup/cleanup.h>
 #include <utility>
 
 #include "ash/constants/app_types.h"
@@ -31,6 +32,7 @@
 #include "base/ranges/algorithm.h"
 #include "base/strings/stringprintf.h"
 #include "chromeos/ui/wm/features.h"
+#include "components/app_restore/full_restore_utils.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window_tracker.h"
 #include "ui/compositor/layer.h"
@@ -236,8 +238,8 @@ class DeskContainerObserver : public aura::WindowObserver {
   }
 
  private:
-  Desk* const owner_;
-  aura::Window* const container_;
+  const raw_ptr<Desk, ExperimentalAsh> owner_;
+  const raw_ptr<aura::Window, ExperimentalAsh> container_;
 };
 
 // -----------------------------------------------------------------------------
@@ -279,7 +281,7 @@ Desk::ScopedContentUpdateNotificationDisabler::
 // Desk:
 
 Desk::Desk(int associated_container_id, bool desk_being_restored)
-    : uuid_(base::GUID::GenerateRandomV4()),
+    : uuid_(base::Uuid::GenerateRandomV4()),
       container_id_(associated_container_id),
       creation_time_(base::Time::Now()) {
   // For the very first default desk added during initialization, there won't be
@@ -355,6 +357,10 @@ void Desk::OnRootWindowClosing(aura::Window* root) {
       base::Erase(windows_, window);
   }
 
+  if (last_active_root_ == root) {
+    last_active_root_ = nullptr;
+  }
+
   all_desk_window_stacking_.erase(root);
 }
 
@@ -369,6 +375,11 @@ void Desk::AddWindowToDesk(aura::Window* window) {
     aura::Window* root = window->GetRootWindow();
     auto& adw_data = all_desk_window_stacking_[root];
 
+    // Update `last_active_root_` in case it has changed.
+    if (!is_active_ && last_active_root_ != root) {
+      last_active_root_ = root;
+    }
+
     // Find z-order of the added window.
     auto* container = GetDeskContainerForRoot(root);
     if (auto order =
@@ -380,6 +391,10 @@ void Desk::AddWindowToDesk(aura::Window* window) {
           ++adw.order;
       }
     }
+  } else if (HasAllDeskWindowDataOnOtherRoot(window)) {
+    // This indicates that the window has moved to a new root. We will notify
+    // the controller about this and it will in turn notify all desks.
+    DesksController::Get()->NotifyAllDeskWindowMovedToNewRoot(window);
   }
 
   windows_.push_back(window);
@@ -395,8 +410,21 @@ void Desk::AddWindowToDesk(aura::Window* window) {
   auto* desks_controller = DesksController::Get();
   if (!is_desk_being_removed_ &&
       !desks_util::IsWindowVisibleOnAllWorkspaces(window)) {
-    window->SetProperty(aura::client::kWindowWorkspaceKey,
-                        desks_controller->GetDeskIndex(this));
+    // Setting the property for `kWindowWorkspaceKey` or
+    // `kDeskUuidKey` will trigger a save for the window state. To
+    // avoid doing this twice, we tell the window state to hold off on saving
+    // until we save the `kDeskUuidKey` value.
+    // TODO(b/265490703): We should eventually clean up this and
+    // `GetScopedIgnorePropertyChange` when unit tests no longer need this
+    // scoping to prevent double saves.
+    {
+      auto scoped_ignore_property_changes =
+          WindowState::Get(window)->GetScopedIgnorePropertyChange();
+      window->SetProperty(aura::client::kWindowWorkspaceKey,
+                          desks_controller->GetDeskIndex(this));
+    }
+
+    window->SetProperty(aura::client::kDeskUuidKey, uuid_.AsLowercaseString());
   }
 
   MaybeIncrementWeeklyActiveDesks();
@@ -467,7 +495,7 @@ void Desk::SetName(std::u16string new_name, bool set_by_user) {
   DesksController::Get()->NotifyDeskNameChanged(this, name_);
 }
 
-void Desk::SetGuid(base::GUID new_guid) {
+void Desk::SetGuid(base::Uuid new_guid) {
   if (new_guid.is_valid()) {
     uuid_ = std::move(new_guid);
   }
@@ -499,6 +527,10 @@ void Desk::PrepareForActivationAnimation() {
 void Desk::Activate(bool update_window_activation) {
   DCHECK(!is_active_);
 
+  absl::Cleanup last_active_root_reset = [this] {
+    last_active_root_ = nullptr;
+  };
+
   if (!MaybeResetContainersOpacities()) {
     for (aura::Window* root : Shell::GetAllRootWindows())
       root->GetChildById(container_id_)->Show();
@@ -528,13 +560,18 @@ void Desk::Activate(bool update_window_activation) {
   auto mru_window_list =
       Shell::Get()->mru_window_tracker()->BuildMruWindowList(kActiveDesk);
 
-  // If there's an adw window that has order=0 (should be on top), then we'll
-  // find it first and activate it. We use the MRU list here so that in the
-  // case that there are multiple roots that each have a topmost adw window,
-  // we'll activate the one most recently used.
+  // If there's an adw window that has order=0 (should be on top) and was on the
+  // last active root window, then we'll find it first and activate it. We use
+  // the MRU list here so that in the case that there are multiple roots that
+  // each have a topmost adw window, we'll activate the one most recently used.
   if (features::IsPerDeskZOrderEnabled()) {
     for (auto* window : mru_window_list) {
       aura::Window* root = window->GetRootWindow();
+
+      if (last_active_root_ != nullptr && last_active_root_ != root) {
+        continue;
+      }
+
       auto& adw_data = all_desk_window_stacking_[root];
 
       if (!adw_data.empty() && adw_data.front().window == window &&
@@ -830,6 +867,9 @@ void Desk::BuildAllDeskStackingData() {
   // This function should not be invoked when this feature isn't enabled.
   DCHECK(features::IsPerDeskZOrderEnabled());
 
+  auto* active_window = window_util::GetActiveWindow();
+  last_active_root_ = active_window ? active_window->GetRootWindow() : nullptr;
+
   for (aura::Window* root : Shell::GetAllRootWindows()) {
     auto& adw_data = all_desk_window_stacking_[root];
     aura::Window* container = GetDeskContainerForRoot(root);
@@ -854,8 +894,9 @@ void Desk::RestackAllDeskWindows() {
 
   for (aura::Window* root : Shell::GetAllRootWindows()) {
     auto& adw_data = all_desk_window_stacking_[root];
-    if (adw_data.empty())
-      return;
+    if (adw_data.empty()) {
+      continue;
+    }
 
     aura::Window* container = GetDeskContainerForRoot(root);
 
@@ -885,6 +926,23 @@ void Desk::RestackAllDeskWindows() {
 
     for (auto& adw : adw_data) {
       DCHECK(adw.window);
+
+      if (adw.window->parent() != container) {
+        // TODO(b/295371112): Clean this up when the root cause has been
+        // resolved. When this function is called, `this` is going to be the
+        // active desk and it is expected that all all-desk windows have been
+        // moved to this desk. If this branch is taken, we have an ADW that is
+        // *not* on the current desk and we must not try to stack it.
+        SCOPED_CRASH_KEY_NUMBER(
+            "Restack", "adw_app_type",
+            adw.window->GetProperty(aura::client::kAppType));
+        SCOPED_CRASH_KEY_STRING32("Restack", "adw_app_id",
+                                  full_restore::GetAppId(adw.window));
+
+        base::debug::DumpWithoutCrashing();
+        continue;
+      }
+
       if (adw.order == 0) {
         container->StackChildAtTop(adw.window);
       } else if (aura::Window* stack_below =
@@ -898,23 +956,27 @@ void Desk::RestackAllDeskWindows() {
   }
 }
 
-void Desk::AddAllDeskWindow(aura::Window* window) {
-  DCHECK(features::IsPerDeskZOrderEnabled());
+void Desk::TrackAllDeskWindow(aura::Window* window) {
   aura::Window* root = window->GetRootWindow();
   auto& adw_data = all_desk_window_stacking_[root];
+
+  // Update `last_active_root_` in case it has changed.
+  if (!is_active_ && last_active_root_ != root) {
+    last_active_root_ = root;
+  }
 
   // Assume this window is going to be on top and bump remaining windows down.
   adw_data.insert(adw_data.begin(), {.window = window, .order = 0});
-  for (size_t i = 1; i != adw_data.size(); ++i)
+  for (size_t i = 1; i != adw_data.size(); ++i) {
     ++adw_data[i].order;
+  }
 }
 
-void Desk::RemoveAllDeskWindow(aura::Window* window) {
-  DCHECK(features::IsPerDeskZOrderEnabled());
-  aura::Window* root = window->GetRootWindow();
-  DCHECK(root);
+void Desk::UntrackAllDeskWindow(aura::Window* window,
+                                aura::Window* recent_root) {
+  CHECK(recent_root);
 
-  auto& adw_data = all_desk_window_stacking_[root];
+  auto& adw_data = all_desk_window_stacking_[recent_root];
   auto it =
       base::ranges::find(adw_data, window, &AllDeskWindowStackingData::window);
   if (it == adw_data.end()) {
@@ -924,10 +986,35 @@ void Desk::RemoveAllDeskWindow(aura::Window* window) {
     return;
   }
 
+  // Reset `last_active_root_` if the adw being removed was the mru window.
+  if (!is_active_ && recent_root == last_active_root_ && it->order == 0) {
+    last_active_root_ = nullptr;
+  }
+
   it = adw_data.erase(it);
   // Raise all remaining windows up.
-  for (; it != adw_data.end(); ++it)
+  for (; it != adw_data.end(); ++it) {
     --it->order;
+  }
+}
+
+void Desk::AllDeskWindowMovedToNewRoot(aura::Window* window) {
+  // `window` has been moved to a new root, so `all_desk_window_stacking_` will
+  // need to be updated.
+  for (const auto& [root, adw_vec] : all_desk_window_stacking_) {
+    for (const auto& adw : adw_vec) {
+      if (adw.window == window) {
+        UntrackAllDeskWindow(window, /*recent_root=*/root);
+        TrackAllDeskWindow(window);
+
+        // Note: Both functions above will manipulate ADW data, so it is
+        // imperative that we end the iteration here.
+        return;
+      }
+    }
+  }
+
+  NOTREACHED();
 }
 
 bool Desk::ContentUpdateNotificationSuspended() const {
@@ -1000,6 +1087,26 @@ void Desk::ResumeContentUpdateNotification(bool notify_when_fully_resumed) {
       notify_when_fully_resumed) {
     NotifyContentChanged();
   }
+}
+
+bool Desk::HasAllDeskWindowDataOnOtherRoot(aura::Window* window) const {
+  if (!desks_util::IsWindowVisibleOnAllWorkspaces(window) ||
+      !features::IsPerDeskZOrderEnabled()) {
+    return false;
+  }
+
+  aura::Window* current_root = window->GetRootWindow();
+  for (const auto& [root, adw_vec] : all_desk_window_stacking_) {
+    if (root != current_root) {
+      for (const auto& adw : adw_vec) {
+        if (adw.window == window) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 }  // namespace ash

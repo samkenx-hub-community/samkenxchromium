@@ -5,12 +5,19 @@
 #ifndef CHROME_BROWSER_PICTURE_IN_PICTURE_PICTURE_IN_PICTURE_WINDOW_MANAGER_H_
 #define CHROME_BROWSER_PICTURE_IN_PICTURE_PICTURE_IN_PICTURE_WINDOW_MANAGER_H_
 
+#include <vector>
+
 #include "base/memory/raw_ptr.h"
 #include "base/memory/singleton.h"
+#include "base/observer_list.h"
+#include "base/observer_list_types.h"
 #include "build/build_config.h"
+#include "chrome/browser/picture_in_picture/auto_pip_setting_overlay_view.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/mojom/picture_in_picture_window_options/picture_in_picture_window_options.mojom.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/views/bubble/bubble_border.h"
+#include "url/origin.h"
 
 namespace content {
 enum class PictureInPictureResult;
@@ -22,12 +29,26 @@ namespace display {
 class Display;
 }  // namespace display
 
+#if !BUILDFLAG(IS_ANDROID)
+class AutoPipSettingHelper;
+
+namespace views {
+class View;
+}  // namespace views
+#endif
+
 // PictureInPictureWindowManager is a singleton that handles the lifetime of the
 // current Picture-in-Picture window and its PictureInPictureWindowController.
 // The class also guarantees that only one window will be present per Chrome
 // instances regardless of the number of windows, tabs, profiles, etc.
 class PictureInPictureWindowManager {
  public:
+  // Observer for PictureInPictureWindowManager events.
+  class Observer : public base::CheckedObserver {
+   public:
+    virtual void OnEnterPictureInPicture() {}
+  };
+
   // Returns the singleton instance.
   static PictureInPictureWindowManager* GetInstance();
 
@@ -62,7 +83,10 @@ class PictureInPictureWindowManager {
   void EnterPictureInPictureWithController(
       content::PictureInPictureWindowController* pip_window_controller);
 
-  void ExitPictureInPicture();
+  // Closes any existing picture-in-picture windows (video or document pip).
+  // Returns true if a picture-in-picture window was closed, and false if there
+  // were no picture-in-picture windows to close.
+  bool ExitPictureInPicture();
 
   // Called to notify that the initiator web contents should be focused.
   void FocusInitiator();
@@ -82,16 +106,61 @@ class PictureInPictureWindowManager {
   // picture-in-picture if either of them is present.
   absl::optional<gfx::Rect> GetPictureInPictureWindowBounds() const;
 
-  // Used for Document picture-in-picture windows only.
-  static gfx::Rect CalculateInitialPictureInPictureWindowBounds(
+  // Used for Document picture-in-picture windows only. The returned dimensions
+  // represent the outer window bounds.
+  // This method is called from the |BrowserNavigator|. Note that the window
+  // bounds may be later re-adjusted by the |PictureInPictureBrowserFrameView|
+  // to accommodate non-client view elements, while respecting the minimum inner
+  // window size.
+  gfx::Rect CalculateInitialPictureInPictureWindowBounds(
       const blink::mojom::PictureInPictureWindowOptions& pip_options,
       const display::Display& display);
 
+  // Used for Document picture-in-picture windows only. The returned dimensions
+  // represent the outer window bounds.
+  // This method is called from |PictureInPictureBrowserFrameView|. Picture in
+  // picture window bounds are only adjusted when, the requested window size
+  // would cause the minimum inner window size to be smaller than the allowed
+  // minimum (|GetMinimumInnerWindowSize|).
+  gfx::Rect AdjustPictureInPictureWindowBounds(
+      const blink::mojom::PictureInPictureWindowOptions& pip_options,
+      const display::Display& display,
+      const gfx::Size& minimum_window_size);
+
+  // Update the most recent window bounds for the pip window in the cache.  Call
+  // this when the pip window moves or resizes, though it's okay if not every
+  // update makes it here.
+  void UpdateCachedBounds(const gfx::Rect& most_recent_bounds);
+
   // Used for Document picture-in-picture windows only.
-  static gfx::Size GetMinimumWindowSize();
+  // Note that this is meant to represent the inner window bounds. When the pip
+  // window is drawn, outer bounds may be greater than kMinWindowSize to
+  // accommodate window decorations and ensure the inner bound minimum size
+  // respects kMinWindowSize.
+  static gfx::Size GetMinimumInnerWindowSize();
 
   // Used for Document picture-in-picture windows only.
   static gfx::Size GetMaximumWindowSize(const display::Display& display);
+
+  void AddObserver(Observer* observer) { observers_.AddObserver(observer); }
+  void RemoveObserver(Observer* observer) {
+    observers_.RemoveObserver(observer);
+  }
+
+#if !BUILDFLAG(IS_ANDROID)
+  std::unique_ptr<AutoPipSettingOverlayView> GetOverlayView(
+      const gfx::Rect& browser_view_overridden_bounds,
+      views::View* anchor_view,
+      views::BubbleBorder::Arrow arrow);
+#endif
+
+  // Get the origins for initiators of active Picture-in-Picture sessions.
+  // Always returns an empty vector for Document Picture-in-Picture sessions.
+  // For Video picture-in-picture sessions, the maximum size of the vector
+  // will be 1, because only one window can be present per Chrome instances.
+  // See spec for detailed information:
+  // https://www.w3.org/TR/picture-in-picture/#defines
+  std::vector<url::Origin> GetActiveSessionOrigins();
 
  private:
   friend struct base::DefaultSingletonTraits<PictureInPictureWindowManager>;
@@ -99,6 +168,13 @@ class PictureInPictureWindowManager {
 #if !BUILDFLAG(IS_ANDROID)
   class DocumentWebContentsObserver;
 #endif  // !BUILDFLAG(IS_ANDROID)
+
+  // Helper method Used to calculate the outer window bounds for Document
+  // picture-in-picture windows only.
+  gfx::Rect CalculatePictureInPictureWindowBounds(
+      const blink::mojom::PictureInPictureWindowOptions& pip_options,
+      const display::Display& display,
+      const gfx::Size& minimum_outer_window_size);
 
   // Create a Picture-in-Picture window and register it in order to be closed
   // when needed.
@@ -111,17 +187,34 @@ class PictureInPictureWindowManager {
   // This is suffixed with "Internal" to keep consistency with the method above.
   void CloseWindowInternal();
 
+  template <typename Functor>
+  void NotifyObservers(const Functor& functor) {
+    for (Observer& observer : observers_) {
+      base::invoke(functor, observer);
+    }
+  }
+
 #if !BUILDFLAG(IS_ANDROID)
   // Called when the document PiP parent web contents is being destroyed.
   void DocumentWebContentsDestroyed();
 #endif  // !BUILDFLAG(IS_ANDROID)
 
+  // Exits picture in picture soon, but not before this call returns.  If
+  // picture in picture closes between now and then, that's okay.  Intended as a
+  // helper class for callbacks, to avoid re-entrant calls during pip set-up.
+  static void ExitPictureInPictureSoon();
+
   PictureInPictureWindowManager();
   ~PictureInPictureWindowManager();
+
+  // Observers that listen to updates of this instance.
+  base::ObserverList<Observer> observers_;
 
   std::unique_ptr<VideoWebContentsObserver> video_web_contents_observer_;
 #if !BUILDFLAG(IS_ANDROID)
   std::unique_ptr<DocumentWebContentsObserver> document_web_contents_observer_;
+
+  std::unique_ptr<AutoPipSettingHelper> auto_pip_setting_helper_;
 #endif  //! BUILDFLAG(IS_ANDROID)
 
   raw_ptr<content::PictureInPictureWindowController, DanglingUntriaged>

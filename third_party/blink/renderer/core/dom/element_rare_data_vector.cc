@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -14,7 +14,6 @@
 #include "third_party/blink/renderer/core/dom/css_toggle_map.h"
 #include "third_party/blink/renderer/core/dom/dataset_dom_string_map.h"
 #include "third_party/blink/renderer/core/dom/dom_token_list.h"
-#include "third_party/blink/renderer/core/dom/element_rare_data_base.h"
 #include "third_party/blink/renderer/core/dom/has_invalidation_flags.h"
 #include "third_party/blink/renderer/core/dom/named_node_map.h"
 #include "third_party/blink/renderer/core/dom/names_map.h"
@@ -28,7 +27,7 @@
 #include "third_party/blink/renderer/core/html/custom/element_internals.h"
 #include "third_party/blink/renderer/core/html/html_element.h"
 #include "third_party/blink/renderer/core/intersection_observer/element_intersection_observer_data.h"
-#include "third_party/blink/renderer/core/layout/anchor_scroll_data.h"
+#include "third_party/blink/renderer/core/layout/anchor_position_scroll_data.h"
 #include "third_party/blink/renderer/core/resize_observer/resize_observation.h"
 #include "third_party/blink/renderer/core/resize_observer/resize_observer.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_map.h"
@@ -37,7 +36,7 @@
 namespace blink {
 
 ElementRareDataVector::ElementRareDataVector(NodeData* node_layout_data)
-    : ElementRareDataBase(node_layout_data) {}
+    : NodeRareData(ClassType::kElementRareData, std::move(*node_layout_data)) {}
 
 ElementRareDataVector::~ElementRareDataVector() {
   DCHECK(!GetField(FieldId::kPseudoElementData));
@@ -312,11 +311,26 @@ const RegionCaptureCropId* ElementRareDataVector::GetRegionCaptureCropId()
 }
 void ElementRareDataVector::SetRegionCaptureCropId(
     std::unique_ptr<RegionCaptureCropId> crop_id) {
-  DCHECK(!GetRegionCaptureCropId());
-  DCHECK(crop_id);
-  DCHECK(!crop_id->value().is_zero());
+  CHECK(!GetRegionCaptureCropId());
+  CHECK(crop_id);
+  CHECK(!crop_id->value().is_zero());
   SetWrappedField<std::unique_ptr<RegionCaptureCropId>>(
       FieldId::kRegionCaptureCropId, std::move(crop_id));
+}
+
+const RestrictionTargetId* ElementRareDataVector::GetRestrictionTargetId()
+    const {
+  auto* value = GetWrappedField<std::unique_ptr<RestrictionTargetId>>(
+      FieldId::kRestrictionTargetId);
+  return value ? value->get() : nullptr;
+}
+void ElementRareDataVector::SetRestrictionTargetId(
+    std::unique_ptr<RestrictionTargetId> id) {
+  CHECK(!GetRestrictionTargetId());
+  CHECK(id);
+  CHECK(!id->value().is_zero());
+  SetWrappedField<std::unique_ptr<RestrictionTargetId>>(
+      FieldId::kRestrictionTargetId, std::move(id));
 }
 
 ElementRareDataVector::ResizeObserverDataMap*
@@ -340,12 +354,22 @@ CustomElementDefinition* ElementRareDataVector::GetCustomElementDefinition()
       GetField(FieldId::kCustomElementDefinition));
 }
 
-void ElementRareDataVector::SaveLastIntrinsicSize(ResizeObserverSize* size) {
-  SetField(FieldId::kLastIntrinsicSize, size);
+void ElementRareDataVector::SetLastRememberedBlockSize(
+    absl::optional<LayoutUnit> size) {
+  SetOptionalField(FieldId::kLastRememberedBlockSize, size);
 }
-const ResizeObserverSize* ElementRareDataVector::LastIntrinsicSize() const {
-  return static_cast<ResizeObserverSize*>(
-      GetField(FieldId::kLastIntrinsicSize));
+void ElementRareDataVector::SetLastRememberedInlineSize(
+    absl::optional<LayoutUnit> size) {
+  SetOptionalField(FieldId::kLastRememberedInlineSize, size);
+}
+
+absl::optional<LayoutUnit> ElementRareDataVector::LastRememberedBlockSize()
+    const {
+  return GetOptionalField<LayoutUnit>(FieldId::kLastRememberedBlockSize);
+}
+absl::optional<LayoutUnit> ElementRareDataVector::LastRememberedInlineSize()
+    const {
+  return GetOptionalField<LayoutUnit>(FieldId::kLastRememberedInlineSize);
 }
 
 PopoverData* ElementRareDataVector::GetPopoverData() const {
@@ -366,18 +390,20 @@ CSSToggleMap& ElementRareDataVector::EnsureToggleMap(Element* owner_element) {
   return EnsureField<CSSToggleMap>(FieldId::kToggleMap, owner_element);
 }
 
-AnchorScrollData* ElementRareDataVector::GetAnchorScrollData() const {
-  return static_cast<AnchorScrollData*>(GetField(FieldId::kAnchorScrollData));
+AnchorPositionScrollData* ElementRareDataVector::GetAnchorPositionScrollData()
+    const {
+  return static_cast<AnchorPositionScrollData*>(
+      GetField(FieldId::kAnchorPositionScrollData));
 }
-void ElementRareDataVector::RemoveAnchorScrollData() {
-  SetField(FieldId::kAnchorScrollData, nullptr);
+void ElementRareDataVector::RemoveAnchorPositionScrollData() {
+  SetField(FieldId::kAnchorPositionScrollData, nullptr);
 }
-AnchorScrollData& ElementRareDataVector::EnsureAnchorScrollData(
+AnchorPositionScrollData& ElementRareDataVector::EnsureAnchorPositionScrollData(
     Element* owner_element) {
-  DCHECK(!GetAnchorScrollData() ||
-         GetAnchorScrollData()->OwnerElement() == owner_element);
-  return EnsureField<AnchorScrollData>(FieldId::kAnchorScrollData,
-                                       owner_element);
+  DCHECK(!GetAnchorPositionScrollData() ||
+         GetAnchorPositionScrollData()->OwnerElement() == owner_element);
+  return EnsureField<AnchorPositionScrollData>(
+      FieldId::kAnchorPositionScrollData, owner_element);
 }
 
 AnchorElementObserver& ElementRareDataVector::EnsureAnchorElementObserver(
@@ -411,7 +437,6 @@ bool ElementRareDataVector::HasImplicitlyAnchoredElement() const {
 void ElementRareDataVector::Trace(blink::Visitor* visitor) const {
   visitor->Trace(fields_);
   NodeRareData::Trace(visitor);
-  ElementRareDataBase::Trace(visitor);
 }
 
 }  // namespace blink

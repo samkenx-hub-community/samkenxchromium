@@ -23,7 +23,7 @@
 #include "components/viz/host/host_frame_sink_manager.h"
 #include "content/browser/compositor/surface_utils.h"
 #include "content/browser/gpu/gpu_data_manager_impl.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/device_service.h"
 #include "gpu/command_buffer/common/capabilities.h"
 #include "media/base/video_types.h"
@@ -64,7 +64,7 @@ void BindWakeLockProvider(
   GetDeviceService().BindWakeLockProvider(std::move(receiver));
 }
 
-scoped_refptr<viz::ContextProvider> GetContextProvider() {
+scoped_refptr<viz::RasterContextProvider> GetContextProvider() {
 #if BUILDFLAG(IS_MAC) || defined(USE_AURA)
   auto* image_transport_factory = ImageTransportFactory::GetInstance();
   DCHECK(image_transport_factory);
@@ -74,7 +74,7 @@ scoped_refptr<viz::ContextProvider> GetContextProvider() {
     return nullptr;
   }
 
-  return ui_context_factory->SharedMainThreadContextProvider();
+  return ui_context_factory->SharedMainThreadRasterContextProvider();
 #else
   return nullptr;
 #endif
@@ -146,7 +146,7 @@ class ContextProviderObserver : viz::ContextLostObserver {
   const OnGpuCapabilitiesFetched on_gpu_capabilities_fetched_;
 
   // Context provider that was used to query the GPU capabilities. May be null.
-  scoped_refptr<viz::ContextProvider> context_provider_
+  scoped_refptr<viz::RasterContextProvider> context_provider_
       GUARDED_BY_CONTEXT(main_sequence_checker_);
 
   SEQUENCE_CHECKER(main_sequence_checker_);
@@ -182,6 +182,14 @@ bool FrameSinkVideoCaptureDevice::CanSupportNV12Format() const {
   // not support returning results in textures, and FrameSinkVideoCapturerImpl
   // does not support NV12 otherwise):
   if (gpu_data_manager->IsGpuCompositingDisabled()) {
+    return false;
+  }
+
+  // TODO(crbug.com/1452092): Disable zero-copy NV12 tab capture with Graphite
+  // until Dawn NV12 rendering is supported.
+  if (!gpu_data_manager->IsGpuFeatureInfoAvailable() ||
+      gpu_data_manager->GetFeatureStatus(gpu::GPU_FEATURE_TYPE_SKIA_GRAPHITE) ==
+          gpu::kGpuFeatureStatusEnabled) {
     return false;
   }
 

@@ -29,18 +29,15 @@
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile_manager.h"
 #include "components/performance_manager/public/features.h"
+#include "components/policy/core/common/policy_pref_names.h"
 #include "components/signin/public/base/signin_pref_names.h"
-#include "content/public/browser/native_web_keyboard_event.h"
+#include "content/public/common/input/native_web_keyboard_event.h"
 #include "ui/events/keycodes/dom/dom_code.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 
 class BrowserCommandControllerTest : public BrowserWithTestWindowTest {
  public:
   BrowserCommandControllerTest() = default;
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_{
-      performance_manager::features::kHighEfficiencyModeAvailable};
 };
 
 TEST_F(BrowserCommandControllerTest, IsReservedCommandOrKey) {
@@ -170,7 +167,6 @@ TEST_F(BrowserCommandControllerTest, IsReservedCommandOrKeyIsApp) {
 TEST_F(BrowserWithTestWindowTest, IncognitoCommands) {
   EXPECT_TRUE(chrome::IsCommandEnabled(browser(), IDC_OPTIONS));
   EXPECT_TRUE(chrome::IsCommandEnabled(browser(), IDC_IMPORT_SETTINGS));
-  EXPECT_TRUE(chrome::IsCommandEnabled(browser(), IDC_SHOW_SIGNIN));
   EXPECT_TRUE(chrome::IsCommandEnabled(browser(), IDC_PERFORMANCE));
 
   TestingProfile* testprofile = browser()->profile()->AsTestingProfile();
@@ -181,19 +177,17 @@ TEST_F(BrowserWithTestWindowTest, IncognitoCommands) {
           browser()->command_controller(), testprofile);
   EXPECT_TRUE(chrome::IsCommandEnabled(browser(), IDC_OPTIONS));
   EXPECT_FALSE(chrome::IsCommandEnabled(browser(), IDC_IMPORT_SETTINGS));
-  EXPECT_FALSE(chrome::IsCommandEnabled(browser(), IDC_SHOW_SIGNIN));
   EXPECT_FALSE(chrome::IsCommandEnabled(browser(), IDC_PERFORMANCE));
 
   testprofile->SetGuestSession(false);
   IncognitoModePrefs::SetAvailability(
       browser()->profile()->GetPrefs(),
-      IncognitoModePrefs::Availability::kForced);
+      policy::IncognitoModeAvailability::kForced);
   chrome::BrowserCommandController ::
       UpdateSharedCommandsForIncognitoAvailability(
           browser()->command_controller(), testprofile);
   EXPECT_FALSE(chrome::IsCommandEnabled(browser(), IDC_OPTIONS));
   EXPECT_FALSE(chrome::IsCommandEnabled(browser(), IDC_IMPORT_SETTINGS));
-  EXPECT_FALSE(chrome::IsCommandEnabled(browser(), IDC_SHOW_SIGNIN));
   EXPECT_FALSE(chrome::IsCommandEnabled(browser(), IDC_PERFORMANCE));
 }
 
@@ -385,7 +379,6 @@ TEST_F(BrowserCommandControllerFullscreenTest,
     { IDC_VIEW_PASSWORDS,          true,     false,     false,     false    },
     { IDC_ABOUT,                   true,     false,     false,     false    },
     { IDC_SHOW_APP_MENU,           true,     false,     false,     false    },
-    { IDC_SEND_TAB_TO_SELF,        true,     false,     false,     false    },
     { IDC_FULLSCREEN,              true,     false,     true,      true     },
     { IDC_CLOSE_TAB,               true,     true,      true,      false    },
     { IDC_CLOSE_WINDOW,            true,     true,      true,      false    },
@@ -396,7 +389,6 @@ TEST_F(BrowserCommandControllerFullscreenTest,
     { IDC_SELECT_PREVIOUS_TAB,     true,     true,      true,      false    },
     { IDC_EXIT,                    true,     true,      true,      true     },
     { IDC_SHOW_AS_TAB,             false,    false,     false,     false    },
-    { IDC_SHOW_SIGNIN,             true,     false,      true,      false   },
     // clang-format on
   };
   const content::NativeWebKeyboardEvent key_event(
@@ -483,7 +475,7 @@ TEST_F(BrowserWithTestWindowTest, OptionsConsistency) {
   // Setup forced incognito mode.
   IncognitoModePrefs::SetAvailability(
       browser()->profile()->GetPrefs(),
-      IncognitoModePrefs::Availability::kForced);
+      policy::IncognitoModeAvailability::kForced);
   EXPECT_TRUE(chrome::IsCommandEnabled(browser(), IDC_OPTIONS));
   // Enter fullscreen.
   browser()->command_controller()->FullscreenStateChanged();
@@ -495,43 +487,11 @@ TEST_F(BrowserWithTestWindowTest, OptionsConsistency) {
   // UpdateSharedCommandsForIncognitoAvailability() again.
   IncognitoModePrefs::SetAvailability(
       browser()->profile()->GetPrefs(),
-      IncognitoModePrefs::Availability::kDisabled);
+      policy::IncognitoModeAvailability::kDisabled);
   IncognitoModePrefs::SetAvailability(
       browser()->profile()->GetPrefs(),
-      IncognitoModePrefs::Availability::kForced);
+      policy::IncognitoModeAvailability::kForced);
   EXPECT_TRUE(chrome::IsCommandEnabled(browser(), IDC_OPTIONS));
-}
-
-TEST_F(BrowserCommandControllerTest, IncognitoModeOnSigninAllowedPrefChange) {
-  // Set up a profile with an off the record profile.
-  std::unique_ptr<TestingProfile> profile1 = TestingProfile::Builder().Build();
-  Profile* profile2 = profile1->GetPrimaryOTRProfile(/*create_if_needed=*/true);
-
-  EXPECT_EQ(profile2->GetOriginalProfile(), profile1.get());
-
-  // Create a new browser based on the off the record profile.
-  Browser::CreateParams profile_params(
-      profile1->GetPrimaryOTRProfile(/*create_if_needed=*/true), true);
-  std::unique_ptr<Browser> browser2(
-      CreateBrowserWithTestWindowForParams(profile_params));
-
-  chrome::BrowserCommandController command_controller(browser2.get());
-  const CommandUpdater* command_updater = &command_controller;
-
-  // Check that the SYNC_SETUP command is updated on preference change.
-  EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_SHOW_SIGNIN));
-  profile1->GetPrefs()->SetBoolean(prefs::kSigninAllowed, false);
-  EXPECT_FALSE(command_updater->IsCommandEnabled(IDC_SHOW_SIGNIN));
-}
-
-TEST_F(BrowserCommandControllerTest, OnSigninAllowedPrefChange) {
-  chrome::BrowserCommandController command_controller(browser());
-  const CommandUpdater* command_updater = &command_controller;
-
-  // Check that the SYNC_SETUP command is updated on preference change.
-  EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_SHOW_SIGNIN));
-  profile()->GetPrefs()->SetBoolean(prefs::kSigninAllowed, false);
-  EXPECT_FALSE(command_updater->IsCommandEnabled(IDC_SHOW_SIGNIN));
 }
 
 TEST_F(BrowserCommandControllerTest,

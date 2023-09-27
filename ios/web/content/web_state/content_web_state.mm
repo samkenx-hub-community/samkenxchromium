@@ -4,25 +4,33 @@
 
 #import "ios/web/content/web_state/content_web_state.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/strings/utf_string_conversions.h"
 #import "content/public/browser/navigation_entry.h"
 #import "content/public/browser/web_contents.h"
+#import "ios/web/content/content_browser_context.h"
 #import "ios/web/content/navigation/content_navigation_context.h"
+#import "ios/web/content/web_state/content_web_state_builder.h"
 #import "ios/web/content/web_state/crc_web_view_proxy_impl.h"
+#import "ios/web/content/web_state/crc_web_viewport_container_view.h"
 #import "ios/web/find_in_page/java_script_find_in_page_manager_impl.h"
 #import "ios/web/public/favicon/favicon_url.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/navigation/web_state_policy_decider.h"
+#import "ios/web/public/session/crw_navigation_item_storage.h"
+#import "ios/web/public/session/crw_session_storage.h"
+#import "ios/web/public/session/proto/metadata.pb.h"
+#import "ios/web/public/session/proto/storage.pb.h"
+#import "ios/web/public/web_state_delegate.h"
 #import "ios/web/public/web_state_observer.h"
 #import "ios/web/text_fragments/text_fragments_manager_impl.h"
 #import "net/cert/x509_util.h"
 #import "net/cert/x509_util_apple.h"
 #import "services/network/public/mojom/referrer_policy.mojom-shared.h"
+#import "skia/ext/skia_utils_ios.h"
 #import "third_party/blink/public/mojom/favicon/favicon_url.mojom.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "ui/display/display.h"
+#import "ui/display/screen.h"
 
 namespace web {
 
@@ -36,11 +44,10 @@ class DummySessionCertificatePolicyCache
   explicit DummySessionCertificatePolicyCache(BrowserState* browser_state)
       : SessionCertificatePolicyCache(browser_state) {}
 
-  void UpdateCertificatePolicyCache(
-      const scoped_refptr<web::CertificatePolicyCache>& cache) const override {}
+  void UpdateCertificatePolicyCache() const override {}
 
   void RegisterAllowedCertificate(
-      const scoped_refptr<net::X509Certificate> certificate,
+      const scoped_refptr<net::X509Certificate>& certificate,
       const std::string& host,
       net::CertStatus status) override {}
 };
@@ -61,37 +68,90 @@ FaviconURL::IconType IconTypeFromContentIconType(
   return FaviconURL::IconType::kInvalid;
 }
 
+// Creates a CRWSessionStorage instance from protobuf message.
+// TODO(crbug.com/1383087): remove when ContentWebState supports serialization
+// using protobuf message format directly.
+CRWSessionStorage* CreateSessionStorage(
+    WebStateID unique_identifier,
+    proto::WebStateMetadataStorage metadata,
+    WebState::WebStateStorageLoader storage_loader) {
+  // Load the data from disk as this is needed to create the CRWSessionStorage.
+  proto::WebStateStorage storage;
+  std::move(storage_loader).Run(storage);
+  *storage.mutable_metadata() = std::move(metadata);
+
+  CRWSessionStorage* session_storage =
+      [[CRWSessionStorage alloc] initWithProto:storage];
+  session_storage.stableIdentifier = [[NSUUID UUID] UUIDString];
+  session_storage.uniqueIdentifier = unique_identifier;
+  return session_storage;
+}
+
 }  // namespace
 
-ContentWebState::ContentWebState(const CreateParams& params) {
-  // TODO(crbug.com/1419001): initialize web_contents_ with
-  // WebContents::Create(...) when a BrowserContext is available.
-  WebContentsObserver::Observe(web_contents_.get());
-  content::NavigationController* controller = nullptr;
-  if (web_contents_) {
-    controller = &web_contents_->GetController();
+ContentWebState::ContentWebState(const CreateParams& params)
+    : ContentWebState(params, nil) {}
+
+ContentWebState::ContentWebState(const CreateParams& params,
+                                 CRWSessionStorage* session_storage)
+    : unique_identifier_(session_storage ? session_storage.uniqueIdentifier
+                                         : WebStateID::NewUnique()) {
+  content::BrowserContext* browser_context =
+      ContentBrowserContext::FromBrowserState(params.browser_state);
+  scoped_refptr<content::SiteInstance> site_instance;
+  content::WebContents::CreateParams createParams(browser_context,
+                                                  site_instance);
+  if (params.created_with_opener) {
+    ContentWebState* opener_web_state =
+        static_cast<ContentWebState*>(params.opener_web_state);
+    DCHECK(opener_web_state->child_web_contents_);
+    web_contents_ = std::move(opener_web_state->child_web_contents_);
+  } else {
+    web_contents_ = content::WebContents::Create(createParams);
   }
+  web_contents_->SetDelegate(this);
+  WebContentsObserver::Observe(web_contents_.get());
   certificate_policy_cache_ =
       std::make_unique<DummySessionCertificatePolicyCache>(
           params.browser_state);
   navigation_manager_ = std::make_unique<ContentNavigationManager>(
-      this, params.browser_state, controller);
-  web_frames_manager_ = std::make_unique<ContentWebFramesManager>();
+      this, params.browser_state, web_contents_->GetController());
+  web_frames_manager_ = std::make_unique<ContentWebFramesManager>(this);
 
-  web_view_ = [[UIScrollView alloc] init];
-  web_view_.translatesAutoresizingMaskIntoConstraints = NO;
-  web_view_.backgroundColor = UIColor.redColor;
+  UIScrollView* web_contents_view = base::apple::ObjCCastStrict<UIScrollView>(
+      web_contents_->GetNativeView().Get());
+
+  web_view_ = [[CRCWebViewportContainerView alloc] init];
+  // Comment this back in to show visual glitches that might be present.
+  // web_view_.backgroundColor = UIColor.redColor;
 
   CRCWebViewProxyImpl* proxy = [[CRCWebViewProxyImpl alloc] init];
-  proxy.contentView = web_view_;
+  proxy.contentView = web_contents_view;
   web_view_proxy_ = proxy;
+
+  [web_view_ addSubview:web_contents_view];
 
   // These should be moved when the are removed from CRWWebController.
   web::JavaScriptFindInPageManagerImpl::CreateForWebState(this);
   web::TextFragmentsManagerImpl::CreateForWebState(this);
 
-  UUID_ = [[NSUUID UUID] UUIDString];
+  session_storage_ = session_storage;
+  if (session_storage) {
+    UUID_ = [session_storage.stableIdentifier copy];
+  } else {
+    UUID_ = [[[NSUUID UUID] UUIDString] copy];
+  }
 }
+
+ContentWebState::ContentWebState(BrowserState* browser_state,
+                                 WebStateID unique_identifier,
+                                 proto::WebStateMetadataStorage metadata,
+                                 WebStateStorageLoader storage_loader,
+                                 NativeSessionFetcher session_fetcher)
+    : ContentWebState(CreateParams(browser_state),
+                      CreateSessionStorage(unique_identifier,
+                                           std::move(metadata),
+                                           std::move(storage_loader))) {}
 
 ContentWebState::~ContentWebState() {
   WebContentsObserver::Observe(nullptr);
@@ -106,17 +166,60 @@ ContentWebState::~ContentWebState() {
   }
 }
 
+content::WebContents* ContentWebState::GetWebContents() {
+  return web_contents_.get();
+}
+
+void ContentWebState::SerializeToProto(proto::WebStateStorage& storage) const {
+  // TODO(crbug.com/1383087): implement directly instead of serialising to
+  // CRWSessionStorage and then converting to protobuf message format.
+  DCHECK(IsRealized());
+  CRWSessionStorage* session_storage = BuildSessionStorage();
+  [session_storage serializeToProto:storage];
+}
+
 WebStateDelegate* ContentWebState::GetDelegate() {
   return nullptr;
 }
 
-void ContentWebState::SetDelegate(WebStateDelegate* delegate) {}
+std::unique_ptr<WebState> ContentWebState::Clone() const {
+  CreateParams params(GetBrowserState());
+  params.last_active_time = base::Time::Now();
+  CRWSessionStorage* session_storage = BuildSessionStorage();
+  session_storage.stableIdentifier = [[NSUUID UUID] UUIDString];
+  session_storage.uniqueIdentifier = WebStateID::NewUnique();
+  auto clone = std::make_unique<ContentWebState>(params, session_storage);
+  IgnoreOverRealizationCheck();
+  clone->ForceRealized();
+  return clone;
+}
+
+void ContentWebState::SetDelegate(WebStateDelegate* delegate) {
+  if (delegate == delegate_) {
+    return;
+  }
+  if (delegate_) {
+    delegate_->Detach(this);
+  }
+  delegate_ = delegate;
+  if (delegate_) {
+    delegate_->Attach(this);
+  }
+}
 
 bool ContentWebState::IsRealized() const {
-  return true;
+  return session_storage_ == nil;
 }
 
 WebState* ContentWebState::ForceRealized() {
+  if (session_storage_) {
+    ExtractContentSessionStorage(this, web_contents_->GetController(),
+                                 GetBrowserState(), session_storage_);
+    session_storage_ = nil;
+    for (auto& observer : observers_) {
+      observer.WebStateRealized(this);
+    }
+  }
   return this;
 }
 
@@ -142,9 +245,19 @@ base::Time ContentWebState::GetCreationTime() const {
   return base::Time::Now();
 }
 
-void ContentWebState::WasShown() {}
+void ContentWebState::WasShown() {
+  ForceRealized();
+  for (auto& observer : observers_) {
+    observer.WasShown(this);
+  }
+}
 
-void ContentWebState::WasHidden() {}
+void ContentWebState::WasHidden() {
+  ForceRealized();
+  for (auto& observer : observers_) {
+    observer.WasHidden(this);
+  }
+}
 
 void ContentWebState::SetKeepRenderProcessAlive(bool keep_alive) {}
 
@@ -153,7 +266,7 @@ BrowserState* ContentWebState::GetBrowserState() const {
 }
 
 base::WeakPtr<WebState> ContentWebState::GetWeakPtr() {
-  return nullptr;
+  return weak_factory_.GetWeakPtr();
 }
 
 void ContentWebState::OpenURL(const OpenURLParams& params) {}
@@ -189,8 +302,11 @@ ContentWebState::GetSessionCertificatePolicyCache() {
   return certificate_policy_cache_.get();
 }
 
-CRWSessionStorage* ContentWebState::BuildSessionStorage() {
-  return nil;
+CRWSessionStorage* ContentWebState::BuildSessionStorage() const {
+  if (session_storage_) {
+    return session_storage_;
+  }
+  return BuildContentSessionStorage(this, navigation_manager_.get());
 }
 
 void ContentWebState::LoadData(NSData* data,
@@ -203,6 +319,10 @@ NSString* ContentWebState::GetStableIdentifier() const {
   return UUID_;
 }
 
+WebStateID ContentWebState::GetUniqueIdentifier() const {
+  return unique_identifier_;
+}
+
 const std::string& ContentWebState::GetContentsMimeType() const {
   static std::string type = "text/html";
   return type;
@@ -213,16 +333,21 @@ bool ContentWebState::ContentIsHTML() const {
 }
 
 const std::u16string& ContentWebState::GetTitle() const {
-  static std::u16string title = u"";
-  return web_contents_ ? web_contents_->GetTitle() : title;
+  if (session_storage_) {
+    const NSUInteger index = session_storage_.lastCommittedItemIndex;
+    if (index > 0u && index <= session_storage_.itemStorages.count) {
+      return session_storage_.itemStorages[index].title;
+    }
+  }
+  return web_contents_->GetTitle();
 }
 
 bool ContentWebState::IsLoading() const {
-  return web_contents_ ? web_contents_->IsLoading() : false;
+  return session_storage_ ? false : web_contents_->IsLoading();
 }
 
 double ContentWebState::GetLoadingProgress() const {
-  return web_contents_ ? web_contents_->GetLoadProgress() : 0.0;
+  return session_storage_ ? 0.0 : web_contents_->GetLoadProgress();
 }
 
 bool ContentWebState::IsVisible() const {
@@ -258,6 +383,10 @@ void ContentWebState::SetFaviconStatus(const FaviconStatus& favicon_status) {
 }
 
 int ContentWebState::GetNavigationItemCount() const {
+  if (session_storage_) {
+    return session_storage_.itemStorages.count;
+  }
+
   return navigation_manager_->GetItemCount();
 }
 
@@ -271,12 +400,8 @@ const GURL& ContentWebState::GetLastCommittedURL() const {
   return item ? item->GetURL() : GURL::EmptyGURL();
 }
 
-GURL ContentWebState::GetCurrentURL(
-    URLVerificationTrustLevel* trust_level) const {
-  // TODO(crbug.com/1419001): Make sure that callers are using this correctly
-  // and that unexpected URLs are not displayed.
-  auto* item = navigation_manager_->GetLastCommittedItem();
-  return item ? item->GetURL() : GURL::EmptyGURL();
+absl::optional<GURL> ContentWebState::GetLastCommittedURLIfTrusted() const {
+  return GetLastCommittedURL();
 }
 
 WebFramesManager* ContentWebState::GetWebFramesManager(ContentWorld world) {
@@ -304,9 +429,6 @@ bool ContentWebState::SetSessionStateData(NSData* data) {
 NSData* ContentWebState::SessionStateData() {
   return nil;
 }
-
-void ContentWebState::SetSwipeRecognizerProvider(
-    id<CRWSwipeRecognizerProvider> delegate) {}
 
 PermissionState ContentWebState::GetStateForPermission(
     Permission permission) const {
@@ -341,6 +463,14 @@ id<CRWFindInteraction> ContentWebState::GetFindInteraction() {
 }
 
 id ContentWebState::GetActivityItem() {
+  return nil;
+}
+
+UIColor* ContentWebState::GetThemeColor() {
+  auto color = web_contents_->GetThemeColor();
+  if (color) {
+    return skia::UIColorFromSkColor(*color);
+  }
   return nil;
 }
 
@@ -480,6 +610,76 @@ void ContentWebState::PrimaryMainFrameRenderProcessGone(
   for (auto& observer : observers_) {
     observer.RenderProcessGone(this);
   }
+}
+
+void ContentWebState::AddNewContents(
+    content::WebContents* source,
+    std::unique_ptr<content::WebContents> new_contents,
+    const GURL& target_url,
+    WindowOpenDisposition disposition,
+    const blink::mojom::WindowFeatures& window_features,
+    bool user_gesture,
+    bool* was_blocked) {
+  // TODO: Add a constructor that takes the new_contents.
+  child_web_contents_ = std::move(new_contents);
+  delegate_->CreateNewWebState(this, target_url, GetLastCommittedURL(),
+                               user_gesture);
+  DCHECK(!child_web_contents_);
+}
+
+int ContentWebState::GetTopControlsHeight() {
+  return ([web_view_ maxViewportInsets].top -
+          [web_view_ minViewportInsets].top) *
+         display::Screen::GetScreen()
+             ->GetDisplayNearestWindow(web_contents_->GetTopLevelNativeWindow())
+             .device_scale_factor();
+}
+
+int ContentWebState::GetTopControlsMinHeight() {
+  return 0;
+}
+
+int ContentWebState::GetBottomControlsHeight() {
+  return ([web_view_ maxViewportInsets].bottom -
+          [web_view_ minViewportInsets].bottom) *
+         display::Screen::GetScreen()
+             ->GetDisplayNearestWindow(web_contents_->GetTopLevelNativeWindow())
+             .device_scale_factor();
+}
+
+int ContentWebState::GetBottomControlsMinHeight() {
+  return 0;
+}
+
+bool ContentWebState::ShouldAnimateBrowserControlsHeightChanges() {
+  return true;
+}
+
+bool ContentWebState::DoBrowserControlsShrinkRendererSize(
+    content::WebContents* web_contents) {
+  // We want to remain consistent while scroll is in progress because
+  // we only resize the WebContents at the end of a gesture.
+  if (top_control_scroll_in_progress_) {
+    return cached_shrink_controls_;
+  }
+  UIScrollView* web_contents_view = base::apple::ObjCCastStrict<UIScrollView>(
+      web_contents->GetNativeView().Get());
+  if (web_contents_view.contentInset.top > [web_view_ minViewportInsets].top) {
+    return true;
+  }
+  return false;
+}
+
+bool ContentWebState::OnlyExpandTopControlsAtPageTop() {
+  return false;
+}
+
+void ContentWebState::SetTopControlsGestureScrollInProgress(bool in_progress) {
+  if (in_progress) {
+    cached_shrink_controls_ =
+        DoBrowserControlsShrinkRendererSize(web_contents_.get());
+  }
+  top_control_scroll_in_progress_ = in_progress;
 }
 
 }  // namespace web

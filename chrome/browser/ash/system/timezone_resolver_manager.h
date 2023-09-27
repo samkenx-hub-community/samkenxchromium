@@ -5,6 +5,8 @@
 #ifndef CHROME_BROWSER_ASH_SYSTEM_TIMEZONE_RESOLVER_MANAGER_H_
 #define CHROME_BROWSER_ASH_SYSTEM_TIMEZONE_RESOLVER_MANAGER_H_
 
+#include "ash/public/cpp/session/session_observer.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "chromeos/ash/components/timezone/timezone_resolver.h"
@@ -46,14 +48,19 @@ class TimeZoneResolverManager : public TimeZoneResolver::Delegate {
   // This sets primary_user_prefs_.
   void SetPrimaryUserPrefs(PrefService* pref_service);
 
-  // TimeZoneResolver::Delegate overrides:
-  bool ShouldSendWiFiGeolocationData() override;
+  // TimeZoneResolver::Delegate:
+  bool ShouldSendWiFiGeolocationData() const override;
+  bool ShouldSendCellularGeolocationData() const override;
+  bool IsSystemGeolocationAllowed() const override;
 
-  // TimeZoneResolver::Delegate overrides:
-  bool ShouldSendCellularGeolocationData() override;
-
-  // Starts or stops TimezoneResolver according to currect settings.
+  // Starts or stops TimezoneResolver according to current settings.
   void UpdateTimezoneResolver();
+
+  // This class should respect the system geolocation permission. When the
+  // permission is disabled, no requests should be dispatched and no responses
+  // processed.
+  // Called from `ash::Preferences::ApplyPreferences()`.
+  void OnSystemGeolocationPermissionChanged(bool enabled);
 
   void AddObserver(Observer* observer);
   void RemoveObserver(Observer* observer);
@@ -100,7 +107,8 @@ class TimeZoneResolverManager : public TimeZoneResolver::Delegate {
   base::ObserverList<Observer>::Unchecked observers_;
 
   // This is non-null only after user logs in.
-  PrefService* primary_user_prefs_ = nullptr;
+  raw_ptr<PrefService, DanglingUntriaged | ExperimentalAsh>
+      primary_user_prefs_ = nullptr;
 
   // This is used to subscribe to policy preference.
   PrefChangeRegistrar local_state_pref_change_registrar_;

@@ -28,7 +28,6 @@
 #include "chrome/updater/util/util.h"
 #include "chrome/updater/util/win_util.h"
 #include "chrome/updater/win/setup/setup_util.h"
-#include "chrome/updater/win/task_scheduler.h"
 #include "chrome/updater/win/win_constants.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
@@ -49,9 +48,9 @@ std::vector<base::FilePath> GetSetupFiles(const base::FilePath& source_dir) {
       source_dir, false, base::FileEnumerator::FileType::FILES,
       FILE_PATH_LITERAL("*"), base::FileEnumerator::FolderSearchPolicy::ALL,
       base::FileEnumerator::ErrorPolicy::STOP_ENUMERATION);
-  for (base::FilePath file = it.Next(); !file.empty(); file = it.Next()) {
+  it.ForEach([&result](const base::FilePath& file) {
     result.push_back(file.BaseName());
-  }
+  });
   if (it.GetError() != base::File::Error::FILE_OK) {
     VLOG(2) << __func__ << " could not enumerate files : " << it.GetError();
     return {};
@@ -61,7 +60,6 @@ std::vector<base::FilePath> GetSetupFiles(const base::FilePath& source_dir) {
 
 }  // namespace
 
-// TODO(crbug.com/1069976): use specific return values for different code paths.
 int Setup(UpdaterScope scope) {
   VLOG(1) << __func__ << ", scope: " << scope;
   CHECK(!IsSystemInstall(scope) || ::IsUserAnAdmin());
@@ -72,31 +70,36 @@ int Setup(UpdaterScope scope) {
   base::FilePath temp_dir;
   if (!base::GetTempDir(&temp_dir)) {
     LOG(ERROR) << "GetTempDir failed.";
-    return -1;
+    return kErrorCreatingTempDir;
   }
   const absl::optional<base::FilePath> versioned_dir =
       GetVersionedInstallDirectory(scope);
   if (!versioned_dir) {
     LOG(ERROR) << "GetVersionedInstallDirectory failed.";
-    return -1;
+    return kErrorNoVersionedDirectory;
   }
+
+  // Stop any processes that may be running under the versioned path before
+  // installation.
+  StopProcessesUnderPath(*versioned_dir, base::Seconds(15));
+
   base::FilePath exe_path;
   if (!base::PathService::Get(base::FILE_EXE, &exe_path)) {
     LOG(ERROR) << "PathService failed.";
-    return -1;
+    return kErrorPathServiceFailed;
   }
 
   installer::SelfCleaningTempDir backup_dir;
   if (!backup_dir.Initialize(temp_dir, L"updater-backup")) {
     LOG(ERROR) << "Failed to initialize the backup dir.";
-    return -1;
+    return kErrorInitializingBackupDir;
   }
 
   const auto source_dir = exe_path.DirName();
   const auto setup_files = GetSetupFiles(source_dir);
   if (setup_files.empty()) {
     LOG(ERROR) << "No files to set up.";
-    return -1;
+    return kErrorFailedToGetSetupFiles;
   }
 
   // All source files are installed in a flat directory structure inside the
@@ -156,12 +159,12 @@ int Setup(UpdaterScope scope) {
     LOG(ERROR) << "Install failed, rolling back...";
     install_list->Rollback();
     LOG(ERROR) << "Rollback complete.";
-    return -1;
+    return kErrorFailedToRunInstallList;
   }
 
   VLOG(1) << "Setup succeeded.";
 
-  return 0;
+  return kErrorOk;
 }
 
 }  // namespace updater

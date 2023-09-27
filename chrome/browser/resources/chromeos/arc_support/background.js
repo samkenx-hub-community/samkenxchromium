@@ -6,56 +6,53 @@
  * Chrome window that hosts UI. Only one window is allowed.
  * @type {chrome.app.window.AppWindow}
  */
-var appWindow = null;
+let appWindow = null;
 
 /** @type {TermsOfServicePage} */
-var termsPage = null;
-
-/** @type {ActiveDirectoryAuthPage} */
-var activeDirectoryAuthPage = null;
+let termsPage = null;
 
 /**
  * Used for bidirectional communication with native code.
  * @type {chrome.runtime.Port}
  */
-var port = null;
+let port = null;
 
 /**
  * Stores current device id.
  * @type {string}
  */
-var currentDeviceId = null;
+let currentDeviceId = null;
 
 /**
  * Stores last focused element before showing overlay. It is used to restore
  * focus once overlay is closed.
  * @type {Object}
  */
-var lastFocusedElement = null;
+let lastFocusedElement = null;
 
 /**
  * Stores locale set for the current browser process.
  * @type {string}
  */
-var locale = null;
+let locale = null;
 
 /**
  * Host window outer default width.
  * @const {number}
  */
-var OUTER_WIDTH = 768;
+const OUTER_WIDTH = 768;
 
 /**
  * Host window outer default height.
  * @const {number}
  */
-var OUTER_HEIGHT = 640;
+const OUTER_HEIGHT = 640;
 
 /**
  * Contains list of possible combination for languages and country codes. If
  * match is found then navigate to final document directly.
  */
-var PLAYSTORE_TOS_LOCALIZATIONS = [
+const PLAYSTORE_TOS_LOCALIZATIONS = [
   'id_id',     'bs_ba',     'ca_es',     'cs_cz',     'da_dk',     'de_be',
   'de_de',     'de_li',     'de_lu',     'de_at',     'de_ch',     'et_ee',
   'en_as',     'en_ag',     'en_au',     'en_bs',     'en_bh',     'en_bz',
@@ -92,7 +89,7 @@ var PLAYSTORE_TOS_LOCALIZATIONS = [
  * @param {Object=} opt_props Extra properties for the message.
  */
 function sendNativeMessage(event, opt_props) {
-  var message = Object.assign({'event': event}, opt_props);
+  const message = Object.assign({'event': event}, opt_props);
   port.postMessage(message);
 }
 
@@ -122,7 +119,7 @@ class PreferenceCheckbox {
 
     this.isManaged_ = false;
 
-    var learnMoreLink = this.label_.querySelector(learnMoreLinkId);
+    const learnMoreLink = this.label_.querySelector(learnMoreLinkId);
     if (learnMoreLink) {
       learnMoreLink.addEventListener(
           'click', (event) => this.onLearnMoreLinkClicked(event));
@@ -229,10 +226,10 @@ class MetricsPreferenceCheckbox extends PreferenceCheckbox {
     // TODO(jhorwich) Remove checkbox functionality from the metrics notice as
     // we've removed the ability for a device owner to enable it during ARC
     // setup.
-    var canEnable = false;
+    const canEnable = false;
     this.checkbox_.hidden = !canEnable;
     this.textLabel_.hidden = canEnable;
-    var label = canEnable ? this.label_ : this.textLabel_;
+    const label = canEnable ? this.label_ : this.textLabel_;
 
     // Update label text.
     label.innerHTML = this.texts_[isManaged ? 1 : 0][isEnabled ? 1 : 0];
@@ -243,7 +240,7 @@ class MetricsPreferenceCheckbox extends PreferenceCheckbox {
     // the translation target).
     // So, meanwhile, we set the link every time we update the text.
     // TODO: fix the translation text, and main html.
-    var learnMoreLink = label.querySelector(this.learnMoreLinkId_);
+    const learnMoreLink = label.querySelector(this.learnMoreLinkId_);
     if (learnMoreLink) {
       learnMoreLink.addEventListener(
           'click', (event) => this.onLearnMoreLinkClicked(event));
@@ -251,7 +248,7 @@ class MetricsPreferenceCheckbox extends PreferenceCheckbox {
           'keydown', (event) => this.suppressKeyDown(event));
     }
     // settings-link is used only in privacy section.
-    var settingsLink = label.querySelector('#settings-link');
+    const settingsLink = label.querySelector('#settings-link');
     if (settingsLink) {
       settingsLink.addEventListener(
           'click', (event) => this.onPrivacySettingsLinkClicked(event));
@@ -271,7 +268,7 @@ class MetricsPreferenceCheckbox extends PreferenceCheckbox {
  * Represents the page loading state.
  * @enum {number}
  */
-var LoadState = {
+const LoadState = {
   UNLOADED: 0,
   LOADING: 1,
   ABORTED: 2,
@@ -321,12 +318,12 @@ class TermsOfServicePage {
         'contentload', () => this.onTermsViewLoaded_());
     this.termsView_.addEventListener(
         'loadabort', (event) => this.onTermsViewLoadAborted_(event.reason));
-    var requestFilter = {urls: ['<all_urls>'], types: ['main_frame']};
+    const requestFilter = {urls: ['<all_urls>'], types: ['main_frame']};
     this.termsView_.request.onCompleted.addListener(
         this.onTermsViewRequestCompleted_.bind(this), requestFilter);
     this.countryCode = countryCode.toLowerCase();
 
-    var scriptInitTermsView =
+    let scriptInitTermsView =
         'document.countryCode = \'' + this.countryCode + '\';';
     scriptInitTermsView += 'document.language = \'' + locale + '\';';
     scriptInitTermsView += 'document.viewMode = \'large-view\';';
@@ -365,12 +362,12 @@ class TermsOfServicePage {
 
     // On managed case, do not show TermsOfService section. Note that the
     // checkbox for the preferences are still visible.
-    var visibility = isManaged ? 'hidden' : 'visible';
+    const visibility = isManaged ? 'hidden' : 'visible';
     container.querySelector('#terms-container').style.visibility = visibility;
 
     // PAI service.
-    var paiLabel = this.paiService_.querySelector('.content-text');
-    var paiLearnMoreLink = paiLabel.querySelector('#learn-more-link-pai');
+    const paiLabel = this.paiService_.querySelector('.content-text');
+    const paiLearnMoreLink = paiLabel.querySelector('#learn-more-link-pai');
     if (paiLearnMoreLink) {
       paiLearnMoreLink.onclick = function(event) {
         event.stopPropagation();
@@ -429,13 +426,13 @@ class TermsOfServicePage {
     // Update the height in next cycle to prevent webview animation and
     // wrong layout caused by whole-page layout change.
     setTimeout(function() {
-      var doc = appWindow.contentWindow.document;
+      const doc = appWindow.contentWindow.document;
       // Reset terms-view height in order to stabilize style computation. For
       // some reason, child webview affects final result.
       this.termsView_.style.height = '0px';
-      var termsContainer =
+      const termsContainer =
           this.contentContainer_.querySelector('#terms-container');
-      var style = window.getComputedStyle(termsContainer, null);
+      const style = window.getComputedStyle(termsContainer, null);
       this.termsView_.style.height = style.getPropertyValue('height');
     }.bind(this), 0);
   }
@@ -447,7 +444,7 @@ class TermsOfServicePage {
       return;
     }
 
-    var defaultLocation = 'https://play.google.com/about/play-terms/';
+    const defaultLocation = 'https://play.google.com/about/play-terms/';
     if (this.termsView_.src) {
       // This is reloading the page, typically clicked RETRY on error page.
       this.fastLocation_ = undefined;
@@ -476,14 +473,14 @@ class TermsOfServicePage {
    * Returns undefined in case the fast location cannot be found.
    */
   getFastLocation_() {
-    var matchByLangZone = locale + '_' + this.countryCode;
+    const matchByLangZone = locale + '_' + this.countryCode;
     if (PLAYSTORE_TOS_LOCALIZATIONS.indexOf(matchByLangZone) >= 0) {
       return matchByLangZone;
     }
 
-    var langSegments = locale.split('-');
+    const langSegments = locale.split('-');
     if (langSegments.length == 2) {
-      var matchByShortLangZone = langSegments[0] + '_' + this.countryCode;
+      const matchByShortLangZone = langSegments[0] + '_' + this.countryCode;
       if (PLAYSTORE_TOS_LOCALIZATIONS.indexOf(matchByShortLangZone) >= 0) {
         return matchByShortLangZone;
       }
@@ -524,7 +521,7 @@ class TermsOfServicePage {
     // state_ is set to ABORTED. Here, switch the view only for the
     // successful loading case.
     if (this.state_ == LoadState.LOADING) {
-      var getToSContent = {code: 'getToSContent();'};
+      const getToSContent = {code: 'getToSContent();'};
       termsPage.termsView_.executeScript(
           getToSContent, this.onGetToSContent_.bind(this));
     }
@@ -545,9 +542,9 @@ class TermsOfServicePage {
       if (this.fastLocation_) {
         // For fast location load make sure we have right terms displayed.
         this.fastLocation_ = undefined;
-        var checkInitialLangZoneTerms = 'processLangZoneTerms(true, \'' +
+        const checkInitialLangZoneTerms = 'processLangZoneTerms(true, \'' +
             locale + '\', \'' + this.countryCode + '\');';
-        var details = {code: checkInitialLangZoneTerms};
+        const details = {code: checkInitialLangZoneTerms};
         termsPage.termsView_.executeScript(details, function(results) {});
       }
     }
@@ -612,119 +609,14 @@ class TermsOfServicePage {
 }
 
 /**
- * Handles events for the Active Directory authentication page.
- */
-class ActiveDirectoryAuthPage {
-  /**
-   * @param {Element} container The container of the page.
-   */
-  constructor(container) {
-    var requestFilter = {urls: ['<all_urls>'], types: ['main_frame']};
-
-    this.authView_ = container.querySelector('#active-directory-auth-view');
-    this.authView_.request.onCompleted.addListener(
-        (details) => this.onAuthViewCompleted_(details), requestFilter);
-    this.authView_.request.onErrorOccurred.addListener(
-        (details) => this.onAuthViewErrorOccurred_(details), requestFilter);
-
-    this.deviceManagementUrlPrefix_ = null;
-
-    // https://crbug.com/756144: Disable event processing while the page is not
-    // shown. The bug seems to be caused by erroneous onErrorOccurred events
-    // that are fired even though authView_.src is never set. This might be
-    // related to a bug in webview, see also CL:638413.
-    this.process_events_ = false;
-
-    container.querySelector('#button-active-directory-auth-cancel')
-        .addEventListener('click', () => this.onCancel_());
-  }
-
-  /**
-   * Sets URLs used for Active Directory user SAML authentication.
-   * @param {string} federationUrl The Active Directory Federation Services URL.
-   * @param {string} deviceManagementUrlPrefix Device management server URL
-   *        prefix used to detect if the SAML flow finished. DM server is the
-   *        SAML service provider.
-   */
-  setUrls(federationUrl, deviceManagementUrlPrefix) {
-    this.authView_.src = federationUrl;
-    this.deviceManagementUrlPrefix_ = deviceManagementUrlPrefix;
-  }
-
-  /**
-   * Toggles onCompleted and onErrorOccurred event processing.
-   * @param {boolean} enabled Process (true) or ignore (false) events.
-   */
-  enableEventProcessing(enabled) {
-    this.process_events_ = enabled;
-  }
-
-  /**
-   * Auth view onCompleted event handler. Checks whether the SAML flow
-   * reached its endpoint, the device management server.
-   * @param {!Object} details Event parameters.
-   */
-  onAuthViewCompleted_(details) {
-    if (!this.process_events_) {
-      console.error(
-          'Unexpected onAuthViewCompleted_ event from URL ' + details.url);
-      return;
-    }
-    // See if we hit the device management server. This should happen at the
-    // end of the SAML flow. Before that, we're on the Active Directory
-    // Federation Services server.
-    if (this.deviceManagementUrlPrefix_ &&
-        details.url.startsWith(this.deviceManagementUrlPrefix_)) {
-      // Once we hit the final URL, stop processing further events.
-      this.process_events_ = false;
-      // Did it actually work?
-      if (details.statusCode == 200) {
-        // 'code' is unused, but it needs to be there.
-        sendNativeMessage('onAuthSucceeded');
-      } else {
-        sendNativeMessage('onAuthFailed', {
-          errorMessage: 'Status code ' + details.statusCode +
-              ' in SAML auth response from the AD FS server.',
-        });
-      }
-    }
-  }
-
-  /**
-   * Auth view onErrorOccurred event handler.
-   * @param {!Object} details Event parameters.
-   */
-  onAuthViewErrorOccurred_(details) {
-    if (!this.process_events_) {
-      console.error(
-          'Unexpected onAuthViewErrorOccurred_ event: ' + details.error);
-      return;
-    }
-    // Retry triggers net::ERR_ABORTED, so ignore it.
-    if (details.error == 'net::ERR_ABORTED') {
-      return;
-    }
-    // Stop processing further events on first error.
-    this.process_events_ = false;
-    sendNativeMessage(
-        'onAuthFailed', {errorMessage: 'Error occurred: ' + details.error});
-  }
-
-  /** Called when the "CANCEL" button is clicked. */
-  onCancel_() {
-    closeWindow();
-  }
-}
-
-/**
  * Applies localization for html content and sets terms webview.
  * @param {!Object} data Localized strings and relevant information.
  * @param {string} deviceId Current device id.
  */
 function initialize(data, deviceId) {
   currentDeviceId = deviceId;
-  var doc = appWindow.contentWindow.document;
-  var loadTimeData = appWindow.contentWindow.loadTimeData;
+  const doc = appWindow.contentWindow.document;
+  const loadTimeData = appWindow.contentWindow.loadTimeData;
   loadTimeData.data = data;
   appWindow.contentWindow.i18nTemplate.process(doc, loadTimeData);
   locale = loadTimeData.getString('locale');
@@ -747,10 +639,6 @@ function initialize(data, deviceId) {
           data.controlledByPolicy),
       data.learnMorePaiService);
 
-  // Initialize the Active Directory SAML authentication page.
-  activeDirectoryAuthPage =
-      new ActiveDirectoryAuthPage(doc.getElementById('active-directory-auth'));
-
   doc.getElementById('close-button').title =
       loadTimeData.getString('overlayClose');
 
@@ -764,18 +652,13 @@ function adjustTopMargin() {
     return;
   }
 
-  var decorationHeight =
+  const decorationHeight =
       appWindow.outerBounds.height - appWindow.innerBounds.height;
 
-  var doc = appWindow.contentWindow.document;
-  var headers = doc.getElementsByClassName('header');
-  for (var i = 0; i < headers.length; i++) {
+  const doc = appWindow.contentWindow.document;
+  const headers = doc.getElementsByClassName('header');
+  for (let i = 0; i < headers.length; i++) {
     headers[i].style.marginTop = -decorationHeight + 'px';
-  }
-
-  var authPages = doc.getElementsByClassName('section-active-directory-auth');
-  for (var i = 0; i < authPages.length; i++) {
-    authPages[i].style.marginTop = -decorationHeight + 'px';
   }
 }
 
@@ -804,7 +687,7 @@ function onNativeMessage(message) {
     termsPage.onLocationServicePreferenceChanged(
         message.enabled, message.managed);
   } else if (message.action == 'showPage') {
-    showPage(message.page, message.options);
+    showPage(message.page);
   } else if (message.action == 'showErrorPage') {
     showErrorPage(
         message.errorMessage, message.shouldShowSendFeedback,
@@ -822,7 +705,7 @@ function onNativeMessage(message) {
  * Connects to ArcSupportHost.
  */
 function connectPort() {
-  var hostName = 'com.google.arc_support';
+  const hostName = 'com.google.arc_support';
   port = chrome.runtime.connectNative(hostName);
   port.onMessage.addListener(onNativeMessage);
 }
@@ -831,31 +714,19 @@ function connectPort() {
  * Shows requested page and hide others. Show appWindow if it was hidden before.
  * 'none' hides all views.
  * @param {string} pageDivId id of divider of the page to show.
- * @param {dictionary=} options Additional options depending on pageDivId. For
- *     'active-directory-auth', this has to contain keys 'federationUrl' and
- *     'deviceManagementUrlPrefix' with corresponding values. See
- *     ActiveDirectoryAuthPage::setUrls for a description of those parameters.
  */
-function showPage(pageDivId, options) {
+function showPage(pageDivId) {
   if (!appWindow) {
     return;
   }
 
   hideOverlay();
   appWindow.contentWindow.stopProgressAnimation();
-  var doc = appWindow.contentWindow.document;
+  const doc = appWindow.contentWindow.document;
 
-  var pages = doc.getElementsByClassName('section');
-  for (var i = 0; i < pages.length; i++) {
+  const pages = doc.getElementsByClassName('section');
+  for (let i = 0; i < pages.length; i++) {
     pages[i].hidden = pages[i].id != pageDivId;
-  }
-
-  if (pageDivId == 'active-directory-auth') {
-    activeDirectoryAuthPage.enableEventProcessing(true);
-    activeDirectoryAuthPage.setUrls(
-        options.federationUrl, options.deviceManagementUrlPrefix);
-  } else {
-    activeDirectoryAuthPage.enableEventProcessing(false);
   }
 
   appWindow.show();
@@ -887,20 +758,20 @@ function showErrorPage(
     return;
   }
 
-  var doc = appWindow.contentWindow.document;
-  var messageElement = doc.getElementById('error-message');
+  const doc = appWindow.contentWindow.document;
+  const messageElement = doc.getElementById('error-message');
   messageElement.innerText = errorMessage;
 
-  var sendFeedbackElement = doc.getElementById('button-send-feedback');
+  const sendFeedbackElement = doc.getElementById('button-send-feedback');
   sendFeedbackElement.hidden = !opt_shouldShowSendFeedback;
 
-  var networkTestsElement = doc.getElementById('button-run-network-tests');
+  const networkTestsElement = doc.getElementById('button-run-network-tests');
   networkTestsElement.hidden = !opt_shouldShowNetworkTests;
   showPage('error');
 
   // If the error is not network-related, position send feedback after the flex
   // div.
-  var feedbackSeparator = doc.getElementById('div-error-separating-buttons');
+  const feedbackSeparator = doc.getElementById('div-error-separating-buttons');
   feedbackSeparator.style.order = opt_shouldShowNetworkTests ? 'initial' : -1;
 }
 
@@ -911,8 +782,8 @@ function showErrorPage(
  *                              simple text view.
  */
 function showOverlay(overlayClass) {
-  var doc = appWindow.contentWindow.document;
-  var overlayContainer = doc.getElementById('overlay-container');
+  const doc = appWindow.contentWindow.document;
+  const overlayContainer = doc.getElementById('overlay-container');
   overlayContainer.classList.remove('overlay-text');
   overlayContainer.classList.remove('overlay-url');
   overlayContainer.classList.add('overlay-loading');
@@ -927,8 +798,8 @@ function showOverlay(overlayClass) {
  * @param {string} content HTML formatted text to show.
  */
 function showTextOverlay(content) {
-  var doc = appWindow.contentWindow.document;
-  var textContent = doc.getElementById('overlay-text-content');
+  const doc = appWindow.contentWindow.document;
+  const textContent = doc.getElementById('overlay-text-content');
   textContent.innerHTML = content;
   showOverlay('overlay-text');
 }
@@ -938,8 +809,8 @@ function showTextOverlay(content) {
  * @param {string} url Target URL to open in overlay dialog.
  */
 function showURLOverlay(url) {
-  var doc = appWindow.contentWindow.document;
-  var overlayWebview = doc.getElementById('overlay-url');
+  const doc = appWindow.contentWindow.document;
+  const overlayWebview = doc.getElementById('overlay-url');
   overlayWebview.src = url;
   showOverlay('overlay-url');
 }
@@ -949,13 +820,13 @@ function showURLOverlay(url) {
  * the content of terms view.
  */
 function showPrivacyPolicyOverlay() {
-  var defaultLink =
+  const defaultLink =
       'https://www.google.com/intl/' + locale + '/policies/privacy/';
   if (termsPage.isManaged_) {
     showURLOverlay(defaultLink);
     return;
   }
-  var details = {code: 'getPrivacyPolicyLink();'};
+  const details = {code: 'getPrivacyPolicyLink();'};
   termsPage.termsView_.executeScript(details, function(results) {
     if (results && results.length == 1 && typeof results[0] == 'string') {
       showURLOverlay(results[0]);
@@ -969,8 +840,8 @@ function showPrivacyPolicyOverlay() {
  * Hides overlay dialog.
  */
 function hideOverlay() {
-  var doc = appWindow.contentWindow.document;
-  var overlayContainer = doc.getElementById('overlay-container');
+  const doc = appWindow.contentWindow.document;
+  const overlayContainer = doc.getElementById('overlay-container');
   overlayContainer.hidden = true;
   if (lastFocusedElement) {
     lastFocusedElement.focus();
@@ -983,8 +854,8 @@ function setWindowBounds(x, y, width, height) {
     return;
   }
 
-  var outerWidth = OUTER_WIDTH;
-  var outerHeight = OUTER_HEIGHT;
+  let outerWidth = OUTER_WIDTH;
+  let outerHeight = OUTER_HEIGHT;
   if (outerWidth > width) {
     outerWidth = width;
   }
@@ -1005,20 +876,20 @@ function closeWindow() {
 }
 
 chrome.app.runtime.onLaunched.addListener(function() {
-  var onAppContentLoad = function() {
-    var onRetry = function() {
+  const onAppContentLoad = function() {
+    const onRetry = function() {
       sendNativeMessage('onRetryClicked');
     };
 
-    var onSendFeedback = function() {
+    const onSendFeedback = function() {
       sendNativeMessage('onSendFeedbackClicked');
     };
 
-    var onRunNetworkTests = function() {
+    const onRunNetworkTests = function() {
       sendNativeMessage('onRunNetworkTestsClicked');
     };
 
-    var doc = appWindow.contentWindow.document;
+    const doc = appWindow.contentWindow.document;
     doc.getElementById('button-retry').addEventListener('click', onRetry);
     doc.getElementById('button-send-feedback')
         .addEventListener('click', onSendFeedback);
@@ -1028,12 +899,12 @@ chrome.app.runtime.onLaunched.addListener(function() {
     doc.getElementById('privacy-policy-link')
         .addEventListener('click', showPrivacyPolicyOverlay);
 
-    var overlay = doc.getElementById('overlay-container');
+    const overlay = doc.getElementById('overlay-container');
     appWindow.contentWindow.cr.ui.overlay.setupOverlay(overlay);
     appWindow.contentWindow.cr.ui.overlay.globalInitialization();
     overlay.addEventListener('cancelOverlay', hideOverlay);
 
-    var overlayWebview = doc.getElementById('overlay-url');
+    const overlayWebview = doc.getElementById('overlay-url');
     overlayWebview.addEventListener('contentload', function() {
       overlay.classList.remove('overlay-loading');
     });
@@ -1051,17 +922,8 @@ chrome.app.runtime.onLaunched.addListener(function() {
     sendNativeMessage('requestWindowBounds');
   };
 
-  var onWindowCreated = function(createdWindow) {
-    appWindow = createdWindow;
-    appWindow.contentWindow.onload = onAppContentLoad;
-    appWindow.onClosed.addListener(onWindowClosed);
-  };
-
-  var onWindowClosed = function() {
+  const onWindowClosed = function() {
     appWindow = null;
-
-    // Turn off event processing.
-    activeDirectoryAuthPage.enableEventProcessing(false);
 
     // Notify to Chrome.
     sendNativeMessage('onWindowClosed');
@@ -1073,7 +935,13 @@ chrome.app.runtime.onLaunched.addListener(function() {
     port = null;
   };
 
-  var options = {
+  const onWindowCreated = function(createdWindow) {
+    appWindow = createdWindow;
+    appWindow.contentWindow.onload = onAppContentLoad;
+    appWindow.onClosed.addListener(onWindowClosed);
+  };
+
+  const options = {
     'id': 'play_store_wnd',
     'resizable': false,
     'hidden': true,

@@ -16,7 +16,6 @@ namespace ash::audio_config {
 namespace {
 
 constexpr int kDefaultInternalMicId = 0;
-constexpr char kStubInternalMicDisplayName[] = "Internal Mic";
 constexpr base::TimeDelta kMetricsDelayTimerInterval = base::Seconds(2);
 
 // Histogram names.
@@ -42,8 +41,6 @@ AudioDevice CreateStubInternalMic() {
   AudioDevice internal_mic;
   internal_mic.id = kDefaultInternalMicId;
   internal_mic.is_input = true;
-  // TODO(b/260277007): Replace with lookup for localized device name.
-  internal_mic.display_name = kStubInternalMicDisplayName;
   internal_mic.stable_device_id_version = 2;
   internal_mic.type = AudioDeviceType::kInternalMic;
   internal_mic.active = false;
@@ -88,10 +85,36 @@ mojom::AudioEffectState GetNoiseCancellationState(const AudioDevice& device) {
              : mojom::AudioEffectState::kNotEnabled;
 }
 
+// Determines the correct `mojom::AudioEffectState` for an audio device
+mojom::AudioEffectState GetForceRespectUiGainsState(const AudioDevice& device) {
+  CrasAudioHandler* audio_handler = CrasAudioHandler::Get();
+  CHECK(audio_handler);
+
+  // Get current device wide preference state from `CrasAudioHandler`.
+  return audio_handler->GetForceRespectUiGainsState()
+             ? mojom::AudioEffectState::kEnabled
+             : mojom::AudioEffectState::kNotEnabled;
+}
+
 void RecordMuteStateChanged(const char* histogram_name, bool muted) {
   base::UmaHistogramEnumeration(
       histogram_name,
       muted ? AudioMuteButtonAction::kMuted : AudioMuteButtonAction::kUnmuted);
+}
+
+// Determines the correct `mojom::AudioEffectState` for an audio device
+mojom::AudioEffectState GetHfpMicSrState(const AudioDevice& device) {
+  CrasAudioHandler* audio_handler = CrasAudioHandler::Get();
+
+  if (!audio_handler->IsHfpMicSrSupportedForDevice(device.id)) {
+    return mojom::AudioEffectState::kNotSupported;
+  }
+
+  // Device supports hfp mic sr, get current device wide preference
+  // state from `CrasAudioHandler`.
+  return audio_handler->GetHfpMicSrState()
+             ? mojom::AudioEffectState::kEnabled
+             : mojom::AudioEffectState::kNotEnabled;
 }
 
 }  // namespace
@@ -142,6 +165,9 @@ mojom::AudioDevicePtr GenerateMojoAudioDevice(const AudioDevice& device) {
   mojo_device->is_active = device.active;
   mojo_device->device_type = ComputeDeviceType(device.type);
   mojo_device->noise_cancellation_state = GetNoiseCancellationState(device);
+  mojo_device->force_respect_ui_gains_state =
+      GetForceRespectUiGainsState(device);
+  mojo_device->hfp_mic_sr_state = GetHfpMicSrState(device);
   return mojo_device;
 }
 
@@ -244,7 +270,8 @@ void CrosAudioConfigImpl::SetOutputMuted(bool muted) {
     return;
   }
 
-  audio_handler->SetOutputMute(muted);
+  audio_handler->SetOutputMute(
+      muted, CrasAudioHandler::AudioSettingsChangeSource::kOsSettings);
   RecordMuteStateChanged(kOutputMuteChangeHistogramName, muted);
 }
 
@@ -319,8 +346,9 @@ void CrosAudioConfigImpl::SetInputMuted(bool muted) {
     return;
   }
 
-  audio_handler->SetMuteForDevice(audio_handler->GetPrimaryActiveInputNode(),
-                                  muted);
+  audio_handler->SetMuteForDevice(
+      audio_handler->GetPrimaryActiveInputNode(), muted,
+      CrasAudioHandler::AudioSettingsChangeSource::kOsSettings);
   RecordMuteStateChanged(kInputMuteChangeHistogramName, muted);
 }
 
@@ -334,8 +362,30 @@ void CrosAudioConfigImpl::SetNoiseCancellationEnabled(bool enabled) {
     return;
   }
 
-  audio_handler->SetNoiseCancellationState(enabled);
+  audio_handler->SetNoiseCancellationState(
+      enabled, CrasAudioHandler::AudioSettingsChangeSource::kOsSettings);
   base::UmaHistogramBoolean(kNoiseCancellationEnabledHistogramName, enabled);
+}
+
+void CrosAudioConfigImpl::SetForceRespectUiGainsEnabled(bool enabled) {
+  CrasAudioHandler* audio_handler = CrasAudioHandler::Get();
+  CHECK(audio_handler);
+
+  audio_handler->SetForceRespectUiGainsState(enabled);
+}
+
+void CrosAudioConfigImpl::SetHfpMicSrEnabled(bool enabled) {
+  CrasAudioHandler* audio_handler = CrasAudioHandler::Get();
+
+  if (!audio_handler->IsHfpMicSrSupportedForDevice(
+          audio_handler->GetPrimaryActiveInputNode())) {
+    LOG(ERROR) << "SetHfpMicSrEnabled: hfp mic sr is not "
+                  "supported by active input node.";
+    return;
+  }
+
+  audio_handler->SetHfpMicSrState(
+      enabled, CrasAudioHandler::AudioSettingsChangeSource::kOsSettings);
 }
 
 void CrosAudioConfigImpl::RecordOutputVolume() {
@@ -354,6 +404,14 @@ void CrosAudioConfigImpl::RecordInputGain() {
   base::UmaHistogramEnumeration(
       CrasAudioHandler::kInputGainChangedSourceHistogramName,
       CrasAudioHandler::AudioSettingsChangeSource::kOsSettings);
+
+  CrasAudioHandler* audio_handler = CrasAudioHandler::Get();
+  CHECK(audio_handler);
+  if (!audio_handler->GetForceRespectUiGainsState()) {
+    base::UmaHistogramEnumeration(
+        CrasAudioHandler::kInputGainChangedHistogramName,
+        CrasAudioHandler::AudioSettingsChangeSource::kOsSettings);
+  }
 }
 
 void CrosAudioConfigImpl::OnOutputNodeVolumeChanged(uint64_t node_id,
@@ -393,6 +451,14 @@ void CrosAudioConfigImpl::OnInputMutedByMicrophoneMuteSwitchChanged(
 }
 
 void CrosAudioConfigImpl::OnNoiseCancellationStateChanged() {
+  NotifyObserversAudioSystemPropertiesChanged();
+}
+
+void CrosAudioConfigImpl::OnForceRespectUiGainsStateChanged() {
+  NotifyObserversAudioSystemPropertiesChanged();
+}
+
+void CrosAudioConfigImpl::OnHfpMicSrStateChanged() {
   NotifyObserversAudioSystemPropertiesChanged();
 }
 

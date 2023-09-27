@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {SecurityTestRunner} from 'security_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+
 (async function() {
   TestRunner.addResult(`Tests active mixed content blocking in the security panel.\n`);
-  await TestRunner.loadTestModule('security_test_runner');
   await TestRunner.showPanel('security');
 
   TestRunner.mainTarget.model(Security.SecurityModel)
@@ -14,7 +18,7 @@
           Protocol.Security.SecurityState.Secure, /* certificateSecurityState= */ null,
           /* safetyTipInfo */ null, /* securityStateIssueIds= */ ['scheme-is-not-cryptographic']));
 
-  var request = SDK.NetworkRequest.create(
+  var request = SDK.NetworkRequest.NetworkRequest.create(
       0, 'http://foo.test', 'https://foo.test', 0, 0, null);
   request.setBlockedReason(Protocol.Network.BlockedReason.MixedContent);
   request.mixedContentType = 'blockable';
@@ -26,7 +30,7 @@
     TestRunner.dumpDeepInnerHTML(explanations[i]);
 
   // Test that the explanations are cleared on navigation. Regression test for https://crbug.com/601944.
-  TestRunner.mainTarget.model(SDK.ResourceTreeModel)
+  TestRunner.mainTarget.model(SDK.ResourceTreeModel.ResourceTreeModel)
       .dispatchEventToListeners(
           SDK.ResourceTreeModel.Events.PrimaryPageChanged, {frame: TestRunner.resourceTreeModel.mainFrame, type: 'Navigation'});
   explanations =

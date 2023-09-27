@@ -7,9 +7,10 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/timer/timer.h"
-#include "chrome/browser/ui/passwords/bubble_controllers/items_bubble_controller.h"
+#include "chrome/browser/ui/passwords/bubble_controllers/manage_passwords_bubble_controller.h"
 #include "chrome/browser/ui/views/passwords/password_bubble_view_base.h"
 #include "components/password_manager/core/browser/password_form.h"
+#include "ui/base/interaction/element_identifier.h"
 
 class PageSwitcherView;
 class ManagePasswordsListView;
@@ -20,6 +21,8 @@ class ManagePasswordsDetailsView;
 // stored password note.
 class ManagePasswordsView : public PasswordBubbleViewBase {
  public:
+  DECLARE_CLASS_ELEMENT_IDENTIFIER_VALUE(kTopView);
+
   ManagePasswordsView(content::WebContents* web_contents,
                       views::View* anchor_view);
 
@@ -77,9 +80,9 @@ class ManagePasswordsView : public PasswordBubbleViewBase {
   // Holds the favicon of the page when it is asynchronously loaded.
   gfx::Image favicon_;
 
-  ManagePasswordsDetailsView* password_details_view_ = nullptr;
+  raw_ptr<ManagePasswordsDetailsView> password_details_view_ = nullptr;
 
-  ItemsBubbleController controller_;
+  ManagePasswordsBubbleController controller_;
   raw_ptr<PageSwitcherView> page_container_ = nullptr;
 
   // Used to keep track of the time once the user passed the auth challenge to

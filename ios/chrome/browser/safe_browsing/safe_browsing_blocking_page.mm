@@ -16,9 +16,9 @@
 #import "components/security_interstitials/core/base_safe_browsing_error_ui.h"
 #import "components/security_interstitials/core/metrics_helper.h"
 #import "components/security_interstitials/core/safe_browsing_loud_error_ui.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/safe_browsing/safe_browsing_metrics_collector_factory.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/components/security_interstitials/ios_blocking_page_metrics_helper.h"
 #import "ios/components/security_interstitials/safe_browsing/safe_browsing_tab_helper.h"
 #import "ios/components/security_interstitials/safe_browsing/unsafe_resource_util.h"
@@ -26,10 +26,6 @@
 #import "ui/base/resource/resource_bundle.h"
 #import "ui/base/webui/jstemplate_builder.h"
 #import "ui/base/webui/web_ui_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using security_interstitials::SecurityInterstitialCommand;
 using security_interstitials::BaseSafeBrowsingErrorUI;

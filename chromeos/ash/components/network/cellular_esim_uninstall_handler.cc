@@ -60,7 +60,7 @@ void CellularESimUninstallHandler::Init(
   network_connection_handler_ = network_connection_handler;
   network_state_handler_ = network_state_handler;
 
-  network_state_handler_observer_.Observe(network_state_handler_);
+  network_state_handler_observer_.Observe(network_state_handler_.get());
 }
 
 void CellularESimUninstallHandler::UninstallESim(
@@ -342,8 +342,13 @@ void CellularESimUninstallHandler::OnUninstallProfile(
   }
 
   if (managed_cellular_pref_handler_) {
-    for (const auto& iccid : removed_iccids)
-      managed_cellular_pref_handler_->RemovePairWithIccid(iccid);
+    for (const auto& iccid : removed_iccids) {
+      if (ash::features::IsSmdsSupportEuiccUploadEnabled()) {
+        managed_cellular_pref_handler_->RemoveESimMetadata(iccid);
+      } else {
+        managed_cellular_pref_handler_->RemovePairWithIccid(iccid);
+      }
+    }
   }
   TransitionToUninstallState(UninstallState::kRemovingShillService);
   AttemptRemoveShillService();

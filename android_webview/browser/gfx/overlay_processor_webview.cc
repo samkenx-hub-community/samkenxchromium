@@ -52,9 +52,14 @@ scoped_refptr<gpu::SyncPointClientState> CreateSyncPointClientState(
 // Manages ASurfaceControl life-cycle and handles ASurfaceTransactions. Created
 // on Android RenderThread, but both used on both Android RenderThread and GPU
 // Main thread, so can be destroyed on one of them.
+//
+// Lifetime: WebView
+// Each OverlayProcessorWebView owns one Manager. Ref-counted for callbacks.
 class OverlayProcessorWebView::Manager
     : public base::RefCountedThreadSafe<OverlayProcessorWebView::Manager> {
  private:
+  // Instances are either directly owned by Manager or indirectly through
+  // OverlaySurface.
   class Resource {
    public:
     Resource(gpu::SharedImageManager* shared_image_manager,
@@ -77,7 +82,7 @@ class OverlayProcessorWebView::Manager
 
       gfx::GpuFenceHandle acquire_fence = read_access_->TakeAcquireFence();
       if (!acquire_fence.is_null()) {
-        begin_read_fence_ = std::move(acquire_fence.owned_fd);
+        begin_read_fence_ = acquire_fence.Release();
       }
 
       AHardwareBuffer_Desc desc;
@@ -106,7 +111,7 @@ class OverlayProcessorWebView::Manager
       // surface in this case.
       if (read_access_) {
         gfx::GpuFenceHandle fence_handle;
-        fence_handle.owned_fd = std::move(end_read_fence);
+        fence_handle.Adopt(std::move(end_read_fence));
         read_access_->SetReleaseFence(std::move(fence_handle));
         read_access_.reset();
       } else {
@@ -411,6 +416,8 @@ class OverlayProcessorWebView::Manager
   friend class base::RefCountedThreadSafe<Manager>;
 
   // Class that holds SurfaceControl and associated resources.
+  //
+  // Instances are owned by Manager.
   class OverlaySurface {
    public:
     OverlaySurface(const gfx::SurfaceControl::Surface& parent)
@@ -909,7 +916,7 @@ void OverlayProcessorWebView::ReturnResource(viz::ResourceId resource_id,
     resource_lock_count_.erase(surface_id.frame_sink_id());
 }
 
-void OverlayProcessorWebView::ProcessForFrameSinkId(
+bool OverlayProcessorWebView::ProcessForFrameSinkId(
     const viz::FrameSinkId& frame_sink_id,
     const viz::ResolvedFrameData* frame_data) {
   auto it = overlays_.find(frame_sink_id);
@@ -918,10 +925,11 @@ void OverlayProcessorWebView::ProcessForFrameSinkId(
 
   const auto& passes = frame_data->GetResolvedPasses();
   if (passes.empty()) {
-    return;
+    return false;
   }
 
   DCHECK_EQ(passes.size(), 1u);
+  bool buffer_updated = false;
 
   auto& pass = passes.back();
   if (!pass.draw_quads().empty()) {
@@ -932,15 +940,25 @@ void OverlayProcessorWebView::ProcessForFrameSinkId(
     // TODO(vasilyt): We should get this from surface aggregator after
     // aggregator refactoring will be finished.
     const auto& frame = surface->GetActiveFrame();
-    auto* quad = viz::TextureDrawQuad::MaterialCast(
-        frame.render_pass_list.back()->quad_list.front());
-    DCHECK(quad->is_stream_video);
+    auto* quad = frame.render_pass_list.back()->quad_list.front();
 
-    auto uv_rect = gfx::BoundingRect(quad->uv_top_left, quad->uv_bottom_right);
+    // We overlay only TextureDrawQuads and only if resource
+    // IsOverlayCandidate(), return false otherwise so we would trigger
+    // invalidate and normal draw would remove this overlay candidate.
+    if (quad->material == viz::TextureDrawQuad::kMaterial) {
+      auto* texture_quad = viz::TextureDrawQuad::MaterialCast(quad);
+      DCHECK(texture_quad->is_stream_video);
 
-    UpdateOverlayResource(frame_sink_id,
-                          pass.draw_quads().front().remapped_resources.ids[0],
-                          uv_rect);
+      auto uv_rect = gfx::BoundingRect(texture_quad->uv_top_left,
+                                       texture_quad->uv_bottom_right);
+
+      auto new_resource_id =
+          pass.draw_quads().front().remapped_resources.ids[0];
+      if (resource_provider_->IsOverlayCandidate(new_resource_id)) {
+        UpdateOverlayResource(frame_sink_id, new_resource_id, uv_rect);
+        buffer_updated = true;
+      }
+    }
     // If resource lock count reached kMaxBuffersInFlight it means we can't
     // schedule any more frames right away, in this case we delay sending ack to
     // the client and will send it in ReturnResources after OverlayManager will
@@ -949,6 +967,8 @@ void OverlayProcessorWebView::ProcessForFrameSinkId(
       surface->SendAckToClient();
     }
   }
+
+  return buffer_updated;
 }
 
 viz::SurfaceId OverlayProcessorWebView::GetOverlaySurfaceId(

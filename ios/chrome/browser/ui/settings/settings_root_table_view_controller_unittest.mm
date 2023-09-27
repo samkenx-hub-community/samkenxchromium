@@ -5,8 +5,8 @@
 #import "ios/chrome/browser/ui/settings/settings_root_table_view_controller.h"
 
 #import "base/test/task_environment.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
-#import "ios/chrome/browser/main/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/ui/settings/settings_navigation_controller.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "testing/gtest/include/gtest/gtest.h"
@@ -15,10 +15,6 @@
 #import "third_party/ocmock/OCMock/OCMock.h"
 #import "third_party/ocmock/gtest_support.h"
 #import "ui/base/l10n/l10n_util_mac.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 class SettingsRootTableViewControllerTest : public PlatformTest {
  public:
@@ -87,6 +83,7 @@ TEST_F(SettingsRootTableViewControllerTest, TestUpdateUIForEditState) {
   EXPECT_NSEQ(l10n_util::GetNSString(IDS_IOS_NAVIGATION_BAR_EDIT_BUTTON),
               controller.navigationItem.rightBarButtonItem.title);
   EXPECT_FALSE(controller.navigationController.toolbarHidden);
+  [navigationController cleanUpSettings];
 }
 
 // Tests that the delete button in the bottom toolbar is displayed only when the
@@ -134,4 +131,5 @@ TEST_F(SettingsRootTableViewControllerTest, TestDeleteToolbar) {
   [controller tableView:controller.tableView
       didDeselectRowAtIndexPath:testIndexPath];
   EXPECT_TRUE(navigationController.toolbarHidden);
+  [navigationController cleanUpSettings];
 }

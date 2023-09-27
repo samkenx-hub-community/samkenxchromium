@@ -16,6 +16,7 @@
 #include "ash/public/cpp/session/session_types.h"
 #include "ash/session/session_activation_observer_holder.h"
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/sequence_checker.h"
@@ -63,6 +64,10 @@ class ASH_EXPORT SessionControllerImpl : public SessionController {
 
   // Gets the policy of adding a user session to ash.
   AddUserSessionPolicy GetAddUserPolicy() const;
+
+  // Returns true if the active user account is under any policy management.
+  // NOTE: This function should only be called if the active account exists.
+  bool IsActiveAccountManaged() const;
 
   // Returns |true| if the session has been fully started for the active user.
   // When a user becomes active, the profile and browser UI are not immediately
@@ -117,6 +122,9 @@ class ASH_EXPORT SessionControllerImpl : public SessionController {
 
   // Returns true if the current user is a child account.
   bool IsUserChild() const;
+
+  // Returns true if the current user is a guest account.
+  bool IsUserGuest() const;
 
   // Returns true if the current user is a public account.
   bool IsUserPublicAccount() const;
@@ -277,7 +285,7 @@ class ASH_EXPORT SessionControllerImpl : public SessionController {
   void RemoveScopedScreenLockBlocker();
 
   // Client interface to session manager code (chrome).
-  SessionControllerClient* client_ = nullptr;
+  raw_ptr<SessionControllerClient, ExperimentalAsh> client_ = nullptr;
 
   // Cached session info.
   bool can_lock_ = false;
@@ -331,7 +339,7 @@ class ASH_EXPORT SessionControllerImpl : public SessionController {
 
   bool signin_screen_prefs_obtained_ = false;
 
-  PrefService* last_active_user_prefs_ = nullptr;
+  raw_ptr<PrefService, ExperimentalAsh> last_active_user_prefs_ = nullptr;
 
   std::unique_ptr<FullscreenController> fullscreen_controller_;
 

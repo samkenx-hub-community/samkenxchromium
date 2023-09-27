@@ -10,7 +10,7 @@
 #include "third_party/blink/renderer/core/layout/layout_block_flow.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_node_data.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_layout_input_node.h"
-#include "third_party/blink/renderer/core/layout/ng/svg/ng_svg_character_data.h"
+#include "third_party/blink/renderer/core/layout/svg/svg_character_data.h"
 #include "third_party/blink/renderer/platform/wtf/casting.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
 
@@ -79,7 +79,7 @@ class CORE_EXPORT NGInlineNode : public NGLayoutInputNode {
   // |new_text| is new text of |layout_text|.
   // This is optimized version of |PrepareLayout()|.
   static bool SetTextWithOffset(LayoutText* layout_text,
-                                scoped_refptr<StringImpl> new_text,
+                                String new_text,
                                 unsigned offset,
                                 unsigned length);
 
@@ -96,11 +96,22 @@ class CORE_EXPORT NGInlineNode : public NGLayoutInputNode {
   bool IsBidiEnabled() const { return Data().is_bidi_enabled_; }
   TextDirection BaseDirection() const { return Data().BaseDirection(); }
 
+  bool HasFloats() const { return Data().HasFloats(); }
   bool HasInitialLetterBox() const { return Data().has_initial_letter_box_; }
-
   bool HasRuby() const { return Data().has_ruby_; }
 
   bool IsBlockLevel() { return EnsureData().is_block_level_; }
+
+  // True if this node can't use the bisection in `NGParagraphLineBreaker`.
+  bool IsBisectLineBreakDisabled() const {
+    return Data().IsBisectLineBreakDisabled();
+  }
+  // True if this node can't use the `NGScorehLineBreaker`, that can be
+  // determined by `CollectInlines`. Conditions that can change without
+  // `CollectInlines` are in `NGLineBreaker::ShouldDisableScoreLineBreak()`.
+  bool IsScoreLineBreakDisabled() const {
+    return Data().IsScoreLineBreakDisabled();
+  }
 
   // @return if this node can contain the "first formatted line".
   // https://www.w3.org/TR/CSS22/selector.html#first-formatted-line
@@ -113,7 +124,7 @@ class CORE_EXPORT NGInlineNode : public NGLayoutInputNode {
   void CheckConsistency() const;
 
   // This function is available after PrepareLayout(), only for SVG <text>.
-  const Vector<std::pair<unsigned, NGSvgCharacterData>>& SvgCharacterDataList()
+  const Vector<std::pair<unsigned, SvgCharacterData>>& SvgCharacterDataList()
       const;
   // This function is available after PrepareLayout(), only for SVG <text>.
   const HeapVector<SvgTextContentRange>& SvgTextLengthRangeList() const;
@@ -125,10 +136,13 @@ class CORE_EXPORT NGInlineNode : public NGLayoutInputNode {
   struct FloatingObject {
     DISALLOW_NEW();
 
-    void Trace(Visitor* visitor) const {}
+    void Trace(Visitor* visitor) const {
+      visitor->Trace(float_style);
+      visitor->Trace(style);
+    }
 
-    const ComputedStyle& float_style;
-    const ComputedStyle& style;
+    Member<const ComputedStyle> float_style;
+    Member<const ComputedStyle> style;
     LayoutUnit float_inline_max_size_with_margin;
   };
 
@@ -163,6 +177,10 @@ class CORE_EXPORT NGInlineNode : public NGLayoutInputNode {
       const String* previous_text,
       const HeapVector<NGInlineItem>* previous_items) const;
   void AssociateItemsWithInlines(NGInlineNodeData*) const;
+  bool IsNGShapeCacheAllowed(const String&,
+                             const Font*,
+                             const HeapVector<NGInlineItem>&,
+                             ShapeResultSpacing<String>&) const;
 
   NGInlineNodeData* MutableData() const {
     return To<LayoutBlockFlow>(box_.Get())->GetNGInlineNodeData();

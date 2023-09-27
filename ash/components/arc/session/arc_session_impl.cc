@@ -23,6 +23,7 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
+#include "base/memory/raw_ptr.h"
 #include "base/posix/eintr_wrapper.h"
 #include "base/process/process_metrics.h"
 #include "base/rand_util.h"
@@ -122,39 +123,6 @@ void ApplyDalvikMemoryProfile(
           << (mem_info.total / 1024) << "Mb device.";
 }
 
-// Applies USAP profile to the ARC mini instance start params.
-// Profile is determined based on enable feature and available memory on the
-// device. Possible profiles 16G,8G and 4G. For low memory devices USAP
-// profile is not overridden. If |memory_stat_file_for_testing| is set,
-// it specifies the file to read in tests instead of /proc/meminfo in
-// production.
-// Note: This is only used for VM. This profile does nothing for container.
-void ApplyUsapProfile(
-    ArcSessionImpl::SystemMemoryInfoCallback system_memory_info_callback,
-    StartParams* params) {
-  // Check if enabled.
-  if (!base::FeatureList::IsEnabled(arc::kEnableUsap)) {
-    VLOG(1) << "USAP profile is not enabled.";
-    return;
-  }
-
-  base::SystemMemoryInfoKB mem_info;
-  if (!system_memory_info_callback.Run(&mem_info)) {
-    LOG(ERROR) << "Failed to get system memory info";
-    return;
-  }
-
-  if (mem_info.total >= kClassify16GbDeviceInKb) {
-    params->usap_profile = StartParams::UsapProfile::M16G;
-  } else if (mem_info.total >= kClassify8GbDeviceInKb) {
-    params->usap_profile = StartParams::UsapProfile::M8G;
-  } else if (mem_info.total >= kClassify4GbDeviceInKb) {
-    params->usap_profile = StartParams::UsapProfile::M4G;
-  } else {
-    params->usap_profile = StartParams::UsapProfile::DEFAULT;
-  }
-}
-
 void ApplyDisableDownloadProvider(StartParams* params) {
   params->disable_download_provider =
       base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -169,6 +137,10 @@ void ApplyDisableUreadahed(StartParams* params) {
 
 void ApplyHostUreadahedGeneration(StartParams* params) {
   params->host_ureadahead_generation = IsHostUreadaheadGeneration();
+}
+
+void ApplyUseDevCaches(StartParams* params) {
+  params->use_dev_caches = IsArcUseDevCaches();
 }
 
 // Real Delegate implementation to connect Mojo.
@@ -209,7 +181,7 @@ class ArcSessionDelegateImpl : public ArcSessionImpl::Delegate {
                        mojo::ScopedMessagePipeHandle server_pipe);
 
   // Owned by ArcServiceManager.
-  ArcBridgeService* const arc_bridge_service_;
+  const raw_ptr<ArcBridgeService, ExperimentalAsh> arc_bridge_service_;
 
   const version_info::Channel channel_;
 
@@ -464,8 +436,8 @@ void ArcSessionImpl::DoStartMiniInstance(size_t num_cores_disabled) {
           arc::kKeyboardShortcutHelperIntegrationFeature);
   params.lcd_density = lcd_density_;
   params.num_cores_disabled = num_cores_disabled;
-  params.enable_notifications_refresh =
-      ash::features::IsNotificationsRefreshEnabled();
+  // TODO(b/278121256): Remove pre-NotificationsRefresh code from ARC.
+  params.enable_notifications_refresh = true;
   params.enable_tts_caching = true;
   params.enable_consumer_auto_update_toggle = base::FeatureList::IsEnabled(
       ash::features::kConsumerAutoUpdateToggleAllowed);
@@ -514,10 +486,10 @@ void ArcSessionImpl::DoStartMiniInstance(size_t num_cores_disabled) {
           << ", num_cores_disabled=" << params.num_cores_disabled;
 
   ApplyDalvikMemoryProfile(system_memory_info_callback_, &params);
-  ApplyUsapProfile(system_memory_info_callback_, &params);
   ApplyDisableDownloadProvider(&params);
   ApplyDisableUreadahed(&params);
   ApplyHostUreadahedGeneration(&params);
+  ApplyUseDevCaches(&params);
 
   client_->StartMiniArc(std::move(params),
                         base::BindOnce(&ArcSessionImpl::OnMiniInstanceStarted,
@@ -698,9 +670,6 @@ void ArcSessionImpl::OnMojoConnected(
 
   VLOG(0) << "ARC ready.";
   state_ = State::RUNNING_FULL_INSTANCE;
-
-  // Some memory parameters may be changed when ARC is launched.
-  ash::UpdateMemoryParameters();
 }
 
 void ArcSessionImpl::Stop() {

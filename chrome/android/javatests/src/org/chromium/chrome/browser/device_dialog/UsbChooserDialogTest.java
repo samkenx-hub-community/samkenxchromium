@@ -24,11 +24,11 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.JniMocker;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
 import org.chromium.components.security_state.ConnectionSecurityLevel;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
@@ -99,7 +99,9 @@ public class UsbChooserDialogTest {
         TouchCommon.singleClickView(items.getChildAt(position - firstVisiblePosition));
 
         CriteriaHelper.pollUiThread(() -> button.isEnabled());
-
+        // Make sure the button is properly rendered before clicking.
+        CriteriaHelper.pollUiThread(
+                () -> { Criteria.checkThat(button.getHeight(), Matchers.greaterThan(0)); });
         TouchCommon.singleClickView(button);
 
         CriteriaHelper.pollUiThread(() -> {
@@ -140,6 +142,7 @@ public class UsbChooserDialogTest {
     @SmallTest
     public void testSelectItem() {
         Dialog dialog = mChooserDialog.mItemChooserDialog.getDialogForTesting();
+        Assert.assertTrue(dialog.isShowing());
 
         TextViewWithClickableSpans statusView =
                 (TextViewWithClickableSpans) dialog.findViewById(R.id.status);

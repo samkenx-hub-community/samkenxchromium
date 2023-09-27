@@ -9,8 +9,8 @@
 #include "ash/assistant/ui/base/stack_layout.h"
 #include "ash/public/cpp/ash_web_view.h"
 #include "ash/public/cpp/ash_web_view_factory.h"
+#include "ash/wallpaper/views/wallpaper_view.h"
 #include "ash/wallpaper/wallpaper_constants.h"
-#include "ash/wallpaper/wallpaper_view.h"
 #include "base/check_deref.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
@@ -70,6 +70,7 @@ void RemoteMaintenanceCurtainView::AddCurtainWebView() {
   DCHECK(!curtain_view_);
   curtain_view_ =
       AddChildView(AshWebViewFactory::Get()->Create(AshWebView::InitParams()));
+  curtain_view_->SetID(kRemoteMaintenanceCurtainAshWebViewId);
   layout_->SetVerticalAlignmentForView(curtain_view_,
                                        StackLayout::VerticalAlignment::kCenter);
 

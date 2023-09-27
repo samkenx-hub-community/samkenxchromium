@@ -17,7 +17,7 @@
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/ui_base_features.h"
-#include "ui/chromeos/events/keyboard_layout_util.h"
+#include "ui/events/ash/keyboard_layout_util.h"
 #include "ui/events/devices/device_data_manager.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/dom/dom_code.h"
@@ -665,7 +665,7 @@ const std::vector<ash::KeyboardShortcutItem>& GetKeyboardShortcutItemList() {
        IDS_KSV_DESCRIPTION_KEYBOARD_SHORTCUT_HELPER,
        {},
        // |accelerator_ids|
-       {{ui::VKEY_OEM_2, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN}}},
+       {{ui::VKEY_S, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN}}},
 
       {// |categories|
        {ShortcutCategory::kTabAndWindow},

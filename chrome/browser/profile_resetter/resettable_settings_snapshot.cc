@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "base/functional/bind.h"
-#include "base/guid.h"
 #include "base/hash/md5.h"
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
@@ -17,6 +16,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
+#include "base/uuid.h"
 #include "base/values.h"
 #include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
@@ -27,7 +27,7 @@
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/common/channel_info.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/embedder_support/user_agent_utils.h"
 #include "components/prefs/pref_service.h"
@@ -85,7 +85,7 @@ ResettableSettingsSnapshot::ResettableSettingsSnapshot(Profile* profile)
 
   // Calculate the MD5 sum of the GUID to make sure that no part of the GUID
   // contains information identifying the sender of the report.
-  guid_ = base::MD5String(base::GenerateGUID());
+  guid_ = base::MD5String(base::Uuid::GenerateRandomV4().AsLowercaseString());
 }
 
 ResettableSettingsSnapshot::~ResettableSettingsSnapshot() {
@@ -244,7 +244,7 @@ base::Value::List GetReadableFeedbackForSnapshot(
           g_browser_process->GetApplicationLocale());
   AddPair(list, l10n_util::GetStringUTF16(IDS_VERSION_UI_USER_AGENT),
           embedder_support::GetUserAgent());
-  std::string version = version_info::GetVersionNumber();
+  std::string version(version_info::GetVersionNumber());
   version += chrome::GetChannelName(chrome::WithExtendedStable(true));
   AddPair(list,
           l10n_util::GetStringUTF16(IDS_PRODUCT_NAME),

@@ -18,6 +18,7 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_front_face.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_index_format.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_load_op.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_mipmap_filter_mode.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_pipeline_statistic_name.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_primitive_topology.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_query_type.h"
@@ -79,6 +80,10 @@ WGPUStorageTextureAccess AsDawnEnum(
   switch (webgpu_enum.AsEnum()) {
     case V8GPUStorageTextureAccess::Enum::kWriteOnly:
       return WGPUStorageTextureAccess_WriteOnly;
+    case V8GPUStorageTextureAccess::Enum::kReadOnly:
+      return WGPUStorageTextureAccess_ReadOnly;
+    case V8GPUStorageTextureAccess::Enum::kReadWrite:
+      return WGPUStorageTextureAccess_ReadWrite;
   }
 }
 
@@ -203,6 +208,8 @@ WGPUTextureFormat AsDawnEnum(const V8GPUTextureFormat& webgpu_enum) {
       // Packed 32 bit formats
     case V8GPUTextureFormat::Enum::kRgb9E5Ufloat:
       return WGPUTextureFormat_RGB9E5Ufloat;
+    case V8GPUTextureFormat::Enum::kRgb10A2Uint:
+      return WGPUTextureFormat_RGB10A2Uint;
     case V8GPUTextureFormat::Enum::kRgb10A2Unorm:
       return WGPUTextureFormat_RGB10A2Unorm;
     case V8GPUTextureFormat::Enum::kRg11B10Ufloat:
@@ -415,6 +422,8 @@ const char* FromDawnEnum(WGPUTextureFormat dawn_enum) {
     // Packed 32 bit formats
     case WGPUTextureFormat_RGB9E5Ufloat:
       return "rgb9e5ufloat";
+    case WGPUTextureFormat_RGB10A2Uint:
+      return "rgb10a2uint";
     case WGPUTextureFormat_RGB10A2Unorm:
       return "rgb10a2unorm";
     case WGPUTextureFormat_RG11B10Ufloat:
@@ -677,8 +686,6 @@ WGPUFeatureName AsDawnEnum(const V8GPUFeatureName& webgpu_enum) {
       return WGPUFeatureName_TimestampQuery;
     case V8GPUFeatureName::Enum::kTimestampQueryInsidePasses:
       return WGPUFeatureName_TimestampQueryInsidePasses;
-    case V8GPUFeatureName::Enum::kShaderFloat16:
-      return WGPUFeatureName_DawnShaderFloat16;
     case V8GPUFeatureName::Enum::kDepthClipControl:
       return WGPUFeatureName_DepthClipControl;
     case V8GPUFeatureName::Enum::kDepth32FloatStencil8:
@@ -687,10 +694,21 @@ WGPUFeatureName AsDawnEnum(const V8GPUFeatureName& webgpu_enum) {
       return WGPUFeatureName_IndirectFirstInstance;
     case V8GPUFeatureName::Enum::kChromiumExperimentalDp4A:
       return WGPUFeatureName_ChromiumExperimentalDp4a;
+    case V8GPUFeatureName::Enum::kChromiumExperimentalReadWriteStorageTexture:
+      return WGPUFeatureName_ChromiumExperimentalReadWriteStorageTexture;
+    case V8GPUFeatureName::Enum::kChromiumExperimentalSubgroups:
+      return WGPUFeatureName_ChromiumExperimentalSubgroups;
+    case V8GPUFeatureName::Enum::
+        kChromiumExperimentalSubgroupUniformControlFlow:
+      return WGPUFeatureName_ChromiumExperimentalSubgroupUniformControlFlow;
     case V8GPUFeatureName::Enum::kRg11B10UfloatRenderable:
       return WGPUFeatureName_RG11B10UfloatRenderable;
     case V8GPUFeatureName::Enum::kBgra8UnormStorage:
       return WGPUFeatureName_BGRA8UnormStorage;
+    case V8GPUFeatureName::Enum::kShaderF16:
+      return WGPUFeatureName_ShaderF16;
+    case V8GPUFeatureName::Enum::kFloat32Filterable:
+      return WGPUFeatureName_Float32Filterable;
   }
 }
 
@@ -846,6 +864,15 @@ WGPUFilterMode AsDawnEnum(const V8GPUFilterMode& webgpu_enum) {
       return WGPUFilterMode_Nearest;
     case V8GPUFilterMode::Enum::kLinear:
       return WGPUFilterMode_Linear;
+  }
+}
+
+WGPUMipmapFilterMode AsDawnEnum(const V8GPUMipmapFilterMode& webgpu_enum) {
+  switch (webgpu_enum.AsEnum()) {
+    case V8GPUMipmapFilterMode::Enum::kNearest:
+      return WGPUMipmapFilterMode_Nearest;
+    case V8GPUMipmapFilterMode::Enum::kLinear:
+      return WGPUMipmapFilterMode_Linear;
   }
 }
 

@@ -13,16 +13,15 @@ import android.app.Instrumentation;
 import android.app.Instrumentation.ActivityMonitor;
 import android.app.PendingIntent;
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 import android.text.TextUtils;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.test.filters.MediumTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -37,7 +36,6 @@ import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.CriteriaNotSatisfiedException;
 import org.chromium.base.test.util.DisabledTest;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.ChromeTabbedActivity2;
 import org.chromium.chrome.browser.app.metrics.LaunchCauseMetrics;
@@ -52,6 +50,7 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeActivityTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeApplicationTestUtils;
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.MenuUtils;
@@ -82,13 +81,6 @@ public class SwitchToTabTest {
     public void setUp() throws InterruptedException {
         mActivityTestRule.startMainActivityOnBlankPage();
         mOmnibox = new OmniboxTestUtils(mActivityTestRule.getActivity());
-    }
-
-    @After
-    public void tearDown() {
-        if (mTestServer != null) {
-            mTestServer.stopAndDestroyServer();
-        }
     }
 
     /**
@@ -263,7 +255,6 @@ public class SwitchToTabTest {
 
     @Test
     @MediumTest
-    @CommandLineFlags.Add({"disable-features=OmniboxUpdateResultDebounce"})
     public void testSwitchToTabSuggestion() throws InterruptedException {
         mTestServer = EmbeddedTestServer.createAndStartHTTPSServer(
                 InstrumentationRegistry.getInstrumentation().getContext(),
@@ -356,7 +347,6 @@ public class SwitchToTabTest {
 
     @Test
     @MediumTest
-    @CommandLineFlags.Add({"disable-features=OmniboxUpdateResultDebounce"})
     public void testSwitchToTabInSearchActivity() throws InterruptedException {
         mTestServer = EmbeddedTestServer.createAndStartHTTPSServer(
                 InstrumentationRegistry.getInstrumentation().getContext(),

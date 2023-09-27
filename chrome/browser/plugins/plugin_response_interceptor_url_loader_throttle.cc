@@ -9,7 +9,7 @@
 
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
-#include "base/guid.h"
+#include "base/uuid.h"
 #include "chrome/browser/extensions/api/streams_private/streams_private_api.h"
 #include "chrome/browser/plugins/plugin_utils.h"
 #include "content/public/browser/browser_task_traits.h"
@@ -97,16 +97,17 @@ void PluginResponseInterceptorURLLoaderThrottle::WillProcessResponse(
     network::mojom::URLResponseHead* response_head,
     bool* defer) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (content::download_utils::MustDownload(response_url,
-                                            response_head->headers.get(),
-                                            response_head->mime_type)) {
-    return;
-  }
 
   content::WebContents* web_contents =
       content::WebContents::FromFrameTreeNodeId(frame_tree_node_id_);
   if (!web_contents)
     return;
+
+  if (content::download_utils::MustDownload(
+          web_contents->GetBrowserContext(), response_url,
+          response_head->headers.get(), response_head->mime_type)) {
+    return;
+  }
 
   std::string extension_id = PluginUtils::GetExtensionIdForMimeType(
       web_contents->GetBrowserContext(), response_head->mime_type);
@@ -136,7 +137,8 @@ void PluginResponseInterceptorURLLoaderThrottle::WillProcessResponse(
 
   // TODO(mcnee): Could this id just be an int instead? This is only used
   // internally.
-  const std::string stream_id = base::GenerateGUID();
+  const std::string stream_id =
+      base::Uuid::GenerateRandomV4().AsLowercaseString();
 
   mojo::PendingRemote<network::mojom::URLLoader> dummy_new_loader;
   std::ignore = dummy_new_loader.InitWithNewPipeAndPassReceiver();
@@ -189,7 +191,7 @@ void PluginResponseInterceptorURLLoaderThrottle::WillProcessResponse(
   auto transferrable_loader = blink::mojom::TransferrableURLLoader::New();
   transferrable_loader->url = GURL(
       extensions::Extension::GetBaseURLFromExtensionId(extension_id).spec() +
-      base::GenerateGUID());
+      base::Uuid::GenerateRandomV4().AsLowercaseString());
   transferrable_loader->url_loader = std::move(original_loader);
   transferrable_loader->url_loader_client = std::move(original_client);
   transferrable_loader->head = std::move(deep_copied_response);

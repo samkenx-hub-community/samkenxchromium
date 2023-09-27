@@ -9,7 +9,7 @@
 #include <string>
 
 #include "base/threading/thread_checker.h"
-#import "ios/chrome/browser/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
 
 namespace network {
 class TestNetworkConnectionTracker;
@@ -41,6 +41,9 @@ class TestingApplicationContext : public ApplicationContext {
   // Sets the ChromeBrowserStateManager.
   void SetChromeBrowserStateManager(ios::ChromeBrowserStateManager* manager);
 
+  // Sets the VariationsService.
+  void SetVariationsService(variations::VariationsService* variations_service);
+
   // ApplicationContext implementation.
   void OnAppEnterForeground() override;
   void OnAppEnterBackground() override;
@@ -69,7 +72,6 @@ class TestingApplicationContext : public ApplicationContext {
   SafeBrowsingService* GetSafeBrowsingService() override;
   network::NetworkConnectionTracker* GetNetworkConnectionTracker() override;
   BrowserPolicyConnectorIOS* GetBrowserPolicyConnector() override;
-  PromosManager* GetPromosManager() override;
   id<SingleSignOnService> GetSSOService() override;
   SystemIdentityManager* GetSystemIdentityManager() override;
   segmentation_platform::OTRWebStateObserver*
@@ -99,6 +101,7 @@ class TestingApplicationContext : public ApplicationContext {
   __strong id<SingleSignOnService> single_sign_on_service_ = nil;
   std::unique_ptr<SystemIdentityManager> system_identity_manager_;
   std::unique_ptr<PushNotificationService> push_notification_service_;
+  variations::VariationsService* variations_service_;
 };
 
 #endif  // IOS_CHROME_TEST_TESTING_APPLICATION_CONTEXT_H_

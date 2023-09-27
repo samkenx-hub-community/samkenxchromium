@@ -4,10 +4,11 @@
 
 package org.chromium.chrome.browser.tab;
 
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
+
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
@@ -32,9 +33,6 @@ import org.robolectric.annotation.Config;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.chrome.browser.app.ChromeActivity;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabDataObserver;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.content_public.browser.LoadUrlParams;
@@ -48,7 +46,6 @@ import java.lang.ref.WeakReference;
  */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-@Features.EnableFeatures(ChromeFeatureList.TAB_STATE_V1_OPTIMIZATIONS)
 public class TabUnitTest {
     private static final int TAB1_ID = 456;
     private static final int TAB2_ID = 789;
@@ -73,10 +70,6 @@ public class TabUnitTest {
     private WeakReference<Activity> mWeakReferenceActivity;
     @Mock
     private Activity mActivity;
-    @Mock
-    private CriticalPersistedTabData mCriticalPersistedTabData;
-    @Mock
-    private CriticalPersistedTabDataObserver mCriticalPersistedTabDataObserver;
     @Mock
     private NativePage mNativePage;
     @Mock
@@ -104,14 +97,13 @@ public class TabUnitTest {
         doReturn(mContext).when(mWeakReferenceContext).get();
         doReturn(mContext).when(mContext).getApplicationContext();
 
-        mTab = new TabImpl(TAB1_ID, false, null, null) {
+        mTab = new TabImpl(TAB1_ID, false, null) {
             @Override
             public boolean isInitialized() {
                 return true;
             }
         };
         mTab.addObserver(mObserver);
-        CriticalPersistedTabData.from(mTab).addObserver(mCriticalPersistedTabDataObserver);
     }
 
     @Test
@@ -120,13 +112,13 @@ public class TabUnitTest {
         TabStateAttributes.createForTab(mTab, TabCreationState.FROZEN_ON_RESTORE);
         assertThat(TabStateAttributes.from(mTab).getDirtinessState(),
                 equalTo(TabStateAttributes.DirtinessState.CLEAN));
-        assertThat(CriticalPersistedTabData.from(mTab).getRootId(), equalTo(TAB1_ID));
+        assertThat(mTab.getRootId(), equalTo(TAB1_ID));
 
-        CriticalPersistedTabData.from(mTab).setRootId(TAB2_ID);
+        mTab.setRootId(TAB2_ID);
 
-        verify(mCriticalPersistedTabDataObserver).onRootIdChanged(mTab, TAB2_ID);
+        verify(mObserver).onRootIdChanged(mTab, TAB2_ID);
 
-        assertThat(CriticalPersistedTabData.from(mTab).getRootId(), equalTo(TAB2_ID));
+        assertThat(mTab.getRootId(), equalTo(TAB2_ID));
         assertThat(TabStateAttributes.from(mTab).getDirtinessState(),
                 equalTo(TabStateAttributes.DirtinessState.DIRTY));
     }
@@ -137,14 +129,13 @@ public class TabUnitTest {
         TabStateAttributes.createForTab(mTab, TabCreationState.FROZEN_ON_RESTORE);
         assertThat(TabStateAttributes.from(mTab).getDirtinessState(),
                 equalTo(TabStateAttributes.DirtinessState.CLEAN));
-        assertThat(CriticalPersistedTabData.from(mTab).getRootId(), equalTo(TAB1_ID));
+        assertThat(mTab.getRootId(), equalTo(TAB1_ID));
         TabStateAttributes.from(mTab).clearTabStateDirtiness();
 
-        CriticalPersistedTabData.from(mTab).setRootId(TAB1_ID);
+        mTab.setRootId(TAB1_ID);
 
-        verify(mCriticalPersistedTabDataObserver, never())
-                .onRootIdChanged(any(Tab.class), anyInt());
-        assertThat(CriticalPersistedTabData.from(mTab).getRootId(), equalTo(TAB1_ID));
+        verify(mObserver, never()).onRootIdChanged(any(Tab.class), anyInt());
+        assertThat(mTab.getRootId(), equalTo(TAB1_ID));
         assertThat(TabStateAttributes.from(mTab).getDirtinessState(),
                 equalTo(TabStateAttributes.DirtinessState.CLEAN));
     }
@@ -165,7 +156,7 @@ public class TabUnitTest {
         doReturn(mWindowAndroid).when(mWebContents).getTopLevelNativeWindow();
         doReturn(mChromeActivity).when(mWeakReferenceContext).get();
 
-        mTab = new TabImpl(TAB1_ID, false, null, null) {
+        mTab = new TabImpl(TAB1_ID, false, null) {
             @Override
             void updateWindowAndroid(WindowAndroid windowAndroid) {}
             @Override

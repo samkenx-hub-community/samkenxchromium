@@ -43,10 +43,6 @@ class MODULES_EXPORT VideoTrackAdapter
  public:
   using OnMutedCallback = base::RepeatingCallback<void(bool mute_state)>;
 
-  // Min delta time between two frames allowed without being dropped if a max
-  // frame rate is specified. Exposed globally for testability.
-  static constexpr int kMinTimeBetweenFramesMs = 5;
-
   VideoTrackAdapter(
       scoped_refptr<base::SequencedTaskRunner> video_task_runner,
       base::WeakPtr<MediaStreamVideoSource> media_stream_video_source);
@@ -84,6 +80,11 @@ class MODULES_EXPORT VideoTrackAdapter
   void DeliverEncodedVideoFrameOnVideoTaskRunner(
       scoped_refptr<EncodedVideoFrame> frame,
       base::TimeTicks estimated_capture_time);
+
+  // Called if a frame was dropped prior to delivery, i.e.
+  // DeliverFrameOnVideoTaskRunner() will not be called for this frame.
+  void OnFrameDroppedOnVideoTaskRunner(
+      media::VideoCaptureFrameDropReason reason);
 
   // Called when it is guaranteed that all subsequent frames delivered
   // over DeliverFrameOnVideoTaskRunner() will have a crop version that is
@@ -132,7 +133,7 @@ class MODULES_EXPORT VideoTrackAdapter
           std::vector<scoped_refptr<media::VideoFrame>> scaled_video_frames,
           base::TimeTicks estimated_capture_time)>;
   using VideoCaptureNotifyFrameDroppedInternalCallback =
-      WTF::CrossThreadFunction<void()>;
+      WTF::CrossThreadFunction<void(media::VideoCaptureFrameDropReason)>;
   using DeliverEncodedVideoFrameInternalCallback =
       WTF::CrossThreadFunction<void(
           scoped_refptr<EncodedVideoFrame> video_frame,

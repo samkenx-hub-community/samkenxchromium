@@ -7,7 +7,6 @@ package org.chromium.chrome.browser.findinpage;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 import android.text.Spannable;
 import android.text.style.StyleSpan;
 import android.view.KeyCharacterMap;
@@ -19,6 +18,7 @@ import android.widget.TextView;
 import androidx.test.espresso.Espresso;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.After;
@@ -34,13 +34,14 @@ import org.chromium.base.test.util.CloseableOnMainThread;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
+import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
 import org.chromium.chrome.test.util.FullscreenTestUtils;
 import org.chromium.chrome.test.util.MenuUtils;
@@ -413,7 +414,7 @@ public class FindTest {
     @Test
     @MediumTest
     @Feature({"FindInPage"})
-    @DisableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @DisableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testBackKeyDoesNotDismissFindWhenImeIsPresent() {
         sActivityTestRule.loadUrl(sActivityTestRule.getTestServer().getURL(FILEPATH));
         findInPageFromMenu();
@@ -436,7 +437,7 @@ public class FindTest {
     @Test
     @MediumTest
     @Feature({"FindInPage"})
-    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testBackKeyDoesNotDismissFindWhenImeIsPresent_BackRefactored() {
         sActivityTestRule.loadUrl(sActivityTestRule.getTestServer().getURL(FILEPATH));
         findInPageFromMenu();
@@ -459,7 +460,7 @@ public class FindTest {
     @Test
     @MediumTest
     @Feature({"FindInPage"})
-    @DisableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @DisableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
     public void testBackKeyDismissesFind() {
         loadTestAndVerifyFindInPage("pitts", "1/7");
         waitForIME(true);
@@ -477,7 +478,8 @@ public class FindTest {
     @Test
     @MediumTest
     @Feature({"FindInPage"})
-    @EnableFeatures({ChromeFeatureList.BACK_GESTURE_REFACTOR})
+    @EnableFeatures(ChromeFeatureList.BACK_GESTURE_REFACTOR)
+    @DisabledTest(message = "https://crbug.com/1458344")
     public void testBackKeyDismissesFind_BackRefactored() {
         loadTestAndVerifyFindInPage("pitts", "1/7");
         waitForIME(true);

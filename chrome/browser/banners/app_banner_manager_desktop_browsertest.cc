@@ -6,6 +6,7 @@
 #include <string>
 #include <utility>
 
+#include "base/auto_reset.h"
 #include "base/functional/callback.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
@@ -33,6 +34,7 @@
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "chromeos/ash/components/standalone_browser/feature_refs.h"
 #include "components/password_manager/content/common/web_ui_constants.h"
 #include "components/password_manager/core/common/password_manager_features.h"
 #include "components/webapps/browser/banners/app_banner_metrics.h"
@@ -52,8 +54,9 @@ namespace webapps {
 namespace {
 
 std::vector<base::test::FeatureRef> GetDisabledFeatures() {
+// TODO(crbug.com/1462253): Also test with Lacros flags enabled.
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-  return {features::kWebAppsCrosapi, ash::features::kLacrosPrimary};
+  return ash::standalone_browser::GetFeatureRefs();
 #else
   return {};
 #endif
@@ -66,7 +69,9 @@ using State = AppBannerManager::State;
 class AppBannerManagerDesktopBrowserTest
     : public AppBannerManagerBrowserTestBase {
  public:
-  AppBannerManagerDesktopBrowserTest() = default;
+  AppBannerManagerDesktopBrowserTest()
+      : total_engagement_(
+            AppBannerSettingsHelper::ScopeTotalEngagementForTesting(0)) {}
 
   void SetUp() override {
     scoped_feature_list_.InitWithFeatures({}, GetDisabledFeatures());
@@ -75,8 +80,6 @@ class AppBannerManagerDesktopBrowserTest
   }
 
   void SetUpOnMainThread() override {
-    // Trigger banners instantly.
-    AppBannerSettingsHelper::SetTotalEngagementToTrigger(0);
     chrome::SetAutoAcceptPWAInstallConfirmationForTesting(true);
 
     AppBannerManagerBrowserTestBase::SetUpOnMainThread();
@@ -93,6 +96,8 @@ class AppBannerManagerDesktopBrowserTest
 
  protected:
   base::test::ScopedFeatureList scoped_feature_list_;
+  // Scope engagement needed to trigger banners instantly.
+  base::AutoReset<double> total_engagement_;
 };
 
 IN_PROC_BROWSER_TEST_F(AppBannerManagerDesktopBrowserTest,
@@ -156,7 +161,7 @@ IN_PROC_BROWSER_TEST_F(AppBannerManagerDesktopBrowserTest,
     bool callback_called = false;
 
     web_app::SetInstalledCallbackForTesting(
-        base::BindLambdaForTesting([&](const web_app::AppId& installed_app_id,
+        base::BindLambdaForTesting([&](const webapps::AppId& installed_app_id,
                                        webapps::InstallResultCode code) {
           EXPECT_EQ(webapps::InstallResultCode::kSuccessNewInstall, code);
           EXPECT_EQ(installed_app_id,
@@ -206,7 +211,7 @@ IN_PROC_BROWSER_TEST_F(AppBannerManagerDesktopBrowserTest,
     bool callback_called = false;
 
     web_app::SetInstalledCallbackForTesting(
-        base::BindLambdaForTesting([&](const web_app::AppId& installed_app_id,
+        base::BindLambdaForTesting([&](const webapps::AppId& installed_app_id,
                                        webapps::InstallResultCode code) {
           EXPECT_EQ(webapps::InstallResultCode::kWebContentsDestroyed, code);
           callback_called = true;
@@ -465,8 +470,7 @@ class AppBannerManagerDesktopBrowserTestForPasswordManagerPage
  public:
   void SetUp() override {
     scoped_feature_list_.InitWithFeatures(
-        {password_manager::features::kPasswordManagerRedesign},
-        GetDisabledFeatures());
+        /*enabled_features=*/{}, GetDisabledFeatures());
     TestAppBannerManagerDesktop::SetUp();
     AppBannerManagerBrowserTestBase::SetUp();
   }
@@ -490,7 +494,7 @@ IN_PROC_BROWSER_TEST_F(AppBannerManagerDesktopBrowserTestForPasswordManagerPage,
     run_loop.Run();
   }
 
-  EXPECT_EQ(AppBannerManager::InstallableWebAppCheckResult::kYes_ByUserRequest,
+  EXPECT_EQ(AppBannerManager::InstallableWebAppCheckResult::kYes_Promotable,
             manager->GetInstallableWebAppCheckResultForTesting());
 }
 

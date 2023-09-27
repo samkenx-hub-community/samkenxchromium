@@ -9,14 +9,10 @@
 #import "ios/chrome/app/application_delegate/app_state.h"
 #import "ios/chrome/app/application_delegate/app_state_observer.h"
 #import "ios/chrome/app/safe_mode_app_state_agent+private.h"
-#import "ios/chrome/browser/ui/main/scene_state.h"
-#import "ios/chrome/browser/ui/main/scene_state_observer.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state_observer.h"
 #import "ios/chrome/browser/ui/safe_mode/safe_mode_coordinator.h"
 #import "ios/chrome/browser/ui/scoped_ui_blocker/scoped_ui_blocker.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @implementation SafeModeAppAgent {
   // Multiwindow UI blocker used when safe mode is active to only show the safe

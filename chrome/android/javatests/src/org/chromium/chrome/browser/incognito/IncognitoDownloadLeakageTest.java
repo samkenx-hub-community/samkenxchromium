@@ -8,10 +8,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import android.os.Environment;
-import android.support.test.InstrumentationRegistry;
 import android.view.View;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -63,10 +64,10 @@ import java.util.concurrent.TimeoutException;
  */
 @RunWith(ParameterizedRunner.class)
 @UseRunnerDelegate(ChromeJUnit4RunnerDelegate.class)
-@EnableFeatures({ChromeFeatureList.CCT_INCOGNITO})
+@EnableFeatures(ChromeFeatureList.CCT_INCOGNITO)
 // TODO(crbug.com/1360906) remove INCOGNITO_DOWNLOADS_WARNING from the disabled features and fix
 // the test accordingly
-@DisableFeatures({ChromeFeatureList.INCOGNITO_DOWNLOADS_WARNING})
+@DisableFeatures(ChromeFeatureList.INCOGNITO_DOWNLOADS_WARNING)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE,
         "enable-features=UseDownloadOfflineContentProvider"})
 public class IncognitoDownloadLeakageTest {
@@ -137,7 +138,8 @@ public class IncognitoDownloadLeakageTest {
 
     @Before
     public void setUp() throws Exception {
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         mDownloadTestPage = mTestServer.getURL(DOWNLOAD_TEST_PAGE_PATH);
 
         // Ensuring native is initialized before we access the CCT_INCOGNITO feature flag.
@@ -169,7 +171,6 @@ public class IncognitoDownloadLeakageTest {
                                    .removeDownloadObserver(mTestDownloadManagerServiceObserver));
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> IncognitoDataTestUtils.closeTabs(mChromeActivityTestRule));
-        mTestServer.stopAndDestroyServer();
     }
 
     private boolean hasFileDownloaded(String downloadedFileName) {

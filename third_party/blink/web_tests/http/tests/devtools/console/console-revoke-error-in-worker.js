@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+
 (async function() {
   TestRunner.addResult(`Tests that console revokes lazily handled promise rejections.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('console');
   await TestRunner.evaluateInPagePromise(`
       var worker;
@@ -20,8 +25,8 @@
       }
   `);
 
-  SDK.targetManager.addModelListener(SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, messageAdded);
-  SDK.targetManager.addModelListener(SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageUpdated, messageUpdated);
+  SDK.TargetManager.TargetManager.instance().addModelListener(SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, messageAdded);
+  SDK.TargetManager.TargetManager.instance().addModelListener(SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.MessageUpdated, messageUpdated);
 
   Console.ConsoleView.instance().setImmediatelyFilterMessagesForTest();
   TestRunner.addResult('Creating worker with promise');

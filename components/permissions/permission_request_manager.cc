@@ -17,13 +17,16 @@
 #include "base/rand_util.h"
 #include "base/ranges/algorithm.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/time/clock.h"
 #include "base/time/time.h"
 #include "components/back_forward_cache/back_forward_cache_disable.h"
+#include "components/permissions/constants.h"
 #include "components/permissions/features.h"
 #include "components/permissions/origin_keyed_permission_action_service.h"
 #include "components/permissions/permission_decision_auto_blocker.h"
 #include "components/permissions/permission_prompt.h"
 #include "components/permissions/permission_request.h"
+#include "components/permissions/permission_uma_util.h"
 #include "components/permissions/permission_util.h"
 #include "components/permissions/permissions_client.h"
 #include "components/permissions/request_type.h"
@@ -37,6 +40,8 @@
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/web_contents.h"
+#include "ui/base/window_open_disposition_utils.h"
+#include "ui/events/event.h"
 #include "url/gurl.h"
 #include "url/origin.h"
 
@@ -233,18 +238,25 @@ void PermissionRequestManager::AddRequest(
   }
 
   // Don't re-add an existing request or one with a duplicate text request.
-  PermissionRequest* existing_request = GetExistingRequest(request);
-  if (existing_request) {
+  if (auto* existing_request = GetExistingRequest(request)) {
+    if (request == existing_request) {
+      return;
+    }
+
     // |request| is a duplicate. Add it to |duplicate_requests_| unless it's the
     // same object as |existing_request| or an existing duplicate.
-    if (request == existing_request)
+    auto iter = FindDuplicateRequestList(existing_request);
+    if (iter == duplicate_requests_.end()) {
+      duplicate_requests_.push_back({request->GetWeakPtr()});
       return;
-    auto range = duplicate_requests_.equal_range(existing_request);
-    for (auto it = range.first; it != range.second; ++it) {
-      if (request == it->second)
-        return;
     }
-    duplicate_requests_.insert(std::make_pair(existing_request, request));
+
+    for (const auto& weak_request : (*iter)) {
+      if (weak_request && request == weak_request.get()) {
+        return;
+      }
+    }
+    iter->push_back(request->GetWeakPtr());
     return;
   }
 
@@ -382,6 +394,10 @@ void PermissionRequestManager::PreemptAndRequeueCurrentRequest() {
   for (auto* current_request : requests_) {
     pending_permission_requests_.Push(current_request);
   }
+
+  // Because the order of the requests is changed, we should not preignore it.
+  preignore_timer_.AbandonAndStop();
+
   requests_.clear();
 }
 
@@ -427,17 +443,25 @@ void PermissionRequestManager::DidFinishNavigation(
     return;
   }
 
-  if (!pending_permission_requests_.IsEmpty() || IsRequestInProgress()) {
-    // |pending_permission_requests_| and |requests_| will be deleted below,
-    // which might be a problem for back-forward cache — the page might be
-    // restored later, but the requests won't be. Disable bfcache here if we
-    // have any requests here to prevent this from happening.
-    content::BackForwardCache::DisableForRenderFrameHost(
-        navigation_handle->GetPreviousRenderFrameHostId(),
-        back_forward_cache::DisabledReason(
-            back_forward_cache::DisabledReasonId::kPermissionRequestManager));
+  if (!navigation_handle->IsErrorPage()) {
+    permissions::PermissionUmaUtil::
+        RecordTopLevelPermissionsHeaderPolicyOnNavigation(
+            navigation_handle->GetRenderFrameHost());
   }
 
+  if (!base::FeatureList::IsEnabled(
+          features::kBackForwardCacheUnblockPermissionRequest)) {
+    if (!pending_permission_requests_.IsEmpty() || IsRequestInProgress()) {
+      // |pending_permission_requests_| and |requests_| will be deleted below,
+      // which might be a problem for back-forward cache — the page might be
+      // restored later, but the requests won't be. Disable bfcache here if we
+      // have any requests here to prevent this from happening.
+      content::BackForwardCache::DisableForRenderFrameHost(
+          navigation_handle->GetPreviousRenderFrameHostId(),
+          back_forward_cache::DisabledReason(
+              back_forward_cache::DisabledReasonId::kPermissionRequestManager));
+    }
+  }
   CleanUpRequests();
 }
 
@@ -473,7 +497,7 @@ void PermissionRequestManager::OnVisibilityChanged(
   tab_is_hidden_ = visibility == content::Visibility::HIDDEN;
   if (tab_was_hidden == tab_is_hidden_)
     return;
-
+  NotifyTabVisibilityChanged(visibility);
   if (tab_is_hidden_) {
     if (view_) {
       switch (view_->GetTabSwitchingBehavior()) {
@@ -525,6 +549,10 @@ GURL PermissionRequestManager::GetRequestingOrigin() const {
 }
 
 GURL PermissionRequestManager::GetEmbeddingOrigin() const {
+  if (embedding_origin_for_testing_.has_value()) {
+    return embedding_origin_for_testing_.value();
+  }
+
   return PermissionUtil::GetLastCommittedOriginAsURL(
       web_contents()->GetPrimaryMainFrame());
 }
@@ -541,6 +569,17 @@ void PermissionRequestManager::Accept() {
                                 PermissionAction::GRANTED);
     PermissionGrantedIncludingDuplicates(*requests_iter,
                                          /*is_one_time=*/false);
+
+#if !BUILDFLAG(IS_ANDROID)
+    absl::optional<ContentSettingsType> content_settings_type =
+        RequestTypeToContentSettingsType((*requests_iter)->request_type());
+    if (content_settings_type.has_value()) {
+      PermissionUmaUtil::RecordPermissionRegrantForUnusedSites(
+          (*requests_iter)->requesting_origin(), content_settings_type.value(),
+          PermissionSourceUI::PROMPT, web_contents()->GetBrowserContext(),
+          base::Time::Now());
+    }
+#endif
   }
 
   NotifyRequestDecided(PermissionAction::GRANTED);
@@ -629,6 +668,21 @@ void PermissionRequestManager::Ignore() {
   FinalizeCurrentRequests(PermissionAction::IGNORED);
 }
 
+void PermissionRequestManager::OpenHelpCenterLink(const ui::Event& event) {
+  CHECK_GT(requests_.size(), 0u);
+  switch (requests_[0]->request_type()) {
+    case permissions::RequestType::kStorageAccess:
+      GetAssociatedWebContents()->OpenURL(content::OpenURLParams(
+          GURL(permissions::kEmbeddedContentHelpCenterURL), content::Referrer(),
+          ui::DispositionFromEventFlags(
+              event.flags(), WindowOpenDisposition::NEW_FOREGROUND_TAB),
+          ui::PAGE_TRANSITION_LINK, /*is_renderer_initiated=*/false));
+      break;
+    default:
+      NOTREACHED_NORETURN();
+  }
+}
+
 void PermissionRequestManager::PreIgnoreQuietPrompt() {
   // Random number of seconds in the range [1.0, 2.0).
   double delay_seconds = 1.0 + 1.0 * base::RandDouble();
@@ -639,6 +693,11 @@ void PermissionRequestManager::PreIgnoreQuietPrompt() {
 
 void PermissionRequestManager::PreIgnoreQuietPromptInternal() {
   DCHECK(!requests_.empty());
+
+  if (requests_.empty()) {
+    // If `requests_` was cleared then there is nothing preignore.
+    return;
+  }
 
   std::vector<PermissionRequest*>::iterator requests_iter;
   for (requests_iter = requests_.begin(); requests_iter != requests_.end();
@@ -702,6 +761,11 @@ bool PermissionRequestManager::RecreateView() {
 
   current_request_prompt_disposition_ = view_->GetPromptDisposition();
   return true;
+}
+
+absl::optional<gfx::Rect>
+PermissionRequestManager::GetPromptBubbleViewBoundsInScreen() const {
+  return view_ ? view_->GetViewBoundsInScreen() : absl::nullopt;
 }
 
 PermissionRequestManager::PermissionRequestManager(
@@ -862,6 +926,7 @@ void PermissionRequestManager::ShowPrompt() {
         absl::nullopt, DetermineCurrentRequestUIDisposition(),
         DetermineCurrentRequestUIDispositionReasonForUMA(),
         requests_[0]->GetGestureType(), absl::nullopt, false,
+        web_contents()->GetLastCommittedURL(),
         hats_shown_callback_.has_value()
             ? std::move(hats_shown_callback_.value())
             : base::DoNothing());
@@ -997,6 +1062,11 @@ void PermissionRequestManager::FinalizeCurrentRequests(
     validated_requests_set_.erase(*requests_iter);
     request_sources_map_.erase(*requests_iter);
   }
+
+  // No need to execute the preignore logic as we canceling currently active
+  // requests anyway.
+  preignore_timer_.AbandonAndStop();
+
   requests_.clear();
 
   for (Observer& observer : observer_list_)
@@ -1036,10 +1106,58 @@ void PermissionRequestManager::CleanUpRequests() {
 PermissionRequest* PermissionRequestManager::GetExistingRequest(
     PermissionRequest* request) const {
   for (PermissionRequest* existing_request : requests_) {
-    if (request->IsDuplicateOf(existing_request))
+    if (request->IsDuplicateOf(existing_request)) {
       return existing_request;
+    }
   }
   return pending_permission_requests_.FindDuplicate(request);
+}
+
+PermissionRequestManager::WeakPermissionRequestList::iterator
+PermissionRequestManager::FindDuplicateRequestList(PermissionRequest* request) {
+  for (auto request_list = duplicate_requests_.begin();
+       request_list != duplicate_requests_.end(); ++request_list) {
+    for (auto iter = request_list->begin(); iter != request_list->end();) {
+      // Remove any requests that have been destroyed.
+      const auto& weak_request = (*iter);
+      if (!weak_request) {
+        iter = request_list->erase(iter);
+        continue;
+      }
+
+      // The first valid request in the list will indicate whether all other
+      // members are duplicate or not.
+      if (weak_request->IsDuplicateOf(request)) {
+        return request_list;
+      }
+
+      break;
+    }
+  }
+
+  return duplicate_requests_.end();
+}
+
+PermissionRequestManager::WeakPermissionRequestList::iterator
+PermissionRequestManager::VisitDuplicateRequests(
+    DuplicateRequestVisitor visitor,
+    PermissionRequest* request) {
+  auto request_list = FindDuplicateRequestList(request);
+  if (request_list == duplicate_requests_.end()) {
+    return request_list;
+  }
+
+  for (auto iter = request_list->begin(); iter != request_list->end();) {
+    if (auto& weak_request = (*iter)) {
+      visitor.Run(weak_request);
+      ++iter;
+    } else {
+      // Remove any requests that have been destroyed.
+      iter = request_list->erase(iter);
+    }
+  }
+
+  return request_list;
 }
 
 void PermissionRequestManager::PermissionGrantedIncludingDuplicates(
@@ -1049,9 +1167,14 @@ void PermissionRequestManager::PermissionGrantedIncludingDuplicates(
                      pending_permission_requests_.Count(request))
       << "Only requests in [pending_permission_]requests_ can have duplicates";
   request->PermissionGranted(is_one_time);
-  auto range = duplicate_requests_.equal_range(request);
-  for (auto it = range.first; it != range.second; ++it)
-    it->second->PermissionGranted(is_one_time);
+  VisitDuplicateRequests(
+      base::BindRepeating(
+          [](bool is_one_time,
+             const base::WeakPtr<PermissionRequest>& weak_request) {
+            weak_request->PermissionGranted(is_one_time);
+          },
+          is_one_time),
+      request);
 }
 
 void PermissionRequestManager::PermissionDeniedIncludingDuplicates(
@@ -1060,9 +1183,12 @@ void PermissionRequestManager::PermissionDeniedIncludingDuplicates(
                      pending_permission_requests_.Count(request))
       << "Only requests in [pending_permission_]requests_ can have duplicates";
   request->PermissionDenied();
-  auto range = duplicate_requests_.equal_range(request);
-  for (auto it = range.first; it != range.second; ++it)
-    it->second->PermissionDenied();
+  VisitDuplicateRequests(
+      base::BindRepeating(
+          [](const base::WeakPtr<PermissionRequest>& weak_request) {
+            weak_request->PermissionDenied();
+          }),
+      request);
 }
 
 void PermissionRequestManager::CancelledIncludingDuplicates(
@@ -1072,9 +1198,14 @@ void PermissionRequestManager::CancelledIncludingDuplicates(
                      pending_permission_requests_.Count(request))
       << "Only requests in [pending_permission_]requests_ can have duplicates";
   request->Cancelled(is_final_decision);
-  auto range = duplicate_requests_.equal_range(request);
-  for (auto it = range.first; it != range.second; ++it)
-    it->second->Cancelled(is_final_decision);
+  VisitDuplicateRequests(
+      base::BindRepeating(
+          [](bool is_final,
+             const base::WeakPtr<PermissionRequest>& weak_request) {
+            weak_request->Cancelled(is_final);
+          },
+          is_final_decision),
+      request);
 }
 
 void PermissionRequestManager::RequestFinishedIncludingDuplicates(
@@ -1082,13 +1213,21 @@ void PermissionRequestManager::RequestFinishedIncludingDuplicates(
   DCHECK_EQ(1ul, base::ranges::count(requests_, request) +
                      pending_permission_requests_.Count(request))
       << "Only requests in [pending_permission_]requests_ can have duplicates";
+  auto duplicate_list = VisitDuplicateRequests(
+      base::BindRepeating(
+          [](const base::WeakPtr<PermissionRequest>& weak_request) {
+            weak_request->RequestFinished();
+          }),
+      request);
+
+  // Note: beyond this point, |request| has probably been deleted, any
+  // dereference of |request| must be done prior this point.
   request->RequestFinished();
-  // Beyond this point, |request| has probably been deleted.
-  auto range = duplicate_requests_.equal_range(request);
-  for (auto it = range.first; it != range.second; ++it)
-    it->second->RequestFinished();
+
   // Additionally, we can now remove the duplicates.
-  duplicate_requests_.erase(request);
+  if (duplicate_list != duplicate_requests_.end()) {
+    duplicate_requests_.erase(duplicate_list);
+  }
 }
 
 void PermissionRequestManager::AddObserver(Observer* observer) {
@@ -1153,14 +1292,22 @@ bool PermissionRequestManager::ShouldDropCurrentRequestIfCannotShowQuietly()
   return false;
 }
 
+void PermissionRequestManager::NotifyTabVisibilityChanged(
+    content::Visibility visibility) {
+  for (Observer& observer : observer_list_) {
+    observer.OnTabVisibilityChanged(visibility);
+  }
+}
+
 void PermissionRequestManager::NotifyPromptAdded() {
   for (Observer& observer : observer_list_)
     observer.OnPromptAdded();
 }
 
 void PermissionRequestManager::NotifyPromptRemoved() {
-  for (Observer& observer : observer_list_)
+  for (Observer& observer : observer_list_) {
     observer.OnPromptRemoved();
+  }
 }
 
 void PermissionRequestManager::NotifyPromptRecreateFailed() {

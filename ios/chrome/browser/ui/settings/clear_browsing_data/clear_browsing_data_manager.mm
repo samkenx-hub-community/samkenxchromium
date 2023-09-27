@@ -4,8 +4,8 @@
 
 #import "ios/chrome/browser/ui/settings/clear_browsing_data/clear_browsing_data_manager.h"
 
+#import "base/apple/foundation_util.h"
 #import "base/functional/bind.h"
-#import "base/mac/foundation_util.h"
 #import "base/metrics/histogram_macros.h"
 #import "base/scoped_observation.h"
 #import "base/strings/sys_string_conversions.h"
@@ -22,21 +22,27 @@
 #import "components/search_engines/template_url_service_observer.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
 #import "components/strings/grit/components_strings.h"
-#import "components/sync/driver/sync_service.h"
-#import "ios/chrome/browser/application_context/application_context.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/browsing_data/browsing_data_counter_wrapper.h"
-#import "ios/chrome/browser/browsing_data/browsing_data_features.h"
-#import "ios/chrome/browser/browsing_data/browsing_data_remove_mask.h"
-#import "ios/chrome/browser/browsing_data/browsing_data_remover.h"
-#import "ios/chrome/browser/browsing_data/browsing_data_remover_factory.h"
-#import "ios/chrome/browser/browsing_data/browsing_data_remover_observer_bridge.h"
+#import "components/sync/service/sync_service.h"
+#import "ios/chrome/browser/browsing_data/model/browsing_data_counter_wrapper.h"
+#import "ios/chrome/browser/browsing_data/model/browsing_data_features.h"
+#import "ios/chrome/browser/browsing_data/model/browsing_data_remove_mask.h"
+#import "ios/chrome/browser/browsing_data/model/browsing_data_remover.h"
+#import "ios/chrome/browser/browsing_data/model/browsing_data_remover_factory.h"
+#import "ios/chrome/browser/browsing_data/model/browsing_data_remover_observer_bridge.h"
 #import "ios/chrome/browser/feature_engagement/tracker_factory.h"
 #import "ios/chrome/browser/history/web_history_service_factory.h"
-#import "ios/chrome/browser/main/browser.h"
 #import "ios/chrome/browser/net/crurl.h"
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
+#import "ios/chrome/browser/shared/coordinator/alert/action_sheet_coordinator.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state_browser_agent.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
 #import "ios/chrome/browser/shared/ui/list_model/list_model.h"
+#import "ios/chrome/browser/shared/ui/symbols/chrome_icon.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_detail_icon_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_button_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_item.h"
@@ -46,9 +52,7 @@
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/identity_manager_factory.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
-#import "ios/chrome/browser/ui/alert_coordinator/action_sheet_coordinator.h"
-#import "ios/chrome/browser/ui/icons/chrome_icon.h"
-#import "ios/chrome/browser/ui/icons/symbols.h"
+#import "ios/chrome/browser/ui/scoped_ui_blocker/ui_blocker_manager.h"
 #import "ios/chrome/browser/ui/settings/cells/clear_browsing_data_constants.h"
 #import "ios/chrome/browser/ui/settings/cells/search_engine_item.h"
 #import "ios/chrome/browser/ui/settings/cells/table_view_clear_browsing_data_item.h"
@@ -56,17 +60,12 @@
 #import "ios/chrome/browser/ui/settings/clear_browsing_data/clear_browsing_data_consumer.h"
 #import "ios/chrome/browser/ui/settings/clear_browsing_data/clear_browsing_data_ui_constants.h"
 #import "ios/chrome/browser/ui/settings/clear_browsing_data/time_range_selector_table_view_controller.h"
-#import "ios/chrome/browser/url/chrome_url_constants.h"
 #import "ios/chrome/common/channel_info.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
-#import "ios/chrome/grit/ios_chromium_strings.h"
+#import "ios/chrome/grit/ios_branded_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/public/provider/chrome/browser/branded_images/branded_images_api.h"
 #import "ui/base/l10n/l10n_util_mac.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 const char kCBDSignOutOfChromeURL[] = "settings://CBDSignOutOfChrome";
 
@@ -111,6 +110,14 @@ UIImage* SymbolForItemType(ClearBrowsingDataItemType itemType) {
   return symbol;
 }
 
+// Returns YES if UI is currently blocking, to stop a second clear browsing data
+// task to start.
+BOOL UIIsBlocking(Browser* browser) {
+  SceneState* sceneState =
+      SceneStateBrowserAgent::FromBrowser(browser)->GetSceneState();
+  return [sceneState.uiBlockerManager currentUIBlocker];
+}
+
 }  // namespace
 
 @interface ClearBrowsingDataManager () <BrowsingDataRemoverObserving,
@@ -125,7 +132,7 @@ UIImage* SymbolForItemType(ClearBrowsingDataItemType itemType) {
   // Observer for browsing data removal events and associated
   // base::ScopedObservation used to track registration with
   // BrowsingDataRemover.
-  std::unique_ptr<BrowsingDataRemoverObserver> _observer;
+  std::unique_ptr<BrowsingDataRemoverObserver> _browsingDataRemoverObserver;
   std::unique_ptr<
       base::ScopedObservation<BrowsingDataRemover, BrowsingDataRemoverObserver>>
       _scoped_observation;
@@ -187,9 +194,12 @@ UIImage* SymbolForItemType(ClearBrowsingDataItemType itemType) {
     _timeRangePref.Init(browsing_data::prefs::kDeleteTimePeriod,
                         _browserState->GetPrefs());
 
-    _observer = std::make_unique<BrowsingDataRemoverObserverBridge>(self);
-    _scoped_observation = std::make_unique<base::ScopedObservation<
-        BrowsingDataRemover, BrowsingDataRemoverObserver>>(_observer.get());
+    _browsingDataRemoverObserver =
+        std::make_unique<BrowsingDataRemoverObserverBridge>(self);
+    _scoped_observation =
+        std::make_unique<base::ScopedObservation<BrowsingDataRemover,
+                                                 BrowsingDataRemoverObserver>>(
+            _browsingDataRemoverObserver.get());
     _scoped_observation->Observe(remover);
 
     _prefChangeRegistrar.Init(_browserState->GetPrefs());
@@ -244,7 +254,13 @@ UIImage* SymbolForItemType(ClearBrowsingDataItemType itemType) {
 }
 
 - (void)disconnect {
+  _timeRangePref.Destroy();
+  _prefObserverBridge.reset();
   _prefChangeRegistrar.RemoveAll();
+  _scoped_observation.reset();
+  _browsingDataRemoverObserver.reset();
+  _countersByMasks.clear();
+  _counterWrapperProducer = nil;
 }
 
 // Add items for types of browsing data to clear.
@@ -370,7 +386,12 @@ UIImage* SymbolForItemType(ClearBrowsingDataItemType itemType) {
   [actionCoordinator
       addItemWithTitle:l10n_util::GetNSString(IDS_IOS_CLEAR_BUTTON)
                 action:^{
-                  [weakSelf clearDataForDataTypes:dataTypeMaskToRemove];
+                  if (!UIIsBlocking(browser)) {
+                    // Race condition caused the flow to get here, cancel this
+                    // one.
+                    [weakSelf clearDataForDataTypes:dataTypeMaskToRemove];
+                    [weakSelf.consumer dismissAlertCoordinator];
+                  }
                 }
                  style:UIAlertActionStyleDestructive];
   return actionCoordinator;
@@ -404,11 +425,6 @@ UIImage* SymbolForItemType(ClearBrowsingDataItemType itemType) {
 
   syncer::SyncService* syncService = [self syncService];
   [self addSavedSiteDataSectionWithModel:model];
-
-  // If not syncing, no need to continue with profile syncing.
-  if (![self identityManager]->HasPrimaryAccount(signin::ConsentLevel::kSync)) {
-    return;
-  }
 
   history::WebHistoryService* historyService =
       ios::WebHistoryServiceFactory::GetForBrowserState(_browserState);

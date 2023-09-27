@@ -164,7 +164,7 @@ public class OverlayPanelContent {
 
         @Override
         public boolean shouldIgnoreNavigation(NavigationHandle navigationHandle, GURL escapedUrl,
-                boolean crossFrame, boolean isSandboxedFrame) {
+                boolean hiddenCrossFrame, boolean isSandboxedFrame) {
             // If either of the required params for the delegate are null, do not call the
             // delegate and ignore the navigation.
             if (mExternalNavHandler == null || navigationHandle == null) return true;
@@ -349,7 +349,7 @@ public class OverlayPanelContent {
 
         Profile profile = IncognitoUtils.getProfileFromWindowAndroid(mWindowAndroid, mIsIncognito);
         // Creates an initially hidden WebContents which gets shown when the panel is opened.
-        mWebContents = WebContentsFactory.createWebContents(profile, true);
+        mWebContents = WebContentsFactory.createWebContents(profile, true, false);
 
         ContentView cv = ContentView.createContentView(
                 mActivity, null /* eventOffsetHandler */, mWebContents);

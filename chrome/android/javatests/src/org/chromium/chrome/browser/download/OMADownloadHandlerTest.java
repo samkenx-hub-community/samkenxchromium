@@ -4,11 +4,13 @@
 
 package org.chromium.chrome.browser.download;
 
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
+
 import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
-import android.support.test.InstrumentationRegistry;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
 
@@ -69,7 +71,7 @@ public class OMADownloadHandlerTest {
     }
 
     private Context getTestContext() {
-        return new AdvancedMockContext(InstrumentationRegistry.getTargetContext());
+        return new AdvancedMockContext(ApplicationProvider.getApplicationContext());
     }
 
     /**
@@ -257,7 +259,7 @@ public class OMADownloadHandlerTest {
         Assert.assertEquals(info.getValue(OMADownloadHandler.OMA_DESCRIPTION), "testjpg");
         Assert.assertEquals(info.getValue(OMADownloadHandler.OMA_NEXT_URL), "http://nexturl.html");
         List<String> types = info.getTypes();
-        Assert.assertThat(
+        assertThat(
                 types, Matchers.containsInAnyOrder("image/jpeg", MimeUtils.OMA_DRM_MESSAGE_MIME));
     }
 
@@ -381,8 +383,8 @@ public class OMADownloadHandlerTest {
     @MediumTest
     @Feature({"Download"})
     public void testEnqueueOMADownloads() {
-        EmbeddedTestServer testServer =
-                EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        EmbeddedTestServer testServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
         Context context = getTestContext();
 
         OMADownloadHandler.OMAInfo omaInfo = new OMAInfo();
@@ -391,38 +393,32 @@ public class OMADownloadHandlerTest {
                 testServer.getURL("/chrome/test/data/android/download/test.gzip"));
         omaInfo.addAttributeValue(OMADownloadHandler.OMA_INSTALL_NOTIFY_URI, INSTALL_NOTIFY_URI);
 
-        try {
-            DownloadInfo info = new DownloadInfo.Builder().build();
-            final OMADownloadHandlerForTest omaHandler =
-                    TestThreadUtils.runOnUiThreadBlockingNoException(() -> {
-                        return new OMADownloadHandlerForTest(context) {
-                            @Override
-                            public void onReceive(Context context, Intent intent) {
-                                // Ignore all the broadcasts.
-                            }
-                        };
-                    });
-
-            omaHandler.clearPendingOMADownloads();
-            omaHandler.downloadOMAContent(0, info, omaInfo);
-            CriteriaHelper.pollUiThread(() -> {
-                Criteria.checkThat(omaHandler.mDownloadId, Matchers.not(0));
-                Criteria.checkThat(mTestInfoBarController.mDownloadStarted, Matchers.is(true));
-            });
-
-            Set<String> downloads = DownloadManagerService.getStoredDownloadInfo(
-                    SharedPreferencesManager.getInstance(),
-                    ChromePreferenceKeys.DOWNLOAD_PENDING_OMA_DOWNLOADS);
-            Assert.assertEquals(1, downloads.size());
-            OMADownloadHandler.OMAEntry entry =
-                    OMADownloadHandler.OMAEntry.parseOMAEntry((String) (downloads.toArray()[0]));
-            Assert.assertEquals(entry.mDownloadId, omaHandler.mDownloadId);
-            Assert.assertEquals(entry.mInstallNotifyURI, INSTALL_NOTIFY_URI);
-            DownloadManager manager =
-                    (DownloadManager) getTestContext().getSystemService(Context.DOWNLOAD_SERVICE);
-            manager.remove(omaHandler.mDownloadId);
-        } finally {
-            testServer.stopAndDestroyServer();
-        }
+        DownloadInfo info = new DownloadInfo.Builder().build();
+        final OMADownloadHandlerForTest omaHandler =
+                TestThreadUtils.runOnUiThreadBlockingNoException(() -> {
+                    return new OMADownloadHandlerForTest(context) {
+                        @Override
+                        public void onReceive(Context context, Intent intent) {
+                            // Ignore all the broadcasts.
+                        }
+                    };
+                });
+        omaHandler.clearPendingOMADownloads();
+        omaHandler.downloadOMAContent(0, info, omaInfo);
+        CriteriaHelper.pollUiThread(() -> {
+            Criteria.checkThat(omaHandler.mDownloadId, Matchers.not(0));
+            Criteria.checkThat(mTestInfoBarController.mDownloadStarted, Matchers.is(true));
+        });
+        Set<String> downloads =
+                DownloadManagerService.getStoredDownloadInfo(SharedPreferencesManager.getInstance(),
+                        ChromePreferenceKeys.DOWNLOAD_PENDING_OMA_DOWNLOADS);
+        Assert.assertEquals(1, downloads.size());
+        OMADownloadHandler.OMAEntry entry =
+                OMADownloadHandler.OMAEntry.parseOMAEntry((String) (downloads.toArray()[0]));
+        Assert.assertEquals(entry.mDownloadId, omaHandler.mDownloadId);
+        Assert.assertEquals(entry.mInstallNotifyURI, INSTALL_NOTIFY_URI);
+        DownloadManager manager =
+                (DownloadManager) getTestContext().getSystemService(Context.DOWNLOAD_SERVICE);
+        manager.remove(omaHandler.mDownloadId);
     }
 }

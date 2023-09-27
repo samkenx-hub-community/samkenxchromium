@@ -12,17 +12,18 @@
 #include "base/check.h"
 #include "base/containers/flat_map.h"
 #include "base/cpu.h"
-#include "base/guid.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/system/sys_info.h"
+#include "base/uuid.h"
 #include "base/values.h"
 #include "base/version.h"
 #include "build/build_config.h"
 #include "components/update_client/activity_data_service.h"
 #include "components/update_client/persisted_data.h"
+#include "components/update_client/protocol_definition.h"
 #include "components/update_client/update_query_params.h"
 #include "components/update_client/utils.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -108,7 +109,7 @@ protocol_request::Request MakeProtocolRequest(
     const base::flat_map<std::string, std::string>& updater_state_attributes,
     std::vector<protocol_request::App> apps) {
   protocol_request::Request request;
-  request.protocol_version = kProtocolVersion;
+  request.protocol_version = protocol_request::kProtocolVersion;
   request.is_machine = is_machine;
 
   // Session id and request id.
@@ -116,7 +117,8 @@ protocol_request::Request MakeProtocolRequest(
   CHECK(base::StartsWith(session_id, "{", base::CompareCase::SENSITIVE));
   CHECK(base::EndsWith(session_id, "}", base::CompareCase::SENSITIVE));
   request.session_id = session_id;
-  request.request_id = base::StrCat({"{", base::GenerateGUID(), "}"});
+  request.request_id = base::StrCat(
+      {"{", base::Uuid::GenerateRandomV4().AsLowercaseString(), "}"});
 
   request.updatername = prod_id;
   request.updaterversion = browser_version;

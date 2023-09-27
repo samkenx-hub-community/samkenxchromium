@@ -9,18 +9,14 @@
 #import "ios/chrome/browser/overlays/public/overlay_response.h"
 #import "ios/chrome/browser/overlays/public/web_content_area/alert_constants.h"
 #import "ios/chrome/browser/overlays/public/web_content_area/alert_overlay.h"
+#import "ios/chrome/browser/shared/ui/elements/text_field_configuration.h"
 #import "ios/chrome/browser/ui/dialogs/java_script_dialog_blocking_state.h"
-#import "ios/chrome/browser/ui/elements/text_field_configuration.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
 #import "testing/gtest_mac.h"
 #import "testing/platform_test.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using alert_overlays::AlertRequest;
 using alert_overlays::AlertResponse;

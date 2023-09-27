@@ -11,6 +11,7 @@
 #include <string>
 
 #include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/scoped_observation.h"
@@ -19,7 +20,7 @@
 #include "chrome/browser/ash/login/saml/password_sync_token_checkers_collection.h"
 #include "chrome/browser/ash/login/screens/encryption_migration_mode.h"
 #include "chrome/browser/ash/login/session/user_session_manager.h"
-#include "chrome/browser/ash/login/ui/login_display.h"
+#include "chrome/browser/ash/login/signin_specifics.h"
 #include "chromeos/ash/components/login/auth/login_performer.h"
 #include "chromeos/ash/components/login/auth/public/auth_failure.h"
 #include "chromeos/ash/components/login/auth/public/user_context.h"
@@ -31,6 +32,7 @@
 #include "content/public/browser/notification_registrar.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/cros_system_api/dbus/cryptohome/dbus-constants.h"
+#include "ui/base/user_activity/user_activity_observer.h"
 #include "url/gurl.h"
 
 namespace base {
@@ -54,11 +56,11 @@ class PinSaltStorage;
 // ExistingUserController is used to handle login when someone has already
 // logged into the machine. ExistingUserController is created and owned by
 // LoginDisplayHost.
-class ExistingUserController : public LoginDisplay::Delegate,
-                               public content::NotificationObserver,
+class ExistingUserController : public content::NotificationObserver,
                                public LoginPerformer::Delegate,
                                public UserSessionManagerDelegate,
-                               public user_manager::UserManager::Observer {
+                               public user_manager::UserManager::Observer,
+                               public ui::UserActivityObserver {
  public:
   // Returns the current existing user controller fetched from the current
   // LoginDisplayHost instance.
@@ -95,17 +97,17 @@ class ExistingUserController : public LoginDisplay::Delegate,
   // Returns name of the currently connected network, for error message,
   std::u16string GetConnectedNetworkName() const;
 
-  // LoginDisplay::Delegate: implementation
-  void Login(const UserContext& user_context,
-             const SigninSpecifics& specifics) override;
-  void OnStartKioskEnableScreen() override;
-  void ResetAutoLoginTimer() override;
+  // This is virtual for mocking in the unit tests.
+  virtual void Login(const UserContext& user_context,
+                     const SigninSpecifics& specifics);
+  void OnStartKioskEnableScreen();
+
+  // ui::UserActivityObserver:
+  void OnUserActivity(const ui::Event* event) override;
 
   void CompleteLogin(const UserContext& user_context);
   void OnGaiaScreenReady();
   void SetDisplayEmail(const std::string& email);
-  void SetDisplayAndGivenName(const std::string& display_name,
-                              const std::string& given_name);
   bool IsUserAllowlisted(
       const AccountId& account_id,
       const absl::optional<user_manager::UserType>& user_type);
@@ -188,8 +190,7 @@ class ExistingUserController : public LoginDisplay::Delegate,
   // that the diversion to a resume flow did not occur, indicating either no
   // hibernation image was present, the resume was cancelled/aborted, or
   // hibernate is simply not supported.
-  void ContinueAuthSuccessAfterResumeAttempt(const UserContext& user_context,
-                                             bool resume_call_success);
+  void ContinueAuthSuccessAfterResumeAttempt(const UserContext& user_context);
 
   // UserSessionManagerDelegate implementation:
   void OnProfilePrepared(Profile* profile, bool browser_launched) override;
@@ -333,7 +334,7 @@ class ExistingUserController : public LoginDisplay::Delegate,
   size_t num_login_attempts_ = 0;
 
   // Interface to the signed settings store.
-  CrosSettings* cros_settings_;
+  raw_ptr<CrosSettings, ExperimentalAsh> cros_settings_;
 
   // URL to append to start Guest mode with.
   GURL guest_mode_url_;
@@ -343,13 +344,6 @@ class ExistingUserController : public LoginDisplay::Delegate,
 
   // The displayed email for the next login attempt set by `SetDisplayEmail`.
   std::string display_email_;
-
-  // The displayed name for the next login attempt set by
-  // `SetDisplayAndGivenName`.
-  std::u16string display_name_;
-
-  // The given name for the next login attempt set by `SetDisplayAndGivenName`.
-  std::u16string given_name_;
 
   // Whether login attempt is running.
   bool is_login_in_progress_ = false;
@@ -372,10 +366,6 @@ class ExistingUserController : public LoginDisplay::Delegate,
 
   // Timer for the interval to wait for the reboot after TPM error UI was shown.
   base::OneShotTimer reboot_timer_;
-
-  // Collection of verifiers that check validity of password sync token for SAML
-  // users.
-  std::unique_ptr<PasswordSyncTokenCheckersCollection> sync_token_checkers_;
 
   std::unique_ptr<login::NetworkStateHelper> network_state_helper_;
 

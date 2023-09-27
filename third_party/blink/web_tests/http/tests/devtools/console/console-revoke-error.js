@@ -2,9 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ConsoleTestRunner} from 'console_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+import * as Common from 'devtools/core/common/common.js';
+
 (async function() {
   TestRunner.addResult(`Tests that console revokes lazily handled promise rejections.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('console_test_runner');
+  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('console');
   await TestRunner.evaluateInPagePromise(`
       var p = [];
@@ -23,10 +29,10 @@
   `);
 
   var messageAddedListener = ConsoleTestRunner.wrapListener(messageAdded);
-  const consoleModel = SDK.targetManager.primaryPageTarget().model(SDK.ConsoleModel);
+  const consoleModel = SDK.TargetManager.TargetManager.instance().primaryPageTarget().model(SDK.ConsoleModel.ConsoleModel);
   consoleModel.addEventListener(SDK.ConsoleModel.Events.MessageAdded, messageAddedListener);
   Console.ConsoleView.instance().setImmediatelyFilterMessagesForTest();
-  Common.settings.moduleSetting('consoleGroupSimilar').set(false);
+  Common.Settings.moduleSetting('consoleGroupSimilar').set(false);
   TestRunner.addResult('Creating promise');
   TestRunner.evaluateInPageWithTimeout('createPromises()');
 

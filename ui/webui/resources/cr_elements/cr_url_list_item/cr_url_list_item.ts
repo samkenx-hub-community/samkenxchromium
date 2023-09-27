@@ -25,7 +25,9 @@ export enum CrUrlListItemSize {
 export interface CrUrlListItemElement {
   $: {
     badges: HTMLSlotElement,
+    content: HTMLSlotElement,
     description: HTMLSlotElement,
+    title: HTMLButtonElement,
   };
 }
 
@@ -46,32 +48,69 @@ export class CrUrlListItemElement extends CrUrlListItemElementBase {
       buttonAriaDescription: String,
       count: Number,
       description: String,
+      url: String,
+
+      title: {
+        reflectToAttribute: true,
+        type: String,
+      },
+
       hasBadges_: {
         type: Boolean,
         reflectToAttribute: true,
       },
+
       hasDescriptions_: {
         type: Boolean,
         computed: 'computeHasDescriptions_(hasBadges_, description)',
         reflectToAttribute: true,
       },
+
+      hasSlottedContent_: {
+        type: Boolean,
+        reflectToAttribute: true,
+      },
+
+      reverseElideDescription: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: false,
+      },
+
       isFolder_: {
         computed: 'computeIsFolder_(count)',
         type: Boolean,
         value: false,
         reflectToAttribute: true,
       },
+
       size: {
         observer: 'onSizeChanged_',
         reflectToAttribute: true,
         type: String,
         value: CrUrlListItemSize.MEDIUM,
       },
-      title: String,
-      url: String,
+
       imageUrls: {
+        observer: 'resetFirstImageLoaded_',
         type: Array,
         value: () => [],
+      },
+
+      firstImageLoaded_: {
+        type: Boolean,
+        value: false,
+      },
+
+      forceHover: {
+        reflectToAttribute: true,
+        type: Boolean,
+        value: false,
+      },
+
+      descriptionMeta: {
+        type: String,
+        value: '',
       },
     };
   }
@@ -80,13 +119,17 @@ export class CrUrlListItemElement extends CrUrlListItemElementBase {
   buttonAriaDescription?: string;
   count?: number;
   description?: string;
+  reverseElideDescription: boolean;
   private hasBadges_: boolean;
   private hasDescription_: boolean;
+  private hasSlottedContent_: boolean;
   private isFolder_: boolean;
   size: CrUrlListItemSize;
-  override title: string;
   url?: string;
   imageUrls: string[];
+  private firstImageLoaded_: boolean;
+  forceHover: boolean;
+  descriptionMeta: string;
 
   override ready() {
     super.ready();
@@ -96,8 +139,36 @@ export class CrUrlListItemElement extends CrUrlListItemElementBase {
     this.addEventListener('pointerleave', () => this.setActiveState_(false));
   }
 
+  override connectedCallback() {
+    super.connectedCallback();
+    this.resetFirstImageLoaded_();
+  }
+
+  override focus() {
+    // This component itself is not focusable, so override its focus method
+    // to focus its main focusable child, the title button.
+    this.$.title.focus();
+  }
+
+  private resetFirstImageLoaded_() {
+    this.firstImageLoaded_ = false;
+    const image = this.shadowRoot!.querySelector('img');
+    if (!image) {
+      return;
+    }
+
+    if (image.complete) {
+      this.firstImageLoaded_ = true;
+      return;
+    }
+
+    image.addEventListener('load', () => {
+      this.firstImageLoaded_ = true;
+    }, {once: true});
+  }
+
   private computeHasDescriptions_(): boolean {
-    return !!this.description || this.hasBadges_;
+    return !!this.description || this.hasBadges_ || !!this.descriptionMeta;
   }
 
   private computeIsFolder_(): boolean {
@@ -126,12 +197,17 @@ export class CrUrlListItemElement extends CrUrlListItemElementBase {
   }
 
   private shouldShowImageUrl_(_url: string, index: number) {
-    return index <= 2;
+    return index <= 1;
   }
 
   private onBadgesSlotChange_() {
     this.hasBadges_ =
         this.$.badges.assignedElements({flatten: true}).length > 0;
+  }
+
+  private onContentSlotChange_() {
+    this.hasSlottedContent_ =
+        this.$.content.assignedElements({flatten: true}).length > 0;
   }
 
   private onSizeChanged_() {
@@ -151,7 +227,8 @@ export class CrUrlListItemElement extends CrUrlListItemElementBase {
   private shouldShowUrlImage_(): boolean {
     return this.url !== undefined &&
         !(this.size === CrUrlListItemSize.COMPACT ||
-          this.imageUrls.length === 0);
+          this.imageUrls.length === 0) &&
+        this.firstImageLoaded_;
   }
 
   private shouldShowFolderImages_(): boolean {

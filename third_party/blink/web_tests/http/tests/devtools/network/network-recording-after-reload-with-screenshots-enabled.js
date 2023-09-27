@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {NetworkTestRunner} from 'network_test_runner';
+
+import * as Network from 'devtools/panels/network/network.js';
+
 (async function() {
   TestRunner.addResult(`Tests if page keeps recording after refresh with Screenshot enabled. Bug 569557\n`);
-  await TestRunner.loadTestModule('network_test_runner');
   await TestRunner.showPanel('network');
   await TestRunner.loadHTML(`
       <p id="test"></p>
@@ -12,7 +16,7 @@
 
   UI.panels.network.networkRecordFilmStripSetting.set(true);
 
-  Network.NetworkPanel.displayScreenshotDelay = 0;
+  Network.NetworkPanel.NetworkPanel.displayScreenshotDelay = 0;
 
   TestRunner.resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.Load, TestRunner.pageLoaded);
   TestRunner.runWhenPageLoads(() => setTimeout(checkRecording, 50));

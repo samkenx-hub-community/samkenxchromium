@@ -11,12 +11,13 @@
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/values.h"
+#include "chrome/test/chromedriver/chrome/mobile_device.h"
 #include "chrome/test/chromedriver/chrome/web_view.h"
 
 struct BrowserInfo;
-struct DeviceMetrics;
 class DevToolsClient;
 class DownloadDirectoryOverrideManager;
+class FedCmTracker;
 class FrameTracker;
 class GeolocationOverrideManager;
 class MobileEmulationOverrideManager;
@@ -41,7 +42,7 @@ class WebViewImpl : public WebView {
               const WebViewImpl* parent,
               const BrowserInfo* browser_info,
               std::unique_ptr<DevToolsClient> client,
-              const DeviceMetrics* device_metrics,
+              absl::optional<MobileDevice> mobile_device,
               std::string page_load_strategy);
   ~WebViewImpl() override;
   WebViewImpl* CreateChild(const std::string& session_id,
@@ -85,11 +86,6 @@ class WebViewImpl : public WebView {
                       const std::string& function,
                       const base::Value::List& args,
                       std::unique_ptr<base::Value>* result) override;
-  Status CallAsyncFunction(const std::string& frame,
-                           const std::string& function,
-                           const base::Value::List& args,
-                           const base::TimeDelta& timeout,
-                           std::unique_ptr<base::Value>* result) override;
   Status CallUserSyncScript(const std::string& frame,
                             const std::string& script,
                             const base::Value::List& args,
@@ -166,6 +162,7 @@ class WebViewImpl : public WebView {
                                    const base::Value& element,
                                    int* backend_node_id) override;
   bool IsNonBlocking() const override;
+  Status GetFedCmTracker(FedCmTracker** out_tracker) override;
   FrameTracker* GetFrameTracker() const override;
   std::unique_ptr<base::Value> GetCastSinks() override;
   std::unique_ptr<base::Value> GetCastIssueMessage() override;
@@ -191,7 +188,6 @@ class WebViewImpl : public WebView {
   Status CallAsyncFunctionInternal(const std::string& frame,
                                    const std::string& function,
                                    const base::Value::List& args,
-                                   bool is_user_supplied,
                                    const base::TimeDelta& timeout,
                                    std::unique_ptr<base::Value>* result);
   Status IsNotPendingNavigation(const std::string& frame_id,
@@ -247,6 +243,7 @@ class WebViewImpl : public WebView {
       download_directory_override_manager_;
   std::unique_ptr<HeapSnapshotTaker> heap_snapshot_taker_;
   std::unique_ptr<CastTracker> cast_tracker_;
+  std::unique_ptr<FedCmTracker> fedcm_tracker_;
   bool is_service_worker_;
 };
 

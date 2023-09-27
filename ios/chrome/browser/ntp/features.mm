@@ -6,15 +6,43 @@
 
 #import <Foundation/Foundation.h>
 
+#import "base/containers/contains.h"
 #import "base/metrics/field_trial_params.h"
+#import "components/country_codes/country_codes.h"
 #import "components/version_info/channel.h"
 #import "ios/chrome/app/background_mode_buildflags.h"
-#import "ios/chrome/browser/flags/system_flags.h"
+#import "ios/chrome/browser/shared/public/features/system_flags.h"
 #import "ios/chrome/common/channel_info.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+namespace {
+
+// Whether feed background refresh is enabled. This only checks if the feature
+// is enabled, not if the capability was enabled at startup.
+bool IsFeedBackgroundRefreshEnabledOnly() {
+  return base::FeatureList::IsEnabled(kEnableFeedBackgroundRefresh);
+}
+
+// Whether feed is refreshed in the background soon after the app is
+// backgrounded. This only checks if the feature is enabled, not if the
+// capability was enabled at startup.
+bool IsFeedAppCloseBackgroundRefreshEnabledOnly() {
+  return base::GetFieldTrialParamByFeatureAsBool(
+      kEnableFeedInvisibleForegroundRefresh,
+      kEnableFeedAppCloseBackgroundRefresh,
+      /*default=*/false);
+}
+
+// Returns the override value from the Foreground Refresh section of Feed
+// Refresh Settings in Experimental Settings in the Settings App.
+bool IsFeedOverrideForegroundDefaultsEnabled() {
+  if (GetChannel() == version_info::Channel::STABLE) {
+    return false;
+  }
+  return [[NSUserDefaults standardUserDefaults]
+      boolForKey:@"FeedOverrideForegroundDefaultsEnabled"];
+}
+
+}  // namespace
 
 BASE_FEATURE(kEnableWebChannels,
              "EnableWebChannels",
@@ -32,13 +60,9 @@ BASE_FEATURE(kCreateDiscoverFeedServiceEarly,
              "CreateDiscoverFeedServiceEarly",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kEnableFeedBottomSignInPromo,
-             "EnableFeedBottomSignInPromo",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kEnableFeedCardMenuSignInPromo,
              "EnableFeedCardMenuSignInPromo",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEnableFeedAblation,
              "EnableFeedAblation",
@@ -48,15 +72,37 @@ BASE_FEATURE(kEnableFeedExperimentTagging,
              "EnableFeedExperimentTagging",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kIOSSetUpList, "IOSSetUpList", base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kFeedDisableHotStartRefresh,
+             "FeedDisableHotStartRefresh",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kEnableFollowUIUpdate,
+             "EnableFollowUIUpdate",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kDiscoverFeedSportCard,
+             "DiscoverFeedSportCard",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kContentPushNotifications,
+             "ContentPushNotifications",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kIOSLargeFakebox,
+             "IOSLargeFakebox",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Key for NSUserDefaults containing a bool indicating whether the next run
-// should enable feed background refresh. This is used because registering for
-// background refreshes must happen early in app initialization and FeatureList
-// is not yet available. Changing the `kEnableFeedBackgroundRefresh` feature
-// will always take effect after two cold starts after the feature has been
-// changed on the server (once for the Finch configuration, and another for
-// reading the stored value from NSUserDefaults).
-NSString* const kEnableFeedBackgroundRefreshForNextColdStart =
-    @"EnableFeedBackgroundRefreshForNextColdStart";
+// should enable feed background refresh capability. This is used because
+// registering for background refreshes must happen early in app initialization
+// and FeatureList is not yet available. Enabling or disabling background
+// refresh features will always take effect after two cold starts after the
+// feature has been changed on the server (once for the Finch configuration, and
+// another for reading the stored value from NSUserDefaults).
+NSString* const kEnableFeedBackgroundRefreshCapabilityForNextColdStart =
+    @"EnableFeedBackgroundRefreshCapabilityForNextColdStart";
 
 const char kEnableFollowingFeedBackgroundRefresh[] =
     "EnableFollowingFeedBackgroundRefresh";
@@ -85,8 +131,15 @@ const char kFeedSeenRefreshThresholdInSeconds[] =
     "FeedSeenRefreshThresholdInSeconds";
 const char kFeedUnseenRefreshThresholdInSeconds[] =
     "FeedUnseenRefreshThresholdInSeconds";
+const char kEnableFeedUseInteractivityInvalidationForForegroundRefreshes[] =
+    "EnableFeedUseInteractivityInvalidationForForegroundRefreshes";
 
 bool IsWebChannelsEnabled() {
+  std::string launched_countries[6] = {"AU", "CA", "GB", "NZ", "US", "ZA"};
+  if (base::Contains(launched_countries,
+                     country_codes::GetCurrentCountryCode())) {
+    return true;
+  }
   return base::FeatureList::IsEnabled(kEnableWebChannels);
 }
 
@@ -95,21 +148,28 @@ bool IsDiscoverFeedServiceCreatedEarly() {
 }
 
 bool IsFeedBackgroundRefreshEnabled() {
+  return IsFeedBackgroundRefreshCapabilityEnabled() &&
+         IsFeedBackgroundRefreshEnabledOnly();
+}
+
+bool IsFeedBackgroundRefreshCapabilityEnabled() {
 #if !BUILDFLAG(IOS_BACKGROUND_MODE_ENABLED)
   return false;
 #else
   static bool feedBackgroundRefreshEnabled =
       [[NSUserDefaults standardUserDefaults]
-          boolForKey:kEnableFeedBackgroundRefreshForNextColdStart];
+          boolForKey:kEnableFeedBackgroundRefreshCapabilityForNextColdStart];
   return feedBackgroundRefreshEnabled;
 #endif  // BUILDFLAG(IOS_BACKGROUND_MODE_ENABLED)
 }
 
-void SaveFeedBackgroundRefreshEnabledForNextColdStart() {
+void SaveFeedBackgroundRefreshCapabilityEnabledForNextColdStart() {
   DCHECK(base::FeatureList::GetInstance());
+  BOOL enabled = IsFeedBackgroundRefreshEnabledOnly() ||
+                 IsFeedAppCloseBackgroundRefreshEnabledOnly();
   [[NSUserDefaults standardUserDefaults]
-      setBool:base::FeatureList::IsEnabled(kEnableFeedBackgroundRefresh)
-       forKey:kEnableFeedBackgroundRefreshForNextColdStart];
+      setBool:enabled
+       forKey:kEnableFeedBackgroundRefreshCapabilityForNextColdStart];
 }
 
 void SetFeedRefreshTimestamp(NSDate* timestamp, NSString* NSUserDefaultsKey) {
@@ -134,7 +194,7 @@ bool IsFeedBackgroundRefreshCompletedNotificationEnabled() {
   if (GetChannel() == version_info::Channel::STABLE) {
     return false;
   }
-  return IsFeedBackgroundRefreshEnabled() &&
+  return IsFeedBackgroundRefreshCapabilityEnabled() &&
          [[NSUserDefaults standardUserDefaults]
              boolForKey:@"FeedBackgroundRefreshNotificationEnabled"];
 }
@@ -214,10 +274,8 @@ bool IsFeedAppCloseForegroundRefreshEnabled() {
 }
 
 bool IsFeedAppCloseBackgroundRefreshEnabled() {
-  return base::GetFieldTrialParamByFeatureAsBool(
-      kEnableFeedInvisibleForegroundRefresh,
-      kEnableFeedAppCloseBackgroundRefresh,
-      /*default=*/false);
+  return IsFeedBackgroundRefreshCapabilityEnabled() &&
+         IsFeedAppCloseBackgroundRefreshEnabledOnly();
 }
 
 FeedRefreshEngagementCriteriaType GetFeedRefreshEngagementCriteriaType() {
@@ -275,8 +333,16 @@ double GetFeedUnseenRefreshThresholdInSeconds() {
       /*default=*/base::Hours(6).InSecondsF());
 }
 
-bool IsFeedBottomSignInPromoEnabled() {
-  return base::FeatureList::IsEnabled(kEnableFeedBottomSignInPromo);
+bool IsFeedUseInteractivityInvalidationForForegroundRefreshesEnabled() {
+  if (IsFeedOverrideForegroundDefaultsEnabled()) {
+    return [[NSUserDefaults standardUserDefaults]
+        doubleForKey:
+            @"FeedUseInteractivityInvalidationForForegroundRefreshesEnabled"];
+  }
+  return base::GetFieldTrialParamByFeatureAsBool(
+      kEnableFeedInvisibleForegroundRefresh,
+      kEnableFeedUseInteractivityInvalidationForForegroundRefreshes,
+      /*default=*/false);
 }
 
 bool IsFeedCardMenuSignInPromoEnabled() {
@@ -289,4 +355,24 @@ bool IsFeedAblationEnabled() {
 
 bool IsFeedExperimentTaggingEnabled() {
   return base::FeatureList::IsEnabled(kEnableFeedExperimentTagging);
+}
+
+bool IsIOSSetUpListEnabled() {
+  return base::FeatureList::IsEnabled(kIOSSetUpList);
+}
+
+bool IsFeedHotStartRefreshDisabled() {
+  return base::FeatureList::IsEnabled(kFeedDisableHotStartRefresh);
+}
+
+bool IsFollowUIUpdateEnabled() {
+  return base::FeatureList::IsEnabled(kEnableFollowUIUpdate);
+}
+
+bool IsContentPushNotificationsEnabled() {
+  return base::FeatureList::IsEnabled(kContentPushNotifications);
+}
+
+bool IsIOSLargeFakeboxEnabled() {
+  return base::FeatureList::IsEnabled(kIOSLargeFakebox);
 }

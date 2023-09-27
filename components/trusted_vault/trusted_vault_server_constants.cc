@@ -5,9 +5,12 @@
 #include "components/trusted_vault/trusted_vault_server_constants.h"
 
 #include "base/base64url.h"
+#include "base/containers/contains.h"
+#include "base/containers/fixed_flat_map.h"
+#include "base/strings/string_piece.h"
 #include "net/base/url_util.h"
 
-namespace syncer {
+namespace trusted_vault {
 
 std::vector<uint8_t> GetConstantTrustedVaultKey() {
   return std::vector<uint8_t>(16, 0);
@@ -44,4 +47,25 @@ GURL GetFullGetSecurityDomainURLForTesting(const GURL& server_url) {
       kQueryParameterAlternateOutputKey, kQueryParameterAlternateOutputProto);
 }
 
-}  // namespace syncer
+std::string GetSecurityDomainName(SecurityDomainId domain) {
+  switch (domain) {
+    case SecurityDomainId::kChromeSync:
+      return kSyncSecurityDomainName;
+  }
+}
+
+absl::optional<SecurityDomainId> GetSecurityDomainByName(
+    base::StringPiece name) {
+  static_assert(static_cast<int>(SecurityDomainId::kMaxValue) == 0,
+                "Update GetSecurityDomainByName when adding SecurityDomainId "
+                "enum values");
+  static constexpr auto kSecurityDomainNames =
+      base::MakeFixedFlatMap<base::StringPiece, SecurityDomainId>({
+          {kSyncSecurityDomainName, SecurityDomainId::kChromeSync},
+      });
+  return base::Contains(kSecurityDomainNames, name)
+             ? absl::make_optional(kSecurityDomainNames.at(name))
+             : absl::nullopt;
+}
+
+}  // namespace trusted_vault

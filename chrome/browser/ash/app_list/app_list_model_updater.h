@@ -11,6 +11,8 @@
 
 #include "ash/public/cpp/app_list/app_list_types.h"
 #include "base/functional/callback_forward.h"
+#include "base/gtest_prod_util.h"
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/ash/app_list/app_list_model_updater_observer.h"
 #include "chrome/browser/ash/app_list/app_list_syncable_service.h"
 #include "chrome/browser/ash/app_list/chrome_app_list_item.h"
@@ -36,7 +38,8 @@ class AppListModelUpdater {
     }
 
    private:
-    AppListModelUpdater* const model_updater_;
+    const raw_ptr<AppListModelUpdater, DanglingUntriaged | ExperimentalAsh>
+        model_updater_;
   };
 
   virtual ~AppListModelUpdater();
@@ -71,6 +74,8 @@ class AppListModelUpdater {
   virtual void SetItemIconAndColor(const std::string& id,
                                    const gfx::ImageSkia& icon,
                                    const ash::IconColor& icon_color) {}
+  virtual void SetItemBadgeIcon(const std::string& id,
+                                const gfx::ImageSkia& badge_icon) {}
   virtual void SetItemName(const std::string& id, const std::string& name) {}
   virtual void SetAppStatus(const std::string& id, ash::AppStatus app_status) {}
   virtual void SetItemPosition(const std::string& id,
@@ -92,6 +97,7 @@ class AppListModelUpdater {
                                         const gfx::ImageSkia& badge_icon) {}
   virtual void ActivateChromeItem(const std::string& id, int event_flags) {}
   virtual void LoadAppIcon(const std::string& id) {}
+  virtual void UpdateProgress(const std::string& id, float progress) {}
 
   // For AppListModel:
   virtual ChromeAppListItem* FindItem(const std::string& id) = 0;
@@ -120,12 +126,10 @@ class AppListModelUpdater {
   virtual size_t BadgedItemCount() = 0;
   // For SearchModel:
   virtual bool SearchEngineIsGoogle() = 0;
+  virtual void RecalculateWouldTriggerLauncherSearchIph() = 0;
 
   // Notifies when the app list gets hidden.
   virtual void OnAppListHidden() = 0;
-
-  // Handles the request to commit the app list temporary sort order from ash.
-  virtual void CommitTemporarySortOrder() = 0;
 
   virtual void AddObserver(AppListModelUpdaterObserver* observer) = 0;
   virtual void RemoveObserver(AppListModelUpdaterObserver* observer) = 0;

@@ -3,49 +3,72 @@
 // found in the LICENSE file.
 
 import {SearchQuery, URLVisit} from 'chrome://new-tab-page/history_cluster_types.mojom-webui.js';
-import {LAYOUT_1_MIN_IMAGE_VISITS, LAYOUT_1_MIN_VISITS, MIN_RELATED_SEARCHES} from 'chrome://new-tab-page/lazy_load.js';
+import {LAYOUT_1_MIN_IMAGE_VISITS, LAYOUT_1_MIN_VISITS} from 'chrome://new-tab-page/lazy_load.js';
+import {assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 
-export function createVisit(
-    visitId: bigint, normalizedUrl: string, urlForDisplay: string,
-    pageTitle: string, hasUrlKeyedImage: boolean,
-    relativeDate: string = ''): URLVisit {
-  return {
-    visitId: visitId,
-    normalizedUrl: {url: normalizedUrl},
-    urlForDisplay: urlForDisplay,
-    pageTitle: pageTitle,
-    titleMatchPositions: [],
-    urlForDisplayMatchPositions: [],
-    duplicates: [],
-    relativeDate: relativeDate,
-    annotations: [],
-    debugInfo: {},
-    rawVisitData: {
-      url: {url: ''},
-      visitTime: {internalValue: BigInt(0)},
-    },
-    hasUrlKeyedImage: hasUrlKeyedImage,
-    isKnownToSync: true,
-  };
+export const MIN_RELATED_SEARCHES = 3;
+
+export function assertModuleHeaderTitle(
+    headerElement: HTMLElement, title: string) {
+  const moduleHeaderTextContent = headerElement.textContent!.trim();
+  const headerText = moduleHeaderTextContent.split(/\r?\n/);
+  assertTrue(headerText.length > 0);
+  assertEquals(title, headerText[0]!.trim());
 }
+
+export function createVisit(overrides?: Partial<URLVisit>): URLVisit {
+  return Object.assign(
+      {
+        visitId: BigInt(1),
+        normalizedUrl: {url: 'https://www.foo.com'},
+        urlForDisplay: 'www.foo.com',
+        pageTitle: 'Test Title',
+        titleMatchPositions: [],
+        urlForDisplayMatchPositions: [],
+        duplicates: [],
+        relativeDate: '',
+        annotations: [],
+        debugInfo: {},
+        rawVisitData: {
+          url: {url: ''},
+          visitTime: {internalValue: BigInt(0)},
+        },
+        hasUrlKeyedImage: false,
+        isKnownToSync: true,
+      },
+      overrides);
+}
+
+export const GOOGLE_SEARCH_BASE_URL = 'https://www.google.com/search';
 
 // Use Layout 1 as default for tests that do not care which layout.
 export function createSampleVisits(
     numVisits: number = LAYOUT_1_MIN_VISITS,
-    numImageVisits: number = LAYOUT_1_MIN_IMAGE_VISITS): URLVisit[] {
-  const result: URLVisit[] = [];
-
-  // Create SRP visit.
-  result.push(createVisit(
-      BigInt(0), 'https://www.google.com/', 'www.google.com', 'SRP', false));
-
-  // Create general visits.
-  for (let i = 1; i <= numVisits; i++) {
-    result.push(createVisit(
-        BigInt(i), `https://www.foo.com/${i}`, `www.foo.com/${i}`,
-        `Test Title ${i}`, i <= numImageVisits));
+    numImageVisits: number = LAYOUT_1_MIN_IMAGE_VISITS,
+    imageVisitsFirst: boolean = true): URLVisit[] {
+  const nonSrpVisits = Array(numVisits).fill(0).map((_, i) => {
+    const id = i + 1;
+    return createVisit({
+      visitId: BigInt(id),
+      normalizedUrl: {url: `https://www.foo.com/${id}`},
+      urlForDisplay: `www.foo.com/${id}`,
+      pageTitle: `Test Title ${id}`,
+      hasUrlKeyedImage: i < numImageVisits,
+    });
+  });
+  if (!imageVisitsFirst) {
+    nonSrpVisits.reverse();
   }
-  return result;
+
+  return [
+    createVisit({
+      visitId: BigInt(0),
+      normalizedUrl: {url: `${GOOGLE_SEARCH_BASE_URL}?q=foo`},
+      urlForDisplay: 'www.google.com',
+      pageTitle: 'SRP',
+    }),
+    ...nonSrpVisits,
+  ];
 }
 
 export function createRelatedSearches(num: number = MIN_RELATED_SEARCHES):
@@ -56,8 +79,7 @@ export function createRelatedSearches(num: number = MIN_RELATED_SEARCHES):
     result.push({
       query: `Test Query ${i}`,
       url: {
-        url:
-            `https://www.google.com/search?q=${encodeURIComponent(`test${i}`)}`,
+        url: `${GOOGLE_SEARCH_BASE_URL}?q=${encodeURIComponent(`test${i}`)}`,
       },
     });
   }

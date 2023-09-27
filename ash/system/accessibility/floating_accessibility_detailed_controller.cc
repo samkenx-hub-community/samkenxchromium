@@ -79,6 +79,7 @@ void FloatingAccessibilityDetailedController::Show(
       0, kBubbleMenuPadding, kBubbleMenuPadding, kBubbleMenuPadding);
   init_params.close_on_deactivate = false;
   init_params.translucent = true;
+  init_params.type = TrayBubbleView::TrayBubbleType::kAccessibilityBubble;
 
   bubble_view_ = new DetailedBubbleView(init_params);
   bubble_view_->SetArrowWithoutResizing(alignment);
@@ -87,14 +88,7 @@ void FloatingAccessibilityDetailedController::Show(
       std::make_unique<AccessibilityDetailedView>(this));
   bubble_view_->SetPreferredSize(
       gfx::Size(kTrayMenuWidth, kDetailedViewHeightDip));
-  bubble_view_->SetFocusBehavior(ActionableView::FocusBehavior::ALWAYS);
-
-  // In dark light mode, we switch TrayBubbleView to use a textured layer
-  // instead of solid color layer, so no need to create an extra layer here.
-  if (!features::IsDarkLightModeEnabled()) {
-    detailed_view_->SetPaintToLayer();
-    detailed_view_->layer()->SetFillsBoundsOpaquely(false);
-  }
+  bubble_view_->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
 
   bubble_widget_ = views::BubbleDialogDelegateView::CreateBubble(bubble_view_);
   bubble_view_->SetCanActivate(true);

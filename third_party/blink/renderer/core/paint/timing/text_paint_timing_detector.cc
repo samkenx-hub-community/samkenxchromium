@@ -36,9 +36,8 @@ TextPaintTimingDetector::TextPaintTimingDetector(
 void LargestTextPaintManager::PopulateTraceValue(
     TracedValue& value,
     const TextRecord& first_text_paint) {
-  value.SetInteger(
-      "DOMNodeId",
-      static_cast<int>(DOMNodeIds::IdForNode(first_text_paint.node_)));
+  value.SetInteger("DOMNodeId",
+                   static_cast<int>(first_text_paint.node_->GetDomNodeId()));
   value.SetInteger("size", static_cast<int>(first_text_paint.recorded_size));
   value.SetInteger("candidateIndex", ++count_candidates_);
   value.SetBoolean("isMainFrame", frame_view_->GetFrame().IsMainFrame());
@@ -58,10 +57,10 @@ void LargestTextPaintManager::ReportCandidateToTrace(
     return;
   auto value = std::make_unique<TracedValue>();
   PopulateTraceValue(*value, largest_text_record);
-  TRACE_EVENT_MARK_WITH_TIMESTAMP2("loading", "LargestTextPaint::Candidate",
-                                   largest_text_record.paint_time, "data",
-                                   std::move(value), "frame",
-                                   ToTraceValue(&frame_view_->GetFrame()));
+  TRACE_EVENT_MARK_WITH_TIMESTAMP2(
+      "loading", "LargestTextPaint::Candidate", largest_text_record.paint_time,
+      "data", std::move(value), "frame",
+      GetFrameIdForTracing(&frame_view_->GetFrame()));
 }
 
 TextRecord* LargestTextPaintManager::UpdateMetricsCandidate() {
@@ -86,10 +85,6 @@ void TextPaintTimingDetector::OnPaintFinished() {
   if (!added_entry_in_latest_frame_)
     return;
 
-  // TODO(npm): while simplifying the logic on PaintTimingDetector, stop calling
-  // this on OnPaintFinished() as this it should be sufficient to call this
-  // solely on ReportPresentationTime(), at least for the text case.
-  frame_view_->GetPaintTimingDetector().UpdateLargestContentfulPaintCandidate();
   // |WrapCrossThreadWeakPersistent| guarantees that when |this| is killed,
   // the callback function will not be invoked.
   RegisterNotifyPresentationTime(

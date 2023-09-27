@@ -49,7 +49,7 @@ IN_PROC_BROWSER_TEST_F(PaymentRequestPaymentResponseShippingAddressTest,
   ResetEventWaiterForSequence(
       {DialogEvent::PROCESSING_SPINNER_SHOWN, DialogEvent::DIALOG_CLOSED});
   ClickOnDialogViewAndWait(DialogViewID::PAY_BUTTON, dialog_view());
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 
   // Test that the shipping address was sent to the merchant.
   ExpectBodyContains(
@@ -84,7 +84,7 @@ IN_PROC_BROWSER_TEST_F(PaymentRequestPaymentResponseAllContactDetailsTest,
   ResetEventWaiterForSequence(
       {DialogEvent::PROCESSING_SPINNER_SHOWN, DialogEvent::DIALOG_CLOSED});
   ClickOnDialogViewAndWait(DialogViewID::PAY_BUTTON, dialog_view());
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 
   // Test that the contact details were sent to the merchant.
   ExpectBodyContains({"\"payerName\": \"John H. Doe\"",
@@ -135,7 +135,7 @@ IN_PROC_BROWSER_TEST_F(
                                DialogEvent::SPEC_DONE_UPDATING,
                                DialogEvent::PROCESSING_SPINNER_HIDDEN,
                                DialogEvent::BACK_TO_PAYMENT_SHEET_NAVIGATION});
-  ASSERT_TRUE(content::ExecuteScript(GetActiveWebContents(), "retry({});"));
+  ASSERT_TRUE(content::ExecJs(GetActiveWebContents(), "retry({});"));
 
   // Select "contact2" profile
   OpenContactInfoScreen();
@@ -170,7 +170,7 @@ IN_PROC_BROWSER_TEST_F(PaymentRequestPaymentResponseOneContactDetailTest,
   ResetEventWaiterForSequence(
       {DialogEvent::PROCESSING_SPINNER_SHOWN, DialogEvent::DIALOG_CLOSED});
   ClickOnDialogViewAndWait(DialogViewID::PAY_BUTTON, dialog_view());
-  WaitForObservedEvent();
+  ASSERT_TRUE(WaitForObservedEvent());
 
   // Test that the contact details were sent to the merchant.
   ExpectBodyContains({"\"payerName\": null",

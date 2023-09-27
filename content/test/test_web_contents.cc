@@ -37,6 +37,7 @@
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/page_state/page_state.h"
 #include "third_party/blink/public/mojom/security_context/insecure_request_policy.mojom.h"
+#include "third_party/blink/public/mojom/speculation_rules/speculation_rules.mojom-shared.h"
 #include "ui/base/page_transition_types.h"
 
 namespace content {
@@ -86,11 +87,16 @@ TestWebContents* TestWebContents::Create(const CreateParams& params) {
 
 TestWebContents::~TestWebContents() = default;
 
-TestRenderFrameHost* TestWebContents::GetPrimaryMainFrame() {
-  auto* instance = WebContentsImpl::GetPrimaryMainFrame();
+const TestRenderFrameHost* TestWebContents::GetPrimaryMainFrame() const {
+  const auto* const instance = WebContentsImpl::GetPrimaryMainFrame();
   DCHECK(instance->IsTestRenderFrameHost())
       << "You may want to instantiate RenderViewHostTestEnabler.";
-  return static_cast<TestRenderFrameHost*>(instance);
+  return static_cast<const TestRenderFrameHost*>(instance);
+}
+
+TestRenderFrameHost* TestWebContents::GetPrimaryMainFrame() {
+  return const_cast<TestRenderFrameHost*>(
+      std::as_const(*this).GetPrimaryMainFrame());
 }
 
 TestRenderViewHost* TestWebContents::GetRenderViewHost() {
@@ -204,7 +210,7 @@ void TestWebContents::SetMainFrameMimeType(const std::string& mime_type) {
 }
 
 const std::string& TestWebContents::GetContentsMimeType() {
-  return GetPrimaryPage().contents_mime_type();
+  return GetPrimaryPage().GetContentsMimeType();
 }
 
 void TestWebContents::SetIsCurrentlyAudible(bool audible) {
@@ -291,7 +297,8 @@ void TestWebContents::NavigateAndFail(const GURL& url, int error_code) {
 
 void TestWebContents::TestSetIsLoading(bool value) {
   if (value) {
-    DidStartLoading(GetPrimaryMainFrame()->frame_tree_node(), true);
+    DidStartLoading(GetPrimaryMainFrame()->frame_tree_node());
+    LoadingStateChanged(LoadingState::LOADING_UI_REQUESTED);
   } else {
     for (FrameTreeNode* node : primary_frame_tree_.Nodes()) {
       RenderFrameHostImpl* current_frame_host =
@@ -452,6 +459,14 @@ bool TestWebContents::IsBackForwardCacheSupported() {
   return back_forward_cache_supported_;
 }
 
+const absl::optional<blink::mojom::PictureInPictureWindowOptions>&
+TestWebContents::GetPictureInPictureOptions() const {
+  if (picture_in_picture_options_.has_value()) {
+    return picture_in_picture_options_;
+  }
+  return WebContentsImpl::GetPictureInPictureOptions();
+}
+
 int TestWebContents::AddPrerender(const GURL& url) {
   DCHECK(!base::FeatureList::IsEnabled(
       blink::features::kPrerender2MemoryControls));
@@ -460,6 +475,7 @@ int TestWebContents::AddPrerender(const GURL& url) {
   return GetPrerenderHostRegistry()->CreateAndStartHost(PrerenderAttributes(
       url, PrerenderTriggerType::kSpeculationRule,
       /*embedder_histogram_suffix=*/"", Referrer(),
+      blink::mojom::SpeculationEagerness::kEager,
       rfhi->GetLastCommittedOrigin(), rfhi->GetProcess()->GetID(), GetWeakPtr(),
       rfhi->GetFrameToken(), rfhi->GetFrameTreeNodeId(),
       rfhi->GetPageUkmSourceId(), ui::PAGE_TRANSITION_LINK,
@@ -544,6 +560,19 @@ void TestWebContents::ActivatePrerenderedPageFromAddressBar(const GURL& url) {
 
 base::TimeTicks TestWebContents::GetTabSwitchStartTime() {
   return tab_switch_start_time_;
+}
+
+void TestWebContents::SetPictureInPictureOptions(
+    absl::optional<blink::mojom::PictureInPictureWindowOptions> options) {
+  picture_in_picture_options_ = options;
+}
+
+void TestWebContents::SetOverscrollNavigationEnabled(bool enabled) {
+  overscroll_enabled_ = enabled;
+}
+
+bool TestWebContents::GetOverscrollNavigationEnabled() {
+  return overscroll_enabled_;
 }
 
 }  // namespace content

@@ -24,7 +24,7 @@
 #include "components/password_manager/ios/password_manager_client_bridge.h"
 #include "components/prefs/pref_member.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
 #import "ios/web/public/web_state.h"
 #include "ios/web_view/internal/passwords/web_view_password_feature_manager.h"
 #include "ios/web_view/internal/web_view_browser_state.h"
@@ -83,7 +83,7 @@ class WebViewPasswordManagerClient
       std::unique_ptr<password_manager::PasswordFormManagerForUI>
           saved_form_manager) override;
   void PromptUserToEnableAutosignin() override;
-  bool IsIncognito() const override;
+  bool IsOffTheRecord() const override;
   const password_manager::PasswordManager* GetPasswordManager() const override;
   const password_manager::PasswordFeatureManager* GetPasswordFeatureManager()
       const override;
@@ -127,23 +127,11 @@ class WebViewPasswordManagerClient
   GetPasswordRequirementsService() override;
   bool IsIsolationForPasswordSitesEnabled() const override;
   bool IsNewTabPage() const override;
-  password_manager::FieldInfoManager* GetFieldInfoManager() const override;
 
   void set_bridge(id<PasswordManagerClientBridge> bridge) { bridge_ = bridge; }
 
   safe_browsing::PasswordProtectionService* GetPasswordProtectionService()
       const override;
-
-  void CheckProtectedPasswordEntry(
-      password_manager::metrics_util::PasswordType reused_password_type,
-      const std::string& username,
-      const std::vector<password_manager::MatchingReusedCredential>&
-          matching_reused_credentials,
-      bool password_field_exists,
-      uint64_t reused_password_hash,
-      const std::string& domain) override;
-
-  void LogPasswordReuseDetectedEvent() override;
 
  private:
   __weak id<PasswordManagerClientBridge> bridge_;

@@ -12,10 +12,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -31,10 +31,8 @@ import org.chromium.base.test.params.ParameterizedRunner;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.UrlUtils;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.dom_distiller.DomDistillerTabUtils;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.omnibox.LocationBarDataProvider;
 import org.chromium.chrome.browser.omnibox.NewTabPageDelegate;
@@ -44,11 +42,11 @@ import org.chromium.chrome.browser.tab.MockTab;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.toolbar.top.ToolbarLayout;
+import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.browser.Features;
-import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
-import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.url.GURL;
@@ -62,6 +60,7 @@ import java.util.List;
  * Tests for LocationBarModel.
  */
 @RunWith(ParameterizedRunner.class)
+@ParameterAnnotations.UseRunnerDelegate(ChromeJUnit4RunnerDelegate.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 public class LocationBarModelTest {
     @Rule
@@ -94,50 +93,18 @@ public class LocationBarModelTest {
 
     @Test
     @SmallTest
-    @DisableFeatures(ChromeFeatureList.ANDROID_SCROLL_OPTIMIZATIONS)
     public void testDisplayAndEditText() {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             TestLocationBarModel model = new TestLocationBarModel(mActivityTestRule.getActivity());
             model.setVisibleGurl(UrlConstants.ntpGurl());
             assertDisplayAndEditText(model, "", null);
 
-            model.setVisibleGurl(new GURL(JUnitTestGURLs.CHROME_ABOUT));
-            model.setDisplayUrl(JUnitTestGURLs.CHROME_ABOUT);
-            model.setFullUrl(JUnitTestGURLs.CHROME_ABOUT);
+            model.setVisibleGurl(JUnitTestGURLs.CHROME_ABOUT);
+            model.setDisplayUrl("chrome://about");
+            model.setFullUrl("chrome://about");
             assertDisplayAndEditText(model, "chrome://about", "chrome://about");
 
-            model.setVisibleGurl(new GURL(JUnitTestGURLs.URL_1));
-            model.setDisplayUrl("https://one.com");
-            model.setFullUrl("https://one.com");
-            assertDisplayAndEditText(model, "https://one.com", "https://one.com");
-
-            model.setDisplayUrl("one.com");
-            assertDisplayAndEditText(model, "one.com", "https://one.com");
-
-            // https://crbug.com/1214481
-            model.setVisibleGurl(GURL.emptyGURL());
-            model.setDisplayUrl("about:blank");
-            model.setFullUrl("about:blank");
-            assertDisplayAndEditText(model, "about:blank", "about:blank");
-
-            model.destroy();
-        });
-    }
-    @Test
-    @SmallTest
-    @EnableFeatures(ChromeFeatureList.ANDROID_SCROLL_OPTIMIZATIONS)
-    public void testDisplayAndEditText_optimizationsEnabled() {
-        TestThreadUtils.runOnUiThreadBlocking(() -> {
-            TestLocationBarModel model = new TestLocationBarModel(mActivityTestRule.getActivity());
-            model.setVisibleGurl(UrlConstants.ntpGurl());
-            assertDisplayAndEditText(model, "", null);
-
-            model.setVisibleGurl(new GURL(JUnitTestGURLs.CHROME_ABOUT));
-            model.setDisplayUrl(JUnitTestGURLs.CHROME_ABOUT);
-            model.setFullUrl(JUnitTestGURLs.CHROME_ABOUT);
-            assertDisplayAndEditText(model, "chrome://about", "chrome://about");
-
-            model.setVisibleGurl(new GURL(JUnitTestGURLs.URL_1));
+            model.setVisibleGurl(JUnitTestGURLs.URL_1);
             model.setDisplayUrl("https://one.com");
             model.setFullUrl("https://one.com");
             assertDisplayAndEditText(model, "https://one.com", "https://one.com");

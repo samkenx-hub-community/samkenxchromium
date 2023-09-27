@@ -14,6 +14,7 @@ import androidx.annotation.VisibleForTesting;
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.Log;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.StreamUtil;
 import org.chromium.base.ThreadUtils;
 import org.chromium.components.version_info.VersionInfo;
@@ -103,7 +104,7 @@ public class OmahaBase {
     private static final int UNKNOWN_DATE = -2;
 
     /** Whether or not the Omaha server should really be contacted. */
-    private static boolean sIsDisabled;
+    private static boolean sDisabledForTesting;
 
     // Results of {@link #handlePostRequest()}.
     @IntDef({PostResult.NO_REQUEST, PostResult.SENT, PostResult.FAILED, PostResult.SCHEDULED})
@@ -150,14 +151,13 @@ public class OmahaBase {
     // Request failure error code.
     private int mRequestErrorCode;
 
-    /** See {@link #sIsDisabled}. */
     public static void setIsDisabledForTesting(boolean state) {
-        sIsDisabled = state;
+        sDisabledForTesting = state;
+        ResettersForTesting.register(() -> sDisabledForTesting = false);
     }
 
-    /** See {@link #sIsDisabled}. */
     static boolean isDisabled() {
-        return sIsDisabled;
+        return sDisabledForTesting;
     }
 
     /**
@@ -176,9 +176,6 @@ public class OmahaBase {
         // Since this update check is synchronous and blocking on the network
         // connection, it should not be run on the UI thread.
         ThreadUtils.assertOnBackgroundThread();
-        Log.i(TAG,
-                "OmahaBase::checkForUpdates(): Current version String: \"" + getInstalledVersion()
-                        + "\"");
         // This is not available on developer builds.
         if (getRequestGenerator() == null) {
             Log.w(TAG,
@@ -209,9 +206,6 @@ public class OmahaBase {
         if (versionConfig.updateStatus != null && versionConfig.updateStatus.equals("noupdate")) {
             return UpdateStatus.UPDATED;
         }
-        Log.i(TAG,
-                "OmahaBase::checkForUpdates(): Received latest version String from Omaha "
-                        + "server: \"" + versionConfig.latestVersion + "\"");
         // Compare the current version with the latest received from the server.
         VersionNumber current = VersionNumber.fromString(getInstalledVersion());
         VersionNumber latest = VersionNumber.fromString(versionConfig.latestVersion);
@@ -247,7 +241,7 @@ public class OmahaBase {
         //                    case a scheduling error occurs.
         if (nextTimestamp != Long.MAX_VALUE && nextTimestamp >= 0) {
             long currentTimestamp = mDelegate.getScheduler().getCurrentTime();
-            Log.i(TAG, "Attempting to schedule next job for: " + new Date(nextTimestamp));
+            Log.d(TAG, "Attempting to schedule next job for: " + new Date(nextTimestamp));
             mDelegate.scheduleService(currentTimestamp, nextTimestamp);
         }
 
@@ -335,13 +329,9 @@ public class OmahaBase {
                     installAgeInDays,
                     mVersionConfig == null ? UNKNOWN_DATE : mVersionConfig.serverDate,
                     currentRequest);
-            Log.i(TAG, "OmahaBase::generateAndPostRequest(): Sending request to Omaha:\n" + xml);
 
             // Send the request to the server & wait for a response.
             String response = postRequest(currentTimestamp, xml);
-            Log.i(TAG,
-                    "OmahaBase::generateAndPostRequest(): Received response from Omaha:\n"
-                            + response);
 
             // Parse out the response.
             String appId = getRequestGenerator().getAppId();
@@ -363,7 +353,7 @@ public class OmahaBase {
             scheduler.resetFailedAttempts();
             mTimestampForNewRequest = scheduler.getCurrentTime() + MS_BETWEEN_REQUESTS;
             mTimestampForNextPostAttempt = scheduler.calculateNextTimestamp();
-            Log.i(TAG,
+            Log.d(TAG,
                     "Request to Server Successful. Timestamp for next request:"
                             + mTimestampForNextPostAttempt);
         } else {
@@ -478,7 +468,7 @@ public class OmahaBase {
 
     /**
      * Reads the data back from the file it was saved to.  Uses SharedPreferences to handle I/O.
-     * Sanity checks are performed on the timestamps to guard against clock changing.
+     * Validity checks are performed on the timestamps to guard against clock changing.
      */
     private void restoreState() {
         if (mStateHasBeenRestored) return;

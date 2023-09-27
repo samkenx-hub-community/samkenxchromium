@@ -24,6 +24,7 @@
 #include "components/content_settings/core/test/content_settings_mock_provider.h"
 #include "components/content_settings/core/test/content_settings_test_utils.h"
 #include "components/privacy_sandbox/privacy_sandbox_prefs.h"
+#include "components/privacy_sandbox/tracking_protection_prefs.h"
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "components/unified_consent/pref_names.h"
@@ -166,6 +167,7 @@ class TrustSafetySentimentServiceTest : public testing::Test {
     std::string trusted_surface_time = "5s";
     std::string browsing_data_probability = "0.4";
     std::string control_group_probability = "0.4";
+    std::string download_warning_ui_probability = "0.0";
     std::string password_check_probability = "0.4";
     std::string safety_check_probability = "0.4";
     std::string trusted_surface_probability = "0.4";
@@ -174,8 +176,10 @@ class TrustSafetySentimentServiceTest : public testing::Test {
     std::string privacy_sandbox_4_consent_decline_probability = "0.1";
     std::string privacy_sandbox_4_notice_ok_probability = "0.1";
     std::string privacy_sandbox_4_notice_settings_probability = "0.1";
+    std::string safe_browsing_interstitial_probability = "0.4";
     std::string browsing_data_trigger_id = "browsing-data-test";
     std::string control_group_trigger_id = "control-group-test";
+    std::string download_warning_ui_trigger_id = "download-warning-ui-test";
     std::string password_check_trigger_id = "password-check-test";
     std::string safety_check_trigger_id = "safety-check-test";
     std::string trusted_surface_trigger_id = "trusted-surface-test";
@@ -188,6 +192,8 @@ class TrustSafetySentimentServiceTest : public testing::Test {
         "privacy-sandbox-4-notice-ok";
     std::string privacy_sandbox_4_notice_settings_trigger_id =
         "privacy-sandbox-4-notice-settings";
+    std::string safe_browsing_interstitial_trigger_id =
+        "safe-browsing-interstitial";
   };
 
   void SetupFeatureParametersV2(FeatureParamsV2 params) {
@@ -202,6 +208,8 @@ class TrustSafetySentimentServiceTest : public testing::Test {
             {"trusted-surface-time", params.trusted_surface_time},
             {"browsing-data-probability", params.browsing_data_probability},
             {"control-group-probability", params.control_group_probability},
+            {"download-warning-ui-probability",
+             params.download_warning_ui_probability},
             {"password-check-probability", params.password_check_probability},
             {"safety-check-probability", params.safety_check_probability},
             {"trusted-surface-probability", params.trusted_surface_probability},
@@ -214,8 +222,12 @@ class TrustSafetySentimentServiceTest : public testing::Test {
              params.privacy_sandbox_4_notice_ok_probability},
             {"privacy-sandbox-4-notice-settings-probability",
              params.privacy_sandbox_4_notice_settings_probability},
+            {"safe-browsing-interstitial-probability",
+             params.safe_browsing_interstitial_probability},
             {"browsing-data-trigger-id", params.browsing_data_trigger_id},
             {"control-group-trigger-id", params.control_group_trigger_id},
+            {"download-warning-ui-trigger-id",
+             params.download_warning_ui_trigger_id},
             {"password-check-trigger-id", params.password_check_trigger_id},
             {"safety-check-trigger-id", params.safety_check_trigger_id},
             {"trusted-surface-trigger-id", params.trusted_surface_trigger_id},
@@ -228,6 +240,8 @@ class TrustSafetySentimentServiceTest : public testing::Test {
              params.privacy_sandbox_4_notice_ok_trigger_id},
             {"privacy-sandbox-4-notice-settings-trigger-id",
              params.privacy_sandbox_4_notice_settings_trigger_id},
+            {"safe-browsing-interstitial-trigger-id",
+             params.safe_browsing_interstitial_trigger_id},
         });
   }
 
@@ -248,6 +262,22 @@ class TrustSafetySentimentServiceTest : public testing::Test {
         histogram_tester()->ExpectBucketCount(histogram_name, area, 1);
       }
     }
+  }
+
+  void CheckCallTriggerOccurredHistogram(
+      const std::map<TrustSafetySentimentService::FeatureArea, int>&
+          triggered_area_counts) {
+    int total_count = 0;
+    const std::string histogram_name =
+        "Feedback.TrustSafetySentiment.CallTriggerOccurred";
+    for (const auto& histogram_expected : triggered_area_counts) {
+      const auto& feature_area = histogram_expected.first;
+      int expected_count = histogram_expected.second;
+      histogram_tester()->ExpectBucketCount(histogram_name, feature_area,
+                                            expected_count);
+      total_count += expected_count;
+    }
+    histogram_tester()->ExpectTotalCount(histogram_name, total_count);
   }
 
   TrustSafetySentimentService* service() {
@@ -298,6 +328,9 @@ TEST_F(TrustSafetySentimentServiceTest, Eligibility_NtpOpens) {
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kPrivacySettings,
                    TrustSafetySentimentService::FeatureArea::kTrustedSurface},
                   {});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kPrivacySettings, 1},
+       {TrustSafetySentimentService::FeatureArea::kTrustedSurface, 1}});
 
   // The next NTP should be eligible for a survey.
   EXPECT_CALL(*mock_hats_service(), LaunchSurvey(_, _, _, _, _));
@@ -338,6 +371,9 @@ TEST_F(TrustSafetySentimentServiceTest, Eligibility_Time) {
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kPrivacySettings,
                    TrustSafetySentimentService::FeatureArea::kTrustedSurface},
                   {TrustSafetySentimentService::FeatureArea::kTrustedSurface});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kPrivacySettings, 1},
+       {TrustSafetySentimentService::FeatureArea::kTrustedSurface, 1}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, TriggerProbability) {
@@ -353,6 +389,8 @@ TEST_F(TrustSafetySentimentServiceTest, TriggerProbability) {
       TrustSafetySentimentService::FeatureArea::kTrustedSurface, {});
   service()->OpenedNewTabPage();
   CheckHistograms({}, {});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kTrustedSurface, 1}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, TriggersClearOnLaunch) {
@@ -405,6 +443,10 @@ TEST_F(TrustSafetySentimentServiceTest, TriggersClearOnLaunch) {
                    TrustSafetySentimentService::FeatureArea::kTransactions},
                   {surveyed_feature_area,
                    TrustSafetySentimentService::FeatureArea::kTransactions});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kPrivacySettings, 1},
+       {TrustSafetySentimentService::FeatureArea::kTrustedSurface, 1},
+       {TrustSafetySentimentService::FeatureArea::kTransactions, 1}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, SettingsWatcher_PrivacySettings) {
@@ -903,6 +945,9 @@ TEST_F(TrustSafetySentimentServiceTest, ActiveIncognitoPreventsSurvey) {
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kPrivacySettings,
                    TrustSafetySentimentService::FeatureArea::kIneligible},
                   {TrustSafetySentimentService::FeatureArea::kPrivacySettings});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kSafetyCheck, 1},
+       {TrustSafetySentimentService::FeatureArea::kPrivacySettings, 1}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, ClosingIncognitoDelaysSurvey) {
@@ -956,6 +1001,9 @@ TEST_F(TrustSafetySentimentServiceTest, ClosingIncognitoDelaysSurvey) {
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kPrivacySettings,
                    TrustSafetySentimentService::FeatureArea::kIneligible},
                   {TrustSafetySentimentService::FeatureArea::kPrivacySettings});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kSafetyCheck, 1},
+       {TrustSafetySentimentService::FeatureArea::kPrivacySettings, 1}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, AllFeatureAreasHaveTriggers) {
@@ -1032,6 +1080,7 @@ TEST_F(TrustSafetySentimentServiceTest, V2_AllFeatureAreasHaveProbabilities) {
   FeatureParamsV2 params;
   params.browsing_data_probability = "1.0";
   params.control_group_probability = "1.0";
+  params.download_warning_ui_probability = "1.0";
   params.password_check_probability = "1.0";
   params.safety_check_probability = "1.0";
   params.trusted_surface_probability = "1.0";
@@ -1040,6 +1089,7 @@ TEST_F(TrustSafetySentimentServiceTest, V2_AllFeatureAreasHaveProbabilities) {
   params.privacy_sandbox_4_consent_decline_probability = "1.0";
   params.privacy_sandbox_4_notice_ok_probability = "1.0";
   params.privacy_sandbox_4_notice_settings_probability = "1.0";
+  params.safe_browsing_interstitial_probability = "1.0";
 
   SetupFeatureParametersV2(params);
   for (int enum_value = 0;
@@ -1097,6 +1147,8 @@ TEST_F(TrustSafetySentimentServiceTest, Eligibility_V1FeatureWhileV2Enabled) {
   service()->OpenedNewTabPage();
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kPrivacySettings},
                   {TrustSafetySentimentService::FeatureArea::kPrivacySettings});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kPrivacySettings, 2}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, V2_TrustedSurface) {
@@ -1136,6 +1188,8 @@ TEST_F(TrustSafetySentimentServiceTest, V2_TrustedSurface) {
   service()->OpenedNewTabPage();
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kTrustedSurface},
                   {TrustSafetySentimentService::FeatureArea::kTrustedSurface});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kTrustedSurface, 1}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, V2_SafetyCheck) {
@@ -1161,6 +1215,9 @@ TEST_F(TrustSafetySentimentServiceTest, V2_SafetyCheck) {
   service()->OpenedNewTabPage();
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kSafetyCheck},
                   {TrustSafetySentimentService::FeatureArea::kSafetyCheck});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kSafetyCheck, 1},
+       {TrustSafetySentimentService::FeatureArea::kPrivacySettings, 1}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, V2_PasswordCheck) {
@@ -1180,6 +1237,8 @@ TEST_F(TrustSafetySentimentServiceTest, V2_PasswordCheck) {
   service()->OpenedNewTabPage();
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kPasswordCheck},
                   {TrustSafetySentimentService::FeatureArea::kPasswordCheck});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kPasswordCheck, 1}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, V2_BrowsingData) {
@@ -1234,6 +1293,7 @@ TEST_F(TrustSafetySentimentServiceTest, V2_BrowsingData_NotInterested) {
   service()->ClearedBrowsingData(browsing_data::BrowsingDataType::COOKIES);
   service()->OpenedNewTabPage();
   CheckHistograms({}, {});
+  CheckCallTriggerOccurredHistogram({});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, V2_PrivacyGuide) {
@@ -1254,6 +1314,8 @@ TEST_F(TrustSafetySentimentServiceTest, V2_PrivacyGuide) {
   service()->OpenedNewTabPage();
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kPrivacyGuide},
                   {TrustSafetySentimentService::FeatureArea::kPrivacyGuide});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kPrivacyGuide, 1}});
 }
 
 TEST_F(TrustSafetySentimentServiceTest, V2_ControlGroup) {
@@ -1291,6 +1353,8 @@ TEST_F(TrustSafetySentimentServiceTest, V2_ControlGroup) {
   service()->OpenedNewTabPage();
   CheckHistograms({TrustSafetySentimentService::FeatureArea::kControlGroup},
                   {TrustSafetySentimentService::FeatureArea::kControlGroup});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kControlGroup, 1}});
   testing::Mock::VerifyAndClearExpectations(mock_hats_service());
 
   // A second valid trigger should not launch a survey because we have already
@@ -1378,4 +1442,55 @@ TEST_F(TrustSafetySentimentServiceTest, V2_PrivacySandbox4NoticeSettings) {
   service()->InteractedWithPrivacySandbox4(
       TrustSafetySentimentService::FeatureArea::kPrivacySandbox4NoticeSettings);
   service()->OpenedNewTabPage();
+}
+
+TEST_F(TrustSafetySentimentServiceTest, V2_SafeBrowsingInterstitial) {
+  // Making a final decision on a safe browsing interstitial is considered a
+  // trigger, and should make a user eligible to receive a survey.
+  FeatureParamsV2 params;
+  params.safe_browsing_interstitial_probability = "1.0";
+  params.min_time_to_prompt = "0s";
+  params.ntp_visits_min_range = "0";
+  params.ntp_visits_max_range = "0";
+  SetupFeatureParametersV2(params);
+
+  // The correct survey should be launched.
+  EXPECT_CALL(
+      *mock_hats_service(),
+      LaunchSurvey(kHatsSurveyTriggerTrustSafetyV2SafeBrowsingInterstitial, _,
+                   _, _, _));
+  service()->InteractedWithSafeBrowsingInterstitial(
+      true, safe_browsing::SB_THREAT_TYPE_URL_PHISHING);
+  service()->OpenedNewTabPage();
+  CheckHistograms(
+      {TrustSafetySentimentService::FeatureArea::kSafeBrowsingInterstitial},
+      {TrustSafetySentimentService::FeatureArea::kSafeBrowsingInterstitial});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kSafeBrowsingInterstitial,
+        1}});
+}
+
+TEST_F(TrustSafetySentimentServiceTest, V2_DownloadWarningUI) {
+  // Making a final decision on a safe browsing interstitial is considered a
+  // trigger, and should make a user eligible to receive a survey.
+  FeatureParamsV2 params;
+  params.download_warning_ui_probability = "1.0";
+  params.min_time_to_prompt = "0s";
+  params.ntp_visits_min_range = "0";
+  params.ntp_visits_max_range = "0";
+  SetupFeatureParametersV2(params);
+
+  // The correct survey should be launched.
+  EXPECT_CALL(*mock_hats_service(),
+              LaunchSurvey(kHatsSurveyTriggerTrustSafetyV2DownloadWarningUI, _,
+                           _, _, _));
+  service()->InteractedWithDownloadWarningUI(
+      DownloadItemWarningData::WarningSurface::BUBBLE_MAINPAGE,
+      DownloadItemWarningData::WarningAction::PROCEED);
+  service()->OpenedNewTabPage();
+  CheckHistograms(
+      {TrustSafetySentimentService::FeatureArea::kDownloadWarningUI},
+      {TrustSafetySentimentService::FeatureArea::kDownloadWarningUI});
+  CheckCallTriggerOccurredHistogram(
+      {{TrustSafetySentimentService::FeatureArea::kDownloadWarningUI, 1}});
 }

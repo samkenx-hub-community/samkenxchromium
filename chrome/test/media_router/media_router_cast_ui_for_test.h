@@ -10,22 +10,17 @@
 #include "chrome/test/media_router/media_router_ui_for_test_base.h"
 #include "components/media_router/common/media_sink.h"
 #include "components/media_router/common/media_source.h"
-#include "content/public/browser/web_contents_user_data.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace media_router {
 
-class MediaRouterCastUiForTest
-    : public MediaRouterUiForTestBase,
-      public content::WebContentsUserData<MediaRouterCastUiForTest>,
-      public CastDialogView::Observer {
+class MediaRouterCastUiForTest : public MediaRouterUiForTestBase,
+                                 public CastDialogView::Observer {
  public:
-  static MediaRouterCastUiForTest* GetOrCreateForWebContents(
-      content::WebContents* web_contents);
-
   MediaRouterCastUiForTest(const MediaRouterCastUiForTest&) = delete;
   MediaRouterCastUiForTest& operator=(const MediaRouterCastUiForTest&) = delete;
 
+  explicit MediaRouterCastUiForTest(content::WebContents* web_contents);
   ~MediaRouterCastUiForTest() override;
 
   // MediaRouterUiForTestBase:
@@ -35,6 +30,8 @@ class MediaRouterCastUiForTest
   void HideDialog() override;
   void ChooseSourceType(CastDialogView::SourceType source_type) override;
   CastDialogView::SourceType GetChosenSourceType() const override;
+  void StartCasting(const std::string& sink_name) override;
+  void StopCasting(const std::string& sink_name) override;
   std::string GetRouteIdForSink(const std::string& sink_name) const override;
   std::string GetStatusTextForSink(const std::string& sink_name) const override;
   std::string GetIssueTextForSink(const std::string& sink_name) const override;
@@ -47,10 +44,6 @@ class MediaRouterCastUiForTest
   void OnDialogCreated() override;
 
  private:
-  friend class content::WebContentsUserData<MediaRouterCastUiForTest>;
-
-  explicit MediaRouterCastUiForTest(content::WebContents* web_contents);
-
   // CastDialogView::Observer:
   void OnDialogModelUpdated(CastDialogView* dialog_view) override;
   void OnDialogWillClose(CastDialogView* dialog_view) override;
@@ -69,7 +62,7 @@ class MediaRouterCastUiForTest
   const CastDialogView* GetDialogView() const;
   CastDialogView* GetDialogView();
 
-  WEB_CONTENTS_USER_DATA_KEY_DECL();
+  CastDialogSinkView* GetSinkView(const std::string& sink_name) const;
 };
 
 }  // namespace media_router

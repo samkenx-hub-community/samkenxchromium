@@ -2,30 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "ios/web_view/internal/passwords/web_view_password_store_factory.h"
+#import "ios/web_view/internal/passwords/web_view_password_store_factory.h"
 
-#include <memory>
-#include <utility>
+#import <memory>
+#import <utility>
 
-#include "base/command_line.h"
-#include "base/functional/callback.h"
-#include "base/no_destructor.h"
+#import "base/command_line.h"
+#import "base/functional/callback.h"
+#import "base/no_destructor.h"
 #import "base/task/sequenced_task_runner.h"
-#include "base/task/sequenced_task_runner.h"
-#import "base/task/sequenced_task_runner.h"
-#include "base/task/thread_pool.h"
-#include "components/keyed_service/core/service_access_type.h"
-#include "components/keyed_service/ios/browser_state_dependency_manager.h"
-#include "components/password_manager/core/browser/login_database.h"
-#include "components/password_manager/core/browser/password_store_built_in_backend.h"
-#include "components/password_manager/core/browser/password_store_factory_util.h"
-#include "components/sync/driver/sync_service.h"
-#include "ios/web_view/internal/app/application_context.h"
-#include "ios/web_view/internal/web_view_browser_state.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "base/task/thread_pool.h"
+#import "components/keyed_service/core/service_access_type.h"
+#import "components/keyed_service/ios/browser_state_dependency_manager.h"
+#import "components/password_manager/core/browser/login_database.h"
+#import "components/password_manager/core/browser/password_store_built_in_backend.h"
+#import "components/password_manager/core/browser/password_store_factory_util.h"
+#import "components/sync/service/sync_service.h"
+#import "ios/web_view/internal/app/application_context.h"
+#import "ios/web_view/internal/web_view_browser_state.h"
 
 namespace ios_web_view {
 
@@ -78,7 +72,8 @@ WebViewPasswordStoreFactory::BuildServiceInstanceFor(
   scoped_refptr<password_manager::PasswordStore> store =
       new password_manager::PasswordStore(
           std::make_unique<password_manager::PasswordStoreBuiltInBackend>(
-              std::move(login_db)));
+              std::move(login_db),
+              syncer::WipeModelUponSyncDisabledBehavior::kNever));
   store->Init(/*prefs=*/nullptr, /*affiliated_match_helper=*/nullptr);
   return store;
 }

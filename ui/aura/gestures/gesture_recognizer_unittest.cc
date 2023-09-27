@@ -398,7 +398,7 @@ class QueueTouchEventDelegate : public GestureEventConsumeDelegate {
         false /* is_source_touch_event_set_blocking */);
   }
 
-  raw_ptr<Window> window_;
+  raw_ptr<Window, DanglingUntriaged> window_;
   raw_ptr<WindowEventDispatcher> dispatcher_;
   AckState synchronous_ack_for_next_event_;
   std::list<uint32_t> sent_events_ids_;
@@ -1778,10 +1778,8 @@ TEST_F(GestureRecognizerTest, DestroyGestureProviderAuraBeforeAck) {
   // Verify that the gesture provider for `window1` is created.
   auto* gesture_recognizer = static_cast<ui::GestureRecognizerImpl*>(
       aura::Env::GetInstance()->gesture_recognizer());
-  const auto& consumer_provider_mappings =
-      gesture_recognizer->consumer_gesture_provider_;
-  EXPECT_NE(consumer_provider_mappings.cend(),
-            consumer_provider_mappings.find(window1.get()));
+  const auto& consumers = gesture_recognizer->consumers_;
+  EXPECT_NE(consumers.cend(), consumers.find(window1.get()));
 
   // Create a second window for handling touch events.
   std::unique_ptr<QueueTouchEventDelegate> delegate2(
@@ -1799,8 +1797,7 @@ TEST_F(GestureRecognizerTest, DestroyGestureProviderAuraBeforeAck) {
       /*time_stamp=*/tes.Now(),
       ui::PointerDetails(ui::EventPointerType::kTouch, kTouchId2));
   DispatchEventUsingWindowDispatcher(&press2);
-  EXPECT_NE(consumer_provider_mappings.cend(),
-            consumer_provider_mappings.find(window2.get()));
+  EXPECT_NE(consumers.cend(), consumers.find(window2.get()));
 
   // Verify that `press2` is associated with a gesture provider raw pointer.
   const auto& event_provider_mappings =
@@ -4330,12 +4327,14 @@ TEST_F(GestureRecognizerTest, GestureEventFlagsPassedFromTouchEvent) {
 // A delegate that deletes a window on long press.
 class GestureEventDeleteWindowOnLongPress : public GestureEventConsumeDelegate {
  public:
-  GestureEventDeleteWindowOnLongPress() : window_(nullptr) {}
+  GestureEventDeleteWindowOnLongPress() = default;
 
   GestureEventDeleteWindowOnLongPress(
       const GestureEventDeleteWindowOnLongPress&) = delete;
   GestureEventDeleteWindowOnLongPress& operator=(
       const GestureEventDeleteWindowOnLongPress&) = delete;
+
+  ~GestureEventDeleteWindowOnLongPress() override { DCHECK(!window_); }
 
   void set_window(aura::Window** window) { window_ = window; }
 
@@ -4348,7 +4347,7 @@ class GestureEventDeleteWindowOnLongPress : public GestureEventConsumeDelegate {
   }
 
  private:
-  raw_ptr<aura::Window*> window_;
+  raw_ptr<aura::Window*> window_ = nullptr;
 };
 
 // Check that deleting the window in response to a long press gesture doesn't
@@ -4372,6 +4371,8 @@ TEST_F(GestureRecognizerTest, GestureEventLongPressDeletingWindow) {
   // Wait until the timer runs out.
   delegate.WaitUntilReceivedGesture(ui::ET_GESTURE_LONG_PRESS);
   EXPECT_EQ(nullptr, window);
+
+  delegate.set_window(nullptr);
 }
 
 TEST_F(GestureRecognizerWithSwitchTest, GestureEventSmallPinchDisabled) {
@@ -4835,7 +4836,7 @@ TEST_F(GestureRecognizerTest, ResetGestureRecognizerWithGestureProvider) {
   // Check that the gesture recognizer owns one gesture provider.
   EXPECT_EQ(1u, static_cast<ui::GestureRecognizerImpl*>(
                     aura::Env::GetInstance()->gesture_recognizer())
-                    ->consumer_gesture_provider_.size());
+                    ->consumers_.size());
 
   // Destroy the current gesture recognizer.
   aura::Env::GetInstance()->SetGestureRecognizer(

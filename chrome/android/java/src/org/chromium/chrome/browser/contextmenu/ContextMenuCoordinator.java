@@ -14,6 +14,7 @@ import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewStub;
+import android.view.Window;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -23,10 +24,9 @@ import androidx.appcompat.app.AlertDialog;
 import org.chromium.base.Callback;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.profiles.Profile;
-import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
 import org.chromium.components.browser_ui.widget.ContextMenuDialog;
 import org.chromium.components.embedder_support.contextmenu.ContextMenuParams;
-import org.chromium.content_public.browser.ContentFeatureList;
+import org.chromium.content_public.browser.ContentFeatureMap;
 import org.chromium.content_public.browser.LoadCommittedDetails;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
@@ -108,7 +108,7 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         mOnMenuClosed = onMenuClosed;
         Activity activity = window.getActivity().get();
         final boolean isDragDropEnabled =
-                ContentFeatureList.isEnabled(ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU)
+                ContentFeatureMap.isEnabled(ContentFeatures.TOUCH_DRAG_AND_CONTEXT_MENU)
                 && ContextMenuUtils.usePopupContextMenuForContext(activity);
         final boolean isPopup = isDragDropEnabled
                 || params.getSourceType() == MenuSourceType.MENU_SOURCE_MOUSE
@@ -133,6 +133,13 @@ public class ContextMenuCoordinator implements ContextMenuUi {
             layout.getLocationOnScreen(layoutScreenLocation);
             x += layoutScreenLocation[0];
             y += layoutScreenLocation[1];
+
+            // Also take the Window offset into account. This is necessary when a partial width/
+            // height window hosts the activity.
+            Window activityWindow = activity.getWindow();
+            var attrs = activityWindow.getAttributes();
+            x += attrs.x;
+            y += attrs.y;
         }
 
         // If drag drop is enabled, the context menu needs to be anchored next to the drag shadow.
@@ -177,11 +184,16 @@ public class ContextMenuCoordinator implements ContextMenuUi {
             desiredPopupContentWidth =
                     activity.getResources().getDimensionPixelSize(R.dimen.context_menu_small_width);
         }
-        View webContentView = webContents.getViewAndroidDelegate() != null && isDragDropEnabled
-                ? webContents.getViewAndroidDelegate().getContainerView()
-                : null;
+
+        // When drag and drop is enabled, context menu will be dismissed by web content when drag
+        // moves beyond certain threshold. ContentView will need to receive drag events dispatched
+        // from ContextMenuDialog in order to calculate the movement.
+        View dragDispatchingTargetView =
+                isDragDropEnabled ? webContents.getViewAndroidDelegate().getContainerView() : null;
+
         mDialog = createContextMenuDialog(activity, layout, menu, isPopup, dialogTopMarginPx,
-                dialogBottomMarginPx, popupMargin, desiredPopupContentWidth, webContentView, rect);
+                dialogBottomMarginPx, popupMargin, desiredPopupContentWidth,
+                dragDispatchingTargetView, rect);
         mDialog.setOnShowListener(dialogInterface -> onMenuShown.run());
         mDialog.setOnDismissListener(dialogInterface -> mOnMenuClosed.run());
 
@@ -190,8 +202,8 @@ public class ContextMenuCoordinator implements ContextMenuUi {
                 activity, params, Profile.fromWebContents(mWebContents), mNativeDelegate);
 
         // The Integer here specifies the {@link ListItemType}.
-        ModelList listItems = getItemList(
-                activity, items, onItemClicked, params.getOpenedFromHighlight() ? false : true);
+        ModelList listItems =
+                getItemList(activity, items, onItemClicked, !params.getOpenedFromHighlight());
 
         ModelListAdapter adapter = new ModelListAdapter(listItems) {
             @Override
@@ -283,7 +295,7 @@ public class ContextMenuCoordinator implements ContextMenuUi {
      *
      * @param activity Used to inflate the dialog.
      * @param layout The inflated context menu layout that will house the context menu.
-     * @param view The inflated view that contains the list view.
+     * @param menuView The inflated view that contains the list view.
      * @param isPopup Whether the context menu is being shown in a {@link AnchoredPopupWindow}.
      * @param topMarginPx An explicit top margin for the dialog, or -1 to use default
      *                    defined in XML.
@@ -291,22 +303,24 @@ public class ContextMenuCoordinator implements ContextMenuUi {
      *                       defined in XML.
      * @param popupMargin The margin for the popup window.
      * @param desiredPopupContentWidth The desired width for the content of the context menu.
-     * @param webContentView The web content view presented behind the context menu.
+     * @param dragDispatchingTargetView The view presented behind the context menu. If provided,
+     *         drag event happened outside of ContextMenu will be dispatched into this View.
      * @param rect Rect location where context menu is triggered. If this menu is a popup, the
      *             coordinates are expected to be screen coordinates.
      * @return Returns a final dialog that does not have a background can be displayed using
      *         {@link AlertDialog#show()}.
      */
     @VisibleForTesting
-    static ContextMenuDialog createContextMenuDialog(Activity activity, View layout, View view,
+    static ContextMenuDialog createContextMenuDialog(Activity activity, View layout, View menuView,
             boolean isPopup, int topMarginPx, int bottomMarginPx, @Nullable Integer popupMargin,
-            @Nullable Integer desiredPopupContentWidth, @Nullable View webContentView, Rect rect) {
+            @Nullable Integer desiredPopupContentWidth, @Nullable View dragDispatchingTargetView,
+            Rect rect) {
         // TODO(sinansahin): Refactor ContextMenuDialog as well.
         boolean shouldRemoveScrim = ContextMenuUtils.usePopupContextMenuForContext(activity);
-        final ContextMenuDialog dialog = new ContextMenuDialog(activity,
-                R.style.ThemeOverlay_BrowserUI_AlertDialog, topMarginPx, bottomMarginPx, layout,
-                view, isPopup, shouldRemoveScrim, popupMargin, desiredPopupContentWidth,
-                webContentView, rect, ChromeAccessibilityUtil.get());
+        final ContextMenuDialog dialog =
+                new ContextMenuDialog(activity, R.style.ThemeOverlay_BrowserUI_AlertDialog,
+                        topMarginPx, bottomMarginPx, layout, menuView, isPopup, shouldRemoveScrim,
+                        popupMargin, desiredPopupContentWidth, dragDispatchingTargetView, rect);
         dialog.setContentView(layout);
 
         return dialog;
@@ -372,7 +386,6 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         mDialog.dismiss();
     }
 
-    @VisibleForTesting
     Callback<ChipRenderParams> getChipRenderParamsCallbackForTesting(ChipDelegate chipDelegate) {
         return (chipRenderParams) -> {
             if (chipDelegate.isValidChipRenderParams(chipRenderParams) && mDialog.isShowing()) {
@@ -381,14 +394,12 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         };
     }
 
-    @VisibleForTesting
     void initializeHeaderCoordinatorForTesting(Activity activity, ContextMenuParams params,
             Profile profile, ContextMenuNativeDelegate nativeDelegate) {
         mHeaderCoordinator =
                 new ContextMenuHeaderCoordinator(activity, params, profile, nativeDelegate);
     }
 
-    @VisibleForTesting
     void simulateShoppyImageClassificationForTesting() {
         // Don't need to initialize controller because that should be triggered by
         // forcing feature flags.
@@ -400,7 +411,6 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         mChipController.showChip(chipRenderParamsForTesting);
     }
 
-    @VisibleForTesting
     void simulateTranslateImageClassificationForTesting() {
         // Don't need to initialize controller because that should be triggered by
         // forcing feature flags.
@@ -412,7 +422,6 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         mChipController.showChip(chipRenderParamsForTesting);
     }
 
-    @VisibleForTesting
     ChipRenderParams simulateImageClassificationForTesting() {
         // Don't need to initialize controller because that should be triggered by
         // forcing feature flags.
@@ -460,12 +469,10 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         return null;
     }
 
-    @VisibleForTesting
     public ContextMenuDialog getDialogForTest() {
         return mDialog;
     }
 
-    @VisibleForTesting
     public ContextMenuListView getListViewForTest() {
         return mListView;
     }

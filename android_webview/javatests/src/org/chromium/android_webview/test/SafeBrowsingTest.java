@@ -8,18 +8,16 @@ import static org.junit.Assert.assertNotEquals;
 
 import android.content.Context;
 import android.content.ContextWrapper;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
-import android.support.test.InstrumentationRegistry;
 import android.view.ViewGroup;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 
 import org.hamcrest.Matchers;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -37,6 +35,7 @@ import org.chromium.android_webview.AwSettings;
 import org.chromium.android_webview.SafeBrowsingAction;
 import org.chromium.android_webview.WebviewErrorCode;
 import org.chromium.android_webview.common.AwSwitches;
+import org.chromium.android_webview.common.PlatformServiceBridge;
 import org.chromium.android_webview.safe_browsing.AwSafeBrowsingConfigHelper;
 import org.chromium.android_webview.safe_browsing.AwSafeBrowsingConversionHelper;
 import org.chromium.android_webview.safe_browsing.AwSafeBrowsingResponse;
@@ -53,9 +52,8 @@ import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.CriteriaNotSatisfiedException;
 import org.chromium.base.test.util.Feature;
-import org.chromium.base.test.util.InMemorySharedPreferences;
 import org.chromium.components.safe_browsing.SafeBrowsingApiBridge;
-import org.chromium.components.safe_browsing.SafeBrowsingApiHandler;
+import org.chromium.components.safe_browsing.SafetyNetApiHandler;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.content_public.common.ContentUrlConstants;
 import org.chromium.net.test.EmbeddedTestServer;
@@ -79,8 +77,8 @@ public class SafeBrowsingTest {
          * sites are malicious
          */
         @Override
-        public AwBrowserContext createAwBrowserContextOnUiThread(InMemorySharedPreferences prefs) {
-            return new MockAwBrowserContext(prefs);
+        public AwBrowserContext createAwBrowserContextOnUiThread() {
+            return new MockAwBrowserContext();
         }
     };
 
@@ -131,10 +129,10 @@ public class SafeBrowsingTest {
     private static final String WEB_UI_HOST = "safe-browsing";
 
     /**
-     * A fake SafeBrowsingApiHandler which treats URLs ending in MALWARE_HTML_PATH as malicious URLs
+     * A fake SafetyNetApiHandler which treats URLs ending in MALWARE_HTML_PATH as malicious URLs
      * that should be blocked.
      */
-    public static class MockSafeBrowsingApiHandler implements SafeBrowsingApiHandler {
+    public static class MockSafetyNetApiHandler implements SafetyNetApiHandler {
         private Observer mObserver;
         private static final String SAFE_METADATA = "{}";
 
@@ -192,12 +190,22 @@ public class SafeBrowsingTest {
     }
 
     /**
-     * A fake AwBrowserContext which loads the MockSafeBrowsingApiHandler instead of the real one.
+     * A fake PlatformServiceBridge that allows tests to make safe browsing requests without GMS.
+     */
+    private static class MockPlatformServiceBridge extends PlatformServiceBridge {
+        @Override
+        public boolean canUseGms() {
+            return true;
+        }
+    }
+
+    /**
+     * A fake AwBrowserContext which loads the MockSafetyNetApiHandler instead of the real one.
      */
     private static class MockAwBrowserContext extends AwBrowserContext {
-        public MockAwBrowserContext(SharedPreferences sharedPreferences) {
-            super(sharedPreferences, 0, true);
-            SafeBrowsingApiBridge.setHandler(new MockSafeBrowsingApiHandler());
+        public MockAwBrowserContext() {
+            super(0);
+            SafeBrowsingApiBridge.setSafetyNetApiHandler(new MockSafetyNetApiHandler());
         }
     }
 
@@ -303,6 +311,9 @@ public class SafeBrowsingTest {
                 mContentsClient, false, new SafeBrowsingDependencyFactory());
         mAwContents = (MockAwContents) mContainerView.getAwContents();
 
+        MockPlatformServiceBridge mockPlatformServiceBridge = new MockPlatformServiceBridge();
+        PlatformServiceBridge.injectInstance(mockPlatformServiceBridge);
+
         mTestServer = EmbeddedTestServer.createAndStartServer(
                 InstrumentationRegistry.getInstrumentation().getContext());
 
@@ -311,11 +322,6 @@ public class SafeBrowsingTest {
 
         // Some tests need to inject JavaScript.
         AwActivityTestRule.enableJavaScriptOnUiThread(mAwContents);
-    }
-
-    @After
-    public void tearDown() {
-        mTestServer.stopAndDestroyServer();
     }
 
     private int getPageColor() {

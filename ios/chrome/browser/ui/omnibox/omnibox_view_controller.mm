@@ -12,9 +12,10 @@
 #import "components/omnibox/browser/omnibox_field_trial.h"
 #import "components/open_from_clipboard/clipboard_recent_content.h"
 #import "components/strings/grit/components_strings.h"
+#import "ios/chrome/browser/default_browser/utils.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
-#import "ios/chrome/browser/ui/default_promo/default_browser_utils.h"
 #import "ios/chrome/browser/ui/omnibox/omnibox_constants.h"
 #import "ios/chrome/browser/ui/omnibox/omnibox_container_view.h"
 #import "ios/chrome/browser/ui/omnibox/omnibox_keyboard_delegate.h"
@@ -27,15 +28,12 @@
 #import "ios/public/provider/chrome/browser/lens/lens_api.h"
 #import "ui/base/l10n/l10n_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 using base::UserMetricsAction;
 
 namespace {
 
-const CGFloat kClearButtonSize = 28.0f;
+const CGFloat kClearButtonInset = 4.0f;
+const CGFloat kClearButtonImageSize = 17.0f;
 
 }  // namespace
 
@@ -580,9 +578,16 @@ const CGFloat kClearButtonSize = 28.0f;
   [self.textField setClearButtonMode:UITextFieldViewModeNever];
   [self.textField setRightViewMode:UITextFieldViewModeAlways];
 
+  UIButtonConfiguration* conf =
+      [UIButtonConfiguration plainButtonConfiguration];
+  conf.image = [self clearButtonIcon];
+  conf.contentInsets =
+      NSDirectionalEdgeInsetsMake(kClearButtonInset, kClearButtonInset,
+                                  kClearButtonInset, kClearButtonInset);
+
   UIButton* clearButton = [UIButton buttonWithType:UIButtonTypeSystem];
-  clearButton.frame = CGRectMake(0, 0, kClearButtonSize, kClearButtonSize);
-  [clearButton setImage:[self clearButtonIcon] forState:UIControlStateNormal];
+  clearButton.configuration = conf;
+
   [clearButton addTarget:self
                   action:@selector(clearButtonPressed)
         forControlEvents:UIControlEventTouchUpInside];
@@ -604,10 +609,8 @@ const CGFloat kClearButtonSize = 28.0f;
 }
 
 - (UIImage*)clearButtonIcon {
-  UIImage* image = [[UIImage imageNamed:@"omnibox_clear_icon"]
-      imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-
-  return image;
+  return DefaultSymbolWithPointSize(kXMarkCircleFillSymbol,
+                                    kClearButtonImageSize);
 }
 
 - (void)clearButtonPressed {
@@ -682,7 +685,7 @@ const CGFloat kClearButtonSize = 28.0f;
 - (void)visitCopiedLink:(id)sender {
   // A search using clipboard link is activity that should indicate a user
   // that would be interested in setting Chrome as the default browser.
-  LogLikelyInterestedDefaultBrowserUserActivity(DefaultPromoTypeGeneral);
+  LogCopyPasteInOmniboxForDefaultBrowserPromo();
   RecordAction(UserMetricsAction("Mobile.OmniboxContextMenu.VisitCopiedLink"));
   self.omniboxInteractedWhileFocused = YES;
   [self.pasteDelegate didTapVisitCopiedLink];
@@ -691,7 +694,7 @@ const CGFloat kClearButtonSize = 28.0f;
 - (void)searchCopiedText:(id)sender {
   // A search using clipboard text is activity that should indicate a user
   // that would be interested in setting Chrome as the default browser.
-  LogLikelyInterestedDefaultBrowserUserActivity(DefaultPromoTypeGeneral);
+  LogCopyPasteInOmniboxForDefaultBrowserPromo();
   RecordAction(UserMetricsAction("Mobile.OmniboxContextMenu.SearchCopiedText"));
   self.omniboxInteractedWhileFocused = YES;
   [self.pasteDelegate didTapSearchCopiedText];

@@ -4,8 +4,7 @@
 
 package org.chromium.chrome.browser;
 
-import android.support.test.InstrumentationRegistry;
-
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
 import org.junit.After;
@@ -73,7 +72,8 @@ public class InstalledAppTest {
     public void setUp() throws Exception {
         mActivityTestRule.startMainActivityOnBlankPage();
 
-        mTestServer = EmbeddedTestServer.createAndStartServer(InstrumentationRegistry.getContext());
+        mTestServer = EmbeddedTestServer.createAndStartServer(
+                ApplicationProvider.getApplicationContext());
 
         mUrl = mTestServer.getURL(TEST_FILE);
 
@@ -85,7 +85,6 @@ public class InstalledAppTest {
     @After
     public void tearDown() {
         TestThreadUtils.runOnUiThreadBlocking(() -> mTab.removeObserver(mUpdateWaiter));
-        mTestServer.stopAndDestroyServer();
     }
 
     /**

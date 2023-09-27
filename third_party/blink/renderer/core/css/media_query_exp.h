@@ -66,21 +66,16 @@ class CORE_EXPORT MediaQueryExpValue {
   bool IsNumeric() const { return type_ == Type::kNumeric; }
   bool IsRatio() const { return type_ == Type::kRatio; }
   bool IsCSSValue() const { return type_ == Type::kCSSValue; }
+  bool IsResolution() const;
 
   CSSValueID Id() const {
     DCHECK(IsId());
     return id_;
   }
 
-  double Value() const {
-    DCHECK(IsNumeric());
-    return numeric_.value;
-  }
+  double Value() const;
 
-  CSSPrimitiveValue::UnitType Unit() const {
-    DCHECK(IsNumeric());
-    return numeric_.unit;
-  }
+  CSSPrimitiveValue::UnitType Unit() const;
 
   double Numerator() const {
     DCHECK(IsRatio());
@@ -321,6 +316,8 @@ class CORE_EXPORT MediaQueryExpNode
     kFeatureInlineSize = 1 << 4,
     kFeatureBlockSize = 1 << 5,
     kFeatureStyle = 1 << 6,
+    kFeatureSticky = 1 << 7,
+    kFeatureSnap = 1 << 8,
   };
 
   using FeatureFlags = unsigned;

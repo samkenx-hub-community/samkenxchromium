@@ -21,6 +21,7 @@
 
 #include "third_party/blink/renderer/core/editing/layout_selection.h"
 
+#include "third_party/blink/renderer/core/css/style_change_reason.h"
 #include "third_party/blink/renderer/core/dom/document.h"
 #include "third_party/blink/renderer/core/dom/node_computed_style.h"
 #include "third_party/blink/renderer/core/editing/editing_utilities.h"
@@ -30,11 +31,9 @@
 #include "third_party/blink/renderer/core/editing/visible_position.h"
 #include "third_party/blink/renderer/core/editing/visible_units.h"
 #include "third_party/blink/renderer/core/html/forms/text_control_element.h"
-#include "third_party/blink/renderer/core/layout/api/line_layout_api_shim.h"
 #include "third_party/blink/renderer/core/layout/layout_text.h"
 #include "third_party/blink/renderer/core/layout/layout_text_fragment.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
-#include "third_party/blink/renderer/core/layout/line/inline_text_box.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_fragment_item.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_cursor.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_offset_mapping.h"
@@ -48,14 +47,13 @@ namespace blink {
 namespace {
 
 // TODO(yoichio): Share condition between NGOffsetMapping::AcceptsPosition.
+// TODO(1229581): Do we need this function anymore?
 bool ShouldUseLayoutNGTextContent(const Node& node) {
   LayoutObject* layout_object = node.GetLayoutObject();
   DCHECK(layout_object);
   if (layout_object->IsInline())
     return layout_object->IsInLayoutNGInlineFormattingContext();
-  if (auto* block_flow = DynamicTo<LayoutBlockFlow>(layout_object))
-    return NGBlockNode::CanUseNewLayout(*block_flow);
-  return false;
+  return IsA<LayoutBlockFlow>(layout_object);
 }
 
 }  // namespace
@@ -239,7 +237,7 @@ static void SetShouldInvalidateIfNeeded(LayoutObject* layout_object) {
        parent = parent->Parent()) {
     if (parent->IsSVGRoot())
       return;
-    if (parent->IsSVGText() || parent->IsNGSVGText()) {
+    if (parent->IsSVGText()) {
       if (!parent->ShouldInvalidateSelection())
         parent->SetShouldInvalidateSelection();
       return;
@@ -346,7 +344,7 @@ static bool IsDisplayContentElement(const Node& node) {
 }
 
 template <typename Visitor>
-static void VisitSelectedInclusiveDescendantsOfInternal(const Node& node,
+static void VisitSelectedInclusiveDescendantsOfInternal(Node& node,
                                                         Visitor* visitor) {
   // Display:content element appears in a flat tree even it doesn't have
   // a LayoutObject but we need to visit its children.
@@ -368,14 +366,13 @@ static inline bool IsFlatTreeClean(const Node& node) {
 }
 
 template <typename Visitor>
-static void VisitSelectedInclusiveDescendantsOf(const Node& node,
-                                                Visitor* visitor) {
+static void VisitSelectedInclusiveDescendantsOf(Node& node, Visitor* visitor) {
   DCHECK(IsFlatTreeClean(node));
   return VisitSelectedInclusiveDescendantsOfInternal(node, visitor);
 }
 
 static OldSelectedNodes ResetOldSelectedNodes(
-    const Node& root,
+    Node& root,
     absl::optional<unsigned> old_start_offset,
     absl::optional<unsigned> old_end_offset) {
   class OldSelectedVisitor {
@@ -387,7 +384,7 @@ static OldSelectedNodes ResetOldSelectedNodes(
         : old_start_offset(passed_old_start_offset),
           old_end_offset(passed_old_end_offset) {}
 
-    void Visit(const Node& node) {
+    void Visit(Node& node) {
       LayoutObject* layout_object = node.GetLayoutObject();
       const SelectionState old_state = layout_object->GetSelectionState();
       DCHECK_NE(old_state, SelectionState::kNone) << node;
@@ -679,7 +676,7 @@ LayoutSelectionStatus LayoutSelection::ComputeSelectionStatus(
 
 LayoutSelectionStatus LayoutSelection::ComputeSelectionStatus(
     const NGInlineCursor& cursor,
-    const NGTextOffset& offset) const {
+    const NGTextOffsetRange& offset) const {
   const unsigned start_offset = offset.start;
   const unsigned end_offset = offset.end;
   switch (GetSelectionStateFor(cursor.Current())) {
@@ -786,7 +783,7 @@ SelectionState LayoutSelection::ComputePaintingSelectionStateForCursor(
   if (position.IsEllipsis())
     return SelectionState::kNone;
 
-  const NGTextOffset offset = position.TextOffset();
+  const NGTextOffsetRange offset = position.TextOffset();
   const unsigned start_offset = offset.start;
   const unsigned end_offset = offset.end;
   // Determine the state of the overall selection, relative to the LayoutObject
@@ -796,20 +793,6 @@ SelectionState LayoutSelection::ComputePaintingSelectionStateForCursor(
 
   SelectionState state =
       GetPaintingSelectionStateFor(To<LayoutText>(*position.GetLayoutObject()));
-  return ComputeSelectionStateFromOffsets(state, start_offset, end_offset);
-}
-
-SelectionState LayoutSelection::ComputeSelectionStateForInlineTextBox(
-    const InlineTextBox& text_box) const {
-  AssertIsValid();
-  unsigned start_offset = static_cast<unsigned>(text_box.CaretMinOffset());
-  unsigned end_offset = static_cast<unsigned>(text_box.CaretMaxOffset());
-  // Determine the state of the overall selection, relative to the
-  // InlineTextBox. This state will allow us know which offset comparisons are
-  // valid, and determine if the selection endpoints fall within InlineTextBox.
-  const LayoutText* text = To<LayoutText>(
-      LineLayoutAPIShim::ConstLayoutObjectFrom(text_box.GetLineLayoutItem()));
-  SelectionState state = GetSelectionStateFor(*text);
   return ComputeSelectionStateFromOffsets(state, start_offset, end_offset);
 }
 
@@ -1005,7 +988,7 @@ gfx::Rect LayoutSelection::AbsoluteSelectionBounds() {
   return ToPixelSnappedRect(visitor.selected_rect);
 }
 
-void LayoutSelection::InvalidatePaintForSelection() {
+void LayoutSelection::InvalidateStyleAndPaintForSelection() {
   if (paint_range_->IsNull())
     return;
 
@@ -1013,7 +996,29 @@ void LayoutSelection::InvalidatePaintForSelection() {
     STACK_ALLOCATED();
 
    public:
-    void Visit(const Node& node) { VisitLayoutObjectsOf(node, this); }
+    void Visit(Node& node) {
+      if (!node.GetLayoutObject()) {
+        return;
+      }
+
+      // Invalidate style to force an update to ::selection pseudo
+      // elements so that ::selection::inactive-window style is applied
+      // (or removed).
+      if (auto* this_element = DynamicTo<Element>(node)) {
+        const ComputedStyle* element_style = node.GetComputedStyle();
+        if (element_style &&
+            element_style->HasPseudoElementStyle(kPseudoIdSelection)) {
+          node.SetNeedsStyleRecalc(
+              kLocalStyleChange,
+              StyleChangeReasonForTracing::CreateWithExtraData(
+                  style_change_reason::kPseudoClass,
+                  style_change_extra_data::g_active));
+          this_element->PseudoStateChanged(CSSSelector::kPseudoSelection);
+        }
+      }
+
+      VisitLayoutObjectsOf(node, this);
+    }
     void Visit(LayoutObject* layout_object) {
       layout_object->SetShouldInvalidateSelection();
     }

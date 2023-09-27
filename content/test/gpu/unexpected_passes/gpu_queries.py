@@ -5,20 +5,35 @@
 
 import typing
 
+from gpu_tests import gpu_integration_test
+
 from unexpected_passes_common import constants
 from unexpected_passes_common import data_types
 from unexpected_passes_common import queries as queries_module
 
+# step_name can be either the step_name tag or test_suite variant because of the
+# way Skylab builders work. In normal Chromium test tasks, the step name is
+# reported to the task-level RDB invocation, which then gets applied to every
+# result that task reports. Skylab test steps are actually separate
+# Buildbucket builds that report results a bit differently. They do not report
+# a step_name tag, but do put the same information in for the test_suite
+# variant. So, we will look for step_name first to cover most builders and fall
+# back to test_suite for Skylab builders.
 RESULTS_SUBQUERY = """\
   results AS (
     SELECT
       exported.id,
       test_id,
       status,
-      (
-        SELECT value
-        FROM tr.tags
-        WHERE key = "step_name") as step_name,
+      IFNULL(
+        (
+          SELECT value
+          FROM tr.tags
+          WHERE key = "step_name"),
+        (
+          SELECT value
+          FROM tr.variant
+          WHERE key = "test_suite")) as step_name,
       ARRAY(
         SELECT value
         FROM tr.tags
@@ -179,25 +194,15 @@ ACTIVE_INTERNAL_BUILDER_SUBQUERY = """\
 {all_builders_from_table_subquery}""".format(
     all_builders_from_table_subquery=ALL_BUILDERS_FROM_TABLE_SUBQUERY)
 
-# The suite reported to Telemetry for selecting which suite to run is not
-# necessarily the same one that is reported to typ/ResultDB, so map any special
-# cases here.
-TELEMETRY_SUITE_TO_RDB_SUITE_EXCEPTION_MAP = {
-    'info_collection': 'info_collection_test',
-    'power': 'power_measurement_integration_test',
-    'trace_test': 'trace_integration_test',
-}
-
 
 class GpuBigQueryQuerier(queries_module.BigQueryQuerier):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-    # Most test names are |suite|_integration_test, but there are several that
-    # are not reported that way in typ, and by extension ResultDB, so adjust
-    # that here.
-    self._suite = TELEMETRY_SUITE_TO_RDB_SUITE_EXCEPTION_MAP.get(
-        self._suite, self._suite + '_integration_test')
+    name_mapping = gpu_integration_test.GenerateTestNameMapping()
+    # The suite name we use for identification (return value of Name()) is not
+    # the same as the one used by ResultDB (Python module), so convert here.
+    self._suite = name_mapping[self._suite].__module__.split('.')[-1]
 
   def _GetQueryGeneratorForBuilder(
       self, builder: data_types.BuilderEntry

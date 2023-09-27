@@ -33,6 +33,9 @@ namespace {
 
 constexpr char kNotifierESimPolicy[] = "policy.esim-policy";
 
+// The timeout is increased as per b/293583300.
+constexpr base::TimeDelta kEuiccCommandExpirationTime = base::Days(180);
+
 }  // namespace
 
 // static
@@ -53,8 +56,13 @@ enterprise_management::RemoteCommand_Type DeviceCommandResetEuiccJob::GetType()
   return enterprise_management::RemoteCommand_Type_DEVICE_RESET_EUICC;
 }
 
+bool DeviceCommandResetEuiccJob::IsExpired(base::TimeTicks now) {
+  return now > issued_time() + kEuiccCommandExpirationTime;
+}
+
 void DeviceCommandResetEuiccJob::RunImpl(CallbackWithResult result_callback) {
-  absl::optional<dbus::ObjectPath> euicc_path = ash::GetCurrentEuiccPath();
+  absl::optional<dbus::ObjectPath> euicc_path =
+      ash::cellular_utils::GetCurrentEuiccPath();
   if (!euicc_path) {
     SYSLOG(ERROR) << "No current EUICC. Unable to reset EUICC";
     RunResultCallback(std::move(result_callback), ResultType::kFailure);

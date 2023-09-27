@@ -8,13 +8,15 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
-#include "chrome/browser/web_applications/test/service_worker_registration_waiter.h"
+#include "chrome/browser/web_applications/test/os_integration_test_override_impl.h"
 #include "chrome/browser/web_applications/test/web_app_icon_waiter.h"
+#include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/test/web_app_test_utils.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/metrics/content/subprocess_metrics_provider.h"
+#include "components/webapps/browser/test/service_worker_registration_waiter.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_base.h"
 #include "content/public/test/test_navigation_observer.h"
@@ -28,12 +30,8 @@
 #include "base/win/windows_version.h"
 #endif
 
-#if BUILDFLAG(IS_CHROMEOS)
-#include "chromeos/constants/chromeos_features.h"
-#endif
-
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-#include "ash/constants/ash_features.h"
+#include "ash/public/cpp/style/dark_light_mode_controller.h"
 #endif
 
 using ::testing::ElementsAre;
@@ -57,12 +55,25 @@ enum class PageFlagParam {
 
 class WebAppOfflineTest : public InProcessBrowserTest {
  public:
+  void SetUpOnMainThread() override {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    override_registration_ =
+        OsIntegrationTestOverrideImpl::OverrideForTesting();
+  }
+  void TearDownOnMainThread() override {
+    test::UninstallAllWebApps(browser()->profile());
+    {
+      base::ScopedAllowBlockingForTesting allow_blocking;
+      override_registration_.reset();
+    }
+  }
+
   // Start a web app without a service worker and disconnect.
-  web_app::AppId StartWebAppAndDisconnect(content::WebContents* web_contents,
+  webapps::AppId StartWebAppAndDisconnect(content::WebContents* web_contents,
                                           base::StringPiece relative_url) {
     GURL target_url(embedded_test_server()->GetURL(relative_url));
     web_app::NavigateToURLAndWait(browser(), target_url);
-    web_app::AppId app_id = web_app::test::InstallPwaForCurrentUrl(browser());
+    webapps::AppId app_id = web_app::test::InstallPwaForCurrentUrl(browser());
     WebAppIconWaiter(browser()->profile(), app_id).Wait();
     std::unique_ptr<content::URLLoaderInterceptor> interceptor =
         content::URLLoaderInterceptor::SetupRequestFailForURL(
@@ -82,7 +93,7 @@ class WebAppOfflineTest : public InProcessBrowserTest {
         browser()->profile(), target_url);
     web_app::NavigateToURLAndWait(browser(), target_url);
     registration_waiter.AwaitRegistration();
-    web_app::AppId app_id = web_app::test::InstallPwaForCurrentUrl(browser());
+    webapps::AppId app_id = web_app::test::InstallPwaForCurrentUrl(browser());
     WebAppIconWaiter(browser()->profile(), app_id).Wait();
     std::unique_ptr<content::URLLoaderInterceptor> interceptor =
         content::URLLoaderInterceptor::SetupRequestFailForURL(
@@ -104,6 +115,10 @@ class WebAppOfflineTest : public InProcessBrowserTest {
     app_browser->window()->Close();
     ui_test_utils::WaitForBrowserToClose(app_browser);
   }
+
+ private:
+  std::unique_ptr<OsIntegrationTestOverrideImpl::BlockingRegistration>
+      override_registration_;
 };
 
 class WebAppOfflinePageTest
@@ -333,6 +348,10 @@ IN_PROC_BROWSER_TEST_P(WebAppOfflinePageTest, WebAppOfflinePageIconShowing) {
     EXPECT_EQ(kExpectedIconUrl,
               EvalJs(web_contents, "document.getElementById('icon').src")
                   .ExtractString());
+    EXPECT_EQ("inline",
+              EvalJs(web_contents,
+                     "document.getElementById('offlineIcon').style.display")
+                  .ExtractString());
   } else {
     // Expect that the default offline page is not showing.
     EXPECT_TRUE(
@@ -445,7 +464,7 @@ IN_PROC_BROWSER_TEST_P(WebAppOfflinePageTest, WebAppOfflineMetricsPwaClosing) {
   content::WebContents* web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   ExpectUniqueSample(net::ERR_INTERNET_DISCONNECTED, 0);
-  web_app::AppId app_id =
+  webapps::AppId app_id =
       StartWebAppAndDisconnect(web_contents, "/banners/no-sw-with-colors.html");
 
   SyncHistograms();
@@ -496,14 +515,6 @@ class WebAppOfflineDarkModeTest
  public:
   WebAppOfflineDarkModeTest() {
     std::vector<base::test::FeatureRef> disabled_features;
-#if BUILDFLAG(IS_CHROMEOS)
-    disabled_features.push_back(chromeos::features::kDarkLightMode);
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-    disabled_features.push_back(ash::features::kNotificationsRefresh);
-#endif
-
     feature_list_.InitWithFeatures({features::kPWAsDefaultOfflinePage,
                                     blink::features::kWebAppEnableDarkMode},
                                    {disabled_features});
@@ -511,17 +522,23 @@ class WebAppOfflineDarkModeTest
 
   void SetUp() override {
 #if BUILDFLAG(IS_WIN)
-    if (base::win::GetVersion() < base::win::Version::WIN10) {
-      GTEST_SKIP();
-    } else {
-      InProcessBrowserTest::SetUp();
-    }
+    InProcessBrowserTest::SetUp();
 #elif BUILDFLAG(IS_MAC)
     // TODO(crbug.com/1298658): Get this test suite working.
     GTEST_SKIP();
 #else
     InProcessBrowserTest::SetUp();
 #endif  // BUILDFLAG(IS_MAC)
+  }
+
+  void SetUpOnMainThread() override {
+    WebAppOfflineTest::SetUpOnMainThread();
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+    // Explicitly set dark mode in ChromeOS or we can't get light mode after
+    // sunset (due to dark mode auto-scheduling).
+    ash::DarkLightModeController::Get()->SetDarkModeEnabledForTest(
+        GetParam() == blink::mojom::PreferredColorScheme::kDark);
+#endif
   }
 
  protected:
@@ -539,8 +556,8 @@ class WebAppOfflineDarkModeTest
 
 // Testing offline page in dark mode for a web app with a manifest and no
 // service worker.
-// TODO(crbug.com/1373750): tests are flaky on Lacros.
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
+// TODO(crbug.com/1373750): tests are flaky on Lacros and Linux.
+#if BUILDFLAG(IS_CHROMEOS_LACROS) || BUILDFLAG(IS_LINUX)
 #define MAYBE_WebAppOfflineDarkModeNoServiceWorker \
   DISABLED_WebAppOfflineDarkModeNoServiceWorker
 #else
@@ -549,6 +566,13 @@ class WebAppOfflineDarkModeTest
 #endif
 IN_PROC_BROWSER_TEST_P(WebAppOfflineDarkModeTest,
                        MAYBE_WebAppOfflineDarkModeNoServiceWorker) {
+#if BUILDFLAG(IS_WIN)
+  if (GetParam() == blink::mojom::PreferredColorScheme::kLight &&
+      ui::NativeTheme::GetInstanceForNativeUi()->ShouldUseDarkColors()) {
+    GTEST_SKIP() << "Host is in dark mode; skipping test";
+  }
+#endif  // BUILDFLAG(IS_WIN)
+
   ASSERT_TRUE(embedded_test_server()->Start());
 
   // ui::NativeTheme::GetInstanceForNativeUi()->set_use_dark_colors(true);
@@ -594,8 +618,8 @@ IN_PROC_BROWSER_TEST_P(WebAppOfflineDarkModeTest,
 
 // Testing offline page in dark mode for a web app with a manifest and service
 // worker that does not handle offline error.
-// TODO(crbug.com/1373750): tests are flaky on Lacros.
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
+// TODO(crbug.com/1373750): tests are flaky on Lacros and Linux.
+#if BUILDFLAG(IS_CHROMEOS_LACROS) || BUILDFLAG(IS_LINUX)
 #define MAYBE_WebAppOfflineDarkModeEmptyServiceWorker \
   DISABLED_WebAppOfflineDarkModeEmptyServiceWorker
 #else
@@ -604,6 +628,13 @@ IN_PROC_BROWSER_TEST_P(WebAppOfflineDarkModeTest,
 #endif
 IN_PROC_BROWSER_TEST_P(WebAppOfflineDarkModeTest,
                        MAYBE_WebAppOfflineDarkModeEmptyServiceWorker) {
+#if BUILDFLAG(IS_WIN)
+  if (GetParam() == blink::mojom::PreferredColorScheme::kLight &&
+      ui::NativeTheme::GetInstanceForNativeUi()->ShouldUseDarkColors()) {
+    GTEST_SKIP() << "Host is in dark mode; skipping test";
+  }
+#endif  // BUILDFLAG(IS_WIN)
+
   ASSERT_TRUE(embedded_test_server()->Start());
 
   content::WebContents* web_contents =
@@ -649,8 +680,8 @@ IN_PROC_BROWSER_TEST_P(WebAppOfflineDarkModeTest,
 
 // Testing offline page in dark mode for a web app with a manifest that has not
 // provided dark mode colors.
-// TODO(crbug.com/1373750): tests are flaky on Lacros.
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
+// TODO(crbug.com/1373750): tests are flaky on Lacros and Linux.
+#if BUILDFLAG(IS_CHROMEOS_LACROS) || BUILDFLAG(IS_LINUX)
 #define MAYBE_WebAppOfflineNoDarkModeColorsProvided \
   DISABLED_WebAppOfflineNoDarkModeColorsProvided
 #else
@@ -659,6 +690,13 @@ IN_PROC_BROWSER_TEST_P(WebAppOfflineDarkModeTest,
 #endif
 IN_PROC_BROWSER_TEST_P(WebAppOfflineDarkModeTest,
                        MAYBE_WebAppOfflineNoDarkModeColorsProvided) {
+#if BUILDFLAG(IS_WIN)
+  if (GetParam() == blink::mojom::PreferredColorScheme::kLight &&
+      ui::NativeTheme::GetInstanceForNativeUi()->ShouldUseDarkColors()) {
+    GTEST_SKIP() << "Host is in dark mode; skipping test";
+  }
+#endif  // BUILDFLAG(IS_WIN)
+
   ASSERT_TRUE(embedded_test_server()->Start());
 
   content::WebContents* web_contents =

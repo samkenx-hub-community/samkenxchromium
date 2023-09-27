@@ -27,10 +27,6 @@
 #import "net/url_request/url_request_context.h"
 #import "net/url_request/url_request_context_getter.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace cookie_util {
 
 namespace {
@@ -49,7 +45,8 @@ scoped_refptr<net::SQLitePersistentCookieStore> CreatePersistentCookieStore(
           base::ThreadPool::CreateSequencedTaskRunner(
               {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
                base::TaskShutdownBehavior::BLOCK_SHUTDOWN}),
-          restore_old_session_cookies, crypto_delegate));
+          restore_old_session_cookies, crypto_delegate,
+          /*enable_exclusive_access=*/false));
 }
 
 // Creates a CookieMonster configured by `config`.

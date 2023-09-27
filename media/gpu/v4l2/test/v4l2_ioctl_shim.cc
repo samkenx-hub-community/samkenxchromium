@@ -12,11 +12,16 @@
 #include <unordered_map>
 
 #include "base/containers/contains.h"
+#include "base/files/file.h"
+#include "base/files/file_path.h"
+#include "base/files/file_util.h"
 #include "base/files/memory_mapped_file.h"
 #include "base/logging.h"
 #include "base/notreached.h"
+#include "base/strings/pattern.h"
 #include "base/strings/string_number_conversions.h"
 #include "media/base/video_types.h"
+#include "media/gpu/macros.h"
 
 namespace media {
 
@@ -30,7 +35,7 @@ constexpr int kMaxRetryCount = 1 << 24;
 #define V4L2_REQUEST_CODE_AND_STRING(x) \
   { x, #x }
 
-constexpr uint32_t kMaximumDeviceNumber = 20;
+constexpr uint32_t kMaximumDeviceNumber = 40;
 
 constexpr base::StringPiece kDecoderDevicePrefix = "/dev/video";
 constexpr base::StringPiece kMediaDevicePrefix = "/dev/media";
@@ -82,7 +87,8 @@ std::ostream& operator<<(std::ostream& ostream,
 // Returns resolution and number of planes given |pix_mp|.
 std::ostream& operator<<(std::ostream& ostream,
                          const struct v4l2_pix_format_mplane& pix_mp) {
-  ostream << pix_mp.width << " x " << pix_mp.height
+  ostream << media::FourccToString(pix_mp.pixelformat) << ", " << pix_mp.width
+          << " x " << pix_mp.height
           << ", num_planes = " << static_cast<size_t>(pix_mp.num_planes) << ".";
 
   return ostream;
@@ -148,16 +154,13 @@ MmappedBuffer::~MmappedBuffer() {
 }
 
 V4L2Queue::V4L2Queue(enum v4l2_buf_type type,
-                     uint32_t fourcc,
-                     const gfx::Size& size,
-                     uint32_t num_planes,
+                     const gfx::Size& resolution,
                      enum v4l2_memory memory,
                      uint32_t num_buffers)
     : type_(type),
-      fourcc_(fourcc),
       num_buffers_(num_buffers),
-      display_size_(size),
-      num_planes_(num_planes),
+      resolution_(resolution),
+      num_planes_(1),
       memory_(memory) {}
 
 V4L2Queue::~V4L2Queue() = default;
@@ -170,6 +173,24 @@ scoped_refptr<MmappedBuffer> V4L2Queue::GetBuffer(const size_t index) const {
 
 V4L2IoctlShim::V4L2IoctlShim(const uint32_t coded_fourcc) {
   uint32_t i;
+
+  // TODO(b/278748005): Remove |cur_val_is_supported_| when all drivers
+  // fully support |V4L2_CTRL_WHICH_CUR_VAL|
+
+  // On kernel version 5.4 the MTK driver for MT8192 does not correctly support
+  // |V4L2_CTRL_WHICH_CUR_VAL|. This parameter is used when calling
+  // VIDIOC_S_EXT_CTRLS to indicate that the call should be executed
+  // immediately instead of putting it in a queue. Making sure the first
+  // buffer is processed immediately is only necessary for codecs that
+  // support 10 bit profiles. When processing a 10 bit profile the parameters
+  // need to be processed before the format can be determined. There are no
+  // chipsets that are on kernels older 5.10 and produce 10 bit output.
+  constexpr base::StringPiece kKernelVersion5dot4 = "Linux version 5.4*";
+  std::string kernel_version;
+  ReadFileToString(base::FilePath("/proc/version"), &kernel_version);
+
+  cur_val_is_supported_ =
+      !base::MatchPattern(kernel_version, kKernelVersion5dot4);
 
   for (i = 0; i < kMaximumDeviceNumber; ++i) {
     std::string path =
@@ -365,8 +386,16 @@ bool V4L2IoctlShim::EnumFrameSizes(uint32_t fourcc) const {
   return Ioctl(VIDIOC_ENUM_FRAMESIZES, &frame_size);
 }
 
-bool V4L2IoctlShim::SetFmt(const std::unique_ptr<V4L2Queue>& queue) const {
+void V4L2IoctlShim::SetFmt(const std::unique_ptr<V4L2Queue>& queue) const {
   struct v4l2_format fmt;
+
+  if (queue->type() == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+    // TODO(stevecho): remove VIDIOC_ENUM_FRAMESIZES ioctl call
+    //   after b/193237015 is resolved.
+    if (!EnumFrameSizes(queue->fourcc())) {
+      LOG(INFO) << "EnumFrameSizes for OUTPUT queue failed.";
+    }
+  }
 
   memset(&fmt, 0, sizeof(fmt));
   fmt.type = queue->type();
@@ -377,52 +406,32 @@ bool V4L2IoctlShim::SetFmt(const std::unique_ptr<V4L2Queue>& queue) const {
   }
 
   fmt.fmt.pix_mp.num_planes = queue->num_planes();
-  fmt.fmt.pix_mp.width = queue->display_size().width();
-  fmt.fmt.pix_mp.height = queue->display_size().height();
+  fmt.fmt.pix_mp.width = queue->resolution().width();
+  fmt.fmt.pix_mp.height = queue->resolution().height();
 
   const bool ret = Ioctl(VIDIOC_S_FMT, &fmt);
 
-  LOG(INFO) << queue->type() << " - VIDIOC_S_FMT: " << fmt.fmt.pix_mp;
-
-  return ret;
+  LOGF(INFO) << queue->type() << " - VIDIOC_S_FMT: " << fmt.fmt.pix_mp;
+  LOG_ASSERT(ret) << "VIDIOC_S_FMT for " << queue->type() << " queue failed.";
 }
 
-bool V4L2IoctlShim::GetFmt(const enum v4l2_buf_type type,
-                           gfx::Size* coded_size,
-                           uint32_t* num_planes) const {
-  struct v4l2_format fmt;
+void V4L2IoctlShim::GetFmt(struct v4l2_format* fmt) const {
+  const bool ret = Ioctl(VIDIOC_G_FMT, fmt);
 
-  memset(&fmt, 0, sizeof(fmt));
-  fmt.type = type;
-
-  const bool ret = Ioctl(VIDIOC_G_FMT, &fmt);
-
-  coded_size->SetSize(fmt.fmt.pix_mp.width, fmt.fmt.pix_mp.height);
-  *num_planes = fmt.fmt.pix_mp.num_planes;
-
-  LOG(INFO) << type << " - VIDIOC_G_FMT: " << fmt.fmt.pix_mp;
-
-  return ret;
+  const enum v4l2_buf_type type = static_cast<enum v4l2_buf_type>(fmt->type);
+  LOGF(INFO) << type << " - VIDIOC_G_FMT: " << fmt->fmt.pix_mp;
+  LOG_ASSERT(ret) << "VIDIOC_G_FMT for " << type << " queue failed.";
 }
 
-bool V4L2IoctlShim::TryFmt(const std::unique_ptr<V4L2Queue>& queue) const {
-  struct v4l2_format fmt;
+void V4L2IoctlShim::TryFmt(struct v4l2_format* fmt) const {
+  const bool ret = Ioctl(VIDIOC_TRY_FMT, fmt);
 
-  memset(&fmt, 0, sizeof(fmt));
-  fmt.type = queue->type();
-  fmt.fmt.pix_mp.pixelformat = queue->fourcc();
-  fmt.fmt.pix_mp.num_planes = queue->num_planes();
-  fmt.fmt.pix_mp.width = queue->coded_size().width();
-  fmt.fmt.pix_mp.height = queue->coded_size().height();
-
-  const bool ret = Ioctl(VIDIOC_TRY_FMT, &fmt);
-
-  LOG(INFO) << queue->type() << " - VIDIOC_TRY_FMT: " << fmt.fmt.pix_mp;
-
-  return ret;
+  const enum v4l2_buf_type type = static_cast<enum v4l2_buf_type>(fmt->type);
+  LOGF(INFO) << type << " - VIDIOC_TRY_FMT: " << fmt->fmt.pix_mp;
+  LOG_ASSERT(ret) << "VIDIOC_TRY_FMT for " << type << " queue failed.";
 }
 
-bool V4L2IoctlShim::ReqBufs(std::unique_ptr<V4L2Queue>& queue) const {
+void V4L2IoctlShim::ReqBufs(std::unique_ptr<V4L2Queue>& queue) const {
   struct v4l2_requestbuffers reqbuf;
 
   memset(&reqbuf, 0, sizeof(reqbuf));
@@ -434,13 +443,12 @@ bool V4L2IoctlShim::ReqBufs(std::unique_ptr<V4L2Queue>& queue) const {
 
   queue->set_num_buffers(reqbuf.count);
 
-  LOG(INFO) << queue->num_buffers() << " buffers requested, " << reqbuf.count
-            << " buffers returned for " << queue->type() << ".";
-
-  return ret;
+  LOGF(INFO) << queue->num_buffers() << " buffers requested, " << reqbuf.count
+             << " buffers returned for " << queue->type() << ".";
+  LOG_ASSERT(ret) << "VIDIOC_REQBUFS for " << queue->type() << " queue failed.";
 }
 
-bool V4L2IoctlShim::ReqBufsWithCount(std::unique_ptr<V4L2Queue>& queue,
+void V4L2IoctlShim::ReqBufsWithCount(std::unique_ptr<V4L2Queue>& queue,
                                      uint32_t count) const {
   struct v4l2_requestbuffers reqbuf;
 
@@ -454,14 +462,14 @@ bool V4L2IoctlShim::ReqBufsWithCount(std::unique_ptr<V4L2Queue>& queue,
   queue->set_num_buffers(reqbuf.count);
 
   if (count == 0) {
-    LOG(INFO) << "Requested to free all buffers in " << queue->type()
-              << " with a buffer count of 0.";
+    LOGF(INFO) << "Requested to free all buffers in " << queue->type()
+               << " with a buffer count of 0.";
   } else {
-    LOG(INFO) << queue->num_buffers() << " buffers requested, " << reqbuf.count
-              << " buffers returned for " << queue->type() << ".";
+    LOGF(INFO) << queue->num_buffers() << " buffers requested, " << reqbuf.count
+               << " buffers returned for " << queue->type() << ".";
   }
 
-  return ret;
+  LOG_ASSERT(ret) << "VIDIOC_REQBUFS for " << queue->type() << " queue failed.";
 }
 
 bool V4L2IoctlShim::QBuf(const std::unique_ptr<V4L2Queue>& queue,
@@ -498,7 +506,7 @@ bool V4L2IoctlShim::QBuf(const std::unique_ptr<V4L2Queue>& queue,
   return Ioctl(VIDIOC_QBUF, &v4l2_buffer);
 }
 
-bool V4L2IoctlShim::DQBuf(const std::unique_ptr<V4L2Queue>& queue,
+void V4L2IoctlShim::DQBuf(const std::unique_ptr<V4L2Queue>& queue,
                           uint32_t* buffer_id) const {
   LOG_ASSERT(queue->memory() == V4L2_MEMORY_MMAP)
       << "Only V4L2_MEMORY_MMAP is currently supported.";
@@ -521,16 +529,18 @@ bool V4L2IoctlShim::DQBuf(const std::unique_ptr<V4L2Queue>& queue,
     int num_tries = kMaxRetryCount;
 
     while ((num_tries != 0) && !Ioctl(VIDIOC_DQBUF, &v4l2_buffer)) {
-      if (errno != EAGAIN)
-        return false;
+      if (errno != EAGAIN) {
+        LOGF(FATAL) << "VIDIOC_DQBUF failed with errno: " << errno << ".";
+        return;
+      }
 
       num_tries--;
     }
 
     if (num_tries == 0) {
-      LOG(ERROR)
+      LOGF(FATAL)
           << "Decoder appeared to stall. VIDIOC_DQBUF ioctl call timed out.";
-      return false;
+      return;
     } else {
       // Successfully dequeued a buffer. Reset the |num_tries| counter.
       num_tries = kMaxRetryCount;
@@ -551,7 +561,7 @@ bool V4L2IoctlShim::DQBuf(const std::unique_ptr<V4L2Queue>& queue,
 
     *buffer_id = id;
 
-    return true;
+    return;
   }
 
   DCHECK_EQ(queue->type(), V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE);
@@ -559,23 +569,27 @@ bool V4L2IoctlShim::DQBuf(const std::unique_ptr<V4L2Queue>& queue,
   // Currently, only 1 OUTPUT buffer is used.
   *buffer_id = 0;
 
-  return Ioctl(VIDIOC_DQBUF, &v4l2_buffer);
+  const bool ret = Ioctl(VIDIOC_DQBUF, &v4l2_buffer);
+  LOG_ASSERT(ret) << "VIDIOC_DQBUF failed for " << queue->type() << " queue.";
 }
 
-bool V4L2IoctlShim::StreamOn(const enum v4l2_buf_type type) const {
+void V4L2IoctlShim::StreamOn(const enum v4l2_buf_type type) const {
   int arg = static_cast<int>(type);
 
-  return Ioctl(VIDIOC_STREAMON, &arg);
+  const bool ret = Ioctl(VIDIOC_STREAMON, &arg);
+  LOG_ASSERT(ret) << "VIDIOC_STREAMON for " << type << " queue failed.";
 }
 
-bool V4L2IoctlShim::StreamOff(const enum v4l2_buf_type type) const {
+void V4L2IoctlShim::StreamOff(const enum v4l2_buf_type type) const {
   int arg = static_cast<int>(type);
 
-  return Ioctl(VIDIOC_STREAMOFF, &arg);
+  const bool ret = Ioctl(VIDIOC_STREAMOFF, &arg);
+  LOG_ASSERT(ret) << "VIDIOC_STREAMOFF for " << type << " queue failed.";
 }
 
-bool V4L2IoctlShim::SetExtCtrls(const std::unique_ptr<V4L2Queue>& queue,
-                                v4l2_ext_controls* ext_ctrls) const {
+void V4L2IoctlShim::SetExtCtrls(const std::unique_ptr<V4L2Queue>& queue,
+                                v4l2_ext_controls* ext_ctrls,
+                                bool immediate) const {
   // TODO(b/230021497): add compressed header probability related change
   // when V4L2_CID_STATELESS_VP9_COMPRESSED_HDR is supported
 
@@ -585,15 +599,23 @@ bool V4L2IoctlShim::SetExtCtrls(const std::unique_ptr<V4L2Queue>& queue,
   // instead are applied by the driver for the buffer associated with
   // the same request.", see:
   // https://www.kernel.org/doc/html/v5.10/userspace-api/media/v4l/vidioc-g-ext-ctrls.html#description
-  ext_ctrls->which = V4L2_CTRL_WHICH_REQUEST_VAL;
+  // Unmentioned in that documentation is that |V4L2_CTRL_WHICH_CUR_VAL| will
+  // force the request to be processed immediately instead of being queue.
+  if (immediate) {
+    ext_ctrls->which = cur_val_is_supported_ ? V4L2_CTRL_WHICH_CUR_VAL
+                                             : V4L2_CTRL_WHICH_REQUEST_VAL;
+  } else {
+    ext_ctrls->which = V4L2_CTRL_WHICH_REQUEST_VAL;
+  }
+
   ext_ctrls->request_fd = queue->media_request_fd();
 
   const bool ret = Ioctl(VIDIOC_S_EXT_CTRLS, ext_ctrls);
 
-  return ret;
+  LOG_ASSERT(ret) << "VIDIOC_S_EXT_CTRLS failed.";
 }
 
-bool V4L2IoctlShim::MediaIocRequestAlloc(int* media_request_fd) const {
+void V4L2IoctlShim::MediaIocRequestAlloc(int* media_request_fd) const {
   LOG_ASSERT(media_request_fd != nullptr)
       << "|media_request_fd| check failed.\n";
 
@@ -604,19 +626,19 @@ bool V4L2IoctlShim::MediaIocRequestAlloc(int* media_request_fd) const {
   if (ret)
     *media_request_fd = allocated_req_fd;
 
-  return ret;
+  LOG_ASSERT(ret) << "MEDIA_IOC_REQUEST_ALLOC failed";
 }
 
-bool V4L2IoctlShim::MediaRequestIocQueue(
+void V4L2IoctlShim::MediaRequestIocQueue(
     const std::unique_ptr<V4L2Queue>& queue) const {
   int req_fd = queue->media_request_fd();
 
   const bool ret = Ioctl(MEDIA_REQUEST_IOC_QUEUE, req_fd);
 
-  return ret;
+  LOG_ASSERT(ret) << "MEDIA_REQUEST_IOC_QUEUE failed.";
 }
 
-bool V4L2IoctlShim::MediaRequestIocReinit(
+void V4L2IoctlShim::MediaRequestIocReinit(
     const std::unique_ptr<V4L2Queue>& queue) const {
   int req_fd = queue->media_request_fd();
   constexpr uint32_t kMaxRetries = 16;
@@ -624,15 +646,13 @@ bool V4L2IoctlShim::MediaRequestIocReinit(
 
   do {
     if (Ioctl(MEDIA_REQUEST_IOC_REINIT, req_fd)) {
-      return true;
+      return;
     }
 
     usleep(1 << retries);
   } while (++retries < kMaxRetries);
 
-  LOG(ERROR) << "MediaRequestIocReinit ioctl call timed out.";
-
-  return false;
+  LOGF(FATAL) << "MEDIA_REQUEST_IOC_REINIT call timed out.";
 }
 
 bool V4L2IoctlShim::FindMediaDevice() {
@@ -703,8 +723,7 @@ bool V4L2IoctlShim::QueryFormat(enum v4l2_buf_type type,
   return false;
 }
 
-bool V4L2IoctlShim::VerifyCapabilities(uint32_t compressed_format,
-                                       uint32_t uncompressed_format) const {
+bool V4L2IoctlShim::VerifyCapabilities(uint32_t compressed_format) const {
   struct v4l2_capability cap;
   memset(&cap, 0, sizeof(cap));
 
@@ -721,17 +740,10 @@ bool V4L2IoctlShim::VerifyCapabilities(uint32_t compressed_format,
       << media::FourccToString(compressed_format)
       << " is not a supported compressed OUTPUT format.";
 
-  const bool is_uncompressed_format_supported =
-      QueryFormat(V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE, uncompressed_format);
-
-  LOG_IF(ERROR, !is_uncompressed_format_supported)
-      << media::FourccToString(uncompressed_format)
-      << " is not a supported uncompressed CAPTURE format.";
-
-  return is_compressed_format_supported && is_uncompressed_format_supported;
+  return is_compressed_format_supported;
 }
 
-bool V4L2IoctlShim::QueryAndMmapQueueBuffers(
+void V4L2IoctlShim::QueryAndMmapQueueBuffers(
     std::unique_ptr<V4L2Queue>& queue) const {
   DCHECK_EQ(queue->memory(), V4L2_MEMORY_MMAP);
 
@@ -749,15 +761,14 @@ bool V4L2IoctlShim::QueryAndMmapQueueBuffers(
     v4l_buffer.m.planes = planes.data();
 
     const bool ret = Ioctl(VIDIOC_QUERYBUF, &v4l_buffer);
-    DCHECK(ret);
+    LOG_ASSERT(ret) << "VIDIOC_QUERYBUF for " << queue->type()
+                    << " queue failed";
 
     buffers.emplace_back(base::MakeRefCounted<MmappedBuffer>(
         decode_fd_.GetPlatformFile(), v4l_buffer));
   }
 
   queue->set_buffers(buffers);
-
-  return true;
 }
 
 }  // namespace v4l2_test

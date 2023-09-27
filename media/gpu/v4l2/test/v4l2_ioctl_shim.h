@@ -12,6 +12,7 @@
 
 #include "base/files/memory_mapped_file.h"
 #include "base/logging.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "ui/gfx/geometry/size.h"
 
@@ -28,17 +29,33 @@ class MmappedBuffer : public base::RefCounted<MmappedBuffer> {
 
   class MmappedPlane {
    public:
-    void* start_addr;
+    raw_ptr<void> start_addr;
     const size_t length;
-    size_t bytes_used;
+    size_t bytes_used = 0;
 
     MmappedPlane(void* start, size_t len) : start_addr(start), length(len) {}
 
-    void CopyIn(const uint8_t* frame_data, size_t frame_size) {
-      LOG_ASSERT(frame_size < length)
+    // Appends the current slice data to the mmapped buffer. Resets |bytes_used|
+    // to 0 for the first slice. This function is used for HEVC because multiple
+    // slices per frame are supported.
+    void CopyInSlice(const uint8_t* frame_data,
+                     size_t frame_size,
+                     bool is_first_slice) {
+      if (is_first_slice) {
+        bytes_used = 0;
+      }
+
+      LOG_ASSERT((bytes_used + frame_size) < length)
           << "Not enough memory allocated to copy into.";
-      bytes_used = frame_size;
-      memcpy(static_cast<uint8_t*>(start_addr), frame_data, frame_size);
+
+      memcpy(static_cast<uint8_t*>(start_addr) + bytes_used, frame_data,
+             frame_size);
+      bytes_used += frame_size;
+    }
+
+    // Overwrites the mmapped buffer with the current frame data.
+    void CopyIn(const uint8_t* frame_data, size_t frame_size) {
+      CopyInSlice(frame_data, frame_size, true);
     }
   };
 
@@ -73,9 +90,7 @@ using MmappedBuffers = std::vector<scoped_refptr<MmappedBuffer>>;
 class V4L2Queue {
  public:
   V4L2Queue(enum v4l2_buf_type type,
-            uint32_t fourcc,
-            const gfx::Size& size,
-            uint32_t num_planes,
+            const gfx::Size& resolution,
             enum v4l2_memory memory,
             uint32_t num_buffers);
 
@@ -89,11 +104,10 @@ class V4L2Queue {
 
   enum v4l2_buf_type type() const { return type_; }
   uint32_t fourcc() const { return fourcc_; }
+  void set_fourcc(uint32_t fourcc) { fourcc_ = fourcc; }
 
-  gfx::Size display_size() const { return display_size_; }
-  void set_display_size(gfx::Size display_size) {
-    display_size_ = display_size;
-  }
+  gfx::Size resolution() const { return resolution_; }
+  void set_resolution(gfx::Size resolution) { resolution_ = resolution; }
 
   enum v4l2_memory memory() const { return memory_; }
 
@@ -101,9 +115,6 @@ class V4L2Queue {
 
   uint32_t num_buffers() const { return num_buffers_; }
   void set_num_buffers(uint32_t num_buffers) { num_buffers_ = num_buffers; }
-
-  gfx::Size coded_size() const { return coded_size_; }
-  void set_coded_size(gfx::Size coded_size) { coded_size_ = coded_size; }
 
   uint32_t num_planes() const { return num_planes_; }
   void set_num_planes(uint32_t num_planes) { num_planes_ = num_planes; }
@@ -132,14 +143,14 @@ class V4L2Queue {
 
  private:
   const enum v4l2_buf_type type_;
-  const uint32_t fourcc_;
+  uint32_t fourcc_;
   MmappedBuffers buffers_;
   uint32_t num_buffers_;
-  // The size of the image on the screen.
-  gfx::Size display_size_;
-  // The size of the encoded frame. Usually has an alignment of 16, 32
-  // depending on codec.
-  gfx::Size coded_size_;
+  // For the OUTPUT queue resolution refers to the coded dimensions of the
+  // video. For the CAPTURE queue resolution refers to the size of the
+  // buffer necessary for the driver to decode into and must
+  // contain the resolution of the OUTPUT queue.
+  gfx::Size resolution_;
   uint32_t num_planes_;
   const enum v4l2_memory memory_;
   // File descriptor returned by MEDIA_IOC_REQUEST_ALLOC ioctl call
@@ -171,25 +182,21 @@ class V4L2IoctlShim {
 
   // Configures the underlying V4L2 queue via VIDIOC_S_FMT. Returns true
   // if the configuration was successful.
-  [[nodiscard]] bool SetFmt(const std::unique_ptr<V4L2Queue>& queue) const;
+  void SetFmt(const std::unique_ptr<V4L2Queue>& queue) const;
 
-  // Retrieves the format of |queue| (via VIDIOC_G_FMT) and returns true if
-  // successful, filling in |coded_size| and |num_planes| in that case.
-  [[nodiscard]] bool GetFmt(const enum v4l2_buf_type type,
-                            gfx::Size* coded_size,
-                            uint32_t* num_planes) const;
+  // Retrieves the format, |fmt|, (via VIDIOC_G_FMT)
+  void GetFmt(struct v4l2_format* fmt) const;
 
-  // Tries to configure |queue|. This does not modify the underlying
-  // driver state.
+  // Tries to configure |fmt|. This does not modify the underlying driver state.
   // https://www.kernel.org/doc/html/v5.10/userspace-api/media/v4l/vidioc-g-fmt.html?highlight=vidioc_try_fmt#description
-  [[nodiscard]] bool TryFmt(const std::unique_ptr<V4L2Queue>& queue) const;
+  void TryFmt(struct v4l2_format* fmt) const;
 
   // Allocates buffers via VIDIOC_REQBUFS for |queue|.
-  [[nodiscard]] bool ReqBufs(std::unique_ptr<V4L2Queue>& queue) const;
+  void ReqBufs(std::unique_ptr<V4L2Queue>& queue) const;
 
   // Allocates buffers via VIDIOC_REQBUFS for |queue| with a buffer count.
-  [[nodiscard]] bool ReqBufsWithCount(std::unique_ptr<V4L2Queue>& queue,
-                                      uint32_t count) const;
+  void ReqBufsWithCount(std::unique_ptr<V4L2Queue>& queue,
+                        uint32_t count) const;
 
   // Enqueues an empty (capturing) or filled (output) buffer
   // in the driver's incoming |queue|.
@@ -198,32 +205,32 @@ class V4L2IoctlShim {
 
   // Dequeues a filled (capturing) or decoded (output) buffer
   // from the driver’s outgoing |queue|.
-  [[nodiscard]] bool DQBuf(const std::unique_ptr<V4L2Queue>& queue,
-                           uint32_t* buffer_id) const;
+  void DQBuf(const std::unique_ptr<V4L2Queue>& queue,
+             uint32_t* buffer_id) const;
 
   // Starts streaming |queue| (via VIDIOC_STREAMON).
-  [[nodiscard]] bool StreamOn(const enum v4l2_buf_type type) const;
+  void StreamOn(const enum v4l2_buf_type type) const;
 
   // Stops streaming |queue| (via VIDIOC_STREAMOFF).
-  [[nodiscard]] bool StreamOff(const enum v4l2_buf_type type) const;
+  void StreamOff(const enum v4l2_buf_type type) const;
 
-  // Sets the value of controls which specify decoding parameters
-  // for each frame.
-  [[nodiscard]] bool SetExtCtrls(const std::unique_ptr<V4L2Queue>& queue,
-                                 v4l2_ext_controls* ext_ctrls) const;
+  // Sets the value of controls which specify decoding parameters for each
+  // frame. |immediate| forces the call to be processed immediately when
+  // |MediaIocRequestAlloc| is next called as opposed to being put in the queue.
+  void SetExtCtrls(const std::unique_ptr<V4L2Queue>& queue,
+                   v4l2_ext_controls* ext_ctrls,
+                   bool immediate = false) const;
 
   // Allocates requests (likely one per OUTPUT buffer) via
   // MEDIA_IOC_REQUEST_ALLOC on the media device.
-  [[nodiscard]] bool MediaIocRequestAlloc(int* req_fd) const;
+  void MediaIocRequestAlloc(int* req_fd) const;
 
   // Submits a request for the given OUTPUT |queue| by queueing
   // the request with |queue|'s media_request_fd().
-  [[nodiscard]] bool MediaRequestIocQueue(
-      const std::unique_ptr<V4L2Queue>& queue) const;
+  void MediaRequestIocQueue(const std::unique_ptr<V4L2Queue>& queue) const;
 
   // Re-initializes the previously allocated request for reuse.
-  [[nodiscard]] bool MediaRequestIocReinit(
-      const std::unique_ptr<V4L2Queue>& queue) const;
+  void MediaRequestIocReinit(const std::unique_ptr<V4L2Queue>& queue) const;
 
   // Finds available media device for video decoder. This function also checks
   // to make sure either |bus_info| or |driver| field from |media_device_info|
@@ -231,14 +238,11 @@ class V4L2IoctlShim {
   // field in |v4l2_capability| struct (obtained from VIDIOC_QUERYCAP call).
   [[nodiscard]] bool FindMediaDevice();
 
-  // Verifies |v4l_fd| supports |compressed_format| for OUTPUT queues
-  // and |uncompressed_format| for CAPTURE queues, respectively.
-  [[nodiscard]] bool VerifyCapabilities(uint32_t compressed_format,
-                                        uint32_t uncompressed_format) const;
+  // Verifies |v4l_fd| supports |compressed_format| for OUTPUT queues.
+  [[nodiscard]] bool VerifyCapabilities(uint32_t compressed_format) const;
 
   // Allocates buffers for the given |queue|.
-  [[nodiscard]] bool QueryAndMmapQueueBuffers(
-      std::unique_ptr<V4L2Queue>& queue) const;
+  void QueryAndMmapQueueBuffers(std::unique_ptr<V4L2Queue>& queue) const;
 
   enum class DeviceType {
     kDecoder,
@@ -262,6 +266,9 @@ class V4L2IoctlShim {
   base::File decode_fd_;
   // Media device file descriptor used for ioctl requests.
   base::File media_fd_;
+
+  // Whether V4L2_CTRL_WHICH_CUR_VAL is implemented correctly
+  bool cur_val_is_supported_ = true;
 };
 
 }  // namespace v4l2_test

@@ -6,12 +6,14 @@
 #define ASH_SYSTEM_UNIFIED_QUICK_SETTINGS_HEADER_H_
 
 #include "ash/ash_export.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/views/view.h"
 
 namespace ash {
 
 class ChannelIndicatorQuickSettingsView;
 class EnterpriseManagedView;
+class EolNoticeQuickSettingsView;
 class SupervisedUserView;
 class UnifiedSystemTrayController;
 
@@ -35,7 +37,7 @@ class ASH_EXPORT QuickSettingsHeader : public views::View {
     return channel_view_;
   }
 
-  views::View* eol_notice_for_test() { return eol_notice_; }
+  EolNoticeQuickSettingsView* eol_notice_for_test() { return eol_notice_; }
 
  private:
   // Updates visibility for this view. When it has no children it sets itself
@@ -44,10 +46,12 @@ class ASH_EXPORT QuickSettingsHeader : public views::View {
   void UpdateVisibilityAndLayout();
 
   // Owned by views hierarchy.
-  EnterpriseManagedView* enterprise_managed_view_ = nullptr;
-  SupervisedUserView* supervised_view_ = nullptr;
-  ChannelIndicatorQuickSettingsView* channel_view_ = nullptr;
-  views::View* eol_notice_ = nullptr;
+  raw_ptr<EnterpriseManagedView, ExperimentalAsh> enterprise_managed_view_ =
+      nullptr;
+  raw_ptr<SupervisedUserView, ExperimentalAsh> supervised_view_ = nullptr;
+  raw_ptr<ChannelIndicatorQuickSettingsView, ExperimentalAsh> channel_view_ =
+      nullptr;
+  raw_ptr<EolNoticeQuickSettingsView, ExperimentalAsh> eol_notice_ = nullptr;
 };
 
 }  // namespace ash

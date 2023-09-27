@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/views/sharing_hub/sharing_hub_bubble_action_button.h"
 #include "chrome/grit/generated_resources.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -142,14 +143,9 @@ void SharingHubBubbleViewImpl::Init() {
   SetLayoutManager(std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kVertical, gfx::Insets(),
       kInterItemPadding));
-  if (controller_->ShouldUsePreview()) {
-    auto* preview = AddChildView(std::make_unique<PreviewView>(
-        attempt_, share::GetDesktopSharePreviewVariant()));
-    preview->TakeCallbackSubscription(
-        controller_->RegisterPreviewImageChangedCallback(base::BindRepeating(
-            &PreviewView::OnImageChanged, base::Unretained(preview))));
-    AddChildView(std::make_unique<views::Separator>());
-  }
+
+  AddChildView(std::make_unique<PreviewView>(attempt_));
+  AddChildView(std::make_unique<views::Separator>());
 
   scroll_view_ = AddChildView(std::make_unique<views::ScrollView>());
   scroll_view_->ClipHeightTo(0, kActionButtonHeight * kMaximumButtons);
@@ -181,5 +177,8 @@ void SharingHubBubbleViewImpl::MaybeSizeToContents() {
   if (GetWidget())
     SizeToContents();
 }
+
+BEGIN_METADATA(SharingHubBubbleViewImpl, LocationBarBubbleDelegateView)
+END_METADATA
 
 }  // namespace sharing_hub

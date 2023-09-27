@@ -5,7 +5,7 @@
 import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chromeos/chai_assert.js';
 
-import {MockVolumeManager} from '../../background/js/mock_volume_manager.js';
+import {fakeDriveVolumeId, MockVolumeManager} from '../../background/js/mock_volume_manager.js';
 import {VolumeInfoImpl} from '../../background/js/volume_info_impl.js';
 import {DialogType} from '../../common/js/dialog_type.js';
 import {EntryList, FakeEntryImpl, VolumeEntry} from '../../common/js/files_app_entry_types.js';
@@ -18,6 +18,7 @@ import {VolumeManagerCommon} from '../../common/js/volume_manager_types.js';
 import {FilesAppEntry} from '../../externs/files_app_entry_interfaces.js';
 
 import {AndroidAppListModel} from './android_app_list_model.js';
+import {constants} from './constants.js';
 import {DirectoryModel} from './directory_model.js';
 import {createFakeAndroidAppListModel} from './fake_android_app_list_model.js';
 import {createFakeDirectoryModel} from './mock_directory_model.js';
@@ -108,7 +109,7 @@ export function testModel() {
       (model.item(1)).entry.fullPath);
   assertEquals(str('MY_FILES_ROOT_LABEL'), model.item(2).label);
   assertEquals(
-      'drive', /** @type {!NavigationModelVolumeItem} */
+      fakeDriveVolumeId, /** @type {!NavigationModelVolumeItem} */
       (model.item(3)).volumeInfo.volumeId);
   assertEquals(
       'android:app1', /** @type {!NavigationModelAndroidAppItem} */
@@ -128,7 +129,7 @@ export function testModel() {
   loadTimeData.overrideValues({FILES_TRASH_ENABLED: true});
   model.fakeTrashItem = new NavigationModelFakeItem(
       'trash-label', NavigationModelItemType.TRASH, new TrashRootEntry());
-  model.reorderNavigationItems_();
+  model.refreshNavigationItems();
   assertEquals(7, model.length);
   assertEquals(
       'fake-entry://trash', /** @type {!NavigationModelFakeItem} */
@@ -155,7 +156,7 @@ export function testNoRecentOrLinuxFiles() {
       (model.item(0)).entry.fullPath);
   assertEquals(str('MY_FILES_ROOT_LABEL'), model.item(1).label);
   const driveItem = /** @type {!NavigationModelVolumeItem} */ (model.item(2));
-  assertEquals('drive', driveItem.volumeInfo.volumeId);
+  assertEquals(fakeDriveVolumeId, driveItem.volumeInfo.volumeId);
   assertFalse(driveItem.disabled);
 }
 
@@ -183,7 +184,7 @@ export function testDisabledVolumes() {
   assertEquals(str('MY_FILES_ROOT_LABEL'), model.item(1).label);
 
   const driveItem = /** @type {!NavigationModelVolumeItem} */ (model.item(2));
-  assertEquals('drive', driveItem.volumeInfo.volumeId);
+  assertEquals(fakeDriveVolumeId, driveItem.volumeInfo.volumeId);
   assertTrue(driveItem.disabled);
 }
 
@@ -285,7 +286,7 @@ export function testAddAndRemoveVolumes() {
       (model.item(0)).entry.fullPath);
   assertEquals(str('MY_FILES_ROOT_LABEL'), model.item(1).label);
   assertEquals(
-      'drive', /** @type {!NavigationModelVolumeItem} */
+      fakeDriveVolumeId, /** @type {!NavigationModelVolumeItem} */
       (model.item(2)).volumeInfo.volumeId);
   if (util.isSinglePartitionFormatEnabled()) {
     const drive = model.item(3);
@@ -311,7 +312,7 @@ export function testAddAndRemoveVolumes() {
       (model.item(0)).entry.fullPath);
   assertEquals(str('MY_FILES_ROOT_LABEL'), model.item(1).label);
   assertEquals(
-      'drive', /** @type {!NavigationModelVolumeItem} */
+      fakeDriveVolumeId, /** @type {!NavigationModelVolumeItem} */
       (model.item(2)).volumeInfo.volumeId);
   if (util.isSinglePartitionFormatEnabled()) {
     const drive1 = model.item(3);
@@ -345,7 +346,7 @@ export function testAddAndRemoveVolumes() {
       (model.item(1)).entry.fullPath);
   assertEquals(str('MY_FILES_ROOT_LABEL'), model.item(2).label);
   assertEquals(
-      'drive', /** @type {!NavigationModelVolumeItem} */
+      fakeDriveVolumeId, /** @type {!NavigationModelVolumeItem} */
       (model.item(3)).volumeInfo.volumeId);
   if (util.isSinglePartitionFormatEnabled()) {
     assertEquals('External Drive', model.item(4).label);
@@ -406,6 +407,10 @@ export function testOrderAndNestItems() {
       VolumeManagerCommon.VolumeType.ANDROID_FILES, 'android_files:droid'));
   volumeManager.volumeInfoList.add(MockVolumeManager.createMockVolumeInfo(
       VolumeManagerCommon.VolumeType.SMB, 'smb:file-share'));
+  // Add ODFS.
+  volumeManager.volumeInfoList.add(MockVolumeManager.createMockVolumeInfo(
+      VolumeManagerCommon.VolumeType.PROVIDED, 'provided:odfs', '', '',
+      constants.ODFS_EXTENSION_ID));
 
   const androidAppListModelWithApps =
       createFakeAndroidAppListModel(['android:app1', 'android:app2']);
@@ -418,18 +423,19 @@ export function testOrderAndNestItems() {
   //        -> Downloads
   //        -> Play files
   //        -> Linux files
-  //  5.  Drive  - from setup()
-  //  6.  smb:file-share
-  //  7.  provided:prov1
-  //  8.  provided:prov2
+  //  5.  Google Drive  - from setup()
+  //  6.  ODFS
+  //  7.  smb:file-share
+  //  8.  provided:prov1
+  //  9.  provided:prov2
   //
-  //  9.  removable:hoge
-  // 10.  removable:fuga
-  // 11.  archive:a-rar  - mounted as archive
-  // 12.  mtp:a-phone
+  // 10.  removable:hoge
+  // 11.  removable:fuga
+  // 12.  archive:a-rar  - mounted as archive
+  // 13.  mtp:a-phone
   //
-  // 13.  android:app1
-  // 14.  android:app2
+  // 14.  android:app1
+  // 15.  android:app2
 
   // Constructor already calls orderAndNestItems_.
   const model = new NavigationListModel(
@@ -438,7 +444,7 @@ export function testOrderAndNestItems() {
 
   // Check items order and that MTP/Archive/Removable respect the original
   // order.
-  assertEquals(14, model.length);
+  assertEquals(15, model.length);
   assertEquals('recent-label', model.item(0).label);
 
   assertEquals('shortcut', model.item(1).label);
@@ -446,23 +452,24 @@ export function testOrderAndNestItems() {
   assertEquals(str('MY_FILES_ROOT_LABEL'), model.item(3).label);
 
   assertEquals(str('DRIVE_DIRECTORY_LABEL'), model.item(4).label);
-  assertEquals('smb:file-share', model.item(5).label);
-  assertEquals('provided:prov1', model.item(6).label);
-  assertEquals('provided:prov2', model.item(7).label);
+  assertEquals('provided:odfs', model.item(5).label);
+  assertEquals('smb:file-share', model.item(6).label);
+  assertEquals('provided:prov1', model.item(7).label);
+  assertEquals('provided:prov2', model.item(8).label);
 
   if (util.isSinglePartitionFormatEnabled()) {
-    assertEquals('External Drive', model.item(8).label);
     assertEquals('External Drive', model.item(9).label);
+    assertEquals('External Drive', model.item(10).label);
   } else {
-    assertEquals('removable:hoge', model.item(8).label);
-    assertEquals('removable:fuga', model.item(9).label);
+    assertEquals('removable:hoge', model.item(9).label);
+    assertEquals('removable:fuga', model.item(10).label);
   }
 
-  assertEquals('archive:a-rar', model.item(10).label);
-  assertEquals('mtp:a-phone', model.item(11).label);
+  assertEquals('archive:a-rar', model.item(11).label);
+  assertEquals('mtp:a-phone', model.item(12).label);
 
-  assertEquals('android:app1', model.item(12).label);
-  assertEquals('android:app2', model.item(13).label);
+  assertEquals('android:app1', model.item(13).label);
+  assertEquals('android:app2', model.item(14).label);
 
   // Check NavigationSection, which defaults to TOP.
   // recent-label.
@@ -475,30 +482,34 @@ export function testOrderAndNestItems() {
   // My Files.
   assertEquals(NavigationSection.MY_FILES, model.item(3).section);
 
-  // Drive, FSP, and SMB are grouped together.
   // My Drive.
-  assertEquals(NavigationSection.CLOUD, model.item(4).section);
+  assertEquals(NavigationSection.GOOGLE_DRIVE, model.item(4).section);
+
+  // ODFS.
+  assertEquals(NavigationSection.ODFS, model.item(5).section);
+
+  // SMB and other FSP are grouped together.
   // smb:file-share.
-  assertEquals(NavigationSection.CLOUD, model.item(5).section);
-  // provided:prov1.
   assertEquals(NavigationSection.CLOUD, model.item(6).section);
-  // provided:prov2.
+  // provided:prov1.
   assertEquals(NavigationSection.CLOUD, model.item(7).section);
+  // provided:prov2.
+  assertEquals(NavigationSection.CLOUD, model.item(8).section);
 
   // MTP/Archive/Removable are grouped together.
   // removable:hoge.
-  assertEquals(NavigationSection.REMOVABLE, model.item(8).section);
-  // removable:fuga.
   assertEquals(NavigationSection.REMOVABLE, model.item(9).section);
-  // archive:a-rar.
+  // removable:fuga.
   assertEquals(NavigationSection.REMOVABLE, model.item(10).section);
-  // mtp:a-phone.
+  // archive:a-rar.
   assertEquals(NavigationSection.REMOVABLE, model.item(11).section);
+  // mtp:a-phone.
+  assertEquals(NavigationSection.REMOVABLE, model.item(12).section);
 
   // android:app1
-  assertEquals(NavigationSection.ANDROID_APPS, model.item(12).section);
-  // android:app2
   assertEquals(NavigationSection.ANDROID_APPS, model.item(13).section);
+  // android:app2
+  assertEquals(NavigationSection.ANDROID_APPS, model.item(14).section);
 
   const myFilesModel = model.item(3);
   // Re-order again: cast to allow calling this private model function.

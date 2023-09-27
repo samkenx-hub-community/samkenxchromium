@@ -2,15 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TestRunner} from 'test_runner';
+import {ApplicationTestRunner} from 'application_test_runner';
+
+import * as SDK from 'devtools/core/sdk/sdk.js';
+
 (async function() {
   TestRunner.addResult(`Tests that cache data is correctly populated in the Inspector.\n`);
-  await TestRunner.loadLegacyModule('console'); await TestRunner.loadTestModule('application_test_runner');
+  await TestRunner.loadLegacyModule('console');
     // Note: every test that uses a storage API must manually clean-up state from previous tests.
   await ApplicationTestRunner.resetState();
 
   await TestRunner.showPanel('resources');
 
-  var cacheStorageModel = TestRunner.mainTarget.model(SDK.ServiceWorkerCacheModel);
+  var cacheStorageModel = TestRunner.mainTarget.model(SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel);
   cacheStorageModel.enable();
 
   function errorAndExit(error) {
@@ -48,5 +53,5 @@
         .catch(errorAndExit);
   }
 
-  ApplicationTestRunner.waitForCacheRefresh(main);
+  main();
 })();

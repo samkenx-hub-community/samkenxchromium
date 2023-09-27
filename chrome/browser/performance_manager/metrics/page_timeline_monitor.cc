@@ -1,15 +1,20 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "chrome/browser/performance_manager/metrics/page_timeline_monitor.h"
 
 #include <stdint.h>
+#include <map>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include "base/check.h"
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
+#include "base/notreached.h"
 #include "base/rand_util.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -17,6 +22,8 @@
 #include "components/performance_manager/public/decorators/page_live_state_decorator.h"
 #include "components/performance_manager/public/features.h"
 #include "components/performance_manager/public/graph/page_node.h"
+#include "components/performance_manager/public/resource_attribution/query_results.h"
+#include "components/performance_manager/public/resource_attribution/resource_contexts.h"
 #include "services/metrics/public/cpp/metrics_utils.h"
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "services/metrics/public/cpp/ukm_recorder.h"
@@ -28,6 +35,42 @@
 
 namespace performance_manager::metrics {
 
+namespace {
+
+using PageMeasurementBackgroundState =
+    PageTimelineMonitor::PageMeasurementBackgroundState;
+
+// CPU usage metrics are provided as a double in the [0.0, number of cores *
+// 100.0] range. The CPU usage is usually below 1%, so the UKM is
+// reported out of 10,000 instead of out of 100 to make analyzing the data
+// easier. This is the same scale factor used by the
+// PerformanceMonitor.AverageCPU8 histograms recorded in
+// chrome/browser/metrics/power/process_metrics_recorder_util.cc.
+constexpr int kCPUUsageFactor = 100 * 100;
+
+PageMeasurementBackgroundState GetBackgroundStateForMeasurementPeriod(
+    const PageNode* page_node,
+    base::TimeDelta time_since_last_measurement) {
+  if (page_node->GetTimeSinceLastVisibilityChange() <
+      time_since_last_measurement) {
+    return PageMeasurementBackgroundState::kMixedForegroundBackground;
+  }
+  if (page_node->IsVisible()) {
+    return PageMeasurementBackgroundState::kForeground;
+  }
+  // Check if the page was audible for the entire measurement period.
+  if (page_node->GetTimeSinceLastAudibleChange().value_or(
+          base::TimeDelta::Max()) < time_since_last_measurement) {
+    return PageMeasurementBackgroundState::kBackgroundMixedAudible;
+  }
+  if (page_node->IsAudible()) {
+    return PageMeasurementBackgroundState::kAudibleInBackground;
+  }
+  return PageMeasurementBackgroundState::kBackground;
+}
+
+}  // namespace
+
 PageTimelineMonitor::PageTimelineMonitor()
     // These counters are initialized to a random value due to privacy concerns,
     // so that we cannot tie either the startup time of a specific tab or the
@@ -37,6 +80,11 @@ PageTimelineMonitor::PageTimelineMonitor()
       FROM_HERE,
       performance_manager::features::kPageTimelineStateIntervalTime.Get(), this,
       &PageTimelineMonitor::CollectSlice);
+
+  // PageResourceUsage is collected on a different schedule from PageTimeline.
+  collect_page_resource_usage_timer_.Start(
+      FROM_HERE, base::Minutes(2), this,
+      &PageTimelineMonitor::CollectPageResourceUsage);
 }
 
 PageTimelineMonitor::~PageTimelineMonitor() = default;
@@ -60,22 +108,83 @@ PageTimelineMonitor::PageNodeInfo::GetPageState() {
   }
 }
 
-void PageTimelineMonitor::CollectSlice() {
-  // Whether or not we record a full PageTimelineState slice, record the
-  // estimated memory usage, which has fewer privacy implications so can be
-  // recorded more often.
-  for (auto const& pair : page_node_info_map_) {
-    const PageNode* page_node = pair.first;
+void PageTimelineMonitor::CollectPageResourceUsage() {
+  if (performance_manager::features::kUseResourceAttributionCPUMonitor.Get()) {
+    const std::map<resource_attribution::ResourceContext,
+                   resource_attribution::CPUTimeResult>
+        cpu_usage_map = cpu_measurement_monitor_.UpdateAndGetCPUMeasurements();
 
-    DCHECK_EQ(page_node->GetType(), performance_manager::PageType::kTab);
-    const ukm::SourceId source_id = page_node->GetUkmSourceID();
+    auto get_cpu_usage = [&cpu_usage_map](const PageNode* page_node) -> double {
+      // CPUMeasurementMonitor collects results for all pages, but any with no
+      // CPU use won't appear in the map.
+      const auto it = cpu_usage_map.find(page_node->GetResourceContext());
+      if (it == cpu_usage_map.end()) {
+        return 0;
+      }
+      const resource_attribution::CPUTimeResult& result = it->second;
+      return result.cumulative_cpu /
+             (result.metadata.measurement_time - result.start_time);
+    };
+    // Calculate the overall CPU usage.
+    double total_cpu_usage = 0;
+    for (const auto& [tab_handle, info_ptr] : page_node_info_map_) {
+      const PageNode* page_node = tab_handle->page_node();
+      CheckPageState(page_node, *info_ptr);
+      total_cpu_usage += get_cpu_usage(page_node);
+    }
 
-    ukm::builders::PerformanceManager_PageResourceUsage(source_id)
-        .SetResidentSetSizeEstimate(page_node->EstimateResidentSetSize())
-        .SetPrivateFootprintEstimate(page_node->EstimatePrivateFootprintSize())
-        .Record(ukm::UkmRecorder::Get());
+    const auto now = base::TimeTicks::Now();
+    for (const auto& [tab_handle, _] : page_node_info_map_) {
+      const PageNode* page_node = tab_handle->page_node();
+      const ukm::SourceId source_id = page_node->GetUkmSourceID();
+      ukm::builders::PerformanceManager_PageResourceUsage2(source_id)
+          .SetResidentSetSizeEstimate(page_node->EstimateResidentSetSize())
+          .SetPrivateFootprintEstimate(
+              page_node->EstimatePrivateFootprintSize())
+          .SetRecentCPUUsage(kCPUUsageFactor * get_cpu_usage(page_node))
+          .SetTotalRecentCPUUsageAllPages(kCPUUsageFactor * total_cpu_usage)
+          .SetBackgroundState(
+              static_cast<int64_t>(GetBackgroundStateForMeasurementPeriod(
+                  page_node, now - time_of_last_resource_usage_)))
+          .Record(ukm::UkmRecorder::Get());
+    }
+    time_of_last_resource_usage_ = now;
+  } else {
+    const PageTimelineCPUMonitor::CPUUsageMap cpu_usage_map =
+        cpu_monitor_.UpdateCPUMeasurements();
+
+    // Calculate the overall CPU usage.
+    double total_cpu_usage = 0;
+    std::vector<std::pair<const PageNode*, double>> page_cpu_usage;
+    page_cpu_usage.reserve(page_node_info_map_.size());
+    for (const auto& [tab_handle, info_ptr] : page_node_info_map_) {
+      const PageNode* page_node = tab_handle->page_node();
+      CheckPageState(page_node, *info_ptr);
+      double cpu_usage = PageTimelineCPUMonitor::EstimatePageCPUUsage(
+          page_node, cpu_usage_map);
+      page_cpu_usage.emplace_back(page_node, cpu_usage);
+      total_cpu_usage += cpu_usage;
+    }
+
+    const auto now = base::TimeTicks::Now();
+    for (const auto& [page_node, cpu_usage] : page_cpu_usage) {
+      const ukm::SourceId source_id = page_node->GetUkmSourceID();
+      ukm::builders::PerformanceManager_PageResourceUsage2(source_id)
+          .SetResidentSetSizeEstimate(page_node->EstimateResidentSetSize())
+          .SetPrivateFootprintEstimate(
+              page_node->EstimatePrivateFootprintSize())
+          .SetRecentCPUUsage(kCPUUsageFactor * cpu_usage)
+          .SetTotalRecentCPUUsageAllPages(kCPUUsageFactor * total_cpu_usage)
+          .SetBackgroundState(
+              static_cast<int64_t>(GetBackgroundStateForMeasurementPeriod(
+                  page_node, now - time_of_last_resource_usage_)))
+          .Record(ukm::UkmRecorder::Get());
+    }
+    time_of_last_resource_usage_ = now;
   }
+}
 
+void PageTimelineMonitor::CollectSlice() {
   // We only collect a slice randomly every ~20 times this gets called for
   // privacy purposes. Always fall through when we're in a test.
   if (!ShouldCollectSlice()) {
@@ -89,10 +198,9 @@ void PageTimelineMonitor::CollectSlice() {
   time_of_last_slice_ = now;
 
   for (auto const& pair : page_node_info_map_) {
-    const PageNode* page_node = pair.first;
+    const PageNode* page_node = pair.first->page_node();
     const std::unique_ptr<PageNodeInfo>& curr_info = pair.second;
-
-    DCHECK_EQ(page_node->GetType(), performance_manager::PageType::kTab);
+    CheckPageState(page_node, *curr_info);
 
     const PageNode::LifecycleState lifecycle_state =
         page_node->GetLifecycleState();
@@ -184,6 +292,11 @@ bool PageTimelineMonitor::ShouldCollectSlice() const {
   return base::RandInt(0, 19) == 1;
 }
 
+void PageTimelineMonitor::SetTriggerCollectionManuallyForTesting() {
+  collect_slice_timer_.Stop();
+  collect_page_resource_usage_timer_.Stop();
+}
+
 void PageTimelineMonitor::SetShouldCollectSliceCallbackForTesting(
     base::RepeatingCallback<bool()> should_collect_slice_callback) {
   should_collect_slice_callback_ = should_collect_slice_callback;
@@ -193,27 +306,62 @@ void PageTimelineMonitor::OnPassedToGraph(Graph* graph) {
   graph_ = graph;
   graph_->AddPageNodeObserver(this);
   graph_->RegisterObject(this);
+  graph->GetRegisteredObjectAs<TabPageDecorator>()->AddObserver(this);
+
+  if (performance_manager::features::kUseResourceAttributionCPUMonitor.Get()) {
+    cpu_measurement_monitor_.StartMonitoring(graph_);
+  } else {
+    cpu_monitor_.StartMonitoring(graph_);
+  }
 }
 
 void PageTimelineMonitor::OnTakenFromGraph(Graph* graph) {
+  if (performance_manager::features::kUseResourceAttributionCPUMonitor.Get()) {
+    cpu_measurement_monitor_.StopMonitoring();
+  } else {
+    cpu_monitor_.StopMonitoring(graph_);
+  }
+
+  // GraphOwned object destruction order is undefined, so only remove ourselves
+  // as observers if the decorator still exists.
+  TabPageDecorator* tab_page_decorator =
+      graph->GetRegisteredObjectAs<TabPageDecorator>();
+  if (tab_page_decorator) {
+    tab_page_decorator->RemoveObserver(this);
+  }
+
   graph_->UnregisterObject(this);
   graph_->RemovePageNodeObserver(this);
   graph_ = nullptr;
 }
 
-void PageTimelineMonitor::OnPageNodeAdded(const PageNode* page_node) {
-  DCHECK_EQ(page_node->GetType(), performance_manager::PageType::kUnknown);
+void PageTimelineMonitor::OnTabAdded(TabPageDecorator::TabHandle* tab_handle) {
+  page_node_info_map_[tab_handle] = std::make_unique<PageNodeInfo>(
+      base::TimeTicks::Now(), tab_handle->page_node(), slice_id_counter_++);
 }
 
-void PageTimelineMonitor::OnBeforePageNodeRemoved(const PageNode* page_node) {
-  // This is a no-op if the pointer is not in the map, so no conditional erase.
-  page_node_info_map_.erase(page_node);
+void PageTimelineMonitor::OnTabAboutToBeDiscarded(
+    const PageNode* old_page_node,
+    TabPageDecorator::TabHandle* tab_handle) {
+  auto it = page_node_info_map_.find(tab_handle);
+  CHECK(it != page_node_info_map_.end());
+
+  it->second->current_lifecycle = mojom::LifecycleState::kDiscarded;
+  CheckPageState(tab_handle->page_node(), *it->second);
+}
+
+void PageTimelineMonitor::OnBeforeTabRemoved(
+    TabPageDecorator::TabHandle* tab_handle) {
+  page_node_info_map_.erase(tab_handle);
 }
 
 void PageTimelineMonitor::OnIsVisibleChanged(const PageNode* page_node) {
-  if (page_node->GetType() != performance_manager::PageType::kTab)
+  if (page_node->GetType() != performance_manager::PageType::kTab) {
     return;
+  }
 
+  TabPageDecorator::TabHandle* tab_handle =
+      TabPageDecorator::FromPageNode(page_node);
   // It's possible for this to happen when a tab is discarded. The sequence of
   // events is:
   // 1. New web contents (and page node) created
@@ -223,11 +371,14 @@ void PageTimelineMonitor::OnIsVisibleChanged(const PageNode* page_node) {
   // 4. The old web contents (and page node) are deleted
   // In the case of PageTimelineMonitor, the page_node is removed from the map
   // on step 2, so the notification from step 3 has to be ignored.
-  if (!base::Contains(page_node_info_map_, page_node)) {
+  if (!tab_handle) {
     return;
   }
 
-  std::unique_ptr<PageNodeInfo>& info = page_node_info_map_[page_node];
+  auto it = page_node_info_map_.find(tab_handle);
+  CHECK(it != page_node_info_map_.end());
+
+  std::unique_ptr<PageNodeInfo>& info = it->second;
   base::TimeTicks now = base::TimeTicks::Now();
   if (info->currently_visible && !page_node->IsVisible()) {
     // Increase total foreground seconds by the time since we entered the
@@ -248,65 +399,40 @@ void PageTimelineMonitor::OnIsVisibleChanged(const PageNode* page_node) {
 
 void PageTimelineMonitor::OnPageLifecycleStateChanged(
     const PageNode* page_node) {
-  if (page_node->GetType() != performance_manager::PageType::kTab)
-    return;
-
-  auto it = page_node_info_map_.find(page_node);
-  if (it == page_node_info_map_.end()) {
-    // This function is called by the tab freezing apparatus between the time a
-    // page is discarded and when its PageNode is removed from the graph. In
-    // that situation, it's not in the map anymore, and another PageNode is
-    // being tracked in its place. It's safe to return early.
+  if (page_node->GetType() != performance_manager::PageType::kTab) {
     return;
   }
+
+  TabPageDecorator::TabHandle* tab_handle =
+      TabPageDecorator::FromPageNode(page_node);
+  if (!tab_handle) {
+    // This function is called by the tab freezing apparatus between the time a
+    // page is discarded and when its PageNode is removed from the graph. In
+    // that situation, it's not in the map anymore, it doesn't have a tab
+    // handle, and another PageNode is being tracked in its place. It's safe to
+    // return early.
+    return;
+  }
+
+  auto it = page_node_info_map_.find(tab_handle);
+  CHECK(it != page_node_info_map_.end());
 
   it->second->current_lifecycle = page_node->GetLifecycleState();
   it->second->time_of_most_recent_state_change = base::TimeTicks::Now();
 }
 
-void PageTimelineMonitor::OnTypeChanged(const PageNode* page_node,
-                                        PageType previous_state) {
-  // If a PageNode already has a PageNodeInfo, its only valid state is
-  // `kDiscarded` and a new PageNodeInfo shouldn't be created for it.
-  if (base::Contains(page_node_info_map_, page_node)) {
-    DCHECK_EQ(page_node_info_map_[page_node]->current_lifecycle,
-              mojom::LifecycleState::kDiscarded);
-    return;
-  }
-
-  // When PageNodes are added, they have type kUnknown, and so it is when new
-  // nodes get changed to being of type kTab that we can start using them.
-  switch (page_node->GetType()) {
-    case performance_manager::PageType::kTab:
-      page_node_info_map_[page_node] = std::make_unique<PageNodeInfo>(
-          base::TimeTicks::Now(), page_node, slice_id_counter_++);
-      break;
-    case performance_manager::PageType::kExtension:
-      // We won't be dealing with these because we're not recording this UKM
-      // for extensions.
-      break;
-    case performance_manager::PageType::kUnknown:
-      NOTREACHED();
-      break;
-  }
-}
-
-void PageTimelineMonitor::OnAboutToBeDiscarded(const PageNode* page_node,
-                                               const PageNode* new_page_node) {
-  auto old_it = page_node_info_map_.find(page_node);
-  DCHECK(old_it != page_node_info_map_.end());
-  old_it->second->current_lifecycle = mojom::LifecycleState::kDiscarded;
-
-  bool inserted =
-      page_node_info_map_.emplace(new_page_node, std::move(old_it->second))
-          .second;
-  DCHECK(inserted);
-
-  page_node_info_map_.erase(old_it);
-}
-
 void PageTimelineMonitor::SetBatterySaverEnabled(bool enabled) {
   battery_saver_enabled_ = enabled;
+}
+
+void PageTimelineMonitor::CheckPageState(const PageNode* page_node,
+                                         const PageNodeInfo& info) {
+  // There's a window after OnAboutToBeDiscarded() where a discarded placeholder
+  // page is in the map with type kUnknown, before it's updated to kTab in
+  // OnTypeChanged().
+  CHECK(page_node->GetType() == PageType::kTab ||
+        page_node->GetType() == PageType::kUnknown &&
+            info.current_lifecycle == mojom::LifecycleState::kDiscarded);
 }
 
 }  // namespace performance_manager::metrics

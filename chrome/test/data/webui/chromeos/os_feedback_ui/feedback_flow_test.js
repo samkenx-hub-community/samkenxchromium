@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {fakeFeedbackContext, fakeInternalUserFeedbackContext, fakePngData, fakeSearchResponse} from 'chrome://os-feedback/fake_data.js';
+import {fakeFeedbackContext, fakeFeedbackContextWithoutLinkedCrossDevicePhone, fakeInternalUserFeedbackContext, fakePngData, fakeSearchResponse} from 'chrome://os-feedback/fake_data.js';
 import {FakeFeedbackServiceProvider} from 'chrome://os-feedback/fake_feedback_service_provider.js';
 import {FakeHelpContentProvider} from 'chrome://os-feedback/fake_help_content_provider.js';
 import {AdditionalContextQueryParam, FeedbackFlowElement, FeedbackFlowState} from 'chrome://os-feedback/feedback_flow.js';
@@ -10,6 +10,7 @@ import {FeedbackAppExitPath, FeedbackAppHelpContentOutcome, FeedbackAppPreSubmit
 import {OS_FEEDBACK_TRUSTED_ORIGIN} from 'chrome://os-feedback/help_content.js';
 import {setFeedbackServiceProviderForTesting, setHelpContentProviderForTesting} from 'chrome://os-feedback/mojo_interface_provider.js';
 import {SearchPageElement} from 'chrome://os-feedback/search_page.js';
+import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
 import {getDeepActiveElement} from 'chrome://resources/ash/common/util.js';
 import {PromiseResolver} from 'chrome://resources/js/promise_resolver.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chromeos/chai_assert.js';
@@ -28,7 +29,7 @@ export function FeedbackFlowTestSuite() {
   let feedbackServiceProvider = null;
 
   setup(() => {
-    document.body.innerHTML = '';
+    document.body.innerHTML = trustedTypes.emptyHTML;
     // Create helpContentProvider.
     helpContentProvider = new FakeHelpContentProvider();
     // Setup search response.
@@ -123,6 +124,16 @@ export function FeedbackFlowTestSuite() {
     feedbackServiceProvider = new FakeFeedbackServiceProvider();
     feedbackServiceProvider.setFakeFeedbackContext(
         fakeInternalUserFeedbackContext);
+    setFeedbackServiceProviderForTesting(feedbackServiceProvider);
+  }
+
+  /**
+   * @private
+   */
+  function SetupTestWithoutLinkedCrossDevicePhone() {
+    feedbackServiceProvider = new FakeFeedbackServiceProvider();
+    feedbackServiceProvider.setFakeFeedbackContext(
+        fakeFeedbackContextWithoutLinkedCrossDevicePhone);
     setFeedbackServiceProviderForTesting(feedbackServiceProvider);
   }
 
@@ -424,6 +435,221 @@ export function FeedbackFlowTestSuite() {
         activePage.shadowRoot.querySelector('#bluetoothCheckboxContainer');
     assertTrue(!!bluetoothCheckbox);
     assertFalse(isVisible(bluetoothCheckbox));
+  });
+
+  // Test the "Link Cross Device Dogfood Feedback" checkbox will show up if
+  // logged with internal account and input description is related.
+  test(
+      'ShowLinkCrossDeviceDogfoodFeedbackCheckboxsWithRelatedDescription',
+      async () => {
+        testWithInternalAccount();
+        await initializePage();
+
+        // Check the "Link Cross Device Dogfood Feedback" checkbox component is
+        // hidden when input is not related to cross device.
+        let activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertTrue(!!activePage);
+        assertEquals('searchPage', activePage.id);
+
+        activePage.shadowRoot.querySelector('textarea').value = 'abc';
+        activePage.shadowRoot.querySelector('#buttonContinue').click();
+        await flushTasks();
+
+        loadTimeData.overrideValues(
+            {'enableLinkCrossDeviceDogfoodFeedbackFlag': true});
+
+        activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertEquals('shareDataPage', activePage.id);
+        const linkCrossDeviceDogfoodFeedbackCheckbox =
+            activePage.shadowRoot.querySelector(
+                '#linkCrossDeviceDogfoodFeedbackCheckboxContainer');
+        assertTrue(!!linkCrossDeviceDogfoodFeedbackCheckbox);
+        assertFalse(isVisible(linkCrossDeviceDogfoodFeedbackCheckbox));
+
+        activePage.shadowRoot.querySelector('#buttonBack').click();
+        await flushTasks();
+
+        loadTimeData.overrideValues(
+            {'enableLinkCrossDeviceDogfoodFeedbackFlag': true});
+
+        // Go back to search page and set description input related to cross
+        // device.
+        activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertTrue(!!activePage);
+        assertEquals('searchPage', activePage.id);
+
+        // Testing tetherRegEx
+        let descriptionElement =
+            activePage.shadowRoot.querySelector('textarea');
+        descriptionElement.value = 'hotspot';
+
+        activePage.shadowRoot.querySelector('#buttonContinue').click();
+        await flushTasks();
+
+        activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertTrue(!!activePage);
+        assertEquals('shareDataPage', activePage.id);
+
+        assertTrue(!!linkCrossDeviceDogfoodFeedbackCheckbox);
+        assertTrue(isVisible(linkCrossDeviceDogfoodFeedbackCheckbox));
+
+        activePage.shadowRoot.querySelector('#buttonBack').click();
+        await flushTasks();
+
+        loadTimeData.overrideValues(
+            {'enableLinkCrossDeviceDogfoodFeedbackFlag': true});
+
+        // Go back to search page and set description input related to cross
+        // device.
+        activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertTrue(!!activePage);
+        assertEquals('searchPage', activePage.id);
+
+        // Testing phoneHubRegEx
+        descriptionElement = activePage.shadowRoot.querySelector('textarea');
+        descriptionElement.value = 'appstream';
+
+        activePage.shadowRoot.querySelector('#buttonContinue').click();
+        await flushTasks();
+
+        activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertTrue(!!activePage);
+        assertEquals('shareDataPage', activePage.id);
+
+        assertTrue(!!linkCrossDeviceDogfoodFeedbackCheckbox);
+        assertTrue(isVisible(linkCrossDeviceDogfoodFeedbackCheckbox));
+
+        activePage.shadowRoot.querySelector('#buttonBack').click();
+        await flushTasks();
+
+        loadTimeData.overrideValues(
+            {'enableLinkCrossDeviceDogfoodFeedbackFlag': true});
+
+        // Go back to search page and set description input related to cross
+        // device.
+        activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertTrue(!!activePage);
+        assertEquals('searchPage', activePage.id);
+
+        // Testing phoneHubRegEx variation.
+        descriptionElement = activePage.shadowRoot.querySelector('textarea');
+        descriptionElement.value = 'camera roll';
+
+        activePage.shadowRoot.querySelector('#buttonContinue').click();
+        await flushTasks();
+
+        activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertTrue(!!activePage);
+        assertEquals('shareDataPage', activePage.id);
+
+        assertTrue(!!linkCrossDeviceDogfoodFeedbackCheckbox);
+        assertTrue(isVisible(linkCrossDeviceDogfoodFeedbackCheckbox));
+      });
+
+  // Test the "Link Cross Device Dogfood Feedback" checkbox will not show up if
+  // not logged with an Internal google account.
+  test(
+      'LinkCrossDeviceDogfoodFeedbackHiddenWithoutInternalAccount',
+      async () => {
+        await initializePage();
+
+        // Enable flag.
+        loadTimeData.overrideValues(
+            {'enableLinkCrossDeviceDogfoodFeedbackFlag': true});
+
+        // Set input description related to cross device.
+        let activePage = page.shadowRoot.querySelector('.iron-selected');
+        activePage.shadowRoot.querySelector('textarea').value = 'phone';
+        activePage.shadowRoot.querySelector('#buttonContinue').click();
+        await flushTasks();
+
+        activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertEquals('shareDataPage', activePage.id);
+        const linkCrossDeviceDogfoodFeedbackCheckbox =
+            activePage.shadowRoot.querySelector(
+                '#linkCrossDeviceDogfoodFeedbackCheckboxContainer');
+        assertTrue(!!linkCrossDeviceDogfoodFeedbackCheckbox);
+        assertFalse(isVisible(linkCrossDeviceDogfoodFeedbackCheckbox));
+      });
+
+  // Test the "Link Cross Device Dogfood Feedback" checkbox will not show up if
+  // the ChromeOs device is not linked to a phone.
+  test(
+      'LinkCrossDeviceDogfoodFeedbackHiddenWithoutLinkedCrossDevicePhone',
+      async () => {
+        SetupTestWithoutLinkedCrossDevicePhone();
+
+        await initializePage();
+
+        // Enable flag.
+        loadTimeData.overrideValues(
+            {'enableLinkCrossDeviceDogfoodFeedbackFlag': true});
+
+        // Set input description related to cross device.
+        let activePage = page.shadowRoot.querySelector('.iron-selected');
+
+        activePage.shadowRoot.querySelector('textarea').value = 'phone';
+        activePage.shadowRoot.querySelector('#buttonContinue').click();
+        await flushTasks();
+
+        activePage = page.shadowRoot.querySelector('.iron-selected');
+        assertEquals('shareDataPage', activePage.id);
+        const linkCrossDeviceDogfoodFeedbackCheckbox =
+            activePage.shadowRoot.querySelector(
+                '#linkCrossDeviceDogfoodFeedbackCheckboxContainer');
+        assertTrue(!!linkCrossDeviceDogfoodFeedbackCheckbox);
+        assertFalse(isVisible(linkCrossDeviceDogfoodFeedbackCheckbox));
+      });
+
+  // Test the "Link Cross Device Dogfood Feedback" checkbox will only show up
+  // when 'enableLinkCrossDeviceDogfoodFeedbackFlag' is enabled.
+  test('LinkCrossDeviceDogfoodFeedbackTestingFlag', async () => {
+    testWithInternalAccount();
+    await initializePage();
+
+    // Enable flag and check that the checkbox appears.
+    loadTimeData.overrideValues(
+        {'enableLinkCrossDeviceDogfoodFeedbackFlag': true});
+
+    // Set input description related to cross device.
+    let activePage = page.shadowRoot.querySelector('.iron-selected');
+
+    activePage.shadowRoot.querySelector('textarea').value = 'phone';
+    activePage.shadowRoot.querySelector('#buttonContinue').click();
+    await flushTasks();
+
+    activePage = page.shadowRoot.querySelector('.iron-selected');
+    assertEquals('shareDataPage', activePage.id);
+    const linkCrossDeviceDogfoodFeedbackCheckbox =
+        activePage.shadowRoot.querySelector(
+            '#linkCrossDeviceDogfoodFeedbackCheckboxContainer');
+    assertTrue(!!linkCrossDeviceDogfoodFeedbackCheckbox);
+    assertTrue(isVisible(linkCrossDeviceDogfoodFeedbackCheckbox));
+
+    activePage.shadowRoot.querySelector('#buttonBack').click();
+    await flushTasks();
+
+    // Go back to search page and set description input related to cross device.
+    activePage = page.shadowRoot.querySelector('.iron-selected');
+    assertTrue(!!activePage);
+    assertEquals('searchPage', activePage.id);
+
+    const descriptionElement = activePage.shadowRoot.querySelector('textarea');
+    descriptionElement.value = 'phone';
+
+    // Disable flag and check that the checkbox doesn't appear.
+    loadTimeData.overrideValues(
+        {'enableLinkCrossDeviceDogfoodFeedbackFlag': false});
+
+    activePage.shadowRoot.querySelector('#buttonContinue').click();
+    await flushTasks();
+
+    activePage = page.shadowRoot.querySelector('.iron-selected');
+    assertTrue(!!activePage);
+    assertEquals('shareDataPage', activePage.id);
+
+    assertTrue(!!linkCrossDeviceDogfoodFeedbackCheckbox);
+    assertFalse(isVisible(linkCrossDeviceDogfoodFeedbackCheckbox));
   });
 
   // Test the assistant logs will show up if logged with internal account and
@@ -911,4 +1137,158 @@ export function FeedbackFlowTestSuite() {
     verifyHelpContentOutcomeMetricCalled(
         true, FeedbackAppHelpContentOutcome.kContinueNoHelpContentDisplayed);
   });
+
+  test(
+      'UpdatesCSSUrlBasedOnIsJellyEnabledForOsFeedback_TrustedUi', async () => {
+        // Setup test for jelly disabled.
+        loadTimeData.overrideValues({
+          isJellyEnabledForOsFeedback: false,
+        });
+        /*@type {HTMLLinkElement}*/
+        const link = document.createElement('link');
+        const disabledUrl =
+            'chrome://resources/chromeos/colors/cros_styles.css';
+        link.href = disabledUrl;
+        document.head.appendChild(link);
+        await initializePage();
+
+        assertTrue(link.href.includes(disabledUrl));
+
+        // Reset app element.
+        document.body.innerHTML = trustedTypes.emptyHTML;
+        page.remove();
+        page = null;
+
+        // Setup test for jelly enabled.
+        loadTimeData.overrideValues({
+          isJellyEnabledForOsFeedback: true,
+        });
+        await initializePage();
+
+        const enabledUrl = 'theme/colors.css';
+        assertTrue(link.href.includes(enabledUrl));
+
+        // Clean up test specific element.
+        document.head.removeChild(link);
+      });
+
+  // Test that test helper message is triggered on untrusted UI when
+  // `isJellyEnabledForOsFeedback` is true.
+  test(
+      'UpdatesCSSUrlBasedOnIsJellyEnabledForOsFeedback_UntrustedUi',
+      async () => {
+        // `isJellyEnabledForOsFeedback` is true by default based on test flag
+        // configuration.
+        assertTrue(loadTimeData.getBoolean('isJellyEnabledForOsFeedback'));
+
+        const resolver = new PromiseResolver();
+        let colorChangeUpdaterCalled = false;
+        const testMessageListener = (event) => {
+          if (event.data.id === 'color-change-updater-started-for-testing') {
+            colorChangeUpdaterCalled = true;
+            resolver.resolve();
+          }
+        };
+        window.addEventListener('message', testMessageListener);
+
+        await initializePage();
+        await resolver.promise;
+
+        assertTrue(colorChangeUpdaterCalled);
+
+        window.removeEventListener('message', testMessageListener);
+      });
+
+  // Test that when dialog args is present, it will be used to populate the
+  // feedback context.
+  test('Create_feedback_context_from_dialogArguments_if_present', async () => {
+    // Save the original chrome.getVariableValue function.
+    const chromeGetVariableValue = chrome.getVariableValue;
+    // Mock the chrome.getVariableValue to return dialogArguments.
+    const mockChromeGetVariableValue = (message) => {
+      if (message === 'dialogArguments') {
+        return '{' +
+            '"autofillMetadata":{"fake key1": "fake value1"},' +
+            '"categoryTag":"Login",' +
+            '"description":"fake description",' +
+            '"descriptionPlaceholder":"fake description placeholder",' +
+            '"fromAssistant": true, ' +
+            '"fromAutofill": true, ' +
+            '"pageUrl":"chrome://flags/",' +
+            '"systemInformation":[' +
+            '  {' +
+            '    "key": "EXTRA_DIAGNOSTICS",' +
+            '    "value": "fake extra log data"' +
+            '  }' +
+            ']' +
+            '}';
+      }
+      return '{}';
+    };
+    chrome.getVariableValue = mockChromeGetVariableValue;
+
+    await initializePage();
+
+    const feedbackContext = getFeedbackContext_();
+    assertEquals('Login', feedbackContext.categoryTag);
+    assertEquals('fake extra log data', feedbackContext.extraDiagnostics);
+    assertEquals('chrome://flags/', feedbackContext.pageUrl.url);
+    assertEquals(
+        '{"fake key1":"fake value1"}', feedbackContext.autofillMetadata);
+    assertTrue(feedbackContext.fromAssistant);
+    assertTrue(feedbackContext.fromAutofill);
+
+    assertEquals('fake description', page.getDescriptionTemplateForTesting());
+    assertEquals(
+        'fake description placeholder',
+        page.getDescriptionPlaceholderTextForTesting());
+
+    // Restore chrome.getVariableValue.
+    chrome.getVariableValue = chromeGetVariableValue;
+    // Verify that the getFeedbackContext is not called.
+    assertEquals(0, feedbackServiceProvider.getFeedbackContextCallCount());
+  });
+
+  // Test that when dialog args is present, it will be used to populate the
+  // feedback context. Most info are empty or with default values.
+  test(
+      'Create_feedback_context_from_dialogArguments_if_present_empty',
+      async () => {
+        // Save the original chrome.getVariableValue function.
+        const chromeGetVariableValue = chrome.getVariableValue;
+        // Mock the chrome.getVariableValue to return dialogArguments.
+        const mockChromeGetVariableValue = (message) => {
+          if (message === 'dialogArguments') {
+            return '{' +
+                '"autofillMetadata":{},' +
+                '"categoryTag":"",' +
+                '"fromAssistant": false, ' +
+                '"fromAutofill": false, ' +
+                '"pageUrl":"",' +
+                '"systemInformation":[]' +
+                '}';
+          }
+          return '{}';
+        };
+        chrome.getVariableValue = mockChromeGetVariableValue;
+
+        await initializePage();
+
+        const feedbackContext = getFeedbackContext_();
+        assertTrue(!feedbackContext.categoryTag);
+        assertTrue(!feedbackContext.extraDiagnostics);
+        assertTrue(!feedbackContext.pageUrl.url);
+        assertEquals('{}', feedbackContext.autofillMetadata);
+        assertFalse(feedbackContext.fromAssistant);
+        assertFalse(feedbackContext.fromAutofill);
+
+        assertTrue(!page.getDescriptionTemplateForTesting());
+        assertTrue(!page.getDescriptionPlaceholderTextForTesting());
+
+        // Restore chrome.getVariableValue.
+        chrome.getVariableValue = chromeGetVariableValue;
+
+        // Verify that the getFeedbackContext is not called.
+        assertEquals(0, feedbackServiceProvider.getFeedbackContextCallCount());
+      });
 }

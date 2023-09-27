@@ -26,7 +26,12 @@ class MediaRouterUiForTestBase {
  public:
   virtual void SetUp() = 0;
 
-  // Cleans up after a test.
+  // Destruction of the test helper happens in two phases: the user of this
+  // helper must first call `TearDown()` before destroying it. `TearDown()`
+  // itself needs to call virtual functions, so that logic cannot live in the
+  // destructor itself: by the time the destructor of this base class runs, the
+  // virtual methods will not work as expected, because the derived class's
+  // destructor will have already completed.
   void TearDown();
 
   virtual void ShowDialog() = 0;
@@ -39,8 +44,8 @@ class MediaRouterUiForTestBase {
 
   // These methods require that the dialog is shown and the specified sink is
   // shown in the dialog.
-  void StartCasting(const std::string& sink_name);
-  void StopCasting(const std::string& sink_name);
+  virtual void StartCasting(const std::string& sink_name) = 0;
+  virtual void StopCasting(const std::string& sink_name) = 0;
 
   // Waits until a condition is met. Requires that the dialog is shown.
   virtual void WaitForSink(const std::string& sink_name) = 0;
@@ -64,6 +69,8 @@ class MediaRouterUiForTestBase {
 
   content::WebContents* web_contents() const { return web_contents_; }
 
+  virtual ~MediaRouterUiForTestBase();
+
  protected:
   enum class WatchType {
     kNone,
@@ -76,15 +83,9 @@ class MediaRouterUiForTestBase {
   };
 
   explicit MediaRouterUiForTestBase(content::WebContents* web_contents);
-  virtual ~MediaRouterUiForTestBase();
   void WaitForAnyDialogShown();
 
-  void StartCasting(views::View* sink_button);
-  void StopCasting(views::View* sink_button);
-
-  static CastDialogSinkButton* GetSinkButtonWithName(
-      const std::vector<CastDialogSinkButton*>& sink_buttons,
-      const std::string& sink_name);
+  static void ClickOnView(views::View* view);
 
   virtual views::View* GetSinkButton(const std::string& sink_name) const = 0;
 
@@ -101,6 +102,8 @@ class MediaRouterUiForTestBase {
   WatchType watch_type_ = WatchType::kNone;
   absl::optional<base::OnceClosure> watch_callback_;
   base::test::ScopedFeatureList feature_list_;
+  bool torn_down_ = false;
+
   base::WeakPtrFactory<MediaRouterUiForTestBase> weak_factory_{this};
 };
 

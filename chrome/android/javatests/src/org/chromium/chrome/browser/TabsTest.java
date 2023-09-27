@@ -17,7 +17,6 @@ import static org.chromium.ui.test.util.ViewUtils.onViewWaiting;
 import android.content.pm.ActivityInfo;
 import android.graphics.Point;
 import android.os.SystemClock;
-import android.support.test.InstrumentationRegistry;
 import android.util.DisplayMetrics;
 import android.view.View;
 
@@ -25,6 +24,7 @@ import androidx.test.espresso.Espresso;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
 import org.junit.After;
@@ -48,7 +48,6 @@ import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Manual;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.base.test.util.UrlUtils;
-import org.chromium.chrome.R;
 import org.chromium.chrome.browser.compositor.layouts.Layout;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerChrome;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerImpl;
@@ -72,6 +71,7 @@ import org.chromium.chrome.browser.tabpersistence.TabStateDirectory;
 import org.chromium.chrome.browser.tabpersistence.TabStateFileManager;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
+import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.MenuUtils;
@@ -124,9 +124,6 @@ public class TabsTest {
     private float mTabsViewWidthDp;
 
     private boolean mNotifyChangedCalled;
-
-    private static final int SWIPE_TO_RIGHT_DIRECTION = 1;
-    private static final int SWIPE_TO_LEFT_DIRECTION = -1;
 
     private static final long WAIT_RESIZE_TIMEOUT_MS = 3000;
 
@@ -241,46 +238,41 @@ public class TabsTest {
     @LargeTest
     @Feature({"Android-TabSwitcher"})
     @Restriction(UiRestriction.RESTRICTION_TYPE_PHONE)
-    @DisabledTest(message = "https://crbug.com/1347598")
     public void testOpenAndCloseNewTabButton() {
         sActivityTestRule.loadUrl(getUrl(TEST_FILE_PATH));
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
-            String title =
-                    sActivityTestRule.getActivity().getCurrentTabModel().getTabAt(0).getTitle();
-            Assert.assertEquals("Data file for TabsTest", title);
-        });
-        final int tabCount = sActivityTestRule.getActivity().getCurrentTabModel().getCount();
-        View tabSwitcherButton =
-                sActivityTestRule.getActivity().findViewById(R.id.tab_switcher_button);
-        Assert.assertNotNull("'tab_switcher_button' view is not found", tabSwitcherButton);
-        TouchCommon.singleClickView(tabSwitcherButton);
+        Tab tab0 = TestThreadUtils.runOnUiThreadBlockingNoException(
+                () -> { return sActivityTestRule.getActivity().getCurrentTabModel().getTabAt(0); });
+        Assert.assertEquals("Data file for TabsTest", ChromeTabUtils.getTitleOnUiThread(tab0));
+        final int originalTabCount = TestThreadUtils.runOnUiThreadBlockingNoException(
+                () -> { return sActivityTestRule.getActivity().getCurrentTabModel().getCount(); });
+        onViewWaiting(withId(R.id.tab_switcher_button))
+                .check(matches(isDisplayed()))
+                .perform(click());
         LayoutTestUtils.waitForLayout(
                 sActivityTestRule.getActivity().getLayoutManager(), LayoutType.TAB_SWITCHER);
 
-        View newTabButton = sActivityTestRule.getActivity().findViewById(R.id.new_tab_button);
-        Assert.assertNotNull("'new_tab_button' view is not found", newTabButton);
-        TouchCommon.singleClickView(newTabButton);
+        onViewWaiting(withId(R.id.new_tab_view)).check(matches(isDisplayed())).perform(click());
         LayoutTestUtils.waitForLayout(
                 sActivityTestRule.getActivity().getLayoutManager(), LayoutType.BROWSING);
 
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(
-                ()
-                        -> Assert.assertEquals("The tab count is wrong", tabCount + 1,
-                                sActivityTestRule.getActivity().getCurrentTabModel().getCount()));
+        int currentTabCount = TestThreadUtils.runOnUiThreadBlockingNoException(
+                () -> { return sActivityTestRule.getActivity().getCurrentTabModel().getCount(); });
+        Assert.assertEquals(
+                "The tab count should increase by one", originalTabCount + 1, currentTabCount);
 
         CriteriaHelper.pollUiThread(() -> {
-            Tab tab = sActivityTestRule.getActivity().getCurrentTabModel().getTabAt(1);
-            String title = tab.getTitle().toLowerCase(Locale.US);
+            Tab tab1 = sActivityTestRule.getActivity().getCurrentTabModel().getTabAt(1);
+            String title = tab1.getTitle().toLowerCase(Locale.US);
             String expectedTitle = "new tab";
             Criteria.checkThat(title, Matchers.startsWith(expectedTitle));
         });
 
         ChromeTabUtils.closeCurrentTab(
                 InstrumentationRegistry.getInstrumentation(), sActivityTestRule.getActivity());
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(
-                ()
-                        -> Assert.assertEquals(tabCount,
-                                sActivityTestRule.getActivity().getCurrentTabModel().getCount()));
+        currentTabCount = TestThreadUtils.runOnUiThreadBlockingNoException(
+                () -> { return sActivityTestRule.getActivity().getCurrentTabModel().getCount(); });
+        Assert.assertEquals(
+                "The tab count should be same as original", originalTabCount, currentTabCount);
     }
 
     private void assertWaitForKeyboardStatus(final boolean show) {
@@ -890,7 +882,6 @@ public class TabsTest {
     @Test
     @MediumTest
     @Feature({"Android-TabSwitcher"})
-    @DisabledTest(message = "https://crbug.com/1424109")
     public void testLastClosedUndoableTabGetsHidden() {
         final TabModel model =
                 sActivityTestRule.getActivity().getTabModelSelector().getCurrentModel();

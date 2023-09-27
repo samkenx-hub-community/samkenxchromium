@@ -4,10 +4,11 @@
 
 package org.chromium.chrome.browser.autofill;
 
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import android.app.Activity;
 import android.view.View;
@@ -32,16 +33,17 @@ import org.robolectric.annotation.Config;
 import org.chromium.base.Callback;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.JniMocker;
-import org.chromium.chrome.browser.autofill.PersonalDataManager.AutofillProfile;
-import org.chromium.chrome.browser.autofill.settings.AddressEditor;
-import org.chromium.chrome.browser.autofill.settings.AutofillProfileBridge;
-import org.chromium.chrome.browser.autofill.settings.AutofillProfileBridgeJni;
+import org.chromium.chrome.browser.autofill.editors.AddressEditorCoordinator;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.payments.AutofillAddress;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
+import org.chromium.chrome.browser.sync.SyncServiceFactory;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
+import org.chromium.components.autofill.AutofillProfile;
+import org.chromium.components.signin.identitymanager.IdentityManager;
+import org.chromium.components.sync.SyncService;
 import org.chromium.ui.base.TestActivity;
 import org.chromium.ui.modaldialog.ModalDialogManager.ModalDialogType;
 import org.chromium.ui.modaldialog.ModalDialogProperties;
@@ -51,9 +53,11 @@ import org.chromium.ui.test.util.modaldialog.FakeModalDialogManager;
 /** Unit tests for {@link SaveUpdateAddressProfilePrompt}. */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-@EnableFeatures({ChromeFeatureList.AUTOFILL_ADDRESS_PROFILE_SAVE_PROMPT_NICKNAME_SUPPORT})
+@EnableFeatures({ChromeFeatureList.AUTOFILL_ADDRESS_PROFILE_SAVE_PROMPT_NICKNAME_SUPPORT,
+        ChromeFeatureList.AUTOFILL_ENABLE_SUPPORT_FOR_HONORIFIC_PREFIXES})
 public class SaveUpdateAddressProfilePromptTest {
     private static final long NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER = 100L;
+    private static final boolean NO_MIGRATION = false;
     @Rule
     public TestRule mProcessor = new Features.JUnitProcessor();
     @Rule
@@ -64,9 +68,17 @@ public class SaveUpdateAddressProfilePromptTest {
     @Mock
     private AutofillProfileBridge.Natives mAutofillProfileBridgeJni;
     @Mock
+    private PersonalDataManager mPersonalDataManager;
+    @Mock
     private Profile mProfile;
     @Mock
-    private AddressEditor mAddressEditor;
+    private AddressEditorCoordinator mAddressEditor;
+    @Mock
+    private IdentityServicesProvider mIdentityServicesProvider;
+    @Mock
+    private IdentityManager mIdentityManager;
+    @Mock
+    private SyncService mSyncService;
 
     @Captor
     private ArgumentCaptor<Callback<AutofillAddress>> mCallbackCaptor;
@@ -79,6 +91,11 @@ public class SaveUpdateAddressProfilePromptTest {
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
+        PersonalDataManager.setInstanceForTesting(mPersonalDataManager);
+        when(mPersonalDataManager.getDefaultCountryCodeForNewAddress()).thenReturn("US");
+        SyncServiceFactory.setInstanceForTesting(mSyncService);
+        IdentityServicesProvider.setInstanceForTests(mIdentityServicesProvider);
+        when(mIdentityServicesProvider.getIdentityManager(any())).thenReturn(mIdentityManager);
 
         mActivity = Robolectric.setupActivity(TestActivity.class);
 
@@ -90,10 +107,14 @@ public class SaveUpdateAddressProfilePromptTest {
     }
 
     private void createAndShowPrompt(boolean isUpdate) {
-        AutofillProfile dummyProfile = new AutofillProfile();
+        createAndShowPrompt(isUpdate, NO_MIGRATION);
+    }
+
+    private void createAndShowPrompt(boolean isUpdate, boolean isMigrationToAccount) {
+        AutofillProfile dummyProfile = AutofillProfile.builder().build();
         mModalDialogManager = new FakeModalDialogManager(ModalDialogType.APP);
         mPrompt = new SaveUpdateAddressProfilePrompt(mPromptController, mModalDialogManager,
-                mActivity, mProfile, dummyProfile, isUpdate);
+                mActivity, mProfile, dummyProfile, isUpdate, isMigrationToAccount);
         mPrompt.setAddressEditorForTesting(mAddressEditor);
         mPrompt.show();
     }
@@ -118,11 +139,9 @@ public class SaveUpdateAddressProfilePromptTest {
         mModalDialogManager.clickPositiveButton();
         Assert.assertNull(mModalDialogManager.getShownDialogModel());
         verify(mPromptControllerJni, times(1))
-                .onUserAccepted(
-                        eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), anyObject());
+                .onUserAccepted(eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), any());
         verify(mPromptControllerJni, times(1))
-                .onPromptDismissed(
-                        eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), anyObject());
+                .onPromptDismissed(eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), any());
     }
 
     @Test
@@ -134,11 +153,9 @@ public class SaveUpdateAddressProfilePromptTest {
         mModalDialogManager.clickNegativeButton();
         Assert.assertNull(mModalDialogManager.getShownDialogModel());
         verify(mPromptControllerJni, times(1))
-                .onUserDeclined(
-                        eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), anyObject());
+                .onUserDeclined(eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), any());
         verify(mPromptControllerJni, times(1))
-                .onPromptDismissed(
-                        eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), anyObject());
+                .onPromptDismissed(eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), any());
     }
 
     @Test
@@ -151,8 +168,7 @@ public class SaveUpdateAddressProfilePromptTest {
         Assert.assertNull(mModalDialogManager.getShownDialogModel());
         // Check that callback was still called when the dialog is dismissed.
         verify(mPromptControllerJni, times(1))
-                .onPromptDismissed(
-                        eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), anyObject());
+                .onPromptDismissed(eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), any());
     }
 
     @Test
@@ -160,7 +176,6 @@ public class SaveUpdateAddressProfilePromptTest {
     public void dialogStrings() {
         createAndShowPrompt(false);
 
-        View dialog = mPrompt.getDialogViewForTesting();
         PropertyModel propertyModel = mModalDialogManager.getShownDialogModel();
 
         mPrompt.setDialogDetails("title", "positive button text", "negative button text");
@@ -169,10 +184,29 @@ public class SaveUpdateAddressProfilePromptTest {
                 propertyModel.get(ModalDialogProperties.POSITIVE_BUTTON_TEXT));
         Assert.assertEquals("negative button text",
                 propertyModel.get(ModalDialogProperties.NEGATIVE_BUTTON_TEXT));
+    }
+
+    @Test
+    @SmallTest
+    public void dialogStrings_SourceNotice() {
+        createAndShowPrompt(false, true);
+        View dialog = mPrompt.getDialogViewForTesting();
+
+        mPrompt.setSourceNotice(null);
+        Assert.assertEquals(View.GONE,
+                dialog.findViewById(R.id.autofill_address_profile_prompt_source_notice)
+                        .getVisibility());
+
+        mPrompt.setSourceNotice("");
+        Assert.assertEquals(View.GONE,
+                dialog.findViewById(R.id.autofill_address_profile_prompt_source_notice)
+                        .getVisibility());
 
         mPrompt.setSourceNotice("source notice");
-        validateTextView(
-                dialog.findViewById(R.id.autofill_save_update_address_profile_prompt_footer),
+        Assert.assertEquals(View.VISIBLE,
+                dialog.findViewById(R.id.autofill_address_profile_prompt_source_notice)
+                        .getVisibility());
+        validateTextView(dialog.findViewById(R.id.autofill_address_profile_prompt_source_notice),
                 "source notice");
     }
 
@@ -183,7 +217,7 @@ public class SaveUpdateAddressProfilePromptTest {
 
         View dialog = mPrompt.getDialogViewForTesting();
 
-        mPrompt.setSaveDetails("address", "email", "phone");
+        mPrompt.setSaveOrMigrateDetails("address", "email", "phone");
         validateTextView(dialog.findViewById(R.id.address), "address");
         validateTextView(dialog.findViewById(R.id.email), "email");
         validateTextView(dialog.findViewById(R.id.phone), "phone");
@@ -223,7 +257,7 @@ public class SaveUpdateAddressProfilePromptTest {
 
     @Test
     @SmallTest
-    @DisableFeatures({ChromeFeatureList.AUTOFILL_ADDRESS_PROFILE_SAVE_PROMPT_NICKNAME_SUPPORT})
+    @DisableFeatures(ChromeFeatureList.AUTOFILL_ADDRESS_PROFILE_SAVE_PROMPT_NICKNAME_SUPPORT)
     public void setupAddressNickname_FeatureDisabled() {
         createAndShowPrompt(false);
 
@@ -274,13 +308,6 @@ public class SaveUpdateAddressProfilePromptTest {
         View dialog = mPrompt.getDialogViewForTesting();
         ImageButton editButton = dialog.findViewById(R.id.edit_button);
         editButton.performClick();
-        verify(mAddressEditor).edit(anyObject(), mCallbackCaptor.capture(), anyObject());
-
-        AutofillAddress autofillAddress = new AutofillAddress(mActivity, new AutofillProfile());
-        mCallbackCaptor.getValue().onResult(autofillAddress);
-        Assert.assertNull(mModalDialogManager.getShownDialogModel());
-        verify(mPromptControllerJni, times(1))
-                .onPromptDismissed(
-                        eq(NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER), anyObject());
+        verify(mAddressEditor).showEditorDialog();
     }
 }

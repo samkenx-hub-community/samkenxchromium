@@ -109,6 +109,7 @@ void RequestSender::SendInternal() {
                        base::Unretained(this),
                        static_cast<int>(ProtocolError::URL_FETCHER_FAILED),
                        std::string(), std::string(), std::string(), 0));
+    return;
   }
   network_fetcher_->PostRequest(
       url, request_body_, kContentType, request_extra_headers_,
@@ -125,6 +126,7 @@ void RequestSender::SendInternalComplete(
     const std::string& response_cup_server_proof,
     int retry_after_sec) {
   VLOG(2) << "Omaha response received: " << response_body;
+  VLOG_IF(2, error) << "Omaha send error: " << error;
 
   if (!error) {
     if (!use_signing_) {
@@ -159,12 +161,11 @@ void RequestSender::SendInternalComplete(
     return;
   }
 
-  VLOG(2) << "Omaha send error: " << response_body;
   HandleSendError(error, retry_after_sec);
 }
 
 void RequestSender::OnResponseStarted(int response_code,
-                                      int64_t content_length) {
+                                      int64_t /*content_length*/) {
   response_code_ = response_code;
 }
 

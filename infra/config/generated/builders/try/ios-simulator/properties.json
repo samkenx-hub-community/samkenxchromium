@@ -55,7 +55,8 @@
     "use_clang_coverage": true
   },
   "$build/flakiness": {
-    "check_for_flakiness": true
+    "check_for_flakiness": true,
+    "check_for_flakiness_with_resultdb": true
   },
   "$recipe_engine/resultdb/test_presentation": {
     "column_keys": [],
@@ -65,5 +66,6 @@
     ]
   },
   "builder_group": "tryserver.chromium.mac",
+  "cq": "required",
   "recipe": "chromium/orchestrator"
 }

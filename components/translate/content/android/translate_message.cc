@@ -15,6 +15,7 @@
 #include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
 #include "base/containers/contains.h"
+#include "base/debug/dump_without_crashing.h"
 #include "base/logging.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_macros.h"
@@ -123,9 +124,12 @@ void RecordCompactInfobarEvent(InfobarEvent event) {
 
 }  // namespace
 
+// Features
 BASE_FEATURE(kTranslateMessageUI,
              "TranslateMessageUI",
              base::FEATURE_DISABLED_BY_DEFAULT);
+// Params
+const char kTranslateMessageUISnackbarParam[] = "use_snackbar";
 
 TranslateMessage::Bridge::~Bridge() = default;
 
@@ -312,6 +316,11 @@ void TranslateMessage::HandlePrimaryAction(JNIEnv* env) {
       ui_delegate_->Translate();
       break;
 
+    case State::kTranslating:
+      // Should not happen, but per https://crbug.com/1409304 it may, so add
+      // logging.
+      base::debug::DumpWithoutCrashing();
+      break;
     case State::kAfterTranslateWithAutoAlwaysConfirmation:
       // The user clicked "Undo" on a translated page when the
       // auto-always-translate confirmation message was showing, so turn off
@@ -336,7 +345,11 @@ void TranslateMessage::HandlePrimaryAction(JNIEnv* env) {
       ui_delegate_->SetLanguageBlocked(false);
       bridge_->Dismiss(env);
       break;
-
+    case State::kDismissed:
+      // Should not happen, but per https://crbug.com/1409304 it may, so add
+      // logging.
+      base::debug::DumpWithoutCrashing();
+      break;
     default:
       NOTREACHED();
       break;
@@ -383,10 +396,9 @@ void TranslateMessage::HandleDismiss(JNIEnv* env, jint dismiss_reason) {
             messages::DismissReason::GESTURE &&
         ui_delegate_->ShouldAutoNeverTranslate();
 
-    if (static_cast<messages::DismissReason>(dismiss_reason) ==
-        messages::DismissReason::GESTURE) {
-      ui_delegate_->TranslationDeclined(true);
-    }
+    ui_delegate_->TranslationDeclined(
+        static_cast<messages::DismissReason>(dismiss_reason) ==
+        messages::DismissReason::GESTURE);
 
     if (should_auto_never_translate) {
       RecordCompactInfobarEvent(
@@ -591,8 +603,6 @@ TranslateMessage::HandleSecondaryMenuItemClicked(
     }
 
     case OverflowMenuItemId::kToggleAlwaysTranslateLanguage:
-      ui_delegate_->ReportUIInteraction(
-          UIInteraction::kAlwaysTranslateLanguage);
       if (ui_delegate_->ShouldAlwaysTranslate() != desired_toggle_value) {
         RecordCompactInfobarEvent(
             desired_toggle_value ? InfobarEvent::INFOBAR_ALWAYS_TRANSLATE
@@ -605,7 +615,6 @@ TranslateMessage::HandleSecondaryMenuItemClicked(
       break;
 
     case OverflowMenuItemId::kToggleNeverTranslateLanguage:
-      ui_delegate_->ReportUIInteraction(UIInteraction::kNeverTranslateLanguage);
       if (ui_delegate_->IsLanguageBlocked() != desired_toggle_value) {
         RecordCompactInfobarEvent(
             desired_toggle_value ? InfobarEvent::INFOBAR_NEVER_TRANSLATE
@@ -621,7 +630,6 @@ TranslateMessage::HandleSecondaryMenuItemClicked(
       break;
 
     case OverflowMenuItemId::kToggleNeverTranslateSite:
-      ui_delegate_->ReportUIInteraction(UIInteraction::kNeverTranslateSite);
       if (ui_delegate_->IsSiteOnNeverPromptList() != desired_toggle_value) {
         RecordCompactInfobarEvent(
             desired_toggle_value

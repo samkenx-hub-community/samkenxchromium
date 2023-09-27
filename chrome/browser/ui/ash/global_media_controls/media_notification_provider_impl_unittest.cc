@@ -7,8 +7,15 @@
 
 #include "ash/system/media/media_notification_provider_observer.h"
 #include "ash/test_shell_delegate.h"
+#include "base/memory/raw_ptr.h"
+#include "base/run_loop.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/unguessable_token.h"
+#include "chrome/browser/ash/crosapi/crosapi_ash.h"
+#include "chrome/browser/ash/crosapi/crosapi_manager.h"
+#include "chrome/browser/ash/crosapi/media_ui_ash.h"
+#include "chrome/browser/ash/crosapi/test_crosapi_environment.h"
+#include "chrome/browser/media/router/discovery/mdns/dns_sd_registry.h"
 #include "chrome/browser/media/router/media_router_feature.h"
 #include "chrome/browser/ui/global_media_controls/cast_media_notification_item.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
@@ -17,11 +24,15 @@
 #include "components/global_media_controls/public/constants.h"
 #include "components/global_media_controls/public/media_item_manager.h"
 #include "components/global_media_controls/public/media_session_item_producer.h"
+#include "components/global_media_controls/public/mojom/device_service.mojom.h"
+#include "components/global_media_controls/public/test/mock_device_service.h"
 #include "components/global_media_controls/public/views/media_item_ui_footer.h"
 #include "components/global_media_controls/public/views/media_item_ui_list_view.h"
 #include "components/global_media_controls/public/views/media_item_ui_view.h"
+#include "components/media_message_center/mock_media_notification_item.h"
 #include "components/media_message_center/notification_theme.h"
 #include "components/media_router/common/media_route.h"
+#include "content/public/test/browser_task_environment.h"
 #include "services/media_session/public/cpp/media_session_service.h"
 #include "services/media_session/public/mojom/audio_focus.mojom.h"
 #include "services/media_session/public/mojom/media_session.mojom.h"
@@ -32,6 +43,10 @@
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view.h"
 
+using global_media_controls::mojom::DeviceListClient;
+using global_media_controls::mojom::DeviceListHost;
+using global_media_controls::mojom::DevicePickerProvider;
+using global_media_controls::test::MockDeviceService;
 using media_session::mojom::AudioFocusRequestState;
 using media_session::mojom::AudioFocusRequestStatePtr;
 using media_session::mojom::MediaSessionInfo;
@@ -49,16 +64,14 @@ class MockCastMediaNotificationItem : public CastMediaNotificationItem {
       Profile* profile)
       : CastMediaNotificationItem(route, item_manager, nullptr, profile) {}
 
-  MOCK_METHOD(void,
-              StopCasting,
-              (global_media_controls::GlobalMediaControlsEntryPoint));
+  MOCK_METHOD(void, StopCasting, ());
 };
 
 class MockMediaNotificationProviderObserver
     : public MediaNotificationProviderObserver {
  public:
-  MOCK_METHOD0(OnNotificationListChanged, void());
-  MOCK_METHOD0(OnNotificationListViewSizeChanged, void());
+  MOCK_METHOD(void, OnNotificationListChanged, ());
+  MOCK_METHOD(void, OnNotificationListViewSizeChanged, ());
 };
 
 class FakeMediaSessionService : public media_session::MediaSessionService {
@@ -99,18 +112,35 @@ class MediaTestShellDelegate : public TestShellDelegate {
   FakeMediaSessionService media_session_service_;
 };
 
+class TestMediaNotificationItem
+    : public media_message_center::test::MockMediaNotificationItem {
+ public:
+  absl::optional<base::UnguessableToken> GetSourceId() const override {
+    return source_id_;
+  }
+
+ private:
+  const base::UnguessableToken source_id_{base::UnguessableToken::Create()};
+};
+
 }  // namespace
 
 class MediaNotificationProviderImplTest : public ChromeAshTestBase {
  protected:
-  MediaNotificationProviderImplTest() = default;
+  MediaNotificationProviderImplTest()
+      : ChromeAshTestBase(std::make_unique<content::BrowserTaskEnvironment>(
+            content::BrowserTaskEnvironment::REAL_IO_THREAD)) {}
   ~MediaNotificationProviderImplTest() override = default;
 
   void SetUp() override {
-    AshTestBase::SetUp(std::make_unique<MediaTestShellDelegate>());
+    auto shell_delegate = std::make_unique<MediaTestShellDelegate>();
+    shell_delegate_ = shell_delegate.get();
+    ChromeAshTestBase::SetUp(std::move(shell_delegate));
 
+    crosapi_environment_.SetUp();
     provider_ = static_cast<MediaNotificationProviderImpl*>(
         MediaNotificationProvider::Get());
+    provider_->SetColorTheme(media_message_center::NotificationTheme());
     observer_ = std::make_unique<MockMediaNotificationProviderObserver>();
     provider_->AddObserver(observer_.get());
     layout_provider_ = std::make_unique<ChromeLayoutProvider>();
@@ -118,6 +148,7 @@ class MediaNotificationProviderImplTest : public ChromeAshTestBase {
 
   void TearDown() override {
     observer_.reset();
+    crosapi_environment_.TearDown();
     AshTestBase::TearDown();
   }
 
@@ -140,9 +171,28 @@ class MediaNotificationProviderImplTest : public ChromeAshTestBase {
         id.ToString());
   }
 
+  void SimulateRefreshNotification(base::UnguessableToken id) {
+    provider_->media_session_item_producer_for_testing()->RefreshItem(
+        id.ToString());
+  }
+
+  std::unique_ptr<global_media_controls::MediaItemUIListView>
+  CreateNotificationListView() {
+    auto view = provider_->GetMediaNotificationListView(
+        1, /*should_clip_height=*/true, /*item_id=*/"",
+        /*show_devices_for_item_id=*/"");
+    return base::WrapUnique(
+        static_cast<global_media_controls::MediaItemUIListView*>(
+            view.release()));
+  }
+
   std::unique_ptr<ChromeLayoutProvider> layout_provider_;
   std::unique_ptr<MockMediaNotificationProviderObserver> observer_;
-  MediaNotificationProviderImpl* provider_;
+  raw_ptr<MediaNotificationProviderImpl, DanglingUntriaged | ExperimentalAsh>
+      provider_ = nullptr;
+  raw_ptr<MediaTestShellDelegate, DanglingUntriaged | ExperimentalAsh>
+      shell_delegate_ = nullptr;
+  crosapi::TestCrosapiEnvironment crosapi_environment_;
 };
 
 TEST_F(MediaNotificationProviderImplTest, NotificationListTest) {
@@ -152,12 +202,7 @@ TEST_F(MediaNotificationProviderImplTest, NotificationListTest) {
   EXPECT_CALL(*observer_, OnNotificationListViewSizeChanged).Times(2);
   SimulateShowNotification(id_1);
   SimulateShowNotification(id_2);
-  provider_->SetColorTheme(media_message_center::NotificationTheme());
-  std::unique_ptr<views::View> view =
-      provider_->GetMediaNotificationListView(1, /*should_clip_height=*/true);
-
-  auto* notification_list_view =
-      static_cast<global_media_controls::MediaItemUIListView*>(view.get());
+  auto notification_list_view = CreateNotificationListView();
   EXPECT_EQ(notification_list_view->items_for_testing().size(), 2u);
 
   EXPECT_CALL(*observer_, OnNotificationListViewSizeChanged);
@@ -187,17 +232,27 @@ TEST_F(MediaNotificationProviderImplTest, DontUseDeletedListView) {
   // Simulate a media session item.
   auto id = base::UnguessableToken::Create();
   SimulateShowNotification(id);
-  provider_->SetColorTheme(media_message_center::NotificationTheme());
 
   // Create a list view with that item.
-  std::unique_ptr<views::View> view =
-      provider_->GetMediaNotificationListView(1, /*should_clip_height=*/true);
+  auto notification_list_view = CreateNotificationListView();
 
   // Delete the list view.
-  view.reset();
+  notification_list_view.reset();
 
   // Hide the item. This should not call into the deleted view.
   SimulateHideNotification(id);
+}
+
+TEST_F(MediaNotificationProviderImplTest, RefreshMediaItem) {
+  auto id = base::UnguessableToken::Create();
+  SimulateShowNotification(id);
+  auto notification_list_view = CreateNotificationListView();
+
+  EXPECT_EQ(notification_list_view->items_for_testing().size(), 1u);
+
+  EXPECT_CALL(*observer_, OnNotificationListViewSizeChanged);
+  SimulateRefreshNotification(id);
+  EXPECT_EQ(notification_list_view->items_for_testing().size(), 1u);
 }
 
 // Tests the `kGlobalMediaControlsCastStartStop` feature.
@@ -208,30 +263,44 @@ class CastStartStopMediaNotificationProviderImplTest
     : public MediaNotificationProviderImplTest {
  public:
   void SetUp() override {
-    MediaNotificationProviderImplTest::SetUp();
+    // This must be called before MediaNotificationProviderImplTest::SetUp()
+    // starts the GPU service thread.
     scoped_feature_list_.InitAndEnableFeature(
         media_router::kGlobalMediaControlsCastStartStop);
+    MediaNotificationProviderImplTest::SetUp();
+
+    profile_ = crosapi_environment_.profile_manager()->CreateTestingProfile(
+        "Profile", /*is_main_profile=*/true);
     InitProvider();
+  }
+
+  void TearDown() override {
+    profile_ = nullptr;
+    // This is needed for avoiding a DCHECK failure caused by
+    // TestNetworkConnectionTracker having an observer when it's destroyed.
+    media_router::DnsSdRegistry::GetInstance()->ResetForTest();
+
+    MediaNotificationProviderImplTest::TearDown();
   }
 
  protected:
   void InitProvider() {
-    provider_->set_profile_for_testing(&profile_);
-    provider_->SetColorTheme(media_message_center::NotificationTheme());
+    provider_->set_profile_for_testing(profile_);
     // We must initialize the list view before we can show individual media
     // items.
-    list_view_ =
-        provider_->GetMediaNotificationListView(1, /*should_clip_height=*/true);
+    list_view_ = provider_->GetMediaNotificationListView(
+        1, /*should_clip_height=*/true, /*item_id=*/"",
+        /*show_devices_for_item_id=*/"");
   }
 
-  TestingProfile profile_;
+  raw_ptr<Profile, ExperimentalAsh> profile_ = nullptr;
   base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<views::View> list_view_;
 };
 
 TEST_F(CastStartStopMediaNotificationProviderImplTest, ShowCastFooterView) {
   MockCastMediaNotificationItem item{
-      media_router::MediaRoute{}, provider_->GetMediaItemManager(), &profile_};
+      media_router::MediaRoute{}, provider_->GetMediaItemManager(), profile_};
   auto* media_item_ui_view =
       provider_->ShowMediaItem("item_id", item.GetWeakPtr());
   global_media_controls::MediaItemUIFooter* footer_view =
@@ -241,16 +310,39 @@ TEST_F(CastStartStopMediaNotificationProviderImplTest, ShowCastFooterView) {
   EXPECT_TRUE(footer_view && footer_view->GetVisible());
 
   // Click on the "Stop casting" button.
-  EXPECT_CALL(
-      item,
-      StopCasting(
-          global_media_controls::GlobalMediaControlsEntryPoint::kSystemTray));
+  EXPECT_CALL(item, StopCasting());
   views::Button* stop_casting_button =
       static_cast<views::Button*>(footer_view->children()[0]);
   views::test::ButtonTestApi(stop_casting_button)
       .NotifyClick(ui::MouseEvent(ui::ET_MOUSE_PRESSED, gfx::Point(0, 0),
                                   gfx::Point(0, 0), ui::EventTimeForNow(),
                                   ui::EF_LEFT_MOUSE_BUTTON, 0));
+}
+
+TEST_F(CastStartStopMediaNotificationProviderImplTest, ShowDeviceSelectorView) {
+  MockDeviceService device_service;
+  TestMediaNotificationItem item;
+  provider_->set_device_service_for_testing(&device_service);
+  auto* media_item_ui_view =
+      provider_->ShowMediaItem("item_id", item.GetWeakPtr());
+  global_media_controls::MediaItemUIDeviceSelector* selector_view =
+      static_cast<global_media_controls::MediaItemUIView*>(media_item_ui_view)
+          ->device_selector_view_for_testing();
+  EXPECT_TRUE(selector_view);
+}
+
+TEST_F(CastStartStopMediaNotificationProviderImplTest,
+       SetDevicePickerProvider) {
+  provider_->OnPrimaryUserSessionStarted();
+
+  MockDeviceService device_service;
+  EXPECT_CALL(device_service, SetDevicePickerProvider);
+  crosapi::CrosapiManager::Get()
+      ->crosapi_ash()
+      ->media_ui_ash()
+      ->RegisterDeviceService(base::UnguessableToken::Create(),
+                              device_service.PassRemote());
+  device_service.FlushForTesting();
 }
 
 }  // namespace ash

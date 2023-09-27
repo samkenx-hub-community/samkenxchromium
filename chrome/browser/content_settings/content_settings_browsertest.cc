@@ -5,6 +5,7 @@
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/path_service.h"
+#include "base/strings/strcat.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
@@ -33,11 +34,14 @@
 #include "components/browsing_data/content/local_storage_helper.h"
 #include "components/browsing_data/content/service_worker_helper.h"
 #include "components/browsing_data/content/shared_worker_helper.h"
+#include "components/browsing_data/core/features.h"
 #include "components/content_settings/browser/page_specific_content_settings.h"
 #include "components/content_settings/core/browser/cookie_settings.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/content_settings/core/common/content_settings.h"
+#include "components/content_settings/core/common/pref_names.h"
 #include "components/nacl/common/buildflags.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/cookie_access_details.h"
@@ -72,7 +76,7 @@
 #include "third_party/widevine/cdm/buildflags.h"
 
 #if BUILDFLAG(IS_MAC)
-#include "base/mac/scoped_nsautorelease_pool.h"
+#include "base/apple/scoped_nsautorelease_pool.h"
 #endif
 
 #if BUILDFLAG(ENABLE_PLUGINS)
@@ -295,12 +299,9 @@ class CookieSettingsTest
  private:
   // Read a cookie via JavaScript.
   std::string JSReadCookie(Browser* browser) {
-    std::string cookies;
-    bool rv = content::ExecuteScriptAndExtractString(
-        browser->tab_strip_model()->GetActiveWebContents(),
-        "window.domAutomationController.send(document.cookie)", &cookies);
-    CHECK(rv);
-    return cookies;
+    return content::EvalJs(browser->tab_strip_model()->GetActiveWebContents(),
+                           "document.cookie")
+        .ExtractString();
   }
 
   // Read a cookie with JavaScript cookie-store API
@@ -312,10 +313,9 @@ class CookieSettingsTest
                "  let cookie_str = '';"
                "  for (const cookie of cookies)"
                "    cookie_str += `${cookie.name}=${cookie.value};`;"
-               "  window.domAutomationController.send(cookie_str);"
+               "  return cookie_str;"
                "}"
-               "doGet()",
-               content::EXECUTE_SCRIPT_USE_MANUAL_REPLY)
+               "doGet()")
         .ExtractString();
   }
 
@@ -331,9 +331,9 @@ class CookieSettingsTest
 
   // Set a cookie with JavaScript.
   void JSWriteCookie(Browser* browser) {
-    bool rv = content::ExecuteScript(
-        browser->tab_strip_model()->GetActiveWebContents(),
-        "document.cookie = 'name=Good;Max-Age=3600'");
+    bool rv =
+        content::ExecJs(browser->tab_strip_model()->GetActiveWebContents(),
+                        "document.cookie = 'name=Good;Max-Age=3600'");
     CHECK(rv);
   }
 
@@ -347,10 +347,9 @@ class CookieSettingsTest
                         "         value: 'Good',"
                         "         expires: Date.now() + 3600*1000,"
                         "         sameSite: 'none' });"
-                        "  window.domAutomationController.send(true);"
+                        "  return true;"
                         "}"
-                        "doSet()",
-                        content::EXECUTE_SCRIPT_USE_MANUAL_REPLY);
+                        "doSet()");
     // Failure ignored here since some tests purposefully try to set disallowed
     // cookies.
   }
@@ -407,18 +406,12 @@ IN_PROC_BROWSER_TEST_P(CookieSettingsTest, PRE_BlockCookies) {
 IN_PROC_BROWSER_TEST_P(CookieSettingsTest, BlockCookies) {
   ASSERT_EQ(CONTENT_SETTING_BLOCK,
             CookieSettingsFactory::GetForProfile(browser()->profile())
-                ->GetDefaultCookieSetting(nullptr));
+                ->GetDefaultCookieSetting());
 }
 
 // Verify that cookies can be allowed and set using exceptions for particular
 // website(s) when all others are blocked.
-// Flaky on Mac (crbug.com/1155077) and Linux (crbug.com/1242410).
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-#define MAYBE_AllowCookiesUsingExceptions DISABLED_AllowCookiesUsingExceptions
-#else
-#define MAYBE_AllowCookiesUsingExceptions AllowCookiesUsingExceptions
-#endif
-IN_PROC_BROWSER_TEST_P(CookieSettingsTest, MAYBE_AllowCookiesUsingExceptions) {
+IN_PROC_BROWSER_TEST_P(CookieSettingsTest, AllowCookiesUsingExceptions) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GetPageURL()));
   content_settings::CookieSettings* settings =
       CookieSettingsFactory::GetForProfile(browser()->profile()).get();
@@ -778,7 +771,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 // This fails on ChromeOS because kRestoreOnStartup is ignored and the startup
 // preference is always "continue where I left off.
-#if !BUILDFLAG(IS_CHROMEOS_ASH)
+#if !BUILDFLAG(IS_CHROMEOS)
 
 // Verify that cookies can be allowed and set using exceptions for particular
 // website(s) only for a session when all others are blocked.
@@ -1142,7 +1135,7 @@ IN_PROC_BROWSER_TEST_F(ContentSettingsTest, RendererUpdateWhilePendingCommit) {
       }));
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), second_url, WindowOpenDisposition::CURRENT_TAB,
-      ui_test_utils::BROWSER_TEST_NONE);
+      ui_test_utils::BROWSER_TEST_NO_WAIT);
   delayer.Wait();
 
   EXPECT_TRUE(PageSpecificContentSettings::GetForFrame(
@@ -1393,7 +1386,8 @@ class ContentSettingsWithPrerenderingBrowserTest : public ContentSettingsTest {
             base::Unretained(this))) {}
 
   void SetUp() override {
-    prerender_test_helper().SetUp(embedded_test_server());
+    prerender_test_helper().RegisterServerRequestMonitor(
+        embedded_test_server());
     ContentSettingsTest::SetUp();
   }
 
@@ -1661,13 +1655,22 @@ IN_PROC_BROWSER_TEST_F(ContentSettingsWithFencedFrameBrowserTest,
     const browsing_data::LocalSharedObjectsContainer& container =
         pscs->allowed_local_shared_objects();
     EXPECT_TRUE(pscs->IsContentAllowed(ContentSettingsType::COOKIES));
-    EXPECT_EQ(container.local_storages()->GetCount(), 1u);
-    EXPECT_EQ(container.session_storages()->GetCount(), 1u);
-    EXPECT_EQ(container.cache_storages()->GetCount(), 1u);
-    EXPECT_EQ(container.file_systems()->GetCount(), 1u);
-    EXPECT_EQ(container.indexed_dbs()->GetCount(), 1u);
-    EXPECT_EQ(container.shared_workers()->GetSharedWorkerCount(), 1u);
-    EXPECT_EQ(container.service_workers()->GetCount(), 1u);
+
+    bool is_migrate_storage_to_bdm_enabled = base::FeatureList::IsEnabled(
+        browsing_data::features::kMigrateStorageToBDM);
+    if (is_migrate_storage_to_bdm_enabled) {
+      EXPECT_EQ(pscs->allowed_browsing_data_model()->size(), 1u);
+    }
+
+    size_t expected_size = is_migrate_storage_to_bdm_enabled ? 0u : 1u;
+    EXPECT_EQ(container.local_storages()->GetCount(), expected_size);
+    EXPECT_EQ(container.session_storages()->GetCount(), expected_size);
+    EXPECT_EQ(container.cache_storages()->GetCount(), expected_size);
+    EXPECT_EQ(container.file_systems()->GetCount(), expected_size);
+    EXPECT_EQ(container.indexed_dbs()->GetCount(), expected_size);
+    EXPECT_EQ(container.shared_workers()->GetSharedWorkerCount(),
+              expected_size);
+    EXPECT_EQ(container.service_workers()->GetCount(), expected_size);
   }
 }
 

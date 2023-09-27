@@ -14,13 +14,13 @@
 #import "base/test/task_environment.h"
 #import "components/infobars/core/confirm_infobar_delegate.h"
 #import "components/infobars/core/infobar.h"
-#import "ios/chrome/browser/browser_state/test_chrome_browser_state.h"
 #import "ios/chrome/browser/download/download_test_util.h"
 #import "ios/chrome/browser/download/pass_kit_tab_helper.h"
 #import "ios/chrome/browser/infobars/infobar_manager_impl.h"
-#import "ios/chrome/browser/main/test_browser.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/web_state_list/web_state_opener.h"
+#import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
+#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_opener.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/fakes/fake_web_content_handler.h"
 #import "ios/chrome/test/scoped_key_window.h"
@@ -30,10 +30,6 @@
 #import "testing/platform_test.h"
 #import "ui/base/device_form_factor.h"
 #import "ui/base/l10n/l10n_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using base::test::ios::WaitUntilConditionOrTimeout;
 using base::test::ios::kWaitForUIElementTimeout;
@@ -63,6 +59,8 @@ class PassKitCoordinatorTest : public PlatformTest {
 
     [scoped_key_window_.Get() setRootViewController:base_view_controller_];
   }
+
+  ~PassKitCoordinatorTest() override { [coordinator_ stop]; }
 
   PassKitTabHelper* tab_helper() {
     return PassKitTabHelper::FromWebState(web_state_);

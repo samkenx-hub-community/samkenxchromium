@@ -6,6 +6,7 @@
 #define DEVICE_VR_ANDROID_XR_JAVA_COORDINATOR_H_
 
 #include "base/android/scoped_java_ref.h"
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "gpu/ipc/common/surface_handle.h"
 #include "ui/display/display.h"
@@ -42,6 +43,8 @@ using SurfaceTouchCallback =
                                  const gfx::PointF& location)>;
 using SurfaceDestroyedCallback = base::OnceClosure;
 
+using XrSessionButtonTouchedCallback = base::OnceClosure;
+
 // The purpose of this interface is to allow for dependency injection of code
 // that needs to talk Java Code in the WebXR component, which otherwise cannot
 // be directly talked to in //device. Unfortunately, the implementation in
@@ -53,7 +56,10 @@ class XrJavaCoordinator {
   virtual ~XrJavaCoordinator() = default;
   virtual bool EnsureARCoreLoaded() = 0;
   virtual base::android::ScopedJavaLocalRef<jobject>
-  GetApplicationContext() = 0;
+  GetCurrentActivityContext() = 0;
+  virtual base::android::ScopedJavaLocalRef<jobject> GetActivityFrom(
+      int render_process_id,
+      int render_frame_id) = 0;
   virtual void RequestArSession(
       int render_process_id,
       int render_frame_id,
@@ -63,6 +69,14 @@ class XrJavaCoordinator {
       SurfaceReadyCallback ready_callback,
       SurfaceTouchCallback touch_callback,
       SurfaceDestroyedCallback destroyed_callback) = 0;
+  virtual void RequestVrSession(
+      int render_process_id,
+      int render_frame_id,
+      const CompositorDelegateProvider& compositor_delegate_provider,
+      device::SurfaceReadyCallback ready_callback,
+      device::SurfaceTouchCallback touch_callback,
+      device::SurfaceDestroyedCallback destroyed_callback,
+      device::XrSessionButtonTouchedCallback button_touched_callback) = 0;
   virtual void EndSession() = 0;
 };
 

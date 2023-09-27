@@ -13,6 +13,7 @@
 
 #include "base/containers/queue.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list_types.h"
 #include "base/scoped_observation.h"
@@ -72,7 +73,6 @@ class KeyPermissionsManagerImpl : public KeyPermissionsManager,
         std::vector<std::vector<uint8_t>> public_key_spki_der_list,
         chromeos::platform_keys::Status keys_retrieval_status);
     void UpdateNextKey();
-    void OnUpdateFinished();
     void UpdatePermissionsForKey(std::vector<uint8_t> public_key_spki_der);
     void UpdatePermissionsForKeyWithCorporateFlag(
         std::vector<uint8_t> public_key_spki_der,
@@ -82,12 +82,11 @@ class KeyPermissionsManagerImpl : public KeyPermissionsManager,
         chromeos::platform_keys::Status permissions_update_status);
 
     const Mode mode_;
-    KeyPermissionsManagerImpl* const key_permissions_manager_;
+    const raw_ptr<KeyPermissionsManagerImpl, ExperimentalAsh>
+        key_permissions_manager_;
     base::queue<std::vector<uint8_t>> public_key_spki_der_queue_;
     bool update_started_ = false;
     UpdateCallback callback_;
-    // The time when the Update() method was called.
-    base::TimeTicks update_start_time_;
 
     base::WeakPtrFactory<KeyPermissionsInChapsUpdater> weak_ptr_factory_{this};
   };
@@ -160,21 +159,10 @@ class KeyPermissionsManagerImpl : public KeyPermissionsManager,
   // this method is called while an update is already running, it will cancel
   // the running update and start a new one.
   void UpdateKeyPermissionsInChaps();
-  void OnKeyPermissionsInChapsUpdated(
-      chromeos::platform_keys::Status update_status);
 
   void StartOneTimeMigration();
   void OnOneTimeMigrationDone(chromeos::platform_keys::Status migration_status);
-
   bool IsOneTimeMigrationDone() const;
-
-  void MigrateFlagsWithAllKeys(
-      std::vector<std::string> public_key_spki_der_list,
-      chromeos::platform_keys::Status all_keys_retrieval_status);
-  void MigrateFlagsWithQueueOfKeys(base::queue<std::string> queue);
-  void OnFlagsMigratedForKey(
-      base::queue<std::string> queue,
-      chromeos::platform_keys::Status last_key_flags_migration_status);
 
   void AllowKeyForCorporateUsage(AllowKeyForUsageCallback callback,
                                  std::vector<uint8_t> public_key_spki_der);
@@ -210,8 +198,10 @@ class KeyPermissionsManagerImpl : public KeyPermissionsManager,
       key_permissions_in_chaps_updater_;
   // The ARC usage manager delegate for |token_id_|.
   std::unique_ptr<ArcKpmDelegate> arc_usage_manager_delegate_;
-  PlatformKeysService* platform_keys_service_ = nullptr;
-  PrefService* pref_service_ = nullptr;
+  raw_ptr<PlatformKeysService, ExperimentalAsh> platform_keys_service_ =
+      nullptr;
+  raw_ptr<PrefService, DanglingUntriaged | ExperimentalAsh> pref_service_ =
+      nullptr;
   base::ScopedObservation<ArcKpmDelegate, ArcKpmDelegate::Observer>
       arc_usage_manager_delegate_observation_{this};
   base::WeakPtrFactory<KeyPermissionsManagerImpl> weak_ptr_factory_{this};

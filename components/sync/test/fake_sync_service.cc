@@ -8,9 +8,10 @@
 
 #include "base/values.h"
 #include "components/signin/public/identity_manager/account_info.h"
-#include "components/sync/driver/sync_token_status.h"
 #include "components/sync/engine/cycle/sync_cycle_snapshot.h"
 #include "components/sync/model/type_entities_count.h"
+#include "components/sync/service/local_data_description.h"
+#include "components/sync/service/sync_token_status.h"
 
 namespace syncer {
 
@@ -19,6 +20,14 @@ namespace syncer {
 FakeSyncService::FakeSyncService() = default;
 
 FakeSyncService::~FakeSyncService() = default;
+
+#if BUILDFLAG(IS_ANDROID)
+base::android::ScopedJavaLocalRef<jobject> FakeSyncService::GetJavaObject() {
+  return base::android::ScopedJavaLocalRef<jobject>();
+}
+#endif  // BUILDFLAG(IS_ANDROID)
+
+void FakeSyncService::SetSyncFeatureRequested() {}
 
 syncer::SyncUserSettings* FakeSyncService::GetUserSettings() {
   return nullptr;
@@ -30,7 +39,7 @@ const syncer::SyncUserSettings* FakeSyncService::GetUserSettings() const {
 
 syncer::SyncService::DisableReasonSet FakeSyncService::GetDisableReasons()
     const {
-  return DISABLE_REASON_NOT_SIGNED_IN;
+  return {DISABLE_REASON_NOT_SIGNED_IN};
 }
 
 syncer::SyncService::TransportState FakeSyncService::GetTransportState() const {
@@ -57,6 +66,11 @@ bool FakeSyncService::IsLocalSyncEnabled() const {
 void FakeSyncService::TriggerRefresh(const ModelTypeSet& types) {}
 
 ModelTypeSet FakeSyncService::GetActiveDataTypes() const {
+  return ModelTypeSet();
+}
+
+ModelTypeSet FakeSyncService::GetTypesWithPendingDownloadForInitialSync()
+    const {
   return ModelTypeSet();
 }
 
@@ -96,6 +110,12 @@ base::Time FakeSyncService::GetAuthErrorTime() const {
 bool FakeSyncService::RequiresClientUpgrade() const {
   return false;
 }
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+bool FakeSyncService::IsSyncFeatureDisabledViaDashboard() const {
+  return false;
+}
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 void FakeSyncService::DataTypePreconditionChanged(ModelType type) {}
 
@@ -149,19 +169,31 @@ void FakeSyncService::RemoveProtocolEventObserver(
 void FakeSyncService::GetAllNodesForDebugging(
     base::OnceCallback<void(base::Value::List)> callback) {}
 
+SyncService::ModelTypeDownloadStatus FakeSyncService::GetDownloadStatusFor(
+    ModelType type) const {
+  return ModelTypeDownloadStatus::kUpToDate;
+}
+
 void FakeSyncService::SetInvalidationsForSessionsEnabled(bool enabled) {}
 
-void FakeSyncService::AddTrustedVaultDecryptionKeysFromWeb(
-    const std::string& gaia_id,
-    const std::vector<std::vector<uint8_t>>& keys,
-    int last_key_version) {}
-
-void FakeSyncService::AddTrustedVaultRecoveryMethodFromWeb(
-    const std::string& gaia_id,
-    const std::vector<uint8_t>& public_key,
-    int method_type_hint,
-    base::OnceClosure callback) {}
+bool FakeSyncService::IsSyncFeatureConsideredRequested() const {
+  return HasSyncConsent();
+}
 
 void FakeSyncService::Shutdown() {}
+
+void FakeSyncService::GetTypesWithUnsyncedData(
+    base::OnceCallback<void(ModelTypeSet)> cb) const {
+  std::move(cb).Run(ModelTypeSet());
+}
+
+void FakeSyncService::GetLocalDataDescriptions(
+    ModelTypeSet types,
+    base::OnceCallback<void(std::map<ModelType, LocalDataDescription>)>
+        callback) {
+  std::move(callback).Run(std::map<ModelType, LocalDataDescription>{});
+}
+
+void FakeSyncService::TriggerLocalDataMigration(ModelTypeSet types) {}
 
 }  // namespace syncer

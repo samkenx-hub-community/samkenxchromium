@@ -14,6 +14,7 @@
 #include "components/viz/common/resources/release_callback.h"
 #include "components/viz/common/resources/returned_resource.h"
 #include "components/viz/test/test_context_provider.h"
+#include "gpu/command_buffer/client/raster_interface.h"
 #include "gpu/command_buffer/common/shared_image_usage.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -56,7 +57,6 @@ class ClientResourceProviderTest : public testing::TestWithParam<bool> {
     TransferableResource r;
     r.id = ResourceId(mailbox_char);
     r.is_software = !gpu;
-    r.filter = 456;
     r.size = gfx::Size(10, 11);
     r.mailbox_holder.mailbox = MailboxFromChar(mailbox_char);
     if (gpu) {
@@ -68,7 +68,9 @@ class ClientResourceProviderTest : public testing::TestWithParam<bool> {
 
   bool use_gpu() const { return use_gpu_; }
   ClientResourceProvider& provider() const { return *provider_; }
-  ContextProvider* context_provider() const { return context_provider_.get(); }
+  RasterContextProvider* context_provider() const {
+    return context_provider_.get();
+  }
 
   void DestroyProvider() {
     provider_->ShutdownAndReleaseAllResources();
@@ -130,7 +132,6 @@ TEST_P(ClientResourceProviderTest, TransferableResourceSendToParent) {
     verified_sync_token.SetVerifyFlush();
   EXPECT_EQ(exported[0].id, id);
   EXPECT_EQ(exported[0].is_software, tran.is_software);
-  EXPECT_EQ(exported[0].filter, tran.filter);
   EXPECT_EQ(exported[0].size, tran.size);
   EXPECT_EQ(exported[0].mailbox_holder.mailbox, tran.mailbox_holder.mailbox);
   EXPECT_EQ(exported[0].mailbox_holder.sync_token, verified_sync_token);
@@ -176,7 +177,6 @@ TEST_P(ClientResourceProviderTest, TransferableResourceSendTwoToParent) {
       verified_sync_token.SetVerifyFlush();
     EXPECT_EQ(exported[i].id, to_send[i]);
     EXPECT_EQ(exported[i].is_software, tran[i].is_software);
-    EXPECT_EQ(exported[i].filter, tran[i].filter);
     EXPECT_EQ(exported[i].size, tran[i].size);
     EXPECT_EQ(exported[i].mailbox_holder.mailbox,
               tran[i].mailbox_holder.mailbox);
@@ -511,13 +511,13 @@ TEST_P(ClientResourceProviderTest, ReturnedSyncTokensArePassedToClient) {
   gpu::Mailbox mailbox = sii->CreateSharedImage(
       SinglePlaneFormat::kRGBA_8888, gfx::Size(1, 1), gfx::ColorSpace(),
       kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType,
-      gpu::SHARED_IMAGE_USAGE_GLES2 | gpu::SHARED_IMAGE_USAGE_DISPLAY_READ,
-      gpu::kNullSurfaceHandle);
+      gpu::SHARED_IMAGE_USAGE_RASTER | gpu::SHARED_IMAGE_USAGE_DISPLAY_READ,
+      "TestLabel", gpu::kNullSurfaceHandle);
   gpu::SyncToken sync_token = sii->GenUnverifiedSyncToken();
 
   constexpr gfx::Size size(64, 64);
-  auto tran = TransferableResource::MakeGpu(mailbox, GL_LINEAR, GL_TEXTURE_2D,
-                                            sync_token, size, RGBA_8888,
+  auto tran = TransferableResource::MakeGpu(mailbox, GL_TEXTURE_2D, sync_token,
+                                            size, SinglePlaneFormat::kRGBA_8888,
                                             false /* is_overlay_candidate */);
   ResourceId resource = provider().ImportResource(
       tran, base::BindOnce(&MockReleaseCallback::Released,
@@ -537,14 +537,9 @@ TEST_P(ClientResourceProviderTest, ReturnedSyncTokensArePassedToClient) {
                       sizeof(mailbox.name)));
 
   // Make a new texture id from the mailbox.
-  context_provider()->ContextGL()->WaitSyncTokenCHROMIUM(
+  context_provider()->RasterInterface()->WaitSyncTokenCHROMIUM(
       list[0].mailbox_holder.sync_token.GetConstData());
-  unsigned other_texture =
-      context_provider()->ContextGL()->CreateAndTexStorage2DSharedImageCHROMIUM(
-          mailbox.name);
-  // Then delete it and make a new SyncToken.
-  context_provider()->ContextGL()->DeleteTextures(1, &other_texture);
-  context_provider()->ContextGL()->GenSyncTokenCHROMIUM(
+  context_provider()->RasterInterface()->GenSyncTokenCHROMIUM(
       list[0].mailbox_holder.sync_token.GetData());
   EXPECT_TRUE(list[0].mailbox_holder.sync_token.HasData());
 

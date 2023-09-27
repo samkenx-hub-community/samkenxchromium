@@ -22,12 +22,15 @@
 #include "base/strings/utf_string_conversions.h"
 #include "build/build_config.h"
 #include "chrome/updater/constants.h"
+#include "chrome/updater/external_constants.h"
 #include "chrome/updater/updater_branding.h"
 #include "chrome/updater/updater_scope.h"
 #include "chrome/updater/util/util.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/crashpad/crashpad/client/crashpad_client.h"
+#include "third_party/crashpad/crashpad/client/crashpad_info.h"
 #include "third_party/crashpad/crashpad/handler/handler_main.h"
+#include "url/gurl.h"
 
 namespace updater {
 namespace {
@@ -85,12 +88,28 @@ void StartCrashReporter(UpdaterScope updater_scope,
   annotations["ver"] = version;
   annotations["prod"] = CRASH_PRODUCT_NAME;
 
+  // Save dereferenced memory from all registers on the crashing thread.
+  // Crashpad saves up to 512 bytes per CPU register, and in the worst case,
+  // ARM64 has 32 registers.
+  constexpr uint32_t kIndirectMemoryLimit = 32 * 512;
+  crashpad::CrashpadInfo::GetCrashpadInfo()
+      ->set_gather_indirectly_referenced_memory(crashpad::TriState::kEnabled,
+                                                kIndirectMemoryLimit);
   crashpad::CrashpadClient& client = GetCrashpadClient();
-  if (!client.StartHandler(handler_path, *database_path,
-                           /*metrics_dir=*/base::FilePath(), CRASH_UPLOAD_URL,
-                           annotations, MakeCrashHandlerArgs(updater_scope),
-                           /*restartable=*/true,
-                           /*asynchronous_start=*/false)) {
+  std::vector<base::FilePath> attachments;
+#if !BUILDFLAG(IS_MAC)  // Crashpad does not support attachments on macOS.
+  absl::optional<base::FilePath> log_file = GetLogFilePath(updater_scope);
+  if (log_file) {
+    attachments.push_back(*log_file);
+  }
+#endif
+  if (!client.StartHandler(
+          handler_path, *database_path,
+          /*metrics_dir=*/base::FilePath(),
+          CreateExternalConstants()->CrashUploadURL().possibly_invalid_spec(),
+          annotations, MakeCrashHandlerArgs(updater_scope),
+          /*restartable=*/true,
+          /*asynchronous_start=*/false, attachments)) {
     VLOG(1) << "Failed to start handler.";
     return;
   }

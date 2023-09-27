@@ -12,10 +12,11 @@
 #include "ash/shell.h"
 #include "ash/system/power/power_event_observer_test_api.h"
 #include "ash/test/ash_test_base.h"
-#include "ash/wallpaper/wallpaper_widget_controller.h"
+#include "ash/wallpaper/views/wallpaper_widget_controller.h"
 #include "ash/wm/lock_state_controller.h"
 #include "ash/wm/lock_state_controller_test_api.h"
 #include "ash/wm/test_session_state_animator.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/time/time.h"
 #include "chromeos/ash/components/feature_usage/feature_usage_metrics.h"
@@ -26,7 +27,7 @@
 #include "ui/aura/window_tree_host.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
-#include "ui/display/fake/fake_display_snapshot.h"
+#include "ui/display/manager/test/fake_display_snapshot.h"
 
 namespace ash {
 
@@ -64,7 +65,8 @@ class PowerEventObserverTest : public AshTestBase {
     return Shell::Get()->session_controller()->IsScreenLocked();
   }
 
-  PowerEventObserver* observer_ = nullptr;
+  raw_ptr<PowerEventObserver, DanglingUntriaged | ExperimentalAsh> observer_ =
+      nullptr;
 };
 
 TEST_F(PowerEventObserverTest, LockBeforeSuspend) {
@@ -277,7 +279,7 @@ TEST_F(PowerEventObserverTest, DelaySuspendForCompositing_MultiDisplay) {
 }
 
 TEST_F(PowerEventObserverTest,
-       DelaySuspendForCompositing_PendingDisplayRemoved) {
+       DISABLED_DelaySuspendForCompositing_PendingDisplayRemoved) {
   SetCanLockScreen(true);
   SetShouldLockScreenAutomatically(true);
 

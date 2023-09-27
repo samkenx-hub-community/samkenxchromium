@@ -12,6 +12,7 @@
 #include "ash/public/cpp/style/dark_light_mode_controller.h"
 #include "ash/public/cpp/system_notification_builder.h"
 #include "ash/style/dark_light_mode_controller_impl.h"
+#include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/i18n/time_formatting.h"
 #include "base/time/default_clock.h"
@@ -138,6 +139,10 @@ void EolNotification::OnEolInfo(UpdateEngineClient::EolInfo eol_info) {
   } else if (SecondWarningDate(eol_date) <= now) {
     dismiss_pref_ = prefs::kSecondEolWarningDismissed;
   } else if (FirstWarningDate(eol_date) <= now) {
+    if (base::FeatureList::IsEnabled(features::kSuppressFirstEolWarning)) {
+      dismiss_pref_ = absl::nullopt;
+      return;
+    }
     dismiss_pref_ = prefs::kFirstEolWarningDismissed;
   } else {
     // |now| < FirstWarningDate() so don't show anything.
@@ -192,7 +197,7 @@ void EolNotification::CreateNotification(base::Time eol_date, base::Time now) {
           .SetDelegate(
               base::MakeRefCounted<message_center::ThunkNotificationDelegate>(
                   weak_ptr_factory_.GetWeakPtr()))
-          .Build(),
+          .Build(false),
       /*metadata=*/nullptr);
 
   eol_incentive_util::RecordShowSourceHistogram(
@@ -297,6 +302,14 @@ void EolNotification::Click(const absl::optional<int>& button_index,
 
   NotificationDisplayServiceFactory::GetForProfile(profile_)->Close(
       NotificationHandler::Type::TRANSIENT, kEolNotificationId);
+}
+
+void EolNotification::OverrideClockForTesting(base::Clock* clock) {
+  if (!clock) {
+    clock_ = base::DefaultClock::GetInstance();
+  } else {
+    clock_ = clock;
+  }
 }
 
 void EolNotification::MaybeShowEolIncentiveNotification(
@@ -433,7 +446,7 @@ void EolNotification::ShowIncentiveNotification(
           .SetDelegate(
               base::MakeRefCounted<message_center::ThunkNotificationDelegate>(
                   weak_ptr_factory_.GetWeakPtr()))
-          .Build(),
+          .Build(false),
       /*metadata=*/nullptr);
 
   if (incentive_type == eol_incentive_util::EolIncentiveType::kEolApproaching) {

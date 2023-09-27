@@ -11,19 +11,9 @@
 
 namespace ash {
 
-void ExecuteScriptAndExtractInt(content::WebContents* web_contents,
-                                const std::string& script,
-                                int* result) {
-  ASSERT_TRUE(content::ExecuteScriptAndExtractInt(
-      web_contents,
-      base::StringPrintf("window.domAutomationController.send(%s);",
-                         script.c_str()),
-      result));
-}
-
 void ExecuteScript(content::WebContents* web_contents,
                    const std::string& script) {
-  ASSERT_TRUE(content::ExecuteScript(web_contents, script));
+  ASSERT_TRUE(content::ExecJs(web_contents, script));
 }
 
 gfx::Rect GetControlBoundsInRoot(content::WebContents* web_contents,
@@ -36,11 +26,13 @@ gfx::Rect GetControlBoundsInRoot(content::WebContents* web_contents,
       var bounds = element.getBoundingClientRect();
     )",
                                                  field_id.c_str()));
-  int top, left, width, height;
-  ExecuteScriptAndExtractInt(web_contents, "bounds.top", &top);
-  ExecuteScriptAndExtractInt(web_contents, "bounds.left", &left);
-  ExecuteScriptAndExtractInt(web_contents, "bounds.width", &width);
-  ExecuteScriptAndExtractInt(web_contents, "bounds.height", &height);
+  // At non-integer device scale factors, bounds are floating point numbers,
+  // which much be extracted as doubles in EvalJs to avoid errors and can
+  // then be cast to integers.
+  int top = content::EvalJs(web_contents, "bounds.top").ExtractDouble();
+  int left = content::EvalJs(web_contents, "bounds.left").ExtractDouble();
+  int width = content::EvalJs(web_contents, "bounds.width").ExtractDouble();
+  int height = content::EvalJs(web_contents, "bounds.height").ExtractDouble();
   gfx::Rect rect(left, top, width, height);
 
   content::RenderWidgetHostView* view = web_contents->GetRenderWidgetHostView();

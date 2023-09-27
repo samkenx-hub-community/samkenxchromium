@@ -7,10 +7,6 @@
 #import "ios/chrome/browser/ui/content_suggestions/ntp_home_constant.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 @implementation ToolbarConfiguration
 
 @synthesize style = _style;
@@ -59,10 +55,10 @@
   // For the omnibox specifically, the background should be different in
   // incognito compared to dark mode.
   switch (self.style) {
-    case NORMAL:
+    case ToolbarStyle::kNormal:
       return [[UIColor colorNamed:kTextfieldBackgroundColor]
           colorWithAlphaComponent:visibilityFactor];
-    case INCOGNITO:
+    case ToolbarStyle::kIncognito:
       return [[UIColor colorNamed:@"omnibox_incognito_background_color"]
           colorWithAlphaComponent:visibilityFactor];
   }

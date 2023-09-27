@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <sstream>
+#include <string>
 #include <utility>
 
 #include "ash/components/arc/arc_prefs.h"
@@ -19,9 +20,11 @@
 #include "ash/components/arc/test/fake_file_system_instance.h"
 #include "ash/constants/ash_switches.h"
 #include "ash/public/cpp/note_taking_client.h"
+#include "ash/shell.h"
 #include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/strings/string_util.h"
@@ -44,6 +47,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/web_applications/web_app_ui_manager_impl.h"
 #include "chrome/browser/web_applications/test/fake_web_app_provider.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
@@ -53,6 +57,7 @@
 #include "chrome/test/base/browser_with_test_window_test.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/test/base/testing_profile_manager.h"
+#include "chrome/test/base/ui_test_utils.h"
 #include "chromeos/ash/components/dbus/cros_disks/cros_disks_client.h"
 #include "chromeos/ash/components/dbus/session_manager/fake_session_manager_client.h"
 #include "chromeos/ash/components/dbus/session_manager/session_manager_client.h"
@@ -72,10 +77,10 @@
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_builder.h"
 #include "extensions/common/extension_id.h"
-#include "extensions/common/value_builder.h"
 #include "mojo/public/cpp/bindings/struct_ptr.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkTypes.h"
+#include "ui/display/test/display_manager_test_api.h"
 #include "url/gurl.h"
 
 namespace ash {
@@ -299,20 +304,15 @@ class NoteTakingHelperTest : public BrowserWithTestWindowTest {
       absl::optional<base::Value::List> permissions,
       absl::optional<base::Value::List> action_handlers) {
     base::Value::Dict manifest =
-        extensions::DictionaryBuilder()
+        base::Value::Dict()
             .Set("name", name)
             .Set("version", "1.0")
             .Set("manifest_version", 2)
-            .Set("app",
-                 extensions::DictionaryBuilder()
-                     .Set("background",
-                          extensions::DictionaryBuilder()
-                              .Set("scripts", extensions::ListBuilder()
-                                                  .Append("background.js")
-                                                  .Build())
-                              .Build())
-                     .Build())
-            .Build();
+            .Set("app", base::Value::Dict().Set(
+                            "background",
+                            base::Value::Dict().Set(
+                                "scripts",
+                                base::Value::List().Append("background.js"))));
 
     if (action_handlers)
       manifest.Set("action_handlers", std::move(*action_handlers));
@@ -327,6 +327,10 @@ class NoteTakingHelperTest : public BrowserWithTestWindowTest {
   }
 
   void InitWebAppProvider(Profile* profile) {
+    web_app::FakeWebAppProvider* fake_provider =
+        web_app::FakeWebAppProvider::Get(profile);
+    fake_provider->SetWebAppUiManager(
+        std::make_unique<web_app::WebAppUiManagerImpl>(profile));
     web_app::test::AwaitStartWebAppProviderAndSubsystems(profile);
   }
 
@@ -364,8 +368,7 @@ class NoteTakingHelperTest : public BrowserWithTestWindowTest {
       const std::string& app_name,
       Profile* profile) {
     return CreateAndInstallLockScreenAppWithPermissions(
-        id, app_name, extensions::ListBuilder().Append("lockScreen").Build(),
-        profile);
+        id, app_name, base::Value::List().Append("lockScreen"), profile);
   }
 
   scoped_refptr<const extensions::Extension>
@@ -374,14 +377,11 @@ class NoteTakingHelperTest : public BrowserWithTestWindowTest {
       const std::string& app_name,
       absl::optional<base::Value::List> permissions,
       Profile* profile) {
-    base::Value::List lock_enabled_action_handler =
-        extensions::ListBuilder()
-            .Append(extensions::DictionaryBuilder()
-                        .Set("action", app_runtime::ToString(
-                                           app_runtime::ACTION_TYPE_NEW_NOTE))
-                        .Set("enabled_on_lock_screen", true)
-                        .Build())
-            .Build();
+    base::Value::List lock_enabled_action_handler = base::Value::List().Append(
+        base::Value::Dict()
+            .Set("action",
+                 app_runtime::ToString(app_runtime::ActionType::kNewNote))
+            .Set("enabled_on_lock_screen", true));
 
     scoped_refptr<const extensions::Extension> keep_extension =
         CreateExtension(id, app_name, std::move(permissions),
@@ -473,7 +473,9 @@ class NoteTakingHelperTest : public BrowserWithTestWindowTest {
 
   // Pointer to the primary profile (returned by |profile()|) prefs - owned by
   // the profile.
-  sync_preferences::TestingPrefServiceSyncable* profile_prefs_ = nullptr;
+  raw_ptr<sync_preferences::TestingPrefServiceSyncable,
+          DanglingUntriaged | ExperimentalAsh>
+      profile_prefs_ = nullptr;
 
  private:
   // Callback registered with the helper to record Chrome app launch requests.
@@ -481,8 +483,7 @@ class NoteTakingHelperTest : public BrowserWithTestWindowTest {
                        const extensions::Extension* extension,
                        app_runtime::ActionData action_data) {
     EXPECT_EQ(profile(), passed_context);
-    EXPECT_EQ(app_runtime::ActionType::ACTION_TYPE_NEW_NOTE,
-              action_data.action_type);
+    EXPECT_EQ(app_runtime::ActionType::kNewNote, action_data.action_type);
     launched_chrome_apps_.push_back(ChromeAppLaunchInfo{extension->id()});
   }
 
@@ -566,10 +567,8 @@ TEST_F(NoteTakingHelperTest, ListChromeAppsWithLockScreenNotesSupported) {
   ASSERT_FALSE(helper()->IsAppAvailable(profile()));
   ASSERT_TRUE(helper()->GetAvailableApps(profile()).empty());
 
-  base::Value::List lock_disabled_action_handler =
-      extensions::ListBuilder()
-          .Append(app_runtime::ToString(app_runtime::ACTION_TYPE_NEW_NOTE))
-          .Build();
+  base::Value::List lock_disabled_action_handler = base::Value::List().Append(
+      app_runtime::ToString(app_runtime::ActionType::kNewNote));
 
   // Install Keep app that does not support lock screen note taking - it should
   // be reported not to support lock screen note taking.
@@ -717,14 +716,12 @@ TEST_F(NoteTakingHelperTest, CustomChromeApps) {
   // "action_handlers": ["new_note"]
   scoped_refptr<const extensions::Extension> has_new_note = CreateExtension(
       kNewNoteId, kName, /*permissions=*/absl::nullopt,
-      extensions::ListBuilder()
-          .Append(app_runtime::ToString(app_runtime::ACTION_TYPE_NEW_NOTE))
-          .Build());
+      base::Value::List().Append(
+          app_runtime::ToString(app_runtime::ActionType::kNewNote)));
   InstallExtension(has_new_note.get(), profile());
   // "action_handlers": []
-  scoped_refptr<const extensions::Extension> empty_array =
-      CreateExtension(kEmptyArrayId, kName, /*permissions=*/absl::nullopt,
-                      extensions::ListBuilder().Build());
+  scoped_refptr<const extensions::Extension> empty_array = CreateExtension(
+      kEmptyArrayId, kName, /*permissions=*/absl::nullopt, base::Value::List());
   InstallExtension(empty_array.get(), profile());
   // (no action handler entry)
   scoped_refptr<const extensions::Extension> none =
@@ -741,7 +738,7 @@ TEST_F(NoteTakingHelperTest, NoteTakingWebAppsListed) {
   Init(ENABLE_PALETTE);
 
   {
-    auto app_info = std::make_unique<WebAppInstallInfo>();
+    auto app_info = std::make_unique<web_app::WebAppInstallInfo>();
     app_info->start_url = GURL("http://some1.url");
     app_info->scope = GURL("http://some1.url");
     app_info->title = u"Web App 1";
@@ -749,7 +746,7 @@ TEST_F(NoteTakingHelperTest, NoteTakingWebAppsListed) {
   }
   std::string app2_id;
   {
-    auto app_info = std::make_unique<WebAppInstallInfo>();
+    auto app_info = std::make_unique<web_app::WebAppInstallInfo>();
     app_info->start_url = GURL("http://some2.url");
     app_info->scope = GURL("http://some2.url");
     app_info->title = u"Web App 2";
@@ -771,11 +768,11 @@ TEST_F(NoteTakingHelperTest, NoteTakingWebAppsListed) {
 // TODO(crbug.com/1332379): Move this to a lock screen apps unittest file.
 TEST_F(NoteTakingHelperTest, LockScreenWebAppsListed) {
   Init(ENABLE_PALETTE);
-  DCHECK(!base::FeatureList::IsEnabled(features::kWebLockScreenApi));
+  DCHECK(!base::FeatureList::IsEnabled(::features::kWebLockScreenApi));
 
   std::string app1_id;
   {
-    auto app_info = std::make_unique<WebAppInstallInfo>();
+    auto app_info = std::make_unique<web_app::WebAppInstallInfo>();
     app_info->start_url = GURL("http://some1.url");
     app_info->scope = GURL("http://some1.url");
     app_info->title = u"Web App 1";
@@ -785,7 +782,7 @@ TEST_F(NoteTakingHelperTest, LockScreenWebAppsListed) {
   }
   std::string app2_id;
   {
-    auto app_info = std::make_unique<WebAppInstallInfo>();
+    auto app_info = std::make_unique<web_app::WebAppInstallInfo>();
     app_info->start_url = GURL("http://some2.url");
     app_info->scope = GURL("http://some2.url");
     app_info->title = u"Web App 2";
@@ -807,7 +804,7 @@ TEST_F(NoteTakingHelperTest, LockScreenWebAppsListed) {
 
 class NoteTakingHelperTest_WebLockScreenApiEnabled
     : public NoteTakingHelperTest {
-  base::test::ScopedFeatureList features_{features::kWebLockScreenApi};
+  base::test::ScopedFeatureList features_{::features::kWebLockScreenApi};
 };
 
 // Web apps with a lock_screen_start_url should show as supported on the lock
@@ -815,11 +812,11 @@ class NoteTakingHelperTest_WebLockScreenApiEnabled
 // TODO(crbug.com/1332379): Move this to a lock screen apps unittest file.
 TEST_F(NoteTakingHelperTest_WebLockScreenApiEnabled, LockScreenWebAppsListed) {
   Init(ENABLE_PALETTE);
-  DCHECK(base::FeatureList::IsEnabled(features::kWebLockScreenApi));
+  DCHECK(base::FeatureList::IsEnabled(::features::kWebLockScreenApi));
 
   std::string app1_id;
   {
-    auto app_info = std::make_unique<WebAppInstallInfo>();
+    auto app_info = std::make_unique<web_app::WebAppInstallInfo>();
     app_info->start_url = GURL("http://some1.url");
     app_info->scope = GURL("http://some1.url");
     app_info->title = u"Web App 1";
@@ -829,7 +826,7 @@ TEST_F(NoteTakingHelperTest_WebLockScreenApiEnabled, LockScreenWebAppsListed) {
   }
   std::string app2_id;
   {
-    auto app_info = std::make_unique<WebAppInstallInfo>();
+    auto app_info = std::make_unique<web_app::WebAppInstallInfo>();
     app_info->start_url = GURL("http://some2.url");
     app_info->scope = GURL("http://some2.url");
     app_info->title = u"Web App 2";
@@ -868,9 +865,8 @@ TEST_F(NoteTakingHelperTest, AllowlistedAndCustomAppsShowOnlyOnce) {
 
   scoped_refptr<const extensions::Extension> extension = CreateExtension(
       kProdKeepExtensionId, "Keep", /*permissions=*/absl::nullopt,
-      extensions::ListBuilder()
-          .Append(app_runtime::ToString(app_runtime::ACTION_TYPE_NEW_NOTE))
-          .Build());
+      base::Value::List().Append(
+          app_runtime::ToString(app_runtime::ActionType::kNewNote)));
   InstallExtension(extension.get(), profile());
 
   EXPECT_TRUE(AvailableAppsMatch(
@@ -903,7 +899,7 @@ TEST_F(NoteTakingHelperTest, LaunchHardcodedWebApp) {
   GURL app_url("https://yielding-large-chef.glitch.me/");
   // Install a default-allowed web app corresponding to ID of
   // |NoteTakingHelper::kNoteTakingWebAppIdTest|.
-  auto app_info = std::make_unique<WebAppInstallInfo>();
+  auto app_info = std::make_unique<web_app::WebAppInstallInfo>();
   app_info->start_url = app_url;
   app_info->title = u"Default Allowed Web App";
   std::string app_id =
@@ -913,8 +909,11 @@ TEST_F(NoteTakingHelperTest, LaunchHardcodedWebApp) {
   // Fire a "Create Note" action and check the app is launched.
   HistogramTester histogram_tester;
   SetNoteTakingClientProfile(profile());
+
+  ui_test_utils::AllBrowserTabAddedWaiter tab_waiter;
   NoteTakingClient::GetInstance()->CreateNote();
   base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(tab_waiter.Wait());
 
   // Web app, so no launched_chrome_apps.
   EXPECT_EQ(0u, launched_chrome_apps_.size());
@@ -936,7 +935,7 @@ TEST_F(NoteTakingHelperTest, LaunchWebApp) {
 
   // Install a web app with a note_taking_new_note_url.
   GURL new_note_url("http://some.url/new-note");
-  auto app_info = std::make_unique<WebAppInstallInfo>();
+  auto app_info = std::make_unique<web_app::WebAppInstallInfo>();
   app_info->start_url = GURL("http://some.url");
   app_info->scope = GURL("http://some.url");
   app_info->title = u"Web App 2";
@@ -948,8 +947,10 @@ TEST_F(NoteTakingHelperTest, LaunchWebApp) {
   // Fire a "Create Note" action and check the app is launched.
   HistogramTester histogram_tester;
   SetNoteTakingClientProfile(profile());
+  ui_test_utils::AllBrowserTabAddedWaiter tab_added_observer;
   NoteTakingClient::GetInstance()->CreateNote();
   base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(tab_added_observer.Wait());
 
   histogram_tester.ExpectUniqueSample(
       NoteTakingHelper::kPreferredLaunchResultHistogramName,
@@ -973,7 +974,7 @@ TEST_F(NoteTakingHelperTest, FallBackIfPreferredAppUnavailable) {
   {
     // Install a default-allowed web app corresponding to ID of
     // |NoteTakingHelper::kNoteTakingWebAppIdTest|.
-    auto app_info = std::make_unique<WebAppInstallInfo>();
+    auto app_info = std::make_unique<web_app::WebAppInstallInfo>();
     app_info->start_url = GURL("https://yielding-large-chef.glitch.me/");
     app_info->title = u"Default Allowed Web App";
     std::string app_id =
@@ -1126,7 +1127,39 @@ TEST_F(NoteTakingHelperTest, ListAndroidApps) {
   EXPECT_TRUE(helper()->GetAvailableApps(profile()).empty());
 }
 
+TEST_F(NoteTakingHelperTest, LaunchAndroidAppNoDisplay) {
+  // Opening Android apps via OpenUrlsWithPermissionAndWindowInfo requires a
+  // valid internal display, not being able to find one will halt launch.
+  const std::string kPackage1 = "org.chromium.package1";
+  std::vector<IntentHandlerInfoPtr> handlers;
+  handlers.emplace_back(CreateIntentHandlerInfo("App 1", kPackage1));
+  intent_helper_.SetIntentHandlers(NoteTakingHelper::kIntentAction,
+                                   std::move(handlers));
+
+  Init(ENABLE_PALETTE | ENABLE_PLAY_STORE);
+  base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(helper()->IsAppAvailable(profile()));
+
+  // The installed app fails to launch, registering on histogram.
+  std::unique_ptr<HistogramTester> histogram_tester(new HistogramTester());
+  helper()->LaunchAppForNewNote(profile());
+  ASSERT_EQ(0u, file_system_->handledUrlRequests().size());
+
+  histogram_tester->ExpectUniqueSample(
+      NoteTakingHelper::kPreferredLaunchResultHistogramName,
+      static_cast<int>(LaunchResult::NO_APP_SPECIFIED), 1);
+  histogram_tester->ExpectUniqueSample(
+      NoteTakingHelper::kDefaultLaunchResultHistogramName,
+      static_cast<int>(LaunchResult::NO_INTERNAL_DISPLAY_FOUND), 1);
+}
+
 TEST_F(NoteTakingHelperTest, LaunchAndroidApp) {
+  // Since now launching Android apps require window info, this step is needed
+  // to make display info available.
+  ASSERT_TRUE(Shell::Get());
+  display::test::DisplayManagerTestApi(Shell::Get()->display_manager())
+      .SetFirstDisplayAsInternalDisplay();
+
   const std::string kPackage1 = "org.chromium.package1";
   std::vector<IntentHandlerInfoPtr> handlers;
   handlers.emplace_back(CreateIntentHandlerInfo("App 1", kPackage1));
@@ -1422,9 +1455,8 @@ TEST_F(NoteTakingHelperTest, SetAppEnabledOnLockScreen) {
         kNotSupported}}));
 
   // Allowlist prod app by policy.
-  profile_prefs_->SetManagedPref(
-      prefs::kNoteTakingAppsLockScreenAllowlist,
-      extensions::ListBuilder().Append(prod_app->id()).Build());
+  profile_prefs_->SetManagedPref(prefs::kNoteTakingAppsLockScreenAllowlist,
+                                 base::Value::List().Append(prod_app->id()));
 
   // The preferred app's status hasn't changed, so the observers can remain
   // agnostic of the policy change.
@@ -1439,9 +1471,8 @@ TEST_F(NoteTakingHelperTest, SetAppEnabledOnLockScreen) {
         kNotSupported}}));
 
   // Change allowlist so only dev app is allowlisted.
-  profile_prefs_->SetManagedPref(
-      prefs::kNoteTakingAppsLockScreenAllowlist,
-      extensions::ListBuilder().Append(dev_app->id()).Build());
+  profile_prefs_->SetManagedPref(prefs::kNoteTakingAppsLockScreenAllowlist,
+                                 base::Value::List().Append(dev_app->id()));
 
   // The preferred app status changed, so observers are expected to be notified.
   EXPECT_EQ(std::vector<Profile*>{profile()}, observer.preferred_app_updates());
@@ -1555,9 +1586,8 @@ TEST_F(NoteTakingHelperTest,
 
   // Changing policy before the app's lock screen availability has been reported
   // to NoteTakingHelper clients is not expected to fire observers.
-  profile_prefs_->SetManagedPref(
-      prefs::kNoteTakingAppsLockScreenAllowlist,
-      extensions::ListBuilder().Append(app->id()).Build());
+  profile_prefs_->SetManagedPref(prefs::kNoteTakingAppsLockScreenAllowlist,
+                                 base::Value::List().Append(app->id()));
   EXPECT_TRUE(observer.preferred_app_updates().empty());
 
   EXPECT_TRUE(AvailableAppsMatch(

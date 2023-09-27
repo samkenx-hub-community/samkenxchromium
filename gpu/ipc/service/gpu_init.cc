@@ -51,6 +51,8 @@
 #endif
 
 #if BUILDFLAG(IS_OZONE)
+#include "gpu/vulkan/drm_modifiers_filter_vulkan.h"
+#include "ui/ozone/public/drm_modifiers_filter.h"
 #include "ui/ozone/public/ozone_platform.h"
 #include "ui/ozone/public/surface_factory_ozone.h"
 #endif
@@ -98,13 +100,17 @@ void InitializePlatformOverlaySettings(GPUInfo* gpu_info,
   // Also, this has to be called after falling back to SwiftShader decision is
   // finalized because this function depends on GL is ANGLE's GLES or not.
   gl::DirectCompositionOverlayWorkarounds workarounds = {
+      .disable_sw_video_overlays = gpu_feature_info.IsWorkaroundEnabled(
+          DISABLE_DIRECT_COMPOSITION_SW_VIDEO_OVERLAYS),
+      .disable_decode_swap_chain =
+          gpu_feature_info.IsWorkaroundEnabled(DISABLE_DECODE_SWAP_CHAIN),
       .enable_bgra8_overlays_with_yuv_overlay_support =
           gpu_feature_info.IsWorkaroundEnabled(
               gpu::ENABLE_BGRA8_OVERLAYS_WITH_YUV_OVERLAY_SUPPORT),
       .force_nv12_overlay_support =
           gpu_feature_info.IsWorkaroundEnabled(gpu::FORCE_NV12_OVERLAY_SUPPORT),
       .force_rgb10a2_overlay_support = gpu_feature_info.IsWorkaroundEnabled(
-          gpu::FORCE_RGB10A2_OVERLAY_SUPPORT_FLAGS),
+          gpu::FORCE_RGB10A2_OVERLAY_SUPPORT),
       .check_ycbcr_studio_g22_left_p709_for_nv12_support =
           gpu_feature_info.IsWorkaroundEnabled(
               gpu::CHECK_YCBCR_STUDIO_G22_LEFT_P709_FOR_NV12_SUPPORT)};
@@ -153,6 +159,27 @@ class GpuWatchdogInit {
   // #constexpr-ctor-field-initializer
   RAW_PTR_EXCLUSION GpuWatchdogThread* watchdog_ptr_ = nullptr;
 };
+
+void PauseGpuWatchdog(GpuWatchdogThread* watchdog_thread) {
+  if (watchdog_thread) {
+    if (base::FeatureList::IsEnabled(
+            features::kEnableWatchdogReportOnlyModeOnGpuInit)) {
+      watchdog_thread->EnableReportOnlyMode();
+    } else {
+      watchdog_thread->PauseWatchdog();
+    }
+  }
+}
+void ResumeGpuWatchdog(GpuWatchdogThread* watchdog_thread) {
+  if (watchdog_thread) {
+    if (base::FeatureList::IsEnabled(
+            features::kEnableWatchdogReportOnlyModeOnGpuInit)) {
+      watchdog_thread->DisableReportOnlyMode();
+    } else {
+      watchdog_thread->ResumeWatchdog();
+    }
+  }
+}
 
 // TODO(https://crbug.com/1095744): We currently do not handle
 // VK_ERROR_DEVICE_LOST in in-process-gpu.
@@ -400,25 +427,13 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
 #endif  // BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
   ui::OzonePlatform::InitializeForGPU(params);
-  // We need to get supported formats before sandboxing to avoid an known
-  // issue which breaks the camera preview. (b/166850715)
-  std::vector<gfx::BufferFormat> supported_buffer_formats_for_texturing =
-      ui::OzonePlatform::GetInstance()
-          ->GetSurfaceFactoryOzone()
-          ->GetSupportedFormatsForTexturing();
 #endif  // BUILDFLAG(IS_OZONE)
 
   gl::GLDisplay* gl_display = nullptr;
 
   // Pause watchdog. LoadLibrary in GLBindings may take long time.
-  if (watchdog_thread_) {
-    if (base::FeatureList::IsEnabled(
-            features::kEnableWatchdogReportOnlyModeOnGpuInit)) {
-      watchdog_thread_->EnableReportOnlyMode();
-    } else {
-      watchdog_thread_->PauseWatchdog();
-    }
-  }
+  PauseGpuWatchdog(watchdog_thread_.get());
+
   if (!gl::init::InitializeStaticGLBindingsOneOff()) {
     VLOG(1) << "gl::init::InitializeStaticGLBindingsOneOff failed";
     return false;
@@ -435,14 +450,6 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
       return false;
     }
   }
-  if (watchdog_thread_) {
-    if (base::FeatureList::IsEnabled(
-            features::kEnableWatchdogReportOnlyModeOnGpuInit)) {
-      watchdog_thread_->DisableReportOnlyMode();
-    } else {
-      watchdog_thread_->ResumeWatchdog();
-    }
-  }
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
   // The ContentSandboxHelper is currently the only one implementation of
@@ -452,16 +459,12 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
   // sure the watchdog is paused as loadLibrary may take a long time and
   // restarting the GPU process will not help.
   if (!attempted_startsandbox) {
-    if (watchdog_thread_)
-      watchdog_thread_->PauseWatchdog();
-
     // The sandbox is not started yet.
     sandbox_helper_->PreSandboxStartup(gpu_preferences);
-
-    if (watchdog_thread_)
-      watchdog_thread_->ResumeWatchdog();
   }
 #endif
+
+  ResumeGpuWatchdog(watchdog_thread_.get());
 
   auto impl = gl::GetGLImplementationParts();
   bool gl_disabled = impl == gl::kGLImplementationDisabled;
@@ -605,14 +608,23 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
     // On Windows, MITIGATION_FORCE_MS_SIGNED_BINS is used which disallows
     // loading any .dll that is not signed by Microsoft. Preload the SwiftShader
     // .dll so it may be accessed later. This is needed for WebGPU to
-    // initialize a software fallback adapter.
-    // Don't handle errors as failure here is non-fatal. Loading SwiftShader
+    // initialize a software fallback adapter. Also do the same for DXC,
+    // which WebGPU may use on D3D12 devices.
+    // Don't handle errors as failure here is non-fatal. Loading either DLL
     // again at a later point will fail as well.
+    PauseGpuWatchdog(watchdog_thread_.get());
+
     base::FilePath module_path;
     if (base::PathService::Get(base::DIR_MODULE, &module_path)) {
       base::LoadNativeLibrary(module_path.Append(L"vk_swiftshader.dll"),
                               nullptr);
+
+#if defined(DAWN_USE_BUILT_DXC)
+      base::LoadNativeLibrary(module_path.Append(L"dxcompiler.dll"), nullptr);
+#endif
     }
+
+    ResumeGpuWatchdog(watchdog_thread_.get());
   }
 #endif  // BUILDFLAG(IS_WIN)
 
@@ -662,6 +674,15 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
       return false;
     }
   }
+
+#if BUILDFLAG(IS_OZONE)
+  // We need to get supported formats before sandboxing to avoid an known
+  // issue which breaks the camera preview. (b/166850715)
+  std::vector<gfx::BufferFormat> supported_buffer_formats_for_texturing =
+      ui::OzonePlatform::GetInstance()
+          ->GetSurfaceFactoryOzone()
+          ->GetSupportedFormatsForTexturing();
+#endif  // BUILDFLAG(IS_OZONE)
 
   InitializePlatformOverlaySettings(&gpu_info_, gpu_feature_info_);
 
@@ -765,19 +786,23 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
   ui::OzonePlatform::GetInstance()->AfterSandboxEntry();
   gpu_feature_info_.supported_buffer_formats_for_allocation_and_texturing =
       std::move(supported_buffer_formats_for_texturing);
-#endif
+#if BUILDFLAG(ENABLE_VULKAN)
+  auto* factory = ui::OzonePlatform::GetInstance()->GetSurfaceFactoryOzone();
+  if (gpu_feature_info_.status_values[GPU_FEATURE_TYPE_VULKAN] ==
+          kGpuFeatureStatusEnabled &&
+      factory->SupportsDrmModifiersFilter()) {
+    DCHECK(vulkan_implementation_ &&
+           vulkan_implementation_->GetVulkanInstance() &&
+           vulkan_implementation_->GetVulkanInstance()->vk_instance() !=
+               VK_NULL_HANDLE);
+    factory->SetDrmModifiersFilter(std::make_unique<DrmModifiersFilterVulkan>(
+        vulkan_implementation_.get()));
+  }
+#endif  // BUILDFLAG(ENABLE_VULKAN)
+#endif  // BUILDFLAG(IS_OZONE)
 
   if (!watchdog_thread_)
     watchdog_init.SetGpuWatchdogPtr(nullptr);
-
-#if BUILDFLAG(IS_WIN)
-  if (gpu_feature_info_.IsWorkaroundEnabled(DISABLE_DECODE_SWAP_CHAIN))
-    gl::DisableDirectCompositionDecodeSwapChain();
-  if (gpu_feature_info_.IsWorkaroundEnabled(
-          DISABLE_DIRECT_COMPOSITION_SW_VIDEO_OVERLAYS)) {
-    gl::DisableDirectCompositionSoftwareOverlays();
-  }
-#endif
 
 #if defined(USE_EGL) && !BUILDFLAG(IS_MAC)
   if (gpu_feature_info_.IsWorkaroundEnabled(CHECK_EGL_FENCE_BEFORE_WAIT))
@@ -933,6 +958,12 @@ void GpuInit::InitializeInProcess(base::CommandLine* command_line,
 
   InitializePlatformOverlaySettings(&gpu_info_, gpu_feature_info_);
 
+  if (!gl_disabled) {
+    if (!CollectGpuExtraInfo(&gpu_extra_info_, gpu_preferences)) {
+      VLOG(1) << "gpu::CollectGpuExtraInfo failed";
+    }
+  }
+
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
   // Driver may create a compatibility profile context when collect graphics
   // information on Linux platform. Try to collect graphics information
@@ -973,11 +1004,6 @@ void GpuInit::InitializeInProcess(base::CommandLine* command_line,
 #endif
 
   DisableInProcessGpuVulkan(&gpu_feature_info_, &gpu_preferences_);
-
-#if BUILDFLAG(IS_WIN)
-  if (gpu_feature_info_.IsWorkaroundEnabled(DISABLE_DECODE_SWAP_CHAIN))
-    gl::DisableDirectCompositionDecodeSwapChain();
-#endif
 
   UMA_HISTOGRAM_ENUMERATION("GPU.GLImplementation", gl::GetGLImplementation());
 }
@@ -1027,24 +1053,6 @@ bool GpuInit::InitializeVulkan() {
   // histograms.xml when we start Vulkan finch on Windows.
 
   if (!vulkan_implementation_)
-    return false;
-
-  const base::FeatureParam<std::string> disable_patterns(
-      &features::kVulkan, "disable_by_gl_renderer",
-      "*Mali-G?? M*" /* https://crbug.com/1183702 */);
-  if (MatchGLInfo(gpu_info_.gl_renderer, disable_patterns.Get()))
-    return false;
-
-  const base::FeatureParam<std::string> disable_driver_patterns(
-      &features::kVulkan, "disable_by_gl_driver",
-#if BUILDFLAG(IS_ANDROID)
-      "324.0|331.0|334.0|378.0|415.0|420.0|444.0" /* https://crbug.com/1246857
-                                                   */
-#else
-      ""
-#endif
-  );
-  if (MatchGLInfo(gpu_info_.gpu.driver_version, disable_driver_patterns.Get()))
     return false;
 
   const base::FeatureParam<std::string> force_enable_patterns(

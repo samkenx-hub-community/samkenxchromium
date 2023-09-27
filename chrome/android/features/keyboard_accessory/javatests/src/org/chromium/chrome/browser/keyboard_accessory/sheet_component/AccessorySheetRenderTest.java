@@ -55,7 +55,7 @@ import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.CreditCardAcces
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.PasswordAccessorySheetCoordinator;
 import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
-import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.content_public.browser.test.NativeLibraryTestUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.ui.AsyncViewProvider;
@@ -68,15 +68,16 @@ import org.chromium.ui.test.util.NightModeTestUtils;
 import org.chromium.ui.test.util.ViewUtils;
 
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * These tests render screenshots of various accessory sheets and compare them to a gold standard.
  */
 @RunWith(ParameterizedRunner.class)
 @ParameterAnnotations.UseRunnerDelegate(ChromeJUnit4RunnerDelegate.class)
-@EnableFeatures({ChromeFeatureList.AUTOFILL_KEYBOARD_ACCESSORY})
+@DisableFeatures(ChromeFeatureList.AUTOFILL_ENABLE_NEW_CARD_ART_AND_NETWORK_IMAGES)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 public class AccessorySheetRenderTest {
     @ParameterAnnotations.ClassParameter
@@ -101,8 +102,10 @@ public class AccessorySheetRenderTest {
                     .build();
 
     public AccessorySheetRenderTest(boolean nightModeEnabled, boolean useRtlLayout) {
-        FeatureList.setTestFeatures(
-                Collections.singletonMap(ChromeFeatureList.AUTOFILL_KEYBOARD_ACCESSORY, true));
+        Map<String, Boolean> featureMap = new HashMap<>();
+        featureMap.put(ChromeFeatureList.AUTOFILL_ENABLE_NEW_CARD_ART_AND_NETWORK_IMAGES, false);
+        FeatureList.setTestFeatures(featureMap);
+
         setRtlForTesting(useRtlLayout);
         NightModeTestUtils.setUpNightModeForBlankUiTestActivity(nightModeEnabled);
         mRenderTestRule.setNightModeEnabled(nightModeEnabled);

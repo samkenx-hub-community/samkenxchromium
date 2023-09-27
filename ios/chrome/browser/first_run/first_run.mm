@@ -10,11 +10,8 @@
 #import "base/no_destructor.h"
 #import "base/path_service.h"
 #import "components/pref_registry/pref_registry_syncable.h"
-#import "ios/chrome/browser/paths/paths.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "components/startup_metric_utils/browser/startup_metric_utils.h"
+#import "ios/chrome/browser/shared/model/paths/paths.h"
 
 namespace {
 
@@ -77,12 +74,15 @@ bool FirstRun::RemoveSentinel() {
 }
 
 // static
-FirstRun::SentinelResult FirstRun::CreateSentinel(base::File::Error* error) {
+startup_metric_utils::FirstRunSentinelCreationResult FirstRun::CreateSentinel(
+    base::File::Error* error) {
   base::FilePath first_run_sentinel;
   if (!GetFirstRunSentinelFilePath(&first_run_sentinel))
-    return SENTINEL_RESULT_FAILED_TO_GET_PATH;
+    return startup_metric_utils::FirstRunSentinelCreationResult::
+        kFailedToGetPath;
   if (base::PathExists(first_run_sentinel))
-    return SENTINEL_RESULT_FILE_PATH_EXISTS;
+    return startup_metric_utils::FirstRunSentinelCreationResult::
+        kFilePathExists;
   bool success = base::WriteFile(first_run_sentinel, base::StringPiece());
   if (error)
     *error = base::File::GetLastFileError();
@@ -90,7 +90,10 @@ FirstRun::SentinelResult FirstRun::CreateSentinel(base::File::Error* error) {
   if (success && !GetSentinelInfoGlobal().has_value()) {
     LoadSentinelInfo();
   }
-  return success ? SENTINEL_RESULT_SUCCESS : SENTINEL_RESULT_FILE_ERROR;
+  return success
+             ? startup_metric_utils::FirstRunSentinelCreationResult::kSuccess
+             : startup_metric_utils::FirstRunSentinelCreationResult::
+                   kFileSystemError;
 }
 
 // static
@@ -118,4 +121,9 @@ const char* FirstRun::GetPingDelayPrefName() {
 void FirstRun::RegisterProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterIntegerPref(GetPingDelayPrefName(), 0);
+}
+
+// static
+void FirstRun::ClearStateForTesting() {
+  first_run_ = FIRST_RUN_UNKNOWN;
 }

@@ -13,6 +13,7 @@
 #include "content/public/test/content_browser_test_utils.h"
 #include "content/shell/browser/shell.h"
 #include "media/base/media_switches.h"
+#include "media/base/supported_types.h"
 #include "media/media_buildflags.h"
 #include "ui/display/display_switches.h"
 
@@ -134,23 +135,14 @@ IN_PROC_BROWSER_TEST_F(MediaCanPlayTypeTest, CodecSupportTest_AvcLevels) {
 
 IN_PROC_BROWSER_TEST_F(MediaCanPlayTypeTest, CodecSupportTest_Mp4aVariants) {
 #if BUILDFLAG(USE_PROPRIETARY_CODECS)
-#if BUILDFLAG(IS_ANDROID)
-  // xHE-AAC support is currently only available on P+.
-  if (base::android::BuildInfo::GetInstance()->sdk_int() >=
-      base::android::SDK_VERSION_P) {
+  if (media::IsSupportedAudioType({media::AudioCodec::kAAC,
+                                   media::AudioCodecProfile::kXHE_AAC,
+                                   false})) {
     ExecuteTest(
         "testMp4aVariants(true, true)");  // has_proprietary_codecs=true,
                                           // has_xhe_aac_support=true
     return;
   }
-#elif BUILDFLAG(IS_MAC)
-  if (__builtin_available(macOS 10.15, *)) {
-    ExecuteTest(
-        "testMp4aVariants(true, true)");  // has_proprietary_codecs=true,
-                                          // has_xhe_aac_support=true
-    return;
-  }
-#endif
   ExecuteTest("testMp4aVariants(true, false)");  // has_proprietary_codecs=true,
                                                  // has_xhe_aac_support=false
 #else
@@ -177,15 +169,9 @@ IN_PROC_BROWSER_TEST_F(MediaCanPlayTypeTest, CodecSupportTest_AAC_ADTS) {
 }
 
 IN_PROC_BROWSER_TEST_F(MediaCanPlayTypeTest, CodecSupportTest_Mpeg2Ts) {
-// TODO(crbug.com/1091962): This is actually wrong. We don't support mpeg2ts in
-// src=, only MSE playbacks, so this should actually indicate no support when
-// querying canPlayType().
-#if BUILDFLAG(ENABLE_MSE_MPEG2TS_STREAM_PARSER) && \
-    BUILDFLAG(USE_PROPRIETARY_CODECS)
-  ExecuteTest("testMp2tsVariants(true)");  // has_mp2ts_support=true
-#else
+  // Regardless of mp2t stream parser being enabled, it is _not_ supported for
+  // HTMLMediaElement::canPlayType
   ExecuteTest("testMp2tsVariants(false)");  // has_mp2ts_support=false
-#endif
 }
 
 // See more complete codec string testing in media/base/video_codecs_unittest.cc

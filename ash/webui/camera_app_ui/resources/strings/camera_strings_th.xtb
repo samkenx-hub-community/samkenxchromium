@@ -27,9 +27,7 @@
 <translation id="199526504800285197">หยุดบันทึกแล้ว</translation>
 <translation id="1995951722691075581">หยุดบันทึกแล้วเนื่องจากพื้นที่เก็บข้อมูลในอุปกรณ์เหลือน้อย คุณต้องเพิ่มพื้นที่ว่างในอุปกรณ์เพื่อบันทึกวิดีโอมากขึ้น</translation>
 <translation id="2036868001356139588">ระยะเวลาของตัวจับเวลา</translation>
-<translation id="2050339315714019657">แนวตั้ง</translation>
 <translation id="2064538373111010176">ใช้งาน <ph name="CAMERA" /> อยู่</translation>
-<translation id="2128052519899549250">บันทึกวิดีโอไทม์แลปส์</translation>
 <translation id="2134029355740465625">การตั้งค่าวิดีโอ</translation>
 <translation id="2144806332417375165">กำหนดพารามิเตอร์วิดีโอเอง</translation>
 <translation id="2175927920773552910">คิวอาร์โค้ด</translation>
@@ -59,6 +57,7 @@
 <translation id="3566302376254083266">ย้ายไปทางด้านซ้ายบน</translation>
 <translation id="3573890771273113519">เปลี่ยนไปใช้โหมดสแกน</translation>
 <translation id="3583444040776960729">มุมซ้ายล่างของเอกสาร</translation>
+<translation id="3642192109456033823">กำลังประมวลผลวิดีโอ...</translation>
 <translation id="3789724198583203151">หมุน 90 องศาทวนเข็มนาฬิกา</translation>
 <translation id="3810838688059735925">วิดีโอ</translation>
 <translation id="3892148308691398805">คัดลอกข้อความ</translation>
@@ -67,9 +66,10 @@
 <translation id="4118525110028899586">หยุดบันทึกชั่วคราว</translation>
 <translation id="4121305183798804752">ตรวจพบเอกสาร</translation>
 <translation id="414641094616694804">เปลี่ยนความละเอียดของกล้องนี้ไม่ได้</translation>
+<translation id="4176463684765177261">ปิดการทำงาน</translation>
 <translation id="4269820728363426813">คัดลอกที่อยู่ลิงก์</translation>
-<translation id="4281620174117014503">ความละเอียดปานกลาง</translation>
 <translation id="428234092390943511">ภาพขนาดย่อของหน้า</translation>
+<translation id="4349714250734879769">ปรับขนาดเฟรมตาม Chrome</translation>
 <translation id="4383571725254449280">พิมพ์บันทึกประสิทธิภาพ</translation>
 <translation id="4445542136948522167">หยุดถ่ายภาพ</translation>
 <translation id="4570032796877367747">กล้องหน้า</translation>
@@ -82,19 +82,21 @@
 <translation id="4864143361253542638">รายการหน้าที่สแกน</translation>
 <translation id="4890010094662541459">3 x 3</translation>
 <translation id="491895758387112773">การบันทึกวิดีโอแบบหลายสตรีม</translation>
+<translation id="495170559598752135">การทำงาน</translation>
 <translation id="4984613436295737187">Quad HD (1440p)</translation>
 <translation id="5034763830503483128">สัดส่วนภาพ</translation>
 <translation id="5057360777601936059">ขณะนี้กล้องไม่พร้อมใช้งาน
         โปรดตรวจสอบว่ากล้องเชื่อมต่ออย่างถูกต้อง</translation>
 <translation id="5163387177077603948">ย้ายไปทางด้านขวา</translation>
+<translation id="5219374179772385066">โหมดไทม์แลปส์พร้อมให้ใช้งานแล้ว</translation>
 <translation id="5235304959032763950">16 ต่อ 9</translation>
 <translation id="5266635337630551423">มุมซ้ายบนของเอกสาร</translation>
 <translation id="5317780077021120954">บันทึก</translation>
 <translation id="5320594929574852403">ย้ายไปทางด้านซ้าย</translation>
 <translation id="5374917190292010970">4K (2160p)</translation>
-<translation id="5577251651370645658">ไทม์แลปส์</translation>
 <translation id="5662366948659129155">กำลังสแกนหน้า <ph name="COUNT" /></translation>
 <translation id="5671277269877808209">สี่เหลี่ยมจัตุรัส</translation>
+<translation id="574392208103952083">ปานกลาง</translation>
 <translation id="5746169159649715125">บันทึกเป็น PDF</translation>
 <translation id="5753488212459587150">เปิดใช้โหมดผู้เชี่ยวชาญ</translation>
 <translation id="5759254179196327752">สแกนเอกสาร</translation>
@@ -122,6 +124,7 @@
 <translation id="6888362557094394345">ย้ายไปทางด้านล่าง</translation>
 <translation id="695140971690006676">รีเซ็ตทั้งหมด</translation>
 <translation id="6965382102122355670">ตกลง</translation>
+<translation id="6965830616442491568">ภาพบุคคล</translation>
 <translation id="698156982839284926">3 วินาที</translation>
 <translation id="7134221860976209830">ตัวจับเวลา 10 วินาที</translation>
 <translation id="7191890674911603392">ประเภทการบันทึก</translation>
@@ -137,6 +140,7 @@
 <translation id="7658239707568436148">ยกเลิก</translation>
 <translation id="7670511624014457267">60 FPS</translation>
 <translation id="7671804233658741790">มุมขวาล่างของเอกสาร</translation>
+<translation id="7684446460490665873">บันทึกวิดีโอไทม์แลปส์</translation>
 <translation id="7692090236657809299">เปิดใช้การเลื่อน การเอียง การซูม</translation>
 <translation id="7726641833034062494">บันทึกวิดีโอทั่วไป</translation>
 <translation id="7748344063862150053">มุมขวาบนของเอกสาร</translation>
@@ -148,6 +152,7 @@
 <translation id="8145038249676204903">เปลี่ยนเป็นโหมดถ่ายภาพ</translation>
 <translation id="8167081290930651932">บันทึกเป็นรูปภาพ</translation>
 <translation id="8239780215768881278">ถ่ายสแนปชอตในวิดีโอ</translation>
+<translation id="8346544573713510785">ปรับขนาดเฟรมตาม HAL ของกล้อง</translation>
 <translation id="8425673304802773841">เอียงลง</translation>
 <translation id="8428213095426709021">การตั้งค่า</translation>
 <translation id="8629662593426079630">360p</translation>
@@ -162,6 +167,7 @@
 <translation id="9045010116236796332">จัดขอบเอกสารทุกด้านให้อยู่ภายในกรอบ</translation>
 <translation id="9045155556724273246">10 วินาที</translation>
 <translation id="906331135292332864">กำลังดำเนินการกับรูปภาพ...</translation>
+<translation id="9161584225258678723">ไทม์แลปส์</translation>
 <translation id="922762992951083513">เปิดมิเรอร์</translation>
 <translation id="945522503751344254">ส่งความคิดเห็น</translation>
 </translationbundle>

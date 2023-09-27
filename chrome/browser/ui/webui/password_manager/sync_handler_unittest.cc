@@ -4,12 +4,13 @@
 
 #include "chrome/browser/ui/webui/password_manager/sync_handler.h"
 
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/signin/identity_test_environment_profile_adaptor.h"
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
 #include "chrome/test/base/testing_browser_process.h"
-#include "components/sync/driver/sync_service_utils.h"
+#include "components/sync/service/sync_service_utils.h"
 #include "components/sync/test/mock_sync_service.h"
 #include "content/public/test/test_web_ui.h"
 
@@ -68,9 +69,8 @@ class SyncHandlerTest : public ChromeRenderViewHostTestHarness {
     auto account_info = identity_test_env()->MakePrimaryAccountAvailable(
         "user@gmail.com", signin::ConsentLevel::kSync);
     ON_CALL(*sync_service(), HasSyncConsent).WillByDefault(Return(true));
-    ON_CALL(*sync_service()->GetMockUserSettings(), IsSyncRequested)
-        .WillByDefault(Return(true));
-    ON_CALL(*sync_service()->GetMockUserSettings(), IsFirstSetupComplete())
+    ON_CALL(*sync_service()->GetMockUserSettings(),
+            IsInitialSyncFeatureSetupComplete())
         .WillByDefault(Return(true));
     ON_CALL(*sync_service(), GetAccountInfo)
         .WillByDefault(Return(account_info));
@@ -115,8 +115,8 @@ class SyncHandlerTest : public ChromeRenderViewHostTestHarness {
   content::TestWebUI web_ui_;
   std::unique_ptr<IdentityTestEnvironmentProfileAdaptor>
       identity_test_env_adaptor_;
-  raw_ptr<MockSyncService> mock_sync_service_;
-  SyncHandler* handler_;
+  raw_ptr<MockSyncService, DanglingUntriaged> mock_sync_service_;
+  raw_ptr<SyncHandler> handler_;
 };
 
 TEST_F(SyncHandlerTest, HandleTrustedVaultBannerStateNotShown) {
@@ -146,9 +146,11 @@ TEST_F(SyncHandlerTest, HandleTrustedVaultBannerStateOfferOptIn) {
   ON_CALL(*sync_service(), GetTransportState())
       .WillByDefault(Return(syncer::SyncService::TransportState::ACTIVE));
   ON_CALL(*sync_service(), GetActiveDataTypes())
-      .WillByDefault(testing::Return(syncer::ModelTypeSet(syncer::PASSWORDS)));
+      .WillByDefault(
+          testing::Return(syncer::ModelTypeSet({syncer::PASSWORDS})));
   ON_CALL(*sync_service()->GetMockUserSettings(), GetEncryptedDataTypes())
-      .WillByDefault(testing::Return(syncer::ModelTypeSet(syncer::PASSWORDS)));
+      .WillByDefault(
+          testing::Return(syncer::ModelTypeSet({syncer::PASSWORDS})));
   ON_CALL(*sync_service()->GetMockUserSettings(), GetPassphraseType())
       .WillByDefault(Return(syncer::PassphraseType::kKeystorePassphrase));
   ON_CALL(*sync_service()->GetMockUserSettings(), IsPassphraseRequired())
@@ -234,6 +236,22 @@ TEST_F(SyncHandlerTest, AccountInfo) {
   ASSERT_EQ(num_account_change_updates + 1, update_args.size());
   ASSERT_TRUE(update_args[1]->is_dict());
   EXPECT_EQ(account_info.email, *update_args[1]->GetDict().FindString("email"));
+}
+
+TEST_F(SyncHandlerTest, NotEligibleForAccountStorageWhenSetupNotComplete) {
+  CreateTestSyncAccount();
+  ON_CALL(*sync_service()->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
+      .WillByDefault(Return(false));
+
+  base::Value::List args;
+  args.Append(kTestCallbackId);
+  web_ui()->ProcessWebUIMessage(GURL(), "GetSyncInfo", std::move(args));
+
+  auto& data = *web_ui()->call_data().back();
+  ASSERT_TRUE(CallbackReturnedSuccessfully(data));
+  ASSERT_TRUE(data.arg3()->is_dict());
+  EXPECT_FALSE(*data.arg3()->GetDict().FindBool("isEligibleForAccountStorage"));
 }
 
 }  // namespace password_manager

@@ -15,6 +15,7 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/memory/raw_ptr.h"
 #include "base/values.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
@@ -82,7 +83,7 @@ class TestSelectFileDialog : public ui::SelectFileDialog {
   bool IsRunning(gfx::NativeWindow owning_window) const override {
     return true;
   }
-  void ListenerDestroyed() override {}
+  void ListenerDestroyed() override { listener_ = nullptr; }
   bool HasMultipleFileTypeChoicesImpl() override { return false; }
 
  private:
@@ -158,6 +159,11 @@ class FakeScanningAppDelegate : public ScanningAppDelegate {
 
   std::string GetScanSettingsFromPrefs() override { return scan_settings_; }
 
+  BindScanServiceCallback GetBindScanServiceCallback(
+      content::WebUI* web_ui) override {
+    return base::DoNothing();
+  }
+
   // Returns the file paths saved in OpenFilesInMediaApp().
   const std::vector<base::FilePath>& file_paths() const { return file_paths_; }
 
@@ -217,7 +223,7 @@ class ScanningHandlerTest : public testing::Test {
   content::BrowserTaskEnvironment task_environment_;
   content::TestWebUI web_ui_;
   std::unique_ptr<ScanningHandler> scanning_handler_;
-  FakeScanningAppDelegate* fake_scanning_app_delegate_;
+  raw_ptr<FakeScanningAppDelegate, ExperimentalAsh> fake_scanning_app_delegate_;
   base::ScopedTempDir temp_dir_;
   base::FilePath my_files_path_;
 };
@@ -228,7 +234,7 @@ class ScanningHandlerTest : public testing::Test {
 TEST_F(ScanningHandlerTest, SelectDirectory) {
   const base::FilePath base_file_path("/this/is/a/test/directory/Base Name");
   ui::SelectFileDialog::SetFactory(
-      new TestSelectFileDialogFactory(base_file_path));
+      std::make_unique<TestSelectFileDialogFactory>(base_file_path));
 
   const size_t call_data_count_before_call = web_ui_.call_data().size();
   base::Value::List args;
@@ -248,7 +254,7 @@ TEST_F(ScanningHandlerTest, SelectDirectory) {
 // base name.
 TEST_F(ScanningHandlerTest, CancelDialog) {
   ui::SelectFileDialog::SetFactory(
-      new TestSelectFileDialogFactory(base::FilePath()));
+      std::make_unique<TestSelectFileDialogFactory>(base::FilePath()));
 
   const size_t call_data_count_before_call = web_ui_.call_data().size();
   base::Value::List args;

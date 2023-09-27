@@ -14,6 +14,7 @@
 #include "ash/system/model/system_tray_model.h"
 #include "ash/system/network/network_list_mobile_header_view.h"
 #include "ash/system/network/network_list_network_header_view.h"
+#include "ash/system/network/network_utils.h"
 #include "ash/system/network/tray_network_state_model.h"
 #include "ash/system/tray/hover_highlight_view.h"
 #include "ash/system/tray/tray_popup_utils.h"
@@ -29,40 +30,6 @@
 
 namespace ash {
 
-namespace {
-
-using chromeos::network_config::mojom::DeviceStateProperties;
-using chromeos::network_config::mojom::NetworkType;
-
-int GetAddESimTooltipMessageId() {
-  const DeviceStateProperties* cellular_device =
-      Shell::Get()->system_tray_model()->network_state_model()->GetDevice(
-          NetworkType::kCellular);
-
-  DCHECK(cellular_device);
-
-  switch (cellular_device->inhibit_reason) {
-    case chromeos::network_config::mojom::InhibitReason::kInstallingProfile:
-      return IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_INSTALLING_PROFILE;
-    case chromeos::network_config::mojom::InhibitReason::kRenamingProfile:
-      return IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_RENAMING_PROFILE;
-    case chromeos::network_config::mojom::InhibitReason::kRemovingProfile:
-      return IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_REMOVING_PROFILE;
-    case chromeos::network_config::mojom::InhibitReason::kConnectingToProfile:
-      return IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_CONNECTING_TO_PROFILE;
-    case chromeos::network_config::mojom::InhibitReason::kRefreshingProfileList:
-      return IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_REFRESHING_PROFILE_LIST;
-    case chromeos::network_config::mojom::InhibitReason::kNotInhibited:
-      return IDS_ASH_STATUS_TRAY_ADD_CELLULAR_LABEL;
-    case chromeos::network_config::mojom::InhibitReason::kResettingEuiccMemory:
-      return IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_RESETTING_ESIM;
-    case chromeos::network_config::mojom::InhibitReason::kDisablingProfile:
-      return IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_DISABLING_PROFILE;
-  }
-}
-
-}  // namespace
-
 NetworkListMobileHeaderViewImpl::NetworkListMobileHeaderViewImpl(
     NetworkListNetworkHeaderView::Delegate* delegate)
     : NetworkListMobileHeaderView(delegate) {
@@ -72,6 +39,10 @@ NetworkListMobileHeaderViewImpl::NetworkListMobileHeaderViewImpl(
 NetworkListMobileHeaderViewImpl::~NetworkListMobileHeaderViewImpl() = default;
 
 void NetworkListMobileHeaderViewImpl::AddExtraButtons() {
+  if (features::IsQsRevampEnabled()) {
+    return;
+  }
+
   // The button navigates to Settings, only add it if this can occur.
   if (!TrayPopupUtils::CanOpenWebUISettings()) {
     return;
@@ -87,12 +58,23 @@ void NetworkListMobileHeaderViewImpl::AddExtraButtons() {
       /*has_border=*/false);
   add_esim_button.get()->SetID(kAddESimButtonId);
   add_esim_button_ = add_esim_button.get();
+  container()->AddViewAt(TriView::Container::END, add_esim_button.release(),
+                         /*index=*/0);
+}
+
+void NetworkListMobileHeaderViewImpl::SetToggleState(bool enabled,
+                                                     bool is_on,
+                                                     bool animate_toggle) {
   if (features::IsQsRevampEnabled()) {
-    entry_row()->AddAdditionalRightView(add_esim_button.release());
-  } else {
-    container()->AddViewAt(TriView::Container::END, add_esim_button.release(),
-                           /*index=*/0);
+    std::u16string tooltip_text = l10n_util::GetStringFUTF16(
+        IDS_ASH_STATUS_TRAY_NETWORK_TOGGLE_MOBILE,
+        l10n_util::GetStringUTF16(
+            is_on ? IDS_ASH_STATUS_TRAY_NETWORK_MOBILE_ENABLED
+                  : IDS_ASH_STATUS_TRAY_NETWORK_MOBILE_DISABLED));
+    entry_row()->SetTooltipText(tooltip_text);
+    qs_toggle()->SetTooltipText(tooltip_text);
   }
+  NetworkListMobileHeaderView::SetToggleState(enabled, is_on, animate_toggle);
 }
 
 void NetworkListMobileHeaderViewImpl::OnToggleToggled(bool is_on) {

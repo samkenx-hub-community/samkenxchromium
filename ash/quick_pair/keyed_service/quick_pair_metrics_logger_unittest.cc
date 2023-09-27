@@ -29,6 +29,7 @@
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/test/ash_test_base.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -165,7 +166,8 @@ class QuickPairMetricsLoggerTest : public NoSessionAshTestBase {
     // desks restore data before the user signs in.
     auto user_prefs = std::make_unique<TestingPrefServiceSimple>();
     user_prefs_ = user_prefs.get();
-    RegisterUserProfilePrefs(user_prefs_->registry(), /*for_test=*/true);
+    RegisterUserProfilePrefs(user_prefs_->registry(), /*country=*/"",
+                             /*for_test=*/true);
 
     auto accountId = AccountId::FromUserEmail(kUserEmail);
     session_controller->AddUserSession(kUserEmail,
@@ -523,12 +525,17 @@ class QuickPairMetricsLoggerTest : public NoSessionAshTestBase {
 
   std::unique_ptr<MockQuickPairBrowserDelegate> browser_delegate_;
   TestingPrefServiceSimple pref_service_;
-  TestingPrefServiceSimple* user_prefs_;
+  raw_ptr<TestingPrefServiceSimple, DanglingUntriaged | ExperimentalAsh>
+      user_prefs_;
 
-  MockScannerBroker* mock_scanner_broker_ = nullptr;
-  MockPairerBroker* mock_pairer_broker_ = nullptr;
-  MockUIBroker* mock_ui_broker_ = nullptr;
-  FakeRetroactivePairingDetector* fake_retroactive_pairing_detector_ = nullptr;
+  raw_ptr<MockScannerBroker, DanglingUntriaged | ExperimentalAsh>
+      mock_scanner_broker_ = nullptr;
+  raw_ptr<MockPairerBroker, DanglingUntriaged | ExperimentalAsh>
+      mock_pairer_broker_ = nullptr;
+  raw_ptr<MockUIBroker, DanglingUntriaged | ExperimentalAsh> mock_ui_broker_ =
+      nullptr;
+  raw_ptr<FakeRetroactivePairingDetector, DanglingUntriaged | ExperimentalAsh>
+      fake_retroactive_pairing_detector_ = nullptr;
 
   std::unique_ptr<FakeFastPairRepository> fake_fast_pair_repository_;
   std::unique_ptr<ScannerBroker> scanner_broker_;

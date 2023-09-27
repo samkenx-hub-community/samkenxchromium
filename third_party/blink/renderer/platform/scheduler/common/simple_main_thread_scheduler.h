@@ -52,6 +52,9 @@ class SimpleMainThreadScheduler : public MainThreadScheduler {
   // Do nothing.
   void RemoveRAILModeObserver(RAILModeObserver const*) override;
 
+  void ForEachMainThreadIsolate(
+      base::RepeatingCallback<void(v8::Isolate* isolate)> callback) override;
+
   // Return the thread task runner (there's no separate task runner for them).
   scoped_refptr<base::SingleThreadTaskRunner> V8TaskRunner() override;
   scoped_refptr<base::SingleThreadTaskRunner> CleanupTaskRunner() override;
@@ -77,6 +80,9 @@ class SimpleMainThreadScheduler : public MainThreadScheduler {
   void SetV8Isolate(v8::Isolate* isolate) override;
   v8::Isolate* Isolate() override;
   std::unique_ptr<RendererPauseHandle> PauseScheduler() override;
+
+  // Idle tasks are dropped in `PostIdleTask()` and friends, so this is a no-op.
+  void StartIdlePeriodForTesting() override;
 
  private:
   v8::Isolate* isolate_ = nullptr;

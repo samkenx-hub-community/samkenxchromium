@@ -19,7 +19,7 @@
 
 class Profile;
 
-namespace ash {
+namespace chromeos {
 
 class ChromeKioskAppInstaller
     : private extensions::InstallObserver,
@@ -45,7 +45,9 @@ class ChromeKioskAppInstaller
   void FinalizeAppInstall();
 
   // extensions::InstallObserver overrides.
-  void OnFinishCrxInstall(const std::string& extension_id,
+  void OnFinishCrxInstall(content::BrowserContext* context,
+                          const extensions::CrxInstaller& installer,
+                          const std::string& extension_id,
                           bool success) override;
 
   // extensions::InstallStageTracker::Observer overrides.
@@ -62,7 +64,7 @@ class ChromeKioskAppInstaller
   // Returns true if all secondary apps have been installed.
   bool AreSecondaryAppsInstalled() const;
 
-  // Returns true if the app with id |id| is pending an install.
+  // Returns true if the app with id `id` is pending an install.
   bool IsAppInstallPending(const std::string& id) const;
 
   // Returns true if any secondary app is pending.
@@ -71,7 +73,7 @@ class ChromeKioskAppInstaller
   // Returns true if the primary app has a pending update.
   bool PrimaryAppHasPendingUpdate() const;
 
-  // Returns true if the app with |id| failed, and it is the primary or one of
+  // Returns true if the app with `id` failed, and it is the primary or one of
   // the secondary apps.
   bool DidPrimaryOrSecondaryAppFailedToInstall(bool success,
                                                const std::string& id) const;
@@ -99,6 +101,6 @@ class ChromeKioskAppInstaller
   base::WeakPtrFactory<ChromeKioskAppInstaller> weak_ptr_factory_{this};
 };
 
-}  // namespace ash
+}  // namespace chromeos
 
 #endif  // CHROME_BROWSER_CHROMEOS_APP_MODE_CHROME_KIOSK_APP_INSTALLER_H_

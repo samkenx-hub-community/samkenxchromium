@@ -13,6 +13,7 @@
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey.h"
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/ui/autofill/autofill_app_interface.h"
+#import "ios/chrome/browser/ui/settings/password/password_settings_app_interface.h"
 #import "ios/chrome/browser/ui/settings/password/passwords_table_view_constants.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/earl_grey/chrome_actions.h"
@@ -24,10 +25,6 @@
 #import "net/test/embedded_test_server/embedded_test_server.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using chrome_test_util::ButtonWithAccessibilityLabelId;
 using chrome_test_util::CancelButton;
@@ -104,10 +101,16 @@ id<GREYMatcher> CancelUsingOtherPasswordButton() {
   [ChromeEarlGrey loadURL:self.URL];
   [ChromeEarlGrey waitForWebStateContainingText:"hello!"];
   [AutofillAppInterface saveExamplePasswordForm];
+
+  // Mock successful reauth for opening the Password Manager.
+  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                    ReauthenticationResult::kSuccess];
 }
 
 - (void)tearDown {
   [AutofillAppInterface clearPasswordStore];
+  [PasswordSettingsAppInterface removeMockReauthenticationModule];
   [super tearDown];
 }
 
@@ -400,9 +403,9 @@ id<GREYMatcher> CancelUsingOtherPasswordButton() {
       assertWithMatcher:grey_notVisible()];
 }
 
-// Tests that the Password View Controller is not present when presenting UI.
-// TODO(crbug.com/1350323): Test is flaky.
-- (void)DISABLED_testPasswordControllerPauses {
+// Tests that the Password View Controller is still present after tapping the
+// search bar.
+- (void)testPasswordControllerWhileSearching {
   // Bring up the keyboard.
   [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
       performAction:TapWebElementWithId(kFormElementUsername)];
@@ -411,22 +414,29 @@ id<GREYMatcher> CancelUsingOtherPasswordButton() {
   [[EarlGrey selectElementWithMatcher:ManualFallbackPasswordIconMatcher()]
       performAction:grey_tap()];
 
-  // Tap the "Manage Passwords..." action.
-  [[EarlGrey selectElementWithMatcher:ManualFallbackManagePasswordsMatcher()]
+  // Tap the "Select Password..." action.
+  [[EarlGrey selectElementWithMatcher:ManualFallbackOtherPasswordsMatcher()]
       performAction:grey_tap()];
+
+  // Acknowledge concerns using other passwords on a website.
+  [[EarlGrey selectElementWithMatcher:ConfirmUsingOtherPasswordButton()]
+      performAction:grey_tap()];
+
+  // Verify the use other passwords opened.
+  [[EarlGrey
+      selectElementWithMatcher:ManualFallbackOtherPasswordsDismissMatcher()]
+      assertWithMatcher:grey_sufficientlyVisible()];
 
   // Tap the password search.
-  [[EarlGrey selectElementWithMatcher:SettingsPasswordSearchMatcher()]
+  [[EarlGrey selectElementWithMatcher:ManualFallbackPasswordSearchBarMatcher()]
       performAction:grey_tap()];
 
-  // Verify keyboard is shown without the password controller.
+  // Verify keyboard is shown and that the password controller is still present
+  // in the background.
   GREYAssertTrue([EarlGrey isKeyboardShownWithError:nil],
                  @"Keyboard Should be Shown");
   [[EarlGrey selectElementWithMatcher:ManualFallbackPasswordTableViewMatcher()]
-      assertWithMatcher:grey_notVisible()];
-
-  [[EarlGrey selectElementWithMatcher:SettingsPasswordMatcher()]
-      performAction:grey_tap()];
+      assertWithMatcher:grey_minimumVisiblePercent(0.5)];
 }
 
 // Tests that the Password View Controller is dismissed when tapping the
@@ -517,7 +527,7 @@ id<GREYMatcher> CancelUsingOtherPasswordButton() {
       assertWithMatcher:grey_sufficientlyVisible()];
 
   [[EarlGrey selectElementWithMatcher:ManualFallbackPasswordTableViewMatcher()]
-      performAction:grey_typeText(@"text")];
+      performAction:grey_replaceText(@"text")];
 
   // Verify the password controller table view and the password icon is NOT
   // visible.

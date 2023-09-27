@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -17,10 +17,7 @@
 #include "chrome/browser/web_applications/web_app_id_constants.h"
 #include "components/crx_file/id_util.h"
 #include "components/services/app_service/public/cpp/app_update.h"
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-#include "chrome/browser/ash/app_list/arc/arc_app_list_prefs.h"
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+#include "components/services/app_service/public/cpp/types_util.h"
 
 namespace apps_util {
 
@@ -90,14 +87,6 @@ GetPreinstalledWebAppsMappingForTesting() {
 
 }  // namespace
 
-bool IsSupportedAppTypePolicyId(base::StringPiece policy_id) {
-  return IsChromeAppPolicyId(policy_id) ||
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-         IsArcAppPolicyId(policy_id) || IsSystemWebAppPolicyId(policy_id) ||
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-         IsWebAppPolicyId(policy_id) || IsPreinstalledWebAppPolicyId(policy_id);
-}
-
 bool IsChromeAppPolicyId(base::StringPiece policy_id) {
   return crx_file::id_util::IdIsValid(policy_id);
 }
@@ -135,72 +124,36 @@ std::string TransformRawPolicyId(const std::string& raw_policy_id) {
   return raw_policy_id;
 }
 
-absl::optional<std::string> GetAppIdFromPolicyId(Profile* profile,
-                                                 const std::string& policy_id) {
-  // AppService might be absent in some cases, e.g. Arc++ Kiosk mode.
-  // TODO(b/240493670): Revisit this after app service is available in Kiosk.
-  if (apps::AppServiceProxyFactory::IsAppServiceAvailableForProfile(profile)) {
-    absl::optional<std::string> app_id;
-    apps::AppServiceProxyFactory::GetForProfile(profile)
-        ->AppRegistryCache()
-        .ForEachApp([&policy_id, &app_id](const apps::AppUpdate& update) {
-          if (base::Contains(update.PolicyIds(), policy_id)) {
-            DCHECK(!app_id);
-            app_id = update.AppId();
-          }
-        });
-
-    return app_id;
+std::vector<std::string> GetAppIdsFromPolicyId(Profile* profile,
+                                               const std::string& policy_id) {
+  if (!apps::AppServiceProxyFactory::IsAppServiceAvailableForProfile(profile)) {
+    return {};
   }
-
-  if (IsChromeAppPolicyId(policy_id)) {
-    return policy_id;
-  }
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  if (IsArcAppPolicyId(policy_id)) {
-    auto* arc_prefs = ArcAppListPrefs::Get(profile);
-    if (!arc_prefs) {
-      return {};
-    }
-    std::string app_id = arc_prefs->GetAppIdByPackageName(policy_id);
-    if (app_id.empty()) {
-      return {};
-    }
-    return app_id;
-  }
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-
-  return {};
+  std::vector<std::string> app_ids;
+  apps::AppServiceProxyFactory::GetForProfile(profile)
+      ->AppRegistryCache()
+      .ForEachApp([&policy_id, &app_ids](const apps::AppUpdate& update) {
+        if (IsInstalled(update.Readiness()) &&
+            base::Contains(update.PolicyIds(), policy_id)) {
+          app_ids.push_back(update.AppId());
+        }
+      });
+  return app_ids;
 }
 
 absl::optional<std::vector<std::string>> GetPolicyIdsFromAppId(
     Profile* profile,
     const std::string& app_id) {
-  // AppService might be absent in some cases, e.g. Arc++ Kiosk mode.
-  // TODO(b/240493670): Revisit this after app service is available in Kiosk.
-  if (apps::AppServiceProxyFactory::IsAppServiceAvailableForProfile(profile)) {
-    absl::optional<std::vector<std::string>> policy_ids;
-    apps::AppServiceProxyFactory::GetForProfile(profile)
-        ->AppRegistryCache()
-        .ForOneApp(app_id, [&policy_ids](const apps::AppUpdate& update) {
-          policy_ids = update.PolicyIds();
-        });
-
-    return policy_ids;
+  if (!apps::AppServiceProxyFactory::IsAppServiceAvailableForProfile(profile)) {
+    return absl::nullopt;
   }
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  // Handle Arc++ ids
-  if (auto* arc_prefs = ArcAppListPrefs::Get(profile)) {
-    if (auto app_info = arc_prefs->GetApp(app_id)) {
-      return {{app_info->package_name}};
-    }
-  }
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-
-  // Handle Chrome App ids
-  return {{app_id}};
+  absl::optional<std::vector<std::string>> policy_ids;
+  apps::AppServiceProxyFactory::GetForProfile(profile)
+      ->AppRegistryCache()
+      .ForOneApp(app_id, [&policy_ids](const apps::AppUpdate& update) {
+        policy_ids = update.PolicyIds();
+      });
+  return policy_ids;
 }
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)

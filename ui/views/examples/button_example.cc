@@ -224,11 +224,11 @@ void ButtonExample::CreateExampleView(View* container) {
                                    .SetIsDefault(true),
                                Builder<MdTextButton>()
                                    .CopyAddressTo(&md_tonal_button_)
-                                   .SetStyle(MdTextButton::Style::kTonal)
+                                   .SetStyle(ui::ButtonStyle::kTonal)
                                    .SetText(u"Tonal"),
                                Builder<MdTextButton>()
                                    .CopyAddressTo(&md_text_button_)
-                                   .SetStyle(MdTextButton::Style::kText)
+                                   .SetStyle(ui::ButtonStyle::kText)
                                    .SetText(u"Material Text"),
                                Builder<ImageButton>()
                                    .CopyAddressTo(&image_button_)
@@ -249,6 +249,11 @@ void ButtonExample::CreateExampleView(View* container) {
       base::BindRepeating(&ButtonExample::ImageButtonPressed,
                           base::Unretained(this)),
       u"Fab Prototype"));
+
+  view->AddChildView(ImageButton::CreateIconButton(
+      base::BindRepeating(&ButtonExample::ImageButtonPressed,
+                          base::Unretained(this)),
+      views::kLaunchIcon, u"Icon button"));
 
   image_button_->SetImage(ImageButton::STATE_NORMAL,
                           rb.GetImageNamed(IDR_CLOSE).ToImageSkia());

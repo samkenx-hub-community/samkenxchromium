@@ -77,11 +77,10 @@ bool HardwareVideoDecodingPreSandboxHookForVaapiOnIntel(
                            /*read_write=*/false);
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 #if BUILDFLAG(USE_VAAPI)
-  VaapiWrapper::PreSandboxInitialization();
+  VaapiWrapper::PreSandboxInitialization(/*allow_disabling_global_lock=*/true);
   return true;
 #else
-  NOTREACHED();
-  return false;
+  NOTREACHED_NORETURN();
 #endif  // BUILDFLAG(USE_VAAPI)
 }
 
@@ -106,11 +105,10 @@ bool HardwareVideoDecodingPreSandboxHookForVaapiOnAMD(
   }
 
 #if BUILDFLAG(USE_VAAPI)
-  VaapiWrapper::PreSandboxInitialization();
+  VaapiWrapper::PreSandboxInitialization(/*allow_disabling_global_lock=*/true);
   return true;
 #else
-  NOTREACHED();
-  return false;
+  NOTREACHED_NORETURN();
 #endif  // BUILDFLAG(USE_VAAPI)
 }
 
@@ -164,8 +162,7 @@ bool HardwareVideoDecodingPreSandboxHookForV4L2(
 #endif  // BUILDFLAG(USE_LIBV4L2)
   return true;
 #else
-  NOTREACHED();
-  return false;
+  NOTREACHED_NORETURN();
 #endif  // BUILDFLAG(USE_V4L2_CODEC)
 }
 

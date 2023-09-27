@@ -37,7 +37,8 @@ ResourceRequestPolicy::~ResourceRequestPolicy() = default;
 void ResourceRequestPolicy::OnExtensionLoaded(const Extension& extension) {
   if (WebAccessibleResourcesInfo::HasWebAccessibleResources(&extension) ||
       WebviewInfo::HasWebviewAccessibleResources(
-          extension, dispatcher_->webview_partition_id()) ||
+          extension,
+          dispatcher_->webview_partition_id().value_or(std::string())) ||
       // Hosted app icons are accessible.
       // TODO(devlin): Should we incorporate this into
       // WebAccessibleResourcesInfo?
@@ -72,7 +73,7 @@ bool ResourceRequestPolicy::CanRequestResource(
     const GURL& resource_url,
     blink::WebLocalFrame* frame,
     ui::PageTransition transition_type,
-    const absl::optional<url::Origin>& initiator_origin) {
+    const url::Origin* initiator_origin) {
   CHECK(resource_url.SchemeIs(kExtensionScheme));
 
   GURL frame_url = frame->GetDocument().Url();
@@ -180,7 +181,8 @@ bool ResourceRequestPolicy::CanRequestResource(
   if (!WebAccessibleResourcesInfo::IsResourceWebAccessible(
           extension, resource_url.path(), initiator_origin) &&
       !WebviewInfo::IsResourceWebviewAccessible(
-          extension, dispatcher_->webview_partition_id(),
+          extension,
+          dispatcher_->webview_partition_id().value_or(std::string()),
           resource_url.path())) {
     std::string message = base::StringPrintf(
         "Denying load of %s. Resources must be listed in the "

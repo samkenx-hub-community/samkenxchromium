@@ -46,7 +46,7 @@ class MockQuotaManagerProxy : public QuotaManagerProxy {
   QuotaErrorOr<BucketInfo> GetOrCreateBucketSync(
       const BucketInitParams& params) override;
 
-  void GetBucketForTesting(
+  void GetBucketByNameUnsafe(
       const blink::StorageKey& storage_key,
       const std::string& bucket_name,
       blink::mojom::StorageType type,
@@ -125,7 +125,8 @@ class MockQuotaManagerProxy : public QuotaManagerProxy {
   ~MockQuotaManagerProxy() override;
 
  private:
-  const raw_ptr<MockQuotaManager> mock_quota_manager_;
+  const raw_ptr<MockQuotaManager, AcrossTasksDanglingUntriaged>
+      mock_quota_manager_;
 
   blink::StorageKey last_notified_storage_key_;
   blink::mojom::StorageType last_notified_type_ =

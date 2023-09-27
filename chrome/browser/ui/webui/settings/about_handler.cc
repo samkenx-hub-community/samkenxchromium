@@ -27,7 +27,7 @@
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_content_browser_client.h"
-#include "chrome/browser/policy/management_utils.h"
+#include "chrome/browser/enterprise/browser_management/management_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -37,9 +37,10 @@
 #include "chrome/browser/upgrade_detector/upgrade_detector.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/google/core/common/google_util.h"
+#include "components/policy/core/common/management/management_service.h"
 #include "components/policy/core/common/policy_namespace.h"
 #include "components/policy/policy_constants.h"
 #include "components/services/app_service/public/cpp/app_launch_util.h"
@@ -58,6 +59,7 @@
 #include "base/i18n/time_formatting.h"
 #include "base/strings/strcat.h"
 #include "chrome/browser/ash/arc/arc_util.h"
+#include "chrome/browser/ash/eol_incentive_util.h"
 #include "chrome/browser/ash/ownership/owner_settings_service_ash.h"
 #include "chrome/browser/ash/ownership/owner_settings_service_ash_factory.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
@@ -76,6 +78,7 @@
 #include "chromeos/version/version_loader.h"
 #include "components/user_manager/user_manager.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/icu/source/i18n/unicode/timezone.h"
 #include "ui/chromeos/devicetype_utils.h"
 #endif
 
@@ -118,7 +121,7 @@ std::u16string GetAllowedConnectionTypesMessage() {
 
 // Returns true if current user can change channel, false otherwise.
 bool CanChangeChannel(Profile* profile) {
-  if (policy::IsDeviceEnterpriseManaged()) {
+  if (policy::ManagementServiceFactory::GetForPlatform()->IsManaged()) {
     bool value = false;
     // On a managed machine we delegate this setting to the affiliated users
     // only if the policy value is true.
@@ -241,6 +244,9 @@ std::string UpdateStatusToString(VersionUpdater::Status status) {
     case VersionUpdater::DISABLED_BY_ADMIN:
       status_str = "disabled_by_admin";
       break;
+    case VersionUpdater::UPDATE_TO_ROLLBACK_VERSION_DISALLOWED:
+      status_str = "update_to_rollback_version_disallowed";
+      break;
     case VersionUpdater::NEED_PERMISSION_TO_UPDATE:
       status_str = "need_permission_to_update";
       break;
@@ -334,6 +340,10 @@ void AboutHandler::RegisterMessages() {
   web_ui()->RegisterMessageCallback(
       "getEndOfLifeInfo",
       base::BindRepeating(&AboutHandler::HandleGetEndOfLifeInfo,
+                          base::Unretained(this)));
+  web_ui()->RegisterMessageCallback(
+      "openEndOfLifeIncentive",
+      base::BindRepeating(&AboutHandler::HandleOpenEndOfLifeIncentive,
                           base::Unretained(this)));
   web_ui()->RegisterMessageCallback(
       "launchReleaseNotes",
@@ -544,8 +554,15 @@ void AboutHandler::OnGetVersionInfoReady(std::string callback_id,
 void AboutHandler::HandleGetFirmwareUpdateCount(const base::Value::List& args) {
   CHECK_EQ(1U, args.size());
   const std::string& callback_id = args[0].GetString();
+  size_t update_count = 0u;
+  if (!ash::FirmwareUpdateManager::IsInitialized()) {
+    ResolveJavascriptCallback(base::Value(callback_id),
+                              base::Value(static_cast<int>(update_count)));
+    return;
+  }
+
   auto* firmware_update_manager = ash::FirmwareUpdateManager::Get();
-  size_t update_count = firmware_update_manager->GetUpdateCount();
+  update_count = firmware_update_manager->GetUpdateCount();
   DCHECK_LT(update_count, std::numeric_limits<size_t>::max());
   ResolveJavascriptCallback(base::Value(callback_id),
                             base::Value(static_cast<int>(update_count)));
@@ -672,11 +689,40 @@ void AboutHandler::OnGetEndOfLifeInfo(
                                                     icu::TimeZone::getGMT()),
             base::ASCIIToUTF16(has_eol_passed ? chrome::kEolNotificationURL
                                               : chrome::kAutoUpdatePolicyURL)));
+    const ash::eol_incentive_util::EolIncentiveType eolIncentiveType =
+        ash::eol_incentive_util::ShouldShowEolIncentive(
+            profile_, eol_info.eol_date, clock_->Now());
+    response.Set(
+        "shouldShowEndOfLifeIncentive",
+        (eolIncentiveType ==
+             ash::eol_incentive_util::EolIncentiveType::kEolPassedRecently ||
+         eolIncentiveType ==
+             ash::eol_incentive_util::EolIncentiveType::kEolPassed) &&
+            has_eol_passed &&
+            base::FeatureList::IsEnabled(ash::features::kEolIncentiveSettings));
+    eol_incentive_shows_offer_ =
+        (ash::features::kEolIncentiveParam.Get() !=
+             ash::features::EolIncentiveParam::kNoOffer &&
+         eolIncentiveType ==
+             ash::eol_incentive_util::EolIncentiveType::kEolPassedRecently);
+    response.Set("shouldShowOfferText", eol_incentive_shows_offer_);
   } else {
     response.Set("hasEndOfLife", false);
     response.Set("aboutPageEndOfLifeMessage", "");
+    response.Set("shouldShowEndOfLifeIncentive", false);
+    response.Set("shouldShowOfferText", false);
   }
   ResolveJavascriptCallback(base::Value(callback_id), response);
+}
+
+void AboutHandler::HandleOpenEndOfLifeIncentive(const base::Value::List& args) {
+  DCHECK(args.empty());
+  ash::NewWindowDelegate::GetPrimary()->OpenUrl(
+      GURL(eol_incentive_shows_offer_
+               ? chrome::kEolIncentiveNotificationOfferURL
+               : chrome::kEolIncentiveNotificationNoOfferURL),
+      ash::NewWindowDelegate::OpenUrlFrom::kUserInteraction,
+      ash::NewWindowDelegate::Disposition::kNewForegroundTab);
 }
 
 void AboutHandler::HandleIsManagedAutoUpdateEnabled(

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <string>
 #include <vector>
 
-#include "base/guid.h"
 #include "base/rand_util.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -12,15 +12,25 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
+#include "base/uuid.h"
+#include "components/autofill/core/browser/autofill_granular_filling_utils.h"
 #include "components/autofill/core/browser/autofill_suggestion_generator.h"
 #include "components/autofill/core/browser/autofill_test_utils.h"
+#include "components/autofill/core/browser/data_model/autofill_profile.h"
+#include "components/autofill/core/browser/data_model/autofill_wallet_usage_data.h"
 #include "components/autofill/core/browser/data_model/credit_card.h"
 #include "components/autofill/core/browser/data_model/iban.h"
+#include "components/autofill/core/browser/field_types.h"
 #include "components/autofill/core/browser/metrics/payments/card_metadata_metrics.h"
 #include "components/autofill/core/browser/mock_autofill_optimization_guide.h"
+#include "components/autofill/core/browser/payments/constants.h"
+#include "components/autofill/core/browser/personal_data_manager_test_base.h"
 #include "components/autofill/core/browser/test_autofill_client.h"
 #include "components/autofill/core/browser/test_personal_data_manager.h"
+#include "components/autofill/core/browser/ui/label_formatter_utils.h"
+#include "components/autofill/core/browser/ui/popup_item_ids.h"
 #include "components/autofill/core/browser/ui/suggestion.h"
+#include "components/autofill/core/browser/ui/suggestion_selection.h"
 #include "components/autofill/core/browser/webdata/autofill_webdata_service.h"
 #include "components/autofill/core/common/autofill_clock.h"
 #include "components/autofill/core/common/autofill_features.h"
@@ -28,6 +38,8 @@
 #include "components/feature_engagement/public/feature_constants.h"
 #include "components/grit/components_scaled_resources.h"
 #include "components/strings/grit/components_strings.h"
+#include "components/sync/test/test_sync_service.h"
+#include "components/webdata/common/web_data_results.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/mock_resource_bundle_delegate.h"
@@ -39,6 +51,34 @@
 using gfx::test::AreImagesEqual;
 
 namespace autofill {
+
+namespace {
+
+using testing::Field;
+using testing::Matcher;
+
+constexpr char kAddressEntryIcon[] = "accountIcon";
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+std::vector<std::vector<Suggestion::Text>> ConstructLabelLineMatrix(
+    const std::vector<std::u16string>& parts) {
+  return {{Suggestion::Text(ConstructLabelLine(parts))}};
+}
+#endif
+
+Matcher<Suggestion> EqualsSuggestion(PopupItemId id) {
+  return Field(&Suggestion::popup_item_id, id);
+}
+
+Matcher<Suggestion> EqualsSuggestion(PopupItemId id,
+                                     const std::u16string& text) {
+  return AllOf(
+      Field(&Suggestion::popup_item_id, id),
+      Field(&Suggestion::main_text,
+            Suggestion::Text(text, Suggestion::Text::IsPrimary(true))));
+}
+
+}  // namespace
 
 // Test component for tests to access implementation details in
 // AutofillSuggestionGenerator.
@@ -54,8 +94,8 @@ class TestAutofillSuggestionGenerator : public AutofillSuggestionGenerator {
       bool virtual_card_option,
       bool card_linked_offer_available) const {
     return AutofillSuggestionGenerator::CreateCreditCardSuggestion(
-        credit_card, type, /*prefix_matched_suggestion=*/false,
-        virtual_card_option, /*app_locale=*/"", card_linked_offer_available);
+        credit_card, type, virtual_card_option, /*app_locale=*/"",
+        card_linked_offer_available);
   }
 };
 
@@ -77,25 +117,25 @@ class AutofillSuggestionGeneratorTest : public testing::Test {
                           /*local_state=*/autofill_client_.GetPrefs(),
                           /*identity_manager=*/nullptr,
                           /*history_service=*/nullptr,
+                          /*sync_service=*/&sync_service_,
                           /*strike_database=*/nullptr,
-                          /*image_fetcher=*/nullptr,
-                          /*is_off_the_record=*/false);
+                          /*image_fetcher=*/nullptr);
     suggestion_generator_ = std::make_unique<TestAutofillSuggestionGenerator>(
         &autofill_client_, personal_data());
     autofill_client_.set_autofill_offer_manager(
         std::make_unique<AutofillOfferManager>(
             personal_data(),
-            /*coupon_service_delegate=*/nullptr));
+            /*coupon_service_delegate=*/nullptr, /*shopping_service=*/nullptr));
   }
 
   CreditCard CreateServerCard(
       const std::string& guid = "00000000-0000-0000-0000-000000000001",
       const std::string& server_id = "server_id1",
       int instrument_id = 1) {
-    CreditCard server_card(CreditCard::MASKED_SERVER_CARD, "a123");
+    CreditCard server_card(CreditCard::RecordType::kMaskedServerCard, "a123");
     test::SetCreditCardInfo(&server_card, "Elvis Presley", "1111" /* Visa */,
                             test::NextMonth().c_str(), test::NextYear().c_str(),
-                            "1");
+                            "1", /*cvc=*/u"123");
     server_card.SetNetworkForMaskedCard(kVisaCard);
     server_card.set_server_id(server_id);
     server_card.set_guid(guid);
@@ -108,21 +148,26 @@ class AutofillSuggestionGeneratorTest : public testing::Test {
     CreditCard local_card(guid, test::kEmptyOrigin);
     test::SetCreditCardInfo(&local_card, "Elvis Presley", "4111111111111111",
                             test::NextMonth().c_str(), test::NextYear().c_str(),
-                            "1");
+                            "1", /*cvc=*/u"123");
     return local_card;
   }
 
   gfx::Image CreateFakeImage() { return gfx::test::CreateImage(32, 32); }
 
   void SetUpIbanImageResources() {
-    if (ui::ResourceBundle::HasSharedInstance()) {
-      ui::ResourceBundle::CleanupSharedInstance();
-    }
+    original_resource_bundle_ =
+        ui::ResourceBundle::SwapSharedInstanceForTesting(nullptr);
     ui::ResourceBundle::InitSharedInstanceWithLocale(
         "en-US", &mock_resource_delegate_,
         ui::ResourceBundle::DO_NOT_LOAD_COMMON_RESOURCES);
     ON_CALL(mock_resource_delegate_, GetImageNamed(IDR_AUTOFILL_IBAN))
         .WillByDefault(testing::Return(CreateFakeImage()));
+  }
+
+  void CleanUpIbanImageResources() {
+    ui::ResourceBundle::CleanupSharedInstance();
+    ui::ResourceBundle::SwapSharedInstanceForTesting(
+        original_resource_bundle_.ExtractAsDangling());
   }
 
   bool VerifyCardArtImageExpectation(Suggestion& suggestion,
@@ -151,10 +196,1124 @@ class AutofillSuggestionGeneratorTest : public testing::Test {
       base::test::TaskEnvironment::TimeSource::SYSTEM_TIME};
   test::AutofillUnitTestEnvironment autofill_test_environment_;
   TestAutofillClient autofill_client_;
+  syncer::TestSyncService sync_service_;
   std::unique_ptr<TestAutofillSuggestionGenerator> suggestion_generator_;
   scoped_refptr<AutofillWebDataService> database_;
   testing::NiceMock<ui::MockResourceBundleDelegate> mock_resource_delegate_;
+  raw_ptr<ui::ResourceBundle> original_resource_bundle_;
 };
+
+// Tests that special characters will be used while prefix matching the user's
+// field input with the available emails to suggest.
+TEST_F(AutofillSuggestionGeneratorTest,
+       GetProfilesForSuggestions_UseSpecialCharactersInEmail) {
+  AutofillProfile profile_1, profile_2;
+  profile_1.SetRawInfo(EMAIL_ADDRESS, u"test@email.xyz");
+  profile_2.SetRawInfo(EMAIL_ADDRESS, u"test1@email.xyz");
+  personal_data()->AddProfile(profile_1);
+  personal_data()->AddProfile(profile_2);
+  ASSERT_EQ(personal_data()->GetProfilesToSuggest().size(), 2u);
+
+  std::vector<AutofillProfile*> profiles =
+      suggestion_generator()->GetProfilesToSuggest(AutofillType(EMAIL_ADDRESS),
+                                                   u"Test@", false, {});
+
+  ASSERT_EQ(profiles.size(), 1u);
+  EXPECT_EQ(*profiles[0], profile_1);
+}
+
+TEST_F(AutofillSuggestionGeneratorTest, GetProfilesForSuggestions_HideSubsets) {
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Marion", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+
+  // Dupe profile, except different in email address (irrelevant for this form).
+  AutofillProfile profile1 = profile;
+  profile1.set_guid(base::Uuid::GenerateRandomV4().AsLowercaseString());
+  profile1.SetRawInfo(EMAIL_ADDRESS, u"spam_me@example.com");
+
+  // Dupe profile, except different in address state.
+  AutofillProfile profile2 = profile;
+  profile2.set_guid(base::Uuid::GenerateRandomV4().AsLowercaseString());
+  profile2.SetRawInfo(ADDRESS_HOME_STATE, u"TX");
+
+  // Subset profile.
+  AutofillProfile profile3 = profile;
+  profile3.set_guid(base::Uuid::GenerateRandomV4().AsLowercaseString());
+  profile3.SetRawInfo(ADDRESS_HOME_STATE, std::u16string());
+
+  // For easier results verification, make sure |profile| is suggested first.
+  profile.set_use_count(5);
+  personal_data()->AddProfile(profile);
+  personal_data()->AddProfile(profile1);
+  personal_data()->AddProfile(profile2);
+  personal_data()->AddProfile(profile3);
+
+  // Simulate a form with street address, city and state.
+  ServerFieldTypeSet types = {ADDRESS_HOME_CITY, ADDRESS_HOME_STATE};
+  std::vector<AutofillProfile*> profiles =
+      suggestion_generator()->GetProfilesToSuggest(
+          AutofillType(ADDRESS_HOME_STREET_ADDRESS), u"123", false, types);
+  ASSERT_EQ(2U, profiles.size());
+  EXPECT_EQ(profiles[0]->GetRawInfo(ADDRESS_HOME_STATE), u"CA");
+  EXPECT_EQ(profiles[1]->GetRawInfo(ADDRESS_HOME_STATE), u"TX");
+}
+
+TEST_F(AutofillSuggestionGeneratorTest,
+       GetProfilesForSuggestions_SuggestionsLimit) {
+  // Drawing takes noticeable time when there are more than 10 profiles.
+  // Therefore, we keep only the 10 first suggested profiles.
+  std::vector<AutofillProfile> profiles;
+  for (size_t i = 0;
+       i < 2 * suggestion_selection::kMaxUniqueSuggestedProfilesCount; i++) {
+    AutofillProfile profile;
+    test::SetProfileInfo(&profile, base::StringPrintf("Marion%zu", i).c_str(),
+                         "Mitchell", "Morrison", "johnwayne@me.xyz", "Fox",
+                         "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                         "Hollywood", "CA", "91601", "US", "12345678910");
+    personal_data()->AddProfile(profile);
+    profiles.push_back(profile);
+  }
+
+  std::vector<AutofillProfile*> suggested_profiles =
+      suggestion_generator()->GetProfilesToSuggest(AutofillType(NAME_FIRST),
+                                                   u"Ma", false, {});
+
+  ASSERT_EQ(2 * suggestion_selection::kMaxUniqueSuggestedProfilesCount,
+            personal_data()->GetProfiles().size());
+  ASSERT_EQ(suggestion_selection::kMaxUniqueSuggestedProfilesCount,
+            suggested_profiles.size());
+}
+
+TEST_F(AutofillSuggestionGeneratorTest,
+       GetProfilesForSuggestions_ProfilesLimit) {
+  // Deduping takes noticeable time when there are more than 50 profiles.
+  // Therefore, keep only the 50 first pre-dedupe matching profiles.
+  std::vector<AutofillProfile> profiles;
+  for (size_t i = 0; i < suggestion_selection::kMaxSuggestedProfilesCount;
+       i++) {
+    AutofillProfile profile;
+
+    test::SetProfileInfo(
+        &profile, "Marion", "Mitchell", "Morrison", "johnwayne@me.xyz", "Fox",
+        base::StringPrintf("%zu123 Zoo St.\nSecond Line\nThird line", i)
+            .c_str(),
+        "unit 5", "Hollywood", "CA", "91601", "US", "12345678910");
+
+    // Set ranking score such that they appear before the "last" profile (added
+    // next).
+    profile.set_use_count(12);
+    profile.set_use_date(AutofillClock::Now() - base::Days(1));
+
+    personal_data()->AddProfile(profile);
+    profiles.push_back(profile);
+  }
+
+  // Add another profile that matches, but that will get stripped out.
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Marie", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "000 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+  profile.set_use_count(1);
+  profile.set_use_date(AutofillClock::Now() - base::Days(7));
+  personal_data()->AddProfile(profile);
+
+  std::vector<AutofillProfile*> suggested_profiles =
+      suggestion_generator()->GetProfilesToSuggest(AutofillType(NAME_FIRST),
+                                                   u"Ma", false, {});
+
+  ASSERT_EQ(suggestion_selection::kMaxSuggestedProfilesCount + 1,
+            personal_data()->GetProfiles().size());
+  ASSERT_EQ(1U, suggested_profiles.size());
+  EXPECT_EQ(suggested_profiles.front()->GetRawInfo(NAME_FIRST),
+            profiles.front().GetRawInfo(NAME_FIRST));
+}
+
+// Tests that GetProfilesForSuggestions orders its suggestions based on the
+// ranking formula.
+TEST_F(AutofillSuggestionGeneratorTest, GetProfilesForSuggestions_Ranking) {
+  // Set up the profiles. They are named with number suffixes X so the X is the
+  // order in which they should be ordered by the ranking formula.
+  AutofillProfile profile3;
+  test::SetProfileInfo(&profile3, "Marion3", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+  profile3.set_use_date(AutofillClock::Now() - base::Days(1));
+  profile3.set_use_count(5);
+  personal_data()->AddProfile(profile3);
+
+  AutofillProfile profile1;
+  test::SetProfileInfo(&profile1, "Marion1", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+  profile1.set_use_date(AutofillClock::Now() - base::Days(1));
+  profile1.set_use_count(10);
+  personal_data()->AddProfile(profile1);
+
+  AutofillProfile profile2;
+  test::SetProfileInfo(&profile2, "Marion2", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+  profile2.set_use_date(AutofillClock::Now() - base::Days(15));
+  profile2.set_use_count(300);
+  personal_data()->AddProfile(profile2);
+
+  std::vector<AutofillProfile*> suggested_profiles =
+      suggestion_generator()->GetProfilesToSuggest(AutofillType(NAME_FIRST),
+                                                   u"Ma", false, {});
+  ASSERT_EQ(3U, suggested_profiles.size());
+  EXPECT_EQ(suggested_profiles[0]->GetRawInfo(NAME_FIRST), u"Marion1");
+  EXPECT_EQ(suggested_profiles[1]->GetRawInfo(NAME_FIRST), u"Marion2");
+  EXPECT_EQ(suggested_profiles[2]->GetRawInfo(NAME_FIRST), u"Marion3");
+}
+
+// Tests that GetProfilesForSuggestions returns all profiles suggestions.
+TEST_F(AutofillSuggestionGeneratorTest,
+       GetProfilesForSuggestions_NumberOfSuggestions) {
+  // Set up 3 different profiles.
+  AutofillProfile profile1;
+  test::SetProfileInfo(&profile1, "Marion1", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+  personal_data()->AddProfile(profile1);
+
+  AutofillProfile profile2;
+  test::SetProfileInfo(&profile2, "Marion2", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+  personal_data()->AddProfile(profile2);
+
+  AutofillProfile profile3;
+  test::SetProfileInfo(&profile3, "Marion3", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+  personal_data()->AddProfile(profile3);
+
+  // Verify that all the profiles are suggested.
+  std::vector<AutofillProfile*> suggested_profiles =
+      suggestion_generator()->GetProfilesToSuggest(AutofillType(NAME_FIRST),
+                                                   std::u16string(), false, {});
+  EXPECT_EQ(3U, suggested_profiles.size());
+}
+
+// Tests that phone number types are correctly deduplicated for suggestions.
+TEST_F(AutofillSuggestionGeneratorTest,
+       GetProfilesForSuggestions_PhoneNumberDeduplication) {
+  // Set up 2 different profiles.
+  AutofillProfile profile1;
+  profile1.SetRawInfo(NAME_FULL, u"First Middle Last");
+  profile1.SetRawInfo(PHONE_HOME_WHOLE_NUMBER, u"+491601234567");
+  personal_data()->AddProfile(profile1);
+
+  AutofillProfile profile2;
+  profile2.SetRawInfo(NAME_FULL, u"First Middle Last");
+  profile2.SetRawInfo(PHONE_HOME_WHOLE_NUMBER, u"+491607654321");
+  personal_data()->AddProfile(profile2);
+
+  {
+    std::vector<AutofillProfile*> suggested_profiles =
+        suggestion_generator()->GetProfilesToSuggest(
+            AutofillType(NAME_FULL), std::u16string(), false,
+            {NAME_FULL, PHONE_HOME_WHOLE_NUMBER});
+    EXPECT_EQ(2U, suggested_profiles.size());
+  }
+  {
+    std::vector<AutofillProfile*> suggested_profiles =
+        suggestion_generator()->GetProfilesToSuggest(
+            AutofillType(NAME_FULL), std::u16string(), false,
+            {NAME_FULL, PHONE_HOME_COUNTRY_CODE, PHONE_HOME_CITY_AND_NUMBER});
+    EXPECT_EQ(2U, suggested_profiles.size());
+  }
+  {
+    std::vector<AutofillProfile*> suggested_profiles =
+        suggestion_generator()->GetProfilesToSuggest(
+            AutofillType(NAME_FULL), std::u16string(), false,
+            {NAME_FULL, PHONE_HOME_COUNTRY_CODE, PHONE_HOME_CITY_CODE,
+             PHONE_HOME_NUMBER});
+    EXPECT_EQ(2U, suggested_profiles.size());
+  }
+  {
+    std::vector<AutofillProfile*> suggested_profiles =
+        suggestion_generator()->GetProfilesToSuggest(
+            AutofillType(NAME_FULL), std::u16string(), false,
+            {NAME_FULL, PHONE_HOME_COUNTRY_CODE, PHONE_HOME_CITY_CODE});
+    EXPECT_EQ(1U, suggested_profiles.size());
+  }
+}
+
+// Tests that disused profiles are suppressed when suppression is enabled and
+// the input field is empty.
+TEST_F(AutofillSuggestionGeneratorTest,
+       GetProfilesForSuggestions_SuppressDisusedProfilesOnEmptyField) {
+  // Set up 2 different profiles.
+  AutofillProfile profile1;
+  test::SetProfileInfo(&profile1, "Marion1", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+  profile1.set_use_date(AutofillClock::Now() - base::Days(200));
+  personal_data()->AddProfile(profile1);
+
+  AutofillProfile profile2;
+  test::SetProfileInfo(&profile2, "Marion2", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "456 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+  profile2.set_use_date(AutofillClock::Now() - base::Days(20));
+  personal_data()->AddProfile(profile2);
+
+  // Query with empty string only returns profile2.
+  {
+    std::vector<AutofillProfile*> suggested_profiles =
+        suggestion_generator()->GetProfilesToSuggest(
+            AutofillType(ADDRESS_HOME_STREET_ADDRESS), std::u16string(), false,
+            {});
+    EXPECT_EQ(1U, suggested_profiles.size());
+  }
+
+  // Query with non-alpha-numeric string only returns profile2.
+  {
+    std::vector<AutofillProfile*> suggested_profiles =
+        suggestion_generator()->GetProfilesToSuggest(
+            AutofillType(ADDRESS_HOME_STREET_ADDRESS), u"--", false, {});
+    EXPECT_EQ(1U, suggested_profiles.size());
+  }
+
+  // Query with prefix for profile1 returns profile1.
+  {
+    std::vector<AutofillProfile*> suggested_profiles =
+        suggestion_generator()->GetProfilesToSuggest(
+            AutofillType(ADDRESS_HOME_STREET_ADDRESS), u"123", false, {});
+    ASSERT_EQ(1U, suggested_profiles.size());
+    EXPECT_EQ(u"Marion1", suggested_profiles[0]->GetRawInfo(NAME_FIRST));
+  }
+
+  // Query with prefix for profile2 returns profile2.
+  {
+    std::vector<AutofillProfile*> suggested_profiles =
+        suggestion_generator()->GetProfilesToSuggest(
+            AutofillType(ADDRESS_HOME_STREET_ADDRESS), u"456", false, {});
+    EXPECT_EQ(1U, suggested_profiles.size());
+    EXPECT_EQ(u"Marion2", suggested_profiles[0]->GetRawInfo(NAME_FIRST));
+  }
+}
+
+TEST_F(AutofillSuggestionGeneratorTest, CreateSuggestionsFromProfiles) {
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Marion", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+
+  std::vector<Suggestion> suggestions =
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile}, {ADDRESS_HOME_STREET_ADDRESS},
+          /*last_targeted_fields=*/absl::nullopt,
+          AutofillType(ADDRESS_HOME_STREET_ADDRESS),
+          /*trigger_field_max_length=*/0);
+  ASSERT_FALSE(suggestions.empty());
+  EXPECT_EQ(u"123 Zoo St., Second Line, Third line, unit 5",
+            suggestions[0].main_text.value);
+}
+
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_PhoneSubstring_NoImprovedDisambiguation) {
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndDisableFeature(
+      features::kAutofillUseImprovedLabelDisambiguation);
+
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Marion", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+
+  std::vector<Suggestion> suggestions =
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile}, {PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt,
+          AutofillType(PHONE_HOME_WHOLE_NUMBER),
+          /*trigger_field_max_length=*/0);
+  ASSERT_FALSE(suggestions.empty());
+  EXPECT_EQ(u"12345678910", suggestions[0].main_text.value);
+}
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_PhoneSubstring_ImprovedDisambiguation) {
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndEnableFeature(
+      features::kAutofillUseImprovedLabelDisambiguation);
+
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Marion", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox",
+                       "123 Zoo St.\nSecond Line\nThird line", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+
+  std::vector<Suggestion> suggestions =
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile}, {PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt,
+          AutofillType(PHONE_HOME_WHOLE_NUMBER),
+          /*trigger_field_max_length=*/0);
+  ASSERT_FALSE(suggestions.empty());
+  EXPECT_EQ(u"(234) 567-8910", suggestions[0].main_text.value);
+}
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_LogProfileSuggestionsMadeWithFormatter) {
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Hoa", "", "Pham", "hoa.pham@comcast.net", "",
+                       "401 Merrimack St", "", "Lowell", "MA", "01852", "US",
+                       "19786744120");
+
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndEnableFeature(
+      features::kAutofillUseImprovedLabelDisambiguation);
+
+  base::HistogramTester histogram_tester;
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile},
+          {NAME_FIRST, NAME_LAST, EMAIL_ADDRESS, PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FIRST),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(testing::Field(
+          &Suggestion::main_text,
+          Suggestion::Text(u"Hoa", Suggestion::Text::IsPrimary(true)))));
+  histogram_tester.ExpectUniqueSample(
+      "Autofill.ProfileSuggestionsMadeWithFormatter", true, 1);
+}
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_ForContactForm) {
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Hoa", "", "Pham", "hoa.pham@comcast.net", "",
+                       "401 Merrimack St", "", "Lowell", "MA", "01852", "US",
+                       "19786744120");
+
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndEnableFeature(
+      features::kAutofillUseImprovedLabelDisambiguation);
+
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile},
+          {NAME_FIRST, NAME_LAST, EMAIL_ADDRESS, PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FIRST),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(AllOf(
+          testing::Field(&Suggestion::labels,
+                         ConstructLabelLineMatrix(
+                             {u"(978) 674-4120", u"hoa.pham@comcast.net"})),
+          testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+}
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_AddressForm) {
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Hoa", "", "Pham", "hoa.pham@comcast.net", "",
+                       "401 Merrimack St", "", "Lowell", "MA", "01852", "US",
+                       "19786744120");
+
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndEnableFeature(
+      features::kAutofillUseImprovedLabelDisambiguation);
+
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile},
+          {NAME_FULL, ADDRESS_HOME_STREET_ADDRESS, ADDRESS_HOME_CITY,
+           ADDRESS_HOME_STATE, ADDRESS_HOME_ZIP},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FULL),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(
+          AllOf(testing::Field(&Suggestion::labels,
+                               ConstructLabelLineMatrix(
+                                   {u"401 Merrimack St, Lowell, MA 01852"})),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+}
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_AddressPhoneForm) {
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Hoa", "", "Pham", "hoa.pham@comcast.net", "",
+                       "401 Merrimack St", "", "Lowell", "MA", "01852", "US",
+                       "19786744120");
+
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndEnableFeature(
+      features::kAutofillUseImprovedLabelDisambiguation);
+
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile},
+          {NAME_FULL, ADDRESS_HOME_STREET_ADDRESS, PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FULL),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(
+          AllOf(testing::Field(&Suggestion::labels,
+                               ConstructLabelLineMatrix(
+                                   {u"(978) 674-4120", u"401 Merrimack St"})),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+}
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_AddressEmailForm) {
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Hoa", "", "Pham", "hoa.pham@comcast.net", "",
+                       "401 Merrimack St", "", "Lowell", "MA", "01852", "US",
+                       "19786744120");
+
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndEnableFeature(
+      features::kAutofillUseImprovedLabelDisambiguation);
+
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile}, {NAME_FULL, ADDRESS_HOME_STREET_ADDRESS, EMAIL_ADDRESS},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FULL),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(AllOf(
+          testing::Field(&Suggestion::labels,
+                         ConstructLabelLineMatrix(
+                             {u"401 Merrimack St", u"hoa.pham@comcast.net"})),
+          testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+}
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_FormWithOneProfile) {
+  AutofillProfile profile;
+  test::SetProfileInfo(&profile, "Hoa", "", "Pham", "hoa.pham@comcast.net", "",
+                       "401 Merrimack St", "", "Lowell", "MA", "01852", "US",
+                       "19786744120");
+
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndEnableFeature(
+      features::kAutofillUseImprovedLabelDisambiguation);
+
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile},
+          {NAME_FULL, ADDRESS_HOME_STREET_ADDRESS, EMAIL_ADDRESS,
+           PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FULL),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(
+          AllOf(testing::Field(&Suggestion::labels,
+                               ConstructLabelLineMatrix({u"401 Merrimack St"})),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+}
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_AddressContactFormWithProfiles) {
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitWithFeatures(
+      /*enabled_features=*/{features::
+                                kAutofillEnableRankingFormulaAddressProfiles,
+                            features::kAutofillUseImprovedLabelDisambiguation},
+      /*disabled_features=*/{});
+
+  AutofillProfile profile1;
+  test::SetProfileInfo(&profile1, "Hoa", "", "Pham", "hoa.pham@comcast.net", "",
+                       "401 Merrimack St", "", "Lowell", "MA", "01852", "US",
+                       "19786744120");
+
+  AutofillProfile profile2;
+  test::SetProfileInfo(&profile2, "Hoa", "", "Pham", "hp@aol.com", "",
+                       "216 Broadway St", "", "Lowell", "MA", "01854", "US",
+                       "19784523366");
+
+  // The profiles' use dates and counts are set make this test deterministic.
+  // The suggestion created with data from profile1 should be ranked higher
+  // than profile2's associated suggestion. This ensures that profile1's
+  // suggestion is the first element in the collection returned by
+  // GetProfilesForSuggestions.
+  profile1.set_use_date(AutofillClock::Now());
+  profile1.set_use_count(10);
+  profile2.set_use_date(AutofillClock::Now() - base::Days(10));
+  profile2.set_use_count(1);
+
+  EXPECT_TRUE(profile1.HasGreaterRankingThan(&profile2, AutofillClock::Now()));
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile1, &profile2},
+          {NAME_FULL, ADDRESS_HOME_STREET_ADDRESS, EMAIL_ADDRESS,
+           PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FULL),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(
+          AllOf(testing::Field(&Suggestion::labels,
+                               ConstructLabelLineMatrix(
+                                   {u"401 Merrimack St", u"(978) 674-4120",
+                                    u"hoa.pham@comcast.net"})),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon)),
+          AllOf(testing::Field(&Suggestion::labels,
+                               ConstructLabelLineMatrix({u"216 Broadway St",
+                                                         u"(978) 452-3366",
+                                                         u"hp@aol.com"})),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+}
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_MobileShowOne) {
+  std::map<std::string, std::string> parameters;
+  parameters[features::kAutofillUseMobileLabelDisambiguationParameterName] =
+      features::kAutofillUseMobileLabelDisambiguationParameterShowOne;
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndEnableFeatureWithParameters(
+      features::kAutofillUseMobileLabelDisambiguation, parameters);
+
+  AutofillProfile profile1;
+  test::SetProfileInfo(&profile1, "Hoa", "", "Pham", "hoa.pham@comcast.net", "",
+                       "401 Merrimack St", "", "Lowell", "MA", "01852", "US",
+                       "19786744120");
+  AutofillProfile profile2;
+  test::SetProfileInfo(&profile2, "María", "", "Lòpez", "maria@aol.com", "",
+                       "11 Elkins St", "", "Boston", "MA", "02127", "US",
+                       "6172686862");
+
+  // The profiles' use dates and counts are set make this test deterministic.
+  // The suggestion created with data from profile1 should be ranked higher
+  // than profile2's associated suggestion. This ensures that profile1's
+  // suggestion is the first element in the collection returned by
+  // GetProfilesForSuggestions.
+  profile1.set_use_date(AutofillClock::Now());
+  profile1.set_use_count(10);
+  profile2.set_use_date(AutofillClock::Now() - base::Days(10));
+  profile2.set_use_count(1);
+
+  // Tests a form with name, email address, and phone number fields.
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile1, &profile2},
+          {NAME_FIRST, NAME_LAST, EMAIL_ADDRESS, PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(EMAIL_ADDRESS),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(
+          AllOf(testing::Field(&Suggestion::labels,
+                               std::vector<std::vector<Suggestion::Text>>{
+                                   {Suggestion::Text(u"(978) 674-4120")}}),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon)),
+          AllOf(testing::Field(&Suggestion::labels,
+                               std::vector<std::vector<Suggestion::Text>>{
+                                   {Suggestion::Text(u"(617) 268-6862")}}),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+
+  // Tests a form with name, address, phone number, and email address fields.
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile1, &profile2},
+          {NAME_FULL, ADDRESS_HOME_STREET_ADDRESS, ADDRESS_HOME_CITY,
+           EMAIL_ADDRESS, PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(EMAIL_ADDRESS),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(
+          AllOf(testing::Field(&Suggestion::labels,
+                               std::vector<std::vector<Suggestion::Text>>{
+                                   {Suggestion::Text(u"401 Merrimack St")}}),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon)),
+          AllOf(testing::Field(&Suggestion::labels,
+                               std::vector<std::vector<Suggestion::Text>>{
+                                   {Suggestion::Text(u"11 Elkins St")}}),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+}
+#endif  // if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_MobileShowAll) {
+  std::map<std::string, std::string> parameters;
+  parameters[features::kAutofillUseMobileLabelDisambiguationParameterName] =
+      features::kAutofillUseMobileLabelDisambiguationParameterShowAll;
+  base::test::ScopedFeatureList scoped_features;
+  scoped_features.InitAndEnableFeatureWithParameters(
+      features::kAutofillUseMobileLabelDisambiguation, parameters);
+
+  AutofillProfile profile1;
+  test::SetProfileInfo(&profile1, "Hoa", "", "Pham", "hoa.pham@comcast.net", "",
+                       "401 Merrimack St", "", "Lowell", "MA", "01852", "US",
+                       "19786744120");
+  AutofillProfile profile2;
+  test::SetProfileInfo(&profile2, "María", "", "Lòpez", "maria@aol.com", "",
+                       "11 Elkins St", "", "Boston", "MA", "02127", "US",
+                       "6172686862");
+
+  // The profiles' use dates and counts are set make this test deterministic.
+  // The suggestion created with data from profile1 should be ranked higher
+  // than profile2's associated suggestion. This ensures that profile1's
+  // suggestion is the first element in the collection returned by
+  // GetProfilesForSuggestions.
+  profile1.set_use_date(AutofillClock::Now());
+  profile1.set_use_count(10);
+  profile2.set_use_date(AutofillClock::Now() - base::Days(10));
+  profile2.set_use_count(1);
+
+  // Tests a form with name, email address, and phone number fields.
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile1, &profile2},
+          {NAME_FIRST, NAME_LAST, EMAIL_ADDRESS, PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(EMAIL_ADDRESS),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(
+          AllOf(testing::Field(&Suggestion::labels,
+                               std::vector<std::vector<Suggestion::Text>>{
+                                   {Suggestion::Text(ConstructMobileLabelLine(
+                                       {u"Hoa", u"(978) 674-4120"}))}}),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon)),
+          AllOf(testing::Field(&Suggestion::labels,
+                               std::vector<std::vector<Suggestion::Text>>{
+                                   {Suggestion::Text(ConstructMobileLabelLine(
+                                       {u"María", u"(617) 268-6862"}))}}),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+
+  // Tests a form with name, address, phone number, and email address fields.
+  EXPECT_THAT(
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile1, &profile2},
+          {NAME_FULL, ADDRESS_HOME_STREET_ADDRESS, ADDRESS_HOME_CITY,
+           EMAIL_ADDRESS, PHONE_HOME_WHOLE_NUMBER},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(EMAIL_ADDRESS),
+          /*trigger_field_max_length=*/0),
+      ElementsAre(
+          AllOf(
+              testing::Field(
+                  &Suggestion::labels,
+                  std::vector<std::vector<Suggestion::Text>>{
+                      {Suggestion::Text(ConstructMobileLabelLine(
+                          {u"Hoa", u"401 Merrimack St", u"(978) 674-4120"}))}}),
+              testing::Field(&Suggestion::icon, kAddressEntryIcon)),
+          AllOf(testing::Field(
+                    &Suggestion::labels,
+                    std::vector<std::vector<Suggestion::Text>>{
+                        {Suggestion::Text(ConstructMobileLabelLine(
+                            {u"María", u"11 Elkins St", u"(617) 268-6862"}))}}),
+                testing::Field(&Suggestion::icon, kAddressEntryIcon))));
+}
+#endif  // if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+
+// TODO(crbug.com/1459990): Consider having a test fixture for granular filling
+// related tests. In general these tests are quite lengthy and finding a way to
+// make them more concise is desirable.
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_FirstLevelChildrenSuggestions) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+  AutofillProfile profile = test::GetFullProfile();
+
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, /*field_types=*/{NAME_FIRST},
+      /*last_targeted_fields=*/kAllServerFieldTypes, AutofillType(NAME_FIRST),
+      /*trigger_field_max_length=*/0);
+
+  ASSERT_EQ(1U, suggestions.size());
+  // Test root suggestion
+  EXPECT_THAT(
+      suggestions,
+      ElementsAre(Field(&Suggestion::main_text,
+                        Suggestion::Text(profile.GetRawInfo(NAME_FIRST),
+                                         Suggestion::Text::IsPrimary(true)))));
+
+  // The children suggestions should be.
+  //
+  // 1. fill full name
+  // 2. first name
+  // 3. middle name
+  // 4. family name
+  // 5. line separator
+  // 6. address line 1
+  // 7. address line 2
+  // 8. Zip
+  // 9. line separator
+  // 10. phone number
+  // 11. email
+  // 12. line separator
+  // 13. edit profile
+  // 14. delete address
+  ASSERT_EQ(14U, suggestions[0].children.size());
+  std::string app_locale = personal_data()->app_locale();
+  EXPECT_THAT(
+      suggestions[0].children,
+      ElementsAre(
+          EqualsSuggestion(PopupItemId::kFillFullName),
+          EqualsSuggestion(PopupItemId::kFieldByFieldFilling,
+                           profile.GetInfo(NAME_FIRST, app_locale)),
+          EqualsSuggestion(PopupItemId::kFieldByFieldFilling,
+                           profile.GetInfo(NAME_MIDDLE, app_locale)),
+          EqualsSuggestion(PopupItemId::kFieldByFieldFilling,
+                           profile.GetInfo(NAME_LAST, app_locale)),
+          EqualsSuggestion(PopupItemId::kSeparator),
+          EqualsSuggestion(PopupItemId::kFieldByFieldFilling,
+                           profile.GetInfo(ADDRESS_HOME_LINE1, app_locale)),
+          EqualsSuggestion(PopupItemId::kFieldByFieldFilling,
+                           profile.GetInfo(ADDRESS_HOME_LINE2, app_locale)),
+          EqualsSuggestion(PopupItemId::kFieldByFieldFilling,
+                           profile.GetInfo(ADDRESS_HOME_ZIP, app_locale)),
+          EqualsSuggestion(PopupItemId::kSeparator),
+          EqualsSuggestion(
+              PopupItemId::kFieldByFieldFilling,
+              profile.GetInfo(PHONE_HOME_WHOLE_NUMBER, app_locale)),
+          EqualsSuggestion(PopupItemId::kFieldByFieldFilling,
+                           profile.GetInfo(EMAIL_ADDRESS, app_locale)),
+          EqualsSuggestion(PopupItemId::kSeparator),
+          EqualsSuggestion(PopupItemId::kEditAddressProfile),
+          EqualsSuggestion(PopupItemId::kDeleteAddressProfile)));
+}
+
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_SecondLevelChildrenSuggestions) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+  AutofillProfile profile = test::GetFullProfile();
+
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, /*field_types=*/{NAME_FIRST},
+      /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FIRST),
+      /*trigger_field_max_length=*/0);
+
+  // Suggestions should have two levels of children, The address line 1 (sixth
+  // child) suggestion should have the following children: house number street
+  // name.
+  ASSERT_EQ(2U, suggestions[0].children[5].children.size());
+  std::string app_locale = personal_data()->app_locale();
+  EXPECT_THAT(
+      suggestions[0].children[5].children,
+      ElementsAre(EqualsSuggestion(
+                      PopupItemId::kFieldByFieldFilling,
+                      profile.GetInfo(ADDRESS_HOME_HOUSE_NUMBER, app_locale)),
+                  EqualsSuggestion(
+                      PopupItemId::kFieldByFieldFilling,
+                      profile.GetInfo(ADDRESS_HOME_STREET_NAME, app_locale))));
+  // House number and street name suggestions should have labels.
+  EXPECT_EQ(suggestions[0].children[5].children[0].labels,
+            std::vector<std::vector<Suggestion::Text>>(
+                {{Suggestion::Text(u"Building number")}}));
+  EXPECT_EQ(suggestions[0].children[5].children[1].labels,
+            std::vector<std::vector<Suggestion::Text>>(
+                {{Suggestion::Text(u"Street")}}));
+}
+
+TEST_F(
+    AutofillSuggestionGeneratorTest,
+    CreateSuggestionsFromProfiles_LastTargetedFieldsIsSingleField_FieldByFieldFilling) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+  AutofillProfile profile = test::GetFullProfile();
+
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, /*field_types=*/{NAME_LAST},
+      absl::optional<ServerFieldTypeSet>({NAME_LAST}), AutofillType(NAME_FIRST),
+      /*trigger_field_max_length=*/0);
+
+  EXPECT_EQ(suggestions[0].popup_item_id, PopupItemId::kFieldByFieldFilling);
+}
+
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_LastTargedFieldsIsGroup_GroupFilling) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+  AutofillProfile profile = test::GetFullProfile();
+
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, /*field_types=*/{NAME_FIRST},
+      absl::optional<ServerFieldTypeSet>(GetAddressFieldsForGroupFilling()),
+      AutofillType(NAME_FIRST),
+      /*trigger_field_max_length=*/0);
+
+  EXPECT_EQ(suggestions[0].popup_item_id, PopupItemId::kFillFullName);
+}
+
+TEST_F(
+    AutofillSuggestionGeneratorTest,
+    CreateSuggestionsFromProfiles_LastTargedFieldsAreAllServerFields_FullForm) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+  AutofillProfile profile = test::GetFullProfile();
+
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, /*field_types=*/{NAME_FIRST},
+      absl::optional<ServerFieldTypeSet>(kAllServerFieldTypes),
+      AutofillType(NAME_FIRST),
+      /*trigger_field_max_length=*/0);
+
+  EXPECT_EQ(suggestions[0].popup_item_id, PopupItemId::kAddressEntry);
+}
+
+// Fallback to full form (PopupItemId::kAddressEntry) when the last targeted
+// fields are a group but the triggering field does not match any group.
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_LastTargetedFieldsAreGroup_Fallback) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+  AutofillProfile profile = test::GetFullProfile();
+
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, /*field_types=*/{CREDIT_CARD_TYPE},
+      absl::optional<ServerFieldTypeSet>(kAllServerFieldTypes),
+      AutofillType(CREDIT_CARD_TYPE),
+      /*trigger_field_max_length=*/0);
+
+  EXPECT_EQ(suggestions[0].popup_item_id, PopupItemId::kAddressEntry);
+}
+
+// Asserts that when the triggering field is a phone field, the phone number
+// suggestion is of type `PopupItemId::kFillFullPhoneNumber`. In other
+// scenarios, phone number is of type `PopupItemId::kFieldByFieldFilling` as the
+// user expressed intent to use their phone number their phone number on a
+// "random" field.
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_ChildrenSuggestionsPhoneField) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+  AutofillProfile profile = test::GetFullProfile();
+  std::vector<AutofillProfile*> matched_profiles;
+
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, {PHONE_HOME_WHOLE_NUMBER},
+      /*last_targeted_fields=*/kAllServerFieldTypes,
+      AutofillType(PHONE_HOME_WHOLE_NUMBER),
+      /*trigger_field_max_length=*/0);
+
+  // The child suggestions should be:
+  //
+  // 1. first name
+  // 2. middle name
+  // 3. family name
+  // 4. line separator
+  // 5. address line 1
+  // 6. address line 2
+  // 7. Zip
+  // 8. line separator
+  // 9. phone number
+  // 10. email
+  // 11. line separator
+  // 12. edit profile
+  // 13. delete address
+  ASSERT_EQ(13U, suggestions[0].children.size());
+  EXPECT_THAT(
+      suggestions[0].children[8],
+      Field(&Suggestion::popup_item_id, PopupItemId::kFillFullPhoneNumber));
+}
+
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_ChildrenSuggestionsAddressField) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+  AutofillProfile profile = test::GetFullProfile();
+
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, /*field_types=*/{ADDRESS_HOME_LINE1},
+      /*last_targeted_fields=*/kAllServerFieldTypes,
+      AutofillType(ADDRESS_HOME_LINE1),
+      /*trigger_field_max_length=*/0);
+
+  // The child suggestions should be:
+  //
+  // 1. first name
+  // 2. middle name
+  // 3. family name
+  // 4. line separator
+  // 5. fill full address
+  // 6. address line 1
+  // 7. address line 2
+  // 8. Zip
+  // 9. line separator
+  // 10. phone number
+  // 11. email
+  // 12. line separator
+  // 13. edit address
+  // 14. delete address
+  ASSERT_EQ(14U, suggestions[0].children.size());
+  EXPECT_THAT(suggestions[0].children[4],
+              Field(&Suggestion::popup_item_id, PopupItemId::kFillFullAddress));
+}
+
+TEST_F(
+    AutofillSuggestionGeneratorTest,
+    CreateSuggestionsFromProfiles_ChildrenSuggestions_HouseNumberAndStreetNameCanBeNestedUnderDifferentAddressLines) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+
+  AutofillProfile profile;
+  // Update the profile to have house number and street name information in
+  // different address lines.
+  std::string app_locale = personal_data()->app_locale();
+  // profile.SetRawInfo(NAME_FULL, u"First Middle Last");
+  profile.SetRawInfo(ADDRESS_HOME_LINE1, u"Amphitheatre Parkway, Brookling");
+  profile.SetRawInfo(ADDRESS_HOME_LINE2, u"1600 Apartment 1");
+  profile.SetRawInfo(ADDRESS_HOME_STREET_NAME, u"Amphitheatre Parkway");
+  profile.SetRawInfo(ADDRESS_HOME_HOUSE_NUMBER, u"1600");
+
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, /*field_types=*/{ADDRESS_HOME_LINE1},
+      /*last_targeted_fields=*/absl::nullopt, AutofillType(ADDRESS_HOME_LINE1),
+      /*trigger_field_max_length=*/0);
+  ASSERT_EQ(1u, suggestions.size());
+  ASSERT_LE(3u, suggestions[0].children.size());
+
+  // The address line 1 (sixth child) should have the street name as child.
+  EXPECT_THAT(suggestions[0].children[1].children,
+              ElementsAre(EqualsSuggestion(
+                  PopupItemId::kFieldByFieldFilling,
+                  profile.GetInfo(ADDRESS_HOME_STREET_NAME, app_locale))));
+  // The address line 2 (seventh child) should have the house number as child.
+  EXPECT_THAT(suggestions[0].children[2].children,
+              ElementsAre(EqualsSuggestion(
+                  PopupItemId::kFieldByFieldFilling,
+                  profile.GetInfo(ADDRESS_HOME_HOUSE_NUMBER, app_locale))));
+}
+
+// TODO(crbug.com/1477646): Investigate AssignLabelsAndDeduplicate and remove
+// the test if it is not needed.
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_DiscardDuplicateSuggestions) {
+  std::vector<AutofillProfile> profiles(3);
+  for (AutofillProfile& profile : profiles) {
+    profile.SetRawInfo(NAME_FULL, u"Jon Snow");
+    profile.SetRawInfo(ADDRESS_HOME_STREET_ADDRESS, u"2 Beyond-the-Wall Rd");
+  }
+  profiles[1].SetRawInfo(ADDRESS_HOME_STREET_ADDRESS, u"1 Winterfell Ln");
+  std::vector<Suggestion> suggestions =
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profiles[0], &profiles[1], &profiles[2]},
+          {NAME_FULL, ADDRESS_HOME_STREET_ADDRESS},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FULL),
+          /*trigger_field_max_length=*/0);
+
+  // Suggestions are sorted from highest to lowest rank, so check that
+  // duplicates with a lower rank are removed.
+  EXPECT_THAT(
+      suggestions,
+      ElementsAre(
+          AllOf(Field(&Suggestion::main_text,
+                      Suggestion::Text(u"Jon Snow",
+                                       Suggestion::Text::IsPrimary(true))),
+                Field(&Suggestion::labels,
+                      std::vector<std::vector<Suggestion::Text>>{
+                          {Suggestion::Text(u"2 Beyond-the-Wall Rd")}})),
+          AllOf(Field(&Suggestion::main_text,
+                      Suggestion::Text(u"Jon Snow",
+                                       Suggestion::Text::IsPrimary(true))),
+                Field(&Suggestion::labels,
+                      std::vector<std::vector<Suggestion::Text>>{
+                          {Suggestion::Text(u"1 Winterfell Ln")}}))));
+}
+
+// TODO(crbug.com/1477646): Investigate AssignLabelsAndDeduplicate and remove
+// the test if it is not needed.
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_KeepNonDuplicateSuggestions) {
+  AutofillProfile profile_1;
+  profile_1.SetRawInfo(NAME_FIRST, u"Sansa");
+  profile_1.SetRawInfo(ADDRESS_HOME_STREET_ADDRESS, u"1 Winterfell Ln");
+
+  AutofillProfile profile_2;
+  profile_2.SetRawInfo(NAME_FIRST, u"Sansa");
+
+  AutofillProfile profile_3;
+  profile_3.SetRawInfo(NAME_FIRST, u"Brienne");
+  profile_3.SetRawInfo(ADDRESS_HOME_STREET_ADDRESS, u"1 Winterfell Ln");
+
+  std::vector<Suggestion> suggestions =
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile_1, &profile_2, &profile_3},
+          {NAME_FIRST, ADDRESS_HOME_STREET_ADDRESS},
+          /*last_targeted_fields=*/absl::nullopt, AutofillType(NAME_FIRST),
+          /*trigger_field_max_length=*/0);
+
+  EXPECT_THAT(
+      suggestions,
+      ElementsAre(
+          AllOf(Field(&Suggestion::main_text,
+                      Suggestion::Text(u"Sansa",
+                                       Suggestion::Text::IsPrimary(true))),
+                Field(&Suggestion::labels,
+                      std::vector<std::vector<Suggestion::Text>>{
+                          {Suggestion::Text(u"1 Winterfell Ln")}})),
+          AllOf(Field(&Suggestion::main_text,
+                      Suggestion::Text(u"Sansa",
+                                       Suggestion::Text::IsPrimary(true))),
+                Field(&Suggestion::labels,
+                      std::vector<std::vector<Suggestion::Text>>{})),
+          AllOf(Field(&Suggestion::main_text,
+                      Suggestion::Text(u"Brienne",
+                                       Suggestion::Text::IsPrimary(true))),
+                Field(&Suggestion::labels,
+                      std::vector<std::vector<Suggestion::Text>>{
+                          {Suggestion::Text(u"1 Winterfell Ln")}}))));
+}
+
+// TODO(crbug.com/1477646): Investigate AssignLabelsAndDeduplicate and remove
+// the test if it is not needed.
+TEST_F(AutofillSuggestionGeneratorTest,
+       CreateSuggestionsFromProfiles_SameStringInValueAndLabel) {
+  AutofillProfile profile;
+  profile.SetRawInfo(ADDRESS_HOME_STREET_ADDRESS, u"Mañana Road");
+  profile.SetRawInfo(ADDRESS_HOME_STREET_NAME, u"manana road");
+
+  std::vector<Suggestion> suggestions =
+      suggestion_generator()->CreateSuggestionsFromProfiles(
+          {&profile}, {ADDRESS_HOME_STREET_NAME, ADDRESS_HOME_STREET_ADDRESS},
+          /*last_targeted_fields=*/absl::nullopt,
+          AutofillType(ADDRESS_HOME_STREET_ADDRESS),
+          /*trigger_field_max_length=*/0);
+
+  EXPECT_THAT(suggestions,
+              ElementsAre(AllOf(
+                  Field(&Suggestion::main_text,
+                        Suggestion::Text(u"Mañana Road",
+                                         Suggestion::Text::IsPrimary(true))),
+                  Field(&Suggestion::labels,
+                        std::vector<std::vector<Suggestion::Text>>{}))));
+}
+
+TEST_F(
+    AutofillSuggestionGeneratorTest,
+    CreateSuggestionsFromProfiles_GranularityNotFullForm_FillEverythingChildSuggestion) {
+  base::test::ScopedFeatureList feature_list(
+      features::kAutofillGranularFillingAvailable);
+  AutofillProfile profile = test::GetFullProfile();
+
+  // We set only a name field as `last_targeted_fields` to denote that the user
+  // chose field by field filling.
+  auto suggestions = suggestion_generator()->CreateSuggestionsFromProfiles(
+      {&profile}, /*field_types=*/{ADDRESS_HOME_LINE1},
+      /*last_targeted_fields=*/absl::optional<ServerFieldTypeSet>({NAME_FIRST}),
+      AutofillType(ADDRESS_HOME_LINE1),
+      /*trigger_field_max_length=*/0);
+
+  EXPECT_TRUE(base::ranges::any_of(suggestions[0].children, [](auto child) {
+    return child.popup_item_id ==
+           PopupItemId::kFillEverythingFromAddressProfile;
+  }));
+}
 
 TEST_F(AutofillSuggestionGeneratorTest,
        RemoveExpiredCreditCardsNotUsedSinceTimestamp) {
@@ -172,7 +1331,9 @@ TEST_F(AutofillSuggestionGeneratorTest,
   all_card_ptrs.reserve(kNumCards);
   for (size_t i = 0; i < kNumCards; ++i) {
     constexpr base::TimeDelta k30Days = base::Days(30);
-    all_card_data.emplace_back(base::GenerateGUID(), "https://example.com");
+    all_card_data.emplace_back(
+        base::Uuid::GenerateRandomV4().AsLowercaseString(),
+        "https://example.com");
     if (i < 5) {
       all_card_data.back().set_use_date(kNow - (i + i + 1) * k30Days);
       test::SetCreditCardInfo(&all_card_data.back(), "Clyde Barrow",
@@ -318,7 +1479,7 @@ TEST_F(AutofillSuggestionGeneratorTest,
     for (auto it = all_card_ptrs.begin(); it < all_card_ptrs.end(); it++) {
       (*it)->SetExpirationYear(2001);
     }
-    cards[0]->set_record_type(CreditCard::MASKED_SERVER_CARD);
+    cards[0]->set_record_type(CreditCard::RecordType::kMaskedServerCard);
 
     // Filter the cards while capturing histograms.
     base::HistogramTester histogram_tester;
@@ -341,19 +1502,19 @@ TEST_F(AutofillSuggestionGeneratorTest, GetServerCardForLocalCard) {
 
   // The server card should be returned if the local card is passed in.
   const CreditCard* result =
-      suggestion_generator()->GetServerCardForLocalCard(&local_card);
+      personal_data()->GetServerCardForLocalCard(&local_card);
   ASSERT_TRUE(result);
   EXPECT_EQ(server_card.guid(), result->guid());
 
   // Should return nullptr if a server card is passed in.
-  EXPECT_FALSE(suggestion_generator()->GetServerCardForLocalCard(&server_card));
+  EXPECT_FALSE(personal_data()->GetServerCardForLocalCard(&server_card));
 
   // Should return nullptr if no server card has the same information as the
   // local card.
   server_card.SetNumber(u"5454545454545454");
   personal_data()->ClearCreditCards();
   personal_data()->AddServerCreditCard(server_card);
-  EXPECT_FALSE(suggestion_generator()->GetServerCardForLocalCard(&local_card));
+  EXPECT_FALSE(personal_data()->GetServerCardForLocalCard(&local_card));
 }
 
 // The suggestions of credit cards with card linked offers are moved to the
@@ -399,6 +1560,28 @@ TEST_F(AutofillSuggestionGeneratorTest,
             Suggestion::BackendId("00000000-0000-0000-0000-000000000003"));
   EXPECT_EQ(suggestions[2].GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("00000000-0000-0000-0000-000000000001"));
+}
+
+// Ensures we appropriately generate suggestions for virtual cards on a
+// standalone CVC field.
+TEST_F(AutofillSuggestionGeneratorTest,
+       GetSuggestionsForVirtualCardStandaloneCvc) {
+  personal_data()->ClearCreditCards();
+  CreditCard virtual_card = test::GetVirtualCard();
+  virtual_card.set_guid("1234");
+  personal_data()->AddServerCreditCard(virtual_card);
+
+  base::flat_map<std::string, VirtualCardUsageData::VirtualCardLastFour>
+      virtual_card_guid_to_last_four_map;
+  virtual_card_guid_to_last_four_map.insert(
+      {virtual_card.guid(),
+       VirtualCardUsageData::VirtualCardLastFour(u"1234")});
+  autofill_metrics::CardMetadataLoggingContext metadata_logging_context;
+  auto suggestions =
+      suggestion_generator()->GetSuggestionsForVirtualCardStandaloneCvc(
+          metadata_logging_context, virtual_card_guid_to_last_four_map);
+
+  ASSERT_EQ(suggestions.size(), 1U);
 }
 
 // Verifies that the `should_display_gpay_logo` is set correctly.
@@ -504,7 +1687,7 @@ TEST_F(AutofillSuggestionGeneratorTest, ShouldShowVirtualCardOption) {
   CreditCard server_card =
       CreateServerCard(/*guid=*/"00000000-0000-0000-0000-000000000001");
   server_card.set_virtual_card_enrollment_state(
-      CreditCard::VirtualCardEnrollmentState::ENROLLED);
+      CreditCard::VirtualCardEnrollmentState::kEnrolled);
   personal_data()->AddServerCreditCard(server_card);
 
   // Create a local card with same information.
@@ -525,7 +1708,7 @@ TEST_F(AutofillSuggestionGeneratorTest,
   CreditCard server_card =
       CreateServerCard(/*guid=*/"00000000-0000-0000-0000-000000000001");
   server_card.set_virtual_card_enrollment_state(
-      CreditCard::VirtualCardEnrollmentState::ENROLLED);
+      CreditCard::VirtualCardEnrollmentState::kEnrolled);
   personal_data()->AddServerCreditCard(server_card);
   autofill_client()->ResetAutofillOptimizationGuide();
 
@@ -547,7 +1730,7 @@ TEST_F(AutofillSuggestionGeneratorTest,
   CreditCard server_card =
       CreateServerCard(/*guid=*/"00000000-0000-0000-0000-000000000001");
   server_card.set_virtual_card_enrollment_state(
-      CreditCard::VirtualCardEnrollmentState::ENROLLED);
+      CreditCard::VirtualCardEnrollmentState::kEnrolled);
   personal_data()->AddServerCreditCard(server_card);
 
   // Create a local card with same information.
@@ -574,7 +1757,7 @@ TEST_F(AutofillSuggestionGeneratorTest,
   CreditCard server_card =
       CreateServerCard(/*guid=*/"00000000-0000-0000-0000-000000000001");
   server_card.set_virtual_card_enrollment_state(
-      CreditCard::VirtualCardEnrollmentState::UNSPECIFIED);
+      CreditCard::VirtualCardEnrollmentState::kUnspecified);
   personal_data()->AddServerCreditCard(server_card);
 
   // Create a local card with same information.
@@ -602,25 +1785,25 @@ TEST_F(AutofillSuggestionGeneratorTest,
       suggestion_generator()->ShouldShowVirtualCardOption(&local_card));
 }
 
-TEST_F(AutofillSuggestionGeneratorTest, GetIBANSuggestions) {
+TEST_F(AutofillSuggestionGeneratorTest, GetIbanSuggestions) {
   SetUpIbanImageResources();
 
-  auto MakeIBAN = [](const std::u16string& value,
+  auto MakeIban = [](const std::u16string& value,
                      const std::u16string& nickname) {
-    IBAN iban(base::GenerateGUID());
+    Iban iban(Iban::Guid(base::Uuid::GenerateRandomV4().AsLowercaseString()));
     iban.set_value(value);
     if (!nickname.empty())
       iban.set_nickname(nickname);
     return iban;
   };
-  IBAN iban0 = MakeIBAN(u"CH56 0483 5012 3456 7800 9", u"My doctor's IBAN");
-  IBAN iban1 = MakeIBAN(u"DE91 1000 0000 0123 4567 89", u"My brother's IBAN");
-  IBAN iban2 =
-      MakeIBAN(u"GR96 0810 0010 0000 0123 4567 890", u"My teacher's IBAN");
-  IBAN iban3 = MakeIBAN(u"PK70 BANK 0000 1234 5678 9000", u"");
+  Iban iban0 = MakeIban(u"CH56 0483 5012 3456 7800 9", u"My doctor's IBAN");
+  Iban iban1 = MakeIban(u"DE91 1000 0000 0123 4567 89", u"My brother's IBAN");
+  Iban iban2 =
+      MakeIban(u"GR96 0810 0010 0000 0123 4567 890", u"My teacher's IBAN");
+  Iban iban3 = MakeIban(u"PK70 BANK 0000 1234 5678 9000", u"");
 
   std::vector<Suggestion> iban_suggestions =
-      AutofillSuggestionGenerator::GetSuggestionsForIBANs(
+      AutofillSuggestionGenerator::GetSuggestionsForIbans(
           {&iban0, &iban1, &iban2, &iban3});
 
   // There are 6 suggestions, 4 for IBAN suggestions, followed by a separator,
@@ -635,7 +1818,7 @@ TEST_F(AutofillSuggestionGeneratorTest, GetIBANSuggestions) {
   ASSERT_EQ(iban_suggestions[0].labels.size(), 1u);
   ASSERT_EQ(iban_suggestions[0].labels[0].size(), 1u);
   EXPECT_EQ(iban_suggestions[0].labels[0][0].value, u"My doctor's IBAN");
-  EXPECT_EQ(iban_suggestions[0].frontend_id, POPUP_ITEM_ID_IBAN_ENTRY);
+  EXPECT_EQ(iban_suggestions[0].popup_item_id, PopupItemId::kIbanEntry);
   EXPECT_TRUE(
       AreImagesEqual(iban_suggestions[0].custom_icon, CreateFakeImage()));
 
@@ -646,7 +1829,7 @@ TEST_F(AutofillSuggestionGeneratorTest, GetIBANSuggestions) {
   ASSERT_EQ(iban_suggestions[1].labels.size(), 1u);
   ASSERT_EQ(iban_suggestions[1].labels[0].size(), 1u);
   EXPECT_EQ(iban_suggestions[1].labels[0][0].value, u"My brother's IBAN");
-  EXPECT_EQ(iban_suggestions[1].frontend_id, POPUP_ITEM_ID_IBAN_ENTRY);
+  EXPECT_EQ(iban_suggestions[1].popup_item_id, PopupItemId::kIbanEntry);
   EXPECT_TRUE(
       AreImagesEqual(iban_suggestions[1].custom_icon, CreateFakeImage()));
 
@@ -657,7 +1840,7 @@ TEST_F(AutofillSuggestionGeneratorTest, GetIBANSuggestions) {
   ASSERT_EQ(iban_suggestions[2].labels.size(), 1u);
   ASSERT_EQ(iban_suggestions[2].labels[0].size(), 1u);
   EXPECT_EQ(iban_suggestions[2].labels[0][0].value, u"My teacher's IBAN");
-  EXPECT_EQ(iban_suggestions[2].frontend_id, POPUP_ITEM_ID_IBAN_ENTRY);
+  EXPECT_EQ(iban_suggestions[2].popup_item_id, PopupItemId::kIbanEntry);
   EXPECT_TRUE(
       AreImagesEqual(iban_suggestions[2].custom_icon, CreateFakeImage()));
 
@@ -666,15 +1849,17 @@ TEST_F(AutofillSuggestionGeneratorTest, GetIBANSuggestions) {
   EXPECT_EQ(iban_suggestions[3].GetPayload<Suggestion::ValueToFill>().value(),
             iban3.GetStrippedValue());
   EXPECT_EQ(iban_suggestions[3].labels.size(), 0u);
-  EXPECT_EQ(iban_suggestions[3].frontend_id, POPUP_ITEM_ID_IBAN_ENTRY);
+  EXPECT_EQ(iban_suggestions[3].popup_item_id, PopupItemId::kIbanEntry);
   EXPECT_TRUE(
       AreImagesEqual(iban_suggestions[3].custom_icon, CreateFakeImage()));
 
-  EXPECT_EQ(iban_suggestions[4].frontend_id, POPUP_ITEM_ID_SEPARATOR);
+  EXPECT_EQ(iban_suggestions[4].popup_item_id, PopupItemId::kSeparator);
 
   EXPECT_EQ(iban_suggestions[5].main_text.value,
             l10n_util::GetStringUTF16(IDS_AUTOFILL_MANAGE_PAYMENT_METHODS));
-  EXPECT_EQ(iban_suggestions[5].frontend_id, POPUP_ITEM_ID_AUTOFILL_OPTIONS);
+  EXPECT_EQ(iban_suggestions[5].popup_item_id, PopupItemId::kAutofillOptions);
+
+  CleanUpIbanImageResources();
 }
 
 TEST_F(AutofillSuggestionGeneratorTest,
@@ -717,8 +1902,8 @@ TEST_F(AutofillSuggestionGeneratorTest,
             u"test_value_prop_text_1");
   EXPECT_EQ(promo_code_suggestions[0].GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("1"));
-  EXPECT_EQ(promo_code_suggestions[0].frontend_id,
-            POPUP_ITEM_ID_MERCHANT_PROMO_CODE_ENTRY);
+  EXPECT_EQ(promo_code_suggestions[0].popup_item_id,
+            PopupItemId::kMerchantPromoCodeEntry);
 
   EXPECT_EQ(promo_code_suggestions[1].main_text.value, u"test_promo_code_2");
   EXPECT_EQ(promo_code_suggestions[1].GetPayload<Suggestion::BackendId>(),
@@ -729,18 +1914,18 @@ TEST_F(AutofillSuggestionGeneratorTest,
             u"test_value_prop_text_2");
   EXPECT_EQ(promo_code_suggestions[1].GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("2"));
-  EXPECT_EQ(promo_code_suggestions[1].frontend_id,
-            POPUP_ITEM_ID_MERCHANT_PROMO_CODE_ENTRY);
+  EXPECT_EQ(promo_code_suggestions[1].popup_item_id,
+            PopupItemId::kMerchantPromoCodeEntry);
 
-  EXPECT_EQ(promo_code_suggestions[2].frontend_id, POPUP_ITEM_ID_SEPARATOR);
+  EXPECT_EQ(promo_code_suggestions[2].popup_item_id, PopupItemId::kSeparator);
 
   EXPECT_EQ(promo_code_suggestions[3].main_text.value,
             l10n_util::GetStringUTF16(
                 IDS_AUTOFILL_PROMO_CODE_SUGGESTIONS_FOOTER_TEXT));
   EXPECT_EQ(promo_code_suggestions[3].GetPayload<GURL>(),
             offer1.GetOfferDetailsUrl().spec());
-  EXPECT_EQ(promo_code_suggestions[3].frontend_id,
-            POPUP_ITEM_ID_SEE_PROMO_CODE_DETAILS);
+  EXPECT_EQ(promo_code_suggestions[3].popup_item_id,
+            PopupItemId::kSeePromoCodeDetails);
 }
 
 TEST_F(AutofillSuggestionGeneratorTest,
@@ -765,80 +1950,17 @@ TEST_F(AutofillSuggestionGeneratorTest,
             u"test_value_prop_text_1");
   EXPECT_FALSE(
       absl::holds_alternative<GURL>(promo_code_suggestions[0].payload));
-  EXPECT_EQ(promo_code_suggestions[0].frontend_id,
-            POPUP_ITEM_ID_MERCHANT_PROMO_CODE_ENTRY);
-}
-
-TEST_F(AutofillSuggestionGeneratorTest, BackendIdAndFrontendIdMappings) {
-  // Test that frontend ID retrieval with an invalid backend ID works correctly.
-  Suggestion::BackendId backend_id = Suggestion::BackendId();
-  EXPECT_FALSE(suggestion_generator()->MakeFrontendIdFromBackendId(backend_id));
-
-  // Test that frontend ID retrieval with valid backend IDs works correctly.
-  std::string valid_guid_digits = "00000000-0000-0000-0000-000000000000";
-  for (int i = 1; i <= 2; i++) {
-    valid_guid_digits.back() = base::NumberToString(i)[0];
-    backend_id = Suggestion::BackendId(valid_guid_digits);
-
-    // Check that querying
-    // AutofillSuggestionGenerator::MakeFrontendIdFromBackendId(~) with a new
-    // backend id creates a new entry in the backend_to_frontend_map() and
-    // frontend_to_backend_map() maps.
-    const int& frontend_id =
-        suggestion_generator()->MakeFrontendIdFromBackendId(backend_id);
-    EXPECT_GT(frontend_id, 0);
-    EXPECT_EQ(static_cast<int>(suggestion_generator()
-                                   ->backend_to_frontend_map_for_testing()
-                                   .size()),
-              i);
-    EXPECT_EQ(static_cast<int>(suggestion_generator()
-                                   ->frontend_to_backend_map_for_testing()
-                                   .size()),
-              i);
-
-    // Check that querying
-    // AutofillSuggestionGenerator::GetBackendIdFromFrontendId(~) again returns
-    // the previously added entry, and does not create a new entry in the
-    // backend_to_frontend_map() and frontend_to_backend_map() maps.
-    EXPECT_TRUE(suggestion_generator()->MakeFrontendIdFromBackendId(
-                    backend_id) == frontend_id);
-    EXPECT_EQ(static_cast<int>(suggestion_generator()
-                                   ->backend_to_frontend_map_for_testing()
-                                   .size()),
-              i);
-    EXPECT_EQ(static_cast<int>(suggestion_generator()
-                                   ->frontend_to_backend_map_for_testing()
-                                   .size()),
-              i);
-  }
-
-  // The test cases below are run after the
-  // AutofillSuggestionGenerator::GetBackendIdFromFrontendId(~) test cases to
-  // ensure the maps backend_to_frontend_map() and frontend_to_backend_map() are
-  // populated.
-
-  // Test that backend ID retrieval with valid frontend IDs works correctly.
-  for (int i = 1; i <= 2; i++) {
-    backend_id = suggestion_generator()->GetBackendIdFromFrontendId(i);
-    EXPECT_FALSE(backend_id->empty());
-    valid_guid_digits.back() = base::NumberToString(i)[0];
-    EXPECT_EQ(*backend_id, valid_guid_digits);
-  }
+  EXPECT_EQ(promo_code_suggestions[0].popup_item_id,
+            PopupItemId::kMerchantPromoCodeEntry);
 }
 
 // This class helps test the credit card contents that are displayed in Autofill
 // suggestions. It covers suggestions on Desktop/Android dropdown, and on
 // Android keyboard accessory.
 class AutofillCreditCardSuggestionContentTest
-    : public AutofillSuggestionGeneratorTest,
-      public testing::WithParamInterface<bool> {
+    : public AutofillSuggestionGeneratorTest {
  public:
   AutofillCreditCardSuggestionContentTest() {
-#if BUILDFLAG(IS_ANDROID)
-    keyboard_accessory_enabled_ = GetParam();
-    feature_list_keyboard_accessory_.InitWithFeatureState(
-        features::kAutofillKeyboardAccessory, keyboard_accessory_enabled_);
-#endif
     feature_list_metadata_.InitWithFeatures(
         /*enabled_features=*/{features::kAutofillEnableVirtualCardMetadata,
                               features::kAutofillEnableCardProductName},
@@ -849,27 +1971,32 @@ class AutofillCreditCardSuggestionContentTest
 
   bool keyboard_accessory_enabled() const {
 #if BUILDFLAG(IS_ANDROID)
-    return keyboard_accessory_enabled_;
+    return true;
 #else
     return false;
 #endif
   }
 
- private:
-#if BUILDFLAG(IS_ANDROID)
-  bool keyboard_accessory_enabled_;
-  base::test::ScopedFeatureList feature_list_keyboard_accessory_;
+#if BUILDFLAG(IS_IOS)
+  // Return the obfuscation length for the last four digits on iOS.
+  // Although this depends on the kAutofillUseTwoDotsForLastFourDigits flag,
+  // that flag is not tested explicitly by this test; see
+  // AutofillCreditCardSuggestionIOSObfuscationLengthContentTest instead.
+  int ios_obfuscation_length() const {
+    return base::FeatureList::IsEnabled(
+               features::kAutofillUseTwoDotsForLastFourDigits)
+               ? 2
+               : 4;
+  }
 #endif
+
+ private:
   base::test::ScopedFeatureList feature_list_metadata_;
 };
 
-INSTANTIATE_TEST_SUITE_P(All,
-                         AutofillCreditCardSuggestionContentTest,
-                         testing::Bool());
-
 // Verify that the suggestion's texts are populated correctly for a virtual card
 // suggestion when the cardholder name field is focused.
-TEST_P(AutofillCreditCardSuggestionContentTest,
+TEST_F(AutofillCreditCardSuggestionContentTest,
        CreateCreditCardSuggestion_VirtualCardMetadata_NameField) {
   CreditCard server_card = CreateServerCard();
 
@@ -895,19 +2022,21 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
 
 #if BUILDFLAG(IS_IOS)
   // There should be 2 lines of labels:
-  // 1. Obfuscated last 4 digits "....1111".
+  // 1. Obfuscated last 4 digits "..1111" or "....1111".
   // 2. Virtual card label.
   ASSERT_EQ(virtual_card_name_field_suggestion.labels.size(), 2U);
   ASSERT_EQ(virtual_card_name_field_suggestion.labels[0].size(), 1U);
   EXPECT_EQ(virtual_card_name_field_suggestion.labels[0][0].value,
-            internal::GetObfuscatedStringForCardDigits(u"1111", 4));
+            CreditCard::GetObfuscatedStringForCardDigits(
+                ios_obfuscation_length(), u"1111"));
 #else
   if (keyboard_accessory_enabled()) {
     // There should be only 1 line of label: obfuscated last 4 digits "..1111".
     ASSERT_EQ(virtual_card_name_field_suggestion.labels.size(), 1U);
     ASSERT_EQ(virtual_card_name_field_suggestion.labels[0].size(), 1U);
     EXPECT_EQ(virtual_card_name_field_suggestion.labels[0][0].value,
-              internal::GetObfuscatedStringForCardDigits(u"1111", 2));
+              CreditCard::GetObfuscatedStringForCardDigits(
+                  /*obfuscation_length=*/2, u"1111"));
   } else {
     // There should be 2 lines of labels:
     // 1. Card name + obfuscated last 4 digits "CardName  ....1111". Card name
@@ -917,7 +2046,8 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
     ASSERT_EQ(virtual_card_name_field_suggestion.labels[0].size(), 2U);
     EXPECT_EQ(virtual_card_name_field_suggestion.labels[0][0].value, u"Visa");
     EXPECT_EQ(virtual_card_name_field_suggestion.labels[0][1].value,
-              internal::GetObfuscatedStringForCardDigits(u"1111", 4));
+              CreditCard::GetObfuscatedStringForCardDigits(
+                  /*obfuscation_length=*/4, u"1111"));
   }
 #endif
 
@@ -932,7 +2062,7 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
 
 // Verify that the suggestion's texts are populated correctly for a virtual card
 // suggestion when the card number field is focused.
-TEST_P(AutofillCreditCardSuggestionContentTest,
+TEST_F(AutofillCreditCardSuggestionContentTest,
        CreateCreditCardSuggestion_VirtualCardMetadata_NumberField) {
   CreditCard server_card = CreateServerCard();
 
@@ -945,9 +2075,10 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
 
 #if BUILDFLAG(IS_IOS)
   // Only card number is displayed on the first line.
-  EXPECT_EQ(virtual_card_number_field_suggestion.main_text.value,
-            base::StrCat({u"Visa  ", internal::GetObfuscatedStringForCardDigits(
-                                         u"1111", 4)}));
+  EXPECT_EQ(
+      virtual_card_number_field_suggestion.main_text.value,
+      base::StrCat({u"Visa  ", CreditCard::GetObfuscatedStringForCardDigits(
+                                   ios_obfuscation_length(), u"1111")}));
   EXPECT_EQ(virtual_card_number_field_suggestion.minor_text.value, u"");
 #else
   if (keyboard_accessory_enabled()) {
@@ -957,12 +2088,14 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
     EXPECT_EQ(virtual_card_number_field_suggestion.main_text.value,
               u"Virtual card  Visa");
     EXPECT_EQ(virtual_card_number_field_suggestion.minor_text.value,
-              internal::GetObfuscatedStringForCardDigits(u"1111", 2));
+              CreditCard::GetObfuscatedStringForCardDigits(
+                  /*obfuscation_length=*/2, u"1111"));
   } else {
     // Card name and the obfuscated last four digits are shown separately.
     EXPECT_EQ(virtual_card_number_field_suggestion.main_text.value, u"Visa");
     EXPECT_EQ(virtual_card_number_field_suggestion.minor_text.value,
-              internal::GetObfuscatedStringForCardDigits(u"1111", 4));
+              CreditCard::GetObfuscatedStringForCardDigits(
+                  /*obfuscation_length=*/4, u"1111"));
   }
 #endif
 
@@ -980,7 +2113,7 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
 
 // Verify that the suggestion's texts are populated correctly for a masked
 // server card suggestion when the cardholder name field is focused.
-TEST_P(AutofillCreditCardSuggestionContentTest,
+TEST_F(AutofillCreditCardSuggestionContentTest,
        CreateCreditCardSuggestion_MaskedServerCardMetadata_NameField) {
   CreditCard server_card = CreateServerCard();
 
@@ -996,18 +2129,20 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
   EXPECT_EQ(real_card_name_field_suggestion.minor_text.value, u"");
 
 #if BUILDFLAG(IS_IOS)
-  // For IOS, the label is "....1111".
+  // For IOS, the label is "..1111" or "....1111".
   ASSERT_EQ(real_card_name_field_suggestion.labels.size(), 1U);
   ASSERT_EQ(real_card_name_field_suggestion.labels[0].size(), 1U);
   EXPECT_EQ(real_card_name_field_suggestion.labels[0][0].value,
-            internal::GetObfuscatedStringForCardDigits(u"1111", 4));
+            CreditCard::GetObfuscatedStringForCardDigits(
+                ios_obfuscation_length(), u"1111"));
 #else
   if (keyboard_accessory_enabled()) {
     // For the keyboard accessory, the label is "..1111".
     ASSERT_EQ(real_card_name_field_suggestion.labels.size(), 1U);
     ASSERT_EQ(real_card_name_field_suggestion.labels[0].size(), 1U);
     EXPECT_EQ(real_card_name_field_suggestion.labels[0][0].value,
-              internal::GetObfuscatedStringForCardDigits(u"1111", 2));
+              CreditCard::GetObfuscatedStringForCardDigits(
+                  /*obfuscation_length=*/2, u"1111"));
   } else {
     // For Desktop/Android, the label is "CardName  ....1111". Card name and
     // last four are shown separately.
@@ -1015,14 +2150,15 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
     ASSERT_EQ(real_card_name_field_suggestion.labels[0].size(), 2U);
     EXPECT_EQ(real_card_name_field_suggestion.labels[0][0].value, u"Visa");
     EXPECT_EQ(real_card_name_field_suggestion.labels[0][1].value,
-              internal::GetObfuscatedStringForCardDigits(u"1111", 4));
+              CreditCard::GetObfuscatedStringForCardDigits(
+                  /*obfuscation_length=*/4, u"1111"));
   }
 #endif
 }
 
 // Verify that the suggestion's texts are populated correctly for a masked
 // server card suggestion when the card number field is focused.
-TEST_P(AutofillCreditCardSuggestionContentTest,
+TEST_F(AutofillCreditCardSuggestionContentTest,
        CreateCreditCardSuggestion_MaskedServerCardMetadata_NumberField) {
   CreditCard server_card = CreateServerCard();
 
@@ -1035,17 +2171,19 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
 
 #if BUILDFLAG(IS_IOS)
   // Only the card number is displayed on the first line.
-  EXPECT_EQ(real_card_number_field_suggestion.main_text.value,
-            base::StrCat({u"Visa  ", internal::GetObfuscatedStringForCardDigits(
-                                         u"1111", 4)}));
+  EXPECT_EQ(
+      real_card_number_field_suggestion.main_text.value,
+      base::StrCat({u"Visa  ", CreditCard::GetObfuscatedStringForCardDigits(
+                                   ios_obfuscation_length(), u"1111")}));
   EXPECT_EQ(real_card_number_field_suggestion.minor_text.value, u"");
 #else
   // For Desktop/Android, split the first line and populate the card name and
   // the last 4 digits separately.
   EXPECT_EQ(real_card_number_field_suggestion.main_text.value, u"Visa");
   EXPECT_EQ(real_card_number_field_suggestion.minor_text.value,
-            internal::GetObfuscatedStringForCardDigits(
-                u"1111", keyboard_accessory_enabled() ? 2 : 4));
+            CreditCard::GetObfuscatedStringForCardDigits(
+                /*obfuscation_length=*/keyboard_accessory_enabled() ? 2 : 4,
+                u"1111"));
 #endif
 
   // The label is the expiration date formatted as mm/yy.
@@ -1056,35 +2194,196 @@ TEST_P(AutofillCreditCardSuggestionContentTest,
                           base::UTF8ToUTF16(test::NextYear().substr(2))}));
 }
 
+#if !BUILDFLAG(IS_ANDROID)
+// Verify that the suggestion's texts are populated correctly for a local and
+// server card suggestion when the CVC field is focused.
+TEST_F(AutofillCreditCardSuggestionContentTest,
+       GetSuggestionsForCreditCards_CvcField) {
+  // Create one server card and one local card with CVC.
+  CreditCard local_card = CreateLocalCard();
+  // We used last 4 to deduplicate local card and server card so we should set
+  // local card with different last 4.
+  local_card.SetNumber(u"5454545454545454");
+  personal_data()->AddCreditCard(std::move(local_card));
+  personal_data()->AddServerCreditCard(CreateServerCard());
+
+  bool should_display_gpay_logo;
+  bool with_offer;
+  autofill_metrics::CardMetadataLoggingContext metadata_logging_context;
+  const std::vector<Suggestion> suggestions =
+      suggestion_generator()->GetSuggestionsForCreditCards(
+          FormFieldData(), AutofillType(CREDIT_CARD_VERIFICATION_CODE),
+          /*app_locale=*/"en", should_display_gpay_logo, with_offer,
+          metadata_logging_context);
+
+  // Both local card and server card suggestion should be shown when CVC field
+  // is focused.
+  ASSERT_EQ(suggestions.size(), 2U);
+  EXPECT_EQ(suggestions[0].main_text.value,
+            l10n_util::GetStringUTF16(IDS_AUTOFILL_CVC_SUGGESTION_MAIN_TEXT));
+  EXPECT_EQ(suggestions[1].main_text.value,
+            l10n_util::GetStringUTF16(IDS_AUTOFILL_CVC_SUGGESTION_MAIN_TEXT));
+}
+
+// Verify that the suggestion's texts are populated correctly for a duplicate
+// local and server card suggestion when the CVC field is focused.
+TEST_F(AutofillCreditCardSuggestionContentTest,
+       GetSuggestionsForCreditCards_Duplicate_CvcField) {
+  // Create 2 duplicate local and server card with same last 4.
+  personal_data()->AddCreditCard(CreateLocalCard());
+  personal_data()->AddServerCreditCard(CreateServerCard());
+
+  bool should_display_gpay_logo;
+  bool with_offer;
+  autofill_metrics::CardMetadataLoggingContext metadata_logging_context;
+  const std::vector<Suggestion> suggestions =
+      suggestion_generator()->GetSuggestionsForCreditCards(
+          FormFieldData(), AutofillType(CREDIT_CARD_VERIFICATION_CODE),
+          /*app_locale=*/"en", should_display_gpay_logo, with_offer,
+          metadata_logging_context);
+
+  // Only 1 suggestion should be shown when CVC field is focused.
+  ASSERT_EQ(suggestions.size(), 1U);
+  EXPECT_EQ(suggestions[0].main_text.value,
+            l10n_util::GetStringUTF16(IDS_AUTOFILL_CVC_SUGGESTION_MAIN_TEXT));
+}
+
+// Verify that the FPAN and VCN suggestion's texts are populated correctly for a
+// enrolled card when the CVC field is focused.
+TEST_F(AutofillCreditCardSuggestionContentTest,
+       GetSuggestionsForCreditCards_VirtualCard_CvcField) {
+  // Create a server card with CVC that enrolled to virtual card.
+  CreditCard server_card = CreateServerCard();
+  server_card.set_virtual_card_enrollment_state(
+      CreditCard::VirtualCardEnrollmentState::kEnrolled);
+  personal_data()->AddServerCreditCard(std::move(server_card));
+
+  bool should_display_gpay_logo;
+  bool with_offer;
+  autofill_metrics::CardMetadataLoggingContext metadata_logging_context;
+  const std::vector<Suggestion> suggestions =
+      suggestion_generator()->GetSuggestionsForCreditCards(
+          FormFieldData(), AutofillType(CREDIT_CARD_VERIFICATION_CODE),
+          /*app_locale=*/"en", should_display_gpay_logo, with_offer,
+          metadata_logging_context);
+
+  // Both FPAN and VCN suggestion should be shown when CVC field is focused.
+  ASSERT_EQ(suggestions.size(), 2U);
+  EXPECT_EQ(suggestions[0].main_text.value,
+            l10n_util::GetStringUTF16(IDS_AUTOFILL_CVC_SUGGESTION_MAIN_TEXT));
+  EXPECT_EQ(suggestions[1].main_text.value,
+            l10n_util::GetStringUTF16(IDS_AUTOFILL_CVC_SUGGESTION_MAIN_TEXT));
+}
+
+// Verify that the FPAN and VCN suggestion's texts are populated correctly for a
+// enrolled card when the CVC field is focused.
+TEST_F(AutofillCreditCardSuggestionContentTest,
+       GetSuggestionsForCreditCards_VirtualCard_Duplicate_CvcField) {
+  // Create duplicate local and server card with CVC that enrolled to virtual
+  // card.
+  CreditCard server_card = CreateServerCard();
+  server_card.set_virtual_card_enrollment_state(
+      CreditCard::VirtualCardEnrollmentState::kEnrolled);
+  personal_data()->AddServerCreditCard(std::move(server_card));
+  personal_data()->AddCreditCard(CreateLocalCard());
+
+  bool should_display_gpay_logo;
+  bool with_offer;
+  autofill_metrics::CardMetadataLoggingContext metadata_logging_context;
+  const std::vector<Suggestion> suggestions =
+      suggestion_generator()->GetSuggestionsForCreditCards(
+          FormFieldData(), AutofillType(CREDIT_CARD_VERIFICATION_CODE),
+          /*app_locale=*/"en", should_display_gpay_logo, with_offer,
+          metadata_logging_context);
+
+  // Both FPAN and VCN suggestion should be shown when CVC field is focused.
+  ASSERT_EQ(suggestions.size(), 2U);
+  EXPECT_EQ(suggestions[0].main_text.value,
+            l10n_util::GetStringUTF16(IDS_AUTOFILL_CVC_SUGGESTION_MAIN_TEXT));
+  EXPECT_EQ(suggestions[1].main_text.value,
+            l10n_util::GetStringUTF16(IDS_AUTOFILL_CVC_SUGGESTION_MAIN_TEXT));
+}
+
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_IOS)
+// Tests that credit card suggestions on iOS use the correct number of '•'
+// characters depending on the kAutofillUseTwoDotsForLastFourDigits feature.
+class AutofillCreditCardSuggestionIOSObfuscationLengthContentTest
+    : public AutofillSuggestionGeneratorTest,
+      public testing::WithParamInterface<bool> {
+ public:
+  AutofillCreditCardSuggestionIOSObfuscationLengthContentTest() {
+    feature_list_.InitWithFeatureState(
+        features::kAutofillUseTwoDotsForLastFourDigits, GetParam());
+  }
+
+  ~AutofillCreditCardSuggestionIOSObfuscationLengthContentTest() override =
+      default;
+
+  int expected_obfuscation_length() const { return GetParam() ? 2 : 4; }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    AutofillCreditCardSuggestionContentTest,
+    AutofillCreditCardSuggestionIOSObfuscationLengthContentTest,
+    testing::Bool());
+
+TEST_P(AutofillCreditCardSuggestionIOSObfuscationLengthContentTest,
+       CreateCreditCardSuggestion_CorrectObfuscationLength) {
+  CreditCard server_card = CreateServerCard();
+
+  // Name field suggestion.
+  Suggestion card_name_field_suggestion =
+      suggestion_generator()->CreateCreditCardSuggestion(
+          server_card, AutofillType(CREDIT_CARD_NAME_FULL),
+          /*virtual_card_option=*/false,
+          /*card_linked_offer_available=*/false);
+
+  ASSERT_EQ(card_name_field_suggestion.labels.size(), 1U);
+  ASSERT_EQ(card_name_field_suggestion.labels[0].size(), 1U);
+  EXPECT_EQ(card_name_field_suggestion.labels[0][0].value,
+            CreditCard::GetObfuscatedStringForCardDigits(
+                expected_obfuscation_length(), u"1111"));
+
+  // Card number field suggestion.
+  Suggestion card_number_field_suggestion =
+      suggestion_generator()->CreateCreditCardSuggestion(
+          server_card, AutofillType(CREDIT_CARD_NUMBER),
+          /*virtual_card_option=*/false,
+          /*card_linked_offer_available=*/false);
+
+  EXPECT_EQ(
+      card_number_field_suggestion.main_text.value,
+      base::StrCat({u"Visa  ", CreditCard::GetObfuscatedStringForCardDigits(
+                                   expected_obfuscation_length(), u"1111")}));
+}
+
+#endif  // BUILDFLAG(IS_IOS)
+
 class AutofillSuggestionGeneratorTestForMetadata
     : public AutofillSuggestionGeneratorTest,
       public testing::WithParamInterface<std::tuple<bool, bool, bool>> {
  public:
-  AutofillSuggestionGeneratorTestForMetadata()
-      : card_product_description_enabled_(std::get<0>(GetParam())),
-        card_art_image_enabled_(std::get<1>(GetParam())),
-        card_has_linked_virtual_card_(std::get<2>(GetParam())) {
+  AutofillSuggestionGeneratorTestForMetadata() {
     feature_list_card_product_description_.InitWithFeatureState(
-        features::kAutofillEnableCardProductName,
-        card_product_description_enabled_);
+        features::kAutofillEnableCardProductName, std::get<0>(GetParam()));
     feature_list_card_art_image_.InitWithFeatureState(
-        features::kAutofillEnableCardArtImage, card_art_image_enabled_);
+        features::kAutofillEnableCardArtImage, std::get<1>(GetParam()));
   }
 
   ~AutofillSuggestionGeneratorTestForMetadata() override = default;
 
   bool card_product_description_enabled() const {
-    return card_product_description_enabled_;
+    return std::get<0>(GetParam());
   }
-  bool card_art_image_enabled() const { return card_art_image_enabled_; }
-  bool card_has_linked_virtual_card() const {
-    return card_has_linked_virtual_card_;
-  }
+  bool card_art_image_enabled() const { return std::get<1>(GetParam()); }
+  bool card_has_capital_one_icon() const { return std::get<2>(GetParam()); }
 
  private:
-  const bool card_product_description_enabled_;
-  const bool card_art_image_enabled_;
-  const bool card_has_linked_virtual_card_;
   base::test::ScopedFeatureList feature_list_card_product_description_;
   base::test::ScopedFeatureList feature_list_card_art_image_;
 };
@@ -1110,12 +2409,13 @@ TEST_P(AutofillSuggestionGeneratorTestForMetadata,
           /*virtual_card_option=*/true,
           /*card_linked_offer_available=*/false);
 
-  EXPECT_EQ(virtual_card_suggestion.frontend_id,
-            POPUP_ITEM_ID_VIRTUAL_CREDIT_CARD_ENTRY);
+  EXPECT_EQ(virtual_card_suggestion.popup_item_id,
+            PopupItemId::kVirtualCreditCardEntry);
   EXPECT_EQ(virtual_card_suggestion.GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("00000000-0000-0000-0000-000000000001"));
-  EXPECT_TRUE(VerifyCardArtImageExpectation(virtual_card_suggestion,
-                                            card_art_url, fake_image));
+  EXPECT_EQ(VerifyCardArtImageExpectation(virtual_card_suggestion, card_art_url,
+                                          fake_image),
+            card_art_image_enabled());
 
   Suggestion real_card_suggestion =
       suggestion_generator()->CreateCreditCardSuggestion(
@@ -1123,7 +2423,7 @@ TEST_P(AutofillSuggestionGeneratorTestForMetadata,
           /*virtual_card_option=*/false,
           /*card_linked_offer_available=*/false);
 
-  EXPECT_EQ(real_card_suggestion.frontend_id, 0);
+  EXPECT_EQ(real_card_suggestion.popup_item_id, PopupItemId::kCreditCardEntry);
   EXPECT_EQ(real_card_suggestion.GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("00000000-0000-0000-0000-000000000001"));
   EXPECT_EQ(VerifyCardArtImageExpectation(real_card_suggestion, card_art_url,
@@ -1142,7 +2442,7 @@ TEST_P(AutofillSuggestionGeneratorTestForMetadata,
           /*virtual_card_option=*/false,
           /*card_linked_offer_available=*/false);
 
-  EXPECT_EQ(real_card_suggestion.frontend_id, 0);
+  EXPECT_EQ(real_card_suggestion.popup_item_id, PopupItemId::kCreditCardEntry);
   EXPECT_EQ(real_card_suggestion.GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("00000000-0000-0000-0000-000000000001"));
   EXPECT_TRUE(VerifyCardArtImageExpectation(real_card_suggestion, GURL(),
@@ -1171,12 +2471,13 @@ TEST_P(AutofillSuggestionGeneratorTestForMetadata,
           /*virtual_card_option=*/true,
           /*card_linked_offer_available=*/false);
 
-  EXPECT_EQ(virtual_card_suggestion.frontend_id,
-            POPUP_ITEM_ID_VIRTUAL_CREDIT_CARD_ENTRY);
+  EXPECT_EQ(virtual_card_suggestion.popup_item_id,
+            PopupItemId::kVirtualCreditCardEntry);
   EXPECT_EQ(virtual_card_suggestion.GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("00000000-0000-0000-0000-000000000001"));
-  EXPECT_TRUE(VerifyCardArtImageExpectation(virtual_card_suggestion,
-                                            card_art_url, fake_image));
+  EXPECT_EQ(VerifyCardArtImageExpectation(virtual_card_suggestion, card_art_url,
+                                          fake_image),
+            card_art_image_enabled());
 
   Suggestion real_card_suggestion =
       suggestion_generator()->CreateCreditCardSuggestion(
@@ -1184,7 +2485,7 @@ TEST_P(AutofillSuggestionGeneratorTestForMetadata,
           /*virtual_card_option=*/false,
           /*card_linked_offer_available=*/false);
 
-  EXPECT_EQ(real_card_suggestion.frontend_id, 0);
+  EXPECT_EQ(real_card_suggestion.popup_item_id, PopupItemId::kCreditCardEntry);
   EXPECT_EQ(real_card_suggestion.GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("00000000-0000-0000-0000-000000000002"));
   EXPECT_EQ(VerifyCardArtImageExpectation(real_card_suggestion, card_art_url,
@@ -1198,9 +2499,9 @@ TEST_P(AutofillSuggestionGeneratorTestForMetadata,
   {
     // Create one server card with no metadata.
     CreditCard server_card = CreateServerCard();
-    if (card_has_linked_virtual_card()) {
-      server_card.set_virtual_card_enrollment_state(
-          CreditCard::VirtualCardEnrollmentState::ENROLLED);
+    server_card.set_issuer_id(kCapitalOneCardIssuerId);
+    if (card_has_capital_one_icon()) {
+      server_card.set_card_art_url(GURL(kCapitalOneCardArtUrl));
     }
     personal_data()->AddServerCreditCard(server_card);
 
@@ -1215,6 +2516,13 @@ TEST_P(AutofillSuggestionGeneratorTestForMetadata,
     EXPECT_FALSE(metadata_logging_context.card_metadata_available);
     EXPECT_FALSE(metadata_logging_context.card_product_description_shown);
     EXPECT_FALSE(metadata_logging_context.card_art_image_shown);
+
+    // Verify that a record is added that a Capital One card suggestion
+    // was generated, and it did not have metadata.
+    base::flat_map<std::string, bool> expected_issuer_to_metadata_availability =
+        {{kCapitalOneCardIssuerId, false}};
+    EXPECT_EQ(metadata_logging_context.issuer_to_metadata_availability,
+              expected_issuer_to_metadata_availability);
   }
 
   personal_data()->ClearCreditCards();
@@ -1222,13 +2530,10 @@ TEST_P(AutofillSuggestionGeneratorTestForMetadata,
   {
     // Create a server card with card product description & card art image.
     CreditCard server_card_with_metadata = CreateServerCard();
+    server_card_with_metadata.set_issuer_id(kCapitalOneCardIssuerId);
     server_card_with_metadata.set_product_description(u"product_description");
     server_card_with_metadata.set_card_art_url(
         GURL("https://www.example.com/card-art.png"));
-    if (card_has_linked_virtual_card()) {
-      server_card_with_metadata.set_virtual_card_enrollment_state(
-          CreditCard::VirtualCardEnrollmentState::ENROLLED);
-    }
     personal_data()->AddServerCreditCard(server_card_with_metadata);
 
     bool should_display_gpay_logo;
@@ -1243,8 +2548,54 @@ TEST_P(AutofillSuggestionGeneratorTestForMetadata,
     EXPECT_EQ(metadata_logging_context.card_product_description_shown,
               card_product_description_enabled());
     EXPECT_EQ(metadata_logging_context.card_art_image_shown,
-              card_art_image_enabled() || card_has_linked_virtual_card());
+              card_art_image_enabled());
+
+    // Verify that a record is added that a Capital One card suggestion
+    // was generated, and it had metadata.
+    base::flat_map<std::string, bool> expected_issuer_to_metadata_availability =
+        {{kCapitalOneCardIssuerId, true}};
+    EXPECT_EQ(metadata_logging_context.issuer_to_metadata_availability,
+              expected_issuer_to_metadata_availability);
   }
+}
+
+// Verifies that the custom icon is set correctly. The card art should be shown
+// when the metadata card art flag is enabled. Capital One virtual card icon is
+// an exception which should only and always be shown for virtual cards.
+TEST_P(AutofillSuggestionGeneratorTestForMetadata,
+       CreateCreditCardSuggestion_CustomCardIcon) {
+  // Create a server card.
+  CreditCard server_card = CreateServerCard();
+  GURL card_art_url =
+      GURL(card_has_capital_one_icon() ? kCapitalOneCardArtUrl
+                                       : "https://www.example.com/card-art");
+  server_card.set_card_art_url(card_art_url);
+  gfx::Image fake_image = CreateFakeImage();
+  personal_data()->AddCardArtImage(card_art_url, fake_image);
+
+  Suggestion virtual_card_suggestion =
+      suggestion_generator()->CreateCreditCardSuggestion(
+          server_card, AutofillType(CREDIT_CARD_NUMBER),
+          /*virtual_card_option=*/true,
+          /*card_linked_offer_available=*/false);
+
+  // Verify that for virtual cards, the custom icon is shown if the card art is
+  // the Capital One virtual card art or if the metadata card art is enabled.
+  EXPECT_EQ(VerifyCardArtImageExpectation(virtual_card_suggestion, card_art_url,
+                                          fake_image),
+            card_has_capital_one_icon() || card_art_image_enabled());
+
+  Suggestion real_card_suggestion =
+      suggestion_generator()->CreateCreditCardSuggestion(
+          server_card, AutofillType(CREDIT_CARD_NUMBER),
+          /*virtual_card_option=*/false,
+          /*card_linked_offer_available=*/false);
+
+  // Verify that for FPAN, the custom icon is shown if the card art is not the
+  // Capital One virtual card art and the metadata card art is enabled.
+  EXPECT_EQ(VerifyCardArtImageExpectation(real_card_suggestion, card_art_url,
+                                          fake_image),
+            !card_has_capital_one_icon() && card_art_image_enabled());
 }
 
 class AutofillSuggestionGeneratorTestForOffer
@@ -1256,13 +2607,10 @@ class AutofillSuggestionGeneratorTestForOffer
     keyboard_accessory_offer_enabled_ = GetParam();
     if (keyboard_accessory_offer_enabled_) {
       scoped_feature_keyboard_accessory_offer_.InitWithFeatures(
-          {features::kAutofillKeyboardAccessory,
-           features::kAutofillEnableOffersInClankKeyboardAccessory},
-          {});
+          {features::kAutofillEnableOffersInClankKeyboardAccessory}, {});
     } else {
       scoped_feature_keyboard_accessory_offer_.InitWithFeatures(
-          {}, {features::kAutofillKeyboardAccessory,
-               features::kAutofillEnableOffersInClankKeyboardAccessory});
+          {}, {features::kAutofillEnableOffersInClankKeyboardAccessory});
     }
 #endif
   }
@@ -1301,8 +2649,8 @@ TEST_P(AutofillSuggestionGeneratorTestForOffer,
           /*virtual_card_option=*/true,
           /*card_linked_offer_available=*/true);
 
-  EXPECT_EQ(virtual_card_suggestion.frontend_id,
-            POPUP_ITEM_ID_VIRTUAL_CREDIT_CARD_ENTRY);
+  EXPECT_EQ(virtual_card_suggestion.popup_item_id,
+            PopupItemId::kVirtualCreditCardEntry);
   EXPECT_EQ(virtual_card_suggestion.GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("00000000-0000-0000-0000-000000000001"));
   // Ensures CLO text is not shown for virtual card option.
@@ -1314,7 +2662,7 @@ TEST_P(AutofillSuggestionGeneratorTestForOffer,
           /*virtual_card_option=*/false,
           /*card_linked_offer_available=*/true);
 
-  EXPECT_EQ(real_card_suggestion.frontend_id, 0);
+  EXPECT_EQ(real_card_suggestion.popup_item_id, PopupItemId::kCreditCardEntry);
   EXPECT_EQ(real_card_suggestion.GetPayload<Suggestion::BackendId>(),
             Suggestion::BackendId("00000000-0000-0000-0000-000000000001"));
 

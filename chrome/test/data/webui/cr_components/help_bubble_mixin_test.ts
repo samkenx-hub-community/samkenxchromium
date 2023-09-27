@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'chrome://webui-test/mojo_webui_test_support.js';
 import 'chrome://resources/cr_components/help_bubble/help_bubble.js';
 
 import {IronIconElement} from '//resources/polymer/v3_0/iron-icon/iron-icon.js';
@@ -115,6 +114,12 @@ declare global {
 
 class TestHelpBubbleHandler extends TestBrowserProxy implements
     HelpBubbleHandlerInterface {
+  // Records the current visibility of all known elements.
+  // Simply looking at the call logs can produce extraneous results, as
+  // visible=true may be generated multiple times if an element e.g. changes
+  // position on the page.
+  visibility: Map<string, boolean> = new Map();
+
   constructor() {
     super([
       'helpBubbleAnchorVisibilityChanged',
@@ -127,6 +132,7 @@ class TestHelpBubbleHandler extends TestBrowserProxy implements
 
   helpBubbleAnchorVisibilityChanged(
       nativeIdentifier: string, visible: boolean) {
+    this.visibility.set(nativeIdentifier, visible);
     this.methodCalled(
         'helpBubbleAnchorVisibilityChanged', nativeIdentifier, visible);
   }
@@ -267,7 +273,6 @@ suite('CrComponentsHelpBubbleMixinTest', () => {
     bodyIconName: 'lightbulb_outline',
     bodyIconAltText: BODY_ICON_ALT_TEXT,
     buttons: [],
-    forceCloseButton: false,
   };
 
   test('help bubble mixin shows bubble when called directly', () => {
@@ -454,7 +459,6 @@ suite('CrComponentsHelpBubbleMixinTest', () => {
           position: HelpBubbleArrowPosition.BOTTOM_CENTER,
           bodyText: 'This is a help bubble.',
           buttons: [],
-          forceCloseButton: false,
         };
 
         testProxy.getCallbackRouterRemote().showHelpBubble(params);
@@ -484,43 +488,30 @@ suite('CrComponentsHelpBubbleMixinTest', () => {
 
   test('help bubble mixin sends events on initially visible', async () => {
     await waitAfterNextRender(container);
-    // Since we're watching four elements, we get events for all four.
-    assertEquals(
-        5,
-        testProxy.getHandler().getCallCount(
-            'helpBubbleAnchorVisibilityChanged'));
     assertDeepEquals(
-        [
+        new Map<string, boolean>([
           [TITLE_NATIVE_ID, true],
           [PARAGRAPH_NATIVE_ID, true],
           [LIST_NATIVE_ID, true],
           [SPAN_NATIVE_ID, true],
           [NESTED_CHILD_NATIVE_ID, true],
-        ],
-        testProxy.getHandler().getArgs('helpBubbleAnchorVisibilityChanged'));
+        ]),
+        testProxy.getHandler().visibility);
   });
 
   test('help bubble mixin sends event on lost visibility', async () => {
+    await waitAfterNextRender(container);
     container.style.display = 'none';
     await waitForVisibilityEvents();
-    assertEquals(
-        10,
-        testProxy.getHandler().getCallCount(
-            'helpBubbleAnchorVisibilityChanged'));
     assertDeepEquals(
-        [
-          [TITLE_NATIVE_ID, true],
-          [PARAGRAPH_NATIVE_ID, true],
-          [LIST_NATIVE_ID, true],
-          [SPAN_NATIVE_ID, true],
-          [NESTED_CHILD_NATIVE_ID, true],
+        new Map<string, boolean>([
           [TITLE_NATIVE_ID, false],
           [PARAGRAPH_NATIVE_ID, false],
           [LIST_NATIVE_ID, false],
           [SPAN_NATIVE_ID, false],
           [NESTED_CHILD_NATIVE_ID, false],
-        ],
-        testProxy.getHandler().getArgs('helpBubbleAnchorVisibilityChanged'));
+        ]),
+        testProxy.getHandler().visibility);
   });
 
   test('help bubble mixin sends event on element activated', async () => {
@@ -626,7 +617,6 @@ suite('CrComponentsHelpBubbleMixinTest', () => {
     bodyText: 'This is another help bubble.',
     titleText: 'This is a title',
     buttons: [],
-    forceCloseButton: false,
   };
 
   test('help bubble mixin shows multiple bubbles', async () => {
@@ -668,7 +658,6 @@ suite('CrComponentsHelpBubbleMixinTest', () => {
     bodyText: 'This is another help bubble.',
     progress: {current: 1, total: 3},
     buttons: [],
-    forceCloseButton: false,
   };
 
   test(
@@ -740,7 +729,6 @@ suite('CrComponentsHelpBubbleMixinTest', () => {
         isDefault: true,
       },
     ],
-    forceCloseButton: false,
   };
 
   test('help bubble mixin sends action button clicked event', async () => {
@@ -770,7 +758,6 @@ suite('CrComponentsHelpBubbleMixinTest', () => {
     bodyText: 'This is another help bubble.',
     titleText: 'This is a title',
     buttons: [],
-    forceCloseButton: false,
   };
 
   // It is hard to guarantee the correct timing on various test systems,

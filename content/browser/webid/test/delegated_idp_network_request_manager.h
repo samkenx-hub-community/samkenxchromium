@@ -39,7 +39,8 @@ class DelegatedIdpNetworkRequestManager : public MockIdpNetworkRequestManager {
   void SendTokenRequest(const GURL& token_url,
                         const std::string& account,
                         const std::string& url_encoded_post_data,
-                        TokenRequestCallback callback) override;
+                        TokenRequestCallback callback,
+                        ContinueOnCallback continue_on_callback) override;
   void SendSuccessfulTokenRequestMetrics(
       const GURL& metrics_endpoint_url,
       base::TimeDelta api_call_to_show_dialog_time,
@@ -52,7 +53,7 @@ class DelegatedIdpNetworkRequestManager : public MockIdpNetworkRequestManager {
   void SendLogout(const GURL& logout_url, LogoutCallback callback) override;
 
  private:
-  raw_ptr<IdpNetworkRequestManager> delegate_;
+  raw_ptr<IdpNetworkRequestManager, DanglingUntriaged> delegate_;
 };
 
 }  // namespace content

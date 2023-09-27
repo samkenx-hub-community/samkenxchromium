@@ -8,8 +8,8 @@
 
 #include "ash/shell.h"
 #include "ash/style/ash_color_id.h"
-#include "ash/style/color_util.h"
-#include "ash/style/dark_light_mode_controller_impl.h"
+#include "ash/style/color_palette_controller.h"
+#include "base/check_is_test.h"
 #include "base/check_op.h"
 #include "ui/chromeos/styles/cros_styles.h"
 #include "ui/color/color_id.h"
@@ -27,13 +27,6 @@ constexpr float kLightInkDropOpacity = 0.08f;
 constexpr float kDarkInkDropOpacity = 0.06f;
 
 AshColorProvider* g_instance = nullptr;
-
-bool IsDarkModeEnabled() {
-  // May be null in unit tests.
-  if (!Shell::HasInstance())
-    return true;
-  return Shell::Get()->dark_light_mode_controller()->IsDarkModeEnabled();
-}
 
 }  // namespace
 
@@ -99,18 +92,6 @@ SkColor AshColorProvider::GetControlsLayerColor(ControlsLayerType type) const {
       return color_provider->GetColor(kColorAshFocusAuraColor);
     case ControlsLayerType::kFocusRingColor:
       return color_provider->GetColor(ui::kColorAshFocusRing);
-    case ControlsLayerType::kHighlightColor1:
-      return color_provider->GetColor(ui::kColorHighlightBorderHighlight1);
-    case ControlsLayerType::kHighlightColor2:
-      return color_provider->GetColor(ui::kColorHighlightBorderHighlight2);
-    case ControlsLayerType::kHighlightColor3:
-      return color_provider->GetColor(ui::kColorHighlightBorderHighlight3);
-    case ControlsLayerType::kBorderColor1:
-      return color_provider->GetColor(ui::kColorHighlightBorderBorder1);
-    case ControlsLayerType::kBorderColor2:
-      return color_provider->GetColor(ui::kColorHighlightBorderBorder2);
-    case ControlsLayerType::kBorderColor3:
-      return color_provider->GetColor(ui::kColorHighlightBorderBorder3);
   }
 }
 
@@ -220,9 +201,15 @@ std::pair<SkColor, float> AshColorProvider::GetInkDropBaseColorAndOpacity(
 }
 
 SkColor AshColorProvider::GetBackgroundColor() const {
-  return ColorUtil::GetBackgroundThemedColor(
-      GetColorProvider()->GetColor(kColorAshShieldAndBaseOpaque),
-      IsDarkModeEnabled());
+  const auto default_color =
+      GetColorProvider()->GetColor(kColorAshShieldAndBaseOpaque);
+  if (!Shell::HasInstance()) {
+    CHECK_IS_TEST();
+    return default_color;
+  }
+  return Shell::Get()
+      ->color_palette_controller()
+      ->GetUserWallpaperColorOrDefault(default_color);
 }
 
 ui::ColorProvider* AshColorProvider::GetColorProvider() const {

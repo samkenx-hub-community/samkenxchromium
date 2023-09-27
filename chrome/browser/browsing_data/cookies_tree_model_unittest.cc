@@ -13,14 +13,15 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/test/scoped_feature_list.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
-#include "chrome/browser/browsing_data/mock_browsing_data_quota_helper.h"
 #include "chrome/browser/content_settings/cookie_settings_factory.h"
 #include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/content_settings/mock_settings_observer.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/browsing_data/content/cookie_helper.h"
+#include "components/browsing_data/content/mock_browsing_data_quota_helper.h"
 #include "components/browsing_data/content/mock_cache_storage_helper.h"
 #include "components/browsing_data/content/mock_cookie_helper.h"
 #include "components/browsing_data/content/mock_database_helper.h"
@@ -32,6 +33,7 @@
 #include "components/content_settings/core/browser/cookie_settings.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/prefs/pref_service.h"
+#include "components/supervised_user/core/common/features.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_types.h"
@@ -112,17 +114,19 @@ class CookiesTreeModelTest : public testing::Test {
   }
 
   void TearDown() override {
-    mock_browsing_data_service_worker_helper_ = nullptr;
-    mock_browsing_data_shared_worker_helper_ = nullptr;
     mock_browsing_data_cache_storage_helper_ = nullptr;
+    mock_browsing_data_shared_worker_helper_ = nullptr;
+    mock_browsing_data_service_worker_helper_ = nullptr;
     mock_browsing_data_quota_helper_ = nullptr;
     mock_browsing_data_file_system_helper_ = nullptr;
     mock_browsing_data_indexed_db_helper_ = nullptr;
     mock_browsing_data_session_storage_helper_ = nullptr;
     mock_browsing_data_local_storage_helper_ = nullptr;
     mock_browsing_data_database_helper_ = nullptr;
+    mock_browsing_data_cookie_helper_ = nullptr;
     base::RunLoop().RunUntilIdle();
   }
+
   std::unique_ptr<CookiesTreeModel> CreateCookiesTreeModelWithInitialSample() {
     auto container = std::make_unique<LocalDataContainer>(
         mock_browsing_data_cookie_helper_, mock_browsing_data_database_helper_,
@@ -286,7 +290,8 @@ class CookiesTreeModelTest : public testing::Test {
                    .spec() +
                ",";
       case CookieTreeNode::DetailedInfo::TYPE_QUOTA:
-        return node->GetDetailedInfo().quota_info->host + ",";
+        return node->GetDetailedInfo().quota_info->storage_key.origin().host() +
+               ",";
       case CookieTreeNode::DetailedInfo::TYPE_SHARED_WORKER:
         return node->GetDetailedInfo().shared_worker_info->worker.spec() + ",";
       default:
@@ -1647,13 +1652,70 @@ TEST_F(CookiesTreeModelTest, CanonicalizeCookieSource) {
 }
 
 TEST_F(CookiesTreeModelTest, CookieDeletionFilterNormalUser) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndDisableFeature(
+      supervised_user::kClearingCookiesKeepsSupervisedUsersSignedIn);
   auto callback =
       CookiesTreeModel::GetCookieDeletionDisabledCallback(profile_.get());
   EXPECT_FALSE(callback);
 }
 
+TEST_F(CookiesTreeModelTest, CookieDeletionFilterIncognitoProfile) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      supervised_user::kClearingCookiesKeepsSupervisedUsersSignedIn);
+  auto* incognito_profile = profile_->GetOffTheRecordProfile(
+      Profile::OTRProfileID::CreateUniqueForTesting(), true);
+  ASSERT_TRUE(incognito_profile->IsOffTheRecord());
+  auto callback =
+      CookiesTreeModel::GetCookieDeletionDisabledCallback(incognito_profile);
+  EXPECT_TRUE(callback);
+  EXPECT_FALSE(callback.Run(GURL("https://google.com")));
+  EXPECT_FALSE(callback.Run(GURL("https://example.com")));
+  EXPECT_FALSE(callback.Run(GURL("http://youtube.com")));
+  EXPECT_FALSE(callback.Run(GURL("https://youtube.com")));
+}
+
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS_ASH)
 TEST_F(CookiesTreeModelTest, CookieDeletionFilterChildUser) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndDisableFeature(
+      supervised_user::kClearingCookiesKeepsSupervisedUsersSignedIn);
+  profile_->SetIsSupervisedProfile();
+  auto callback =
+      CookiesTreeModel::GetCookieDeletionDisabledCallback(profile_.get());
+
+  EXPECT_TRUE(callback);
+  EXPECT_FALSE(callback.Run(GURL("https://google.com")));
+  EXPECT_FALSE(callback.Run(GURL("https://example.com")));
+  EXPECT_TRUE(callback.Run(GURL("http://youtube.com")));
+  EXPECT_TRUE(callback.Run(GURL("https://youtube.com")));
+}
+#endif
+
+TEST_F(
+    CookiesTreeModelTest,
+    CookieDeletionFilterNormalUserWithClearingCookiesEnabledForSupervisedUsers) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      supervised_user::kClearingCookiesKeepsSupervisedUsersSignedIn);
+  auto callback =
+      CookiesTreeModel::GetCookieDeletionDisabledCallback(profile_.get());
+  EXPECT_TRUE(callback);
+  EXPECT_FALSE(callback.Run(GURL("https://google.com")));
+  EXPECT_FALSE(callback.Run(GURL("https://google.com")));
+  EXPECT_FALSE(callback.Run(GURL("https://example.com")));
+  EXPECT_FALSE(callback.Run(GURL("http://youtube.com")));
+  EXPECT_FALSE(callback.Run(GURL("https://youtube.com")));
+}
+
+#if BUILDFLAG(ENABLE_SUPERVISED_USERS)
+TEST_F(
+    CookiesTreeModelTest,
+    CookieDeletionFilterChildUserWithClearingCookiesEnabledForSupervisedUsers) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      supervised_user::kClearingCookiesKeepsSupervisedUsersSignedIn);
   profile_->SetIsSupervisedProfile();
   auto callback =
       CookiesTreeModel::GetCookieDeletionDisabledCallback(profile_.get());

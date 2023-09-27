@@ -10,6 +10,7 @@
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/views/passwords/password_bubble_view_base.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/password_manager/core/common/password_manager_ui.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -29,6 +30,8 @@ ManagePasswordsIconViews::ManagePasswordsIconViews(
   // Password icon should not be mirrored in RTL.
   image()->SetFlipCanvasOnPaintForRTLUI(false);
   SetProperty(views::kElementIdentifierKey, kPasswordsOmniboxKeyIconElementId);
+  SetAccessibilityProperties(/*role*/ absl::nullopt,
+                             GetTextForTooltipAndAccessibleName());
 }
 
 ManagePasswordsIconViews::~ManagePasswordsIconViews() = default;
@@ -40,6 +43,7 @@ void ManagePasswordsIconViews::SetState(password_manager::ui::State state) {
   PasswordBubbleViewBase::CloseCurrentBubble();
   state_ = state;
   UpdateUiForState();
+  SetAccessibleName(GetTextForTooltipAndAccessibleName());
 }
 
 void ManagePasswordsIconViews::UpdateUiForState() {
@@ -78,7 +82,9 @@ bool ManagePasswordsIconViews::OnMousePressed(const ui::MouseEvent& event) {
 }
 
 const gfx::VectorIcon& ManagePasswordsIconViews::GetVectorIcon() const {
-  return kKeyIcon;
+  return OmniboxFieldTrial::IsChromeRefreshIconsEnabled()
+             ? kKeyOpenChromeRefreshIcon
+             : kKeyIcon;
 }
 
 std::u16string ManagePasswordsIconViews::GetTextForTooltipAndAccessibleName()
@@ -95,12 +101,17 @@ std::u16string ManagePasswordsIconViews::GetTextForTooltipAndAccessibleName()
       return l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_TOOLTIP_MANAGE);
     case password_manager::ui::PENDING_PASSWORD_UPDATE_STATE:
     case password_manager::ui::PENDING_PASSWORD_STATE:
+    case password_manager::ui::GENERATED_PASSWORD_CONFIRMATION_STATE:
       return l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_TOOLTIP_SAVE);
     case password_manager::ui::CAN_MOVE_PASSWORD_TO_ACCOUNT_STATE:
       return l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_TOOLTIP_MOVE);
     case password_manager::ui::BIOMETRIC_AUTHENTICATION_FOR_FILLING_STATE:
     case password_manager::ui::BIOMETRIC_AUTHENTICATION_CONFIRMATION_STATE:
       return l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_TOOLTIP_PROTECT);
+    case password_manager::ui::NOTIFY_RECEIVED_SHARED_CREDENTIALS: {
+      return l10n_util::GetStringUTF16(
+          IDS_PASSWORD_MANAGER_TOOLTIP_SHARED_NOTIFICATION);
+    }
   }
   NOTREACHED_NORETURN();
 }

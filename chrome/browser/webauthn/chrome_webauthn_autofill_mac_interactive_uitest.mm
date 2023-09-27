@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "base/test/bind.h"
+#include "base/time/time.h"
 #include "build/build_config.h"
 #include "chrome/browser/password_manager/chrome_webauthn_credentials_delegate.h"
 #include "chrome/browser/ssl/cert_verifier_browser_test.h"
@@ -18,6 +19,7 @@
 #include "components/autofill/core/browser/ui/popup_item_ids.h"
 #include "components/network_session_configurator/common/network_switches.h"
 #include "components/password_manager/core/browser/password_ui_utils.h"
+#include "components/strings/grit/components_strings.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -123,8 +125,8 @@ IN_PROC_BROWSER_TEST_F(WebAuthnMacAutofillIntegrationTest, SelectAccount) {
   autofill::Suggestion webauthn_entry;
   for (suggestion_index = 0; suggestion_index < suggestions.size();
        ++suggestion_index) {
-    if (suggestions[suggestion_index].frontend_id ==
-        autofill::PopupItemId::POPUP_ITEM_ID_WEBAUTHN_CREDENTIAL) {
+    if (suggestions[suggestion_index].popup_item_id ==
+        autofill::PopupItemId::kWebauthnCredential) {
       webauthn_entry = suggestions[suggestion_index];
       break;
     }
@@ -133,11 +135,12 @@ IN_PROC_BROWSER_TEST_F(WebAuthnMacAutofillIntegrationTest, SelectAccount) {
   EXPECT_EQ(webauthn_entry.main_text.value, u"flandre");
   EXPECT_EQ(webauthn_entry.labels.at(0).at(0).value,
             l10n_util::GetStringUTF16(
-                password_manager::GetPlatformAuthenticatorLabel()));
+                IDS_PASSWORD_MANAGER_PASSKEY_FROM_CHROME_PROFILE));
   EXPECT_EQ(webauthn_entry.icon, "globeIcon");
 
   // Click the credential.
-  popup_controller->AcceptSuggestionWithoutThreshold(suggestion_index);
+  popup_controller->AcceptSuggestion(
+      suggestion_index, base::TimeTicks::Now() + base::Milliseconds(500));
   std::string result;
   ASSERT_TRUE(message_queue.WaitForMessage(&result));
   EXPECT_EQ(result, "\"webauthn: OK\"");

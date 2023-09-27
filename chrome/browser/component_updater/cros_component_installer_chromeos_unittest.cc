@@ -13,6 +13,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/thread_pool.h"
@@ -44,6 +45,8 @@ constexpr char kTestComponentValidMinEnvVersion[] = "1.0";
 constexpr char kTestComponentInvalidMinEnvVersion[] = "0.0.1";
 constexpr char kTestComponentMountPath[] =
     "/run/imageloader/demo-mode-resources";
+
+constexpr char kGrowthCampaignsName[] = "growth-campaigns";
 
 MATCHER_P(CrxComponentWithName, name, "") {
   return arg.name == name;
@@ -348,7 +351,8 @@ class CrOSComponentInstallerTest : public testing::Test {
   user_manager::ScopedUserManager user_manager_;
 
   // Image loader client that is active during the test.
-  ash::FakeImageLoaderClient* image_loader_client_ = nullptr;
+  raw_ptr<ash::FakeImageLoaderClient, ExperimentalAsh> image_loader_client_ =
+      nullptr;
 
   base::ScopedTempDir base_component_paths_;
 
@@ -439,11 +443,28 @@ TEST_F(CrOSComponentInstallerTest, LacrosMinVersion) {
                         /*manifest=*/base::Value::Dict());
   EXPECT_TRUE(installer->GetCompatiblePath("lacros-fishfood").empty());
 
-  // Simulate finding a compatible existing install.
   policy.ComponentReady(base::Version("9.0.0.0"),
                         base::FilePath("/lacros/9.0.0.0"),
                         /*manifest=*/base::Value::Dict());
-  EXPECT_EQ("/lacros/9.0.0.0",
+  EXPECT_TRUE(installer->GetCompatiblePath("lacros-fishfood").empty());
+
+  // Simulate finding a compatible existing install.
+  policy.ComponentReady(base::Version("10.0.0.0"),
+                        base::FilePath("/lacros/10.0.0.0"),
+                        /*manifest=*/base::Value::Dict());
+  EXPECT_EQ("/lacros/10.0.0.0",
+            installer->GetCompatiblePath("lacros-fishfood").MaybeAsASCII());
+
+  policy.ComponentReady(base::Version("11.0.0.0"),
+                        base::FilePath("/lacros/11.0.0.0"),
+                        /*manifest=*/base::Value::Dict());
+  EXPECT_EQ("/lacros/11.0.0.0",
+            installer->GetCompatiblePath("lacros-fishfood").MaybeAsASCII());
+
+  policy.ComponentReady(base::Version("12.0.0.0"),
+                        base::FilePath("/lacros/12.0.0.0"),
+                        /*manifest=*/base::Value::Dict());
+  EXPECT_EQ("/lacros/12.0.0.0",
             installer->GetCompatiblePath("lacros-fishfood").MaybeAsASCII());
 
   LacrosInstallerPolicy::SetAshVersionForTest(nullptr);
@@ -1041,6 +1062,40 @@ TEST_F(CrOSComponentInstallerTest,
                         load_result2,
                         GetInstalledComponentPath(kTestComponentName, "2.0"));
   EXPECT_EQ(mount_path1, mount_path2);
+}
+
+TEST_F(CrOSComponentInstallerTest, LoadGrowthComponent) {
+  image_loader_client()->SetMountPathForComponent(
+      kGrowthCampaignsName,
+      base::FilePath("/run/imageloader/growth-campaigns"));
+  TestUpdater updater;
+  std::unique_ptr<MockComponentUpdateService> update_service =
+      CreateUpdateServiceForSingleRegistration(kGrowthCampaignsName, &updater);
+  scoped_refptr<CrOSComponentInstaller> cros_component_manager =
+      base::MakeRefCounted<CrOSComponentInstaller>(nullptr,
+                                                   update_service.get());
+
+  absl::optional<CrOSComponentManager::Error> load_result;
+  base::FilePath mount_path;
+  cros_component_manager->Load(
+      kGrowthCampaignsName, CrOSComponentManager::MountPolicy::kMount,
+      CrOSComponentManager::UpdatePolicy::kDontForce,
+      base::BindOnce(&RecordLoadResult, &load_result, &mount_path));
+
+  RunUntilIdle();
+  absl::optional<base::FilePath> unpacked_path = CreateUnpackedComponent(
+      kGrowthCampaignsName, "1.0", kTestComponentValidMinEnvVersion);
+  ASSERT_TRUE(unpacked_path.has_value());
+  ASSERT_TRUE(updater.FinishForegroundUpdate(
+      kGrowthCampaignsName, update_client::Error::NONE, unpacked_path.value()));
+
+  RunUntilIdle();
+  ASSERT_FALSE(updater.HasPendingUpdate(kGrowthCampaignsName));
+
+  VerifyComponentLoaded(cros_component_manager, kGrowthCampaignsName,
+                        load_result,
+                        GetInstalledComponentPath(kGrowthCampaignsName, "1.0"));
+  EXPECT_EQ(base::FilePath("/run/imageloader/growth-campaigns"), mount_path);
 }
 
 }  // namespace component_updater

@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "chrome/browser/ui/toolbar/app_menu_model.h"
+
+#include "base/feature_list.h"
 #include "base/logging.h"
 #include "base/test/bind.h"
 #include "base/test/gtest_util.h"
@@ -13,7 +16,6 @@
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window.h"
-#include "chrome/browser/ui/toolbar/app_menu_model.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/interactive_test_utils.h"
@@ -21,6 +23,7 @@
 #include "chrome/test/interaction/interactive_browser_test.h"
 #include "chrome/test/interaction/tracked_element_webcontents.h"
 #include "chrome/test/interaction/webcontents_interaction_test_util.h"
+#include "components/password_manager/core/common/password_manager_features.h"
 #include "components/performance_manager/public/features.h"
 #include "content/public/test/browser_test.h"
 #include "extensions/common/extension_urls.h"
@@ -29,6 +32,7 @@
 #include "ui/base/interaction/element_tracker.h"
 #include "ui/base/interaction/expect_call_in_scope.h"
 #include "ui/base/interaction/interaction_sequence.h"
+#include "ui/base/ui_base_features.h"
 #include "url/gurl.h"
 
 namespace {
@@ -45,9 +49,6 @@ class AppMenuModelInteractiveTest : public InteractiveBrowserTest {
   void SetUp() override {
     set_open_about_blank_on_browser_launch(true);
     ASSERT_TRUE(embedded_test_server()->InitializeAndListen());
-    base::test::ScopedFeatureList scoped_feature_list;
-    scoped_feature_list.InitAndEnableFeature(
-        performance_manager::features::kHighEfficiencyModeAvailable);
     InteractiveBrowserTest::SetUp();
   }
 
@@ -79,7 +80,7 @@ class AppMenuModelInteractiveTest : public InteractiveBrowserTest {
 
 IN_PROC_BROWSER_TEST_F(AppMenuModelInteractiveTest, PerformanceNavigation) {
   RunTestSequence(InstrumentTab(kPrimaryTabPageElementId),
-                  PressButton(kAppMenuButtonElementId),
+                  PressButton(kToolbarAppMenuButtonElementId),
                   SelectMenuItem(AppMenuModel::kMoreToolsMenuItem),
                   SelectMenuItem(ToolsMenuModel::kPerformanceMenuItem),
                   WaitForWebContentsNavigation(
@@ -88,7 +89,7 @@ IN_PROC_BROWSER_TEST_F(AppMenuModelInteractiveTest, PerformanceNavigation) {
 }
 
 IN_PROC_BROWSER_TEST_F(AppMenuModelInteractiveTest, IncognitoMenuItem) {
-  RunTestSequence(PressButton(kAppMenuButtonElementId),
+  RunTestSequence(PressButton(kToolbarAppMenuButtonElementId),
                   SelectMenuItem(AppMenuModel::kIncognitoMenuItem),
                   CheckInconitoWindowOpened());
 }
@@ -99,15 +100,24 @@ IN_PROC_BROWSER_TEST_F(AppMenuModelInteractiveTest, IncognitoAccelerator) {
       IDC_NEW_INCOGNITO_WINDOW, &incognito_accelerator);
 
   RunTestSequence(
-      SendAccelerator(kAppMenuButtonElementId, incognito_accelerator),
+      SendAccelerator(kToolbarAppMenuButtonElementId, incognito_accelerator),
       CheckInconitoWindowOpened());
 }
 
 class ExtensionsMenuModelInteractiveTest : public AppMenuModelInteractiveTest {
  public:
   explicit ExtensionsMenuModelInteractiveTest(bool enable_feature = true) {
-    scoped_feature_list_.InitWithFeatureState(
-        features::kExtensionsMenuInAppMenu, enable_feature);
+    std::vector<base::test::FeatureRef> enabled_features;
+    std::vector<base::test::FeatureRef> disabled_features;
+    if (enable_feature) {
+      enabled_features = {features::kExtensionsMenuInAppMenu};
+      disabled_features = {features::kChromeRefresh2023};
+    } else {
+      enabled_features = {};
+      disabled_features = {features::kExtensionsMenuInAppMenu,
+                           features::kChromeRefresh2023};
+    }
+    scoped_feature_list_.InitWithFeatures(enabled_features, disabled_features);
   }
   ~ExtensionsMenuModelInteractiveTest() override = default;
   ExtensionsMenuModelInteractiveTest(
@@ -139,22 +149,24 @@ class ExtensionsMenuModelPresenceTest
 INSTANTIATE_TEST_SUITE_P(
     All,
     ExtensionsMenuModelPresenceTest,
-    /* features::kNewExtensionsTopLevelMenu status */ testing::Bool());
+    testing::Bool(),
+    [](const testing::TestParamInfo<ExtensionsMenuModelPresenceTest::ParamType>&
+           info) { return info.param ? "InRootAppMenu" : "NotInRootAppMenu"; });
 
 // Test to confirm that the structure of the Extensions menu is present but that
 // no histograms are logged since it isn't interacted with.
 IN_PROC_BROWSER_TEST_P(ExtensionsMenuModelPresenceTest, MenuPresence) {
-  if (GetParam()) {  // Menu enabled
+  if (features::IsExtensionMenuInRootAppMenu()) {  // Menu enabled
     RunTestSequence(
         InstrumentTab(kPrimaryTabPageElementId),
-        PressButton(kAppMenuButtonElementId),
+        PressButton(kToolbarAppMenuButtonElementId),
         EnsurePresent(AppMenuModel::kExtensionsMenuItem),
         SelectMenuItem(AppMenuModel::kExtensionsMenuItem),
         EnsurePresent(ExtensionsMenuModel::kManageExtensionsMenuItem),
         EnsurePresent(ExtensionsMenuModel::kVisitChromeWebStoreMenuItem));
   } else {
     RunTestSequence(InstrumentTab(kPrimaryTabPageElementId),
-                    PressButton(kAppMenuButtonElementId),
+                    PressButton(kToolbarAppMenuButtonElementId),
                     EnsureNotPresent(AppMenuModel::kExtensionsMenuItem));
   }
 
@@ -171,7 +183,7 @@ IN_PROC_BROWSER_TEST_P(ExtensionsMenuModelPresenceTest, MenuPresence) {
 IN_PROC_BROWSER_TEST_F(ExtensionsMenuModelInteractiveTest, ManageExtensions) {
   RunTestSequence(
       InstrumentTab(kPrimaryTabPageElementId),
-      PressButton(kAppMenuButtonElementId),
+      PressButton(kToolbarAppMenuButtonElementId),
       SelectMenuItem(AppMenuModel::kExtensionsMenuItem),
       SelectMenuItem(ExtensionsMenuModel::kManageExtensionsMenuItem),
       WaitForWebContentsNavigation(kPrimaryTabPageElementId,
@@ -191,11 +203,13 @@ IN_PROC_BROWSER_TEST_F(ExtensionsMenuModelInteractiveTest,
                        VisitChromeWebStore) {
   RunTestSequence(
       InstrumentTab(kPrimaryTabPageElementId),
-      PressButton(kAppMenuButtonElementId),
+      PressButton(kToolbarAppMenuButtonElementId),
       SelectMenuItem(AppMenuModel::kExtensionsMenuItem),
       SelectMenuItem(ExtensionsMenuModel::kVisitChromeWebStoreMenuItem),
       WaitForWebContentsNavigation(kPrimaryTabPageElementId,
-                                   extension_urls::GetWebstoreLaunchURL()));
+                                   extension_urls::AppendUtmSource(
+                                       extension_urls::GetWebstoreLaunchURL(),
+                                       extension_urls::kAppMenuUtmSource)));
 
   histograms.ExpectTotalCount("WrenchMenu.TimeToAction.VisitChromeWebStore", 1);
   histograms.ExpectTotalCount("WrenchMenu.TimeToAction.ManageExtensions", 0);
@@ -203,4 +217,47 @@ IN_PROC_BROWSER_TEST_F(ExtensionsMenuModelInteractiveTest,
                                MENU_ACTION_VISIT_CHROME_WEB_STORE, 1);
   histograms.ExpectBucketCount("WrenchMenu.MenuAction",
                                MENU_ACTION_MANAGE_EXTENSIONS, 0);
+}
+
+class PasswordManagerMenuItemInteractiveTest
+    : public AppMenuModelInteractiveTest,
+      public testing::WithParamInterface<bool> {
+ public:
+  PasswordManagerMenuItemInteractiveTest() {
+    scoped_feature_list_.InitWithFeatureStates(
+        {{features::kChromeRefresh2023, false},
+         {features::kChromeRefreshSecondary2023, false}});
+  }
+  PasswordManagerMenuItemInteractiveTest(
+      const PasswordManagerMenuItemInteractiveTest&) = delete;
+  void operator=(const PasswordManagerMenuItemInteractiveTest&) = delete;
+
+  ~PasswordManagerMenuItemInteractiveTest() override = default;
+};
+
+IN_PROC_BROWSER_TEST_F(PasswordManagerMenuItemInteractiveTest,
+                       PasswordManagerMenuItem) {
+  base::HistogramTester histograms;
+
+  RunTestSequence(InstrumentTab(kPrimaryTabPageElementId),
+                  PressButton(kToolbarAppMenuButtonElementId),
+                  SelectMenuItem(AppMenuModel::kPasswordManagerMenuItem),
+                  WaitForWebContentsNavigation(
+                      kPrimaryTabPageElementId,
+                      GURL("chrome://password-manager/passwords")));
+
+  histograms.ExpectTotalCount("WrenchMenu.TimeToAction.PasswordManager", 1);
+  histograms.ExpectBucketCount("WrenchMenu.MenuAction",
+                               MENU_ACTION_PASSWORD_MANAGER, 1);
+}
+
+IN_PROC_BROWSER_TEST_F(PasswordManagerMenuItemInteractiveTest,
+                       NoMenuItemOnPasswordManagerPage) {
+  RunTestSequence(
+      AddInstrumentedTab(kPrimaryTabPageElementId,
+                         GURL("chrome://password-manager/passwords")),
+      WaitForWebContentsReady(kPrimaryTabPageElementId,
+                              GURL("chrome://password-manager/passwords")),
+      PressButton(kToolbarAppMenuButtonElementId),
+      EnsureNotPresent(AppMenuModel::kPasswordManagerMenuItem));
 }

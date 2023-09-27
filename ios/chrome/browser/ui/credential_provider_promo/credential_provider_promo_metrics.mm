@@ -7,10 +7,6 @@
 #import "base/metrics/histogram_functions.h"
 #import "base/notreached.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 const char kIOSCredentialProviderPromoImpressionHistogram[] =
     "IOS.CredentialProviderExtension.Promo.Impression";
 const char kIOSCredentialProviderPromoImpressionIsReminderHistogram[] =
@@ -29,6 +25,10 @@ const char kIOSCredentialProviderPromoOnAutofillUsedHistogram[] =
 const char kIOSCredentialProviderPromoOnAutofillUsedIsReminderHistogram[] =
     "IOS.CredentialProviderExtension.Promo."
     "OnSuccessfulLoginWithAutofilledPassword.IsReminder";
+const char kIOSCredentialProviderPromoOnSetUpListIsReminderHistogram[] =
+    "IOS.CredentialProviderExtension.Promo.OnSetUpList.IsReminder";
+const char kIOSCredentialProviderPromoOnSetUpListHistogram[] =
+    "IOS.CredentialProviderExtension.Promo.OnSetUpList";
 
 namespace credential_provider_promo {
 
@@ -63,6 +63,11 @@ void RecordAction(IOSCredentialProviderPromoSource source,
       name = is_reminder
                  ? kIOSCredentialProviderPromoOnAutofillUsedIsReminderHistogram
                  : kIOSCredentialProviderPromoOnAutofillUsedHistogram;
+      break;
+    case IOSCredentialProviderPromoSource::kSetUpList:
+      name = is_reminder
+                 ? kIOSCredentialProviderPromoOnSetUpListIsReminderHistogram
+                 : kIOSCredentialProviderPromoOnSetUpListHistogram;
       break;
     case IOSCredentialProviderPromoSource::kUnknown:
       NOTREACHED();

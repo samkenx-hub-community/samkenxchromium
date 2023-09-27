@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 #include "chrome/browser/ui/views/tabs/tab_group_style.h"
-#include <string>
+
+#include "base/feature_list.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/tabs/tab_style.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/tabs/tab.h"
 #include "chrome/browser/ui/views/tabs/tab_group_header.h"
 #include "chrome/browser/ui/views/tabs/tab_group_underline.h"
@@ -24,12 +26,19 @@ namespace {
 constexpr int kHeaderChipVerticalInset = 1;
 constexpr int kTitleAdjustmentForEmptyHeader = 2;
 constexpr int kTitleAdjustmentForNonEmptyHeader = -2;
+// The default size of an empty chip in the tab group header.
 constexpr int kEmptyChipSize = 14;
-constexpr int kSyncIconWidth = 12;
+// The width of the sync icon when a tab group is saved.
+constexpr int kSyncIconWidth = 16;
+// The size of the empty chips when the #tab-groups-save flag is on.
+constexpr int kSavedEmptyChipSize = 22;
 
 constexpr int kChromeRefreshHeaderChipVerticalInset = 2;
 constexpr int kChromeRefreshEmptyChipSize = 20;
 constexpr int kChromeRefreshSyncIconWidth = 16;
+constexpr int kChromeRefreshSyncIconLeftMargin = 2;
+constexpr int kChromeRefreshCornerRadius = 6;
+constexpr int kTabGroupOverlapAdjustment = 2;
 
 }  // namespace
 
@@ -70,9 +79,22 @@ SkPath TabGroupStyle::GetUnderlinePath(const gfx::Rect local_bounds) const {
 
 gfx::Rect TabGroupStyle::GetEmptyTitleChipBounds(
     const TabGroupHeader* const header) const {
-  const int y = (GetLayoutConstant(TAB_HEIGHT) - GetEmptyChipSize()) / 2;
-  return gfx::Rect(TabGroupUnderline::GetStrokeInset(), y, GetEmptyChipSize(),
+  return gfx::Rect(GetTitleChipOffset(absl::nullopt).x(),
+                   GetTitleChipOffset(absl::nullopt).y(), GetEmptyChipSize(),
                    GetEmptyChipSize());
+}
+
+gfx::Point TabGroupStyle::GetTitleChipOffset(
+    absl::optional<int> text_height) const {
+  if (text_height.has_value()) {
+    return gfx::Point(
+        TabGroupUnderline::GetStrokeInset(),
+        ((GetLayoutConstant(TAB_HEIGHT) - text_height.value()) / 2 -
+         GetInsetsForHeaderChip(false).top()));
+  } else {
+    return gfx::Point(TabGroupUnderline::GetStrokeInset(),
+                      (GetLayoutConstant(TAB_HEIGHT) - GetEmptyChipSize()) / 2);
+  }
 }
 
 std::unique_ptr<views::Background> TabGroupStyle::GetEmptyTitleChipBackground(
@@ -80,7 +102,8 @@ std::unique_ptr<views::Background> TabGroupStyle::GetEmptyTitleChipBackground(
   return views::CreateRoundedRectBackground(color, GetEmptyChipSize() / 2);
 }
 
-gfx::Insets TabGroupStyle::GetInsetsForHeaderChip() const {
+gfx::Insets TabGroupStyle::GetInsetsForHeaderChip(
+    bool should_show_sync_icon) const {
   return gfx::Insets::TLBR(kHeaderChipVerticalInset,
                            GetChipCornerRadius() + kHeaderChipVerticalInset,
                            kHeaderChipVerticalInset,
@@ -99,16 +122,22 @@ int TabGroupStyle::GetTitleAdjustmentToTabGroupHeaderDesiredWidth(
 }
 
 float TabGroupStyle::GetEmptyChipSize() const {
-  return kEmptyChipSize;
+  return base::FeatureList::IsEnabled(features::kTabGroupsSave)
+             ? kSavedEmptyChipSize
+             : kEmptyChipSize;
 }
 
 float TabGroupStyle::GetSyncIconWidth() const {
   return kSyncIconWidth;
 }
 
-// static
-int TabGroupStyle::GetChipCornerRadius() {
-  return TabStyle::GetCornerRadius() - TabGroupUnderline::kStrokeThickness;
+int TabGroupStyle::GetChipCornerRadius() const {
+  return TabStyle::Get()->GetBottomCornerRadius() -
+         TabGroupUnderline::kStrokeThickness;
+}
+
+int TabGroupStyle::GetTabGroupViewOverlap() const {
+  return TabStyle::Get()->GetTabOverlap();
 }
 
 ChromeRefresh2023TabGroupStyle::ChromeRefresh2023TabGroupStyle(
@@ -153,14 +182,25 @@ SkPath ChromeRefresh2023TabGroupStyle::GetUnderlinePath(
 
 gfx::Rect ChromeRefresh2023TabGroupStyle::GetEmptyTitleChipBounds(
     const TabGroupHeader* const header) const {
-  const int y = (GetLayoutConstant(TAB_HEIGHT) - GetEmptyChipSize()) / 2;
-  return gfx::Rect(TabGroupUnderline::GetStrokeInset(), y, GetEmptyChipSize(),
+  return gfx::Rect(GetTitleChipOffset(absl::nullopt).x(),
+                   GetTitleChipOffset(absl::nullopt).y(), GetEmptyChipSize(),
                    GetEmptyChipSize());
 }
 
-gfx::Insets ChromeRefresh2023TabGroupStyle::GetInsetsForHeaderChip() const {
+gfx::Point ChromeRefresh2023TabGroupStyle::GetTitleChipOffset(
+    absl::optional<int> text_height) const {
+  const int total_space = GetLayoutConstant(TAB_STRIP_HEIGHT) -
+                          GetEmptyChipSize() -
+                          GetLayoutConstant(TABSTRIP_TOOLBAR_OVERLAP);
+  return gfx::Point(TabStyle::Get()->GetTabOverlap() - 2, total_space / 2);
+}
+
+gfx::Insets ChromeRefresh2023TabGroupStyle::GetInsetsForHeaderChip(
+    bool should_show_sync_icon) const {
   return gfx::Insets::TLBR(
-      kChromeRefreshHeaderChipVerticalInset, GetChipCornerRadius(),
+      kChromeRefreshHeaderChipVerticalInset,
+      should_show_sync_icon ? kChromeRefreshSyncIconLeftMargin
+                            : GetChipCornerRadius(),
       kChromeRefreshHeaderChipVerticalInset, GetChipCornerRadius());
 }
 
@@ -189,4 +229,19 @@ float ChromeRefresh2023TabGroupStyle::GetEmptyChipSize() const {
 
 float ChromeRefresh2023TabGroupStyle::GetSyncIconWidth() const {
   return kChromeRefreshSyncIconWidth;
+}
+
+int ChromeRefresh2023TabGroupStyle::GetChipCornerRadius() const {
+  return kChromeRefreshCornerRadius;
+}
+
+int ChromeRefresh2023TabGroupStyle::GetTabGroupViewOverlap() const {
+  // For refresh the tab has an overlap value is 18. Inorder to have a margin of
+  // 10 from the neighbor tabs this is required.
+  return TabStyle::Get()->GetTabOverlap() - GetTabGroupOverlapAdjustment();
+}
+
+// static
+int ChromeRefresh2023TabGroupStyle::GetTabGroupOverlapAdjustment() {
+  return kTabGroupOverlapAdjustment;
 }

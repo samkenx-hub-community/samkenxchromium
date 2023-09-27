@@ -20,7 +20,7 @@
 #include "base/threading/thread_restrictions.h"
 #include "base/timer/elapsed_timer.h"
 #include "content/public/browser/browser_context.h"
-#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/storage_partition.h"
 #include "extensions/browser/content_hash_fetcher.h"
 #include "extensions/browser/content_hash_reader.h"
@@ -119,7 +119,7 @@ std::unique_ptr<ContentVerifierIOData::ExtensionData> CreateIOData(
   }
   for (const std::unique_ptr<UserScript>& script :
        ContentScriptsInfo::GetContentScripts(extension)) {
-    for (const std::unique_ptr<UserScript::File>& js_file :
+    for (const std::unique_ptr<UserScript::Content>& js_file :
          script->js_scripts()) {
       background_or_content_paths->insert(
           canonicalize_path(js_file->relative_path()));

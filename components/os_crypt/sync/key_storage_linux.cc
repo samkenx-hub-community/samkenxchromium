@@ -21,9 +21,6 @@
 #if defined(USE_LIBSECRET)
 #include "components/os_crypt/sync/key_storage_libsecret.h"
 #endif
-#if defined(USE_KEYRING)
-#include "components/os_crypt/sync/key_storage_keyring.h"
-#endif
 #if defined(USE_KWALLET)
 #include "components/os_crypt/sync/key_storage_kwallet.h"
 #endif
@@ -46,17 +43,21 @@ enum class BackendUsage {
   kDeferFailed = 1,
   kBasicText = 2,
   kBasicTextFailed = 3,
-  kGnomeAny = 4,
-  kGnomeAnyFailed = 5,
-  kGnomeKeyring = 6,
-  kGnomeKeyringFailed = 7,
+  // gnome-keyring support has been dropped, but the enum slots corresponding
+  // to it should not be used since this enum is also used for metrics.
+  // kGnomeAny = 4,
+  // kGnomeAnyFailed = 5,
+  // kGnomeKeyring = 6,
+  // kGnomeKeyringFailed = 7,
   kGnomeLibsecret = 8,
   kGnomeLibsecretFailed = 9,
   kKwallet = 10,
   kKwalletFailed = 11,
   kKwallet5 = 12,
   kKwallet5Failed = 13,
-  kMaxValue = kKwallet5Failed,
+  kKwallet6 = 14,
+  kKwallet6Failed = 15,
+  kMaxValue = kKwallet6Failed,
 };
 
 constexpr BackendUsage SelectedBackendToMetric(
@@ -67,11 +68,6 @@ constexpr BackendUsage SelectedBackendToMetric(
       return used ? BackendUsage::kDefer : BackendUsage::kDeferFailed;
     case os_crypt::SelectedLinuxBackend::BASIC_TEXT:
       return used ? BackendUsage::kBasicText : BackendUsage::kBasicTextFailed;
-    case os_crypt::SelectedLinuxBackend::GNOME_ANY:
-      return used ? BackendUsage::kGnomeAny : BackendUsage::kGnomeAnyFailed;
-    case os_crypt::SelectedLinuxBackend::GNOME_KEYRING:
-      return used ? BackendUsage::kGnomeKeyring
-                  : BackendUsage::kGnomeKeyringFailed;
     case os_crypt::SelectedLinuxBackend::GNOME_LIBSECRET:
       return used ? BackendUsage::kGnomeLibsecret
                   : BackendUsage::kGnomeLibsecretFailed;
@@ -79,6 +75,8 @@ constexpr BackendUsage SelectedBackendToMetric(
       return used ? BackendUsage::kKwallet : BackendUsage::kKwalletFailed;
     case os_crypt::SelectedLinuxBackend::KWALLET5:
       return used ? BackendUsage::kKwallet5 : BackendUsage::kKwallet5Failed;
+    case os_crypt::SelectedLinuxBackend::KWALLET6:
+      return used ? BackendUsage::kKwallet6 : BackendUsage::kKwallet6Failed;
   }
   NOTREACHED();
   return BackendUsage::kDeferFailed;
@@ -91,16 +89,14 @@ const char* SelectedLinuxBackendToString(
       return "DEFER";
     case os_crypt::SelectedLinuxBackend::BASIC_TEXT:
       return "BASIC_TEXT";
-    case os_crypt::SelectedLinuxBackend::GNOME_ANY:
-      return "GNOME_ANY";
-    case os_crypt::SelectedLinuxBackend::GNOME_KEYRING:
-      return "GNOME_KEYRING";
     case os_crypt::SelectedLinuxBackend::GNOME_LIBSECRET:
       return "GNOME_LIBSECRET";
     case os_crypt::SelectedLinuxBackend::KWALLET:
       return "KWALLET";
     case os_crypt::SelectedLinuxBackend::KWALLET5:
       return "KWALLET5";
+    case os_crypt::SelectedLinuxBackend::KWALLET6:
+      return "KWALLET6";
   }
   NOTREACHED();
   return nullptr;
@@ -128,10 +124,9 @@ std::unique_ptr<KeyStorageLinux> KeyStorageLinux::CreateService(
   // Try initializing the selected backend.
   // In case of GNOME_ANY, prefer Libsecret
   std::unique_ptr<KeyStorageLinux> key_storage;
-#if defined(USE_LIBSECRET) || defined(USE_KEYRING) || defined(USE_KWALLET)
+#if defined(USE_LIBSECRET) || defined(USE_KWALLET)
   key_storage = CreateServiceInternal(selected_backend, config);
-#endif  // defined(USE_LIBSECRET) || defined(USE_KEYRING) ||
-        // defined(USE_KWALLET)
+#endif  // defined(USE_LIBSECRET) || defined(USE_KWALLET)
 
   UMA_HISTOGRAM_ENUMERATION(
       "OSCrypt.BackendUsage",
@@ -143,7 +138,7 @@ std::unique_ptr<KeyStorageLinux> KeyStorageLinux::CreateService(
   return key_storage;
 }
 
-#if defined(USE_LIBSECRET) || defined(USE_KEYRING) || defined(USE_KWALLET)
+#if defined(USE_LIBSECRET) || defined(USE_KWALLET)
 std::unique_ptr<KeyStorageLinux> KeyStorageLinux::CreateServiceInternal(
     os_crypt::SelectedLinuxBackend selected_backend,
     const os_crypt::Config& config) {
@@ -155,20 +150,16 @@ std::unique_ptr<KeyStorageLinux> KeyStorageLinux::CreateServiceInternal(
 
   std::unique_ptr<KeyStorageLinux> key_storage;
 
-#if defined(USE_LIBSECRET) || defined(USE_KEYRING)
-#if defined(ALLOW_RUNTIME_CONFIGURABLE_KEY_STORAGE)
-  std::string application_name = config.application_name;
-  if (application_name.empty()) {
-    application_name = *kDefaultApplicationName;
-  }
-#else
-  std::string application_name = *kDefaultApplicationName;
-#endif
-#endif
-
 #if defined(USE_LIBSECRET)
-  if (selected_backend == os_crypt::SelectedLinuxBackend::GNOME_ANY ||
-      selected_backend == os_crypt::SelectedLinuxBackend::GNOME_LIBSECRET) {
+  if (selected_backend == os_crypt::SelectedLinuxBackend::GNOME_LIBSECRET) {
+#if defined(ALLOW_RUNTIME_CONFIGURABLE_KEY_STORAGE)
+    std::string application_name = config.application_name;
+    if (application_name.empty()) {
+      application_name = *kDefaultApplicationName;
+    }
+#else
+    std::string application_name = *kDefaultApplicationName;
+#endif
     key_storage = std::make_unique<KeyStorageLibsecret>(application_name);
     if (key_storage->WaitForInitOnTaskRunner()) {
       VLOG(1) << "OSCrypt using Libsecret as backend.";
@@ -178,27 +169,19 @@ std::unique_ptr<KeyStorageLinux> KeyStorageLinux::CreateServiceInternal(
   }
 #endif  // defined(USE_LIBSECRET)
 
-#if defined(USE_KEYRING)
-  if (selected_backend == os_crypt::SelectedLinuxBackend::GNOME_ANY ||
-      selected_backend == os_crypt::SelectedLinuxBackend::GNOME_KEYRING) {
-    key_storage = std::make_unique<KeyStorageKeyring>(config.main_thread_runner,
-                                                      application_name);
-    if (key_storage->WaitForInitOnTaskRunner()) {
-      VLOG(1) << "OSCrypt using Keyring as backend.";
-      return key_storage;
-    }
-    LOG(WARNING) << "OSCrypt tried Keyring but couldn't initialise.";
-  }
-#endif  // defined(USE_KEYRING)
-
 #if defined(USE_KWALLET)
   if (selected_backend == os_crypt::SelectedLinuxBackend::KWALLET ||
-      selected_backend == os_crypt::SelectedLinuxBackend::KWALLET5) {
+      selected_backend == os_crypt::SelectedLinuxBackend::KWALLET5 ||
+      selected_backend == os_crypt::SelectedLinuxBackend::KWALLET6) {
     DCHECK(!config.product_name.empty());
     base::nix::DesktopEnvironment used_desktop_env =
-        selected_backend == os_crypt::SelectedLinuxBackend::KWALLET
-            ? base::nix::DESKTOP_ENVIRONMENT_KDE4
-            : base::nix::DESKTOP_ENVIRONMENT_KDE5;
+        base::nix::DESKTOP_ENVIRONMENT_KDE4;
+    if (selected_backend == os_crypt::SelectedLinuxBackend::KWALLET5) {
+      used_desktop_env = base::nix::DESKTOP_ENVIRONMENT_KDE5;
+    }
+    if (selected_backend == os_crypt::SelectedLinuxBackend::KWALLET6) {
+      used_desktop_env = base::nix::DESKTOP_ENVIRONMENT_KDE6;
+    }
     key_storage = std::make_unique<KeyStorageKWallet>(used_desktop_env,
                                                       config.product_name);
     if (key_storage->WaitForInitOnTaskRunner()) {
@@ -211,8 +194,7 @@ std::unique_ptr<KeyStorageLinux> KeyStorageLinux::CreateServiceInternal(
 
   return nullptr;
 }
-#endif  // defined(USE_LIBSECRET) || defined(USE_KEYRING) ||
-        // defined(USE_KWALLET)
+#endif  // defined(USE_LIBSECRET) || defined(USE_KWALLET)
 
 bool KeyStorageLinux::WaitForInitOnTaskRunner() {
   base::ScopedAllowBaseSyncPrimitivesOutsideBlockingScope allow_sync_primitives;

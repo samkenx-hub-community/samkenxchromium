@@ -59,6 +59,8 @@ enum ModelType {
   AUTOFILL_PROFILE,
   // An autofill object, i.e. an autocomplete entry keyed to an HTML form field.
   AUTOFILL,
+  // Credentials related to an autofill wallet instrument; aka the CVC/CVV code.
+  AUTOFILL_WALLET_CREDENTIAL,
   // Credit cards and addresses from the user's account. These are read-only on
   // the client.
   AUTOFILL_WALLET_DATA,
@@ -146,6 +148,11 @@ enum ModelType {
 
   // WebAuthn credentials, more commonly known as passkeys.
   WEBAUTHN_CREDENTIAL,
+
+  // Invitations for sending passwords. Outgoing invitation from one user will
+  // become an incoming one for another.
+  INCOMING_PASSWORD_SHARING_INVITATION,
+  OUTGOING_PASSWORD_SHARING_INVITATION,
 
   // Proxy types are excluded from the sync protocol, but are still considered
   // real user types. By convention, we prefix them with 'PROXY_' to distinguish
@@ -250,7 +257,10 @@ enum class ModelTypeForHistograms {
   kSavedTabGroups = 56,
   kPowerBookmark = 57,
   kWebAuthnCredentials = 58,
-  kMaxValue = kWebAuthnCredentials,
+  kIncomingPasswordSharingInvitations = 59,
+  kOutgoingPasswordSharingInvitations = 60,
+  kAutofillWalletCredential = 61,
+  kMaxValue = kAutofillWalletCredential,
 };
 
 // Used to mark the type of EntitySpecifics that has no actual data.
@@ -264,17 +274,52 @@ ModelType GetModelTypeFromSpecifics(const sync_pb::EntitySpecifics& specifics);
 // representations. This distinguishes them from Proxy types, which have no
 // protocol representation and are never sent to the server.
 constexpr ModelTypeSet ProtocolTypes() {
-  return ModelTypeSet(
-      BOOKMARKS, PREFERENCES, PASSWORDS, AUTOFILL_PROFILE, AUTOFILL,
-      AUTOFILL_WALLET_DATA, AUTOFILL_WALLET_METADATA, AUTOFILL_WALLET_OFFER,
-      AUTOFILL_WALLET_USAGE, THEMES, TYPED_URLS, EXTENSIONS, SEARCH_ENGINES,
-      SESSIONS, APPS, APP_SETTINGS, EXTENSION_SETTINGS,
-      HISTORY_DELETE_DIRECTIVES, DICTIONARY, DEVICE_INFO, PRIORITY_PREFERENCES,
-      SUPERVISED_USER_SETTINGS, APP_LIST, ARC_PACKAGE, PRINTERS, READING_LIST,
-      USER_EVENTS, NIGORI, USER_CONSENTS, SEND_TAB_TO_SELF, SECURITY_EVENTS,
-      WEB_APPS, WIFI_CONFIGURATIONS, OS_PREFERENCES, OS_PRIORITY_PREFERENCES,
-      SHARING_MESSAGE, WORKSPACE_DESK, HISTORY, PRINTERS_AUTHORIZATION_SERVERS,
-      CONTACT_INFO, SAVED_TAB_GROUP, POWER_BOOKMARK, WEBAUTHN_CREDENTIAL);
+  return {BOOKMARKS,
+          PREFERENCES,
+          PASSWORDS,
+          AUTOFILL_PROFILE,
+          AUTOFILL,
+          AUTOFILL_WALLET_CREDENTIAL,
+          AUTOFILL_WALLET_DATA,
+          AUTOFILL_WALLET_METADATA,
+          AUTOFILL_WALLET_OFFER,
+          AUTOFILL_WALLET_USAGE,
+          THEMES,
+          TYPED_URLS,
+          EXTENSIONS,
+          SEARCH_ENGINES,
+          SESSIONS,
+          APPS,
+          APP_SETTINGS,
+          EXTENSION_SETTINGS,
+          HISTORY_DELETE_DIRECTIVES,
+          DICTIONARY,
+          DEVICE_INFO,
+          PRIORITY_PREFERENCES,
+          SUPERVISED_USER_SETTINGS,
+          APP_LIST,
+          ARC_PACKAGE,
+          PRINTERS,
+          READING_LIST,
+          USER_EVENTS,
+          NIGORI,
+          USER_CONSENTS,
+          SEND_TAB_TO_SELF,
+          SECURITY_EVENTS,
+          WEB_APPS,
+          WIFI_CONFIGURATIONS,
+          OS_PREFERENCES,
+          OS_PRIORITY_PREFERENCES,
+          SHARING_MESSAGE,
+          WORKSPACE_DESK,
+          HISTORY,
+          PRINTERS_AUTHORIZATION_SERVERS,
+          CONTACT_INFO,
+          SAVED_TAB_GROUP,
+          POWER_BOOKMARK,
+          WEBAUTHN_CREDENTIAL,
+          INCOMING_PASSWORD_SHARING_INVITATION,
+          OUTGOING_PASSWORD_SHARING_INVITATION};
 }
 
 // These are the normal user-controlled types. This is to distinguish from
@@ -286,9 +331,12 @@ constexpr ModelTypeSet UserTypes() {
 
 // User types which are not user-controlled.
 constexpr ModelTypeSet AlwaysPreferredUserTypes() {
-  return ModelTypeSet(DEVICE_INFO, USER_CONSENTS, SECURITY_EVENTS,
-                      SEND_TAB_TO_SELF, SUPERVISED_USER_SETTINGS,
-                      SHARING_MESSAGE);
+  return {DEVICE_INFO,
+          USER_CONSENTS,
+          SECURITY_EVENTS,
+          SEND_TAB_TO_SELF,
+          SUPERVISED_USER_SETTINGS,
+          SHARING_MESSAGE};
 }
 
 // User types which are always encrypted.
@@ -296,7 +344,7 @@ constexpr ModelTypeSet AlwaysEncryptedUserTypes() {
   // If you add a new model type here that is conceptually different from a
   // password, make sure you audit UI code that refers to these types as
   // passwords, e.g. consumers of IsEncryptEverythingEnabled().
-  return ModelTypeSet(PASSWORDS, WIFI_CONFIGURATIONS);
+  return {AUTOFILL_WALLET_CREDENTIAL, PASSWORDS, WIFI_CONFIGURATIONS};
 }
 
 // This is the subset of UserTypes() that have priority over other types. These
@@ -305,7 +353,7 @@ constexpr ModelTypeSet AlwaysEncryptedUserTypes() {
 // active before all the data for non-prio types has been downloaded (which may
 // be a lot of data).
 constexpr ModelTypeSet HighPriorityUserTypes() {
-  return ModelTypeSet(
+  return {
       // The "Send to Your Devices" feature needs fast updating of the list of
       // your devices and also fast sending of the actual messages.
       DEVICE_INFO, SHARING_MESSAGE,
@@ -321,7 +369,7 @@ constexpr ModelTypeSet HighPriorityUserTypes() {
       // in the creation flow for a new profile. If the user has no theme in
       // their sync data, the browser offers a theme customization bubble which
       // should appear soon after opening the browser.
-      THEMES);
+      THEMES};
 }
 
 // This is the subset of UserTypes() that have a *lower* priority than other
@@ -330,12 +378,16 @@ constexpr ModelTypeSet HighPriorityUserTypes() {
 // high-priority and regular types can become active before all the data for
 // low-priority types has been downloaded (which may be a lot of data).
 constexpr ModelTypeSet LowPriorityUserTypes() {
-  return ModelTypeSet(
+  return {
       // Downloading History may take a while, but should not block the download
       // of other data types.
       HISTORY,
       // User Events should not block or delay commits for other data types.
-      USER_EVENTS);
+      USER_EVENTS,
+      // Incoming password sharing invitations must be processed after
+      // Passwords data type to prevent storing incoming passwords locally first
+      // and overwriting the remote password during conflict resolution.
+      INCOMING_PASSWORD_SHARING_INVITATION};
 }
 
 // Returns a list of all control types.
@@ -349,22 +401,23 @@ constexpr ModelTypeSet LowPriorityUserTypes() {
 // - They support custom update application and conflict resolution logic.
 // - All change processing occurs on the sync thread.
 constexpr ModelTypeSet ControlTypes() {
-  return ModelTypeSet(NIGORI);
+  return {NIGORI};
 }
 
 // Types that may commit data, but should never be included in a GetUpdates.
 // These are never encrypted.
 constexpr ModelTypeSet CommitOnlyTypes() {
-  return ModelTypeSet(USER_EVENTS, USER_CONSENTS, SECURITY_EVENTS,
-                      SHARING_MESSAGE);
+  return {USER_EVENTS, USER_CONSENTS, SECURITY_EVENTS, SHARING_MESSAGE,
+          OUTGOING_PASSWORD_SHARING_INVITATION};
 }
 
 // Types for which downloaded updates are applied immediately, before all
 // updates are downloaded and the Sync cycle finishes.
-// For these types, ModelTypeSyncBridge::MergeSyncData() will never be called
-// (since without downloading all the data, no initial merge is possible).
+// For these types, ModelTypeSyncBridge::MergeFullSyncData() will never be
+// called (since without downloading all the data, no initial merge is
+// possible).
 constexpr ModelTypeSet ApplyUpdatesImmediatelyTypes() {
-  return ModelTypeSet(HISTORY);
+  return {HISTORY};
 }
 
 // User types that can be encrypted, which is a subset of UserTypes() and a
@@ -444,20 +497,6 @@ std::string ModelTypeToProtocolRootTag(ModelType model_type);
 // exposed in the sync protocol, but that is still stable and thus can be used
 // for local persistence. It is guaranteed to be lowercase.
 const char* GetModelTypeLowerCaseRootTag(ModelType model_type);
-
-// Convert a real model type to a notification type (used for
-// subscribing to server-issued notifications).  Returns true iff
-// |model_type| was a real model type and |notification_type| was
-// filled in.
-bool RealModelTypeToNotificationType(ModelType model_type,
-                                     std::string* notification_type);
-
-// Converts a notification type to a real model type.  Returns true
-// iff |notification_type| was the notification type of a real model
-// type and |model_type| was filled in.
-[[nodiscard]] bool NotificationTypeToRealModelType(
-    const std::string& notification_type,
-    ModelType* model_type);
 
 // Returns true if |model_type| is a real datatype
 bool IsRealDataType(ModelType model_type);

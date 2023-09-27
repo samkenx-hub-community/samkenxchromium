@@ -37,7 +37,7 @@ FileManagerPrivateInternalGetContentMimeTypeFunction::Run() {
   const std::string& blob_uuid = args()[0].GetString();
 
   if (blob_uuid.empty()) {
-    return RespondNow(Error("fileEntry.file() blob error."));
+    return RespondNow(Error("Blob UUID must not be empty."));
   }
 
   content::GetUIThreadTaskRunner({})->PostTask(
@@ -54,7 +54,7 @@ void FileManagerPrivateInternalGetContentMimeTypeFunction::ReadBlobBytes(
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   BlobReader::Read(  // Read net::kMaxBytesToSniff bytes from the front.
-      browser_context(), blob_uuid,
+      browser_context()->GetBlobRemote(blob_uuid),
       base::BindOnce(
           &FileManagerPrivateInternalGetContentMimeTypeFunction::SniffMimeType,
           this, blob_uuid),
@@ -89,7 +89,7 @@ FileManagerPrivateInternalGetContentMetadataFunction::Run() {
   EXTENSION_FUNCTION_VALIDATE(params);
 
   if (params->blob_uuid.empty()) {
-    return RespondNow(Error("fileEntry.file() blob error."));
+    return RespondNow(Error("Blob UUID must not be empty"));
   }
 
   content::GetUIThreadTaskRunner({})->PostTask(
@@ -108,7 +108,7 @@ void FileManagerPrivateInternalGetContentMetadataFunction::ReadBlobSize(
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   BlobReader::Read(  // Read net::kMaxBytesToSniff bytes from the front.
-      browser_context(), blob_uuid,
+      browser_context()->GetBlobRemote(blob_uuid),
       base::BindOnce(
           &FileManagerPrivateInternalGetContentMetadataFunction::CanParseBlob,
           this, blob_uuid, mime_type, include_images),

@@ -31,6 +31,7 @@
 #include "third_party/blink/renderer/core/svg/svg_length_tear_off.h"
 
 #include "third_party/blink/renderer/core/svg/svg_element.h"
+#include "third_party/blink/renderer/core/svg/svg_length_context.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 
@@ -137,11 +138,13 @@ void SVGLengthTearOff::setValue(float value, ExceptionState& exception_state) {
                                       "Could not resolve relative length.");
     return;
   }
-  SVGLengthContext length_context(ContextElement());
-  if (Target()->IsCalculated())
+  if (Target()->IsCalculated() || Target()->HasContainerRelativeUnits()) {
     Target()->SetValueAsNumber(value);
-  else
-    Target()->SetValue(value, length_context);
+  } else {
+    SVGLengthContext length_context(ContextElement());
+    Target()->SetValueInSpecifiedUnits(length_context.ConvertValueFromUserUnits(
+        value, Target()->UnitMode(), Target()->NumericLiteralType()));
+  }
   CommitChange();
 }
 

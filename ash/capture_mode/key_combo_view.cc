@@ -11,13 +11,8 @@
 
 #include "ash/accelerators/keyboard_code_util.h"
 #include "ash/capture_mode/key_item_view.h"
-#include "ash/public/cpp/assistant/assistant_state.h"
-#include "ash/public/cpp/assistant/assistant_state_base.h"
 #include "ash/resources/vector_icons/vector_icons.h"
-#include "ash/shell.h"
-#include "key_item_view.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
-#include "ui/chromeos/events/keyboard_capability.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes_posix.h"
 #include "ui/gfx/geometry/insets.h"
@@ -31,29 +26,11 @@ namespace {
 
 constexpr auto kBetweenKeyItemSpace = 8;
 
-bool IsAssistantAvailable() {
-  AssistantStateBase* state = AssistantState::Get();
-  return state->allowed_state() == assistant::AssistantAllowedState::ALLOWED &&
-         state->settings_enabled().value_or(false);
-}
-
-// Returns the corresponding vector icon for search or launcher key depending on
-// the keyboard layout and whether the assistant is enabled or not.
-const gfx::VectorIcon* GetVectorIconForSearchOrLauncherIcon() {
-  if (Shell::Get()->keyboard_capability()->HasLauncherButton()) {
-    return IsAssistantAvailable()
-               ? &kCaptureModeDemoToolsLauncherAssistantOnIcon
-               : &kCaptureModeDemoToolsLauncherAssistantOffIcon;
-  }
-
-  return &kCaptureModeDemoToolsSearchIcon;
-}
-
 // Returns the vector icons for keys that have icons on the keyboard.
 const gfx::VectorIcon* GetVectorIconForDemoTools(ui::KeyboardCode key_code) {
   switch (key_code) {
     case ui::VKEY_COMMAND:
-      return GetVectorIconForSearchOrLauncherIcon();
+      return GetSearchOrLauncherVectorIcon();
     case ui::VKEY_ASSISTANT:
       return &kCaptureModeDemoToolsAssistantIcon;
     case ui::VKEY_SETTINGS:
@@ -216,7 +193,7 @@ void KeyComboView::RefreshView(int modifiers,
   if (last_non_modifier_key != last_non_modifier_key_) {
     last_non_modifier_key_ = last_non_modifier_key;
     if (non_modifier_view_) {
-      RemoveChildViewT(non_modifier_view_);
+      RemoveChildViewT(non_modifier_view_.get());
       non_modifier_view_ = nullptr;
     }
 

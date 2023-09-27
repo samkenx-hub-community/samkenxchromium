@@ -32,8 +32,8 @@ import org.chromium.chrome.browser.compositor.resources.SystemResourcePreloads;
 import org.chromium.chrome.browser.externalnav.IntentWithRequestMetadataHandler;
 import org.chromium.chrome.browser.layouts.scene_layer.SceneLayer;
 import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
-import org.chromium.chrome.browser.tabmodel.TabSwitchMetrics;
 import org.chromium.components.browser_ui.styles.ChromeColors;
+import org.chromium.content_public.browser.SelectionPopupController;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.resources.AndroidResourceType;
@@ -225,7 +225,10 @@ public class CompositorView
     public void onSelectionHandlesStateChanged(boolean active) {
         // If the feature is disabled or we're in Vr mode, we are already rendering directly to the
         // SurfaceView.
-        if (!mIsSurfaceControlEnabled || mIsInXr) return;
+        if (!mIsSurfaceControlEnabled || mIsInXr
+                || !SelectionPopupController.needsSurfaceViewDuringSelection()) {
+            return;
+        }
 
         if (mSelectionHandlesActive == active) return;
         mSelectionHandlesActive = active;
@@ -373,6 +376,18 @@ public class CompositorView
         // around this.
         mCompositorSurfaceManager.shutDown();
         createCompositorSurfaceManager();
+    }
+
+    /**
+     * Enables/disables immersive VR overlay mode, a variant of overlay video mode.
+     * @param enabled Whether to enter or leave overlay immersive vr mode.
+     */
+    public void setOverlayVrMode(boolean enabled) {
+        mIsInXr = enabled;
+
+        // We're essentially entering OverlayVideo mode because we're going to be rendering to an
+        // overlay, but we don't actually need a new composite or to adjust the alpha blend.
+        mCompositorSurfaceManager.requestSurface(getSurfacePixelFormat());
     }
 
     private int getSurfacePixelFormat() {
@@ -610,7 +625,7 @@ public class CompositorView
         }
         mHaveSwappedFramesSinceSurfaceCreated = true;
 
-        mRenderHost.didSwapBuffers(swappedCurrentSize);
+        mRenderHost.didSwapBuffers(swappedCurrentSize, mFramesUntilHideBackground);
 
         updateNeedsDidSwapBuffersCallback();
     }
@@ -656,7 +671,6 @@ public class CompositorView
         CompositorViewJni.get().setSceneLayer(
                 mNativeCompositorView, CompositorView.this, sceneLayer);
 
-        TabSwitchMetrics.flushActualTabSwitchLatencyMetric();
         CompositorViewJni.get().finalizeLayers(mNativeCompositorView, CompositorView.this);
         TraceEvent.end("CompositorView:finalizeLayers");
     }

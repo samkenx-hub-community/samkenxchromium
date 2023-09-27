@@ -71,8 +71,6 @@ source_set("common") {
 
   sources = [
     "all_messages.h",
-    "ax_serialization_utils.cc",
-    "ax_serialization_utils.h",
     "background_fetch/background_fetch_types.cc",
     "background_fetch/background_fetch_types.h",
     "color_parser.cc",
@@ -148,6 +146,14 @@ source_set("common") {
     "process_visibility_tracker.h",
     "pseudonymization_salt.cc",
     "pseudonymization_salt.h",
+    "service_worker/forwarded_race_network_request_url_loader_factory.cc",
+    "service_worker/forwarded_race_network_request_url_loader_factory.h",
+    "service_worker/race_network_request_url_loader_client.cc",
+    "service_worker/race_network_request_url_loader_client.h",
+    "service_worker/service_worker_resource_loader.cc",
+    "service_worker/service_worker_resource_loader.h",
+    "service_worker/service_worker_router_evaluator.cc",
+    "service_worker/service_worker_router_evaluator.h",
     "set_process_title.cc",
     "set_process_title.h",
     "skia_utils.cc",
@@ -158,6 +164,8 @@ source_set("common") {
     "url_schemes.cc",
     "url_schemes.h",
     "user_agent.cc",
+    "user_level_memory_pressure_signal_features.cc",
+    "user_level_memory_pressure_signal_features.h",
     "web_package/signed_exchange_utils.cc",
     "web_package/signed_exchange_utils.h",
     "webid/identity_url_loader_throttle.cc",
@@ -195,11 +203,9 @@ source_set("common") {
     "//build:chromeos_buildflags",
     "//build/util:chromium_git_revision",
     "//components/discardable_memory/common",
-    "//components/power_scheduler",
     "//components/services/filesystem/public/mojom",
     "//components/tracing:startup_tracing",
     "//content:content_resources",
-    "//content:dev_ui_content_resources",
     "//content/common/fetch:fetch_api_request_proto",
     "//content/public/common:interfaces",
     "//content/public/common/zygote:buildflags",
@@ -218,7 +224,6 @@ source_set("common") {
     "//media/base/ipc",
     "//media/capture",
     "//media/gpu:buildflags",
-    "//media/gpu/ipc/client",
     "//media/gpu/ipc/common",
     "//media/midi",
     "//media/midi:mojo",
@@ -341,7 +346,7 @@ source_set("common") {
     libs += [ "android" ]
   }
 
-  if (is_debug && !is_component_build && enable_plugins) {
+  if (is_debug && !is_component_build && enable_ppapi) {
     # Content depends on the PPAPI message logging stuff; if this isn't here,
     # some unit test binaries won't compile. This only worked in release mode
     # because logging is disabled there.
@@ -618,6 +623,7 @@ mojom("mojo_bindings") {
     "//services/viz/public/mojom",
     "//skia/public/mojom",
     "//third_party/blink/public/mojom:mojom_core",
+    "//third_party/blink/public/mojom:mojom_modules",
     "//third_party/blink/public/mojom:web_feature_mojo_bindings",
     "//ui/accessibility:ax_enums_mojo",
     "//ui/accessibility/mojom",
@@ -626,6 +632,7 @@ mojom("mojo_bindings") {
     "//ui/color:mojom",
     "//ui/display/mojom",
     "//ui/events/mojom",
+    "//ui/events/mojom:event_latency_metadata_mojom",
     "//ui/gfx/geometry/mojom",
     "//ui/gfx/image/mojom",
     "//ui/gfx/mojom",
@@ -660,7 +667,10 @@ mojom("mojo_bindings") {
     ]
   }
 
-  overridden_deps = [ "//third_party/blink/public/mojom:mojom_core" ]
+  overridden_deps = [
+    "//third_party/blink/public/mojom:mojom_core",
+    "//third_party/blink/public/mojom:mojom_modules",
+  ]
   component_deps = [ "//third_party/blink/public/common" ]
 
   component_output_prefix = "content_common_mojo_bindings"

@@ -5,7 +5,8 @@
 package org.chromium.chrome.test;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
+
+import androidx.test.core.app.ApplicationProvider;
 
 import org.hamcrest.Matchers;
 import org.junit.rules.TestRule;
@@ -26,8 +27,6 @@ import java.util.concurrent.TimeoutException;
 
 /** Custom TestRule for MultiActivity Tests. */
 public class MultiActivityTestRule implements TestRule {
-    private static final String TAG = "MultiActivityTest";
-
     Context mContext;
 
     public Context getContext() {
@@ -60,7 +59,7 @@ public class MultiActivityTestRule implements TestRule {
     }
 
     private void ruleSetUp() {
-        mContext = InstrumentationRegistry.getTargetContext();
+        mContext = ApplicationProvider.getApplicationContext();
         ChromeApplicationTestUtils.setUp(mContext);
     }
 

@@ -36,19 +36,18 @@ class CONTENT_EXPORT PrivateAggregationBindings : public Bindings {
       delete;
   ~PrivateAggregationBindings() override;
 
-  // Add privateAggregation object to `global_template`. `this` must outlive the
-  // template.
-  void FillInGlobalTemplate(
-      v8::Local<v8::ObjectTemplate> global_template) override;
+  // Add privateAggregation object to global context. `this` must outlive the
+  // context.
+  void AttachToContext(v8::Local<v8::Context> context) override;
   void Reset() override;
 
   std::vector<auction_worklet::mojom::PrivateAggregationRequestPtr>
   TakePrivateAggregationRequests();
 
  private:
-  static void SendHistogramReport(
+  static void ContributeToHistogram(
       const v8::FunctionCallbackInfo<v8::Value>& args);
-  static void ReportContributionForEvent(
+  static void ContributeToHistogramOnEvent(
       const v8::FunctionCallbackInfo<v8::Value>& args);
   static void EnableDebugMode(const v8::FunctionCallbackInfo<v8::Value>& args);
 

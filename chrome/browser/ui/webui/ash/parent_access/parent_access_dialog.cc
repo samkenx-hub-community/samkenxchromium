@@ -98,6 +98,14 @@ bool ParentAccessDialog::ShouldCloseDialogOnEscape() const {
   return true;
 }
 
+bool ParentAccessDialog::ShouldShowDialogTitle() const {
+  return false;
+}
+// The close button is implemented in the WebUI itself.
+bool ParentAccessDialog::ShouldShowCloseButton() const {
+  return false;
+}
+
 parent_access_ui::mojom::ParentAccessParamsPtr
 ParentAccessDialog::CloneParentAccessParams() {
   return parent_access_params_->Clone();
@@ -121,6 +129,12 @@ void ParentAccessDialog::SetDeclined() {
 void ParentAccessDialog::SetCanceled() {
   auto result = std::make_unique<ParentAccessDialog::Result>();
   result->status = ParentAccessDialog::Result::Status::kCanceled;
+  CloseWithResult(std::move(result));
+}
+
+void ParentAccessDialog::SetDisabled() {
+  auto result = std::make_unique<ParentAccessDialog::Result>();
+  result->status = ParentAccessDialog::Result::Status::kDisabled;
   CloseWithResult(std::move(result));
 }
 

@@ -20,6 +20,7 @@
 #include "ash/system/power/power_button_menu_screen_view.h"
 #include "ash/system/power/power_button_menu_view.h"
 #include "ash/system/power/power_button_screenshot_controller.h"
+#include "ash/wm/container_finder.h"
 #include "ash/wm/lock_state_controller.h"
 #include "ash/wm/session_state_animator.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
@@ -322,6 +323,10 @@ bool PowerButtonController::IsMenuOpened() const {
   return menu_widget_ && menu_widget_->GetLayer()->GetTargetVisibility();
 }
 
+void PowerButtonController::ShowMenuOnDebugAccelerator() {
+  StartPowerMenuAnimation(ShutdownReason::DEBUG_ACCELERATOR);
+}
+
 void PowerButtonController::DismissMenu() {
   if (IsMenuOpened()) {
     static_cast<PowerButtonMenuScreenView*>(menu_widget_->GetContentsView())
@@ -459,8 +464,7 @@ void PowerButtonController::OnSecurityCurtainEnabled() {
 
 void PowerButtonController::OnSecurityCurtainDisabled() {
   DismissMenu();
-  Shell::GetPrimaryRootWindow()
-      ->GetChildById(kShellWindowId_LockScreenRelatedContainersContainer)
+  GetPowerMenuContainerParent(Shell::GetPrimaryRootWindow())
       ->AddChild(GetPowerMenuContainer());
 }
 

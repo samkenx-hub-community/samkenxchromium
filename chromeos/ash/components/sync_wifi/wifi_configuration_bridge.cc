@@ -15,6 +15,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/time/clock.h"
 #include "base/time/time.h"
+#include "base/trace_event/trace_event.h"
 #include "base/values.h"
 #include "chromeos/ash/components/network/network_configuration_handler.h"
 #include "chromeos/ash/components/network/network_event_log.h"
@@ -109,7 +110,7 @@ WifiConfigurationBridge::CreateMetadataChangeList() {
   return syncer::ModelTypeStore::WriteBatch::CreateMetadataChangeList();
 }
 
-absl::optional<syncer::ModelError> WifiConfigurationBridge::MergeSyncData(
+absl::optional<syncer::ModelError> WifiConfigurationBridge::MergeFullSyncData(
     std::unique_ptr<syncer::MetadataChangeList> metadata_change_list,
     syncer::EntityChangeList change_list) {
   DCHECK(entries_.empty());
@@ -210,7 +211,8 @@ void WifiConfigurationBridge::OnGetAllSyncableNetworksResult(
   }
 }
 
-absl::optional<syncer::ModelError> WifiConfigurationBridge::ApplySyncChanges(
+absl::optional<syncer::ModelError>
+WifiConfigurationBridge::ApplyIncrementalSyncChanges(
     std::unique_ptr<syncer::MetadataChangeList> metadata_change_list,
     syncer::EntityChangeList entity_changes) {
   std::unique_ptr<syncer::ModelTypeStore::WriteBatch> batch =
@@ -293,16 +295,13 @@ std::string WifiConfigurationBridge::GetStorageKey(
       .SerializeToString();
 }
 
-void WifiConfigurationBridge::ApplyStopSyncChanges(
+void WifiConfigurationBridge::ApplyDisableSyncChanges(
     std::unique_ptr<syncer::MetadataChangeList> delete_metadata_change_list) {
-  if (!delete_metadata_change_list) {
-    return;
-  }
-
   // Since bridge and ModelTypeStore state represents the synced networks state,
   // while actual data is stored by Shill, it's appropriate to treat all data
   // stored by bridge as metadata and clear it out when processor requests to
-  // clear metadata. MergeSyncData() will be called once sync is starting again.
+  // clear metadata. MergeFullSyncData() will be called once sync is starting
+  // again.
   entries_.clear();
   pending_deletes_.clear();
   network_guid_to_timer_map_.clear();
@@ -357,7 +356,7 @@ void WifiConfigurationBridge::OnReadAllData(
 
   int entries_size = entries_.size();
   // Do not log the total network count during OOBE. It returns 0 even if there
-  // are networks synced since MergeSyncData has not executed yet.
+  // are networks synced since MergeFullSyncData has not executed yet.
   if (pref_service_->GetBoolean(kIsFirstRun)) {
     pref_service_->SetBoolean(kIsFirstRun, false);
     // This is only meant to filter out 0's that are logged during OOBE. If the
@@ -394,6 +393,7 @@ void WifiConfigurationBridge::OnFixAutoconnectComplete() {
 void WifiConfigurationBridge::OnReadAllMetadata(
     const absl::optional<syncer::ModelError>& error,
     std::unique_ptr<syncer::MetadataBatch> metadata_batch) {
+  TRACE_EVENT0("ui", "WifiConfigurationBridge::OnReadAllMetadata");
   if (error) {
     change_processor()->ReportError(*error);
     return;

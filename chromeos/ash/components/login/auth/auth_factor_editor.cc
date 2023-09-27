@@ -5,6 +5,9 @@
 #include "chromeos/ash/components/login/auth/auth_factor_editor.h"
 
 #include "ash/constants/ash_features.h"
+#include "ash/constants/ash_switches.h"
+#include "base/command_line.h"
+#include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "chromeos/ash/components/cryptohome/auth_factor.h"
@@ -28,7 +31,11 @@ namespace ash {
 
 using ::cryptohome::KeyLabel;
 
-AuthFactorEditor::AuthFactorEditor() = default;
+AuthFactorEditor::AuthFactorEditor(UserDataAuthClient* client)
+    : client_(client) {
+  CHECK(client_);
+}
+
 AuthFactorEditor::~AuthFactorEditor() = default;
 
 void AuthFactorEditor::InvalidateCurrentAttempts() {
@@ -48,7 +55,7 @@ void AuthFactorEditor::GetAuthFactorsConfiguration(
   *request.mutable_account_id() =
       cryptohome::CreateAccountIdentifierFromAccountId(context->GetAccountId());
 
-  UserDataAuthClient::Get()->ListAuthFactors(
+  client_->ListAuthFactors(
       request, base::BindOnce(&AuthFactorEditor::OnListAuthFactors,
                               weak_factory_.GetWeakPtr(), std::move(context),
                               std::move(callback)));
@@ -79,7 +86,7 @@ void AuthFactorEditor::AddKioskKey(std::unique_ptr<UserContext> context,
   cryptohome::AuthFactorInput input(cryptohome::AuthFactorInput::Kiosk{});
   cryptohome::SerializeAuthFactor(factor, request.mutable_auth_factor());
   cryptohome::SerializeAuthInput(ref, input, request.mutable_auth_input());
-  UserDataAuthClient::Get()->AddAuthFactor(
+  client_->AddAuthFactor(
       request, base::BindOnce(&AuthFactorEditor::OnAddAuthFactor,
                               weak_factory_.GetWeakPtr(), std::move(context),
                               std::move(callback)));
@@ -130,7 +137,7 @@ void AuthFactorEditor::AddContextKnowledgeKey(
     cryptohome::SerializeAuthFactor(factor, request.mutable_auth_factor());
     cryptohome::SerializeAuthInput(ref, input, request.mutable_auth_input());
   }
-  UserDataAuthClient::Get()->AddAuthFactor(
+  client_->AddAuthFactor(
       request, base::BindOnce(&AuthFactorEditor::OnAddAuthFactor,
                               weak_factory_.GetWeakPtr(), std::move(context),
                               std::move(callback)));
@@ -166,7 +173,7 @@ void AuthFactorEditor::AddContextChallengeResponseKey(
   cryptohome::SerializeAuthFactor(factor, request.mutable_auth_factor());
   cryptohome::SerializeAuthInput(ref, input, request.mutable_auth_input());
 
-  UserDataAuthClient::Get()->AddAuthFactor(
+  client_->AddAuthFactor(
       request, base::BindOnce(&AuthFactorEditor::OnAddAuthFactor,
                               weak_factory_.GetWeakPtr(), std::move(context),
                               std::move(callback)));
@@ -218,7 +225,7 @@ void AuthFactorEditor::ReplaceContextKey(std::unique_ptr<UserContext> context,
       cryptohome::AuthFactorInput::Password{key->GetSecret()});
   cryptohome::SerializeAuthFactor(factor, request.mutable_auth_factor());
   cryptohome::SerializeAuthInput(ref, input, request.mutable_auth_input());
-  UserDataAuthClient::Get()->UpdateAuthFactor(
+  client_->UpdateAuthFactor(
       request, base::BindOnce(&AuthFactorEditor::OnUpdateAuthFactor,
                               weak_factory_.GetWeakPtr(), std::move(context),
                               std::move(callback)));
@@ -270,8 +277,7 @@ void AuthFactorEditor::AddPinFactor(std::unique_ptr<UserContext> context,
       &AuthFactorEditor::OnAddAuthFactor, weak_factory_.GetWeakPtr(),
       std::move(context), std::move(callback));
   LOGIN_LOG(EVENT) << "Adding pin factor";
-  UserDataAuthClient::Get()->AddAuthFactor(std::move(request),
-                                           std::move(on_added_callback));
+  client_->AddAuthFactor(std::move(request), std::move(on_added_callback));
 }
 
 void AuthFactorEditor::ReplacePinFactor(std::unique_ptr<UserContext> context,
@@ -303,8 +309,7 @@ void AuthFactorEditor::ReplacePinFactor(std::unique_ptr<UserContext> context,
       &AuthFactorEditor::OnUpdateAuthFactor, weak_factory_.GetWeakPtr(),
       std::move(context), std::move(callback));
   LOGIN_LOG(EVENT) << "Replacing pin factor";
-  UserDataAuthClient::Get()->UpdateAuthFactor(std::move(request),
-                                              std::move(on_updated_callback));
+  client_->UpdateAuthFactor(std::move(request), std::move(on_updated_callback));
 }
 
 void AuthFactorEditor::RemovePinFactor(std::unique_ptr<UserContext> context,
@@ -320,8 +325,7 @@ void AuthFactorEditor::RemovePinFactor(std::unique_ptr<UserContext> context,
   auto remove_auth_factor_callback = base::BindOnce(
       &AuthFactorEditor::OnRemoveAuthFactor, weak_factory_.GetWeakPtr(),
       std::move(context), std::move(callback));
-  UserDataAuthClient::Get()->RemoveAuthFactor(
-      req, std::move(remove_auth_factor_callback));
+  client_->RemoveAuthFactor(req, std::move(remove_auth_factor_callback));
 }
 
 void AuthFactorEditor::AddRecoveryFactor(std::unique_ptr<UserContext> context,
@@ -339,11 +343,12 @@ void AuthFactorEditor::AddRecoveryFactor(std::unique_ptr<UserContext> context,
 
   cryptohome::AuthFactorRef ref{cryptohome::AuthFactorType::kRecovery,
                                 KeyLabel{kCryptohomeRecoveryKeyLabel}};
+  cryptohome::CryptohomeRecoveryMetadata recovery_metadata{
+      GetRecoveryHsmPublicKey()};
   cryptohome::AuthFactorCommonMetadata metadata;
-  cryptohome::AuthFactor factor(ref, std::move(metadata));
+  cryptohome::AuthFactor factor(ref, std::move(metadata),
+                                std::move(recovery_metadata));
 
-  // TODO(crbug.com/1310312): The public key will likely be hardcoded, although
-  //  perhaps configurable via a command line switch for testing.
   cryptohome::AuthFactorInput input(
       cryptohome::AuthFactorInput::RecoveryCreation{
           .pub_key = GetRecoveryHsmPublicKey(),
@@ -357,8 +362,43 @@ void AuthFactorEditor::AddRecoveryFactor(std::unique_ptr<UserContext> context,
       &AuthFactorEditor::OnAddAuthFactor, weak_factory_.GetWeakPtr(),
       std::move(context), std::move(callback));
 
-  UserDataAuthClient::Get()->AddAuthFactor(std::move(request),
-                                           std::move(add_auth_factor_callback));
+  client_->AddAuthFactor(std::move(request),
+                         std::move(add_auth_factor_callback));
+}
+
+void AuthFactorEditor::RotateRecoveryFactor(
+    std::unique_ptr<UserContext> context,
+    AuthOperationCallback callback) {
+  CHECK(features::IsCryptohomeRecoveryEnabled());
+  CHECK(!context->GetAuthSessionId().empty());
+
+  LOGIN_LOG(EVENT) << "Rotating recovery key";
+
+  user_data_auth::UpdateAuthFactorRequest request;
+  request.set_auth_session_id(context->GetAuthSessionId());
+  request.set_auth_factor_label(kCryptohomeRecoveryKeyLabel);
+
+  cryptohome::AuthFactorRef ref{cryptohome::AuthFactorType::kRecovery,
+                                KeyLabel{kCryptohomeRecoveryKeyLabel}};
+  cryptohome::CryptohomeRecoveryMetadata recovery_metadata{
+      GetRecoveryHsmPublicKey()};
+  cryptohome::AuthFactorCommonMetadata metadata;
+  cryptohome::AuthFactor factor(ref, std::move(metadata),
+                                std::move(recovery_metadata));
+
+  cryptohome::AuthFactorInput input(
+      cryptohome::AuthFactorInput::RecoveryCreation{
+          .pub_key = GetRecoveryHsmPublicKey(),
+          .user_gaia_id = context->GetGaiaID(),
+          .device_user_id = context->GetDeviceId()});
+
+  cryptohome::SerializeAuthFactor(factor, request.mutable_auth_factor());
+  cryptohome::SerializeAuthInput(ref, input, request.mutable_auth_input());
+
+  auto on_updated_callback = base::BindOnce(
+      &AuthFactorEditor::OnUpdateAuthFactor, weak_factory_.GetWeakPtr(),
+      std::move(context), std::move(callback));
+  client_->UpdateAuthFactor(std::move(request), std::move(on_updated_callback));
 }
 
 void AuthFactorEditor::RemoveRecoveryFactor(
@@ -379,8 +419,48 @@ void AuthFactorEditor::RemoveRecoveryFactor(
   auto remove_auth_factor_callback = base::BindOnce(
       &AuthFactorEditor::OnRemoveAuthFactor, weak_factory_.GetWeakPtr(),
       std::move(context), std::move(callback));
-  UserDataAuthClient::Get()->RemoveAuthFactor(
-      req, std::move(remove_auth_factor_callback));
+  client_->RemoveAuthFactor(req, std::move(remove_auth_factor_callback));
+}
+
+void AuthFactorEditor::ReplaceLocalPasswordFactor(
+    std::unique_ptr<UserContext> context,
+    cryptohome::RawPassword new_password,
+    AuthOperationCallback callback) {
+  LOGIN_LOG(EVENT) << "Replacing local password";
+
+  SystemSaltGetter::Get()->GetSystemSalt(
+      base::BindOnce(&AuthFactorEditor::ReplaceLocalPasswordFactorImpl,
+                     weak_factory_.GetWeakPtr(), std::move(context),
+                     std::move(new_password), std::move(callback)));
+}
+
+void AuthFactorEditor::ReplaceLocalPasswordFactorImpl(
+    std::unique_ptr<UserContext> context,
+    cryptohome::RawPassword new_password,
+    AuthOperationCallback callback,
+    const std::string& system_salt) {
+  Key key{std::move(new_password).value()};
+  key.Transform(Key::KEY_TYPE_SALTED_SHA256_TOP_HALF, system_salt);
+
+  user_data_auth::UpdateAuthFactorRequest request;
+  request.set_auth_session_id(context->GetAuthSessionId());
+
+  cryptohome::AuthFactorRef ref{cryptohome::AuthFactorType::kPassword,
+                                KeyLabel{kCryptohomeLocalPasswordKeyLabel}};
+
+  request.set_auth_factor_label(ref.label().value());
+
+  cryptohome::AuthFactorCommonMetadata metadata;
+  cryptohome::AuthFactor factor(ref, std::move(metadata));
+
+  cryptohome::AuthFactorInput input(
+      cryptohome::AuthFactorInput::Password{std::move(key.GetSecret())});
+  cryptohome::SerializeAuthFactor(factor, request.mutable_auth_factor());
+  cryptohome::SerializeAuthInput(ref, input, request.mutable_auth_input());
+  client_->UpdateAuthFactor(
+      request, base::BindOnce(&AuthFactorEditor::OnUpdateAuthFactor,
+                              weak_factory_.GetWeakPtr(), std::move(context),
+                              std::move(callback)));
 }
 
 /// ---- private callbacks ----
@@ -403,8 +483,19 @@ void AuthFactorEditor::OnListAuthFactors(
       cryptohome::AuthFactorType::kPassword;
   if (user_manager::User::TypeIsKiosk(context->GetUserType()))
     fallback_type = cryptohome::AuthFactorType::kKiosk;
+
+  // Ignore unknown factors that are in development.
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  bool ignore_unknown_factors =
+      command_line->HasSwitch(ash::switches::kIgnoreUnknownAuthFactors);
+
   for (const auto& factor_with_status_proto :
        reply->configured_auth_factors_with_status()) {
+    if (ignore_unknown_factors &&
+        !cryptohome::SafeConvertFactorTypeFromProto(
+            factor_with_status_proto.auth_factor().type())) {
+      continue;
+    }
     auto factor = cryptohome::DeserializeAuthFactor(
         factor_with_status_proto.auth_factor(), fallback_type);
     // Dirty hack below, as cryptohome does not send correct value as a part of
@@ -431,13 +522,15 @@ void AuthFactorEditor::OnListAuthFactors(
     if (proto_type == user_data_auth::AUTH_FACTOR_TYPE_FINGERPRINT) {
       continue;
     }
-    cryptohome::AuthFactorType type = cryptohome::ConvertFactorTypeFromProto(
-        static_cast<user_data_auth::AuthFactorType>(proto_type));
-    if (type == cryptohome::AuthFactorType::kUnknownLegacy) {
-      NOTREACHED();
+    absl::optional<cryptohome::AuthFactorType> type =
+        cryptohome::SafeConvertFactorTypeFromProto(
+            static_cast<user_data_auth::AuthFactorType>(proto_type));
+    if (!type.has_value()) {
+      LOG(ERROR) << " Unknown supported factor type, ignoring";
+      base::debug::DumpWithoutCrashing(FROM_HERE);
       continue;
     }
-    supported_factors.Put(type);
+    supported_factors.Put(type.value());
   }
 
   AuthFactorsConfiguration configured_factors(std::move(factor_list),

@@ -71,9 +71,10 @@ class BlobRegistryWrapper;
 class BluetoothAllowedDevicesMap;
 class BroadcastChannelService;
 class BrowsingDataFilterBuilder;
-class BrowsingTopicsURLLoaderService;
+class KeepAliveURLLoaderService;
 class BucketManager;
 class CacheStorageControlWrapper;
+class CookieDeprecationLabelManagerImpl;
 class CookieStoreManager;
 class DevToolsBackgroundServicesContextImpl;
 class FileSystemAccessEntryFactory;
@@ -88,12 +89,17 @@ class LockManager;
 class MediaLicenseManager;
 #endif  // BUILDFLAG(ENABLE_LIBRARY_CDMS)
 class PaymentAppContextImpl;
-class PrefetchURLLoaderService;
+class PrivateAggregationDataModel;
 class PrivateAggregationManager;
+class PrivateAggregationManagerImpl;
 class PushMessagingContext;
+class ResourceCacheManager;
 class QuotaContext;
+class SharedDictionaryAccessObserver;
+class SharedStorageHeaderObserver;
 class SharedStorageWorkletHostManager;
 class SharedWorkerServiceImpl;
+class SubresourceProxyingURLLoaderService;
 class NavigationOrDocumentHandle;
 
 class CONTENT_EXPORT StoragePartitionImpl
@@ -141,12 +147,16 @@ class CONTENT_EXPORT StoragePartitionImpl
   void OverrideSharedStorageWorkletHostManagerForTesting(
       std::unique_ptr<SharedStorageWorkletHostManager>
           shared_storage_worklet_host_manager);
+  void OverrideSharedStorageHeaderObserverForTesting(
+      std::unique_ptr<SharedStorageHeaderObserver>
+          shared_storage_header_observer);
   void OverrideAggregationServiceForTesting(
       std::unique_ptr<AggregationService> aggregation_service);
   void OverrideAttributionManagerForTesting(
       std::unique_ptr<AttributionManager> attribution_manager);
   void OverridePrivateAggregationManagerForTesting(
-      std::unique_ptr<PrivateAggregationManager> private_aggregation_manager);
+      std::unique_ptr<PrivateAggregationManagerImpl>
+          private_aggregation_manager);
 
   // StoragePartition interface.
   const StoragePartitionConfig& GetConfig() override;
@@ -198,6 +208,8 @@ class CONTENT_EXPORT StoragePartitionImpl
   leveldb_proto::ProtoDatabaseProvider* GetProtoDatabaseProvider() override;
   // Use outside content.
   AttributionDataModel* GetAttributionDataModel() override;
+  PrivateAggregationDataModel* GetPrivateAggregationDataModel() override;
+  CookieDeprecationLabelManager* GetCookieDeprecationLabelManager() override;
 
   void SetProtoDatabaseProvider(
       std::unique_ptr<leveldb_proto::ProtoDatabaseProvider> proto_db_provider)
@@ -242,8 +254,6 @@ class CONTENT_EXPORT StoragePartitionImpl
   void SetNetworkContextForTesting(
       mojo::PendingRemote<network::mojom::NetworkContext>
           network_context_remote) override;
-  void ResetAttributionManagerForTesting(
-      base::OnceCallback<void(bool)> callback) override;
 
   base::WeakPtr<StoragePartitionImpl> GetWeakPtr();
   BackgroundFetchContext* GetBackgroundFetchContext();
@@ -252,8 +262,8 @@ class CONTENT_EXPORT StoragePartitionImpl
   BluetoothAllowedDevicesMap* GetBluetoothAllowedDevicesMap();
   BlobRegistryWrapper* GetBlobRegistry();
   storage::BlobUrlRegistry* GetBlobUrlRegistry();
-  PrefetchURLLoaderService* GetPrefetchURLLoaderService();
-  BrowsingTopicsURLLoaderService* GetBrowsingTopicsURLLoaderService();
+  SubresourceProxyingURLLoaderService* GetSubresourceProxyingURLLoaderService();
+  KeepAliveURLLoaderService* GetKeepAliveURLLoaderService();
   CookieStoreManager* GetCookieStoreManager();
   FileSystemAccessManagerImpl* GetFileSystemAccessManager();
   BucketManager* GetBucketManager();
@@ -271,6 +281,7 @@ class CONTENT_EXPORT StoragePartitionImpl
 
   storage::SharedStorageManager* GetSharedStorageManager() override;
   PrivateAggregationManager* GetPrivateAggregationManager();
+  ResourceCacheManager* GetResourceCacheManager();
 
   // blink::mojom::DomStorage interface.
   void OpenLocalStorage(
@@ -339,6 +350,12 @@ class CONTENT_EXPORT StoragePartitionImpl
       const scoped_refptr<net::HttpResponseHeaders>& head_headers,
       mojo::PendingRemote<network::mojom::AuthChallengeResponder>
           auth_challenge_responder) override;
+  void OnPrivateNetworkAccessPermissionRequired(
+      const GURL& url,
+      const net::IPAddress& ip_address,
+      const std::string& private_network_device_id,
+      const std::string& private_network_device_name,
+      OnPrivateNetworkAccessPermissionRequiredCallback callback) override;
   void OnClearSiteData(
       const GURL& url,
       const std::string& header_value,
@@ -351,6 +368,14 @@ class CONTENT_EXPORT StoragePartitionImpl
   void OnDataUseUpdate(int32_t network_traffic_annotation_id_hash,
                        int64_t recv_bytes,
                        int64_t sent_bytes) override;
+  void OnSharedStorageHeaderReceived(
+      const url::Origin& request_origin,
+      std::vector<network::mojom::SharedStorageOperationPtr> operations,
+      OnSharedStorageHeaderReceivedCallback callback) override;
+
+  SharedStorageHeaderObserver* shared_storage_header_observer() {
+    return shared_storage_header_observer_.get();
+  }
 
   scoped_refptr<URLLoaderFactoryGetter> url_loader_factory_getter() {
     return url_loader_factory_getter_;
@@ -413,6 +438,9 @@ class CONTENT_EXPORT StoragePartitionImpl
 
   mojo::PendingRemote<network::mojom::TrustTokenAccessObserver>
   CreateTrustTokenAccessObserverForServiceWorker();
+
+  mojo::PendingRemote<network::mojom::SharedDictionaryAccessObserver>
+  CreateSharedDictionaryAccessObserverForServiceWorker();
 
   mojo::PendingRemote<network::mojom::URLLoaderNetworkServiceObserver>
   CreateAuthCertObserverForServiceWorker();
@@ -487,6 +515,7 @@ class CONTENT_EXPORT StoragePartitionImpl
   class URLLoaderFactoryForBrowserProcess;
   class ServiceWorkerCookieAccessObserver;
   class ServiceWorkerTrustTokenAccessObserver;
+  class ServiceWorkerSharedDictionaryAccessObserver;
 
   friend class BackgroundSyncManagerTest;
   friend class BackgroundSyncServiceImplTestHarness;
@@ -607,7 +636,7 @@ class CONTENT_EXPORT StoragePartitionImpl
   // Raw pointer that should always be valid. The BrowserContext owns the
   // StoragePartitionImplMap which then owns StoragePartitionImpl. When the
   // BrowserContext is destroyed, `this` will be destroyed too.
-  raw_ptr<BrowserContext> browser_context_;
+  raw_ptr<BrowserContext, DanglingUntriaged> browser_context_;
 
   const base::FilePath partition_path_;
 
@@ -645,13 +674,13 @@ class CONTENT_EXPORT StoragePartitionImpl
   std::unique_ptr<BluetoothAllowedDevicesMap> bluetooth_allowed_devices_map_;
   scoped_refptr<BlobRegistryWrapper> blob_registry_;
   std::unique_ptr<storage::BlobUrlRegistry> blob_url_registry_;
-  std::unique_ptr<PrefetchURLLoaderService> prefetch_url_loader_service_;
-  std::unique_ptr<BrowsingTopicsURLLoaderService>
-      browsing_topics_url_loader_service_;
+  std::unique_ptr<SubresourceProxyingURLLoaderService>
+      subresource_proxying_url_loader_service_;
+  std::unique_ptr<KeepAliveURLLoaderService> keep_alive_url_loader_service_;
   std::unique_ptr<CookieStoreManager> cookie_store_manager_;
   std::unique_ptr<BucketManager> bucket_manager_;
   scoped_refptr<GeneratedCodeCacheContext> generated_code_cache_context_;
-  scoped_refptr<DevToolsBackgroundServicesContextImpl>
+  std::unique_ptr<DevToolsBackgroundServicesContextImpl>
       devtools_background_services_context_;
   scoped_refptr<FileSystemAccessManagerImpl> file_system_access_manager_;
   std::unique_ptr<leveldb_proto::ProtoDatabaseProvider>
@@ -677,7 +706,15 @@ class CONTENT_EXPORT StoragePartitionImpl
   std::unique_ptr<SharedStorageWorkletHostManager>
       shared_storage_worklet_host_manager_;
 
-  std::unique_ptr<PrivateAggregationManager> private_aggregation_manager_;
+  // Owning pointer to the `SharedStorageHeaderObserver` for this partition.
+  std::unique_ptr<SharedStorageHeaderObserver> shared_storage_header_observer_;
+
+  std::unique_ptr<PrivateAggregationManagerImpl> private_aggregation_manager_;
+
+  std::unique_ptr<ResourceCacheManager> resource_cache_manager_;
+
+  std::unique_ptr<CookieDeprecationLabelManagerImpl>
+      cookie_deprecation_label_manager_;
 
   // ReceiverSet for DomStorage, using the
   // ChildProcessSecurityPolicyImpl::Handle as the binding context type. The
@@ -740,6 +777,11 @@ class CONTENT_EXPORT StoragePartitionImpl
   // about Trust Token accesses made by a service worker in this process.
   mojo::UniqueReceiverSet<network::mojom::TrustTokenAccessObserver>
       service_worker_trust_token_observers_;
+
+  // A set of connections to the network service used to notify browser process
+  // about shared dictionary accesses made by a service worker in this process.
+  mojo::UniqueReceiverSet<network::mojom::SharedDictionaryAccessObserver>
+      service_worker_shared_dictionary_observers_;
 
   mojo::ReceiverSet<network::mojom::URLLoaderNetworkServiceObserver,
                     URLLoaderNetworkContext>

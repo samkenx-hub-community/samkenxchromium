@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "ash/display/cursor_window_controller.h"
+#include "base/memory/raw_ptr.h"
 
 #include <utility>
 
@@ -23,7 +24,6 @@
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/cursor/cursor.h"
 #include "ui/base/cursor/mojom/cursor_type.mojom-shared.h"
-#include "ui/base/layout.h"
 #include "ui/base/resource/mock_resource_bundle_delegate.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/base/resource/resource_scale_factor.h"
@@ -104,7 +104,8 @@ class CursorWindowControllerTest : public AshTestBase {
 
  private:
   // Not owned.
-  CursorWindowController* cursor_window_controller_;
+  raw_ptr<CursorWindowController, DanglingUntriaged | ExperimentalAsh>
+      cursor_window_controller_;
 };
 
 // Test that the composited cursor moves to another display when the real cursor
@@ -267,8 +268,7 @@ TEST_F(CursorWindowControllerTest, ScaleUsesCorrectAssets) {
 // Test different properties of the composited cursor with different device
 // scale factors and zoom levels.
 TEST_F(CursorWindowControllerTest, DSF) {
-  auto* const cursor_shape_client = aura::client::GetCursorShapeClient();
-  DCHECK(cursor_shape_client);
+  const auto& cursor_shape_client = aura::client::GetCursorShapeClient();
 
   auto cursor_test = [&](ui::Cursor cursor, float size, float cursor_scale) {
     const float dsf =
@@ -278,7 +278,7 @@ TEST_F(CursorWindowControllerTest, DSF) {
 
     cursor_window_controller()->SetCursor(cursor);
     const absl::optional<ui::CursorData> cursor_data =
-        cursor_shape_client->GetCursorData(cursor);
+        cursor_shape_client.GetCursorData(cursor);
     DCHECK(cursor_data);
 
     // Software cursors look blurry if they are resized by the window they are
@@ -299,10 +299,10 @@ TEST_F(CursorWindowControllerTest, DSF) {
     EXPECT_EQ(GetCursorImage().size(), kCursorSize);
 
     // TODO(hferreiro): the cursor hotspot for non-custom cursors cannot be
-    // checked, since the software cursor uses `ImageSkia::MapToResourceScale`,
-    // and `CursorLoader::GetCursorData` uses
-    // `ui::GetSupportedResourceScaleFactor`, and 2x cursor hotspots are not
-    // just twice the 1x hotspots.
+    // checked, since the software cursor uses
+    // `ui::GetSupportedResourceScaleFactorForRescale`, and
+    // `CursorLoader::GetCursorData` uses `ui::GetSupportedResourceScaleFactor`,
+    // and 2x cursor hotspots are not just twice the 1x hotspots.
     if (cursor.type() == CursorType::kCustom) {
       const gfx::Point kHotspot = gfx::ToFlooredPoint(
           gfx::ConvertPointToDips(cursor_data->hotspot, cursor_scale));

@@ -23,20 +23,8 @@ ExternalTextureCache::ExternalTextureCache(GPUDevice* device)
     : device_(device) {}
 
 GPUExternalTexture* ExternalTextureCache::Import(
-    ExecutionContext* execution_context,
     const GPUExternalTextureDescriptor* descriptor,
     ExceptionState& exception_state) {
-  // Gate VideoFrame importExternalTexture on the WebGPUWebCodecs OT.
-  if (descriptor->source()->GetContentType() ==
-          V8UnionHTMLVideoElementOrVideoFrame::ContentType::kVideoFrame &&
-      !RuntimeEnabledFeatures::WebGPUWebCodecsEnabled(execution_context)) {
-    exception_state.ThrowTypeError(
-        "VideoFrame isn't supported for importExternalTexture. This feature "
-        "requires the WebGPUWebCodecs origin trial or "
-        "--enable-webgpu-developer-features");
-    return nullptr;
-  }
-
   // Ensure the GPUExternalTexture created from a destroyed GPUDevice will be
   // expired immediately.
   if (device()->destroyed()) {
@@ -47,13 +35,28 @@ GPUExternalTexture* ExternalTextureCache::Import(
   switch (descriptor->source()->GetContentType()) {
     case V8UnionHTMLVideoElementOrVideoFrame::ContentType::kHTMLVideoElement: {
       HTMLVideoElement* video = descriptor->source()->GetAsHTMLVideoElement();
-
       auto cache = from_html_video_element_.find(video);
       if (cache != from_html_video_element_.end()) {
         external_texture = cache->value;
+
+        // If we got a cache miss, or `ContinueCheckingCurrentVideoFrame`
+        // returned false, make a new external texture.
+        // `ContinueCheckingCurrentVideoFrame` returns false if the frame has
+        // expired and it no longer needs to be checked for expiry.
+        if (external_texture->NeedsToUpdate()) {
+          external_texture = GPUExternalTexture::FromHTMLVideoElement(
+              this, video, descriptor, exception_state);
+        }
       } else {
         external_texture = GPUExternalTexture::FromHTMLVideoElement(
             this, video, descriptor, exception_state);
+      }
+
+      // GPUExternalTexture imported from HTMLVideoElement should be expired
+      // at the end of task.
+      if (external_texture) {
+        external_texture->Refresh();
+        ExpireAtEndOfTask(external_texture);
       }
       break;
     }
@@ -73,11 +76,6 @@ GPUExternalTexture* ExternalTextureCache::Import(
       NOTREACHED();
   }
 
-  if (external_texture) {
-    external_texture->Refresh();
-    ExpireAtEndOfTask(external_texture);
-  }
-
   return external_texture;
 }
 
@@ -95,7 +93,7 @@ void ExternalTextureCache::Destroy() {
   // GPUExternalTexture in expire list should be in from_html_video_element_ and
   // from_video_frame_. It has been destroyed when clean up the cache. Clear
   // list here is enough.
-  expire_list_.clear();
+  expire_set_.clear();
 }
 
 void ExternalTextureCache::Add(HTMLVideoElement* video,
@@ -119,7 +117,7 @@ void ExternalTextureCache::Remove(VideoFrame* frame) {
 void ExternalTextureCache::Trace(Visitor* visitor) const {
   visitor->Trace(from_html_video_element_);
   visitor->Trace(from_video_frame_);
-  visitor->Trace(expire_list_);
+  visitor->Trace(expire_set_);
   visitor->Trace(device_);
 }
 
@@ -129,8 +127,8 @@ GPUDevice* ExternalTextureCache::device() const {
 
 void ExternalTextureCache::ExpireAtEndOfTask(
     GPUExternalTexture* external_texture) {
-  DCHECK(external_texture);
-  expire_list_.push_back(external_texture);
+  CHECK(external_texture);
+  expire_set_.insert(external_texture);
 
   if (expire_task_scheduled_) {
     return;
@@ -152,7 +150,7 @@ void ExternalTextureCache::ExpireTask() {
 
   expire_task_scheduled_ = false;
 
-  auto external_textures = std::move(expire_list_);
+  auto external_textures = std::move(expire_set_);
   for (auto& external_texture : external_textures) {
     external_texture->Expire();
   }
@@ -166,7 +164,7 @@ GPUExternalTexture* GPUExternalTexture::CreateImpl(
     media::PaintCanvasVideoRenderer* video_renderer,
     absl::optional<media::VideoFrame::ID> media_video_frame_unique_id,
     ExceptionState& exception_state) {
-  DCHECK(media_video_frame);
+  CHECK(media_video_frame);
 
   // TODO(crbug.com/1330250): Support additional color spaces for external
   // textures.
@@ -265,6 +263,13 @@ GPUExternalTexture* GPUExternalTexture::FromHTMLVideoElement(
   if (!source.valid)
     return nullptr;
 
+  // Ensure that video playback remains unaffected by preventing any
+  // throttling when the video is not visible on the screen.
+  DCHECK(video);
+  if (auto* wmp = video->GetWebMediaPlayer()) {
+    wmp->RequestVideoFrameCallback();
+  }
+
   GPUExternalTexture* external_texture = GPUExternalTexture::CreateImpl(
       cache, webgpu_desc, source.media_video_frame, source.video_renderer,
       source.media_video_frame_unique_id, exception_state);
@@ -275,7 +280,7 @@ GPUExternalTexture* GPUExternalTexture::FromHTMLVideoElement(
   // active list. Listen to HTMLVideoElement and insert the texture into active
   // list for management.
   if (external_texture) {
-    external_texture->ListenToHTMLVideoElement(video);
+    external_texture->SetVideo(video);
     cache->Add(video, external_texture);
   }
 
@@ -302,14 +307,11 @@ GPUExternalTexture* GPUExternalTexture::FromVideoFrame(
   // from active list. Listen to the VideoFrame and insert the texture into
   // active list for management.
   if (external_texture) {
-    external_texture->ListenToVideoFrame(frame);
-
-    // VideoFrame maybe closed when GPUExternalTexture trying to listen to.
-    // In that case GPUExternalTexture is not active and GPUDevice
-    // doesn't need to manage it.
-    if (external_texture->active()) {
-      cache->Add(frame, external_texture);
+    if (!external_texture->ListenToVideoFrame(frame)) {
+      return nullptr;
     }
+
+    cache->Add(frame, external_texture);
   }
 
   return external_texture;
@@ -326,6 +328,9 @@ GPUExternalTexture::GPUExternalTexture(
       is_zero_copy_(is_zero_copy),
       media_video_frame_unique_id_(media_video_frame_unique_id),
       cache_(cache) {
+  task_runner_ =
+      device()->GetExecutionContext()->GetTaskRunner(TaskType::kWebGPU);
+
   // Mark GPUExternalTexture without back resources as destroyed because no need
   // to do real resource releasing.
   if (!mailbox_texture_)
@@ -333,7 +338,7 @@ GPUExternalTexture::GPUExternalTexture(
 }
 
 void GPUExternalTexture::Refresh() {
-  DCHECK(status_ != Status::Destroyed);
+  CHECK(status_ != Status::Destroyed);
 
   GetProcs().externalTextureRefresh(GetHandle());
   status_ = Status::Active;
@@ -356,41 +361,26 @@ void GPUExternalTexture::Destroy() {
   mailbox_texture_.reset();
 }
 
-void GPUExternalTexture::ListenToHTMLVideoElement(HTMLVideoElement* video) {
-  DCHECK(video);
-  video->GetDocument()
-      .GetScriptedAnimationController()
-      .WebGPURegisterVideoFrameStateCallback(WTF::BindRepeating(
-          &GPUExternalTexture::ContinueCheckingCurrentVideoFrame,
-          WrapPersistent(this)));
-
+void GPUExternalTexture::SetVideo(HTMLVideoElement* video) {
+  CHECK(video);
   video_ = video;
-  task_runner_ =
-      device()->GetExecutionContext()->GetTaskRunner(TaskType::kWebGPU);
-
-  status_ = Status::Active;
 }
 
-bool GPUExternalTexture::ContinueCheckingCurrentVideoFrame() {
-  DCHECK(video_);
-  DCHECK(media_video_frame_unique_id_.has_value());
+bool GPUExternalTexture::NeedsToUpdate() {
+  CHECK(media_video_frame_unique_id_.has_value());
+  CHECK(video_);
 
-  if (destroyed())
-    return false;
-
-  WebMediaPlayer* media_player = video_->GetWebMediaPlayer();
-
-  // HTMLVideoElement transition from having a WMP to not having one.
-  if (!media_player) {
-    OnSourceInvalidated();
+  if (IsCurrentFrameFromHTMLVideoElementValid()) {
     return false;
   }
 
-  // VideoFrame unique id is unique in the same process. Compare the unique id
-  // with current video frame from compositor to detect a new presented
-  // video frame and expire the GPUExternalTexture.
-  if (media_video_frame_unique_id_ != media_player->CurrentFrameId()) {
-    OnSourceInvalidated();
+  // Schedule source invalid task to remove GPUExternalTexture
+  // from cache.
+  OnSourceInvalidated();
+
+  // If GPUExternalTexture is used in current task scope, don't do
+  // reimport until current task scope finished.
+  if (active()) {
     return false;
   }
 
@@ -404,9 +394,30 @@ void GPUExternalTexture::Trace(Visitor* visitor) const {
   DawnObject<WGPUExternalTexture>::Trace(visitor);
 }
 
+bool GPUExternalTexture::IsCurrentFrameFromHTMLVideoElementValid() {
+  CHECK(video_);
+  CHECK(media_video_frame_unique_id_.has_value());
+
+  WebMediaPlayer* media_player = video_->GetWebMediaPlayer();
+
+  // HTMLVideoElement transition from having a WMP to not having one.
+  if (!media_player) {
+    return false;
+  }
+
+  // VideoFrame unique id is unique in the same process. Compare the unique id
+  // with current video frame from compositor to detect a new presented
+  // video frame and expire the GPUExternalTexture.
+  if (media_video_frame_unique_id_ != media_player->CurrentFrameId()) {
+    return false;
+  }
+
+  return true;
+}
+
 void GPUExternalTexture::OnSourceInvalidated() {
-  DCHECK(task_runner_);
-  DCHECK(task_runner_->BelongsToCurrentThread());
+  CHECK(task_runner_);
+  CHECK(task_runner_->BelongsToCurrentThread());
 
   // OnSourceInvalidated is called for both VideoFrame and HTMLVE.
   // VideoFrames are invalidated with and explicit close() call that
@@ -415,16 +426,12 @@ void GPUExternalTexture::OnSourceInvalidated() {
   // that imported the ExternalTexture. In that case defer the invalidation
   // until the end of the task to preserve the semantic of ExternalTexture.
   if (status_ == Status::Active && video_) {
-    if (task_runner_->BelongsToCurrentThread()) {
+    if (!remove_from_cache_task_scheduled_) {
       task_runner_->PostTask(FROM_HERE,
                              WTF::BindOnce(&GPUExternalTexture::RemoveFromCache,
                                            WrapWeakPersistent(this)));
-    } else {
-      task_runner_->PostTask(FROM_HERE,
-                             ConvertToBaseOnceCallback(CrossThreadBindOnce(
-                                 &GPUExternalTexture::RemoveFromCache,
-                                 WrapCrossThreadWeakPersistent(this))));
     }
+    remove_from_cache_task_scheduled_ = true;
   } else {
     RemoveFromCache();
   }
@@ -440,24 +447,20 @@ void GPUExternalTexture::RemoveFromCache() {
   Destroy();
 }
 
-void GPUExternalTexture::ListenToVideoFrame(VideoFrame* frame) {
-  bool success = frame->handle()->WebGPURegisterExternalTextureExpireCallback(
-      CrossThreadBindOnce(&GPUExternalTexture::OnVideoFrameClosed,
-                          WrapCrossThreadWeakPersistent(this)));
-  if (!success) {
-    Destroy();
-    return;
+bool GPUExternalTexture::ListenToVideoFrame(VideoFrame* frame) {
+  if (!frame->handle()->WebGPURegisterExternalTextureExpireCallback(
+          CrossThreadBindOnce(&GPUExternalTexture::OnVideoFrameClosed,
+                              WrapCrossThreadWeakPersistent(this)))) {
+    OnSourceInvalidated();
+    return false;
   }
 
   frame_ = frame;
-  task_runner_ =
-      device()->GetExecutionContext()->GetTaskRunner(TaskType::kWebGPU);
-
-  status_ = Status::Active;
+  return true;
 }
 
 void GPUExternalTexture::OnVideoFrameClosed() {
-  DCHECK(task_runner_);
+  CHECK(task_runner_);
 
   if (destroyed())
     return;
@@ -466,7 +469,7 @@ void GPUExternalTexture::OnVideoFrameClosed() {
   // being used again (because WebGPU runs on the main thread). Expiring the
   // texture later in ExpireExternalTextureFromVideoFrame() could occur on a
   // worker thread and cause a race condition.
-  status_ = Status::Expired;
+  Expire();
 
   if (task_runner_->BelongsToCurrentThread()) {
     OnSourceInvalidated();

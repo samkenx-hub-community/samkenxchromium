@@ -99,7 +99,6 @@ base::Value::Dict CreateEmptyPrinterInfo() {
   printer_info.Set("printerPPDPath", "");
   printer_info.Set("printerProtocol", "ipp");
   printer_info.Set("printerQueue", "");
-  printer_info.Set("printerStatus", "");
   return printer_info;
 }
 

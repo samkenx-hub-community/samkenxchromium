@@ -7,6 +7,7 @@
 
 #include "ash/ash_export.h"
 #include "ash/system/tray/actionable_view.h"
+#include "base/memory/raw_ptr.h"
 #include "google_apis/calendar/calendar_api_response_types.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "url/gurl.h"
@@ -21,11 +22,13 @@ class RoundedCornersF;
 
 namespace ash {
 
-// Label ID's.
+// View ID's.
 constexpr int kSummaryLabelID = 100;
 constexpr int kTimeLabelID = 101;
 constexpr int kEventListItemDotID = 102;
 constexpr int kJoinButtonID = 103;
+constexpr int kEventListMultiDayEventsContainer = 104;
+constexpr int kEventListSameDayEventsContainer = 105;
 
 class CalendarViewController;
 
@@ -38,6 +41,9 @@ struct SelectedDateParams {
 struct UIParams {
   bool round_top_corners = false;
   bool round_bottom_corners = false;
+  // If this view is for `CalendarUpNextView`. `CalendarUpNextView` event list
+  // item has a different focus ring rounded corner radius.
+  bool is_up_next_event_list_item = false;
   // Show the calendar indicator dots which show the event colors. If
   // false this piece of UI is not added to the view hierarchy.
   bool show_event_list_dot = false;
@@ -87,7 +93,8 @@ class ASH_EXPORT CalendarEventListItemViewJelly : public ActionableView {
   friend class CalendarViewEventListViewTest;
 
   // Unowned.
-  CalendarViewController* const calendar_view_controller_;
+  const raw_ptr<CalendarViewController, DanglingUntriaged | ExperimentalAsh>
+      calendar_view_controller_;
 
   const SelectedDateParams selected_date_params_;
 

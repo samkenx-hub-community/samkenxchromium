@@ -115,8 +115,9 @@ void AiaRequest::GetNext(ParsedCertificateList* out_certs) {
     auto req = std::move(cert_fetcher_requests_[current_request_++]);
     req->WaitForResult(&error, &bytes);
 
-    if (AddCompletedFetchToResults(error, std::move(bytes), out_certs))
+    if (AddCompletedFetchToResults(error, std::move(bytes), out_certs)) {
       return;
+    }
   }
 }
 
@@ -177,7 +178,7 @@ void CertIssuerSourceAia::AsyncGetIssuersOf(const ParsedCertificate* cert,
 
   std::vector<GURL> urls;
   for (const auto& uri : cert->ca_issuers_uris()) {
-    GURL url(base::StringPiece(uri.data(), uri.size()));
+    GURL url(uri);
     if (url.is_valid()) {
       // TODO(mattm): do the kMaxFetchesPerCert check only on the number of
       // supported URL schemes, not all the URLs.

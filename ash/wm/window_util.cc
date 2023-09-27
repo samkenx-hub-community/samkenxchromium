@@ -8,6 +8,7 @@
 #include <tuple>
 
 #include "ash/constants/app_types.h"
+#include "ash/constants/ash_pref_names.h"
 #include "ash/multi_user/multi_user_window_manager_impl.h"
 #include "ash/public/cpp/app_types_util.h"
 #include "ash/public/cpp/shell_window_ids.h"
@@ -24,18 +25,22 @@
 #include "ash/wm/mru_window_tracker.h"
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/overview/overview_session.h"
+#include "ash/wm/snap_group/snap_group.h"
 #include "ash/wm/snap_group/snap_group_controller.h"
 #include "ash/wm/splitview/split_view_controller.h"
+#include "ash/wm/splitview/split_view_overview_session.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/window_positioning_utils.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/wm_event.h"
+#include "base/containers/adapters.h"
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/ranges/algorithm.h"
 #include "chromeos/ui/base/chromeos_ui_constants.h"
 #include "chromeos/ui/frame/interior_resize_handler_targeter.h"
 #include "chromeos/ui/wm/features.h"
+#include "components/prefs/pref_service.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/client/capture_client.h"
 #include "ui/aura/client/focus_client.h"
@@ -44,6 +49,7 @@
 #include "ui/aura/window_event_dispatcher.h"
 #include "ui/aura/window_targeter.h"
 #include "ui/base/hit_test.h"
+#include "ui/base/ui_base_types.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_tree_owner.h"
@@ -51,7 +57,6 @@
 #include "ui/display/screen.h"
 #include "ui/events/event.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform_util.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
@@ -60,8 +65,7 @@
 #include "ui/wm/core/window_animations.h"
 #include "ui/wm/public/activation_client.h"
 
-namespace ash {
-namespace window_util {
+namespace ash::window_util {
 namespace {
 
 // This window targeter reserves space for the portion of the resize handles
@@ -87,6 +91,76 @@ class InteriorResizeHandleTargeterAsh
   }
 };
 
+// Returns true if `window` has any descendant that is a system modal window or
+// is itself a system modal window.
+bool ContainsSystemModalWindow(const aura::Window* window) {
+  if (!window) {
+    return false;
+  }
+
+  if (window->GetProperty(aura::client::kModalKey) ==
+      ui::ModalType::MODAL_TYPE_SYSTEM) {
+    return true;
+  }
+
+  for (const auto* child : window->children()) {
+    if (ContainsSystemModalWindow(child)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Returns the lowest common parent of the given `windows` by traversing up from
+// one of the windows' direct parent and check if the intermediate parent
+// contains all the `windows`. If yes, it will be the lowest common parent.
+aura::Window* FindLowestCommonParent(const aura::Window::Windows& windows) {
+  if (windows.empty()) {
+    return nullptr;
+  }
+
+  auto contains_all = [&](aura::Window* parent) {
+    for (aura::Window* window : windows) {
+      if (!parent->Contains(window)) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  // As a window can `Contains` itself, which is not the common parent, we start
+  // traversing from its parent instead.
+  for (aura::Window* parent = windows.front()->parent(); parent;
+       parent = parent->parent()) {
+    if (contains_all(parent)) {
+      return parent;
+    }
+  }
+
+  return nullptr;
+}
+
+// Uses DFS to find the topmost child of the `parent` that is included in
+// `windows`. With the reverse traversing of the children, the first observed
+// window found will be the topmost one.
+aura::Window* FindTopMostChild(aura::Window* parent,
+                               const aura::Window::Windows& windows) {
+  for (aura::Window* child : base::Reversed(parent->children())) {
+    for (aura::Window* window : windows) {
+      if (child == window) {
+        return window;
+      }
+      if (child->Contains(window)) {
+        return FindTopMostChild(child, windows);
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 }  // namespace
 
 aura::Window* GetActiveWindow() {
@@ -102,6 +176,25 @@ aura::Window* GetFocusedWindow() {
       ->GetFocusedWindow();
 }
 
+bool IsStackedBelow(aura::Window* win1, aura::Window* win2) {
+  CHECK_NE(win1, win2);
+  CHECK_EQ(win1->parent(), win2->parent());
+
+  const auto& children = win1->parent()->children();
+  auto win1_iter = base::ranges::find(children, win1);
+  auto win2_iter = base::ranges::find(children, win2);
+  CHECK(win1_iter != children.end());
+  CHECK(win2_iter != children.end());
+  return win1_iter < win2_iter;
+}
+
+aura::Window* GetTopMostWindow(const aura::Window::Windows& windows) {
+  aura::Window* lowest_common_parent = FindLowestCommonParent(windows);
+  CHECK(lowest_common_parent);
+
+  return FindTopMostChild(lowest_common_parent, windows);
+}
+
 aura::Window* GetCaptureWindow() {
   return aura::client::GetCaptureWindow(Shell::GetPrimaryRootWindow());
 }
@@ -114,6 +207,11 @@ void GetBlockingContainersForRoot(aura::Window* root_window,
         root_window->GetChildById(kShellWindowId_LockScreenContainersContainer);
     *system_modal_container =
         root_window->GetChildById(kShellWindowId_LockSystemModalContainer);
+  } else if (aura::Window* const help_bubble_container =
+                 root_window->GetChildById(kShellWindowId_HelpBubbleContainer);
+             ContainsSystemModalWindow(help_bubble_container)) {
+    *min_container = help_bubble_container;
+    *system_modal_container = nullptr;
   } else {
     *min_container = nullptr;
     *system_modal_container =
@@ -238,20 +336,40 @@ bool ShouldExcludeForOverview(const aura::Window* window) {
   // snap position is the position where the window was first snapped. See
   // `default_snap_position_` in SplitViewController for more details.
   auto* split_view_controller =
-      SplitViewController::Get(Shell::GetPrimaryRootWindow());
+      SplitViewController::Get(window->GetRootWindow());
 
-  auto* snap_group_controller = Shell::Get()->snap_group_controller();
-  const bool should_exclude_in_clamshell =
-      snap_group_controller &&
-      snap_group_controller->IsArm1AutomaticallyLockEnabled();
-  if ((split_view_controller->InTabletSplitViewMode() ||
-       should_exclude_in_clamshell) &&
-      window == split_view_controller->GetDefaultSnappedWindow()) {
+  // A window should be excluded from being shown in overview when:
+  // 1. In tablet split view mode on one window snapped;
+  // 2. During split view overview session in clamshell mode,
+  // 3. If the window is not the mru window in snap group i.e. the corresponding
+  // overview item representation for the snap group has been created.
+  auto should_exclude_in_clamshell = [&]() -> bool {
+    if (auto* snap_group_controller = SnapGroupController::Get()) {
+      if (auto* split_view_overview_session =
+              RootWindowController::ForWindow(window)
+                  ->split_view_overview_session();
+          snap_group_controller->IsArm1AutomaticallyLockEnabled() &&
+          split_view_overview_session &&
+          split_view_overview_session->window() == window) {
+        return true;
+      }
+
+      if (SnapGroup* snap_group =
+              snap_group_controller->GetSnapGroupForGivenWindow(window)) {
+        return window != snap_group->GetTopMostWindowInGroup();
+      }
+    }
+
+    return false;
+  };
+
+  if (ShouldExcludeForCycleList(window)) {
     return true;
   }
 
-  // Remove everything cycle list should not have.
-  return ShouldExcludeForCycleList(window);
+  return Shell::Get()->tablet_mode_controller()->InTabletMode()
+             ? (window == split_view_controller->GetDefaultSnappedWindow())
+             : should_exclude_in_clamshell();
 }
 
 void EnsureTransientRoots(std::vector<aura::Window*>* out_window_list) {
@@ -513,5 +631,30 @@ aura::Window* GetEventHandlerForEvent(const ui::LocatedEvent& event) {
   return root_window_at_point->GetEventHandlerForPoint(location_in_root);
 }
 
-}  // namespace window_util
-}  // namespace ash
+bool IsNaturalScrollOn() {
+  PrefService* pref =
+      Shell::Get()->session_controller()->GetActivePrefService();
+  return pref->GetBoolean(prefs::kTouchpadEnabled) &&
+         pref->GetBoolean(prefs::kNaturalScroll);
+}
+
+bool ShouldRoundThumbnailWindow(views::View* backdrop_view,
+                                const gfx::RectF& thumbnail_bounds_in_screen) {
+  // If the backdrop is not created or not visible, round the thumbnail.
+  if (!backdrop_view || !backdrop_view->GetVisible()) {
+    return true;
+  }
+
+  CHECK(backdrop_view->layer());
+  // Get the bounds of the backdrop as a rounded rect object. This will allow us
+  // to use `gfx::RRectF::Contains` to check if `thumbnail_bounds_in_screen` is
+  // inside the rounding. For example, if the x,y,w,h all match and the rounding
+  // is non-zero, this will return false as the thumbnails corners will be
+  // considered out of bounds.
+  const gfx::RRectF backdrop_bounds_in_screen(
+      gfx::RRectF(gfx::RectF(backdrop_view->GetBoundsInScreen()),
+                  backdrop_view->layer()->rounded_corner_radii()));
+  return !backdrop_bounds_in_screen.Contains(thumbnail_bounds_in_screen);
+}
+
+}  // namespace ash::window_util

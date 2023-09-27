@@ -24,6 +24,7 @@
 #include "ui/gl/gl_bindings.h"
 #include "ui/gl/gl_context_egl.h"
 #include "ui/gl/gl_display_egl_util.h"
+#include "ui/gl/gl_features.h"
 #include "ui/gl/gl_implementation.h"
 #include "ui/gl/gl_surface.h"
 
@@ -142,6 +143,21 @@ using ui::GetLastEGLErrorString;
 namespace gl {
 
 namespace {
+
+void AdjustAngleFeaturesFromChromeFeatures(
+    std::vector<std::string>& enabled_angle_features,
+    std::vector<std::string>& disabled_angle_features) {
+#if BUILDFLAG(IS_MAC)
+  if (base::FeatureList::IsEnabled(features::kWriteMetalShaderCacheToDisk)) {
+    disabled_angle_features.push_back("enableParallelMtlLibraryCompilation");
+    enabled_angle_features.push_back("compileMetalShaders");
+    enabled_angle_features.push_back("disableProgramCaching");
+  }
+  if (base::FeatureList::IsEnabled(features::kUseBuiltInMetalShaderCache)) {
+    enabled_angle_features.push_back("loadMetalShadersFromBlobCache");
+  }
+#endif
+}
 
 std::vector<const char*> GetAttribArrayFromStringVector(
     const std::vector<std::string>& strings) {
@@ -575,12 +591,17 @@ void GLDisplayEGL::EGLGpuSwitchingObserver::OnGpuSwitched(
   eglHandleGPUSwitchANGLE(display_);
 }
 
+// Because on Apple platforms there is a member variable of a type (ObjCStorage)
+// that is defined in gl_display_egl.mm, the constructor/destructor also have to
+// be there. If making changes to this copy, be sure to adjust the other.
+#if !BUILDFLAG(IS_APPLE)
 GLDisplayEGL::GLDisplayEGL(uint64_t system_device_id, DisplayKey display_key)
-    : GLDisplay(system_device_id, display_key, EGL), display_(EGL_NO_DISPLAY) {
+    : GLDisplay(system_device_id, display_key, EGL) {
   ext = std::make_unique<DisplayExtensionsEGL>();
 }
 
 GLDisplayEGL::~GLDisplayEGL() = default;
+#endif
 
 EGLDisplay GLDisplayEGL::GetDisplay() const {
   return display_;
@@ -729,6 +750,9 @@ bool GLDisplayEGL::InitializeDisplay(bool supports_angle,
   std::vector<std::string> disabled_angle_features =
       GetStringVectorFromCommandLine(command_line,
                                      switches::kDisableANGLEFeatures);
+
+  AdjustAngleFeaturesFromChromeFeatures(enabled_angle_features,
+                                        disabled_angle_features);
 
   bool disable_all_angle_features =
       command_line->HasSwitch(switches::kDisableGpuDriverBugWorkarounds);

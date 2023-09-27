@@ -27,11 +27,6 @@ class MESSAGE_CENTER_EXPORT NotificationView : public NotificationViewBase {
   NotificationView& operator=(const NotificationView&) = delete;
   ~NotificationView() override;
 
-  // NotificationViewBase:
-  // TODO(crbug/1262372): Move this to private once CaptureModeNotificationView
-  // does not depend on this class.
-  void Layout() override;
-
   SkColor GetActionButtonColorForTesting(views::LabelButton* action_button);
 
  private:
@@ -45,6 +40,8 @@ class MESSAGE_CENTER_EXPORT NotificationView : public NotificationViewBase {
   void CreateOrUpdateSmallIconView(const Notification& notification) override;
   void CreateOrUpdateInlineSettingsViews(
       const Notification& notification) override;
+  void CreateOrUpdateSnoozeSettingsViews(
+      const Notification& notification) override;
   std::unique_ptr<views::LabelButton> GenerateNotificationLabelButton(
       views::Button::PressedCallback callback,
       const std::u16string& label) override;
@@ -54,10 +51,12 @@ class MESSAGE_CENTER_EXPORT NotificationView : public NotificationViewBase {
   void OnThemeChanged() override;
   void UpdateCornerRadius(int top_radius, int bottom_radius) override;
   void ToggleInlineSettings(const ui::Event& event) override;
+  void ToggleSnoozeSettings(const ui::Event& event) override;
   bool IsExpandable() const override;
   void AddLayerToRegion(ui::Layer* layer, views::LayerRegion region) override;
   void RemoveLayerFromRegions(ui::Layer* layer) override;
   void PreferredSizeChanged() override;
+  void Layout() override;
 
   void UpdateHeaderViewBackgroundColor();
   SkColor GetNotificationHeaderViewBackgroundColor() const;
@@ -76,7 +75,7 @@ class MESSAGE_CENTER_EXPORT NotificationView : public NotificationViewBase {
   void HeaderRowPressed();
 
   // Notification title, which is dynamically created inside view hierarchy.
-  raw_ptr<views::Label> title_view_ = nullptr;
+  raw_ptr<views::Label, DanglingUntriaged> title_view_ = nullptr;
 
   // Views for inline settings.
   raw_ptr<views::RadioButton> block_all_button_ = nullptr;

@@ -17,22 +17,18 @@
 #import "components/bookmarks/browser/bookmark_model.h"
 #import "components/bookmarks/browser/url_and_title.h"
 #import "components/sessions/core/tab_restore_service.h"
-#import "ios/chrome/browser/bookmarks/local_or_syncable_bookmark_model_factory.h"
-#import "ios/chrome/browser/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/main/browser.h"
-#import "ios/chrome/browser/main/browser_list.h"
-#import "ios/chrome/browser/main/browser_list_factory.h"
+#import "ios/chrome/browser/bookmarks/model/local_or_syncable_bookmark_model_factory.h"
 #import "ios/chrome/browser/sessions/ios_chrome_tab_restore_service_factory.h"
-#import "ios/chrome/browser/url/url_util.h"
-#import "ios/chrome/browser/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser/browser_list.h"
+#import "ios/chrome/browser/shared/model/browser/browser_list_factory.h"
+#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/url/url_util.h"
+#import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ios/web/public/thread/web_thread.h"
 #import "ios/web/public/web_state.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -263,9 +259,7 @@ NSSet* ExternalFileRemoverImpl::GetReferencedExternalFiles() {
     return referenced_external_files;
 
   // Add files from Bookmarks.
-  std::vector<bookmarks::UrlAndTitle> bookmarks;
-  bookmark_model->GetBookmarks(&bookmarks);
-  for (const auto& bookmark : bookmarks) {
+  for (const auto& bookmark : bookmark_model->GetUniqueUrls()) {
     GURL bookmark_url = bookmark.url;
     if (UrlIsExternalFileReference(bookmark_url)) {
       [referenced_external_files

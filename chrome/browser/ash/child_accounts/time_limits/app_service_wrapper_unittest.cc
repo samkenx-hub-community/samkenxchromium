@@ -17,6 +17,7 @@
 #include "base/containers/flat_map.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
@@ -159,7 +160,7 @@ class AppServiceWrapperTest : public ::testing::Test {
 
     if (app_id.app_type() == apps::AppType::kWeb) {
       DCHECK(url.has_value());
-      const web_app::AppId installed_app_id = web_app::test::InstallDummyWebApp(
+      const webapps::AppId installed_app_id = web_app::test::InstallDummyWebApp(
           &profile_, app_name, GURL(url.value()),
           webapps::WebappInstallSource::EXTERNAL_DEFAULT);
       EXPECT_EQ(installed_app_id, app_id.app_id());
@@ -178,16 +179,13 @@ class AppServiceWrapperTest : public ::testing::Test {
 
     if (app_id.app_type() == apps::AppType::kWeb) {
       base::RunLoop run_loop;
-      WebAppProvider::GetForTest(&profile_)
-          ->install_finalizer()
-          .UninstallExternalWebApp(
-              app_id.app_id(), web_app::WebAppManagement::kDefault,
-              webapps::WebappUninstallSource::kExternalPreinstalled,
-              base::BindLambdaForTesting(
-                  [&](webapps::UninstallResultCode code) {
-                    EXPECT_EQ(code, webapps::UninstallResultCode::kSuccess);
-                    run_loop.Quit();
-                  }));
+      WebAppProvider::GetForTest(&profile_)->scheduler().RemoveInstallSource(
+          app_id.app_id(), web_app::WebAppManagement::kDefault,
+          webapps::WebappUninstallSource::kExternalPreinstalled,
+          base::BindLambdaForTesting([&](webapps::UninstallResultCode code) {
+            EXPECT_EQ(code, webapps::UninstallResultCode::kSuccess);
+            run_loop.Quit();
+          }));
       run_loop.Run();
       task_environment_.RunUntilIdle();
       return;
@@ -244,7 +242,8 @@ class AppServiceWrapperTest : public ::testing::Test {
   apps::AppServiceTest app_service_test_;
   ArcAppTest arc_test_;
 
-  extensions::ExtensionService* extension_service_ = nullptr;
+  raw_ptr<extensions::ExtensionService, ExperimentalAsh> extension_service_ =
+      nullptr;
 
   AppServiceWrapper tested_wrapper_{&profile_};
   MockListener test_listener_;

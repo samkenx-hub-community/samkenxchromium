@@ -12,6 +12,7 @@
 #include "base/gtest_prod_util.h"
 #include "base/sequence_checker.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/unguessable_token.h"
 #include "chrome/browser/media/mirroring_service_host.h"
 #include "chrome/browser/media/offscreen_tab.h"
 #include "components/mirroring/mojom/mirroring_service.mojom.h"
@@ -20,17 +21,15 @@
 #include "content/public/browser/media_stream_request.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "extensions/buildflags/buildflags.h"
+#include "media/capture/mojom/video_capture.mojom.h"
 #include "media/mojo/mojom/audio_stream_factory.mojom.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "ui/gfx/geometry/size.h"
-
-namespace base {
-class UnguessableToken;
-}
 
 namespace content {
 class BrowserContext;
@@ -89,6 +88,9 @@ class CastMirroringServiceHost final : public MirroringServiceHost,
   void BindGpu(mojo::PendingReceiver<viz::mojom::Gpu> receiver) override;
   void GetVideoCaptureHost(
       mojo::PendingReceiver<media::mojom::VideoCaptureHost> receiver) override;
+  void GetVideoEncoderMetricsProvider(
+      mojo::PendingReceiver<media::mojom::VideoEncoderMetricsProvider> receiver)
+      override;
   void GetNetworkContext(
       mojo::PendingReceiver<network::mojom::NetworkContext> receiver) override;
   void CreateAudioStream(
@@ -134,6 +136,23 @@ class CastMirroringServiceHost final : public MirroringServiceHost,
                         const GURL& presentation_url,
                         const std::string& presentation_id);
 
+  // Sets the current session's video_capture_client_.
+  void SetVideoCaptureHost(
+      mojo::SelfOwnedReceiverRef<media::mojom::VideoCaptureHost>);
+
+  // Send request to current video capture host to pause the stream, if
+  // active. media::mojom::VideoCaptureHost implementations `device_id` is
+  // ignored since there will be only one device and one client.
+  // `on_paused_callback` is invoked once the playback has paused.
+  void Pause(base::OnceClosure on_paused_callback) override;
+
+  // Send request to current video capture host to resume the stream, if
+  // paused. media::mojom::VideoCaptureHost implementations
+  // `device_id` and `session_id` are ignored since there will be only one
+  // device and one client. `on_resumed_callback` is invoked once the playback
+  // has been resumed.
+  void Resume(base::OnceClosure on_resumed_callback) override;
+
   // Describes the media source for this mirroring session.
   content::DesktopMediaID source_media_id_;
 
@@ -152,15 +171,13 @@ class CastMirroringServiceHost final : public MirroringServiceHost,
   mojo::Remote<media::mojom::AudioStreamFactory> audio_stream_factory_;
 
   // Used to mute local audio from the WebContents being mirrored (in the tab
-  // mirrorng case). See the comments in the implementation of
+  // mirroring case). See the comments in the implementation of
   // CreateAudioStream() for further explanation.
   mojo::AssociatedRemote<media::mojom::LocalMuter> web_contents_audio_muter_;
 
   // The lifetime of the capture indicator icon on the tabstrip is tied to that
   // of |media_stream_ui_|.
   std::unique_ptr<content::MediaStreamUI> media_stream_ui_;
-
-  std::unique_ptr<OffscreenTab> offscreen_tab_;
 
   const bool tab_switching_ui_enabled_;
 
@@ -172,6 +189,18 @@ class CastMirroringServiceHost final : public MirroringServiceHost,
   std::u16string sink_name_;
 
   SEQUENCE_CHECKER(sequence_checker_);
+
+  // Used to pause and resume the current mirroring session.
+  mojo::SelfOwnedReceiverRef<media::mojom::VideoCaptureHost>
+      video_capture_host_;
+  base::UnguessableToken ignored_token_ = base::UnguessableToken::Create();
+  const media::VideoCaptureParams ignored_params_;
+
+  // Notes on order: `offscreen_tab_` needs to be defined after
+  // `video_capture_host_`. This guarantees that during class destruction
+  // `video_capture_host_` gets destroyed before the captured WebContents (i.e
+  // `offscreen_tab_`).
+  std::unique_ptr<OffscreenTab> offscreen_tab_;
 
   // Used for calls supplied to `media_stream_ui_`, mainly to handle callbacks
   // for TabSharingUIViews. Invalidated every time a new UI is created.

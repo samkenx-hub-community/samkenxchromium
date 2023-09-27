@@ -11,6 +11,7 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
+#include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_parser.h"
@@ -25,8 +26,10 @@
 #include "chrome/browser/ash/file_manager/file_manager_test_util.h"
 #include "chrome/browser/ash/file_manager/file_tasks.h"
 #include "chrome/browser/ash/file_manager/fileapi_util.h"
+#include "chrome/browser/ash/file_manager/office_file_tasks.h"
 #include "chrome/browser/ash/file_manager/open_util.h"
 #include "chrome/browser/ash/file_manager/path_util.h"
+#include "chrome/browser/ash/file_manager/url_util.h"
 #include "chrome/browser/ash/file_system_provider/fake_extension_provider.h"
 #include "chrome/browser/ash/file_system_provider/service.h"
 #include "chrome/browser/ash/system_web_apps/system_web_app_manager.h"
@@ -34,21 +37,25 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_dialog.h"
+#include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_util.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/web_app_id_constants.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_sync_bridge.h"
 #include "chrome/common/chrome_paths.h"
+#include "chrome/common/extensions/extension_constants.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/in_process_browser_test.h"
+#include "chrome/test/base/ui_test_utils.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_navigation_observer.h"
 #include "extensions/common/constants.h"
+#include "storage/browser/file_system/external_mount_points.h"
 #include "ui/gfx/native_widget_types.h"
 
 namespace ash::cloud_upload {
@@ -62,6 +69,8 @@ const char kDocMimeType[] = "application/msword";
 const char kDocxFileExtension[] = ".docx";
 const char kDocxMimeType[] =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const char kPptFileExtension[] = ".ppt";
+const char kPptMimeType[] = "application/vnd.ms-powerpoint";
 const char kPptxFileExtension[] = ".pptx";
 const char kPptxMimeType[] =
     "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -85,7 +94,7 @@ void CreateFakeWebApps(
   for (int i = 0; i < n; ++i) {
     std::string start_url =
         "https://www.example" + base::NumberToString(i) + ".com";
-    auto web_app_info = std::make_unique<WebAppInstallInfo>();
+    auto web_app_info = std::make_unique<web_app::WebAppInstallInfo>();
     web_app_info->start_url = GURL(start_url);
     web_app_info->scope = GURL(start_url);
     apps::FileHandler handler;
@@ -140,16 +149,6 @@ content::WebContents* GetWebContentsFromCloudUploadDialog() {
   return web_contents;
 }
 
-// Fill in the placeholder from `script_with_placeholder` with the JS command
-// to retrieve the HTML `element`. Return the resulting JS script.
-std::string ScriptFillPlaceholder(const char script_with_placeholder[],
-                                  std::string element) {
-  const char element_with_placeholder[] = "document.querySelectorAll('%s')[0]";
-  std::string element_script =
-      base::StringPrintf(element_with_placeholder, element.c_str());
-  return base::StringPrintf(script_with_placeholder, element_script.c_str());
-}
-
 // Set email (using a domain from |kNonManagedDomainPatterns|) to login a
 // non-managed user. Intended to be used in the override of |SetUpCommandLine|
 // from |InProcessBrowserTest| to ensure
@@ -158,6 +157,20 @@ std::string ScriptFillPlaceholder(const char script_with_placeholder[],
 void SetUpCommandLineForNonManagedUser(base::CommandLine* command_line) {
   command_line->AppendSwitchASCII(switches::kLoginUser, "testuser@gmail.com");
   command_line->AppendSwitchASCII(switches::kLoginProfile, "user");
+}
+
+// A matcher to verify that absl::optional<TaskDescriptor> corresponds to a Web
+// Drive Office Task.
+auto IsWebDriveOfficeTask() {
+  return testing::Optional(testing::ResultOf(
+      &file_manager::file_tasks::IsWebDriveOfficeTask, testing::Eq(true)));
+}
+
+// A matcher to verify that absl::optional<TaskDescriptor> corresponds to an
+// Open in Office Task.
+auto IsOpenInOfficeTask() {
+  return testing::Optional(testing::ResultOf(
+      &file_manager::file_tasks::IsOpenInOfficeTask, testing::Eq(true)));
 }
 
 }  // namespace
@@ -169,7 +182,8 @@ void SetUpCommandLineForNonManagedUser(base::CommandLine* command_line) {
 class FileHandlerDialogBrowserTest : public InProcessBrowserTest {
  public:
   FileHandlerDialogBrowserTest() {
-    feature_list_.InitAndEnableFeature(features::kUploadOfficeToCloud);
+    feature_list_.InitAndEnableFeature(
+        chromeos::features::kUploadOfficeToCloud);
   }
 
   FileHandlerDialogBrowserTest(const FileHandlerDialogBrowserTest&) = delete;
@@ -191,8 +205,8 @@ class FileHandlerDialogBrowserTest : public InProcessBrowserTest {
   // Create test office files and store in `files_` and create `num_tasks_` fake
   // web apps for all office file types.
   void SetUpTasksAndFiles() {
-    // Create `n` fake web apps for office files with the Doc extension and
-    // store the created `urls_` and `tasks_`.
+    // Create `num_tasks_` fake web apps for office files with the Doc extension
+    // and store the created `urls_` and `tasks_`.
     CreateFakeWebApps(
         profile(), &urls_, &tasks_,
         {kDocxFileExtension, kPptxFileExtension, kXlsxFileExtension},
@@ -290,9 +304,11 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest,
             run_loop.Quit();
           }));
   run_loop.Run();
+  Browser* first_files_app = ui_test_utils::WaitForBrowserToOpen();
 
   browser = FindSystemWebAppBrowser(profile(), SystemWebAppType::FILE_MANAGER);
   ASSERT_NE(nullptr, browser);
+  ASSERT_EQ(first_files_app, browser);
 
   // Watch for File Handler dialog URL chrome://cloud-upload.
   content::TestNavigationObserver navigation_observer_dialog(
@@ -302,16 +318,15 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest,
   // Launch File Handler dialog.
   ASSERT_TRUE(CloudOpenTask::Execute(profile(), files_,
                                      CloudProvider::kGoogleDrive, nullptr));
+  // Check that a new browser opened.
+  Browser* new_browser = ui_test_utils::WaitForBrowserToOpen();
+  ASSERT_NE(new_browser, first_files_app);
+  ASSERT_TRUE(
+      IsBrowserForSystemWebApp(new_browser, SystemWebAppType::FILE_MANAGER));
 
   // Wait for File Handler dialog to open at chrome://cloud-upload.
   navigation_observer_dialog.Wait();
   ASSERT_TRUE(navigation_observer_dialog.last_navigation_succeeded());
-
-  // Check that a new Files app window opened.
-  Browser* new_browser =
-      FindSystemWebAppBrowser(profile(), SystemWebAppType::FILE_MANAGER);
-  ASSERT_NE(nullptr, new_browser);
-  ASSERT_NE(browser, new_browser);
 }
 
 // Tests that a new Files app window is not created when there is a Files app
@@ -324,6 +339,8 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest, ModalParentProvided) {
   ASSERT_EQ(nullptr, browser);
 
   // Open a files app window.
+  ui_test_utils::BrowserChangeObserver browser_added_observer(
+      nullptr, ui_test_utils::BrowserChangeObserver::ChangeType::kAdded);
   base::RunLoop run_loop;
   file_manager::util::ShowItemInFolder(
       profile(), files_.at(0).path(),
@@ -334,6 +351,7 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest, ModalParentProvided) {
             run_loop.Quit();
           }));
   run_loop.Run();
+  browser_added_observer.Wait();
 
   browser = FindSystemWebAppBrowser(profile(), SystemWebAppType::FILE_MANAGER);
   ASSERT_NE(nullptr, browser);
@@ -370,10 +388,10 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest, OpenFileTaskFromDialog) {
       (GURL(chrome::kChromeUICloudUploadURL)));
   navigation_observer_dialog.StartWatchingNewWebContents();
 
-  // Check that the Setup flow has never run and so the File
-  // Handler dialog will be launched when CloudOpenTask::Execute() is
-  // called.
-  ASSERT_FALSE(file_manager::file_tasks::OfficeSetupComplete(profile()));
+  // Check that the Setup flow has never run and so the File Handler dialog will
+  // be launched when CloudOpenTask::Execute() is called.
+  ASSERT_FALSE(file_manager::file_tasks::HasExplicitDefaultFileHandler(
+      profile(), ".docx"));
 
   // Launch File Handler dialog.
   ASSERT_TRUE(CloudOpenTask::Execute(profile(), files_,
@@ -390,34 +408,26 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest, OpenFileTaskFromDialog) {
   // Get the `tasks` member from the `FileHandlerPageElement` which are all of
   // the observed local file tasks.
   bool dialog_init_complete = false;
-  base::internal::JSONParser parser(base::JSON_PARSE_RFC);
-  absl::optional<base::Value> value;
-  std::string result;
+  base::Value::List observed_app_ids;
   while (!dialog_init_complete) {
     // It is possible that the `FileHandlerPageElement` element still hasn't
-    // been initiated yet. It is completed when the `tasks` member is non-empty.
-    if (!content::ExecuteScriptAndExtractString(
-            web_contents,
-            base::StringPrintf(
-                "domAutomationController.send(%s)",
-                ScriptFillPlaceholder(
-                    "JSON.stringify(%s.tasks.map(task => task.appId))",
-                    "file-handler-page")
-                    .c_str()),
-            &result)) {
+    // been initiated yet. It is completed when the `localTasks` member is
+    // non-empty.
+    content::EvalJsResult eval_result =
+        content::EvalJs(web_contents,
+                        "document.querySelector('file-handler-page')"
+                        ".localTasks.map(task => task.appId)");
+    if (!eval_result.error.empty()) {
       continue;
     }
-    value = parser.Parse(result);
-    ASSERT_TRUE(value->is_list());
-    dialog_init_complete = !(value->GetList().empty());
+    observed_app_ids = eval_result.ExtractList().TakeList();
+    dialog_init_complete = !observed_app_ids.empty();
   }
 
-  base::Value::List& observed_app_ids = value->GetList();
-// Check QuickOffice was not observed by the dialog.
+// Check QuickOffice was observed by the dialog as it should always be shown.
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  ASSERT_TRUE(file_manager::file_tasks::IsExtensionInstalled(
-      profile(), extension_misc::kQuickOfficeComponentExtensionId));
-  ASSERT_LT(PositionInList(observed_app_ids,
+  ASSERT_TRUE(file_manager::file_tasks::IsQuickOfficeInstalled(profile()));
+  ASSERT_GE(PositionInList(observed_app_ids,
                            extension_misc::kQuickOfficeComponentExtensionId),
             0);
 #endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
@@ -426,7 +436,7 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest, OpenFileTaskFromDialog) {
   // task to be opened. Use this to find the `selected_task_position` and to
   // watch for the appropriate url in `urls_` to open.
   size_t selected_task = 1;
-  // Position of the selected task in dialog's tasks array - this is not
+  // Position of the selected task in dialog's localTasks array - this is not
   // necessarily the same as the `tasks_` vector. Its position is its id
   // so use this to click the task's button.
   size_t selected_task_position;
@@ -447,58 +457,196 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest, OpenFileTaskFromDialog) {
   navigation_observer_task.StartWatchingNewWebContents();
 
   // Check that there is not a default task for doc files.
-  file_manager::file_tasks::TaskDescriptor default_task;
   ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-      *profile()->GetPrefs(), kDocxMimeType, kDocxFileExtension,
-      &default_task));
+      *profile()->GetPrefs(), kDocxMimeType, kDocxFileExtension));
 
   // Check that there is not a default task for pptx files.
   ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-      *profile()->GetPrefs(), kPptxMimeType, kPptxFileExtension,
-      &default_task));
+      *profile()->GetPrefs(), kPptxMimeType, kPptxFileExtension));
 
   // Expand local tasks accordion.
-  std::string expand_local_tasks = "%s.$('#accordion').click()";
   EXPECT_TRUE(content::ExecJs(
       web_contents,
-      ScriptFillPlaceholder(expand_local_tasks.c_str(), "file-handler-page")));
+      "document.querySelector('file-handler-page').$('#accordion').click()"));
 
   // Click the selected task.
-  std::string rename_task_id =
-      "%s.$('#id" + base::NumberToString(selected_task_position) + "').click()";
+  std::string position_string = base::NumberToString(selected_task_position);
   EXPECT_TRUE(content::ExecJs(
-      web_contents,
-      ScriptFillPlaceholder(rename_task_id.c_str(), "file-handler-page")));
+      web_contents, "document.querySelector('file-handler-page').$('#id" +
+                        position_string + "').click()"));
 
   // Click the open button.
-  EXPECT_TRUE(content::ExecJs(
-      web_contents, ScriptFillPlaceholder("%s.$('.action-button').click()",
-                                          "file-handler-page")));
+  EXPECT_TRUE(content::ExecJs(web_contents,
+                              "document.querySelector('file-handler-page')"
+                              ".$('.action-button').click()"));
 
   // Wait for selected task to open.
   navigation_observer_task.Wait();
 
   // Check that the Setup flow has been marked complete.
-  ASSERT_TRUE(file_manager::file_tasks::OfficeSetupComplete(profile()));
+  ASSERT_TRUE(file_manager::file_tasks::HasExplicitDefaultFileHandler(profile(),
+                                                                      ".docx"));
 
   // Check that the selected task has been made the default for doc files.
-  ASSERT_TRUE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-      *profile()->GetPrefs(), kDocxMimeType, kDocxFileExtension,
-      &default_task));
-  ASSERT_EQ(tasks_[selected_task], default_task);
+  ASSERT_EQ(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                *profile()->GetPrefs(), kDocxMimeType, kDocxFileExtension),
+            tasks_[selected_task]);
 
   // Check that the selected task has been made the default for pptx files.
-  ASSERT_TRUE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-      *profile()->GetPrefs(), kPptxMimeType, kPptxFileExtension,
-      &default_task));
-  ASSERT_EQ(tasks_[selected_task], default_task);
+  ASSERT_EQ(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                *profile()->GetPrefs(), kPptxMimeType, kPptxFileExtension),
+            tasks_[selected_task]);
 
   // Check that the selected task has not been made the default for xlsx files
   // because there was not an xlsx file selected by the user, even though the
   // task supports xlsx files.
   ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-      *profile()->GetPrefs(), kXlsxMimeType, kXlsxFileExtension,
-      &default_task));
+      *profile()->GetPrefs(), kXlsxMimeType, kXlsxFileExtension));
+}
+
+IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest, DefaultSetForDocsOnly) {
+  // Watch for File Handler dialog URL chrome://cloud-upload.
+  content::TestNavigationObserver navigation_observer_dialog(
+      (GURL(chrome::kChromeUICloudUploadURL)));
+  navigation_observer_dialog.StartWatchingNewWebContents();
+
+  // Check that the Setup flow has never run and so the File
+  // Handler dialog will be launched when CloudOpenTask::Execute() is
+  // called.
+  ASSERT_FALSE(file_manager::file_tasks::HasExplicitDefaultFileHandler(
+      profile(), ".docx"));
+
+  // Launch File Handler dialog.
+  ASSERT_TRUE(CloudOpenTask::Execute(profile(), files_,
+                                     CloudProvider::kGoogleDrive, nullptr));
+
+  // Wait for File Handler dialog to open at chrome://cloud-upload.
+  navigation_observer_dialog.Wait();
+  ASSERT_TRUE(navigation_observer_dialog.last_navigation_succeeded());
+
+  // Get the web contents of the dialog to be able to query
+  // `FileHandlerPageElement`.
+  content::WebContents* web_contents = GetWebContentsFromCloudUploadDialog();
+
+  // Wait for local tasks to be filled in, which indicates the dialog is ready.
+  bool dialog_init_complete = false;
+  base::Value::List observed_app_ids;
+  while (!dialog_init_complete) {
+    // It is possible that the `FileHandlerPageElement` element still hasn't
+    // been initiated yet. It is completed when the `localTasks` member is
+    // non-empty.
+    content::EvalJsResult eval_result =
+        content::EvalJs(web_contents,
+                        "document.querySelector('file-handler-page')"
+                        ".localTasks.map(task => task.appId)");
+    if (!eval_result.error.empty()) {
+      continue;
+    }
+    observed_app_ids = eval_result.ExtractList().TakeList();
+    dialog_init_complete = !observed_app_ids.empty();
+  }
+
+  // Check that there is not a default task for doc/x files.
+  ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+      *profile()->GetPrefs(), kDocMimeType, kDocFileExtension));
+  ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+      *profile()->GetPrefs(), kDocxMimeType, kDocxFileExtension));
+
+  // Check that there is not a default task for ppt/x files.
+  ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+      *profile()->GetPrefs(), kPptMimeType, kPptFileExtension));
+  ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+      *profile()->GetPrefs(), kPptxMimeType, kPptxFileExtension));
+
+  // Click the Docs task.
+  EXPECT_TRUE(content::ExecJs(
+      web_contents,
+      "document.querySelector('file-handler-page').$('#drive').click()"));
+
+  content::TestNavigationObserver navigation_observer_move_page(
+      (GURL(chrome::kChromeUICloudUploadURL)));
+  navigation_observer_move_page.StartWatchingNewWebContents();
+
+  // Click the open button.
+  EXPECT_TRUE(content::ExecJs(web_contents,
+                              "document.querySelector('file-handler-page')"
+                              ".$('.action-button').click()"));
+
+  // Wait for the move confirmation dialog to open, so we know that the File
+  // Handler dialog closed.
+  navigation_observer_move_page.Wait();
+  ASSERT_TRUE(navigation_observer_move_page.last_navigation_succeeded());
+
+  // Check that the Setup flow has been marked complete.
+  ASSERT_TRUE(file_manager::file_tasks::HasExplicitDefaultFileHandler(profile(),
+                                                                      ".docx"));
+
+  // Check that the Docs/Slides task has been made the default for doc/x and
+  // ppt/x files, but the Sheets task has not been made default for xlsx files,
+  // because there was not an xlsx file selected by the user.
+  ASSERT_THAT(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                  *profile()->GetPrefs(), kDocMimeType, kDocFileExtension),
+              IsWebDriveOfficeTask());
+  ASSERT_THAT(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                  *profile()->GetPrefs(), kDocxMimeType, kDocxFileExtension),
+              IsWebDriveOfficeTask());
+  ASSERT_THAT(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                  *profile()->GetPrefs(), kPptMimeType, kPptFileExtension),
+              IsWebDriveOfficeTask());
+  ASSERT_THAT(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                  *profile()->GetPrefs(), kPptxMimeType, kPptxFileExtension),
+              IsWebDriveOfficeTask());
+
+  ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+      *profile()->GetPrefs(), kXlsxMimeType, kXlsxFileExtension));
+}
+
+// Helper to launch Files app and return its NativeWindow.
+gfx::NativeWindow LaunchFilesAppAndWait(Profile* profile) {
+  GURL files_swa_url = file_manager::util::GetFileManagerMainPageUrlWithParams(
+      ui::SelectFileDialog::SELECT_NONE, /*title=*/std::u16string(),
+      /*current_directory_url=*/{},
+      /*selection_url=*/GURL(),
+      /*target_name=*/{}, /*file_types=*/{},
+      /*file_type_index=*/0,
+      /*search_query=*/{},
+      /*show_android_picker_apps=*/false,
+      /*volume_filter=*/{});
+  ash::SystemAppLaunchParams params;
+  params.url = files_swa_url;
+  ash::LaunchSystemWebAppAsync(profile, ash::SystemWebAppType::FILE_MANAGER,
+                               params);
+  Browser* files_app = ui_test_utils::WaitForBrowserToOpen();
+  return files_app->window()->GetNativeWindow();
+}
+
+IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest,
+                       ShowConnectOneDriveDialog_OpensAndClosesDialog) {
+  // Watch for the Connect OneDrive dialog URL chrome://cloud-upload.
+  content::TestNavigationObserver navigation_observer_dialog(
+      (GURL(chrome::kChromeUICloudUploadURL)));
+  navigation_observer_dialog.StartWatchingNewWebContents();
+
+  // Launch the Connect OneDrive dialog.
+  gfx::NativeWindow modal_parent = LaunchFilesAppAndWait(browser()->profile());
+  ASSERT_TRUE(ShowConnectOneDriveDialog(modal_parent));
+
+  // Wait for the Connect OneDrive dialog to open at chrome://cloud-upload.
+  navigation_observer_dialog.Wait();
+  ASSERT_TRUE(navigation_observer_dialog.last_navigation_succeeded());
+
+  // Check that we have the right dialog page (Connect OneDrive).
+  content::WebContents* web_contents = GetWebContentsFromCloudUploadDialog();
+  content::EvalJsResult eval_result = content::EvalJs(
+      web_contents, "!!document.querySelector('connect-onedrive')");
+  ASSERT_TRUE(eval_result.ExtractBool());
+
+  // Click the close button and wait for the dialog to close.
+  content::WebContentsDestroyedWatcher watcher(web_contents);
+  EXPECT_TRUE(content::ExecJs(web_contents,
+                              "document.querySelector('connect-onedrive')"
+                              ".$('.cancel-button').click()"));
+  watcher.Wait();
 }
 
 // Tests that OnDialogComplete() opens the specified fake file task.
@@ -524,10 +672,9 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest,
     navigation_observer_task.Wait();
 
     // Check that the selected task has been made the default.
-    ASSERT_TRUE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-        *profile()->GetPrefs(), kPptxMimeType, kPptxFileExtension,
-        &default_task));
-    ASSERT_EQ(tasks_[selected_task], default_task);
+    ASSERT_EQ(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                  *profile()->GetPrefs(), kPptxMimeType, kPptxFileExtension),
+              tasks_[selected_task]);
   }
 }
 
@@ -552,7 +699,8 @@ IN_PROC_BROWSER_TEST_F(FileHandlerDialogBrowserTest, OnDialogCompleteNoCrash) {
 class FixUpFlowBrowserTest : public InProcessBrowserTest {
  public:
   FixUpFlowBrowserTest() {
-    feature_list_.InitAndEnableFeature(features::kUploadOfficeToCloud);
+    feature_list_.InitAndEnableFeature(
+        chromeos::features::kUploadOfficeToCloud);
   }
 
   FixUpFlowBrowserTest(const FixUpFlowBrowserTest&) = delete;
@@ -560,21 +708,26 @@ class FixUpFlowBrowserTest : public InProcessBrowserTest {
 
   Profile* profile() { return browser()->profile(); }
 
+  void SetUpOnMainThread() override {
+    // Needed to check that Files app was launched as the dialog's modal parent.
+    ash::SystemWebAppManager::GetForTest(browser()->profile())
+        ->InstallSystemAppsForTesting();
+  }
+
   // Add a doc test file.
   void SetUpFiles() {
     base::FilePath file =
         file_manager::util::GetMyFilesFolderForProfile(profile()).AppendASCII(
             "foo.doc");
-    GURL url;
-    CHECK(file_manager::util::ConvertAbsoluteFilePathToFileSystemUrl(
-        profile(), file, file_manager::util::GetFileManagerURL(), &url));
-    files_.push_back(storage::FileSystemURL::CreateForTest(url));
+    files_.push_back(FilePathToFileSystemURL(
+        profile(),
+        file_manager::util::GetFileManagerFileSystemContext(profile()), file));
   }
 
   void AddFakeODFS() {
     auto fake_provider =
         ash::file_system_provider::FakeExtensionProvider::Create(
-            file_manager::file_tasks::kODFSExtensionId);
+            extension_misc::kODFSExtensionId);
     const auto kProviderId = fake_provider->GetId();
     auto* service = file_system_provider::Service::Get(profile());
     service->RegisterProvider(std::move(fake_provider));
@@ -602,12 +755,15 @@ class FixUpFlowBrowserTest : public InProcessBrowserTest {
   base::test::ScopedFeatureList feature_list_;
 };
 
+using file_manager::file_tasks::kActionIdWebDriveOfficeWord;
+using file_manager::file_tasks::SetWordFileHandlerToFilesSWA;
+
 // Tests that the Fixup flow is entered when OneDrive is selected as the cloud
 // provider but ODFS is not mounted and the Setup flow has already completed.
 // Checks that the ODFS Sign In Page is reachable.
 IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest, FixUpFlowWhenODFSNotMounted) {
-  // Set Setup flow as complete.
-  file_manager::file_tasks::SetOfficeSetupComplete(profile(), true);
+  // Simulate prefs where the setup flow has already run.
+  SetWordFileHandlerToFilesSWA(profile(), kActionIdWebDriveOfficeWord);
 
   SetUpFiles();
   AddFakeOfficePWA();
@@ -620,7 +776,10 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest, FixUpFlowWhenODFSNotMounted) {
       (GURL(chrome::kChromeUICloudUploadURL)));
   navigation_observer_dialog.StartWatchingNewWebContents();
 
-  CloudOpenTask::Execute(profile(), files_, CloudProvider::kOneDrive, nullptr);
+  gfx::NativeWindow modal_parent = LaunchFilesAppAndWait(browser()->profile());
+
+  CloudOpenTask::Execute(profile(), files_, CloudProvider::kOneDrive,
+                         modal_parent);
 
   // Wait for Welcome Page to open at chrome://cloud-upload.
   navigation_observer_dialog.Wait();
@@ -631,16 +790,15 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest, FixUpFlowWhenODFSNotMounted) {
   // Click through the Welcome Page.
   while (!content::ExecJs(
       web_contents,
-      ScriptFillPlaceholder(
-          "%s.$('welcome-page').querySelector('.action-button').click()",
-          "cloud-upload"))) {
+      "document.querySelector('cloud-upload').$('welcome-page')"
+      ".querySelector('.action-button').click()")) {
   }
 
   // Wait for the ODFS Sign In Page.
   while (!content::ExecJs(
-      web_contents, ScriptFillPlaceholder(
-                        "%s.$('sign-in-page').querySelector('.action-button')",
-                        "cloud-upload"))) {
+      web_contents,
+      "document.querySelector('cloud-upload').$('sign-in-page')"
+      ".querySelector('.action-button')")) {
   }
 }
 
@@ -649,8 +807,8 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest, FixUpFlowWhenODFSNotMounted) {
 // completed. Checks that the Office PWA Install Page is reachable.
 IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest,
                        FixUpFlowWhenOfficePWANotInstalled) {
-  // Set Setup flow as complete.
-  file_manager::file_tasks::SetOfficeSetupComplete(profile(), true);
+  // Simulate prefs where the setup flow has already run.
+  SetWordFileHandlerToFilesSWA(profile(), kActionIdWebDriveOfficeWord);
 
   SetUpFiles();
   AddFakeODFS();
@@ -663,7 +821,10 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest,
       (GURL(chrome::kChromeUICloudUploadURL)));
   navigation_observer_dialog.StartWatchingNewWebContents();
 
-  CloudOpenTask::Execute(profile(), files_, CloudProvider::kOneDrive, nullptr);
+  gfx::NativeWindow modal_parent = LaunchFilesAppAndWait(browser()->profile());
+
+  CloudOpenTask::Execute(profile(), files_, CloudProvider::kOneDrive,
+                         modal_parent);
 
   // Wait for Welcome Page to open at chrome://cloud-upload.
   navigation_observer_dialog.Wait();
@@ -674,18 +835,16 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest,
   // Click through the Welcome Page.
   while (!content::ExecJs(
       web_contents,
-      ScriptFillPlaceholder(
-          "%s.$('welcome-page').querySelector('.action-button').click()",
-          "cloud-upload"))) {
+      "document.querySelector('cloud-upload').$('welcome-page')"
+      ".querySelector('.action-button').click()")) {
   }
 
   // Wait for the Office PWA Install Page, this script will fail until the page
   // exists.
   while (!content::ExecJs(
       web_contents,
-      ScriptFillPlaceholder(
-          "%s.$('office-pwa-install-page').querySelector('.action-button')",
-          "cloud-upload"))) {
+      "document.querySelector('cloud-upload').$('office-pwa-install-page')"
+      ".querySelector('.action-button')")) {
   }
 }
 
@@ -713,8 +872,7 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest, ShouldFixUpOfficeODFSAndPWA) {
 // point changes the default task set when the Setup has not been run before.
 IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest,
                        OneDriveSetUpChangesDefaultTaskWhenSetUpIncomplete) {
-  // Set Setup flow as incomplete.
-  file_manager::file_tasks::SetOfficeSetupComplete(profile(), false);
+  // Simulate Setup flow incomplete - prefs are empty to begin with.
 
   // Add a doc test file.
   SetUpFiles();
@@ -735,10 +893,11 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest,
       (GURL(chrome::kChromeUICloudUploadURL)));
   navigation_observer_dialog.StartWatchingNewWebContents();
 
-  // Check that there is not a default task for doc files.
-  file_manager::file_tasks::TaskDescriptor default_task;
+  // Check that there is not a default task for doc or xlsx files.
   ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-      *profile()->GetPrefs(), kDocMimeType, kDocFileExtension, &default_task));
+      *profile()->GetPrefs(), kDocMimeType, kDocFileExtension));
+  ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+      *profile()->GetPrefs(), kXlsxMimeType, kXlsxFileExtension));
 
   // Open the Welcome Page for the OneDrive set up part of the Setup flow. This
   // will lead to the Office PWA being set as the default task.
@@ -753,33 +912,34 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest,
   // Click through the Welcome Page.
   while (!content::ExecJs(
       web_contents,
-      ScriptFillPlaceholder(
-          "%s.$('welcome-page').querySelector('.action-button').click()",
-          "cloud-upload"))) {
+      "document.querySelector('cloud-upload').$('welcome-page')"
+      ".querySelector('.action-button').click()")) {
   }
 
   // Click through the Upload Page.
   while (!content::ExecJs(
       web_contents,
-      ScriptFillPlaceholder(
-          "%s.$('upload-page').querySelector('.action-button').click()",
-          "cloud-upload"))) {
+      "document.querySelector('cloud-upload').$('complete-page')"
+      ".querySelector('.action-button').click()")) {
   }
 
-  // Check that the Office PWA has been made the default for doc files.
-  ASSERT_TRUE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-      *profile()->GetPrefs(), kDocMimeType, kDocFileExtension, &default_task));
-  ASSERT_TRUE(IsOpenInOfficeTask(default_task));
+  // Check that the Office PWA has been made the default for doc and xlsx files.
+  ASSERT_THAT(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                  *profile()->GetPrefs(), kDocMimeType, kDocFileExtension),
+              IsOpenInOfficeTask());
+  ASSERT_THAT(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                  *profile()->GetPrefs(), kXlsxMimeType, kXlsxFileExtension),
+              IsOpenInOfficeTask());
 }
 
 // Test that entering and completing the Setup flow from the OneDrive Set Up
-// point does not change the default task set when the Setup has been run
-// before. This is to test that when the Fixup flow runs, the default task does
-// not change.
+// point does not change the default task set when there was already a default
+// handler before setup. This is to test that when the Fixup flow runs, the
+// default task does not change.
 IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest,
                        OneDriveSetUpDoesNotChangeDefaultTaskWhenSetUpComplete) {
-  // Set Setup flow as complete.
-  file_manager::file_tasks::SetOfficeSetupComplete(profile(), true);
+  // Simulate prefs where the setup flow has already run.
+  SetWordFileHandlerToFilesSWA(profile(), kActionIdWebDriveOfficeWord);
 
   // Add a doc test file.
   SetUpFiles();
@@ -806,14 +966,9 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest,
       (GURL(chrome::kChromeUICloudUploadURL)));
   navigation_observer_dialog.StartWatchingNewWebContents();
 
-  // Check that there is not a default task for doc files.
-  file_manager::file_tasks::TaskDescriptor default_task;
-  ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-      *profile()->GetPrefs(), kDocMimeType, kDocFileExtension, &default_task));
-
   // Open the Welcome Page for the OneDrive set up part of the Setup flow. This
-  // will not lead to the Office PWA being set as the default task because the
-  // Setup flow has already been completed.
+  // will not lead to the Office PWA being set as the default task because there
+  // was already a default before running setup.
   dialog->ShowSystemDialog();
 
   // Wait for Welcome Page to open at chrome://cloud-upload.
@@ -825,37 +980,123 @@ IN_PROC_BROWSER_TEST_F(FixUpFlowBrowserTest,
   // Click through the Welcome Page.
   while (!content::ExecJs(
       web_contents,
-      ScriptFillPlaceholder(
-          "%s.$('welcome-page').querySelector('.action-button').click()",
-          "cloud-upload"))) {
+      "document.querySelector('cloud-upload').$('welcome-page')"
+      ".querySelector('.action-button').click()")) {
   }
 
   // Click through the Upload Page.
   while (!content::ExecJs(
       web_contents,
-      ScriptFillPlaceholder(
-          "%s.$('upload-page').querySelector('.action-button').click()",
-          "cloud-upload"))) {
+      "document.querySelector('cloud-upload').$('complete-page')"
+      ".querySelector('.action-button').click()")) {
   }
 
-  // Check that there is still not a default task for doc files.
-  ASSERT_FALSE(file_manager::file_tasks::GetDefaultTaskFromPrefs(
-      *profile()->GetPrefs(), kDocMimeType, kDocFileExtension, &default_task));
+  // Check that the default task for doc files is still Drive, and not OneDrive,
+  // despite running fixup setup.
+  ASSERT_THAT(file_manager::file_tasks::GetDefaultTaskFromPrefs(
+                  *profile()->GetPrefs(), kDocMimeType, kDocFileExtension),
+              testing::Optional(testing::Field(
+                  &file_manager::file_tasks::TaskDescriptor::action_id,
+                  testing::EndsWith(kActionIdWebDriveOfficeWord))));
 }
 
-// Tests that the preference |kOfficeMoveConfirmationShown| is False before the
-// `kMoveConfirmationOneDrive` and `kMoveConfirmationGoogleDrive` dialogs and
-// True afterwards.
-class MoveConfirmationDialogBrowserTest : public InProcessBrowserTest {
+class CloudOpenTaskBrowserTest : public InProcessBrowserTest {
  public:
-  MoveConfirmationDialogBrowserTest() {
-    feature_list_.InitAndEnableFeature(features::kUploadOfficeToCloud);
+  CloudOpenTaskBrowserTest() {
+    EXPECT_TRUE(temp_dir_.CreateUniqueTempDir());
+    my_files_dir_ = temp_dir_.GetPath().Append("myfiles");
+    read_only_dir_ = temp_dir_.GetPath().Append("readonly");
+    smb_dir_ = temp_dir_.GetPath().Append("smb");
   }
 
-  MoveConfirmationDialogBrowserTest(const MoveConfirmationDialogBrowserTest&) =
-      delete;
-  MoveConfirmationDialogBrowserTest& operator=(
-      const MoveConfirmationDialogBrowserTest&) = delete;
+  CloudOpenTaskBrowserTest(const CloudOpenTaskBrowserTest&) = delete;
+  CloudOpenTaskBrowserTest& operator=(const CloudOpenTaskBrowserTest&) = delete;
+
+  void SetUpLocalToDriveTask() {
+    SetUpMyFiles();
+
+    source_files_.push_back(FilePathToFileSystemURL(
+        profile(),
+        file_manager::util::GetFileManagerFileSystemContext(profile()),
+        my_files_dir_.AppendASCII("file.docx")));
+
+    upload_task_ = base::WrapRefCounted(new ash::cloud_upload::CloudOpenTask(
+        profile(), source_files_,
+        ash::cloud_upload::CloudProvider::kGoogleDrive, nullptr));
+  }
+
+  void SetUpCloudToDriveTask() {
+    SetUpCloudLocation();
+
+    source_files_.push_back(FilePathToFileSystemURL(
+        profile(),
+        file_manager::util::GetFileManagerFileSystemContext(profile()),
+        smb_dir_.AppendASCII("file.docx")));
+
+    upload_task_ = base::WrapRefCounted(new ash::cloud_upload::CloudOpenTask(
+        profile(), source_files_,
+        ash::cloud_upload::CloudProvider::kGoogleDrive, nullptr));
+  }
+
+  void SetUpReadOnlyToDriveTask() {
+    SetUpReadOnlyLocation();
+
+    source_files_.push_back(FilePathToFileSystemURL(
+        profile(),
+        file_manager::util::GetFileManagerFileSystemContext(profile()),
+        read_only_dir_.AppendASCII("file.docx")));
+
+    upload_task_ = base::WrapRefCounted(new ash::cloud_upload::CloudOpenTask(
+        profile(), source_files_,
+        ash::cloud_upload::CloudProvider::kGoogleDrive, nullptr));
+  }
+
+  void SetUpLocalToOneDriveTask() {
+    SetUpMyFiles();
+
+    source_files_.push_back(FilePathToFileSystemURL(
+        profile(),
+        file_manager::util::GetFileManagerFileSystemContext(profile()),
+        my_files_dir_.AppendASCII("file.docx")));
+
+    upload_task_ = base::WrapRefCounted(new ash::cloud_upload::CloudOpenTask(
+        profile(), source_files_, ash::cloud_upload::CloudProvider::kOneDrive,
+        nullptr));
+  }
+
+  void SetUpCloudToOneDriveTask() {
+    SetUpCloudLocation();
+
+    source_files_.push_back(FilePathToFileSystemURL(
+        profile(),
+        file_manager::util::GetFileManagerFileSystemContext(profile()),
+        smb_dir_.AppendASCII("file.docx")));
+
+    upload_task_ = base::WrapRefCounted(new ash::cloud_upload::CloudOpenTask(
+        profile(), source_files_, ash::cloud_upload::CloudProvider::kOneDrive,
+        nullptr));
+  }
+
+  void SetUpReadOnlyToOneDriveTask() {
+    SetUpReadOnlyLocation();
+
+    source_files_.push_back(FilePathToFileSystemURL(
+        profile(),
+        file_manager::util::GetFileManagerFileSystemContext(profile()),
+        read_only_dir_.AppendASCII("file.docx")));
+
+    upload_task_ = base::WrapRefCounted(new ash::cloud_upload::CloudOpenTask(
+        profile(), source_files_, ash::cloud_upload::CloudProvider::kOneDrive,
+        nullptr));
+  }
+
+  bool ShouldShowConfirmationDialog() {
+    return upload_task_->ShouldShowConfirmationDialog();
+  }
+
+  void OnDialogComplete(const std::string& user_response) {
+    upload_task_->OnDialogComplete(user_response);
+  }
 
   Profile* profile() { return browser()->profile(); }
 
@@ -868,55 +1109,340 @@ class MoveConfirmationDialogBrowserTest : public InProcessBrowserTest {
   }
 
  private:
-  base::test::ScopedFeatureList feature_list_;
+  // Creates mount point for My files and registers local filesystem.
+  void SetUpMyFiles() {
+    {
+      base::ScopedAllowBlockingForTesting allow_blocking;
+      ASSERT_TRUE(base::CreateDirectory(my_files_dir_));
+    }
+    std::string mount_point_name =
+        file_manager::util::GetDownloadsMountPointName(profile());
+    storage::ExternalMountPoints::GetSystemInstance()->RevokeFileSystem(
+        mount_point_name);
+    CHECK(storage::ExternalMountPoints::GetSystemInstance()->RegisterFileSystem(
+        mount_point_name, storage::kFileSystemTypeLocal,
+        storage::FileSystemMountOption(), my_files_dir_));
+    file_manager::VolumeManager::Get(profile())
+        ->RegisterDownloadsDirectoryForTesting(my_files_dir_);
+  }
+
+  // Creates a new SMB filesystem, which we use in tests as an example of cloud
+  // location.
+  void SetUpCloudLocation() {
+    {
+      base::ScopedAllowBlockingForTesting allow_blocking;
+      ASSERT_TRUE(base::CreateDirectory(smb_dir_));
+    }
+    std::string mount_point_name = "smb";
+    storage::ExternalMountPoints::GetSystemInstance()->RevokeFileSystem(
+        mount_point_name);
+    EXPECT_TRUE(profile()->GetMountPoints()->RegisterFileSystem(
+        mount_point_name, storage::kFileSystemTypeLocal,
+        storage::FileSystemMountOption(), smb_dir_));
+    file_manager::VolumeManager::Get(profile())->AddVolumeForTesting(
+        smb_dir_, file_manager::VOLUME_TYPE_SMB, ash::DeviceType::kUnknown,
+        /*read_only=*/false);
+  }
+
+  // Creates a new filesystem which represents a read-only location, files
+  // cannot be moved from it.
+  void SetUpReadOnlyLocation() {
+    {
+      base::ScopedAllowBlockingForTesting allow_blocking;
+      ASSERT_TRUE(base::CreateDirectory(read_only_dir_));
+    }
+    std::string mount_point_name = "readonly";
+    storage::ExternalMountPoints::GetSystemInstance()->RevokeFileSystem(
+        mount_point_name);
+    EXPECT_TRUE(profile()->GetMountPoints()->RegisterFileSystem(
+        mount_point_name, storage::kFileSystemTypeLocal,
+        storage::FileSystemMountOption(), read_only_dir_));
+    file_manager::VolumeManager::Get(profile())->AddVolumeForTesting(
+        read_only_dir_, file_manager::VOLUME_TYPE_TESTING,
+        ash::DeviceType::kUnknown, /*read_only=*/true);
+  }
+
+  base::ScopedTempDir temp_dir_;
+  base::FilePath my_files_dir_;
+  base::FilePath read_only_dir_;
+  base::FilePath smb_dir_;
+  std::vector<storage::FileSystemURL> source_files_;
+  scoped_refptr<CloudOpenTask> upload_task_;
 };
 
-// Tests that the preference |kOfficeMoveConfirmationShown| is False before the
-// `kMoveConfirmationGoogleDrive` dialog and True afterwards.
-IN_PROC_BROWSER_TEST_F(MoveConfirmationDialogBrowserTest,
-                       MoveConfirmationGoogleDriveSetsPref) {
-  ASSERT_FALSE(
-      file_manager::file_tasks::OfficeMoveConfirmationShown(profile()));
-  {
-    base::RunLoop run_loop;
-    PrefChangeRegistrar change_observer;
-    change_observer.Init(profile()->GetPrefs());
-    change_observer.Add(prefs::kOfficeMoveConfirmationShown,
-                        run_loop.QuitClosure());
-    mojom::DialogArgsPtr args = mojom::DialogArgs::New();
-    args->dialog_page = mojom::DialogPage::kMoveConfirmationGoogleDrive;
-    CloudUploadDialog* dialog = new CloudUploadDialog(
-        std::move(args), base::DoNothing(),
-        mojom::DialogPage::kMoveConfirmationGoogleDrive, false);
-    dialog->ShowSystemDialog();
+// Tests that when moving files from a local location to Drive, the preferences
+// |kOfficeFilesAlwaysMoveToDrive| and
+// |kOfficeMoveConfirmationShownForLocalToDrive| control whether the
+// confirmation dialog is going to be shown or not.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       ShowConfirmationForLocalToDrive) {
+  SetUpLocalToDriveTask();
 
-    // Wait for preference change.
-    run_loop.Run();
-  }
+  // Check that if |kOfficeMoveConfirmationShownForLocalToDrive| is false, we
+  // always show the confirmation dialog, whether
+  // |kOfficeFilesAlwaysMoveToDrive| is true or false.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForLocalToDrive(
+      profile(), false);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), true);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+
+  // Check that if |kOfficeMoveConfirmationShownForLocalToDrive| is true, we
+  // only show the confirmation dialog depending on the value of
+  // |kOfficeFilesAlwaysMoveToDrive|.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForLocalToDrive(
+      profile(), true);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), true);
+  ASSERT_FALSE(ShouldShowConfirmationDialog());
 }
 
-// Tests that the preference |kOfficeMoveConfirmationShown| is False before the
-// `kMoveConfirmationOneDrive` dialog and True afterwards.
-IN_PROC_BROWSER_TEST_F(MoveConfirmationDialogBrowserTest,
-                       MoveConfirmationOneDriveSetsPref) {
-  ASSERT_FALSE(
-      file_manager::file_tasks::OfficeMoveConfirmationShown(profile()));
-  {
-    base::RunLoop run_loop;
-    PrefChangeRegistrar change_observer;
-    change_observer.Init(profile()->GetPrefs());
-    change_observer.Add(prefs::kOfficeMoveConfirmationShown,
-                        run_loop.QuitClosure());
-    mojom::DialogArgsPtr args = mojom::DialogArgs::New();
-    args->dialog_page = mojom::DialogPage::kMoveConfirmationOneDrive;
-    CloudUploadDialog* dialog = new CloudUploadDialog(
-        std::move(args), base::DoNothing(),
-        mojom::DialogPage::kMoveConfirmationOneDrive, false);
-    dialog->ShowSystemDialog();
+// Tests that when moving files from a cloud location to Drive, the preferences
+// |kOfficeFilesAlwaysMoveToDrive| and
+// |kOfficeMoveConfirmationShownForCloudToDrive| control whether the
+// confirmation dialog is going to be shown or not.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       ShowConfirmationForCloudToDrive) {
+  SetUpCloudToDriveTask();
 
-    // Wait for preference change.
-    run_loop.Run();
-  }
+  // Check that if |kOfficeMoveConfirmationShownForCloudToDrive| is false, we
+  // always show the confirmation dialog, whether
+  // |kOfficeFilesAlwaysMoveToDrive| is true or false.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForCloudToDrive(
+      profile(), false);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), true);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+
+  // Check that if |kOfficeMoveConfirmationShownForLocalToDrive| is true, we
+  // only show the confirmation dialog depending on the value of
+  // |kOfficeFilesAlwaysMoveToDrive|.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForCloudToDrive(
+      profile(), true);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), true);
+  ASSERT_FALSE(ShouldShowConfirmationDialog());
+}
+
+// Tests that when moving files from a read-only location to Drive, the
+// preferences |kOfficeFilesAlwaysMoveToDrive|,
+// |kOfficeMoveConfirmationShownForLocalToDrive| and
+// |kOfficeMoveConfirmationShownForCloudToDrive| control whether the
+// confirmation dialog is going to be shown or not.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       ShowConfirmationForReadOnlyToDrive) {
+  SetUpReadOnlyToDriveTask();
+
+  // Check that if |kOfficeMoveConfirmationShownForLocalToDrive| and
+  // |kOfficeMoveConfirmationShownForCloudToDrive| are both false, we always
+  // show the confirmation dialog, whether |kOfficeFilesAlwaysMoveToDrive| is
+  // true or false.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForLocalToDrive(
+      profile(), false);
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForCloudToDrive(
+      profile(), false);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), true);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+
+  // Check that if at least one of |kOfficeMoveConfirmationShownForLocalToDrive|
+  // and |kOfficeMoveConfirmationShownForCloudToDrive| is true, we only show the
+  // confirmation dialog depending on the value of
+  // |kOfficeFilesAlwaysMoveToDrive|.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForCloudToDrive(
+      profile(), true);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToDrive(profile(), true);
+  ASSERT_FALSE(ShouldShowConfirmationDialog());
+}
+
+// Tests that when moving files from a local location to OneDrive, the
+// preferences |kOfficeFilesAlwaysMoveToOneDrive| and
+// |kOfficeMoveConfirmationShownForLocalToOneDrive| control whether the
+// confirmation dialog is going to be shown or not.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       ShowConfirmationForLocalToOneDrive) {
+  SetUpLocalToOneDriveTask();
+
+  // Check that if |kOfficeMoveConfirmationShownForLocalToOneDrive| is false, we
+  // always show the confirmation dialog, whether
+  // |kOfficeFilesAlwaysMoveToOneDrive| is true or false.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForLocalToOneDrive(
+      profile(), false);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(),
+                                                               false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(), true);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+
+  // Check that if |kOfficeMoveConfirmationShownForLocalToOneDrive| is true, we
+  // only show the confirmation dialog depending on the value of
+  // |kOfficeFilesAlwaysMoveToOneDrive|.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForLocalToOneDrive(
+      profile(), true);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(),
+                                                               false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(), true);
+  ASSERT_FALSE(ShouldShowConfirmationDialog());
+}
+
+// Tests that when moving files from a cloud location to OneDrive, the
+// preferences |kOfficeFilesAlwaysMoveToOneDrive| and
+// |kOfficeMoveConfirmationShownForCloudToOneDrive| control whether the
+// confirmation dialog is going to be shown or not.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       ShowConfirmationForCloudToOneDrive) {
+  SetUpCloudToOneDriveTask();
+
+  // Check that if |kOfficeMoveConfirmationShownForCloudToOneDrive| is false, we
+  // always show the confirmation dialog, whether
+  // |kOfficeFilesAlwaysMoveToOneDrive| is true or false.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForCloudToOneDrive(
+      profile(), false);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(),
+                                                               false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(), true);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+
+  // Check that if |kOfficeMoveConfirmationShownForLocalToOneDrive| is true, we
+  // only show the confirmation dialog depending on the value of
+  // |kOfficeFilesAlwaysMoveToOneDrive|.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForCloudToOneDrive(
+      profile(), true);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(),
+                                                               false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(), true);
+  ASSERT_FALSE(ShouldShowConfirmationDialog());
+}
+
+// Tests that when moving files from a read-only location to OneDrive, the
+// preferences |kOfficeFilesAlwaysMoveToOneDrive|,
+// |kOfficeMoveConfirmationShownForLocalToOneDrive| and
+// |kOfficeMoveConfirmationShownForCloudToOneDrive| control whether the
+// confirmation dialog is going to be shown or not.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       ShowConfirmationForReadOnlyToOneDrive) {
+  SetUpReadOnlyToOneDriveTask();
+
+  // Check that if |kOfficeMoveConfirmationShownForLocalToOneDrive| and
+  // |kOfficeMoveConfirmationShownForCloudToOneDrive| are both false, we always
+  // show the confirmation dialog, whether |kOfficeFilesAlwaysMoveToOneDrive| is
+  // true or false.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForLocalToOneDrive(
+      profile(), false);
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForCloudToOneDrive(
+      profile(), false);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(),
+                                                               false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(), true);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+
+  // Check that if at least one of
+  // |kOfficeMoveConfirmationShownForLocalToOneDrive| and
+  // |kOfficeMoveConfirmationShownForCloudToOneDrive| is true, we only show the
+  // confirmation dialog depending on the value of
+  // |kOfficeFilesAlwaysMoveToOneDrive|.
+  file_manager::file_tasks::SetOfficeMoveConfirmationShownForCloudToOneDrive(
+      profile(), true);
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(),
+                                                               false);
+  ASSERT_TRUE(ShouldShowConfirmationDialog());
+  file_manager::file_tasks::SetAlwaysMoveOfficeFilesToOneDrive(profile(), true);
+  ASSERT_FALSE(ShouldShowConfirmationDialog());
+}
+
+// Tests that the preferences |kOfficeMoveConfirmationShownForDrive| and
+// |kOfficeMoveConfirmationShownForLocalToDrive| is are both set to true once
+// the user has confirmed the upload of a file to Drive.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       SetPrefsAfterConfirmationShownForLocalToDrive) {
+  SetUpLocalToDriveTask();
+  ASSERT_FALSE(file_manager::file_tasks::GetOfficeMoveConfirmationShownForDrive(
+      profile()));
+  ASSERT_FALSE(
+      file_manager::file_tasks::GetOfficeMoveConfirmationShownForLocalToDrive(
+          profile()));
+
+  OnDialogComplete(kUserActionUploadToGoogleDrive);
+
+  ASSERT_TRUE(file_manager::file_tasks::GetOfficeMoveConfirmationShownForDrive(
+      profile()));
+  ASSERT_TRUE(
+      file_manager::file_tasks::GetOfficeMoveConfirmationShownForLocalToDrive(
+          profile()));
+}
+
+// Tests that the preferences |kOfficeMoveConfirmationShownForDrive| and
+// |kOfficeMoveConfirmationShownForCloudToDrive| is are both set to true once
+// the user has confirmed the upload of a file to Drive.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       SetPrefsAfterConfirmationShownForCloudToDrive) {
+  SetUpCloudToDriveTask();
+  ASSERT_FALSE(file_manager::file_tasks::GetOfficeMoveConfirmationShownForDrive(
+      profile()));
+  ASSERT_FALSE(
+      file_manager::file_tasks::GetOfficeMoveConfirmationShownForCloudToDrive(
+          profile()));
+
+  OnDialogComplete(kUserActionUploadToGoogleDrive);
+
+  ASSERT_TRUE(file_manager::file_tasks::GetOfficeMoveConfirmationShownForDrive(
+      profile()));
+  ASSERT_TRUE(
+      file_manager::file_tasks::GetOfficeMoveConfirmationShownForCloudToDrive(
+          profile()));
+}
+
+// Tests that the preferences |kOfficeMoveConfirmationShownForOneDrive| and
+// |kOfficeMoveConfirmationShownForLocalToOneDrive| is are both set to true once
+// the user has confirmed the upload of a file to OneDrive.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       SetPrefsAfterConfirmationShownForLocalToOneDrive) {
+  SetUpLocalToOneDriveTask();
+  ASSERT_FALSE(
+      file_manager::file_tasks::GetOfficeMoveConfirmationShownForOneDrive(
+          profile()));
+  ASSERT_FALSE(file_manager::file_tasks::
+                   GetOfficeMoveConfirmationShownForLocalToOneDrive(profile()));
+
+  OnDialogComplete(kUserActionUploadToOneDrive);
+
+  ASSERT_TRUE(
+      file_manager::file_tasks::GetOfficeMoveConfirmationShownForOneDrive(
+          profile()));
+  ASSERT_TRUE(file_manager::file_tasks::
+                  GetOfficeMoveConfirmationShownForLocalToOneDrive(profile()));
+}
+
+// Tests that the preferences |kOfficeMoveConfirmationShownForOneDrive| and
+// |kOfficeMoveConfirmationShownForCloudToOneDrive| is are both set to true once
+// the user has confirmed the upload of a file to OneDrive.
+IN_PROC_BROWSER_TEST_F(CloudOpenTaskBrowserTest,
+                       SetPrefsAfterConfirmationShownForCloudToOneDrive) {
+  SetUpCloudToOneDriveTask();
+  ASSERT_FALSE(
+      file_manager::file_tasks::GetOfficeMoveConfirmationShownForOneDrive(
+          profile()));
+  ASSERT_FALSE(file_manager::file_tasks::
+                   GetOfficeMoveConfirmationShownForCloudToOneDrive(profile()));
+
+  OnDialogComplete(kUserActionUploadToOneDrive);
+
+  ASSERT_TRUE(
+      file_manager::file_tasks::GetOfficeMoveConfirmationShownForOneDrive(
+          profile()));
+  ASSERT_TRUE(file_manager::file_tasks::
+                  GetOfficeMoveConfirmationShownForCloudToOneDrive(profile()));
 }
 
 }  // namespace ash::cloud_upload

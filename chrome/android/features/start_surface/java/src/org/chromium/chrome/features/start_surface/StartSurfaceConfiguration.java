@@ -74,11 +74,39 @@ public class StartSurfaceConfiguration {
             new IntCachedFieldTrialParameter(ChromeFeatureList.START_SURFACE_RETURN_TIME,
                     START_SURFACE_RETURN_TIME_SECONDS_PARAM, 28800); // 8 hours
 
+    public static final String START_SURFACE_RETURN_TIME_ON_TABLET_SECONDS_PARAM =
+            "start_surface_return_time_on_tablet_seconds";
+    public static final IntCachedFieldTrialParameter START_SURFACE_RETURN_TIME_ON_TABLET_SECONDS =
+            new IntCachedFieldTrialParameter(ChromeFeatureList.START_SURFACE_RETURN_TIME,
+                    START_SURFACE_RETURN_TIME_ON_TABLET_SECONDS_PARAM, 28800); // 8 hours
     private static final String START_SURFACE_RETURN_TIME_USE_MODEL_PARAM =
             "start_surface_return_time_use_model";
     public static final BooleanCachedFieldTrialParameter START_SURFACE_RETURN_TIME_USE_MODEL =
             new BooleanCachedFieldTrialParameter(ChromeFeatureList.START_SURFACE_RETURN_TIME,
                     START_SURFACE_RETURN_TIME_USE_MODEL_PARAM, false);
+
+    public static final BooleanCachedFieldTrialParameter SURFACE_POLISH_OMNIBOX_COLOR =
+            new BooleanCachedFieldTrialParameter(
+                    ChromeFeatureList.SURFACE_POLISH, "polish_omnibox_color", false);
+
+    private static final String SURFACE_POLISH_MOVE_DOWN_LOGO_PARAM = "move_down_logo";
+    public static final BooleanCachedFieldTrialParameter SURFACE_POLISH_MOVE_DOWN_LOGO =
+            new BooleanCachedFieldTrialParameter(
+                    ChromeFeatureList.SURFACE_POLISH, SURFACE_POLISH_MOVE_DOWN_LOGO_PARAM, false);
+
+    private static final String SURFACE_POLISH_LESS_BRAND_SPACE_PARAM = "less_brand_space";
+    public static final BooleanCachedFieldTrialParameter SURFACE_POLISH_LESS_BRAND_SPACE =
+            new BooleanCachedFieldTrialParameter(
+                    ChromeFeatureList.SURFACE_POLISH, SURFACE_POLISH_LESS_BRAND_SPACE_PARAM, false);
+
+    private static final String SURFACE_POLISH_SCROLLABLE_MVT_PARAM = "scrollable_mvt";
+    public static final BooleanCachedFieldTrialParameter SURFACE_POLISH_SCROLLABLE_MVT =
+            new BooleanCachedFieldTrialParameter(
+                    ChromeFeatureList.SURFACE_POLISH, SURFACE_POLISH_SCROLLABLE_MVT_PARAM, false);
+
+    public static final BooleanCachedFieldTrialParameter SURFACE_POLISH_USE_MAGIC_SPACE =
+            new BooleanCachedFieldTrialParameter(
+                    ChromeFeatureList.SURFACE_POLISH, "use_magic_space", false);
 
     private static final String STARTUP_UMA_PREFIX = "Startup.Android.";
     private static final String INSTANT_START_SUBFIX = ".Instant";
@@ -91,6 +119,22 @@ public class StartSurfaceConfiguration {
      */
     public static boolean isStartSurfaceFlagEnabled() {
         return ChromeFeatureList.sStartSurfaceAndroid.isEnabled() && !SysUtils.isLowEndDevice();
+    }
+
+    /**
+     * Returns whether showing a NTP as the home surface is enabled in the given context.
+     */
+    public static boolean isNtpAsHomeSurfaceEnabled(boolean isTablet) {
+        return isTablet && ChromeFeatureList.sStartSurfaceOnTablet.isEnabled();
+    }
+
+    /**
+     * Returns whether a magic space is enabled on Start surface.
+     */
+    public static boolean useMagicSpace() {
+        return ChromeFeatureList.sSurfacePolish.isEnabled()
+                && SURFACE_POLISH_USE_MAGIC_SPACE.getValue()
+                && ChromeFeatureList.sStartSurfaceRefactor.isEnabled();
     }
 
     /**
@@ -115,7 +159,6 @@ public class StartSurfaceConfiguration {
         return false;
     }
 
-    @VisibleForTesting
     static void setFeedVisibilityForTesting(boolean isVisible) {
         SharedPreferencesManager.getInstance().writeBoolean(
                 ChromePreferenceKeys.FEED_ARTICLES_LIST_VISIBLE, isVisible);

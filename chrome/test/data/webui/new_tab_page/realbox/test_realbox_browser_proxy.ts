@@ -4,7 +4,7 @@
 
 import {NavigationPredictor, PageCallbackRouter, PageHandlerInterface, PageRemote} from 'chrome://resources/cr_components/omnibox/omnibox.mojom-webui.js';
 import {String16} from 'chrome://resources/mojo/mojo/public/mojom/base/string16.mojom-webui.js';
-import {TimeDelta, TimeTicks} from 'chrome://resources/mojo/mojo/public/mojom/base/time.mojom-webui.js';
+import {TimeTicks} from 'chrome://resources/mojo/mojo/public/mojom/base/time.mojom-webui.js';
 import {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
 import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
 
@@ -20,12 +20,12 @@ class FakePageHandler extends TestBrowserProxy implements PageHandlerInterface {
     super([
       'deleteAutocompleteMatch',
       'executeAction',
-      'logCharTypedToRepaintLatency',
       'onNavigationLikely',
       'openAutocompleteMatch',
       'queryAutocomplete',
       'stopAutocomplete',
       'toggleSuggestionGroupIdVisibility',
+      'onFocusChanged',
     ]);
   }
 
@@ -33,15 +33,22 @@ class FakePageHandler extends TestBrowserProxy implements PageHandlerInterface {
     this.methodCalled('setPage', page);
   }
 
-  deleteAutocompleteMatch(line: number) {
-    this.methodCalled('deleteAutocompleteMatch', {line});
+  onFocusChanged(focused: boolean) {
+    this.methodCalled('onFocusChanged', {focused});
+  }
+
+  deleteAutocompleteMatch(line: number, url: Url) {
+    this.methodCalled('deleteAutocompleteMatch', {line, url});
   }
 
   executeAction(
-      line: number, matchSelectionTimestamp: TimeTicks, mouseButton: number,
-      altKey: boolean, ctrlKey: boolean, metaKey: boolean, shiftKey: boolean) {
+      line: number, actionIndex: number, url: Url,
+      matchSelectionTimestamp: TimeTicks, mouseButton: number, altKey: boolean,
+      ctrlKey: boolean, metaKey: boolean, shiftKey: boolean) {
     this.methodCalled('executeAction', {
       line,
+      actionIndex,
+      url,
       matchSelectionTimestamp,
       mouseButton,
       altKey,
@@ -51,19 +58,13 @@ class FakePageHandler extends TestBrowserProxy implements PageHandlerInterface {
     });
   }
 
-  logCharTypedToRepaintLatency(timeDelta: TimeDelta) {
-    this.methodCalled('logCharTypedToRepaintLatency', {timeDelta});
-  }
-
   openAutocompleteMatch(
-      line: number, url: Url, areMatchesShowing: boolean,
-      timeElapsedSinceLastFocus: TimeDelta, mouseButton: number,
+      line: number, url: Url, areMatchesShowing: boolean, mouseButton: number,
       altKey: boolean, ctrlKey: boolean, metaKey: boolean, shiftKey: boolean) {
     this.methodCalled('openAutocompleteMatch', {
       line,
       url,
       areMatchesShowing,
-      timeElapsedSinceLastFocus,
       mouseButton,
       altKey,
       ctrlKey,
@@ -72,8 +73,9 @@ class FakePageHandler extends TestBrowserProxy implements PageHandlerInterface {
     });
   }
 
-  onNavigationLikely(line: number, navigationPredictor: NavigationPredictor) {
-    this.methodCalled('onNavigationLikely', {line, navigationPredictor});
+  onNavigationLikely(
+      line: number, url: Url, navigationPredictor: NavigationPredictor) {
+    this.methodCalled('onNavigationLikely', {line, url, navigationPredictor});
   }
 
   queryAutocomplete(input: String16, preventInlineAutocomplete: boolean) {

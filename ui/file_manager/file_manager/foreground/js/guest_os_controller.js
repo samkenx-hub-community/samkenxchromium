@@ -7,7 +7,7 @@ import {GuestOsPlaceholder} from '../../common/js/files_app_entry_types.js';
 import {util} from '../../common/js/util.js';
 import {VolumeManagerCommon} from '../../common/js/volume_manager_types.js';
 import {VolumeManager} from '../../externs/volume_manager.js';
-import {addUiEntry, removeUiEntry} from '../../state/actions/ui_entries.js';
+import {addUiEntry, removeUiEntry} from '../../state/ducks/ui_entries.js';
 import {getEntry, getStore} from '../../state/store.js';
 
 import {DirectoryModel} from './directory_model.js';
@@ -58,37 +58,38 @@ export class GuestOsController {
    */
   async onMountableGuestsChanged(guests) {
     const store = getStore();
-    if (util.isFilesAppExperimental()) {
-      const newGuestIdSet = new Set(guests.map(guest => guest.id));
-      const state = store.getState();
-      // Remove non-existed guest os.
-      for (const uiEntryKey of state.uiEntries) {
-        const uiEntry = getEntry(state, uiEntryKey);
-        if (uiEntry && 'guest_id' in uiEntry &&
-            !newGuestIdSet.has(uiEntry.guest_id)) {
-          store.dispatch(removeUiEntry({key: uiEntryKey}));
-        }
+    const newGuestIdSet = new Set(guests.map(guest => guest.id));
+    const state = store.getState();
+    // Remove non-existing guest os.
+    for (const uiEntryKey of state.uiEntries) {
+      const uiEntry = getEntry(state, uiEntryKey);
+      if (uiEntry && 'guest_id' in uiEntry &&
+          !newGuestIdSet.has(uiEntry.guest_id)) {
+        store.dispatch(removeUiEntry({key: uiEntryKey}));
       }
     }
-    this.directoryTree_.dataModel.guestOsPlaceholders = guests.map(guest => {
+
+    const newGuestOsPlaceholders = guests.map(guest => {
       const guestOsEntry =
           new GuestOsPlaceholder(guest.displayName, guest.id, guest.vmType);
       const navigationModelItem = new NavigationModelFakeItem(
           guest.displayName, NavigationModelItemType.GUEST_OS, guestOsEntry);
-      if (guest.vmType == chrome.fileManagerPrivate.VmType.ARCVM) {
-        navigationModelItem.disabled = this.volumeManager_.isDisabled(
-            VolumeManagerCommon.VolumeType.ANDROID_FILES);
-      } else {
-        navigationModelItem.disabled = this.volumeManager_.isDisabled(
-            VolumeManagerCommon.VolumeType.GUEST_OS);
-      }
-      if (util.isFilesAppExperimental()) {
-        store.dispatch(addUiEntry({entry: guestOsEntry}));
-      }
+      const volumeType =
+          guest.vmType == chrome.fileManagerPrivate.VmType.ARCVM ?
+          VolumeManagerCommon.VolumeType.ANDROID_FILES :
+          VolumeManagerCommon.VolumeType.GUEST_OS;
+
+      navigationModelItem.disabled = this.volumeManager_.isDisabled(volumeType);
+      store.dispatch(addUiEntry({entry: guestOsEntry}));
       return navigationModelItem;
     });
 
-    // Redraw the tree to ensure any newly added/removed roots are updated.
-    this.directoryTree_.redraw(false);
+    if (!util.isFilesAppExperimental()) {
+      this.directoryTree_.dataModel.guestOsPlaceholders =
+          newGuestOsPlaceholders;
+      // Redraw the tree to ensure any newly added/removed roots are
+      // updated.
+      this.directoryTree_.redraw(false);
+    }
   }
 }

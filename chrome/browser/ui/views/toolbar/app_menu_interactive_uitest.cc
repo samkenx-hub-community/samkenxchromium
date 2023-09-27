@@ -32,8 +32,7 @@ class AppMenuInteractiveTest : public InteractiveBrowserTest {
     set_open_about_blank_on_browser_launch(true);
     ASSERT_TRUE(embedded_test_server()->InitializeAndListen());
     feature_list_.InitAndEnableFeatures(
-        {performance_manager::features::kHighEfficiencyModeAvailable,
-         feature_engagement::kIPHPerformanceNewBadgeFeature});
+        {feature_engagement::kIPHPerformanceNewBadgeFeature});
     InteractiveBrowserTest::SetUp();
   }
 
@@ -63,7 +62,7 @@ IN_PROC_BROWSER_TEST_F(AppMenuInteractiveTest, PerformanceShowsNewBadge) {
 
   RunTestSequence(
       InstrumentTab(kPrimaryTabPageElementId),
-      PressButton(kAppMenuButtonElementId),
+      PressButton(kToolbarAppMenuButtonElementId),
       SelectMenuItem(AppMenuModel::kMoreToolsMenuItem),
       AfterShow(ToolsMenuModel::kPerformanceMenuItem,
                 base::BindOnce([](ui::TrackedElement* el) {
@@ -73,7 +72,7 @@ IN_PROC_BROWSER_TEST_F(AppMenuInteractiveTest, PerformanceShowsNewBadge) {
       WaitForWebContentsNavigation(
           kPrimaryTabPageElementId,
           GURL(chrome::kChromeUIPerformanceSettingsURL)),
-      PressButton(kAppMenuButtonElementId),
+      PressButton(kToolbarAppMenuButtonElementId),
       SelectMenuItem(AppMenuModel::kMoreToolsMenuItem),
       AfterShow(ToolsMenuModel::kPerformanceMenuItem,
                 base::BindOnce([](ui::TrackedElement* el) {

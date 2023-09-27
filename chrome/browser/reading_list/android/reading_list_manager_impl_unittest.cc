@@ -8,16 +8,17 @@
 #include <string>
 #include <utility>
 
-#include "base/guid.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/simple_test_clock.h"
+#include "base/uuid.h"
 #include "chrome/browser/reading_list/android/reading_list_manager.h"
 #include "components/bookmarks/browser/bookmark_node.h"
 #include "components/bookmarks/browser/bookmark_utils.h"
 #include "components/reading_list/core/fake_reading_list_model_storage.h"
 #include "components/reading_list/core/reading_list_model_impl.h"
 #include "components/sync/base/storage_type.h"
+#include "components/sync/model/wipe_model_upon_sync_disabled_behavior.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -66,7 +67,8 @@ class ReadingListManagerImplTest : public testing::Test {
         storage->AsWeakPtr();
 
     reading_list_model_ = std::make_unique<ReadingListModelImpl>(
-        std::move(storage), syncer::StorageType::kUnspecified, &clock_);
+        std::move(storage), syncer::StorageType::kUnspecified,
+        syncer::WipeModelUponSyncDisabledBehavior::kNever, &clock_);
     manager_ =
         std::make_unique<ReadingListManagerImpl>(reading_list_model_.get());
     manager_->AddObserver(observer());
@@ -185,7 +187,7 @@ TEST_F(ReadingListManagerImplTest, GetNodeByIDIsReadingListBookmark) {
 
   // Node with the same URL but not in the tree.
   auto node_same_url =
-      std::make_unique<BookmarkNode>(0, base::GUID::GenerateRandomV4(), url);
+      std::make_unique<BookmarkNode>(0, base::Uuid::GenerateRandomV4(), url);
   EXPECT_FALSE(manager()->IsReadingListBookmark(node_same_url.get()));
 }
 
@@ -305,7 +307,7 @@ TEST_F(ReadingListManagerImplTest, ReadStatus) {
 
   // Node not in the reading list should return false.
   auto other_node =
-      std::make_unique<BookmarkNode>(0, base::GUID::GenerateRandomV4(), url);
+      std::make_unique<BookmarkNode>(0, base::Uuid::GenerateRandomV4(), url);
   EXPECT_FALSE(manager()->GetReadStatus(node));
 
   // Root node should return false.

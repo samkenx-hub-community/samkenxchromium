@@ -5,6 +5,7 @@
 #ifndef ASH_SYSTEM_VIDEO_CONFERENCE_EFFECTS_VIDEO_CONFERENCE_TRAY_EFFECTS_DELEGATE_H_
 #define ASH_SYSTEM_VIDEO_CONFERENCE_EFFECTS_VIDEO_CONFERENCE_TRAY_EFFECTS_DELEGATE_H_
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -37,17 +38,23 @@ class ASH_EXPORT VcEffectsDelegate {
 
   virtual ~VcEffectsDelegate();
 
-  // Inserts `effect` into the vector of effects hosted by this delegate.
+  // Inserts `effect` into the collection of effects hosted by this delegate.
   void AddEffect(std::unique_ptr<VcHostedEffect> effect);
+
+  // Removes effect associated with `effect_id`.
+  void RemoveEffect(VcEffectId effect_id);
 
   // Returns the number of hosted effects.
   int GetNumEffects();
 
-  // Retrieves the `VcHostedEffect` at `index`.
-  const VcHostedEffect* GetEffect(int index);
+  // Retrieves the `VcHostedEffect` given its `effect_id`.
+  const VcHostedEffect* GetEffectById(VcEffectId effect_id);
 
   // Retrieves a std::vector<> of hosted effects of the passed-in `type`.
   std::vector<VcHostedEffect*> GetEffects(VcEffectType type);
+
+  // Records the state of all effects.
+  void RecordInitialStates();
 
   // Invoked when the UI controls are being constructed, to get the actual
   // effect state. `effect_id` specifies the effect whose state is requested,
@@ -69,12 +76,18 @@ class ASH_EXPORT VcEffectsDelegate {
   // to record metrics. Note that for togglable effects, we are already
   // recording metrics in `ToggleEffectsView`, so no need further metrics
   // collection needed for them.
-  virtual void RecordMetricsForSetValueEffect(VcEffectId effect_id,
-                                              int state_value) const {}
+  virtual void RecordMetricsForSetValueEffectOnClick(VcEffectId effect_id,
+                                                     int state_value) const {}
+
+  // This function will only be used for set-value effects, not for togglable
+  // effects. Invoked when the tray becomes visible.
+  virtual void RecordMetricsForSetValueEffectOnStartup(VcEffectId effect_id,
+                                                       int state_value) const {}
 
  private:
-  // Effects are created by `VcEffectsDelegate` subclasses.
-  std::vector<std::unique_ptr<VcHostedEffect>> effects_;
+  // Stores the collection of effects that are hosted by this delegate. The keys
+  // are the unique ids of the effects.
+  std::map<VcEffectId, std::unique_ptr<VcHostedEffect>> effects_;
 };
 
 }  // namespace ash

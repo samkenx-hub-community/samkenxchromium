@@ -12,7 +12,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "chrome/browser/ash/login/demo_mode/demo_session.h"
-#include "chrome/browser/ash/login/enrollment/enterprise_enrollment_helper.h"
+#include "chrome/browser/ash/login/enrollment/enrollment_launcher.h"
 #include "chrome/browser/component_updater/cros_component_installer_chromeos.h"
 #include "components/policy/core/common/cloud/cloud_policy_store.h"
 
@@ -28,7 +28,7 @@ class DemoComponents;
 
 // Controls enrollment flow for setting up Demo Mode.
 class DemoSetupController
-    : public EnterpriseEnrollmentHelper::EnrollmentStatusConsumer {
+    : public EnrollmentLauncher::EnrollmentStatusConsumer {
  public:
   // All steps required for setup.
   enum class DemoSetupStep {
@@ -133,7 +133,7 @@ class DemoSetupController
         const policy::EnrollmentStatus& status);
 
     static DemoSetupError CreateFromOtherEnrollmentError(
-        EnterpriseEnrollmentHelper::OtherError error);
+        EnrollmentLauncher::OtherError error);
 
     static DemoSetupError CreateFromComponentError(
         component_updater::CrOSComponentManager::Error error,
@@ -202,9 +202,11 @@ class DemoSetupController
     demo_config_ = demo_config;
   }
 
-  void set_retailer_name(const std::string& retailer_name) {
-    retailer_name_ = retailer_name;
-  }
+  // Set a canonicalized (whitespace and punctuation removed, case homogenized)
+  // version of the retailer name string.
+  void SetAndCanonicalizeRetailerName(const std::string& retailer_name);
+
+  std::string get_retailer_name_for_testing() { return retailer_name_; }
 
   void set_store_number(const std::string& store_number) {
     store_number_ = store_number;
@@ -227,11 +229,11 @@ class DemoSetupController
   base::FilePath GetPreinstalledDemoResourcesPath(
       const base::FilePath& relative_path);
 
-  // EnterpriseEnrollmentHelper::EnrollmentStatusConsumer:
+  // EnrollmentLauncher::EnrollmentStatusConsumer:
   void OnDeviceEnrolled() override;
   void OnEnrollmentError(policy::EnrollmentStatus status) override;
   void OnAuthError(const GoogleServiceAuthError& error) override;
-  void OnOtherError(EnterpriseEnrollmentHelper::OtherError error) override;
+  void OnOtherError(EnrollmentLauncher::OtherError error) override;
   void OnDeviceAttributeUploadCompleted(bool success) override;
   void OnDeviceAttributeUpdatePermission(bool granted) override;
 
@@ -299,7 +301,7 @@ class DemoSetupController
   // Callback to call when enrollment finishes successfully.
   OnSetupSuccess on_setup_success_;
 
-  std::unique_ptr<EnterpriseEnrollmentHelper> enrollment_helper_;
+  std::unique_ptr<EnrollmentLauncher> enrollment_launcher_;
 
   // The Demo Mode Resources ChromeOS Component downloaded for online Demo Mode.
   std::unique_ptr<DemoComponents> demo_components_;

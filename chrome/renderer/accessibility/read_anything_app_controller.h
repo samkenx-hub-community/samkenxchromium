@@ -20,8 +20,8 @@
 #include "services/metrics/public/cpp/ukm_source_id.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/accessibility/ax_node_id_forward.h"
-#include "ui/accessibility/ax_tree_observer.h"
 #include "ui/accessibility/ax_tree_update_forward.h"
+#include "url/gurl.h"
 
 namespace content {
 class RenderFrame;
@@ -40,7 +40,8 @@ class ReadAnythingAppControllerTest;
 // ReadAnythingAppController
 //
 //  A class that controls the Read Anything WebUI app. It serves two purposes:
-//  1. Communicate with ReadAnythingPageHandler (written in c++) via mojom.
+//  1. Communicate with ReadAnythingUntrustedPageHandler (written in c++) via
+//  mojom.
 //  2. Communicate with ReadAnythingApp (written in ts) via gin bindings.
 //  The ReadAnythingAppController unserializes the AXTreeUpdate and exposes
 //  methods on it to the ts resource for accessing information about the AXTree.
@@ -58,8 +59,7 @@ class ReadAnythingAppControllerTest;
 //
 class ReadAnythingAppController
     : public gin::Wrappable<ReadAnythingAppController>,
-      public read_anything::mojom::Page,
-      public ui::AXTreeObserver {
+      public read_anything::mojom::UntrustedPage {
  public:
   static gin::WrapperInfo kWrapperInfo;
 
@@ -67,7 +67,7 @@ class ReadAnythingAppController
   ReadAnythingAppController& operator=(const ReadAnythingAppController&) =
       delete;
 
-  // Installs v8 context for Read Anything and adds chrome.readAnything binding
+  // Installs v8 context for Read Anything and adds chrome.readingMode binding
   // to page.
   static ReadAnythingAppController* Install(content::RenderFrame* render_frame);
 
@@ -81,26 +81,29 @@ class ReadAnythingAppController
   gin::ObjectTemplateBuilder GetObjectTemplateBuilder(
       v8::Isolate* isolate) override;
 
-  // read_anything::mojom::Page:
+  // read_anything::mojom::UntrustedPage:
   void AccessibilityEventReceived(
       const ui::AXTreeID& tree_id,
       const std::vector<ui::AXTreeUpdate>& updates,
       const std::vector<ui::AXEvent>& events) override;
   void OnActiveAXTreeIDChanged(const ui::AXTreeID& tree_id,
-                               ukm::SourceId ukm_source_id) override;
+                               ukm::SourceId ukm_source_id,
+                               const GURL& hostname) override;
   void OnAXTreeDestroyed(const ui::AXTreeID& tree_id) override;
   void OnThemeChanged(
       read_anything::mojom::ReadAnythingThemePtr new_theme) override;
+  void OnSettingsRestoredFromPrefs(
+      read_anything::mojom::LineSpacing line_spacing,
+      read_anything::mojom::LetterSpacing letter_spacing,
+      const std::string& font,
+      double font_size,
+      read_anything::mojom::Colors color,
+      double speech_rate,
+      read_anything::mojom::HighlightGranularity granularity) override;
+  void SetDefaultLanguageCode(const std::string& code) override;
 #if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
   void ScreenAIServiceReady() override;
 #endif
-
-  // ui::AXTreeObserver:
-  void OnAtomicUpdateFinished(ui::AXTree* tree,
-                              bool root_changed,
-                              const std::vector<Change>& changes) override;
-  // TODO(crbug.com/1266555): Implement OnNodeWillBeDeleted to capture the
-  // deletion of child trees.
 
   // gin templates:
   ui::AXNodeID RootId() const;
@@ -111,9 +114,26 @@ class ReadAnythingAppController
   SkColor BackgroundColor() const;
   std::string FontName() const;
   float FontSize() const;
+  float SpeechRate() const;
+  void OnFontSizeChanged(bool increase);
+  void OnFontSizeReset();
   SkColor ForegroundColor() const;
   float LetterSpacing() const;
   float LineSpacing() const;
+  int ColorTheme() const;
+  int HighlightGranularity() const;
+  int HighlightOn() const;
+  int StandardLineSpacing() const;
+  int LooseLineSpacing() const;
+  int VeryLooseLineSpacing() const;
+  int StandardLetterSpacing() const;
+  int WideLetterSpacing() const;
+  int VeryWideLetterSpacing() const;
+  int DefaultTheme() const;
+  int LightTheme() const;
+  int DarkTheme() const;
+  int YellowTheme() const;
+  int BlueTheme() const;
   std::vector<ui::AXNodeID> GetChildren(ui::AXNodeID ax_node_id) const;
   std::string GetHtmlTag(ui::AXNodeID ax_node_id) const;
   std::string GetLanguage(ui::AXNodeID ax_node_id) const;
@@ -123,14 +143,43 @@ class ReadAnythingAppController
   bool ShouldBold(ui::AXNodeID ax_node_id) const;
   bool IsOverline(ui::AXNodeID ax_node_id) const;
   void OnConnected();
+  void OnCopy() const;
+  void OnScroll(bool on_selection) const;
   void OnLinkClicked(ui::AXNodeID ax_node_id) const;
   void OnSelectionChange(ui::AXNodeID anchor_node_id,
                          int anchor_offset,
                          ui::AXNodeID focus_node_id,
                          int focus_offset) const;
+  void OnCollapseSelection() const;
+  bool IsSelectable() const;
+  bool IsWebUIToolbarEnabled() const;
+  bool IsReadAloudEnabled() const;
+  void OnStandardLineSpacing();
+  void OnLooseLineSpacing();
+  void OnVeryLooseLineSpacing();
+  void OnStandardLetterSpacing();
+  void OnWideLetterSpacing();
+  void OnVeryWideLetterSpacing();
+  void OnLightTheme();
+  void OnDefaultTheme();
+  void OnDarkTheme();
+  void OnYellowTheme();
+  void OnBlueTheme();
+  void OnFontChange(const std::string& font);
+  void OnSpeechRateChange(double rate);
+  void TurnedHighlightOn();
+  void TurnedHighlightOff();
+  double GetLineSpacingValue(int line_spacing) const;
+  double GetLetterSpacingValue(int letter_spacing) const;
+  std::vector<std::string> GetSupportedFonts() const;
+
+  // The language code that should be used to determine which voices are
+  // supported for speech.
+  const std::string& GetLanguageCodeForSpeech() const;
 
   void Distill();
   void Draw();
+  void DrawSelection();
 
   void UnserializeUpdates(std::vector<ui::AXTreeUpdate> updates,
                           const ui::AXTreeID& tree_id);
@@ -139,18 +188,21 @@ class ReadAnythingAppController
   void OnAXTreeDistilled(const ui::AXTreeID& tree_id,
                          const std::vector<ui::AXNodeID>& content_node_ids);
 
-  // Helper functions for the rendering algorithm. Post-process the AXTree and
-  // cache values before sending an `updateContent` notification to the Read
-  // Anything app.ts. These functions:
-  // 1. Save state related to selection (start_node_, end_node_, start_offset_,
-  //    end_offset_).
-  // 2. Save the display_node_ids_, which is a set of all nodes to be displayed
-  //    in Read Anything app.ts.
-  void PostProcessAXTreeWithSelection();
-  void PostProcessDistillableAXTree();
+  void PostProcessSelection();
 
-  // The following methods are used for testing ReadAnythingAppTest.
-  // Snapshot_lite is a data structure which resembles an AXTreeUpdate. E.g.:
+  // Returns the index of the next sentence of the given text, such that the
+  // next sentence is equivalent to text.substr(0, <returned_index>).
+  // If the sentence exceeds the maximum text length, the sentence will be
+  // cropped to the nearest word boundary that doesn't exceed the maximum
+  // text length.
+  int GetNextSentence(const std::u16string& text, int maxTextLength);
+
+  // SetContentForTesting, SetThemeForTesting, and SetLanguageForTesting are
+  // used by ReadAnythingAppTest and thus need to be kept in
+  // ReadAnythingAppController even though ReadAnythingAppControllerBrowserTest
+  // is friended.
+  // Snapshot_lite is a data structure which resembles an
+  // AXTreeUpdate. E.g.:
   //   const axTree = {
   //     root_id: 1,
   //     nodes: [
@@ -174,19 +226,18 @@ class ReadAnythingAppController
                           SkColor background_color,
                           int line_spacing,
                           int letter_spacing);
-  AXTreeDistiller* SetDistillerForTesting(
-      std::unique_ptr<AXTreeDistiller> distiller);
-  void SetPageHandlerForTesting(
-      mojo::PendingRemote<read_anything::mojom::PageHandler> page_handler);
+  void SetLanguageForTesting(const std::string& language_code);
 
   content::RenderFrame* render_frame_;
   std::unique_ptr<AXTreeDistiller> distiller_;
-  mojo::Remote<read_anything::mojom::PageHandlerFactory> page_handler_factory_;
-  mojo::Remote<read_anything::mojom::PageHandler> page_handler_;
-  mojo::Receiver<read_anything::mojom::Page> receiver_{this};
+  mojo::Remote<read_anything::mojom::UntrustedPageHandlerFactory>
+      page_handler_factory_;
+  mojo::Remote<read_anything::mojom::UntrustedPageHandler> page_handler_;
+  mojo::Receiver<read_anything::mojom::UntrustedPage> receiver_{this};
 
   // Model that holds state for this controller.
   ReadAnythingAppModel model_;
+
   base::WeakPtrFactory<ReadAnythingAppController> weak_ptr_factory_{this};
 };
 

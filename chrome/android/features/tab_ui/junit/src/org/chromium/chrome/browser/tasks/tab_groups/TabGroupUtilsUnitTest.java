@@ -4,10 +4,10 @@
 
 package org.chromium.chrome.browser.tasks.tab_groups;
 
+import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
+
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.junit.Before;
@@ -19,16 +19,14 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.robolectric.annotation.Config;
 
-import org.chromium.base.UserDataHost;
+import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabImpl;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelFilterProvider;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiUnitTestUtils;
 import org.chromium.chrome.test.util.browser.Features;
-import org.chromium.testing.local.LocalRobolectricTestRunner;
 import org.chromium.url.GURL;
 
 import java.util.ArrayList;
@@ -39,7 +37,7 @@ import java.util.List;
  * Tests for {@link TabGroupUtils}.
  */
 @SuppressWarnings("ResultOfMethodCallIgnored")
-@RunWith(LocalRobolectricTestRunner.class)
+@RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
 public class TabGroupUtilsUnitTest {
     @Rule
@@ -114,12 +112,7 @@ public class TabGroupUtilsUnitTest {
     private void createTabGroup(List<Tab> tabs, int rootId) {
         for (Tab tab : tabs) {
             when(mTabGroupModelFilter.getRelatedTabList(tab.getId())).thenReturn(tabs);
-            CriticalPersistedTabData criticalPersistedTabData =
-                    mock(CriticalPersistedTabData.class);
-            UserDataHost userDataHost = new UserDataHost();
-            userDataHost.setUserData(CriticalPersistedTabData.class, criticalPersistedTabData);
-            doReturn(userDataHost).when(tab).getUserDataHost();
-            doReturn(rootId).when(criticalPersistedTabData).getRootId();
+            when(tab.getRootId()).thenReturn(rootId);
         }
     }
 }

@@ -6,6 +6,7 @@
 #include <tuple>
 
 #include "base/test/scoped_feature_list.h"
+#include "base/test/values_test_util.h"
 #include "chrome/browser/devtools/protocol/devtools_protocol_test_support.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -13,6 +14,8 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/content_browser_test_utils.h"
 
+// TODO(crbug.com/1399414): Refactor tests when we start emitting issues in
+// bulk, via checkFormsIssues command and FormIssuesAdded event.
 namespace autofill {
 
 namespace {
@@ -56,6 +59,15 @@ class AutofillFormDevtoolsProtocolTest : public DevToolsProtocolTestBase {
 }  // namespace
 
 IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
+                       checkFormIssuesCommandReturnsIssuesList) {
+  NavigateToFormPageAndEnableAudits();
+  const base::Value::Dict* res = SendCommandSync("Audits.checkFormsIssues");
+  const base::Value::List* issues = res->FindListByDottedPath("formIssues");
+  ASSERT_NE(issues, nullptr);
+  ASSERT_EQ(issues->size(), 0ul);
+}
+
+IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
                        FormHasLabelAssociatedToNameAttribute) {
   NavigateToFormPageAndEnableAudits();
   base::Value::Dict notification =
@@ -75,17 +87,9 @@ IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
                   .FindIntByDottedPath(
                       "issue.details.genericIssueDetails.violatingNodeId")
                   .has_value());
-}
-
-IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
-                       FormHasInputWithNoLabels) {
-  NavigateToFormPageAndEnableAudits();
-  base::Value::Dict notification =
-      WaitForGenericIssueAdded("FormInputWithNoLabelError");
-  EXPECT_TRUE(notification
-                  .FindIntByDottedPath(
-                      "issue.details.genericIssueDetails.violatingNodeId")
-                  .has_value());
+  base::ExpectDictStringValue(
+      "id", notification,
+      "issue.details.genericIssueDetails.violatingNodeAttribute");
 }
 
 IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
@@ -97,6 +101,9 @@ IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
                   .FindIntByDottedPath(
                       "issue.details.genericIssueDetails.violatingNodeId")
                   .has_value());
+  base::ExpectDictStringValue(
+      "autocomplete", notification,
+      "issue.details.genericIssueDetails.violatingNodeAttribute");
 }
 
 IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
@@ -132,6 +139,9 @@ IN_PROC_BROWSER_TEST_F(
                   .FindIntByDottedPath(
                       "issue.details.genericIssueDetails.violatingNodeId")
                   .has_value());
+  base::ExpectDictStringValue(
+      "id", notification,
+      "issue.details.genericIssueDetails.violatingNodeAttribute");
 }
 
 IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
@@ -154,6 +164,9 @@ IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
                   .FindIntByDottedPath(
                       "issue.details.genericIssueDetails.violatingNodeId")
                   .has_value());
+  base::ExpectDictStringValue(
+      "for", notification,
+      "issue.details.genericIssueDetails.violatingNodeAttribute");
 }
 
 IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
@@ -165,6 +178,9 @@ IN_PROC_BROWSER_TEST_F(AutofillFormDevtoolsProtocolTest,
                   .FindIntByDottedPath(
                       "issue.details.genericIssueDetails.violatingNodeId")
                   .has_value());
+  base::ExpectDictStringValue(
+      "autocomplete", notification,
+      "issue.details.genericIssueDetails.violatingNodeAttribute");
 }
 
 }  // namespace autofill

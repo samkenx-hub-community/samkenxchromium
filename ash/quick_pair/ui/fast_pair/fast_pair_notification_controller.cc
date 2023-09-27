@@ -10,13 +10,14 @@
 #include "ash/strings/grit/ash_strings.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/time/time.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/message_center/message_center.h"
 #include "ui/message_center/public/cpp/notification.h"
 #include "ui/message_center/public/cpp/notification_delegate.h"
 
-#include "ash/quick_pair/common/logging.h"
+#include "components/cross_device/logging/logging.h"
 
 using message_center::MessageCenter;
 using message_center::Notification;
@@ -130,8 +131,8 @@ class NotificationDelegate : public message_center::NotificationDelegate {
     // dismisses the notification to prevent the timer firing and removing
     // notifications that might come up later.
     if (expire_notification_timer_) {
-      QP_LOG(VERBOSE) << __func__
-                      << ": stopping expiration timer on notification close";
+      CD_LOG(VERBOSE, Feature::FP)
+          << __func__ << ": stopping expiration timer on notification close";
       expire_notification_timer_->Stop();
     }
 
@@ -154,7 +155,8 @@ class NotificationDelegate : public message_center::NotificationDelegate {
   base::RepeatingClosure on_primary_click_;
   base::RepeatingClosure on_secondary_click_;
   base::OnceCallback<void(FastPairNotificationDismissReason)> on_close_;
-  base::OneShotTimer* expire_notification_timer_;
+  raw_ptr<base::OneShotTimer, DanglingUntriaged | ExperimentalAsh>
+      expire_notification_timer_;
 };
 
 FastPairNotificationController::FastPairNotificationController(
@@ -205,8 +207,8 @@ void FastPairNotificationController::ExtendNotification() {
   // point if the notification is for the same device, which means we reset the
   // timeout.
   if (expire_notification_timer_.IsRunning()) {
-    QP_LOG(INFO) << __func__
-                 << " extending notification for re-discovered device";
+    CD_LOG(INFO, Feature::FP)
+        << __func__ << " extending notification for re-discovered device";
     expire_notification_timer_.Reset();
   }
 }
@@ -365,10 +367,6 @@ void FastPairNotificationController::ShowApplicationAvailableNotification(
       base::MakeRefCounted<NotificationDelegate>(
           /*on_primary_click=*/download_app_callback,
           /*on_close=*/std::move(on_close)));
-  application_available_notification->set_type(
-      message_center::NOTIFICATION_TYPE_PROGRESS);
-  application_available_notification->set_progress(
-      kInfiniteLoadingProgressValue);
   application_available_notification->set_image(device_image);
 
   message_center_->AddNotification(
@@ -397,10 +395,6 @@ void FastPairNotificationController::ShowApplicationInstalledNotification(
       base::MakeRefCounted<NotificationDelegate>(
           /*on_primary_click=*/launch_app_callback,
           /*on_close=*/std::move(on_close)));
-  application_installed_notification->set_type(
-      message_center::NOTIFICATION_TYPE_PROGRESS);
-  application_installed_notification->set_progress(
-      kInfiniteLoadingProgressValue);
   application_installed_notification->set_image(device_image);
 
   message_center_->AddNotification(

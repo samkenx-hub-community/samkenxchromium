@@ -5,9 +5,9 @@
 package org.chromium.chrome.browser.bookmarks;
 
 import android.content.Context;
+import android.content.res.Resources;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.accessibility.AccessibilityManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,9 +18,11 @@ import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
 import org.chromium.chrome.R;
+import org.chromium.chrome.browser.bookmarks.BookmarkUiPrefs.BookmarkRowDisplayPref;
 import org.chromium.chrome.browser.commerce.PriceTrackingUtils;
 import org.chromium.chrome.browser.commerce.ShoppingFeatures;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.sync.SyncServiceFactory;
 import org.chromium.chrome.browser.user_education.IPHCommandBuilder;
 import org.chromium.chrome.browser.user_education.UserEducationHelper;
 import org.chromium.components.bookmarks.BookmarkId;
@@ -28,22 +30,23 @@ import org.chromium.components.browser_ui.bottomsheet.BottomSheetContent;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.bottomsheet.EmptyBottomSheetObserver;
 import org.chromium.components.commerce.core.ShoppingService;
+import org.chromium.components.favicon.LargeIconBridge;
 import org.chromium.components.feature_engagement.FeatureConstants;
+import org.chromium.components.image_fetcher.ImageFetcherConfig;
+import org.chromium.components.image_fetcher.ImageFetcherFactory;
 import org.chromium.components.power_bookmarks.PowerBookmarkMeta;
+import org.chromium.ui.accessibility.AccessibilityState;
 import org.chromium.ui.modelutil.PropertyKey;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.ui.modelutil.PropertyModelChangeProcessor;
-import org.chromium.ui.widget.ViewLookupCachingFrameLayout;
 
 /** Coordinates the bottom-sheet saveflow. */
 public class BookmarkSaveFlowCoordinator {
-    private static final int AUTODISMISS_TIME_MS = 6000;
+    private static final int AUTO_DISMISS_TIME_MS = 10000;
 
     private final Context mContext;
-    private final PropertyModel mPropertyModel =
-            new PropertyModel(BookmarkSaveFlowProperties.ALL_PROPERTIES);
-    private final PropertyModelChangeProcessor<PropertyModel, ViewLookupCachingFrameLayout,
-            PropertyKey> mChangeProcessor;
+    private final PropertyModel mPropertyModel;
+    private final PropertyModelChangeProcessor<PropertyModel, View, PropertyKey> mChangeProcessor;
     private final DestroyChecker mDestroyChecker;
     private final Profile mProfile;
 
@@ -68,17 +71,38 @@ public class BookmarkSaveFlowCoordinator {
         mContext = context;
         mBottomSheetController = bottomSheetController;
         mUserEducationHelper = userEducationHelper;
-        mBookmarkModel = BookmarkModel.getForProfile(Profile.getLastUsedRegularProfile());
+        mBookmarkModel = BookmarkModel.getForProfile(profile);
+        assert mBookmarkModel != null;
         mDestroyChecker = new DestroyChecker();
         mProfile = profile;
 
-        mBookmarkSaveFlowView = LayoutInflater.from(mContext).inflate(
-                org.chromium.chrome.R.layout.bookmark_save_flow, /*root=*/null);
-        mMediator = new BookmarkSaveFlowMediator(
-                mBookmarkModel, mPropertyModel, mContext, this::close, shoppingService);
-        mChangeProcessor = PropertyModelChangeProcessor.create(mPropertyModel,
-                (ViewLookupCachingFrameLayout) mBookmarkSaveFlowView,
-                new BookmarkSaveFlowViewBinder());
+        if (BookmarkFeatures.isAndroidImprovedBookmarksEnabled()) {
+            mPropertyModel = new PropertyModel(ImprovedBookmarkSaveFlowProperties.ALL_KEYS);
+            mBookmarkSaveFlowView = LayoutInflater.from(mContext).inflate(
+                    org.chromium.chrome.R.layout.improved_bookmark_save_flow, /*root=*/null);
+            mChangeProcessor = PropertyModelChangeProcessor.create(mPropertyModel,
+                    mBookmarkSaveFlowView, ImprovedBookmarkSaveFlowViewBinder::bind);
+        } else {
+            mPropertyModel = new PropertyModel(BookmarkSaveFlowProperties.ALL_KEYS);
+            mBookmarkSaveFlowView = LayoutInflater.from(mContext).inflate(
+                    org.chromium.chrome.R.layout.bookmark_save_flow, /*root=*/null);
+            mChangeProcessor = PropertyModelChangeProcessor.create(
+                    mPropertyModel, mBookmarkSaveFlowView, new BookmarkSaveFlowViewBinder());
+        }
+
+        Resources res = mContext.getResources();
+        BookmarkImageFetcher bookmarkImageFetcher = new BookmarkImageFetcher(context,
+                mBookmarkModel,
+                ImageFetcherFactory.createImageFetcher(
+                        ImageFetcherConfig.DISK_CACHE_ONLY, mProfile.getProfileKey()),
+                new LargeIconBridge(mProfile),
+                BookmarkUtils.getRoundedIconGenerator(mContext, BookmarkRowDisplayPref.VISUAL),
+                res.getDimensionPixelSize(R.dimen.improved_bookmark_save_flow_image_size),
+                BookmarkUtils.getFaviconDisplaySize(res, BookmarkRowDisplayPref.VISUAL),
+                SyncServiceFactory.getForProfile(profile));
+
+        mMediator = new BookmarkSaveFlowMediator(mBookmarkModel, mPropertyModel, mContext,
+                this::close, shoppingService, bookmarkImageFetcher, mProfile);
     }
 
     /**
@@ -118,9 +142,7 @@ public class BookmarkSaveFlowCoordinator {
         boolean shown =
                 mBottomSheetController.requestShowContent(mBottomSheetContent, /* animate= */ true);
 
-        AccessibilityManager am =
-                (AccessibilityManager) mContext.getSystemService(Context.ACCESSIBILITY_SERVICE);
-        if (!am.isTouchExplorationEnabled()) {
+        if (!AccessibilityState.isTouchExplorationEnabled()) {
             setupAutodismiss();
         }
 
@@ -167,7 +189,7 @@ public class BookmarkSaveFlowCoordinator {
     }
 
     private void setupAutodismiss() {
-        PostTask.postDelayedTask(TaskTraits.UI_USER_VISIBLE, this::close, AUTODISMISS_TIME_MS);
+        PostTask.postDelayedTask(TaskTraits.UI_USER_VISIBLE, this::close, AUTO_DISMISS_TIME_MS);
     }
 
     private void destroy() {
@@ -261,7 +283,6 @@ public class BookmarkSaveFlowCoordinator {
         }
     }
 
-    @VisibleForTesting
     View getViewForTesting() {
         return mBookmarkSaveFlowView;
     }

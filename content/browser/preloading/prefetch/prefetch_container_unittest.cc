@@ -9,7 +9,6 @@
 #include "content/browser/preloading/prefetch/prefetch_document_manager.h"
 #include "content/browser/preloading/prefetch/prefetch_probe_result.h"
 #include "content/browser/preloading/prefetch/prefetch_status.h"
-#include "content/browser/preloading/prefetch/prefetch_streaming_url_loader.h"
 #include "content/browser/preloading/prefetch/prefetch_test_utils.h"
 #include "content/browser/preloading/prefetch/prefetch_type.h"
 #include "content/public/browser/browser_context.h"
@@ -18,9 +17,11 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/test_renderer_host.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "mojo/public/cpp/system/string_data_source.h"
 #include "net/base/isolation_info.h"
 #include "services/metrics/public/cpp/metrics_utils.h"
 #include "services/metrics/public/cpp/ukm_builders.h"
+#include "services/network/public/cpp/features.h"
 #include "services/network/public/mojom/cookie_manager.mojom.h"
 #include "services/network/public/mojom/network_context.mojom.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
@@ -93,21 +94,39 @@ class PrefetchContainerTest : public RenderViewHostTestHarness {
   mojo::Remote<network::mojom::CookieManager> cookie_manager_;
 };
 
+namespace {
+
+// Add a redirect hop with dummy redirect info that should be good enough in
+// most cases.
+void AddRedirectHop(PrefetchContainer& container, const GURL& url) {
+  net::RedirectInfo redirect_info;
+  redirect_info.status_code = 302;
+  redirect_info.new_method = "GET";
+  redirect_info.new_url = url;
+  redirect_info.new_site_for_cookies = net::SiteForCookies::FromUrl(url);
+  container.AddRedirectHop(redirect_info);
+}
+
+}  // namespace
+
 TEST_F(PrefetchContainerTest, CreatePrefetchContainer) {
   PrefetchContainer prefetch_container(
       GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com"),
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), nullptr);
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
 
   EXPECT_EQ(prefetch_container.GetReferringRenderFrameHostId(),
             GlobalRenderFrameHostId(1234, 5678));
   EXPECT_EQ(prefetch_container.GetURL(), GURL("https://test.com"));
   EXPECT_EQ(prefetch_container.GetPrefetchType(),
-            PrefetchType(/*use_isolated_network_context=*/true,
-                         /*use_prefetch_proxy=*/true,
+            PrefetchType(/*use_prefetch_proxy=*/true,
                          blink::mojom::SpeculationEagerness::kEager));
+  EXPECT_TRUE(
+      prefetch_container.IsIsolatedNetworkContextRequiredForCurrentPrefetch());
 
   EXPECT_EQ(prefetch_container.GetPrefetchContainerKey(),
             std::make_pair(GlobalRenderFrameHostId(1234, 5678),
@@ -118,10 +137,12 @@ TEST_F(PrefetchContainerTest, CreatePrefetchContainer) {
 TEST_F(PrefetchContainerTest, PrefetchStatus) {
   PrefetchContainer prefetch_container(
       GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com"),
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), nullptr);
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
 
   EXPECT_FALSE(prefetch_container.HasPrefetchStatus());
 
@@ -135,10 +156,12 @@ TEST_F(PrefetchContainerTest, PrefetchStatus) {
 TEST_F(PrefetchContainerTest, IsDecoy) {
   PrefetchContainer prefetch_container(
       GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com"),
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), nullptr);
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
 
   EXPECT_FALSE(prefetch_container.IsDecoy());
 
@@ -149,19 +172,22 @@ TEST_F(PrefetchContainerTest, IsDecoy) {
 TEST_F(PrefetchContainerTest, Servable) {
   PrefetchContainer prefetch_container(
       GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com"),
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), nullptr);
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
 
-  prefetch_container.TakeStreamingURLLoader(
-      MakeServableStreamingURLLoaderForTest(
-          network::mojom::URLResponseHead::New(), "test body"));
+  MakeServableStreamingURLLoaderForTest(
+      &prefetch_container, network::mojom::URLResponseHead::New(), "test body");
 
   task_environment()->FastForwardBy(base::Minutes(2));
 
-  EXPECT_FALSE(prefetch_container.IsPrefetchServable(base::Minutes(1)));
-  EXPECT_TRUE(prefetch_container.IsPrefetchServable(base::Minutes(3)));
+  EXPECT_NE(prefetch_container.GetServableState(base::Minutes(1)),
+            PrefetchContainer::ServableState::kServable);
+  EXPECT_EQ(prefetch_container.GetServableState(base::Minutes(3)),
+            PrefetchContainer::ServableState::kServable);
   EXPECT_TRUE(prefetch_container.GetHead());
 }
 
@@ -172,45 +198,75 @@ TEST_F(PrefetchContainerTest, CookieListener) {
 
   PrefetchContainer prefetch_container(
       GlobalRenderFrameHostId(1234, 5678), kTestUrl1,
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), nullptr);
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
+  prefetch_container.MakeResourceRequest({});
+  prefetch_container.RegisterCookieListener(cookie_manager());
 
-  // Add redirect hops. Each hop will have its own cookie listener.
-  prefetch_container.AddRedirectHop(kTestUrl2);
-  prefetch_container.AddRedirectHop(kTestUrl3);
+  // Add redirect hops, and register its own cookie listener for each hop.
+  AddRedirectHop(prefetch_container, kTestUrl2);
+  prefetch_container.RegisterCookieListener(cookie_manager());
+  AddRedirectHop(prefetch_container, kTestUrl3);
+  prefetch_container.RegisterCookieListener(cookie_manager());
 
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl1));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl2));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl3));
+  // Check the cookies for `kTestUrl1`, `kTestUrl2` and `kTestUrl3`,
+  // respectively. AdvanceCurrentURLToServe() is used to set the current hop to
+  // check the cookies.
+  {
+    auto reader = prefetch_container.CreateReader();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+  }
 
-  prefetch_container.RegisterCookieListener(kTestUrl1, cookie_manager());
-  prefetch_container.RegisterCookieListener(kTestUrl2, cookie_manager());
-  prefetch_container.RegisterCookieListener(kTestUrl3, cookie_manager());
-
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl1));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl2));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl3));
+  {
+    auto reader = prefetch_container.CreateReader();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+  }
 
   ASSERT_TRUE(SetCookie(kTestUrl1, "test-cookie1"));
 
-  EXPECT_TRUE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl1));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl2));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl3));
+  {
+    auto reader = prefetch_container.CreateReader();
+    EXPECT_TRUE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+  }
 
   ASSERT_TRUE(SetCookie(kTestUrl2, "test-cookie2"));
 
-  EXPECT_TRUE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl1));
-  EXPECT_TRUE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl2));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl3));
+  {
+    auto reader = prefetch_container.CreateReader();
+    EXPECT_TRUE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_TRUE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+  }
 
   prefetch_container.StopAllCookieListeners();
   ASSERT_TRUE(SetCookie(kTestUrl2, "test-cookie3"));
 
-  EXPECT_TRUE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl1));
-  EXPECT_TRUE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl2));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl3));
+  {
+    auto reader = prefetch_container.CreateReader();
+    EXPECT_TRUE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_TRUE(reader.HaveDefaultContextCookiesChanged());
+    reader.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
+  }
 }
 
 TEST_F(PrefetchContainerTest, CookieCopy) {
@@ -218,41 +274,45 @@ TEST_F(PrefetchContainerTest, CookieCopy) {
   base::HistogramTester histogram_tester;
   PrefetchContainer prefetch_container(
       GlobalRenderFrameHostId(1234, 5678), kTestUrl,
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), nullptr);
-  prefetch_container.RegisterCookieListener(kTestUrl, cookie_manager());
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
+  prefetch_container.RegisterCookieListener(cookie_manager());
 
-  EXPECT_FALSE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  auto reader = prefetch_container.CreateReader();
 
-  prefetch_container.OnIsolatedCookieCopyStart();
+  EXPECT_FALSE(reader.IsIsolatedCookieCopyInProgress());
 
-  EXPECT_TRUE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  reader.OnIsolatedCookieCopyStart();
+
+  EXPECT_TRUE(reader.IsIsolatedCookieCopyInProgress());
 
   // Once the cookie copy process has started, we should stop the cookie
   // listener.
   ASSERT_TRUE(SetCookie(kTestUrl, "test-cookie"));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl));
+  EXPECT_FALSE(reader.HaveDefaultContextCookiesChanged());
 
   task_environment()->FastForwardBy(base::Milliseconds(10));
-  prefetch_container.OnIsolatedCookiesReadCompleteAndWriteStart();
+  reader.OnIsolatedCookiesReadCompleteAndWriteStart();
   task_environment()->FastForwardBy(base::Milliseconds(20));
 
   // The URL interceptor checks on the cookie copy status when trying to serve a
   // prefetch. If its still in progress, it registers a callback to be called
   // once the copy is complete.
-  EXPECT_TRUE(prefetch_container.IsIsolatedCookieCopyInProgress());
-  prefetch_container.OnInterceptorCheckCookieCopy();
+  EXPECT_TRUE(reader.IsIsolatedCookieCopyInProgress());
+  reader.OnInterceptorCheckCookieCopy();
   task_environment()->FastForwardBy(base::Milliseconds(40));
   bool callback_called = false;
-  prefetch_container.SetOnCookieCopyCompleteCallback(
+  reader.SetOnCookieCopyCompleteCallback(
       base::BindOnce([](bool* callback_called) { *callback_called = true; },
                      &callback_called));
 
-  prefetch_container.OnIsolatedCookieCopyComplete();
+  reader.OnIsolatedCookieCopyComplete();
 
-  EXPECT_FALSE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  EXPECT_FALSE(reader.IsIsolatedCookieCopyInProgress());
   EXPECT_TRUE(callback_called);
 
   histogram_tester.ExpectUniqueTimeSample(
@@ -276,103 +336,114 @@ TEST_F(PrefetchContainerTest, CookieCopyWithRedirects) {
   base::HistogramTester histogram_tester;
   PrefetchContainer prefetch_container(
       GlobalRenderFrameHostId(1234, 5678), kTestUrl,
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), nullptr);
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
+  prefetch_container.MakeResourceRequest({});
+  prefetch_container.RegisterCookieListener(cookie_manager());
 
-  prefetch_container.AddRedirectHop(kRedirectUrl1);
-  prefetch_container.AddRedirectHop(kRedirectUrl2);
+  AddRedirectHop(prefetch_container, kRedirectUrl1);
+  prefetch_container.RegisterCookieListener(cookie_manager());
 
-  prefetch_container.RegisterCookieListener(kTestUrl, cookie_manager());
-  prefetch_container.RegisterCookieListener(kRedirectUrl1, cookie_manager());
-  prefetch_container.RegisterCookieListener(kRedirectUrl2, cookie_manager());
+  AddRedirectHop(prefetch_container, kRedirectUrl2);
+  prefetch_container.RegisterCookieListener(cookie_manager());
 
-  EXPECT_EQ(prefetch_container.GetCurrentURLToServe(), kTestUrl);
+  auto reader = prefetch_container.CreateReader();
 
-  EXPECT_FALSE(prefetch_container.IsIsolatedCookieCopyInProgress());
-  prefetch_container.OnIsolatedCookieCopyStart();
-  EXPECT_TRUE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  EXPECT_EQ(reader.GetCurrentURLToServe(), kTestUrl);
+
+  EXPECT_FALSE(reader.IsIsolatedCookieCopyInProgress());
+  reader.OnIsolatedCookieCopyStart();
+  EXPECT_TRUE(reader.IsIsolatedCookieCopyInProgress());
 
   // Once the cookie copy process has started, all cookie listeners are stopped.
   ASSERT_TRUE(SetCookie(kTestUrl, "test-cookie"));
   ASSERT_TRUE(SetCookie(kRedirectUrl1, "test-cookie"));
   ASSERT_TRUE(SetCookie(kRedirectUrl2, "test-cookie"));
 
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl));
-  EXPECT_FALSE(
-      prefetch_container.HaveDefaultContextCookiesChanged(kRedirectUrl1));
-  EXPECT_FALSE(
-      prefetch_container.HaveDefaultContextCookiesChanged(kRedirectUrl2));
+  // Check the cookies for `kTestUrl`, `kRedirectUrl1` and `kRedirectUrl2`,
+  // respectively. AdvanceCurrentURLToServe() is used to set the current
+  // hop to check the cookies.
+  {
+    auto reader1 = prefetch_container.CreateReader();
+    EXPECT_FALSE(reader1.HaveDefaultContextCookiesChanged());
+    reader1.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader1.HaveDefaultContextCookiesChanged());
+    reader1.AdvanceCurrentURLToServe();
+    EXPECT_FALSE(reader1.HaveDefaultContextCookiesChanged());
+  }
 
   task_environment()->FastForwardBy(base::Milliseconds(10));
-  prefetch_container.OnIsolatedCookiesReadCompleteAndWriteStart();
+  reader.OnIsolatedCookiesReadCompleteAndWriteStart();
   task_environment()->FastForwardBy(base::Milliseconds(20));
 
   // The URL interceptor checks on the cookie copy status when trying to serve a
   // prefetch. If its still in progress, it registers a callback to be called
   // once the copy is complete.
-  EXPECT_TRUE(prefetch_container.IsIsolatedCookieCopyInProgress());
-  prefetch_container.OnInterceptorCheckCookieCopy();
+  EXPECT_TRUE(reader.IsIsolatedCookieCopyInProgress());
+  reader.OnInterceptorCheckCookieCopy();
   task_environment()->FastForwardBy(base::Milliseconds(40));
   bool callback_called = false;
-  prefetch_container.SetOnCookieCopyCompleteCallback(
+  reader.SetOnCookieCopyCompleteCallback(
       base::BindOnce([](bool* callback_called) { *callback_called = true; },
                      &callback_called));
 
-  prefetch_container.OnIsolatedCookieCopyComplete();
+  reader.OnIsolatedCookieCopyComplete();
 
-  EXPECT_FALSE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  EXPECT_FALSE(reader.IsIsolatedCookieCopyInProgress());
   EXPECT_TRUE(callback_called);
 
   // Simulate copying cookies for the next redirect hop.
-  prefetch_container.AdvanceCurrentURLToServe();
-  EXPECT_EQ(prefetch_container.GetCurrentURLToServe(), kRedirectUrl1);
-  EXPECT_FALSE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  reader.AdvanceCurrentURLToServe();
+  EXPECT_EQ(reader.GetCurrentURLToServe(), kRedirectUrl1);
+  EXPECT_FALSE(reader.IsIsolatedCookieCopyInProgress());
 
-  prefetch_container.OnIsolatedCookieCopyStart();
-  EXPECT_TRUE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  reader.OnIsolatedCookieCopyStart();
+  EXPECT_TRUE(reader.IsIsolatedCookieCopyInProgress());
   task_environment()->FastForwardBy(base::Milliseconds(10));
 
-  prefetch_container.OnIsolatedCookiesReadCompleteAndWriteStart();
+  reader.OnIsolatedCookiesReadCompleteAndWriteStart();
   task_environment()->FastForwardBy(base::Milliseconds(20));
-  EXPECT_TRUE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  EXPECT_TRUE(reader.IsIsolatedCookieCopyInProgress());
 
-  prefetch_container.OnInterceptorCheckCookieCopy();
+  reader.OnInterceptorCheckCookieCopy();
   task_environment()->FastForwardBy(base::Milliseconds(40));
 
   callback_called = false;
-  prefetch_container.SetOnCookieCopyCompleteCallback(
+  reader.SetOnCookieCopyCompleteCallback(
       base::BindOnce([](bool* callback_called) { *callback_called = true; },
                      &callback_called));
 
-  prefetch_container.OnIsolatedCookieCopyComplete();
-  EXPECT_FALSE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  reader.OnIsolatedCookieCopyComplete();
+  EXPECT_FALSE(reader.IsIsolatedCookieCopyInProgress());
   EXPECT_TRUE(callback_called);
 
   // Simulate copying cookies for the last redirect hop.
-  prefetch_container.AdvanceCurrentURLToServe();
-  EXPECT_EQ(prefetch_container.GetCurrentURLToServe(), kRedirectUrl2);
-  EXPECT_FALSE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  reader.AdvanceCurrentURLToServe();
+  EXPECT_EQ(reader.GetCurrentURLToServe(), kRedirectUrl2);
+  EXPECT_FALSE(reader.IsIsolatedCookieCopyInProgress());
 
-  prefetch_container.OnIsolatedCookieCopyStart();
-  EXPECT_TRUE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  reader.OnIsolatedCookieCopyStart();
+  EXPECT_TRUE(reader.IsIsolatedCookieCopyInProgress());
   task_environment()->FastForwardBy(base::Milliseconds(10));
 
-  prefetch_container.OnIsolatedCookiesReadCompleteAndWriteStart();
+  reader.OnIsolatedCookiesReadCompleteAndWriteStart();
   task_environment()->FastForwardBy(base::Milliseconds(20));
-  EXPECT_TRUE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  EXPECT_TRUE(reader.IsIsolatedCookieCopyInProgress());
 
-  prefetch_container.OnInterceptorCheckCookieCopy();
+  reader.OnInterceptorCheckCookieCopy();
   task_environment()->FastForwardBy(base::Milliseconds(40));
 
   callback_called = false;
-  prefetch_container.SetOnCookieCopyCompleteCallback(
+  reader.SetOnCookieCopyCompleteCallback(
       base::BindOnce([](bool* callback_called) { *callback_called = true; },
                      &callback_called));
 
-  prefetch_container.OnIsolatedCookieCopyComplete();
-  EXPECT_FALSE(prefetch_container.IsIsolatedCookieCopyInProgress());
+  reader.OnIsolatedCookieCopyComplete();
+  EXPECT_FALSE(reader.IsIsolatedCookieCopyInProgress());
   EXPECT_TRUE(callback_called);
 
   histogram_tester.ExpectUniqueTimeSample(
@@ -395,10 +466,12 @@ TEST_F(PrefetchContainerTest, PrefetchProxyPrefetchedResourceUkm) {
   std::unique_ptr<PrefetchContainer> prefetch_container =
       std::make_unique<PrefetchContainer>(
           GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com"),
-          PrefetchType(/*use_isolated_network_context=*/true,
-                       /*use_prefetch_proxy=*/true,
+          PrefetchType(/*use_prefetch_proxy=*/true,
                        blink::mojom::SpeculationEagerness::kEager),
-          blink::mojom::Referrer(), nullptr);
+          blink::mojom::Referrer(),
+          /*no_vary_search_expected=*/absl::nullopt,
+          blink::mojom::SpeculationInjectionWorld::kNone,
+          /*prefetch_document_manager=*/nullptr);
 
   network::URLLoaderCompletionStatus completion_status;
   completion_status.encoded_data_length = 100;
@@ -412,18 +485,18 @@ TEST_F(PrefetchContainerTest, PrefetchProxyPrefetchedResourceUkm) {
   UpdatePrefetchRequestMetrics(prefetch_container.get(), completion_status,
                                head.get());
 
-  prefetch_container->TakeStreamingURLLoader(
-      MakeServableStreamingURLLoaderForTest(
-          network::mojom::URLResponseHead::New(), "test body"));
+  MakeServableStreamingURLLoaderForTest(prefetch_container.get(),
+                                        network::mojom::URLResponseHead::New(),
+                                        "test body");
 
   // Simulates the URL of the prefetch being navigated to and the prefetch being
   // considered for serving.
-  prefetch_container->OnNavigationToPrefetch();
+  prefetch_container->OnReturnPrefetchToServe(/*served=*/true);
 
   // Simulate a successful DNS probe for this prefetch. Not this will also
   // update the status of the prefetch to
   // |PrefetchStatus::kPrefetchUsedProbeSuccess|.
-  prefetch_container->OnPrefetchProbeResult(
+  prefetch_container->CreateReader().OnPrefetchProbeResult(
       PrefetchProbeResult::kDNSProbeSuccess);
 
   // Deleting the prefetch container will trigger the recording of the
@@ -514,10 +587,12 @@ TEST_F(PrefetchContainerTest, PrefetchProxyPrefetchedResourceUkm_NothingSet) {
   std::unique_ptr<PrefetchContainer> prefetch_container =
       std::make_unique<PrefetchContainer>(
           GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com"),
-          PrefetchType(/*use_isolated_network_context=*/true,
-                       /*use_prefetch_proxy=*/true,
+          PrefetchType(/*use_prefetch_proxy=*/true,
                        blink::mojom::SpeculationEagerness::kEager),
-          blink::mojom::Referrer(), nullptr);
+          blink::mojom::Referrer(),
+          /*no_vary_search_expected=*/absl::nullopt,
+          blink::mojom::SpeculationInjectionWorld::kNone,
+          /*prefetch_document_manager=*/nullptr);
   prefetch_container.reset();
 
   auto ukm_entries = ukm_recorder.GetEntries(
@@ -585,32 +660,24 @@ TEST_F(PrefetchContainerTest, EligibilityCheck) {
 
   PrefetchContainer prefetch_container(
       GlobalRenderFrameHostId(1234, 5678), kTestUrl1,
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), prefetch_document_manager->GetWeakPtr());
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      prefetch_document_manager->GetWeakPtr());
+  prefetch_container.MakeResourceRequest({});
 
   // Mark initial prefetch as eligible
-  prefetch_container.OnEligibilityCheckComplete(kTestUrl1, true, absl::nullopt);
+  prefetch_container.OnEligibilityCheckComplete(true, absl::nullopt);
 
   EXPECT_EQ(prefetch_document_manager->GetReferringPageMetrics()
                 .prefetch_eligible_count,
             1);
 
   // Add a redirect, register a callback for it, and then mark it as eligible.
-  prefetch_container.AddRedirectHop(kTestUrl2);
-
-  base::RunLoop run_loop;
-  prefetch_container.SetOnEligibilityCheckCompleteCallback(
-      kTestUrl2, base::BindOnce(
-                     [](base::RunLoop* run_loop, bool is_eligible) {
-                       EXPECT_TRUE(is_eligible);
-                       run_loop->Quit();
-                     },
-                     &run_loop));
-
-  prefetch_container.OnEligibilityCheckComplete(kTestUrl2, true, absl::nullopt);
-  run_loop.Run();
+  AddRedirectHop(prefetch_container, kTestUrl2);
+  prefetch_container.OnEligibilityCheckComplete(true, absl::nullopt);
 
   // Referring page metrics is only incremented for the original prefetch URL
   // and not any redirects.
@@ -631,33 +698,25 @@ TEST_F(PrefetchContainerTest, IneligibleRedirect) {
 
   PrefetchContainer prefetch_container(
       GlobalRenderFrameHostId(1234, 5678), kTestUrl1,
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), prefetch_document_manager->GetWeakPtr());
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      prefetch_document_manager->GetWeakPtr());
+  prefetch_container.MakeResourceRequest({});
 
   // Mark initial prefetch as eligible
-  prefetch_container.OnEligibilityCheckComplete(kTestUrl1, true, absl::nullopt);
+  prefetch_container.OnEligibilityCheckComplete(true, absl::nullopt);
 
   EXPECT_EQ(prefetch_document_manager->GetReferringPageMetrics()
                 .prefetch_eligible_count,
             1);
 
   // Add a redirect, register a callback for it, and then mark it as ineligible.
-  prefetch_container.AddRedirectHop(kTestUrl2);
-
-  base::RunLoop run_loop;
-  prefetch_container.SetOnEligibilityCheckCompleteCallback(
-      kTestUrl2, base::BindOnce(
-                     [](base::RunLoop* run_loop, bool is_eligible) {
-                       EXPECT_FALSE(is_eligible);
-                       run_loop->Quit();
-                     },
-                     &run_loop));
-
+  AddRedirectHop(prefetch_container, kTestUrl2);
   prefetch_container.OnEligibilityCheckComplete(
-      kTestUrl2, false, PrefetchStatus::kPrefetchNotEligibleUserHasCookies);
-  run_loop.Run();
+      false, PrefetchStatus::kPrefetchNotEligibleUserHasCookies);
 
   // Ineligible redirects are treated as failed prefetches, and not ineligible
   // prefetches.
@@ -668,49 +727,586 @@ TEST_F(PrefetchContainerTest, IneligibleRedirect) {
             PrefetchStatus::kPrefetchFailedIneligibleRedirect);
 }
 
-TEST_F(PrefetchContainerTest, NoVarySearchHelper) {
-  const GURL kTestUrl = GURL("https://test.com?a=2&b=3");
+TEST_F(PrefetchContainerTest, BlockUntilHeadHistograms) {
+  struct TestCase {
+    blink::mojom::SpeculationEagerness eagerness;
+    bool block_until_head;
+    base::TimeDelta block_until_head_duration;
+    bool served;
+  };
+
+  std::vector<TestCase> test_cases{
+      {blink::mojom::SpeculationEagerness::kEager, true, base::Milliseconds(10),
+       true},
+      {blink::mojom::SpeculationEagerness::kModerate, false,
+       base::Milliseconds(20), false},
+      {blink::mojom::SpeculationEagerness::kConservative, true,
+       base::Milliseconds(40), false}};
+
+  base::HistogramTester histogram_tester;
+  for (const auto& test_case : test_cases) {
+    PrefetchContainer prefetch_container(
+        GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com"),
+        PrefetchType(/*use_prefetch_proxy=*/true, test_case.eagerness),
+        blink::mojom::Referrer(),
+        /*no_vary_search_expected=*/absl::nullopt,
+        blink::mojom::SpeculationInjectionWorld::kNone,
+        /*prefetch_document_manager=*/nullptr);
+
+    prefetch_container.OnGetPrefetchToServe(test_case.block_until_head);
+    if (test_case.block_until_head) {
+      task_environment()->FastForwardBy(test_case.block_until_head_duration);
+    }
+    prefetch_container.OnReturnPrefetchToServe(test_case.served);
+  }
+
+  histogram_tester.ExpectBucketCount(
+      "PrefetchProxy.AfterClick.WasBlockedUntilHeadWhenServing.Eager", true, 1);
+  histogram_tester.ExpectBucketCount(
+      "PrefetchProxy.AfterClick.WasBlockedUntilHeadWhenServing.Eager", false,
+      0);
+
+  histogram_tester.ExpectBucketCount(
+      "PrefetchProxy.AfterClick.WasBlockedUntilHeadWhenServing.Moderate", true,
+      0);
+  histogram_tester.ExpectBucketCount(
+      "PrefetchProxy.AfterClick.WasBlockedUntilHeadWhenServing.Moderate", false,
+      1);
+
+  histogram_tester.ExpectBucketCount(
+      "PrefetchProxy.AfterClick.WasBlockedUntilHeadWhenServing.Conservative",
+      true, 1);
+  histogram_tester.ExpectBucketCount(
+      "PrefetchProxy.AfterClick.WasBlockedUntilHeadWhenServing.Conservative",
+      false, 0);
+
+  histogram_tester.ExpectUniqueTimeSample(
+      "PrefetchProxy.AfterClick.BlockUntilHeadDuration.Served.Eager",
+      base::Milliseconds(10), 1);
+  histogram_tester.ExpectTotalCount(
+      "PrefetchProxy.AfterClick.BlockUntilHeadDuration.NotServed.Eager", 0);
+
+  histogram_tester.ExpectTotalCount(
+      "PrefetchProxy.AfterClick.BlockUntilHeadDuration.Served.Moderate", 0);
+  histogram_tester.ExpectTotalCount(
+      "PrefetchProxy.AfterClick.BlockUntilHeadDuration.NotServed.Moderate", 0);
+
+  histogram_tester.ExpectTotalCount(
+      "PrefetchProxy.AfterClick.BlockUntilHeadDuration.Served.Conservative", 0);
+  histogram_tester.ExpectUniqueTimeSample(
+      "PrefetchProxy.AfterClick.BlockUntilHeadDuration.NotServed.Conservative",
+      base::Milliseconds(40), 1);
+}
+
+TEST_F(PrefetchContainerTest, RecordRedirectChainSize) {
+  base::HistogramTester histogram_tester;
 
   PrefetchContainer prefetch_container(
-      GlobalRenderFrameHostId(1234, 5678), kTestUrl,
-      PrefetchType(/*use_isolated_network_context=*/true,
-                   /*use_prefetch_proxy=*/true,
+      GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com"),
+      PrefetchType(/*use_prefetch_proxy=*/true,
                    blink::mojom::SpeculationEagerness::kEager),
-      blink::mojom::Referrer(), nullptr);
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
+  prefetch_container.MakeResourceRequest({});
 
-  // Set up NoVarySearchHelper.
-  scoped_refptr<NoVarySearchHelper> no_vary_search_helper =
-      base::MakeRefCounted<NoVarySearchHelper>();
+  AddRedirectHop(prefetch_container, GURL("https://redirect1.com"));
+  AddRedirectHop(prefetch_container, GURL("https://redirect2.com"));
+  prefetch_container.OnPrefetchComplete();
 
-  network::mojom::URLResponseHeadPtr head =
-      network::mojom::URLResponseHead::New();
-  head->parsed_headers = network::mojom::ParsedHeaders::New();
-  head->parsed_headers->no_vary_search_with_parse_error =
-      network::mojom::NoVarySearchWithParseError::NewNoVarySearch(
-          network::mojom::NoVarySearch::New());
-  head->parsed_headers->no_vary_search_with_parse_error->get_no_vary_search()
-      ->vary_on_key_order = true;
-  head->parsed_headers->no_vary_search_with_parse_error->get_no_vary_search()
-      ->search_variance =
-      network::mojom::SearchParamsVariance::NewVaryParams({"a"});
-
-  no_vary_search_helper->AddUrl(kTestUrl, *head);
-  prefetch_container.SetNoVarySearchHelper(no_vary_search_helper);
-
-  // Register Cookie listener for the prefetch URL.
-  prefetch_container.RegisterCookieListener(kTestUrl, cookie_manager());
-
-  // Can use either the exact URL or a matching URL based on the
-  // NoVarySearchHelper.
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl));
-  EXPECT_FALSE(prefetch_container.HaveDefaultContextCookiesChanged(
-      GURL("https://test.com?a=2")));
-
-  ASSERT_TRUE(SetCookie(kTestUrl, "test-cookie"));
-
-  EXPECT_TRUE(prefetch_container.HaveDefaultContextCookiesChanged(kTestUrl));
-  EXPECT_TRUE(prefetch_container.HaveDefaultContextCookiesChanged(
-      GURL("https://test.com?a=2")));
+  histogram_tester.ExpectUniqueSample(
+      "PrefetchProxy.Prefetch.RedirectChainSize", 3, 1);
 }
+
+TEST_F(PrefetchContainerTest, IsIsolatedNetworkRequired) {
+  base::HistogramTester histogram_tester;
+
+  blink::mojom::Referrer referrer;
+  referrer.url = GURL("https://test.com/referrer");
+  PrefetchContainer prefetch_container(
+      GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com/prefetch"),
+      PrefetchType(/*use_prefetch_proxy=*/true,
+                   blink::mojom::SpeculationEagerness::kEager),
+      referrer, /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
+  prefetch_container.MakeResourceRequest({});
+
+  EXPECT_FALSE(
+      prefetch_container.IsIsolatedNetworkContextRequiredForCurrentPrefetch());
+
+  AddRedirectHop(prefetch_container, GURL("https://test.com/redirect"));
+
+  EXPECT_FALSE(
+      prefetch_container.IsIsolatedNetworkContextRequiredForCurrentPrefetch());
+  EXPECT_FALSE(prefetch_container
+                   .IsIsolatedNetworkContextRequiredForPreviousRedirectHop());
+
+  AddRedirectHop(prefetch_container, GURL("https://m.test.com/redirect"));
+
+  EXPECT_FALSE(
+      prefetch_container.IsIsolatedNetworkContextRequiredForCurrentPrefetch());
+  EXPECT_FALSE(prefetch_container
+                   .IsIsolatedNetworkContextRequiredForPreviousRedirectHop());
+
+  AddRedirectHop(prefetch_container, GURL("https://other.com/redirect1"));
+
+  EXPECT_TRUE(
+      prefetch_container.IsIsolatedNetworkContextRequiredForCurrentPrefetch());
+  EXPECT_FALSE(prefetch_container
+                   .IsIsolatedNetworkContextRequiredForPreviousRedirectHop());
+
+  AddRedirectHop(prefetch_container, GURL("https://other.com/redirect2"));
+
+  EXPECT_TRUE(
+      prefetch_container.IsIsolatedNetworkContextRequiredForCurrentPrefetch());
+  EXPECT_TRUE(prefetch_container
+                  .IsIsolatedNetworkContextRequiredForPreviousRedirectHop());
+}
+
+TEST_F(PrefetchContainerTest, MultipleStreamingURLLoaders) {
+  const GURL kTestUrl1 = GURL("https://test1.com");
+  const GURL kTestUrl2 = GURL("https://test2.com");
+
+  base::HistogramTester histogram_tester;
+
+  auto prefetch_container = std::make_unique<PrefetchContainer>(
+      GlobalRenderFrameHostId(1234, 5678), kTestUrl1,
+      PrefetchType(/*use_prefetch_proxy=*/true,
+                   blink::mojom::SpeculationEagerness::kEager),
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
+  prefetch_container->MakeResourceRequest({});
+
+  EXPECT_FALSE(prefetch_container->GetStreamingURLLoader());
+
+  EXPECT_NE(prefetch_container->GetServableState(base::TimeDelta::Max()),
+            PrefetchContainer::ServableState::kServable);
+  EXPECT_FALSE(prefetch_container->GetHead());
+
+  MakeServableStreamingURLLoadersWithNetworkTransitionRedirectForTest(
+      prefetch_container.get(), kTestUrl1, kTestUrl2);
+  EXPECT_EQ(prefetch_container->GetServableState(base::TimeDelta::Max()),
+            PrefetchContainer::ServableState::kServable);
+  EXPECT_TRUE(prefetch_container->GetHead());
+
+  // As the prefetch is already completed, the streaming loader is deleted
+  // asynchronously.
+  EXPECT_TRUE(
+      prefetch_container->IsStreamingURLLoaderDeletionScheduledForTesting());
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(prefetch_container->GetStreamingURLLoader());
+
+  PrefetchContainer::Reader reader = prefetch_container->CreateReader();
+
+  base::WeakPtr<PrefetchResponseReader> weak_first_response_reader =
+      reader.GetCurrentResponseReaderToServeForTesting();
+  PrefetchRequestHandler first_request_handler = reader.CreateRequestHandler();
+
+  base::WeakPtr<PrefetchResponseReader> weak_second_response_reader =
+      reader.GetCurrentResponseReaderToServeForTesting();
+  PrefetchRequestHandler second_request_handler = reader.CreateRequestHandler();
+
+  // `CreateRequestHandler()` itself doesn't make the PrefetchContainer
+  // non-servable.
+  EXPECT_EQ(prefetch_container->GetServableState(base::TimeDelta::Max()),
+            PrefetchContainer::ServableState::kServable);
+  EXPECT_TRUE(prefetch_container->GetHead());
+
+  std::unique_ptr<PrefetchTestURLLoaderClient> first_serving_url_loader_client =
+      std::make_unique<PrefetchTestURLLoaderClient>();
+  network::ResourceRequest first_serving_request;
+  first_serving_request.url = kTestUrl1;
+  first_serving_request.method = "GET";
+
+  std::move(first_request_handler)
+      .Run(first_serving_request,
+           first_serving_url_loader_client->BindURLloaderAndGetReceiver(),
+           first_serving_url_loader_client->BindURLLoaderClientAndGetRemote());
+
+  std::unique_ptr<PrefetchTestURLLoaderClient>
+      second_serving_url_loader_client =
+          std::make_unique<PrefetchTestURLLoaderClient>();
+  network::ResourceRequest second_serving_request;
+  second_serving_request.url = kTestUrl2;
+  second_serving_request.method = "GET";
+
+  std::move(second_request_handler)
+      .Run(second_serving_request,
+           second_serving_url_loader_client->BindURLloaderAndGetReceiver(),
+           second_serving_url_loader_client->BindURLLoaderClientAndGetRemote());
+
+  prefetch_container.reset();
+
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_EQ(first_serving_url_loader_client->received_redirects().size(), 1u);
+
+  EXPECT_EQ(second_serving_url_loader_client->body_content(), "test body");
+  EXPECT_TRUE(
+      second_serving_url_loader_client->completion_status().has_value());
+
+  EXPECT_TRUE(weak_first_response_reader);
+  EXPECT_TRUE(weak_second_response_reader);
+
+  first_serving_url_loader_client->DisconnectMojoPipes();
+  second_serving_url_loader_client->DisconnectMojoPipes();
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_FALSE(weak_first_response_reader);
+  EXPECT_FALSE(weak_second_response_reader);
+}
+
+TEST_F(PrefetchContainerTest, CancelAndClearStreamingLoader) {
+  const GURL kTestUrl1 = GURL("https://test1.com");
+  const GURL kTestUrl2 = GURL("https://test2.com");
+
+  base::HistogramTester histogram_tester;
+
+  PrefetchContainer prefetch_container(
+      GlobalRenderFrameHostId(1234, 5678), kTestUrl1,
+      PrefetchType(/*use_prefetch_proxy=*/true,
+                   blink::mojom::SpeculationEagerness::kEager),
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
+  prefetch_container.MakeResourceRequest({});
+
+  auto pending_request =
+      MakeManuallyServableStreamingURLLoaderForTest(&prefetch_container);
+
+  mojo::ScopedDataPipeConsumerHandle consumer_handle;
+  mojo::ScopedDataPipeProducerHandle producer_handle;
+  CHECK_EQ(mojo::CreateDataPipe(1024, producer_handle, consumer_handle),
+           MOJO_RESULT_OK);
+  pending_request.client->OnReceiveResponse(
+      network::mojom::URLResponseHead::New(), std::move(consumer_handle),
+      absl::nullopt);
+  base::RunLoop().RunUntilIdle();
+
+  // Prefetching is ongoing.
+  ASSERT_TRUE(prefetch_container.GetStreamingURLLoader());
+  base::WeakPtr<PrefetchStreamingURLLoader> streaming_loader =
+      prefetch_container.GetStreamingURLLoader();
+  EXPECT_EQ(prefetch_container.GetServableState(base::TimeDelta::Max()),
+            PrefetchContainer::ServableState::kServable);
+
+  prefetch_container.CancelStreamingURLLoaderIfNotServing();
+
+  // `streaming_loader` is still alive and working.
+  EXPECT_FALSE(prefetch_container.GetStreamingURLLoader());
+  EXPECT_TRUE(streaming_loader);
+  EXPECT_EQ(prefetch_container.GetServableState(base::TimeDelta::Max()),
+            PrefetchContainer::ServableState::kServable);
+
+  base::RunLoop().RunUntilIdle();
+
+  // `streaming_loader` is deleted asynchronously and its prefetching URL loader
+  // is canceled. This itself doesn't make PrefetchContainer non-servable.
+  EXPECT_FALSE(streaming_loader);
+  EXPECT_EQ(prefetch_container.GetServableState(base::TimeDelta::Max()),
+            PrefetchContainer::ServableState::kServable);
+}
+
+// To test lifetime and ownership issues, all possible event orderings for
+// successful prefetching and serving are tested.
+enum class Event {
+  // Call OnComplete().
+  kPrefetchOnComplete,
+
+  // Call CreateRequestHandler().
+  kCreateRequestHandler,
+
+  // Call the PrefetchRequestHandler returned by CreateRequestHandler().
+  kRequestHandler,
+
+  // Disconnect `serving_url_loader_client`.
+  kDisconnectServingClient,
+
+  // Completely read the body mojo pipe.
+  kCompleteBody,
+
+  // Destruct PrefetchContainer.
+  kDestructPrefetchContainer,
+};
+
+enum class BodySize { kSmall, kLarge };
+
+// To detect corner cases around lifetime and ownership, test all possible
+// permutations of the order of events.
+class PrefetchContainerLifetimeTest
+    : public PrefetchContainerTest,
+      public ::testing::WithParamInterface<
+          std::tuple<std::vector<Event>, BodySize>> {};
+
+TEST_P(PrefetchContainerLifetimeTest, Lifetime) {
+  auto prefetch_container = std::make_unique<PrefetchContainer>(
+      GlobalRenderFrameHostId(1234, 5678), GURL("https://test.com"),
+      PrefetchType(/*use_prefetch_proxy=*/true,
+                   blink::mojom::SpeculationEagerness::kEager),
+      blink::mojom::Referrer(),
+      /*no_vary_search_expected=*/absl::nullopt,
+      blink::mojom::SpeculationInjectionWorld::kNone,
+      /*prefetch_document_manager=*/nullptr);
+
+  auto pending_request =
+      MakeManuallyServableStreamingURLLoaderForTest(prefetch_container.get());
+
+  const auto producer_pipe_capacity =
+      network::features::GetDataPipeDefaultAllocationSize(
+          network::features::DataPipeAllocationSize::kLargerSizeIfPossible);
+
+  const BodySize body_size = std::get<1>(GetParam());
+  std::string content;
+  switch (body_size) {
+    case BodySize::kSmall:
+      content = "Body";
+      break;
+    case BodySize::kLarge:
+      content = std::string(4 * producer_pipe_capacity, '-');
+      break;
+  }
+
+  mojo::ScopedDataPipeConsumerHandle consumer_handle;
+  bool producer_completed = false;
+
+  {
+    mojo::ScopedDataPipeProducerHandle producer_handle;
+    ASSERT_EQ(mojo::CreateDataPipe(producer_pipe_capacity, producer_handle,
+                                   consumer_handle),
+              MOJO_RESULT_OK);
+    auto producer =
+        std::make_unique<mojo::DataPipeProducer>(std::move(producer_handle));
+    mojo::DataPipeProducer* raw_producer = producer.get();
+    raw_producer->Write(std::make_unique<mojo::StringDataSource>(
+                            content, mojo::StringDataSource::AsyncWritingMode::
+                                         STRING_STAYS_VALID_UNTIL_COMPLETION),
+                        base::BindOnce(
+                            [](std::unique_ptr<mojo::DataPipeProducer> producer,
+                               bool* producer_completed, MojoResult result) {
+                              *producer_completed = true;
+                              CHECK_EQ(result, MOJO_RESULT_OK);
+                              // `producer` is deleted here.
+                            },
+                            std::move(producer), &producer_completed));
+  }
+
+  EXPECT_NE(prefetch_container->GetServableState(base::TimeDelta::Max()),
+            PrefetchContainer::ServableState::kServable);
+  EXPECT_FALSE(prefetch_container->GetHead());
+
+  pending_request.client->OnReceiveResponse(
+      network::mojom::URLResponseHead::New(), std::move(consumer_handle),
+      absl::nullopt);
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_EQ(prefetch_container->GetServableState(base::TimeDelta::Max()),
+            PrefetchContainer::ServableState::kServable);
+  EXPECT_TRUE(prefetch_container->GetHead());
+
+  PrefetchContainer::Reader reader = prefetch_container->CreateReader();
+
+  base::WeakPtr<PrefetchResponseReader> weak_response_reader =
+      reader.GetCurrentResponseReaderToServeForTesting();
+  ASSERT_TRUE(prefetch_container->GetStreamingURLLoader());
+  base::WeakPtr<PrefetchStreamingURLLoader> weak_streaming_loader =
+      prefetch_container->GetStreamingURLLoader();
+
+  PrefetchRequestHandler request_handler;
+  std::unique_ptr<PrefetchTestURLLoaderClient> serving_url_loader_client;
+
+  // `PrefetchStreamingURLLoader` and `PrefetchResponseReader` are initially
+  // both expected alive, because they are needed for serving `request_handler`.
+
+  std::set<Event> done;
+
+  for (const Event event : std::get<0>(GetParam())) {
+    switch (event) {
+      case Event::kPrefetchOnComplete:
+        pending_request.client->OnComplete(
+            network::URLLoaderCompletionStatus(net::OK));
+        break;
+
+      case Event::kCreateRequestHandler:
+        ASSERT_FALSE(request_handler);
+        ASSERT_TRUE(prefetch_container);
+        request_handler = reader.CreateRequestHandler();
+        break;
+
+      // Call the PrefetchRequestHandler returned by CreateRequestHandler().
+      case Event::kRequestHandler: {
+        ASSERT_TRUE(request_handler);  // NOLINT(bugprone-use-after-move)
+        ASSERT_FALSE(serving_url_loader_client);
+
+        network::ResourceRequest serving_request;
+        serving_request.url = GURL("https://test.com");
+        serving_request.method = "GET";
+
+        serving_url_loader_client =
+            std::make_unique<PrefetchTestURLLoaderClient>();
+        serving_url_loader_client->SetAutoDraining(false);
+
+        // NOLINT(bugprone-use-after-move)
+        std::move(request_handler)
+            .Run(serving_request,
+                 serving_url_loader_client->BindURLloaderAndGetReceiver(),
+                 serving_url_loader_client->BindURLLoaderClientAndGetRemote());
+        break;
+      }
+
+      // Disconnect `serving_url_loader_client`.
+      case Event::kDisconnectServingClient:
+        ASSERT_TRUE(serving_url_loader_client);
+        serving_url_loader_client->DisconnectMojoPipes();
+        break;
+
+      // Completely read the body mojo pipe.
+      case Event::kCompleteBody: {
+        if (body_size == BodySize::kLarge) {
+          // The body is sufficiently large to fill the data pipes and thus the
+          // producer should still have pending data to write before
+          // `StartDraining()`.
+          EXPECT_FALSE(producer_completed);
+        }
+        // Wait until the URLLoaderClient completion.
+        // `base::RunLoop().RunUntilIdle()` is not sufficient here, because
+        // `mojo::DataPipeProducer` uses thread pool.
+        base::RunLoop loop;
+        serving_url_loader_client->SetOnDataCompleteCallback(
+            loop.QuitClosure());
+        serving_url_loader_client->StartDraining();
+        loop.Run();
+        EXPECT_TRUE(producer_completed);
+        break;
+      }
+
+      case Event::kDestructPrefetchContainer:
+        ASSERT_TRUE(prefetch_container);
+        prefetch_container.reset();
+        break;
+    }
+    done.insert(event);
+
+    base::RunLoop().RunUntilIdle();
+
+    // `PrefetchResponseReader` should be kept alive as long as
+    // `PrefetchContainer` is alive or serving URLLoaderClients are not
+    // finished.
+    EXPECT_EQ(!!weak_response_reader,
+              !done.count(Event::kDisconnectServingClient) ||
+                  !done.count(Event::kDestructPrefetchContainer));
+
+    // `PrefetchStreamingURLLoader` is kept alive until prefetching is
+    // completed.
+    EXPECT_EQ(!!weak_streaming_loader, !done.count(Event::kPrefetchOnComplete));
+
+    if (done.count(Event::kRequestHandler)) {
+      EXPECT_EQ(serving_url_loader_client->completion_status().has_value(),
+                done.count(Event::kPrefetchOnComplete));
+    }
+    if (done.count(Event::kCompleteBody)) {
+      EXPECT_EQ(serving_url_loader_client->body_content().size(),
+                content.size());
+      EXPECT_EQ(serving_url_loader_client->body_content(), content);
+    }
+  }
+}
+
+std::vector<std::vector<Event>> ValidEventPermutations() {
+  std::vector<Event> events({
+      Event::kPrefetchOnComplete,
+      Event::kCreateRequestHandler,
+      Event::kRequestHandler,
+      Event::kDisconnectServingClient,
+      Event::kCompleteBody,
+      Event::kDestructPrefetchContainer,
+  });
+
+  std::vector<std::vector<Event>> params;
+  do {
+    const auto it_prefetch_on_complete =
+        std::find(events.begin(), events.end(), Event::kPrefetchOnComplete);
+    const auto it_create_request_handler =
+        std::find(events.begin(), events.end(), Event::kCreateRequestHandler);
+    const auto it_request_handler =
+        std::find(events.begin(), events.end(), Event::kRequestHandler);
+    const auto it_disconnect_serving_client = std::find(
+        events.begin(), events.end(), Event::kDisconnectServingClient);
+    const auto it_complete_body =
+        std::find(events.begin(), events.end(), Event::kCompleteBody);
+    const auto it_destruct_prefetch_container = std::find(
+        events.begin(), events.end(), Event::kDestructPrefetchContainer);
+
+    // Ordering requirements due to direct data dependencies:
+
+    // `kCreateRequestHandler` -> `kRequestHandler` (`request_handler`)
+    if (it_create_request_handler > it_request_handler) {
+      continue;
+    }
+    // `kRequestHandler` -> `kDisconnectServingClient`
+    // (`serving_url_loader_client`)
+    if (it_request_handler > it_disconnect_serving_client) {
+      continue;
+    }
+    // `kCreateRequestHandler` -> `kDestructPrefetchContainer`
+    // (`prefetch_container`)
+    if (it_create_request_handler > it_destruct_prefetch_container) {
+      continue;
+    }
+    // `kRequestHandler` -> `kCompleteBody` (body data pipe)
+    if (it_request_handler > it_complete_body) {
+      continue;
+    }
+
+    // `kPrefetchOnComplete` -> `kCompleteBody` and successful
+    // `kDisconnectServingClient` (prefetch completion)
+    if (it_prefetch_on_complete > it_complete_body) {
+      continue;
+    }
+    if (it_prefetch_on_complete > it_disconnect_serving_client) {
+      continue;
+    }
+
+    params.push_back(events);
+  } while (std::next_permutation(events.begin(), events.end()));
+
+  // Make sure some particular sequences are tested, where:
+
+  // - `PrefetchContainer` is destructed before prefetch is completed:
+  CHECK(base::Contains(
+      params, std::vector<Event>{
+                  Event::kCreateRequestHandler, Event::kRequestHandler,
+                  Event::kDestructPrefetchContainer, Event::kPrefetchOnComplete,
+                  Event::kCompleteBody, Event::kDisconnectServingClient}));
+
+  // - `PrefetchContainer` is destructed before PrefetchRequestHandler is
+  // invoked and prefetch is completed:
+  CHECK(base::Contains(
+      params,
+      std::vector<Event>{
+          Event::kCreateRequestHandler, Event::kDestructPrefetchContainer,
+          Event::kRequestHandler, Event::kPrefetchOnComplete,
+          Event::kCompleteBody, Event::kDisconnectServingClient}));
+
+  // - `PrefetchContainer` is destructed before PrefetchRequestHandler is
+  // invoked but after prefetch is completed:
+  CHECK(base::Contains(
+      params, std::vector<Event>{
+                  Event::kPrefetchOnComplete, Event::kCreateRequestHandler,
+                  Event::kDestructPrefetchContainer, Event::kRequestHandler,
+                  Event::kCompleteBody, Event::kDisconnectServingClient}));
+
+  return params;
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ParametrizedTests,
+    PrefetchContainerLifetimeTest,
+    testing::Combine(testing::ValuesIn(ValidEventPermutations()),
+                     testing::Values(BodySize::kSmall, BodySize::kLarge)));
 
 }  // namespace content

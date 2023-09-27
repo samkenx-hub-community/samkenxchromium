@@ -16,24 +16,42 @@
 #include "chromeos/ash/components/dbus/hermes/hermes_manager_client.h"
 #include "chromeos/ash/components/dbus/hermes/hermes_profile_client.h"
 #include "chromeos/ash/components/network/cellular_esim_profile.h"
+#include "chromeos/ash/components/network/network_handler.h"
+#include "chromeos/ash/components/network/network_profile.h"
+#include "chromeos/ash/components/network/network_profile_handler.h"
 
 namespace ash {
 
-namespace {
+namespace cellular_utils {
 
+const char kSmdsGsma[] = "1$lpa.ds.gsma.com$";
+const char kSmdsStork[] = "1$prod.smds.rsp.goog$";
+const char kSmdsAndroidProduction[] = "1$lpa.live.esimdiscovery.com$";
+const char kSmdsAndroidStaging[] = "1$lpa.live.esimdiscovery.dev$";
+
+}  // namespace cellular_utils
+
+namespace {
 const char kNonShillCellularNetworkPathPrefix[] = "/non-shill-cellular/";
+}  // namespace
 
 base::flat_set<dbus::ObjectPath> GetProfilePathsFromEuicc(
     HermesEuiccClient::Properties* euicc_properties) {
   base::flat_set<dbus::ObjectPath> profile_paths;
 
-  for (const dbus::ObjectPath& path :
-       euicc_properties->installed_carrier_profiles().value()) {
-    profile_paths.insert(path);
-  }
-  for (const dbus::ObjectPath& path :
-       euicc_properties->pending_carrier_profiles().value()) {
-    profile_paths.insert(path);
+  if (features::IsSmdsDbusMigrationEnabled()) {
+    for (const dbus::ObjectPath& path : euicc_properties->profiles().value()) {
+      profile_paths.insert(path);
+    }
+  } else {
+    for (const dbus::ObjectPath& path :
+         euicc_properties->installed_carrier_profiles().value()) {
+      profile_paths.insert(path);
+    }
+    for (const dbus::ObjectPath& path :
+         euicc_properties->pending_carrier_profiles().value()) {
+      profile_paths.insert(path);
+    }
   }
 
   return profile_paths;
@@ -93,7 +111,7 @@ const base::flat_map<int32_t, std::string> GetESimSlotToEidMap() {
   return esim_slot_to_eid;
 }
 
-}  // namespace
+namespace cellular_utils {
 
 std::vector<CellularESimProfile> GenerateProfilesFromHermes() {
   std::vector<CellularESimProfile> profiles;
@@ -149,6 +167,13 @@ std::string GenerateStubCellularServicePath(const std::string& iccid) {
   return base::StrCat({kNonShillCellularNetworkPathPrefix, iccid});
 }
 
+const NetworkProfile* GetCellularProfile(
+    const NetworkProfileHandler* network_profile_handler) {
+  DCHECK(network_profile_handler);
+  return network_profile_handler->GetProfileForUserhash(
+      /*userhash=*/std::string());
+}
+
 bool IsStubCellularServicePath(const std::string& service_path) {
   return base::StartsWith(service_path, kNonShillCellularNetworkPathPrefix);
 }
@@ -170,4 +195,22 @@ absl::optional<dbus::ObjectPath> GetCurrentEuiccPath() {
   return use_second_euicc ? euicc_paths[1] : euicc_paths[0];
 }
 
+std::vector<std::string> GetSmdsActivationCodes() {
+  std::vector<std::string> activation_codes;
+  if (features::ShouldUseStorkSmds()) {
+    activation_codes.push_back(kSmdsStork);
+  }
+  if (features::ShouldUseAndroidStagingSmds()) {
+    activation_codes.push_back(kSmdsAndroidStaging);
+  }
+  if (activation_codes.empty()) {
+    if (features::IsSmdsSupportEnabled()) {
+      activation_codes.push_back(kSmdsAndroidProduction);
+    }
+    activation_codes.push_back(kSmdsGsma);
+  }
+  return activation_codes;
+}
+
+}  // namespace cellular_utils
 }  // namespace ash

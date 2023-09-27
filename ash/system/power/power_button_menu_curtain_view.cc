@@ -6,10 +6,8 @@
 
 #include <memory>
 
-#include "ash/public/cpp/style/color_provider.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/style/ash_color_id.h"
-#include "ash/style/ash_color_provider.h"
 #include "ash/style/system_shadow.h"
 #include "ash/system/power/power_button_menu_view_util.h"
 #include "base/check_deref.h"
@@ -17,6 +15,7 @@
 #include "ui/accessibility/ax_enums.mojom-shared.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
 #include "ui/compositor/scoped_layer_animation_settings.h"
@@ -67,11 +66,10 @@ views::FlexSpecification FullFlex() {
       .WithWeight(1);
 }
 
-gfx::ImageSkia EnterpriseIcon(const ColorProvider& color_provider) {
+gfx::ImageSkia EnterpriseIcon(const ui::ColorProvider& color_provider) {
   return gfx::CreateVectorIcon(
       chromeos::kEnterpriseIcon,
-      color_provider.GetContentLayerColor(
-          ash::AshColorProvider::ContentLayerType::kIconColorPrimary));
+      color_provider.GetColor(kColorAshIconColorPrimary));
 }
 
 std::u16string TitleText() {
@@ -87,15 +85,15 @@ std::u16string MessageText() {
 PowerButtonMenuCurtainView::PowerButtonMenuCurtainView() {
   SetPaintToLayer();
   SetBorder(std::make_unique<views::HighlightBorder>(
-      kPowerButtonMenuCornerRadius, kPowerButtonMenuBorderType,
-      /*use_light_colors=*/false));
+      kPowerButtonMenuCornerRadius, kPowerButtonMenuBorderType));
   SetBackground(
       views::CreateThemedSolidBackground(kPowerButtonMenuBackgroundColorId));
 
   layer()->SetFillsBoundsOpaquely(false);
   layer()->SetRoundedCornerRadius(
       gfx::RoundedCornersF(kPowerButtonMenuCornerRadius));
-  layer()->SetBackgroundBlur(kPowerButtonMenuBlurType);
+  layer()->SetBackgroundBlur(ColorProvider::kBackgroundBlurSigma);
+  layer()->SetBackdropFilterQuality(ColorProvider::kBackgroundBlurQuality);
   GetViewAccessibility().OverrideRole(ax::mojom::Role::kDialog);
   Initialize();
 
@@ -121,10 +119,17 @@ void PowerButtonMenuCurtainView::ScheduleShowHideAnimation(bool show) {
   SetLayerAnimation(shadow_->GetLayer(), nullptr, show, transform);
 }
 
-void PowerButtonMenuCurtainView::Initialize() {
-  // TODO(b/272826467) Update to views::View::GetColorProvider().
-  const ColorProvider& color_provider = CHECK_DEREF(ColorProvider::Get());
+void PowerButtonMenuCurtainView::OnThemeChanged() {
+  views::View::OnThemeChanged();
+  const ui::ColorProvider& color_provider = CHECK_DEREF(GetColorProvider());
+  enterprise_icon().SetImage(EnterpriseIcon(color_provider));
+  title_text().SetEnabledColor(
+      color_provider.GetColor(kColorAshIconColorPrimary));
+  description_text().SetEnabledColor(
+      color_provider.GetColor(kColorAshIconColorPrimary));
+}
 
+void PowerButtonMenuCurtainView::Initialize() {
   Builder<FlexLayoutView>(this)
       .SetOrientation(views::LayoutOrientation::kHorizontal)
       .AddChildren(
@@ -134,7 +139,6 @@ void PowerButtonMenuCurtainView::Initialize() {
               .AddChildren(
                   // Enterprise icon
                   Builder<ImageView>()
-                      .SetImage(EnterpriseIcon(color_provider))
                       .SetImageSize(kEnterpriseIconSize)
                       .SetSize(kEnterpriseIconSize)
                       .SetHorizontalAlignment(ImageView::Alignment::kLeading)
@@ -142,7 +146,8 @@ void PowerButtonMenuCurtainView::Initialize() {
                       .SetProperty(views::kMarginsKey,
                                    gfx::Insets::TLBR(
                                        kVerticalPadding, kHorizontalPadding,
-                                       kIconBottomMargin, kHorizontalPadding)),
+                                       kIconBottomMargin, kHorizontalPadding))
+                      .CopyAddressTo(&enterprise_icon_),
                   // Title
                   Builder<views::Label>()
                       .SetText(TitleText())
@@ -151,14 +156,13 @@ void PowerButtonMenuCurtainView::Initialize() {
                       .SetHorizontalAlignment(
                           gfx::HorizontalAlignment::ALIGN_LEFT)
                       .SetMultiLine(true)
-                      .SetEnabledColor(color_provider.GetContentLayerColor(
-                          ColorProvider::ContentLayerType::kTextColorPrimary))
                       .SetProperty(views::kFlexBehaviorKey, FullFlex())
                       .SetProperty(views::kMarginsKey,
                                    gfx::Insets::TLBR(0, kHorizontalPadding,
                                                      kTitleBottomMargin,
                                                      kHorizontalPadding))
-                      .SetMaximumWidth(kWidth),
+                      .SetMaximumWidth(kWidth)
+                      .CopyAddressTo(&title_text_),
                   // Description
                   Builder<views::Label>()
                       .SetText(MessageText())
@@ -166,15 +170,14 @@ void PowerButtonMenuCurtainView::Initialize() {
                       .SetHorizontalAlignment(
                           gfx::HorizontalAlignment::ALIGN_LEFT)
                       .SetMultiLine(true)
-                      .SetEnabledColor(color_provider.GetContentLayerColor(
-                          ColorProvider::ContentLayerType::kTextColorPrimary))
                       .SetProperty(views::kFlexBehaviorKey, FullFlex())
                       .SetProperty(views::kMarginsKey,
                                    gfx::Insets::TLBR(0, kHorizontalPadding,
                                                      kVerticalPadding,
                                                      kHorizontalPadding))
                       .SetLineHeight(kContentLineHeight)
-                      .SetMaximumWidth(kWidth)))
+                      .SetMaximumWidth(kWidth)
+                      .CopyAddressTo(&description_text_)))
       .BuildChildren();
 }
 

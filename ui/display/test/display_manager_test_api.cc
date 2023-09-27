@@ -13,8 +13,9 @@
 #include "build/chromeos_buildflags.h"
 #include "ui/display/display_layout_builder.h"
 #include "ui/display/manager/display_manager.h"
-#include "ui/display/manager/display_manager_utilities.h"
 #include "ui/display/manager/managed_display_info.h"
+#include "ui/display/manager/util/display_manager_test_util.h"
+#include "ui/display/manager/util/display_manager_util.h"
 #include "ui/display/screen.h"
 #include "ui/display/util/display_util.h"
 
@@ -125,8 +126,9 @@ void DisplayManagerTestApi::UpdateDisplay(const std::string& display_specs) {
     display_manager_->RegisterDisplayProperty(
         info.id(), info.GetRotation(Display::RotationSource::USER),
         /*overscan_insets=*/nullptr,
-        /*native_resolution=*/gfx::Size(), info.device_scale_factor(),
-        info.zoom_factor(), info.refresh_rate(), info.is_interlaced());
+        /*resolution_in_pixels=*/gfx::Size(), info.device_scale_factor(),
+        info.zoom_factor(), info.refresh_rate(), info.is_interlaced(),
+        info.variable_refresh_rate_state(), info.vsync_rate_min());
   }
 
   display_manager_->OnNativeDisplaysChanged(display_info_list);
@@ -227,7 +229,7 @@ DisplayIdList CreateDisplayIdListN(int64_t start_id, size_t count) {
   int64_t id = start_id;
   size_t N = count;
   while (count-- > 1) {
-    id = display::GetNextSynthesizedDisplayId(id);
+    id = display::SynthesizeDisplayIdFromSeed(id);
     list.push_back(id);
   }
   SortDisplayIdList(&list);

@@ -14,6 +14,7 @@
 #include "base/containers/adapters.h"
 #include "base/files/file.h"
 #include "base/files/file_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/path_service.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/system/sys_info.h"
@@ -22,10 +23,9 @@
 #include "chrome/browser/ash/arc/test/test_arc_session_manager.h"
 #include "chrome/browser/ash/borealis/borealis_prefs.h"
 #include "chrome/browser/ash/borealis/testing/features.h"
-#include "chrome/browser/ash/file_manager/fake_disk_mount_manager.h"
 #include "chrome/browser/ash/file_manager/path_util.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
-#include "chrome/browser/ui/webui/settings/ash/calculator/size_calculator_test_api.h"
+#include "chrome/browser/ui/webui/ash/settings/calculator/size_calculator_test_api.h"
 #include "chrome/browser/ui/webui/settings/ash/device_storage_handler.h"
 #include "chrome/browser/ui/webui/settings/ash/device_storage_util.h"
 #include "chrome/common/chrome_features.h"
@@ -35,6 +35,8 @@
 #include "chrome/test/base/testing_profile_manager.h"
 #include "chromeos/ash/components/dbus/concierge/concierge_client.h"
 #include "chromeos/ash/components/dbus/spaced/spaced_client.h"
+#include "chromeos/ash/components/disks/disk_mount_manager.h"
+#include "chromeos/ash/components/disks/fake_disk_mount_manager.h"
 #include "components/user_manager/scoped_user_manager.h"
 #include "content/public/browser/web_ui_data_source.h"
 #include "content/public/test/browser_task_environment.h"
@@ -74,7 +76,7 @@ class StorageHandlerTest : public testing::Test {
     // The storage handler requires an instance of DiskMountManager,
     // ArcServiceManager and ArcSessionManager.
     disks::DiskMountManager::InitializeForTesting(
-        new file_manager::FakeDiskMountManager);
+        new disks::FakeDiskMountManager);
     arc_service_manager_ = std::make_unique<arc::ArcServiceManager>();
     arc_session_manager_ = arc::CreateTestArcSessionManager(
         std::make_unique<arc::ArcSessionRunner>(
@@ -228,11 +230,11 @@ class StorageHandlerTest : public testing::Test {
     ASSERT_EQ(expected_size, stat.st_size);
   }
 
-  StorageHandler* handler_;
+  raw_ptr<StorageHandler, DanglingUntriaged | ExperimentalAsh> handler_;
   std::unique_ptr<content::TestWebUI> web_ui_;
   content::BrowserTaskEnvironment task_environment_;
   std::unique_ptr<TestingProfileManager> profile_manager_;
-  Profile* profile_;
+  raw_ptr<Profile, ExperimentalAsh> profile_;
   base::test::ScopedFeatureList features_;
   std::unique_ptr<TotalDiskSpaceTestAPI> total_disk_space_test_api_;
   std::unique_ptr<FreeDiskSpaceTestAPI> free_disk_space_test_api_;
@@ -242,7 +244,8 @@ class StorageHandlerTest : public testing::Test {
   std::unique_ptr<DriveOfflineSizeTestAPI> drive_offline_size_test_api_;
   std::unique_ptr<CrostiniSizeTestAPI> crostini_size_test_api_;
   std::unique_ptr<OtherUsersSizeTestAPI> other_users_size_test_api_;
-  MockNewWindowDelegate* new_window_delegate_primary_;
+  raw_ptr<MockNewWindowDelegate, DanglingUntriaged | ExperimentalAsh>
+      new_window_delegate_primary_;
 
  private:
   std::unique_ptr<arc::ArcServiceManager> arc_service_manager_;

@@ -231,10 +231,14 @@ net::SiteForCookies DefaultSiteForCookies(ExecutionContext* execution_context) {
     return window->document()->SiteForCookies();
 
   auto* scope = To<ServiceWorkerGlobalScope>(execution_context);
-  return net::SiteForCookies::FromUrl(GURL(scope->Url()));
+  const blink::BlinkStorageKey& key = scope->storage_key();
+  if (key.IsFirstPartyContext()) {
+    return net::SiteForCookies::FromUrl(GURL(scope->Url()));
+  }
+  return net::SiteForCookies();
 }
 
-scoped_refptr<SecurityOrigin> DefaultTopFrameOrigin(
+const scoped_refptr<const SecurityOrigin> DefaultTopFrameOrigin(
     ExecutionContext* execution_context) {
   DCHECK(execution_context);
 
@@ -244,12 +248,13 @@ scoped_refptr<SecurityOrigin> DefaultTopFrameOrigin(
     return window->document()->TopFrameOrigin()->IsolatedCopy();
   }
 
-  // TODO(crbug.com/1225444): This is a temporary solution until we can plumb
-  // BlinkStorageKey to ServiceWorkerGlobalScope. Once we do the top-frame
-  // origin should be BlinkStorageKey's top-frame site.
-  auto* scope = To<ServiceWorkerGlobalScope>(execution_context);
-  return SecurityOrigin::CreateFromUrlOrigin(url::Origin::Create(
-      net::SchemefulSite(scope->GetSecurityOrigin()->ToUrlOrigin()).GetURL()));
+  const BlinkStorageKey& key =
+      To<ServiceWorkerGlobalScope>(execution_context)->storage_key();
+  if (key.IsFirstPartyContext()) {
+    return key.GetSecurityOrigin();
+  }
+  return SecurityOrigin::CreateFromUrlOrigin(
+      url::Origin::Create(net::SchemefulSite(key.GetTopLevelSite()).GetURL()));
 }
 
 }  // namespace
@@ -358,7 +363,7 @@ ScriptPromise CookieStore::Delete(ScriptState* script_state,
 void CookieStore::Trace(Visitor* visitor) const {
   visitor->Trace(change_listener_receiver_);
   visitor->Trace(backend_);
-  EventTargetWithInlineData::Trace(visitor);
+  EventTarget::Trace(visitor);
   ExecutionContextClient::Trace(visitor);
 }
 
@@ -371,7 +376,7 @@ ExecutionContext* CookieStore::GetExecutionContext() const {
 }
 
 void CookieStore::RemoveAllEventListeners() {
-  EventTargetWithInlineData::RemoveAllEventListeners();
+  EventTarget::RemoveAllEventListeners();
   DCHECK(!HasEventListeners());
   StopObserving();
 }
@@ -391,16 +396,14 @@ void CookieStore::OnCookieChange(
 void CookieStore::AddedEventListener(
     const AtomicString& event_type,
     RegisteredEventListener& registered_listener) {
-  EventTargetWithInlineData::AddedEventListener(event_type,
-                                                registered_listener);
+  EventTarget::AddedEventListener(event_type, registered_listener);
   StartObserving();
 }
 
 void CookieStore::RemovedEventListener(
     const AtomicString& event_type,
     const RegisteredEventListener& registered_listener) {
-  EventTargetWithInlineData::RemovedEventListener(event_type,
-                                                  registered_listener);
+  EventTarget::RemovedEventListener(event_type, registered_listener);
   if (!HasEventListeners())
     StopObserving();
 }

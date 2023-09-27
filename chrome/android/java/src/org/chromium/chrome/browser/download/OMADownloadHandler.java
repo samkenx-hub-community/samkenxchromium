@@ -38,6 +38,7 @@ import org.chromium.base.Log;
 import org.chromium.base.ObserverList;
 import org.chromium.base.PackageManagerUtils;
 import org.chromium.base.task.AsyncTask;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.content.ContentUtils;
 import org.chromium.chrome.browser.download.DownloadManagerBridge.DownloadEnqueueRequest;
 import org.chromium.chrome.browser.download.DownloadManagerBridge.DownloadEnqueueResponse;
@@ -119,7 +120,6 @@ public class OMADownloadHandler extends BroadcastReceiver {
             "901 insufficient memory \n\r";
     private static final String DOWNLOAD_STATUS_USER_CANCELLED = "902 User Cancelled \n\r";
     private static final String DOWNLOAD_STATUS_LOSS_OF_SERVICE = "903 Loss of Service \n\r";
-    private static final String DOWNLOAD_STATUS_ATTRIBUTE_MISMATCH = "905 Attribute mismatch \n\r";
     private static final String DOWNLOAD_STATUS_INVALID_DESCRIPTOR = "906 Invalid descriptor \n\r";
     private static final String DOWNLOAD_STATUS_INVALID_DDVERSION = "951 Invalid DDVersion \n\r";
     private static final String DOWNLOAD_STATUS_DEVICE_ABORTED = "952 Device Aborted \n\r";
@@ -294,7 +294,6 @@ public class OMADownloadHandler extends BroadcastReceiver {
         task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
-    @VisibleForTesting
     void addObserverForTest(TestObserver testObserver) {
         mObservers.addObserver(testObserver);
     }

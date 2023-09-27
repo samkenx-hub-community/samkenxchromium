@@ -26,9 +26,9 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelectorSupplier;
 import org.chromium.components.autofill.AutofillDelegate;
 import org.chromium.components.autofill.AutofillPopup;
 import org.chromium.components.autofill.AutofillSuggestion;
+import org.chromium.components.autofill.PopupItemId;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsAccessibility;
-import org.chromium.ui.DropdownItem;
 import org.chromium.ui.base.ViewAndroidDelegate;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.url.GURL;
@@ -174,7 +174,7 @@ public class AutofillPopupBridge implements AutofillDelegate, DialogInterface.On
      * @param itemTag The third line of the suggestion.
      * @param iconId The resource ID for the icon associated with the suggestion, or 0 for no icon.
      * @param isIconAtStart {@code true} if {@param iconId} is displayed before {@param label}.
-     * @param suggestionId Identifier for the suggestion type.
+     * @param popupItemId Determines the suggestion type.
      * @param isDeletable Whether the item can be deleted by the user.
      * @param isLabelMultiline Whether the label should be should over multiple lines.
      * @param isLabelBold true if {@param label} should be displayed in {@code Typeface.BOLD},
@@ -185,32 +185,23 @@ public class AutofillPopupBridge implements AutofillDelegate, DialogInterface.On
     @CalledByNative
     private void addToAutofillSuggestionArray(AutofillSuggestion[] array, int index, String label,
             String secondaryLabel, String sublabel, String secondarySublabel, String itemTag,
-            int iconId, boolean isIconAtStart, int suggestionId, boolean isDeletable,
+            int iconId, boolean isIconAtStart, @PopupItemId int popupItemId, boolean isDeletable,
             boolean isLabelMultiline, boolean isLabelBold, GURL customIconUrl) {
-        int drawableId = iconId == 0 ? DropdownItem.NO_ICON : iconId;
-        AutofillSuggestion.Builder builder = new AutofillSuggestion.Builder()
-                                                     .setLabel(label)
-                                                     .setSecondaryLabel(secondaryLabel)
-                                                     .setSubLabel(sublabel)
-                                                     .setSecondarySubLabel(secondarySublabel)
-                                                     .setItemTag(itemTag)
-                                                     .setIconId(drawableId)
-                                                     .setIsIconAtStart(isIconAtStart)
-                                                     .setSuggestionId(suggestionId)
-                                                     .setIsDeletable(isDeletable)
-                                                     .setIsMultiLineLabel(isLabelMultiline)
-                                                     .setIsBoldLabel(isLabelBold);
-        if (customIconUrl != null && customIconUrl.isValid()) {
-            builder.setCustomIcon(
-                    PersonalDataManager.getInstance()
-                            .getCustomImageForAutofillSuggestionIfAvailable(
-                                    AutofillUiUtils.getCCIconURLWithParams(customIconUrl,
-                                            mContext.getResources().getDimensionPixelSize(
-                                                    R.dimen.autofill_dropdown_icon_width),
-                                            mContext.getResources().getDimensionPixelSize(
-                                                    R.dimen.autofill_dropdown_icon_height))));
-        }
-        array[index] = builder.build();
+        array[index] = new AutofillSuggestion.Builder()
+                               .setLabel(label)
+                               .setSecondaryLabel(secondaryLabel)
+                               .setSubLabel(sublabel)
+                               .setSecondarySubLabel(secondarySublabel)
+                               .setItemTag(itemTag)
+                               .setIsIconAtStart(isIconAtStart)
+                               .setPopupItemId(popupItemId)
+                               .setIsDeletable(isDeletable)
+                               .setIsMultiLineLabel(isLabelMultiline)
+                               .setIsBoldLabel(isLabelBold)
+                               .setIconDrawable(AutofillUiUtils.getCardIcon(mContext, customIconUrl,
+                                       iconId, AutofillUiUtils.CardIconSize.LARGE,
+                                       /* showCustomIcon= */ true))
+                               .build();
     }
 
     private @Nullable WebContentsViewRectProvider tryCreateRectProvider(
