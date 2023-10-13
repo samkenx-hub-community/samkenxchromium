@@ -57,9 +57,19 @@ HTMLDetailsElement::~HTMLDetailsElement() = default;
 
 void HTMLDetailsElement::DispatchPendingEvent(
     const AttributeModificationReason reason) {
+  Event* toggle_event = nullptr;
+  if (RuntimeEnabledFeatures::DetailsElementToggleEventEnabled()) {
+    CHECK(pending_toggle_event_);
+    toggle_event = pending_toggle_event_.Get();
+    pending_toggle_event_ = nullptr;
+  } else {
+    CHECK(!pending_toggle_event_);
+    toggle_event = Event::Create(event_type_names::kToggle);
+  }
+
   if (reason == AttributeModificationReason::kByParser)
     GetDocument().SetToggleDuringParsing(true);
-  DispatchEvent(*Event::Create(event_type_names::kToggle));
+  DispatchEvent(*toggle_event);
   if (reason == AttributeModificationReason::kByParser)
     GetDocument().SetToggleDuringParsing(false);
 }
@@ -159,6 +169,7 @@ void HTMLDetailsElement::ManuallyAssignSlots() {
 }
 
 void HTMLDetailsElement::Trace(Visitor* visitor) const {
+  visitor->Trace(pending_toggle_event_);
   visitor->Trace(summary_slot_);
   visitor->Trace(content_slot_);
   HTMLElement::Trace(visitor);
@@ -180,7 +191,17 @@ void HTMLDetailsElement::ParseAttribute(
       return;
 
     // Dispatch toggle event asynchronously.
-    pending_event_ = PostCancellableTask(
+    if (RuntimeEnabledFeatures::DetailsElementToggleEventEnabled()) {
+      String old_state = is_open_ ? "closed" : "open";
+      String new_state = is_open_ ? "open" : "closed";
+      if (pending_toggle_event_) {
+        old_state = pending_toggle_event_->oldState();
+      }
+      pending_toggle_event_ =
+          ToggleEvent::Create(event_type_names::kToggle, Event::Cancelable::kNo,
+                              old_state, new_state);
+    }
+    pending_event_task_ = PostCancellableTask(
         *GetDocument().GetTaskRunner(TaskType::kDOMManipulation), FROM_HERE,
         WTF::BindOnce(&HTMLDetailsElement::DispatchPendingEvent,
                       WrapPersistent(this), params.reason));
@@ -193,6 +214,8 @@ void HTMLDetailsElement::ParseAttribute(
       content->RemoveInlineStyleProperty(CSSPropertyID::kContentVisibility);
       content->RemoveInlineStyleProperty(CSSPropertyID::kDisplay);
 
+      // https://html.spec.whatwg.org/multipage/interactive-elements.html#ensure-details-exclusivity-by-closing-other-elements-if-needed
+      //
       // The name attribute links multiple details elements into an
       // exclusive accordion.  So if this one has a name, close the
       // other ones with the same name.
@@ -203,13 +226,17 @@ void HTMLDetailsElement::ParseAttribute(
       if (RuntimeEnabledFeatures::AccordionPatternEnabled() &&
           !GetName().empty() &&
           params.reason == AttributeModificationReason::kDirectly) {
-        // It's important that we have a copy of the set of details
-        // elements, because the setAttribute call can trigger mutation
-        // events that change the set.
+        // Don't fire mutation events for any changes to the open attribute
+        // that this causes.
+        MutationEventSuppressionScope scope(GetDocument());
+
         HeapVector<Member<HTMLDetailsElement>> details_with_name(
             OtherElementsInNameGroup());
         for (HTMLDetailsElement* other_details : details_with_name) {
           CHECK_NE(other_details, this);
+          UseCounter::Count(
+              GetDocument(),
+              WebFeature::kHTMLDetailsElementNameAttributeClosesOther);
           other_details->setAttribute(html_names::kOpenAttr, g_null_atom);
         }
       }
@@ -229,6 +256,10 @@ void HTMLDetailsElement::AttributeChanged(
     const AttributeModificationParams& params) {
   const QualifiedName& name = params.name;
   if (name == html_names::kNameAttr) {
+    if (!params.new_value.empty()) {
+      UseCounter::Count(GetDocument(),
+                        WebFeature::kHTMLDetailsElementNameAttribute);
+    }
     MaybeCloseForExclusivity();
   }
 
@@ -240,22 +271,21 @@ Node::InsertionNotificationRequest HTMLDetailsElement::InsertedInto(
   Node::InsertionNotificationRequest result =
       HTMLElement::InsertedInto(insertion_point);
 
-  {
-    // Don't fire mutation events for any changes to the open attribute
-    // that this causes.
-    MutationEventSuppressionScope scope(GetDocument());
-
-    MaybeCloseForExclusivity();
-  }
+  MaybeCloseForExclusivity();
 
   return result;
 }
 
+// https://html.spec.whatwg.org/multipage/C#ensure-details-exclusivity-by-closing-the-given-element-if-needed
 void HTMLDetailsElement::MaybeCloseForExclusivity() {
   if (!RuntimeEnabledFeatures::AccordionPatternEnabled() || GetName().empty() ||
       !is_open_) {
     return;
   }
+
+  // Don't fire mutation events for any changes to the open attribute
+  // that this causes.
+  MutationEventSuppressionScope scope(GetDocument());
 
   DCHECK(RuntimeEnabledFeatures::OptimizedNodeCloneOrderEnabled())
       << "OptimizedNodeCloneOrder should ship before AccordionPattern";
@@ -265,6 +295,8 @@ void HTMLDetailsElement::MaybeCloseForExclusivity() {
     CHECK_NE(other_details, this);
     if (other_details->is_open_) {
       // close this details element
+      UseCounter::Count(GetDocument(),
+                        WebFeature::kHTMLDetailsElementNameAttributeClosesSelf);
       ToggleOpen();
       break;
     }

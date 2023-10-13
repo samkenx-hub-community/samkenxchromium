@@ -58,11 +58,43 @@ class BLINK_EXPORT WebFormControlElement : public WebElement {
   bool IsEnabled() const;
   bool IsReadOnly() const;
   WebString FormControlName() const;
-  WebString FormControlType() const;
 
-  // Same as FormControlType() but returns the type "password" for text fields
-  // that have been a password in the past.
-  WebString FormControlTypeForAutofill() const;
+  enum class Type {
+    kButtonButton,
+    kButtonSubmit,
+    kButtonReset,
+    kButtonSelectList,
+    kFieldset,
+    kInputButton,
+    kInputCheckbox,
+    kInputColor,
+    kInputDate,
+    kInputDatetimeLocal,
+    kInputEmail,
+    kInputFile,
+    kInputHidden,
+    kInputImage,
+    kInputMonth,
+    kInputNumber,
+    kInputPassword,
+    kInputRadio,
+    kInputRange,
+    kInputReset,
+    kInputSearch,
+    kInputSubmit,
+    kInputTelephone,
+    kInputText,
+    kInputTime,
+    kInputUrl,
+    kInputWeek,
+    kOutput,
+    kSelectOne,
+    kSelectMultiple,
+    kSelectList,
+    kTextArea,
+  };
+  Type FormControlType() const;
+  Type FormControlTypeForAutofill() const;
 
   enum WebAutofillState GetAutofillState() const;
   bool IsAutofilled() const;
@@ -123,6 +155,12 @@ class BLINK_EXPORT WebFormControlElement : public WebElement {
   // or insisde the textarea. If neither input element nor textarea element,
   // a null string is returned.
   WebString EditingValue() const;
+
+  // The maximum length in terms of text length the form control can hold. Like
+  // the maxLength IDL attribute, this is non-negative with two exceptions: if
+  // the attribute does not apply to the element or the element has no (valid)
+  // maximum length set, it is -1.
+  int MaxLength() const;
 
   // Sets character selection range.
   void SetSelectionRange(unsigned start, unsigned end);

@@ -33,6 +33,7 @@
 #include "content/public/browser/network_service_instance.h"
 #include "content/public/common/content_features.h"
 #include "content/public/test/browser_test.h"
+#include "net/base/features.h"
 #include "sandbox/policy/features.h"
 #include "services/network/public/mojom/network_change_manager.mojom.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -137,7 +138,10 @@ class SandboxedNetworkChangeNotifierBrowserTest
   SandboxedNetworkChangeNotifierBrowserTest() {
     if (GetParam()) {
       scoped_feature_list_.InitWithFeatures(
-          {sandbox::policy::features::kNetworkServiceSandbox},
+          {sandbox::policy::features::kNetworkServiceSandbox,
+           // When running inside the sandbox, the GetNetworkConnectivityHint
+           // API must be used.
+           net::features::kEnableGetNetworkConnectivityHintAPI},
           {features::kNetworkServiceInProcess});
     } else {
       scoped_feature_list_.InitWithFeatures(
@@ -156,8 +160,11 @@ class SandboxedNetworkChangeNotifierBrowserTest
 // The network service is able to see these network adapter changes, as it is
 // created with the LPAC "internetClient" capability. See
 // https://learn.microsoft.com/en-us/windows/uwp/packaging/app-capability-declarations
+// TODO(crbug.com/1487750): This test install a new network interface that is
+// causing wrong route path added to bots and blocks the DNS lookup or causing
+// bot died.
 IN_PROC_BROWSER_TEST_P(SandboxedNetworkChangeNotifierBrowserTest,
-                       AddNetworkAdapter) {
+                       DISABLED_AddNetworkAdapter) {
   if (!::IsUserAnAdmin()) {
     GTEST_SKIP() << "This test requires running elevated.";
   }

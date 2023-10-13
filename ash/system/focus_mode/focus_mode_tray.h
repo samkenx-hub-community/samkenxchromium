@@ -11,6 +11,7 @@
 
 namespace ash {
 
+class FocusModeCountdownView;
 class TrayBubbleWrapper;
 
 // Status area tray which is visible when focus mode is enabled. A circular
@@ -26,12 +27,16 @@ class FocusModeTray : public TrayBackgroundView,
   ~FocusModeTray() override;
 
   TrayBubbleWrapper* tray_bubble_wrapper_for_testing() { return bubble_.get(); }
+  FocusModeCountdownView* countdown_view_for_testing() {
+    return countdown_view_;
+  }
 
   // TrayBackgroundView:
   void ClickedOutsideBubble() override;
   std::u16string GetAccessibleNameForTray() override;
   void HandleLocaleChange() override {}
   void HideBubbleWithView(const TrayBubbleView* bubble_view) override;
+  void HideBubble(const TrayBubbleView* bubble_view) override;
   void CloseBubble() override;
   void ShowBubble() override;
   void UpdateTrayItemColor(bool is_active) override;
@@ -49,6 +54,9 @@ class FocusModeTray : public TrayBackgroundView,
 
   // Image view of the focus mode lamp.
   const raw_ptr<views::ImageView> image_view_;
+
+  // The main content view of the bubble.
+  raw_ptr<FocusModeCountdownView, DanglingUntriaged> countdown_view_ = nullptr;
 
   // The bubble that appears after clicking the tray button.
   std::unique_ptr<TrayBubbleWrapper> bubble_;

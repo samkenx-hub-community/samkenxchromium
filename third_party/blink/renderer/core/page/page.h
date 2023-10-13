@@ -81,13 +81,13 @@ class LinkHighlight;
 class LocalFrame;
 class LocalFrameView;
 class MediaFeatureOverrides;
-class OverscrollController;
 class PageAnimator;
 struct PageScaleConstraints;
 class PageScaleConstraintsSet;
 class PluginData;
 class PluginsChangedObserver;
 class PointerLockController;
+class PreferenceOverrides;
 class ScopedPagePauser;
 class ScrollingCoordinator;
 class ScrollbarTheme;
@@ -257,9 +257,6 @@ class CORE_EXPORT Page final : public GarbageCollected<Page>,
 
   LinkHighlight& GetLinkHighlight();
 
-  OverscrollController& GetOverscrollController();
-  const OverscrollController& GetOverscrollController() const;
-
   void SetTabKeyCyclesThroughElements(bool b) {
     tab_key_cycles_through_elements_ = b;
   }
@@ -373,6 +370,13 @@ class CORE_EXPORT Page final : public GarbageCollected<Page>,
     return media_feature_overrides_.get();
   }
   void ClearMediaFeatureOverrides();
+
+  void SetPreferenceOverride(const AtomicString& media_feature,
+                             const String& value);
+  const PreferenceOverrides* GetPreferenceOverrides() const {
+    return preference_overrides_.get();
+  }
+  void ClearPreferenceOverrides();
 
   void SetVisionDeficiency(VisionDeficiency new_vision_deficiency);
   VisionDeficiency GetVisionDeficiency() const { return vision_deficiency_; }
@@ -506,7 +510,6 @@ class CORE_EXPORT Page final : public GarbageCollected<Page>,
   const Member<TopDocumentRootScrollerController>
       global_root_scroller_controller_;
   const Member<VisualViewport> visual_viewport_;
-  const Member<OverscrollController> overscroll_controller_;
   const Member<LinkHighlight> link_highlight_;
   Member<SpatialNavigationController> spatial_navigation_controller_;
 
@@ -566,6 +569,9 @@ class CORE_EXPORT Page final : public GarbageCollected<Page>,
 
   // Overrides for various media features, set from DevTools.
   std::unique_ptr<MediaFeatureOverrides> media_feature_overrides_;
+
+  // Overrides for user preference media features, set from Web Preferences API.
+  std::unique_ptr<PreferenceOverrides> preference_overrides_;
 
   // Emulated vision deficiency, set from DevTools.
   VisionDeficiency vision_deficiency_ = VisionDeficiency::kNoVisionDeficiency;

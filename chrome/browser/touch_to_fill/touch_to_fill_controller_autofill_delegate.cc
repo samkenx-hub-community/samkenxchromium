@@ -132,10 +132,10 @@ void TouchToFillControllerAutofillDelegate::OnCredentialSelected(
   // `this` notifies the authenticator when it is destructed, resulting in
   // the callback being reset by the authenticator. Therefore, it is safe
   // to use base::Unretained.
-  authenticator_->Authenticate(
+  authenticator_->AuthenticateWithMessage(
+      u"",
       base::BindOnce(&TouchToFillControllerAutofillDelegate::OnReauthCompleted,
-                     base::Unretained(this), credential),
-      /*use_last_valid_auth=*/true);
+                     base::Unretained(this), credential));
 }
 
 void TouchToFillControllerAutofillDelegate::OnPasskeyCredentialSelected(
@@ -219,6 +219,11 @@ bool TouchToFillControllerAutofillDelegate::ShouldTriggerSubmission() {
 
 bool TouchToFillControllerAutofillDelegate::ShouldShowHybridOption() {
   return should_show_hybrid_option_.value();
+}
+
+bool TouchToFillControllerAutofillDelegate::
+    ShouldShowNoPasskeysSheetIfRequired() {
+  return false;
 }
 
 gfx::NativeView TouchToFillControllerAutofillDelegate::GetNativeView() {

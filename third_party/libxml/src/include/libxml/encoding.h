@@ -196,17 +196,20 @@ XMLPUBFUN xmlCharEncoding
 					 int len);
 
 struct _xmlBuffer;
-XMLPUBFUN int xmlCharEncOutFunc(xmlCharEncodingHandler* handler,
-                                struct _xmlBuffer* out,
-                                struct _xmlBuffer* in);
+XMLPUBFUN int
+	xmlCharEncOutFunc		(xmlCharEncodingHandler *handler,
+					 struct _xmlBuffer *out,
+					 struct _xmlBuffer *in);
 
-XMLPUBFUN int xmlCharEncInFunc(xmlCharEncodingHandler* handler,
-                               struct _xmlBuffer* out,
-                               struct _xmlBuffer* in);
+XMLPUBFUN int
+	xmlCharEncInFunc		(xmlCharEncodingHandler *handler,
+					 struct _xmlBuffer *out,
+					 struct _xmlBuffer *in);
 XML_DEPRECATED
-XMLPUBFUN int xmlCharEncFirstLine(xmlCharEncodingHandler* handler,
-                                  struct _xmlBuffer* out,
-                                  struct _xmlBuffer* in);
+XMLPUBFUN int
+	xmlCharEncFirstLine		(xmlCharEncodingHandler *handler,
+					 struct _xmlBuffer *out,
+					 struct _xmlBuffer *in);
 XMLPUBFUN int
 	xmlCharEncCloseFunc		(xmlCharEncodingHandler *handler);
 

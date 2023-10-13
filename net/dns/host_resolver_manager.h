@@ -561,6 +561,9 @@ class NET_EXPORT HostResolverManager
   bool last_ipv6_probe_result_ = true;
   bool probing_ipv6_ = false;
 
+  // When true, query AAAA even when the globally reachable check failed.
+  bool ipv6_reachability_override_ = false;
+
   // Any resolver flags that should be added to a request by default.
   HostResolverFlags additional_resolver_flags_ = 0;
 

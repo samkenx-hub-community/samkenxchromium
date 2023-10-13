@@ -38,6 +38,7 @@ public class SurveyClientFactory {
 
         assert sInstance == null : "Instance is already #initialized.";
         sInstance = new SurveyClientFactory(crashUploadPermissionSupplier);
+        SurveyMetadata.initializeInBackground();
         ResettersForTesting.register(() -> sInstance = null);
     }
 
@@ -47,7 +48,7 @@ public class SurveyClientFactory {
     public static void setInstanceForTesting(SurveyClientFactory testFactory) {
         var origin = sInstance;
         sInstance = testFactory;
-        sHasInstanceForTesting = true;
+        sHasInstanceForTesting = (testFactory != null);
         ResettersForTesting.register(() -> {
             sInstance = origin;
             sHasInstanceForTesting = false;

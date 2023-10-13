@@ -10,10 +10,10 @@
 #ifndef __XML_IO_H__
 #define __XML_IO_H__
 
+#include <stdio.h>
+#include <libxml/xmlversion.h>
 #include <libxml/encoding.h>
 #include <libxml/tree.h>
-#include <libxml/xmlversion.h>
-#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -123,9 +123,8 @@ typedef int (*xmlOutputCloseCallback) (void * context);
  * Returns the new xmlParserInputBufferPtr in case of success or NULL if no
  *         method was found.
  */
-typedef xmlParserInputBufferPtr (*xmlParserInputBufferCreateFilenameFunc)(
-    const char* URI,
-    xmlCharEncoding enc);
+typedef xmlParserInputBufferPtr
+(*xmlParserInputBufferCreateFilenameFunc)(const char *URI, xmlCharEncoding enc);
 
 /**
  * xmlOutputBufferCreateFilenameFunc:
@@ -138,10 +137,9 @@ typedef xmlParserInputBufferPtr (*xmlParserInputBufferCreateFilenameFunc)(
  * Returns the new xmlOutputBufferPtr in case of success or NULL if no
  *         method was found.
  */
-typedef xmlOutputBufferPtr (*xmlOutputBufferCreateFilenameFunc)(
-    const char* URI,
-    xmlCharEncodingHandlerPtr encoder,
-    int compression);
+typedef xmlOutputBufferPtr
+(*xmlOutputBufferCreateFilenameFunc)(const char *URI,
+        xmlCharEncodingHandlerPtr encoder, int compression);
 
 struct _xmlParserInputBuffer {
     void*                  context;
@@ -174,21 +172,21 @@ struct _xmlOutputBuffer {
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /** DOC_DISABLE */
-#define XML_GLOBALS_IO                                           \
-  XML_OP(xmlParserInputBufferCreateFilenameValue,                \
-         xmlParserInputBufferCreateFilenameFunc, XML_DEPRECATED) \
-  XML_OP(xmlOutputBufferCreateFilenameValue,                     \
-         xmlOutputBufferCreateFilenameFunc, XML_DEPRECATED)
+#define XML_GLOBALS_IO \
+  XML_OP(xmlParserInputBufferCreateFilenameValue, \
+           xmlParserInputBufferCreateFilenameFunc, XML_DEPRECATED) \
+  XML_OP(xmlOutputBufferCreateFilenameValue, \
+           xmlOutputBufferCreateFilenameFunc, XML_DEPRECATED)
 
 #define XML_OP XML_DECLARE_GLOBAL
 XML_GLOBALS_IO
 #undef XML_OP
 
 #if defined(LIBXML_THREAD_ENABLED) && !defined(XML_GLOBALS_NO_REDEFINITION)
-#define xmlParserInputBufferCreateFilenameValue \
-  XML_GLOBAL_MACRO(xmlParserInputBufferCreateFilenameValue)
-#define xmlOutputBufferCreateFilenameValue \
-  XML_GLOBAL_MACRO(xmlOutputBufferCreateFilenameValue)
+  #define xmlParserInputBufferCreateFilenameValue \
+    XML_GLOBAL_MACRO(xmlParserInputBufferCreateFilenameValue)
+  #define xmlOutputBufferCreateFilenameValue \
+    XML_GLOBAL_MACRO(xmlOutputBufferCreateFilenameValue)
 #endif
 /** DOC_ENABLE */
 
@@ -403,16 +401,17 @@ XMLPUBFUN int
 #endif /* defined(LIBXML_FTP_ENABLED) */
 
 XMLPUBFUN xmlParserInputBufferCreateFilenameFunc
-xmlParserInputBufferCreateFilenameDefault(
-    xmlParserInputBufferCreateFilenameFunc func);
+	xmlParserInputBufferCreateFilenameDefault(
+		xmlParserInputBufferCreateFilenameFunc func);
 XMLPUBFUN xmlOutputBufferCreateFilenameFunc
-xmlOutputBufferCreateFilenameDefault(xmlOutputBufferCreateFilenameFunc func);
+	xmlOutputBufferCreateFilenameDefault(
+		xmlOutputBufferCreateFilenameFunc func);
 XMLPUBFUN xmlOutputBufferCreateFilenameFunc
-xmlThrDefOutputBufferCreateFilenameDefault(
-    xmlOutputBufferCreateFilenameFunc func);
+	xmlThrDefOutputBufferCreateFilenameDefault(
+		xmlOutputBufferCreateFilenameFunc func);
 XMLPUBFUN xmlParserInputBufferCreateFilenameFunc
-xmlThrDefParserInputBufferCreateFilenameDefault(
-    xmlParserInputBufferCreateFilenameFunc func);
+	xmlThrDefParserInputBufferCreateFilenameDefault(
+		xmlParserInputBufferCreateFilenameFunc func);
 
 #ifdef __cplusplus
 }

@@ -5,90 +5,96 @@
 package org.chromium.chrome.browser.readaloud.player;
 
 import android.content.Context;
+import android.view.ViewStub;
 
+import androidx.annotation.VisibleForTesting;
+
+import org.chromium.base.Log;
 import org.chromium.base.ObserverList;
+import org.chromium.chrome.browser.readaloud.player.expanded.ExpandedPlayerCoordinator;
+import org.chromium.chrome.browser.readaloud.player.mini.MiniPlayerCoordinator;
 import org.chromium.chrome.modules.readaloud.Playback;
 import org.chromium.chrome.modules.readaloud.PlaybackListener;
+import org.chromium.chrome.modules.readaloud.Player;
 import org.chromium.ui.modelutil.PropertyModel;
 
 /**
  * Class that controls and coordinates the mini and expanded player UI.
  *
- * The expanded player is a full-width bottom sheet that will completely obscure
- * the mini player if it's showing. Since showing or hiding the mini player
- * requires resizing web contents which is expensive and laggy, we will leave
- * the mini player on screen when the expanded player is shown.
+ * <p>The expanded player is a full-width bottom sheet that will completely obscure the mini player
+ * if it's showing. Since showing or hiding the mini player requires resizing web contents which is
+ * expensive and laggy, we will leave the mini player on screen when the expanded player is shown.
  *
- * States:
- * A. no players shown
- * B. mini player visible
- * C. expanded player open and mini player visible (behind expanded player)
- *
+ * <p>States: A. no players shown B. mini player visible C. expanded player open and mini player
+ * visible (behind expanded player)
  */
-public class PlayerCoordinator {
+public class PlayerCoordinator implements Player {
     private static final String TAG = "ReadAloudPlayer";
-
     private final ObserverList<Observer> mObserverList;
-    private final PropertyModel mModel;
     private final PlayerMediator mMediator;
+    private final Delegate mDelegate;
+    private final MiniPlayerCoordinator mMiniPlayer;
+    private final ExpandedPlayerCoordinator mExpandedPlayer;
+    private Playback mPlayback;
 
-    public interface Observer {
-        /*
-         * Called when the user dismisses the player. The observer is responsible for
-         * then calling dismissPlayers().
-         */
-        void onRequestClosePlayers();
-    }
-
-    public PlayerCoordinator(Context context) {
+    public PlayerCoordinator(Context context, ViewStub miniPlayerStub, Delegate delegate) {
+        // Note, context isn't used yet but will be needed by the expanded player.
         mObserverList = new ObserverList<Observer>();
-        mModel = new PropertyModel.Builder(PlayerProperties.ALL_KEYS).build();
-        mMediator = new PlayerMediator(/*coordinator=*/this, mModel);
+        PropertyModel model = new PropertyModel.Builder(PlayerProperties.ALL_KEYS).build();
+        mMiniPlayer = new MiniPlayerCoordinator(miniPlayerStub, model);
+        mExpandedPlayer = new ExpandedPlayerCoordinator(context, delegate, model);
+        mMediator = new PlayerMediator(/* coordinator= */ this, delegate, model);
+        mDelegate = delegate;
     }
 
-    /**
-     * Add an observer to receive event updates.
-     *
-     * @param observer Observer to add.
-     */
+    @VisibleForTesting
+    PlayerCoordinator(
+            MiniPlayerCoordinator miniPlayer,
+            PlayerMediator mediator,
+            Delegate delegate,
+            ExpandedPlayerCoordinator player) {
+        mObserverList = new ObserverList<Observer>();
+        mMiniPlayer = miniPlayer;
+        mMediator = mediator;
+        mDelegate = delegate;
+        mExpandedPlayer = player;
+    }
+
+    @Override
     public void addObserver(Observer observer) {
         mObserverList.addObserver(observer);
     }
 
-    /**
-     * Remove an observer that was previously added. No effect if the observer was
-     * never added.
-     */
+    @Override
     public void removeObserver(Observer observer) {
         mObserverList.removeObserver(observer);
     }
 
-    /** Stop playback and stop tracking players. */
+    @Override
     public void destroy() {
         dismissPlayers();
         mMediator.destroy();
+        mMiniPlayer.destroy();
     }
 
-    /**
-     * Show the mini player, called when playback is requested.
-     */
+    @Override
     public void playTabRequested() {
-        // TODO implement
+        mMediator.setPlayback(null);
+        mMediator.setPlaybackState(PlaybackListener.State.BUFFERING);
+        mMiniPlayer.show(shouldAnimateMiniPlayer());
     }
 
-    /**
-     * Update players when playback is ready.
-     *
-     * @param playback             New Playback object.
-     * @param currentPlaybackState Playback state.
-     */
+    @Override
     public void playbackReady(Playback playback, @PlaybackListener.State int currentPlaybackState) {
-        // TODO implement
+        mMediator.setPlayback(playback);
+        mMediator.setPlaybackState(currentPlaybackState);
     }
 
-    /** Update players when playback fails. */
+    @Override
     public void playbackFailed() {
-        // TODO implement
+        mMediator.setPlayback(null);
+        mMediator.setPlaybackState(PlaybackListener.State.ERROR);
+        Log.e(TAG, "PlayerController.playbackFailed() UI changes not implemented.");
     }
 
     /** Show expanded player. */
@@ -96,9 +102,14 @@ public class PlayerCoordinator {
         // TODO implement
     }
 
-    /** Hide players. */
+    @Override
     public void dismissPlayers() {
-        // TODO implement
+        // Resetting the state. We can do it unconditionally because this UI is only
+        // dismissed when stopping the playback.
+        mMediator.setPlayback(null);
+        mMediator.setPlaybackState(PlaybackListener.State.STOPPED);
+        mMiniPlayer.dismiss(shouldAnimateMiniPlayer());
+        mExpandedPlayer.dismiss();
     }
 
     /** To be called when the close button is clicked. */
@@ -108,7 +119,10 @@ public class PlayerCoordinator {
         }
     }
 
-    PropertyModel getModelForTesting() {
-        return mModel;
+    private boolean shouldAnimateMiniPlayer() {
+        // If the expanded player is definitely covering the mini player, we can skip
+        // animating the mini player show and hide.
+        // TODO return !mExpandedPlayer.isVisible();
+        return true;
     }
 }

@@ -370,6 +370,11 @@ id<GREYMatcher> MoveAddressBarToBottomContextMenuButton() {
 
 @implementation AdaptiveToolbarTestCase
 
+- (void)setUp {
+  [super setUp];
+  [ChromeEarlGrey setBoolValue:NO forUserPref:prefs::kBottomOmnibox];
+}
+
 // Tests that tapping a button cancels the focus on the omnibox.
 - (void)testCancelOmniboxEdit {
   if ([ChromeEarlGrey isCompactWidth]) {
@@ -465,7 +470,8 @@ id<GREYMatcher> MoveAddressBarToBottomContextMenuButton() {
 
 // Verifies that the back/forward buttons are working and are correctly enabled
 // during navigations.
-- (void)testNavigationButtons {
+// TODO(crbug.com/1488801): Test is failing on downstream bots.
+- (void)DISABLED_testNavigationButtons {
   // Setup the server.
   self.testServer->RegisterRequestHandler(
       base::BindRepeating(&StandardResponse));
@@ -620,6 +626,51 @@ id<GREYMatcher> MoveAddressBarToBottomContextMenuButton() {
     // Cancel the rotation.
     [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationPortrait error:nil];
   }
+}
+
+// Verifies that the location bar is hidden on NTP.
+- (void)testLocationBarHiddenOnNTP {
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_SKIPPED(@"The NTP is sometimes scrolled on iPad, making the "
+                           @"location bar visible.");
+  }
+  // Location bar should be hidden when loading NTP.
+  CheckVisibilityInToolbar(chrome_test_util::DefocusedLocationView(),
+                           ButtonVisibilityNone);
+
+  // Location bar should be hidden when returning to NTP with the back button.
+  [ChromeEarlGrey loadURL:GURL("chrome://version")];
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::BackButton()]
+      performAction:grey_tap()];
+  [ChromeEarlGrey waitForPageToFinishLoading];
+
+  CheckVisibilityInToolbar(chrome_test_util::DefocusedLocationView(),
+                           ButtonVisibilityNone);
+
+  // Change the orientation or the trait collection.
+  UIViewController* topViewController = TopPresentedViewController();
+  UITraitCollection* originalTraitCollection =
+      topViewController.traitCollection;
+  RotateOrChangeTraitCollection(originalTraitCollection, topViewController);
+
+  CheckVisibilityInToolbar(chrome_test_util::DefocusedLocationView(),
+                           ButtonVisibilityNone);
+
+  // Revert the orientation/trait collection to the original.
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    // Remove the override.
+    for (UIViewController* child in topViewController.childViewControllers) {
+      [topViewController setOverrideTraitCollection:originalTraitCollection
+                             forChildViewController:child];
+    }
+  } else {
+    // Cancel the rotation.
+    [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationPortrait error:nil];
+  }
+
+  // Check the visiblity after a rotation.
+  CheckVisibilityInToolbar(chrome_test_util::DefocusedLocationView(),
+                           ButtonVisibilityNone);
 }
 
 @end

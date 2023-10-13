@@ -38,7 +38,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
-#include "chrome/browser/ui/browser_dialogs.h"
+#include "chrome/browser/ui/web_applications/web_app_dialogs.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_location.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.pb.h"
@@ -112,6 +112,12 @@ class RandomHelper {
 
   bool next_bool() { return non_zero_ || next_uint() & 1u; }
 
+  base::Time next_time() {
+    return base::Time::UnixEpoch() + base::Milliseconds(next_uint());
+  }
+
+  int64_t next_proto_time() { return syncer::TimeToProtoTime(next_time()); }
+
   template <typename T>
   T next_enum() {
     constexpr uint32_t min = static_cast<uint32_t>(T::kMinValue);
@@ -125,6 +131,11 @@ class RandomHelper {
   std::uniform_int_distribution<uint32_t> distribution_;
   bool non_zero_;
 };
+
+#define NEXT_PROTO_ENUM(random_helper, T, skip_zero)         \
+  static_cast<T>(static_cast<uint32_t>(skip_zero) +          \
+                 random_helper.next_uint(T##_MAX - T##_MIN - \
+                                         static_cast<uint32_t>(skip_zero)))
 
 apps::FileHandlers CreateRandomFileHandlers(uint32_t suffix) {
   apps::FileHandlers file_handlers;
@@ -443,8 +454,7 @@ proto::WebAppOsIntegrationState GenerateRandomWebAppOsIntegrationState(
   shortcuts->set_description(app.untranslated_description());
   auto* first_shortcut = shortcuts->add_icon_data_any();
   first_shortcut->set_icon_size(32);
-  first_shortcut->set_timestamp(syncer::TimeToProtoTime(
-      base::Time::UnixEpoch() + base::Milliseconds(random.next_uint())));
+  first_shortcut->set_timestamp(random.next_proto_time());
 
   // Randomly fill protocols_handled.
   auto* protocols_handled = state.mutable_protocols_handled();
@@ -481,18 +491,15 @@ proto::WebAppOsIntegrationState GenerateRandomWebAppOsIntegrationState(
 
     auto* data_any = menu_info->add_icon_data_any();
     data_any->set_icon_size(16 * random.next_uint(/*bound=*/4));
-    data_any->set_timestamp(syncer::TimeToProtoTime(
-        base::Time::UnixEpoch() + base::Milliseconds(random.next_uint())));
+    data_any->set_timestamp(random.next_proto_time());
 
     auto* data_maskable = menu_info->add_icon_data_maskable();
     data_maskable->set_icon_size(16 * random.next_uint(/*bound=*/4));
-    data_maskable->set_timestamp(syncer::TimeToProtoTime(
-        base::Time::UnixEpoch() + base::Milliseconds(random.next_uint())));
+    data_maskable->set_timestamp(random.next_proto_time());
 
     auto* data_monochrome = menu_info->add_icon_data_monochrome();
     data_monochrome->set_icon_size(16 * random.next_uint(/*bound=*/4));
-    data_monochrome->set_timestamp(syncer::TimeToProtoTime(
-        base::Time::UnixEpoch() + base::Milliseconds(random.next_uint())));
+    data_monochrome->set_timestamp(random.next_proto_time());
   }
 
   // Randomly fill file handling information.
@@ -619,6 +626,10 @@ std::unique_ptr<WebApp> CreateRandomWebApp(CreateRandomWebAppParams params) {
     app->AddSource(WebAppManagement::kOneDriveIntegration);
     management_types.push_back(WebAppManagement::kOneDriveIntegration);
   }
+  if (random.next_bool()) {
+    app->AddSource(WebAppManagement::kApsDefault);
+    management_types.push_back(WebAppManagement::kApsDefault);
+  }
 
   // Must always be at least one source.
   if (!app->HasAnySources()) {
@@ -655,17 +666,11 @@ std::unique_ptr<WebApp> CreateRandomWebApp(CreateRandomWebAppParams params) {
       mojom::UserDisplayMode::kTabbed};
   app->SetUserDisplayMode(user_display_modes[random.next_uint(3)]);
 
-  const base::Time last_badging_time =
-      base::Time::UnixEpoch() + base::Milliseconds(random.next_uint());
-  app->SetLastBadgingTime(last_badging_time);
+  app->SetLastBadgingTime(random.next_time());
 
-  const base::Time last_launch_time =
-      base::Time::UnixEpoch() + base::Milliseconds(random.next_uint());
-  app->SetLastLaunchTime(last_launch_time);
+  app->SetLastLaunchTime(random.next_time());
 
-  const base::Time install_time =
-      base::Time::UnixEpoch() + base::Milliseconds(random.next_uint());
-  app->SetFirstInstallTime(install_time);
+  app->SetFirstInstallTime(random.next_time());
 
   const DisplayMode display_modes[4] = {
       DisplayMode::kBrowser, DisplayMode::kMinimalUi, DisplayMode::kStandalone,
@@ -798,9 +803,7 @@ std::unique_ptr<WebApp> CreateRandomWebApp(CreateRandomWebAppParams params) {
         LaunchHandler{random.next_enum<LaunchHandler::ClientMode>()});
   }
 
-  const base::Time manifest_update_time =
-      base::Time::UnixEpoch() + base::Milliseconds(random.next_uint());
-  app->SetManifestUpdateTime(manifest_update_time);
+  app->SetManifestUpdateTime(random.next_time());
 
   if (random.next_bool())
     app->SetParentAppId(base::NumberToString(random.next_uint()));
@@ -932,9 +935,22 @@ std::unique_ptr<WebApp> CreateRandomWebApp(CreateRandomWebAppParams params) {
 
   app->SetIsUserSelectedAppForSupportedLinks(random.next_bool());
 
-  const base::Time latest_install_time =
-      base::Time::UnixEpoch() + base::Milliseconds(random.next_uint());
-  app->SetLatestInstallTime(latest_install_time);
+  app->SetLatestInstallTime(random.next_time());
+
+  if (random.next_bool()) {
+    GeneratedIconFix generated_icon_fix;
+    generated_icon_fix.set_source(
+        NEXT_PROTO_ENUM(random, GeneratedIconFixSource, /*skip_zero=*/true));
+    generated_icon_fix.set_window_start_time(random.next_proto_time());
+    if (random.next_bool()) {
+      generated_icon_fix.set_last_attempt_time(random.next_proto_time());
+    }
+    generated_icon_fix.set_attempt_count(random.next_uint(100));
+    app->SetGeneratedIconFix(generated_icon_fix);
+  }
+
+  app->SetSupportedLinksOfferIgnoreCount(random.next_uint());
+  app->SetSupportedLinksOfferDismissCount(random.next_uint());
   return app;
 }
 
@@ -958,14 +974,14 @@ void TestDeclineDialogCallback(
 
 webapps::AppId InstallPwaForCurrentUrl(Browser* browser) {
   // Depending on the installability criteria, different dialogs can be used.
-  chrome::SetAutoAcceptWebAppDialogForTesting(true, true);
-  chrome::SetAutoAcceptPWAInstallConfirmationForTesting(true);
+  SetAutoAcceptWebAppDialogForTesting(true, true);
+  SetAutoAcceptPWAInstallConfirmationForTesting(true);
   WebAppTestInstallWithOsHooksObserver observer(browser->profile());
   observer.BeginListening();
   CHECK(chrome::ExecuteCommand(browser, IDC_INSTALL_PWA));
   webapps::AppId app_id = observer.Wait();
-  chrome::SetAutoAcceptPWAInstallConfirmationForTesting(false);
-  chrome::SetAutoAcceptWebAppDialogForTesting(false, false);
+  SetAutoAcceptPWAInstallConfirmationForTesting(false);
+  SetAutoAcceptWebAppDialogForTesting(false, false);
   return app_id;
 }
 

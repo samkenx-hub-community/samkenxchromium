@@ -4652,18 +4652,45 @@ IN_PROC_BROWSER_TEST_F(NavigationRequestResponseBodyBrowserTest,
   ASSERT_TRUE(manager.WaitForNavigationFinished());
 }
 
-IN_PROC_BROWSER_TEST_F(NavigationRequestBrowserTest,
+// Helper class to turn off strict site isolation, to allow testing dynamic
+// isolated origins added for future BrowsingInstances.
+class NavigationRequestNoSiteIsolationBrowserTest
+    : public NavigationRequestBrowserTest {
+ public:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    command_line->AppendSwitch(switches::kDisableSiteIsolation);
+    command_line->RemoveSwitch(switches::kSitePerProcess);
+    NavigationRequestBrowserTest::SetUpCommandLine(command_line);
+  }
+};
+
+// Test the early swap metrics logged when performing the early swap out of the
+// initial RenderFrameHost.  Currently, the vast majority of navigations are
+// allowed to reuse the initial RFH.  One exception is a navigation to a
+// future-isolated origin, which forces a BrowsingInstance swap so that the
+// isolation can take effect right away, so this is the case this test
+// exercises.
+IN_PROC_BROWSER_TEST_F(NavigationRequestNoSiteIsolationBrowserTest,
                        EarlySwapMetrics_InitialFrame) {
   base::HistogramTester histograms;
 
-  // Navigate the initial frame to a WebUI URL. Currently, the initial RFH
-  // cannot be reused for such a URL, and hence we should create a speculative
-  // RenderFrameHost and swap it in early because the initial frame is not
-  // live.
+  EXPECT_FALSE(SiteIsolationPolicy::UseDedicatedProcessesForAllSites());
+
+  // Isolate bar.com in future BrowsingInstances.
+  GURL bar_url(embedded_test_server()->GetURL("bar.com", "/title1.html"));
+  auto* policy = ChildProcessSecurityPolicyImpl::GetInstance();
+  policy->AddFutureIsolatedOrigins(
+      {url::Origin::Create(bar_url)},
+      ChildProcessSecurityPolicy::IsolatedOriginSource::TEST);
+
+  // Navigate the initial frame to bar.com which requires isolation. Currently,
+  // the isolation heuristics force a BrowsingInstance and a RenderFrameHost
+  // swap, so the initial RFH cannot be reused for such a URL, and hence we
+  // should create a speculative RenderFrameHost and swap it in early because
+  // the initial frame is not live.
   ASSERT_FALSE(
       shell()->web_contents()->GetPrimaryMainFrame()->IsRenderFrameLive());
-  GURL web_ui_url(GetWebUIURL("gpu"));
-  ASSERT_TRUE(NavigateToURL(shell(), web_ui_url));
+  ASSERT_TRUE(NavigateToURL(shell(), bar_url));
   histograms.ExpectUniqueSample(
       "Navigation.EarlyRenderFrameHostSwapType",
       NavigationRequest::EarlyRenderFrameHostSwapType::kInitialFrame, 1);
@@ -4759,6 +4786,26 @@ IN_PROC_BROWSER_TEST_F(NavigationRequestBrowserTest,
   }
 }
 
+IN_PROC_BROWSER_TEST_F(NavigationRequestBrowserTest,
+                       EarlySwapMetrics_NoSwapForWebUI) {
+  base::HistogramTester histograms;
+
+  // Navigate the initial frame to a WebUI URL. The initial RFH should be reused
+  // for such a URL, and hence there should be no early swap recorded in the
+  // metrics.
+  ASSERT_FALSE(
+      shell()->web_contents()->GetPrimaryMainFrame()->IsRenderFrameLive());
+  GURL web_ui_url(GetWebUIURL("gpu"));
+  ASSERT_TRUE(NavigateToURL(shell(), web_ui_url));
+  histograms.ExpectUniqueSample(
+      "Navigation.EarlyRenderFrameHostSwapType",
+      NavigationRequest::EarlyRenderFrameHostSwapType::kNone, 1);
+  histograms.ExpectTotalCount(
+      "Navigation.EarlyRenderFrameHostSwap.HasCommitted", 0);
+  histograms.ExpectTotalCount(
+      "Navigation.EarlyRenderFrameHostSwap.IsInOutermostMainFrame", 0);
+}
+
 // Check the output of NavigationHandle::SandboxFlagsInitiator() when the
 // navigation is initiated from the omnibox. It must be `kNone`.
 IN_PROC_BROWSER_TEST_F(NavigationRequestBrowserTest,
@@ -4845,6 +4892,56 @@ IN_PROC_BROWSER_TEST_F(NavigationRequestBrowserTest,
           ~network::mojom::WebSandboxFlags::kPopups &
           ~network::mojom::WebSandboxFlags::kTopNavigationToCustomProtocols &
           ~network::mojom::WebSandboxFlags::kAutomaticFeatures);
+}
+
+// Tests the scenario when a navigation without URLLoader is cancelled and an
+// error page is committed using the same NavigationRequest.
+// See https://crbug.com/1487944.
+IN_PROC_BROWSER_TEST_F(
+    NavigationRequestBrowserTest,
+    ThrottleDeferAndCancelCommitWithoutUrlLoaderWithErrorPage) {
+  GURL url(embedded_test_server()->GetURL("/title1.html"));
+  GURL about_blank_url(url::kAboutBlankURL);
+
+  // Perform a new-document navigation (setup).
+  EXPECT_TRUE(NavigateToURL(shell(), url));
+
+  // Navigate to about:blank so the NavigationRequest is expected to commit
+  // without URL loader.
+  {
+    TestNavigationObserver navigation_observer(shell()->web_contents(), 1);
+    NavigationHandleObserver observer(shell()->web_contents(), about_blank_url);
+    TestNavigationThrottleInstaller installer(
+        shell()->web_contents(), NavigationThrottle::DEFER,
+        NavigationThrottle::DEFER, NavigationThrottle::DEFER,
+        NavigationThrottle::DEFER, NavigationThrottle::DEFER);
+
+    shell()->LoadURL(about_blank_url);
+
+    // Wait for WillCommitWithoutUrlLoader.
+    installer.WaitForThrottleWillCommitWithoutUrlLoader();
+    EXPECT_EQ(0, installer.will_start_called());
+    EXPECT_EQ(0, installer.will_redirect_called());
+    EXPECT_EQ(0, installer.will_fail_called());
+    EXPECT_EQ(0, installer.will_process_called());
+    EXPECT_EQ(1, installer.will_commit_without_url_loader_called());
+
+    // Cancel the deferred navigation with `net::ERR_BLOCKED_BY_RESPONSE`, so
+    // the NavigationRequest will be used for an error page commit.
+    installer.navigation_throttle()->CancelNavigation(
+        {NavigationThrottle::CANCEL_AND_IGNORE, net::ERR_BLOCKED_BY_RESPONSE});
+
+    // Wait for the end of the navigation.
+    navigation_observer.Wait();
+
+    EXPECT_FALSE(observer.is_same_document());
+    EXPECT_TRUE(observer.has_committed());
+    EXPECT_FALSE(observer.was_redirected());
+    EXPECT_TRUE(observer.is_error());
+
+    EXPECT_TRUE(
+        shell()->web_contents()->GetPrimaryMainFrame()->IsErrorDocument());
+  }
 }
 
 }  // namespace content

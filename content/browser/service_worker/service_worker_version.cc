@@ -1198,6 +1198,15 @@ void ServiceWorkerVersion::InitializeGlobalScope() {
 
   is_endpoint_ready_ = true;
   associated_registry_ = std::make_unique<blink::AssociatedInterfaceRegistry>();
+
+  // If we have allocated the process we can tell the client to register
+  // services.
+  if (embedded_worker()->process_id() != ChildProcessHost::kInvalidUniqueID) {
+    GetContentClient()
+        ->browser()
+        ->RegisterAssociatedInterfaceBindersForServiceWorker(
+            GetInfo(), *associated_registry_);
+  }
 }
 
 bool ServiceWorkerVersion::IsControlleeProcessID(int process_id) const {
@@ -1378,6 +1387,17 @@ void ServiceWorkerVersion::OnScriptLoaded() {
   for (auto& callback : callbacks) {
     std::move(callback).Run(blink::ServiceWorkerStatusCode::kOk);
   }
+}
+
+void ServiceWorkerVersion::OnProcessAllocated() {
+  // If we have not initialized the global scope yet, return early.
+  if (!is_endpoint_ready_) {
+    return;
+  }
+  GetContentClient()
+      ->browser()
+      ->RegisterAssociatedInterfaceBindersForServiceWorker(
+          GetInfo(), *associated_registry_);
 }
 
 void ServiceWorkerVersion::OnStarting() {
@@ -2303,6 +2323,8 @@ void ServiceWorkerVersion::StartWorkerInternal() {
   params->provider_info = std::move(provider_info);
 
   params->ukm_source_id = ukm_source_id_;
+
+  params->storage_key = key_;
 
   // policy_container_host could be null for registration restored from old DB
   if (policy_container_host_) {

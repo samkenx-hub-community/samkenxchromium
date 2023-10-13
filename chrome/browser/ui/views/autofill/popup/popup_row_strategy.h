@@ -82,23 +82,29 @@ class PopupSuggestionStrategy : public PopupRowBaseStrategy {
   // PopupRowStrategy:
   std::unique_ptr<PopupCellView> CreateContent() override;
   std::unique_ptr<PopupCellView> CreateControl() override;
-  std::unique_ptr<PopupCellView> CreateAutocompleteRow();
 
  private:
-  // Returns the type of the popup that this row belongs to.
-  PopupType GetPopupType() const { return popup_type_; }
+  // Creates the cell for an Autocomplete entry with a delete button.
+  std::unique_ptr<PopupCellView> CreateAutocompleteWithDeleteButtonCell();
 
-  // Applies additional formatting to the `label` based on the popup's type and
-  // the parameters in `text`.
-  void FormatLabel(views::Label& label, const Suggestion::Text& text) const;
+  // Adds content and labels for a suggestion. A helper method used by all
+  // suggestion types.
+  void AddContentLabelsAndCallbacks(PopupCellView& view);
+};
 
-  // Creates the subtext views for this suggestion. Since it registers the
-  // labels inside them for tracking with `content_view`, it assumes that the
-  // returned views are added to `content_view` afterwards.
-  std::vector<std::unique_ptr<views::View>> CreateAndTrackSubtextViews(
-      PopupCellView& content_view) const;
+// A `PopupRowStrategy` that creates the content of a Compose row.
+class PopupComposeSuggestionStrategy : public PopupRowBaseStrategy {
+ public:
+  PopupComposeSuggestionStrategy(
+      base::WeakPtr<AutofillPopupController> controller,
+      int line_number);
+  ~PopupComposeSuggestionStrategy() override;
 
-  const PopupType popup_type_;
+  // PopupRowStrategy:
+  std::unique_ptr<PopupCellView> CreateContent() override;
+  std::unique_ptr<PopupCellView> CreateControl() override;
+
+ private:
 };
 
 // A `PopupRowStrategy` that creates the content for password suggestion rows.

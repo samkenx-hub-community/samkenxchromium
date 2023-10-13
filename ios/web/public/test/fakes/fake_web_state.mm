@@ -288,6 +288,9 @@ void FakeWebState::SetContentsMimeType(const std::string& mime_type) {
 
 void FakeWebState::SetTitle(const std::u16string& title) {
   title_ = title;
+  for (auto& observer : observers_) {
+    observer.TitleWasSet(this);
+  }
 }
 
 const std::u16string& FakeWebState::GetTitle() const {
@@ -579,6 +582,10 @@ id FakeWebState::GetActivityItem() API_AVAILABLE(ios(16.4)) {
 }
 
 UIColor* FakeWebState::GetThemeColor() {
+  return nil;
+}
+
+UIColor* FakeWebState::GetUnderPageBackgroundColor() {
   return nil;
 }
 

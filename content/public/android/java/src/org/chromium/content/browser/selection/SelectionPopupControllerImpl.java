@@ -986,7 +986,8 @@ public class SelectionPopupControllerImpl extends ActionModeCallbackHelper
 
     @Override
     public void onCreateActionMode(ActionMode mode, Menu menu) {
-        mode.setTitle(DeviceFormFactor.isWindowOnTablet(mWindowAndroid)
+        mode.setTitle(
+                mWindowAndroid != null && DeviceFormFactor.isWindowOnTablet(mWindowAndroid)
                         ? mContext.getString(R.string.actionbar_textselection_title)
                         : null);
         mode.setSubtitle(null);
@@ -1517,6 +1518,13 @@ public class SelectionPopupControllerImpl extends ActionModeCallbackHelper
         if (hasSelection() && !isActionModeValid()
                 && getMenuType() == SelectionMenuType.ACTION_MODE) {
             showActionModeOrClearOnFailure();
+        }
+    }
+
+    @CalledByNative
+    private void childLocalSurfaceIdChanged() {
+        if (mMagnifierAnimator != null) {
+            mMagnifierAnimator.childLocalSurfaceIdChanged();
         }
     }
 

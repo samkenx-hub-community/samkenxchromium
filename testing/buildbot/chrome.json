@@ -1177,7 +1177,8 @@
       {
         "autotest_name": "tast.chrome-from-gcs",
         "cros_board": "brya",
-        "cros_img": "brya-release/R119-15626.0.0",
+        "cros_img": "brya-release/R120-15642.0.0",
+        "dut_pool": "chrome",
         "name": "chrome_all_tast_tests BRYA_RELEASE_LKGM",
         "shards": 10,
         "tast_expr": "STUB_STRING_TO_RUN_TAST_TESTS",
@@ -1189,8 +1190,10 @@
       },
       {
         "autotest_name": "tast.chrome-from-gcs",
+        "ci_only": true,
         "cros_board": "brya",
-        "cros_img": "brya-release/R119-15626.0.0",
+        "cros_img": "brya-release/R120-15642.0.0",
+        "dut_pool": "chrome",
         "experiment_percentage": 100,
         "name": "chrome_criticalstaging_tast_tests BRYA_RELEASE_LKGM",
         "shards": 3,
@@ -1203,8 +1206,10 @@
       },
       {
         "autotest_name": "tast.chrome-from-gcs",
+        "ci_only": true,
         "cros_board": "brya",
-        "cros_img": "brya-release/R119-15626.0.0",
+        "cros_img": "brya-release/R120-15642.0.0",
+        "dut_pool": "chrome",
         "experiment_percentage": 100,
         "name": "chrome_disabled_tast_tests BRYA_RELEASE_LKGM",
         "shards": 2,
@@ -1403,7 +1408,7 @@
       {
         "autotest_name": "tast.chrome-from-gcs",
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R119-15626.0.0",
+        "cros_img": "jacuzzi-release/R120-15642.0.0",
         "name": "chrome_all_tast_tests JACUZZI_RELEASE_CHROME_FROM_TLS_LKGM",
         "shards": 10,
         "tast_expr": "STUB_STRING_TO_RUN_TAST_TESTS",
@@ -1415,8 +1420,9 @@
       },
       {
         "autotest_name": "tast.chrome-from-gcs",
+        "ci_only": true,
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R119-15626.0.0",
+        "cros_img": "jacuzzi-release/R120-15642.0.0",
         "experiment_percentage": 100,
         "name": "chrome_criticalstaging_tast_tests JACUZZI_RELEASE_CHROME_FROM_TLS_LKGM",
         "shards": 3,
@@ -1429,8 +1435,9 @@
       },
       {
         "autotest_name": "tast.chrome-from-gcs",
+        "ci_only": true,
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R119-15626.0.0",
+        "cros_img": "jacuzzi-release/R120-15642.0.0",
         "experiment_percentage": 100,
         "name": "chrome_disabled_tast_tests JACUZZI_RELEASE_CHROME_FROM_TLS_LKGM",
         "shards": 2,
@@ -1458,7 +1465,6 @@
       {
         "autotest_name": "tast.chrome-from-gcs",
         "cros_board": "octopus",
-        "cros_img": "octopus-release/R119-15626.0.0",
         "name": "chrome_all_tast_tests OCTOPUS_RELEASE_CHROME_FROM_TLS_LKGM",
         "shards": 10,
         "tast_expr": "STUB_STRING_TO_RUN_TAST_TESTS",
@@ -1466,6 +1472,7 @@
         "test_id_prefix": "ninja://chromeos:chrome_all_tast_tests/",
         "test_level_retries": 2,
         "timeout_sec": 21600,
+        "use_lkgm": true,
         "variant_id": "OCTOPUS_RELEASE_CHROME_FROM_TLS_LKGM"
       }
     ]
@@ -1566,7 +1573,7 @@
       {
         "autotest_name": "tast.chrome-from-gcs",
         "cros_board": "volteer",
-        "cros_img": "volteer-release/R119-15626.0.0",
+        "cros_img": "volteer-release/R120-15642.0.0",
         "name": "chrome_all_tast_tests VOLTEER_RELEASE_LKGM",
         "shards": 10,
         "tast_expr": "STUB_STRING_TO_RUN_TAST_TESTS",
@@ -1578,8 +1585,9 @@
       },
       {
         "autotest_name": "tast.chrome-from-gcs",
+        "ci_only": true,
         "cros_board": "volteer",
-        "cros_img": "volteer-release/R119-15626.0.0",
+        "cros_img": "volteer-release/R120-15642.0.0",
         "experiment_percentage": 100,
         "name": "chrome_criticalstaging_tast_tests VOLTEER_RELEASE_LKGM",
         "shards": 3,
@@ -1592,8 +1600,9 @@
       },
       {
         "autotest_name": "tast.chrome-from-gcs",
+        "ci_only": true,
         "cros_board": "volteer",
-        "cros_img": "volteer-release/R119-15626.0.0",
+        "cros_img": "volteer-release/R120-15642.0.0",
         "experiment_percentage": 100,
         "name": "chrome_disabled_tast_tests VOLTEER_RELEASE_LKGM",
         "shards": 2,
@@ -1638,7 +1647,7 @@
     "skylab_tests": [
       {
         "cros_board": "brya",
-        "cros_img": "brya-release/R116-15509.50.0",
+        "cros_img": "brya-release/R118-15604.35.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests BRYA_RELEASE_BETA",
         "resultdb": {
@@ -1655,7 +1664,7 @@
       },
       {
         "cros_board": "brya",
-        "cros_img": "brya-release/R117-15563.0.0",
+        "cros_img": "brya-release/R119-15633.0.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests BRYA_RELEASE_DEV",
         "resultdb": {
@@ -1673,7 +1682,7 @@
       {
         "autotest_name": "tast.lacros-from-gcs",
         "cros_board": "brya",
-        "cros_img": "brya-release/R119-15626.0.0",
+        "cros_img": "brya-release/R120-15642.0.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests BRYA_RELEASE_LKGM",
         "resultdb": {
@@ -1690,7 +1699,7 @@
       },
       {
         "cros_board": "brya",
-        "cros_img": "brya-release/R115-15474.70.0",
+        "cros_img": "brya-release/R117-15572.63.2",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests BRYA_RELEASE_STABLE",
         "resultdb": {
@@ -1707,7 +1716,7 @@
       },
       {
         "cros_board": "dedede",
-        "cros_img": "dedede-release/R116-15509.50.0",
+        "cros_img": "dedede-release/R118-15604.35.0",
         "name": "lacros_all_tast_tests DEDEDE_RELEASE_BETA",
         "resultdb": {
           "enable": true,
@@ -1723,7 +1732,7 @@
       },
       {
         "cros_board": "dedede",
-        "cros_img": "dedede-release/R117-15552.0.0",
+        "cros_img": "dedede-release/R119-15633.0.0",
         "name": "lacros_all_tast_tests DEDEDE_RELEASE_DEV",
         "resultdb": {
           "enable": true,
@@ -1740,7 +1749,7 @@
       {
         "autotest_name": "tast.lacros-from-gcs",
         "cros_board": "dedede",
-        "cros_img": "dedede-release/R119-15626.0.0",
+        "cros_img": "dedede-release/R120-15642.0.0",
         "name": "lacros_all_tast_tests DEDEDE_RELEASE_LKGM",
         "resultdb": {
           "enable": true,
@@ -1756,7 +1765,7 @@
       },
       {
         "cros_board": "dedede",
-        "cros_img": "dedede-release/R115-15474.70.0",
+        "cros_img": "dedede-release/R117-15572.63.0",
         "name": "lacros_all_tast_tests DEDEDE_RELEASE_STABLE",
         "resultdb": {
           "enable": true,
@@ -1772,7 +1781,7 @@
       },
       {
         "cros_board": "fizz",
-        "cros_img": "fizz-release/R116-15509.50.0",
+        "cros_img": "fizz-release/R118-15604.35.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests FIZZ_RELEASE_BETA",
         "resultdb": {
@@ -1789,7 +1798,7 @@
       },
       {
         "cros_board": "fizz",
-        "cros_img": "fizz-release/R117-15563.0.0",
+        "cros_img": "fizz-release/R119-15633.0.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests FIZZ_RELEASE_DEV",
         "resultdb": {
@@ -1807,7 +1816,7 @@
       {
         "autotest_name": "tast.lacros-from-gcs",
         "cros_board": "fizz",
-        "cros_img": "fizz-release/R119-15626.0.0",
+        "cros_img": "fizz-release/R120-15642.0.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests FIZZ_RELEASE_LKGM",
         "resultdb": {
@@ -1824,7 +1833,7 @@
       },
       {
         "cros_board": "fizz",
-        "cros_img": "fizz-release/R115-15474.70.0",
+        "cros_img": "fizz-release/R117-15572.63.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests FIZZ_RELEASE_STABLE",
         "resultdb": {
@@ -1841,7 +1850,7 @@
       },
       {
         "cros_board": "guybrush",
-        "cros_img": "guybrush-release/R116-15509.50.0",
+        "cros_img": "guybrush-release/R118-15604.35.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests GUYBRUSH_RELEASE_BETA",
         "resultdb": {
@@ -1858,7 +1867,7 @@
       },
       {
         "cros_board": "guybrush",
-        "cros_img": "guybrush-release/R117-15563.0.0",
+        "cros_img": "guybrush-release/R119-15626.0.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests GUYBRUSH_RELEASE_DEV",
         "resultdb": {
@@ -1876,7 +1885,7 @@
       {
         "autotest_name": "tast.lacros-from-gcs",
         "cros_board": "guybrush",
-        "cros_img": "guybrush-release/R119-15626.0.0",
+        "cros_img": "guybrush-release/R120-15642.0.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests GUYBRUSH_RELEASE_LKGM",
         "resultdb": {
@@ -1893,7 +1902,7 @@
       },
       {
         "cros_board": "guybrush",
-        "cros_img": "guybrush-release/R115-15474.70.0",
+        "cros_img": "guybrush-release/R117-15572.63.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests GUYBRUSH_RELEASE_STABLE",
         "resultdb": {
@@ -1910,7 +1919,7 @@
       },
       {
         "cros_board": "puff",
-        "cros_img": "puff-release/R116-15509.50.0",
+        "cros_img": "puff-release/R118-15604.35.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests PUFF_RELEASE_BETA",
         "resultdb": {
@@ -1927,7 +1936,7 @@
       },
       {
         "cros_board": "puff",
-        "cros_img": "puff-release/R117-15563.0.0",
+        "cros_img": "puff-release/R119-15633.0.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests PUFF_RELEASE_DEV",
         "resultdb": {
@@ -1945,7 +1954,7 @@
       {
         "autotest_name": "tast.lacros-from-gcs",
         "cros_board": "puff",
-        "cros_img": "puff-release/R119-15626.0.0",
+        "cros_img": "puff-release/R120-15642.0.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests PUFF_RELEASE_LKGM",
         "resultdb": {
@@ -1962,7 +1971,7 @@
       },
       {
         "cros_board": "puff",
-        "cros_img": "puff-release/R115-15474.70.0",
+        "cros_img": "puff-release/R117-15572.63.0",
         "dut_pool": "chrome",
         "name": "lacros_all_tast_tests PUFF_RELEASE_STABLE",
         "resultdb": {
@@ -2011,7 +2020,7 @@
     "skylab_tests": [
       {
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R115-15474.14.0",
+        "cros_img": "jacuzzi-release/R118-15604.35.0",
         "name": "lacros_all_tast_tests JACUZZI_RELEASE_BETA",
         "resultdb": {
           "enable": true,
@@ -2027,7 +2036,7 @@
       },
       {
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R116-15501.0.0",
+        "cros_img": "jacuzzi-release/R119-15633.0.0",
         "name": "lacros_all_tast_tests JACUZZI_RELEASE_DEV",
         "resultdb": {
           "enable": true,
@@ -2044,7 +2053,7 @@
       {
         "autotest_name": "tast.lacros-from-gcs",
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R119-15626.0.0",
+        "cros_img": "jacuzzi-release/R120-15642.0.0",
         "name": "lacros_all_tast_tests JACUZZI_RELEASE_LKGM",
         "resultdb": {
           "enable": true,
@@ -2060,7 +2069,7 @@
       },
       {
         "cros_board": "jacuzzi",
-        "cros_img": "jacuzzi-release/R114-15437.42.0",
+        "cros_img": "jacuzzi-release/R117-15572.63.0",
         "name": "lacros_all_tast_tests JACUZZI_RELEASE_STABLE",
         "resultdb": {
           "enable": true,
@@ -2109,7 +2118,7 @@
       {
         "autotest_name": "tast.lacros-from-gcs",
         "cros_board": "strongbad",
-        "cros_img": "strongbad-release/R119-15626.0.0",
+        "cros_img": "strongbad-release/R120-15642.0.0",
         "name": "lacros_all_tast_tests STRONGBAD_RELEASE_LKGM",
         "resultdb": {
           "enable": true,

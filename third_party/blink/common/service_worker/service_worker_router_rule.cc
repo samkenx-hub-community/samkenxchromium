@@ -12,9 +12,14 @@ bool ServiceWorkerRouterRequestCondition::operator==(
          destination == other.destination;
 }
 
+bool ServiceWorkerRouterConditionObject::operator==(
+    const ServiceWorkerRouterConditionObject& other) const {
+  return conditions == other.conditions;
+}
+
 bool ServiceWorkerRouterOrCondition::operator==(
     const ServiceWorkerRouterOrCondition& other) const {
-  return conditions == other.conditions;
+  return objects == other.objects;
 }
 
 bool ServiceWorkerRouterCondition::operator==(
@@ -45,13 +50,13 @@ bool ServiceWorkerRouterSource::operator==(
     return false;
   }
   switch (type) {
-    case SourceType::kNetwork:
+    case Type::kNetwork:
       return network_source == other.network_source;
-    case SourceType::kRace:
+    case Type::kRace:
       return race_source == other.race_source;
-    case SourceType::kFetchEvent:
+    case Type::kFetchEvent:
       return fetch_event_source == other.fetch_event_source;
-    case SourceType::kCache:
+    case Type::kCache:
       return cache_source == other.cache_source;
   }
 }

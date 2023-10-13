@@ -23,6 +23,7 @@ import static org.chromium.chrome.browser.ui.device_lock.DeviceLockProperties.ON
 import static org.chromium.chrome.browser.ui.device_lock.DeviceLockProperties.ON_GO_TO_OS_SETTINGS_CLICKED;
 import static org.chromium.chrome.browser.ui.device_lock.DeviceLockProperties.ON_USER_UNDERSTANDS_CLICKED;
 import static org.chromium.chrome.browser.ui.device_lock.DeviceLockProperties.PREEXISTING_DEVICE_LOCK;
+import static org.chromium.chrome.browser.ui.device_lock.DeviceLockProperties.UI_ENABLED;
 import static org.chromium.components.browser_ui.device_lock.DeviceLockBridge.DEVICE_LOCK_PAGE_HAS_BEEN_PASSED;
 
 import android.accounts.Account;
@@ -50,7 +51,6 @@ import org.robolectric.annotation.Config;
 import org.chromium.base.Callback;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.FeatureList;
-import org.chromium.base.test.BaseActivityTestRule;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.device_reauth.ReauthenticatorBridge;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -59,20 +59,14 @@ import org.chromium.chrome.test.util.browser.signin.AccountManagerTestRule;
 import org.chromium.components.signin.AccountReauthenticationUtils;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.modelutil.PropertyModel;
-import org.chromium.ui.test.util.BlankUiTestActivity;
 
 /** Unit tests for the {@link DeviceLockMediator}.*/
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
 @Features.EnableFeatures({ChromeFeatureList.ACCOUNT_REAUTHENTICATION_RECENT_TIME_WINDOW})
 public class DeviceLockMediatorUnitTest {
-    private static final int MOCK_RECENT_TIME_WINDOW = 10;
-
     @Rule
     public final AccountManagerTestRule mAccountManagerTestRule = new AccountManagerTestRule();
-    @Rule
-    public BaseActivityTestRule<BlankUiTestActivity> mActivityTestRule =
-            new BaseActivityTestRule<>(BlankUiTestActivity.class);
 
     @Mock
     public Activity mActivity;
@@ -426,6 +420,13 @@ public class DeviceLockMediatorUnitTest {
                             + "device lock is not ready.",
                     ContextUtils.getAppSharedPreferences().getBoolean(
                             DEVICE_LOCK_PAGE_HAS_BEEN_PASSED, false));
+        }
+        if (onClick.equals(ON_DISMISS_CLICKED)) {
+            assertTrue("The UI should still be in an enabled state.",
+                    deviceLockMediator.getModel().get(UI_ENABLED));
+        } else {
+            assertFalse("The UI should have been set to a disabled state.",
+                    deviceLockMediator.getModel().get(UI_ENABLED));
         }
     }
 

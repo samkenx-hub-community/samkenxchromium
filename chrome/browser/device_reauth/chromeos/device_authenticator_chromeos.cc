@@ -13,7 +13,8 @@ DeviceAuthenticatorChromeOS::DeviceAuthenticatorChromeOS(
     DeviceAuthenticatorProxy* proxy,
     const device_reauth::DeviceAuthParams& params)
     : ChromeDeviceAuthenticatorCommon(proxy,
-                                      params.GetAuthenticationValidityPeriod()),
+                                      params.GetAuthenticationValidityPeriod(),
+                                      params.GetAuthResultHistogram()),
       authenticator_(std::move(authenticator)) {}
 
 DeviceAuthenticatorChromeOS::~DeviceAuthenticatorChromeOS() = default;
@@ -32,16 +33,12 @@ bool DeviceAuthenticatorChromeOS::CanAuthenticateWithBiometricOrScreenLock() {
   return false;
 }
 
-void DeviceAuthenticatorChromeOS::Authenticate(
-    AuthenticateCallback callback,
-    bool use_last_valid_auth) {
-  NOTIMPLEMENTED();
-}
-
 void DeviceAuthenticatorChromeOS::AuthenticateWithMessage(
     const std::u16string& message,
     AuthenticateCallback callback) {
   if (!NeedsToAuthenticate()) {
+    RecordAuthResultSkipped();
+
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(std::move(callback), /*success=*/true));
     return;

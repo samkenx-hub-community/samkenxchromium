@@ -98,6 +98,7 @@
 #include "services/network/http_server_properties_pref_delegate.h"
 #include "services/network/ignore_errors_cert_verifier.h"
 #include "services/network/ip_protection_config_cache_impl.h"
+#include "services/network/ip_protection_token_cache_manager_impl.h"
 #include "services/network/is_browser_initiated.h"
 #include "services/network/net_log_exporter.h"
 #include "services/network/network_service.h"
@@ -673,32 +674,9 @@ NetworkContext::~NetworkContext() {
 
   // May be nullptr in tests.
   if (network_service_) {
-#if BUILDFLAG(IS_ANDROID)
-    if (params_ && params_->file_paths) {
-      base::FilePath path_to_invalidate;
-      if (GetFullDataFilePath(params_->file_paths,
-                              &network::mojom::NetworkContextFilePaths::
-                                  trust_token_database_name,
-                              path_to_invalidate)) {
-        network_service_->InvalidateNetworkContextPath(path_to_invalidate);
-      }
-      if (GetFullDataFilePath(params_->file_paths,
-                              &network::mojom::NetworkContextFilePaths::
-                                  reporting_and_nel_store_database_name,
-                              path_to_invalidate)) {
-        network_service_->InvalidateNetworkContextPath(path_to_invalidate);
-      }
-      if (GetFullDataFilePath(
-              params_->file_paths,
-              &network::mojom::NetworkContextFilePaths::cookie_database_name,
-              path_to_invalidate)) {
-        network_service_->InvalidateNetworkContextPath(path_to_invalidate);
-      }
-    }
-
-#endif
     network_service_->DeregisterNetworkContext(this);
   }
+
   if (domain_reliability_monitor_)
     domain_reliability_monitor_->Shutdown();
   // Because of the order of declaration in the class,
@@ -1491,9 +1469,9 @@ void NetworkContext::SetCTPolicy(mojom::CTPolicyPtr ct_policy) {
   if (!require_ct_delegate_)
     return;
 
-  require_ct_delegate_->UpdateCTPolicies(
-      ct_policy->required_hosts, ct_policy->excluded_hosts,
-      ct_policy->excluded_spkis, ct_policy->excluded_legacy_spkis);
+  require_ct_delegate_->UpdateCTPolicies(ct_policy->excluded_hosts,
+                                         ct_policy->excluded_spkis,
+                                         ct_policy->excluded_legacy_spkis);
 }
 
 int NetworkContext::CheckCTComplianceForSignedExchange(
@@ -2031,31 +2009,34 @@ void NetworkContext::VerifyIpProtectionConfigGetterForTesting(
   // initialized.
   CHECK(proxy_delegate_);
 
-  auto* ipp_config_cache_impl = static_cast<IpProtectionConfigCacheImpl*>(
-      proxy_delegate_->GetIpProtectionConfigCache());
-  CHECK(ipp_config_cache_impl);
+  auto* ipp_config_cache = proxy_delegate_->GetIpProtectionConfigCache();
+  CHECK(ipp_config_cache);
+  auto* ipp_token_cache_manager_impl =
+      static_cast<IpProtectionTokenCacheManagerImpl*>(
+          ipp_config_cache
+              ->GetIpProtectionTokenCacheManagerForTesting());  // IN-TEST
+  CHECK(ipp_token_cache_manager_impl);
 
   // If active cache management is enabled (the default), disable it and do a
   // one-time reset of the state. Since the browser process will be driving this
   // test, this makes it easier to reason about the state of
-  // `ipp_config_cache_impl` (for instance, if the browser process sends less
+  // `ipp_config_cache` (for instance, if the browser process sends less
   // than the requested number of tokens, the network service won't immediately
   // request more).
-  if (ipp_config_cache_impl->IsCacheManagementEnabledForTesting()) {
-    ipp_config_cache_impl->DisableCacheManagementForTesting(  // IN-TEST
+  if (ipp_token_cache_manager_impl->IsCacheManagementEnabledForTesting()) {
+    ipp_token_cache_manager_impl->DisableCacheManagementForTesting(  // IN-TEST
         base::BindOnce(
             [](base::WeakPtr<NetworkContext> weak_ptr,
                VerifyIpProtectionConfigGetterForTestingCallback callback) {
-              // If this callback is called then `ipp_config_cache_impl` is
+              // If this callback is called then `ipp_config_cache` is
               // still alive, which means that this `NetworkContext` is alive as
               // well.
               CHECK(weak_ptr);
-              auto* ipp_config_cache_impl =
-                  static_cast<IpProtectionConfigCacheImpl*>(
-                      weak_ptr->proxy_delegate_->GetIpProtectionConfigCache());
-              ipp_config_cache_impl->InvalidateTryAgainAfterTime();
-              while (ipp_config_cache_impl->IsAuthTokenAvailable()) {
-                ipp_config_cache_impl->GetAuthToken();
+              auto* ipp_config_cache =
+                  weak_ptr->proxy_delegate_->GetIpProtectionConfigCache();
+              ipp_config_cache->InvalidateTryAgainAfterTime();
+              while (ipp_config_cache->IsAuthTokenAvailable()) {
+                ipp_config_cache->GetAuthToken();
               }
               // Call `PostTask()` instead of invoking the Verify method again
               // directly so that if `DisableCacheManagementForTesting()` needed
@@ -2074,34 +2055,38 @@ void NetworkContext::VerifyIpProtectionConfigGetterForTesting(
 
   // If there is a cooldown in effect, then don't send any tokens and instead
   // send back the try again after time.
-  // TODO(awillia): This will actually be used in a follow-up CL.
   base::Time try_auth_tokens_after =
-      ipp_config_cache_impl
+      ipp_token_cache_manager_impl
           ->try_get_auth_tokens_after_for_testing();  // IN-TEST
   if (!try_auth_tokens_after.is_null()) {
     std::move(callback).Run(nullptr, try_auth_tokens_after);
     return;
   }
 
-  ipp_config_cache_impl->SetOnTryGetAuthTokensCompletedForTesting(  // IN-TEST
-      base::BindOnce(&NetworkContext::OnIpProtectionConfigAvailableForTesting,
-                     weak_factory_.GetWeakPtr(), std::move(callback)));
-  ipp_config_cache_impl->CallTryGetAuthTokensForTesting();  // IN-TEST
+  ipp_token_cache_manager_impl
+      ->SetOnTryGetAuthTokensCompletedForTesting(  // IN-TEST
+          base::BindOnce(
+              &NetworkContext::OnIpProtectionConfigAvailableForTesting,
+              weak_factory_.GetWeakPtr(), std::move(callback)));
+  ipp_token_cache_manager_impl->CallTryGetAuthTokensForTesting();  // IN-TEST
 }
 
 void NetworkContext::OnIpProtectionConfigAvailableForTesting(
     VerifyIpProtectionConfigGetterForTestingCallback callback) {
-  auto* ipp_config_cache_impl = static_cast<IpProtectionConfigCacheImpl*>(
-      proxy_delegate_->GetIpProtectionConfigCache());
+  auto* ipp_config_cache = proxy_delegate_->GetIpProtectionConfigCache();
+  auto* ipp_token_cache_manager_impl =
+      static_cast<IpProtectionTokenCacheManagerImpl*>(
+          ipp_config_cache
+              ->GetIpProtectionTokenCacheManagerForTesting());  // IN-TEST
 
   absl::optional<network::mojom::BlindSignedAuthTokenPtr> result =
-      ipp_config_cache_impl->GetAuthToken();
+      ipp_config_cache->GetAuthToken();
   if (result.has_value()) {
     std::move(callback).Run(std::move(result).value(), absl::nullopt);
     return;
   }
   base::Time try_auth_tokens_after =
-      ipp_config_cache_impl
+      ipp_token_cache_manager_impl
           ->try_get_auth_tokens_after_for_testing();  // IN-TEST
   std::move(callback).Run(nullptr, try_auth_tokens_after);
 }
@@ -2750,11 +2735,16 @@ URLRequestContextOwner NetworkContext::MakeURLRequestContext(
   builder.set_host_mapping_rules(
       command_line->GetSwitchValueASCII(switches::kHostResolverRules));
 
+#if BUILDFLAG(IS_WIN)
   if (params_->socket_broker) {
     builder.set_client_socket_factory(
         std::make_unique<BrokeredClientSocketFactory>(
             std::move(params_->socket_broker)));
   }
+#endif
+
+  require_network_anonymization_key_ =
+      params_->require_network_anonymization_key;
 
   // If `require_network_anonymization_key_` is true, but the features that can
   // trigger another URLRequest are not set to respect NetworkAnonymizationKeys,
@@ -2782,9 +2772,6 @@ URLRequestContextOwner NetworkContext::MakeURLRequestContext(
   }
   auto result =
       URLRequestContextOwner(std::move(pref_service), builder.Build());
-
-  require_network_anonymization_key_ =
-      params_->require_network_anonymization_key;
 
   // Subscribe the CertVerifier to configuration changes that are exposed via
   // the mojom::SSLConfig, but which are not part of the
@@ -2866,6 +2853,7 @@ URLRequestContextOwner NetworkContext::MakeURLRequestContext(
       proxy_delegate_->SetIpProtectionConfigCache(
           std::make_unique<IpProtectionConfigCacheImpl>(
               std::move(params_->ip_protection_config_getter)));
+      proxy_delegate_->GetIpProtectionConfigCache()->SetUp();
     }
   }
 
@@ -3073,6 +3061,10 @@ bool NetworkContext::IsAllowedToUseAllHttpAuthSchemes(
     const url::SchemeHostPort& scheme_host_port) {
   DCHECK(url_matcher_);
   return !url_matcher_->MatchURL(scheme_host_port.GetURL()).empty();
+}
+
+bool NetworkContext::AfpBlockListExperimentEnabled() const {
+  return params_ && params_->afp_block_list_experiment_enabled;
 }
 
 void NetworkContext::CreateTrustedUrlLoaderFactoryForNetworkService(

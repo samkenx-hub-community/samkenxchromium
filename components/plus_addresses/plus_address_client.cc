@@ -9,6 +9,7 @@
 #include "base/sequence_checker.h"
 #include "base/strings/strcat.h"
 #include "components/plus_addresses/features.h"
+#include "components/plus_addresses/plus_address_metrics.h"
 #include "components/plus_addresses/plus_address_parser.h"
 #include "components/plus_addresses/plus_address_types.h"
 #include "components/signin/public/base/consent_level.h"
@@ -19,6 +20,7 @@
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
+#include "services/network/public/mojom/url_response_head.mojom.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 
@@ -29,7 +31,7 @@ namespace {
 const base::TimeDelta kRequestTimeout = base::Seconds(5);
 
 // See docs/network_traffic_annotations.md for reference.
-// TODO(b/277532955): Update the description and trigger fields when possible.
+// TODO(b/295556954): Update the description and trigger fields when possible.
 //                    Also replace the policy_exception when we have a policy.
 const net::NetworkTrafficAnnotationTag kCreatePlusAddressAnnotation =
     net::DefineNetworkTrafficAnnotation("plus_address_creation", R"(
@@ -59,7 +61,69 @@ const net::NetworkTrafficAnnotationTag kCreatePlusAddressAnnotation =
       }
     )");
 
+// TODO(b/295556954): Update the description and trigger fields when possible.
+//                    Also replace the policy_exception when we have a policy.
+const net::NetworkTrafficAnnotationTag kReservePlusAddressAnnotation =
+    net::DefineNetworkTrafficAnnotation("plus_address_reservation", R"(
+      semantics {
+        sender: "Chrome Plus Address Client"
+        description: "A plus address is reserved for the user on the "
+                      "enterprise-specified server with this request."
+        trigger: "User enters the create plus address UX flow."
+        internal {
+          contacts {
+              email: "dc-komics@google.com"
+          }
+        }
+        user_data {
+          type: ACCESS_TOKEN,
+          type: SENSITIVE_URL
+        }
+        data: "The site that the user may use a plus address on is sent."
+        destination: GOOGLE_OWNED_SERVICE
+        last_reviewed: "2023-09-23"
+      }
+      policy {
+        cookies_allowed: NO
+        setting: "Disable the Plus Addresses feature."
+        policy_exception_justification: "We don't have an opt-out policy yet"
+                                        " as Plus Addresses hasn't launched."
+      }
+    )");
+
 // TODO(b/277532955): Update the description and trigger fields when possible.
+//                    Also replace the policy_exception when we have a policy.
+const net::NetworkTrafficAnnotationTag kConfirmPlusAddressAnnotation =
+    net::DefineNetworkTrafficAnnotation("plus_address_confirmation", R"(
+      semantics {
+        sender: "Chrome Plus Address Client"
+        description: "A plus address is confirmed for creation on the "
+                      "enterprise-specified server with this request."
+        trigger: "User confirms to create the displayed plus address."
+        internal {
+          contacts {
+              email: "dc-komics@google.com"
+          }
+        }
+        user_data {
+          type: ACCESS_TOKEN,
+          type: SENSITIVE_URL,
+          type: USERNAME
+        }
+        data: "The plus address and the site that the user is using it on are "
+              "both sent."
+        destination: GOOGLE_OWNED_SERVICE
+        last_reviewed: "2023-09-23"
+      }
+      policy {
+        cookies_allowed: NO
+        setting: "Disable the Plus Addresses feature."
+        policy_exception_justification: "We don't have an opt-out policy yet"
+                                        " as Plus Addresses hasn't launched."
+      }
+    )");
+
+// TODO(b/295556954): Update the description and trigger fields when possible.
 //                    Also replace the policy_exception when we have a policy.
 const net::NetworkTrafficAnnotationTag kGetAllPlusAddressesAnnotation =
     net::DefineNetworkTrafficAnnotation("get_all_plus_addresses", R"(
@@ -136,37 +200,118 @@ void PlusAddressClient::CreatePlusAddress(const std::string& site,
   bool wrote_payload = base::JSONWriter::Write(payload, &request_body);
   DCHECK(wrote_payload);
 
-  // TODO(b/300443275): Handle potential race to `loader_for_creation_` here.
-  loader_for_creation_ = network::SimpleURLLoader::Create(
-      std::move(resource_request), kCreatePlusAddressAnnotation);
-  loader_for_creation_->AttachStringForUpload(request_body, "application/json");
-  loader_for_creation_->SetTimeoutDuration(kRequestTimeout);
-  // Use max download size for now.
-  // TODO(kaklilu) - Measure average downloadsize and pick a more appropriate
-  // one.
-  loader_for_creation_->DownloadToString(
+  std::unique_ptr<network::SimpleURLLoader> loader =
+      network::SimpleURLLoader::Create(std::move(resource_request),
+                                       kCreatePlusAddressAnnotation);
+  network::SimpleURLLoader* loader_ptr = loader.get();
+  loader_ptr->AttachStringForUpload(request_body, "application/json");
+  loader_ptr->SetTimeoutDuration(kRequestTimeout);
+  // TODO(b/301984623) - Measure average downloadsize and change this.
+  loader_ptr->DownloadToString(
       url_loader_factory_.get(),
-      base::BindOnce(
-          [](PlusAddressCallback callback,
-             std::unique_ptr<std::string> response) {
-            if (!response) {
-              // The request has failed.
-              // TODO: Add metrics here.
-              return;
-            }
-            data_decoder::DataDecoder::ParseJsonIsolated(
-                *response,
-                base::BindOnce(&PlusAddressParser::ParsePlusAddressFromV1Create)
-                    .Then(base::BindOnce(
-                        [](PlusAddressCallback callback,
-                           absl::optional<std::string> result) {
-                          if (result.has_value()) {
-                            std::move(callback).Run(result.value());
-                          }
-                        },
-                        std::move(callback))));
-          },
-          std::move(callback)),
+      base::BindOnce(&PlusAddressClient::OnCreateOrReservePlusAddressComplete,
+                     // Safe since this class owns the list of loaders.
+                     base::Unretained(this),
+                     loaders_for_creation_.insert(loaders_for_creation_.begin(),
+                                                  std::move(loader)),
+                     PlusAddressNetworkRequestType::kGetOrCreate, clock_->Now(),
+                     std::move(callback)),
+      network::SimpleURLLoader::kMaxBoundedStringDownloadSize);
+}
+
+void PlusAddressClient::ReservePlusAddress(const std::string& site,
+                                           PlusAddressCallback callback) {
+  if (!server_url_) {
+    return;
+  }
+  // Refresh the OAuth token if it's expired.
+  if (access_token_info_.expiration_time < clock_->Now()) {
+    GetAuthToken(base::BindOnce(&PlusAddressClient::ReservePlusAddress,
+                                base::Unretained(this), site,
+                                std::move(callback)));
+    return;
+  }
+
+  auto resource_request = std::make_unique<network::ResourceRequest>();
+  resource_request->method = net::HttpRequestHeaders::kPutMethod;
+  resource_request->url =
+      server_url_.value().Resolve(kServerReservePlusAddressEndpoint);
+  resource_request->headers.SetHeader(
+      net::HttpRequestHeaders::kAuthorization,
+      base::StrCat({"Bearer ", access_token_info_.token}));
+  resource_request->credentials_mode = network::mojom::CredentialsMode::kOmit;
+
+  base::Value::Dict payload;
+  payload.Set("facet", site);
+  std::string request_body;
+  bool wrote_payload = base::JSONWriter::Write(payload, &request_body);
+  DCHECK(wrote_payload);
+
+  std::unique_ptr<network::SimpleURLLoader> loader =
+      network::SimpleURLLoader::Create(std::move(resource_request),
+                                       kReservePlusAddressAnnotation);
+  network::SimpleURLLoader* loader_ptr = loader.get();
+  loader_ptr->AttachStringForUpload(request_body, "application/json");
+  loader_ptr->SetTimeoutDuration(kRequestTimeout);
+  // TODO(b/301984623) - Measure average downloadsize and change this.
+  loader_ptr->DownloadToString(
+      url_loader_factory_.get(),
+      base::BindOnce(&PlusAddressClient::OnCreateOrReservePlusAddressComplete,
+                     // Safe since this class owns the list of loaders.
+                     base::Unretained(this),
+                     loaders_for_creation_.insert(loaders_for_creation_.begin(),
+                                                  std::move(loader)),
+                     PlusAddressNetworkRequestType::kReserve, clock_->Now(),
+                     std::move(callback)),
+      network::SimpleURLLoader::kMaxBoundedStringDownloadSize);
+}
+
+void PlusAddressClient::ConfirmPlusAddress(const std::string& site,
+                                           const std::string& plus_address,
+                                           PlusAddressCallback callback) {
+  if (!server_url_) {
+    return;
+  }
+  // Refresh the OAuth token if it's expired.
+  if (access_token_info_.expiration_time < clock_->Now()) {
+    GetAuthToken(base::BindOnce(&PlusAddressClient::ConfirmPlusAddress,
+                                base::Unretained(this), plus_address, site,
+                                std::move(callback)));
+    return;
+  }
+
+  auto resource_request = std::make_unique<network::ResourceRequest>();
+  resource_request->method = net::HttpRequestHeaders::kPutMethod;
+  resource_request->url =
+      server_url_.value().Resolve(kServerCreatePlusAddressEndpoint);
+  resource_request->headers.SetHeader(
+      net::HttpRequestHeaders::kAuthorization,
+      base::StrCat({"Bearer ", access_token_info_.token}));
+  resource_request->credentials_mode = network::mojom::CredentialsMode::kOmit;
+
+  base::Value::Dict payload;
+  payload.Set("facet", site);
+  payload.Set("reserved_email_address", plus_address);
+  std::string request_body;
+  bool wrote_payload = base::JSONWriter::Write(payload, &request_body);
+  DCHECK(wrote_payload);
+
+  std::unique_ptr<network::SimpleURLLoader> loader =
+      network::SimpleURLLoader::Create(std::move(resource_request),
+                                       kConfirmPlusAddressAnnotation);
+  network::SimpleURLLoader* loader_ptr = loader.get();
+  loader_ptr->AttachStringForUpload(request_body, "application/json");
+  loader_ptr->SetTimeoutDuration(kRequestTimeout);
+  // TODO(b/301984623) - Measure average downloadsize and change this.
+  loader_ptr->DownloadToString(
+      url_loader_factory_.get(),
+      base::BindOnce(&PlusAddressClient::OnCreateOrReservePlusAddressComplete,
+                     // Safe since this class owns the list of loaders.
+                     base::Unretained(this),
+                     loaders_for_creation_.insert(loaders_for_creation_.begin(),
+                                                  std::move(loader)),
+                     PlusAddressNetworkRequestType::kCreate, clock_->Now(),
+                     std::move(callback)),
       network::SimpleURLLoader::kMaxBoundedStringDownloadSize);
 }
 
@@ -181,6 +326,13 @@ void PlusAddressClient::GetAllPlusAddresses(PlusAddressMapCallback callback) {
     return;
   }
 
+  // Fail early if the URL Loader is already in-use. We never expect this method
+  // to be called in quick succession.
+  if (loader_for_sync_) {
+    DCHECK(false);
+    return;
+  }
+
   auto resource_request = std::make_unique<network::ResourceRequest>();
   resource_request->method = net::HttpRequestHeaders::kGetMethod;
   resource_request->url =
@@ -190,39 +342,85 @@ void PlusAddressClient::GetAllPlusAddresses(PlusAddressMapCallback callback) {
       base::StrCat({"Bearer ", access_token_info_.token}));
   resource_request->credentials_mode = network::mojom::CredentialsMode::kOmit;
 
-  // TODO(b/300443275): Handle potential race to `loader_for_retrieval_` here.
-  loader_for_retrieval_ = network::SimpleURLLoader::Create(
+  loader_for_sync_ = network::SimpleURLLoader::Create(
       std::move(resource_request), kGetAllPlusAddressesAnnotation);
-  loader_for_retrieval_->SetTimeoutDuration(kRequestTimeout);
-  // Use max download size for now.
-  // TODO(kaklilu) - Measure average downloadsize and pick a more appropriate
-  // one.
-  loader_for_retrieval_->DownloadToString(
+  loader_for_sync_->SetTimeoutDuration(kRequestTimeout);
+  loader_for_sync_->DownloadToString(
       url_loader_factory_.get(),
-      base::BindOnce(
-          [](PlusAddressMapCallback callback,
-             std::unique_ptr<std::string> response) {
-            if (!response) {
-              // The request has failed.
-              // TODO: Add metrics here.
-              return;
-            }
-
-            data_decoder::DataDecoder::ParseJsonIsolated(
-                *response,
-                base::BindOnce(
-                    &PlusAddressParser::ParsePlusAddressMapFromV1List)
-                    .Then(base::BindOnce(
-                        [](PlusAddressMapCallback callback,
-                           absl::optional<PlusAddressMap> result) {
-                          if (result.has_value()) {
-                            std::move(callback).Run(result.value());
-                          }
-                        },
-                        std::move(callback))));
-          },
-          std::move(callback)),
+      base::BindOnce(&PlusAddressClient::OnGetAllPlusAddressesComplete,
+                     // Safe since this class owns the loader_for_sync_.
+                     base::Unretained(this), clock_->Now(),
+                     std::move(callback)),
+      // TODO(b/301984623) - Measure average downloadsize and change this.
       network::SimpleURLLoader::kMaxBoundedStringDownloadSize);
+}
+
+void PlusAddressClient::OnCreateOrReservePlusAddressComplete(
+    UrlLoaderList::iterator it,
+    PlusAddressNetworkRequestType type,
+    base::Time request_start,
+    PlusAddressCallback callback,
+    std::unique_ptr<std::string> response) {
+  // Record relevant metrics.
+  std::unique_ptr<network::SimpleURLLoader> loader = std::move(*it);
+  PlusAddressMetrics::RecordNetworkRequestLatency(
+      type, clock_->Now() - request_start);
+  if (loader && loader->ResponseInfo() && loader->ResponseInfo()->headers) {
+    PlusAddressMetrics::RecordNetworkRequestResponseCode(
+        type, loader->ResponseInfo()->headers->response_code());
+  }
+  // Destroy the loader before returning.
+  loaders_for_creation_.erase(it);
+  if (!response) {
+    return;
+  }
+  PlusAddressMetrics::RecordNetworkRequestResponseSize(type, response->size());
+  // Parse the response & return it via callback.
+  data_decoder::DataDecoder::ParseJsonIsolated(
+      *response,
+      base::BindOnce(&PlusAddressParser::ParsePlusAddressFromV1Create)
+          .Then(base::BindOnce(
+              [](PlusAddressCallback callback,
+                 absl::optional<std::string> result) {
+                if (result.has_value()) {
+                  std::move(callback).Run(result.value());
+                }
+              },
+              std::move(callback))));
+}
+
+void PlusAddressClient::OnGetAllPlusAddressesComplete(
+    base::Time request_start,
+    PlusAddressMapCallback callback,
+    std::unique_ptr<std::string> response) {
+  // Record relevant metrics.
+  PlusAddressMetrics::RecordNetworkRequestLatency(
+      PlusAddressNetworkRequestType::kList, clock_->Now() - request_start);
+  if (loader_for_sync_ && loader_for_sync_->ResponseInfo() &&
+      loader_for_sync_->ResponseInfo()->headers) {
+    PlusAddressMetrics::RecordNetworkRequestResponseCode(
+        PlusAddressNetworkRequestType::kList,
+        loader_for_sync_->ResponseInfo()->headers->response_code());
+  }
+  // Destroy the loader before returning.
+  loader_for_sync_.reset();
+  if (!response) {
+    return;
+  }
+  PlusAddressMetrics::RecordNetworkRequestResponseSize(
+      PlusAddressNetworkRequestType::kList, response->size());
+  // Parse the response & return it via callback.
+  data_decoder::DataDecoder::ParseJsonIsolated(
+      *response,
+      base::BindOnce(&PlusAddressParser::ParsePlusAddressMapFromV1List)
+          .Then(base::BindOnce(
+              [](PlusAddressMapCallback callback,
+                 absl::optional<PlusAddressMap> result) {
+                if (result.has_value()) {
+                  std::move(callback).Run(result.value());
+                }
+              },
+              std::move(callback))));
 }
 
 // TODO (kaklilu): Handle requests when token is nearing expiration.
@@ -260,6 +458,7 @@ void PlusAddressClient::OnTokenFetched(
     signin::AccessTokenInfo access_token_info) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   access_token_fetcher_.reset();
+  PlusAddressMetrics::RecordNetworkRequestOauthError(error);
   if (error.state() == GoogleServiceAuthError::NONE) {
     access_token_info_ = access_token_info;
     // Run stored callbacks.
@@ -269,7 +468,6 @@ void PlusAddressClient::OnTokenFetched(
     }
   } else {
     access_token_request_error_ = error;
-    // TODO (kaklilu): Replace this log with Histogram of OAuth errors.
     VLOG(1) << "PlusAddressClient failed to get OAuth token:"
             << error.ToString();
   }

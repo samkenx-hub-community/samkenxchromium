@@ -960,9 +960,6 @@ class MathFunctionParser {
               is_percentage_allowed, allowed_anchor_queries),
           value_range);
     }
-    if (calc_value_ && calc_value_->HasComparisons()) {
-      context.Count(WebFeature::kCSSComparisonFunctions);
-    }
   }
 
   const CSSMathFunctionValue* Value() const { return calc_value_; }
@@ -1972,7 +1969,8 @@ CSSValue* ConsumeColor(CSSParserTokenRange& range,
   }
 
   return ConsumeInternalLightDark(ConsumeColor, range, context,
-                                  accept_quirky_colors, allowed_keywords);
+                                  false /* accept_quirky_colors */,
+                                  allowed_keywords);
 }
 
 CSSValue* ConsumeLineWidth(CSSParserTokenRange& range,
@@ -3591,9 +3589,13 @@ bool IsBaselineKeyword(CSSValueID id) {
 }
 
 bool IsSelfPositionKeyword(CSSValueID id) {
-  return IdentMatches<CSSValueID::kStart, CSSValueID::kEnd, CSSValueID::kCenter,
-                      CSSValueID::kSelfStart, CSSValueID::kSelfEnd,
-                      CSSValueID::kFlexStart, CSSValueID::kFlexEnd>(id);
+  if (IdentMatches<CSSValueID::kStart, CSSValueID::kEnd, CSSValueID::kCenter,
+                   CSSValueID::kSelfStart, CSSValueID::kSelfEnd,
+                   CSSValueID::kFlexStart, CSSValueID::kFlexEnd>(id)) {
+    return true;
+  }
+  return RuntimeEnabledFeatures::CSSAnchorPositioningEnabled() &&
+         id == CSSValueID::kAnchorCenter;
 }
 
 bool IsSelfPositionOrLeftOrRightKeyword(CSSValueID id) {
@@ -4222,14 +4224,31 @@ CSSValue* ParseBackgroundBox(CSSParserTokenRange& range,
   return ConsumeCommaSeparatedList(ConsumeBackgroundBox, range);
 }
 
-CSSValue* ParseBackgroundOrMaskSize(CSSParserTokenRange& range,
-                                    const CSSParserContext& context,
-                                    const CSSParserLocalContext& local_context,
-                                    absl::optional<WebFeature> negative_size) {
+CSSValue* ParseBackgroundSize(CSSParserTokenRange& range,
+                              const CSSParserContext& context,
+                              const CSSParserLocalContext& local_context,
+                              absl::optional<WebFeature> negative_size) {
   return ConsumeCommaSeparatedList(
       ConsumeBackgroundSize, range, context, negative_size,
       local_context.UseAliasParsing() ? ParsingStyle::kLegacy
                                       : ParsingStyle::kNotLegacy);
+}
+
+CSSValue* ParseMaskSize(CSSParserTokenRange& range,
+                        const CSSParserContext& context,
+                        const CSSParserLocalContext& local_context,
+                        absl::optional<WebFeature> negative_size) {
+  return ConsumeCommaSeparatedList(ConsumeBackgroundSize, range, context,
+                                   negative_size, ParsingStyle::kNotLegacy);
+}
+
+// https://drafts.fxtf.org/css-masking/#the-mask-clip
+// Syntax: [ <geometry-box> | no-clip ]#
+CSSValue* ConsumeGeometryBoxOrNoClip(CSSParserTokenRange& range) {
+  if (range.Peek().Id() == CSSValueID::kNoClip) {
+    return css_parsing_utils::ConsumeIdent(range);
+  }
+  return css_parsing_utils::ConsumeGeometryBox(range);
 }
 
 namespace {
@@ -4245,6 +4264,7 @@ CSSValue* ConsumeBackgroundComponent(CSSPropertyID resolved_property,
     case CSSPropertyID::kBackgroundOrigin:
       return ConsumeBackgroundBox(range);
     case CSSPropertyID::kBackgroundImage:
+    case CSSPropertyID::kMaskImage:
     case CSSPropertyID::kWebkitMaskImage:
       return ConsumeImageOrNone(range, context);
     case CSSPropertyID::kBackgroundPositionX:
@@ -4260,19 +4280,31 @@ CSSValue* ConsumeBackgroundComponent(CSSPropertyID resolved_property,
                                    WebFeature::kNegativeBackgroundSize,
                                    ParsingStyle::kNotLegacy);
     case CSSPropertyID::kWebkitMaskSize:
+    case CSSPropertyID::kMaskSize:
       return ConsumeBackgroundSize(range, context,
                                    WebFeature::kNegativeMaskSize,
                                    ParsingStyle::kNotLegacy);
     case CSSPropertyID::kBackgroundColor:
       return ConsumeColor(range, context);
+    case CSSPropertyID::kMaskClip:
+      return ConsumeGeometryBoxOrNoClip(range);
     case CSSPropertyID::kWebkitMaskClip:
       return ConsumePrefixedBackgroundBox(range, AllowTextValue::kAllow);
+    case CSSPropertyID::kMaskOrigin:
+      return ConsumeGeometryBox(range);
     case CSSPropertyID::kWebkitMaskOrigin:
       return ConsumePrefixedBackgroundBox(range, AllowTextValue::kForbid);
     default:
       break;
   };
   return nullptr;
+}
+
+const StylePropertyShorthand& WebkitMaskShorthand(CSSPropertyID shorthand_id) {
+  if (shorthand_id == CSSPropertyID::kWebkitAlternativeMask) {
+    return webkitAlternativeMaskShorthand();
+  }
+  return webkitMaskShorthand();
 }
 
 }  // namespace
@@ -4292,10 +4324,12 @@ bool ParseBackgroundOrMask(bool important,
                            HeapVector<CSSPropertyValue, 64>& properties) {
   CSSPropertyID shorthand_id = local_context.CurrentShorthand();
   DCHECK(shorthand_id == CSSPropertyID::kBackground ||
-         shorthand_id == CSSPropertyID::kWebkitMask);
+         shorthand_id == CSSPropertyID::kWebkitMask ||
+         shorthand_id == CSSPropertyID::kWebkitAlternativeMask);
   const StylePropertyShorthand& shorthand =
-      shorthand_id == CSSPropertyID::kBackground ? backgroundShorthand()
-                                                 : webkitMaskShorthand();
+      shorthand_id == CSSPropertyID::kBackground
+          ? backgroundShorthand()
+          : WebkitMaskShorthand(shorthand_id);
 
   const unsigned longhand_count = shorthand.length();
   CSSValue* longhands[10] = {nullptr};
@@ -4330,7 +4364,8 @@ bool ParseBackgroundOrMask(bool important,
             bg_position_parsed_in_current_layer = true;
           }
         } else if (property.IDEquals(CSSPropertyID::kBackgroundSize) ||
-                   property.IDEquals(CSSPropertyID::kWebkitMaskSize)) {
+                   property.IDEquals(CSSPropertyID::kWebkitMaskSize) ||
+                   property.IDEquals(CSSPropertyID::kMaskSize)) {
           if (!ConsumeSlashIncludingWhitespace(range)) {
             continue;
           }
@@ -4354,6 +4389,7 @@ bool ParseBackgroundOrMask(bool important,
         }
         if (value) {
           if (property.IDEquals(CSSPropertyID::kBackgroundOrigin) ||
+              property.IDEquals(CSSPropertyID::kMaskOrigin) ||
               property.IDEquals(CSSPropertyID::kWebkitMaskOrigin)) {
             origin_value = value;
           }
@@ -4382,6 +4418,7 @@ bool ParseBackgroundOrMask(bool important,
         continue;
       }
       if ((property.IDEquals(CSSPropertyID::kBackgroundClip) ||
+           property.IDEquals(CSSPropertyID::kMaskClip) ||
            property.IDEquals(CSSPropertyID::kWebkitMaskClip)) &&
           !parsed_longhand[i] && origin_value) {
         AddBackgroundValue(longhands[i], origin_value);
@@ -6101,7 +6138,13 @@ cssvalue::CSSPathValue* ConsumeBasicShapePath(CSSParserTokenRange& args) {
   }
 
   auto byte_stream = ConsumePathStringArg(args);
-  if (!byte_stream || !args.AtEnd()) {
+  // https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-path
+  // A path data string that does not conform to the to the grammar
+  // and parsing rules of SVG 1.1, or that does conform but defines
+  // an empty path, is invalid and causes the entire path() to be invalid.
+  if (!byte_stream || !args.AtEnd() ||
+      (RuntimeEnabledFeatures::ClipPathRejectEmptyPathsEnabled() &&
+       byte_stream->IsEmpty())) {
     return nullptr;
   }
 
@@ -6559,6 +6602,20 @@ CSSValue* ConsumeTextDecorationLine(CSSParserTokenRange& range) {
     return nullptr;
   }
   return list;
+}
+
+// Consume the `autospace` production.
+// https://drafts.csswg.org/css-text-4/#typedef-autospace
+CSSValue* ConsumeAutospace(CSSParserTokenRange& range) {
+  // Currently, only `no-autospace` is supported.
+  return ConsumeIdent<CSSValueID::kNoAutospace>(range);
+}
+
+// Consume the `spacing-trim` production.
+// https://drafts.csswg.org/css-text-4/#typedef-spacing-trim
+CSSValue* ConsumeSpacingTrim(CSSParserTokenRange& range) {
+  // Currently, only `space-first` and `space-all` are supported.
+  return ConsumeIdent<CSSValueID::kSpaceFirst, CSSValueID::kSpaceAll>(range);
 }
 
 CSSValue* ConsumeToggleGroup(CSSParserTokenRange& range,

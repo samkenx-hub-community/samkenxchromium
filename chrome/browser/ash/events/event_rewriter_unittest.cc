@@ -42,6 +42,7 @@
 #include "ui/base/ime/ash/mock_input_method_manager_impl.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/events/ash/event_rewriter_ash.h"
+#include "ui/events/ash/event_rewriter_metrics.h"
 #include "ui/events/ash/keyboard_capability.h"
 #include "ui/events/ash/mojom/extended_fkeys_modifier.mojom-shared.h"
 #include "ui/events/ash/mojom/modifier_key.mojom-shared.h"
@@ -1809,8 +1810,9 @@ TEST_F(EventRewriterTest, TestRewriteCapsLockMod3InUse) {
 // TODO(crbug.com/1179893): Remove once the feature is enabled permanently.
 TEST_F(EventRewriterTest, TestRewriteExtendedKeysAltVariantsOld) {
   Preferences::RegisterProfilePrefs(prefs()->registry());
-  scoped_feature_list_.InitAndDisableFeature(
-      ::features::kImprovedKeyboardShortcuts);
+  scoped_feature_list_.InitWithFeatures(
+      {}, {::features::kImprovedKeyboardShortcuts,
+           features::kAltClickAndSixPackCustomization});
   TestNonAppleKeyboardVariants({
       // Alt+Backspace -> Delete
       {ui::ET_KEY_PRESSED,
@@ -1883,6 +1885,8 @@ TEST_F(EventRewriterTest, TestRewriteExtendedKeysAltVariantsOld) {
 // is disabled.
 TEST_F(EventRewriterTest, TestRewriteExtendedKeysAltVariantsM92) {
   Preferences::RegisterProfilePrefs(prefs()->registry());
+  scoped_feature_list_.InitAndDisableFeature(
+      features::kAltClickAndSixPackCustomization);
   TestNonAppleKeyboardVariants({
       // Alt+Backspace -> Delete
       {ui::ET_KEY_PRESSED,
@@ -1955,8 +1959,9 @@ TEST_F(EventRewriterTest, TestRewriteExtendedKeysAltVariantsM92) {
 // kDeprecateAltBasedSixPack enabled.
 TEST_F(EventRewriterTest, TestRewriteExtendedKeysAltVariants) {
   Preferences::RegisterProfilePrefs(prefs()->registry());
-  scoped_feature_list_.InitAndEnableFeature(
-      ::features::kDeprecateAltBasedSixPack);
+  scoped_feature_list_.InitWithFeatures(
+      {::features::kDeprecateAltBasedSixPack},
+      {features::kAltClickAndSixPackCustomization});
   // All the previously supported Alt based rewrites no longer have any
   // effect. The Search workarounds no longer take effect and the Search+Key
   // portion is rewritten as expected.
@@ -2045,8 +2050,9 @@ TEST_F(EventRewriterTest, TestRewriteExtendedKeysAltVariants) {
 // TODO(crbug.com/1179893): Remove once the feature is enabled permanently.
 TEST_F(EventRewriterTest, TestRewriteExtendedKeyInsertOld) {
   Preferences::RegisterProfilePrefs(prefs()->registry());
-  scoped_feature_list_.InitAndDisableFeature(
-      ::features::kImprovedKeyboardShortcuts);
+  scoped_feature_list_.InitWithFeatures(
+      {}, {::features::kImprovedKeyboardShortcuts,
+           features::kAltClickAndSixPackCustomization});
   TestNonAppleKeyboardVariants({
       // Period -> Period
       {ui::ET_KEY_PRESSED,
@@ -2071,8 +2077,9 @@ TEST_F(EventRewriterTest, TestRewriteExtendedKeyInsertOld) {
 
 TEST_F(EventRewriterTest, TestRewriteExtendedKeyInsertDeprecatedNotification) {
   Preferences::RegisterProfilePrefs(prefs()->registry());
-  scoped_feature_list_.InitAndEnableFeature(
-      ::features::kImprovedKeyboardShortcuts);
+  scoped_feature_list_.InitWithFeatures(
+      {::features::kImprovedKeyboardShortcuts},
+      {features::kAltClickAndSixPackCustomization});
   TestNonAppleKeyboardVariants({
       // Period -> Period
       {ui::ET_KEY_PRESSED,
@@ -2104,8 +2111,9 @@ TEST_F(EventRewriterTest, TestRewriteExtendedKeyInsertDeprecatedNotification) {
 // TODO(crbug.com/1179893): Rename once the feature is enabled permanently.
 TEST_F(EventRewriterTest, TestRewriteExtendedKeyInsertNew) {
   Preferences::RegisterProfilePrefs(prefs()->registry());
-  scoped_feature_list_.InitAndEnableFeature(
-      ::features::kImprovedKeyboardShortcuts);
+  scoped_feature_list_.InitWithFeatures(
+      {::features::kImprovedKeyboardShortcuts},
+      {features::kAltClickAndSixPackCustomization});
   TestNonAppleKeyboardVariants({
       // Search+Shift+Backspace -> Insert
       {ui::ET_KEY_PRESSED,
@@ -2123,6 +2131,8 @@ TEST_F(EventRewriterTest, TestRewriteExtendedKeyInsertNew) {
 }
 
 TEST_F(EventRewriterTest, TestRewriteExtendedKeysSearchVariants) {
+  scoped_feature_list_.InitAndDisableFeature(
+      features::kAltClickAndSixPackCustomization);
   Preferences::RegisterProfilePrefs(prefs()->registry());
   TestNonAppleKeyboardVariants({
       // Search+Backspace -> Delete
@@ -2168,7 +2178,8 @@ TEST_F(EventRewriterTest, TestRewriteExtendedKeysSearchVariants) {
 
 TEST_F(EventRewriterTest, TestNumberRowIsNotRewritten) {
   Preferences::RegisterProfilePrefs(prefs()->registry());
-
+  scoped_feature_list_.InitAndDisableFeature(
+      features::kAltClickAndSixPackCustomization);
   TestNonAppleNonCustomLayoutKeyboardVariants({
       // The number row should not be rewritten without Search key.
       {ui::ET_KEY_PRESSED,
@@ -4330,6 +4341,8 @@ TEST_F(EventRewriterTest, TestRewriteFunctionKeysInvalidLayout) {
 TEST_F(EventRewriterTest, TestRewriteExtendedKeysWithControlRemapped) {
   // Remap Control to Search.
   Preferences::RegisterProfilePrefs(prefs()->registry());
+  scoped_feature_list_.InitAndDisableFeature(
+      features::kAltClickAndSixPackCustomization);
   IntegerPrefMember search;
   InitModifierKeyPref(&search, ::prefs::kLanguageRemapControlKeyTo,
                       ui::mojom::ModifierKey::kControl,
@@ -4761,6 +4774,8 @@ void EventRewriterTest::DontRewriteIfNotRewritten(int right_click_flags) {
 }
 
 TEST_F(EventRewriterTest, DontRewriteIfNotRewritten_AltClickIsRightClick) {
+  scoped_feature_list_.InitAndDisableFeature(
+      features::kAltClickAndSixPackCustomization);
   DontRewriteIfNotRewritten(ui::EF_LEFT_MOUSE_BUTTON | ui::EF_ALT_DOWN);
   EXPECT_EQ(message_center_.NotificationCount(), 0u);
 }
@@ -4768,15 +4783,17 @@ TEST_F(EventRewriterTest, DontRewriteIfNotRewritten_AltClickIsRightClick) {
 TEST_F(EventRewriterTest, DontRewriteIfNotRewritten_AltClickIsRightClick_New) {
   // Enabling the kImprovedKeyboardShortcuts feature does not change alt+click
   // behavior or create a notification.
-  scoped_feature_list_.InitAndEnableFeature(
-      ::features::kImprovedKeyboardShortcuts);
+  scoped_feature_list_.InitWithFeatures(
+      {::features::kImprovedKeyboardShortcuts},
+      {features::kAltClickAndSixPackCustomization});
   DontRewriteIfNotRewritten(ui::EF_LEFT_MOUSE_BUTTON | ui::EF_ALT_DOWN);
   EXPECT_EQ(message_center_.NotificationCount(), 0u);
 }
 
 TEST_F(EventRewriterTest, DontRewriteIfNotRewritten_SearchClickIsRightClick) {
-  scoped_feature_list_.InitAndEnableFeature(
-      features::kUseSearchClickForRightClick);
+  scoped_feature_list_.InitWithFeatures(
+      {features::kUseSearchClickForRightClick},
+      {features::kAltClickAndSixPackCustomization});
   DontRewriteIfNotRewritten(ui::EF_LEFT_MOUSE_BUTTON | ui::EF_COMMAND_DOWN);
   EXPECT_EQ(message_center_.NotificationCount(), 0u);
 }
@@ -4784,13 +4801,17 @@ TEST_F(EventRewriterTest, DontRewriteIfNotRewritten_SearchClickIsRightClick) {
 TEST_F(EventRewriterTest, DontRewriteIfNotRewritten_AltClickDeprecated) {
   // Pressing search+click with alt+click deprecated works, but does not
   // generate a notification.
-  scoped_feature_list_.InitAndEnableFeature(::features::kDeprecateAltClick);
+  scoped_feature_list_.InitWithFeatures(
+      {::features::kDeprecateAltClick},
+      {features::kAltClickAndSixPackCustomization});
   DontRewriteIfNotRewritten(ui::EF_LEFT_MOUSE_BUTTON | ui::EF_COMMAND_DOWN);
   EXPECT_EQ(message_center_.NotificationCount(), 0u);
 }
 
 TEST_F(EventRewriterTest, DeprecatedAltClickGeneratesNotification) {
-  scoped_feature_list_.InitAndEnableFeature(::features::kDeprecateAltClick);
+  scoped_feature_list_.InitWithFeatures(
+      {::features::kDeprecateAltClick},
+      {features::kAltClickAndSixPackCustomization});
   ui::DeviceDataManager* device_data_manager =
       ui::DeviceDataManager::GetInstance();
   std::vector<ui::TouchpadDevice> touchpad_devices(1);
@@ -5030,6 +5051,9 @@ TEST_F(EventRewriterAshTest, MouseWheelEventModifiersRewritten) {
 
 // Tests edge cases of key event rewriting (see https://crbug.com/913209).
 TEST_F(EventRewriterAshTest, KeyEventRewritingEdgeCases) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
+      features::kAltClickAndSixPackCustomization);
   std::vector<std::unique_ptr<ui::Event>> events;
 
   // Edge case 1: Press the Launcher button first. Then press the Up Arrow
@@ -5528,10 +5552,9 @@ TEST_F(ExtensionRewriterInputTest, RewriteNumpadExtensionCommand) {
 
 class ModifierPressedMetricsTest
     : public EventRewriterTest,
-      public testing::WithParamInterface<
-          std::tuple<KeyTestCase::Event,
-                     ui::EventRewriterAsh::ModifierKeyUsageMetric,
-                     std::vector<std::string>>> {
+      public testing::WithParamInterface<std::tuple<KeyTestCase::Event,
+                                                    ui::ModifierKeyUsageMetric,
+                                                    std::vector<std::string>>> {
  public:
   void SetUp() override {
     scoped_feature_list_.InitAndDisableFeature(
@@ -5542,73 +5565,72 @@ class ModifierPressedMetricsTest
 
  protected:
   KeyTestCase::Event event_;
-  ui::EventRewriterAsh::ModifierKeyUsageMetric modifier_key_usage_mapping_;
+  ui::ModifierKeyUsageMetric modifier_key_usage_mapping_;
   std::vector<std::string> key_pref_names_;
 };
 
 INSTANTIATE_TEST_SUITE_P(
     All,
     ModifierPressedMetricsTest,
-    testing::ValuesIn(
-        std::vector<std::tuple<KeyTestCase::Event,
-                               ui::EventRewriterAsh::ModifierKeyUsageMetric,
-                               std::vector<std::string>>>{
-            {{ui::VKEY_LWIN, ui::DomCode::META_LEFT, ui::EF_COMMAND_DOWN,
-              ui::DomKey::META},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kMetaLeft,
-             {::prefs::kLanguageRemapSearchKeyTo,
-              ::prefs::kLanguageRemapExternalCommandKeyTo,
-              ::prefs::kLanguageRemapExternalMetaKeyTo}},
-            {{ui::VKEY_RWIN, ui::DomCode::META_RIGHT, ui::EF_COMMAND_DOWN,
-              ui::DomKey::META},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kMetaRight,
-             {::prefs::kLanguageRemapSearchKeyTo,
-              ::prefs::kLanguageRemapExternalCommandKeyTo,
-              ::prefs::kLanguageRemapExternalMetaKeyTo}},
-            {{ui::VKEY_CONTROL, ui::DomCode::CONTROL_LEFT, ui::EF_CONTROL_DOWN,
-              ui::DomKey::CONTROL},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kControlLeft,
-             {::prefs::kLanguageRemapControlKeyTo}},
-            {{ui::VKEY_CONTROL, ui::DomCode::CONTROL_RIGHT, ui::EF_CONTROL_DOWN,
-              ui::DomKey::CONTROL},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kControlRight,
-             {::prefs::kLanguageRemapControlKeyTo}},
-            {{ui::VKEY_MENU, ui::DomCode::ALT_LEFT, ui::EF_ALT_DOWN,
-              ui::DomKey::ALT},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kAltLeft,
-             {::prefs::kLanguageRemapAltKeyTo}},
-            {{ui::VKEY_MENU, ui::DomCode::ALT_RIGHT, ui::EF_ALT_DOWN,
-              ui::DomKey::ALT},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kAltRight,
-             {::prefs::kLanguageRemapAltKeyTo}},
-            {{ui::VKEY_SHIFT, ui::DomCode::SHIFT_LEFT, ui::EF_SHIFT_DOWN,
-              ui::DomKey::SHIFT},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kShiftLeft,
-             // Shift keys cannot be remapped and therefore do not have a real
-             // "pref" path.
-             {"fakePrefPath"}},
-            {{ui::VKEY_SHIFT, ui::DomCode::SHIFT_RIGHT, ui::EF_SHIFT_DOWN,
-              ui::DomKey::SHIFT},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kShiftRight,
-             // Shift keys cannot be remapped and therefore do not have a real
-             // "pref" path.
-             {"fakePrefPath"}},
-            {{ui::VKEY_CAPITAL, ui::DomCode::CAPS_LOCK,
-              ui::EF_CAPS_LOCK_ON | ui::EF_MOD3_DOWN, ui::DomKey::CAPS_LOCK},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kCapsLock,
-             {::prefs::kLanguageRemapCapsLockKeyTo}},
-            {{ui::VKEY_BACK, ui::DomCode::BACKSPACE, ui::EF_NONE,
-              ui::DomKey::BACKSPACE},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kBackspace,
-             {::prefs::kLanguageRemapBackspaceKeyTo}},
-            {{ui::VKEY_ESCAPE, ui::DomCode::ESCAPE, ui::EF_NONE,
-              ui::DomKey::ESCAPE},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kEscape,
-             {::prefs::kLanguageRemapEscapeKeyTo}},
-            {{ui::VKEY_ASSISTANT, ui::DomCode::LAUNCH_ASSISTANT, ui::EF_NONE,
-              ui::DomKey::LAUNCH_ASSISTANT},
-             ui::EventRewriterAsh::ModifierKeyUsageMetric::kAssistant,
-             {::prefs::kLanguageRemapAssistantKeyTo}}}));
+    testing::ValuesIn(std::vector<std::tuple<KeyTestCase::Event,
+                                             ui::ModifierKeyUsageMetric,
+                                             std::vector<std::string>>>{
+        {{ui::VKEY_LWIN, ui::DomCode::META_LEFT, ui::EF_COMMAND_DOWN,
+          ui::DomKey::META},
+         ui::ModifierKeyUsageMetric::kMetaLeft,
+         {::prefs::kLanguageRemapSearchKeyTo,
+          ::prefs::kLanguageRemapExternalCommandKeyTo,
+          ::prefs::kLanguageRemapExternalMetaKeyTo}},
+        {{ui::VKEY_RWIN, ui::DomCode::META_RIGHT, ui::EF_COMMAND_DOWN,
+          ui::DomKey::META},
+         ui::ModifierKeyUsageMetric::kMetaRight,
+         {::prefs::kLanguageRemapSearchKeyTo,
+          ::prefs::kLanguageRemapExternalCommandKeyTo,
+          ::prefs::kLanguageRemapExternalMetaKeyTo}},
+        {{ui::VKEY_CONTROL, ui::DomCode::CONTROL_LEFT, ui::EF_CONTROL_DOWN,
+          ui::DomKey::CONTROL},
+         ui::ModifierKeyUsageMetric::kControlLeft,
+         {::prefs::kLanguageRemapControlKeyTo}},
+        {{ui::VKEY_CONTROL, ui::DomCode::CONTROL_RIGHT, ui::EF_CONTROL_DOWN,
+          ui::DomKey::CONTROL},
+         ui::ModifierKeyUsageMetric::kControlRight,
+         {::prefs::kLanguageRemapControlKeyTo}},
+        {{ui::VKEY_MENU, ui::DomCode::ALT_LEFT, ui::EF_ALT_DOWN,
+          ui::DomKey::ALT},
+         ui::ModifierKeyUsageMetric::kAltLeft,
+         {::prefs::kLanguageRemapAltKeyTo}},
+        {{ui::VKEY_MENU, ui::DomCode::ALT_RIGHT, ui::EF_ALT_DOWN,
+          ui::DomKey::ALT},
+         ui::ModifierKeyUsageMetric::kAltRight,
+         {::prefs::kLanguageRemapAltKeyTo}},
+        {{ui::VKEY_SHIFT, ui::DomCode::SHIFT_LEFT, ui::EF_SHIFT_DOWN,
+          ui::DomKey::SHIFT},
+         ui::ModifierKeyUsageMetric::kShiftLeft,
+         // Shift keys cannot be remapped and therefore do not have a real
+         // "pref" path.
+         {"fakePrefPath"}},
+        {{ui::VKEY_SHIFT, ui::DomCode::SHIFT_RIGHT, ui::EF_SHIFT_DOWN,
+          ui::DomKey::SHIFT},
+         ui::ModifierKeyUsageMetric::kShiftRight,
+         // Shift keys cannot be remapped and therefore do not have a real
+         // "pref" path.
+         {"fakePrefPath"}},
+        {{ui::VKEY_CAPITAL, ui::DomCode::CAPS_LOCK,
+          ui::EF_CAPS_LOCK_ON | ui::EF_MOD3_DOWN, ui::DomKey::CAPS_LOCK},
+         ui::ModifierKeyUsageMetric::kCapsLock,
+         {::prefs::kLanguageRemapCapsLockKeyTo}},
+        {{ui::VKEY_BACK, ui::DomCode::BACKSPACE, ui::EF_NONE,
+          ui::DomKey::BACKSPACE},
+         ui::ModifierKeyUsageMetric::kBackspace,
+         {::prefs::kLanguageRemapBackspaceKeyTo}},
+        {{ui::VKEY_ESCAPE, ui::DomCode::ESCAPE, ui::EF_NONE,
+          ui::DomKey::ESCAPE},
+         ui::ModifierKeyUsageMetric::kEscape,
+         {::prefs::kLanguageRemapEscapeKeyTo}},
+        {{ui::VKEY_ASSISTANT, ui::DomCode::LAUNCH_ASSISTANT, ui::EF_NONE,
+          ui::DomKey::LAUNCH_ASSISTANT},
+         ui::ModifierKeyUsageMetric::kAssistant,
+         {::prefs::kLanguageRemapAssistantKeyTo}}}));
 
 TEST_P(ModifierPressedMetricsTest, KeyPressedTest) {
   base::HistogramTester histogram_tester;
@@ -5669,7 +5691,7 @@ TEST_P(ModifierPressedMetricsTest, KeyPressedWithRemappingToBackspaceTest) {
       modifier_key_usage_mapping_, 1);
   histogram_tester.ExpectUniqueSample(
       "ChromeOS.Inputs.Keyboard.RemappedModifierPressed.Internal",
-      ui::EventRewriterAsh::ModifierKeyUsageMetric::kBackspace, 1);
+      ui::ModifierKeyUsageMetric::kBackspace, 1);
 
   TestExternalChromeKeyboard({{ui::ET_KEY_PRESSED, event_, backspace_event}});
   histogram_tester.ExpectUniqueSample(
@@ -5677,7 +5699,7 @@ TEST_P(ModifierPressedMetricsTest, KeyPressedWithRemappingToBackspaceTest) {
       modifier_key_usage_mapping_, 1);
   histogram_tester.ExpectUniqueSample(
       "ChromeOS.Inputs.Keyboard.RemappedModifierPressed.CrOSExternal",
-      ui::EventRewriterAsh::ModifierKeyUsageMetric::kBackspace, 1);
+      ui::ModifierKeyUsageMetric::kBackspace, 1);
 
   TestExternalAppleKeyboard({{ui::ET_KEY_PRESSED, event_, backspace_event}});
   histogram_tester.ExpectUniqueSample(
@@ -5685,7 +5707,7 @@ TEST_P(ModifierPressedMetricsTest, KeyPressedWithRemappingToBackspaceTest) {
       modifier_key_usage_mapping_, 1);
   histogram_tester.ExpectUniqueSample(
       "ChromeOS.Inputs.Keyboard.RemappedModifierPressed.AppleExternal",
-      ui::EventRewriterAsh::ModifierKeyUsageMetric::kBackspace, 1);
+      ui::ModifierKeyUsageMetric::kBackspace, 1);
 
   TestExternalGenericKeyboard({{ui::ET_KEY_PRESSED, event_, backspace_event}});
   histogram_tester.ExpectUniqueSample(
@@ -5693,7 +5715,7 @@ TEST_P(ModifierPressedMetricsTest, KeyPressedWithRemappingToBackspaceTest) {
       modifier_key_usage_mapping_, 1);
   histogram_tester.ExpectUniqueSample(
       "ChromeOS.Inputs.Keyboard.RemappedModifierPressed.External",
-      ui::EventRewriterAsh::ModifierKeyUsageMetric::kBackspace, 1);
+      ui::ModifierKeyUsageMetric::kBackspace, 1);
 }
 
 TEST_P(ModifierPressedMetricsTest, KeyPressedWithRemappingToControlTest) {
@@ -5707,10 +5729,9 @@ TEST_P(ModifierPressedMetricsTest, KeyPressedWithRemappingToControlTest) {
 
   const bool right = ui::KeycodeConverter::DomCodeToLocation(event_.code) ==
                      ui::DomKeyLocation::RIGHT;
-  const ui::EventRewriterAsh::ModifierKeyUsageMetric
-      remapped_modifier_key_usage_mapping =
-          right ? ui::EventRewriterAsh::ModifierKeyUsageMetric::kControlRight
-                : ui::EventRewriterAsh::ModifierKeyUsageMetric::kControlLeft;
+  const ui::ModifierKeyUsageMetric remapped_modifier_key_usage_mapping =
+      right ? ui::ModifierKeyUsageMetric::kControlRight
+            : ui::ModifierKeyUsageMetric::kControlLeft;
 
   const KeyTestCase::Event control_event{
       ui::VKEY_CONTROL,

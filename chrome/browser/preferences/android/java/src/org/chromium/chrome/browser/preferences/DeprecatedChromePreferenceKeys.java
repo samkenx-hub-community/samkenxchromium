@@ -4,6 +4,7 @@
 
 package org.chromium.chrome.browser.preferences;
 
+import org.chromium.base.shared_preferences.KeyPrefix;
 import org.chromium.build.annotations.CheckDiscard;
 
 import java.util.Arrays;
@@ -13,6 +14,9 @@ import java.util.List;
 /**
  * These values have been used as SharedPreferences keys in the past and should not be reused.
  * Do not remove values from this list.
+ *
+ * TODO(crbug.com/1483469): Rename this to reflect that deprecated keys from all registries should
+ * rest here, not just Chrome-layer keys.
  */
 @CheckDiscard("Validation is performed in tests and in debug builds.")
 public class DeprecatedChromePreferenceKeys {
@@ -31,6 +35,7 @@ public class DeprecatedChromePreferenceKeys {
                 "Chrome.Flags.SafeBool.*",
                 "Chrome.Flags.SafeDouble.*",
                 "Chrome.Flags.SafeInt.*",
+                "Chrome.Flags.SafeModeEnabled",
                 "Chrome.Flags.SafeString.*",
                 "Chrome.Flags.SafeValuesVersion",
                 "Chrome.OfflineMeasurements.HttpProbeResultsList",
@@ -46,6 +51,8 @@ public class DeprecatedChromePreferenceKeys {
                 "Chrome.RequestDesktopSiteGlobalSetting.DefaultEnabledShowMessage",
                 "Chrome.RequestDesktopSiteGlobalSetting.OptInMessageShown",
                 "Chrome.SigninPromo.NTPImpressions",
+                "Chrome.UMA.OnPreCreateCounter",
+                "Chrome.UMA.OnResumeCounter",
                 "Chrome.VideoTutorials.ShareUrls",
                 "LocaleManager_USR_TYPE",
                 "PersistedNotificationId",
@@ -145,8 +152,7 @@ public class DeprecatedChromePreferenceKeys {
                 "swap_pixel_format_to_fix_convert_from_translucent",
                 "tab_persistent_store_task_runner_enabled",
                 "webapk_number_of_uninstalls",
-                "website_settings_filter"
-        );
+                "website_settings_filter");
         // clang-format on
     }
 

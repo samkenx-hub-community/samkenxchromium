@@ -7,6 +7,7 @@
 #include "base/test/bind.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/metrics/chrome_metrics_service_accessor.h"
+#include "components/metrics/log_decoder.h"
 #include "components/metrics/metrics_switches.h"
 #include "components/metrics/structured/structured_metrics_features.h"
 #include "components/metrics/structured/structured_metrics_service.h"
@@ -38,8 +39,9 @@ class TestSystemProfileProvider : public metrics::MetricsProvider {
 namespace metrics::structured {
 
 StructuredMetricsMixin::StructuredMetricsMixin(
-    InProcessBrowserTestMixinHost* host)
-    : InProcessBrowserTestMixin(host) {
+    InProcessBrowserTestMixinHost* host,
+    bool setup_profile)
+    : InProcessBrowserTestMixin(host), setup_profile_(setup_profile) {
   temp_dir_.CreateUniqueTempDir();
 }
 
@@ -55,21 +57,26 @@ void StructuredMetricsMixin::SetUpOnMainThread() {
 
   system_profile_provider_ = std::make_unique<TestSystemProfileProvider>();
 
-  auto recorder =
-      std::unique_ptr<StructuredMetricsRecorder>(new StructuredMetricsRecorder(
-          /*write_delay=*/base::Milliseconds(0),
-          system_profile_provider_.get()));
-
-  base::FilePath device_keys_path =
+  base::FilePath local_state_events_path =
       temp_dir_.GetPath()
           .Append(FILE_PATH_LITERAL("structured"))
-          .Append(FILE_PATH_LITERAL("device_keys"));
+          .Append(FILE_PATH_LITERAL("local_state_events"));
+
+  auto recorder =
+      std::unique_ptr<StructuredMetricsRecorder>(new StructuredMetricsRecorder(
+          /*write_delay=*/base::Milliseconds(0), system_profile_provider_.get(),
+          local_state_events_path));
+
+  base::FilePath local_state_events_keys_path =
+      temp_dir_.GetPath()
+          .Append(FILE_PATH_LITERAL("structured"))
+          .Append(FILE_PATH_LITERAL("local_state_keys"));
   base::FilePath profile_path =
       temp_dir_.GetPath().Append(FILE_PATH_LITERAL("profile"));
 
   // Create test key data provider and initialize key data provider.
   auto test_key_data_provider =
-      std::make_unique<TestKeyDataProvider>(device_keys_path);
+      std::make_unique<TestKeyDataProvider>(local_state_events_keys_path);
   recorder->InitializeKeyDataProvider(std::move(test_key_data_provider));
 
   // TODO(b/282057109): Cleanup provider code once feature is removed.
@@ -82,14 +89,19 @@ void StructuredMetricsMixin::SetUpOnMainThread() {
         std::make_unique<TestStructuredMetricsProvider>(std::move(recorder));
   }
 
-  // Setup test profile directory immediately so that recording can happen.
-  GetRecorder()->OnProfileAdded(profile_path);
+  if (setup_profile_) {
+    // Setup test profile directory immediately so that recording can happen.
+    GetRecorder()->OnProfileAdded(profile_path);
+  }
 }
 
 StructuredMetricsRecorder* StructuredMetricsMixin::GetRecorder() {
+  return GetService()->recorder();
+}
+
+StructuredMetricsService* StructuredMetricsMixin::GetService() {
   return g_browser_process->GetMetricsServicesManager()
-      ->GetStructuredMetricsService()
-      ->recorder();
+      ->GetStructuredMetricsService();
 }
 
 absl::optional<StructuredEventProto> StructuredMetricsMixin::FindEvent(
@@ -107,17 +119,27 @@ std::vector<StructuredEventProto> StructuredMetricsMixin::FindEvents(
     uint64_t project_name_hash,
     uint64_t event_name_hash) {
   std::vector<StructuredEventProto> events_vector;
-  if (!GetRecorder()->can_provide_metrics()) {
-    return events_vector;
-  }
 
-  const EventsProto& events = *GetRecorder()->events();
-  for (const auto& event : events.non_uma_events()) {
-    if (event.project_name_hash() == project_name_hash &&
-        event.event_name_hash() == event_name_hash) {
-      events_vector.push_back(event);
+  if (GetRecorder()->can_provide_local_state_metrics()) {
+    const EventsProto& local_state_events = *GetRecorder()->LocalStateEvents();
+    for (const auto& event : local_state_events.non_uma_events()) {
+      if (event.project_name_hash() == project_name_hash &&
+          event.event_name_hash() == event_name_hash) {
+        events_vector.push_back(event);
+      }
     }
   }
+
+  if (GetRecorder()->can_provide_profile_metrics()) {
+    const EventsProto& profile_events = *GetRecorder()->ProfileEvents();
+    for (const auto& event : profile_events.non_uma_events()) {
+      if (event.project_name_hash() == project_name_hash &&
+          event.event_name_hash() == event_name_hash) {
+        events_vector.push_back(event);
+      }
+    }
+  }
+
   return events_vector;
 }
 
@@ -144,6 +166,13 @@ void StructuredMetricsMixin::WaitUntilEventRecorded(uint64_t project_name_hash,
         }
       });
   GetRecorder()->SetEventRecordCallbackForTest(std::move(callback));
+
+  // The timeout for this is set to 3 seconds because this should be ample time
+  // for the event to show up after Event::Record() has been called. There is
+  // normally a delay between flushes but this delay has been set to 0 for
+  // testing.
+  base::test::ScopedRunLoopTimeout shortened_timeout{FROM_HERE,
+                                                     base::Seconds(3)};
   record_run_loop_->Run();
 }
 
@@ -161,6 +190,35 @@ void StructuredMetricsMixin::UpdateRecordingState(bool state) {
   // Triggers rechecking of metrics state.
   g_browser_process->GetMetricsServicesManager()->UpdateUploadPermissions(
       /*may_upload=*/true);
+}
+
+std::unique_ptr<ChromeUserMetricsExtension>
+StructuredMetricsMixin::GetUmaProto() {
+  StructuredMetricsService* service = GetService();
+  auto* log_store = service->reporting_service_->log_store();
+
+  if (!log_store->has_unsent_logs()) {
+    return nullptr;
+  }
+
+  if (log_store->has_staged_log()) {
+    // For testing purposes, we examine the content of a staged log without
+    // ever sending the log, so discard any previously staged log.
+    log_store->DiscardStagedLog();
+  }
+
+  log_store->StageNextLog();
+  if (!log_store->has_staged_log()) {
+    return nullptr;
+  }
+
+  std::unique_ptr<ChromeUserMetricsExtension> uma_proto =
+      std::make_unique<ChromeUserMetricsExtension>();
+  if (!metrics::DecodeLogDataToProto(log_store->staged_log(),
+                                     uma_proto.get())) {
+    return nullptr;
+  }
+  return uma_proto;
 }
 
 }  // namespace metrics::structured

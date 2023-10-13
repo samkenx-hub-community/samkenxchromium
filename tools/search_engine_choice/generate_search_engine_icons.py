@@ -10,6 +10,9 @@ for display, e.g. in the search engine choice UI and settings.
 This should be run whenever template_url_prepopulate_data.cc changes the list of
 search engines used per country, or whenever prepopulated_engines.json changes
 a favicon.
+
+To run, `apt-get install python3-commentjson`, then
+`python3 tools/search_engine_choice/generate_search_engine_icons.py`.
 """
 
 import hashlib
@@ -37,6 +40,22 @@ def get_image_hash(image_path):
     return hashlib.sha256(image.read()).hexdigest()
 
 
+def keyword_to_identifer(keyword):
+  """Sanitized keyword to be used as identifier.
+
+  Replaces characters we find in prepopulates_engines.json's keyword field into
+  ones that are valid in file names and variable names.
+
+  Args:
+    keyword: the keyword string as in the json file.
+
+  Returns:
+    The keyword string with characters replaced that don't work in a variable or
+    file name.
+  """
+  return keyword.replace('.', '_').replace('-', '_')
+
+
 def populate_used_engines():
   """Populates the `used_engines` set.
 
@@ -44,16 +63,15 @@ def populate_used_engines():
   `template_url_prepopulate_data.cc`.
   """
   print('Populating used engines set')
+  SE_NAME_REGEX = re.compile(r'.*SearchEngineTier::[A-Za-z]+, &(.+)},')
   with open('../search_engines/template_url_prepopulate_data.cc',
             'r',
             encoding='utf-8') as file:
     lines = file.readlines()
     for line in lines:
-      line_without_spaces = line.strip()
-
-      if line_without_spaces.startswith('&') and line_without_spaces.endswith(
-          ','):
-        used_engines.add(line_without_spaces[1:len(line_without_spaces) - 1])
+      match = SE_NAME_REGEX.match(line)
+      if match:
+        used_engines.add(match.group(1))
 
 
 def delete_files_in_directory(directory_path):
@@ -72,8 +90,9 @@ def delete_files_in_directory(directory_path):
     for file in files:
       file_path = os.path.join(directory_path, file)
 
-      # Make sure not to remove the default icon (globe)
-      if os.path.basename(file_path) == 'default_favicon.png':
+      # Only remove pngs and don't remove the default icon (globe)
+      filename = os.path.basename(file_path)
+      if not filename.endswith('.png') or filename == 'default_favicon.png':
         continue
 
       if os.path.isfile(file_path):
@@ -83,7 +102,7 @@ def delete_files_in_directory(directory_path):
     print('Error occurred while deleting files in ' + directory_path)
 
 
-def get_largest_icon_index_and_size(icon_path):
+def get_largest_icon_index_and_size(icon_path, name):
   """Fetches the index and size of largest icon in the .ico file.
 
   Some .ico files contain more than 1 icon. The function finds the largest icon
@@ -108,7 +127,7 @@ def get_largest_icon_index_and_size(icon_path):
     # The image size is the integer before the 'x' character.
     sizes = image_dimensions.split('x')
     if sizes[0] != sizes[1]:
-      print('Warning: Icon %s is not square' % icon_path)
+      print('Warning: Icon for %s is not square' % name)
     image_size = int(sizes[0])
     if image_size > max_image_size:
       max_image_size = image_size
@@ -122,9 +141,9 @@ def create_icons_from_json_file():
 
   Reads the json file and downloads the icons that are referenced in the
   "favicon_url" section of the search_engine.
-  Scales those icons to 24x24 and 48x48 formats and converts them to PNG
-  format. After finishing the previous step, the function moves the icons to
-  their corresponding directories.
+  Scales those icons down to 48x48 size and converts them to PNG format. After
+  finishing the previous step, the function moves the icons to the destination
+  directory and runs png optimization.
   The function filters the search engines based on the search engines that are
   used in `template_url_prepopulate_data.cc` so that icons that are never used
   don't get downloaded.
@@ -137,14 +156,12 @@ def create_icons_from_json_file():
   """
   print('Creating icons from json file...')
   prepopulated_engines_file_path = '../search_engines/prepopulated_engines.json'
-  default_100_path = './default_100_percent/search_engine_choice/'
-  default_200_path = './default_200_percent/search_engine_choice/'
-  icon_sizes = [24, 48]
+  image_destination_path = './default_100_percent/search_engine_choice/'
+  icon_sizes = [48]
   favicon_hash_to_icon_name = {}
 
   # Delete the previously added search engine icons
-  delete_files_in_directory(default_100_path)
-  delete_files_in_directory(default_200_path)
+  delete_files_in_directory(image_destination_path)
 
   with open(prepopulated_engines_file_path, 'r',
             encoding='utf-8') as engines_json:
@@ -165,8 +182,16 @@ def create_icons_from_json_file():
 
       try:
         # Download the icon and rename it as 'original.ico'
-        img_data = requests.get(favicon_url)
-        icon_name = search_engine_keyword.replace('.', '_')
+        img_data = requests.get(
+            favicon_url,
+            headers={
+                # Some search engines 403 even requests for favicons if we don't
+                # look like a browser
+                "User-Agent":
+                ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, "
+                 "like Gecko) Chrome/117.0.0.0 Safari/537.36")
+            })
+        icon_name = keyword_to_identifer(search_engine_keyword)
         with open('original.ico', 'wb') as original_icon:
           original_icon.write(img_data.content)
 
@@ -178,23 +203,21 @@ def create_icons_from_json_file():
           os.remove('original.ico')
           continue
 
-        (largest_index,
-         largest_size) = get_largest_icon_index_and_size('original.ico')
+        (largest_index, largest_size) = get_largest_icon_index_and_size(
+            'original.ico', icon_name)
 
         # Using ImageMagick command line interface, scale the icons, convert
         # them to PNG format and move them to their corresponding folders.
         last_size = 0
-        for icon_size in icon_sizes:
+        for desired_size in icon_sizes:
           if largest_size >= last_size:
+            last_size = desired_size
+            desired_size = min(desired_size, largest_size)
             os.system('convert original.ico[' + str(largest_index) +
-                      '] -thumbnail ' + str(icon_size) + 'x' + str(icon_size) +
-                      ' ' + icon_name + '.png')
-            icon_destination = default_100_path
-            if icon_size == 48:
-              icon_destination = default_200_path
+                      '] -thumbnail ' + str(desired_size) + 'x' +
+                      str(desired_size) + ' ' + icon_name + '.png')
 
-            shutil.move(icon_name + '.png', icon_destination)
-            last_size = icon_size
+            shutil.move(icon_name + '.png', image_destination_path)
 
         engine_keyword_to_icon_name[search_engine_keyword] = icon_name
         favicon_hash_to_icon_name[icon_hash] = icon_name
@@ -209,8 +232,8 @@ def create_icons_from_json_file():
         # default icon in that case.
         engine_keyword_to_icon_name[search_engine_keyword] = ''
         continue
-  os.system('../../tools/resources/optimize-png-files.sh ' + default_100_path)
-  os.system('../../tools/resources/optimize-png-files.sh ' + default_200_path)
+  os.system('../../tools/resources/optimize-png-files.sh ' +
+            image_destination_path)
 
 
 def generate_icon_resource_code():
@@ -241,7 +264,8 @@ def generate_icon_resource_code():
     # Add the remaining resource ids.
     for engine_keyword in engine_keyword_to_icon_name:
       icon_name = engine_keyword_to_icon_name[engine_keyword]
-      resource_id = 'IDR_' + engine_keyword.replace('.', '_').upper() + '_PNG'
+      resource_id = 'IDR_' + keyword_to_identifer(
+          engine_keyword).upper() + '_PNG'
       # No favicon loaded. Use default_favicon.png
       if not icon_name:
         grdp_file.write(
@@ -327,7 +351,7 @@ def create_adding_icons_to_source_function():
         desktop_webui_file.write('\t#endif\n')
 
         for engine_keyword in engine_keyword_to_icon_name:
-          engine_name = engine_keyword.replace('.', '_')
+          engine_name = keyword_to_identifer(engine_keyword)
           local_image_path = 'images/' + engine_name + '.png'
           image_resource_id = 'IDR_' + engine_name.upper() + '_PNG'
           desktop_webui_file.write('\tsource->AddResourcePath("' +

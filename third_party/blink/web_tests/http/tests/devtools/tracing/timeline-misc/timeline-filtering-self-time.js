@@ -5,12 +5,11 @@
 import {TestRunner} from 'test_runner';
 import {PerformanceTestRunner} from 'performance_test_runner';
 
-import * as TimelineModule from 'devtools/panels/timeline/timeline.js';
+import * as Timeline from 'devtools/panels/timeline/timeline.js';
 
 (async function() {
   TestRunner.addResult(
       `Test filtering in Bottom-Up Timeline Tree View panel.\n`);
-  await TestRunner.loadLegacyModule('timeline');
   await TestRunner.showPanel('timeline');
 
   var sessionId = '4.20';
@@ -90,12 +89,12 @@ import * as TimelineModule from 'devtools/panels/timeline/timeline.js';
   ];
 
   var model = await PerformanceTestRunner.createPerformanceModelWithEvents(testData);
-  const tabbedPane = UI.panels.timeline.flameChart.detailsView.tabbedPane;
-  tabbedPane.selectTab(TimelineModule.TimelineDetailsView.Tab.BottomUp);
+  const tabbedPane = Timeline.TimelinePanel.TimelinePanel.instance().flameChart.detailsView.tabbedPane;
+  tabbedPane.selectTab(Timeline.TimelineDetailsView.Tab.BottomUp);
   const view = tabbedPane.visibleView;
 
   view.setModel(model, PerformanceTestRunner.mainTrack());
-  view.updateContents(TimelineModule.TimelineSelection.TimelineSelection.fromRange(
+  view.updateContents(Timeline.TimelineSelection.TimelineSelection.fromRange(
       model.timelineModel().minimumRecordTime(),
       model.timelineModel().maximumRecordTime()));
   function printEventMessage(event, level, node) {

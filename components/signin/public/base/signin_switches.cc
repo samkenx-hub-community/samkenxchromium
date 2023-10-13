@@ -15,6 +15,11 @@ namespace switches {
 BASE_FEATURE(kIdentityStatusConsistency,
              "IdentityStatusConsistency",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Feature to refactor how and when accounts are seeded on Android.
+BASE_FEATURE(kSeedAccountsRevamp,
+             "SeedAccountsRevamp",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
 // Clears the token service before using it. This allows simulating the
@@ -72,8 +77,14 @@ BASE_FEATURE(kTangibleSync,
 
 );
 
+// Enables the search engine choice feature for existing users.
 BASE_FEATURE(kSearchEngineChoice,
              "SearchEngineChoice",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables the search engine choice feature in the FRE.
+BASE_FEATURE(kSearchEngineChoiceFre,
+             "SearchEngineChoiceFre",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kUnoDesktop, "UnoDesktop", base::FEATURE_DISABLED_BY_DEFAULT);

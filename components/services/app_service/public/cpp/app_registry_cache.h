@@ -124,7 +124,7 @@ class COMPONENT_EXPORT(APP_UPDATE) AppRegistryCache {
   // f must be synchronous, and if it asynchronously calls ForEachApp again,
   // it's not guaranteed to see a consistent state.
   template <typename FunctionType>
-  void ForEachApp(FunctionType f) {
+  void ForEachApp(FunctionType f) const {
     DCHECK_CALLED_ON_VALID_SEQUENCE(my_sequence_checker_);
 
     for (const auto& s_iter : states_) {
@@ -157,7 +157,7 @@ class COMPONENT_EXPORT(APP_UPDATE) AppRegistryCache {
   // f must be synchronous, and if it asynchronously calls ForOneApp again,
   // it's not guaranteed to see a consistent state.
   template <typename FunctionType>
-  bool ForOneApp(const std::string& app_id, FunctionType f) {
+  bool ForOneApp(const std::string& app_id, FunctionType f) const {
     DCHECK_CALLED_ON_VALID_SEQUENCE(my_sequence_checker_);
 
     auto s_iter = states_.find(app_id);
@@ -180,12 +180,18 @@ class COMPONENT_EXPORT(APP_UPDATE) AppRegistryCache {
 
   bool IsAppTypeInitialized(AppType app_type) const;
 
+  // Returns true if the cache contains an app with id `app_id` whose
+  // `Readiness()` corresponds to an installed state.
+  bool IsAppInstalled(const std::string& app_id) const;
+
   // Clears all apps from the cache.
   void ReinitializeForTesting();
 
  private:
   friend class AppRegistryCacheTest;
   friend class PublisherTest;
+  friend class AppStorage;
+  friend class FakeAppStorage;
 
   void DoOnApps(std::vector<AppPtr> deltas);
 

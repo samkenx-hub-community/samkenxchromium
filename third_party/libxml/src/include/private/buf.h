@@ -61,8 +61,7 @@ xmlBufMergeBuffer(xmlBufPtr buf, xmlBufferPtr buffer);
 
 XML_HIDDEN int
 xmlBufResetInput(xmlBufPtr buf, xmlParserInputPtr input);
-XML_HIDDEN int xmlBufUpdateInput(xmlBufPtr buf,
-                                 xmlParserInputPtr input,
-                                 size_t pos);
+XML_HIDDEN int
+xmlBufUpdateInput(xmlBufPtr buf, xmlParserInputPtr input, size_t pos);
 
 #endif /* XML_BUF_H_PRIVATE__ */

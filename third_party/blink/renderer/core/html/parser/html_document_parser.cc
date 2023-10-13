@@ -35,6 +35,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/types/optional_util.h"
+#include "components/miracle_parameter/common/public/miracle_parameter.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/loader/loading_behavior_flag.h"
 #include "third_party/blink/public/platform/platform.h"
@@ -48,9 +49,11 @@
 #include "third_party/blink/renderer/core/frame/settings.h"
 #include "third_party/blink/renderer/core/html/html_document.h"
 #include "third_party/blink/renderer/core/html/html_meta_element.h"
+#include "third_party/blink/renderer/core/html/html_template_element.h"
 #include "third_party/blink/renderer/core/html/nesting_level_incrementer.h"
 #include "third_party/blink/renderer/core/html/parser/atomic_html_token.h"
 #include "third_party/blink/renderer/core/html/parser/background_html_scanner.h"
+#include "third_party/blink/renderer/core/html/parser/html_element_stack.h"
 #include "third_party/blink/renderer/core/html/parser/html_parser_metrics.h"
 #include "third_party/blink/renderer/core/html/parser/html_preload_scanner.h"
 #include "third_party/blink/renderer/core/html/parser/html_resource_preloader.h"
@@ -186,51 +189,63 @@ bool IsPreloadScanningEnabled(Document* document) {
          document->GetSettings()->GetDoHtmlPreloadScanning();
 }
 
+MIRACLE_PARAMETER_FOR_TIME_DELTA(GetDefaultParserBudget,
+                                 features::kTimedHTMLParserBudget,
+                                 "default-parser-budget",
+                                 base::Milliseconds(10))
+
+// These constants were chosen using experiment data from the field to
+// optimize Core Web Vitals metrics: https://web.dev/vitals/#core-web-vitals
+// Experiments were run on both Android and desktop to determine the values
+// that gave the best aggregate CWV pass rate.
+constexpr int kNumYieldsWithDefaultBudgetDefaultValue =
+#if BUILDFLAG(IS_ANDROID)
+    2
+#else
+    6
+#endif
+    ;
+
+MIRACLE_PARAMETER_FOR_INT(GetNumYieldsWithDefaultBudget,
+                          features::kTimedHTMLParserBudget,
+                          "num-yields-with-default-budget",
+                          kNumYieldsWithDefaultBudgetDefaultValue)
+
+// These constants were chosen using experiment data from the field to
+// optimize Core Web Vitals metrics: https://web.dev/vitals/#core-web-vitals
+// Experiments were run on both Android and desktop to determine the values
+// that gave the best aggregate CWV pass rate.
+constexpr base::TimeDelta kLongParserBudgetDefaultValue =
+#if BUILDFLAG(IS_ANDROID)
+    base::Milliseconds(50)
+#else
+    base::Milliseconds(500)
+#endif
+    ;
+
+MIRACLE_PARAMETER_FOR_TIME_DELTA(GetLongParserBudget,
+                                 features::kTimedHTMLParserBudget,
+                                 "long-parser-budget",
+                                 kLongParserBudgetDefaultValue)
+
 base::TimeDelta GetDefaultTimedBudget() {
-  static const base::FeatureParam<base::TimeDelta> kDefaultParserBudgetParam{
-      &features::kTimedHTMLParserBudget, "default-parser-budget",
-      base::Milliseconds(10)};
   // Cache the value to avoid parsing the param string more than once.
   static const base::TimeDelta kDefaultParserBudgetValue =
-      kDefaultParserBudgetParam.Get();
+      GetDefaultParserBudget();
   return kDefaultParserBudgetValue;
 }
 
 base::TimeDelta GetTimedBudget(int times_yielded) {
-  static const base::FeatureParam<int> kNumYieldsWithDefaultBudgetParam {
-    &features::kTimedHTMLParserBudget, "num-yields-with-default-budget",
-    // These constants were chosen using experiment data from the field to
-    // optimize Core Web Vitals metrics: https://web.dev/vitals/#core-web-vitals
-    // Experiments were run on both Android and desktop to determine the values
-    // that gave the best aggregate CWV pass rate.
-#if BUILDFLAG(IS_ANDROID)
-        2
-#else
-        6
-#endif
-  };
   // Cache the value to avoid parsing the param string more than once.
   static const int kNumYieldsWithDefaultBudgetValue =
-      kNumYieldsWithDefaultBudgetParam.Get();
+      GetNumYieldsWithDefaultBudget();
 
-  static const base::FeatureParam<base::TimeDelta> kLongParserBudgetParam {
-    &features::kTimedHTMLParserBudget, "long-parser-budget",
-    // These constants were chosen using experiment data from the field to
-    // optimize Core Web Vitals metrics: https://web.dev/vitals/#core-web-vitals
-    // Experiments were run on both Android and desktop to determine the values
-    // that gave the best aggregate CWV pass rate.
-#if BUILDFLAG(IS_ANDROID)
-        base::Milliseconds(50)
-#else
-        base::Milliseconds(500)
-#endif
-  };
   // Cache the value to avoid parsing the param string more than once.
-  static const base::TimeDelta kLongParserBudgetValue =
-      kLongParserBudgetParam.Get();
+  static const base::TimeDelta kLongParserBudgetValue = GetLongParserBudget();
 
-  if (times_yielded <= kNumYieldsWithDefaultBudgetValue)
+  if (times_yielded <= kNumYieldsWithDefaultBudgetValue) {
     return GetDefaultTimedBudget();
+  }
   return kLongParserBudgetValue;
 }
 
@@ -1238,6 +1253,20 @@ void HTMLDocumentParser::ParseDocumentFragment(
     ParserContentPolicy parser_content_policy) {
   auto* parser = MakeGarbageCollected<HTMLDocumentParser>(
       fragment, context_element, parser_content_policy);
+
+  if (RuntimeEnabledFeatures::DOMPartsAPIEnabled()) {
+    // Within templates containing the `parseparts` attribute, allow parsing
+    // DOM Parts. Otherwise do not parse any DOM Part content.
+    DOMPartsAllowed parts_allowed{DOMPartsAllowed::kNever};
+    if (auto* template_element =
+            DynamicTo<HTMLTemplateElement>(context_element);
+        template_element &&
+        template_element->hasAttribute(html_names::kParsepartsAttr)) {
+      parts_allowed = DOMPartsAllowed::kAlways;
+    }
+    parser->tree_builder_->SetDOMPartsAllowedState(parts_allowed);
+  }
+
   parser->Append(source);
   parser->Finish();
   // Allows ~DocumentParser to assert it was detached before destruction.

@@ -57,7 +57,6 @@
 #include "third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom-blink.h"
 #include "third_party/blink/public/platform/platform.h"
 #include "third_party/blink/public/platform/scheduler/web_scoped_virtual_time_pauser.h"
-#include "third_party/blink/public/platform/web_code_cache_loader.h"
 #include "third_party/blink/public/platform/web_url.h"
 #include "third_party/blink/public/platform/web_url_request.h"
 #include "third_party/blink/renderer/platform/bindings/script_forbidden_scope.h"
@@ -850,6 +849,19 @@ void ResourceFetcher::DidLoadResourceFromMemoryCache(
     info->response_end = now;
     info->render_blocking_status =
         render_blocking_behavior == RenderBlockingBehavior::kBlocking;
+
+    // Create a ResourceLoadTiming object and store LCP breakdown timings for
+    // images.
+    if (resource->GetType() == ResourceType::kImage) {
+      // The resource_load_timing may be null in tests.
+      if (ResourceLoadTiming* resource_load_timing =
+              resource->GetResponse().GetResourceLoadTiming()) {
+        resource_load_timing->SetDiscoveryTime(info->start_time);
+        resource_load_timing->SetSendStart(info->start_time);
+        resource_load_timing->SetResponseEnd(info->start_time);
+      }
+    }
+
     scheduled_resource_timing_reports_.push_back(ScheduledResourceTimingInfo{
         std::move(info), resource->Options().initiator_info.name});
     if (!resource_timing_report_timer_.IsActive())
@@ -1198,12 +1210,6 @@ absl::optional<ResourceRequestBlockedReason> ResourceFetcher::PrepareRequest(
 
   if (!params.Url().IsValid())
     return ResourceRequestBlockedReason::kOther;
-
-  if (resource_request.GetCredentialsMode() ==
-      network::mojom::CredentialsMode::kOmit) {
-    // See comments at network::ResourceRequest::credentials_mode.
-    resource_request.SetAllowStoredCredentials(false);
-  }
 
   return absl::nullopt;
 }
@@ -1594,11 +1600,11 @@ std::unique_ptr<URLLoader> ResourceFetcher::CreateURLLoader(
                                           back_forward_cache_loader_helper_);
 }
 
-std::unique_ptr<WebCodeCacheLoader> ResourceFetcher::CreateCodeCacheLoader() {
+CodeCacheHost* ResourceFetcher::GetCodeCacheHost() {
   DCHECK(!GetProperties().IsDetached());
   // TODO(http://crbug.com/1252983): Revert this to DCHECK.
   CHECK(loader_factory_);
-  return loader_factory_->CreateCodeCacheLoader();
+  return loader_factory_->GetCodeCacheHost();
 }
 
 void ResourceFetcher::AddToMemoryCacheIfNeeded(const FetchParameters& params,
@@ -1766,11 +1772,11 @@ void ResourceFetcher::PrintPreloadMismatch(Resource* resource,
                                      mojom::ConsoleMessageLevel::kWarning,
                                      builder.ToString());
 
-  TRACE_EVENT1(
-      "blink,blink.resource", "ResourceFetcher::PrintPreloadMismatch", "data",
-      CreateTracedValueForUnusedPreload(
-          resource->Url(), status,
-          resource->GetResourceRequest().GetDevToolsId().value_or(String())));
+  TRACE_EVENT1("blink,blink.resource", "ResourceFetcher::PrintPreloadMismatch",
+               "data",
+               CreateTracedValueForUnusedPreload(
+                   resource->Url(), status,
+                   resource->GetResourceRequest().GetDevToolsId()));
 }
 
 void ResourceFetcher::InsertAsPreloadIfNecessary(Resource* resource,
@@ -2205,11 +2211,11 @@ void ResourceFetcher::WarnUnusedPreloads() {
     console_logger_->AddConsoleMessage(
         mojom::blink::ConsoleMessageSource::kJavaScript,
         mojom::blink::ConsoleMessageLevel::kWarning, message);
-    TRACE_EVENT1(
-        "blink,blink.resource", "ResourceFetcher::WarnUnusedPreloads", "data",
-        CreateTracedValueForUnusedPreload(
-            resource->Url(), Resource::MatchStatus::kOk,
-            resource->GetResourceRequest().GetDevToolsId().value_or(String())));
+    TRACE_EVENT1("blink,blink.resource", "ResourceFetcher::WarnUnusedPreloads",
+                 "data",
+                 CreateTracedValueForUnusedPreload(
+                     resource->Url(), Resource::MatchStatus::kOk,
+                     resource->GetResourceRequest().GetDevToolsId()));
     UMA_HISTOGRAM_COUNTS_100("Renderer.Preload.UnusedResource",
                              static_cast<int>(resource->GetType()));
   }
@@ -2828,6 +2834,16 @@ void ResourceFetcher::PopulateAndAddResourceTimingInfo(
   info->render_blocking_status = pending_info.render_blocking_behavior ==
                                  RenderBlockingBehavior::kBlocking;
   info->response_end = response_end;
+  // Store LCP breakdown timings for images.
+  if (resource->GetType() == ResourceType::kImage) {
+    // The resource_load_timing may be null in tests.
+    if (ResourceLoadTiming* resource_load_timing =
+            resource->GetResponse().GetResourceLoadTiming()) {
+      resource_load_timing->SetDiscoveryTime(info->start_time);
+      resource_load_timing->SetResponseEnd(response_end);
+    }
+  }
+
   Context().AddResourceTiming(std::move(info), initiator_type);
 }
 

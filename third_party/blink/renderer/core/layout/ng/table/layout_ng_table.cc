@@ -37,14 +37,13 @@ inline bool NeedsTableSection(const LayoutObject& object) {
 
 }  // namespace
 
-LayoutNGTable::LayoutNGTable(Element* element)
-    : LayoutNGMixin<LayoutBlock>(element) {}
+LayoutNGTable::LayoutNGTable(Element* element) : LayoutBlock(element) {}
 
 LayoutNGTable::~LayoutNGTable() = default;
 
 void LayoutNGTable::Trace(Visitor* visitor) const {
   visitor->Trace(cached_table_borders_);
-  LayoutNGBlock::Trace(visitor);
+  LayoutBlock::Trace(visitor);
 }
 
 LayoutNGTable* LayoutNGTable::CreateAnonymousWithParent(
@@ -83,17 +82,6 @@ LayoutNGTableSection* LayoutNGTable::FirstSection() const {
   auto first_section = grouped_children.begin();
   if (first_section != grouped_children.end()) {
     return To<LayoutNGTableSection>((*first_section).GetLayoutBox());
-  }
-  return nullptr;
-}
-
-LayoutNGTableSection* LayoutNGTable::LastSection() const {
-  NOT_DESTROYED();
-  NGTableGroupedChildren grouped_children(
-      NGBlockNode(const_cast<LayoutNGTable*>(this)));
-  auto last_section = --grouped_children.end();
-  if (last_section != grouped_children.end()) {
-    return To<LayoutNGTableSection>((*last_section).GetLayoutBox());
   }
   return nullptr;
 }
@@ -170,28 +158,12 @@ LayoutNGTableSection* LayoutNGTable::PreviousSection(
   return nullptr;
 }
 
-LayoutNGTableSection* LayoutNGTable::FirstBody() const {
-  NOT_DESTROYED();
-  for (LayoutObject* child = FirstChild(); child;
-       child = child->NextSibling()) {
-    if (child->StyleRef().Display() == EDisplay::kTableRowGroup) {
-      return To<LayoutNGTableSection>(child);
-    }
-  }
-  return nullptr;
-}
-
 wtf_size_t LayoutNGTable::ColumnCount() const {
   NOT_DESTROYED();
   const NGLayoutResult* cached_layout_result = GetCachedLayoutResult(nullptr);
   if (!cached_layout_result)
     return 0;
   return cached_layout_result->TableColumnCount();
-}
-
-bool LayoutNGTable::HasCollapsedBorders() const {
-  NOT_DESTROYED();
-  return cached_table_borders_ && cached_table_borders_->IsCollapsed();
 }
 
 void LayoutNGTable::SetCachedTableBorders(const NGTableBorders* table_borders) {
@@ -316,7 +288,7 @@ void LayoutNGTable::AddChild(LayoutObject* child, LayoutObject* before_child) {
 void LayoutNGTable::RemoveChild(LayoutObject* child) {
   NOT_DESTROYED();
   TableGridStructureChanged();
-  LayoutNGMixin<LayoutBlock>::RemoveChild(child);
+  LayoutBlock::RemoveChild(child);
 }
 
 void LayoutNGTable::StyleDidChange(StyleDifference diff,
@@ -334,7 +306,7 @@ void LayoutNGTable::StyleDidChange(StyleDifference diff,
     if (borders_changed || collapse_changed)
       GridBordersChanged();
   }
-  LayoutNGMixin<LayoutBlock>::StyleDidChange(diff, old_style);
+  LayoutBlock::StyleDidChange(diff, old_style);
 }
 
 LayoutBox* LayoutNGTable::CreateAnonymousBoxWithSameTypeAs(
@@ -361,8 +333,8 @@ PhysicalRect LayoutNGTable::OverflowClipRect(
       clip_rect.size.height = LayoutUnit(infinite_rect.height());
     }
   } else {
-    clip_rect = LayoutNGMixin<LayoutBlock>::OverflowClipRect(
-        location, overlay_scrollbar_clip_behavior);
+    clip_rect = LayoutBlock::OverflowClipRect(location,
+                                              overlay_scrollbar_clip_behavior);
   }
   // TODO(1142929)
   // We cannot handle table hidden overflow with captions correctly.
@@ -384,89 +356,72 @@ PhysicalRect LayoutNGTable::OverflowClipRect(
   return clip_rect;
 }
 
-#if DCHECK_IS_ON()
-void LayoutNGTable::AddVisualEffectOverflow() {
-  NOT_DESTROYED();
-  // This is computed in |NGPhysicalBoxFragment::ComputeSelfInkOverflow| and
-  // that we should not reach here.
-  NOTREACHED();
-}
-#endif
-
 LayoutUnit LayoutNGTable::BorderLeft() const {
   NOT_DESTROYED();
   // DCHECK(cached_table_borders_.get())
   // ScrollAnchoring fails this DCHECK.
-  if (ShouldCollapseBorders() && cached_table_borders_) {
+  if (HasCollapsedBorders() && cached_table_borders_) {
     return cached_table_borders_->TableBorder()
         .ConvertToPhysical(Style()->GetWritingDirection())
         .left;
   }
-  return LayoutNGMixin<LayoutBlock>::BorderLeft();
+  return LayoutBlock::BorderLeft();
 }
 
 LayoutUnit LayoutNGTable::BorderRight() const {
   NOT_DESTROYED();
   // DCHECK(cached_table_borders_.get())
   // ScrollAnchoring fails this DCHECK.
-  if (ShouldCollapseBorders() && cached_table_borders_) {
+  if (HasCollapsedBorders() && cached_table_borders_) {
     return cached_table_borders_->TableBorder()
         .ConvertToPhysical(Style()->GetWritingDirection())
         .right;
   }
-  return LayoutNGMixin<LayoutBlock>::BorderRight();
+  return LayoutBlock::BorderRight();
 }
 
 LayoutUnit LayoutNGTable::BorderTop() const {
   NOT_DESTROYED();
   // DCHECK(cached_table_borders_.get())
   // ScrollAnchoring fails this DCHECK.
-  if (ShouldCollapseBorders() && cached_table_borders_) {
+  if (HasCollapsedBorders() && cached_table_borders_) {
     return cached_table_borders_->TableBorder()
         .ConvertToPhysical(Style()->GetWritingDirection())
         .top;
   }
-  return LayoutNGMixin<LayoutBlock>::BorderTop();
+  return LayoutBlock::BorderTop();
 }
 
 LayoutUnit LayoutNGTable::BorderBottom() const {
   NOT_DESTROYED();
   // DCHECK(cached_table_borders_.get())
   // ScrollAnchoring fails this DCHECK.
-  if (ShouldCollapseBorders() && cached_table_borders_) {
+  if (HasCollapsedBorders() && cached_table_borders_) {
     return cached_table_borders_->TableBorder()
         .ConvertToPhysical(Style()->GetWritingDirection())
         .bottom;
   }
-  return LayoutNGMixin<LayoutBlock>::BorderBottom();
+  return LayoutBlock::BorderBottom();
 }
 
 LayoutUnit LayoutNGTable::PaddingTop() const {
   NOT_DESTROYED();
-  if (ShouldCollapseBorders())
-    return LayoutUnit();
-  return LayoutNGMixin<LayoutBlock>::PaddingTop();
+  return HasCollapsedBorders() ? LayoutUnit() : LayoutBlock::PaddingTop();
 }
 
 LayoutUnit LayoutNGTable::PaddingBottom() const {
   NOT_DESTROYED();
-  if (ShouldCollapseBorders())
-    return LayoutUnit();
-  return LayoutNGMixin<LayoutBlock>::PaddingBottom();
+  return HasCollapsedBorders() ? LayoutUnit() : LayoutBlock::PaddingBottom();
 }
 
 LayoutUnit LayoutNGTable::PaddingLeft() const {
   NOT_DESTROYED();
-  if (ShouldCollapseBorders())
-    return LayoutUnit();
-  return LayoutNGMixin<LayoutBlock>::PaddingLeft();
+  return HasCollapsedBorders() ? LayoutUnit() : LayoutBlock::PaddingLeft();
 }
 
 LayoutUnit LayoutNGTable::PaddingRight() const {
   NOT_DESTROYED();
-  if (ShouldCollapseBorders())
-    return LayoutUnit();
-  return LayoutNGMixin<LayoutBlock>::PaddingRight();
+  return HasCollapsedBorders() ? LayoutUnit() : LayoutBlock::PaddingRight();
 }
 
 // Effective column index is index of columns with mergeable
@@ -489,6 +444,15 @@ unsigned LayoutNGTable::AbsoluteColumnToEffectiveColumn(
       return effective_column_index;
   }
   return effective_column_index;
+}
+
+unsigned LayoutNGTable::EffectiveColumnCount() const {
+  NOT_DESTROYED();
+  const wtf_size_t column_count = ColumnCount();
+  if (column_count == 0) {
+    return 0;
+  }
+  return AbsoluteColumnToEffectiveColumn(column_count - 1) + 1;
 }
 
 }  // namespace blink

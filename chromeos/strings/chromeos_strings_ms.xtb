@@ -24,6 +24,7 @@
 <translation id="1154390310959620237">Anda hanya boleh menyesuaikan 5 pintasan. Padam satu pintasan untuk menambahkan pintasan baharu.</translation>
 <translation id="1164939766849482256">Penyelamat skrin subuh sehingga gelap</translation>
 <translation id="1167755866710282443">Buka menu untuk menyesuaikan kunci. Seret menu untuk bergerak.</translation>
+<translation id="1174073918202301297">Pintasan ditambahkan</translation>
 <translation id="1175697296044146566"><ph name="DEVICE_TYPE" /> ini diurus oleh <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Biasa (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Alih keluar</translation>
@@ -91,6 +92,7 @@
 <translation id="1643449475550628585">Tukar imej kertas dinding setiap hari</translation>
 <translation id="1644574205037202324">Sejarah</translation>
 <translation id="1651925268237749928">Anda telah memilih album kongsi. Orang lain boleh menambahkan atau menukar foto. Hiasan latar anda mungkin menggunakan foto yang tiada dalam album ini pada masa ini.</translation>
+<translation id="1661865805917886535">Sesetengah maklumat akaun dan sistem mungkin dihantar kepada Google. Kami menggunakan maklumat ini untuk mengatasi masalah teknikal dan meningkatkan perkhidmatan kami, tertakluk pada Dasar Privasi (<ph name="PRIVACYPOLICYURL" />) dan Syarat Perkhidmatan (<ph name="TERMSOFSERVICEURL" />) kami. Untuk meminta perubahan kandungan, akses Bantuan Perundangan (<ph name="LEGALHELPPAGEURL" />).</translation>
 <translation id="1662989795263954667">Dihentikan - Kehabisan dakwat</translation>
 <translation id="1664796644829245314">Pratonton <ph name="PREVIEW_OBJECT" /></translation>
 <translation id="1668469839109562275">VPN terbina dalam</translation>
@@ -117,6 +119,7 @@
 <translation id="1768959921651994223">Jenis pengesahan</translation>
 <translation id="1776228893584526149">Ton hiasan latar</translation>
 <translation id="1782199038061388045">terjemahan</translation>
+<translation id="1788485524395674731">Apl ini diurus oleh pentadbir anda</translation>
 <translation id="1792647875738159689">Membatalkan pengimbasan</translation>
 <translation id="1801418420130173017">Lumpuhkan tema gelap</translation>
 <translation id="1807246157184219062">Cahaya</translation>
@@ -131,7 +134,6 @@
 <translation id="1871569928317311284">Matikan tema gelap</translation>
 <translation id="1874612839560830905">MTU</translation>
 <translation id="188114911237521550">Matikan mod gelap</translation>
-<translation id="1881188606372070653">Pergi ke <ph name="BEGIN_LINK1" />halaman Bantuan Undang-undang<ph name="END_LINK1" /> untuk meminta perubahan kandungan atas sebab undang-undang. Sesetengah maklumat akaun dan sistem mungkin dihantar kepada Google. Kami akan menggunakan maklumat yang anda berikan untuk membantu kami menyelesaikan isu teknikal dan untuk menambah baik perkhidmatan kami, tertakluk pada <ph name="BEGIN_LINK2" />Dasar Privasi<ph name="END_LINK2" /> dan <ph name="BEGIN_LINK3" />Syarat Perkhidmatan<ph name="END_LINK3" />.</translation>
 <translation id="1885577615937958993">mundar laju media</translation>
 <translation id="1887850431809612466">Semakan perkakasan</translation>
 <translation id="1897672602657312171">Pintasan tanpa kekunci carian mungkin bercanggah dengan sesetengah pintasan apl. Tekan pintasan ini sekali lagi untuk terus digunakan atau tekan pintasan baharu menggunakan kekunci carian.</translation>
@@ -193,6 +195,7 @@
 <translation id="2326139988748364651"><ph name="RESOLUTION_VALUE" /> dpi</translation>
 <translation id="2338501278241028356">Hidupkan Bluetooth untuk menemui peranti berdekatan</translation>
 <translation id="2346474577291266260">Cemerlang (<ph name="SIGNAL_STRENGTH" />)</translation>
+<translation id="2358070305000735383">Dialog edit untuk <ph name="DESCRIPTION" /> dibuka.</translation>
 <translation id="2359808026110333948">Teruskan</translation>
 <translation id="2364498172489649528">Lulus</translation>
 <translation id="2367335866686097760">Kekunci pemetaan kunci</translation>
@@ -212,6 +215,7 @@
 <translation id="2505327257735685095">Muatkan semula imej kertas dinding semasa</translation>
 <translation id="2512979179176933762">tunjukkan tetingkap</translation>
 <translation id="2513396635448525189">Imej log masuk</translation>
+<translation id="2515109918609218604">Pintasan tidak tersedia. Tekan pintasan baharu tanpa menggunakan kekunci fungsi dan carian.</translation>
 <translation id="2517472476991765520">Imbas</translation>
 <translation id="2521835766824839541">lagu sebelumnya</translation>
 <translation id="2526590354069164005">Desktop</translation>
@@ -265,6 +269,7 @@
 <translation id="3122464029669770682">CPU</translation>
 <translation id="3124039320086536031">Peranti disambungkan.</translation>
 <translation id="3127341325625468058">{PAGE_NUMBER,plural, =0{Alih keluar halaman?}=1{Alih keluar halaman {PAGE_NUMBER}?}other{Alih keluar halaman {PAGE_NUMBER}?}}</translation>
+<translation id="3146655726035122603">Eksklusif untuk <ph name="PRODUCT_NAME" /></translation>
 <translation id="315116470104423982">Data mudah alih</translation>
 <translation id="3156846309055100599">Mengimbas halaman <ph name="PAGE_NUMBER" />...</translation>
 <translation id="315738237743207937">Portal terbolot dikesan</translation>
@@ -280,7 +285,6 @@
 <translation id="3226405216343213872">Mencari pengimbas</translation>
 <translation id="3226657629376379887">Menu tindakan reka letak</translation>
 <translation id="3246869037381808805">Tugas cetak yang melebihi 1 hari akan dialih keluar</translation>
-<translation id="3248223063252096240"><ph name="PRODUCT_NAME" /> eksklusif</translation>
 <translation id="3268178239013324452">Gagal - Pintu terbuka</translation>
 <translation id="3275729367986477355">Imej avatar</translation>
 <translation id="3283504360622356314">{0,plural, =1{Edit fail}other{Edit fail}}</translation>
@@ -480,6 +484,7 @@
 <translation id="4793756956024303490">Algoritma pemampatan</translation>
 <translation id="4794140124556169553">Tindakan menjalankan ujian CPU mungkin menjejaskan prestasi sistem anda</translation>
 <translation id="4798078634453489142">Alih keluar APN untuk menambah APN baharu</translation>
+<translation id="479989351350248267">search</translation>
 <translation id="4800589996161293643">Komuniti Chromebook</translation>
 <translation id="4803391892369051319">IPv4</translation>
 <translation id="4808449224298348341">Tugas cetak <ph name="DOCUMENT_TITLE" /> dibatalkan</translation>
@@ -623,6 +628,7 @@
 <translation id="584953448295717128">APN telah dikesan secara automatik.</translation>
 <translation id="5849570051105887917">Kod penyedia tempatan</translation>
 <translation id="5859603669299126575">Album galeri seni</translation>
+<translation id="5859969039821714932">Pintasan tidak tersedia. Tekan pintasan baharu tanpa <ph name="KEY" />.</translation>
 <translation id="5860033963881614850">Dimatikan</translation>
 <translation id="5860491529813859533">Hidupkan</translation>
 <translation id="5876385649737594562">Hidupkan untuk membuat pilihan</translation>
@@ -688,6 +694,7 @@
 <translation id="6318437367327684789">selamanya</translation>
 <translation id="6319207335391420837">Kemas kini perisian tegar pada <ph name="DEVICE_NAME" /></translation>
 <translation id="6321407676395378991">Hidupkan penyelamat skrin</translation>
+<translation id="6324916366299863871">Edit pintasan</translation>
 <translation id="6325525973963619867">Gagal</translation>
 <translation id="6331191339300272798">Tema gelap automatik</translation>
 <translation id="6340526405444716530">Pemperibadian</translation>
@@ -787,6 +794,7 @@
 <translation id="7103252855940681301">Peranti <ph name="INDEX" /> daripada <ph name="COUNT" /> bernama <ph name="NAME" />.</translation>
 <translation id="7107255225945990211">Pilih kerja seni eksklusif <ph name="PRODUCT_NAME" /></translation>
 <translation id="7108668606237948702">enter</translation>
+<translation id="7119389851461848805">kuasa</translation>
 <translation id="7130438335435247835">Nama Titik Capaian (APN)</translation>
 <translation id="7134436342991564651">{0,plural, =1{Pelayan nama}other{Pelayan nama}}</translation>
 <translation id="7135814714616751706">Pintasan carian</translation>
@@ -827,6 +835,7 @@
 <translation id="7375053625150546623">EAP</translation>
 <translation id="7388959671917308825">Pad sentuh terbina dalam</translation>
 <translation id="7397270852490618635">Matikan tema cerah</translation>
+<translation id="7401543881546089382">Padamkan pintasan</translation>
 <translation id="741244894080940828">penukaran</translation>
 <translation id="7415801143053185905">Kependaman HTTP sangat tinggi</translation>
 <translation id="7425178841057519191">{NUM_ROOL_APPS,plural,offset:2 =1{Pentadbir anda telah menetapkan <ph name="APP_NAME_1" /> untuk bermula secara automatik setiap kali anda log masuk.}=2{Pentadbir anda telah menetapkan <ph name="APP_NAME_1" /> dan <ph name="APP_NAME_2" /> untuk bermula secara automatik setiap kali anda log masuk.}=3{Pentadbir anda telah menetapkan <ph name="APP_NAME_1" />, <ph name="APP_NAME_2" /> dan <ph name="APP_NAME_3" /> untuk bermula secara automatik setiap kali anda log masuk.}other{Pentadbir anda telah menetapkan <ph name="APP_NAME_1" />, <ph name="APP_NAME_2" /> dan # apl lain untuk bermula secara automatik setiap kali anda log masuk.}}</translation>
@@ -865,6 +874,7 @@
 <translation id="7705524343798198388">VPN</translation>
 <translation id="7716280709122323042">WPA3</translation>
 <translation id="7718231387947923843">cahaya papan kekunci</translation>
+<translation id="7730077286107534951">Sesetengah maklumat akaun dan sistem mungkin dihantar kepada Google. Kami menggunakan maklumat ini untuk mengatasi masalah teknikal dan meningkatkan perkhidmatan kami, tertakluk pada <ph name="BEGIN_LINK2" />Dasar Privasi<ph name="END_LINK2" /> dan <ph name="BEGIN_LINK3" />Syarat Perkhidmatan<ph name="END_LINK3" /> kami. Akses <ph name="BEGIN_LINK1" />Bantuan Undang-undang<ph name="END_LINK1" /> untuk meminta perubahan kandungan.</translation>
 <translation id="773153675489693198">Kiraan kitaran</translation>
 <translation id="7747039790905080783">Kunci prakongsi</translation>
 <translation id="7752963721013053477">Fajar hingga senja - eksklusif</translation>
@@ -901,6 +911,7 @@
 <translation id="7978412674231730200">Kunci persendirian</translation>
 <translation id="7994702968232966508">Kaedah EAP</translation>
 <translation id="8004582292198964060">Penyemak Imbas</translation>
+<translation id="8017679124341497925">Pintasan diedit</translation>
 <translation id="802154636333426148">Muat turun gagal</translation>
 <translation id="8031884997696620457">HSPAPlus</translation>
 <translation id="80398733265834479">Dayakan mod warna automatik</translation>
@@ -941,6 +952,7 @@
 <translation id="8336739000755212683">Tukar imej akaun peranti</translation>
 <translation id="8347126826554447157"><ph name="SHORCTCUT1" /> atau <ph name="SHORCTCUT2" /></translation>
 <translation id="8347227221149377169">Tugas cetak</translation>
+<translation id="8349826889576450703">launcher</translation>
 <translation id="8351855506390808906">Titik sentuhan pemetaan kunci</translation>
 <translation id="8352772353338965963">Tambahkan akaun untuk berbilang log masuk. Semua akaun dilog masuk boleh diakses tanpa kata laluan, jadi ciri ini mesti digunakan dengan akaun yang dipercayai sahaja.</translation>
 <translation id="8364946094152050673">Pelayan tiada nama</translation>
@@ -1014,6 +1026,7 @@
 <translation id="8868741746785112895">GUID</translation>
 <translation id="8876270629542503161">Peranti ialah tablet.</translation>
 <translation id="8881098542468797602">Ujian berjaya</translation>
+<translation id="8892443466059986410">Batalkan pengeditan pintasan</translation>
 <translation id="8898840733695078011">Kekuatan isyarat</translation>
 <translation id="8909114361904403025">anak panah ke atas</translation>
 <translation id="8910721771319628100">Rangkaian lalai melebihi ambang kependaman</translation>
@@ -1036,6 +1049,7 @@
 <translation id="8998156756248178381">{NUM_ROOL_APPS,plural, =1{<ph name="APP_NAME_1" /> dimulakan secara automatik}other{# apl dimulakan secara automatik}}</translation>
 <translation id="8998289560386111590">Tidak tersedia pada peranti anda</translation>
 <translation id="9003704114456258138">Frekuensi</translation>
+<translation id="901834265349196618">e-mel</translation>
 <translation id="9024331582947483881">skrin penuh</translation>
 <translation id="9025198690966128418">Gunakan sebagai peranti peribadi</translation>
 <translation id="902638246363752736">Tetapan papan kekunci</translation>
@@ -1076,6 +1090,7 @@
 <translation id="945522503751344254">Hantar maklum balas</translation>
 <translation id="952992212772159698">Tidak diaktifkan</translation>
 <translation id="960719561871045870">Kod operator</translation>
+<translation id="966787709310836684">menu</translation>
 <translation id="979450713603643090">Merah jambu cerah</translation>
 <translation id="982713511914535780">Jalankan Ujian nyahcas</translation>
 <translation id="987264212798334818">Umum</translation>

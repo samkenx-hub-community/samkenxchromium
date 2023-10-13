@@ -23,7 +23,6 @@
 #include "chrome/browser/password_manager/chrome_password_manager_client.h"
 #include "chrome/browser/password_manager/password_store_factory.h"
 #include "chrome/browser/signin/signin_ui_util.h"
-#include "chrome/browser/ui/autofill/autofill_bubble_handler.h"
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -258,7 +257,18 @@ void ManagePasswordsUIController::OnAutomaticPasswordSave(
     std::unique_ptr<PasswordFormManagerForUI> form_manager) {
   DestroyPopups();
   save_fallback_timer_.Stop();
-  passwords_data_.OnAutomaticPasswordSave(std::move(form_manager));
+  if (base::FeatureList::IsEnabled(
+          password_manager::features::
+              kNewConfirmationBubbleForGeneratedPasswords)) {
+    passwords_data_.OnSubmittedGeneratedPassword(
+        form_manager->GetPendingCredentials().username_value.empty()
+            ? password_manager::ui::GENERATED_PASSWORD_CONFIRMATION_STATE
+            : password_manager::ui::CONFIRMATION_STATE,
+        std::move(form_manager));
+  } else {
+    passwords_data_.OnAutomaticPasswordSave(std::move(form_manager));
+  }
+
   bubble_status_ = BubbleStatus::SHOULD_POP_UP;
   UpdateBubbleAndIconVisibility();
 }
@@ -290,7 +300,7 @@ void ManagePasswordsUIController::OnPasswordAutofilled(
   }
   // There nothing to do if this controller is not attached to currently active
   // tab.
-  Browser* browser = chrome::FindBrowserWithWebContents(web_contents());
+  Browser* browser = chrome::FindBrowserWithTab(web_contents());
   if (!browser) {
     return;
   }
@@ -417,6 +427,20 @@ void ManagePasswordsUIController::OnBiometricAuthBeforeFillingDeclined() {
   UpdateBubbleAndIconVisibility();
 }
 
+void ManagePasswordsUIController::OnAddUsernameSaveClicked(
+    const std::u16string& username) {
+  CHECK(!dialog_controller_);
+  passwords_data_.form_manager()->OnUpdateUsernameFromPrompt(username);
+  save_fallback_timer_.Stop();
+
+  passwords_data_.form_manager()->Save();
+  passwords_data_.OnSubmittedGeneratedPassword(
+      password_manager::ui::CONFIRMATION_STATE, nullptr);
+  // After adding a new username, confirmation helium bubble should appear.
+  bubble_status_ = BubbleStatus::SHOULD_POP_UP;
+  UpdateBubbleAndIconVisibility();
+}
+
 void ManagePasswordsUIController::NotifyUnsyncedCredentialsWillBeDeleted(
     std::vector<password_manager::PasswordForm> unsynced_credentials) {
   passwords_data_.ProcessUnsyncedCredentialsWillBeDeleted(
@@ -502,10 +526,12 @@ ManagePasswordsUIController::GetPendingPassword() const {
   if (GetState() == password_manager::ui::AUTO_SIGNIN_STATE)
     return *GetCurrentForms()[0];
 
-  DCHECK(GetState() == password_manager::ui::PENDING_PASSWORD_STATE ||
-         GetState() == password_manager::ui::PENDING_PASSWORD_UPDATE_STATE ||
-         GetState() == password_manager::ui::CONFIRMATION_STATE ||
-         GetState() == password_manager::ui::CAN_MOVE_PASSWORD_TO_ACCOUNT_STATE)
+  CHECK(
+      GetState() == password_manager::ui::PENDING_PASSWORD_STATE ||
+      GetState() == password_manager::ui::PENDING_PASSWORD_UPDATE_STATE ||
+      GetState() == password_manager::ui::CONFIRMATION_STATE ||
+      GetState() == password_manager::ui::CAN_MOVE_PASSWORD_TO_ACCOUNT_STATE ||
+      GetState() == password_manager::ui::GENERATED_PASSWORD_CONFIRMATION_STATE)
       << GetState();
   password_manager::PasswordFormManagerForUI* form_manager =
       passwords_data_.form_manager();
@@ -625,6 +651,9 @@ void ManagePasswordsUIController::SavePassword(const std::u16string& username,
               Profile::FromBrowserContext(
                   web_contents()->GetBrowserContext()))) {
     sentiment_service->SavedPassword();
+    if (IsPendingPasswordPhished()) {
+      sentiment_service->PhishedPasswordUpdateFinished();
+    }
   }
 
   if (GetPasswordFormMetricsRecorder() && BubbleIsManualFallbackForSaving()) {
@@ -660,8 +689,7 @@ void ManagePasswordsUIController::SavePassword(const std::u16string& username,
   // The icon is to be updated after the bubble (either "Save password" or "Sign
   // in to Chrome") is closed.
   bubble_status_ = BubbleStatus::SHOWN_PENDING_ICON_UPDATE;
-  if (Browser* browser = chrome::FindBrowserWithWebContents(web_contents())) {
-    browser->window()->GetAutofillBubbleHandler()->OnPasswordSaved();
+  if (Browser* browser = chrome::FindBrowserWithTab(web_contents())) {
     if (browser->window()->MaybeShowFeaturePromo(
             feature_engagement::
                 kIPHPasswordsManagementBubbleAfterSaveFeature)) {
@@ -733,13 +761,13 @@ void ManagePasswordsUIController::ChooseCredential(
 
 void ManagePasswordsUIController::NavigateToPasswordManagerSettingsPage(
     password_manager::ManagePasswordsReferrer referrer) {
-  NavigateToManagePasswordsPage(
-      chrome::FindBrowserWithWebContents(web_contents()), referrer);
+  NavigateToManagePasswordsPage(chrome::FindBrowserWithTab(web_contents()),
+                                referrer);
 }
 
 void ManagePasswordsUIController::NavigateToPasswordCheckup(
     password_manager::PasswordCheckReferrer referrer) {
-  chrome::ShowPasswordCheck(chrome::FindBrowserWithWebContents(web_contents()));
+  chrome::ShowPasswordCheck(chrome::FindBrowserWithTab(web_contents()));
   password_manager::LogPasswordCheckReferrer(referrer);
 }
 
@@ -840,7 +868,7 @@ void ManagePasswordsUIController::
 
 void ManagePasswordsUIController::MaybeShowIOSPasswordPromo() {
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  Browser* browser = chrome::FindBrowserWithWebContents(web_contents());
+  Browser* browser = chrome::FindBrowserWithTab(web_contents());
   if (!browser) {
     return;
   }
@@ -881,7 +909,7 @@ void ManagePasswordsUIController::UpdateBubbleAndIconVisibility() {
     passwords_data_.OnInactive();
   }
 
-  Browser* browser = chrome::FindBrowserWithWebContents(web_contents());
+  Browser* browser = chrome::FindBrowserWithTab(web_contents());
   if (!browser)
     return;
   browser->window()->UpdatePageActionIcon(PageActionIconType::kManagePasswords);
@@ -903,7 +931,7 @@ CredentialLeakPrompt* ManagePasswordsUIController::CreateCredentialLeakPrompt(
 }
 
 bool ManagePasswordsUIController::HasBrowserWindow() const {
-  return chrome::FindBrowserWithWebContents(web_contents()) != nullptr;
+  return chrome::FindBrowserWithTab(web_contents()) != nullptr;
 }
 
 void ManagePasswordsUIController::PrimaryPageChanged(content::Page& page) {
@@ -936,7 +964,7 @@ base::TimeDelta ManagePasswordsUIController::GetTimeoutForSaveFallback() {
 
 void ManagePasswordsUIController::ShowBubbleWithoutUserInteraction() {
   DCHECK(IsAutomaticallyOpeningBubble());
-  Browser* browser = chrome::FindBrowserWithWebContents(web_contents());
+  Browser* browser = chrome::FindBrowserWithTab(web_contents());
   // Can be zero in the tests.
   if (!browser)
     return;
@@ -1082,6 +1110,13 @@ void ManagePasswordsUIController::CancelAnyOngoingBiometricAuth() {
     return;
   biometric_authenticator_->Cancel();
   biometric_authenticator_.reset();
+}
+
+bool ManagePasswordsUIController::IsPendingPasswordPhished() const {
+  const password_manager::PasswordForm& pending_form = GetPendingPassword();
+  return pending_form.password_issues.find(
+             password_manager::InsecureType::kPhished) !=
+         pending_form.password_issues.end();
 }
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(ManagePasswordsUIController);

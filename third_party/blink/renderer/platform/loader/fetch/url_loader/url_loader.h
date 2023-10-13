@@ -36,21 +36,18 @@
 #include <memory>
 
 #include "base/memory/scoped_refptr.h"
-#include "base/time/time.h"
-#include "mojo/public/cpp/bindings/pending_remote.h"
-#include "services/network/public/mojom/url_loader_factory.mojom-forward.h"
-#include "services/network/public/mojom/url_response_head.mojom-forward.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/mojom/loader/keep_alive_handle.mojom-blink.h"
 #include "third_party/blink/public/platform/web_common.h"
-#include "third_party/blink/public/platform/web_string.h"
 #include "third_party/blink/public/platform/web_url_request.h"
-#include "third_party/blink/public/platform/web_vector.h"
 #include "third_party/blink/renderer/platform/loader/fetch/loader_freeze_mode.h"
 #include "third_party/blink/renderer/platform/wtf/forward.h"
+#include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
+#include "third_party/blink/renderer/platform/wtf/vector.h"
 
 namespace base {
 class SingleThreadTaskRunner;
+class TimeDelta;
 class WaitableEvent;
 }  // namespace base
 
@@ -61,15 +58,15 @@ struct ResourceRequest;
 
 namespace blink {
 
-class ResourceLoadInfoNotifierWrapper;
 class BackForwardCacheLoaderHelper;
 class BlobDataHandle;
+class ResourceLoadInfoNotifierWrapper;
 class ResourceRequestSender;
-class WebURLRequestExtraData;
+class SecurityOrigin;
 class URLLoaderClient;
-class WebURLResponse;
-struct WebURLError;
 class URLLoaderThrottle;
+struct WebURLError;
+class WebURLResponse;
 
 class BLINK_PLATFORM_EXPORT URLLoader {
  public:
@@ -99,7 +96,7 @@ class BLINK_PLATFORM_EXPORT URLLoader {
   // |downloaded_blob|.
   virtual void LoadSynchronously(
       std::unique_ptr<network::ResourceRequest> request,
-      scoped_refptr<WebURLRequestExtraData> url_request_extra_data,
+      scoped_refptr<const SecurityOrigin> top_frame_origin,
       bool pass_response_pipe_to_client,
       bool no_mime_sniffing,
       base::TimeDelta timeout_interval,
@@ -118,7 +115,7 @@ class BLINK_PLATFORM_EXPORT URLLoader {
   // loader is disposed before it completes its work.
   virtual void LoadAsynchronously(
       std::unique_ptr<network::ResourceRequest> request,
-      scoped_refptr<WebURLRequestExtraData> url_request_extra_data,
+      scoped_refptr<const SecurityOrigin> top_frame_origin,
       bool no_mime_sniffing,
       std::unique_ptr<ResourceLoadInfoNotifierWrapper>
           resource_load_info_notifier_wrapper,

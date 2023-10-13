@@ -26,7 +26,7 @@ ReauthenticatorBridge::ReauthenticatorBridge(
     jint source)
     : java_bridge_(java_bridge) {
   device_reauth::DeviceAuthParams params(
-      base::Seconds(60), static_cast<device_reauth::DeviceAuthSource>(source));
+      base::Seconds(0), static_cast<device_reauth::DeviceAuthSource>(source));
 
   // TODO(crbug.com/1479361): Replace GetLastUsedProfile() when Android starts
   // supporting multiple profiles.
@@ -58,10 +58,9 @@ void ReauthenticatorBridge::Reauthenticate(JNIEnv* env) {
   // `this` notifies the authenticator when it is destructed, resulting in
   // the callback being reset by the authenticator. Therefore, it is safe
   // to use base::Unretained.
-  authenticator_->Authenticate(
-      base::BindOnce(&ReauthenticatorBridge::OnReauthenticationCompleted,
-                     base::Unretained(this)),
-      false);
+  authenticator_->AuthenticateWithMessage(
+      u"", base::BindOnce(&ReauthenticatorBridge::OnReauthenticationCompleted,
+                          base::Unretained(this)));
 }
 
 void ReauthenticatorBridge::OnReauthenticationCompleted(bool auth_succeeded) {

@@ -397,6 +397,8 @@ ui::mojom::blink::WindowOpenDisposition NavigationPolicyToDisposition(
       return ui::mojom::blink::WindowOpenDisposition::NEW_POPUP;
     case kNavigationPolicyPictureInPicture:
       return ui::mojom::blink::WindowOpenDisposition::NEW_PICTURE_IN_PICTURE;
+    case kNavigationPolicyLinkPreview:
+      NOTREACHED_NORETURN();
   }
   NOTREACHED() << "Unexpected NavigationPolicy";
   return ui::mojom::blink::WindowOpenDisposition::IGNORE_ACTION;
@@ -1286,10 +1288,9 @@ void WebViewImpl::ResizeViewWhileAnchored(
     LocalFrameView* frame_view = MainFrameImpl()->GetFrameView();
     gfx::Size old_size = frame_view->Size();
     UpdateICBAndResizeViewport(visible_viewport_size);
-    gfx::Size new_size = frame_view->Size();
-    frame_view->MarkFixedPositionObjectsForLayout(
-        old_size.width() != new_size.width(),
-        old_size.height() != new_size.height());
+    if (old_size != frame_view->Size()) {
+      frame_view->InvalidateLayoutForViewportConstrainedObjects();
+    }
   }
 
   fullscreen_controller_->UpdateSize();
@@ -2541,6 +2542,14 @@ void WebViewImpl::SetPageLifecycleStateInternal(
 
   UpdateViewTransitionState(restoring_from_bfcache, storing_in_bfcache,
                             page_restore_params);
+
+  if (RuntimeEnabledFeatures::PageRevealEventEnabled()) {
+    if (restoring_from_bfcache) {
+      if (auto* main_frame = DynamicTo<LocalFrame>(GetPage()->MainFrame())) {
+        main_frame->GetDocument()->EnqueuePageRevealEvent();
+      }
+    }
+  }
 }
 
 void WebViewImpl::UpdateViewTransitionState(
@@ -2559,18 +2568,12 @@ void WebViewImpl::UpdateViewTransitionState(
   LocalFrame* local_frame = To<LocalFrame>(GetPage()->MainFrame());
   DCHECK(local_frame);
 
-  if (restoring_from_bfcache) {
-    // When restoring from BFCache, start a transition if we have a view
-    // transition state.
-    if (page_restore_params->view_transition_state) {
-      if (auto* document = local_frame->GetDocument()) {
-        ViewTransitionSupplement::CreateFromSnapshotForNavigation(
-            *document, std::move(*page_restore_params->view_transition_state));
-      }
-    }
-
-    if (RuntimeEnabledFeatures::ViewTransitionOnNavigationEnabled()) {
-      local_frame->GetDocument()->EnqueueReadyToRenderEvent();
+  // When restoring from BFCache, start a transition if we have a view
+  // transition state.
+  if (restoring_from_bfcache && page_restore_params->view_transition_state) {
+    if (auto* document = local_frame->GetDocument()) {
+      ViewTransitionSupplement::CreateFromSnapshotForNavigation(
+          *document, std::move(*page_restore_params->view_transition_state));
     }
   }
 
@@ -3043,6 +3046,13 @@ void WebViewImpl::DidAccessInitialMainDocument() {
   DCHECK(local_main_frame_host_remote_);
   local_main_frame_host_remote_->DidAccessInitialMainDocument();
 }
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+void WebViewImpl::SetResizable(bool resizable) {
+  DCHECK(local_main_frame_host_remote_);
+  local_main_frame_host_remote_->SetResizable(resizable);
+}
+#endif
 
 void WebViewImpl::UpdateTargetURL(const WebURL& url,
                                   const WebURL& fallback_url) {

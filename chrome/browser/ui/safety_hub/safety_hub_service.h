@@ -112,10 +112,16 @@ class SafetyHubService : public KeyedService,
   // KeyedService implementation.
   void Shutdown() override;
 
+  // Checks if the repeating timer is running.
+  bool IsTimerRunningForTesting();
+
  protected:
   // Triggers the repeated update task that updates the state of the Safety Hub
   // service.
   void StartRepeatedUpdates();
+
+  // Stops the repeating timer to stop recurring tasks.
+  void StopTimer();
 
   // SafetyHubService overrides.
 
@@ -126,6 +132,10 @@ class SafetyHubService : public KeyedService,
   // The value returned by this function determines the interval of how often
   // the Update function will be called.
   virtual base::TimeDelta GetRepeatedUpdateInterval() = 0;
+
+  // TODO(crbug.com/1443466): Not each service needs to execute a task in the
+  // background. The SafetyHubService class should be redesigned such that
+  // there's no needless boilerplate code needed in this case.
 
   // Should return the background task that will be executed, containing the
   // computation-heavy part of the update process. This task should be static
@@ -149,6 +159,9 @@ class SafetyHubService : public KeyedService,
   // update process (i.e. `UpdateOnUIThread()`).
   virtual std::unique_ptr<SafetyHubService::Result>
   InitializeLatestResultImpl() = 0;
+
+  // Updates the latest result to the provided value.
+  void SetLatestResult(std::unique_ptr<SafetyHubService::Result> result);
 
  private:
   FRIEND_TEST_ALL_PREFIXES(SafetyHubServiceTest, ManageObservers);

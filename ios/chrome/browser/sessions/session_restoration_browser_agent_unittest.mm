@@ -14,8 +14,8 @@
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper_delegate.h"
 #import "ios/chrome/browser/sessions/ios_chrome_session_tab_helper.h"
 #import "ios/chrome/browser/sessions/session_restoration_browser_agent.h"
-#import "ios/chrome/browser/sessions/session_restoration_observer.h"
 #import "ios/chrome/browser/sessions/session_window_ios.h"
+#import "ios/chrome/browser/sessions/test_session_restoration_observer.h"
 #import "ios/chrome/browser/sessions/test_session_service.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
@@ -27,7 +27,6 @@
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/fake_authentication_service_delegate.h"
 #import "ios/chrome/browser/tabs/features.h"
-#import "ios/chrome/browser/web_state_list/web_usage_enabler/web_usage_enabler_browser_agent.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ios/web/public/navigation/referrer.h"
@@ -127,22 +126,6 @@ SessionWindowIOS* CreateSessionWindow(SessionInfo<N> session_info) {
                                       selectedIndex:session_info.active_index];
 }
 
-class TestRestorationObserver : public SessionRestorationObserver {
- public:
-  bool restore_started() { return restore_started_; }
-  int restored_web_states_count() { return restored_web_states_count_; }
-
- private:
-  void WillStartSessionRestoration() override { restore_started_ = true; }
-  void SessionRestorationFinished(
-      const std::vector<web::WebState*>& restored_web_states) override {
-    restored_web_states_count_ = restored_web_states.size();
-  }
-
-  bool restore_started_ = false;
-  int restored_web_states_count_ = -1;
-};
-
 class SessionRestorationBrowserAgentTest : public PlatformTest {
  public:
   SessionRestorationBrowserAgentTest() {
@@ -172,11 +155,6 @@ class SessionRestorationBrowserAgentTest : public PlatformTest {
     browser_ = std::make_unique<TestBrowser>(
         chrome_browser_state_.get(),
         std::make_unique<BrowserWebStateListDelegate>());
-    // Web usage is disabled during these tests.
-    WebUsageEnablerBrowserAgent::CreateForBrowser(browser_.get());
-    web_usage_enabler_ =
-        WebUsageEnablerBrowserAgent::FromBrowser(browser_.get());
-    web_usage_enabler_->SetWebUsageEnabled(false);
   }
 
   void TearDown() override {
@@ -237,7 +215,6 @@ class SessionRestorationBrowserAgentTest : public PlatformTest {
 
   __strong NSString* session_identifier_ = nil;
   TestSessionService* test_session_service_;
-  WebUsageEnablerBrowserAgent* web_usage_enabler_;
   SessionRestorationBrowserAgent* session_restoration_agent_;
 };
 
@@ -830,7 +807,7 @@ TEST_F(SessionRestorationBrowserAgentTest, ObserverCalledWithRestore) {
                     /*pinned=*/false,
                     /*background=*/false);
 
-  TestRestorationObserver observer;
+  TestSessionRestorationObserver observer;
   session_restoration_agent_->AddObserver(&observer);
 
   SessionWindowIOS* window =

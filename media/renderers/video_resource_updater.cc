@@ -317,12 +317,13 @@ viz::SharedImageFormat GetRGBSharedImageFormat(VideoPixelFormat format) {
 }
 
 viz::SharedImageFormat GetSingleChannel8BitFormat(
-    const gpu::Capabilities& caps) {
-  if (caps.texture_rg && !caps.disable_r8_shared_images) {
+    const gpu::Capabilities& caps,
+    const gpu::SharedImageCapabilities& shared_image_caps) {
+  if (caps.texture_rg && !shared_image_caps.disable_r8_shared_images) {
     return viz::SinglePlaneFormat::kR_8;
   }
 
-  DCHECK(caps.supports_luminance_shared_images);
+  DCHECK(shared_image_caps.supports_luminance_shared_images);
   return viz::SinglePlaneFormat::kLUMINANCE_8;
 }
 
@@ -835,18 +836,22 @@ viz::SharedImageFormat VideoResourceUpdater::YuvSharedImageFormat(
     int bits_per_channel) {
   DCHECK(context_provider_);
   const auto& caps = context_provider_->ContextCapabilities();
+  const auto& shared_image_caps =
+      context_provider_->SharedImageInterface()->GetCapabilities();
   if (caps.disable_one_component_textures)
     return PaintCanvasVideoRenderer::GetRGBPixelsOutputFormat();
   if (bits_per_channel <= 8) {
-    DCHECK(caps.supports_luminance_shared_images || caps.texture_rg);
-    return GetSingleChannel8BitFormat(caps);
+    DCHECK(shared_image_caps.supports_luminance_shared_images ||
+           caps.texture_rg);
+    return GetSingleChannel8BitFormat(caps, shared_image_caps);
   }
   if (use_r16_texture_ && caps.texture_norm16)
     return viz::SinglePlaneFormat::kR_16;
-  if (caps.texture_half_float_linear && caps.supports_luminance_shared_images) {
+  if (caps.texture_half_float_linear &&
+      shared_image_caps.supports_luminance_shared_images) {
     return viz::SinglePlaneFormat::kLUMINANCE_F16;
   }
-  return GetSingleChannel8BitFormat(caps);
+  return GetSingleChannel8BitFormat(caps, shared_image_caps);
 }
 
 bool VideoResourceUpdater::ReallocateUploadPixels(size_t needed_size) {
@@ -994,7 +999,8 @@ void VideoResourceUpdater::CopyHardwarePlane(
   auto transferable_resource = viz::TransferableResource::MakeGpu(
       hardware_resource->mailbox(), GL_TEXTURE_2D, sync_token,
       output_plane_resource_size, copy_si_format,
-      false /* is_overlay_candidate */);
+      false /* is_overlay_candidate */,
+      viz::TransferableResource::ResourceSource::kVideo);
   transferable_resource.color_space = resource_color_space;
   external_resources->resources.push_back(std::move(transferable_resource));
 
@@ -1066,7 +1072,8 @@ VideoFrameExternalResources VideoResourceUpdater::CreateForHardwarePlanes(
       auto transfer_resource = viz::TransferableResource::MakeGpu(
           mailbox_holder.mailbox, mailbox_holder.texture_target,
           mailbox_holder.sync_token, plane_size, si_formats[i],
-          video_frame->metadata().allow_overlay);
+          video_frame->metadata().allow_overlay,
+          viz::TransferableResource::ResourceSource::kVideo);
       transfer_resource.color_space = resource_color_space;
       transfer_resource.color_space_when_sampled =
           resource_color_space_when_sampled;
@@ -1337,7 +1344,8 @@ VideoFrameExternalResources VideoResourceUpdater::CreateForSoftwarePlanes(
       external_resources.type = VideoFrameResourceType::RGBA_PREMULTIPLIED;
       transferable_resource = viz::TransferableResource::MakeSoftware(
           software_resource->shared_bitmap_id(),
-          software_resource->resource_size(), plane_resource->si_format());
+          software_resource->resource_size(), plane_resource->si_format(),
+          viz::TransferableResource::ResourceSource::kVideo);
     } else {
       HardwarePlaneResource* hardware_resource = plane_resource->AsHardware();
       external_resources.type = VideoFrameResourceType::RGBA;
@@ -1346,7 +1354,8 @@ VideoFrameExternalResources VideoResourceUpdater::CreateForSoftwarePlanes(
       transferable_resource = viz::TransferableResource::MakeGpu(
           hardware_resource->mailbox(), hardware_resource->texture_target(),
           sync_token, hardware_resource->resource_size(), output_si_format,
-          hardware_resource->overlay_candidate());
+          hardware_resource->overlay_candidate(),
+          viz::TransferableResource::ResourceSource::kVideo);
     }
 
     transferable_resource.color_space = output_color_space;
@@ -1527,7 +1536,8 @@ VideoFrameExternalResources VideoResourceUpdater::CreateForSoftwarePlanes(
         plane_resource->resource_size(),
         i == 0 ? output_si_format
                : subplane_si_format.value_or(output_si_format),
-        plane_resource->overlay_candidate());
+        plane_resource->overlay_candidate(),
+        viz::TransferableResource::ResourceSource::kVideo);
     transferable_resource.color_space = output_color_space;
     external_resources.resources.push_back(std::move(transferable_resource));
     external_resources.release_callbacks.push_back(base::BindOnce(

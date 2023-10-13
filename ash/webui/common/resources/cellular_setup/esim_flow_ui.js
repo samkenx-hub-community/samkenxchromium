@@ -843,7 +843,8 @@ Polymer({
   onForwardNavigationRequested_() {
     if (this.state_ === ESimUiState.ACTIVATION_CODE_ENTRY_READY ||
         this.state_ === ESimUiState.CONFIRMATION_CODE_ENTRY_READY ||
-        this.state_ === ESimUiState.PROFILE_SEARCH_CONSENT) {
+        this.state_ === ESimUiState.PROFILE_SEARCH_CONSENT ||
+        this.state_ === ESimUiState.PROFILE_SELECTION) {
       this.navigateForward();
     }
   },
@@ -869,6 +870,10 @@ Polymer({
 
   /** @private */
   getLoadingMessage_() {
+    if (this.smdsSupportEnabled_) {
+      return this.i18n('profileLoadingPageMessage');
+    }
+
     return this.hasHadActiveCellularNetwork_ ?
         this.i18n('eSimProfileDetectDuringActiveCellularConnectionMessage') :
         this.i18n('eSimProfileDetectMessage');
@@ -885,6 +890,19 @@ Polymer({
 
     if (this.selectedESimPageName_ === ESimPageName.PROFILE_DISCOVERY_CONSENT) {
       return this.i18n('profileDiscoveryConsentTitle');
+    }
+
+    if (this.smdsSupportEnabled_) {
+      if (this.selectedESimPageName_ === ESimPageName.PROFILE_DISCOVERY) {
+        return this.i18n('profileDiscoveryPageTitle');
+      }
+
+      if (this.selectedESimPageName_ == ESimPageName.CONFIRMATION_CODE) {
+        return this.i18n('confimationCodePageTitle');
+      }
+      if (this.selectedESimPageName_ == ESimPageName.PROFILE_LOADING) {
+        return this.i18n('profileLoadingPageTitle');
+      }
     }
 
     return '';

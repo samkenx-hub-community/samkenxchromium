@@ -14,6 +14,7 @@ source_set("utils") {
     "utils/pre_target_handler.h",
     "utils/preset_text_query.cc",
     "utils/preset_text_query.h",
+    "utils/utils.cc",
     "utils/utils.h",
   ]
 
@@ -22,6 +23,7 @@ source_set("utils") {
     "//chrome/browser/ui/views/editor_menu/vector_icons",
     "//components/vector_icons",
     "//ui/aura",
+    "//ui/display",
     "//ui/events",
     "//ui/gfx",
     "//ui/views",
@@ -37,6 +39,7 @@ source_set("editor_menu") {
   deps = [
     ":utils",
     ":views",
+    "//ash/webui/settings/public/constants:mojom",
     "//base",
     "//chromeos/components/editor_menu/public/cpp",
     "//chromeos/crosapi/mojom",
@@ -57,6 +60,8 @@ source_set("views") {
   sources = [
     "editor_menu_chip_view.cc",
     "editor_menu_chip_view.h",
+    "editor_menu_gradient_badge.cc",
+    "editor_menu_gradient_badge.h",
     "editor_menu_promo_card_view.cc",
     "editor_menu_promo_card_view.h",
     "editor_menu_textfield_view.cc",
@@ -69,11 +74,11 @@ source_set("views") {
   deps = [
     ":utils",
     "//base",
+    "//chrome/browser/ui/views/editor_menu/vector_icons",
     "//chromeos/strings:strings_grit",
     "//components/vector_icons",
     "//ui/aura",
     "//ui/base",
-    "//ui/chromeos/styles:cros_tokens_color_mappings_generator",
     "//ui/gfx",
     "//ui/views",
   ]

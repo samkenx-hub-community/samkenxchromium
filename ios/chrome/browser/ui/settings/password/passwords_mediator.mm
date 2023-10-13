@@ -9,19 +9,19 @@
 #import "components/feature_engagement/public/feature_constants.h"
 #import "components/feature_engagement/public/tracker.h"
 #import "components/password_manager/core/browser/leak_detection_dialog_utils.h"
-#import "components/password_manager/core/browser/password_manager_util.h"
+#import "components/password_manager/core/browser/password_manager_client.h"
 #import "components/password_manager/core/browser/password_sync_util.h"
 #import "components/password_manager/core/common/password_manager_features.h"
 #import "components/sync/service/sync_service_utils.h"
 #import "ios/chrome/browser/favicon/favicon_loader.h"
 #import "ios/chrome/browser/net/crurl.h"
-#import "ios/chrome/browser/passwords/password_check_observer_bridge.h"
-#import "ios/chrome/browser/passwords/password_checkup_utils.h"
-#import "ios/chrome/browser/passwords/password_manager_util_ios.h"
-#import "ios/chrome/browser/passwords/save_passwords_consumer.h"
+#import "ios/chrome/browser/passwords/model/password_check_observer_bridge.h"
+#import "ios/chrome/browser/passwords/model/password_checkup_utils.h"
+#import "ios/chrome/browser/passwords/model/password_manager_util_ios.h"
+#import "ios/chrome/browser/passwords/model/save_passwords_consumer.h"
 #import "ios/chrome/browser/signin/authentication_service.h"
-#import "ios/chrome/browser/sync/sync_observer_bridge.h"
-#import "ios/chrome/browser/sync/sync_setup_service.h"
+#import "ios/chrome/browser/sync/model/sync_observer_bridge.h"
+#import "ios/chrome/browser/sync/model/sync_setup_service.h"
 #import "ios/chrome/browser/ui/settings/password/account_storage_utils.h"
 #import "ios/chrome/browser/ui/settings/password/passwords_consumer.h"
 #import "ios/chrome/browser/ui/settings/password/passwords_mediator+private.h"
@@ -121,8 +121,8 @@ using password_manager::features::IsPasswordCheckupEnabled;
   _currentState = _passwordCheckManager->GetPasswordCheckState();
   [self updateConsumerPasswordCheckState:_currentState];
   [self.consumer
-      setSavingPasswordsToAccount:password_manager_util::GetPasswordSyncState(
-                                      _syncService) !=
+      setSavingPasswordsToAccount:password_manager::sync_util::
+                                      GetPasswordSyncState(_syncService) !=
                                   password_manager::SyncState::kNotSyncing];
 }
 
@@ -418,20 +418,20 @@ using password_manager::features::IsPasswordCheckupEnabled;
 
 - (void)faviconForPageURL:(CrURL*)URL
                completion:(void (^)(FaviconAttributes*))completion {
-  BOOL isPasswordSyncEnabled =
-      password_manager_util::IsPasswordSyncNormalEncryptionEnabled(
+  BOOL fallbackToGoogleServer =
+      password_manager_util::IsSavingPasswordsToAccountWithNormalEncryption(
           _syncService);
-  _faviconLoader->FaviconForPageUrl(
-      URL.gurl, kDesiredMediumFaviconSizePt, kMinFaviconSizePt,
-      /*fallback_to_google_server=*/isPasswordSyncEnabled, completion);
+  _faviconLoader->FaviconForPageUrl(URL.gurl, kDesiredMediumFaviconSizePt,
+                                    kMinFaviconSizePt, fallbackToGoogleServer,
+                                    completion);
 }
 
 #pragma mark - SyncObserverModelBridge
 
 - (void)onSyncStateChanged {
   [self.consumer
-      setSavingPasswordsToAccount:password_manager_util::GetPasswordSyncState(
-                                      _syncService) !=
+      setSavingPasswordsToAccount:password_manager::sync_util::
+                                      GetPasswordSyncState(_syncService) !=
                                   password_manager::SyncState::kNotSyncing];
 }
 

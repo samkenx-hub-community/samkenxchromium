@@ -105,10 +105,7 @@ class CORE_EXPORT LayoutView : public LayoutNGBlockFlow {
 
   bool IsChildAllowed(LayoutObject*, const ComputedStyle&) const override;
 
-  void UpdateLayout() override {
-    NOT_DESTROYED();
-    NOTREACHED_NORETURN();
-  }
+  void UpdateLayout() final;
   LayoutUnit ComputeMinimumWidth();
 
   // Based on LocalFrameView::LayoutSize, but:
@@ -190,6 +187,7 @@ class CORE_EXPORT LayoutView : public LayoutNGBlockFlow {
     NOT_DESTROYED();
     return fragmentation_context_;
   }
+  bool IsFragmentationContextRoot() const override;
 
   void SetDefaultPageDescription(const WebPrintPageDescription& description) {
     NOT_DESTROYED();
@@ -223,11 +221,29 @@ class CORE_EXPORT LayoutView : public LayoutNGBlockFlow {
   PhysicalSize PageAreaSize(wtf_size_t page_index,
                             const AtomicString& page_name) const;
 
-  // TODO(1229581): Make non-virtual.
-  virtual AtomicString NamedPageAtIndex(wtf_size_t page_index) const = 0;
+  AtomicString NamedPageAtIndex(wtf_size_t page_index) const;
 
   PhysicalRect DocumentRect() const;
 
+  // FIXME: This is a work around because the current implementation of counters
+  // requires walking the entire tree repeatedly and most pages don't actually
+  // use either feature so we shouldn't take the performance hit when not
+  // needed. Long term we should rewrite the counter code.
+  // TODO(xiaochengh): Or do we keep it as is?
+  void AddLayoutCounter() {
+    NOT_DESTROYED();
+    layout_counter_count_++;
+    SetNeedsMarkerOrCounterUpdate();
+  }
+  void RemoveLayoutCounter() {
+    NOT_DESTROYED();
+    DCHECK_GT(layout_counter_count_, 0u);
+    layout_counter_count_--;
+  }
+  bool HasLayoutCounters() {
+    NOT_DESTROYED();
+    return layout_counter_count_;
+  }
   void AddLayoutListItem() {
     NOT_DESTROYED();
     layout_list_item_count_++;
@@ -333,7 +349,7 @@ class CORE_EXPORT LayoutView : public LayoutNGBlockFlow {
 
   LayoutViewTransitionRoot* GetViewTransitionRoot() const;
 
- protected:
+ private:
   void StyleDidChange(StyleDifference, const ComputedStyle* old_style) override;
   int ViewLogicalWidthForBoxSizing() const {
     NOT_DESTROYED();
@@ -349,7 +365,6 @@ class CORE_EXPORT LayoutView : public LayoutNGBlockFlow {
   Member<HeapHashSet<Member<const LayoutObject>>>
       initial_containing_block_resize_handled_list_;
 
- private:
   bool CanHaveChildren() const override;
   void UpdateFromStyle() override;
 
@@ -360,7 +375,6 @@ class CORE_EXPORT LayoutView : public LayoutNGBlockFlow {
     return false;
   }
 
- protected:
   // Default page description (size and margins):
   WebPrintPageDescription default_page_description_;
 
@@ -380,8 +394,8 @@ class CORE_EXPORT LayoutView : public LayoutNGBlockFlow {
 
   Member<ViewFragmentationContext> fragmentation_context_;
 
- private:
   Member<LocalFrameView> frame_view_;
+  unsigned layout_counter_count_ = 0;
   unsigned layout_list_item_count_ = 0;
   bool needs_marker_counter_update_ = false;
 

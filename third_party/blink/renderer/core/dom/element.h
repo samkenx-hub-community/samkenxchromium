@@ -115,6 +115,7 @@ class ShadowRoot;
 class ShadowRootInit;
 class SpaceSplitString;
 class StyleEngine;
+class StyleHighlightData;
 class StylePropertyMap;
 class StylePropertyMapReadOnly;
 class StyleRecalcContext;
@@ -924,6 +925,15 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   const ComputedStyle* StyleForPseudoElement(const StyleRecalcContext&,
                                              const StyleRequest&);
 
+  // This is used by ResolveStyle with Highlight Inheritance when caching
+  // is not used.
+  const ComputedStyle* StyleForHighlightPseudoElement(
+      const StyleRecalcContext& style_recalc_context,
+      const ComputedStyle* highlight_parent,
+      const ComputedStyle& originating_style,
+      const PseudoId pseudo_id,
+      const AtomicString& pseudo_argument = g_null_atom);
+
   // Returns the ComputedStyle after applying the declarations in the @try block
   // at the given index. Returns nullptr if the current element doesn't use
   // position fallback, or if the index is out of bound.
@@ -1218,6 +1228,14 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // https://drafts.csswg.org/css-anchor-1/#implicit-anchor-element
   Element* ImplicitAnchorElement();
 
+  void UpdateDirectionalityAndDescendant(TextDirection direction);
+  void UpdateDescendantHasDirAutoAttribute(bool has_dir_auto);
+  enum class UpdateAncestorTraversal {
+    IncludeSelf,  // self and ancestors
+    ExcludeSelf,  // ancestors, but not self
+  };
+  void UpdateAncestorWithDirAuto(UpdateAncestorTraversal traversal);
+
  protected:
   bool HasElementData() const { return element_data_; }
   const ElementData* GetElementData() const { return element_data_.Get(); }
@@ -1262,10 +1280,10 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // element supports focus if, e.g. it has a tabindex attribute, or it is
   // editable, or other conditions. Note that the element might *support* focus
   // while not *being focusable*, for example if the element is disconnected
-  // from the document. This method can be called when layout is not clean, and
-  // it will *not* update layout itself.
-  // This method should stay protected - it is only for use by the Element
-  // class hierarchy. Outside callers should use `IsFocusable()` and/or
+  // from the document. This method can be called when layout is not clean,
+  // but in some cases it might run a style/layout lifecycle update on the
+  // document. This method should stay protected - it is only for use by the
+  // Element class hierarchy. Outside callers should use `IsFocusable()` and/or
   // `IsKeyboardFocusable()`.
   virtual bool SupportsFocus() const;
 
@@ -1282,8 +1300,6 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // This method cannot be moved to LayoutObject because some focusable nodes
   // don't have layoutObjects. e.g., HTMLOptionElement.
   virtual bool IsFocusableStyle() const;
-  // Contains the base logic for IsFocusableStyle.
-  bool IsBaseElementFocusableStyle() const;
   // Similar to IsFocusableStyle, except that it will ensure that any deferred
   // work to create layout objects is completed (e.g. in display-locked trees).
   bool IsFocusableStyleAfterUpdate() const;
@@ -1323,6 +1339,14 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // Mark for style invalidation/recalc for :lang() selectors to pick up the
   // changes.
   void LangAttributeChanged();
+
+  TextDirection ParentDirectionality() const;
+  void AdjustDirectionalityIfNeededAfterChildrenChanged(
+      const ChildrenChange& change);
+  template <typename Traversal>
+  absl::optional<TextDirection> ResolveAutoDirectionality(
+      bool& is_deferred,
+      Node* stay_within) const;
 
  private:
   friend class AXObject;
@@ -1370,6 +1394,31 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
       const StyleRecalcContext&,
       PseudoId,
       const AtomicString& pseudo_argument = g_null_atom);
+
+  enum class HighlightRecalc {
+    // No highlight recalc is needed.
+    kNone,
+    // The HighlightData from the old style can be re-used.
+    kReuse,
+    // The HighlightData contains font relative units and may need recalc.
+    kFontRelative,
+    // Highlights must be calculated in full.
+    kFull,
+  };
+
+  // Determine whether pseudo highlight style must be recalculated,
+  // either because full recalc is required or the parent has font relative
+  // units and the parent's font size differs from the originating element.
+  bool ShouldRecalcHighlightPseudoStyle(HighlightRecalc,
+                                        const ComputedStyle*,
+                                        const ComputedStyle&);
+
+  // Recalc those custom highlights that require it.
+  void RecalcCustomHighlightPseudoStyle(const StyleRecalcContext&,
+                                        HighlightRecalc,
+                                        ComputedStyleBuilder&,
+                                        const StyleHighlightData*,
+                                        const ComputedStyle&);
 
   // Recalculate the ComputedStyle for this element and return a
   // StyleRecalcChange for propagation/traversal into child nodes.
@@ -1447,6 +1496,7 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   }
 
   void RecomputeDirectionFromParent();
+  bool RecalcSelfOrAncestorHasDirAuto();
 
   ShadowRoot& CreateAndAttachShadowRoot(ShadowRootType);
 
@@ -1584,15 +1634,6 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   bool ShouldUpdateLastRememberedInlineSize() const;
 
   bool IsStyleAttributeChangeAllowed(const AtomicString& style_string);
-
-  enum class HighlightRecalc {
-    // No highlight recalc is needed.
-    kNone,
-    // The HighlightData from the old style can be re-used.
-    kReuse,
-    // Highlights must be calculated in full.
-    kFull,
-  };
 
   // Highlight pseudos inherit all properties from the corresponding highlight
   // in the parent, but virtually all existing content uses universal rules

@@ -43,7 +43,7 @@ export class DirectoryTreePageObject {
    */
   static async create(appId, remoteCall) {
     const useNewTree =
-        await sendTestMessage({name: 'isFilesExperimentalEnabled'}) === 'true';
+        await sendTestMessage({name: 'isNewDirectoryTreeEnabled'}) === 'true';
     const directoryTree =
         new DirectoryTreePageObject(appId, remoteCall, useNewTree);
     remoteCall.waitForElement(appId, directoryTree.rootSelector);
@@ -890,6 +890,16 @@ export class DirectoryTreePageObject {
   }
 
   /**
+   * Select the tree item by its path.
+   *
+   * @param {string} path Full path of the tree item.
+   * @return {!Promise<void>}
+   */
+  async selectItemByPath(path) {
+    await this.selectItem_(this.selectors_.itemByPath(path));
+  }
+
+  /**
    * Select the group root tree item (e.g. entry list) by its type.
    *
    * @param {string} type Type of the tree item.
@@ -1314,10 +1324,11 @@ class DirectoryTreeSelectors_ {
    */
   itemItselfByType(type, isPlaceholder) {
     if (this.useNewTree) {
-      return isPlaceholder ? `${this.item}[data-navigation-key^="${
-                                 FAKE_ENTRY_PATH_PREFIX}"][icon="${type}"]` :
-                             `${this.item}[data-navigation-key^="${
-                                 REAL_ENTRY_PATH_PREFIX}"][icon="${type}"]`;
+      return isPlaceholder ?
+          `${this.item}[data-navigation-key^="${
+              FAKE_ENTRY_PATH_PREFIX}"][icon="${type}"]` :
+          `${this.item}[data-navigation-key^="${
+              REAL_ENTRY_PATH_PREFIX}"][volume-type-for-testing="${type}"]`;
     }
     return isPlaceholder ?
         `${this.item}:has(> .tree-row [root-type-icon="${type}"])` :

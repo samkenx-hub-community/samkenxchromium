@@ -6938,7 +6938,10 @@ class FedCmSpecificTest(ChromeDriverBaseTestWithWebServer):
             'enable-experimental-web-platform-features']
     self._driver = self.CreateDriver(
         accept_insecure_certs=True,
-        chrome_switches=self.chrome_switches)
+        chrome_switches=self.chrome_switches +
+            ["--enable-features=FedCmIdpSigninStatusEnabled"])
+
+    self._driver.Load(self._url_prefix + "/mark-signed-in")
 
   def FedCmDialogCondition(self):
     try:
@@ -6982,15 +6985,8 @@ class FedCmSpecificTest(ChromeDriverBaseTestWithWebServer):
     token = self._driver.ExecuteScript('return getResult()')
     self.assertEqual('Error: NetworkError: Error retrieving a token.', token)
 
-  def testConfirmIdpSignin(self):
-    self._driver = self.CreateDriver(
-        accept_insecure_certs=True,
-        chrome_switches=self.chrome_switches +
-            ["--enable-features=FedCmIdpSigninStatusEnabled"])
-
+  def testConfirmIdpLogin(self):
     self._accounts = ""
-
-    self._driver.Load(self._url_prefix + "/mark-signed-in")
 
     self._driver.Load(self._https_server.GetUrl() + "/fedcm.html")
 
@@ -7002,12 +6998,12 @@ class FedCmSpecificTest(ChromeDriverBaseTestWithWebServer):
     self.assertTrue(self.WaitForCondition(self.FedCmDialogCondition))
 
     accounts = self._driver.GetAccounts()
-    self.assertEqual("ConfirmIdpSignin", self._driver.GetDialogType())
+    self.assertEqual("ConfirmIdpLogin", self._driver.GetDialogType())
     self.assertEqual(0, len(accounts))
 
     self._accounts = self._default_accounts
 
-    self._driver.ConfirmIdpSignin(self._vendor_id)
+    self._driver.ConfirmIdpLogin(self._vendor_id)
 
     self.assertTrue(self.WaitForCondition(self.FedCmDialogCondition))
     accounts = self._driver.GetAccounts()

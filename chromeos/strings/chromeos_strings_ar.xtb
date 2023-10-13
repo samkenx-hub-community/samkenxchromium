@@ -24,6 +24,7 @@
 <translation id="1154390310959620237">يمكنك تخصيص 5 اختصارات فقط. يجب حذف أحد الاختصارات لإضافة اختصار جديد.</translation>
 <translation id="1164939766849482256">شاشة استراحة تعرض منظرًا من الفجر إلى الليل</translation>
 <translation id="1167755866710282443">افتح القائمة لتخصيص المفاتيح. اسحب القائمة لنقلها.</translation>
+<translation id="1174073918202301297">تمت إضافة الاختصار</translation>
 <translation id="1175697296044146566">تتم إدارة جهاز <ph name="DEVICE_TYPE" /> هذا من خلال <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">إشارة متوسطة (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">إزالة</translation>
@@ -91,6 +92,7 @@
 <translation id="1643449475550628585">تغيير صورة الخلفية يوميًا</translation>
 <translation id="1644574205037202324">السجل</translation>
 <translation id="1651925268237749928">لقد اختَرت ألبومًا مشترَكًا. يمكن للمستخدمين الآخرين إضافة صور أو تغييرها. قد يتم استخدام صور غير متوفّرة حاليًا في هذا الألبوم لتعيينها كخلفية.</translation>
+<translation id="1661865805917886535">‏قد يتم إرسال بعض المعلومات عن الحساب والنظام إلى Google. ونستخدم هذه المعلومات للمساعدة في حل المشاكل التقنية وتحسين خدماتنا بما يتوافق مع سياسة الخصوصية (<ph name="PRIVACYPOLICYURL" />) وبنود الخدمة (<ph name="TERMSOFSERVICEURL" />) لدينا. لطلب تغيير المحتوى، يُرجى الانتقال إلى صفحة "المساعدة القانونية" (<ph name="LEGALHELPPAGEURL" />).</translation>
 <translation id="1662989795263954667">توقّفت الطابعة - نفد الحبر</translation>
 <translation id="1664796644829245314">معاينة <ph name="PREVIEW_OBJECT" /></translation>
 <translation id="1668469839109562275">الشبكة الافتراضية الخاصة المُدمجة</translation>
@@ -117,6 +119,7 @@
 <translation id="1768959921651994223">نوع المصادقة</translation>
 <translation id="1776228893584526149">الدرجة اللونية للخلفية</translation>
 <translation id="1782199038061388045">الترجمة</translation>
+<translation id="1788485524395674731">يتولّى المشرف إدارة هذا التطبيق</translation>
 <translation id="1792647875738159689">جارٍ إلغاء المسح الضوئي</translation>
 <translation id="1801418420130173017">إيقاف المظهر الداكن</translation>
 <translation id="1807246157184219062">فاتح</translation>
@@ -131,7 +134,6 @@
 <translation id="1871569928317311284">إيقاف تشغيل المظهر الداكن</translation>
 <translation id="1874612839560830905">‏وحدة النقل العظمى (MTU)</translation>
 <translation id="188114911237521550">إيقاف تشغيل الوضع المُعتِم</translation>
-<translation id="1881188606372070653">‏يُرجى الانتقال إلى <ph name="BEGIN_LINK1" />صفحة المساعدة القانونية<ph name="END_LINK1" /> لطلب تغيير المحتوى لأسباب قانونية. قد يتم إرسال بعض المعلومات عن الحساب والنظام إلى Google. وسنستعين بالمعلومات التي تصلنا منك لحل المشاكل التقنية وتحسين خدماتنا وفقًا <ph name="BEGIN_LINK2" />لسياسة الخصوصية<ph name="END_LINK2" /> و<ph name="BEGIN_LINK3" />بنود الخدمة<ph name="END_LINK3" /> لدينا.</translation>
 <translation id="1885577615937958993">تقديم سريع للوسائط</translation>
 <translation id="1887850431809612466">مراجعة الأجهزة</translation>
 <translation id="1897672602657312171">قد يتعارض الاختصار بدون مفتاح البحث مع اختصار بعض التطبيقات. اضغط على هذا الاختصار مرة أخرى لمواصلة استخدامه، أو اضغط على اختصار جديد يستخدم مفتاح البحث.</translation>
@@ -212,6 +214,7 @@
 <translation id="2505327257735685095">إعادة تحميل صورة الخلفية الحالية</translation>
 <translation id="2512979179176933762">إظهار النوافذ</translation>
 <translation id="2513396635448525189">صورة الملف الشخصي</translation>
+<translation id="2515109918609218604">هذا الاختصار غير متاح. اضغط على اختصار جديد بدون استخدام مفاتيح الوظائف والبحث.</translation>
 <translation id="2517472476991765520">فحص</translation>
 <translation id="2521835766824839541">المقطع الصوتي السابق</translation>
 <translation id="2526590354069164005">سطح المكتب</translation>
@@ -265,6 +268,7 @@
 <translation id="3122464029669770682">وحدة المعالجة المركزية</translation>
 <translation id="3124039320086536031">الجهاز متصل.</translation>
 <translation id="3127341325625468058">{PAGE_NUMBER,plural, =0{هل تريد إزالة الصفحة؟}=1{هل تريد إزالة الصفحة {PAGE_NUMBER}؟}two{هل تريد إزالة الصفحة {PAGE_NUMBER}؟}few{هل تريد إزالة الصفحة {PAGE_NUMBER}؟}many{هل تريد إزالة الصفحة {PAGE_NUMBER}؟}other{هل تريد إزالة الصفحة {PAGE_NUMBER}؟}}</translation>
+<translation id="3146655726035122603">حصريًا في <ph name="PRODUCT_NAME" /></translation>
 <translation id="315116470104423982">بيانات الجوال</translation>
 <translation id="3156846309055100599">جارٍ مسح الصفحة <ph name="PAGE_NUMBER" /> ضوئيًا...</translation>
 <translation id="315738237743207937">تم رصد مدخل مشروط الوصول إليه.</translation>
@@ -280,7 +284,6 @@
 <translation id="3226405216343213872">جارٍ البحث عن أجهزة مسح ضوئي</translation>
 <translation id="3226657629376379887">قائمة إجراءات التصميم</translation>
 <translation id="3246869037381808805">ستتم إزالة طلبات الطباعة التي مرَّ عليها أكثر من يوم.</translation>
-<translation id="3248223063252096240">حصري لأجهزة <ph name="PRODUCT_NAME" /></translation>
 <translation id="3268178239013324452">تعذَّرت الطباعة - باب الطابعة مفتوح</translation>
 <translation id="3275729367986477355">الصورة الرمزية</translation>
 <translation id="3283504360622356314">{0,plural, =1{تعديل الملف}zero{تعديل الملفات}two{تعديل الملفَين}few{تعديل الملفات}many{تعديل الملفات}other{تعديل الملفات}}</translation>
@@ -480,6 +483,7 @@
 <translation id="4793756956024303490">خوارزمية الضغط</translation>
 <translation id="4794140124556169553">‏إنّ إجراء اختبار لوحدة المعالجة المركزية (CPU) قد يؤثر في أداء نظامك.</translation>
 <translation id="4798078634453489142">‏يجب إزالة اسم نقطة الوصول (APN) لإضافة APN جديد</translation>
+<translation id="479989351350248267">بحث</translation>
 <translation id="4800589996161293643">‏منتدى Chromebook</translation>
 <translation id="4803391892369051319">‫IPv4</translation>
 <translation id="4808449224298348341">تم إلغاء مهمة الطباعة للمستند <ph name="DOCUMENT_TITLE" />.</translation>
@@ -623,6 +627,7 @@
 <translation id="584953448295717128">‏تم رصد اسم نقطة الوصول (APN) تلقائيًا.</translation>
 <translation id="5849570051105887917">رمز مقدم الخدمة الرئيسي</translation>
 <translation id="5859603669299126575">ألبوم معرض الفنون</translation>
+<translation id="5859969039821714932">هذا الاختصار غير متاح. اضغط على اختصار جديد بدون "<ph name="KEY" />".</translation>
 <translation id="5860033963881614850">غير مفعّلة</translation>
 <translation id="5860491529813859533">تفعيل</translation>
 <translation id="5876385649737594562">يُرجى تفعيل "وضع الاستراحة" لتحديد الخيارات.</translation>
@@ -688,6 +693,7 @@
 <translation id="6318437367327684789">للأبد</translation>
 <translation id="6319207335391420837">تحديث البرامج الثابتة على <ph name="DEVICE_NAME" /></translation>
 <translation id="6321407676395378991">تفعيل شاشة التوقف</translation>
+<translation id="6324916366299863871">تعديل الاختصار</translation>
 <translation id="6325525973963619867">إخفاق</translation>
 <translation id="6331191339300272798">المظهر الداكن التلقائي</translation>
 <translation id="6340526405444716530">التخصيص</translation>
@@ -787,6 +793,7 @@
 <translation id="7103252855940681301">الجهاز <ph name="INDEX" /> من إجمالي <ph name="COUNT" /> اسمه <ph name="NAME" />.</translation>
 <translation id="7107255225945990211">اختيار عمل فني حصري مِن <ph name="PRODUCT_NAME" /></translation>
 <translation id="7108668606237948702">إدخال</translation>
+<translation id="7119389851461848805">الطاقة</translation>
 <translation id="7130438335435247835">‏اسم نقطة الوصول (APN)</translation>
 <translation id="7134436342991564651">{0,plural, =1{خادم أسماء واحد}zero{خوادم الأسماء}two{خادما أسماء}few{خوادم الأسماء}many{خوادم الأسماء}other{خوادم الأسماء}}</translation>
 <translation id="7135814714616751706">البحث في الاختصارات</translation>
@@ -827,6 +834,7 @@
 <translation id="7375053625150546623">EAP</translation>
 <translation id="7388959671917308825">لوحة لمس مُدمَجة</translation>
 <translation id="7397270852490618635">إيقاف تشغيل المظهر الفاتح</translation>
+<translation id="7401543881546089382">حذف الاختصار</translation>
 <translation id="741244894080940828">التحويل</translation>
 <translation id="7415801143053185905">‏وقت استجابة بروتوكول HTTP طويل جدًا.</translation>
 <translation id="7425178841057519191">{NUM_ROOL_APPS,plural,offset:2 =1{لقد ضبط مشرفك "<ph name="APP_NAME_1" />" للبدء تلقائيًا مع كل تسجيل دخول.}=2{لقد ضبط مشرفك "<ph name="APP_NAME_1" />" و"<ph name="APP_NAME_2" />" للبدء تلقائيًا مع كل تسجيل دخول.}=3{لقد ضبط مشرفك "<ph name="APP_NAME_1" />" و"<ph name="APP_NAME_2" />" و"<ph name="APP_NAME_3" />" للبدء تلقائيًا مع كل تسجيل دخول.}zero{لقد ضبط مشرفك "<ph name="APP_NAME_1" />" و"<ph name="APP_NAME_2" />" و# تطبيق آخر للبدء تلقائيًا مع كل تسجيل دخول.}few{لقد ضبط مشرفك "<ph name="APP_NAME_1" />" و"<ph name="APP_NAME_2" />" و# تطبيقات أخرى للبدء تلقائيًا مع كل تسجيل دخول.}many{لقد ضبط مشرفك "<ph name="APP_NAME_1" />" و"<ph name="APP_NAME_2" />" و# تطبيقًا آخر للبدء تلقائيًا مع كل تسجيل دخول.}other{لقد ضبط مشرفك "<ph name="APP_NAME_1" />" و"<ph name="APP_NAME_2" />" و# تطبيق آخر للبدء تلقائيًا مع كل تسجيل دخول.}}</translation>
@@ -865,6 +873,7 @@
 <translation id="7705524343798198388">VPN</translation>
 <translation id="7716280709122323042">WPA3</translation>
 <translation id="7718231387947923843">إضاءة لوحة المفاتيح</translation>
+<translation id="7730077286107534951">‏قد يتم إرسال بعض المعلومات عن الحساب والنظام إلى Google. نستخدم هذه المعلومات للمساعدة في معالجة المشاكل الفنية وتحسين خدماتنا، بما يتوافق مع <ph name="BEGIN_LINK2" />سياسة الخصوصية<ph name="END_LINK2" /> و<ph name="BEGIN_LINK3" />بنود الخدمة<ph name="END_LINK3" />. لطلب إجراء تغييرات في المحتوى، يُرجى الانتقال إلى صفحة <ph name="BEGIN_LINK1" />المساعدة القانونية<ph name="END_LINK1" />.</translation>
 <translation id="773153675489693198">عدد مرات تفريغ البطارية وشحنها</translation>
 <translation id="7747039790905080783">المفتاح المشترَك مسبقًا</translation>
 <translation id="7752963721013053477">صورة متحركة حصرية تعرض منظرًا من الفجر إلى الليل</translation>
@@ -901,6 +910,7 @@
 <translation id="7978412674231730200">مفتاح خاص</translation>
 <translation id="7994702968232966508">‏طريقة EAP</translation>
 <translation id="8004582292198964060">المتصفّح</translation>
+<translation id="8017679124341497925">تمّ تعديل الاختصار</translation>
 <translation id="802154636333426148">تعذّر التنزيل</translation>
 <translation id="8031884997696620457">HSPAPlus</translation>
 <translation id="80398733265834479">تفعيل وضع الألوان التلقائية</translation>
@@ -941,6 +951,7 @@
 <translation id="8336739000755212683">تغيير صورة حساب الجهاز</translation>
 <translation id="8347126826554447157">‫<ph name="SHORCTCUT1" /> أو <ph name="SHORCTCUT2" /></translation>
 <translation id="8347227221149377169">مهام الطباعة</translation>
+<translation id="8349826889576450703">launcher</translation>
 <translation id="8351855506390808906">نقطة لمس تحديد المفاتيح</translation>
 <translation id="8352772353338965963">يمكنك إضافة حساب إلى الدخول المتعدد. يمكن الدخول إلى جميع الحسابات التي تم تسجيل الدخول إليها بدون كلمة مرور، لذا فإن هذه الميزة لا يجب استخدامها إلا مع الحسابات الموثوق بها.</translation>
 <translation id="8364946094152050673">خادم الأسماء فارغ.</translation>
@@ -1036,6 +1047,7 @@
 <translation id="8998156756248178381">{NUM_ROOL_APPS,plural, =1{تم بدء تشغيل "<ph name="APP_NAME_1" />" تلقائيًا}zero{تم بدء تشغيل # تطبيق تلقائيًا}two{تم بدء تشغيل تطبيقَين تلقائيًا}few{تم بدء تشغيل # تطبيقات تلقائيًا}many{تم بدء تشغيل # تطبيقًا تلقائيًا}other{تم بدء تشغيل # تطبيق تلقائيًا}}</translation>
 <translation id="8998289560386111590">الوضع غير متاح على جهازك.</translation>
 <translation id="9003704114456258138">التردد</translation>
+<translation id="901834265349196618">بريد إلكتروني</translation>
 <translation id="9024331582947483881">ملء الشاشة</translation>
 <translation id="9025198690966128418">الاستخدام كجهاز شخصي</translation>
 <translation id="902638246363752736">إعدادات لوحة المفاتيح</translation>
@@ -1076,6 +1088,7 @@
 <translation id="945522503751344254">إرسال ملاحظات</translation>
 <translation id="952992212772159698">غير نشطة</translation>
 <translation id="960719561871045870">رمز مشغل شبكة الجوال</translation>
+<translation id="966787709310836684">القائمة</translation>
 <translation id="979450713603643090">وردي فاتح</translation>
 <translation id="982713511914535780">تشغيل اختبار تفريغ شحن البطارية</translation>
 <translation id="987264212798334818">عام</translation>

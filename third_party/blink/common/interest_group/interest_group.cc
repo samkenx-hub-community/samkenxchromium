@@ -257,7 +257,13 @@ bool InterestGroup::IsValid() const {
   }
 
   // InterestGroups used for negative targeting may not also have ads.
-  if (additional_bid_key && ads) {
+  // They are also not updatable.
+  if (additional_bid_key && (ads || update_url)) {
+    return false;
+  }
+
+  if (aggregation_coordinator_origin &&
+      aggregation_coordinator_origin->scheme() != url::kHttpsScheme) {
     return false;
   }
 
@@ -328,6 +334,9 @@ size_t InterestGroup::EstimateSize() const {
   if (additional_bid_key) {
     size += ED25519_PUBLIC_KEY_LEN;
   }
+  if (aggregation_coordinator_origin) {
+    size += aggregation_coordinator_origin->Serialize().size();
+  }
   return size;
 }
 
@@ -339,8 +348,8 @@ bool InterestGroup::IsEqualForTesting(const InterestGroup& other) const {
                   bidding_wasm_helper_url, update_url,
                   trusted_bidding_signals_url, trusted_bidding_signals_keys,
                   user_bidding_signals, ads, ad_components, ad_sizes,
-                  size_groups, auction_server_request_flags,
-                  additional_bid_key) ==
+                  size_groups, auction_server_request_flags, additional_bid_key,
+                  aggregation_coordinator_origin) ==
          std::tie(
              other.expiry, other.owner, other.name, other.priority,
              other.enable_bidding_signals_prioritization, other.priority_vector,
@@ -350,7 +359,8 @@ bool InterestGroup::IsEqualForTesting(const InterestGroup& other) const {
              other.trusted_bidding_signals_url,
              other.trusted_bidding_signals_keys, other.user_bidding_signals,
              other.ads, other.ad_components, other.ad_sizes, other.size_groups,
-             other.auction_server_request_flags, other.additional_bid_key);
+             other.auction_server_request_flags, other.additional_bid_key,
+             other.aggregation_coordinator_origin);
 }
 
 std::string KAnonKeyForAdBid(const InterestGroup& group, const GURL& ad_url) {

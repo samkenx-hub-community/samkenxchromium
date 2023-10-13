@@ -36,7 +36,6 @@
 #include "content/common/features.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/notification_types.h"
 #include "content/public/browser/render_widget_host_view_mac_delegate.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/mock_render_process_host.h"
@@ -1811,6 +1810,9 @@ TEST_F(InputMethodMacTest, SetMarkedText) {
 // This test makes sure that selectedRange and markedRange are updated correctly
 // in various scenarios.
 TEST_F(InputMethodMacTest, MarkedRangeSelectedRange) {
+  if (!base::FeatureList::IsEnabled(features::kMacImeLiveConversionFix)) {
+    return;
+  }
   // If the replacement range is valid, the range should be replaced with the
   // new text.
   {

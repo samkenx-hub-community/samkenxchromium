@@ -220,6 +220,7 @@
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 #include "chrome/browser/enterprise/idle/action.h"
+#include "chrome/browser/enterprise/signin/enterprise_signin_prefs.h"
 #include "components/device_signals/core/browser/pref_names.h"  // nogncheck due to crbug.com/1125897
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
@@ -1198,6 +1199,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kArcEnabled,
     arc::prefs::kArcEnabled,
     base::Value::Type::BOOLEAN },
+  { key::kUnaffiliatedDeviceArcAllowed,
+    arc::prefs::kUnaffiliatedDeviceArcAllowed,
+    base::Value::Type::BOOLEAN },
   { key::kReportArcStatusEnabled,
     prefs::kReportArcStatusEnabled,
     base::Value::Type::BOOLEAN },
@@ -1536,6 +1540,12 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::INTEGER },
   { key::kDeviceSwitchFunctionKeysBehaviorEnabled,
     ash::prefs::kDeviceSwitchFunctionKeysBehaviorEnabled,
+    base::Value::Type::BOOLEAN },
+  { key::kDeviceExtendedFkeysModifier,
+    ash::prefs::kExtendedFkeysModifier,
+    base::Value::Type::INTEGER },
+  { key::kShowHumanPresenceSensorScreenEnabled,
+    ash::prefs::kShowHumanPresenceSensorScreenEnabled,
     base::Value::Type::BOOLEAN },
 #endif // BUILDFLAG(IS_CHROMEOS_ASH)
 
@@ -1922,9 +1932,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     ash::prefs::kLoginScreenWebUILazyLoading,
     base::Value::Type::BOOLEAN },
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-  { key::kFirstPartySetsEnabled,
-      prefs::kPrivacySandboxRelatedWebsiteSetsEnabled,
-    base::Value::Type::BOOLEAN},
   { key::kWebSQLAccess,
     storage::kWebSQLAccess,
     base::Value::Type::BOOLEAN },
@@ -2039,8 +2046,9 @@ void GetExtensionAllowedTypesMap(
 // Future policies are not supported on Stable and Beta by default.
 bool AreFuturePoliciesEnabledByDefault() {
   // Enable future policies for branded browser tests.
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kTestType))
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kTestType)) {
     return true;
+  }
   version_info::Channel channel = chrome::GetChannel();
   return channel != version_info::Channel::STABLE &&
          channel != version_info::Channel::BETA;
@@ -2053,8 +2061,9 @@ void PopulatePolicyHandlerParameters(PolicyHandlerParameters* parameters) {
   if (user_manager::UserManager::IsInitialized()) {
     const user_manager::User* user =
         user_manager::UserManager::Get()->GetActiveUser();
-    if (user)
+    if (user) {
       parameters->user_id_hash = user->username_hash();
+    }
   }
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 }
@@ -2387,6 +2396,11 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
           key::kProfileSeparationDataMigrationSettings,
           prefs::kProfileSeparationDataMigrationSettings,
           base::Value::Type::INTEGER)));
+  handlers->AddHandler(std::make_unique<IntRangePolicyHandler>(
+      key::kProfileReauthPrompt, enterprise_signin::prefs::kProfileReauthPrompt,
+      static_cast<int>(enterprise_signin::ProfileReauthPrompt::kDoNotPrompt),
+      static_cast<int>(enterprise_signin::ProfileReauthPrompt::kPromptInTab),
+      false));
 #elif BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
   handlers->AddHandler(
       std::make_unique<ManagedAccountRestrictionsPolicyHandler>(chrome_schema));
@@ -2802,9 +2816,13 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
       key::kAllHttpAuthSchemesAllowedForOrigins,
       prefs::kAllHttpAuthSchemesAllowedForOrigins));
 
-  handlers->AddHandler(
-      std::make_unique<first_party_sets::FirstPartySetsOverridesPolicyHandler>(
-          chrome_schema));
+  handlers->AddHandler(std::make_unique<SimpleDeprecatingPolicyHandler>(
+      /*legacy_policy_handler=*/std::make_unique<
+          first_party_sets::FirstPartySetsOverridesPolicyHandler>(
+          policy::key::kFirstPartySetsOverrides, chrome_schema),
+      /*new_policy_handler=*/std::make_unique<
+          first_party_sets::FirstPartySetsOverridesPolicyHandler>(
+          policy::key::kRelatedWebsiteSetsOverrides, chrome_schema)));
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_ANDROID)
   handlers->AddHandler(std::make_unique<PrivacySandboxPolicyHandler>());
@@ -2818,6 +2836,16 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
           key::kDataControlsRules, data_controls::kDataControlsRulesPref,
           chrome_schema));
 #endif  // BUILDFLAG(ENTERPRISE_DATA_CONTROLS)
+
+  handlers->AddHandler(std::make_unique<SimpleDeprecatingPolicyHandler>(
+      /*legacy_policy_handler=*/std::make_unique<SimplePolicyHandler>(
+          key::kFirstPartySetsEnabled,
+          prefs::kPrivacySandboxRelatedWebsiteSetsEnabled,
+          base::Value::Type::BOOLEAN),
+      /*new_policy_handler=*/std::make_unique<SimplePolicyHandler>(
+          key::kRelatedWebsiteSetsEnabled,
+          prefs::kPrivacySandboxRelatedWebsiteSetsEnabled,
+          base::Value::Type::BOOLEAN)));
 
   return handlers;
 }

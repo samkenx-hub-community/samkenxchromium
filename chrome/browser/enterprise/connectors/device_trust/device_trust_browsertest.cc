@@ -239,10 +239,8 @@ class DeviceTrustDelayedManagementBrowserTest
     scoped_feature_list_.InitWithFeatures(
         /*enabled_features=*/
         {
-          kUserDTCInlineFlowEnabled
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-              ,
-              ash::features::kUnmanagedDeviceDeviceTrustConnectorEnabled
+          ash::features::kUnmanagedDeviceDeviceTrustConnectorEnabled
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
         },
         /*disabled_features=*/{});
@@ -398,7 +396,14 @@ IN_PROC_BROWSER_TEST_F(DeviceTrustCreateKeyUploadFailedBrowserTest,
   ASSERT_TRUE(device_trust_test_environment_win_->KeyExists());
 }
 
-IN_PROC_BROWSER_TEST_F(DeviceTrustDesktopBrowserTest,
+class DeviceTrustKeyRotationBrowserTest : public DeviceTrustDesktopBrowserTest {
+ protected:
+  DeviceTrustKeyRotationBrowserTest() {
+    scoped_feature_list_.InitWithFeatureState(kDTCKeyRotationEnabled, true);
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(DeviceTrustKeyRotationBrowserTest,
                        RemoteCommandKeyRotationSuccess) {
   // Make sure the key is present and store its current value.
   std::vector<uint8_t> current_key_pair =
@@ -419,7 +424,7 @@ IN_PROC_BROWSER_TEST_F(DeviceTrustDesktopBrowserTest,
             current_key_pair);
 }
 
-IN_PROC_BROWSER_TEST_F(DeviceTrustDesktopBrowserTest,
+IN_PROC_BROWSER_TEST_F(DeviceTrustKeyRotationBrowserTest,
                        RemoteCommandKeyRotationFailure) {
   // Make sure key presents and stores its current value.
   std::vector<uint8_t> current_key_pair =

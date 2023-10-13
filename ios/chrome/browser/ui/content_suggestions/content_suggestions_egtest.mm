@@ -14,6 +14,7 @@
 #import "components/strings/grit/components_strings.h"
 #import "components/sync/base/features.h"
 #import "ios/chrome/browser/ntp/features.h"
+#import "ios/chrome/browser/ntp/home/features.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/signin/fake_system_identity.h"
@@ -21,7 +22,6 @@
 #import "ios/chrome/browser/ui/authentication/signin/signin_constants.h"
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_constants.h"
-#import "ios/chrome/browser/ui/content_suggestions/content_suggestions_feature.h"
 #import "ios/chrome/browser/ui/content_suggestions/new_tab_page_app_interface.h"
 #import "ios/chrome/browser/ui/content_suggestions/ntp_home_constant.h"
 #import "ios/chrome/browser/ui/content_suggestions/set_up_list/constants.h"
@@ -597,8 +597,57 @@ void TapMoreButtonIfVisible() {
   [[EarlGrey selectElementWithMatcher:syncView] assertWithMatcher:grey_nil()];
 }
 
+// Tests that the "All Set" module is shown after completing all Set Up List
+// Hero Cell modules in the Magic Stack.
 - (void)testMagicStackSetUpListCompleteAllItems {
   [self prepareToTestSetUpListInMagicStack];
+
+  // Tap the default browser item.
+  TapView(set_up_list::kDefaultBrowserItemID);
+  // Ensure the Default Browser Promo is displayed.
+  id<GREYMatcher> defaultBrowserView = grey_accessibilityID(
+      first_run::kFirstRunDefaultBrowserScreenAccessibilityIdentifier);
+  [[EarlGrey selectElementWithMatcher:defaultBrowserView]
+      assertWithMatcher:grey_notNil()];
+  // Dismiss Default Browser Promo.
+  TapPromoStyleSecondaryActionButton();
+
+  ConditionBlock condition = ^{
+    NSError* error = nil;
+    [[EarlGrey
+        selectElementWithMatcher:grey_allOf(grey_accessibilityID(
+                                                set_up_list::kAutofillItemID),
+                                            grey_sufficientlyVisible(), nil)]
+        assertWithMatcher:grey_notNil()
+                    error:&error];
+    return error == nil;
+  };
+  GREYAssert(
+      base::test::ios::WaitUntilConditionOrTimeout(base::Seconds(2), condition),
+      @"Timeout waiting for Autofill Set Up List Item expired.");
+  // Tap the autofill item.
+  TapView(set_up_list::kAutofillItemID);
+  // TODO - verify the CPE promo is displayed.
+  id<GREYMatcher> CPEPromoView =
+      grey_accessibilityID(@"kCredentialProviderPromoAccessibilityId");
+  [[EarlGrey selectElementWithMatcher:CPEPromoView]
+      assertWithMatcher:grey_notNil()];
+  // Dismiss the CPE promo.
+  TapSecondaryActionButton();
+
+  condition = ^{
+    NSError* error = nil;
+    [[EarlGrey
+        selectElementWithMatcher:grey_allOf(grey_accessibilityID(
+                                                set_up_list::kSignInItemID),
+                                            grey_sufficientlyVisible(), nil)]
+        assertWithMatcher:grey_notNil()
+                    error:&error];
+    return error == nil;
+  };
+  GREYAssert(
+      base::test::ios::WaitUntilConditionOrTimeout(base::Seconds(2), condition),
+      @"Timeout waiting for Sign in Set Up List Item expired.");
 
   // Tap the signin item.
   TapView(set_up_list::kSignInItemID);
@@ -613,52 +662,6 @@ void TapMoreButtonIfVisible() {
     TapPromoStyleSecondaryActionButton();
   }
 
-  ConditionBlock condition = ^{
-    NSError* error = nil;
-    [[EarlGrey
-        selectElementWithMatcher:grey_allOf(
-                                     grey_accessibilityID(
-                                         set_up_list::kDefaultBrowserItemID),
-                                     grey_sufficientlyVisible(), nil)]
-        assertWithMatcher:grey_notNil()
-                    error:&error];
-    return error == nil;
-  };
-  GREYAssert(
-      base::test::ios::WaitUntilConditionOrTimeout(base::Seconds(1), condition),
-      @"Timeout waiting for Default Browser Set Up List Item expired.");
-  // Tap the default browser item.
-  TapView(set_up_list::kDefaultBrowserItemID);
-  // Ensure the Default Browser Promo is displayed.
-  id<GREYMatcher> defaultBrowserView = grey_accessibilityID(
-      first_run::kFirstRunDefaultBrowserScreenAccessibilityIdentifier);
-  [[EarlGrey selectElementWithMatcher:defaultBrowserView]
-      assertWithMatcher:grey_notNil()];
-  // Dismiss Default Browser Promo.
-  TapPromoStyleSecondaryActionButton();
-
-  condition = ^{
-    NSError* error = nil;
-    [[EarlGrey
-        selectElementWithMatcher:grey_allOf(grey_accessibilityID(
-                                                set_up_list::kAutofillItemID),
-                                            grey_sufficientlyVisible(), nil)]
-        assertWithMatcher:grey_notNil()
-                    error:&error];
-    return error == nil;
-  };
-  GREYAssert(
-      base::test::ios::WaitUntilConditionOrTimeout(base::Seconds(1), condition),
-      @"Timeout waiting for Autofill Set Up List Item expired.");
-  // Tap the autofill item.
-  TapView(set_up_list::kAutofillItemID);
-  // TODO - verify the CPE promo is displayed.
-  id<GREYMatcher> CPEPromoView =
-      grey_accessibilityID(@"kCredentialProviderPromoAccessibilityId");
-  [[EarlGrey selectElementWithMatcher:CPEPromoView]
-      assertWithMatcher:grey_notNil()];
-  // Dismiss the CPE promo.
-  TapSecondaryActionButton();
   // Verify the All Set item is shown.
   condition = ^{
     NSError* error = nil;

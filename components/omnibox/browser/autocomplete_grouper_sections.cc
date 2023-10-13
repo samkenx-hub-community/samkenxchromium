@@ -106,18 +106,15 @@ void ZpsSection::InitFromMatches(ACMatches& matches) {
 }
 
 AndroidNTPZpsSection::AndroidNTPZpsSection(
-    size_t max_related_queries,
-    size_t max_trending_queries,
     omnibox::GroupConfigMap& group_configs)
-    : ZpsSection(
-          15 + max_related_queries + max_trending_queries,
-          {
-              {1, omnibox::GROUP_MOBILE_CLIPBOARD},
-              {15, omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST},
-              {max_related_queries, omnibox::GROUP_PREVIOUS_SEARCH_RELATED},
-              {max_trending_queries, omnibox::GROUP_TRENDS},
-          },
-          group_configs) {}
+    : ZpsSection(30,
+                 {
+                     {1, omnibox::GROUP_MOBILE_CLIPBOARD},
+                     {15, omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST},
+                     {10, omnibox::GROUP_MOBILE_QUERY_TILES},
+                     {5, omnibox::GROUP_TRENDS},
+                 },
+                 group_configs) {}
 
 AndroidSRPZpsSection::AndroidSRPZpsSection(
     omnibox::GroupConfigMap& group_configs)

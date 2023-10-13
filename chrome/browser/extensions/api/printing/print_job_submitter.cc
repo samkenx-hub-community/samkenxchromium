@@ -14,10 +14,11 @@
 #include "base/functional/callback_helpers.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/types/expected.h"
 #include "base/values.h"
-#include "chrome/browser/extensions/api/printing/print_job_controller.h"
 #include "chrome/browser/extensions/api/printing/printing_api_utils.h"
 #include "chrome/browser/printing/pdf_blob_data_flattener.h"
+#include "chrome/browser/printing/print_job_controller.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/extensions/extensions_dialogs.h"
 #include "chrome/common/pref_names.h"
@@ -73,7 +74,7 @@ bool IsUserConfirmationRequired(content::BrowserContext* browser_context,
 PrintJobSubmitter::PrintJobSubmitter(
     gfx::NativeWindow native_window,
     content::BrowserContext* browser_context,
-    PrintJobController* print_job_controller,
+    printing::PrintJobController* print_job_controller,
     printing::PdfBlobDataFlattener* pdf_blob_data_flattener,
     scoped_refptr<const extensions::Extension> extension,
     api::printing::SubmitJobRequest request,
@@ -92,11 +93,7 @@ PrintJobSubmitter::PrintJobSubmitter(
     native_window_tracker_ = views::NativeWindowTracker::Create(native_window);
 }
 
-PrintJobSubmitter::~PrintJobSubmitter() {
-  DCHECK(!callback_);
-  if (print_job_)
-    print_job_->RemoveObserver(*this);
-}
+PrintJobSubmitter::~PrintJobSubmitter() = default;
 
 // static
 void PrintJobSubmitter::Run(std::unique_ptr<PrintJobSubmitter> submitter) {
@@ -135,12 +132,7 @@ bool PrintJobSubmitter::CheckPrintTicket() {
 }
 
 void PrintJobSubmitter::CheckPrinter() {
-  if (!local_printer_) {
-    LOG(ERROR)
-        << "Local printer not available (PrintJobSubmitter::CheckPrinter()";
-    CheckCapabilitiesCompatibility(nullptr);
-    return;
-  }
+  CHECK(local_printer_);
   local_printer_->GetCapability(
       request_.job.printer_id,
       base::BindOnce(&PrintJobSubmitter::CheckCapabilitiesCompatibility,
@@ -219,8 +211,8 @@ void PrintJobSubmitter::OnPrintJobConfirmationDialogClosed(bool accepted) {
                         ->enabled_extensions()
                         .Contains(extension_->id())) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE, base::BindOnce(std::move(callback_), absl::nullopt, nullptr,
-                                  nullptr, absl::nullopt));
+        FROM_HERE,
+        base::BindOnce(std::move(callback_), base::unexpected(absl::nullopt)));
     return;
   }
   StartPrintJob();
@@ -229,30 +221,30 @@ void PrintJobSubmitter::OnPrintJobConfirmationDialogClosed(bool accepted) {
 void PrintJobSubmitter::StartPrintJob() {
   CHECK(extension_);
   CHECK(settings_);
-  CHECK(!print_job_);
   CHECK(flattened_pdf_);
-  print_job_ = print_job_controller_->StartPrintJob(
-      extension_->id(), std::move(flattened_pdf_), std::move(settings_));
-  print_job_->AddObserver(*this);
+  print_job_controller_->CreatePrintJob(
+      std::move(flattened_pdf_), std::move(settings_),
+      crosapi::mojom::PrintJob::Source::kExtension, extension_->id(),
+      base::BindOnce(&PrintJobSubmitter::OnPrintJobCreated,
+                     weak_ptr_factory_.GetWeakPtr()));
 }
 
-void PrintJobSubmitter::OnDocDone(int job_id,
-                                  printing::PrintedDocument* document) {
+void PrintJobSubmitter::OnPrintJobCreated(
+    absl::optional<printing::PrintJobCreatedInfo> info) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  if (!info) {
+    FireErrorCallback(kPrintingFailed);
+    return;
+  }
   DCHECK(callback_);
-  std::move(callback_).Run(job_id, print_job_.get(), document, absl::nullopt);
-}
-
-void PrintJobSubmitter::OnFailed() {
-  FireErrorCallback(kPrintingFailed);
+  std::move(callback_).Run(std::move(*info));
 }
 
 void PrintJobSubmitter::FireErrorCallback(const std::string& error) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   DCHECK(callback_);
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-      FROM_HERE, base::BindOnce(std::move(callback_), absl::nullopt, nullptr,
-                                nullptr, error));
+      FROM_HERE, base::BindOnce(std::move(callback_), base::unexpected(error)));
 }
 
 // static

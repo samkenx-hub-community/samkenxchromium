@@ -24,6 +24,7 @@
 #include "media/capture/mojom/video_capture_types.mojom.h"
 #include "media/capture/video/video_frame_receiver.h"
 #include "media/capture/video_capture_types.h"
+#include "mojo/public/cpp/bindings/remote.h"
 #include "third_party/blink/public/common/media/video_capture.h"
 #include "third_party/blink/public/common/mediastream/media_stream_request.h"
 
@@ -111,9 +112,7 @@ class CONTENT_EXPORT VideoCaptureController
   void OnCaptureConfigurationChanged() override;
   void OnNewBuffer(int32_t buffer_id,
                    media::mojom::VideoBufferHandlePtr buffer_handle) override;
-  void OnFrameReadyInBuffer(
-      media::ReadyFrameInBuffer frame,
-      std::vector<media::ReadyFrameInBuffer> scaled_frames) override;
+  void OnFrameReadyInBuffer(media::ReadyFrameInBuffer frame) override;
   void OnBufferRetired(int buffer_id) override;
   void OnError(media::VideoCaptureError error) override;
   void OnFrameDropped(media::VideoCaptureFrameDropReason reason) override;
@@ -124,12 +123,6 @@ class CONTENT_EXPORT VideoCaptureController
   void OnStartedUsingGpuDecode() override;
   void OnStopped() override;
 
-  // Frames can be dropped early (e.g. capture process) or late (e.g. renderer
-  // process). Only if the frame drop happened early do we want to forward that
-  // signal to the renderer process for the purpose of the MediaStreamTrack
-  // Statistics API counting frame drops.
-  void OnFrameDroppedByRenderer(media::VideoCaptureFrameDropReason reason);
-
   // Implementation of VideoCaptureDeviceLauncher::Callbacks interface:
   void OnDeviceLaunched(
       std::unique_ptr<LaunchedVideoCaptureDevice> device) override;
@@ -138,9 +131,12 @@ class CONTENT_EXPORT VideoCaptureController
 
   void OnDeviceConnectionLost();
 
-  void CreateAndStartDeviceAsync(const media::VideoCaptureParams& params,
-                                 VideoCaptureDeviceLaunchObserver* callbacks,
-                                 base::OnceClosure done_cb);
+  void CreateAndStartDeviceAsync(
+      const media::VideoCaptureParams& params,
+      VideoCaptureDeviceLaunchObserver* callbacks,
+      base::OnceClosure done_cb,
+      mojo::PendingRemote<video_capture::mojom::VideoEffectsManager>
+          video_effects_manager);
   void ReleaseDeviceAsync(base::OnceClosure done_cb);
   bool IsDeviceAlive() const;
   void GetPhotoState(
@@ -253,8 +249,6 @@ class CONTENT_EXPORT VideoCaptureController
       base::RepeatingCallback<void(VideoCaptureControllerEventHandler* client,
                                    const VideoCaptureControllerID& id)>;
   void PerformForClientsWithOpenSession(EventHandlerAction action);
-
-  void OnFrameDroppedLogging(media::VideoCaptureFrameDropReason reason);
 
   void EmitLogMessage(const std::string& message, int verbose_log_level);
 

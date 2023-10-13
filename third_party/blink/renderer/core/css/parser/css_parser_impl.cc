@@ -169,7 +169,7 @@ MutableCSSPropertyValueSet::SetResult CSSParserImpl::ParseValue(
   StyleRule::RuleType rule_type = RuleTypeForMutableDeclaration(declaration);
   CSSTokenizer tokenizer(string);
   CSSParserTokenStream stream(tokenizer);
-  CSSTokenizedValue tokenized_value = ConsumeValue(stream);
+  CSSTokenizedValue tokenized_value = ConsumeRestrictedPropertyValue(stream);
   parser.ConsumeDeclarationValue(tokenized_value, unresolved_property,
                                  important, rule_type);
   if (parser.parsed_properties_.empty()) {
@@ -188,7 +188,7 @@ MutableCSSPropertyValueSet::SetResult CSSParserImpl::ParseVariableValue(
   STACK_UNINITIALIZED CSSParserImpl parser(context);
   CSSTokenizer tokenizer(value);
   CSSParserTokenStream stream(tokenizer);
-  CSSTokenizedValue tokenized_value = ConsumeValue(stream);
+  CSSTokenizedValue tokenized_value = ConsumeUnrestrictedPropertyValue(stream);
   parser.ConsumeVariableValue(tokenized_value, property_name, important,
                               is_animation_tainted);
   if (parser.parsed_properties_.empty()) {
@@ -1390,7 +1390,7 @@ StyleRuleFontFeatureValues* CSSParserImpl::ConsumeFontFeatureValuesRule(
   FontFeatureAliases ornaments;
   FontFeatureAliases annotation;
 
-  HeapVector<StyleRuleFontFeature*> feature_rules;
+  HeapVector<Member<StyleRuleFontFeature>> feature_rules;
   bool had_valid_rules = false;
   // ConsumeRuleList returns true only if the first rule is true, but we need to
   // be more generous with the internals of what's inside a font feature value
@@ -1408,7 +1408,7 @@ StyleRuleFontFeatureValues* CSSParserImpl::ConsumeFontFeatureValuesRule(
     // https://drafts.csswg.org/css-fonts-4/#font-feature-values-syntax
     // "Specifying the same <font-feature-value-type> more than once is valid;
     // their contents are cascaded together."
-    for (auto* feature_rule : feature_rules) {
+    for (auto& feature_rule : feature_rules) {
       switch (feature_rule->GetFeatureType()) {
         case StyleRuleFontFeature::FeatureType::kStylistic:
           feature_rule->OverrideAliasesIn(stylistic);
@@ -1989,6 +1989,19 @@ StyleRule* CSSParserImpl::ConsumeStyleRule(
     observer_->StartRuleHeader(StyleRule::kStyle, stream.LookAheadOffset());
   }
 
+  // Style rules that look like custom property declarations
+  // are not allowed by css-syntax.
+  //
+  // https://drafts.csswg.org/css-syntax/#consume-qualified-rule
+  bool custom_property_ambiguity = false;
+  if (RuntimeEnabledFeatures::CSSNestingIdentEnabled() &&
+      CSSVariableParser::IsValidVariableName(stream.Peek())) {
+    CSSParserTokenStream::State state = stream.Save();
+    stream.ConsumeIncludingWhitespace();  // <ident>
+    custom_property_ambiguity = stream.Peek().GetType() == kColonToken;
+    stream.Restore(state);
+  }
+
   // Parse the prelude of the style rule
   base::span<CSSSelector> selector_vector = CSSSelectorParser::ConsumeSelector(
       stream, context_, nesting_type, parent_rule_for_nesting,
@@ -2025,6 +2038,9 @@ StyleRule* CSSParserImpl::ConsumeStyleRule(
 
   if (selector_vector.empty()) {
     // Parse error, invalid selector list.
+    return nullptr;
+  }
+  if (custom_property_ambiguity) {
     return nullptr;
   }
 
@@ -2337,11 +2353,13 @@ bool CSSParserImpl::ConsumeDeclaration(CSSParserTokenStream& stream,
   static_assert(static_cast<uint64_t>(AtRuleDescriptorID::Invalid) == 0u);
   static_assert(static_cast<uint64_t>(CSSPropertyID::kInvalid) == 0u);
 
-  if (id) {
-    CSSTokenizedValue tokenized_value = ConsumeValue(stream);
-    important = RemoveImportantAnnotationIfPresent(tokenized_value);
+  stream.ConsumeWhitespace();
 
+  if (id) {
     if (parsing_descriptor) {
+      CSSTokenizedValue tokenized_value =
+          ConsumeUnrestrictedPropertyValue(stream);
+      important = RemoveImportantAnnotationIfPresent(tokenized_value);
       if (important) {
         return false;  // Invalid for descriptors.
       }
@@ -2349,14 +2367,16 @@ bool CSSParserImpl::ConsumeDeclaration(CSSParserTokenStream& stream,
       AtRuleDescriptorParser::ParseAtRule(rule_type, atrule_id, tokenized_value,
                                           *context_, parsed_properties_);
     } else {
-      if (important &&
-          (rule_type == StyleRule::kKeyframe || rule_type == StyleRule::kTry)) {
-        return false;
-      }
       const CSSPropertyID unresolved_property = static_cast<CSSPropertyID>(id);
       if (unresolved_property == CSSPropertyID::kVariable) {
         if (rule_type != StyleRule::kStyle &&
             rule_type != StyleRule::kKeyframe) {
+          return false;
+        }
+        CSSTokenizedValue tokenized_value =
+            ConsumeUnrestrictedPropertyValue(stream);
+        important = RemoveImportantAnnotationIfPresent(tokenized_value);
+        if (important && (rule_type == StyleRule::kKeyframe)) {
           return false;
         }
         AtomicString variable_name = lhs.Value().ToAtomicString();
@@ -2364,8 +2384,17 @@ bool CSSParserImpl::ConsumeDeclaration(CSSParserTokenStream& stream,
         ConsumeVariableValue(tokenized_value, variable_name, important,
                              is_animation_tainted);
       } else if (unresolved_property != CSSPropertyID::kInvalid) {
-        ConsumeDeclarationValue(tokenized_value, unresolved_property, important,
-                                rule_type);
+        CSSTokenizedValue tokenized_value =
+            ConsumeRestrictedPropertyValue(stream);
+        important = RemoveImportantAnnotationIfPresent(tokenized_value);
+        if (important && (rule_type == StyleRule::kKeyframe ||
+                          rule_type == StyleRule::kTry)) {
+          return false;
+        }
+        if (stream.AtEnd()) {
+          ConsumeDeclarationValue(tokenized_value, unresolved_property,
+                                  important, rule_type);
+        }
       }
     }
   }
@@ -2373,11 +2402,12 @@ bool CSSParserImpl::ConsumeDeclaration(CSSParserTokenStream& stream,
   if (observer_ &&
       (rule_type == StyleRule::kStyle || rule_type == StyleRule::kKeyframe ||
        rule_type == StyleRule::kProperty || rule_type == StyleRule::kTry)) {
-    if (!stream.AtEnd()) {
+    if (!id) {
       // If we skipped the main call to ConsumeValue due to an invalid
       // property/descriptor, the inspector still needs to know the offset
       // where the would-be declaration ends.
-      CSSTokenizedValue tokenized_value = ConsumeValue(stream);
+      CSSTokenizedValue tokenized_value =
+          ConsumeRestrictedPropertyValue(stream);
       important = RemoveImportantAnnotationIfPresent(tokenized_value);
     }
     // The end offset is the offset of the terminating token, which is peeked
@@ -2414,17 +2444,49 @@ void CSSParserImpl::ConsumeDeclarationValue(
                                 context_, parsed_properties_, rule_type);
 }
 
-CSSTokenizedValue CSSParserImpl::ConsumeValue(CSSParserTokenStream& stream) {
+template <typename ConsumeFunction>
+CSSTokenizedValue CSSParserImpl::ConsumeValue(
+    CSSParserTokenStream& stream,
+    ConsumeFunction consume_function) {
   // Consume leading whitespace and comments. This is needed
   // by ConsumeDeclarationValue() / CSSPropertyParser::ParseValue(),
   // and also CSSVariableParser::ParseDeclarationIncludingCSSWide().
   stream.ConsumeWhitespace();
   wtf_size_t value_start_offset = stream.LookAheadOffset();
-  CSSParserTokenRange range = stream.ConsumeUntilPeekedTypeIs<>();
+  CSSParserTokenRange range = consume_function(stream);
   wtf_size_t value_end_offset = stream.LookAheadOffset();
 
   return {range, stream.StringRangeAt(value_start_offset,
                                       value_end_offset - value_start_offset)};
+}
+
+CSSTokenizedValue CSSParserImpl::ConsumeRestrictedPropertyValue(
+    CSSParserTokenStream& stream) {
+  if (!RuntimeEnabledFeatures::CSSNestingIdentEnabled()) {
+    return ConsumeUnrestrictedPropertyValue(stream);
+  }
+
+  if (stream.Peek().GetType() == kLeftBraceToken) {
+    // '{}' must be the whole value, hence we simply consume a component
+    // value from the stream, and consider this the whole value.
+    return ConsumeValue(stream, [](CSSParserTokenStream& stream) {
+      return stream.ConsumeComponentValueIncludingWhitespace();
+    });
+  }
+  // Otherwise, we consume until we're AtEnd() (which in the normal case
+  // means we hit a kSemicolonToken), or until we see kLeftBraceToken.
+  // The latter is a kind of error state, which is dealt with via additional
+  // AtEnd() checks at the call site.
+  return ConsumeValue(stream, [](CSSParserTokenStream& stream) {
+    return stream.ConsumeUntilPeekedTypeIs<kLeftBraceToken>();
+  });
+}
+
+CSSTokenizedValue CSSParserImpl::ConsumeUnrestrictedPropertyValue(
+    CSSParserTokenStream& stream) {
+  return ConsumeValue(stream, [](CSSParserTokenStream& stream) {
+    return stream.ConsumeUntilPeekedTypeIs<>();
+  });
 }
 
 bool CSSParserImpl::RemoveImportantAnnotationIfPresent(

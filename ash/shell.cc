@@ -76,7 +76,7 @@
 #include "ash/frame/snap_controller_impl.h"
 #include "ash/frame_throttler/frame_throttling_controller.h"
 #include "ash/game_dashboard/game_dashboard_controller.h"
-#include "ash/glanceables/glanceables_v2_controller.h"
+#include "ash/glanceables/glanceables_controller.h"
 #include "ash/host/ash_window_tree_host_init_params.h"
 #include "ash/hud_display/hud_display.h"
 #include "ash/ime/ime_controller_impl.h"
@@ -239,7 +239,6 @@
 #include "chromeos/dbus/init/initialize_dbus_client.h"
 #include "chromeos/dbus/power/power_policy_controller.h"
 #include "chromeos/ui/clipboard_history/clipboard_history_util.h"
-#include "chromeos/ui/wm/features.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 #include "components/viz/host/host_frame_sink_manager.h"
@@ -878,7 +877,7 @@ Shell::~Shell() {
   // Close all widgets (including the shelf) and destroy all window containers.
   CloseAllRootWindowChildWindows();
 
-  glanceables_v2_controller_.reset();
+  glanceables_controller_.reset();
 
   multitask_menu_nudge_delegate_.reset();
   tablet_mode_controller_.reset();
@@ -1664,16 +1663,14 @@ void Shell::Init(
 
   if (features::AreGlanceablesV2Enabled() ||
       features::AreGlanceablesV2EnabledForTrustedTesters()) {
-    glanceables_v2_controller_ = std::make_unique<GlanceablesV2Controller>();
+    glanceables_controller_ = std::make_unique<GlanceablesController>();
   }
 
   projector_controller_ = std::make_unique<ProjectorControllerImpl>();
 
-  if (chromeos::wm::features::IsWindowLayoutMenuEnabled()) {
-    float_controller_ = std::make_unique<FloatController>();
-    multitask_menu_nudge_delegate_ =
-        std::make_unique<MultitaskMenuNudgeDelegateAsh>();
-  }
+  float_controller_ = std::make_unique<FloatController>();
+  multitask_menu_nudge_delegate_ =
+      std::make_unique<MultitaskMenuNudgeDelegateAsh>();
 
   if (features::IsFederatedServiceEnabled()) {
     federated_service_controller_ =

@@ -402,7 +402,24 @@ std::array<uint8_t, 32> HashPRFValue(base::span<const uint8_t> value) {
   return digest;
 }
 
-absl::optional<std::vector<device::PRFInput>> ParsePRFInputs(
+absl::optional<device::PRFInput> ParsePRFInputForMakeCredential(
+    const blink::mojom::PRFValuesPtr& prf_input_from_renderer) {
+  // The input cannot be credential-specific because we haven't created the
+  // credential yet.
+  if (prf_input_from_renderer->id) {
+    return absl::nullopt;
+  }
+
+  device::PRFInput prf_input;
+  prf_input.salt1 = HashPRFValue(prf_input_from_renderer->first);
+  if (prf_input_from_renderer->second) {
+    prf_input.salt2 = HashPRFValue(*prf_input_from_renderer->second);
+  }
+
+  return prf_input;
+}
+
+absl::optional<std::vector<device::PRFInput>> ParsePRFInputsForGetAssertion(
     base::span<const blink::mojom::PRFValuesPtr> inputs) {
   std::vector<device::PRFInput> ret;
   bool is_first = true;
@@ -440,6 +457,20 @@ absl::optional<std::vector<device::PRFInput>> ParsePRFInputs(
   }
 
   return ret;
+}
+
+blink::mojom::PRFValuesPtr PRFResultsToValues(
+    base::span<const uint8_t> results) {
+  auto prf_values = blink::mojom::PRFValues::New();
+  DCHECK(results.size() == 32 || results.size() == 64);
+  prf_values->first =
+      device::fido_parsing_utils::Materialize(results.subspan(0, 32));
+  if (results.size() == 64) {
+    prf_values->second =
+        device::fido_parsing_utils::Materialize(results.subspan(32, 32));
+  }
+
+  return prf_values;
 }
 
 }  // namespace
@@ -896,6 +927,20 @@ void AuthenticatorCommonImpl::MakeCredential(
   if (options->prf_enable) {
     req_state_->requested_extensions.insert(RequestExtension::kPRF);
     req_state_->ctap_make_credential_request->hmac_secret = true;
+
+    if (options->prf_input &&
+        base::FeatureList::IsEnabled(device::kWebAuthnPRFEvalDuringCreate)) {
+      absl::optional<device::PRFInput> prf_input =
+          ParsePRFInputForMakeCredential(options->prf_input);
+      if (!prf_input) {
+        mojo::ReportBadMessage("invalid PRF inputs");
+        CompleteMakeCredentialRequest(
+            blink::mojom::AuthenticatorStatus::NOT_ALLOWED_ERROR);
+        return;
+      }
+      req_state_->ctap_make_credential_request->prf_input =
+          std::move(*prf_input);
+    }
   }
   if (options->hmac_create_secret) {
     req_state_->requested_extensions.insert(RequestExtension::kHMACSecret);
@@ -1224,7 +1269,7 @@ void AuthenticatorCommonImpl::GetAssertion(
     req_state_->requested_extensions.insert(RequestExtension::kPRF);
 
     absl::optional<std::vector<device::PRFInput>> prf_inputs =
-        ParsePRFInputs(options->extensions->prf_inputs);
+        ParsePRFInputsForGetAssertion(options->extensions->prf_inputs);
 
     // This should never happen for inputs from the renderer, which should sort
     // the values itself. Additionally, `prf_inputs_hashed` is for hybrid
@@ -1348,14 +1393,6 @@ void AuthenticatorCommonImpl::IsConditionalMediationAvailable(
     url::Origin caller_origin,
     blink::mojom::Authenticator::IsConditionalMediationAvailableCallback
         callback) {
-  // Passkeys from a phone can always be discovered through conditional
-  // mediation. To avoid leaking bluetooth or sync status, always advertise the
-  // feature is available.
-  if (base::FeatureList::IsEnabled(device::kWebAuthnListSyncedPasskeys) &&
-      base::FeatureList::IsEnabled(device::kWebAuthnNewPasskeyUI)) {
-    std::move(callback).Run(true);
-    return;
-  }
   // Conditional mediation is always supported if the virtual environment is
   // providing a platform authenticator.
   absl::optional<bool> embedder_isuvpaa_override =
@@ -1366,13 +1403,18 @@ void AuthenticatorCommonImpl::IsConditionalMediationAvailable(
     std::move(callback).Run(*embedder_isuvpaa_override);
     return;
   }
-
+  // Conditional requests cannot be proxied, signal the feature as unavailable.
   if (GetWebAuthnRequestProxyIfActive(caller_origin)) {
-    // Conditional requests cannot be proxied, signal the feature as
-    // unavailable.
     std::move(callback).Run(false);
     return;
   }
+  // Passkeys from a phone can be discovered through conditional mediation. To
+  // avoid leaking bluetooth or sync status, advertise the feature as available.
+  if (GetWebAuthenticationDelegate()->SupportsPasskeyMetadataSyncing()) {
+    std::move(callback).Run(true);
+    return;
+  }
+
 #if BUILDFLAG(IS_MAC)
   std::move(callback).Run(true);
 #elif BUILDFLAG(IS_WIN)
@@ -1968,6 +2010,10 @@ AuthenticatorCommonImpl::CreateMakeCredentialResponse(
       case RequestExtension::kPRF:
         response->echo_prf = true;
         response->prf = did_create_hmac_secret;
+        if (response_data.prf_results) {
+          response->prf_results =
+              PRFResultsToValues(*response_data.prf_results);
+        }
         break;
       case RequestExtension::kHMACSecret:
         response->echo_hmac_create_secret = true;
@@ -2063,6 +2109,8 @@ AuthenticatorCommonImpl::CreateGetAssertionResponse(
     device::AuthenticatorGetAssertionResponse response_data) {
   auto response = blink::mojom::GetAssertionAuthenticatorResponse::New();
   auto common_info = blink::mojom::CommonCredentialInfo::New();
+  auto response_extensions =
+      blink::mojom::AuthenticationExtensionsClientOutputs::New();
   common_info->client_data_json.assign(req_state_->client_data_json.begin(),
                                        req_state_->client_data_json.end());
   common_info->raw_id = response_data.credential->id;
@@ -2084,39 +2132,32 @@ AuthenticatorCommonImpl::CreateGetAssertionResponse(
     switch (ext) {
       case RequestExtension::kAppID:
         DCHECK(req_state_->app_id);
-        response->echo_appid_extension = true;
+        response_extensions->echo_appid_extension = true;
         if (response_data.authenticator_data.application_parameter() ==
             CreateApplicationParameter(*req_state_->app_id)) {
-          response->appid_extension = true;
+          response_extensions->appid_extension = true;
         }
         break;
       case RequestExtension::kPRF: {
-        response->echo_prf = true;
-        absl::optional<base::span<const uint8_t>> hmac_secret =
-            response_data.hmac_secret;
-        if (hmac_secret) {
-          auto prf_values = blink::mojom::PRFValues::New();
-          DCHECK(hmac_secret->size() == 32 || hmac_secret->size() == 64);
-          prf_values->first = device::fido_parsing_utils::Materialize(
-              hmac_secret->subspan(0, 32));
-          if (hmac_secret->size() == 64) {
-            prf_values->second = device::fido_parsing_utils::Materialize(
-                hmac_secret->subspan(32, 32));
-          }
-          response->prf_results = std::move(prf_values);
+        response_extensions->echo_prf = true;
+        if (response_data.hmac_secret) {
+          response_extensions->prf_results =
+              PRFResultsToValues(*response_data.hmac_secret);
         } else {
-          response->prf_not_evaluated = response_data.hmac_secret_not_evaluated;
+          response_extensions->prf_not_evaluated =
+              response_data.hmac_secret_not_evaluated;
         }
         break;
       }
       case RequestExtension::kLargeBlobRead:
-        response->echo_large_blob = true;
-        response->large_blob = response_data.large_blob;
+        response_extensions->echo_large_blob = true;
+        response_extensions->large_blob = response_data.large_blob;
         break;
       case RequestExtension::kLargeBlobWrite:
-        response->echo_large_blob = true;
-        response->echo_large_blob_written = true;
-        response->large_blob_written = response_data.large_blob_written;
+        response_extensions->echo_large_blob = true;
+        response_extensions->echo_large_blob_written = true;
+        response_extensions->large_blob_written =
+            response_data.large_blob_written;
         break;
       case RequestExtension::kGetCredBlob: {
         const absl::optional<cbor::Value>& extensions =
@@ -2125,14 +2166,14 @@ AuthenticatorCommonImpl::CreateGetAssertionResponse(
           const cbor::Value::MapValue& map = extensions->GetMap();
           const auto& it = map.find(cbor::Value(device::kExtensionCredBlob));
           if (it != map.end() && it->second.is_bytestring()) {
-            response->get_cred_blob = it->second.GetBytestring();
+            response_extensions->get_cred_blob = it->second.GetBytestring();
           }
         }
-        if (!response->get_cred_blob.has_value()) {
+        if (!response_extensions->get_cred_blob.has_value()) {
           // The authenticator is supposed to return an empty byte string if it
           // does not have a credBlob for the credential. But in case it
           // doesn't, we return one to the caller anyway.
-          response->get_cred_blob = std::vector<uint8_t>();
+          response_extensions->get_cred_blob = std::vector<uint8_t>();
         }
 
         break;
@@ -2147,11 +2188,11 @@ AuthenticatorCommonImpl::CreateGetAssertionResponse(
           const auto it =
               extensions.find(cbor::Value(device::kExtensionDevicePublicKey));
           if (it != extensions.end() && it->second.is_bytestring()) {
-            response->device_public_key =
+            response_extensions->device_public_key =
                 blink::mojom::DevicePublicKeyResponse::New();
-            response->device_public_key->authenticator_output =
+            response_extensions->device_public_key->authenticator_output =
                 it->second.GetBytestring();
-            response->device_public_key->signature =
+            response_extensions->device_public_key->signature =
                 *response_data.device_public_key_signature;
           }
         }
@@ -2166,6 +2207,7 @@ AuthenticatorCommonImpl::CreateGetAssertionResponse(
         break;
     }
   }
+  response->extensions = std::move(response_extensions);
 
   return response;
 }

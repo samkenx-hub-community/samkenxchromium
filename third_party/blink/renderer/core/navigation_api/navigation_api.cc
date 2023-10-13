@@ -548,20 +548,20 @@ NavigationResult* NavigationApi::traverseTo(ScriptState* script_state,
       MakeGarbageCollected<NavigationApiMethodTracker>(script_state, options,
                                                        key);
   upcoming_traverse_api_method_trackers_.insert(key, api_method_tracker);
-  if (window_->GetFrame()->IsMainFrame()) {
+  LocalFrame* frame = window_->GetFrame();
+  scheduler::TaskAttributionInfo* task = nullptr;
+  if (frame->IsOutermostMainFrame()) {
     SoftNavigationHeuristics* heuristics =
         SoftNavigationHeuristics::From(*window_);
     heuristics->SameDocumentNavigationStarted(script_state);
+    auto* tracker = ThreadScheduler::Current()->GetTaskAttributionTracker();
+    if (tracker && script_state->World().IsMainWorld()) {
+      task = tracker->RunningTask(script_state);
+      tracker->AddSameDocumentNavigationTask(task);
+    }
   }
-  auto* tracker = ThreadScheduler::Current()->GetTaskAttributionTracker();
-  scheduler::TaskAttributionInfo* task = nullptr;
-  if (tracker && script_state->World().IsMainWorld()) {
-    task = tracker->RunningTask(script_state);
-
-    tracker->AddSameDocumentNavigationTask(task);
-  }
-  window_->GetFrame()->GetLocalFrameHostRemote().NavigateToNavigationApiKey(
-      key, LocalFrame::HasTransientUserActivation(window_->GetFrame()),
+  frame->GetLocalFrameHostRemote().NavigateToNavigationApiKey(
+      key, LocalFrame::HasTransientUserActivation(frame),
       task ? absl::optional<scheduler::TaskAttributionId>(task->Id())
            : absl::nullopt);
   return api_method_tracker->GetNavigationResult();
@@ -746,8 +746,18 @@ NavigationApi::DispatchResult NavigationApi::DispatchNavigateEvent(
 
   init->setUserInitiated(params->involvement !=
                          UserNavigationInvolvement::kNone);
-  if (params->form && params->form->Method() == FormSubmission::kPostMethod) {
-    init->setFormData(FormData::Create(params->form, ASSERT_NO_EXCEPTION));
+  if (params->source_element) {
+    HTMLFormElement* form =
+        DynamicTo<HTMLFormElement>(params->source_element.Get());
+    if (!form) {
+      if (auto* control =
+              DynamicTo<HTMLFormControlElement>(params->source_element.Get())) {
+        form = control->formOwner();
+      }
+    }
+    if (form && form->Method() == FormSubmission::kPostMethod) {
+      init->setFormData(FormData::Create(form, ASSERT_NO_EXCEPTION));
+    }
   }
   if (ongoing_api_method_tracker_) {
     init->setInfo(ongoing_api_method_tracker_->GetInfo());
@@ -755,6 +765,10 @@ NavigationApi::DispatchResult NavigationApi::DispatchNavigateEvent(
   auto* controller = AbortController::Create(script_state);
   init->setSignal(controller->signal());
   init->setDownloadRequest(params->download_filename);
+  if (params->source_element &&
+      params->source_element->GetExecutionContext() == window_) {
+    init->setSourceElement(params->source_element);
+  }
   // This unique_ptr needs to be in the function's scope, to maintain the
   // SoftNavigationEventScope until the event handler runs.
   std::unique_ptr<SoftNavigationEventScope> soft_navigation_scope;
@@ -765,7 +779,8 @@ NavigationApi::DispatchResult NavigationApi::DispatchNavigateEvent(
     // consider this a "user initiated click", and the dispatched event handlers
     // as potential soft navigation tasks.
     soft_navigation_scope = std::make_unique<SoftNavigationEventScope>(
-        soft_navigation_heuristics, script_state);
+        soft_navigation_heuristics, script_state,
+        /*is_unfocused_keydown=*/false, /*is_new_interaction=*/true);
 
     soft_navigation_heuristics->SameDocumentNavigationStarted(script_state);
   }

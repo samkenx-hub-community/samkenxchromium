@@ -570,6 +570,7 @@ scoped_refptr<base::SingleThreadTaskRunner> LocalDOMWindow::GetTaskRunner(
 void LocalDOMWindow::ReportPermissionsPolicyViolation(
     mojom::blink::PermissionsPolicyFeature feature,
     mojom::blink::PolicyDisposition disposition,
+    const absl::optional<String>& reporting_endpoint,
     const String& message) const {
   if (disposition == mojom::blink::PolicyDisposition::kEnforce) {
     const_cast<LocalDOMWindow*>(this)->CountPermissionsPolicyUsage(
@@ -594,8 +595,13 @@ void LocalDOMWindow::ReportPermissionsPolicyViolation(
   Report* report = MakeGarbageCollected<Report>(
       ReportType::kPermissionsPolicyViolation, Url().GetString(), body);
 
-  // Send the permissions policy violation report to any ReportingObservers.
-  ReportingContext::From(this)->QueueReport(report);
+  // Send the permissions policy violation report to the specified endpoint,
+  // if one exists, as well as any ReportingObservers.
+  if (reporting_endpoint) {
+    ReportingContext::From(this)->QueueReport(report, {*reporting_endpoint});
+  } else {
+    ReportingContext::From(this)->QueueReport(report);
+  }
 
   // TODO(iclelland): Report something different in report-only mode
   if (disposition == mojom::blink::PolicyDisposition::kEnforce) {
@@ -1928,8 +1934,10 @@ CustomElementRegistry* LocalDOMWindow::customElements(
 }
 
 CustomElementRegistry* LocalDOMWindow::customElements() const {
-  if (!custom_elements_ && document_)
+  if (!custom_elements_ && document_) {
     custom_elements_ = MakeGarbageCollected<CustomElementRegistry>(this);
+    custom_elements_->AssociatedWith(*document_);
+  }
   return custom_elements_;
 }
 
@@ -2490,6 +2498,24 @@ bool LocalDOMWindow::CanUseWindowingControls(ExceptionState& exception_state) {
     return false;
   }
 
+// Additional windowing controls (AWC) is a desktop-only feature.
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+  exception_state.ThrowDOMException(
+      DOMExceptionCode::kNotSupportedError,
+      "API is only supported on Desktop platforms. This excludes mobile "
+      "platforms.");
+  return false;
+#else
+  return true;
+#endif
+}
+
+bool LocalDOMWindow::CanUseMinMaxRestoreWindowingControls(
+    ExceptionState& exception_state) {
+  if (!CanUseWindowingControls(exception_state)) {
+    return false;
+  }
+
 #if !defined(USE_AURA)
   // TODO(crbug.com/1466851): Make the APIs also work on Mac.
   exception_state.ThrowDOMException(
@@ -2503,7 +2529,7 @@ bool LocalDOMWindow::CanUseWindowingControls(ExceptionState& exception_state) {
 }
 
 void LocalDOMWindow::maximize(ExceptionState& exception_state) {
-  if (!CanUseWindowingControls(exception_state)) {
+  if (!CanUseMinMaxRestoreWindowingControls(exception_state)) {
     return;
   }
 
@@ -2520,7 +2546,7 @@ void LocalDOMWindow::maximize(ExceptionState& exception_state) {
 }
 
 void LocalDOMWindow::minimize(ExceptionState& exception_state) {
-  if (!CanUseWindowingControls(exception_state)) {
+  if (!CanUseMinMaxRestoreWindowingControls(exception_state)) {
     return;
   }
 
@@ -2537,7 +2563,7 @@ void LocalDOMWindow::minimize(ExceptionState& exception_state) {
 }
 
 void LocalDOMWindow::restore(ExceptionState& exception_state) {
-  if (!CanUseWindowingControls(exception_state)) {
+  if (!CanUseMinMaxRestoreWindowingControls(exception_state)) {
     return;
   }
 
@@ -2547,6 +2573,18 @@ void LocalDOMWindow::restore(ExceptionState& exception_state) {
 
 #if defined(USE_AURA)
   GetFrame()->GetLocalFrameHostRemote().Restore();
+#endif
+}
+
+void LocalDOMWindow::setResizable(bool resizable,
+                                  ExceptionState& exception_state) {
+  if (!CanUseWindowingControls(exception_state)) {
+    return;
+  }
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+  ChromeClient& chrome_client = GetFrame()->GetChromeClient();
+  chrome_client.SetResizable(resizable, *GetFrame());
 #endif
 }
 

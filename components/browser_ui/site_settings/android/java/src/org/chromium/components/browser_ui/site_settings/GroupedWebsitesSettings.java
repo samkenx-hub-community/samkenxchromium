@@ -25,7 +25,7 @@ import org.chromium.components.browsing_data.DeleteBrowsingDataAction;
 /**
  * Shows the permissions and other settings for a group of websites.
  */
-public class GroupedWebsitesSettings extends SiteSettingsPreferenceFragment
+public class GroupedWebsitesSettings extends BaseSiteSettingsFragment
         implements Preference.OnPreferenceClickListener, CustomDividerFragment {
     public static final String EXTRA_GROUP = "org.chromium.chrome.preferences.site_group";
 
@@ -109,7 +109,7 @@ public class GroupedWebsitesSettings extends SiteSettingsPreferenceFragment
         TextView signedOutText = dialogView.findViewById(R.id.signed_out_text);
         signedOutText.setText(R.string.webstorage_clear_data_dialog_sign_out_group_message);
         TextView offlineText = dialogView.findViewById(R.id.offline_text);
-        offlineText.setText(R.string.webstorage_clear_data_dialog_offline_message);
+        offlineText.setText(R.string.webstorage_delete_data_dialog_offline_message);
         if (getSiteSettingsDelegate().isPrivacySandboxSettings4Enabled()) {
             TextView adPersonalizationText = dialogView.findViewById(R.id.ad_personalization_text);
             adPersonalizationText.setVisibility(View.VISIBLE);

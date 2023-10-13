@@ -29,7 +29,8 @@ typedef xmlMutex *xmlMutexPtr;
 typedef struct _xmlRMutex xmlRMutex;
 typedef xmlRMutex *xmlRMutexPtr;
 
-XMLPUBFUN int xmlCheckThreadLocalStorage(void);
+XMLPUBFUN int
+			xmlCheckThreadLocalStorage(void);
 
 XMLPUBFUN xmlMutexPtr
 			xmlNewMutex	(void);

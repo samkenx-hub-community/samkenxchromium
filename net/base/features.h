@@ -95,6 +95,10 @@ NET_EXPORT extern const base::FeatureParam<int>
     kAlternativePortForGloballyReachableCheck;
 NET_EXPORT BASE_DECLARE_FEATURE(kUseAlternativePortForGloballyReachableCheck);
 
+// If enabled, overrides IPv6 reachability probe results based on the system's
+// IP addresses.
+NET_EXPORT BASE_DECLARE_FEATURE(kEnableIPv6ReachabilityOverride);
+
 // If enabled allows the use of SHA-1 by the server for signatures
 // in the TLS handshake.
 NET_EXPORT BASE_DECLARE_FEATURE(kSHA1ServerSignature);
@@ -324,6 +328,10 @@ NET_EXPORT BASE_DECLARE_FEATURE(kTpcdSupportSettings);
 // component updater.
 NET_EXPORT BASE_DECLARE_FEATURE(kTpcdMetadataGrants);
 
+// Whether temporary storage access grants awarded by all 3PCD heuristics should
+// be considered to override cookie behavior.
+NET_EXPORT BASE_DECLARE_FEATURE(kTpcdReadHeuristicsGrants);
+
 // Whether ALPS parsing is on for any type of frame.
 NET_EXPORT BASE_DECLARE_FEATURE(kAlpsParsing);
 
@@ -347,6 +355,10 @@ NET_EXPORT BASE_DECLARE_FEATURE(kBlockNewForbiddenHeaders);
 // Whether to probe for SHA-256 on some legacy platform keys, before assuming
 // the key requires SHA-1. See SSLPlatformKeyWin for details.
 NET_EXPORT BASE_DECLARE_FEATURE(kPlatformKeyProbeSHA256);
+
+// Whether or not to use the GetNetworkConnectivityHint API on modern Windows
+// versions for the Network Change Notifier.
+NET_EXPORT BASE_DECLARE_FEATURE(kEnableGetNetworkConnectivityHintAPI);
 #endif
 
 // Prefetch to follow normal semantics instead of 5-minute rule
@@ -452,6 +464,19 @@ NET_EXPORT BASE_DECLARE_FEATURE(kThirdPartyPartitionedStorageAllowedByDefault);
 // Enables the HTTP extensible priorities "priority" header.
 // RFC 9218
 NET_EXPORT BASE_DECLARE_FEATURE(kPriorityHeader);
+
+// Enables a more efficient implementation of SpdyHeadersToHttpResponse().
+NET_EXPORT BASE_DECLARE_FEATURE(kSpdyHeadersToHttpResponseUseBuilder);
+
+// Enables comparison of old and new implementations of
+// SpdyHeadersToHttpResponse at runtime and calls DumpWithoutCrashing() if they
+// differ. This is slow, so should never be enabled in Beta or Stable channels.
+// TODO(https://crbug.com/1485670): Remove this once we have run an experiment
+// for two weeks on Dev.
+NET_EXPORT BASE_DECLARE_FEATURE(kSpdyHeadersToHttpResponseVerifyCorrectness);
+
+// Enables receiving ECN bit by sockets in Chrome.
+NET_EXPORT BASE_DECLARE_FEATURE(kReceiveEcn);
 
 }  // namespace net::features
 

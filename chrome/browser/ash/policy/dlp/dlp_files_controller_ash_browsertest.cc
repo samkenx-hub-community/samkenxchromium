@@ -13,7 +13,6 @@
 #include "chrome/browser/ash/file_system_provider/fake_extension_provider.h"
 #include "chrome/browser/ash/file_system_provider/service.h"
 #include "chrome/browser/ash/policy/dlp/dlp_files_controller_ash.h"
-#include "chrome/browser/chromeos/policy/dlp/dlp_policy_event.pb.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_reporting_manager.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager_factory.h"
@@ -25,6 +24,7 @@
 #include "chrome/common/extensions/extension_constants.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/enterprise/data_controls/dlp_policy_event.pb.h"
 #include "content/public/browser/file_select_listener.h"
 #include "content/public/test/browser_test.h"
 #include "third_party/blink/public/mojom/choosers/file_chooser.mojom.h"
@@ -90,6 +90,18 @@ class DlpFilesControllerAshBrowserTest : public InProcessBrowserTest {
     ASSERT_TRUE(DlpRulesManagerFactory::GetForPrimaryProfile());
   }
 
+  void TearDownOnMainThread() override {
+    // Make sure the rules manager does not return a freed files controller.
+    ON_CALL(*mock_rules_manager_, GetDlpFilesController)
+        .WillByDefault(testing::Return(nullptr));
+
+    // The files controller must be destroyed before the profile since it's
+    // holding a pointer to it.
+    files_controller_.reset();
+
+    InProcessBrowserTest::TearDownOnMainThread();
+  }
+
   std::unique_ptr<KeyedService> SetDlpRulesManager(
       content::BrowserContext* context) {
     auto dlp_rules_manager =
@@ -100,8 +112,8 @@ class DlpFilesControllerAshBrowserTest : public InProcessBrowserTest {
     ON_CALL(*mock_rules_manager_, GetReportingManager)
         .WillByDefault(testing::Return(nullptr));
 
-    files_controller_ =
-        std::make_unique<DlpFilesControllerAsh>(*mock_rules_manager_);
+    files_controller_ = std::make_unique<DlpFilesControllerAsh>(
+        *mock_rules_manager_, Profile::FromBrowserContext(context));
     ON_CALL(*mock_rules_manager_, GetDlpFilesController)
         .WillByDefault(testing::Return(files_controller_.get()));
 

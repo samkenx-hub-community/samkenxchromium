@@ -6,10 +6,26 @@
 
 namespace password_manager::features {
 
+// When enabled, updates to shared existing passwords from the same sender are
+// auto-approved.
+BASE_FEATURE(kAutoApproveSharedPasswordUpdatesFromSameSender,
+             "AutoApproveSharedPasswordUpdatesFromSameSender",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables Biometrics for the Touch To Fill feature. This only effects Android.
 BASE_FEATURE(kBiometricTouchToFill,
              "BiometricTouchToFill",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Delete undecryptable passwords from the store when Sync is active.
+BASE_FEATURE(kClearUndecryptablePasswordsOnSync,
+             "ClearUndecryptablePasswordsInSync",
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+             base::FEATURE_ENABLED_BY_DEFAULT
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT
+#endif
+);
 
 // Disables fallback filling if the server or the autocomplete attribute says it
 // is a credit card field.
@@ -56,13 +72,6 @@ BASE_FEATURE(kNewConfirmationBubbleForGeneratedPasswords,
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
-#if BUILDFLAG(IS_IOS)
-// Enables migration to OSCrypt with a single query to the keychain.
-BASE_FEATURE(kOneReadLoginDatabaseMigration,
-             "OneReadLoginDatabaseMigration",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-#endif  // BUILDFLAG(IS_IOS)
-
 // Enables the notification UI that is displayed to the user when visiting a
 // website for which a stored password has been shared by another user.
 BASE_FEATURE(kSharedPasswordNotificationUI,
@@ -85,6 +94,12 @@ BASE_FEATURE(kPasswordManagerEnableSenderService,
 // terminal.
 BASE_FEATURE(kPasswordManagerLogToTerminal,
              "PasswordManagerLogToTerminal",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Displays at least the decryptable and never saved logins in the password
+// manager
+BASE_FEATURE(kSkipUndecryptablePasswords,
+             "SkipUndecryptablePasswords",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Improves PSL matching capabilities by utilizing PSL-extension list from

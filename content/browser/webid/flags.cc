@@ -17,8 +17,7 @@ bool IsFedCmAuthzEnabled() {
 }
 
 bool IsFedCmIdpSignoutEnabled() {
-  return GetFieldTrialParamByFeatureAsBool(
-      features::kFedCm, features::kFedCmIdpSignoutFieldTrialParamName, false);
+  return base::FeatureList::IsEnabled(features::kFedCmLogoutRps);
 }
 
 bool IsFedCmMultipleIdentityProvidersEnabled() {
@@ -57,8 +56,9 @@ bool IsWebIdentityMDocsEnabled() {
   return base::FeatureList::IsEnabled(features::kWebIdentityMDocs);
 }
 
-bool IsFedCmAccountAutoSelectedFlagEnabled() {
-  return base::FeatureList::IsEnabled(features::kFedCmAccountAutoSelectedFlag);
+bool IsFedCmIdentityCredentialAutoSelectedFlagEnabled() {
+  return base::FeatureList::IsEnabled(
+      features::kFedCmIdentityCredentialAutoSelectedFlag);
 }
 
 bool IsFedCmHostedDomainEnabled() {

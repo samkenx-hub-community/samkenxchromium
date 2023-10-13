@@ -7,18 +7,17 @@ import {ApplicationTestRunner} from 'application_test_runner';
 import {ConsoleTestRunner} from 'console_test_runner';
 
 import * as Common from 'devtools/core/common/common.js';
+import * as Application from 'devtools/panels/application/application.js';
 
 (async function() {
   TestRunner.addResult(`Validate IndexeddbModel clearForStorageKey\n`);
-  await TestRunner.loadLegacyModule('console');
   // Note: every test that uses a storage API must manually clean-up state from previous tests.
   await ApplicationTestRunner.resetState();
 
-  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('resources');
 
   const model = TestRunner.mainTarget.model(Resources.IndexedDBModel);
-  const view = UI.panels.resources;
+  const view = Application.ResourcesPanel.ResourcesPanel.instance();
 
   function createIndexedDBInMainFrame(callback) {
     var mainFrameId = TestRunner.resourceTreeModel.mainFrame.id;
@@ -42,7 +41,7 @@ import * as Common from 'devtools/core/common/common.js';
 
   TestRunner.addResult('Create IndexedDB in main frame');
   await new Promise(createIndexedDBInMainFrame);
-  await TestRunner.addSnifferPromise(UI.panels.resources.sidebar.indexedDBListTreeElement, 'indexedDBLoadedForTest');
+  await TestRunner.addSnifferPromise(Application.ResourcesPanel.ResourcesPanel.instance().sidebar.indexedDBListTreeElement, 'indexedDBLoadedForTest');
   dumpDatabases();
 
   TestRunner.addResult('Removing bogus security origin...');

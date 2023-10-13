@@ -32,7 +32,7 @@ class AutofillDriver;
 class BrowserAutofillManager;
 class CreditCard;
 
-// TODO(csharp): A lot of the logic in this class is copied from autofillagent.
+// TODO(csharp): A lot of the logic in this class is copied from AutofillAgent.
 // Once Autofill is moved out of WebKit this class should be the only home for
 // this logic. See http://crbug.com/51644
 
@@ -59,6 +59,8 @@ class AutofillExternalDelegate : public AutofillPopupDelegate,
       const Suggestion& suggestion,
       int position,
       AutofillSuggestionTriggerSource trigger_source) override;
+  void DidPerformButtonActionForSuggestion(
+      const Suggestion& suggestion) override;
   bool GetDeletionConfirmationText(const std::u16string& value,
                                    PopupItemId popup_item_id,
                                    Suggestion::BackendId backend_id,
@@ -98,14 +100,17 @@ class AutofillExternalDelegate : public AutofillPopupDelegate,
       AutofillSuggestionTriggerSource trigger_source,
       bool is_all_server_suggestions = false);
 
-  // Returns the last targeted server field types to be filled. This is used
-  // by group filling to keep users in the same granularity level by filtering
-  // out fields that do not match the last targeted fields group granularity.
-  // For example, if users choose to fill every address field, we will store
-  // these fields so that in a next iteration, when the user clicks, say a name
-  // field only fields that are of group name are filled, therefore staying at a
-  // group filling level.
-  absl::optional<ServerFieldTypeSet> GetLastServerFieldTypesToFillForSection(
+  // Returns the last targeted field types to be filled. This does not
+  // equate to the field types that were actually filed, but only to those
+  // that were targeted. If a field type is not present on the form that
+  // triggered the suggestions, it cannot possibly be filled.
+  // This is used by group filling to keep users in the same granularity level
+  // by filtering out fields that do not match the last targeted fields group
+  // granularity. For example, if users choose to fill every address field, we
+  // will store these fields so that in a next iteration, when the user clicks,
+  // say a name field only fields that are of group name are filled, therefore
+  // staying at a group filling level.
+  absl::optional<ServerFieldTypeSet> GetLastFieldTypesToFillForSection(
       const Section& section) const;
 
   // Returns true if there is a screen reader installed on the machine.
@@ -123,10 +128,6 @@ class AutofillExternalDelegate : public AutofillPopupDelegate,
   // Inform the delegate that the text field editing has ended. This is
   // used to help record the metrics of when a new popup is shown.
   void DidEndTextFieldEditing();
-
-  // Returns the delegate to its starting state by removing any page specific
-  // values or settings.
-  void Reset();
 
   // PersonalDataManagerObserver:
   void OnPersonalDataFinishedProfileTasks() override;
@@ -147,14 +148,25 @@ class AutofillExternalDelegate : public AutofillPopupDelegate,
   // determined by passed `guid`.
   void ShowEditAddressProfileDialog(const std::string& guid);
 
+  // Shows the delete address profile dialog to the user. The Autofill profile
+  // to delete is determined by the passed `guid`.
+  void ShowDeleteAddressProfileDialog(const std::string& guid);
+
   // Triggered when user closes the address editor dialog.
   void OnAddressEditorClosed(
       AutofillClient::SaveAddressProfileOfferUserDecision decision,
       AutofillProfile profile);
 
+  void OnDeleteDialogClosed(const std::string& guid, bool user_accepted_delete);
+
   // Called when a credit card is scanned using device camera.
   void OnCreditCardScanned(const AutofillTriggerSource trigger_source,
                            const CreditCard& card);
+
+  // Returns the last Autofill triggering field. Derived from the `form` and
+  // `field` parameters of `OnQuery(). Returns nullptr if called before
+  // `OnQuery()` or if the `form` becomes outdated, see crbug.com/1117028.
+  AutofillField* GetQueriedAutofillField() const;
 
   // Fills the form field with the given plus address.
   // Called when a plus address is created.
@@ -223,6 +235,9 @@ class AutofillExternalDelegate : public AutofillPopupDelegate,
   // If not null then it will be called in destructor.
   base::OnceClosure deletion_callback_;
 
+  // Autofill profile update and deletion are async operations. PDM observer is
+  // used to detect when these operations finish. These operations can happen at
+  // the same time.
   base::ScopedObservation<PersonalDataManager, PersonalDataManagerObserver>
       pdm_observation_{this};
 

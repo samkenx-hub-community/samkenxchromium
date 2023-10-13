@@ -44,7 +44,6 @@
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/metrics/user_action_tester.h"
 #include "base/test/scoped_chromeos_version_info.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/test/simple_test_tick_clock.h"
 #include "chromeos/dbus/power/fake_power_manager_client.h"
 #include "chromeos/ui/wm/features.h"
@@ -173,6 +172,10 @@ class TabletModeControllerTest : public AshTestBase {
   }
 
   bool IsTabletModeStarted() const { return test_api_->IsTabletModeStarted(); }
+
+  bool IsInPhysicalTabletState() const {
+    return test_api_->IsInPhysicalTabletState();
+  }
 
   // Attaches a SimpleTestTickClock to the TabletModeController with a non
   // null value initial value.
@@ -667,6 +670,31 @@ TEST_F(TabletModeControllerTest, NoTabletModeWithDisabledInternalDisplay) {
   // Tablet mode signal should also be ignored.
   SetTabletMode(true);
   EXPECT_FALSE(IsTabletModeStarted());
+  EXPECT_FALSE(AreEventsBlocked());
+}
+
+// Tests that tablet mode change events are fired while in unified desktop mode.
+TEST_F(TabletModeControllerTest,
+       TabletModeChangeEventsFiredInUnifiedDesktopMode) {
+  UpdateDisplay("300x200, 300x200");
+  display::test::DisplayManagerTestApi(display_manager())
+      .SetFirstDisplayAsInternalDisplay();
+  ASSERT_FALSE(IsTabletModeStarted());
+
+  // Turn on unified desktop mode.
+  display_manager()->SetUnifiedDesktopEnabled(true);
+  ASSERT_TRUE(display_manager()->IsInUnifiedMode());
+
+  // Opening the lid to 270 degrees should start tablet mode.
+  OpenLidToAngle(270.0f);
+  EXPECT_TRUE(IsTabletModeStarted());
+  EXPECT_TRUE(IsInPhysicalTabletState());
+  EXPECT_TRUE(AreEventsBlocked());
+
+  // Opening the lid to 30 degrees should stop tablet mode.
+  OpenLidToAngle(30.0f);
+  EXPECT_FALSE(IsTabletModeStarted());
+  EXPECT_FALSE(IsInPhysicalTabletState());
   EXPECT_FALSE(AreEventsBlocked());
 }
 
@@ -2067,24 +2095,9 @@ TEST_F(TabletModeControllerScreenshotTest, TransientChildTypeWindow) {
   EXPECT_TRUE(IsShelfAndFloatContainerOpaque());
 }
 
-class TabletModeControllerFloatScreenshotTest
-    : public TabletModeControllerScreenshotTest {
- public:
-  TabletModeControllerFloatScreenshotTest()
-      : scoped_feature_list_(chromeos::wm::features::kWindowLayoutMenu) {}
-  TabletModeControllerFloatScreenshotTest(
-      const TabletModeControllerFloatScreenshotTest&) = delete;
-  TabletModeControllerFloatScreenshotTest& operator=(
-      const TabletModeControllerFloatScreenshotTest&) = delete;
-  ~TabletModeControllerFloatScreenshotTest() override = default;
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
-};
-
 // Floated window in tablet mode only covers a portion of the work area, so we
 // don't take a screenshot.
-TEST_F(TabletModeControllerFloatScreenshotTest, NoScreenshotFloatedWindow) {
+TEST_F(TabletModeControllerScreenshotTest, NoScreenshotFloatedWindow) {
   auto window = CreateAppWindow();
   PressAndReleaseKey(ui::VKEY_F, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
   ASSERT_TRUE(WindowState::Get(window.get())->IsFloated());

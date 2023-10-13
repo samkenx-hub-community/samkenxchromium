@@ -31,8 +31,11 @@ enum class DeviceAuthSource {
 class DeviceAuthParams {
  public:
   DeviceAuthParams(base::TimeDelta auth_validity_period,
-                   device_reauth::DeviceAuthSource source)
-      : auth_validity_period_(auth_validity_period), source_(source) {}
+                   device_reauth::DeviceAuthSource source,
+                   std::string auth_result_histogram = std::string())
+      : auth_validity_period_(auth_validity_period),
+        source_(source),
+        auth_result_histogram_(auth_result_histogram) {}
 
   base::TimeDelta GetAuthenticationValidityPeriod() const {
     return auth_validity_period_;
@@ -40,10 +43,16 @@ class DeviceAuthParams {
   device_reauth::DeviceAuthSource GetDeviceAuthSource() const {
     return source_;
   }
+  const std::string& GetAuthResultHistogram() const {
+    return auth_result_histogram_;
+  }
 
  private:
   base::TimeDelta auth_validity_period_;
   device_reauth::DeviceAuthSource source_;
+  // This histogram should be compatible with the metrics_util::ReauthResult
+  // enum.
+  std::string auth_result_histogram_;
 };
 
 // This interface encapsulates operations related to biometric authentication.
@@ -67,17 +76,9 @@ class DeviceAuthenticator {
 
   // Asks the user to authenticate. Invokes |callback| asynchronously when
   // the auth flow returns with the result.
-  // |requester| is the filling surface that is asking for authentication.
-  // |use_last_valid_auth| if set to false, ignores the grace 60 seconds
-  // period between the last valid authentication and the current
-  // authentication, and re-invokes system authentication.
-  virtual void Authenticate(AuthenticateCallback callback,
-                            bool use_last_valid_auth) = 0;
-
-  // Asks the user to authenticate. Invokes |callback| asynchronously when
-  // the auth flow returns with the result.
   // |message| contains text that will be displayed to the end user on
   // authentication request
+  // On Android |message| is not relevant, can be empty.
   virtual void AuthenticateWithMessage(const std::u16string& message,
                                        AuthenticateCallback callback) = 0;
 

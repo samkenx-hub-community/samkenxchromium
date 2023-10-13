@@ -26,9 +26,12 @@
 #include "chrome/test/interaction/webcontents_interaction_test_util.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
+#include "third_party/blink/public/mojom/frame/user_activation_notification_type.mojom-shared.h"
+#include "third_party/blink/public/mojom/frame/user_activation_update_types.mojom-shared.h"
 #include "ui/base/interaction/element_identifier.h"
 #include "ui/base/interaction/element_tracker.h"
 #include "ui/base/interaction/interaction_sequence.h"
+#include "ui/base/interaction/interaction_test_util.h"
 #include "ui/base/interaction/interactive_test_internal.h"
 #include "ui/views/interaction/interactive_views_test.h"
 #include "ui/views/views_delegate.h"
@@ -41,29 +44,6 @@ namespace {
 // time out looking in the wrong place.
 constexpr ui::InteractionSequence::ContextMode kDefaultWebContentsContextMode =
     ui::InteractionSequence::ContextMode::kAny;
-
-std::string DescribeStateChange(
-    const WebContentsInteractionTestUtil::StateChange& state_change) {
-  std::ostringstream oss;
-  oss << "StateChange{ ";
-  switch (state_change.type) {
-    case WebContentsInteractionTestUtil::StateChange::Type::kDoesNotExist:
-      oss << "does not exist: " << state_change.where << " }";
-      break;
-    case WebContentsInteractionTestUtil::StateChange::Type::kExists:
-      oss << "exists: " << state_change.where << " }";
-      break;
-    case WebContentsInteractionTestUtil::StateChange::Type::
-        kExistsAndConditionTrue:
-      oss << "exists: " << state_change.where << " and condition true:\n"
-          << state_change.test_function << "\n}";
-      break;
-    case WebContentsInteractionTestUtil::StateChange::Type::kConditionTrue:
-      oss << "condition true:\n" << state_change.test_function << "\n}";
-      break;
-  }
-  return oss.str();
-}
 
 // Matcher that determines whether a particular value is truthy.
 class IsTruthyMatcher : public testing::MatcherInterface<const base::Value&> {
@@ -331,6 +311,40 @@ InteractiveBrowserTestApi::NavigateWebContents(
                     .FormatDescription(base::StrCat({desc, ": %s"}))));
 }
 
+InteractiveBrowserTestApi::StepBuilder
+InteractiveBrowserTestApi::FocusWebContents(
+    ui::ElementIdentifier webcontents_id) {
+  StepBuilder builder;
+  builder.SetElementID(webcontents_id);
+  builder.SetDescription("FocusWebContents()");
+  builder.SetStartCallback(base::BindLambdaForTesting(
+      [this](ui::InteractionSequence* seq, ui::TrackedElement* el) {
+        auto* const tracked_el = AsInstrumentedWebContents(el);
+        if (!tracked_el) {
+          LOG(ERROR) << "Element is not an instrumented WebContents.";
+          seq->FailForTesting();
+          return;
+        }
+        const auto result = test_util().ActivateSurface(el);
+        test_impl().HandleActionResult(seq, el, "ActivateSurface", result);
+        if (result != ui::test::ActionResult::kSucceeded) {
+          return;
+        }
+        auto* const contents = tracked_el->web_contents();
+        if (!contents || !contents->GetPrimaryMainFrame()) {
+          LOG(ERROR) << "WebContents not present or no main frame.";
+          seq->FailForTesting();
+          return;
+        }
+        content::UpdateUserActivationStateInterceptor
+            user_activation_interceptor(contents->GetPrimaryMainFrame());
+        user_activation_interceptor.UpdateUserActivationState(
+            blink::mojom::UserActivationUpdateType::kNotifyActivation,
+            blink::mojom::UserActivationNotificationType::kTest);
+      }));
+  return builder;
+}
+
 // static
 InteractiveBrowserTestApi::MultiStep
 InteractiveBrowserTestApi::WaitForStateChange(
@@ -340,14 +354,16 @@ InteractiveBrowserTestApi::WaitForStateChange(
   ui::CustomElementEventType event_type =
       expect_timeout ? state_change.timeout_event : state_change.event;
   CHECK(event_type);
-  const auto desc = base::StringPrintf(
-      "WaitForStateChange( %s, %s )", DescribeStateChange(state_change).c_str(),
-      expect_timeout ? "true" : "false");
+  std::ostringstream desc;
+  desc << "WaitForStateChange( " << state_change << ", "
+       << (expect_timeout ? "true" : "false") << " )";
+  const bool fail_on_close = !state_change.continue_across_navigation;
   return Steps(
       std::move(StepBuilder()
-                    .SetDescription(base::StrCat({desc, ": Queue Event"}))
+                    .SetDescription(base::StrCat({desc.str(), ": Queue Event"}))
                     .SetElementID(webcontents_id)
                     .SetContext(kDefaultWebContentsContextMode)
+                    .SetMustRemainVisible(fail_on_close)
                     .SetStartCallback(base::BindOnce(
                         [](StateChange state_change, ui::TrackedElement* el) {
                           el->AsA<TrackedElementWebContents>()
@@ -355,13 +371,15 @@ InteractiveBrowserTestApi::WaitForStateChange(
                               ->SendEventOnStateChange(state_change);
                         },
                         state_change))),
-      std::move(StepBuilder()
-                    .SetDescription(base::StrCat({desc, ": Wait For Event"}))
-                    .SetElementID(webcontents_id)
-                    .SetContext(
-                        ui::InteractionSequence::ContextMode::kFromPreviousStep)
-                    .SetType(ui::InteractionSequence::StepType::kCustomEvent,
-                             event_type)));
+      std::move(
+          StepBuilder()
+              .SetDescription(base::StrCat({desc.str(), ": Wait For Event"}))
+              .SetElementID(webcontents_id)
+              .SetContext(
+                  ui::InteractionSequence::ContextMode::kFromPreviousStep)
+              .SetType(ui::InteractionSequence::StepType::kCustomEvent,
+                       event_type)
+              .SetMustBeVisibleAtStart(fail_on_close)));
 }
 
 // static

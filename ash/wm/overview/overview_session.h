@@ -290,7 +290,7 @@ class ASH_EXPORT OverviewSession : public display::DisplayObserver,
   // OverviewGridEventHandler). When |sender| is nullptr, |from_touch_gesture|
   // does not matter.
   bool CanProcessEvent() const;
-  bool CanProcessEvent(OverviewItem* sender, bool from_touch_gesture) const;
+  bool CanProcessEvent(OverviewItemBase* sender, bool from_touch_gesture) const;
 
   // Returns true if |window| is not nullptr and equals
   // |active_window_before_overview_|.
@@ -438,12 +438,6 @@ class ASH_EXPORT OverviewSession : public display::DisplayObserver,
   void RefreshNoWindowsWidgetBoundsOnEachGrid(bool animate);
 
   void OnItemAdded(aura::Window* window);
-
-  // Called when a window is activated or deactivated and the saved desk feature
-  // is enabled. Returns true if we should keep overview open. Overview should
-  // be kept open if `gained_active` or `lost_active` is a saved desk dialog.
-  bool ShouldKeepOverviewOpenForSavedDeskDialog(aura::Window* gained_active,
-                                                aura::Window* lost_active);
 
   // Weak pointer to the overview delegate which will be called when a selection
   // is made.

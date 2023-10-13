@@ -5,8 +5,10 @@
 #ifndef CHROME_BROWSER_PICTURE_IN_PICTURE_AUTO_PIP_SETTING_OVERLAY_VIEW_H_
 #define CHROME_BROWSER_PICTURE_IN_PICTURE_AUTO_PIP_SETTING_OVERLAY_VIEW_H_
 
+#include "base/check_is_test.h"
 #include "base/functional/callback.h"
 #include "chrome/browser/picture_in_picture/auto_pip_setting_view.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/views/view.h"
 #include "ui/views/view_targeter_delegate.h"
 
@@ -15,6 +17,7 @@
 class AutoPipSettingOverlayView : public views::View,
                                   public views::ViewTargeterDelegate {
  public:
+  METADATA_HEADER(AutoPipSettingOverlayView);
   using ResultCb =
       base::OnceCallback<void(AutoPipSettingView::UiResult result)>;
 
@@ -33,7 +36,10 @@ class AutoPipSettingOverlayView : public views::View,
   // set as the bubble's parent window.
   virtual void ShowBubble(gfx::NativeView parent);
 
-  const views::View* get_background_for_testing() const { return background_; }
+  views::View* get_background_for_testing() const {
+    CHECK_IS_TEST();
+    return background_;
+  }
 
  private:
   std::unique_ptr<AutoPipSettingView> auto_pip_setting_view_;
@@ -42,6 +48,9 @@ class AutoPipSettingOverlayView : public views::View,
 
   // Callback used to hide the semi-opaque background layer.
   void OnHideView();
+
+  // Perform a linear fade in of |layer|.
+  void FadeInLayer(ui::Layer* layer);
 };
 
 #endif  // CHROME_BROWSER_PICTURE_IN_PICTURE_AUTO_PIP_SETTING_OVERLAY_VIEW_H_

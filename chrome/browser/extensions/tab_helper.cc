@@ -41,8 +41,6 @@
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
-#include "content/public/browser/notification_source.h"
-#include "content/public/browser/notification_types.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
@@ -359,7 +357,7 @@ void TabHelper::DidFinishNavigation(
   DisableBackForwardCacheIfNecessary(enabled_extensions, context,
                                      navigation_handle);
 
-  Browser* browser = chrome::FindBrowserWithWebContents(web_contents());
+  Browser* browser = chrome::FindBrowserWithTab(web_contents());
   if (browser && (browser->is_type_app() || browser->is_type_app_popup())) {
     const Extension* extension = registry->GetInstalledExtension(
         web_app::GetAppIdFromApplicationName(browser->app_name()));

@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {AcceleratorAction, ActionChoice, CustomizableButton, ExtendedFkeysModifier, GraphicsTablet, HardCodedAction, Keyboard, MetaKey, ModifierKey, Mouse, PointingStick, SimulateRightClickModifier, SixPackKeyInfo, SixPackShortcutModifier, Stylus, TopRowActionKey, Touchpad, Vkey} from './input_device_settings_types.js';
+import {AcceleratorAction, ActionChoice, CustomizableButton, CustomizationRestriction, ExtendedFkeysModifier, GraphicsTablet, Keyboard, MetaKey, ModifierKey, Mouse, PointingStick, SimulateRightClickModifier, SixPackKeyInfo, SixPackShortcutModifier, StaticShortcutAction, Stylus, TopRowActionKey, Touchpad, Vkey} from './input_device_settings_types.js';
 
 const defaultSixPackKeyRemappings: SixPackKeyInfo = {
   pageDown: SixPackShortcutModifier.kSearch,
   pageUp: SixPackShortcutModifier.kSearch,
   del: SixPackShortcutModifier.kSearch,
   insert: SixPackShortcutModifier.kSearch,
-  home: SixPackShortcutModifier.kAlt,
-  end: SixPackShortcutModifier.kAlt,
+  home: SixPackShortcutModifier.kSearch,
+  end: SixPackShortcutModifier.kSearch,
 };
 
 export const fakeKeyboards: Keyboard[] = [
@@ -308,6 +308,7 @@ export const fakeMice: Mouse[] = [
     deviceKey: 'test:key',
     name: 'Razer Basilisk V3',
     isExternal: true,
+    customizationRestriction: CustomizationRestriction.kAllowCustomizations,
     settings: {
       swapRight: true,
       sensitivity: 5,
@@ -322,7 +323,7 @@ export const fakeMice: Mouse[] = [
             customizableButton: CustomizableButton.kBack,
           },
           remappingAction: {
-            hardcodedAction: HardCodedAction.kCopy,
+            staticShortcutAction: StaticShortcutAction.kDisable,
           },
         },
         {
@@ -331,7 +332,7 @@ export const fakeMice: Mouse[] = [
             customizableButton: CustomizableButton.kForward,
           },
           remappingAction: {
-            action: AcceleratorAction.kCycleForwardMru,
+            acceleratorAction: AcceleratorAction.kCycleForwardMru,
           },
         },
         {
@@ -372,6 +373,7 @@ export const fakeMice: Mouse[] = [
     deviceKey: 'test:key',
     name: 'MX Anywhere 2S',
     isExternal: false,
+    customizationRestriction: CustomizationRestriction.kAllowCustomizations,
     settings: {
       swapRight: false,
       sensitivity: 1,
@@ -401,7 +403,7 @@ export const fakeMice: Mouse[] = [
             customizableButton: CustomizableButton.kMiddle,
           },
           remappingAction: {
-            action: AcceleratorAction.kToggleClipboardHistory,
+            acceleratorAction: AcceleratorAction.kToggleClipboardHistory,
           },
         },
       ],
@@ -415,6 +417,7 @@ export const fakeMice2: Mouse[] = [
     deviceKey: 'test:key',
     name: 'Fake Razer Basilisk V3',
     isExternal: true,
+    customizationRestriction: CustomizationRestriction.kDisallowCustomizations,
     settings: {
       swapRight: true,
       sensitivity: 5,
@@ -492,7 +495,7 @@ export const fakeGraphicsTablets: GraphicsTablet[] = [
             vkey: Vkey.kNum0,
           },
           remappingAction: {
-            action: AcceleratorAction.kCycleBackwardMru,
+            acceleratorAction: AcceleratorAction.kCycleBackwardMru,
           },
         },
         {
@@ -501,7 +504,7 @@ export const fakeGraphicsTablets: GraphicsTablet[] = [
             vkey: Vkey.kNum1,
           },
           remappingAction: {
-            action: AcceleratorAction.kCycleForwardMru,
+            acceleratorAction: AcceleratorAction.kCycleForwardMru,
           },
         },
       ],
@@ -551,7 +554,7 @@ export const fakeGraphicsTablets: GraphicsTablet[] = [
             vkey: Vkey.kNum0,
           },
           remappingAction: {
-            action: AcceleratorAction.kBrightnessUp,
+            acceleratorAction: AcceleratorAction.kBrightnessUp,
           },
         },
         {
@@ -560,7 +563,7 @@ export const fakeGraphicsTablets: GraphicsTablet[] = [
             vkey: Vkey.kNum1,
           },
           remappingAction: {
-            action: AcceleratorAction.kBrightnessDown,
+            acceleratorAction: AcceleratorAction.kBrightnessDown,
           },
         },
       ],
@@ -603,13 +606,19 @@ export const fakeGraphicsTablets: GraphicsTablet[] = [
 export const fakeMouseButtonActions: ActionChoice[] = [
   {
     actionType: {
-      hardcodedAction: HardCodedAction.kCopy,
+      staticShortcutAction: StaticShortcutAction.kDisable,
+    },
+    name: 'Disable',
+  },
+  {
+    actionType: {
+      staticShortcutAction: StaticShortcutAction.kCopy,
     },
     name: 'Copy',
   },
   {
     actionType: {
-      hardcodedAction: HardCodedAction.kPaste,
+      staticShortcutAction: StaticShortcutAction.kPaste,
     },
     name: 'Paste',
   },

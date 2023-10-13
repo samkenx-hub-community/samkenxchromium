@@ -168,6 +168,7 @@
 #include "third_party/blink/public/common/frame/fenced_frame_permissions_policies.h"
 #include "third_party/blink/public/common/frame/fenced_frame_sandbox_flags.h"
 #include "third_party/blink/public/common/frame/frame_owner_element_type.h"
+#include "third_party/blink/public/common/navigation/navigation_params.h"
 #include "third_party/blink/public/common/navigation/navigation_params_mojom_traits.h"
 #include "third_party/blink/public/common/navigation/navigation_policy.h"
 #include "third_party/blink/public/common/origin_trials/trial_token_validator.h"
@@ -1092,6 +1093,63 @@ bool IsSharedStorageWritableForNavigationRequest(FrameTreeNode* frame_tree_node,
       blink::mojom::PermissionsPolicyFeature::kSharedStorage, origin);
 }
 
+absl::optional<base::SafeRef<RenderFrameHostImpl>>
+GetRenderFrameHostForBackForwardCacheRestore(FrameTreeNode* frame_tree_node,
+                                             NavigationEntryImpl* entry) {
+  if (!entry) {
+    return absl::nullopt;
+  }
+
+  auto restored_entry = frame_tree_node->navigator()
+                            .controller()
+                            .GetBackForwardCache()
+                            .GetOrEvictEntry(entry->GetUniqueID());
+  if (!restored_entry.has_value()) {
+    // If there is no active BFCache entry, we can't use the RFH from the
+    // BFCache entry for the history navigation.
+    return absl::nullopt;
+  }
+
+  RenderFrameHostImpl* restored_rfh =
+      restored_entry.value()->render_frame_host();
+
+  // If there is an ongoing BFCache NavigationRequest with the same entry, that
+  // NavigationRequest will be cancelled, and trigger an eviction from the
+  // NavigationRequest destructor (see comment there for details). So, we can't
+  // restore the to-be-evicted entry anymore.
+  NavigationRequest* previous_navigation_request =
+      frame_tree_node->navigation_request();
+  if (previous_navigation_request &&
+      previous_navigation_request->IsServedFromBackForwardCache() &&
+      previous_navigation_request
+              ->GetRenderFrameHostRestoredFromBackForwardCache() ==
+          restored_rfh) {
+    // Since the BFCache entry won't be restored, we evict it here with
+    // `kNavigationCancelledWhileRestoring` so that the NavigationRequest
+    // won't end up with not restored with no reason (or `Unknown` will be
+    // added instead).
+    // TODO(crbug.com/1487883): Only evict BFCache if the
+    // `BackForwardCacheCommitDeferringCondition`, which unfreezes the
+    // page and disables the eviction on the renderer side, is completed.
+    restored_rfh->EvictFromBackForwardCacheWithReason(
+        BackForwardCacheMetrics::NotRestoredReason::
+            kNavigationCancelledWhileRestoring);
+    return absl::nullopt;
+  }
+
+  if (!frame_tree_node->IsMainFrame()) {
+    // We have a matching BFCache entry for a subframe navigation. This
+    // shouldn't happen as we should've triggered deletion of BFCache
+    // entries that have the same BrowsingInstance as the current document.
+    // See https://crbug.com/1250111.
+    CaptureTraceForNavigationDebugScenario(
+        DebugScenario::kDebugBackForwardCacheEntryExistsOnSubframeHistoryNav);
+    return absl::nullopt;
+  }
+
+  return restored_rfh->GetSafeRef();
+}
+
 }  // namespace
 
 NavigationRequest::PrerenderActivationNavigationState::
@@ -1177,29 +1235,6 @@ std::unique_ptr<NavigationRequest> NavigationRequest::Create(
     navigation_params->skip_service_worker = true;
   }
 
-  absl::optional<base::SafeRef<RenderFrameHostImpl>>
-      rfh_restored_from_back_forward_cache = absl::nullopt;
-  if (entry) {
-    auto restored_entry = frame_tree_node->navigator()
-                              .controller()
-                              .GetBackForwardCache()
-                              .GetOrEvictEntry(entry->GetUniqueID());
-    if (restored_entry.has_value()) {
-      if (frame_tree_node->IsMainFrame()) {
-        rfh_restored_from_back_forward_cache =
-            restored_entry.value()->render_frame_host()->GetSafeRef();
-      } else {
-        // We have a matching BFCache entry for a subframe navigation. This
-        // shouldn't happen as we should've triggered deletion of BFCache
-        // entries that have the same BrowsingInstance as the current document.
-        // See https://crbug.com/1250111.
-        CaptureTraceForNavigationDebugScenario(
-            DebugScenario::
-                kDebugBackForwardCacheEntryExistsOnSubframeHistoryNav);
-      }
-    }
-  }
-
   scoped_refptr<network::SharedURLLoaderFactory> blob_url_loader_factory;
   if (frame_entry) {
     blob_url_loader_factory = frame_entry->blob_url_loader_factory();
@@ -1229,8 +1264,8 @@ std::unique_ptr<NavigationRequest> NavigationRequest::Create(
       std::move(navigation_ui_data), std::move(blob_url_loader_factory),
       mojo::NullAssociatedRemote(),
       nullptr /* prefetched_signed_exchange_cache */,
-      rfh_restored_from_back_forward_cache, initiator_process_id,
-      was_opener_suppressed, is_pdf,
+      GetRenderFrameHostForBackForwardCacheRestore(frame_tree_node, entry),
+      initiator_process_id, was_opener_suppressed, is_pdf,
       is_embedder_initiated_fenced_frame_navigation,
       mojo::NullReceiver() /* renderer_cancellation_listener */,
       embedder_shared_storage_context));
@@ -1336,7 +1371,7 @@ std::unique_ptr<NavigationRequest> NavigationRequest::CreateRendererInitiated(
           /*not_restored_reasons=*/nullptr,
           /*load_with_storage_access=*/load_with_storage_access,
           /*browsing_context_group_info=*/absl::nullopt,
-          /*lcpp_hint=*/nullptr);
+          /*lcpp_hint=*/nullptr, blink::CreateDefaultRendererContentSettings());
 
   commit_params->navigation_timing->system_entropy_at_navigation_start =
       SystemEntropyUtils::ComputeSystemEntropyForFrameTreeNode(
@@ -1480,7 +1515,7 @@ NavigationRequest::CreateForSynchronousRendererCommit(
           /*not_restored_reasons=*/nullptr,
           /*load_with_storage_access=*/false,
           /*browsing_context_group_info=*/absl::nullopt,
-          /*lcpp_hint=*/nullptr);
+          /*lcpp_hint=*/nullptr, blink::CreateDefaultRendererContentSettings());
   blink::mojom::BeginNavigationParamsPtr begin_params =
       blink::mojom::BeginNavigationParams::New();
   std::unique_ptr<NavigationRequest> navigation_request(new NavigationRequest(
@@ -1596,7 +1631,7 @@ NavigationRequest::NavigationRequest(
       is_back_forward_cache_restore_(
           rfh_restored_from_back_forward_cache.has_value()),
       // Store the old RenderFrameHost id at request creation to be used later.
-      previous_render_frame_host_id_(
+      current_render_frame_host_id_at_construction_(
           frame_tree_node->current_frame_host()->GetGlobalId()),
       initiator_frame_token_(begin_params_->initiator_frame_token),
       initiator_process_id_(initiator_process_id),
@@ -1658,7 +1693,7 @@ NavigationRequest::NavigationRequest(
     RenderFrameHostImpl* initiator_rfh = RenderFrameHostImpl::FromFrameToken(
         GetInitiatorProcessId(), GetInitiatorFrameToken().value());
     if (initiator_rfh)
-      initiator_document_ = initiator_rfh->GetWeakDocumentPtr();
+      initiator_document_token_ = initiator_rfh->GetDocumentToken();
   }
 
   // Spec: https://github.com/whatwg/html/issues/8846
@@ -2162,6 +2197,9 @@ NavigationRequest::~NavigationRequest() {
           // rfh is still in the cache so the navigation must have failed. But
           // we have already disabled eviction so the safest thing to do here to
           // recover is to evict.
+          // TODO(crbug.com/1487883): Only evict BFCache if the
+          // `BackForwardCacheCommitDeferringCondition`, which unfreezes the
+          // page and disables the eviction on the renderer side, is completed.
           rfh->EvictFromBackForwardCacheWithReason(
               BackForwardCacheMetrics::NotRestoredReason::
                   kNavigationCancelledWhileRestoring);
@@ -2272,6 +2310,18 @@ void NavigationRequest::BeginNavigation() {
     // ConvertFencedFrameURNToURL may cause the destruction of the
     // NavigationRequest.
     return;
+  }
+
+  // Log a histogram for a top-level navigation that initiates from a fenced
+  // frame or URN iframe.
+  if (GetInitiatorDocumentRenderFrameHost() &&
+      GetInitiatorDocumentRenderFrameHost()
+          ->frame_tree_node()
+          ->GetFencedFrameProperties()
+          .has_value() &&
+      IsInOutermostMainFrame()) {
+    base::UmaHistogramEnumeration(blink::kFencedFrameTopNavigationHistogram,
+                                  blink::FencedFrameNavigationState::kBegin);
   }
 
   BeginNavigationImpl();
@@ -2667,6 +2717,9 @@ void NavigationRequest::BeginNavigationImpl() {
 void NavigationRequest::
     SelectFrameHostForCrossDocumentNavigationWithNoUrlLoader() {
   DCHECK(!NeedsUrlLoader());
+  CHECK(!HasRenderFrameHost())
+      << "`render_frame_host_` should not be set before the "
+         "`NavigationRequest` starts to select the RFH.";
 
   if (auto result =
           frame_tree_node_->render_manager()->GetFrameHostForNavigation(
@@ -3066,6 +3119,20 @@ NavigationRequest::TakePolicyContainerHost() {
   return host;
 }
 
+void NavigationRequest::SetSubresourceProxyingFactoryBundle(
+    scoped_refptr<network::SharedURLLoaderFactory>
+        subresource_proxying_factory_bundle) {
+  DCHECK_GE(state_, READY_TO_COMMIT);
+  subresource_proxying_factory_bundle_ =
+      std::move(subresource_proxying_factory_bundle);
+}
+
+scoped_refptr<network::SharedURLLoaderFactory>
+NavigationRequest::TakeSubresourceProxyingFactoryBundle() {
+  DCHECK_GE(state_, READY_TO_COMMIT);
+  return std::move(subresource_proxying_factory_bundle_);
+}
+
 void NavigationRequest::CreateCoepReporter(
     StoragePartition* storage_partition) {
   DCHECK(!isolation_info_for_subresources_.IsEmpty());
@@ -3356,6 +3423,11 @@ base::SafeRef<NavigationHandle> NavigationRequest::GetSafeRef() {
 
 bool NavigationRequest::ExistingDocumentWasDiscarded() const {
   return commit_params_->was_discarded;
+}
+
+void NavigationRequest::SetContentSettings(
+    blink::mojom::RendererContentSettingsPtr content_settings) {
+  commit_params_->content_settings = std::move(content_settings);
 }
 
 void NavigationRequest::CheckForIsolationOptIn(const GURL& url) {
@@ -3979,10 +4051,22 @@ void NavigationRequest::OnResponseStarted(
   response_body_ = std::move(response_body);
   ssl_info_ = response_head_->ssl_info;
   auth_challenge_info_ = response_head_->auth_challenge_info;
+
   // TODO(https://crbug.com/1305896): Store the whole EarlyHints struct instead
   // of duplicating all of its fields.
   was_resource_hints_received_ = early_hints.was_resource_hints_received;
   early_hints_manager_ = std::move(early_hints.manager);
+  if (early_hints_manager_ &&
+      early_hints_manager_->first_early_hints_receive_time()) {
+    base::UmaHistogramTimes(
+        "Navigation.EarlyHints.WillStartRequestToEarlyHintsTime",
+        *early_hints_manager_->first_early_hints_receive_time() -
+            will_start_request_time_);
+    base::UmaHistogramTimes(
+        "Navigation.EarlyHints.EarlyHintsToResponseStartTime",
+        base::TimeTicks::Now() -
+            *early_hints_manager_->first_early_hints_receive_time());
+  }
 
   // A request was made. Record it before we decide to block this response for
   // a reason or another.
@@ -4202,6 +4286,9 @@ void NavigationRequest::SelectFrameHostForOnResponseStarted(
     network::mojom::URLLoaderClientEndpointsPtr url_loader_client_endpoints,
     bool is_download,
     absl::optional<SubresourceLoaderParams> subresource_loader_params) {
+  CHECK(!HasRenderFrameHost())
+      << "`render_frame_host_` should not be set before the "
+         "`NavigationRequest` starts to select the RFH.";
   ScopedCrashKeys crash_keys(*this);
 
   std::string rfh_selected_reason;
@@ -4590,6 +4677,13 @@ void NavigationRequest::OnRequestFailedInternal(
   // anymore from now while the error page is being loaded.
   loader_.reset();
 
+  // Reset the RenderFrameHost R1 that had been computed for committing the
+  // failed navigation. This breaks the binding between the current
+  // NavigationRequest and R1, so that if we create another speculative
+  // RenderFrameHost R2 to commit an error page after this, deleting R1 won't
+  // try to delete this NavigationRequest along with it.
+  render_frame_host_ = absl::nullopt;
+
   ssl_info_ = status.ssl_info;
 
   devtools_instrumentation::OnNavigationRequestFailed(*this, status);
@@ -4641,6 +4735,10 @@ void NavigationRequest::SelectFrameHostForOnRequestFailedInternal(
     bool exists_in_cache,
     bool skip_throttles,
     const absl::optional<std::string>& error_page_content) {
+  CHECK(!HasRenderFrameHost())
+      << "`render_frame_host_` should not be set before the "
+         "`NavigationRequest` starts to select the RFH.";
+
   switch (ComputeErrorPageProcess()) {
     case ErrorPageProcess::kCurrentProcess:
       // There's no way to get here with a same-document navigation, it would
@@ -4699,10 +4797,6 @@ void NavigationRequest::SelectFrameHostForOnRequestFailedInternal(
     }
   }
 
-  // Sanity check that we haven't changed the RenderFrameHost picked for the
-  // error page in OnRequestFailedInternal when running the WillFailRequest
-  // checks.
-  CHECK(!HasRenderFrameHost() || GetRenderFrameHost() == render_frame_host);
   render_frame_host_ = render_frame_host->GetSafeRef();
 
   // Update the associated RenderFrameHost type.
@@ -4943,9 +5037,10 @@ void NavigationRequest::OnStartChecksComplete(
           frame_tree_node_->current_frame_host()->devtools_frame_token(),
           std::move(cors_exempt_headers),
           BuildClientSecurityStateForNavigationFetch(),
-          devtools_accepted_stream_types, is_pdf_, initiator_document_,
-          GetPreviousRenderFrameHostId(), allow_cookies_from_browser_,
-          navigation_id_, shared_storage_writable_),
+          devtools_accepted_stream_types, is_pdf_, GetInitiatorProcessId(),
+          initiator_document_token_, GetPreviousRenderFrameHostId(),
+          allow_cookies_from_browser_, navigation_id_,
+          shared_storage_writable_),
       std::move(navigation_ui_data), service_worker_handle_.get(),
       std::move(prefetched_signed_exchange_cache_), this, loader_type,
       CreateCookieAccessObserver(), CreateTrustTokenAccessObserver(),
@@ -5344,21 +5439,15 @@ void NavigationRequest::OnWillProcessResponseChecksComplete(
       !response_should_be_rendered_) {
     MaybeAddResourceTimingEntryForCancelledNavigation();
 
-    // Reset the RenderFrameHost that had been computed for the commit of the
-    // navigation.
-    // TODO(https://crbug.com/1416916): Reconsider if we really need to unset
-    // the `render_frame_host_` here, as the NavigationRequest might stay alive
-    // for a bit longer to commit an error page.
-    render_frame_host_ = absl::nullopt;
-
     // TODO(clamy): distinguish between CANCEL and CANCEL_AND_IGNORE.
     if (!response_should_be_rendered_) {
-      // DO NOT ADD CODE after this. The previous call to OnRequestFailed has
-      // destroyed the NavigationRequest.
       OnRequestFailedInternal(
           network::URLLoaderCompletionStatus(net::ERR_ABORTED),
           true /* skip_throttles */, absl::nullopt /* error_page_content */,
           false /* collapse_frame */);
+
+      // DO NOT ADD CODE after this. The previous call to
+      // OnRequestFailedInternal has destroyed the NavigationRequest.
       return;
     }
 
@@ -5376,12 +5465,6 @@ void NavigationRequest::OnWillProcessResponseChecksComplete(
 
   if (result.action() == NavigationThrottle::BLOCK_RESPONSE) {
     DCHECK_EQ(net::ERR_BLOCKED_BY_RESPONSE, result.net_error_code());
-    // Reset the RenderFrameHost that had been computed for the commit of the
-    // navigation.
-    // TODO(https://crbug.com/1416916): Reconsider if we really need to unset
-    // the `render_frame_host_` here, as the NavigationRequest might stay alive
-    // for a bit longer to commit an error page.
-    render_frame_host_ = absl::nullopt;
     OnRequestFailedInternal(
         network::URLLoaderCompletionStatus(result.net_error_code()),
         true /* skip_throttles */, result.error_page_content(),
@@ -5474,7 +5557,9 @@ void NavigationRequest::CommitErrorPage(
   common_params_->initiator_base_url = absl::nullopt;
 
   if (request_navigation_client_.is_bound()) {
-    if (GetRenderFrameHost() == frame_tree_node()->current_frame_host()) {
+    if (GetRenderFrameHost() ==
+        RenderFrameHostImpl::FromID(
+            current_render_frame_host_id_at_construction_)) {
       // Reuse the request NavigationClient for commit.
       commit_navigation_client_ = std::move(request_navigation_client_);
     } else {
@@ -5624,7 +5709,9 @@ void NavigationRequest::CommitNavigation() {
              frame_tree_node_->render_manager()->speculative_frame_host());
 
   if (request_navigation_client_.is_bound()) {
-    if (GetRenderFrameHost() == frame_tree_node()->current_frame_host()) {
+    if (GetRenderFrameHost() ==
+        RenderFrameHostImpl::FromID(
+            current_render_frame_host_id_at_construction_)) {
       // Reuse the request NavigationClient for commit.
       commit_navigation_client_ = std::move(request_navigation_client_);
     } else {
@@ -6491,6 +6578,10 @@ void NavigationRequest::IgnoreCommitInterfaceDisconnection() {
 
 bool NavigationRequest::IsSameDocument() const {
   return NavigationTypeUtils::IsSameDocument(common_params_->navigation_type);
+}
+
+bool NavigationRequest::IsRestore() const {
+  return NavigationTypeUtils::IsRestore(common_params_->navigation_type);
 }
 
 void NavigationRequest::RecordDownloadUseCountersPrePolicyCheck() {
@@ -7535,8 +7626,7 @@ NavigationRequest::GetOriginForURLLoaderFactoryAfterResponseWithDebugInfo() {
       "Bug1454273", "embedder_origin",
       embedder ? embedder->GetLastCommittedOrigin().GetDebugString() : "");
 
-  RenderFrameHost* initiator_rfh =
-      initiator_document_.AsRenderFrameHostIfValid();
+  RenderFrameHost* initiator_rfh = GetInitiatorDocumentRenderFrameHost();
   SCOPED_CRASH_KEY_STRING256(
       "Bug1454273", "initiator_origin",
       initiator_rfh ? initiator_rfh->GetLastCommittedOrigin().GetDebugString()
@@ -8210,7 +8300,22 @@ const net::ProxyServer& NavigationRequest::GetProxyServer() {
 }
 
 GlobalRenderFrameHostId NavigationRequest::GetPreviousRenderFrameHostId() {
-  return previous_render_frame_host_id_;
+  if (previous_render_frame_host_id_ != GlobalRenderFrameHostId()) {
+    CHECK_GE(state_, READY_TO_COMMIT);
+    // If `previous_render_frame_host_id_` is set to a non-default value, then
+    // the navigation had committed and potentially replaced the previous
+    // "current RenderFrameHost", so we return the saved value of that previous
+    // RenderFrameHost's ID here.
+    return previous_render_frame_host_id_;
+  }
+
+  // The navigation hasn't committed yet, so the previous RenderFrameHost is
+  // still the current RenderFrameHost. Note that this might be different from
+  // the current RFH at NavigationRequest construction time (whose FTN id value
+  // is saved in `current_render_frame_host_id_at_construction_`), if another
+  // navigation caused a new RenderFrameHost to be committed while this
+  // navigation is in progress.
+  return frame_tree_node_->current_frame_host()->GetGlobalId();
 }
 
 int NavigationRequest::GetExpectedRenderProcessHostId() {
@@ -8761,8 +8866,10 @@ void NavigationRequest::OnCookiesAccessed(
     // TODO(721329): We should not send information to the current frame about
     // (potentially unrelated) ongoing navigation, but at the moment we don't
     // have another way to add messages to DevTools console.
-    EmitCookieWarningsAndMetrics(frame_tree_node()->current_frame_host(),
-                                 details);
+    for (size_t i = 0; i < details->count; ++i) {
+      EmitCookieWarningsAndMetrics(frame_tree_node()->current_frame_host(),
+                                   details);
+    }
 
     CookieAccessDetails allowed;
     CookieAccessDetails blocked;
@@ -8783,7 +8890,7 @@ void NavigationRequest::OnCookiesAccessed(
       uint64_t http_only_cookie_modification_count = 0u;
       for (net::CanonicalCookie& cookie : allowed.cookie_list) {
         if (cookie.IsHttpOnly()) {
-          http_only_cookie_modification_count++;
+          http_only_cookie_modification_count += details->count;
         }
       }
       if (cookie_change_listener_) {
@@ -8838,8 +8945,10 @@ NavigationRequest::TakeSharedDictionaryAccessObservers() {
 }
 
 RenderFrameHostImpl* NavigationRequest::GetInitiatorDocumentRenderFrameHost() {
-  return static_cast<RenderFrameHostImpl*>(
-      initiator_document_.AsRenderFrameHostIfValid());
+  return initiator_document_token_
+             ? RenderFrameHostImpl::FromDocumentToken(
+                   initiator_process_id_, *initiator_document_token_)
+             : nullptr;
 }
 
 void NavigationRequest::RecordAddressSpaceFeature() {
@@ -9639,6 +9748,16 @@ void NavigationRequest::CheckSoftNavigationHeuristicsInvariants() {
   if (!commit_params_->soft_navigation_heuristics_task_id) {
     return;
   }
+  // TODO(https://crbug.com/1487628): Checking for a restore here, to
+  // accommodate for restored same document navigations. They are currently
+  // NOT executed as same-document. The task ID is cleared to ensure it never
+  // leak toward a different document.
+  if (IsRestore()) {
+    DCHECK(!IsSameDocument());
+    commit_params_->soft_navigation_heuristics_task_id = {};
+    return;
+  }
+
   // In NavigationControllerImpl::NavigateToExistingPendingEntry we're verifying
   // that the task ID is only passed along if the initiator RFH is the same as
   // the navigated RFH.

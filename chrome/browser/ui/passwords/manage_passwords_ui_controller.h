@@ -111,6 +111,7 @@ class ManagePasswordsUIController
   void OnBiometricAuthenticationForFilling(PrefService* prefs) override;
   void ShowBiometricActivationConfirmation() override;
   void OnBiometricAuthBeforeFillingDeclined() override;
+  void OnAddUsernameSaveClicked(const std::u16string& username) override;
 
   virtual void NotifyUnsyncedCredentialsWillBeDeleted(
       std::vector<password_manager::PasswordForm> unsynced_credentials);
@@ -317,6 +318,10 @@ class ManagePasswordsUIController
 
   // Cancels current authentication and releases |biometric_authenticator_|.
   void CancelAnyOngoingBiometricAuth();
+
+  // Returns true if the password that is about to be changed was previously
+  // phished.
+  bool IsPendingPasswordPhished() const;
 
   // Timeout in seconds for the manual fallback for saving.
   static int save_fallback_timeout_in_seconds_;

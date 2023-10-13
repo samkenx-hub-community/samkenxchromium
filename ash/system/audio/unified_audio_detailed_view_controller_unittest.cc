@@ -327,11 +327,9 @@ INSTANTIATE_TEST_SUITE_P(All,
 TEST_P(UnifiedAudioDetailedViewControllerTest, ToggleNbsWarning) {
   scoped_feature_list_.Reset();
   if (!IsQsRevampEnabled()) {
-    scoped_feature_list_.InitWithFeatures({ash::features::kAudioHFPNbsWarning},
-                                          {});
+    scoped_feature_list_.InitWithFeatures({}, {});
   } else {
-    scoped_feature_list_.InitWithFeatures(
-        {ash::features::kAudioHFPNbsWarning, features::kQsRevamp}, {});
+    scoped_feature_list_.InitWithFeatures({features::kQsRevamp}, {});
   }
 
   fake_cras_audio_client()->SetAudioNodesAndNotifyObserversForTesting(
@@ -735,19 +733,14 @@ TEST_P(UnifiedAudioDetailedViewControllerTest,
       CrasAudioHandler::ACTIVATE_BY_USER);
   EXPECT_EQ(kHeadphoneId, cras_audio_handler_->GetPrimaryActiveOutputNode());
 
-  // Sets the device level to 0 to mute the device.
-  cras_audio_handler_->SetVolumeGainPercentForDevice(kHeadphoneId, /*value=*/0);
-
-  // For QsRevamp: level is 0 state should be equal to the muted state.
-  if (IsQsRevampEnabled()) {
-    EXPECT_TRUE(cras_audio_handler_->IsOutputMutedForDevice(kHeadphoneId));
-  } else {
-    EXPECT_FALSE(cras_audio_handler_->IsOutputMutedForDevice(kHeadphoneId));
-  }
-
-  // Unmute the device by setting a volume level greater than 0.
+  // Sets a volume level greater than 0 and the device is unmuted.
   cras_audio_handler_->SetVolumeGainPercentForDevice(kHeadphoneId,
                                                      /*value=*/10);
+  EXPECT_FALSE(cras_audio_handler_->IsOutputMutedForDevice(kHeadphoneId));
+
+  // Sets the device level to 0. The mute state is controlled by the mute
+  // button so the output is still unmuted.
+  cras_audio_handler_->SetVolumeGainPercentForDevice(kHeadphoneId, /*value=*/0);
   EXPECT_FALSE(cras_audio_handler_->IsOutputMutedForDevice(kHeadphoneId));
 }
 

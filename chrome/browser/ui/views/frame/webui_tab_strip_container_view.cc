@@ -513,16 +513,17 @@ bool WebUITabStripContainerView::IsDraggedTab(const ui::OSExchangeData& data) {
   base::Pickle pickle;
   if (data.GetPickledData(ui::ClipboardFormatType::WebCustomDataType(),
                           &pickle)) {
-    std::u16string result;
-    ui::ReadCustomDataForType(pickle.data(), pickle.size(),
-                              base::ASCIIToUTF16(kWebUITabIdDataType), &result);
-    if (result.size())
+    if (absl::optional<std::u16string> result =
+            ui::ReadCustomDataForType(pickle, kWebUITabIdDataType);
+        result && !result->empty()) {
       return true;
-    ui::ReadCustomDataForType(pickle.data(), pickle.size(),
-                              base::ASCIIToUTF16(kWebUITabGroupIdDataType),
-                              &result);
-    if (result.size())
+    }
+
+    if (absl::optional<std::u16string> result =
+            ui::ReadCustomDataForType(pickle, kWebUITabGroupIdDataType);
+        result && !result->empty()) {
       return true;
+    }
   }
 
   return false;
@@ -951,3 +952,6 @@ void WebUITabStripContainerView::DeinitializeWebView() {
     tab_strip_ui->Deinitialize();
   }
 }
+
+BEGIN_METADATA(WebUITabStripContainerView, views::AccessiblePaneView)
+END_METADATA

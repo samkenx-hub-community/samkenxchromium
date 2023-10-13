@@ -39,14 +39,13 @@ import '../os_settings_page/settings_idle_load.js';
 import './page_displayer.js';
 
 import {WebUiListenerMixin} from 'chrome://resources/cr_elements/web_ui_listener_mixin.js';
-import {assert} from 'chrome://resources/js/assert_ts.js';
+import {assert} from 'chrome://resources/js/assert.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {beforeNextRender, microTask, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {castExists} from '../assert_extras.js';
 import {isRevampWayfindingEnabled} from '../common/load_time_booleans.js';
 import {PrefsState} from '../common/types.js';
-import {MainPageMixin} from '../main_page_mixin.js';
 import {Section} from '../mojom-webui/routes.mojom-webui.js';
 import {AboutPageBrowserProxyImpl} from '../os_about_page/about_page_browser_proxy.js';
 import {AndroidAppsBrowserProxyImpl, AndroidAppsInfo} from '../os_apps_page/android_apps_browser_proxy.js';
@@ -55,6 +54,7 @@ import {OsPageAvailability} from '../os_page_availability.js';
 import {isAboutRoute, isAdvancedRoute, isBasicRoute, Route, Router} from '../router.js';
 
 import {getTemplate} from './main_page_container.html.js';
+import {MainPageMixin} from './main_page_mixin.js';
 
 const MainPageContainerElementBase =
     MainPageMixin(WebUiListenerMixin(PolymerElement));
@@ -217,14 +217,14 @@ export class MainPageContainerElement extends MainPageContainerElementBase {
     this.advancedTogglingInProgress_ = false;
   }
 
-  override ready() {
+  override ready(): void {
     super.ready();
 
     this.setAttribute('role', 'main');
     this.addEventListener('showing-subpage', this.onShowingSubpage);
   }
 
-  override connectedCallback() {
+  override connectedCallback(): void {
     super.connectedCallback();
 
     this.currentRoute_ = Router.getInstance().currentRoute;
@@ -240,7 +240,7 @@ export class MainPageContainerElement extends MainPageContainerElementBase {
     });
   }
 
-  override currentRouteChanged(newRoute: Route, oldRoute?: Route) {
+  override currentRouteChanged(newRoute: Route, oldRoute?: Route): void {
     this.currentRoute_ = newRoute;
 
     if (isAdvancedRoute(newRoute)) {
@@ -261,7 +261,7 @@ export class MainPageContainerElement extends MainPageContainerElementBase {
     super.currentRouteChanged(newRoute, oldRoute);
   }
 
-  override containsRoute(_route: Route|undefined) {
+  override containsRoute(_route: Route|undefined): boolean {
     // All routes are contained under this element.
     return true;
   }
@@ -286,7 +286,7 @@ export class MainPageContainerElement extends MainPageContainerElementBase {
     return !this.isShowingSubpage_ && this.showEolIncentive_;
   }
 
-  private androidAppsInfoUpdate_(info: AndroidAppsInfo) {
+  private androidAppsInfoUpdate_(info: AndroidAppsInfo): void {
     this.androidAppsInfo = info;
   }
 
@@ -294,7 +294,7 @@ export class MainPageContainerElement extends MainPageContainerElementBase {
    * Hides the update required EOL banner. It is shown again when Settings is
    * re-opened.
    */
-  private onCloseEolBannerClicked_() {
+  private onCloseEolBannerClicked_(): void {
     this.showUpdateRequiredEolBanner_ = false;
   }
 
@@ -305,7 +305,7 @@ export class MainPageContainerElement extends MainPageContainerElementBase {
   /**
    * Render the advanced page now (don't wait for idle).
    */
-  private advancedToggleExpandedChanged_() {
+  private advancedToggleExpandedChanged_(): void {
     if (!this.advancedToggleExpanded) {
       return;
     }
@@ -317,7 +317,7 @@ export class MainPageContainerElement extends MainPageContainerElementBase {
     });
   }
 
-  private advancedToggleClicked_() {
+  private advancedToggleClicked_(): void {
     if (this.advancedTogglingInProgress_) {
       return;
     }

@@ -60,6 +60,7 @@
 #include "third_party/blink/renderer/core/exported/web_page_popup_impl.h"
 #include "third_party/blink/renderer/core/frame/animation_frame_timing_monitor.h"
 #include "third_party/blink/renderer/core/frame/web_local_frame_impl.h"
+#include "third_party/blink/renderer/core/page/drag_controller.h"
 #include "third_party/blink/renderer/core/page/event_with_hit_test_results.h"
 #include "third_party/blink/renderer/core/page/viewport_description.h"
 #include "third_party/blink/renderer/platform/graphics/apply_viewport_changes.h"
@@ -245,11 +246,10 @@ class CORE_EXPORT WebFrameWidgetImpl
                      const gfx::Vector2dF& accumulated_overscroll,
                      const gfx::PointF& position,
                      const gfx::Vector2dF& velocity) override;
-  void InjectGestureScrollEvent(WebGestureDevice device,
-                                const gfx::Vector2dF& delta,
-                                ui::ScrollGranularity granularity,
-                                cc::ElementId scrollable_area_element_id,
-                                WebInputEvent::Type injected_type) override;
+  void InjectScrollbarGestureScroll(const gfx::Vector2dF& delta,
+                                    ui::ScrollGranularity granularity,
+                                    cc::ElementId scrollable_area_element_id,
+                                    WebInputEvent::Type injected_type) override;
   void DidChangeCursor(const ui::Cursor&) override;
   void GetCompositionCharacterBoundsInWindow(
       Vector<gfx::Rect>* bounds_in_dips) override;
@@ -402,6 +402,10 @@ class CORE_EXPORT WebFrameWidgetImpl
   // WebWidget overrides.
   void InitializeCompositing(const display::ScreenInfos& screen_infos,
                              const cc::LayerTreeSettings* settings) override;
+  void InitializeCompositingFromPreviousWidget(
+      const display::ScreenInfos& screen_infos,
+      const cc::LayerTreeSettings* settings,
+      WebFrameWidget& previous_widget) override;
   void SetCompositorVisible(bool visible) override;
   gfx::Size Size() override;
   void Resize(const gfx::Size& size_with_dsf) override;
@@ -906,6 +910,10 @@ class CORE_EXPORT WebFrameWidgetImpl
 
   mojom::blink::FrameWidgetHost* GetAssociatedFrameWidgetHost() const;
 
+  void InitializeCompositingInternal(const display::ScreenInfos& screen_infos,
+                                     const cc::LayerTreeSettings* settings,
+                                     WebFrameWidget* previous_widget);
+
   // Notifies RenderWidgetHostImpl that the frame widget has painted something.
   void DidMeaningfulLayout(WebMeaningfulLayout layout_type);
 
@@ -986,8 +994,7 @@ class CORE_EXPORT WebFrameWidgetImpl
   // The current drag operation as negotiated by the source and destination.
   // When not equal to DragOperationNone, the drag data can be dropped onto the
   // current drop target in this WebView (the drop target can accept the drop).
-  ui::mojom::blink::DragOperation drag_operation_ =
-      ui::mojom::blink::DragOperation::kNone;
+  DragController::Operation drag_operation_;
 
   // This field stores drag/drop related info for the event that is currently
   // being handled. If the current event results in starting a drag/drop

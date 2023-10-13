@@ -13,6 +13,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "build/chromeos_buildflags.h"
+#include "chrome/browser/extensions/api/printing/print_job_submitter.h"
 #include "chrome/common/extensions/api/printing.h"
 #include "chromeos/crosapi/mojom/local_printer.mojom.h"
 #include "extensions/browser/browser_context_keyed_api_factory.h"
@@ -37,16 +38,15 @@ class BrowserContext;
 }  // namespace content
 
 namespace printing {
-struct PrinterStatus;
 class PdfBlobDataFlattener;
-class PrintJob;
-class PrintedDocument;
+class PrintJobController;
+struct PrinterStatus;
+struct PrintJobCreatedInfo;
 }  // namespace printing
 
 namespace extensions {
 
 class ExtensionRegistry;
-class PrintJobController;
 
 // Handles chrome.printing API functions calls, acts as a PrintJobObserver,
 // and generates OnJobStatusChanged() events of chrome.printing API.
@@ -70,17 +70,20 @@ class PrintingAPIHandler : public BrowserContextKeyedAPI,
       content::BrowserContext* browser_context,
       EventRouter* event_router,
       ExtensionRegistry* extension_registry,
-      std::unique_ptr<PrintJobController> print_job_controller,
+      std::unique_ptr<printing::PrintJobController> print_job_controller,
       std::unique_ptr<chromeos::CupsWrapper> cups_wrapper,
       crosapi::mojom::LocalPrinter* local_printer);
 
   explicit PrintingAPIHandler(content::BrowserContext* browser_context);
-  PrintingAPIHandler(content::BrowserContext* browser_context,
-                     EventRouter* event_router,
-                     ExtensionRegistry* extension_registry,
-                     std::unique_ptr<PrintJobController> print_job_controller,
-                     std::unique_ptr<chromeos::CupsWrapper> cups_wrapper,
-                     crosapi::mojom::LocalPrinter* local_printer = nullptr);
+
+  PrintingAPIHandler(
+      content::BrowserContext* browser_context,
+      EventRouter* event_router,
+      ExtensionRegistry* extension_registry,
+      std::unique_ptr<printing::PrintJobController> print_job_controller,
+      std::unique_ptr<chromeos::CupsWrapper> cups_wrapper,
+      crosapi::mojom::LocalPrinter* local_printer);
+
   PrintingAPIHandler(const PrintingAPIHandler&) = delete;
   PrintingAPIHandler& operator=(const PrintingAPIHandler&) = delete;
   ~PrintingAPIHandler() override;
@@ -122,7 +125,7 @@ class PrintingAPIHandler : public BrowserContextKeyedAPI,
                       GetPrinterInfoCallback callback);
 
   void SetPrintJobControllerForTesting(
-      std::unique_ptr<PrintJobController> print_job_controller);
+      std::unique_ptr<printing::PrintJobController> print_job_controller);
 
  private:
   // Needed for BrowserContextKeyedAPI implementation.
@@ -135,10 +138,8 @@ class PrintingAPIHandler : public BrowserContextKeyedAPI,
   };
 
   void OnPrintJobSubmitted(SubmitJobCallback callback,
-                           absl::optional<int> job_id,
-                           printing::PrintJob* print_job,
-                           printing::PrintedDocument* document,
-                           absl::optional<std::string> error);
+                           const std::string& extension_id,
+                           PrintJobSubmitter::PrintJobCreationResult result);
 
   void OnPrintersRetrieved(
       GetPrintersCallback callback,
@@ -163,7 +164,8 @@ class PrintingAPIHandler : public BrowserContextKeyedAPI,
   const raw_ptr<content::BrowserContext> browser_context_;
   const raw_ptr<EventRouter> event_router_;
   const raw_ptr<ExtensionRegistry> extension_registry_;
-  std::unique_ptr<PrintJobController> print_job_controller_;
+
+  std::unique_ptr<printing::PrintJobController> print_job_controller_;
   std::unique_ptr<chromeos::CupsWrapper> cups_wrapper_;
 
   const std::unique_ptr<printing::PdfBlobDataFlattener>
@@ -174,9 +176,6 @@ class PrintingAPIHandler : public BrowserContextKeyedAPI,
   base::flat_map<std::string, PrintJobInfo> print_jobs_;
 
   raw_ptr<crosapi::mojom::LocalPrinter> local_printer_;
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-  int local_printer_version_ = 0;
-#endif
 
   mojo::Receiver<crosapi::mojom::PrintJobObserver> receiver_{this};
 

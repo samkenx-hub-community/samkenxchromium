@@ -29,9 +29,9 @@
 #import "ios/chrome/browser/ui/ntp/new_tab_page_consumer.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_header_consumer.h"
 #import "ios/chrome/browser/ui/toolbar/test/toolbar_test_navigation_manager.h"
-#import "ios/chrome/browser/url_loading/fake_url_loading_browser_agent.h"
-#import "ios/chrome/browser/url_loading/url_loading_notifier_browser_agent.h"
-#import "ios/chrome/browser/url_loading/url_loading_params.h"
+#import "ios/chrome/browser/url_loading/model/fake_url_loading_browser_agent.h"
+#import "ios/chrome/browser/url_loading/model/url_loading_notifier_browser_agent.h"
+#import "ios/chrome/browser/url_loading/model/url_loading_params.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
 #import "ios/web/public/test/web_task_environment.h"
@@ -102,7 +102,9 @@ class NewTabPageMediatorTest : public PlatformTest {
                discoverFeedService:discover_feed_service];
     header_consumer_ = OCMProtocolMock(@protocol(NewTabPageHeaderConsumer));
     mediator_.headerConsumer = header_consumer_;
-    feed_metrics_recorder_ = [[FeedMetricsRecorder alloc] init];
+    PrefService* prefs = chrome_browser_state_->GetPrefs();
+    feed_metrics_recorder_ =
+        [[FeedMetricsRecorder alloc] initWithPrefService:prefs];
     mediator_.feedMetricsRecorder = feed_metrics_recorder_;
     histogram_tester_.reset(new base::HistogramTester());
   }

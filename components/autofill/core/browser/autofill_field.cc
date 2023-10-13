@@ -49,6 +49,12 @@ static constexpr auto kAutofillHeuristicsVsHtmlOverrides =
          {ADDRESS_HOME_APT_NUM, HtmlFieldType::kAddressLine2},
          {ADDRESS_HOME_APT_NUM, HtmlFieldType::kAddressLine3},
          {ADDRESS_HOME_BETWEEN_STREETS, HtmlFieldType::kAddressLevel2},
+         {ADDRESS_HOME_BETWEEN_STREETS_OR_LANDMARK,
+          HtmlFieldType::kAddressLevel2},
+         {ADDRESS_HOME_BETWEEN_STREETS_OR_LANDMARK,
+          HtmlFieldType::kAddressLine2},
+         {ADDRESS_HOME_BETWEEN_STREETS_OR_LANDMARK,
+          HtmlFieldType::kOrganization},
          {ADDRESS_HOME_DEPENDENT_LOCALITY, HtmlFieldType::kAddressLevel1},
          {ADDRESS_HOME_DEPENDENT_LOCALITY, HtmlFieldType::kAddressLevel2},
          {ADDRESS_HOME_DEPENDENT_LOCALITY, HtmlFieldType::kAddressLevel3},
@@ -76,6 +82,7 @@ static constexpr auto kAutofillHeuristicsVsServerOverrides =
          {ADDRESS_HOME_DEPENDENT_LOCALITY, ADDRESS_HOME_LINE2},
          {ADDRESS_HOME_DEPENDENT_LOCALITY, ADDRESS_HOME_LINE3},
          {ADDRESS_HOME_LANDMARK, ADDRESS_HOME_LINE2},
+         {ADDRESS_HOME_BETWEEN_STREETS_OR_LANDMARK, ADDRESS_HOME_LINE2},
          {ADDRESS_HOME_OVERFLOW_AND_LANDMARK, ADDRESS_HOME_LINE2},
          {ADDRESS_HOME_OVERFLOW, ADDRESS_HOME_LINE2}});
 
@@ -256,9 +263,11 @@ AutofillField::AutofillField(FieldSignature field_signature) : AutofillField() {
 }
 
 AutofillField::AutofillField(const FormFieldData& field)
-    : FormFieldData(field), parseable_name_(name), parseable_label_(label) {
-  field_signature_ =
-      CalculateFieldSignatureByNameAndType(name, form_control_type);
+    : FormFieldData(field),
+      field_signature_(
+          CalculateFieldSignatureByNameAndType(name, form_control_type)),
+      parseable_name_(name),
+      parseable_label_(label) {
   local_type_predictions_.fill(NO_SERVER_DATA);
 }
 
@@ -447,7 +456,7 @@ AutofillType AutofillField::ComputedType() const {
     // Either way, retain a preference for the CVC heuristic over the
     // server's password predictions (http://crbug.com/469007)
     believe_server =
-        believe_server && !(AutofillType(server_type()).group() ==
+        believe_server && !(GroupTypeOfServerFieldType(server_type()) ==
                                 FieldTypeGroup::kPasswordField &&
                             heuristic_type() == CREDIT_CARD_VERIFICATION_CODE);
 
@@ -544,8 +553,10 @@ void AutofillField::NormalizePossibleTypesValidities() {
 }
 
 bool AutofillField::IsCreditCardPrediction() const {
-  return AutofillType(server_type()).group() == FieldTypeGroup::kCreditCard ||
-         AutofillType(heuristic_type()).group() == FieldTypeGroup::kCreditCard;
+  return GroupTypeOfServerFieldType(server_type()) ==
+             FieldTypeGroup::kCreditCard ||
+         GroupTypeOfServerFieldType(heuristic_type()) ==
+             FieldTypeGroup::kCreditCard;
 }
 
 void AutofillField::AppendLogEventIfNotRepeated(
@@ -570,27 +581,28 @@ void AutofillField::AppendLogEventIfNotRepeated(
   }
 }
 
-FormControlType AutofillField::FormControlType() const {
+DeprecatedFormControlType AutofillField::FormControlType() const {
   // Keep in sync with https://html.spec.whatwg.org/#attr-input-type.
-  if (form_control_type == "text" || form_control_type == "search" ||
-      form_control_type == "tel" || form_control_type == "url" ||
-      form_control_type == "email" || form_control_type == "password" ||
-      form_control_type == "number") {
-    return FormControlType::kText;
-  } else if (form_control_type == "textarea") {
-    return FormControlType::kTextarea;
-  } else if (form_control_type == "checkbox") {
-    return FormControlType::kCheckbox;
-  } else if (form_control_type == "radio") {
-    return FormControlType::kRadio;
-  } else if (form_control_type == "select-one") {
-    return FormControlType::kSelectOne;
-  } else if (form_control_type == "selectlist") {
-    return FormControlType::kSelectlist;
-  } else if (form_control_type == "") {
-    return FormControlType::kEmpty;
+  if (form_control_type == FormControlType::kInputText ||
+      form_control_type == FormControlType::kInputSearch ||
+      form_control_type == FormControlType::kInputTelephone ||
+      form_control_type == FormControlType::kInputUrl ||
+      form_control_type == FormControlType::kInputEmail ||
+      form_control_type == FormControlType::kInputPassword ||
+      form_control_type == FormControlType::kInputNumber) {
+    return DeprecatedFormControlType::kText;
+  } else if (form_control_type == FormControlType::kTextArea) {
+    return DeprecatedFormControlType::kTextarea;
+  } else if (form_control_type == FormControlType::kInputCheckbox) {
+    return DeprecatedFormControlType::kCheckbox;
+  } else if (form_control_type == FormControlType::kInputRadio) {
+    return DeprecatedFormControlType::kRadio;
+  } else if (form_control_type == FormControlType::kSelectOne) {
+    return DeprecatedFormControlType::kSelectOne;
+  } else if (form_control_type == FormControlType::kSelectList) {
+    return DeprecatedFormControlType::kSelectlist;
   } else {
-    return FormControlType::kOther;
+    return DeprecatedFormControlType::kOther;
   }
 }
 

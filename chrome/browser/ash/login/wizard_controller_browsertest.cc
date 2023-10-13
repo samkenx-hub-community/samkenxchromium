@@ -74,9 +74,9 @@
 #include "chrome/browser/ash/policy/enrollment/fake_auto_enrollment_client.h"
 #include "chrome/browser/ash/policy/server_backed_state/server_backed_device_state.h"
 #include "chrome/browser/ash/policy/server_backed_state/server_backed_state_keys_broker.h"
+#include "chrome/browser/auth_notification_types.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_process_platform_part.h"
-#include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/lifetime/termination_notification.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -520,14 +520,14 @@ IN_PROC_BROWSER_TEST_F(WizardControllerTest, SwitchLanguage) {
   EXPECT_STREQ("en", icu::Locale::getDefault().getLanguage());
   EXPECT_FALSE(base::i18n::IsRTL());
   const std::u16string en_str =
-      l10n_util::GetStringUTF16(IDS_NETWORK_SELECTION_TITLE);
+      l10n_util::GetStringUTF16(IDS_UPDATE_STATUS_TITLE);
 
   RunSwitchLanguageTest("fr", "fr", true);
   EXPECT_EQ("fr", g_browser_process->GetApplicationLocale());
   EXPECT_STREQ("fr", icu::Locale::getDefault().getLanguage());
   EXPECT_FALSE(base::i18n::IsRTL());
   const std::u16string fr_str =
-      l10n_util::GetStringUTF16(IDS_NETWORK_SELECTION_TITLE);
+      l10n_util::GetStringUTF16(IDS_UPDATE_STATUS_TITLE);
 
   EXPECT_NE(en_str, fr_str);
 
@@ -536,7 +536,7 @@ IN_PROC_BROWSER_TEST_F(WizardControllerTest, SwitchLanguage) {
   EXPECT_STREQ("ar", icu::Locale::getDefault().getLanguage());
   EXPECT_TRUE(base::i18n::IsRTL());
   const std::u16string ar_str =
-      l10n_util::GetStringUTF16(IDS_NETWORK_SELECTION_TITLE);
+      l10n_util::GetStringUTF16(IDS_UPDATE_STATUS_TITLE);
 
   EXPECT_NE(fr_str, ar_str);
 }

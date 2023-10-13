@@ -55,6 +55,63 @@ namespace {
 const char* kDuplicateTagBaseError =
     "Unexpected duplicate view-transition-name: ";
 
+CSSPropertyID kPropertiesToCapture[] = {
+    CSSPropertyID::kColorScheme,
+    CSSPropertyID::kMixBlendMode,
+    CSSPropertyID::kTextOrientation,
+    CSSPropertyID::kWritingMode,
+};
+
+template <typename K, typename V>
+class FlatMapBuilder {
+ public:
+  explicit FlatMapBuilder(size_t reserve = 0) { data_.reserve(reserve); }
+
+  template <typename... Args>
+  void Insert(Args&&... args) {
+    data_.emplace_back(std::forward<Args>(args)...);
+  }
+
+  base::flat_map<K, V> Finish() && {
+    return base::flat_map<K, V>(std::move(data_));
+  }
+
+ private:
+  std::vector<std::pair<K, V>> data_
+      ALLOW_DISCOURAGED_TYPE("flat_map underlying type");
+};
+
+mojom::blink::ViewTransitionPropertyId ToTranstionPropertyId(CSSPropertyID id) {
+  switch (id) {
+    case CSSPropertyID::kColorScheme:
+      return mojom::blink::ViewTransitionPropertyId::kColorScheme;
+    case CSSPropertyID::kMixBlendMode:
+      return mojom::blink::ViewTransitionPropertyId::kMixBlendMode;
+    case CSSPropertyID::kTextOrientation:
+      return mojom::blink::ViewTransitionPropertyId::kTextOrientation;
+    case CSSPropertyID::kWritingMode:
+      return mojom::blink::ViewTransitionPropertyId::kWritingMode;
+    default:
+      NOTREACHED() << "Unknown id " << static_cast<uint32_t>(id);
+  }
+  return mojom::blink::ViewTransitionPropertyId::kMinValue;
+}
+
+CSSPropertyID FromTransitionPropertyId(
+    mojom::blink::ViewTransitionPropertyId id) {
+  switch (id) {
+    case mojom::blink::ViewTransitionPropertyId::kColorScheme:
+      return CSSPropertyID::kColorScheme;
+    case mojom::blink::ViewTransitionPropertyId::kMixBlendMode:
+      return CSSPropertyID::kMixBlendMode;
+    case mojom::blink::ViewTransitionPropertyId::kTextOrientation:
+      return CSSPropertyID::kTextOrientation;
+    case mojom::blink::ViewTransitionPropertyId::kWritingMode:
+      return CSSPropertyID::kWritingMode;
+  }
+  return CSSPropertyID::kInvalid;
+}
+
 const String& StaticUAStyles() {
   DEFINE_STATIC_LOCAL(
       String, kStaticUAStyles,
@@ -371,23 +428,18 @@ ViewTransitionStyleTracker::ViewTransitionStyleTracker(
     element_data->captured_rect_in_layout_space =
         transition_state_element.captured_rect_in_layout_space;
 
-    CHECK_LE(transition_state_element.container_writing_mode,
-             static_cast<std::underlying_type_t<WritingMode>>(
-                 WritingMode::kMaxWritingMode));
-    element_data->container_writing_mode = static_cast<WritingMode>(
-        transition_state_element.container_writing_mode);
+    CHECK_LE(transition_state_element.captured_css_properties.size(),
+             std::size(kPropertiesToCapture));
 
-    CHECK_LE(transition_state_element.mix_blend_mode,
-             static_cast<std::underlying_type_t<BlendMode>>(
-                 BlendMode::kMaxBlendMode));
-    element_data->mix_blend_mode =
-        static_cast<BlendMode>(transition_state_element.mix_blend_mode);
-
-    CHECK_LE(transition_state_element.text_orientation,
-             static_cast<std::underlying_type_t<ETextOrientation>>(
-                 ETextOrientation::kMaxEnumValue));
-    element_data->text_orientation = static_cast<ETextOrientation>(
-        transition_state_element.text_orientation);
+    FlatMapBuilder<CSSPropertyID, String> css_property_builder(
+        transition_state_element.captured_css_properties.size());
+    for (const auto& [id, value] :
+         transition_state_element.captured_css_properties) {
+      css_property_builder.Insert(FromTransitionPropertyId(id),
+                                  String::FromUTF8(value.c_str()));
+    }
+    element_data->captured_css_properties =
+        std::move(css_property_builder).Finish();
 
     element_data->CacheGeometryState();
 
@@ -586,7 +638,16 @@ bool ViewTransitionStyleTracker::FlattenAndVerifyElements(
       StringBuilder message;
       message.Append(kDuplicateTagBaseError);
       message.Append(name);
-      AddConsoleError(message.ReleaseString());
+
+      Vector<DOMNodeId> nodes;
+      // Find all the elements with this name.
+      for (auto& name_finder : flat_list) {
+        if (name_finder->name == name) {
+          nodes.push_back(name_finder->element->GetDomNodeId());
+        }
+      }
+
+      AddConsoleError(message.ReleaseString(), nodes);
       return false;
     }
 
@@ -975,6 +1036,7 @@ bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
       *snapshot_root_size_at_capture_);
 
   bool needs_style_invalidation = false;
+
   for (auto& entry : element_data_map_) {
     auto& element_data = entry.value;
     if (!element_data->target_element)
@@ -993,9 +1055,6 @@ bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
 
     ContainerProperties container_properties;
     PhysicalRect visual_overflow_rect_in_layout_space;
-    WritingMode writing_mode;
-    BlendMode blend_mode;
-    ETextOrientation text_orientation;
     absl::optional<gfx::RectF> captured_rect_in_layout_space;
 
     if (element_data->target_element->IsDocumentElement()) {
@@ -1005,25 +1064,35 @@ bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
       container_properties =
           ContainerProperties(layout_view_size_in_css_space, gfx::Transform());
       visual_overflow_rect_in_layout_space.size = layout_view_size;
-      writing_mode = layout_object->StyleRef().GetWritingMode();
-      blend_mode = layout_object->StyleRef().GetBlendMode();
-      text_orientation = layout_object->StyleRef().GetTextOrientation();
     } else {
       ComputeLiveElementGeometry(
           max_capture_size, *layout_object, container_properties,
-          visual_overflow_rect_in_layout_space, writing_mode, blend_mode,
-          text_orientation, captured_rect_in_layout_space);
+          visual_overflow_rect_in_layout_space, captured_rect_in_layout_space);
     }
+
+    FlatMapBuilder<CSSPropertyID, String> css_property_builder(
+        std::size(kPropertiesToCapture));
+    for (CSSPropertyID id : kPropertiesToCapture) {
+      const CSSValue* css_value =
+          CSSProperty::Get(id).CSSValueFromComputedStyle(
+              layout_object->StyleRef(),
+              /*layout_object=*/nullptr,
+              /*allow_visited_style=*/false);
+
+      if (!css_value) {
+        continue;
+      }
+      css_property_builder.Insert(id, css_value->CssText());
+    }
+    auto css_properties = std::move(css_property_builder).Finish();
 
     if (!element_data->container_properties.empty() &&
         element_data->container_properties.back() == container_properties &&
         visual_overflow_rect_in_layout_space ==
             element_data->visual_overflow_rect_in_layout_space &&
-        writing_mode == element_data->container_writing_mode &&
-        blend_mode == element_data->mix_blend_mode &&
-        text_orientation == element_data->text_orientation &&
         captured_rect_in_layout_space ==
-            element_data->captured_rect_in_layout_space) {
+            element_data->captured_rect_in_layout_space &&
+        css_properties == element_data->captured_css_properties) {
       continue;
     }
 
@@ -1042,9 +1111,7 @@ bool ViewTransitionStyleTracker::RunPostPrePaintSteps() {
 
     element_data->visual_overflow_rect_in_layout_space =
         visual_overflow_rect_in_layout_space;
-    element_data->container_writing_mode = writing_mode;
-    element_data->mix_blend_mode = blend_mode;
-    element_data->text_orientation = text_orientation;
+    element_data->captured_css_properties = css_properties;
     element_data->captured_rect_in_layout_space = captured_rect_in_layout_space;
 
     PseudoId live_content_element = HasLiveNewContent()
@@ -1090,9 +1157,6 @@ void ViewTransitionStyleTracker::ComputeLiveElementGeometry(
     LayoutObject& layout_object,
     ContainerProperties& container_properties,
     PhysicalRect& visual_overflow_rect_in_layout_space,
-    WritingMode& writing_mode,
-    BlendMode& blend_mode,
-    ETextOrientation& text_orientation,
     absl::optional<gfx::RectF>& captured_rect_in_layout_space) const {
   DCHECK(!layout_object.IsLayoutView());
 
@@ -1130,6 +1194,7 @@ void ViewTransitionStyleTracker::ComputeLiveElementGeometry(
     auto* resize_observer_entry = MakeGarbageCollected<ResizeObserverEntry>(
         To<Element>(layout_object.GetNode()));
     auto entry_size = resize_observer_entry->borderBoxSize()[0];
+    // ResizeObserver gives us CSS space pixels.
     border_box_size_in_css_space =
         layout_object.IsHorizontalWritingMode()
             ? PhysicalSize(LayoutUnit(entry_size->inlineSize()),
@@ -1139,6 +1204,9 @@ void ViewTransitionStyleTracker::ComputeLiveElementGeometry(
   } else if (auto* box_model = DynamicTo<LayoutBoxModelObject>(layout_object)) {
     border_box_size_in_css_space =
         PhysicalSize(box_model->BorderBoundingBox().size());
+    // Size BorderBoundingBox is in Layout space, we need to convert to CSS
+    // space.
+    border_box_size_in_css_space.Scale(1.f / device_pixel_ratio_);
   }
 
   // If the object's effective zoom differs from device_pixel_ratio, adjust
@@ -1166,10 +1234,6 @@ void ViewTransitionStyleTracker::ComputeLiveElementGeometry(
   captured_rect_in_layout_space = ComputeCaptureRect(
       max_capture_size, visual_overflow_rect_in_layout_space,
       snapshot_matrix_in_layout_space, *snapshot_root_size_at_capture_);
-
-  writing_mode = layout_object.StyleRef().GetWritingMode();
-  blend_mode = layout_object.StyleRef().GetBlendMode();
-  text_orientation = layout_object.StyleRef().GetTextOrientation();
 
   container_properties = ContainerProperties(border_box_size_in_css_space,
                                              snapshot_matrix_in_css_space);
@@ -1470,13 +1534,13 @@ ViewTransitionState ViewTransitionStyleTracker::GetViewTransitionState() const {
     element.paint_order = element_data->element_index;
     element.captured_rect_in_layout_space =
         element_data->captured_rect_in_layout_space;
-    element.container_writing_mode =
-        static_cast<decltype(element.container_writing_mode)>(
-            element_data->container_writing_mode);
-    element.mix_blend_mode = static_cast<decltype(element.mix_blend_mode)>(
-        element_data->mix_blend_mode);
-    element.text_orientation = static_cast<decltype(element.text_orientation)>(
-        element_data->text_orientation);
+
+    FlatMapBuilder<mojom::blink::ViewTransitionPropertyId, std::string>
+        css_property_builder(element_data->captured_css_properties.size());
+    for (const auto& [id, value] : element_data->captured_css_properties) {
+      css_property_builder.Insert(ToTranstionPropertyId(id), value.Utf8());
+    }
+    element.captured_css_properties = std::move(css_property_builder).Finish();
   }
 
   // TODO(khushalsagar): Need to send offsets to retain positioning of
@@ -1567,10 +1631,9 @@ CSSStyleSheet& ViewTransitionStyleTracker::UAStyleSheet() {
 
     // This updates the styles on the pseudo-elements as described in
     // https://drafts.csswg.org/css-view-transitions-1/#style-transition-pseudo-elements-algorithm.
-    builder.AddContainerStyles(
-        view_transition_name, element_data->container_properties.back(),
-        element_data->container_writing_mode, element_data->mix_blend_mode,
-        element_data->text_orientation);
+    builder.AddContainerStyles(view_transition_name,
+                               element_data->container_properties.back(),
+                               element_data->captured_css_properties);
 
     // This sets up the styles to animate the pseudo-elements as described in
     // https://drafts.csswg.org/css-view-transitions-1/#setup-transition-pseudo-elements-algorithm.
@@ -1722,7 +1785,7 @@ PhysicalRect ViewTransitionStyleTracker::ComputeVisualOverflowRect(
           continue;
         }
 
-        auto overflow_rect = child_text->PhysicalVisualOverflowRect();
+        auto overflow_rect = child_text->VisualOverflowRect();
         child_text->MapToVisualRectInAncestorSpace(
             ancestor_for_recursion, overflow_rect, kUseGeometryMapper);
         result.Unite(overflow_rect);
@@ -1833,7 +1896,7 @@ ViewTransitionStyleTracker::ComputeVisualOverflowRectWithPaintLayers(
     // ancestor space and combine that with the result. GeometryMapper should
     // take care of any filters and clips that are necessary between this box
     // and the ancestor.
-    auto overflow_rect = box.PhysicalVisualOverflowRect();
+    auto overflow_rect = box.VisualOverflowRect();
     box.MapToVisualRectInAncestorSpace(ancestor, overflow_rect,
                                        kUseGeometryMapper);
     result.Unite(overflow_rect);
@@ -1845,7 +1908,7 @@ ViewTransitionStyleTracker::ComputeVisualOverflowRectWithPaintLayers(
         layout_box && layout_box->ShouldClipOverflowAlongEitherAxis()) {
       result.Intersect(layout_box->OverflowClipRect(PhysicalOffset()));
     }
-    result.Unite(box.PhysicalVisualOverflowRectIncludingFilters());
+    result.Unite(box.VisualOverflowRectIncludingFilters());
 
     // TODO(crbug.com/1432868): This captures a couple of common cases --
     // box-shadow and no box shadow on the element. However, this isn't at all

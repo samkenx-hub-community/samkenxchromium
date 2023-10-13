@@ -42,9 +42,9 @@ typedef struct _xmlSaveCtxt xmlSaveCtxt;
 typedef xmlSaveCtxt *xmlSaveCtxtPtr;
 
 /** DOC_DISABLE */
-#define XML_GLOBALS_SAVE                              \
-  XML_OP(xmlIndentTreeOutput, int, XML_EMPTY)         \
-  XML_OP(xmlTreeIndentString, const char*, XML_EMPTY) \
+#define XML_GLOBALS_SAVE \
+  XML_OP(xmlIndentTreeOutput, int, XML_EMPTY) \
+  XML_OP(xmlTreeIndentString, const char *, XML_EMPTY) \
   XML_OP(xmlSaveNoEmptyTags, int, XML_EMPTY)
 
 #define XML_OP XML_DECLARE_GLOBAL
@@ -52,9 +52,9 @@ XML_GLOBALS_SAVE
 #undef XML_OP
 
 #if defined(LIBXML_THREAD_ENABLED) && !defined(XML_GLOBALS_NO_REDEFINITION)
-#define xmlIndentTreeOutput XML_GLOBAL_MACRO(xmlIndentTreeOutput)
-#define xmlTreeIndentString XML_GLOBAL_MACRO(xmlTreeIndentString)
-#define xmlSaveNoEmptyTags XML_GLOBAL_MACRO(xmlSaveNoEmptyTags)
+  #define xmlIndentTreeOutput XML_GLOBAL_MACRO(xmlIndentTreeOutput)
+  #define xmlTreeIndentString XML_GLOBAL_MACRO(xmlTreeIndentString)
+  #define xmlSaveNoEmptyTags XML_GLOBAL_MACRO(xmlSaveNoEmptyTags)
 #endif
 /** DOC_ENABLE */
 
@@ -97,9 +97,12 @@ XMLPUBFUN int
 		xmlSaveSetAttrEscape	(xmlSaveCtxtPtr ctxt,
 					 xmlCharEncodingOutputFunc escape);
 
-XMLPUBFUN int xmlThrDefIndentTreeOutput(int v);
-XMLPUBFUN const char* xmlThrDefTreeIndentString(const char* v);
-XMLPUBFUN int xmlThrDefSaveNoEmptyTags(int v);
+XMLPUBFUN int
+                xmlThrDefIndentTreeOutput(int v);
+XMLPUBFUN const char *
+                xmlThrDefTreeIndentString(const char * v);
+XMLPUBFUN int
+                xmlThrDefSaveNoEmptyTags(int v);
 
 #ifdef __cplusplus
 }

@@ -83,6 +83,25 @@ class PictureInPictureWindowManager {
   void EnterPictureInPictureWithController(
       content::PictureInPictureWindowController* pip_window_controller);
 
+  // Expected behavior of the window UI-initiated close.
+  enum class UiBehavior {
+    // Close the window, but don't try to pause the video.  This is also the
+    // behavior of `ExitPictureInPicture()`.
+    kCloseWindowOnly,
+
+    // Close the window, and also pause the video.
+    kCloseWindowAndPauseVideo,
+
+    // Act like the back-to-tab button: focus the opener window, and don't pause
+    // the video.
+    kCloseWindowAndFocusOpener,
+  };
+
+  // The user has requested to close the pip window.  This is similar to
+  // `ExitPictureInPicture()`, except that it's strictly user-initiated via the
+  // window UI.
+  bool ExitPictureInPictureViaWindowUi(UiBehavior behavior);
+
   // Closes any existing picture-in-picture windows (video or document pip).
   // Returns true if a picture-in-picture window was closed, and false if there
   // were no picture-in-picture windows to close.
@@ -152,6 +171,10 @@ class PictureInPictureWindowManager {
       const gfx::Rect& browser_view_overridden_bounds,
       views::View* anchor_view,
       views::BubbleBorder::Arrow arrow);
+
+  AutoPipSettingHelper* get_setting_helper_for_testing() {
+    return auto_pip_setting_helper_.get();
+  }
 #endif
 
   // Get the origins for initiators of active Picture-in-Picture sessions.
@@ -161,6 +184,11 @@ class PictureInPictureWindowManager {
   // See spec for detailed information:
   // https://www.w3.org/TR/picture-in-picture/#defines
   std::vector<url::Origin> GetActiveSessionOrigins();
+
+  void set_window_controller_for_testing(
+      content::PictureInPictureWindowController* controller) {
+    pip_window_controller_ = controller;
+  }
 
  private:
   friend struct base::DefaultSingletonTraits<PictureInPictureWindowManager>;
@@ -203,6 +231,11 @@ class PictureInPictureWindowManager {
   // picture in picture closes between now and then, that's okay.  Intended as a
   // helper class for callbacks, to avoid re-entrant calls during pip set-up.
   static void ExitPictureInPictureSoon();
+
+#if !BUILDFLAG(IS_ANDROID)
+  // Create the settings helper if this is auto-pip and we don't have one.
+  void CreateAutoPipSettingHelperIfNeeded();
+#endif  // !BUILDFLAG(IS_ANDROID)
 
   PictureInPictureWindowManager();
   ~PictureInPictureWindowManager();

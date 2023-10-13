@@ -156,6 +156,7 @@ void WebContentsViewMac::UpdateWindowControlsOverlay(
 
 void WebContentsViewMac::StartDragging(
     const DropData& drop_data,
+    const url::Origin& source_origin,
     DragOperationsMask allowed_operations,
     const gfx::ImageSkia& image,
     const gfx::Vector2d& cursor_offset,
@@ -173,7 +174,8 @@ void WebContentsViewMac::StartDragging(
   // processing events.
   base::CurrentThread::ScopedAllowApplicationTasksInNativeNestedLoop allow;
   NSDragOperation mask = static_cast<NSDragOperation>(allowed_operations);
-  [drag_dest_ setDragStartTrackersForProcess:source_rwh->GetProcess()->GetID()];
+
+  [drag_dest_ initiateDragWithRenderWidgetHost:source_rwh dropData:drop_data];
   drag_source_start_rwh_ = source_rwh->GetWeakPtr();
 
   WebContentsDelegate* contents_delegate = web_contents_->GetDelegate();
@@ -183,11 +185,11 @@ void WebContentsViewMac::StartDragging(
   // TODO(crbug.com/1302094): The param `drag_obj_rect` is unused.
 
   if (remote_ns_view_) {
-    remote_ns_view_->StartDrag(drop_data, mask, image, cursor_offset,
-                               is_privileged);
+    remote_ns_view_->StartDrag(drop_data, source_origin, mask, image,
+                               cursor_offset, is_privileged);
   } else {
-    in_process_ns_view_bridge_->StartDrag(drop_data, mask, image, cursor_offset,
-                                          is_privileged);
+    in_process_ns_view_bridge_->StartDrag(drop_data, source_origin, mask, image,
+                                          cursor_offset, is_privileged);
   }
 }
 
@@ -243,13 +245,15 @@ DropData* WebContentsViewMac::GetDropData() const {
   return [drag_dest_ currentDropData];
 }
 
-// TODO(crbug.com/1482848): Investigate if this needs to be implemented.
-void WebContentsViewMac::CancelDragDropForPortalActivation() {
-  NOTIMPLEMENTED();
+void WebContentsViewMac::TransferDragSecurityInfo(WebContentsView* view) {
+  WebContentsViewMac* view_mac = static_cast<WebContentsViewMac*>(view);
+  [drag_dest_ setDragSecurityInfo:[view_mac->drag_dest_ dragSecurityInfo]];
 }
 
-void WebContentsViewMac::UpdateDragCursor(ui::mojom::DragOperation operation) {
-  [drag_dest_ setCurrentOperation:static_cast<NSDragOperation>(operation)];
+void WebContentsViewMac::UpdateDragOperation(ui::mojom::DragOperation operation,
+                                             bool document_is_handling_drag) {
+  [drag_dest_ setCurrentOperation:operation
+           documentIsHandlingDrag:document_is_handling_drag];
 }
 
 void WebContentsViewMac::GotFocus(RenderWidgetHostImpl* render_widget_host) {
@@ -558,7 +562,7 @@ bool WebContentsViewMac::DragPromisedFileTo(const base::FilePath& file_path,
 void WebContentsViewMac::EndDrag(uint32_t drag_operation,
                                  const gfx::PointF& local_point,
                                  const gfx::PointF& screen_point) {
-  [drag_dest_ resetDragStartTrackers];
+  [drag_dest_ endDrag];
 
   web_contents_->SystemDragEnded(drag_source_start_rwh_.get());
 

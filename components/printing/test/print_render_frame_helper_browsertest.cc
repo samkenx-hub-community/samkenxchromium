@@ -556,8 +556,8 @@ class PrintRenderFrameHelperTestBase : public content::RenderViewTest {
   }
 
   void OnPrintPagesInFrame(base::StringPiece frame_name) {
-    blink::WebFrame* frame = GetMainFrame()->FindFrameByName(
-        blink::WebString::FromUTF8(frame_name.data(), frame_name.size()));
+    blink::WebFrame* frame =
+        GetMainFrame()->FindFrameByName(blink::WebString::FromUTF8(frame_name));
     ASSERT_TRUE(frame);
     content::RenderFrame* render_frame =
         content::RenderFrame::FromWebFrame(frame->ToWebLocalFrame());
@@ -2638,6 +2638,41 @@ TEST_F(PrintRenderFrameHelperPreviewTest, LandscapeIgnorePageSizeAndMargin) {
 
   // Find the green point in the bottom right corner of the page.
   EXPECT_EQ(image.pixel_at(779, 599), 0x00ff00U);
+}
+
+TEST_F(PrintRenderFrameHelperPreviewTest,
+       NonDefaultFirstPageSizeDefaultSecond) {
+  LoadHTML(R"HTML(
+    <style>
+      @page { margin:0; }
+      @page larger { size:15in; }
+      html, body { margin:0; height:100%; }
+      div { width:100%; height:100%; }
+      * { box-sizing:border-box; }
+    </style>
+    <div style="page:larger;"></div>
+    <div style="break-before:page; border:2pt solid #00ff00;"></div>
+  )HTML");
+
+  print_settings().Set(kSettingShouldPrintBackgrounds, true);
+
+  printer()->set_should_generate_page_images(true);
+
+  OnPrintPreview();
+  const MockPrinterPage* page = printer()->GetPrinterPage(1);
+  ASSERT_TRUE(page);
+  const printing::Image& image(page->image());
+
+  ASSERT_EQ(image.size(), gfx::Size(612, 792));
+
+  // Find the border in the bottom right corner of the page.
+  EXPECT_EQ(image.pixel_at(611, 788), 0x00ff00U);
+  EXPECT_EQ(image.pixel_at(611, 789), 0x00ff00U);
+  EXPECT_EQ(image.pixel_at(611, 790), 0x00ff00U);
+  EXPECT_EQ(image.pixel_at(611, 791), 0x00ff00U);
+  EXPECT_EQ(image.pixel_at(610, 791), 0x00ff00U);
+  EXPECT_EQ(image.pixel_at(609, 791), 0x00ff00U);
+  EXPECT_EQ(image.pixel_at(608, 791), 0x00ff00U);
 }
 
 #endif  // MOCK_PRINTER_SUPPORTS_PAGE_IMAGES

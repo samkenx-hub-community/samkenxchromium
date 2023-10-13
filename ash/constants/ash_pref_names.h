@@ -1198,6 +1198,11 @@ inline constexpr char kTouchscreenEnabled[] = "events.touch_screen.enabled";
 inline constexpr char kShowTouchpadScrollScreenEnabled[] =
     "ash.touchpad_scroll_screen_oobe_enabled";
 
+// Boolean value indicating that the human presence sesnsor screen should be
+// shown to the user during oobe.
+inline constexpr char kShowHumanPresenceSensorScreenEnabled[] =
+    "ash.human_presence_sensor_scren_oobe_enabled";
+
 // Boolean value indicating that the Display size screen should be
 // shown to the user during the first sign-in.
 inline constexpr char kShowDisplaySizeScreenEnabled[] =
@@ -1849,6 +1854,50 @@ inline constexpr char kDemoModeStoreId[] = "demo_mode.store_id";
 
 // A string pref holding the value of the default locale for demo sessions.
 inline constexpr char kDemoModeDefaultLocale[] = "demo_mode.default_locale";
+
+// A dictionary pref containing the set of touchpad settings for the user. This
+// is synced for all user devices.
+inline constexpr char kTouchpadInternalSettings[] =
+    "ash.settings.touchpad.internal";
+
+// A dictionary pref containing the set of pointing stick settings for the user.
+// This is synced for all user devices.
+inline constexpr char kPointingStickInternalSettings[] =
+    "ash.settings.pointing_stick.internal";
+
+// A dictionary pref containing the set of default mouse settings for the user.
+// This is always configured to the settings for the mouse the user last used.
+// These are applied to new mice that are connected to the system. This is
+// synced for all user devices.
+inline constexpr char kMouseDefaultSettings[] = "ash.settings.mouse.defaults";
+
+// A dictionary pref containing the set of default ChromeOS keyboard settings
+// for the user. This is always configured to the settings for the ChromeOS
+// keyboard the user last used. These are applied to new ChromeOS keyboards that
+// are connected to the system. This is synced for all user devices.
+inline constexpr char kKeyboardDefaultChromeOSSettings[] =
+    "ash.settings.keyboard.chromeos_defaults";
+
+// A dictionary pref containing the set of default non-ChromeOS keyboard
+// settings for the user. This is always configured to the settings for the
+// non-ChromeOS keyboard the user last used. These are applied to new
+// non-ChromeOS keyboards that are connected to the system. This is synced for
+// all user devices.
+inline constexpr char kKeyboardDefaultNonChromeOSSettings[] =
+    "ash.settings.keyboard.non_chromeos_defaults";
+
+// A dictionary pref containing the set of default touchpad settings for the
+// user. These are applied to new touchpads that are connected to the system.
+// This is synced for all user devices.
+inline constexpr char kTouchpadDefaultSettings[] =
+    "ash.settings.touchpad.defaults";
+
+// An integer pref that controls the state (Disabled, Ctrl, etc) of the
+// F11/F12 settings found in the customize keyboard keys subpage in device
+// settings. Can be controlled through device policy
+// DeviceExtendedFkeysMofidier.
+inline constexpr char kExtendedFkeysModifier[] =
+    "ash.settings.extended_fkeys_modifier";
 
 // NOTE: New prefs should start with the "ash." prefix. Existing prefs moved
 // into this file should not be renamed, since they may be synced.

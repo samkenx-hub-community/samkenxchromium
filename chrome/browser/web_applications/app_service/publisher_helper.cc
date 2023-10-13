@@ -6,7 +6,6 @@
 
 #include "base/feature_list.h"
 
-#include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/common/chrome_features.h"
@@ -41,9 +40,11 @@ bool IsAppServiceShortcut(const webapps::AppId& web_app_id,
 // shortcuts will still be published as web apps.
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   if (base::FeatureList::IsEnabled(features::kCrosWebAppShortcutUiUpdate)) {
-    return provider.registrar_unsafe().IsShortcutApp(web_app_id);
+    return provider.registrar_unsafe().IsInstalled(web_app_id) &&
+           provider.registrar_unsafe().IsShortcutApp(web_app_id);
   }
 #endif
   return false;
 }
+
 }  // namespace web_app

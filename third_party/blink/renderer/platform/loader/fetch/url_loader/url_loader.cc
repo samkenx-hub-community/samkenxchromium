@@ -6,77 +6,53 @@
 
 #include <stdint.h>
 
-#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "base/check.h"
 #include "base/check_op.h"
-#include "base/command_line.h"
-#include "base/feature_list.h"
-#include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/notreached.h"
-#include "base/sequence_checker.h"
-#include "base/strings/string_number_conversions.h"
-#include "base/strings/string_util.h"
-#include "base/synchronization/waitable_event.h"
+#include "base/memory/raw_ptr.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
-#include "build/build_config.h"
+#include "mojo/public/cpp/base/big_buffer.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
-#include "net/base/filename_util.h"
-#include "net/base/host_port_pair.h"
-#include "net/base/ip_endpoint.h"
+#include "mojo/public/cpp/bindings/struct_ptr.h"
+#include "mojo/public/cpp/system/data_pipe.h"
 #include "net/base/load_flags.h"
 #include "net/base/net_errors.h"
-#include "net/base/registry_controlled_domains/registry_controlled_domain.h"
-#include "net/cert/cert_status_flags.h"
-#include "net/cert/ct_sct_to_string.h"
-#include "net/cert/x509_certificate.h"
-#include "net/cert/x509_util.h"
-#include "net/cookies/parsed_cookie.h"
-#include "net/http/http_request_headers.h"
+#include "net/base/request_priority.h"
 #include "net/http/http_response_headers.h"
-#include "net/ssl/ssl_cipher_suite_names.h"
-#include "net/ssl/ssl_connection_status_flags.h"
-#include "net/ssl/ssl_info.h"
-#include "services/network/public/cpp/http_raw_request_response_info.h"
-#include "services/network/public/cpp/ip_address_space_util.h"
+#include "net/traffic_annotation/network_traffic_annotation.h"
+#include "net/url_request/redirect_info.h"
 #include "services/network/public/cpp/resource_request.h"
-#include "services/network/public/mojom/fetch_api.mojom-shared.h"
-#include "services/network/public/mojom/ip_address_space.mojom-shared.h"
-#include "services/network/public/mojom/trust_tokens.mojom-shared.h"
-#include "services/network/public/mojom/url_loader.mojom.h"
+#include "services/network/public/cpp/shared_url_loader_factory.h"
+#include "services/network/public/cpp/url_loader_completion_status.h"
+#include "services/network/public/mojom/encoded_body_length.mojom.h"
+#include "services/network/public/mojom/url_loader_factory.mojom-forward.h"
+#include "services/network/public/mojom/url_response_head.mojom-forward.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-#include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/loader/mime_sniffing_throttle.h"
 #include "third_party/blink/public/common/loader/referrer_utils.h"
-#include "third_party/blink/public/common/loader/resource_type_util.h"
-#include "third_party/blink/public/common/mime_util/mime_util.h"
-#include "third_party/blink/public/common/security/security_style.h"
+#include "third_party/blink/public/common/loader/url_loader_throttle.h"
 #include "third_party/blink/public/common/thread_safe_browser_interface_broker_proxy.h"
-#include "third_party/blink/public/mojom/blob/blob.mojom.h"
 #include "third_party/blink/public/mojom/blob/blob_registry.mojom-blink.h"
-#include "third_party/blink/public/mojom/loader/keep_alive_handle.mojom.h"
-#include "third_party/blink/public/platform/file_path_conversion.h"
+#include "third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom-shared.h"
 #include "third_party/blink/public/platform/platform.h"
 #include "third_party/blink/public/platform/resource_load_info_notifier_wrapper.h"
-#include "third_party/blink/public/platform/resource_request_blocked_reason.h"
-#include "third_party/blink/public/platform/url_conversion.h"
-#include "third_party/blink/public/platform/web_security_origin.h"
+#include "third_party/blink/public/platform/web_loader_freeze_mode.h"
+#include "third_party/blink/public/platform/web_string.h"
 #include "third_party/blink/public/platform/web_url.h"
 #include "third_party/blink/public/platform/web_url_error.h"
 #include "third_party/blink/public/platform/web_url_request.h"
-#include "third_party/blink/public/platform/web_url_request_extra_data.h"
 #include "third_party/blink/public/platform/web_url_response.h"
-#include "third_party/blink/public/web/web_local_frame.h"
-#include "third_party/blink/public/web/web_security_policy.h"
-#include "third_party/blink/renderer/platform/blob/blob_data.h"
+#include "third_party/blink/renderer/platform/heap/persistent.h"
 #include "third_party/blink/renderer/platform/loader/fetch/back_forward_cache_loader_helper.h"
 #include "third_party/blink/renderer/platform/loader/fetch/fetch_utils.h"
 #include "third_party/blink/renderer/platform/loader/fetch/url_loader/resource_request_client.h"
@@ -85,8 +61,6 @@
 #include "third_party/blink/renderer/platform/loader/fetch/url_loader/url_loader_client.h"
 #include "third_party/blink/renderer/platform/weborigin/kurl.h"
 #include "third_party/blink/renderer/platform/wtf/shared_buffer.h"
-#include "third_party/boringssl/src/include/openssl/ssl.h"
-#include "url/origin.h"
 
 using base::Time;
 using base::TimeTicks;
@@ -125,7 +99,7 @@ class URLLoader::Context : public ResourceRequestClient {
   void DidChangePriority(WebURLRequest::Priority new_priority,
                          int intra_priority_value);
   void Start(std::unique_ptr<network::ResourceRequest> request,
-             scoped_refptr<WebURLRequestExtraData> url_request_extra_data,
+             scoped_refptr<const SecurityOrigin> top_frame_origin,
              bool pass_response_pipe_to_client,
              bool no_mime_sniffing,
              base::TimeDelta timeout_interval,
@@ -155,7 +129,7 @@ class URLLoader::Context : public ResourceRequestClient {
  private:
   ~Context() override;
 
-  URLLoader* loader_;
+  raw_ptr<URLLoader, ExperimentalRenderer> loader_;
 
   KURL url_;
   // This is set in Start() and is used by SetSecurityStyleAndDetails() to
@@ -166,7 +140,7 @@ class URLLoader::Context : public ResourceRequestClient {
   // DevTools request id to that new request, and it will propagate here.
   bool has_devtools_request_id_;
 
-  URLLoaderClient* client_;
+  raw_ptr<URLLoaderClient, ExperimentalRenderer> client_;
   // TODO(https://crbug.com/1137682): Remove |freezable_task_runner_|, migrating
   // the current usage to use |unfreezable_task_runner_| instead. Also, rename
   // |unfreezable_task_runner_| to |maybe_unfreezable_task_runner_| here and
@@ -179,7 +153,7 @@ class URLLoader::Context : public ResourceRequestClient {
   mojo::PendingRemote<mojom::blink::KeepAliveHandle> keep_alive_handle_;
   LoaderFreezeMode freeze_mode_ = LoaderFreezeMode::kNone;
   const Vector<String> cors_exempt_header_list_;
-  base::WaitableEvent* terminate_sync_load_event_;
+  raw_ptr<base::WaitableEvent, ExperimentalRenderer> terminate_sync_load_event_;
 
   int request_id_;
 
@@ -259,7 +233,7 @@ void URLLoader::Context::DidChangePriority(WebURLRequest::Priority new_priority,
 
 void URLLoader::Context::Start(
     std::unique_ptr<network::ResourceRequest> request,
-    scoped_refptr<WebURLRequestExtraData> passed_url_request_extra_data,
+    scoped_refptr<const SecurityOrigin> top_frame_origin,
     bool pass_response_pipe_to_client,
     bool no_mime_sniffing,
     base::TimeDelta timeout_interval,
@@ -271,30 +245,15 @@ void URLLoader::Context::Start(
   url_ = KURL(request->url);
   has_devtools_request_id_ = request->devtools_request_id.has_value();
 
-  // TODO(horo): Check credentials flag is unset when credentials mode is omit.
-  //             Check credentials flag is set when credentials mode is include.
-
-  scoped_refptr<WebURLRequestExtraData> empty_url_request_extra_data;
-  WebURLRequestExtraData* url_request_extra_data;
-  if (passed_url_request_extra_data) {
-    url_request_extra_data = static_cast<WebURLRequestExtraData*>(
-        passed_url_request_extra_data.get());
-  } else {
-    empty_url_request_extra_data =
-        base::MakeRefCounted<WebURLRequestExtraData>();
-    url_request_extra_data = empty_url_request_extra_data.get();
-  }
-
   std::vector<std::unique_ptr<blink::URLLoaderThrottle>> throttles;
   for (auto& throttle : throttles_) {
     throttles.push_back(std::move(throttle));
   }
 
-  // TODO(falken): URLLoader should be able to get the top frame origin via some
-  // plumbing such as through ResourceLoader -> FetchContext -> LocalFrame
-  // -> RenderHostImpl instead of needing WebURLRequestExtraData.
+  // The top frame origin of shared and service workers is null.
   Platform::Current()->AppendVariationsThrottles(
-      url_request_extra_data->top_frame_origin(), &throttles);
+      top_frame_origin ? top_frame_origin->ToUrlOrigin() : url::Origin(),
+      &throttles);
 
   uint32_t loader_options = network::mojom::kURLLoadOptionNone;
   if (!no_mime_sniffing) {
@@ -490,7 +449,7 @@ URLLoader::~URLLoader() {
 
 void URLLoader::LoadSynchronously(
     std::unique_ptr<network::ResourceRequest> request,
-    scoped_refptr<WebURLRequestExtraData> url_request_extra_data,
+    scoped_refptr<const SecurityOrigin> top_frame_origin,
     bool pass_response_pipe_to_client,
     bool no_mime_sniffing,
     base::TimeDelta timeout_interval,
@@ -514,7 +473,7 @@ void URLLoader::LoadSynchronously(
   context_->set_client(client);
 
   const bool has_devtools_request_id = request->devtools_request_id.has_value();
-  context_->Start(std::move(request), std::move(url_request_extra_data),
+  context_->Start(std::move(request), std::move(top_frame_origin),
                   pass_response_pipe_to_client, no_mime_sniffing,
                   timeout_interval, &sync_load_response,
                   std::move(resource_load_info_notifier_wrapper));
@@ -568,7 +527,7 @@ void URLLoader::LoadSynchronously(
 
 void URLLoader::LoadAsynchronously(
     std::unique_ptr<network::ResourceRequest> request,
-    scoped_refptr<WebURLRequestExtraData> url_request_extra_data,
+    scoped_refptr<const SecurityOrigin> top_frame_origin,
     bool no_mime_sniffing,
     std::unique_ptr<ResourceLoadInfoNotifierWrapper>
         resource_load_info_notifier_wrapper,
@@ -582,7 +541,7 @@ void URLLoader::LoadAsynchronously(
   DCHECK(!context_->client());
 
   context_->set_client(client);
-  context_->Start(std::move(request), std::move(url_request_extra_data),
+  context_->Start(std::move(request), std::move(top_frame_origin),
                   /*pass_response_pipe_to_client=*/false, no_mime_sniffing,
                   base::TimeDelta(), nullptr,
                   std::move(resource_load_info_notifier_wrapper));

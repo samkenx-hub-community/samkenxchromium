@@ -144,6 +144,8 @@ String NavigationPolicyToProtocol(NavigationPolicy policy) {
       return DispositionEnum::NewWindow;
     case kNavigationPolicyPictureInPicture:
       return DispositionEnum::NewWindow;
+    case kNavigationPolicyLinkPreview:
+      NOTREACHED_NORETURN();
   }
   return DispositionEnum::CurrentTab;
 }
@@ -674,6 +676,7 @@ protocol::Response InspectorPageAgent::reload(
   pending_script_to_evaluate_on_load_once_ =
       optional_script_to_evaluate_on_load.value_or("");
   v8_session_->setSkipAllPauses(true);
+  v8_session_->resume(true /* terminate on resume */);
   return protocol::Response::Success();
 }
 
@@ -1120,6 +1123,11 @@ void InspectorPageAgent::FrameRequestedNavigation(Frame* target_frame,
                                                   const KURL& url,
                                                   ClientNavigationReason reason,
                                                   NavigationPolicy policy) {
+  // TODO(b:303396822): Support Link Preview
+  if (policy == kNavigationPolicyLinkPreview) {
+    return;
+  }
+
   GetFrontend()->frameRequestedNavigation(
       IdentifiersFactory::FrameId(target_frame),
       ClientNavigationReasonToProtocol(reason), url.GetString(),

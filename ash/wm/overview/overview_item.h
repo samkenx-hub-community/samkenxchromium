@@ -15,7 +15,6 @@
 #include "base/cancelable_callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/aura/scoped_window_event_targeting_blocker.h"
 #include "ui/aura/window_observer.h"
 
@@ -60,7 +59,8 @@ class ASH_EXPORT OverviewItem : public OverviewItemBase,
   OverviewItem(aura::Window* window,
                OverviewSession* overview_session,
                OverviewGrid* overview_grid,
-               WindowDestructionDelegate* delegate);
+               WindowDestructionDelegate* delegate,
+               bool eligible_for_shadow_config);
 
   OverviewItem(const OverviewItem&) = delete;
   OverviewItem& operator=(const OverviewItem&) = delete;
@@ -72,12 +72,11 @@ class ASH_EXPORT OverviewItem : public OverviewItemBase,
   // If the window item represents a minimized window, update its contents view.
   void UpdateItemContentViewForMinimizedWindow();
 
+  // Updates the rounded corners on `this` only.
+  void UpdateRoundedCorners();
+
   OverviewAnimationType GetExitOverviewAnimationType() const;
   OverviewAnimationType GetExitTransformAnimationType() const;
-
-  // If in tablet mode, maybe forward events to `OverviewGridEventHandler` as we
-  // might want to process scroll events on the item.
-  void HandleGestureEventForTabletModeLayout(ui::GestureEvent* event);
 
   // OverviewItemBase:
   aura::Window* GetWindow() override;
@@ -89,7 +88,7 @@ class ASH_EXPORT OverviewItem : public OverviewItemBase,
                  OverviewAnimationType animation_type) override;
   gfx::Transform ComputeTargetTransform(
       const gfx::RectF& target_bounds) override;
-  float GetItemScale(const gfx::Size& size) override;
+  float GetItemScale(int height) override;
   void ScaleUpSelectedItem(OverviewAnimationType animation_type) override;
   void EnsureVisible() override;
   gfx::RectF GetTargetBoundsInScreen() const override;
@@ -98,17 +97,15 @@ class ASH_EXPORT OverviewItem : public OverviewItemBase,
   OverviewFocusableView* GetFocusableView() const override;
   views::View* GetBackDropView() const override;
   void UpdateRoundedCornersAndShadow() override;
-  void SetShadowBounds(absl::optional<gfx::RectF> bounds_in_screen) override;
   void SetOpacity(float opacity) override;
   float GetOpacity() const override;
   void PrepareForOverview() override;
   void OnStartingAnimationComplete() override;
   void HideForSavedDeskLibrary(bool animate) override;
   void RevertHideForSavedDeskLibrary(bool animate) override;
+  void CloseWindows() override;
   void Restack() override;
-  void CloseWindow() override;
-  void HandleMouseEvent(const ui::MouseEvent& event) override;
-  void HandleGestureEvent(ui::GestureEvent* event) override;
+  void StartDrag() override;
   void OnOverviewItemDragStarted(OverviewItemBase* item) override;
   void OnOverviewItemDragEnded(bool snap) override;
   void OnOverviewItemContinuousScroll(const gfx::Transform& target_transform,
@@ -125,7 +122,6 @@ class ASH_EXPORT OverviewItem : public OverviewItemBase,
   void StopWidgetAnimation() override;
   OverviewGridWindowFillMode GetWindowDimensionsType() const override;
   void UpdateWindowDimensionsType() override;
-  void CreateItemWidget() override;
   gfx::Point GetMagnifierFocusPointInScreen() const override;
   const gfx::RoundedCornersF GetRoundedCorners() const override;
 
@@ -144,6 +140,10 @@ class ASH_EXPORT OverviewItem : public OverviewItemBase,
                                   chromeos::WindowStateType old_type) override;
   void OnPostWindowStateTypeChange(WindowState* window_state,
                                    chromeos::WindowStateType old_type) override;
+
+ protected:
+  // OverviewItemBase:
+  void CreateItemWidget() override;
 
  private:
   friend class OverviewTestBase;
@@ -190,26 +190,7 @@ class ASH_EXPORT OverviewItem : public OverviewItemBase,
   OverviewAnimationType GetExitOverviewAnimationTypeForMinimizedWindow(
       OverviewEnterExitType type);
 
-  // Called before dragging. Scales up the window a little bit to indicate its
-  // selection and stacks the window at the top of the Z order in order to keep
-  // it visible while dragging around.
-  void StartDrag();
-
   void CloseButtonPressed();
-
-  // TODO(sammiequon): Current events go from OverviewItemView to
-  // OverviewItem to OverviewSession to OverviewWindowDragController. We may be
-  // able to shorten this pipeline.
-  void HandlePressEvent(const gfx::PointF& location_in_screen,
-                        bool from_touch_gesture);
-  void HandleReleaseEvent(const gfx::PointF& location_in_screen);
-  void HandleDragEvent(const gfx::PointF& location_in_screen);
-  void HandleLongPressEvent(const gfx::PointF& location_in_screen);
-  void HandleFlingStartEvent(const gfx::PointF& location_in_screen,
-                             float velocity_x,
-                             float velocity_y);
-  void HandleTapEvent();
-  void HandleGestureEndEvent();
 
   void HideWindowInOverview();
   void ShowWindowInOverview();
@@ -235,6 +216,12 @@ class ASH_EXPORT OverviewItem : public OverviewItemBase,
   // the bounds update when calling ::wm::RecreateWindowLayers to copy
   // a window layer for display on another monitor.
   bool in_bounds_update_ = false;
+
+  // If true, `shadow_` is eligible to be created, false otherwise. The shadow
+  // should not be created if `this` is hosted by an `OverviewGroupItem`
+  // together with another `OverviewItem` (the group-level shadow will be
+  // installed instead).
+  const bool eligible_for_shadow_config_;
 
   // The view associated with |item_widget_|. Contains a title, close button and
   // maybe a backdrop. Forwards certain events to |this|.

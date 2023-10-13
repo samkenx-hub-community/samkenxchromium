@@ -5,12 +5,12 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "components/url_formatter/elide_url.h"
-#import "ios/chrome/browser/ntp_tiles/tab_resumption/tab_resumption_prefs.h"
+#import "ios/chrome/browser/ntp/home/features.h"
+#import "ios/chrome/browser/ntp_tiles/model/tab_resumption/tab_resumption_prefs.h"
 #import "ios/chrome/browser/signin/fake_system_identity.h"
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey.h"
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_constants.h"
-#import "ios/chrome/browser/ui/content_suggestions/content_suggestions_feature.h"
 #import "ios/chrome/browser/ui/content_suggestions/tab_resumption/tab_resumption_constants.h"
 #import "ios/chrome/browser/ui/start_surface/start_surface_features.h"
 #import "ios/chrome/browser/ui/tabs/tests/distant_tabs_app_interface.h"
@@ -205,13 +205,7 @@ NSString* HostnameFromGURL(GURL URL) {
 
 // Tests that interacting with the Shortcuts tile works when the tab resumption
 // tile is displayed.
-// TODO(crbug.com/1486969): Test is failing on device. Re-enable the test.
-#if TARGET_OS_SIMULATOR
-#define MAYBE_testInteractWithAnotherTile testInteractWithAnotherTile
-#else
-#define MAYBE_testInteractWithAnotherTile DISABLED_testInteractWithAnotherTile
-#endif
-- (void)MAYBE_testInteractWithAnotherTile {
+- (void)testInteractWithAnotherTile {
   // Check that the tile is not displayed when there is no distant tab.
   WaitUntilTabResumptionTileVisibleOrTimeout(false);
 
@@ -228,21 +222,22 @@ NSString* HostnameFromGURL(GURL URL) {
   // Check that the tile is displayed when there is a distant tab.
   WaitUntilTabResumptionTileVisibleOrTimeout(true);
 
-  // Verify Shortcuts module title is visible in Magic Stack.
-  [[EarlGrey
-      selectElementWithMatcher:
-          grey_accessibilityID(kMagicStackScrollViewAccessibilityIdentifier)]
-      performAction:grey_scrollInDirection(kGREYDirectionRight, 343)];
-  [[EarlGrey selectElementWithMatcher:
-                 grey_accessibilityID(l10n_util::GetNSString(
-                     IDS_IOS_CONTENT_SUGGESTIONS_SHORTCUTS_MODULE_TITLE))]
-      assertWithMatcher:grey_sufficientlyVisible()];
-
-  // Check the RecentTabs shortcut.
-  [[EarlGrey
-      selectElementWithMatcher:chrome_test_util::ButtonWithAccessibilityLabelId(
-                                   IDS_IOS_CONTENT_SUGGESTIONS_RECENT_TABS)]
+  if (![ChromeEarlGrey isIPadIdiom]) {
+    // Rotate iphone device so Magic Stack can be scrollable.
+    [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationLandscapeLeft
+                                  error:nil];
+    [[EarlGrey selectElementWithMatcher:chrome_test_util::NTPCollectionView()]
+        performAction:grey_scrollInDirection(kGREYDirectionDown, 150)];
+  }
+  [[[EarlGrey selectElementWithMatcher:
+                  grey_allOf(chrome_test_util::ButtonWithAccessibilityLabelId(
+                                 IDS_IOS_CONTENT_SUGGESTIONS_RECENT_TABS),
+                             grey_sufficientlyVisible(), nil)]
+         usingSearchAction:grey_scrollInDirection(kGREYDirectionRight, 350)
+      onElementWithMatcher:grey_accessibilityID(
+                               kMagicStackScrollViewAccessibilityIdentifier)]
       performAction:grey_tap()];
+
   [[EarlGrey
       selectElementWithMatcher:chrome_test_util::HeaderWithAccessibilityLabelId(
                                    IDS_IOS_CONTENT_SUGGESTIONS_RECENT_TABS)]
@@ -250,6 +245,11 @@ NSString* HostnameFromGURL(GURL URL) {
   [[EarlGrey
       selectElementWithMatcher:chrome_test_util::NavigationBarDoneButton()]
       performAction:grey_tap()];
+
+  if (![ChromeEarlGrey isIPadIdiom]) {
+    // Rotate iphone device back to portrait mode.
+    [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationPortrait error:nil];
+  }
 }
 
 // Tests that the context menu has the correct action and correctly hides the

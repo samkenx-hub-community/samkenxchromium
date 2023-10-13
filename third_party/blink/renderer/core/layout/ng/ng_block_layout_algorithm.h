@@ -40,9 +40,9 @@ struct NGPreviousInflowPosition {
 // This struct holds information for the current inflow child. The data is not
 // useful outside of handling this single inflow child.
 struct NGInflowChildData {
-  NGInflowChildData(NGBfcOffset bfc_offset_estimate,
+  NGInflowChildData(BfcOffset bfc_offset_estimate,
                     const NGMarginStrut& margin_strut,
-                    const NGBoxStrut& margins,
+                    const BoxStrut& margins,
                     bool is_pushed_by_floats = false)
       : bfc_offset_estimate(bfc_offset_estimate),
         margin_strut(margin_strut),
@@ -51,9 +51,9 @@ struct NGInflowChildData {
 
   NGInflowChildData(const NGInflowChildData&) = default;
 
-  NGBfcOffset bfc_offset_estimate;
+  BfcOffset bfc_offset_estimate;
   NGMarginStrut margin_strut;
-  NGBoxStrut margins;
+  BoxStrut margins;
   bool is_pushed_by_floats = false;
 };
 
@@ -100,7 +100,7 @@ class CORE_EXPORT NGBlockLayoutAlgorithm
       return *container_builder_.BfcBlockOffset();
     // Otherwise fall back to the BFC block offset assigned by the parent
     // algorithm.
-    return ConstraintSpace().BfcOffset().block_offset;
+    return ConstraintSpace().GetBfcOffset().block_offset;
   }
 
   // Return the BFC block offset of the next block-start border edge (for some
@@ -111,9 +111,9 @@ class CORE_EXPORT NGBlockLayoutAlgorithm
            previous_inflow_position.margin_strut.Sum();
   }
 
-  NGBoxStrut CalculateMargins(NGLayoutInputNode child,
-                              bool is_new_fc,
-                              LayoutUnit* additional_line_offset);
+  BoxStrut CalculateMargins(NGLayoutInputNode child,
+                            bool is_new_fc,
+                            LayoutUnit* additional_line_offset);
 
   // Creates a new constraint space for the current child.
   NGConstraintSpace CreateConstraintSpaceForChild(
@@ -197,9 +197,10 @@ class CORE_EXPORT NGBlockLayoutAlgorithm
       NGLayoutInputNode child,
       const NGBlockBreakToken* child_break_token,
       const NGInflowChildData&,
-      NGBfcOffset origin_offset,
+      BfcOffset origin_offset,
       bool abort_if_cleared,
-      NGBfcOffset* out_child_bfc_offset);
+      BfcOffset* out_child_bfc_offset,
+      BoxStrut* out_resolved_margins);
 
   // Handle an in-flow child.
   // Returns false if we need to abort layout, because a previously unknown BFC
@@ -255,7 +256,7 @@ class CORE_EXPORT NGBlockLayoutAlgorithm
   void PropagateBaselineFromLineBox(const NGPhysicalFragment& child,
                                     LayoutUnit block_offset);
   void PropagateBaselineFromBlockChild(const NGPhysicalFragment& child,
-                                       const NGBoxStrut& margins,
+                                       const BoxStrut& margins,
                                        LayoutUnit block_offset);
 
   // If still unresolved, resolve the fragment's BFC block offset.

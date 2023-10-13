@@ -444,6 +444,18 @@ uint32_t GenerateBrowserSalt() {
   return salt;
 }
 
+std::string GetRelatedWebsiteSetSwitch() {
+  // `kUseFirstPartySet` switch is being deprecated in favor of
+  // `kUseRelatedWebsiteSet` switch. Both switches are supported during the
+  // transition period with `kUseRelatedWebsiteSet` taking precedence.
+  base::CommandLine* commandLine = base::CommandLine::ForCurrentProcess();
+  if (commandLine->HasSwitch(network::switches::kUseRelatedWebsiteSet)) {
+    return commandLine->GetSwitchValueASCII(
+        network::switches::kUseRelatedWebsiteSet);
+  }
+  return commandLine->GetSwitchValueASCII(network::switches::kUseFirstPartySet);
+}
+
 }  // namespace
 
 // The currently-running BrowserMainLoop.  There can be one or zero.
@@ -770,6 +782,7 @@ int BrowserMainLoop::PreCreateThreads() {
   // This must occur before metrics recording initialization in
   // ChromeBrowserMainParts::PreCreateThreads() because it's used in
   // BackgroundTracingMetricsProvider.
+  tracing_controller_ = std::make_unique<content::TracingControllerImpl>();
   background_tracing_manager_ =
       content::BackgroundTracingManagerImpl::CreateInstance();
 
@@ -963,7 +976,6 @@ int BrowserMainLoop::CreateThreads() {
 int BrowserMainLoop::PostCreateThreads() {
   TRACE_EVENT0("startup", "BrowserMainLoop::PostCreateThreads");
 
-  tracing_controller_ = std::make_unique<content::TracingControllerImpl>();
   content::BackgroundTracingManagerImpl::GetInstance()
       .AddMetadataGeneratorFunction();
 
@@ -995,9 +1007,7 @@ int BrowserMainLoop::PreMainMessageLoopRun() {
   if (result_code_ == RESULT_CODE_NORMAL_EXIT) {
     FirstPartySetsHandlerImpl::GetInstance()->Init(
         GetContentClient()->browser()->GetFirstPartySetsDirectory(),
-        LocalSetDeclaration(
-            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
-                network::switches::kUseFirstPartySet)));
+        LocalSetDeclaration(GetRelatedWebsiteSetSwitch()));
   }
 
   variations::MaybeScheduleFakeCrash();

@@ -4,6 +4,7 @@
 
 #include "components/autofill/core/browser/payments/iban_save_manager.h"
 
+#include "base/ranges/algorithm.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/autofill/core/browser/data_model/iban.h"
 #include "components/autofill/core/browser/metrics/autofill_metrics.h"
@@ -33,9 +34,6 @@ bool IbanSaveManager::AttemptToOfferIbanLocalSave(
     return false;
   }
   iban_save_candidate_ = iban_import_candidate;
-  // Set the guid as this IBAN will be offered to save locally.
-  iban_save_candidate_.set_identifier(
-      Iban::Guid(base::Uuid::GenerateRandomV4().AsLowercaseString()));
   // If the max strikes limit has been reached, do not show the IBAN save
   // prompt.
   bool show_save_prompt =
@@ -66,7 +64,7 @@ bool IbanSaveManager::AttemptToOfferIbanLocalSave(
 bool IbanSaveManager::ShouldOfferLocalSave(const Iban& iban_import_candidate) {
   // Only offer to save new IBANs. Users can go to the payment methods settings
   // page to update existing IBANs if desired.
-  return std::ranges::none_of(
+  return base::ranges::none_of(
       personal_data_manager_->GetLocalIbans(), [&](const auto& iban) {
         return iban->value() == iban_import_candidate.value();
       });
@@ -101,7 +99,7 @@ void IbanSaveManager::OnUserDidDecideOnLocalSave(
       // the strike count starts over with respect to re-saving it.
       GetIbanSaveStrikeDatabase()->ClearStrikes(partial_iban_hash);
       client_->GetPersonalDataManager()->OnAcceptedLocalIbanSave(
-          iban_save_candidate_);
+          std::move(iban_save_candidate_));
       if (observer_for_testing_) {
         observer_for_testing_->OnAcceptSaveIbanComplete();
       }

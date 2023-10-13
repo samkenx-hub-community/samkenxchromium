@@ -4,6 +4,7 @@
 
 #include "ash/system/message_center/ash_message_popup_collection.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 
@@ -27,6 +28,7 @@
 #include "ash/system/tray/tray_utils.h"
 #include "ash/system/unified/unified_system_tray.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
+#include "ash/wm/window_properties.h"
 #include "ash/wm/work_area_insets.h"
 #include "base/check.h"
 #include "base/i18n/rtl.h"
@@ -66,10 +68,14 @@ AshMessagePopupCollection::NotifierCollisionHandler::NotifierCollisionHandler(
     AshMessagePopupCollection* popup_collection)
     : popup_collection_(popup_collection) {
   Shell::Get()->system_tray_notifier()->AddSystemTrayObserver(this);
+  Shell::Get()->tablet_mode_controller()->AddObserver(this);
+  popup_collection_->shelf_->AddObserver(this);
 }
 
 AshMessagePopupCollection::NotifierCollisionHandler::
     ~NotifierCollisionHandler() {
+  popup_collection_->shelf_->RemoveObserver(this);
+  Shell::Get()->tablet_mode_controller()->RemoveObserver(this);
   Shell::Get()->system_tray_notifier()->RemoveSystemTrayObserver(this);
 }
 
@@ -96,14 +102,18 @@ void AshMessagePopupCollection::NotifierCollisionHandler::
 
     // Reset bounds so popup baseline is updated.
     popup_collection_->ResetBounds();
+  } else {
+    // Record metrics if the bubble stays open.
+    RecordOnTopOfSurfacesPopupCount();
   }
 }
 
 int AshMessagePopupCollection::NotifierCollisionHandler::
-    CalculateBaselineOffset() const {
+    CalculateBaselineOffset() {
   // Baseline pre-notifier collision does not consider corner anchored shelf pod
   // bubbles or slider bubbles to set its offset.
   if (!features::IsNotifierCollisionEnabled()) {
+    surface_type_ = NotifierCollisionSurfaceType::kExtendedHotseat;
     return CalculateExtendedHotseatOffset();
   }
 
@@ -116,13 +126,30 @@ int AshMessagePopupCollection::NotifierCollisionHandler::
       current_open_shelf_pod_bubble->IsAnchoredToShelfCorner()) {
     // Offset is calculated based on the height of the corner anchored shelf pod
     // bubble, if one is open.
-    return current_open_shelf_pod_bubble->height() +
-           message_center::kMarginBetweenPopups;
+    baseline_offset_ = current_open_shelf_pod_bubble->height() +
+                       message_center::kMarginBetweenPopups;
+    surface_type_ = NotifierCollisionSurfaceType::kShelfPodBubble;
   } else {
+    int slider_offset = CalculateSliderOffset();
+    int hotseat_offset = CalculateExtendedHotseatOffset();
+
     // If no corner anchored shelf pod bubble is open, the offset is calculated
     // based on the visibility of slider bubbles and the extended hotseat.
-    return CalculateSliderOffset() + CalculateExtendedHotseatOffset();
+    baseline_offset_ = slider_offset + hotseat_offset;
+
+    if (slider_offset != 0 && hotseat_offset != 0) {
+      surface_type_ =
+          NotifierCollisionSurfaceType::kSliderBubbleAndExtendedHotseat;
+    } else if (slider_offset != 0) {
+      surface_type_ = NotifierCollisionSurfaceType::kSliderBubble;
+    } else if (hotseat_offset != 0) {
+      surface_type_ = NotifierCollisionSurfaceType::kExtendedHotseat;
+    } else {
+      surface_type_ = NotifierCollisionSurfaceType::kNone;
+    }
   }
+
+  return baseline_offset_;
 }
 
 void AshMessagePopupCollection::NotifierCollisionHandler::
@@ -142,6 +169,8 @@ void AshMessagePopupCollection::NotifierCollisionHandler::
     return;
   }
 
+  int previous_baseline_offset = baseline_offset_;
+
   // If the popup collection does not fit in the available space when opening a
   // bubble or updating its height, close all popups.
   if (popup_collection_->popup_collection_bounds().height() >
@@ -151,6 +180,11 @@ void AshMessagePopupCollection::NotifierCollisionHandler::
 
   // Reset bounds so popup baseline is updated.
   popup_collection_->ResetBounds();
+
+  if (baseline_offset_ != previous_baseline_offset && baseline_offset_ != 0) {
+    RecordOnTopOfSurfacesPopupCount();
+    RecordSurfaceType();
+  }
 }
 
 int AshMessagePopupCollection::NotifierCollisionHandler::
@@ -183,14 +217,54 @@ int AshMessagePopupCollection::NotifierCollisionHandler::CalculateSliderOffset()
              : 0;
 }
 
-// TODO(b/300003350): Record whenever a bubble or a slider shifts the pop-up
-// baseline up.
 void AshMessagePopupCollection::NotifierCollisionHandler::
-    RecordBaselineShiftedUp(int popup_count) {
+    RecordOnTopOfSurfacesPopupCount() {
+  size_t popup_count = popup_collection_->popup_items().size();
   if (popup_count != 0) {
-    base::UmaHistogramCounts100("Ash.NotificationPopup.BaselineShiftedUp",
-                                popup_count);
+    base::UmaHistogramCounts100(
+        "Ash.NotificationPopup.OnTopOfSurfacesPopupCount", popup_count);
   }
+}
+
+void AshMessagePopupCollection::NotifierCollisionHandler::RecordSurfaceType() {
+  if (popup_collection_->popup_items().size() != 0) {
+    base::UmaHistogramEnumeration("Ash.NotificationPopup.OnTopOfSurfacesType",
+                                  surface_type_);
+  }
+}
+
+void AshMessagePopupCollection::NotifierCollisionHandler::
+    OnTabletModeStarted() {
+  // Reset bounds so pop-up baseline is updated.
+  popup_collection_->ResetBounds();
+}
+
+void AshMessagePopupCollection::NotifierCollisionHandler::OnTabletModeEnded() {
+  // Reset bounds so pop-up baseline is updated.
+  popup_collection_->ResetBounds();
+}
+
+void AshMessagePopupCollection::NotifierCollisionHandler::
+    OnBackgroundTypeChanged(ShelfBackgroundType background_type,
+                            AnimationChangeType change_type) {
+  popup_collection_->ResetBounds();
+}
+
+void AshMessagePopupCollection::NotifierCollisionHandler::
+    OnShelfWorkAreaInsetsChanged() {
+  popup_collection_->UpdateWorkArea();
+}
+
+void AshMessagePopupCollection::NotifierCollisionHandler::OnHotseatStateChanged(
+    HotseatState old_state,
+    HotseatState new_state) {
+  // We only need to take care of `HotseatState::kExtended` state.
+  if (old_state != HotseatState::kExtended &&
+      new_state != HotseatState::kExtended) {
+    return;
+  }
+  popup_collection_->ResetBounds();
+  RecordSurfaceType();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -200,17 +274,16 @@ AshMessagePopupCollection::AshMessagePopupCollection(Shelf* shelf)
     : screen_(nullptr), shelf_(shelf) {
   notifier_collision_handler_ =
       std::make_unique<NotifierCollisionHandler>(this);
-
-  shelf_->AddObserver(this);
-  Shell::Get()->tablet_mode_controller()->AddObserver(this);
 }
 
 AshMessagePopupCollection::~AshMessagePopupCollection() {
-  Shell::Get()->tablet_mode_controller()->RemoveObserver(this);
-  shelf_->RemoveObserver(this);
   for (views::Widget* widget : tracked_widgets_)
     widget->RemoveObserver(this);
   CHECK(!views::WidgetObserver::IsInObserverList());
+
+  // Should destruct `notifier_collision_handler_` before all other instances of
+  // this class since the handler depends on some of them.
+  notifier_collision_handler_.reset();
 }
 
 void AshMessagePopupCollection::StartObserving(
@@ -275,6 +348,8 @@ void AshMessagePopupCollection::ConfigureWidgetInitParamsForContainer(
   init_params->activatable = views::Widget::InitParams::Activatable::kYes;
   init_params->name = kMessagePopupWidgetName;
   init_params->corner_radius = kMessagePopupCornerRadius;
+  init_params->init_properties_container.SetProperty(
+      kStayInOverviewOnActivationKey, true);
   Shell::Get()->focus_cycler()->AddWidget(widget);
   widget->AddObserver(this);
   tracked_widgets_.insert(widget);
@@ -360,16 +435,6 @@ void AshMessagePopupCollection::ClosePopupItem(const PopupItem& item) {
   message_center::MessagePopupCollection::ClosePopupItem(item);
 }
 
-void AshMessagePopupCollection::OnTabletModeStarted() {
-  // Reset bounds so pop-up baseline is updated.
-  ResetBounds();
-}
-
-void AshMessagePopupCollection::OnTabletModeEnded() {
-  // Reset bounds so pop-up baseline is updated.
-  ResetBounds();
-}
-
 bool AshMessagePopupCollection::IsWidgetAPopupNotification(
     views::Widget* widget) {
   for (auto* popup_widget : tracked_widgets_) {
@@ -429,21 +494,6 @@ void AshMessagePopupCollection::UpdateWorkArea() {
   work_area_ = new_work_area;
   ResetBounds();
 }
-
-///////////////////////////////////////////////////////////////////////////////
-// ShelfObserver:
-
-void AshMessagePopupCollection::OnShelfWorkAreaInsetsChanged() {
-  UpdateWorkArea();
-}
-
-void AshMessagePopupCollection::OnHotseatStateChanged(HotseatState old_state,
-                                                      HotseatState new_state) {
-  ResetBounds();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// display::DisplayObserver:
 
 void AshMessagePopupCollection::OnDisplayMetricsChanged(
     const display::Display& display,

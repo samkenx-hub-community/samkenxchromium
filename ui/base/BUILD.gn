@@ -592,8 +592,9 @@ component("base") {
     sources += [
       "glib/glib_cast.h",
       "glib/glib_integers.h",
-      "glib/glib_signal.h",
       "glib/scoped_gobject.h",
+      "glib/scoped_gsignal.cc",
+      "glib/scoped_gsignal.h",
     ]
   }
 
@@ -777,6 +778,7 @@ static_library("test_support") {
     "interaction/interactive_test.h",
     "interaction/interactive_test_internal.cc",
     "interaction/interactive_test_internal.h",
+    "interaction/polling_state_observer.h",
     "interaction/state_observer.h",
     "resource/mock_resource_bundle_delegate.cc",
     "resource/mock_resource_bundle_delegate.h",
@@ -1298,6 +1300,10 @@ test("ui_base_unittests") {
   # If the platform supports wayland, run wayland library unittests, too.
   if (is_chromeos_ash || ozone_platform_wayland) {
     deps += [ "//ui/base/wayland:unittests" ]
+  }
+
+  if (use_glib) {
+    sources += [ "glib/scoped_gsignal_unittest.cc" ]
   }
 }
 

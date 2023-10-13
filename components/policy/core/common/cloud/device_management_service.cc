@@ -102,6 +102,59 @@ bool FailedWithProxy(const std::string& mime_type,
   return false;
 }
 
+std::string ResponseCodeToString(int response_code) {
+  switch (response_code) {
+    case DeviceManagementService::kSuccess:
+      return "Success";
+    case DeviceManagementService::kInvalidArgument:
+      return "InvalidArgument";
+    case DeviceManagementService::kInvalidAuthCookieOrDMToken:
+      return "InvalidAuthCookieOrDMToken";
+    case DeviceManagementService::kMissingLicenses:
+      return "MissingLicenses";
+    case DeviceManagementService::kDeviceManagementNotAllowed:
+      return "DeviceManagementNotAllowed";
+    case DeviceManagementService::kInvalidURL:
+      return "InvalidURL";
+    case DeviceManagementService::kInvalidSerialNumber:
+      return "InvalidSerialNumber";
+    case DeviceManagementService::kDomainMismatch:
+      return "DomainMismatch";
+    case DeviceManagementService::kDeviceIdConflict:
+      return "DeviceIdConflict";
+    case DeviceManagementService::kDeviceNotFound:
+      return "DeviceNotFound";
+    case DeviceManagementService::kPendingApproval:
+      return "PendingApproval";
+    case DeviceManagementService::kRequestTooLarge:
+      return "RequestTooLarge";
+    case DeviceManagementService::kConsumerAccountWithPackagedLicense:
+      return "ConsumerAccountWithPackagedLicense";
+    case DeviceManagementService::kTooManyRequests:
+      return "TooManyRequests";
+    case DeviceManagementService::kInternalServerError:
+      return "InternalServerError";
+    case DeviceManagementService::kServiceUnavailable:
+      return "ServiceUnavailable";
+    case DeviceManagementService::kPolicyNotFound:
+      return "PolicyNotFound";
+    case DeviceManagementService::kDeprovisioned:
+      return "Deprovisioned";
+    case DeviceManagementService::kArcDisabled:
+      return "ArcDisabled";
+    case DeviceManagementService::kInvalidDomainlessCustomer:
+      return "InvalidDomainlessCustomer";
+    case DeviceManagementService::kTosHasNotBeenAccepted:
+      return "TosHasNotBeenAccepted";
+    case DeviceManagementService::kIllegalAccountForPackagedEDULicense:
+      return "IllegalAccountForPackagedEDULicense";
+    case DeviceManagementService::kInvalidPackagedDeviceForKiosk:
+      return "InvalidPackagedDeviceForKiosk";
+  }
+
+  return base::NumberToString(response_code);
+}
+
 }  // namespace
 
 // While these are declared as constexpr in the header file, they also need to
@@ -361,6 +414,10 @@ JobConfigurationBase::GetResourceRequest(bool bypass_proxy, int last_error) {
   return rr;
 }
 
+bool JobConfigurationBase::ShouldRecordUma() const {
+  return true;
+}
+
 DeviceManagementService::Job::RetryMethod JobConfigurationBase::ShouldRetry(
     int response_code,
     const std::string& response_body) {
@@ -509,15 +566,17 @@ DeviceManagementService::JobImpl::HandleResponseData(
     int net_error,
     int response_code,
     bool was_fetched_via_proxy) {
-  std::string uma_name = config_->GetUmaName();
   if (net_error != net::OK) {
-    // Using histogram functions which allows runtime histogram name.
-    base::UmaHistogramEnumeration(uma_name,
-                                  DMServerRequestSuccess::kRequestFailed);
+    if (config_->ShouldRecordUma()) {
+      // Using histogram functions which allows runtime histogram name.
+      base::UmaHistogramEnumeration(config_->GetUmaName(),
+                                    DMServerRequestSuccess::kRequestFailed);
+    }
     LOG_POLICY(WARNING, CBCM_ENROLLMENT)
         << "Request of type "
         << JobConfiguration::GetJobTypeAsString(config_->GetType())
-        << " failed (net_error = " << net_error << ").";
+        << " failed (net_error = " << net::ErrorToString(net_error) << " ("
+        << net_error << ")).";
     config_->OnURLLoadComplete(this, net_error, response_code, std::string());
     return RetryMethod::NO_RETRY;
   }
@@ -526,9 +585,12 @@ DeviceManagementService::JobImpl::HandleResponseData(
     LOG_POLICY(WARNING, CBCM_ENROLLMENT)
         << "Request of type "
         << JobConfiguration::GetJobTypeAsString(config_->GetType())
-        << " failed (response_code = " << response_code << ").";
-    base::UmaHistogramEnumeration(uma_name,
-                                  DMServerRequestSuccess::kRequestError);
+        << " failed (response_code = " << ResponseCodeToString(response_code)
+        << " (" << response_code << ")).";
+    if (config_->ShouldRecordUma()) {
+      base::UmaHistogramEnumeration(config_->GetUmaName(),
+                                    DMServerRequestSuccess::kRequestError);
+    }
   } else {
     // Success with retries_count_ retries.
     if (retries_count_) {
@@ -537,9 +599,11 @@ DeviceManagementService::JobImpl::HandleResponseData(
           << JobConfiguration::GetJobTypeAsString(config_->GetType())
           << " succeeded after " << retries_count_ << " retries.";
     }
-    base::UmaHistogramExactLinear(
-        uma_name, retries_count_,
-        static_cast<int>(DMServerRequestSuccess::kMaxValue) + 1);
+    if (config_->ShouldRecordUma()) {
+      base::UmaHistogramExactLinear(
+          config_->GetUmaName(), retries_count_,
+          static_cast<int>(DMServerRequestSuccess::kMaxValue) + 1);
+    }
   }
 
   config_->OnURLLoadComplete(this, net_error, response_code, response_body);

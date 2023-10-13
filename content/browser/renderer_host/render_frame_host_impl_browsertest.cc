@@ -39,8 +39,8 @@
 #include "content/browser/browser_main_loop.h"
 #include "content/browser/renderer_host/input/timeout_monitor.h"
 #include "content/browser/renderer_host/navigation_request.h"
+#include "content/browser/renderer_host/origin_trial_state_host_impl.h"
 #include "content/browser/renderer_host/render_process_host_impl.h"
-#include "content/browser/renderer_host/runtime_feature_state_controller_impl.h"
 #include "content/browser/sms/test/mock_sms_provider.h"
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/browser/web_contents/web_contents_view.h"
@@ -108,7 +108,6 @@
 #include "services/service_manager/public/cpp/interface_provider.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-#include "third_party/blink/public/common/origin_trials/origin_trial_feature.h"
 #include "third_party/blink/public/common/storage_key/storage_key.h"
 #include "third_party/blink/public/common/switches.h"
 #include "third_party/blink/public/mojom/browser_interface_broker.mojom-test-utils.h"
@@ -994,7 +993,7 @@ class RenderFrameHostImplWithTokensBrowserTest : public ContentBrowserTest {
 };
 
 // Check that the RuntimeFeatureStateDocumentData is altered when we receive a
-// RuntimeFeatureStateController IPC.
+// OriginTrialStateHost IPC.
 IN_PROC_BROWSER_TEST_F(RenderFrameHostImplWithTokensBrowserTest,
                        DocumentDataAltered) {
   // Generated with:
@@ -1012,12 +1011,12 @@ IN_PROC_BROWSER_TEST_F(RenderFrameHostImplWithTokensBrowserTest,
   EXPECT_TRUE(NavigateToURL(shell(), simple_origin_trial_url()));
 
   // Create a test remote to initiate the IPC.
-  mojo::Remote<blink::mojom::RuntimeFeatureStateController>
-      runtime_feature_state_controller_remote;
-  RuntimeFeatureStateControllerImpl::Create(
+  mojo::Remote<blink::mojom::OriginTrialStateHost>
+      origin_trial_state_host_remote;
+  OriginTrialStateHostImpl::Create(
       web_contents()->GetPrimaryMainFrame(),
-      runtime_feature_state_controller_remote.BindNewPipeAndPassReceiver());
-  ASSERT_TRUE(runtime_feature_state_controller_remote.is_connected());
+      origin_trial_state_host_remote.BindNewPipeAndPassReceiver());
+  ASSERT_TRUE(origin_trial_state_host_remote.is_connected());
 
   // Before ApplyFeatureDiffForOriginTrial() is called, we expect that the
   // feature overrides will be empty.
@@ -1031,14 +1030,15 @@ IN_PROC_BROWSER_TEST_F(RenderFrameHostImplWithTokensBrowserTest,
                 .GetFeatureOverrides());
 
   // Simulate receiving a feature diff from the renderer process.
-  auto overrides_with_tokens = base::flat_map<blink::mojom::RuntimeFeatureState,
-                                              blink::mojom::FeatureValuePtr>();
+  auto overrides_with_tokens =
+      base::flat_map<blink::mojom::RuntimeFeatureState,
+                     blink::mojom::OriginTrialFeatureStatePtr>();
   std::string raw_token(kValidFirstPartyToken);
   std::vector<std::string> raw_tokens_vector{raw_token};
   overrides_with_tokens[blink::mojom::RuntimeFeatureState::
                             kDisableThirdPartyStoragePartitioning] =
-      blink::mojom::FeatureValue::New(true, raw_tokens_vector);
-  runtime_feature_state_controller_remote.get()->ApplyFeatureDiffForOriginTrial(
+      blink::mojom::OriginTrialFeatureState::New(true, raw_tokens_vector);
+  origin_trial_state_host_remote.get()->ApplyFeatureDiffForOriginTrial(
       std::move(overrides_with_tokens));
 
   // Create the set of expected overrides without the corresponding tokens.
@@ -1046,14 +1046,14 @@ IN_PROC_BROWSER_TEST_F(RenderFrameHostImplWithTokensBrowserTest,
                          kDisableThirdPartyStoragePartitioning] = true;
 
   // Verify that the document data was altered with the correct overrides.
-  runtime_feature_state_controller_remote.FlushForTesting();
+  origin_trial_state_host_remote.FlushForTesting();
   EXPECT_EQ(expected_overrides,
             actual_document_data->runtime_feature_state_read_context()
                 .GetFeatureOverrides());
 }
 
 // Check that the RuntimeFeatureStateDocumentData is not altered when we receive
-// a RuntimeFeatureStateController IPC that contains an invalid token.
+// a OriginTrialStateHost IPC that contains an invalid token.
 IN_PROC_BROWSER_TEST_F(RenderFrameHostImplWithTokensBrowserTest,
                        DocumentDataInvalidToken) {
   const char kInvalidToken[] = "invalid";
@@ -1062,12 +1062,12 @@ IN_PROC_BROWSER_TEST_F(RenderFrameHostImplWithTokensBrowserTest,
   EXPECT_TRUE(NavigateToURL(shell(), simple_origin_trial_url()));
 
   // Create a test remote to initiate the IPC.
-  mojo::Remote<blink::mojom::RuntimeFeatureStateController>
-      runtime_feature_state_controller_remote;
-  RuntimeFeatureStateControllerImpl::Create(
+  mojo::Remote<blink::mojom::OriginTrialStateHost>
+      origin_trial_state_host_remote;
+  OriginTrialStateHostImpl::Create(
       web_contents()->GetPrimaryMainFrame(),
-      runtime_feature_state_controller_remote.BindNewPipeAndPassReceiver());
-  ASSERT_TRUE(runtime_feature_state_controller_remote.is_connected());
+      origin_trial_state_host_remote.BindNewPipeAndPassReceiver());
+  ASSERT_TRUE(origin_trial_state_host_remote.is_connected());
 
   // Before ApplyFeatureDiffForOriginTrial() is called, we expect that the
   // feature overrides will be empty.
@@ -1081,18 +1081,19 @@ IN_PROC_BROWSER_TEST_F(RenderFrameHostImplWithTokensBrowserTest,
                 .GetFeatureOverrides());
 
   // Simulate receiving a feature diff from the renderer process.
-  auto overrides_with_tokens = base::flat_map<blink::mojom::RuntimeFeatureState,
-                                              blink::mojom::FeatureValuePtr>();
+  auto overrides_with_tokens =
+      base::flat_map<blink::mojom::RuntimeFeatureState,
+                     blink::mojom::OriginTrialFeatureStatePtr>();
   std::string raw_token(kInvalidToken);
   std::vector<std::string> raw_tokens_vector{raw_token};
   overrides_with_tokens[blink::mojom::RuntimeFeatureState::
                             kDisableThirdPartyStoragePartitioning] =
-      blink::mojom::FeatureValue::New(true, raw_tokens_vector);
-  runtime_feature_state_controller_remote.get()->ApplyFeatureDiffForOriginTrial(
+      blink::mojom::OriginTrialFeatureState::New(true, raw_tokens_vector);
+  origin_trial_state_host_remote.get()->ApplyFeatureDiffForOriginTrial(
       std::move(overrides_with_tokens));
 
   // Verify that no feature overrides were added.
-  runtime_feature_state_controller_remote.FlushForTesting();
+  origin_trial_state_host_remote.FlushForTesting();
   EXPECT_EQ(expected_overrides,
             actual_document_data->runtime_feature_state_read_context()
                 .GetFeatureOverrides());
@@ -1122,7 +1123,7 @@ IN_PROC_BROWSER_TEST_F(RenderFrameHostImplWithTokensBrowserTest,
   url::Origin trial_origin = url::Origin::Create(GURL(kOriginTrialUrl));
   EXPECT_TRUE(delegate->IsFeaturePersistedForOrigin(
       /*origin=*/trial_origin, /*partition_origin=*/trial_origin,
-      blink::OriginTrialFeature::kOriginTrialsSampleAPIPersistentFeature,
+      blink::mojom::OriginTrialFeature::kOriginTrialsSampleAPIPersistentFeature,
       validTime));
 }
 
@@ -1177,7 +1178,7 @@ IN_PROC_BROWSER_TEST_F(
   url::Origin trial_origin = url::Origin::Create(GURL(kThirdPartyScriptUrl));
   EXPECT_TRUE(delegate->IsFeaturePersistedForOrigin(
       /*origin=*/trial_origin, /*partition_origin=*/main_origin,
-      blink::OriginTrialFeature::
+      blink::mojom::OriginTrialFeature::
           kOriginTrialsSampleAPIPersistentThirdPartyDeprecationFeature,
       validTime));
 }
@@ -7626,16 +7627,12 @@ void AssertBitmapOfColor(const SkBitmap& bitmap, SkColor color) {
 // visual glitches.
 //
 // TODO(https://crbug.com/1472026): Investigate and re-enable.
-#if BUILDFLAG(IS_WIN)
-#define MAYBE_NewContentTimeoutIsSetWhenLeavingBFCacheWithViewTransition \
-  DISABLED_NewContentTimeoutIsSetWhenLeavingBFCacheWithViewTransition
-#else
-#define MAYBE_NewContentTimeoutIsSetWhenLeavingBFCacheWithViewTransition \
-  NewContentTimeoutIsSetWhenLeavingBFCacheWithViewTransition
-#endif
+//
+// TODO(https://crbug.com/1487799): Disabled globally as the killswitch has been
+// flipped. Re-enable once the proper fix for VT+BFCache has landed.
 IN_PROC_BROWSER_TEST_F(
     RenderFrameHostImplBrowserTestWithBFCacheAndViewTransition,
-    MAYBE_NewContentTimeoutIsSetWhenLeavingBFCacheWithViewTransition) {
+    DISABLED_NewContentTimeoutIsSetWhenLeavingBFCacheWithViewTransition) {
   // "red_jank_second_pageshow.html" janks the renderer on the second pageshow
   // event.
   const GURL url_red(embedded_test_server()->GetURL(

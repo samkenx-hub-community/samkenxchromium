@@ -70,9 +70,7 @@ class CORE_EXPORT NGLayoutResult final
   // Same as Clone(), but uses the "post-layout" fragments to ensure
   // fragment-tree consistency.
   static const NGLayoutResult* CloneWithPostLayoutFragments(
-      const NGLayoutResult& other,
-      const absl::optional<PhysicalRect> updated_layout_overflow =
-          absl::nullopt);
+      const NGLayoutResult& other);
 
   // Create a copy of NGLayoutResult with |BfcBlockOffset| replaced by the given
   // parameter. Note, when |bfc_block_offset| is |nullopt|, |BfcBlockOffset| is
@@ -165,7 +163,7 @@ class CORE_EXPORT NGLayoutResult final
   // Returns the absolutized inset property values in the parent's writing mode.
   // Not necessarily the insets of the actual box in the container, but matches
   // the result of the `getComputedStyle()` JavaScript API.
-  const NGBoxStrut& OutOfFlowInsetsForGetComputedStyle() const {
+  const BoxStrut& OutOfFlowInsetsForGetComputedStyle() const {
     CHECK(bitfields_.has_oof_insets_for_get_computed_style);
     return oof_insets_for_get_computed_style_;
   }
@@ -187,6 +185,15 @@ class CORE_EXPORT NGLayoutResult final
   PositionFallbackNonOverflowingRanges() const {
     return rare_data_ ? rare_data_->PositionFallbackNonOverflowingRanges()
                       : nullptr;
+  }
+
+  bool NeedsAnchorPositionScrollAdjustmentInX() const {
+    return rare_data_ &&
+           rare_data_->needs_anchor_position_scroll_adjustment_in_x();
+  }
+  bool NeedsAnchorPositionScrollAdjustmentInY() const {
+    return rare_data_ &&
+           rare_data_->needs_anchor_position_scroll_adjustment_in_y();
   }
 
   // Get the path to the column spanner (if any) that interrupted column layout.
@@ -485,7 +492,7 @@ class CORE_EXPORT NGLayoutResult final
     friend class NGOutOfFlowLayoutPart;
 
     void SetOutOfFlowInsetsForGetComputedStyle(
-        const NGBoxStrut& insets,
+        const BoxStrut& insets,
         bool can_use_out_of_flow_positioned_first_tier_cache) {
       // OOF-positioned nodes *must* always have an initial BFC-offset.
       DCHECK(layout_result_->physical_fragment_->IsOutOfFlowPositioned());
@@ -513,6 +520,19 @@ class CORE_EXPORT NGLayoutResult final
                         .StartOffset()) {
         layout_result_->EnsureRareData()->SetOutOfFlowPositionedOffset(offset);
       }
+    }
+
+    void SetNeedsScrollAdjustment(bool needs_scroll_adjustment_in_x,
+                                  bool needs_scroll_adjustment_in_y) {
+      if (!needs_scroll_adjustment_in_x && !needs_scroll_adjustment_in_y) {
+        return;
+      }
+      layout_result_->EnsureRareData()
+          ->set_needs_anchor_position_scroll_adjustment_in_x(
+              needs_scroll_adjustment_in_x);
+      layout_result_->EnsureRareData()
+          ->set_needs_anchor_position_scroll_adjustment_in_y(
+              needs_scroll_adjustment_in_y);
     }
 
     void SetPositionFallbackResult(
@@ -614,8 +634,12 @@ class CORE_EXPORT NGLayoutResult final
         LineBoxBfcBlockOffsetIsSetFlag::DefineNextValue<bool, 1>;
     using OutOfFlowPositionedOffsetIsSetFlag =
         PositionFallbackResultIsSetFlag::DefineNextValue<bool, 1>;
+    using NeedsAnchorPositionScrollAdjustmentInXFlag =
+        OutOfFlowPositionedOffsetIsSetFlag::DefineNextValue<bool, 1>;
+    using NeedsAnchorPositionScrollAdjustmentInYFlag =
+        NeedsAnchorPositionScrollAdjustmentInXFlag::DefineNextValue<bool, 1>;
     using DataUnionTypeValue =
-        OutOfFlowPositionedOffsetIsSetFlag::DefineNextValue<uint8_t, 3>;
+        NeedsAnchorPositionScrollAdjustmentInYFlag::DefineNextValue<uint8_t, 3>;
 
     struct BlockData {
       GC_PLUGIN_IGNORE("crbug.com/1146383")
@@ -678,6 +702,22 @@ class CORE_EXPORT NGLayoutResult final
 
     void set_oof_positioned_offset_is_set(bool flag) {
       return bit_field.set<OutOfFlowPositionedOffsetIsSetFlag>(flag);
+    }
+
+    bool needs_anchor_position_scroll_adjustment_in_x() const {
+      return bit_field.get<NeedsAnchorPositionScrollAdjustmentInXFlag>();
+    }
+
+    void set_needs_anchor_position_scroll_adjustment_in_x(bool flag) {
+      return bit_field.set<NeedsAnchorPositionScrollAdjustmentInXFlag>(flag);
+    }
+
+    bool needs_anchor_position_scroll_adjustment_in_y() const {
+      return bit_field.get<NeedsAnchorPositionScrollAdjustmentInYFlag>();
+    }
+
+    void set_needs_anchor_position_scroll_adjustment_in_y(bool flag) {
+      return bit_field.set<NeedsAnchorPositionScrollAdjustmentInYFlag>(flag);
     }
 
     DataUnionType data_union_type() const {
@@ -985,11 +1025,11 @@ class CORE_EXPORT NGLayoutResult final
   // *always* the initial value.
   Member<RareData> rare_data_;
   union {
-    NGBfcOffset bfc_offset_;
+    BfcOffset bfc_offset_;
     // This is the absolutized inset property values of an OOF-positioned object
     // in its parent's writing-mode. This is set by the |NGOutOfFlowLayoutPart|
     // while generating this layout result.
-    NGBoxStrut oof_insets_for_get_computed_style_;
+    BoxStrut oof_insets_for_get_computed_style_;
   };
 
   LayoutUnit intrinsic_block_size_;

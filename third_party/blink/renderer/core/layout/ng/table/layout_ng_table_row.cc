@@ -13,8 +13,7 @@
 
 namespace blink {
 
-LayoutNGTableRow::LayoutNGTableRow(Element* element)
-    : LayoutNGMixin<LayoutBlock>(element) {}
+LayoutNGTableRow::LayoutNGTableRow(Element* element) : LayoutBlock(element) {}
 
 LayoutNGTableRow* LayoutNGTableRow::CreateAnonymousWithParent(
     const LayoutObject& parent) {
@@ -25,11 +24,6 @@ LayoutNGTableRow* LayoutNGTableRow::CreateAnonymousWithParent(
   new_row->SetDocumentForAnonymous(&parent.GetDocument());
   new_row->SetStyle(new_style);
   return new_row;
-}
-
-bool LayoutNGTableRow::IsEmpty() const {
-  NOT_DESTROYED();
-  return !FirstChild();
 }
 
 LayoutNGTableCell* LayoutNGTableRow::FirstCell() const {
@@ -112,21 +106,27 @@ void LayoutNGTableRow::AddChild(LayoutObject* child,
     before_child = SplitAnonymousBoxesAroundChild(before_child);
 
   DCHECK(!before_child || before_child->IsTableCell());
-  LayoutNGMixin<LayoutBlock>::AddChild(child, before_child);
+  LayoutBlock::AddChild(child, before_child);
 }
 
 void LayoutNGTableRow::RemoveChild(LayoutObject* child) {
   NOT_DESTROYED();
   if (LayoutNGTable* table = Table())
     table->TableGridStructureChanged();
-  LayoutNGMixin<LayoutBlock>::RemoveChild(child);
+  // Invalidate background in case this doesn't need layout which would
+  // trigger the invalidation, e.g. when the last child is removed.
+  if (StyleRef().HasBackground()) {
+    SetBackgroundNeedsFullPaintInvalidation();
+  }
+
+  LayoutBlock::RemoveChild(child);
 }
 
 void LayoutNGTableRow::WillBeRemovedFromTree() {
   NOT_DESTROYED();
   if (LayoutNGTable* table = Table())
     table->TableGridStructureChanged();
-  LayoutNGMixin<LayoutBlock>::WillBeRemovedFromTree();
+  LayoutBlock::WillBeRemovedFromTree();
 }
 
 void LayoutNGTableRow::StyleDidChange(StyleDifference diff,
@@ -139,7 +139,7 @@ void LayoutNGTableRow::StyleDidChange(StyleDifference diff,
       table->GridBordersChanged();
     }
   }
-  LayoutNGMixin<LayoutBlock>::StyleDidChange(diff, old_style);
+  LayoutBlock::StyleDidChange(diff, old_style);
 }
 
 LayoutBox* LayoutNGTableRow::CreateAnonymousBoxWithSameTypeAs(
@@ -152,15 +152,6 @@ LayoutBlock* LayoutNGTableRow::StickyContainer() const {
   NOT_DESTROYED();
   return Table();
 }
-
-#if DCHECK_IS_ON()
-void LayoutNGTableRow::AddVisualOverflowFromBlockChildren() {
-  NOT_DESTROYED();
-  // This is computed in |NGPhysicalBoxFragment::ComputeSelfInkOverflow| and
-  // that we should not reach here.
-  NOTREACHED();
-}
-#endif
 
 PositionWithAffinity LayoutNGTableRow::PositionForPoint(
     const PhysicalOffset& offset) const {

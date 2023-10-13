@@ -10,9 +10,15 @@
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
+#import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/ui/autofill/bottom_sheet/payments_suggestion_bottom_sheet_mediator.h"
 #import "ios/chrome/browser/ui/autofill/bottom_sheet/payments_suggestion_bottom_sheet_view_controller.h"
 #import "ios/web/public/web_state.h"
+
+using PaymentsSuggestionBottomSheetExitReason::kDismissal;
+using PaymentsSuggestionBottomSheetExitReason::kShowPaymentDetails;
+using PaymentsSuggestionBottomSheetExitReason::kShowPaymentMethods;
+using PaymentsSuggestionBottomSheetExitReason::kUsePaymentsSuggestion;
 
 @interface PaymentsSuggestionBottomSheetCoordinator () {
   // Information regarding the triggering form for this bottom sheet.
@@ -99,44 +105,53 @@
 #pragma mark - PaymentsSuggestionBottomSheetHandler
 
 - (void)displayPaymentMethods {
+  _dismissing = YES;
+  [self.mediator logExitReason:kShowPaymentMethods];
   __weak __typeof(self) weakSelf = self;
   [self.baseViewController.presentedViewController
       dismissViewControllerAnimated:NO
                          completion:^{
-                           [weakSelf stop];
-                           [weakSelf.applicationCommandsHandler
+                           [weakSelf.applicationSettingsCommandsHandler
                                    showCreditCardSettings];
+                           [weakSelf.browserCoordinatorCommandsHandler
+                                   dismissPaymentSuggestions];
                          }];
 }
 
 - (void)displayPaymentDetailsForCreditCardIdentifier:
     (NSString*)creditCardIdentifier {
+  _dismissing = YES;
   autofill::CreditCard* creditCard =
       [self.mediator creditCardForIdentifier:creditCardIdentifier];
   if (creditCard) {
+    [self.mediator logExitReason:kShowPaymentDetails];
     __weak __typeof(self) weakSelf = self;
     [self.baseViewController.presentedViewController
         dismissViewControllerAnimated:NO
                            completion:^{
-                             [weakSelf stop];
-                             [weakSelf.applicationCommandsHandler
+                             [weakSelf.applicationSettingsCommandsHandler
                                  showCreditCardDetails:creditCard];
+                             [weakSelf.browserCoordinatorCommandsHandler
+                                     dismissPaymentSuggestions];
                            }];
   }
 }
 
 - (void)primaryButtonTapped:(NSString*)backendIdentifier {
   _dismissing = YES;
+  [self.mediator logExitReason:kUsePaymentsSuggestion];
   __weak __typeof(self) weakSelf = self;
   [self.viewController
       dismissViewControllerAnimated:NO
                          completion:^{
                            [weakSelf didSelectCreditCard:backendIdentifier];
+                           [weakSelf.browserCoordinatorCommandsHandler
+                                   dismissPaymentSuggestions];
                          }];
 }
 
 - (void)secondaryButtonTapped {
-  // "No thanks" button, which dismisses the bottom sheet.
+  // "Use Keyboard" button, which dismisses the bottom sheet.
   [self.viewController dismissViewControllerAnimated:YES completion:NULL];
 }
 
@@ -145,7 +160,9 @@
     return;
   }
 
+  [self.mediator logExitReason:kDismissal];
   [self.mediator disconnect];
+  [_browserCoordinatorCommandsHandler dismissPaymentSuggestions];
 }
 
 #pragma mark - Private

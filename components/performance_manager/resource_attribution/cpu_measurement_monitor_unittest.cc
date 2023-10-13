@@ -31,7 +31,6 @@
 #include "components/performance_manager/graph/worker_node_impl.h"
 #include "components/performance_manager/public/graph/process_node.h"
 #include "components/performance_manager/public/performance_manager.h"
-#include "components/performance_manager/public/resource_attribution/frame_context_registry.h"
 #include "components/performance_manager/public/resource_attribution/query_results.h"
 #include "components/performance_manager/public/resource_attribution/resource_contexts.h"
 #include "components/performance_manager/test_support/graph_test_harness.h"
@@ -169,8 +168,7 @@ class CPUMeasurementMonitorTest : public GraphTestHarness {
   // Creates a renderer process and starts mocking its CPU measurements. By
   // default the process will use 100% CPU as long as it's alive.
   TestNodeWrapper<ProcessNodeImpl> CreateMockCPURenderer() {
-    // CreateNode's default arguments create a renderer process node.
-    auto process_node = CreateNode<ProcessNodeImpl>();
+    auto process_node = CreateProcessNodeAutoId(content::PROCESS_TYPE_RENDERER);
     SetProcessCPUUsage(process_node.get(), 1.0);
     return process_node;
   }
@@ -1263,13 +1261,13 @@ class CPUMeasurementMonitorTimingTest : public PerformanceManagerTestHarness {
   std::unique_ptr<CPUMeasurementMonitor> cpu_monitor_;
 };
 
-TEST_F(CPUMeasurementMonitorTimingTest, DISABLED_ProcessLifetime) {
+TEST_F(CPUMeasurementMonitorTimingTest, ProcessLifetime) {
   SetContents(CreateTestWebContents());
   content::NavigationSimulator::NavigateAndCommitFromBrowser(
       web_contents(), GURL("https://www.example.com/"));
 
-  const FrameContext frame_context =
-      FrameContextRegistry::ContextForRenderFrameHost(main_rfh()).value();
+  const auto frame_context =
+      FrameContext::FromRenderFrameHost(main_rfh()).value();
   base::WeakPtr<ProcessNode> process_node =
       PerformanceManager::GetProcessNodeForRenderProcessHost(process());
 
@@ -1282,38 +1280,98 @@ TEST_F(CPUMeasurementMonitorTimingTest, DISABLED_ProcessLifetime) {
     EXPECT_EQ(process_node->GetProcessId(), base::kNullProcessId);
 
     // Process can't be measured yet.
-    EXPECT_FALSE(base::Contains(cpu_monitor_->UpdateAndGetCPUMeasurements(),
-                                frame_context));
+    const auto measurements = cpu_monitor_->UpdateAndGetCPUMeasurements();
+    EXPECT_FALSE(
+        base::Contains(measurements, process_node->GetResourceContext()));
+    EXPECT_FALSE(base::Contains(measurements, frame_context));
   }));
 
   // Assign a real process to the ProcessNode. (Will call
-  // OnProcessLifetimeChange.)
-  LetTimePass();
-  RunOnPMSequence(base::BindLambdaForTesting([&] {
+  // OnProcessLifetimeChange and start monitoring.)
+  auto set_process_on_pm_sequence = [&process_node] {
     ASSERT_TRUE(process_node);
     ProcessNodeImpl::FromNode(process_node.get())
         ->SetProcess(base::Process::Current(), base::TimeTicks::Now());
     EXPECT_NE(process_node->GetProcessId(), base::kNullProcessId);
+  };
+  RunOnPMSequence(base::BindLambdaForTesting(set_process_on_pm_sequence));
+
+  // Let some time pass so there's CPU to measure after monitoring starts.
+  LetTimePass();
+
+  base::TimeDelta cumulative_process_cpu;
+  base::TimeDelta cumulative_frame_cpu;
+  RunOnPMSequence(base::BindLambdaForTesting([&] {
+    ASSERT_TRUE(process_node);
+    EXPECT_TRUE(process_node->GetProcess().IsValid());
 
     // Process can be measured now.
-    EXPECT_TRUE(base::Contains(cpu_monitor_->UpdateAndGetCPUMeasurements(),
-                               frame_context));
+    const auto measurements = cpu_monitor_->UpdateAndGetCPUMeasurements();
+
+    ASSERT_TRUE(
+        base::Contains(measurements, process_node->GetResourceContext()));
+    cumulative_process_cpu =
+        measurements.at(process_node->GetResourceContext()).cumulative_cpu;
+    EXPECT_FALSE(cumulative_process_cpu.is_negative());
+
+    ASSERT_TRUE(base::Contains(measurements, frame_context));
+    cumulative_frame_cpu = measurements.at(frame_context).cumulative_cpu;
+    EXPECT_FALSE(cumulative_frame_cpu.is_negative());
   }));
 
   // Simulate that the process died.
-  LetTimePass();
   process()->SimulateRenderProcessExit(
       base::TERMINATION_STATUS_NORMAL_TERMINATION, 0);
-  RunOnPMSequence(base::BindLambdaForTesting([&](Graph* graph) {
+  LetTimePass();
+  RunOnPMSequence(base::BindLambdaForTesting([&] {
     // Process is no longer running, so can't be measured.
-    // TODO(crbug.com/1410503): Capture the final CPU usage correctly.
     ASSERT_TRUE(process_node);
     EXPECT_FALSE(process_node->GetProcess().IsValid());
-    // Depending on the order that observers fire, the main frame may or may not
-    // have been deleted already. If it's deleted CPUMeasurementMonitor will
-    // return its last measured usage.
-    EXPECT_TRUE(base::Contains(cpu_monitor_->UpdateAndGetCPUMeasurements(),
-                               frame_context));
+
+    // CPUMeasurementMonitor will continue to return the last measured usage of
+    // the process and its main frame.
+    // TODO(crbug.com/1410503): Capture the final CPU usage correctly, and after
+    // the main FrameNode is deleted, only cache it for the length of one query.
+    const auto measurements = cpu_monitor_->UpdateAndGetCPUMeasurements();
+
+    ASSERT_TRUE(
+        base::Contains(measurements, process_node->GetResourceContext()));
+    const base::TimeDelta new_process_cpu =
+        measurements.at(process_node->GetResourceContext()).cumulative_cpu;
+    EXPECT_GE(new_process_cpu, cumulative_process_cpu);
+    cumulative_process_cpu = new_process_cpu;
+
+    ASSERT_TRUE(base::Contains(measurements, frame_context));
+    const base::TimeDelta new_frame_cpu =
+        measurements.at(frame_context).cumulative_cpu;
+    EXPECT_GE(new_frame_cpu, cumulative_frame_cpu);
+    cumulative_frame_cpu = new_frame_cpu;
+  }));
+
+  // Assign a new process to the same renderer. This should add the CPU usage of
+  // the new process to the existing CPU usage.
+  EXPECT_TRUE(process()->MayReuseHost());
+  RunOnPMSequence(base::BindLambdaForTesting(set_process_on_pm_sequence));
+
+  LetTimePass();
+  RunOnPMSequence(base::BindLambdaForTesting([&] {
+    ASSERT_TRUE(process_node);
+    EXPECT_TRUE(process_node->GetProcess().IsValid());
+
+    const auto measurements = cpu_monitor_->UpdateAndGetCPUMeasurements();
+
+    ASSERT_TRUE(
+        base::Contains(measurements, process_node->GetResourceContext()));
+    const base::TimeDelta new_process_cpu =
+        measurements.at(process_node->GetResourceContext()).cumulative_cpu;
+    EXPECT_GE(new_process_cpu, cumulative_process_cpu);
+    cumulative_process_cpu = new_process_cpu;
+
+    ASSERT_TRUE(base::Contains(measurements, frame_context));
+    const base::TimeDelta new_frame_cpu =
+        measurements.at(frame_context).cumulative_cpu;
+    EXPECT_GE(new_frame_cpu, cumulative_frame_cpu);
+    cumulative_frame_cpu = new_frame_cpu;
   }));
 }
 

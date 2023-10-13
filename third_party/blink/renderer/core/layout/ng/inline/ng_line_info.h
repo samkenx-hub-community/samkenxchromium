@@ -125,18 +125,20 @@ class CORE_EXPORT NGLineInfo {
   // that must be called after |SetIsLastLine()|.
   void UpdateTextAlign();
 
-  NGBfcOffset BfcOffset() const { return bfc_offset_; }
+  BfcOffset GetBfcOffset() const { return bfc_offset_; }
   LayoutUnit AvailableWidth() const { return available_width_; }
 
-  // The width of this line. Includes trailing spaces if they were preserved.
+  // The width of this line, including the hanging width from trailing spaces.
   // Negative width created by negative 'text-indent' is clamped to zero.
   LayoutUnit Width() const { return width_.ClampNegativeToZero(); }
-  // Same as |Width()| but returns negative value as is. Preserved trailing
-  // spaces may or may not be included, depends on |ShouldHangTrailingSpaces()|.
+  // Same as |Width()| but returns negatives value as is. The hanging width
+  // (e.g. from preserved trailing spaces) may or may not be included, depends
+  // on |ShouldHangTrailingSpaces()|.
   LayoutUnit WidthForAlignment() const {
     return width_ - HangWidthForAlignment();
   }
   // Width that hangs over the end of the line; e.g., preserved trailing spaces.
+  // See https://drafts.csswg.org/css-text/#hanging.
   LayoutUnit HangWidth() const { return hang_width_; }
   // Same as |HangWidth()| but it may be 0 depending on
   // |ShouldHangTrailingSpaces()|.
@@ -165,7 +167,7 @@ class CORE_EXPORT NGLineInfo {
   // True if this line is hyphenated.
   bool IsHyphenated() const;
 
-  void SetBfcOffset(const NGBfcOffset& bfc_offset) { bfc_offset_ = bfc_offset; }
+  void SetBfcOffset(const BfcOffset& bfc_offset) { bfc_offset_ = bfc_offset; }
   void SetWidth(LayoutUnit available_width, LayoutUnit width) {
     available_width_ = available_width;
     width_ = width;
@@ -262,7 +264,7 @@ class CORE_EXPORT NGLineInfo {
   const ComputedStyle* line_style_{nullptr};
   NGInlineItemResults results_;
 
-  NGBfcOffset bfc_offset_;
+  BfcOffset bfc_offset_;
 
   const NGInlineBreakToken* break_token_ = nullptr;
   HeapVector<Member<const NGBreakToken>> parallel_flow_break_tokens_;

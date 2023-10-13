@@ -52,10 +52,10 @@ if (is_ios) {
     bundle_data("components_tests_distiller_bundle_data") {
       testonly = true
       sources = [
-        "//third_party/chaijs/chai.js",
         "//third_party/dom_distiller_js/dist/test/data/out/domdistillerjstest.js",
         "//third_party/dom_distiller_js/dist/test/data/war/test.html",
-        "//third_party/mocha/mocha.js",
+        "//third_party/node/node_modules/chai/chai.js",
+        "//third_party/node/node_modules/mocha/mocha.js",
         "dom_distiller/core/javascript/dom_distiller_viewer.js",
         "dom_distiller/core/javascript/domdistiller.js",
         "dom_distiller/core/javascript/extract_features.js",
@@ -258,6 +258,7 @@ test("components_unittests") {
     "//components/password_manager/core/browser/affiliation:affiliation_fetching_unittests",
     "//components/password_manager/core/browser/affiliation:unit_tests",
     "//components/password_manager/core/browser/export:unit_tests",
+    "//components/password_manager/core/browser/features:unit_tests",
     "//components/password_manager/core/browser/generation:unit_tests",
     "//components/password_manager/core/browser/sharing:unit_tests",
     "//components/password_manager/core/browser/well_known_change_password:unit_tests",
@@ -409,6 +410,7 @@ test("components_unittests") {
       "//components/captive_portal/content:unit_tests",
       "//components/cast_receiver:unit_tests",
       "//components/cast_streaming:unit_tests",
+      "//components/certificate_transparency:unit_tests",
       "//components/content_capture/browser:unit_tests",
       "//components/content_relationship_verification:unit_tests",
       "//components/contextual_search/core/browser:unit_tests",
@@ -440,6 +442,7 @@ test("components_unittests") {
       "//components/link_header_util:unit_tests",
       "//components/media_device_salt:unit_tests",
       "//components/media_effects:unit_tests",
+      "//components/miracle_parameter/common:unit_tests",
       "//components/mirroring:mirroring_tests",
       "//components/navigation_interception:unit_tests",
       "//components/no_state_prefetch/browser:unit_tests",
@@ -519,7 +522,6 @@ test("components_unittests") {
     deps += [
       "//components/background_sync:unit_tests",
       "//components/blocked_content:unit_tests",
-      "//components/certificate_transparency:unit_tests",
       "//components/content_settings/browser:unit_tests",
       "//components/content_settings/browser/ui:unit_tests",
       "//components/feed/core/v2:core_unit_tests",
@@ -637,6 +639,7 @@ test("components_unittests") {
   } else {  #!is_android
     deps += [
       "//components/keep_alive_registry:unit_tests",
+      "//components/manta:unit_tests",
       "//components/trusted_vault:unit_tests",
     ]
   }
@@ -834,11 +837,7 @@ repack("components_tests_pak") {
     "//components/strings",
   ]
 
-  if (is_chrome_branded) {
-    sources += [ "${root_gen_dir}/components/strings/components_google_chrome_strings_en-US.pak" ]
-  } else {
-    sources += [ "${root_gen_dir}/components/strings/components_chromium_strings_en-US.pak" ]
-  }
+  sources += [ "${root_gen_dir}/components/strings/components_${branding_path_product}_strings_en-US.pak" ]
 }
 
 if (is_android) {
@@ -898,6 +897,7 @@ if (use_blink) {
 
     sources = [
       "autofill/content/browser/risk/fingerprint_browsertest.cc",
+      "autofill/content/renderer/a11y_utils_browsertest.cc",
       "autofill/content/renderer/autofill_agent_browsertest.cc",
       "autofill/content/renderer/form_autofill_issues_browsertest.cc",
       "autofill/content/renderer/form_autofill_util_browsertest.cc",
@@ -934,9 +934,9 @@ if (use_blink) {
       "dom_distiller/core/javascript/",
       "security_state/content/testdata/",
       "//content/test/data/",
-      "//third_party/chaijs",
+      "//third_party/node/node_modules/chai",
       "//third_party/dom_distiller_js/dist/test/data/",
-      "//third_party/mocha",
+      "//third_party/node/node_modules/mocha/mocha.js",
     ]
 
     deps = [
@@ -1219,6 +1219,6 @@ if (is_android) {
       "//components/webapps/browser/android:junit",
       "//components/webauthn/android:junit",
     ]
-    shared_libraries = [ "//url:libgurl_robolectric($robolectric_toolchain)" ]
+    shared_libraries = [ "//components/robolectric:libcomponents_junit_tests($robolectric_toolchain)" ]
   }
 }

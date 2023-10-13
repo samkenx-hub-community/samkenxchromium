@@ -5,6 +5,8 @@
 #include "components/ml/webnn/graph_validation_utils.h"
 
 #include <algorithm>
+#include <numeric>
+#include <set>
 
 #include "base/check_op.h"
 #include "base/notreached.h"
@@ -189,6 +191,70 @@ base::expected<Operand, std::string> ValidateSoftmaxAndInferOutput(
   }
   // The output tensor of softmax is the same shape as the input tensor.
   return Operand(input.data_type, std::move(input.dimensions));
+}
+
+base::expected<std::vector<Operand>, std::string> ValidateSplitAndInferOutput(
+    const Operand& input,
+    const SplitAttribute& attributes) {
+  std::vector<Operand> outputs;
+
+  if (attributes.axis >= input.dimensions.size()) {
+    return base::unexpected(
+        "The axis must be in the range [0, N-1] where N is the rank of the "
+        "input tensor.");
+  }
+
+  static_assert(absl::variant_size<decltype(attributes.splits)>() == 2,
+                "When adding new variants update the branches below.");
+  if (absl::holds_alternative<uint32_t>(attributes.splits)) {
+    uint32_t splits = absl::get<uint32_t>(attributes.splits);
+    if (splits == 0) {
+      return base::unexpected("The splits must be greater than zero.");
+    }
+
+    if (input.dimensions[attributes.axis] % splits != 0) {
+      return base::unexpected(
+          "The dimension size of the input tensor along "
+          "options.axis must be divisible by splits.");
+    }
+
+    outputs.reserve(splits);
+    for (uint32_t i = 0; i < splits; ++i) {
+      // When splits is of type uint32_t, we create splits number of Operands.
+      // Each Operand will have the same new_dimensions shape.
+      std::vector<uint32_t> new_dimensions = input.dimensions;
+      new_dimensions[attributes.axis] /= splits;
+      outputs.emplace_back(input.data_type, std::move(new_dimensions));
+    }
+  } else if (absl::holds_alternative<base::span<const uint32_t>>(
+                 attributes.splits)) {
+    const auto& splits =
+        absl::get<base::span<const uint32_t>>(attributes.splits);
+    if (base::ranges::any_of(splits,
+                             [](uint32_t split) { return split == 0; })) {
+      return base::unexpected("All splits must be greater than zero.");
+    }
+
+    base::CheckedNumeric<uint32_t> sum = std::accumulate(
+        splits.begin(), splits.end(), base::MakeCheckedNum<uint32_t>(0));
+    if (!sum.IsValid() ||
+        sum.ValueOrDie() != input.dimensions[attributes.axis]) {
+      return base::unexpected(
+          "The sum of all sizes in splits must be equal to the dimension size "
+          "of the input tensor specified by options.axis.");
+    }
+
+    outputs.reserve(splits.size());
+    for (uint32_t split : splits) {
+      std::vector<uint32_t> new_dimensions = input.dimensions;
+      new_dimensions[attributes.axis] = split;
+      outputs.emplace_back(input.data_type, std::move(new_dimensions));
+    }
+  } else {
+    NOTREACHED_NORETURN();
+  }
+
+  return outputs;
 }
 
 Conv2dAttributes::Conv2dAttributes() = default;
@@ -502,6 +568,28 @@ base::expected<Operand, std::string> ValidateGemmAndInferOutput(
   return Operand(a.data_type, std::move(output_shape));
 }
 
+base::expected<Operand, std::string> ValidateTransposeAndInferOutput(
+    const Operand& input,
+    base::span<const uint32_t> permutation) {
+  auto input_dimensions = input.dimensions;
+  auto input_rank = input_dimensions.size();
+  if (permutation.size() != input_rank) {
+    return base::unexpected(
+        "The number of values in permutation must be the same as the rank of "
+        "the input tensor.");
+  }
+  auto validation_result = ValidateAxes(permutation, input_rank);
+  if (!validation_result.has_value()) {
+    return base::unexpected(validation_result.error());
+  }
+
+  std::vector<uint32_t> output_shape(input_rank);
+  for (size_t i = 0; i < input_rank; ++i) {
+    output_shape[i] = input_dimensions[permutation[i]];
+  }
+  return Operand(input.data_type, std::move(output_shape));
+}
+
 base::expected<size_t, std::string> ValidateAndCalculateElementsNumber(
     base::span<const uint32_t> dimensions) {
   if (dimensions.empty()) {
@@ -533,6 +621,24 @@ base::expected<size_t, std::string> ValidateAndCalculateByteLength(
     return base::unexpected("The byte length is too large.");
   }
   return checked_byte_length.ValueOrDie();
+}
+
+base::expected<void, std::string> ValidateAxes(base::span<const uint32_t> axes,
+                                               uint32_t rank) {
+  if (base::ranges::any_of(axes, [rank](uint32_t axis) {
+        return base::MakeStrictNum(axis) >= rank;
+      })) {
+    return base::unexpected(base::StringPrintf(
+        "The values in axes must be within the range from 0 to (%u).",
+        rank - 1));
+  }
+
+  if (axes.size() != std::set<uint32_t>(axes.begin(), axes.end()).size()) {
+    return base::unexpected(
+        "Two or more values are same in the axes sequence.");
+  }
+
+  return base::ok();
 }
 
 absl::optional<std::vector<uint32_t>> BroadcastShapes(

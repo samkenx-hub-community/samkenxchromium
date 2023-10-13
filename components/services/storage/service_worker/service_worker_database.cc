@@ -683,23 +683,28 @@ absl::optional<blink::ServiceWorkerRouterCondition> ConvertToBlinkCondition(
       ret.running_status = running_status;
       break;
     }
-    case ServiceWorkerRegistrationData::RouterRules::RuleV1::Condition::kOr: {
+    case ServiceWorkerRegistrationData::RouterRules::RuleV1::Condition::
+        kOrCondition: {
       ret.type = blink::ServiceWorkerRouterCondition::Type::kOr;
-      if (!condition.has_or_()) {
+      if (!condition.has_or_condition()) {
         return absl::nullopt;
       }
       blink::ServiceWorkerRouterOrCondition or_condition;
-
-      const auto& pb_conditions = condition.or_().conditions();
-      or_condition.conditions.reserve(pb_conditions.size());
-      for (const auto& pb_c : pb_conditions) {
-        absl::optional<blink::ServiceWorkerRouterCondition> c =
-            ConvertToBlinkCondition(pb_c);
-        if (c) {
-          or_condition.conditions.emplace_back(std::move(*c));
-        } else {
-          return absl::nullopt;
+      const auto& pb_objects = condition.or_condition().objects();
+      or_condition.objects.reserve(pb_objects.size());
+      for (const auto& pb_o : pb_objects) {
+        std::vector<blink::ServiceWorkerRouterCondition> conditions;
+        conditions.reserve(pb_o.conditions_size());
+        for (const auto& pb_c : pb_o.conditions()) {
+          absl::optional<blink::ServiceWorkerRouterCondition> c =
+              ConvertToBlinkCondition(pb_c);
+          if (c) {
+            conditions.emplace_back(std::move(*c));
+          } else {
+            return absl::nullopt;
+          }
         }
+        or_condition.objects.emplace_back(std::move(conditions));
       }
 
       ret.or_condition = std::move(or_condition);
@@ -943,12 +948,16 @@ void WriteConditionToProto(
       break;
     }
     case blink::ServiceWorkerRouterCondition::Type::kOr: {
-      const auto& conditions = condition.or_condition->conditions;
-      auto* pb_conditions = out->mutable_or_()->mutable_conditions();
-      pb_conditions->Reserve(conditions.size());
-      for (auto&& c : conditions) {
-        auto* e_out = pb_conditions->Add();
-        WriteConditionToProto(c, e_out);
+      const auto& objects = condition.or_condition->objects;
+      auto* pb_objects = out->mutable_or_condition()->mutable_objects();
+      pb_objects->Reserve(objects.size());
+      for (const auto& o : objects) {
+        auto* pb_o = pb_objects->Add();
+        pb_o->mutable_conditions()->Reserve(o.conditions.size());
+        for (const auto& c : o.conditions) {
+          auto* pb_c = pb_o->add_conditions();
+          WriteConditionToProto(c, pb_c);
+        }
       }
       break;
     }
@@ -2658,24 +2667,22 @@ ServiceWorkerDatabase::Status ServiceWorkerDatabase::ParseRegistrationData(
             return Status::kErrorCorrupted;
           case ServiceWorkerRegistrationData::RouterRules::RuleV1::Source::
               kNetworkSource:
-            source.type =
-                blink::ServiceWorkerRouterSource::SourceType::kNetwork;
+            source.type = blink::ServiceWorkerRouterSource::Type::kNetwork;
             source.network_source.emplace();
             break;
           case ServiceWorkerRegistrationData::RouterRules::RuleV1::Source::
               kRaceSource:
-            source.type = blink::ServiceWorkerRouterSource::SourceType::kRace;
+            source.type = blink::ServiceWorkerRouterSource::Type::kRace;
             source.race_source.emplace();
             break;
           case ServiceWorkerRegistrationData::RouterRules::RuleV1::Source::
               kFetchEventSource:
-            source.type =
-                blink::ServiceWorkerRouterSource::SourceType::kFetchEvent;
+            source.type = blink::ServiceWorkerRouterSource::Type::kFetchEvent;
             source.fetch_event_source.emplace();
             break;
           case ServiceWorkerRegistrationData::RouterRules::RuleV1::Source::
               kCacheSource:
-            source.type = blink::ServiceWorkerRouterSource::SourceType::kCache;
+            source.type = blink::ServiceWorkerRouterSource::Type::kCache;
             blink::ServiceWorkerRouterCacheSource cache_source;
             if (s.cache_source().has_cache_name()) {
               cache_source.cache_name = s.cache_source().cache_name();
@@ -2888,16 +2895,16 @@ void ServiceWorkerDatabase::WriteRegistrationDataInBatch(
         ServiceWorkerRegistrationData::RouterRules::RuleV1::Source* source =
             v1->add_source();
         switch (s.type) {
-          case blink::ServiceWorkerRouterSource::SourceType::kNetwork:
+          case blink::ServiceWorkerRouterSource::Type::kNetwork:
             source->mutable_network_source();
             break;
-          case blink::ServiceWorkerRouterSource::SourceType::kRace:
+          case blink::ServiceWorkerRouterSource::Type::kRace:
             source->mutable_race_source();
             break;
-          case blink::ServiceWorkerRouterSource::SourceType::kFetchEvent:
+          case blink::ServiceWorkerRouterSource::Type::kFetchEvent:
             source->mutable_fetch_event_source();
             break;
-          case blink::ServiceWorkerRouterSource::SourceType::kCache:
+          case blink::ServiceWorkerRouterSource::Type::kCache:
             auto* cache_source = source->mutable_cache_source();
             if (s.cache_source->cache_name) {
               cache_source->set_cache_name(*s.cache_source->cache_name);

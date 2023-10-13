@@ -4,25 +4,22 @@
 
 #include "chrome/browser/ui/views/editor_menu/editor_menu_promo_card_view.h"
 
-#include <algorithm>
-
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/ui/views/editor_menu/editor_menu_view_delegate.h"
 #include "chrome/browser/ui/views/editor_menu/utils/pre_target_handler.h"
 #include "chrome/browser/ui/views/editor_menu/utils/utils.h"
+#include "chrome/browser/ui/views/editor_menu/vector_icons/vector_icons.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
-#include "components/vector_icons/vector_icons.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/models/image_model.h"
 #include "ui/color/color_id.h"
-#include "ui/display/screen.h"
 #include "ui/gfx/color_palette.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/paint_vector_icon.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/button/button.h"
@@ -45,30 +42,14 @@ namespace chromeos::editor_menu {
 namespace {
 
 constexpr char kWidgetName[] = "EditorMenuPromoCardViewWidget";
-constexpr char16_t kTitleTextPlaceholder[] =
-    u"Editor menu title text placeholder";
-constexpr char16_t kDescriptionTextPlaceholder[] =
-    u"Editor menu description text placeholder text to introduce the editor "
-    u"menu feature";
 
-constexpr int kPromoCardIconSizeDip = 48;
+constexpr int kPromoCardIconSizeDip = 20;
 
 // Spacing around the main containers in the promo card. This is applied between
 // the icon container, text container and promo card edges.
 constexpr int kPromoCardHorizontalPaddingDip = 16;
 constexpr gfx::Insets kPromoCardInsets =
     gfx::Insets::VH(12, kPromoCardHorizontalPaddingDip);
-
-constexpr int kPromoCardMinWidthDip = 320;
-constexpr int kPromoCardMaxWidthDip = 592;
-
-// Spacing between this view and the anchor view (context menu).
-constexpr int kMarginDip = 8;
-
-int GetPromoCardWidth(int anchor_view_width) {
-  return std::clamp(anchor_view_width, kPromoCardMinWidthDip,
-                    kPromoCardMaxWidthDip);
-}
 
 int GetPromoCardLabelWidth(int promo_card_width) {
   return promo_card_width - kPromoCardInsets.width() - kPromoCardIconSizeDip -
@@ -124,7 +105,8 @@ void EditorMenuPromoCardView::RequestFocus() {
 
 void EditorMenuPromoCardView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
   node_data->role = ax::mojom::Role::kDialog;
-  node_data->SetName(kTitleTextPlaceholder);
+  node_data->SetName(
+      l10n_util::GetStringUTF16(IDS_EDITOR_MENU_PROMO_CARD_TITLE));
 }
 
 void EditorMenuPromoCardView::OnWidgetDestroying(views::Widget* widget) {
@@ -162,7 +144,7 @@ bool EditorMenuPromoCardView::AcceleratorPressed(
 
 void EditorMenuPromoCardView::UpdateBounds(
     const gfx::Rect& anchor_view_bounds) {
-  const int promo_card_width = GetPromoCardWidth(anchor_view_bounds.width());
+  const int promo_card_width = GetEditorMenuWidth(anchor_view_bounds.width());
 
   // Multiline labels aren't resized properly in flex or box layouts. According
   // to https://crbug.com/678337#c7 this isn't easy to fix. As a workaround, we
@@ -172,36 +154,19 @@ void EditorMenuPromoCardView::UpdateBounds(
   description_->SetMaximumWidth(label_width);
 
   // Since the width of the labels can affect their preferred height, compute
-  // promo card height after label width has been set.
-  const int promo_card_height = GetHeightForWidth(promo_card_width);
+  // promo card preferred size after label width has been set.
+  const gfx::Size promo_card_size(promo_card_width,
+                                  GetHeightForWidth(promo_card_width));
 
-  // Try to align the left edges of the promo card and anchor view. If that
-  // places the promo card partially offscreen, align the right edges instead.
-  int x = anchor_view_bounds.x();
-  if (x + promo_card_width > display::Screen::GetScreen()
-                                 ->GetDisplayMatching(anchor_view_bounds)
-                                 .work_area()
-                                 .right()) {
-    x = anchor_view_bounds.right() - promo_card_width;
-  }
-
-  // Try to position the promo card above the anchor view. If that places the
-  // promo card partially offscreen, position it below the anchor view instead.
-  int y = anchor_view_bounds.y() - kMarginDip - promo_card_height;
-  if (y < display::Screen::GetScreen()
-              ->GetDisplayMatching(anchor_view_bounds)
-              .work_area()
-              .y()) {
-    y = anchor_view_bounds.bottom() + kMarginDip;
-  }
-
-  GetWidget()->SetBounds(gfx::Rect(x, y, promo_card_width, promo_card_height));
+  GetWidget()->SetBounds(
+      GetEditorMenuBounds(anchor_view_bounds, promo_card_size));
 }
 
 void EditorMenuPromoCardView::InitLayout() {
   SetBackground(views::CreateThemedRoundedRectBackground(
-      ui::kColorSysSurface, views::LayoutProvider::Get()->GetCornerRadiusMetric(
-                                views::ShapeContextTokens::kMenuRadius)));
+      ui::kColorPrimaryBackground,
+      views::LayoutProvider::Get()->GetCornerRadiusMetric(
+          views::ShapeContextTokens::kMenuRadius)));
 
   auto* layout = SetLayoutManager(std::make_unique<views::FlexLayout>());
   layout->SetOrientation(views::LayoutOrientation::kHorizontal)
@@ -211,9 +176,8 @@ void EditorMenuPromoCardView::InitLayout() {
 
   // Icon.
   auto* icon = AddChildView(std::make_unique<views::ImageView>());
-  icon->SetImage(gfx::CreateVectorIcon(vector_icons::kGoogleColorIcon,
-                                       kPromoCardIconSizeDip,
-                                       gfx::kPlaceholderColor));
+  icon->SetImage(ui::ImageModel::FromVectorIcon(
+      kEditorMenuPenSparkIcon, ui::kColorSysOnSurface, kPromoCardIconSizeDip));
 
   // The main view, which shows the promo card text and buttons.
   auto* main_view = AddChildView(std::make_unique<views::FlexLayoutView>());
@@ -230,8 +194,8 @@ void EditorMenuPromoCardView::InitLayout() {
 
 void EditorMenuPromoCardView::AddTitle(views::View* main_view) {
   title_ = main_view->AddChildView(std::make_unique<views::Label>(
-      kTitleTextPlaceholder, views::style::CONTEXT_DIALOG_TITLE,
-      views::style::STYLE_HEADLINE_5));
+      l10n_util::GetStringUTF16(IDS_EDITOR_MENU_PROMO_CARD_TITLE),
+      views::style::CONTEXT_DIALOG_TITLE, views::style::STYLE_HEADLINE_5));
   title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
   title_->SetMultiLine(true);
   title_->SetEnabledColorId(ui::kColorSysOnSurface);
@@ -239,8 +203,8 @@ void EditorMenuPromoCardView::AddTitle(views::View* main_view) {
 
 void EditorMenuPromoCardView::AddDescription(views::View* main_view) {
   description_ = main_view->AddChildView(std::make_unique<views::Label>(
-      kDescriptionTextPlaceholder, views::style::CONTEXT_DIALOG_BODY_TEXT,
-      views::style::STYLE_BODY_3));
+      l10n_util::GetStringUTF16(IDS_EDITOR_MENU_PROMO_CARD_DESC),
+      views::style::CONTEXT_DIALOG_BODY_TEXT, views::style::STYLE_BODY_3));
   description_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
   description_->SetMultiLine(true);
   description_->SetEnabledColorId(ui::kColorSysOnSurfaceSubtle);
@@ -274,19 +238,18 @@ void EditorMenuPromoCardView::AddButtonBar(views::View* main_view) {
                               weak_factory_.GetWeakPtr(),
                               views::Widget::ClosedReason::kCloseButtonClicked),
           l10n_util::GetStringUTF16(
-              IDS_EDITOR_MENU_PROMO_CARD_VIEW_DISMISS_BUTTON)));
+              IDS_EDITOR_MENU_PROMO_CARD_DISMISS_BUTTON)));
   dismiss_button_->SetStyle(ui::ButtonStyle::kText);
 
-  // Tell me more button.
-  tell_me_more_button_ =
+  // Try it button.
+  try_it_button_ =
       button_bar->AddChildView(std::make_unique<views::MdTextButton>(
           base::BindRepeating(
               &EditorMenuPromoCardView::CloseWidgetWithReason,
               weak_factory_.GetWeakPtr(),
               views::Widget::ClosedReason::kAcceptButtonClicked),
-          l10n_util::GetStringUTF16(
-              IDS_EDITOR_MENU_PROMO_CARD_VIEW_TELL_ME_MORE_BUTTON)));
-  tell_me_more_button_->SetStyle(ui::ButtonStyle::kProminent);
+          l10n_util::GetStringUTF16(IDS_EDITOR_MENU_PROMO_CARD_TRY_IT_BUTTON)));
+  try_it_button_->SetStyle(ui::ButtonStyle::kProminent);
 }
 
 void EditorMenuPromoCardView::CloseWidgetWithReason(

@@ -6,6 +6,9 @@
 
 load("@builtin//struct.star", "module")
 
+def __filegroups(ctx):
+    return {}
+
 def __copy(ctx, cmd):
     input = cmd.inputs[0]
     out = cmd.outputs[0]
@@ -19,6 +22,7 @@ def __stamp(ctx, cmd):
         # dir and non-exist-in-hashfs file?
         # TODO(b/300385880): fix this workaround.
         return
+
     # don't truncate if file exists.
     out = cmd.outputs[0]
     if ctx.fs.exists(out):
@@ -51,6 +55,6 @@ def __step_config(ctx, step_config):
 simple = module(
     "simple",
     step_config = __step_config,
-    filegroups = {},
+    filegroups = __filegroups,
     handlers = __handlers,
 )

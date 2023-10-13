@@ -10,7 +10,6 @@
 #include "chrome/browser/ui/autofill/payments/save_card_ui.h"
 #include "chrome/browser/ui/autofill/payments/save_iban_ui.h"
 #include "chrome/browser/ui/browser_commands.h"
-#include "chrome/browser/ui/views/autofill/edit_address_profile_view.h"
 #include "chrome/browser/ui/views/autofill/payments/local_card_migration_bubble_views.h"
 #include "chrome/browser/ui/views/autofill/payments/local_card_migration_icon_view.h"
 #include "chrome/browser/ui/views/autofill/payments/manage_saved_iban_bubble_view.h"
@@ -73,6 +72,7 @@ AutofillBubbleBase* AutofillBubbleHandlerImpl::ShowSaveCreditCardBubble(
     case BubbleType::LOCAL_SAVE:
     case BubbleType::LOCAL_CVC_SAVE:
     case BubbleType::UPLOAD_SAVE:
+    case BubbleType::UPLOAD_CVC_SAVE:
       bubble =
           new SaveCardOfferBubbleViews(anchor_view, web_contents, controller);
       break;
@@ -226,15 +226,6 @@ AutofillBubbleBase* AutofillBubbleHandlerImpl::ShowUpdateAddressProfileBubble(
   return bubble;
 }
 
-AutofillBubbleBase* AutofillBubbleHandlerImpl::ShowEditAddressProfileDialog(
-    content::WebContents* web_contents,
-    EditAddressProfileDialogController* controller) {
-  EditAddressProfileView* dialog = new EditAddressProfileView(controller);
-  dialog->ShowForWebContents(web_contents);
-  constrained_window::ShowWebModalDialogViews(dialog, web_contents);
-  return dialog;
-}
-
 AutofillBubbleBase*
 AutofillBubbleHandlerImpl::ShowVirtualCardManualFallbackBubble(
     content::WebContents* web_contents,
@@ -318,8 +309,6 @@ AutofillBubbleBase* AutofillBubbleHandlerImpl::ShowMandatoryReauthBubble(
       NOTREACHED_NORETURN();
   }
 }
-
-void AutofillBubbleHandlerImpl::OnPasswordSaved() {}
 
 void AutofillBubbleHandlerImpl::OnAvatarHighlightAnimationFinished() {
   if (should_show_sign_in_promo_if_applicable_) {

@@ -56,9 +56,12 @@
     void stop();
     [CrossOrigin, CallWith=Isolate] void focus();
     [CrossOrigin] void blur();
+
+    // Additional Windowing Controls (AWC)
     [RuntimeEnabled=DesktopPWAsAdditionalWindowingControls, RaisesException] void maximize();
     [RuntimeEnabled=DesktopPWAsAdditionalWindowingControls, RaisesException] void minimize();
     [RuntimeEnabled=DesktopPWAsAdditionalWindowingControls, RaisesException] void restore();
+    [RuntimeEnabled=DesktopPWAsAdditionalWindowingControls, RaisesException] void setResizable(boolean resizable);
 
     // other browsing contexts
     [Replaceable, CrossOrigin, CachedAccessor=kWindowProxy] readonly attribute Window frames;
@@ -175,9 +178,9 @@
     //  90 is when rotated counter clockwise.
     [HighEntropy=Direct, MeasureAs=WindowOrientation, RuntimeEnabled=OrientationEvent] readonly attribute long orientation;
 
-    // Event handler attribute for cross-document view transitions.
+    // Event handler attribute for the pagereveal event.
     // https://drafts.csswg.org/css-view-transitions-2/#reveal-event
-    [RuntimeEnabled=ViewTransitionOnNavigation] attribute EventHandler onreadytorender;
+    [RuntimeEnabled=PageRevealEvent] attribute EventHandler onpagereveal;
 
     // Accessibility Object Model
     // https://github.com/WICG/aom/blob/HEAD/explainer.md

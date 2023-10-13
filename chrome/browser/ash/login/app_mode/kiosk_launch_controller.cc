@@ -244,6 +244,17 @@ class DefaultNetworkMonitor : public NetworkUiController::NetworkMonitor {
   scoped_refptr<NetworkStateInformer> network_state_informer_;
 };
 
+std::string ToString(app_mode::ForceInstallObserver::Result result) {
+  switch (result) {
+    case app_mode::ForceInstallObserver::Result::kSuccess:
+      return "kSuccess";
+    case app_mode::ForceInstallObserver::Result::kTimeout:
+      return "kTimeout";
+    case app_mode::ForceInstallObserver::Result::kInvalidPolicy:
+      return "kInvalidPolicy";
+  }
+}
+
 }  // namespace
 
 using NetworkUIState = NetworkUiController::NetworkUIState;
@@ -400,7 +411,12 @@ void KioskLaunchController::OnProfileLoaded(Profile* profile) {
 
   // This is needed to trigger input method extensions being loaded.
   profile->InitChromeOSPreferences();
-  network_ui_controller_->SetProfile(profile);
+
+  if (cleaned_up_) {
+    LOG(WARNING) << "Profile is loaded after kiosk launch has been aborted.";
+    return;
+  }
+  CHECK_DEREF(network_ui_controller_.get()).SetProfile(profile);
 
   InitializeKeyboard();
   LaunchLacros();
@@ -641,6 +657,9 @@ void KioskLaunchController::FinishForcedExtensionsInstall(
     app_mode::ForceInstallObserver::Result result) {
   app_state_ = AppState::kInstalled;
   force_install_observer_.reset();
+
+  SYSLOG(INFO) << "Kiosk finished installing extensions with result: "
+               << ToString(result);
 
   switch (result) {
     case app_mode::ForceInstallObserver::Result::kTimeout:

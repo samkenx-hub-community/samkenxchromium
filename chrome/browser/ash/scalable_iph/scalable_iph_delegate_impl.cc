@@ -59,6 +59,7 @@
 #include "chromeos/ash/grit/ash_resources.h"
 #include "chromeos/crosapi/cpp/gurl_os_handler_utils.h"
 #include "chromeos/dbus/power/power_manager_client.h"
+#include "chromeos/ui/vector_icons/vector_icons.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/image/image_skia_operations.h"
@@ -91,13 +92,13 @@ using NotificationImageType =
 using BubbleIcon = ::scalable_iph::ScalableIphDelegate::BubbleIcon;
 using scalable_iph::ActionType;
 
-constexpr char kNotificationSourceName[] = "ChromeOS";
 constexpr char kScalableIphNotificationType[] =
     "scalable_iph_notification_type";
 constexpr char kWallpaperNotificationType[] = "wallpaper_notification_type";
 constexpr char kNotifierId[] = "scalable_iph";
 constexpr char kButtonIndex = 0;
 constexpr gfx::Size kBubbleIconSizeDip = gfx::Size(60, 60);
+constexpr char kHelpAppPerksUrl[] = "chrome://help-app/offers";
 
 const base::flat_map<ActionType, std::string>& GetActionTypeURLs() {
   static const base::NoDestructor<base::flat_map<ActionType, std::string>>
@@ -108,7 +109,13 @@ const base::flat_map<ActionType, std::string>& GetActionTypeURLs() {
            {ActionType::kOpenGoogleDocs,
             "https://docs.google.com/document/?usp=installed_webapp/"},
            {ActionType::kOpenGooglePhotos, "https://photos.google.com/"},
-           {ActionType::kOpenYouTube, "https://www.youtube.com/"}});
+           {ActionType::kOpenYouTube, "https://www.youtube.com/"},
+           {ActionType::kOpenChromebookPerksWeb,
+            "https://www.google.com/chromebook/perks/"},
+           {ActionType::kOpenChromebookPerksGfnPriority2022,
+            "https://www.google.com/chromebook/perks/?id=gfn.priority.2022"},
+           {ActionType::kOpenChromebookPerksMinecraft2023,
+            "https://www.google.com/chromebook/perks/?id=minecraft.2023"}});
   return *action_type_urls;
 }
 
@@ -420,7 +427,7 @@ void ScalableIphDelegateImpl::ShowNotification(
     std::unique_ptr<scalable_iph::IphSession> iph_session) {
   SCALABLE_IPH_LOG(GetLogger()) << "Show notification: " << params;
 
-  std::string notification_source_name = kNotificationSourceName;
+  std::string notification_source_name = params.source;
   std::string notification_title = params.title;
   std::string notification_text = params.text;
 
@@ -440,23 +447,35 @@ void ScalableIphDelegateImpl::ShowNotification(
   }
 #endif  // BUILDFLAG(ENABLE_CROS_SCALABLE_IPH)
 
+  const gfx::VectorIcon* icon = &gfx::kNoneIcon;
+  if (params.icon == ScalableIphDelegate::NotificationIcon::kRedeem) {
+    icon = &chromeos::kRedeemIcon;
+  }
+
+  std::string custom_view_type;
+  if (IsWallpaperNotification(params)) {
+    custom_view_type = kWallpaperNotificationType;
+  } else if (params.summary_text ==
+             ScalableIphDelegate::NotificationSummaryText::kWelcomeTips) {
+    custom_view_type = kScalableIphNotificationType;
+  }
+
   std::unique_ptr<message_center::Notification> notification =
       ash::CreateSystemNotificationPtr(
-          message_center::NOTIFICATION_TYPE_CUSTOM, params.notification_id,
-          base::UTF8ToUTF16(notification_title),
+          custom_view_type.empty() ? message_center::NOTIFICATION_TYPE_SIMPLE
+                                   : message_center::NOTIFICATION_TYPE_CUSTOM,
+          params.notification_id, base::UTF8ToUTF16(notification_title),
           base::UTF8ToUTF16(notification_text),
           base::UTF8ToUTF16(notification_source_name), GURL(), GetNotifierId(),
           rich_notification_data,
           base::MakeRefCounted<ScalableIphNotificationDelegate>(
               std::move(iph_session), params.notification_id,
               params.button.action),
-          gfx::kNoneIcon,
-          message_center::SystemNotificationWarningLevel::NORMAL);
-  if (IsWallpaperNotification(params)) {
-    notification->set_custom_view_type(kWallpaperNotificationType);
-  } else {
-    notification->set_custom_view_type(kScalableIphNotificationType);
+          *icon, message_center::SystemNotificationWarningLevel::NORMAL);
+  if (!custom_view_type.empty()) {
+    notification->set_custom_view_type(custom_view_type);
   }
+
   AddOrReplaceNotification(std::move(notification));
 }
 
@@ -582,6 +601,39 @@ void ScalableIphDelegateImpl::PerformActionForScalableIph(
           crosapi::browser_util::ClearGotoFilesClicked,
           g_browser_process->local_state(), std::move(user_id_hash)));
       SCALABLE_IPH_LOG(GetLogger()) << "Opening file manager.";
+      break;
+    }
+    case ActionType::kOpenHelpAppPerks: {
+      SCALABLE_IPH_LOG(GetLogger())
+          << "Opening ash::SystemWebAppType::HELP via "
+             "ash::LaunchSystemWebAppAsync for url: "
+          << kHelpAppPerksUrl;
+
+      SystemAppLaunchParams system_app_launch_params;
+      system_app_launch_params.url = GURL(kHelpAppPerksUrl);
+      ash::LaunchSystemWebAppAsync(profile_, ash::SystemWebAppType::HELP,
+                                   system_app_launch_params);
+      break;
+    }
+    case ActionType::kOpenChromebookPerksWeb: {
+      OpenUrlForProfile(
+          profile_,
+          GURL(GetActionTypeURLs().at(ActionType::kOpenChromebookPerksWeb)),
+          GetLogger());
+      break;
+    }
+    case ActionType::kOpenChromebookPerksGfnPriority2022: {
+      OpenUrlForProfile(profile_,
+                        GURL(GetActionTypeURLs().at(
+                            ActionType::kOpenChromebookPerksGfnPriority2022)),
+                        GetLogger());
+      break;
+    }
+    case ActionType::kOpenChromebookPerksMinecraft2023: {
+      OpenUrlForProfile(profile_,
+                        GURL(GetActionTypeURLs().at(
+                            ActionType::kOpenChromebookPerksMinecraft2023)),
+                        GetLogger());
       break;
     }
     case ActionType::kOpenLauncher:

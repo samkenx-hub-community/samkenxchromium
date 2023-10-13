@@ -43,7 +43,6 @@
 #include "components/autofill/core/browser/test_autofill_clock.h"
 #include "components/autofill/core/browser/ui/label_formatter_utils.h"
 #include "components/autofill/core/browser/ui/suggestion.h"
-#include "components/autofill/core/browser/ui/suggestion_selection.h"
 #include "components/autofill/core/common/autofill_clock.h"
 #include "components/autofill/core/common/autofill_constants.h"
 #include "components/autofill/core/common/autofill_features.h"
@@ -53,6 +52,7 @@
 #include "components/autofill/core/common/form_data.h"
 #include "components/signin/public/base/signin_switches.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
+#include "components/sync/base/model_type.h"
 #include "components/sync/base/user_selectable_type.h"
 #include "components/sync/test/test_sync_service.h"
 #include "components/version_info/version_info.h"
@@ -141,12 +141,6 @@ class PersonalDataManagerHelper : public PersonalDataManagerTestBase {
     personal_data_ = std::make_unique<PersonalDataManager>("EN", "US");
     PersonalDataManagerTestBase::ResetPersonalDataManager(
         use_sync_transport_mode, personal_data_.get());
-  }
-
-  void ResetProfiles() {
-    std::vector<AutofillProfile> empty_profiles;
-    personal_data_->SetProfilesForAllSources(&empty_profiles);
-    PersonalDataProfileTaskWaiter(*personal_data_).Wait();
   }
 
   bool TurnOnSyncFeature() {
@@ -322,7 +316,7 @@ class PersonalDataManagerHelper : public PersonalDataManagerTestBase {
   void ConvertWalletAddressesAndUpdateWalletCards() {
     // Simulate new data is coming from sync which triggers a conversion of
     // wallet addresses which in turn triggers a refresh.
-    personal_data_->AutofillMultipleChangedBySync();
+    personal_data_->AutofillMultipleChangedBySync(syncer::AUTOFILL_WALLET_DATA);
     PersonalDataProfileTaskWaiter(*personal_data_).Wait();
   }
 
@@ -362,60 +356,24 @@ class PersonalDataManagerMockTest : public PersonalDataManagerTestBase,
   void SetUp() override {
     SetUpTest();
     ResetPersonalDataManager();
-    personal_data_->pref_service_->SetInteger(
-        prefs::kAutofillLastVersionDeduped, 0);
   }
 
   void TearDown() override {
-    if (personal_data_)
+    if (personal_data_) {
       personal_data_->Shutdown();
+    }
     personal_data_.reset();
     TearDownTest();
   }
 
   void ResetPersonalDataManager() {
-    if (personal_data_)
+    if (personal_data_) {
       personal_data_->Shutdown();
+    }
     personal_data_ =
         std::make_unique<PersonalDataManagerMock>("en", std::string());
     PersonalDataManagerTestBase::ResetPersonalDataManager(
         /*use_sync_transport_mode=*/true, personal_data_.get());
-  }
-
-  bool TurnOnSyncFeature() {
-    return PersonalDataManagerTestBase::TurnOnSyncFeature(personal_data_.get());
-  }
-
-  void StopTheDedupeProcess() {
-    personal_data_->pref_service_->SetInteger(
-        prefs::kAutofillLastVersionDeduped,
-        version_info::GetMajorVersionNumberAsInt());
-  }
-
-  void AddProfileToPersonalDataManager(const AutofillProfile& profile) {
-    PersonalDataProfileTaskWaiter waiter(*personal_data_);
-    EXPECT_CALL(waiter.mock_observer(), OnPersonalDataChanged());
-    personal_data_->AddProfile(profile);
-    std::move(waiter).Wait();
-  }
-
-  void UpdateProfileOnPersonalDataManager(const AutofillProfile& profile) {
-    PersonalDataProfileTaskWaiter waiter(*personal_data_);
-    EXPECT_CALL(waiter.mock_observer(), OnPersonalDataChanged());
-    personal_data_->UpdateProfile(profile);
-    std::move(waiter).Wait();
-  }
-
-  void RemoveByGUIDFromPersonalDataManager(const std::string& guid) {
-    PersonalDataProfileTaskWaiter waiter(*personal_data_);
-    EXPECT_CALL(waiter.mock_observer(), OnPersonalDataChanged());
-    personal_data_->RemoveByGUID(guid);
-    std::move(waiter).Wait();
-  }
-
-  void AddOfferDataForTest(AutofillOfferData offer_data) {
-    personal_data_->AddOfferDataForTest(
-        std::make_unique<AutofillOfferData>(offer_data));
   }
 
   // Verifies the credit card art image fetching should begin.
@@ -582,49 +540,6 @@ TEST_F(PersonalDataManagerTest, GetProfilesForSettings) {
   EXPECT_THAT(
       personal_data_->GetProfilesForSettings(),
       ElementsAre(Pointee(kLocalOrSyncableProfile), Pointee(kAccountProfile)));
-}
-
-// Tests that `SetProfilesForAllSources()` overwrites profiles with the correct
-// source.
-TEST_F(PersonalDataManagerTest, SetProfiles) {
-  AutofillProfile kAccountProfile = test::GetFullProfile();
-  kAccountProfile.set_source_for_testing(AutofillProfile::Source::kAccount);
-  AutofillProfile kLocalProfile = test::GetFullProfile();
-
-  // Set `kAccount` profiles only.
-  std::vector<AutofillProfile> profiles = {kAccountProfile};
-  personal_data_->SetProfilesForAllSources(&profiles);
-  PersonalDataProfileTaskWaiter(*personal_data_).Wait();
-  EXPECT_THAT(
-      personal_data_->GetProfilesFromSource(AutofillProfile::Source::kAccount),
-      ElementsAre(Pointee(kAccountProfile)));
-  EXPECT_TRUE(
-      personal_data_
-          ->GetProfilesFromSource(AutofillProfile::Source::kLocalOrSyncable)
-          .empty());
-
-  // Set `kLocalOrSyncable` profiles only. This clear the existing `kAccount`
-  // profiles
-  profiles = {kLocalProfile};
-  personal_data_->SetProfilesForAllSources(&profiles);
-  PersonalDataProfileTaskWaiter(*personal_data_).Wait();
-  EXPECT_TRUE(
-      personal_data_->GetProfilesFromSource(AutofillProfile::Source::kAccount)
-          .empty());
-  EXPECT_THAT(personal_data_->GetProfilesFromSource(
-                  AutofillProfile::Source::kLocalOrSyncable),
-              ElementsAre(Pointee(kLocalProfile)));
-
-  // Set profiles of both sources.
-  profiles = {kAccountProfile, kLocalProfile};
-  personal_data_->SetProfilesForAllSources(&profiles);
-  PersonalDataProfileTaskWaiter(*personal_data_).Wait();
-  EXPECT_THAT(
-      personal_data_->GetProfilesFromSource(AutofillProfile::Source::kAccount),
-      ElementsAre(Pointee(kAccountProfile)));
-  EXPECT_THAT(personal_data_->GetProfilesFromSource(
-                  AutofillProfile::Source::kLocalOrSyncable),
-              ElementsAre(Pointee(kLocalProfile)));
 }
 
 // Adding, updating, removing operations without waiting in between.
@@ -796,10 +711,9 @@ TEST_F(PersonalDataManagerTest, AddProfile_CrazyCharacters) {
   profile7.FinalizeAfterImport();
   profiles.push_back(profile7);
 
-  personal_data_->SetProfilesForAllSources(&profiles);
-
-  PersonalDataProfileTaskWaiter(*personal_data_).Wait();
-
+  for (const AutofillProfile& profile : profiles) {
+    AddProfileToPersonalDataManager(profile);
+  }
   ASSERT_EQ(profiles.size(), personal_data_->GetProfiles().size());
   for (size_t i = 0; i < profiles.size(); ++i) {
     EXPECT_TRUE(base::Contains(profiles, *personal_data_->GetProfiles()[i]));
@@ -822,10 +736,7 @@ TEST_F(PersonalDataManagerTest, AddProfile_Invalid) {
   AutofillProfile with_invalid = without_invalid;
   with_invalid.SetRawInfo(PHONE_HOME_WHOLE_NUMBER, u"Invalid_Phone_Number");
 
-  std::vector<AutofillProfile> profiles;
-  profiles.push_back(with_invalid);
-  personal_data_->SetProfilesForAllSources(&profiles);
-  PersonalDataProfileTaskWaiter(*personal_data_).Wait();
+  AddProfileToPersonalDataManager(with_invalid);
   ASSERT_EQ(1u, personal_data_->GetProfiles().size());
   AutofillProfile profile = *personal_data_->GetProfiles()[0];
   ASSERT_NE(without_invalid.GetRawInfo(PHONE_HOME_WHOLE_NUMBER),
@@ -1054,11 +965,35 @@ TEST_F(PersonalDataManagerTest,
 }
 #endif  // BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
 
-TEST_F(PersonalDataManagerTest, NoIbansAddedIfDisabled) {
-  prefs::SetAutofillCreditCardEnabled(prefs_.get(), false);
+// Test that server IBANs can be added and automatically loaded/cached.
+TEST_F(PersonalDataManagerTest, AddAndReloadServerIbans) {
+  Iban server_iban1 = test::GetServerIban();
+  Iban server_iban2 = test::GetServerIban2();
 
-  personal_data_->AddIban(autofill::test::GetIban());
-  personal_data_->AddIban(autofill::test::GetIban2());
+  GetServerDataTable()->SetServerIbans({server_iban1, server_iban2});
+  std::vector<const Iban*> expected_ibans = {&server_iban1, &server_iban2};
+  personal_data_->Refresh();
+  PersonalDataProfileTaskWaiter(*personal_data_).Wait();
+  ExpectSameElements(expected_ibans, personal_data_->GetServerIbans());
+
+  // Reset the PersonalDataManager. This tests that the personal data was saved
+  // to the web database, and that we can load the IBANs from the web database.
+  ResetPersonalDataManager();
+
+  // Verify that we've reloaded the IBANs from the web database.
+  ExpectSameElements(expected_ibans, personal_data_->GetServerIbans());
+}
+
+TEST_F(PersonalDataManagerTest, NoIbansAddedIfDisabled) {
+  prefs::SetAutofillPaymentMethodsEnabled(prefs_.get(), false);
+
+  Iban iban;
+  iban.set_value(base::UTF8ToUTF16(std::string(test::kIbanValue)));
+  Iban iban1;
+  iban1.set_value(base::UTF8ToUTF16(std::string(test::kIbanValue_1)));
+
+  personal_data_->AddIban(iban);
+  personal_data_->AddIban(iban1);
 
   EXPECT_EQ(0U, personal_data_->GetLocalIbans().size());
 }
@@ -1066,7 +1001,8 @@ TEST_F(PersonalDataManagerTest, NoIbansAddedIfDisabled) {
 TEST_F(PersonalDataManagerTest, AddingIbanUpdatesPref) {
   // The pref should always start disabled.
   ASSERT_FALSE(personal_data_->IsAutofillHasSeenIbanPrefEnabled());
-  Iban iban = test::GetIban();
+  Iban iban;
+  iban.set_value(base::UTF8ToUTF16(std::string(test::kIbanValue)));
 
   personal_data_->AddIban(iban);
   PersonalDataProfileTaskWaiter(*personal_data_).Wait();
@@ -1074,80 +1010,112 @@ TEST_F(PersonalDataManagerTest, AddingIbanUpdatesPref) {
   EXPECT_TRUE(personal_data_->IsAutofillHasSeenIbanPrefEnabled());
 }
 
-TEST_F(PersonalDataManagerTest, AddUpdateRemoveIbans) {
-  Iban iban0 = autofill::test::GetIban();
+TEST_F(PersonalDataManagerTest, AddLocalIbans) {
+  Iban iban1;
+  iban1.set_value(base::UTF8ToUTF16(std::string(test::kIbanValue)));
+  iban1.set_nickname(u"Nickname for Iban");
 
-  Iban iban1 = autofill::test::GetIban2();
-  iban1.set_nickname(u"Nickname 1");
+  Iban iban2;
+  iban2.set_value(base::UTF8ToUTF16(std::string(test::kIbanValue_1)));
+  iban2.set_nickname(u"Original nickname");
 
-  Iban iban1_1 = iban1;
-  iban1_1.set_nickname(u"Nickname 1_1");
+  Iban iban2_with_different_nickname = iban2;
+  iban2_with_different_nickname.set_nickname(u"Different nickname");
 
-  Iban iban2 = autofill::test::GetIbanWithoutNickname();
-  iban2.set_nickname(u"Nickname 2");
+  // Attempt to add all three IBANs to the database. The first two should add
+  // successfully, but the third should get skipped because its value is
+  // identical to `iban2`.
+  std::string guid = personal_data_->AddIban(iban1);
+  PersonalDataProfileTaskWaiter(*personal_data_).Wait();
+  // Should set identifier and record_type manually here as `iban1` has been
+  // passed by value above in `AddIban`, and `AddIban` method sets identifier
+  // and record_type to the given `iban1`.
+  iban1.set_identifier(Iban::Guid(guid));
+  iban1.set_record_type(Iban::kLocalIban);
 
-  // Add two test IBANs to the database. `iban1_1` has the same value
-  // as `iban1` but with a different nickname. Verify that only `iban1` is
-  // added.
-  personal_data_->AddIban(iban0);
+  guid = personal_data_->AddIban(iban2);
+  PersonalDataProfileTaskWaiter(*personal_data_).Wait();
+  iban2.set_identifier(Iban::Guid(guid));
+  iban2.set_record_type(Iban::kLocalIban);
+
+  // Do not add `PersonalDataProfileTaskWaiter(*personal_data_).Wait()` for this
+  // `AddIban` operation, as it will be terminated prematurely for
+  // `iban2_with_different_nickname` due to the presence of an IBAN with the
+  // same value.
+  personal_data_->AddIban(iban2_with_different_nickname);
+
+  std::vector<Iban*> ibans = {&iban1, &iban2};
+  ExpectSameElements(ibans, personal_data_->GetLocalIbans());
+}
+
+TEST_F(PersonalDataManagerTest, UpdateLocalIbans) {
+  Iban iban;
+  iban.set_value(base::UTF8ToUTF16(std::string(test::kIbanValue)));
+  iban.set_nickname(u"Nickname for Iban");
+
+  std::string guid = personal_data_->AddIban(iban);
+  PersonalDataProfileTaskWaiter(*personal_data_).Wait();
+  // Should set identifier and record_type manually here as `iban` has been
+  // passed by value above in `AddIban`, and `AddIban` method sets identifier
+  // and record_type to the given `iban`.
+  iban.set_identifier(Iban::Guid(guid));
+  iban.set_record_type(Iban::kLocalIban);
+
+  // Verify the `iban` has been added successfully.
+  std::vector<Iban*> ibans = {&iban};
+  ExpectSameElements(ibans, personal_data_->GetLocalIbans());
+
+  // Update the `iban` with new value.
+  iban.SetRawInfo(IBAN_VALUE, u"GB98 MIDL 0700 9312 3456 78");
+  personal_data_->UpdateIban(iban);
   PersonalDataProfileTaskWaiter(*personal_data_).Wait();
 
-  personal_data_->AddIban(iban1);
+  ibans = {&iban};
+  ExpectSameElements(ibans, personal_data_->GetLocalIbans());
+
+  // Update the `iban` with new nickname.
+  iban.set_nickname(u"Another nickname");
+  personal_data_->UpdateIban(iban);
   PersonalDataProfileTaskWaiter(*personal_data_).Wait();
 
-  personal_data_->AddIban(iban1_1);
-
-  std::vector<Iban*> ibans;
-  ibans.push_back(&iban0);
-  ibans.push_back(&iban1);
+  ibans = {&iban};
   ExpectSameElements(ibans, personal_data_->GetLocalIbans());
+}
 
-  // `iban1_2` has the same fields as `iban1_1`, verify that `iban1_2` is
-  // not added.
-  Iban iban1_2 = iban1_1;
-  personal_data_->AddIban(iban1_1);
-  ExpectSameElements(ibans, personal_data_->GetLocalIbans());
+TEST_F(PersonalDataManagerTest, RemoveLocalIbans) {
+  Iban iban;
+  iban.set_value(base::UTF8ToUTF16(std::string(test::kIbanValue)));
+  iban.set_nickname(u"Nickname for Iban");
 
-  // Update iban0, remove iban1, and add iban2.
-  iban0.set_nickname(u"Nickname new 0");
-  iban0.SetRawInfo(IBAN_VALUE, u"GB98 MIDL 0700 9312 3456 78");
-  personal_data_->UpdateIban(iban0);
-  RemoveByGUIDFromPersonalDataManager(iban1.guid());
-  personal_data_->AddIban(iban2);
-
+  std::string guid = personal_data_->AddIban(iban);
   PersonalDataProfileTaskWaiter(*personal_data_).Wait();
+  // Should set identifier and record_type manually here as `iban` has been
+  // passed by value above in `AddIban`, and `AddIban` method sets identifier
+  // and record_type to the given `iban`.
+  iban.set_identifier(Iban::Guid(guid));
+  iban.set_record_type(Iban::kLocalIban);
 
-  ibans.clear();
-  ibans.push_back(&iban0);
-  ibans.push_back(&iban2);
+  // Verify the `iban` has been added successfully.
+  std::vector<Iban*> ibans = {&iban};
   ExpectSameElements(ibans, personal_data_->GetLocalIbans());
 
-  // Verify that a duplicate IBAN should not be added.
-  Iban iban0_dup = iban0;
-  personal_data_->AddIban(iban0_dup);
-  ibans.clear();
-  ibans.push_back(&iban0);
-  ibans.push_back(&iban2);
-  ExpectSameElements(ibans, personal_data_->GetLocalIbans());
+  RemoveByGUIDFromPersonalDataManager(guid);
+  EXPECT_TRUE(personal_data_->GetLocalIbans().empty());
 
-  // Reset the PersonalDataManager. This tests that the personal data was saved
-  // to the web database, and that we can load the IBANs from the web database.
-  ResetPersonalDataManager();
-
-  // Verify that we've reloaded the IBANs from the web database.
-  ibans.clear();
-  ibans.push_back(&iban0);
-  ibans.push_back(&iban2);
-  ExpectSameElements(ibans, personal_data_->GetLocalIbans());
+  // Verify that removal of a GUID that doesn't exist won't crash.
+  RemoveByGUIDFromPersonalDataManager(guid);
 }
 
 // Ensure that new IBANs can be updated and saved via
 // `OnAcceptedLocalIbanSave()`.
 TEST_F(PersonalDataManagerTest, OnAcceptedLocalIbanSave) {
   // Start with a new IBAN.
-  Iban iban0 = autofill::test::GetIban();
+  Iban iban0;
+  iban0.set_value(base::UTF8ToUTF16(std::string(test::kIbanValue)));
   // Add the IBAN to the database.
-  personal_data_->OnAcceptedLocalIbanSave(iban0);
+  std::string guid = personal_data_->OnAcceptedLocalIbanSave(iban0);
+  iban0.set_identifier(Iban::Guid(guid));
+  iban0.set_record_type(Iban::kLocalIban);
 
   // Make sure everything is set up correctly.
   PersonalDataProfileTaskWaiter(*personal_data_).Wait();
@@ -1155,9 +1123,12 @@ TEST_F(PersonalDataManagerTest, OnAcceptedLocalIbanSave) {
 
   // Creates a new IBAN and call `OnAcceptedLocalIbanSave()` and verify that
   // the new IBAN is saved.
-  Iban iban1 = autofill::test::GetIban2();
-  personal_data_->OnAcceptedLocalIbanSave(iban1);
+  Iban iban1;
+  iban1.set_value(base::UTF8ToUTF16(std::string(test::kIbanValue_1)));
+  guid = personal_data_->OnAcceptedLocalIbanSave(iban1);
   PersonalDataProfileTaskWaiter(*personal_data_).Wait();
+  iban1.set_identifier(Iban::Guid(guid));
+  iban1.set_record_type(Iban::kLocalIban);
 
   // Expect that the new IBAN is added.
   ASSERT_EQ(2U, personal_data_->GetLocalIbans().size());
@@ -1954,7 +1925,7 @@ TEST_F(PersonalDataManagerTest, GetAutofillOffers) {
 
 // Tests that GetAutofillOffers does not return any offers if
 // |IsAutofillWalletImportEnabled()| returns |false|.
-TEST_F(PersonalDataManagerMockTest, GetAutofillOffers_WalletImportDisabled) {
+TEST_F(PersonalDataManagerTest, GetAutofillOffers_WalletImportDisabled) {
   syncer::TestSyncService sync_service;
   personal_data_->SetSyncServiceForTest(&sync_service);
 
@@ -1976,13 +1947,12 @@ TEST_F(PersonalDataManagerMockTest, GetAutofillOffers_WalletImportDisabled) {
 
 // Tests that GetAutofillOffers does not return any offers if
 // |IsAutofillCreditCardEnabled()| returns |false|.
-TEST_F(PersonalDataManagerMockTest,
-       GetAutofillOffers_AutofillCreditCardDisabled) {
+TEST_F(PersonalDataManagerTest, GetAutofillOffers_AutofillCreditCardDisabled) {
   // Add a card-linked offer and a promo code offer.
   AddOfferDataForTest(test::GetCardLinkedOfferData1());
   AddOfferDataForTest(test::GetPromoCodeOfferData());
 
-  prefs::SetAutofillCreditCardEnabled(prefs_.get(), false);
+  prefs::SetAutofillPaymentMethodsEnabled(prefs_.get(), false);
 
   // Should return neither of the offers as the autofill credit card import pref
   // is disabled.
@@ -2014,7 +1984,7 @@ TEST_F(PersonalDataManagerTest, GetActiveAutofillPromoCodeOffersForOrigin) {
 
 // Tests that GetActiveAutofillPromoCodeOffersForOrigin does not return any
 // promo code offers if |IsAutofillWalletImportEnabled()| returns |false|.
-TEST_F(PersonalDataManagerMockTest,
+TEST_F(PersonalDataManagerTest,
        GetActiveAutofillPromoCodeOffersForOrigin_WalletImportDisabled) {
   syncer::TestSyncService sync_service;
   personal_data_->SetSyncServiceForTest(&sync_service);
@@ -2043,13 +2013,13 @@ TEST_F(PersonalDataManagerMockTest,
 
 // Tests that GetActiveAutofillPromoCodeOffersForOrigin does not return any
 // promo code offers if |IsAutofillCreditCardEnabled()| returns |false|.
-TEST_F(PersonalDataManagerMockTest,
+TEST_F(PersonalDataManagerTest,
        GetActiveAutofillPromoCodeOffersForOrigin_AutofillCreditCardDisabled) {
   // Add an active promo code offer.
   AddOfferDataForTest(test::GetPromoCodeOfferData(
       /*origin=*/GURL("http://www.example.com")));
 
-  prefs::SetAutofillCreditCardEnabled(prefs_.get(), false);
+  prefs::SetAutofillPaymentMethodsEnabled(prefs_.get(), false);
 
   // Should not return the offer as the autofill credit card pref is disabled.
   EXPECT_EQ(0U, personal_data_
@@ -2074,7 +2044,7 @@ TEST_F(PersonalDataManagerTest, DefaultCountryCodeIsCached) {
   // Disabling Autofill blows away this cache and shouldn't account for Autofill
   // profiles.
   prefs::SetAutofillProfileEnabled(prefs_.get(), false);
-  prefs::SetAutofillCreditCardEnabled(prefs_.get(), false);
+  prefs::SetAutofillPaymentMethodsEnabled(prefs_.get(), false);
   PersonalDataProfileTaskWaiter(*personal_data_).Wait();
   EXPECT_EQ(default_country,
             personal_data_->GetDefaultCountryCodeForNewAddress());
@@ -2506,7 +2476,7 @@ TEST_F(PersonalDataManagerTest,
   PersonalDataProfileTaskWaiter(*personal_data_).Wait();
 
   // Disable Credit card autofill.
-  prefs::SetAutofillCreditCardEnabled(personal_data_->pref_service_, false);
+  prefs::SetAutofillPaymentMethodsEnabled(personal_data_->pref_service_, false);
   PersonalDataProfileTaskWaiter(*personal_data_).Wait();
 
   // Check that profiles were saved.
@@ -2549,7 +2519,7 @@ TEST_F(PersonalDataManagerTest,
   EXPECT_EQ(5U, personal_data_->GetCreditCards().size());
 
   // Disable Credit card autofill.
-  prefs::SetAutofillCreditCardEnabled(personal_data_->pref_service_, false);
+  prefs::SetAutofillPaymentMethodsEnabled(personal_data_->pref_service_, false);
   // Reload the database.
   ResetPersonalDataManager();
 
@@ -2566,7 +2536,7 @@ TEST_F(PersonalDataManagerTest,
 TEST_F(PersonalDataManagerTest,
        GetCreditCardsToSuggest_NoCreditCardsAddedIfDisabled) {
   // Disable Profile autofill.
-  prefs::SetAutofillCreditCardEnabled(personal_data_->pref_service_, false);
+  prefs::SetAutofillPaymentMethodsEnabled(personal_data_->pref_service_, false);
 
   // Add a local credit card.
   CreditCard credit_card("002149C1-EE28-4213-A3B9-DA243FFF021B",

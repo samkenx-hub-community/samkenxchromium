@@ -370,6 +370,13 @@ void SharedImageInterfaceInProcess::CreateSharedImageWithBufferUsageOnGpuThread(
   }
 
   DCHECK(shared_image_factory_);
+
+  // Note that SharedImageInterfaceInProcess implementation here uses
+  // SharedImageFactory::CreateSharedImage() to create a shared image backed by
+  // native buffer/shared memory in GPU process. This is different
+  // implementation and code path compared to ClientSharedImage implementation
+  // which creates native buffer/shared memory on IO thread and then creates a
+  // mailbox from it on GPU thread.
   if (!shared_image_factory_->CreateSharedImage(
           mailbox, format, size, color_space, surface_origin, alpha_type,
           surface_handle, usage, std::move(debug_label), buffer_usage)) {
@@ -379,8 +386,17 @@ void SharedImageInterfaceInProcess::CreateSharedImageWithBufferUsageOnGpuThread(
   sync_point_client_state_->ReleaseFenceSync(sync_token.release_count());
 }
 
-std::unique_ptr<SharedImageInterface::ScopedMapping>
-SharedImageInterfaceInProcess::MapSharedImage(const Mailbox& mailbox) {
+GpuMemoryBufferHandleInfo
+SharedImageInterfaceInProcess::GetGpuMemoryBufferHandleInfo(
+    const Mailbox& mailbox) {
+  {
+    base::AutoLock lock(lock_);
+    auto it = gmb_handle_infos_.find(mailbox);
+    if (it != gmb_handle_infos_.end()) {
+      return it->second;
+    }
+  }
+
   base::WaitableEvent completion(
       base::WaitableEvent::ResetPolicy::MANUAL,
       base::WaitableEvent::InitialState::NOT_SIGNALED);
@@ -390,23 +406,33 @@ SharedImageInterfaceInProcess::MapSharedImage(const Mailbox& mailbox) {
   gfx::Size size;
   gfx::BufferUsage buffer_usage;
 
-  // NOTE: If making this blocking call ever becomes a performance bottleneck,
-  // we can cache the info on this thread as
-  // SharedImageInterfaceProxy::GetGpuMemoryBufferHandleInfo() does.
   task_sequence_->ScheduleTask(
-      base::BindOnce(&SharedImageInterfaceInProcess::MapSharedImageOnGpuThread,
+      base::BindOnce(&SharedImageInterfaceInProcess::
+                         GetGpuMemoryBufferHandleInfoOnGpuThread,
                      base::Unretained(this), mailbox, &handle, &format, &size,
                      &buffer_usage, &completion),
       {});
   completion.Wait();
+  GpuMemoryBufferHandleInfo handle_info(std::move(handle), format, size,
+                                        buffer_usage);
+  {
+    base::AutoLock lock(lock_);
+    gmb_handle_infos_[mailbox] = handle_info;
+  }
 
-  if (handle.is_null()) {
-    LOG(ERROR) << "Unable to create ScopedMapping.";
+  return handle_info;
+}
+
+std::unique_ptr<SharedImageInterface::ScopedMapping>
+SharedImageInterfaceInProcess::MapSharedImage(const Mailbox& mailbox) {
+  auto handle_info = GetGpuMemoryBufferHandleInfo(mailbox);
+  if (handle_info.handle.is_null()) {
+    LOG(ERROR) << "Buffer is null.";
     return nullptr;
   }
 
-  auto scoped_mapping = SharedImageInterface::ScopedMapping::Create(
-      std::move(handle), format, size, buffer_usage);
+  auto scoped_mapping =
+      SharedImageInterface::ScopedMapping::Create(std::move(handle_info));
 
   if (!scoped_mapping) {
     LOG(ERROR) << "Unable to create ScopedMapping.";
@@ -415,7 +441,7 @@ SharedImageInterfaceInProcess::MapSharedImage(const Mailbox& mailbox) {
   return scoped_mapping;
 }
 
-void SharedImageInterfaceInProcess::MapSharedImageOnGpuThread(
+void SharedImageInterfaceInProcess::GetGpuMemoryBufferHandleInfoOnGpuThread(
     const Mailbox& mailbox,
     gfx::GpuMemoryBufferHandle* handle,
     viz::SharedImageFormat* format,
@@ -666,6 +692,11 @@ void SharedImageInterfaceInProcess::DestroySharedImageOnGpuThread(
   if (!shared_image_factory_ ||
       !shared_image_factory_->DestroySharedImage(mailbox)) {
     context_state_->MarkContextLost();
+  }
+
+  {
+    base::AutoLock lock(lock_);
+    gmb_handle_infos_.erase(mailbox);
   }
 }
 

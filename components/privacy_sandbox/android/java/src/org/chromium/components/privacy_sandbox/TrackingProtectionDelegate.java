@@ -4,6 +4,11 @@
 
 package org.chromium.components.privacy_sandbox;
 
+import android.content.Context;
+
+import org.chromium.components.browser_ui.site_settings.SiteSettingsDelegate;
+import org.chromium.content_public.browser.BrowserContextHandle;
+
 /** Interface implemented by the embedder to access embedder-specific logic. */
 public interface TrackingProtectionDelegate {
     /** @return whether block all 3PCD pref is enabled. */
@@ -17,4 +22,10 @@ public interface TrackingProtectionDelegate {
 
     /** Set the value of the Do Not Track Pref. */
     void setDoNotTrack(boolean enabled);
+
+    /** @return the browser context associated with the settings page. */
+    BrowserContextHandle getBrowserContext();
+
+    /** @return the site settings delegate object. */
+    SiteSettingsDelegate getSiteSettingsDelegate(Context context);
 }

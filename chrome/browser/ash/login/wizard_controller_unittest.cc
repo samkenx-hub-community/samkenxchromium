@@ -270,6 +270,8 @@ class WizardControllerTestBase : public ::testing::Test {
           base::test::TaskEnvironment::ThreadingMode::MULTIPLE_THREADS,
           base::test::TaskEnvironment::TimeSource::MOCK_TIME);
 
+  user_manager::TypedScopedUserManager<user_manager::FakeUserManager>
+      fake_user_manager_{std::make_unique<user_manager::FakeUserManager>()};
   std::unique_ptr<TestingProfileManager> profile_manager_;
   raw_ptr<Profile> profile_ = nullptr;
   std::unique_ptr<ui::TestContextFactories> test_context_factories_;
@@ -281,8 +283,6 @@ class WizardControllerTestBase : public ::testing::Test {
   std::unique_ptr<NetworkHandlerTestHelper> network_handler_test_helper_;
   std::unique_ptr<ChromeKeyboardControllerClientTestHelper>
       chrome_keyboard_controller_client_test_helper_;
-  user_manager::ScopedUserManager user_manager_{
-      std::make_unique<user_manager::FakeUserManager>()};
   ScopedTestingCrosSettings settings_;
   KioskAppManager kiosk_app_manager_;
   ScopedStubInstallAttributes scoped_stub_install_attributes_;
@@ -454,7 +454,8 @@ TEST_F(WizardControllerTest, DemoModeOobeFlowEndsOnGaiaScreenAndCompletesOobe) {
 
   PerformUserAction(kActionStartSetup);
 
-  enrollment_signal.Wait();
+  // TODO: handle return value.
+  std::ignore = enrollment_signal.Wait();
 
   ASSERT_TRUE(AwaitScreen(kGaiaSigninScreen));
   EXPECT_TRUE(StartupUtils::IsOobeCompleted());
@@ -542,7 +543,7 @@ TEST_F(WizardControllerAfterRollbackTest, ImportNetworkConfigAfterRollback) {
 
   wizard_controller_->Init(ash::OOBE_SCREEN_UNKNOWN);
 
-  config_imported.Wait();
+  ASSERT_TRUE(config_imported.Wait());
 
   auto* imported_config = rollback_network_config_->imported_config();
   ASSERT_TRUE(imported_config != nullptr);

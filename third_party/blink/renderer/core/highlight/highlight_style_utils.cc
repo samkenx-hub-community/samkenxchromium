@@ -244,8 +244,11 @@ const ComputedStyle* HighlightPseudoStyleWithOriginatingInheritance(
     // ::selection and ::selection:window-inactive styles may be different. Only
     // cache the styles for ::selection if there are no :window-inactive
     // selector, or if the page is active.
+    // With Originating Inheritance the originating element is also the parent
+    // element.
     return element->UncachedStyleForPseudoElement(
-        StyleRequest(pseudo, element->GetComputedStyle(), pseudo_argument));
+        StyleRequest(pseudo, element->GetComputedStyle(),
+                     element->GetComputedStyle(), pseudo_argument));
   }
 
   return element->CachedStyleForPseudoElement(pseudo, pseudo_argument);
@@ -483,6 +486,11 @@ absl::optional<Color> HighlightStyleUtils::HighlightTextDecorationColor(
 bool HighlightStyleUtils::ShouldInvalidateVisualOverflow(
     const Node& node,
     DocumentMarker::MarkerType type) {
+  if ((type == DocumentMarker::kSpelling || type == DocumentMarker::kGrammar) &&
+      RuntimeEnabledFeatures::CSSPaintingForSpellingGrammarErrorsEnabled()) {
+    return true;
+  }
+
   // Custom highlights are handled separately. Here we just need to handle
   // spelling, grammar and target-text. Note that we assume
   // RuntimeEnabledFeatures::HighlightInheritanceEnabled() is true to avoid
@@ -500,17 +508,13 @@ bool HighlightStyleUtils::ShouldInvalidateVisualOverflow(
       break;
 
     case DocumentMarker::kSpelling:
-      if (RuntimeEnabledFeatures::CSSSpellingGrammarErrorsEnabled() ||
-          RuntimeEnabledFeatures::
-              CSSPaintingForSpellingGrammarErrorsEnabled()) {
+      if (RuntimeEnabledFeatures::CSSSpellingGrammarErrorsEnabled()) {
         pseudo_style = style->HighlightData().SpellingError();
       }
       break;
 
     case DocumentMarker::kGrammar:
-      if (RuntimeEnabledFeatures::CSSSpellingGrammarErrorsEnabled() ||
-          RuntimeEnabledFeatures::
-              CSSPaintingForSpellingGrammarErrorsEnabled()) {
+      if (RuntimeEnabledFeatures::CSSSpellingGrammarErrorsEnabled()) {
         pseudo_style = style->HighlightData().GrammarError();
       }
       break;

@@ -221,8 +221,8 @@ DropData* WebContentsViewAndroid::GetDropData() const {
   return NULL;
 }
 
-// TODO(crbug.com/1482848): Investigate if this needs to be implemented.
-void WebContentsViewAndroid::CancelDragDropForPortalActivation() {
+// TODO(crbug.com/1488620): Implement this.
+void WebContentsViewAndroid::TransferDragSecurityInfo(WebContentsView*) {
   NOTIMPLEMENTED();
 }
 
@@ -353,6 +353,7 @@ void WebContentsViewAndroid::ShowPopupMenu(
 
 void WebContentsViewAndroid::StartDragging(
     const DropData& drop_data,
+    const url::Origin& source_origin,
     blink::DragOperationsMask allowed_ops,
     const gfx::ImageSkia& image,
     const gfx::Vector2d& cursor_offset,
@@ -406,8 +407,12 @@ void WebContentsViewAndroid::StartDragging(
   }
 }
 
-void WebContentsViewAndroid::UpdateDragCursor(ui::mojom::DragOperation op) {
-  // Intentional no-op because Android does not have cursor.
+void WebContentsViewAndroid::UpdateDragOperation(
+    ui::mojom::DragOperation op,
+    bool document_is_handling_drag) {
+  // Intentional not storing `op` because Android does not support drag and
+  // drop cursor yet.
+  document_is_handling_drag_ = document_is_handling_drag;
 }
 
 bool WebContentsViewAndroid::OnDragEvent(const ui::DragEventAndroid& event) {
@@ -427,6 +432,7 @@ bool WebContentsViewAndroid::OnDragEvent(const ui::DragEventAndroid& event) {
     case JNI_DragEvent::ACTION_DROP: {
       DropData drop_data;
       drop_data.did_originate_from_renderer = false;
+      drop_data.document_is_handling_drag = document_is_handling_drag_;
       JNIEnv* env = AttachCurrentThread();
       std::u16string drop_content =
           ConvertJavaStringToUTF16(env, event.GetJavaContent());

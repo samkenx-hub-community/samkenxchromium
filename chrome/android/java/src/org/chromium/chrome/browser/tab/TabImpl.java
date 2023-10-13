@@ -15,6 +15,7 @@ import android.view.View;
 import android.view.View.OnAttachStateChangeListener;
 import android.view.accessibility.AccessibilityEvent;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
@@ -33,10 +34,10 @@ import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ActivityUtils;
 import org.chromium.chrome.browser.WarmupManager;
-import org.chromium.chrome.browser.WebContentsFactory;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.compositor.CompositorViewHolder;
 import org.chromium.chrome.browser.content.ContentUtils;
+import org.chromium.chrome.browser.content.WebContentsFactory;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulatorFactory;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -382,7 +383,6 @@ public class TabImpl implements Tab {
     }
 
     @Override
-    @CalledByNative
     public int getId() {
         return mId;
     }
@@ -993,6 +993,7 @@ public class TabImpl implements Tab {
         assert state != null;
         mWebContentsState = state.contentsState;
         setTimestampMillis(state.timestampMillis);
+        setLastNavigationCommittedTimestampMillis(state.lastNavigationCommittedTimestampMillis);
         mUrl = new GURL(state.contentsState.getVirtualUrlFromState());
         setTitle(state.contentsState.getDisplayTitleFromState());
         mTabLaunchTypeAtCreation = state.tabLaunchTypeAtCreation;
@@ -1405,7 +1406,7 @@ public class TabImpl implements Tab {
      *
      * @param webContents The WebContents object that will initialize all the browser components.
      */
-    private void initWebContents(WebContents webContents) {
+    private void initWebContents(@NonNull WebContents webContents) {
         try {
             TraceEvent.begin("ChromeTab.initWebContents");
             WebContents oldWebContents = mWebContents;

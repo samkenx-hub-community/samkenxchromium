@@ -5,7 +5,10 @@
 #include "chrome/browser/picture_in_picture/auto_pip_setting_overlay_view.h"
 
 #include "chrome/browser/ui/color/chrome_color_id.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/compositor/layer.h"
+#include "ui/gfx/animation/tween.h"
+#include "ui/views/animation/animation_builder.h"
 #include "ui/views/background.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/label_button.h"
@@ -15,6 +18,9 @@
 #include "ui/views/layout/flex_layout_view.h"
 
 constexpr float kOverlayViewOpacity = 0.7f;
+
+// The time duration for |background_| to fade in.
+constexpr int kFadeInDurationMs = 500;
 
 AutoPipSettingOverlayView::AutoPipSettingOverlayView(
     ResultCb result_cb,
@@ -41,7 +47,8 @@ AutoPipSettingOverlayView::AutoPipSettingOverlayView(
                        .SetBackground(views::CreateThemedSolidBackground(
                            kColorPipWindowBackground))
                        .Build());
-  background_->layer()->SetOpacity(kOverlayViewOpacity);
+  background_->layer()->SetOpacity(0.0f);
+  FadeInLayer(background_->layer());
 }
 
 void AutoPipSettingOverlayView::ShowBubble(gfx::NativeView parent) {
@@ -56,7 +63,19 @@ void AutoPipSettingOverlayView::OnHideView() {
   SetVisible(false);
 }
 
+void AutoPipSettingOverlayView::FadeInLayer(ui::Layer* layer) {
+  views::AnimationBuilder()
+      .SetPreemptionStrategy(
+          ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET)
+      .Once()
+      .SetDuration(base::Milliseconds(kFadeInDurationMs))
+      .SetOpacity(layer, kOverlayViewOpacity, gfx::Tween::LINEAR);
+}
+
 AutoPipSettingOverlayView::~AutoPipSettingOverlayView() {
   background_ = nullptr;
   auto_pip_setting_view_.reset();
 }
+
+BEGIN_METADATA(AutoPipSettingOverlayView, views::View)
+END_METADATA

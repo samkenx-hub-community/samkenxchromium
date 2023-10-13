@@ -17,12 +17,12 @@
 #include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/theme_resources.h"
+#include "components/password_manager/core/browser/features/password_manager_features_util.h"
 #include "components/password_manager/core/browser/manage_passwords_referrer.h"
 #include "components/password_manager/core/browser/password_feature_manager.h"
 #include "components/password_manager/core/browser/password_form_metrics_recorder.h"
-#include "components/password_manager/core/browser/password_manager_features_util.h"
-#include "components/password_manager/core/browser/password_manager_util.h"
 #include "components/password_manager/core/browser/password_store_interface.h"
+#include "components/password_manager/core/browser/password_sync_util.h"
 #include "components/password_manager/core/browser/reauth_purpose.h"
 #include "components/password_manager/core/browser/smart_bubble_stats_store.h"
 #include "components/password_manager/core/common/password_manager_pref_names.h"
@@ -40,6 +40,7 @@ namespace {
 
 using Store = password_manager::PasswordForm::Store;
 namespace metrics_util = password_manager::metrics_util;
+namespace features_util = password_manager::features_util;
 
 metrics_util::UIDisplayDisposition ComputeDisplayDisposition(
     PasswordBubbleControllerBase::DisplayReason display_reason,
@@ -93,7 +94,7 @@ bool IsSyncUser(Profile* profile) {
   const syncer::SyncService* sync_service =
       SyncServiceFactory::GetForProfile(profile);
   password_manager::SyncState sync_state =
-      password_manager_util::GetPasswordSyncState(sync_service);
+      password_manager::sync_util::GetPasswordSyncState(sync_service);
   return sync_state == password_manager::SyncState::kSyncingNormalEncryption ||
          sync_state ==
              password_manager::SyncState::kSyncingWithCustomPassphrase;
@@ -334,10 +335,9 @@ void SaveUpdateBubbleController::ReportInteractions() {
 
   // Log UMA histograms.
   if (GetState() == password_manager::ui::PENDING_PASSWORD_UPDATE_STATE) {
-    metrics_util::LogUpdateUIDismissalReason(
-        GetDismissalReason(), GetPendingPassword().submission_event);
+    metrics_util::LogUpdateUIDismissalReason(GetDismissalReason());
   } else if (GetState() == password_manager::ui::PENDING_PASSWORD_STATE) {
-    absl::optional<metrics_util::PasswordAccountStorageUserState> user_state =
+    absl::optional<features_util::PasswordAccountStorageUserState> user_state =
         absl::nullopt;
     Profile* profile = GetProfile();
     if (profile) {
@@ -345,9 +345,7 @@ void SaveUpdateBubbleController::ReportInteractions() {
           ComputePasswordAccountStorageUserState(
               profile->GetPrefs(), SyncServiceFactory::GetForProfile(profile));
     }
-    metrics_util::LogSaveUIDismissalReason(
-        GetDismissalReason(), GetPendingPassword().submission_event,
-        user_state);
+    metrics_util::LogSaveUIDismissalReason(GetDismissalReason(), user_state);
   }
 
   // Update the delegate so that it can send votes to the server.

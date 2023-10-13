@@ -10,6 +10,7 @@
 #include "base/check.h"
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
+#include "base/time/clock.h"
 #include "components/commerce/core/proto/parcel.pb.h"
 #include "components/commerce/core/proto/parcel_tracking_db_content.pb.h"
 #include "components/session_proto_db/session_proto_storage.h"
@@ -27,8 +28,8 @@ class ParcelsStorage {
   using StorageUpdateCallback = base::OnceCallback<void(bool /*success*/)>;
   using OnInitializedCallback = base::OnceCallback<void(bool /*success*/)>;
 
-  explicit ParcelsStorage(
-      SessionProtoStorage<ParcelTrackingContent>* parcel_tracking_db);
+  ParcelsStorage(SessionProtoStorage<ParcelTrackingContent>* parcel_tracking_db,
+                 base::Clock* clock);
   ParcelsStorage(const ParcelsStorage&) = delete;
   ParcelsStorage& operator=(const ParcelsStorage&) = delete;
   virtual ~ParcelsStorage();
@@ -37,7 +38,8 @@ class ParcelsStorage {
   virtual void Init(OnInitializedCallback callback);
 
   // Gets all parcel status.
-  virtual std::unique_ptr<std::vector<ParcelStatus>> GetAllParcelStatus();
+  virtual std::unique_ptr<std::vector<ParcelTrackingContent>>
+  GetAllParcelTrackingContents();
 
   // Updates the status for a list of parcels.
   virtual void UpdateParcelStatus(
@@ -48,8 +50,16 @@ class ParcelsStorage {
   virtual void DeleteParcelStatus(const std::string& tracking_id,
                                   StorageUpdateCallback callback);
 
+  // Deletes multiple parcel status from db.
+  virtual void DeleteParcelsStatus(
+      const std::vector<ParcelIdentifier>& parcel_identifiers,
+      StorageUpdateCallback callback);
+
   // Deletes all the parcel status from db.
   virtual void DeleteAllParcelStatus(StorageUpdateCallback callback);
+
+  // Modify old parcels that are done if necessary.
+  virtual void ModifyOldDoneParcels();
 
  private:
   void OnAllParcelsLoaded(OnInitializedCallback callback,
@@ -61,8 +71,10 @@ class ParcelsStorage {
 
   raw_ptr<SessionProtoStorage<ParcelTrackingContent>> proto_db_;
 
+  raw_ptr<base::Clock> clock_;
+
   // An in-memory cache of parcel status.
-  std::map<std::string, ParcelStatus> parcels_cache_;
+  std::map<std::string, ParcelTrackingContent> parcels_cache_;
 
   bool is_initialized_ = false;
 

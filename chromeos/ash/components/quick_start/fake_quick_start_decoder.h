@@ -36,6 +36,9 @@ class FakeQuickStartDecoder : public mojom::QuickStartDecoder {
   void DecodeNotifySourceOfUpdateResponse(
       const absl::optional<std::vector<uint8_t>>& data,
       DecodeNotifySourceOfUpdateResponseCallback callback) override;
+  void DecodeUserVerificationMethod(
+      const absl::optional<std::vector<uint8_t>>& data,
+      DecodeUserVerificationMethodCallback callback) override;
   void DecodeUserVerificationRequested(
       const absl::optional<std::vector<uint8_t>>& data,
       DecodeUserVerificationRequestedCallback callback) override;
@@ -64,7 +67,7 @@ class FakeQuickStartDecoder : public mojom::QuickStartDecoder {
       mojom::NotifySourceOfUpdateResponsePtr notify_source_of_update_response);
 
   void SetBootstrapConfigurationsResponse(
-      const std::string& cryptauth_device_id,
+      const std::string& instance_id,
       absl::optional<mojom::QuickStartDecoderError> error);
 
   void SetQuickStartMessage(mojom::QuickStartMessagePtr quick_start_message);
@@ -75,11 +78,12 @@ class FakeQuickStartDecoder : public mojom::QuickStartDecoder {
   mojom::NotifySourceOfUpdateResponsePtr notify_source_of_update_response_;
   mojom::WifiCredentialsPtr credentials_;
   mojom::FidoAssertionResponsePtr fido_assertion_;
+  mojom::UserVerificationMethodPtr user_verification_method_;
   mojom::UserVerificationRequestedPtr user_verification_request_;
   mojom::UserVerificationResponsePtr user_verification_response_;
   mojom::QuickStartMessagePtr quick_start_message_;
   absl::optional<mojom::QuickStartDecoderError> error_;
-  std::string response_cryptauth_device_id_;
+  std::string response_instance_id_;
 };
 
 }  // namespace ash::quick_start

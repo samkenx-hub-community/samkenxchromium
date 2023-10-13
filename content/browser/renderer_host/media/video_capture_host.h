@@ -16,7 +16,9 @@
 #include "base/unguessable_token.h"
 #include "content/browser/renderer_host/media/video_capture_controller.h"
 #include "content/browser/renderer_host/media/video_capture_controller_event_handler.h"
+#include "content/browser/renderer_host/media/video_capture_manager.h"
 #include "content/common/content_export.h"
+#include "content/public/browser/browser_context.h"
 #include "media/capture/mojom/video_capture.mojom.h"
 #include "mojo/public/cpp/bindings/remote.h"
 
@@ -49,12 +51,13 @@ class CONTENT_EXPORT VideoCaptureHost
       mojo::PendingReceiver<media::mojom::VideoCaptureHost> receiver);
 
   // Interface for notifying RenderProcessHost instance about active video
-  // capture stream changes.
+  // capture stream changes and getting the `content::BrowserContext`.
   class CONTENT_EXPORT RenderProcessHostDelegate {
    public:
     virtual ~RenderProcessHostDelegate();
     virtual void NotifyStreamAdded() = 0;
     virtual void NotifyStreamRemoved() = 0;
+    virtual content::BrowserContext* GetBrowserContext() = 0;
   };
 
  private:
@@ -72,10 +75,9 @@ class CONTENT_EXPORT VideoCaptureHost
   void OnBufferDestroyed(const VideoCaptureControllerID& id,
                          int buffer_id) override;
   void OnBufferReady(const VideoCaptureControllerID& controller_id,
-                     const ReadyBuffer& buffer,
-                     const std::vector<ReadyBuffer>& scaled_buffers) override;
-  void OnFrameDroppedEarly(const VideoCaptureControllerID& controller_id,
-                           media::VideoCaptureFrameDropReason reason) override;
+                     const ReadyBuffer& buffer) override;
+  void OnFrameDropped(const VideoCaptureControllerID& controller_id,
+                      media::VideoCaptureFrameDropReason reason) override;
   void OnFrameWithEmptyRegionCapture(
       const VideoCaptureControllerID& controller_id) override;
   void OnEnded(const VideoCaptureControllerID& id) override;
@@ -105,8 +107,6 @@ class CONTENT_EXPORT VideoCaptureHost
                              const base::UnguessableToken& session_id,
                              GetDeviceFormatsInUseCallback callback) override;
   // This refers to a late frame drop, originating from the renderer process.
-  void OnFrameDropped(const base::UnguessableToken& device_id,
-                      media::VideoCaptureFrameDropReason reason) override;
   void OnNewCropVersion(const base::UnguessableToken& device_id,
                         uint32_t crop_version) override;
   void OnLog(const base::UnguessableToken& device_id,
@@ -131,6 +131,12 @@ class CONTENT_EXPORT VideoCaptureHost
   void NotifyStreamAdded();
   void NotifyStreamRemoved();
   void NotifyAllStreamsRemoved();
+
+  void ConnectClient(const base::UnguessableToken session_id,
+                     const media::VideoCaptureParams& params,
+                     VideoCaptureControllerID controller_id,
+                     VideoCaptureManager::DoneCB done_cb,
+                     BrowserContext* browser_context);
 
   class RenderProcessHostDelegateImpl;
   std::unique_ptr<RenderProcessHostDelegate> render_process_host_delegate_;

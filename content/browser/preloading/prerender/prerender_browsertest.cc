@@ -64,8 +64,6 @@
 #include "content/public/browser/document_user_data.h"
 #include "content/public/browser/global_routing_id.h"
 #include "content/public/browser/navigation_handle.h"
-#include "content/public/browser/notification_service.h"
-#include "content/public/browser/notification_types.h"
 #include "content/public/browser/prerender_web_contents_delegate.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
@@ -1369,35 +1367,6 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderCancelledOn205Page) {
       PrerenderFinalStatus::kNavigationBadHttpStatus);
 }
 
-// Tests that prerender will be cancelled if client blocks resource loading.
-IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, ResourceLoadIsBlocked) {
-  GURL initial_url = GetUrl("/empty.html");
-  GURL prerendering_url = GetUrl("/page_with_image.html");
-  GURL image_resource_url(GetUrl("/blank.jpg"));
-
-  // Intercept resource loading and block it.
-  std::unique_ptr<URLLoaderInterceptor> url_interceptor =
-      URLLoaderInterceptor::SetupRequestFailForURL(image_resource_url,
-                                                   net::ERR_BLOCKED_BY_CLIENT);
-
-  // Navigate to an initial page.
-  ASSERT_TRUE(NavigateToURL(shell(), initial_url));
-  test::PrerenderHostObserver host_observer(*web_contents_impl(),
-                                            prerendering_url);
-
-  // Start a prerender and it should fail due to kResourceLoadBlockedByClient.
-  AddPrerenderAsync(prerendering_url);
-  host_observer.WaitForDestroyed();
-
-  ExpectFinalStatusForSpeculationRule(
-      PrerenderFinalStatus::kResourceLoadBlockedByClient);
-
-  histogram_tester().ExpectUniqueSample(
-      "Prerender.Experimental.ResourceLoadingBlockedByClientByType."
-      "SpeculationRule",
-      network::mojom::RequestDestination::kImage, 1);
-}
-
 namespace {
 
 // Tests that an iframe navigation whose response has either 204 or 205 doesn't
@@ -1644,6 +1613,15 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
 IN_PROC_BROWSER_TEST_F(
     PrerenderBrowserTest,
     CancelOnSpeculationCandidateRemoved_WithTargetHintBlank) {
+  // TODO(crbug.com/1350676, crbug.com/4849669): Support the
+  // prerender-into-new-tab case of prerender reset under
+  // kPrerender2NewLimitAndScheduler.
+  if (base::FeatureList::IsEnabled(features::kPrerender2NewLimitAndScheduler)) {
+    GTEST_SKIP();
+  }
+
+  ScopedPrerenderContentBrowserClient prerender_content_browser_client;
+
   // Navigate to an initial page.
   const GURL kInitialUrl = GetUrl("/title1.html");
   ASSERT_TRUE(NavigateToURL(shell(), kInitialUrl));
@@ -2617,13 +2595,10 @@ class PrerenderMainFrameNavigationBrowserTest
     // URL of the given navigation URLs will separately be handled later as that
     // could cancel prerendering and never finish.
     for (auto it = urls.begin(); it != urls.end() - 1; ++it) {
-      RenderFrameHostImpl* prerender_rfh = GetPrerenderedMainFrameHost(host_id);
       TestNavigationManager navigation_observer(web_contents(), *it);
       NavigatePrerenderedPage(host_id, *it);
       ASSERT_TRUE(navigation_observer.WaitForNavigationFinished());
       EXPECT_TRUE(navigation_observer.was_successful());
-      // Make sure that RenderFrameHost swap didn't happen during navigation.
-      EXPECT_EQ(prerender_rfh, GetPrerenderedMainFrameHost(host_id));
     }
 
     // The last navigation URL. This should cancel prerendering if the
@@ -2633,14 +2608,10 @@ class PrerenderMainFrameNavigationBrowserTest
     switch (expected_status) {
       case PrerenderFinalStatus::kActivated: {
         // Navigation to the last URL should succeed.
-        RenderFrameHostImpl* prerender_rfh =
-            GetPrerenderedMainFrameHost(host_id);
         TestNavigationManager navigation_observer(web_contents(), last_url);
         NavigatePrerenderedPage(host_id, last_url);
         ASSERT_TRUE(navigation_observer.WaitForNavigationFinished());
         EXPECT_TRUE(navigation_observer.was_successful());
-        // Make sure that RenderFrameHost swap didn't happen during navigation.
-        EXPECT_EQ(prerender_rfh, GetPrerenderedMainFrameHost(host_id));
 
         // Activation should succeed.
         switch (trigger_type) {
@@ -2726,7 +2697,6 @@ class PrerenderMainFrameNavigationBrowserTest
     test::PrerenderHostObserver observer(*web_contents_impl(), host_id);
 
     // Run redirections in the main frame of the prerendered page.
-    RenderFrameHostImpl* prerender_rfh = GetPrerenderedMainFrameHost(host_id);
     TestNavigationManager navigation_observer(web_contents(), url);
     NavigatePrerenderedPage(host_id, url);
     ASSERT_TRUE(navigation_observer.WaitForNavigationFinished());
@@ -2735,8 +2705,6 @@ class PrerenderMainFrameNavigationBrowserTest
       case PrerenderFinalStatus::kActivated: {
         // Redirections should succeed.
         EXPECT_TRUE(navigation_observer.was_successful());
-        // Make sure that RenderFrameHost swap didn't happen during navigation.
-        EXPECT_EQ(prerender_rfh, GetPrerenderedMainFrameHost(host_id));
 
         // Activation should succeed.
         switch (trigger_type) {
@@ -8113,13 +8081,14 @@ IN_PROC_BROWSER_TEST_F(PrerenderEagernessBrowserTest, kConservative) {
 // test.
 #if !BUILDFLAG(IS_FUCHSIA) && !BUILDFLAG(IS_IOS)
 // Tests the metrics
-// Prerender.Experimental.ReceivedPrerendersPerPrimaryPageChangedCount correctly
-// records the number of prerenders by each category per primary page changed.
+// Prerender.Experimental.ReceivedPrerendersPerPrimaryPageChangedCount2
+// correctly records the number of prerenders by each category per primary page
+// changed.
 IN_PROC_BROWSER_TEST_F(PrerenderEagernessBrowserTest,
-                       EligibleTriggersPerPrimaryPageChangedCount) {
+                       ReceivedPrerendersPerPrimaryPageChangedCount) {
   auto GetAllSamples = [&](const std::string& eagerness_category) {
     return histogram_tester().GetAllSamples(
-        "Prerender.Experimental.ReceivedPrerendersPerPrimaryPageChangedCount."
+        "Prerender.Experimental.ReceivedPrerendersPerPrimaryPageChangedCount2."
         "SpeculationRule." +
         eagerness_category);
   };
@@ -11784,14 +11753,18 @@ IN_PROC_BROWSER_TEST_P(PrerenderSessionHistoryBrowserTest,
   NavigationControllerImpl& controller = web_contents_impl()->GetController();
   ASSERT_TRUE(controller.CanGoBack());
   TestNavigationObserver back_observer(web_contents_impl());
+  InputEventAckWaiter mouse_down_waiter(
+      web_contents_impl()->GetPrimaryMainFrame()->GetRenderWidgetHost(),
+      blink::WebInputEvent::Type::kMouseDown);
   const gfx::Point click_location(50, 50);
   SimulateMouseEvent(web_contents_impl(),
                      blink::WebInputEvent::Type::kMouseDown,
                      blink::WebMouseEvent::Button::kBack, click_location);
-  WaitForHttpCacheQueryCompletion(web_contents_impl());
   // The mouse up triggers the navigation. We wait until after the cache query
   // to send the mouse up to ensure the navigation happens after the browser
   // decides whether to prerender.
+  mouse_down_waiter.Wait();
+  WaitForHttpCacheQueryCompletion(web_contents_impl());
   SimulateMouseEvent(web_contents_impl(), blink::WebInputEvent::Type::kMouseUp,
                      blink::WebMouseEvent::Button::kBack, click_location);
   back_observer.Wait();

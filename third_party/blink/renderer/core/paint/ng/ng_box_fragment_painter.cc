@@ -20,7 +20,6 @@
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_fragment_items.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_cursor.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_physical_line_box_fragment.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_mixin.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_block_break_token.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_fragmentation_utils.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_outline_utils.h"
@@ -392,7 +391,7 @@ PhysicalRect NGBoxFragmentPainter::InkOverflowIncludingFilters() const {
   const NGPhysicalFragment& fragment = PhysicalFragment();
   DCHECK(!fragment.IsInlineBox());
   return To<LayoutBox>(fragment.GetLayoutObject())
-      ->PhysicalVisualOverflowRectIncludingFilters();
+      ->VisualOverflowRectIncludingFilters();
 }
 
 NGInlinePaintContext& NGBoxFragmentPainter::EnsureInlineContext() {
@@ -1859,6 +1858,10 @@ NGPhysicalBoxStrut NGBoxFragmentPainter::ComputeBorders() const {
 
 NGPhysicalBoxStrut NGBoxFragmentPainter::ComputePadding() const {
   return PhysicalFragment().Padding();
+}
+
+NGPhysicalBoxStrut NGBoxFragmentPainter::ComputeMargins() const {
+  return PhysicalFragment().Margins();
 }
 
 BoxPainterBase::FillLayerInfo NGBoxFragmentPainter::GetFillLayerInfo(

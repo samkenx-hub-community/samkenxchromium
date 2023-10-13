@@ -6,7 +6,7 @@ import '../strings.m.js';
 import 'chrome://resources/d3/d3.min.js';
 
 import {PricePoint} from '//shopping-insights-side-panel.top-chrome/shared/shopping_list.mojom-webui.js';
-import {assert} from 'chrome://resources/js/assert_ts.js';
+import {assert} from 'chrome://resources/js/assert.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
@@ -285,9 +285,16 @@ export class ShoppingInsightsHistoryGraphElement extends PolymerElement {
       return Math.max(max, value.price);
     }, this.points[0].price);
 
-    // Ensure the line is in the middle of the graph.
-    minPrice = Math.max(minPrice - 1, 0);
-    maxPrice = maxPrice + 1;
+    // To ensure that the Y-axis doesn't reflect trivial changes and that the
+    // line is in the middle of the graph, apply a padding max(median price /
+    // 10, $1) to the minPrice and maxPrice.
+    const medianPrice = ([...this.points].sort(
+        (a, b) => a.price - b.price))[Math.floor(this.points.length / 2)]
+                            .price;
+    const padding = Math.max(medianPrice / 10, 1);
+    minPrice = Math.max(minPrice - padding, 0);
+    maxPrice = maxPrice + padding;
+
     const valueRange = maxPrice - minPrice;
     let tickInterval = valueRange / (TICK_COUNT_Y - 1);
 

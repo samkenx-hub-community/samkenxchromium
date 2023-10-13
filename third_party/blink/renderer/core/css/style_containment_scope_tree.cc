@@ -9,7 +9,6 @@
 #include "third_party/blink/renderer/core/dom/layout_tree_builder_traversal.h"
 #include "third_party/blink/renderer/core/dom/node_computed_style.h"
 #include "third_party/blink/renderer/core/dom/pseudo_element.h"
-#include "third_party/blink/renderer/core/html/html_olist_element.h"
 #include "third_party/blink/renderer/core/html/list_item_ordinal.h"
 #include "third_party/blink/renderer/core/layout/counter_node.h"
 #include "third_party/blink/renderer/core/layout/layout_counter.h"
@@ -102,7 +101,7 @@ StyleContainmentScope* FindCommonAncestor(StyleContainmentScope* scope1,
   if (!scope2) {
     return scope1;
   }
-  HeapVector<StyleContainmentScope*> ancestors1, ancestors2;
+  HeapVector<Member<StyleContainmentScope>> ancestors1, ancestors2;
   for (StyleContainmentScope* it = scope1; it; it = it->Parent()) {
     if (it == scope2) {
       return scope2;
@@ -206,11 +205,10 @@ void StyleContainmentScopeTree::RemoveCounterForLayoutObject(
   if (counter) {
     StyleContainmentScope* scope = counter->Scope()->StyleScope();
     CountersScopeTree* tree = scope->GetCountersScopeTree();
-    Element& root_element = counter->Scope()->RootElement();
     tree->RemoveCounterFromScope(*counter, *counter->Scope(), identifier);
     if (identifier == list_item_) {
-      if (auto* o_list_element = DynamicTo<HTMLOListElement>(root_element)) {
-        ListItemOrdinal::InvalidateAllItemsForOrderedList(o_list_element);
+      if (ListItemOrdinal::Get(*object.GetNode())) {
+        ListItemOrdinal::ItemInsertedOrRemoved(&object);
       }
     }
     UpdateOutermostCountersDirtyScope(scope->Parent() ? scope->Parent()
@@ -226,10 +224,9 @@ void StyleContainmentScopeTree::RemoveListItemCounterForLayoutObject(
     StyleContainmentScope* scope = counter->Scope()->StyleScope();
     CountersScopeTree* tree =
         counter->Scope()->StyleScope()->GetCountersScopeTree();
-    Element& root_element = counter->Scope()->RootElement();
     tree->RemoveCounterFromScope(*counter, *counter->Scope(), list_item_);
-    if (auto* o_list_element = DynamicTo<HTMLOListElement>(root_element)) {
-      ListItemOrdinal::InvalidateAllItemsForOrderedList(o_list_element);
+    if (ListItemOrdinal::Get(*object.GetNode())) {
+      ListItemOrdinal::ItemInsertedOrRemoved(&object);
     }
     UpdateOutermostCountersDirtyScope(scope->Parent() ? scope->Parent()
                                                       : scope);
