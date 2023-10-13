@@ -210,6 +210,13 @@ crbug.com/1201009 [ linux ] WebGLCanvasCaptureTraceTest_VideoStreamFromWebGLCanv
 crbug.com/1201009 [ fuchsia ] WebGLCanvasCaptureTraceTest_VideoStreamFromWebGLCanvas_OneCopy [ Failure ]
 crbug.com/1201009 [ fuchsia ] WebGLCanvasCaptureTraceTest_VideoStreamFromWebGLCanvas_TwoCopy_Accelerated [ Failure ]
 
+# Accelerated canvas capture does not yet work with Graphite.
+crbug.com/1450879 [ mac graphite-enabled ] WebGLCanvasCaptureTraceTest_VideoStreamFromWebGLCanvas_OneCopy [ Failure ]
+crbug.com/1450879 [ mac graphite-enabled ] WebGLCanvasCaptureTraceTest_VideoStreamFromWebGLCanvas_TwoCopy_Accelerated [ Failure ]
+crbug.com/1450879 [ mac no-asan graphite-enabled ] WebGPUTraceTest_WebGPUCanvasOneCopyCapture [ Failure ]
+crbug.com/1450879 [ mac no-asan graphite-enabled ] WebGPUTraceTest_WebGPUCanvasOneCopyCapture_Hidden [ Failure ]
+crbug.com/1450879 [ mac no-asan graphite-enabled ] WebGPUTraceTest_WebGPUCanvasDisableOneCopyCapture_Accelerated [ Failure ]
+
 # WebGL drawingBufferStorage does not work on Pixel 4, Samsung A23, nexus-5x or
 # Lacros FYI x64 Release (Intel) yet.
 crbug.com/1230619 [ android android-nexus-5x passthrough ] TraceTest_WebGLFloat [ Failure ]
@@ -243,6 +250,9 @@ crbug.com/1453832 [ win nvidia ] OverlayModeTraceTest_DirectComposition_Video_VP
 # Win AMD failure since test added
 crbug.com/1446057 [ win10 amd-0x7340 angle-d3d11 ] VideoPathTraceTest_DirectComposition_Video_SW_Decode [ Failure ]
 
+# Android devices
+crbug.com/1487723 [ android android-shield-android-tv ] TraceTest_CSS3DBlueBox [ RetryOnFailure ]
+crbug.com/1487723 [ android android-shield-android-tv ] TraceTest_SolidColorBackground [ RetryOnFailure ]
 
 #######################################################################
 # Automated Entries After This Point - Do Not Manually Add Below Here #

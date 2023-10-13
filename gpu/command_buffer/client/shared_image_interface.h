@@ -14,6 +14,7 @@
 #include "gpu/command_buffer/common/mailbox.h"
 #include "gpu/command_buffer/common/sync_token.h"
 #include "gpu/gpu_export.h"
+#include "gpu/ipc/common/gpu_memory_buffer_handle_info.h"
 #include "gpu/ipc/common/gpu_memory_buffer_impl.h"
 #include "gpu/ipc/common/surface_handle.h"
 #include "third_party/skia/include/core/SkImageInfo.h"
@@ -66,6 +67,9 @@ class GPU_EXPORT SharedImageInterface {
     // Returns plane stride.
     size_t Stride(const uint32_t plane_index);
 
+    // Returns the size of the buffer.
+    gfx::Size Size();
+
     // Returns BufferFormat.
     gfx::BufferFormat Format();
 
@@ -90,14 +94,8 @@ class GPU_EXPORT SharedImageInterface {
 
     ScopedMapping();
     static std::unique_ptr<ScopedMapping> Create(
-        gfx::GpuMemoryBufferHandle handle,
-        viz::SharedImageFormat format,
-        gfx::Size size,
-        gfx::BufferUsage buffer_usage);
-    bool Init(gfx::GpuMemoryBufferHandle handle,
-              viz::SharedImageFormat format,
-              gfx::Size size,
-              gfx::BufferUsage buffer_usage);
+        GpuMemoryBufferHandleInfo handle_info);
+    bool Init(GpuMemoryBufferHandleInfo handle_info);
 
     // ScopedMapping is essentially a wrapper around GpuMemoryBuffer for now for
     // simplicity and will be removed later.
@@ -214,19 +212,6 @@ class GPU_EXPORT SharedImageInterface {
       SkAlphaType alpha_type,
       uint32_t usage,
       base::StringPiece debug_label) = 0;
-
-  // NOTE: The below method is DEPRECATED for `gpu_memory_buffer` only with
-  // single planar eg. RGB BufferFormats. Please use the equivalent method above
-  // taking in single planar SharedImageFormat with GpuMemoryBufferHandle.
-  //
-  // Same as the above, but specifies gfx::BufferPlane::DEFAULT for |plane|.
-  Mailbox CreateSharedImage(gfx::GpuMemoryBuffer* gpu_memory_buffer,
-                            GpuMemoryBufferManager* gpu_memory_buffer_manager,
-                            const gfx::ColorSpace& color_space,
-                            GrSurfaceOrigin surface_origin,
-                            SkAlphaType alpha_type,
-                            uint32_t usage,
-                            base::StringPiece debug_label);
 
   // Updates a shared image after its GpuMemoryBuffer (if any) was modified on
   // the CPU or through external devices, after |sync_token| has been released.
@@ -354,14 +339,6 @@ class GPU_EXPORT SharedImageInterface {
   // and blocks on the clients thread only the first time for a given |mailbox|.
   virtual std::unique_ptr<SharedImageInterface::ScopedMapping> MapSharedImage(
       const Mailbox& mailbox);
-
-  // MapSharedImage() is a blocking call and blocks on the client thread where
-  // it is called. WaitForMailboxToBeMappable() can be used to issue the
-  // blocking call instead. This ensures that MapSharedImage() will not block if
-  // WaitForMailboxToBeMappable() have been already called on that mailbox.
-  // This api is required to provide flexibility to clients by allowing them to
-  // choose where it wants the blocking to happen.
-  virtual void WaitForMailboxToBeMappable(const Mailbox& mailbox);
 
   virtual const SharedImageCapabilities& GetCapabilities() = 0;
 };

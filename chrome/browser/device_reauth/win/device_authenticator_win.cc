@@ -40,7 +40,8 @@ DeviceAuthenticatorWin::DeviceAuthenticatorWin(
     DeviceAuthenticatorProxy* proxy,
     const device_reauth::DeviceAuthParams& params)
     : ChromeDeviceAuthenticatorCommon(proxy,
-                                      params.GetAuthenticationValidityPeriod()),
+                                      params.GetAuthenticationValidityPeriod(),
+                                      params.GetAuthResultHistogram()),
       authenticator_(std::move(authenticator)) {}
 
 DeviceAuthenticatorWin::~DeviceAuthenticatorWin() = default;
@@ -58,16 +59,12 @@ bool DeviceAuthenticatorWin::CanAuthenticateWithBiometricOrScreenLock() {
          authenticator_->CanAuthenticateWithScreenLock();
 }
 
-void DeviceAuthenticatorWin::Authenticate(
-    AuthenticateCallback callback,
-    bool use_last_valid_auth) {
-  NOTIMPLEMENTED();
-}
-
 void DeviceAuthenticatorWin::AuthenticateWithMessage(
     const std::u16string& message,
     AuthenticateCallback callback) {
   if (!NeedsToAuthenticate()) {
+    RecordAuthResultSkipped();
+
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(std::move(callback), /*success=*/true));
     return;

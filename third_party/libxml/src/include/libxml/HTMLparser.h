@@ -82,10 +82,10 @@ struct _htmlEntityDesc {
 
 /** DOC_DISABLE */
 #ifdef LIBXML_SAX1_ENABLED
-#define XML_GLOBALS_HTML \
-  XML_OP(htmlDefaultSAXHandler, xmlSAXHandlerV1, XML_DEPRECATED)
+  #define XML_GLOBALS_HTML \
+    XML_OP(htmlDefaultSAXHandler, xmlSAXHandlerV1, XML_DEPRECATED)
 #else
-#define XML_GLOBALS_HTML
+  #define XML_GLOBALS_HTML
 #endif
 
 #define XML_OP XML_DECLARE_GLOBAL
@@ -93,7 +93,7 @@ XML_GLOBALS_HTML
 #undef XML_OP
 
 #if defined(LIBXML_THREAD_ENABLED) && !defined(XML_GLOBALS_NO_REDEFINITION)
-#define htmlDefaultSAXHandler XML_GLOBAL_MACRO(htmlDefaultSAXHandler)
+  #define htmlDefaultSAXHandler XML_GLOBAL_MACRO(htmlDefaultSAXHandler)
 #endif
 /** DOC_ENABLE */
 

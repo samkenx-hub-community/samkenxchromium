@@ -164,7 +164,7 @@ class FakeDiagnosticsAppProfileHelperDelegate
   }
 
   const web_app::WebApp* GetWebAppById(
-      const web_app::AppId& app_id,
+      const webapps::AppId& app_id,
       content::BrowserContext* browser_context) override {
     return &web_app_;
   }
@@ -199,7 +199,7 @@ class ChromeShimlessRmaDelegatePrepareDiagnosticsAppProfileTest
             chromeos::features::kIWAForTelemetryExtensionAPI,
         },
         {});
-    testing_profile_manager_.SetUp();
+    ASSERT_TRUE(testing_profile_manager_.SetUp());
     TestingProfile* profile = testing_profile_manager_.CreateTestingProfile(
         kShimlessRmaAppBrowserContextBaseName);
 

@@ -34,12 +34,10 @@ SharedImageInterface::ScopedMapping::~ScopedMapping() {
 
 // static
 std::unique_ptr<SharedImageInterface::ScopedMapping>
-SharedImageInterface::ScopedMapping::Create(gfx::GpuMemoryBufferHandle handle,
-                                            viz::SharedImageFormat format,
-                                            gfx::Size size,
-                                            gfx::BufferUsage buffer_usage) {
+SharedImageInterface::ScopedMapping::Create(
+    GpuMemoryBufferHandleInfo handle_info) {
   auto scoped_mapping = base::WrapUnique(new ScopedMapping());
-  if (!scoped_mapping->Init(std::move(handle), format, size, buffer_usage)) {
+  if (!scoped_mapping->Init(std::move(handle_info))) {
     LOG(ERROR) << "ScopedMapping init failed.";
     return nullptr;
   }
@@ -47,19 +45,16 @@ SharedImageInterface::ScopedMapping::Create(gfx::GpuMemoryBufferHandle handle,
 }
 
 bool SharedImageInterface::ScopedMapping::Init(
-    gfx::GpuMemoryBufferHandle handle,
-    viz::SharedImageFormat format,
-    gfx::Size size,
-    gfx::BufferUsage buffer_usage) {
+    GpuMemoryBufferHandleInfo handle_info) {
   GpuMemoryBufferSupport support;
 
   // Only single planar buffer formats are supported currently. Multiplanar will
   // be supported when Multiplanar SharedImages are fully implemented.
-  CHECK(format.is_single_plane());
+  CHECK(handle_info.format.is_single_plane());
   buffer_ = support.CreateGpuMemoryBufferImplFromHandle(
-      std::move(handle), size,
-      viz::SinglePlaneSharedImageFormatToBufferFormat(format), buffer_usage,
-      base::DoNothing());
+      std::move(handle_info.handle), handle_info.size,
+      viz::SinglePlaneSharedImageFormatToBufferFormat(handle_info.format),
+      handle_info.buffer_usage, base::DoNothing());
   if (!buffer_) {
     LOG(ERROR) << "Unable to create GpuMemoruBuffer.";
     return false;
@@ -80,6 +75,11 @@ void* SharedImageInterface::ScopedMapping::Memory(const uint32_t plane_index) {
 size_t SharedImageInterface::ScopedMapping::Stride(const uint32_t plane_index) {
   CHECK(buffer_);
   return buffer_->stride(plane_index);
+}
+
+gfx::Size SharedImageInterface::ScopedMapping::Size() {
+  CHECK(buffer_);
+  return buffer_->GetSize();
 }
 
 gfx::BufferFormat SharedImageInterface::ScopedMapping::Format() {
@@ -107,19 +107,6 @@ uint32_t SharedImageInterface::UsageForMailbox(const Mailbox& mailbox) {
 void SharedImageInterface::NotifyMailboxAdded(const Mailbox& /*mailbox*/,
                                               uint32_t /*usage*/) {}
 
-Mailbox SharedImageInterface::CreateSharedImage(
-    gfx::GpuMemoryBuffer* gpu_memory_buffer,
-    GpuMemoryBufferManager* gpu_memory_buffer_manager,
-    const gfx::ColorSpace& color_space,
-    GrSurfaceOrigin surface_origin,
-    SkAlphaType alpha_type,
-    uint32_t usage,
-    base::StringPiece debug_label) {
-  return CreateSharedImage(gpu_memory_buffer, gpu_memory_buffer_manager,
-                           gfx::BufferPlane::DEFAULT, color_space,
-                           surface_origin, alpha_type, usage, debug_label);
-}
-
 void SharedImageInterface::CopyToGpuMemoryBuffer(const SyncToken& sync_token,
                                                  const Mailbox& mailbox) {
   NOTREACHED();
@@ -129,10 +116,6 @@ std::unique_ptr<SharedImageInterface::ScopedMapping>
 SharedImageInterface::MapSharedImage(const Mailbox& mailbox) {
   NOTIMPLEMENTED();
   return nullptr;
-}
-
-void SharedImageInterface::WaitForMailboxToBeMappable(const Mailbox& mailbox) {
-  NOTIMPLEMENTED();
 }
 
 }  // namespace gpu

@@ -24,14 +24,24 @@ void FakeQuickStartDecoder::DecodeBootstrapConfigurations(
     const absl::optional<std::vector<uint8_t>>& data,
     DecodeBootstrapConfigurationsCallback callback) {
   std::move(callback).Run(
-      mojom::BootstrapConfigurations::New(response_cryptauth_device_id_),
-      error_);
+      mojom::BootstrapConfigurations::New(response_instance_id_), error_);
 }
 
 void FakeQuickStartDecoder::DecodeWifiCredentialsResponse(
     const absl::optional<std::vector<uint8_t>>& data,
     DecodeWifiCredentialsResponseCallback callback) {
   std::move(callback).Run(std::move(credentials_), error_);
+}
+
+void FakeQuickStartDecoder::DecodeUserVerificationMethod(
+    const absl::optional<std::vector<uint8_t>>& data,
+    DecodeUserVerificationMethodCallback callback) {
+  if (error_ != absl::nullopt) {
+    std::move(callback).Run(nullptr, error_);
+  } else {
+    std::move(callback).Run(std::move(user_verification_method_),
+                            absl::nullopt);
+  }
 }
 
 void FakeQuickStartDecoder::DecodeUserVerificationRequested(
@@ -131,9 +141,9 @@ void FakeQuickStartDecoder::SetNotifySourceOfUpdateResponse(
 }
 
 void FakeQuickStartDecoder::SetBootstrapConfigurationsResponse(
-    const std::string& cryptauth_device_id,
+    const std::string& instance_id,
     absl::optional<mojom::QuickStartDecoderError> error) {
-  response_cryptauth_device_id_ = cryptauth_device_id;
+  response_instance_id_ = instance_id;
   error_ = error;
 }
 

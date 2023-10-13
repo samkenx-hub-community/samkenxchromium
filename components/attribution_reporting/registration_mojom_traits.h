@@ -139,9 +139,9 @@ template <>
 struct COMPONENT_EXPORT(ATTRIBUTION_REPORTING_REGISTRATION_MOJOM_TRAITS)
     StructTraits<attribution_reporting::mojom::EventReportWindowsDataView,
                  attribution_reporting::EventReportWindows> {
-  static base::TimeDelta start_time_or_window_time(
+  static base::TimeDelta start_time(
       const attribution_reporting::EventReportWindows& event_report_windows) {
-    return event_report_windows.start_time_or_window_time();
+    return event_report_windows.start_time();
   }
 
   static const base::flat_set<base::TimeDelta>& end_times(
@@ -168,18 +168,17 @@ struct COMPONENT_EXPORT(ATTRIBUTION_REPORTING_REGISTRATION_MOJOM_TRAITS)
     return source.source_event_id;
   }
 
-  static absl::optional<base::TimeDelta> expiry(
+  static base::TimeDelta expiry(
       const attribution_reporting::SourceRegistration& source) {
     return source.expiry;
   }
 
-  static absl::optional<base::TimeDelta> aggregatable_report_window(
+  static base::TimeDelta aggregatable_report_window(
       const attribution_reporting::SourceRegistration& source) {
     return source.aggregatable_report_window;
   }
 
-  static const absl::optional<attribution_reporting::EventReportWindows>&
-  event_report_windows(
+  static const attribution_reporting::EventReportWindows& event_report_windows(
       const attribution_reporting::SourceRegistration& source) {
     return source.event_report_windows;
   }

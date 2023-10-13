@@ -75,43 +75,45 @@ TEST(ServiceWorkerRouterRulesTest, SimpleRoundTrip) {
       blink::ServiceWorkerRouterCondition condition;
       condition.type = blink::ServiceWorkerRouterCondition::Type::kOr;
       blink::ServiceWorkerRouterOrCondition or_condition;
-
-      blink::ServiceWorkerRouterCondition fake;
-      fake.type = blink::ServiceWorkerRouterCondition::Type::kRequest;
-      blink::ServiceWorkerRouterRequestCondition request;
-      fake.request = request;
-
-      or_condition.conditions = std::vector(3, fake);
+      blink::ServiceWorkerRouterConditionObject fake_object;
+      {
+        blink::ServiceWorkerRouterCondition fake;
+        fake.type = blink::ServiceWorkerRouterCondition::Type::kRequest;
+        blink::ServiceWorkerRouterRequestCondition request;
+        fake.request = request;
+        fake_object.conditions = std::vector(3, fake);
+      }
+      or_condition.objects = std::vector(3, fake_object);
       condition.or_condition = or_condition;
       rule.conditions.push_back(condition);
     }
     {
       blink::ServiceWorkerRouterSource source;
-      source.type = blink::ServiceWorkerRouterSource::SourceType::kNetwork;
+      source.type = blink::ServiceWorkerRouterSource::Type::kNetwork;
       source.network_source.emplace();
       rule.sources.push_back(source);
     }
     {
       blink::ServiceWorkerRouterSource source;
-      source.type = blink::ServiceWorkerRouterSource::SourceType::kRace;
+      source.type = blink::ServiceWorkerRouterSource::Type::kRace;
       source.race_source.emplace();
       rule.sources.push_back(source);
     }
     {
       blink::ServiceWorkerRouterSource source;
-      source.type = blink::ServiceWorkerRouterSource::SourceType::kFetchEvent;
+      source.type = blink::ServiceWorkerRouterSource::Type::kFetchEvent;
       source.fetch_event_source.emplace();
       rule.sources.push_back(source);
     }
     {
       blink::ServiceWorkerRouterSource source;
-      source.type = blink::ServiceWorkerRouterSource::SourceType::kCache;
+      source.type = blink::ServiceWorkerRouterSource::Type::kCache;
       source.cache_source.emplace();
       rule.sources.push_back(source);
     }
     {
       blink::ServiceWorkerRouterSource source;
-      source.type = blink::ServiceWorkerRouterSource::SourceType::kCache;
+      source.type = blink::ServiceWorkerRouterSource::Type::kCache;
       blink::ServiceWorkerRouterCacheSource cache_source;
       cache_source.cache_name = "example cache name";
       source.cache_source = cache_source;

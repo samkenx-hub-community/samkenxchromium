@@ -6,11 +6,12 @@
 
 #import "base/apple/foundation_util.h"
 #import "components/prefs/pref_service.h"
+#import "ios/chrome/browser/ntp/features.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/ntp/new_tab_page_util.h"
 #import "ios/chrome/browser/overlays/public/overlay_presentation_context.h"
-#import "ios/chrome/browser/prerender/prerender_service.h"
-#import "ios/chrome/browser/prerender/prerender_service_factory.h"
+#import "ios/chrome/browser/prerender/model/prerender_service.h"
+#import "ios/chrome/browser/prerender/model/prerender_service_factory.h"
 #import "ios/chrome/browser/segmentation_platform/segmentation_platform_service_factory.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
@@ -74,6 +75,9 @@
   ToolbarType _steadyStateOmniboxPosition;
   /// Whether the omnibox focusing should happen with animation.
   BOOL _enableAnimationsForOmniboxFocus;
+  /// Indicates whether the fakebox was pinned on last signal to focus from
+  /// the fakebox.
+  BOOL _fakeboxPinned;
 }
 
 - (instancetype)initWithBrowser:(Browser*)browser {
@@ -127,6 +131,7 @@
   self.locationBarCoordinator =
       [[LocationBarCoordinator alloc] initWithBrowser:browser];
   self.locationBarCoordinator.delegate = self.omniboxFocusDelegate;
+  self.locationBarCoordinator.bubblePresenter = self.bubblePresenter;
   self.locationBarCoordinator.popupPresenterDelegate =
       self.popupPresenterDelegate;
   [self.locationBarCoordinator start];
@@ -264,7 +269,8 @@
 
 #pragma mark Omnibox and LocationBar
 
-- (void)transitionToLocationBarFocusedState:(BOOL)focused {
+- (void)transitionToLocationBarFocusedState:(BOOL)focused
+                                 completion:(ProceduralBlock)completion {
   // Disable infobarBanner overlays when focusing the omnibox as they overlap
   // with primary toolbar.
   OverlayPresentationContext* infobarBannerContext =
@@ -290,7 +296,9 @@
       transitionToStateOmniboxFocused:focused
                       toolbarExpanded:focused && !IsRegularXRegularSizeClass(
                                                      self.traitEnvironment)
-                             animated:animateTransition];
+                              trigger:[self omniboxFocusTrigger]
+                             animated:animateTransition
+                           completion:completion];
   self.locationBarFocused = focused;
 }
 
@@ -307,7 +315,9 @@
 - (CGFloat)collapsedPrimaryToolbarHeight {
   if (_omniboxPosition == ToolbarType::kSecondary) {
     CHECK(IsBottomOmniboxSteadyStateEnabled());
-    return 0.0;
+    // TODO(crbug.com/1473629): Find out why primary toolbar height cannot be
+    // zero. This is a temporary fix for the pdf bug.
+    return 1.0;
   }
 
   return ToolbarCollapsedHeight(
@@ -317,7 +327,9 @@
 - (CGFloat)expandedPrimaryToolbarHeight {
   if (_omniboxPosition == ToolbarType::kSecondary) {
     CHECK(IsBottomOmniboxSteadyStateEnabled());
-    return 0.0;
+    // TODO(crbug.com/1473629): Find out why primary toolbar height cannot be
+    // zero. This is a temporary fix for the pdf bug.
+    return 1.0;
   }
 
   CGFloat height =
@@ -356,7 +368,7 @@
 
 - (void)focusOmniboxNoAnimation {
   _enableAnimationsForOmniboxFocus = NO;
-  [self fakeboxFocused];
+  [self.locationBarCoordinator focusOmniboxFromFakebox];
   _enableAnimationsForOmniboxFocus = YES;
   // If the pasteboard is containing a URL, the omnibox popup suggestions are
   // displayed as soon as the omnibox is focused.
@@ -367,7 +379,8 @@
   }
 }
 
-- (void)fakeboxFocused {
+- (void)focusOmniboxFromFakeboxPinned:(BOOL)pinned {
+  _fakeboxPinned = pinned;
   [self.locationBarCoordinator focusOmniboxFromFakebox];
 }
 
@@ -568,7 +581,33 @@
                       toolbarExpanded:omniboxFocused &&
                                       !IsRegularXRegularSizeClass(
                                           self.traitEnvironment)
-                             animated:NO];
+                              trigger:[self omniboxFocusTrigger]
+                             animated:NO
+                           completion:nil];
+}
+
+/// Returns the appropriate `OmniboxFocusTrigger` depending on whether this is
+/// an incognito browser, the NTP is displayed, and whether the fakebox was
+/// pinned if it was selected.
+- (OmniboxFocusTrigger)omniboxFocusTrigger {
+  if (self.browser->GetBrowserState()->IsOffTheRecord() ||
+      !IsSplitToolbarMode(self.traitEnvironment)) {
+    return OmniboxFocusTrigger::kOther;
+  }
+  web::WebState* webState =
+      self.browser->GetWebStateList()->GetActiveWebState();
+  if (!webState) {
+    return OmniboxFocusTrigger::kOther;
+  }
+  NewTabPageTabHelper* NTPHelper = NewTabPageTabHelper::FromWebState(webState);
+  if (!NTPHelper || !NTPHelper->IsActive()) {
+    return OmniboxFocusTrigger::kOther;
+  }
+  if (IsIOSLargeFakeboxEnabled()) {
+    return _fakeboxPinned ? OmniboxFocusTrigger::kPinnedLargeFakebox
+                          : OmniboxFocusTrigger::kUnpinnedLargeFakebox;
+  }
+  return OmniboxFocusTrigger::kPinnedFakebox;
 }
 
 @end

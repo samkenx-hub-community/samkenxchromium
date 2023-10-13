@@ -29,10 +29,6 @@ CanvasResourceHost::~CanvasResourceHost() {
   ResetLayer();
 }
 
-CanvasResourceProvider* CanvasResourceHost::ResourceProvider() const {
-  return resource_provider_.get();
-}
-
 std::unique_ptr<CanvasResourceProvider>
 CanvasResourceHost::ReplaceResourceProvider(
     std::unique_ptr<CanvasResourceProvider> new_resource_provider) {
@@ -43,18 +39,9 @@ CanvasResourceHost::ReplaceResourceProvider(
   if (resource_provider_) {
     resource_provider_->AlwaysEnableRasterTimersForTesting(
         always_enable_raster_timers_for_testing_);
-    resource_provider_->SetCanvasResourceHost(this);
-    resource_provider_->Canvas()->restoreToCount(1);
-    InitializeForRecording(resource_provider_->Canvas());
-    // Using unretained here since CanvasResourceHost owns |resource_provider_|
-    // and is guaranteed to outlive it
-    resource_provider_->SetRestoreClipStackCallback(base::BindRepeating(
-        &CanvasResourceHost::InitializeForRecording, base::Unretained(this)));
   }
   if (old_resource_provider) {
     old_resource_provider->SetCanvasResourceHost(nullptr);
-    old_resource_provider->SetRestoreClipStackCallback(
-        CanvasResourceProvider::RestoreMatrixClipStackCb());
   }
   return old_resource_provider;
 }
@@ -62,10 +49,6 @@ CanvasResourceHost::ReplaceResourceProvider(
 void CanvasResourceHost::DiscardResourceProvider() {
   resource_provider_ = nullptr;
   UpdateMemoryUsage();
-}
-
-void CanvasResourceHost::InitializeForRecording(cc::PaintCanvas* canvas) {
-  RestoreCanvasMatrixClipStack(canvas);
 }
 
 void CanvasResourceHost::SetFilterQuality(

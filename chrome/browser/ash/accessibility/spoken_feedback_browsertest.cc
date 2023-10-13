@@ -39,8 +39,9 @@
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
+#include "chrome/browser/ash/accessibility/accessibility_feature_browsertest.h"
 #include "chrome/browser/ash/accessibility/accessibility_manager.h"
-#include "chrome/browser/ash/accessibility/html_test_utils.h"
+#include "chrome/browser/ash/accessibility/automation_test_utils.h"
 #include "chrome/browser/ash/crosapi/browser_manager.h"
 #include "chrome/browser/ash/input_method/ui/candidate_window_view.h"
 #include "chrome/browser/ash/login/test/device_state_mixin.h"
@@ -96,20 +97,14 @@ LoggedInSpokenFeedbackTest::~LoggedInSpokenFeedbackTest() = default;
 
 void LoggedInSpokenFeedbackTest::SetUpInProcessBrowserTestFixture() {
   AccessibilityManager::SetBrailleControllerForTest(&braille_controller_);
-  ash_starter_ = std::make_unique<::test::AshBrowserTestStarter>();
-  if (ash_starter_->HasLacrosArgument()) {
-    ASSERT_TRUE(ash_starter_->PrepareEnvironmentForLacros());
-  }
+  AccessibilityFeatureBrowserTest::SetUpInProcessBrowserTestFixture();
 }
 
 void LoggedInSpokenFeedbackTest::SetUpOnMainThread() {
   InProcessBrowserTest::SetUpOnMainThread();
   event_generator_ = std::make_unique<ui::test::EventGenerator>(
       Shell::Get()->GetPrimaryRootWindow());
-  CHECK(ash_starter_);
-  if (ash_starter_->HasLacrosArgument()) {
-    ash_starter_->StartLacros(this);
-  }
+  AccessibilityFeatureBrowserTest::SetUpOnMainThread();
 }
 
 void LoggedInSpokenFeedbackTest::TearDownOnMainThread() {
@@ -207,8 +202,7 @@ bool LoggedInSpokenFeedbackTest::PerformAcceleratorAction(
 
 void LoggedInSpokenFeedbackTest::RunJSForChromeVox(const std::string& script) {
   extensions::BackgroundScriptExecutor::ExecuteScriptAsync(
-      AccessibilityManager::Get()->profile(),
-      extension_misc::kChromeVoxExtensionId, script,
+      GetProfile(), extension_misc::kChromeVoxExtensionId, script,
       extensions::browsertest_util::ScriptUserActivation::kDontActivate);
 }
 
@@ -218,16 +212,14 @@ void LoggedInSpokenFeedbackTest::DisableEarcons() {
   // (http://crbug.com/396507). Work around this by just telling
   // ChromeVox to not ever play earcons (prerecorded sound effects).
   extensions::browsertest_util::ExecuteScriptInBackgroundPageNoWait(
-      AccessibilityManager::Get()->profile(),
-      extension_misc::kChromeVoxExtensionId,
+      GetProfile(), extension_misc::kChromeVoxExtensionId,
       "ChromeVox.earcons.playEarcon = function() {};");
 }
 
 void LoggedInSpokenFeedbackTest::ImportJSModuleForChromeVox(std::string name,
                                                             std::string path) {
   extensions::browsertest_util::ExecuteScriptInBackgroundPageDeprecated(
-      AccessibilityManager::Get()->profile(),
-      extension_misc::kChromeVoxExtensionId,
+      GetProfile(), extension_misc::kChromeVoxExtensionId,
       "import('" + path +
           "').then(mod => {"
           "globalThis." +
@@ -267,26 +259,9 @@ void LoggedInSpokenFeedbackTest::ExecuteCommandHandlerCommand(
     std::string command) {
   ImportJSModuleForChromeVox(
       "CommandHandlerInterface",
-      "/chromevox/background/command_handler_interface.js");
+      "/chromevox/background/input/command_handler_interface.js");
   RunJSForChromeVox("CommandHandlerInterface.instance.onCommand('" + command +
                     "');");
-}
-
-void LoggedInSpokenFeedbackTest::NavigateToUrl(const GURL& url) {
-  CHECK(ash_starter_);
-  if (ash_starter_->HasLacrosArgument()) {
-    crosapi::BrowserManager::Get()->OpenUrl(
-        url, crosapi::mojom::OpenUrlFrom::kUnspecified,
-        crosapi::mojom::OpenUrlParams::WindowOpenDisposition::
-            kNewForegroundTab);
-  } else {
-    ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
-  }
-}
-
-bool LoggedInSpokenFeedbackTest::IsLacrosRunning() const {
-  CHECK(ash_starter_);
-  return ash_starter_->HasLacrosArgument();
 }
 
 // Flaky test, crbug.com/1081563
@@ -813,8 +788,7 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest,
 
   std::vector<apps::AppPtr> apps;
   apps.push_back(std::move(app));
-  apps::AppServiceProxyFactory::GetForProfile(
-      AccessibilityManager::Get()->profile())
+  apps::AppServiceProxyFactory::GetForProfile(GetProfile())
       ->AppRegistryCache()
       .OnApps(std::move(apps), apps::AppType::kBuiltIn,
               false /* should_notify_initialized */);
@@ -900,8 +874,7 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest,
   app->readiness = apps::Readiness::kDisabledByPolicy;
   std::vector<apps::AppPtr> apps;
   apps.push_back(std::move(app));
-  apps::AppServiceProxyFactory::GetForProfile(
-      AccessibilityManager::Get()->profile())
+  apps::AppServiceProxyFactory::GetForProfile(GetProfile())
       ->AppRegistryCache()
       .OnApps(std::move(apps), apps::AppType::kBuiltIn,
               false /* should_notify_initialized */);
@@ -1564,6 +1537,9 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreSecondaryDisplay) {
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreWebContents) {
   EnableChromeVox();
 
+  AutomationTestUtils test_utils(extension_misc::kChromeVoxExtensionId);
+  sm_.Call([&test_utils]() { test_utils.SetUpTestSupport(); });
+
   base::SimpleTestTickClock clock;
   auto* clock_ptr = &clock;
   ui::SetEventTickClockForTesting(clock_ptr);
@@ -1583,10 +1559,9 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreWebContents) {
         )"));
   });
   sm_.ExpectSpeech("First");
-  sm_.Call([this, clock_ptr, generator_ptr, &b2_bounds, &b3_bounds]() {
-    auto* web_contents = browser()->tab_strip_model()->GetActiveWebContents();
-    b2_bounds = GetControlBoundsInRoot(web_contents, "b2");
-    b3_bounds = GetControlBoundsInRoot(web_contents, "b3");
+  sm_.Call([clock_ptr, generator_ptr, &b2_bounds, &b3_bounds, &test_utils]() {
+    b2_bounds = test_utils.GetNodeBoundsInRoot("Second", "button");
+    b3_bounds = test_utils.GetNodeBoundsInRoot("Third", "button");
 
     ui::TouchEvent touch_press(
         ui::ET_TOUCH_PRESSED, b2_bounds.top_center(), base::TimeTicks::Now(),
@@ -1634,6 +1609,8 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreWebContentsHighDPI) {
       .UpdateDisplay("800x700*1.77778");
 
   EnableChromeVox();
+  AutomationTestUtils test_utils(extension_misc::kChromeVoxExtensionId);
+  sm_.Call([&test_utils]() { test_utils.SetUpTestSupport(); });
 
   base::SimpleTestTickClock clock;
   auto* clock_ptr = &clock;
@@ -1650,11 +1627,10 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreWebContentsHighDPI) {
         )"));
   });
   sm_.ExpectSpeech("First");
-  sm_.Call([this, clock_ptr, generator_ptr]() {
+  sm_.Call([clock_ptr, generator_ptr, &test_utils]() {
     float scale_factor = 1.77778;
-    auto* web_contents = browser()->tab_strip_model()->GetActiveWebContents();
-    gfx::Rect b2_bounds = GetControlBoundsInRoot(web_contents, "b2");
-    // GetControlBoundsInRoot returns in DIPs. Multiply by resolution to get px,
+    gfx::Rect b2_bounds = test_utils.GetNodeBoundsInRoot("Second", "button");
+    // GetNodeBoundsInRoot returns in DIPs. Multiply by resolution to get px,
     // which is where we need to touch on a high density screen.
     b2_bounds.set_x(b2_bounds.x() * scale_factor);
     b2_bounds.set_y(b2_bounds.y() * scale_factor);

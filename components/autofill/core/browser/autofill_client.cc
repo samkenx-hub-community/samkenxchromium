@@ -7,6 +7,7 @@
 #include "base/no_destructor.h"
 #include "build/build_config.h"
 #include "components/autofill/core/browser/autofill_ablation_study.h"
+#include "components/autofill/core/browser/autofill_compose_delegate.h"
 #include "components/autofill/core/browser/payments/credit_card_access_manager.h"
 #include "components/autofill/core/browser/payments/mandatory_reauth_manager.h"
 #include "components/autofill/core/browser/payments/virtual_card_enrollment_manager.h"
@@ -68,6 +69,10 @@ IbanManager* AutofillClient::GetIbanManager() {
   return nullptr;
 }
 
+AutofillComposeDelegate* AutofillClient::GetComposeDelegate() {
+  return nullptr;
+}
+
 plus_addresses::PlusAddressService* AutofillClient::GetPlusAddressService() {
   return nullptr;
 }
@@ -96,6 +101,10 @@ CreditCardCvcAuthenticator* AutofillClient::GetCvcAuthenticator() {
 }
 
 CreditCardOtpAuthenticator* AutofillClient::GetOtpAuthenticator() {
+  return nullptr;
+}
+
+CreditCardRiskBasedAuthenticator* AutofillClient::GetRiskBasedAuthenticator() {
   return nullptr;
 }
 
@@ -237,6 +246,12 @@ const AutofillAblationStudy& AutofillClient::GetAblationStudy() const {
 std::unique_ptr<device_reauth::DeviceAuthenticator>
 AutofillClient::GetDeviceAuthenticator() {
   return nullptr;
+}
+
+std::optional<AutofillClient::PopupScreenLocation>
+AutofillClient::GetPopupScreenLocation() const {
+  NOTIMPLEMENTED();
+  return std::nullopt;
 }
 
 }  // namespace autofill

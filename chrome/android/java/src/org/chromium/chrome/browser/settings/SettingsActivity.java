@@ -5,7 +5,6 @@
 package org.chromium.chrome.browser.settings;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -36,7 +35,6 @@ import org.chromium.base.supplier.OneshotSupplierImpl;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ApplicationLifetime;
 import org.chromium.chrome.browser.ChromeBaseAppCompatActivity;
-import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.LaunchIntentDispatcher;
 import org.chromium.chrome.browser.accessibility.settings.ChromeAccessibilitySettingsDelegate;
 import org.chromium.chrome.browser.autofill.options.AutofillOptionsCoordinator;
@@ -48,7 +46,6 @@ import org.chromium.chrome.browser.browsing_data.ClearBrowsingDataFragmentBasic;
 import org.chromium.chrome.browser.feedback.FragmentHelpAndFeedbackLauncher;
 import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncherImpl;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.history.HistoryActivity;
 import org.chromium.chrome.browser.image_descriptions.ImageDescriptionsController;
 import org.chromium.chrome.browser.image_descriptions.ImageDescriptionsSettings;
 import org.chromium.chrome.browser.init.ChromeBrowserInitializer;
@@ -61,7 +58,6 @@ import org.chromium.chrome.browser.password_entry_edit.CredentialEditUiFactory;
 import org.chromium.chrome.browser.password_entry_edit.CredentialEntryFragmentViewBase;
 import org.chromium.chrome.browser.password_manager.settings.PasswordSettings;
 import org.chromium.chrome.browser.privacy_guide.PrivacyGuideFragment;
-import org.chromium.chrome.browser.privacy_sandbox.AdMeasurementFragment;
 import org.chromium.chrome.browser.privacy_sandbox.ChromeTrackingProtectionDelegate;
 import org.chromium.chrome.browser.privacy_sandbox.PrivacySandboxSettingsBaseFragment;
 import org.chromium.chrome.browser.profiles.Profile;
@@ -87,7 +83,7 @@ import org.chromium.components.browser_ui.settings.FragmentSettingsLauncher;
 import org.chromium.components.browser_ui.settings.PaddedDividerItemDecoration;
 import org.chromium.components.browser_ui.settings.SettingsLauncher;
 import org.chromium.components.browser_ui.site_settings.SiteSettingsCategory;
-import org.chromium.components.browser_ui.site_settings.SiteSettingsPreferenceFragment;
+import org.chromium.components.browser_ui.site_settings.BaseSiteSettingsFragment;
 import org.chromium.components.browser_ui.util.TraceEventVectorDrawableCompat;
 import org.chromium.components.browser_ui.widget.displaystyle.UiConfig;
 import org.chromium.components.browser_ui.widget.displaystyle.ViewResizer;
@@ -318,9 +314,9 @@ public class SettingsActivity extends ChromeBaseAppCompatActivity
 
         Fragment fragment = getMainFragment();
 
-        if (fragment instanceof SiteSettingsPreferenceFragment) {
+        if (fragment instanceof BaseSiteSettingsFragment) {
             ChromeSiteSettingsDelegate delegate =
-                    (ChromeSiteSettingsDelegate) (((SiteSettingsPreferenceFragment) fragment)
+                    (ChromeSiteSettingsDelegate) (((BaseSiteSettingsFragment) fragment)
                                                           .getSiteSettingsDelegate());
             delegate.setSnackbarManager(mSnackbarManager);
         }
@@ -486,8 +482,8 @@ public class SettingsActivity extends ChromeBaseAppCompatActivity
             ((MainSettings) fragment)
                     .setModalDialogManagerSupplier(getModalDialogManagerSupplier());
         }
-        if (fragment instanceof SiteSettingsPreferenceFragment) {
-            ((SiteSettingsPreferenceFragment) fragment)
+        if (fragment instanceof BaseSiteSettingsFragment) {
+            ((BaseSiteSettingsFragment) fragment)
                     .setSiteSettingsDelegate(new ChromeSiteSettingsDelegate(this, mProfile));
         }
         if (fragment instanceof SafetyCheckSettingsFragment) {
@@ -530,8 +526,6 @@ public class SettingsActivity extends ChromeBaseAppCompatActivity
             sandboxFragment.setCustomTabIntentHelper(
                     LaunchIntentDispatcher::createCustomTabActivityIntent);
             sandboxFragment.setCookieSettingsIntentHelper((Context context) -> {
-                assert ChromeFeatureList.isEnabled(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
-                    : "PrivacySandboxSettings4 is disabled";
                 SiteSettingsHelper.showCategorySettings(
                         context, mProfile, SiteSettingsCategory.Type.THIRD_PARTY_COOKIES);
             });
@@ -541,19 +535,6 @@ public class SettingsActivity extends ChromeBaseAppCompatActivity
                     (SafeBrowsingSettingsFragmentBase) fragment;
             safeBrowsingFragment.setCustomTabIntentHelper(
                     LaunchIntentDispatcher::createCustomTabActivityIntent);
-        }
-        if (fragment instanceof AdMeasurementFragment) {
-            // Unlike HistoryManagerUtils, which opens History in a tab on Tablets, this always
-            // opens history in a new activity on top of the SettingsActivity.
-            Runnable openHistoryRunnable = () -> {
-                // TODO(crbug.com/1286276): Opening History overrides the last active tab. Fix it.
-                Activity activity = fragment.getActivity();
-                Intent intent = new Intent();
-                intent.setClass(activity, HistoryActivity.class);
-                intent.putExtra(IntentHandler.EXTRA_INCOGNITO_MODE, false);
-                activity.startActivity(intent);
-            };
-            ((AdMeasurementFragment) fragment).setSetHistoryHelper(openHistoryRunnable);
         }
         if (fragment instanceof LanguageSettings) {
             ((LanguageSettings) fragment).setRestartAction(() -> {

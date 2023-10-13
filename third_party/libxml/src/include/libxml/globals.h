@@ -17,22 +17,26 @@
  */
 #include <libxml/HTMLparser.h>
 #include <libxml/parser.h>
-#include <libxml/threads.h>
-#include <libxml/xmlIO.h>
 #include <libxml/xmlerror.h>
+#include <libxml/xmlIO.h>
 #include <libxml/xmlsave.h>
+#include <libxml/threads.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct _xmlGlobalState xmlGlobalState;
-typedef xmlGlobalState* xmlGlobalStatePtr;
+typedef xmlGlobalState *xmlGlobalStatePtr;
 
-XML_DEPRECATED XMLPUBFUN void xmlInitGlobals(void);
-XML_DEPRECATED XMLPUBFUN void xmlCleanupGlobals(void);
-XML_DEPRECATED XMLPUBFUN void xmlInitializeGlobalState(xmlGlobalStatePtr gs);
-XML_DEPRECATED XMLPUBFUN xmlGlobalStatePtr xmlGetGlobalState(void);
+XML_DEPRECATED XMLPUBFUN void
+xmlInitGlobals(void);
+XML_DEPRECATED XMLPUBFUN void
+xmlCleanupGlobals(void);
+XML_DEPRECATED XMLPUBFUN void
+xmlInitializeGlobalState(xmlGlobalStatePtr gs);
+XML_DEPRECATED XMLPUBFUN
+xmlGlobalStatePtr xmlGetGlobalState(void);
 
 #ifdef __cplusplus
 }

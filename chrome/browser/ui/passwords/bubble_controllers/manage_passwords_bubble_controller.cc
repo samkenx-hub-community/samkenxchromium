@@ -18,8 +18,8 @@
 #include "components/favicon/core/favicon_util.h"
 #include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_form_metrics_recorder.h"
-#include "components/password_manager/core/browser/password_manager_util.h"
 #include "components/password_manager/core/browser/password_store_interface.h"
+#include "components/password_manager/core/browser/password_sync_util.h"
 #include "components/password_manager/core/browser/reauth_purpose.h"
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
@@ -74,9 +74,11 @@ ManagePasswordsBubbleController::~ManagePasswordsBubbleController() {
 }
 
 std::u16string ManagePasswordsBubbleController::GetTitle() const {
-  return GetManagePasswordsDialogTitleText(
-      GetWebContents()->GetVisibleURL(), delegate_->GetOrigin(),
-      !delegate_->GetCurrentForms().empty());
+  return delegate_->GetState() == password_manager::ui::CONFIRMATION_STATE
+             ? GetConfirmationManagePasswordsDialogTitleText()
+             : GetManagePasswordsDialogTitleText(
+                   GetWebContents()->GetVisibleURL(), delegate_->GetOrigin(),
+                   !delegate_->GetCurrentForms().empty());
 }
 
 void ManagePasswordsBubbleController::OnManageClicked(
@@ -104,7 +106,7 @@ password_manager::SyncState
 ManagePasswordsBubbleController::GetPasswordSyncState() {
   const syncer::SyncService* sync_service =
       SyncServiceFactory::GetForProfile(GetProfile());
-  return password_manager_util::GetPasswordSyncState(sync_service);
+  return password_manager::sync_util::GetPasswordSyncState(sync_service);
 }
 
 std::u16string ManagePasswordsBubbleController::GetPrimaryAccountEmail() {

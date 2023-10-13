@@ -83,11 +83,17 @@ void OpenDatabaseOnDatabaseTaskRunner(
   } else {
     success = database->OpenDatabase(*database_dir);
   }
+  absl::optional<NewTraceReport> report_to_upload;
+  if (base::FeatureList::IsEnabled(kBackgroundTracingDatabase)) {
+    report_to_upload = database->GetNextReportPendingUpload();
+  } else {
+    // Traces pending upload from previous sessions have timed out.
+    database->AllPendingUploadSkipped(SkipUploadReason::kUploadTimedOut);
+  }
   GetUIThreadTaskRunner({})->PostTask(
-      FROM_HERE,
-      base::BindOnce(std::move(on_database_created),
-                     database->GetScenarioCounts(),
-                     database->GetNextReportPendingUpload(), success));
+      FROM_HERE, base::BindOnce(std::move(on_database_created),
+                                database->GetScenarioCounts(),
+                                std::move(report_to_upload), success));
 }
 
 void AddTraceOnDatabaseTaskRunner(
@@ -105,7 +111,8 @@ void AddTraceOnDatabaseTaskRunner(
   base::Time since = base::Time::Now() - kMinTimeUntilNextUpload;
   auto upload_count =
       database->UploadCountSince(base_report.scenario_name, since);
-  if (!is_crash_scenario && upload_count && *upload_count > 0) {
+  if (base_report.skip_reason == SkipUploadReason::kNoSkip &&
+      !is_crash_scenario && upload_count && *upload_count > 0) {
     base_report.skip_reason = SkipUploadReason::kScenarioQuotaExceeded;
     if (!should_save_trace) {
       return;
@@ -442,12 +449,15 @@ bool BackgroundTracingManagerImpl::InitializeScenarios(
     return false;
   }
 
-  requires_anonymized_data_ = (data_filtering == ANONYMIZE_DATA);
+  requires_anonymized_data_ = (data_filtering != NO_DATA_FILTERING);
+  bool enable_package_name_filter =
+      (data_filtering == ANONYMIZE_DATA_AND_FILTER_PACKAGE_NAME);
   InitializeTraceReportDatabase();
 
   for (const auto& scenario_config : config.scenarios()) {
-    auto scenario = TracingScenario::Create(scenario_config,
-                                            requires_anonymized_data_, this);
+    auto scenario =
+        TracingScenario::Create(scenario_config, requires_anonymized_data_,
+                                enable_package_name_filter, this);
     if (!scenario) {
       return false;
     }
@@ -500,8 +510,12 @@ bool BackgroundTracingManagerImpl::SetActiveScenario(
     upload_limit_network_kb_ = *config_impl->upload_limit_network_kb();
   }
 
-  requires_anonymized_data_ = (data_filtering == ANONYMIZE_DATA);
+  requires_anonymized_data_ = (data_filtering != NO_DATA_FILTERING);
   config_impl->set_requires_anonymized_data(requires_anonymized_data_);
+
+  bool enable_package_name_filter =
+      (data_filtering == ANONYMIZE_DATA_AND_FILTER_PACKAGE_NAME);
+  config_impl->SetPackageNameFilteringEnabled(enable_package_name_filter);
 
   // TODO(oysteine): Retry when time_until_allowed has elapsed.
   if (delegate_ &&
@@ -646,6 +660,14 @@ void BackgroundTracingManagerImpl::GetTraceToUpload(
     std::move(receive_callback)
         .Run(std::move(trace_report_to_upload_->trace_content),
              std::move(trace_report_to_upload_->system_profile));
+    database_task_runner_->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](TraceReportDatabase* trace_database, const base::Token& uuid) {
+              trace_database->UploadComplete(uuid, base::Time::Now());
+            },
+            base::Unretained(trace_database_.get()),
+            trace_report_to_upload_->uuid));
     OnFinalizeComplete(absl::nullopt, true);
     return;
   }
@@ -783,8 +805,7 @@ void BackgroundTracingManagerImpl::OnProtoDataComplete(
     SkipUploadReason skip_reason = SkipUploadReason::kNoSkip;
     if (!requires_anonymized_data_) {
       skip_reason = SkipUploadReason::kNotAnonymized;
-    }
-    if (serialized_trace.size() > upload_limit_kb_ * 1024) {
+    } else if (serialized_trace.size() > upload_limit_kb_ * 1024) {
       skip_reason = SkipUploadReason::kSizeLimitExceeded;
     }
     bool should_save_trace =

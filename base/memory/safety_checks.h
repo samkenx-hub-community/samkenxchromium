@@ -8,13 +8,13 @@
 #include <new>
 #include <type_traits>
 
-#include "base/allocator/partition_allocator/partition_alloc_buildflags.h"
-#include "base/allocator/partition_allocator/partition_alloc_constants.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_buildflags.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_constants.h"
 #include "base/compiler_specific.h"
 #include "base/dcheck_is_on.h"
 
 #if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
-#include "base/allocator/partition_allocator/shim/allocator_shim_default_dispatch_to_partition_alloc.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_default_dispatch_to_partition_alloc.h"
 #endif  // BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
 
 // This header defines following macros:
@@ -86,14 +86,14 @@ constexpr bool ShouldUsePartitionAlloc(MemorySafetyCheck checks) {
 }
 
 // Returns |partition_alloc::AllocFlags| corresponding to |checks|.
-constexpr unsigned int GetAllocFlags(MemorySafetyCheck checks) {
+constexpr partition_alloc::AllocFlags GetAllocFlags(MemorySafetyCheck checks) {
   return partition_alloc::AllocFlags::kReturnNull |
          partition_alloc::AllocFlags::kNoHooks;
 }
 
 // Returns |partition_alloc::FreeFlags| corresponding to |checks|.
-constexpr unsigned int GetFreeFlags(MemorySafetyCheck checks) {
-  return 0;
+constexpr partition_alloc::FreeFlags GetFreeFlags(MemorySafetyCheck checks) {
+  return partition_alloc::FreeFlags::kNone;
 }
 
 }  // namespace

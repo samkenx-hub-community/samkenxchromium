@@ -59,6 +59,7 @@
 #include "third_party/blink/public/mojom/commit_result/commit_result.mojom-blink.h"
 #include "third_party/blink/public/mojom/fetch/fetch_api_request.mojom-blink.h"
 #include "third_party/blink/public/mojom/frame/frame.mojom-blink.h"
+#include "third_party/blink/public/mojom/origin_trial_feature/origin_trial_feature.mojom-shared.h"
 #include "third_party/blink/public/mojom/page/page.mojom-blink.h"
 #include "third_party/blink/public/mojom/service_worker/service_worker_fetch_handler_bypass_option.mojom-blink.h"
 #include "third_party/blink/public/mojom/service_worker/service_worker_fetch_handler_type.mojom-blink.h"
@@ -171,21 +172,22 @@
 namespace blink {
 namespace {
 
-Vector<OriginTrialFeature> CopyInitiatorOriginTrials(
+Vector<mojom::blink::OriginTrialFeature> CopyInitiatorOriginTrials(
     const WebVector<int>& initiator_origin_trial_features) {
-  Vector<OriginTrialFeature> result;
+  Vector<mojom::blink::OriginTrialFeature> result;
   for (auto feature : initiator_origin_trial_features) {
     // Convert from int to OriginTrialFeature. These values are passed between
     // blink navigations. OriginTrialFeature isn't visible outside of blink (and
     // doesn't need to be) so the values are transferred outside of blink as
     // ints and casted to OriginTrialFeature once being processed in blink.
-    result.push_back(static_cast<OriginTrialFeature>(feature));
+    result.push_back(static_cast<mojom::blink::OriginTrialFeature>(feature));
   }
   return result;
 }
 
 WebVector<int> CopyInitiatorOriginTrials(
-    const Vector<OriginTrialFeature>& initiator_origin_trial_features) {
+    const Vector<mojom::blink::OriginTrialFeature>&
+        initiator_origin_trial_features) {
   WebVector<int> result;
   for (auto feature : initiator_origin_trial_features) {
     // Convert from OriginTrialFeature to int. These values are passed between
@@ -301,7 +303,8 @@ struct SameSizeAsDocumentLoader
   ukm::SourceId ukm_source_id;
   UseCounterImpl use_counter;
   const base::TickClock* clock;
-  const Vector<OriginTrialFeature> initiator_origin_trial_features;
+  const Vector<mojom::blink::OriginTrialFeature>
+      initiator_origin_trial_features;
   const Vector<String> force_enabled_origin_trials;
   bool navigation_scroll_allowed;
   bool origin_agent_cluster;
@@ -942,8 +945,9 @@ void DocumentLoader::UpdateForSameDocumentNavigation(
         // navigation (as this is the first we hear of it in the renderer). We
         // need to do that now.
         soft_navigation_event_scope =
-            std::make_unique<SoftNavigationEventScope>(heuristics,
-                                                       script_state);
+            std::make_unique<SoftNavigationEventScope>(
+                heuristics, script_state, /*is_unfocused_keydown=*/false,
+                /*is_new_interaction=*/true);
         heuristics->SameDocumentNavigationStarted(script_state);
       }
     }
@@ -984,7 +988,7 @@ void DocumentLoader::UpdateForSameDocumentNavigation(
                                                  parent_task);
     }
   }
-  if (heuristics) {
+  if (heuristics && new_url != old_url) {
     // if `heuristics` exists it means we're in an outermost main frame, and in
     // the main world.
     CHECK(script_state);
@@ -1404,6 +1408,7 @@ mojom::CommitResult DocumentLoader::CommitSameDocumentNavigation(
     bool has_transient_user_activation,
     const SecurityOrigin* initiator_origin,
     bool is_synchronously_committed,
+    Element* source_element,
     mojom::blink::TriggeringEventInfo triggering_event_info,
     bool is_browser_initiated,
     absl::optional<scheduler::TaskAttributionId>
@@ -1470,6 +1475,7 @@ mojom::CommitResult DocumentLoader::CommitSameDocumentNavigation(
                mojom::blink::TriggeringEventInfo::kFromTrustedEvent) {
       params->involvement = UserNavigationInvolvement::kActivation;
     }
+    params->source_element = source_element;
     params->destination_item = history_item;
     params->is_browser_initiated = is_browser_initiated;
     params->is_synchronously_committed_same_document =
@@ -1931,8 +1937,8 @@ void DocumentLoader::DidInstallNewDocument(Document* document) {
   // render opportunity after activation) since the event is fired as part of
   // updating the rendering which is suppressed until the prerender is
   // activated.
-  if (RuntimeEnabledFeatures::ViewTransitionOnNavigationEnabled()) {
-    document->EnqueueReadyToRenderEvent();
+  if (RuntimeEnabledFeatures::PageRevealEventEnabled()) {
+    document->EnqueuePageRevealEvent();
   }
 }
 
@@ -2861,7 +2867,7 @@ void DocumentLoader::CreateParserPostCommit() {
     if (frame_->GetSettings()
             ->GetForceTouchEventFeatureDetectionForInspector()) {
       window->GetOriginTrialContext()->AddFeature(
-          OriginTrialFeature::kTouchEventFeatureDetection);
+          mojom::blink::OriginTrialFeature::kTouchEventFeatureDetection);
     }
 
     // Enable any origin trials that have been force enabled for this commit.

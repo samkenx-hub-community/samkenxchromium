@@ -50,9 +50,9 @@ import org.chromium.chrome.browser.locale.LocaleManager;
 import org.chromium.chrome.browser.new_tab_url.DseNewTabUrlManager;
 import org.chromium.chrome.browser.ntp.NewTabPage;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.preferences.PrefChangeRegistrar;
-import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.segmentation_platform.SegmentationPlatformServiceFactory;
 import org.chromium.chrome.browser.tab.Tab;
@@ -74,9 +74,10 @@ import org.chromium.chrome.features.start_surface.StartSurfaceUserData;
 import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
 import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.components.embedder_support.util.UrlUtilities;
-import org.chromium.components.segmentation_platform.SegmentSelectionResult;
+import org.chromium.components.segmentation_platform.ClassificationResult;
+import org.chromium.components.segmentation_platform.PredictionOptions;
 import org.chromium.components.segmentation_platform.SegmentationPlatformService;
-import org.chromium.components.segmentation_platform.proto.SegmentationProto.SegmentId;
+import org.chromium.components.segmentation_platform.prediction_status.PredictionStatus;
 import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.common.ResourceRequestBody;
@@ -221,7 +222,8 @@ public final class ReturnToChromeUtil {
                     interval = TimeUtils.elapsedRealtimeMillis() - mLastBackPressMsSupplier.get();
                 }
                 String msg =
-                        "tab %s; control tab %s; back press state %s; layout %s; isFromSS: %s; interval %s";
+                        "tab %s; control tab %s; back press state %s; layout %s; isFromSS: %s;"
+                                + " interval %s";
                 boolean isFromSS = tab != null && isTabFromStartSurface(tab);
                 assert false : String.format(msg, tab, controlTab, tab != null && tab.canGoBack(),
                                        layoutType, isFromSS, interval);
@@ -331,7 +333,7 @@ public final class ReturnToChromeUtil {
     @VisibleForTesting
     public static long getReturnTimeFromSegmentation(IntCachedFieldTrialParameter returnTime) {
         // Sets the default value as 8 hours; 0 means showing immediately.
-        return SharedPreferencesManager.getInstance().readLong(
+        return ChromeSharedPreferences.getInstance().readLong(
                 ChromePreferenceKeys.START_RETURN_TIME_SEGMENTATION_RESULT_MS,
                 returnTime.getDefaultValue());
     }
@@ -540,6 +542,20 @@ public final class ReturnToChromeUtil {
                 && !DeviceFormFactor.isNonMultiDisplayContextOnTablet(context);
     }
 
+    // TODO(mschillaci): Remove this was recreate issue is resolved. See crbug.com/1491862.
+    /** See {@link isStartSurfaceEnabled} */
+    @Deprecated
+    public static boolean isStartSurfaceEnabled_ForToolbarManager(Context context) {
+        // When creating initial tab, i.e. cold start without restored tabs, we should only show
+        // StartSurface as the HomePage if Single Pane is enabled, HomePage is not customized, not
+        // on tablet, accessibility is not enabled or the tab group continuation feature is enabled.
+        return (!DseNewTabUrlManager.isNewTabSearchEngineUrlAndroidEnabled()
+                        || DseNewTabUrlManager.isDefaultSearchEngineGoogle())
+                && StartSurfaceConfiguration.isStartSurfaceFlagEnabled()
+                && !shouldHideStartSurfaceWithAccessibilityOn_ForToolbarManager(context)
+                && !DeviceFormFactor.isNonMultiDisplayContextOnTablet(context);
+    }
+
     /**
      * @return Whether start surface should be hidden when accessibility is enabled. If it's true,
      *         NTP is shown as homepage. Also, when time threshold is reached, grid tab switcher or
@@ -551,15 +567,25 @@ public final class ReturnToChromeUtil {
                 && !(ChromeFeatureList.sStartSurfaceWithAccessibility.isEnabled());
     }
 
+    // TODO(mschillaci): Remove this when recreate issue is resolved. See crbug.com/1491862.
+    /** See {@link shouldHideStartSurfaceWithAccessibilityOn} */
+    @Deprecated
+    public static boolean shouldHideStartSurfaceWithAccessibilityOn_ForToolbarManager(
+            Context context) {
+        // TODO(crbug.com/1127732): Move this method back to StartSurfaceConfiguration.
+        return ChromeAccessibilityUtil.get().isAccessibilityEnabledHeavy()
+                && !(ChromeFeatureList.sStartSurfaceWithAccessibility.isEnabled());
+    }
+
     /**
      * @param tabModelSelector The tab model selector.
      * @return the total tab count, and works before native initialization.
      */
     public static int getTotalTabCount(TabModelSelector tabModelSelector) {
         if (!tabModelSelector.isTabStateInitialized()) {
-            return SharedPreferencesManager.getInstance().readInt(
+            return ChromeSharedPreferences.getInstance().readInt(
                            ChromePreferenceKeys.REGULAR_TAB_COUNT)
-                    + SharedPreferencesManager.getInstance().readInt(
+                    + ChromeSharedPreferences.getInstance().readInt(
                             ChromePreferenceKeys.INCOGNITO_TAB_COUNT);
         }
 
@@ -797,29 +823,27 @@ public final class ReturnToChromeUtil {
         SegmentationPlatformService segmentationPlatformService =
                 SegmentationPlatformServiceFactory.getForProfile(
                         Profile.getLastUsedRegularProfile());
-
-        segmentationPlatformService.getSelectedSegment(START_V2_SEGMENTATION_PLATFORM_KEY,
+        PredictionOptions predictionOptions = new PredictionOptions(false);
+        segmentationPlatformService.getClassificationResult(START_V2_SEGMENTATION_PLATFORM_KEY,
+                predictionOptions, null,
                 result -> { cacheReturnTimeFromSegmentationImpl(result); });
     }
 
     @VisibleForTesting
-    public static void cacheReturnTimeFromSegmentationImpl(SegmentSelectionResult result) {
+    public static void cacheReturnTimeFromSegmentationImpl(ClassificationResult result) {
         long returnTimeMs =
                 StartSurfaceConfiguration.START_SURFACE_RETURN_TIME_SECONDS.getDefaultValue()
                 * DateUtils.SECOND_IN_MILLIS;
-        if (result.isReady) {
-            if (result.selectedSegment
-                    != SegmentId.OPTIMIZATION_TARGET_SEGMENTATION_CHROME_START_ANDROID_V2) {
-                // If selected segment is not Start, then don't show.
-                returnTimeMs = -1;
-            } else {
-                // The value of result.rank is in the unit of seconds.
-                assert result.rank >= 0;
-                // Converts to milliseconds.
-                returnTimeMs = result.rank.longValue() * DateUtils.SECOND_IN_MILLIS;
-            }
+
+        if (result.status != PredictionStatus.SUCCEEDED || result.orderedLabels.isEmpty()) {
+            // Model execution failed or no label selected.
+            returnTimeMs = -1;
+        } else {
+            // Converts to milliseconds.
+            returnTimeMs = Long.parseLong(result.orderedLabels.get(0))
+                    * DateUtils.SECOND_IN_MILLIS;
         }
-        SharedPreferencesManager.getInstance().writeLong(
+        ChromeSharedPreferences.getInstance().writeLong(
                 ChromePreferenceKeys.START_RETURN_TIME_SEGMENTATION_RESULT_MS, returnTimeMs);
     }
 
@@ -831,13 +855,13 @@ public final class ReturnToChromeUtil {
         // switcher is a search result page or not.
         RecordHistogram.recordBooleanHistogram(
                 LAST_VISITED_TAB_IS_SRP_WHEN_OVERVIEW_IS_SHOWN_AT_LAUNCH_UMA,
-                SharedPreferencesManager.getInstance().readBoolean(
+                ChromeSharedPreferences.getInstance().readBoolean(
                         ChromePreferenceKeys.IS_LAST_VISITED_TAB_SRP, false));
 
         // Records whether the last active tab from tab restore is a NTP.
         RecordHistogram.recordBooleanHistogram(
                 LAST_ACTIVE_TAB_IS_NTP_WHEN_OVERVIEW_IS_SHOWN_AT_LAUNCH_UMA,
-                SharedPreferencesManager.getInstance().readInt(
+                ChromeSharedPreferences.getInstance().readInt(
                         ChromePreferenceKeys.APP_LAUNCH_LAST_KNOWN_ACTIVE_TAB_STATE)
                         == ActiveTabState.NTP);
     }
@@ -854,7 +878,7 @@ public final class ReturnToChromeUtil {
     }
 
     private static void updateFeedVisibility() {
-        SharedPreferencesManager.getInstance().writeBoolean(
+        ChromeSharedPreferences.getInstance().writeBoolean(
                 ChromePreferenceKeys.FEED_ARTICLES_LIST_VISIBLE,
                 FeedFeatures.isFeedEnabled()
                         && UserPrefs.get(Profile.getLastUsedRegularProfile())
@@ -865,7 +889,7 @@ public final class ReturnToChromeUtil {
      * @return Whether the Feed articles are visible.
      */
     public static boolean getFeedArticlesVisibility() {
-        return SharedPreferencesManager.getInstance().readBoolean(
+        return ChromeSharedPreferences.getInstance().readBoolean(
                 ChromePreferenceKeys.FEED_ARTICLES_LIST_VISIBLE, true);
     }
 
@@ -945,22 +969,23 @@ public final class ReturnToChromeUtil {
     }
 
     public static boolean isScrollableMvtEnabled(Context context) {
-        boolean isScrollableMvtEnabled =
-                ChromeFeatureList.isEnabled(ChromeFeatureList.SHOW_SCROLLABLE_MVT_ON_NTP_ANDROID);
         boolean isSurfacePolishEnabled = ChromeFeatureList.sSurfacePolish.isEnabled();
         if (!DeviceFormFactor.isNonMultiDisplayContextOnTablet(context)) {
             // On phones, parameter SURFACE_POLISH_SCROLLABLE_MVT is checked when feature flag
-            // surface polish is enabled; otherwise, feature flag SHOW_SCROLLABLE_MVT_ON_NTP_ANDROID
+            // surface polish is enabled; otherwise, feature flag
+            // SHOW_SCROLLABLE_MVT_ON_NTP_PHONE_ANDROID
             // is checked.
-            return isSurfacePolishEnabled
-                    ? StartSurfaceConfiguration.SURFACE_POLISH_SCROLLABLE_MVT.getValue()
-                    : isScrollableMvtEnabled;
+            return (isSurfacePolishEnabled
+                            && StartSurfaceConfiguration.SURFACE_POLISH_SCROLLABLE_MVT.getValue())
+                    || ChromeFeatureList.isEnabled(
+                            ChromeFeatureList.SHOW_SCROLLABLE_MVT_ON_NTP_PHONE_ANDROID);
         }
         // On tablets, only show the scrollable MV tiles on NTP if feature flag surface polish is
         // enabled.
         return isSurfacePolishEnabled
                 ? true
-                : isScrollableMvtEnabled && ChromeFeatureList.sStartSurfaceOnTablet.isEnabled();
+                : ChromeFeatureList.isEnabled(ChromeFeatureList.SHOW_SCROLLABLE_MVT_ON_NTP_ANDROID)
+                        && ChromeFeatureList.sStartSurfaceOnTablet.isEnabled();
     }
 
     /**

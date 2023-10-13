@@ -8,6 +8,7 @@
 
 import {MessageType, ProblemType} from '//resources/ash/common/quick_unlock/setup_pin_keyboard.js';
 import {$} from '//resources/ash/common/util.js';
+import {sanitizeInnerHtml} from 'chrome://resources/js/parse_html_subset.js';
 
 import {AssistantNativeIconType} from '../../assistant_optin/utils.js';
 import {Oobe} from '../cr_ui.js';
@@ -857,6 +858,26 @@ const createAssistantZippy = (type, isMinor, isNativeIcons) => {
     {
       id: 'local-password-setup',
       kind: ScreenKind.NORMAL,
+      states: [
+        {
+          // Forced password setup
+          id: 'forced',
+          trigger: (screen) => {
+            screen.onBeforeShow({
+              showBackButton: false,
+            });
+          },
+        },
+        {
+          // Forced password setup
+          id: 'optional',
+          trigger: (screen) => {
+            screen.onBeforeShow({
+              showBackButton: true,
+            });
+          },
+        },
+      ],
     },
     {
       id: 'saml-confirm-password',
@@ -1607,52 +1628,40 @@ const createAssistantZippy = (type, isMinor, isNativeIcons) => {
             screens: [
               {
                 screenID: 'screenID1',
-                icon: 'oobe-40:theme-choobe',
-                title: 'choobeThemeSelectionTitle',
-                subtitle: 'choobeThemeSelectionTitle',
-                synced: false,
+                icon: 'oobe-40:scroll-choobe',
+                title: 'choobeTouchpadScrollTitle',
+                subtitle: 'choobeTouchpadScrollSubtitleEnabled',
+                is_synced: true,
                 is_revisitable: true,
                 selected: false,
                 is_completed: false,
               },
               {
                 screenID: 'screenID2',
-                icon: 'oobe-40:scroll-choobe',
-                title: 'choobeThemeSelectionTitle',
-                subtitle: 'choobeThemeSelectionTitle',
-                synced: true,
+                icon: 'oobe-40:drive-pinning-choobe',
+                title: 'choobeDrivePinningTitle',
+                is_synced: false,
                 is_revisitable: false,
                 selected: false,
                 is_completed: false,
               },
               {
                 screenID: 'screenID3',
-                icon: 'oobe-40:scroll-choobe',
-                title: 'choobeThemeSelectionTitle',
-                synced: false,
+                icon: 'oobe-40:display-size-choobe',
+                title: 'choobeDisplaySizeTitle',
+                is_synced: false,
                 is_revisitable: false,
-                selected: false,
-                is_completed: true,
-              },
-              {
-                screenID: 'screenID4',
-                icon: 'oobe-40:scroll-choobe',
-                title: 'choobeThemeSelectionTitle',
-                subtitle: 'choobeThemeSelectionTitle',
-                synced: true,
-                is_revisitable: true,
                 selected: false,
                 is_completed: false,
               },
               {
-                screenID: 'screenID5',
-                icon: 'oobe-40:display-size-choobe',
+                screenID: 'screenID4',
+                icon: 'oobe-40:theme-choobe',
                 title: 'choobeThemeSelectionTitle',
-                subtitle: 'choobeThemeSelectionTitle',
-                synced: false,
-                is_revisitable: true,
+                is_synced: false,
+                is_revisitable: false,
                 selected: false,
-                is_completed: true,
+                is_completed: false,
               },
             ],
           },
@@ -2315,7 +2324,7 @@ const createAssistantZippy = (type, isMinor, isNativeIcons) => {
     createCssStyle(name, styleSpec) {
       var style = document.createElement('style');
       style.type = 'text/css';
-      style.innerHTML = '.' + name + ' {' + styleSpec + '}';
+      style.innerHTML = sanitizeInnerHtml('.' + name + ' {' + styleSpec + '}');
       document.getElementsByTagName('head')[0].appendChild(style);
     }
 

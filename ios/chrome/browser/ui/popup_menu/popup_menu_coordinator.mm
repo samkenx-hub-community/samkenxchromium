@@ -21,8 +21,8 @@
 #import "ios/chrome/browser/ntp/features.h"
 #import "ios/chrome/browser/overlays/public/overlay_presenter.h"
 #import "ios/chrome/browser/promos_manager/promos_manager_factory.h"
-#import "ios/chrome/browser/reading_list/reading_list_browser_agent.h"
-#import "ios/chrome/browser/reading_list/reading_list_model_factory.h"
+#import "ios/chrome/browser/reading_list/model/reading_list_browser_agent.h"
+#import "ios/chrome/browser/reading_list/model/reading_list_model_factory.h"
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
 #import "ios/chrome/browser/shared/coordinator/default_browser_promo/non_modal_default_browser_promo_scheduler_scene_agent.h"
 #import "ios/chrome/browser/shared/coordinator/layout_guide/layout_guide_util.h"
@@ -50,8 +50,8 @@
 #import "ios/chrome/browser/shared/ui/util/util_swift.h"
 #import "ios/chrome/browser/signin/authentication_service.h"
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
-#import "ios/chrome/browser/supervised_user/supervised_user_service_factory.h"
-#import "ios/chrome/browser/sync/sync_service_factory.h"
+#import "ios/chrome/browser/supervised_user/model/supervised_user_service_factory.h"
+#import "ios/chrome/browser/sync/model/sync_service_factory.h"
 #import "ios/chrome/browser/ui/browser_container/browser_container_mediator.h"
 #import "ios/chrome/browser/ui/bubble/bubble_presenter.h"
 #import "ios/chrome/browser/ui/bubble/bubble_view_controller_presenter.h"
@@ -69,7 +69,7 @@
 #import "ios/chrome/browser/ui/popup_menu/public/popup_menu_presenter_delegate.h"
 #import "ios/chrome/browser/ui/popup_menu/public/popup_menu_table_view_controller.h"
 #import "ios/chrome/browser/ui/presenters/contained_presenter_delegate.h"
-#import "ios/chrome/browser/url_loading/url_loading_browser_agent.h"
+#import "ios/chrome/browser/url_loading/model/url_loading_browser_agent.h"
 #import "ios/chrome/browser/web/web_navigation_browser_agent.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
@@ -531,6 +531,23 @@ using base::UserMetricsAction;
   [self.mediator disconnect];
   self.mediator = nil;
   self.viewController = nil;
+}
+
+- (void)adjustPopupSize {
+  if (self.overflowMenuMediator) {
+    UIViewController* menu = self.baseViewController.presentedViewController;
+    UIPopoverPresentationController* popoverPresentationController =
+        menu.popoverPresentationController;
+
+    LayoutGuideCenter* layoutGuideCenter =
+        LayoutGuideCenterForBrowser(self.browser);
+    UILayoutGuide* layoutGuide =
+        [layoutGuideCenter makeLayoutGuideNamed:kToolsMenuGuide];
+    [self.baseViewController.view addLayoutGuide:layoutGuide];
+
+    // Re-anchor the popover if necessary, when the parent view's size changes.
+    popoverPresentationController.sourceRect = layoutGuide.layoutFrame;
+  }
 }
 
 #pragma mark - OverflowMenuCustomizationCommands

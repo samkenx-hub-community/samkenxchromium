@@ -220,7 +220,6 @@ PreloadingEligibility ToEligibility(PrerenderFinalStatus status) {
       NOTREACHED_NORETURN();
     case PrerenderFinalStatus::kInvalidSchemeNavigation:
       return PreloadingEligibility::kHttpOrHttpsOnly;
-    case PrerenderFinalStatus::kInProgressNavigation:
     case PrerenderFinalStatus::kNavigationRequestBlockedByCsp:
     case PrerenderFinalStatus::kMainFrameNavigation:
     case PrerenderFinalStatus::kMojoBinderPolicy:
@@ -291,8 +290,6 @@ PreloadingEligibility ToEligibility(PrerenderFinalStatus status) {
     case PrerenderFinalStatus::kMemoryPressureAfterTriggered:
       NOTREACHED_NORETURN();
     case PrerenderFinalStatus::kPrerenderingDisabledByDevTools:
-      return PreloadingEligibility::kPreloadingDisabledByDevTools;
-    case PrerenderFinalStatus::kResourceLoadBlockedByClient:
       return PreloadingEligibility::kPreloadingDisabledByDevTools;
     case PrerenderFinalStatus::kSpeculationRuleRemoved:
     case PrerenderFinalStatus::kActivatedWithAuxiliaryBrowsingContexts:
@@ -1437,36 +1434,6 @@ void PrerenderHostRegistry::OnVisibilityChanged(Visibility visibility) {
     if (running_prerender_host_id_ == RenderFrameHost::kNoFrameTreeNodeId) {
       StartPrerendering(RenderFrameHost::kNoFrameTreeNodeId);
     }
-  }
-}
-
-void PrerenderHostRegistry::ResourceLoadComplete(
-    RenderFrameHost* render_frame_host,
-    const GlobalRequestID& request_id,
-    const blink::mojom::ResourceLoadInfo& resource_load_info) {
-  CHECK(render_frame_host);
-
-  if (render_frame_host->GetLifecycleState() !=
-      RenderFrameHost::LifecycleState::kPrerendering) {
-    return;
-  }
-
-  // This function only handles ERR_BLOCKED_BY_CLIENT error for now.
-  if (resource_load_info.net_error != net::Error::ERR_BLOCKED_BY_CLIENT) {
-    return;
-  }
-
-  // Cancel the corresponding prerender if the resource load is blocked.
-  for (auto& [host_id, host] : prerender_host_by_frame_tree_node_id_) {
-    if (&render_frame_host->GetPage() !=
-        &host->GetPrerenderedMainFrameHost()->GetPage()) {
-      continue;
-    }
-    RecordBlockedByClientResourceType(resource_load_info.request_destination,
-                                      host->trigger_type(),
-                                      host->embedder_histogram_suffix());
-    CancelHost(host_id, PrerenderFinalStatus::kResourceLoadBlockedByClient);
-    break;
   }
 }
 

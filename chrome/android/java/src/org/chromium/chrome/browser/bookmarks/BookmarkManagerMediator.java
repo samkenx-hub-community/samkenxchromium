@@ -20,6 +20,7 @@ import org.chromium.base.Callback;
 import org.chromium.base.ObserverList;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.task.TaskTraits;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.app.bookmarks.BookmarkFolderSelectActivity;
 import org.chromium.chrome.browser.bookmarks.BookmarkListEntry.ViewType;
@@ -113,10 +114,13 @@ class BookmarkManagerMediator
     }
 
     private final BookmarkModelObserver mBookmarkModelObserver = new BookmarkModelObserver() {
+        private final PendingRunnable mPendingRefresh =
+                new PendingRunnable(TaskTraits.UI_DEFAULT, BookmarkManagerMediator.this::refresh);
+
         @Override
         public void bookmarkNodeChildrenReordered(BookmarkItem node) {
             if (!mIsBookmarkModelReorderingInProgress) {
-                refresh();
+                mPendingRefresh.post();
             }
             mIsBookmarkModelReorderingInProgress = false;
         }
@@ -144,7 +148,7 @@ class BookmarkManagerMediator
                     // If the position couldn't be found, then do a full refresh. Otherwise be
                     // smart and remove only the index of the removed bookmark.
                     if (position == -1) {
-                        refresh();
+                        mPendingRefresh.post();
                     } else {
                         mModelList.removeAt(position);
                         // If the deleted node was selection, unselect it.
@@ -157,7 +161,7 @@ class BookmarkManagerMediator
                 // We cannot rely on removing the specific list item that corresponds to the
                 // removed node because the node might be a parent with children also shown
                 // in the list.
-                refresh();
+                mPendingRefresh.post();
             }
         }
 
@@ -172,7 +176,7 @@ class BookmarkManagerMediator
 
             if (getCurrentUiMode() == BookmarkUiMode.FOLDER
                     && Objects.equals(id, getCurrentFolderId())) {
-                refresh();
+                mPendingRefresh.post();
             } else {
                 super.bookmarkNodeChanged(item);
             }
@@ -186,7 +190,7 @@ class BookmarkManagerMediator
                     && TextUtils.isEmpty(getCurrentSearchText())) {
                 onEndSearch();
             } else {
-                refresh();
+                mPendingRefresh.post();
             }
         }
     };
@@ -306,22 +310,36 @@ class BookmarkManagerMediator
         }
     };
 
-    private final BookmarkUiPrefs.Observer mBookmarkUiPrefsObserver = new Observer() {
-        @Override
-        public void onBookmarkRowDisplayPrefChanged(@BookmarkRowDisplayPref int displayPref) {
-            Resources res = mContext.getResources();
-            mBookmarkImageFetcher.setupFetchProperties(
-                    BookmarkUtils.getRoundedIconGenerator(mContext, displayPref),
-                    BookmarkUtils.getImageIconSize(res, displayPref),
-                    BookmarkUtils.getFaviconDisplaySize(res, displayPref));
-            refresh();
-        }
+    private final BookmarkUiPrefs.Observer mBookmarkUiPrefsObserver =
+            new Observer() {
+                @Override
+                public void onBookmarkRowDisplayPrefChanged(
+                        @BookmarkRowDisplayPref int displayPref) {
+                    Resources res = mContext.getResources();
+                    mBookmarkImageFetcher.setupFetchProperties(
+                            BookmarkUtils.getRoundedIconGenerator(mContext, displayPref),
+                            BookmarkUtils.getImageIconSize(res, displayPref),
+                            BookmarkUtils.getFaviconDisplaySize(res));
+                    refresh();
 
-        @Override
-        public void onBookmarkRowSortOrderChanged(@BookmarkRowSortOrder int sortOrder) {
-            refresh();
-        }
-    };
+                    if (AccessibilityState.isTouchExplorationEnabled()) {
+                        mRecyclerView.announceForAccessibility(
+                                mBookmarkUiPrefs.getViewOptionsAccessibilityAnnouncementText(
+                                        mContext, displayPref));
+                    }
+                }
+
+                @Override
+                public void onBookmarkRowSortOrderChanged(@BookmarkRowSortOrder int sortOrder) {
+                    refresh();
+
+                    if (AccessibilityState.isTouchExplorationEnabled()) {
+                        mRecyclerView.announceForAccessibility(
+                                mBookmarkUiPrefs.getSortOrderAccessibilityAnnouncementText(
+                                        mContext, sortOrder));
+                    }
+                }
+            };
 
     private final ObserverList<BookmarkUiObserver> mUiObservers = new ObserverList<>();
     private final BookmarkDragStateDelegate mDragStateDelegate = new BookmarkDragStateDelegate();
@@ -866,10 +884,18 @@ class BookmarkManagerMediator
      * still be stored by {@link #mSelectionDelegate}, which causes incorrect selection counting.
      */
     private void syncAdapterAndSelectionDelegate() {
-        for (BookmarkId node : mSelectionDelegate.getSelectedItemsAsList()) {
+        List<BookmarkId> selectedItems = mSelectionDelegate.getSelectedItemsAsList();
+        Set<BookmarkId> removedIds = new HashSet<>();
+        for (BookmarkId node : selectedItems) {
             if (mSelectionDelegate.isItemSelected(node) && getPositionForBookmark(node) == -1) {
-                mSelectionDelegate.toggleSelectionForItem(node);
+                removedIds.add(node);
             }
+        }
+
+        if (!removedIds.isEmpty()) {
+            Set<BookmarkId> retainIds = new HashSet<>(selectedItems);
+            retainIds.removeAll(removedIds);
+            mSelectionDelegate.setSelectedItems(retainIds);
         }
     }
 
@@ -1400,7 +1426,7 @@ class BookmarkManagerMediator
     }
 
     private void onClearSearchTextRunnable() {
-        setSearchTextAndUpdateButtonVisibility("");
+        onSearchTextChangeCallback("");
     }
 
     private void setSearchTextAndUpdateButtonVisibility(String searchText) {

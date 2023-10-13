@@ -17,6 +17,7 @@ class IdentityManager;
 
 namespace password_manager {
 
+enum class SyncState;
 struct PasswordForm;
 
 namespace sync_util {
@@ -51,11 +52,30 @@ bool IsGaiaCredentialPage(const std::string& signon_realm);
 bool ShouldSaveEnterprisePasswordHash(const PasswordForm& form,
                                       const PrefService& prefs);
 
-// If syncing passwords is enabled in settings.
-bool IsPasswordSyncEnabled(const syncer::SyncService* sync_service);
+// If the user turned sync-the-feature on and syncing of passwords is enabled in
+// settings.
+//
+// IMPORTANT NOTE: this function returns false for signed-in-not-syncing users,
+// even if account passwords are enabled. On some platforms, e.g. iOS, this can
+// be the majority of users (eventually all), so please avoid integrating with
+// this function if possible.
+// TODO(crbug.com/1462552): Remove this function once IsSyncFeatureEnabled() is
+// fully deprecated, see ConsentLevel::kSync documentation for details.
+bool IsSyncFeatureEnabledIncludingPasswords(
+    const syncer::SyncService* sync_service);
 
-// If passwords are actively syncing.
-bool IsPasswordSyncActive(const syncer::SyncService* sync_service);
+// Returns whether sync-the-feature is on (i.e. configured to be on), active
+// (i.e. initialized and not paused) and including syncing of passwords.
+//
+// IMPORTANT NOTE: this function returns false for signed-in-not-syncing users,
+// even if account passwords are enabled and active. On some platforms, e.g.
+// iOS, this can be the majority of users (eventually all), so please avoid
+// integrating with this function if possible.
+// TODO(crbug.com/1462552): Remove this function once IsSyncFeatureEnabled()/
+// IsSyncFeatureActive() is fully deprecated, see ConsentLevel::kSync
+// documentation for details.
+bool IsSyncFeatureActiveIncludingPasswords(
+    const syncer::SyncService* sync_service);
 
 // Active syncing account if one exists. If password sync is disabled
 // absl::nullopt will be returned.
@@ -67,6 +87,11 @@ absl::optional<std::string> GetSyncingAccount(
 // value if the user is syncing or signed in and opted in to account storage.
 absl::optional<std::string> GetAccountForSaving(
     const PrefService* pref_service,
+    const syncer::SyncService* sync_service);
+
+// Reports whether and how passwords are currently synced. In particular, for a
+// null |sync_service| returns NOT_SYNCING.
+password_manager::SyncState GetPasswordSyncState(
     const syncer::SyncService* sync_service);
 
 }  // namespace sync_util

@@ -7,6 +7,10 @@
 #include <string_view>
 #include <vector>
 
+#include "ash/webui/settings/public/constants/routes.mojom.h"
+#include "ash/webui/settings/public/constants/setting.mojom.h"
+#include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
@@ -15,12 +19,16 @@
 #include "chrome/browser/ui/views/editor_menu/utils/preset_text_query.h"
 #include "chromeos/crosapi/mojom/editor_panel.mojom.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
+#include "chromeos/crosapi/mojom/url_handler.mojom.h"
 #include "chromeos/lacros/lacros_service.h"
 #else
+#include "ash/public/cpp/new_window_delegate.h"
 #include "chrome/browser/ash/input_method/editor_mediator.h"
+#include "chromeos/ash/services/ime/public/mojom/input_method.mojom.h"
 #endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
 
 namespace chromeos::editor_menu {
@@ -77,7 +85,7 @@ EditorMenuControllerImpl::EditorMenuControllerImpl() = default;
 
 EditorMenuControllerImpl::~EditorMenuControllerImpl() = default;
 
-void EditorMenuControllerImpl::OnContextMenuShown() {}
+void EditorMenuControllerImpl::OnContextMenuShown(Profile* profile) {}
 
 void EditorMenuControllerImpl::OnTextAvailable(
     const gfx::Rect& anchor_bounds,
@@ -94,9 +102,14 @@ void EditorMenuControllerImpl::OnAnchorBoundsChanged(
     return;
   }
 
-  // Update the bounds of the shown view.
-  // TODO(b/295060733): The main view.
-  // TODO(b/295061567): The consent view.
+  auto* editor_menu_view = editor_menu_widget_->GetContentsView();
+  if (views::IsViewClass<EditorMenuView>(editor_menu_view)) {
+    views::AsViewClass<EditorMenuView>(editor_menu_view)
+        ->UpdateBounds(anchor_bounds);
+  } else if (views::IsViewClass<EditorMenuPromoCardView>(editor_menu_view)) {
+    views::AsViewClass<EditorMenuPromoCardView>(editor_menu_view)
+        ->UpdateBounds(anchor_bounds);
+  }
 }
 
 void EditorMenuControllerImpl::OnDismiss(bool is_other_command_executed) {
@@ -105,7 +118,22 @@ void EditorMenuControllerImpl::OnDismiss(bool is_other_command_executed) {
   }
 }
 
-void EditorMenuControllerImpl::OnSettingsButtonPressed() {}
+void EditorMenuControllerImpl::OnSettingsButtonPressed() {
+  GURL setting_url = GURL(base::StrCat({"chrome://os-settings/",
+                    chromeos::settings::mojom::kInputSubpagePath, "?settingId=",
+                    base::NumberToString(static_cast<int>(
+                        chromeos::settings::mojom::Setting::kShowOrca))}));
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+  chromeos::LacrosService* service = chromeos::LacrosService::Get();
+  DCHECK(service->IsAvailable<crosapi::mojom::UrlHandler>());
+
+  service->GetRemote<crosapi::mojom::UrlHandler>()->OpenUrl(setting_url);
+#elif BUILDFLAG(IS_CHROMEOS_ASH)
+  ash::NewWindowDelegate::GetInstance()->OpenUrl(
+      setting_url, ash::NewWindowDelegate::OpenUrlFrom::kUserInteraction,
+      ash::NewWindowDelegate::Disposition::kNewForegroundTab);
+#endif
+}
 
 void EditorMenuControllerImpl::OnChipButtonPressed(
     std::string_view text_query_id) {
@@ -133,6 +161,10 @@ void EditorMenuControllerImpl::OnPromoCardWidgetClosed(
   }
 }
 
+void EditorMenuControllerImpl::OnEditorMenuVisibilityChanged(bool visible) {
+  GetEditorPanelManager().OnEditorMenuVisibilityChanged(visible);
+}
+
 void EditorMenuControllerImpl::OnGetEditorPanelContextResultForTesting(
     const gfx::Rect& anchor_bounds,
     crosapi::mojom::EditorPanelContextPtr context) {
@@ -146,8 +178,13 @@ void EditorMenuControllerImpl::OnGetEditorPanelContextResult(
     case EditorPanelMode::kBlocked:
       break;
     case EditorPanelMode::kWrite:
+      editor_menu_widget_ = EditorMenuView::CreateWidget(
+          EditorMenuMode::kWrite, PresetTextQueries(), anchor_bounds, this);
+      editor_menu_widget_->ShowInactive();
+      break;
     case EditorPanelMode::kRewrite:
       editor_menu_widget_ = EditorMenuView::CreateWidget(
+          EditorMenuMode::kRewrite,
           GetPresetTextQueries(context->preset_text_queries), anchor_bounds,
           this);
       editor_menu_widget_->ShowInactive();

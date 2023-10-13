@@ -9,21 +9,27 @@
 #include "base/feature_list.h"
 #include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/ui/autofill/autofill_popup_controller.h"
-#include "chrome/browser/ui/views/autofill/popup/popup_autocomplete_cell_view.h"
 #include "chrome/browser/ui/views/autofill/popup/popup_base_view.h"
 #include "chrome/browser/ui/views/autofill/popup/popup_cell_utils.h"
+#include "chrome/browser/ui/views/autofill/popup/popup_cell_with_button_view.h"
 #include "chrome/browser/ui/views/autofill/popup/popup_view_utils.h"
 #include "components/autofill/core/browser/metrics/autofill_metrics.h"
 #include "components/autofill/core/browser/ui/suggestion.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/strings/grit/components_strings.h"
+#include "components/user_education/views/new_badge_label.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/views/controls/button/image_button.h"
+#include "ui/views/controls/button/image_button_factory.h"
+#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_config.h"
 #include "ui/views/controls/throbber.h"
 #include "ui/views/layout/box_layout_view.h"
+#include "ui/views/style/typography.h"
+#include "ui/views/vector_icons.h"
 
 namespace autofill {
 
@@ -49,6 +55,21 @@ constexpr PopupItemId kItemTypesUsingLeadingIcons[] = {
 
 constexpr int kExpandableControlCellInsetPadding = 16;
 constexpr int kExpandableControlCellIconSize = 6;
+
+// The size of a close or delete icon.
+constexpr int kCloseIconSize = 16;
+
+// Returns a wrapper around `closure` that posts it to the default message
+// queue instead of executing it directly. This is to avoid that the callback's
+// caller can suicide by (unwittingly) deleting itself or its parent.
+base::RepeatingClosure CreateExecuteSoonWrapper(base::RepeatingClosure task) {
+  return base::BindRepeating(
+      [](base::RepeatingClosure delayed_task) {
+        base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+            FROM_HERE, std::move(delayed_task));
+      },
+      std::move(task));
+}
 
 // ********************* AccessibilityDelegate implementations *****************
 
@@ -161,8 +182,7 @@ int PopupRowBaseStrategy::GetLineNumber() const {
 PopupSuggestionStrategy::PopupSuggestionStrategy(
     base::WeakPtr<AutofillPopupController> controller,
     int line_number)
-    : PopupRowBaseStrategy(std::move(controller), line_number),
-      popup_type_(GetController()->GetPopupType()) {}
+    : PopupRowBaseStrategy(std::move(controller), line_number) {}
 
 PopupSuggestionStrategy::~PopupSuggestionStrategy() = default;
 
@@ -171,59 +191,15 @@ std::unique_ptr<PopupCellView> PopupSuggestionStrategy::CreateContent() {
     return nullptr;
   }
 
-  PopupItemId popup_up_item_id =
-      GetController()->GetSuggestionAt(GetLineNumber()).popup_item_id;
-  if (base::FeatureList::IsEnabled(
-          features::kAutofillShowAutocompleteDeleteButton) &&
-      popup_up_item_id == PopupItemId::kAutocompleteEntry) {
-    return CreateAutocompleteRow();
+  if (GetController()->GetSuggestionAt(GetLineNumber()).popup_item_id ==
+          PopupItemId::kAutocompleteEntry &&
+      base::FeatureList::IsEnabled(
+          features::kAutofillShowAutocompleteDeleteButton)) {
+    return CreateAutocompleteWithDeleteButtonCell();
   }
-  const Suggestion& kSuggestion =
-      GetController()->GetSuggestionAt(GetLineNumber());
-  std::unique_ptr<PopupCellView> view =
-      views::Builder<PopupCellView>(
-          std::make_unique<PopupCellView>(
-              GetController()
-                  ->ShouldIgnoreMouseObservedOutsideItemBoundsCheck()))
-          .SetAccessibilityDelegate(
-              std::make_unique<ContentItemAccessibilityDelegate>(
-                  GetController(), GetLineNumber()))
-          .Build();
 
-  // Add the actual views.
-  int text_style = IsGroupFillingPopupItemId(popup_up_item_id)
-                       ? views::style::TextStyle::STYLE_SECONDARY
-                       : views::style::TextStyle::STYLE_PRIMARY;
-  std::unique_ptr<views::Label> main_text_label =
-      popup_cell_utils::CreateMainTextLabel(kSuggestion.main_text, text_style);
-  popup_cell_utils::FormatLabel(*main_text_label, kSuggestion.main_text,
-                                GetController());
-  popup_cell_utils::AddSuggestionContentToView(
-      kSuggestion, std::move(main_text_label),
-      popup_cell_utils::CreateMinorTextLabel(kSuggestion.minor_text),
-      /*description_label=*/nullptr,
-      popup_cell_utils::CreateAndTrackSubtextViews(*view, GetController(),
-                                                   GetLineNumber()),
-      *view);
-
-  // Prepare the callbacks to the controller.
-  popup_cell_utils::AddCallbacksToContentView(GetController(), GetLineNumber(),
-                                              *view);
-
-  return view;
-}
-
-std::unique_ptr<PopupCellView>
-PopupSuggestionStrategy::CreateAutocompleteRow() {
-  if (!GetController()) {
-    return nullptr;
-  }
-  std::unique_ptr<PopupAutocompleteCellView> view =
-      std::make_unique<PopupAutocompleteCellView>(GetController(),
-                                                  GetLineNumber());
-  view->SetAccessibilityDelegate(
-      std::make_unique<ContentItemAccessibilityDelegate>(GetController(),
-                                                         GetLineNumber()));
+  auto view = std::make_unique<PopupCellView>();
+  AddContentLabelsAndCallbacks(*view);
   return view;
 }
 
@@ -235,10 +211,7 @@ std::unique_ptr<PopupCellView> PopupSuggestionStrategy::CreateControl() {
   }
 
   std::unique_ptr<PopupCellView> view =
-      views::Builder<PopupCellView>(
-          std::make_unique<PopupCellView>(
-              GetController()
-                  ->ShouldIgnoreMouseObservedOutsideItemBoundsCheck()))
+      views::Builder<PopupCellView>(std::make_unique<PopupCellView>())
           .SetAccessibilityDelegate(
               std::make_unique<ExpandableControlCellAccessibilityDelegate>())
           .Build();
@@ -248,6 +221,135 @@ std::unique_ptr<PopupCellView> PopupSuggestionStrategy::CreateControl() {
   view->AddChildView(popup_cell_utils::ImageViewFromVectorIcon(
       vector_icons::kSubmenuArrowIcon, kExpandableControlCellIconSize));
   return view;
+}
+
+std::unique_ptr<PopupCellView>
+PopupSuggestionStrategy::CreateAutocompleteWithDeleteButtonCell() {
+  auto view = std::make_unique<PopupCellWithButtonView>();
+  AddContentLabelsAndCallbacks(*view);
+
+  // Add a delete button for Autocomplete entries.
+  views::BoxLayout* layout =
+      static_cast<views::BoxLayout*>(view->GetLayoutManager());
+  for (views::View* child : view->children()) {
+    layout->SetFlexForView(child, 1);
+  }
+
+  // The closure that actually attempts to delete an entry and record metrics
+  // for it.
+  base::RepeatingClosure deletion_action = base::BindRepeating(
+      [](base::WeakPtr<AutofillPopupController> controller, int line_number) {
+        if (controller && controller->RemoveSuggestion(line_number)) {
+          AutofillMetrics::OnAutocompleteSuggestionDeleted(
+              AutofillMetrics::AutocompleteSingleEntryRemovalMethod::
+                  kDeleteButtonClicked);
+        }
+      },
+      GetController(), GetLineNumber());
+  std::unique_ptr<views::ImageButton> button =
+      views::CreateVectorImageButtonWithNativeTheme(
+          CreateExecuteSoonWrapper(std::move(deletion_action)),
+          views::kIcCloseIcon, kCloseIconSize);
+
+  // We are making sure that the vertical distance from the delete button edges
+  // to the cell border is the same as the horizontal distance.
+  // 1. Take the current horizontal distance.
+  int horizontal_margin = layout->inside_border_insets().right();
+  // 2. Take the height of the cell.
+  int cell_height = layout->minimum_cross_axis_size();
+  // 3. The diameter needs to be the height - 2 * the desired margin.
+  int radius = (cell_height - horizontal_margin * 2) / 2;
+  InstallFixedSizeCircleHighlightPathGenerator(button.get(), radius);
+  button->SetPreferredSize(gfx::Size(radius * 2, radius * 2));
+  button->SetTooltipText(l10n_util::GetStringUTF16(
+      IDS_AUTOFILL_DELETE_AUTOCOMPLETE_SUGGESTION_TOOLTIP));
+  button->SetAccessibleRole(ax::mojom::Role::kMenuItem);
+  button->SetAccessibleName(l10n_util::GetStringFUTF16(
+      IDS_AUTOFILL_DELETE_AUTOCOMPLETE_SUGGESTION_A11Y_HINT,
+      popup_cell_utils::GetVoiceOverStringFromSuggestion(
+          GetController()->GetSuggestionAt(GetLineNumber()))));
+  button->SetVisible(false);
+  view->SetCellButton(std::move(button));
+  static_cast<views::BoxLayout*>(view->GetLayoutManager())
+      ->SetFlexForView(view->GetButtonContainer(), 0);
+  return view;
+}
+
+void PopupSuggestionStrategy::AddContentLabelsAndCallbacks(
+    PopupCellView& view) {
+  view.SetAccessibilityDelegate(
+      std::make_unique<ContentItemAccessibilityDelegate>(GetController(),
+                                                         GetLineNumber()));
+
+  // Add the actual views.
+  const Suggestion& kSuggestion =
+      GetController()->GetSuggestionAt(GetLineNumber());
+  const int kTextStyle = IsGroupFillingPopupItemId(kSuggestion.popup_item_id)
+                             ? views::style::TextStyle::STYLE_SECONDARY
+                             : views::style::TextStyle::STYLE_PRIMARY;
+  std::unique_ptr<views::Label> main_text_label =
+      popup_cell_utils::CreateMainTextLabel(kSuggestion.main_text, kTextStyle);
+  popup_cell_utils::FormatLabel(*main_text_label, kSuggestion.main_text,
+                                GetController());
+  popup_cell_utils::AddSuggestionContentToView(
+      kSuggestion, std::move(main_text_label),
+      popup_cell_utils::CreateMinorTextLabel(kSuggestion.minor_text),
+      /*description_label=*/nullptr,
+      popup_cell_utils::CreateAndTrackSubtextViews(view, GetController(),
+                                                   GetLineNumber()),
+      view);
+
+  // Prepare the callbacks to the controller.
+  popup_cell_utils::AddCallbacksToContentView(GetController(), GetLineNumber(),
+                                              view);
+}
+
+/************************ PopupComposeSuggestionStrategy ********************/
+
+PopupComposeSuggestionStrategy::PopupComposeSuggestionStrategy(
+    base::WeakPtr<AutofillPopupController> controller,
+    int line_number)
+    : PopupRowBaseStrategy(std::move(controller), line_number) {}
+
+PopupComposeSuggestionStrategy::~PopupComposeSuggestionStrategy() = default;
+
+std::unique_ptr<PopupCellView> PopupComposeSuggestionStrategy::CreateContent() {
+  if (!GetController()) {
+    return nullptr;
+  }
+
+  const Suggestion& kSuggestion =
+      GetController()->GetSuggestionAt(GetLineNumber());
+  std::unique_ptr<PopupCellView> view =
+      views::Builder<PopupCellView>(std::make_unique<PopupCellView>())
+          .SetAccessibilityDelegate(
+              std::make_unique<ContentItemAccessibilityDelegate>(
+                  GetController(), GetLineNumber()))
+          .Build();
+
+  auto main_text_label = std::make_unique<user_education::NewBadgeLabel>(
+      kSuggestion.main_text.value, views::style::CONTEXT_DIALOG_BODY_TEXT,
+      views::style::STYLE_BODY_3_MEDIUM);
+  // TODO(crbug.com/1487965): Use IPH system to determine whether the NEW badge
+  // should be shown.
+  main_text_label->SetDisplayNewBadge(true);
+  popup_cell_utils::AddSuggestionContentToView(
+      kSuggestion, std::move(main_text_label),
+      /*minor_text_label=*/nullptr,
+      /*description_label=*/nullptr, /*subtext_views=*/
+      popup_cell_utils::CreateAndTrackSubtextViews(
+          *view, GetController(), GetLineNumber(), views::style::STYLE_BODY_4),
+      *view);
+
+  // Prepare the callbacks to the controller.
+  popup_cell_utils::AddCallbacksToContentView(GetController(), GetLineNumber(),
+                                              *view);
+
+  return view;
+}
+
+std::unique_ptr<PopupCellView> PopupComposeSuggestionStrategy::CreateControl() {
+  return nullptr;
 }
 
 /************************ PopupPasswordSuggestionStrategy *******************/

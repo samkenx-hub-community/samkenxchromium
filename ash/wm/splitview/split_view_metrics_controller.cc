@@ -22,6 +22,7 @@
 #include "base/containers/contains.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/ranges/algorithm.h"
+#include "base/time/time.h"
 #include "chromeos/ui/base/display_util.h"
 #include "chromeos/ui/base/window_state_type.h"
 #include "components/app_restore/window_info.h"
@@ -371,12 +372,23 @@ void SplitViewMetricsController::OnPostWindowStateTypeChange(
     WindowState* window_state,
     chromeos::WindowStateType old_type) {
   MaybeStartOrEndRecordSnapTwoWindowsDuration(window_state);
+  MaybeStartOrEndRecordMinimizeTwoWindowsDuration(window_state, old_type);
 
   // We only care if a window is snapped or unsnapped.
   bool is_snapped = window_state->IsSnapped();
   bool was_snapped = chromeos::IsSnappedWindowStateType(old_type);
   if (is_snapped == was_snapped)
     return;
+
+  if (was_snapped &&
+      chromeos::IsSnappedWindowStateType(first_closed_state_type_) &&
+      old_type != first_closed_state_type_) {
+    // If a window in the opposite side of `first_closed_state_type_` gets
+    // unsnapped, record the max duration to indicate a second snapped window
+    // was never closed after the first window.
+    RecordCloseTwoWindowsDuration(kSequentialSnapActionMaxTime);
+  }
+
   MaybeStartOrEndRecordBothSnappedClamshellSplitView();
 }
 
@@ -526,13 +538,24 @@ void SplitViewMetricsController::AddObservedWindow(aura::Window* window) {
 }
 
 void SplitViewMetricsController::RemoveObservedWindow(aura::Window* window) {
+  if (window->is_destroying()) {
+    MaybeStartOrEndRecordCloseTwoWindowsDuration(window);
+  }
+
   if (window == first_snapped_window_) {
     if (window->is_destroying()) {
       // If `first_snapped_window_` was destroyed, record the max duration to
       // indicate a second window was never snapped on the opposite side.
-      RecordSnapTwoWindowsDuration(kSnapTwoWindowsDurationHistogramMaxCount);
+      RecordSnapTwoWindowsDuration(kSequentialSnapActionMaxTime);
     }
     first_snapped_window_ = nullptr;
+  }
+  if (first_minimized_window_state_ &&
+      window == first_minimized_window_state_->window()) {
+    if (window->is_destroying()) {
+      RecordMinimizeTwoWindowsDuration(kSequentialSnapActionMaxTime);
+    }
+    first_minimized_window_state_ = nullptr;
   }
   if (base::Erase(observed_windows_, window)) {
     WindowState::Get(window)->RemoveObserver(this);
@@ -634,12 +657,33 @@ bool SplitViewMetricsController::
 
 void SplitViewMetricsController::RecordSnapTwoWindowsDuration(
     const base::TimeDelta& elapsed_time) {
-  base::UmaHistogramCustomTimes(
-      kSnapTwoWindowsDurationHistogramName,
-      /*sample=*/elapsed_time, kSnapTwoWindowsDurationHistogramMinCount,
-      kSnapTwoWindowsDurationHistogramMaxCount, /*buckets=*/100);
+  base::UmaHistogramCustomTimes(kSnapTwoWindowsDurationHistogramName,
+                                /*sample=*/elapsed_time,
+                                kSequentialSnapActionMinTime,
+                                kSequentialSnapActionMaxTime, /*buckets=*/100);
   first_snapped_window_ = nullptr;
   first_snapped_time_ = base::TimeTicks();
+}
+
+void SplitViewMetricsController::RecordMinimizeTwoWindowsDuration(
+    const base::TimeDelta& elapsed_time) {
+  base::UmaHistogramCustomTimes(kMinimizeTwoWindowsDurationHistogramName,
+                                /*sample=*/elapsed_time,
+                                kSequentialSnapActionMinTime,
+                                kSequentialSnapActionMaxTime, /*buckets=*/100);
+  first_minimized_window_state_ = nullptr;
+  first_minimized_time_ = base::TimeTicks();
+}
+
+void SplitViewMetricsController::RecordCloseTwoWindowsDuration(
+    const base::TimeDelta& elapsed_time) {
+  base::UmaHistogramCustomTimes(kCloseTwoWindowsDurationHistogramName,
+                                /*sample=*/elapsed_time,
+                                kSequentialSnapActionMinTime,
+                                kSequentialSnapActionMaxTime, /*buckets=*/100);
+  // Reset `first_closed_state_type_` to kDefault to stop recording.
+  first_closed_state_type_ = chromeos::WindowStateType::kDefault;
+  first_closed_time_ = base::TimeTicks();
 }
 
 void SplitViewMetricsController::MaybeStartOrEndRecordSnapTwoWindowsDuration(
@@ -664,7 +708,53 @@ void SplitViewMetricsController::MaybeStartOrEndRecordSnapTwoWindowsDuration(
   // If `first_snapped_window_` is no longer snapped, record the max duration to
   // indicate a second window was never snapped on the opposite side.
   if (window_state->window() == first_snapped_window_) {
-    RecordSnapTwoWindowsDuration(kSnapTwoWindowsDurationHistogramMaxCount);
+    RecordSnapTwoWindowsDuration(kSequentialSnapActionMaxTime);
+  }
+}
+
+void SplitViewMetricsController::
+    MaybeStartOrEndRecordMinimizeTwoWindowsDuration(
+        WindowState* window_state,
+        chromeos::WindowStateType old_type) {
+  const bool is_minimized = window_state->IsMinimized();
+  if (is_minimized && chromeos::IsSnappedWindowStateType(old_type)) {
+    if (first_minimized_window_state_ && !first_minimized_time_.is_null()) {
+      // No need to check if `first_minimized_window_state_` is the same as
+      // `window_state`, since if it changes state it would no longer be
+      // minimized, and would fall through to record the max duration below.
+      RecordMinimizeTwoWindowsDuration(base::TimeTicks::Now() -
+                                       first_minimized_time_);
+      return;
+    }
+    first_minimized_window_state_ = window_state;
+    first_minimized_time_ = base::TimeTicks::Now();
+    return;
+  }
+  if (window_state == first_minimized_window_state_ && !is_minimized &&
+      !window_state->IsSnapped()) {
+    // If the first window is no longer minimized or snapped, record the max
+    // duration to indicate no other window was snapped then minimized.
+    RecordMinimizeTwoWindowsDuration(kSequentialSnapActionMaxTime);
+  }
+}
+
+void SplitViewMetricsController::MaybeStartOrEndRecordCloseTwoWindowsDuration(
+    aura::Window* window) {
+  if (auto* window_state = WindowState::Get(window);
+      window_state && window_state->IsSnapped()) {
+    if (!chromeos::IsSnappedWindowStateType(first_closed_state_type_)) {
+      // If `first_closed_state_type_` is reset to kDefault, start recording.
+      first_closed_state_type_ = window_state->GetStateType();
+      first_closed_time_ = base::TimeTicks::Now();
+      return;
+    }
+    // If `window` has the opposite state type of `first_closed_state_type_`,
+    // record the duration.
+    if (GetOppositeSnapType(window) == first_closed_state_type_ &&
+        !first_closed_time_.is_null()) {
+      RecordCloseTwoWindowsDuration(base::TimeTicks::Now() -
+                                    first_closed_time_);
+    }
   }
 }
 

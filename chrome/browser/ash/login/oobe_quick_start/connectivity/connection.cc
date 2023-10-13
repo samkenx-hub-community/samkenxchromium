@@ -6,7 +6,6 @@
 
 #include <array>
 
-#include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
 #include "base/notreached.h"
@@ -27,16 +26,6 @@
 #include "chromeos/ash/services/nearby/public/mojom/quick_start_decoder_types.mojom.h"
 
 namespace ash::quick_start {
-
-namespace {
-
-// TODO(b/280308144): Delete this switch once the host device handles the
-// NotifySourceOfUpdate message. This is used to manually test forced update
-// before Android implements the NotifySourceOfUpdate ack response.
-constexpr char kQuickStartTestForcedUpdateSwitch[] =
-    "quick-start-test-forced-update";
-
-}  // namespace
 
 Connection::Factory::~Factory() = default;
 
@@ -122,15 +111,6 @@ void Connection::RequestWifiCredentials(
 }
 
 void Connection::NotifySourceOfUpdate(NotifySourceOfUpdateCallback callback) {
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          kQuickStartTestForcedUpdateSwitch)) {
-    HandleNotifySourceOfUpdateResponse(
-        std::move(callback),
-        mojom::NotifySourceOfUpdateResponse::New(/*ack_received=*/true),
-        /*error=*/absl::nullopt);
-    return;
-  }
-
   SessionContext::SharedSecret secondary_shared_secret =
       session_context_.secondary_shared_secret();
   SendMessageAndReadResponse(
@@ -286,7 +266,10 @@ void Connection::OnBootstrapConfigurationsResponse(
 
 void Connection::ParseBootstrapConfigurationsResponse(
     absl::optional<mojom::BootstrapConfigurations> bootstrap_configurations) {
-  phone_instance_id_ = bootstrap_configurations->cryptauth_device_id;
+  if (!bootstrap_configurations) {
+    return;
+  }
+  phone_instance_id_ = bootstrap_configurations->instance_id;
 }
 
 void Connection::SendMessageAndReadResponse(
@@ -367,17 +350,50 @@ void Connection::OnHandshakeResponse(
 
 void Connection::WaitForUserVerification(
     AwaitUserVerificationCallback callback) {
-  auto on_decoding_completed =
-      base::BindOnce(&Connection::OnUserVerificationRequested,
-                     weak_ptr_factory_.GetWeakPtr(), std::move(callback));
+  auto [on_user_verification_complete, on_error] =
+      base::SplitOnceCallback(std::move(callback));
+  auto on_user_verification_requested_decoded = base::BindOnce(
+      &Connection::OnUserVerificationRequested, weak_ptr_factory_.GetWeakPtr(),
+      std::move(on_user_verification_complete));
 
-  ConnectionResponseCallback on_message_received =
+  ConnectionResponseCallback decode_user_verification_requested =
       base::BindOnce(&Connection::DecodeData<mojom::UserVerificationRequested>,
                      weak_ptr_factory_.GetWeakPtr(),
                      &mojom::QuickStartDecoder::DecodeUserVerificationRequested,
-                     std::move(on_decoding_completed));
+                     std::move(on_user_verification_requested_decoded));
 
-  nearby_connection_->Read(std::move(on_message_received));
+  // We decode the user verification packet either (1) when the first packet
+  // received fails to parse as a user verification method, or (2) when we
+  // finish handling the user verification method and we receive the second
+  // packet.
+  auto [on_decode_user_verification_method_failure, on_receive_second_packet] =
+      base::SplitOnceCallback(std::move(decode_user_verification_requested));
+
+  OnDecodingSuccessCallback<mojom::UserVerificationMethod>
+      on_decode_user_verification_method_success = base::BindOnce(
+          [](AwaitUserVerificationCallback callback,
+             base::OnceClosure read_next_packet,
+             mojom::UserVerificationMethod user_verification_method) {
+            if (!user_verification_method.use_source_lock_screen_prompt) {
+              QS_LOG(ERROR) << "Unsupported user verification method";
+              std::move(callback).Run(absl::nullopt);
+              return;
+            }
+            std::move(read_next_packet).Run();
+          },
+          std::move(on_error),
+          base::BindOnce(&NearbyConnection::Read,
+                         nearby_connection_->GetWeakPtr(),
+                         std::move(on_receive_second_packet)));
+
+  ConnectionResponseCallback try_decode_user_verification_method =
+      base::BindOnce(&Connection::TryDecodeData<mojom::UserVerificationMethod>,
+                     weak_ptr_factory_.GetWeakPtr(),
+                     &mojom::QuickStartDecoder::DecodeUserVerificationMethod,
+                     std::move(on_decode_user_verification_method_success),
+                     std::move(on_decode_user_verification_method_failure));
+
+  nearby_connection_->Read(std::move(try_decode_user_verification_method));
 }
 
 base::Value::Dict Connection::GetPrepareForUpdateInfo() {
@@ -418,6 +434,9 @@ void Connection::DecodeData(DecoderMethod<T> decoder_method,
   // Setup a callback to handle the decoder's response. If an error was
   // reported, return empty. If not, run the success callback with the
   // decoded data.
+  // TODO(b/302034651): Refactor to avoid using InlinedStructPtr like this.
+  // Whether an InlinedStructPtr or a StructPtr is to be used is an
+  // implementation detail, and code like this is fragile.
   DecoderResponseCallback<T> decoder_callback = base::BindOnce(
       [](OnDecodingCompleteCallback<T> on_decoding_complete,
          mojo::InlinedStructPtr<T> data,
@@ -432,6 +451,39 @@ void Connection::DecodeData(DecoderMethod<T> decoder_method,
         std::move(on_decoding_complete).Run(*std::move(data));
       },
       std::move(on_decoding_complete));
+
+  // Run the decoder
+  base::BindOnce(decoder_method, decoder_, data, std::move(decoder_callback))
+      .Run();
+}
+
+template <typename T>
+void Connection::TryDecodeData(DecoderMethod<T> decoder_method,
+                               OnDecodingSuccessCallback<T> on_decoding_success,
+                               ConnectionResponseCallback on_decoding_failed,
+                               absl::optional<std::vector<uint8_t>> data) {
+  // Setup a callback to handle the decoder's response. If an error was
+  // reported, run the failure callback with the original data. If not, run the
+  // success callback with the decoded data.
+  // TODO(b/302034651): Refactor to avoid using InlinedStructPtr like this.
+  // Whether an InlinedStructPtr or a StructPtr is to be used is an
+  // implementation detail, and code like this is fragile.
+  DecoderResponseCallback<T> decoder_callback = base::BindOnce(
+      [](OnDecodingSuccessCallback<T> on_decoding_success,
+         ConnectionResponseCallback on_decoding_failed,
+         absl::optional<std::vector<uint8_t>> data,
+         mojo::InlinedStructPtr<T> result,
+         absl::optional<mojom::QuickStartDecoderError> error) {
+        if (error.has_value() || !result) {
+          // TODO(b/281052191): Log error code here
+          QS_LOG(INFO) << "Failed attempt to decode data.";
+          std::move(on_decoding_failed).Run(data);
+          return;
+        }
+
+        std::move(on_decoding_success).Run(*std::move(result));
+      },
+      std::move(on_decoding_success), std::move(on_decoding_failed), data);
 
   // Run the decoder
   base::BindOnce(decoder_method, decoder_, data, std::move(decoder_callback))

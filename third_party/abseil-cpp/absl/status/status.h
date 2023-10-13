@@ -64,9 +64,12 @@
 #include "absl/functional/function_ref.h"
 #include "absl/status/internal/status_internal.h"
 #include "absl/strings/cord.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+
+// TODO: crbug.com/1491724 - Remove include below when other third_party
+// libraries stop silently rely on it.
+#include "absl/strings/str_cat.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -428,7 +431,7 @@ inline StatusToStringMode& operator^=(StatusToStringMode& lhs,
 // Returned Status objects may not be ignored. status_internal.h has a forward
 // declaration of the form
 // class ABSL_MUST_USE_RESULT Status;
-class Status final {
+class ABSL_ATTRIBUTE_TRIVIAL_ABI Status final {
  public:
   // Constructors
 
@@ -522,6 +525,12 @@ class Status final {
   // mechanism (which is internal).
   std::string ToString(
       StatusToStringMode mode = StatusToStringMode::kDefault) const;
+
+  // Support `absl::StrCat`, `absl::StrFormat`, etc.
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink, const Status& status) {
+    sink.Append(status.ToString(StatusToStringMode::kWithEverything));
+  }
 
   // Status::IgnoreError()
   //

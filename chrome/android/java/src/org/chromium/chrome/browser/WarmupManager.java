@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 package org.chromium.chrome.browser;
-
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.net.Uri;
+import android.util.DisplayMetrics;
 import android.view.ContextThemeWrapper;
 import android.view.InflateException;
 import android.view.LayoutInflater;
@@ -19,6 +20,7 @@ import androidx.annotation.IntDef;
 import androidx.annotation.VisibleForTesting;
 import androidx.asynclayoutinflater.appcompat.AsyncAppCompatFactory;
 
+import org.chromium.base.BuildInfo;
 import org.chromium.base.Log;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.TraceEvent;
@@ -27,6 +29,7 @@ import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.task.AsyncTask;
 import org.chromium.chrome.R;
+import org.chromium.chrome.browser.content.WebContentsFactory;
 import org.chromium.chrome.browser.crash.ChromePureJavaExceptionReporter;
 import org.chromium.chrome.browser.flags.BooleanCachedFieldTrialParameter;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -41,6 +44,7 @@ import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
 import org.chromium.ui.LayoutInflaterUtils;
+import org.chromium.ui.display.DisplayUtil;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -326,8 +330,21 @@ public class WarmupManager {
             int toolbarId) {
         ThreadUtils.assertOnUiThread();
         if (mMainView != null && mToolbarContainerId == toolbarContainerId) return;
-        mMainView = inflateViewHierarchy(baseContext, toolbarContainerId, toolbarId);
+
+        Context context = applyContextOverrides(baseContext);
+        mMainView = inflateViewHierarchy(context, toolbarContainerId, toolbarId);
         mToolbarContainerId = toolbarContainerId;
+    }
+
+    @VisibleForTesting
+    static Context applyContextOverrides(Context baseContext) {
+        // Scale up the UI for the base Context on automotive
+        if (BuildInfo.getInstance().isAutomotive) {
+            Configuration config = new Configuration();
+            DisplayUtil.scaleUpConfigurationForAutomotive(baseContext, config);
+            return baseContext.createConfigurationContext(config);
+        }
+        return baseContext;
     }
 
     /**
@@ -385,7 +402,7 @@ public class WarmupManager {
         ViewGroup viewHierarchy = mMainView;
         mMainView = null;
         if (viewHierarchy == null) return;
-        transferViewHeirarchy(viewHierarchy, contentView);
+        transferViewHierarchy(viewHierarchy, contentView);
     }
 
     /**
@@ -393,7 +410,7 @@ public class WarmupManager {
      * @param from The parent ViewGroup to transfer children from.
      * @param to The parent ViewGroup to transfer children to.
      */
-    public static void transferViewHeirarchy(ViewGroup from, ViewGroup to) {
+    public static void transferViewHierarchy(ViewGroup from, ViewGroup to) {
         while (from.getChildCount() > 0) {
             View currentChild = from.getChildAt(0);
             from.removeView(currentChild);
@@ -402,11 +419,22 @@ public class WarmupManager {
     }
 
     /**
-     * @return Whether a pre-built view hierarchy exists for the given toolbarContainerId.
+     * @param toolbarContainerId Toolbare container ID.
+     * @param context Context in which the CustomTab is launched.
+     * @return Whether a pre-built view hierarchy of compatible metrics exists
+     *     for the given toolbarContainerId.
      */
-    public boolean hasViewHierarchyWithToolbar(int toolbarContainerId) {
+    public boolean hasViewHierarchyWithToolbar(int toolbarContainerId, Context context) {
         ThreadUtils.assertOnUiThread();
-        return mMainView != null && mToolbarContainerId == toolbarContainerId;
+        if (mMainView == null || mToolbarContainerId != toolbarContainerId) {
+            return false;
+        }
+        DisplayMetrics preDm = mMainView.getContext().getResources().getDisplayMetrics();
+        DisplayMetrics curDm = context.getResources().getDisplayMetrics();
+        // If following displayMetrics params don't match, toolbar is being shown on a display
+        // incompatible with the one it was built with, which may result in a view of a wrong
+        // height. Return false to have it re-inflated with the right context.
+        return preDm.xdpi == curDm.xdpi && preDm.ydpi == curDm.ydpi;
     }
 
     /**

@@ -122,6 +122,10 @@ bool OfferNotificationBubbleControllerImpl::ShouldIconExpand() const {
   return icon_should_expand_;
 }
 
+void OfferNotificationBubbleControllerImpl::OnIconExpanded() {
+  icon_should_expand_ = false;
+}
+
 void OfferNotificationBubbleControllerImpl::OnBubbleClosed(
     PaymentsBubbleClosedReason closed_reason) {
   set_bubble_view(nullptr);
@@ -261,7 +265,7 @@ void OfferNotificationBubbleControllerImpl::DoShowBubble() {
   if (!IsWebContentsActive())
     return;
 
-  Browser* browser = chrome::FindBrowserWithWebContents(web_contents());
+  Browser* browser = chrome::FindBrowserWithTab(web_contents());
   set_bubble_view(browser->window()
                       ->GetAutofillBubbleHandler()
                       ->ShowOfferNotificationBubble(web_contents(), this,

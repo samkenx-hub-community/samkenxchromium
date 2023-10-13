@@ -4,6 +4,7 @@
 
 #include "components/global_media_controls/public/views/media_notification_view_ash_impl.h"
 
+#include "base/metrics/histogram_functions.h"
 #include "components/media_message_center/media_notification_container.h"
 #include "components/media_message_center/media_notification_item.h"
 #include "components/media_message_center/media_notification_util.h"
@@ -64,8 +65,11 @@ const views::Label::CustomFont kTextFont = {
                                              /*font_size=*/12,
                                              gfx::Font::Weight::NORMAL))};
 
+const char kMediaDisplayPageHistogramName[] = "Media.Notification.DisplayPage";
+
 class MediaButton : public views::ImageButton {
  public:
+  METADATA_HEADER(MediaButton);
   MediaButton(PressedCallback callback,
               int button_id,
               const gfx::VectorIcon& vector_icon,
@@ -117,6 +121,9 @@ class MediaButton : public views::ImageButton {
   const ui::ColorId foreground_disabled_color_id_;
 };
 
+BEGIN_METADATA(MediaButton, views::ImageButton)
+END_METADATA
+
 // If the image does not fit the square view, scale the image to fill the view
 // even if part of the image is cropped.
 gfx::Size ScaleImageSizeToFitView(const gfx::Size& image_size,
@@ -148,6 +155,8 @@ MediaNotificationViewAshImpl::MediaNotificationViewAshImpl(
   } else {
     CHECK(item_);
   }
+  base::UmaHistogramEnumeration(kMediaDisplayPageHistogramName,
+                                media_display_page_);
 
   SetBorder(views::CreateEmptyBorder(kBorderInsets));
   SetBackground(views::CreateThemedRoundedRectBackground(
@@ -558,9 +567,10 @@ void MediaNotificationViewAshImpl::StartCastingButtonPressed() {
       container_->OnShowCastingDevicesRequested();
       break;
     }
-    case MediaDisplayPage::kQuickSettingsMediaDetailedView: {
-      // Clicking the button on the quick settings media detailed view will open
-      // the device selector view to show the device list.
+    case MediaDisplayPage::kQuickSettingsMediaDetailedView:
+    case MediaDisplayPage::kSystemShelfMediaDetailedView: {
+      // Clicking the button on the media detailed view will open the device
+      // selector view to show the device list.
       device_selector_view_->ShowOrHideDeviceList();
       UpdateCastingState();
       break;

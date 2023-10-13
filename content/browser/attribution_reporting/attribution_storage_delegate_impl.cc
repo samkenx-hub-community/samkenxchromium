@@ -7,7 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <algorithm>
 #include <cstdlib>
 #include <iterator>
 #include <utility>
@@ -19,6 +18,7 @@
 #include "base/rand_util.h"
 #include "base/time/time.h"
 #include "base/uuid.h"
+#include "components/attribution_reporting/constants.h"
 #include "components/attribution_reporting/event_report_windows.h"
 #include "components/attribution_reporting/features.h"
 #include "components/attribution_reporting/source_registration_time_config.mojom.h"
@@ -26,8 +26,6 @@
 #include "components/attribution_reporting/trigger_registration.h"
 #include "content/browser/attribution_reporting/aggregatable_attribution_utils.h"
 #include "content/browser/attribution_reporting/attribution_config.h"
-#include "content/browser/attribution_reporting/attribution_constants.h"
-#include "content/browser/attribution_reporting/attribution_features.h"
 #include "content/browser/attribution_reporting/attribution_report.h"
 #include "content/browser/attribution_reporting/attribution_trigger.h"
 #include "content/browser/attribution_reporting/attribution_utils.h"
@@ -340,32 +338,6 @@ AttributionStorageDelegateImpl::GetFakeReportsForSequenceIndex(
   return fake_reports;
 }
 
-base::Time AttributionStorageDelegateImpl::GetExpiryTime(
-    absl::optional<base::TimeDelta> declared_expiry,
-    base::Time source_time,
-    SourceType source_type) {
-  base::TimeDelta expiry =
-      declared_expiry.value_or(kDefaultAttributionSourceExpiry);
-
-  if (source_type == SourceType::kEvent) {
-    expiry = expiry.RoundToMultiple(base::Days(1));
-  }
-
-  return source_time +
-         std::clamp(expiry, base::Days(1), kDefaultAttributionSourceExpiry);
-}
-
-absl::optional<base::Time> AttributionStorageDelegateImpl::GetReportWindowTime(
-    absl::optional<base::TimeDelta> declared_window,
-    base::Time source_time) {
-  if (!declared_window.has_value()) {
-    return absl::nullopt;
-  }
-
-  return source_time + std::clamp(*declared_window, base::Hours(1),
-                                  kDefaultAttributionSourceExpiry);
-}
-
 std::vector<AttributionStorageDelegate::NullAggregatableReport>
 AttributionStorageDelegateImpl::GetNullAggregatableReports(
     const AttributionTrigger& trigger,
@@ -406,14 +378,13 @@ AttributionStorageDelegateImpl::GetNullAggregatableReportsImpl(
             RoundDownToWholeDaySinceUnixEpoch(*attributed_source_time);
       }
 
-      static_assert(kDefaultAttributionSourceExpiry == base::Days(30),
+      static_assert(attribution_reporting::kMaxSourceExpiry == base::Days(30),
                     "update null reports rate");
 
       return GetNullAggregatableReportsForLookback(
           trigger, trigger_time, rounded_attributed_source_time,
           /*days_lookback=*/
-          kDefaultAttributionSourceExpiry.RoundToMultiple(base::Days(1))
-              .InDays(),
+          attribution_reporting::kMaxSourceExpiry.InDays(),
           config_.aggregate_limit
               .null_reports_rate_include_source_registration_time);
     }
@@ -429,34 +400,6 @@ AttributionStorageDelegateImpl::GetNullAggregatableReportsImpl(
               .null_reports_rate_exclude_source_registration_time);
     }
   }
-}
-
-EventReportWindows AttributionStorageDelegateImpl::GetDefaultEventReportWindows(
-    SourceType source_type,
-    base::TimeDelta last_report_window) const {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  std::vector<base::TimeDelta> end_times;
-  switch (source_type) {
-    case SourceType::kNavigation:
-      end_times = {
-          config_.event_level_limit.first_navigation_report_window_deadline,
-          config_.event_level_limit.second_navigation_report_window_deadline};
-      break;
-    case SourceType::kEvent:
-      if (kVTCEarlyReportingWindows.Get()) {
-        end_times = {
-            config_.event_level_limit.first_event_report_window_deadline,
-            config_.event_level_limit.second_event_report_window_deadline};
-      }
-      break;
-  }
-
-  absl::optional<EventReportWindows> event_report_windows =
-      EventReportWindows::CreateWindowsAndTruncate(
-          /*start_time=*/base::Days(0), std::move(end_times),
-          /*expiry=*/last_report_window);
-  DCHECK(event_report_windows.has_value());
-  return event_report_windows.value();
 }
 
 }  // namespace content

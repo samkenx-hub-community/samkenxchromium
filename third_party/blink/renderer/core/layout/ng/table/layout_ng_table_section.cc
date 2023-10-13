@@ -12,7 +12,7 @@
 namespace blink {
 
 LayoutNGTableSection::LayoutNGTableSection(Element* element)
-    : LayoutNGMixin<LayoutBlock>(element) {}
+    : LayoutBlock(element) {}
 
 LayoutNGTableSection* LayoutNGTableSection::CreateAnonymousWithParent(
     const LayoutObject& parent) {
@@ -92,21 +92,21 @@ void LayoutNGTableSection::AddChild(LayoutObject* child,
   if (before_child && before_child->Parent() != this)
     before_child = SplitAnonymousBoxesAroundChild(before_child);
 
-  LayoutNGMixin<LayoutBlock>::AddChild(child, before_child);
+  LayoutBlock::AddChild(child, before_child);
 }
 
 void LayoutNGTableSection::RemoveChild(LayoutObject* child) {
   NOT_DESTROYED();
   if (LayoutNGTable* table = Table())
     table->TableGridStructureChanged();
-  LayoutNGMixin<LayoutBlock>::RemoveChild(child);
+  LayoutBlock::RemoveChild(child);
 }
 
 void LayoutNGTableSection::WillBeRemovedFromTree() {
   NOT_DESTROYED();
   if (LayoutNGTable* table = Table())
     table->TableGridStructureChanged();
-  LayoutNGMixin<LayoutBlock>::WillBeRemovedFromTree();
+  LayoutBlock::WillBeRemovedFromTree();
 }
 
 void LayoutNGTableSection::StyleDidChange(StyleDifference diff,
@@ -119,44 +119,13 @@ void LayoutNGTableSection::StyleDidChange(StyleDifference diff,
       table->GridBordersChanged();
     }
   }
-  LayoutNGMixin<LayoutBlock>::StyleDidChange(diff, old_style);
+  LayoutBlock::StyleDidChange(diff, old_style);
 }
 
 LayoutBox* LayoutNGTableSection::CreateAnonymousBoxWithSameTypeAs(
     const LayoutObject* parent) const {
   NOT_DESTROYED();
   return CreateAnonymousWithParent(*parent);
-}
-
-// TODO(crbug.com/1079133): Used by AXLayoutObject::IsDataTable, verify
-// behaviour is correct. Consider removing these methods.
-unsigned LayoutNGTableSection::NumEffectiveColumns() const {
-  NOT_DESTROYED();
-  const LayoutNGTable* table = Table();
-  DCHECK(table);
-  wtf_size_t column_count = table->ColumnCount();
-  if (column_count == 0)
-    return 0;
-  return table->AbsoluteColumnToEffectiveColumn(column_count - 1) + 1;
-}
-
-// TODO(crbug.com/1079133): Used by AXLayoutObject::IsDataTable/ColumnCount,
-// verify behaviour is correct.
-unsigned LayoutNGTableSection::NumCols(unsigned row) const {
-  NOT_DESTROYED();
-  unsigned current_row = 0;
-  for (LayoutObject* layout_row = FirstChild(); layout_row;
-       layout_row = layout_row->NextSibling()) {
-    if (current_row++ == row) {
-      unsigned current_column = 0;
-      for (LayoutObject* layout_cell = FirstChild(); layout_cell;
-           layout_cell = layout_cell->NextSibling()) {
-        ++current_column;
-      }
-      return current_column;
-    }
-  }
-  return 0;
 }
 
 // TODO(crbug.com/1079133): Used by AXLayoutObject, verify behaviour is

@@ -114,8 +114,8 @@ class InputHandler : public DevToolsDomainHandler, public Input::Backend {
       Maybe<int> click_count,
       Maybe<double> force,
       Maybe<double> tangential_pressure,
-      Maybe<int> tilt_x,
-      Maybe<int> tilt_y,
+      Maybe<double> tilt_x,
+      Maybe<double> tilt_y,
       Maybe<int> twist,
       Maybe<double> delta_x,
       Maybe<double> delta_y,
@@ -237,7 +237,8 @@ class InputHandler : public DevToolsDomainHandler, public Input::Backend {
     void DragUpdated(
         std::unique_ptr<blink::WebMouseEvent> event,
         std::unique_ptr<FailSafe<DispatchMouseEventCallback>> callback,
-        ui::mojom::DragOperation operation);
+        ui::mojom::DragOperation operation,
+        bool document_is_handling_drag);
 
     // Ends the drag with the given event and host.
     //

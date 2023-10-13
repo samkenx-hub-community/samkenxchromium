@@ -58,11 +58,11 @@
 #include "content/browser/renderer_host/media/render_frame_audio_input_stream_factory.h"
 #include "content/browser/renderer_host/media/render_frame_audio_output_stream_factory.h"
 #include "content/browser/renderer_host/navigation_discard_reason.h"
+#include "content/browser/renderer_host/origin_trial_state_host_impl.h"
 #include "content/browser/renderer_host/page_impl.h"
 #include "content/browser/renderer_host/pending_beacon_host.h"
 #include "content/browser/renderer_host/policy_container_host.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
-#include "content/browser/renderer_host/runtime_feature_state_controller_impl.h"
 #include "content/browser/renderer_host/transient_allow_popup.h"
 #include "content/browser/renderer_host/transient_focus_source_user_activation.h"
 #include "content/browser/site_instance_group.h"
@@ -82,6 +82,7 @@
 #include "content/public/browser/global_request_id.h"
 #include "content/public/browser/global_routing_id.h"
 #include "content/public/browser/javascript_dialog_manager.h"
+#include "content/public/browser/reload_type.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_ui.h"
@@ -107,7 +108,6 @@
 #include "net/cookies/cookie_setting_override.h"
 #include "net/net_buildflags.h"
 #include "ppapi/buildflags/buildflags.h"
-#include "services/device/public/mojom/sensor_provider.mojom-forward.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
 #include "services/network/public/cpp/attribution_reporting_runtime_features.h"
 #include "services/network/public/cpp/cross_origin_embedder_policy.h"
@@ -149,19 +149,21 @@
 #include "third_party/blink/public/mojom/image_downloader/image_downloader.mojom.h"
 #include "third_party/blink/public/mojom/input/focus_type.mojom-forward.h"
 #include "third_party/blink/public/mojom/installedapp/installed_app_provider.mojom-forward.h"
+#include "third_party/blink/public/mojom/loader/fetch_later.mojom-forward.h"
 #include "third_party/blink/public/mojom/loader/resource_cache.mojom-forward.h"
 #include "third_party/blink/public/mojom/loader/resource_load_info.mojom-forward.h"
 #include "third_party/blink/public/mojom/navigation/navigation_params.mojom-forward.h"
 #include "third_party/blink/public/mojom/navigation/navigation_params.mojom.h"
 #include "third_party/blink/public/mojom/navigation/renderer_eviction_reason.mojom.h"
 #include "third_party/blink/public/mojom/notifications/notification_service.mojom-forward.h"
+#include "third_party/blink/public/mojom/origin_trial_state/origin_trial_state_host.mojom.h"
 #include "third_party/blink/public/mojom/peerconnection/peer_connection_tracker.mojom-forward.h"
 #include "third_party/blink/public/mojom/permissions/permission.mojom-forward.h"
 #include "third_party/blink/public/mojom/portal/portal.mojom-forward.h"
 #include "third_party/blink/public/mojom/presentation/presentation.mojom-forward.h"
 #include "third_party/blink/public/mojom/render_accessibility.mojom.h"
-#include "third_party/blink/public/mojom/runtime_feature_state/runtime_feature_state_controller.mojom.h"
 #include "third_party/blink/public/mojom/security_context/insecure_request_policy.mojom-forward.h"
+#include "third_party/blink/public/mojom/sensor/web_sensor_provider.mojom-forward.h"
 #include "third_party/blink/public/mojom/sms/webotp_service.mojom-forward.h"
 #include "third_party/blink/public/mojom/speech/speech_synthesis.mojom-forward.h"
 #include "third_party/blink/public/mojom/webaudio/audio_context_manager.mojom-forward.h"
@@ -668,6 +670,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
       int opt_request_id,
       base::OnceCallback<void(ui::AXPlatformTreeManager* hit_manager,
                               ui::AXNodeID hit_node_id)> opt_callback) override;
+  gfx::NativeWindow GetTopLevelNativeWindow() override;
   bool AccessibilityIsRootFrame() const override;
   RenderFrameHostImpl* AccessibilityRenderFrameHost() override;
   WebContentsAccessibility* AccessibilityGetWebContentsAccessibility() override;
@@ -1097,6 +1100,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // Process the acknowledgment of the unload of this frame from the renderer.
   void OnUnloadACK();
+
+  // Depending on switches, may log when an unload ack has not been received.
+  void MaybeLogMissingUnloadAck();
 
   // Remove this frame and its children. This happens asynchronously, an IPC
   // round trip with the renderer process is needed to ensure children's unload
@@ -2011,7 +2017,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
       mojo::PendingReceiver<blink::mojom::BucketManagerHost> receiver);
 
   void GetSensorProvider(
-      mojo::PendingReceiver<device::mojom::SensorProvider> receiver);
+      mojo::PendingReceiver<blink::mojom::WebSensorProvider> receiver);
 
   void CreatePermissionService(
       mojo::PendingReceiver<blink::mojom::PermissionService> receiver);
@@ -2136,9 +2142,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
       mojo::PendingReceiver<blink::mojom::NonAssociatedLocalFrameHost>
           receiver);
 
-  void CreateRuntimeFeatureStateController(
-      mojo::PendingReceiver<blink::mojom::RuntimeFeatureStateController>
-          receiver);
+  void CreateOriginTrialStateHost(
+      mojo::PendingReceiver<blink::mojom::OriginTrialStateHost> receiver);
 
   // Prerender2:
   // Tells PrerenderHostRegistry to cancel the prerendering of the page this
@@ -2225,6 +2230,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   bool has_unload_handler() const { return has_unload_handler_; }
 
+  // See member declaration for details.
   bool has_committed_any_navigation() const {
     return has_committed_any_navigation_;
   }
@@ -2518,6 +2524,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
                      SetWindowRectCallback callback) override;
   void DidFirstVisuallyNonEmptyPaint() override;
   void DidAccessInitialMainDocument() override;
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+  void SetResizable(bool resizable) override;
+#endif
 
   void ReportNoBinderForInterface(const std::string& error);
 
@@ -3003,6 +3012,14 @@ class CONTENT_EXPORT RenderFrameHostImpl
       mojo::PendingAssociatedReceiver<blink::mojom::FileBackedBlobFactory>
           receiver);
 
+  // Binds the receiver end of FetchLaterLoaderFactory interface.
+  // The implementation is managed by StoragePartition, but its lifetime is
+  // roughly equals to the length of `receiver` connection.
+  // FetchLaterLoaderFactory is a navigation-associated interface.
+  void BindFetchLaterLoaderFactory(
+      mojo::PendingAssociatedReceiver<blink::mojom::FetchLaterLoaderFactory>
+          receiver);
+
   // Determine if a focus change coming from the renderer was allowed to happen.
   // This only checks focus calls that crosses a fenced frame boundary. It will
   // badmessage the renderer that made the focus call if it deems the focus
@@ -3244,6 +3261,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
       NavigationBrowserTest,
       NavigationSuddenTerminationDisablerTypeRecordUmaActivation);
   FRIEND_TEST_ALL_PREFIXES(NavigationRequestTest, SharedStorageWritable);
+  FRIEND_TEST_ALL_PREFIXES(WebContentsImplBrowserTest, SetTitleOnUnload);
+  FRIEND_TEST_ALL_PREFIXES(SitePerProcessBrowserTest,
+                           DetachedIframeUnloadHandlerABCB);
 
   class SubresourceLoaderFactoriesConfig;
 
@@ -3822,9 +3842,12 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // This function should only be called on swapped out RenderFrameHosts.
   void ResetNavigationsUsingSwappedOutRFH();
 
-  // Called on an unloading frame when its unload timeout is reached. This
-  // immediately deletes the RenderFrameHost.
-  void OnUnloadTimeout();
+  // Called when on a subframe that is being deleted when its unload timeout is
+  // reached. This immediately deletes the RenderFrameHost.
+  void OnSubframeDeletionUnloadTimeout();
+  // Called on a frame that is being navigated away from when its unload timeout
+  // is reached.
+  void OnNavigationUnloadTimeout();
 
   // Runs interception set up in testing code, if any.
   // Returns true if we should proceed to the Commit callback, false otherwise.
@@ -4081,9 +4104,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
   std::vector<RenderFrameHostImpl*> GetAncestorChainForStorageKeyCalculation(
       const url::Origin& new_rfh_origin);
 
-#if defined(USE_AURA)
   bool CanUseWindowingControls(base::StringPiece js_api_name);
-#endif
 
   // The RenderViewHost that this RenderFrameHost is associated with.
   //
@@ -4526,6 +4547,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // navigation or not. Starts off false and is set to true for the lifetime of
   // the RenderFrame when the first CommitNavigation message is sent to the
   // RenderFrame. It is reset after a renderer process crash.
+  //
+  // Note that some use cases may still consider a RenderFrameHost used after a
+  // crash, in which case is_initial_empty_document() may be a more relevant
+  // check. Also, unlike is_initial_empty_document(), this field does not
+  // change if this frame is modified via document.open().
   bool has_committed_any_navigation_ = false;
   bool must_be_replaced_ = false;
 
@@ -4907,6 +4933,18 @@ class CONTENT_EXPORT RenderFrameHostImpl
       devtools_navigation_token_ = devtools_navigation_token;
     }
 
+    void set_subresource_proxying_factory_bundle(
+        scoped_refptr<network::SharedURLLoaderFactory>
+            subresource_proxying_factory_bundle) {
+      subresource_proxying_factory_bundle_ =
+          std::move(subresource_proxying_factory_bundle);
+    }
+
+    scoped_refptr<network::SharedURLLoaderFactory>
+    subresource_proxying_factory_bundle() const {
+      return subresource_proxying_factory_bundle_;
+    }
+
     // Produces weak pointers to the hosting RenderFrameHostImpl. This is
     // invalidated whenever DocumentAssociatedData is destroyed, due to
     // RenderFrameHost deletion or cross-document navigation.
@@ -4924,6 +4962,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
     base::WeakPtrFactory<RenderFrameHostImpl> weak_factory_;
     absl::optional<base::UnguessableToken> devtools_navigation_token_ =
         absl::nullopt;
+    // The factory bundle passed to renderer when committing navigation.
+    // Used in `BindFetchLaterLoaderFactory()` which needs to share the same
+    // bundle but happens after committing.
+    scoped_refptr<network::SharedURLLoaderFactory>
+        subresource_proxying_factory_bundle_ = nullptr;
   };
 
   // Reset immediately before a RenderFrameHost is reused for hosting a new

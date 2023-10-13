@@ -21,7 +21,7 @@
 #import "components/sync/base/features.h"
 #import "components/sync/base/user_selectable_type.h"
 #import "components/sync/service/sync_prefs.h"
-#import "ios/chrome/browser/credential_provider_promo/features.h"
+#import "ios/chrome/browser/credential_provider_promo/model/features.h"
 #import "ios/chrome/browser/metrics/metrics_app_interface.h"
 #import "ios/chrome/browser/policy/policy_earl_grey_utils.h"
 #import "ios/chrome/browser/signin/fake_system_identity.h"
@@ -335,6 +335,14 @@ id<GREYMatcher> PasswordManagerWidgetPromoInstructions() {
   return grey_accessibilityID(password_manager::kWidgetPromoInstructionsViewID);
 }
 
+// Returns matcher for the close button of the Password Manager widget promo
+// instruction screen.
+id<GREYMatcher> PasswordManagerWidgetPromoInstructionsCloseButton() {
+  return grey_allOf(
+      ButtonWithAccessibilityLabel(l10n_util::GetNSString(IDS_CLOSE)),
+      grey_interactable(), nullptr);
+}
+
 // Saves two example forms in the store.
 void SaveExamplePasswordForms() {
   SavePasswordForm(/*password=*/@"password1",
@@ -450,12 +458,107 @@ void CheckPasswordManagerVisitMetricCount(int count) {
   // Check password manager visit metric.
   NSError* error = [MetricsAppInterface expectTotalCount:count
                                             forHistogram:histogram];
-  GREYAssertNil(error, @"Unexpected Password Manager Vistit histogram count");
+  GREYAssertNil(error, @"Unexpected Password Manager Visit histogram count");
 
   error = [MetricsAppInterface expectCount:count
                                  forBucket:YES
                               forHistogram:histogram];
-  GREYAssertNil(error, @"Unexpected Password Manager Vistit histogram count");
+  GREYAssertNil(error, @"Unexpected Password Manager Visit histogram count");
+}
+
+// Verifies that the elements of the Password Manager widget promo are as
+// expected.
+void CheckPasswordManagerWidgetPromoVisible() {
+  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromo()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromoCloseButton()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  id<GREYMatcher> image_matcher = grey_accessibilityID(kWidgetPromoImageID);
+  [[EarlGrey selectElementWithMatcher:image_matcher]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  id<GREYMatcher> text_matcher = grey_accessibilityLabel(
+      l10n_util::GetNSString(IDS_IOS_PASSWORD_MANAGER_WIDGET_PROMO_TEXT));
+  [[EarlGrey selectElementWithMatcher:text_matcher]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  [[EarlGrey
+      selectElementWithMatcher:PasswordManagerWidgetPromoMoreInfoButton()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+}
+
+// Verifies that the elements of the Password Manager widget promo instruction
+// screen are as expected.
+void CheckPasswordManagerWidgetPromoInstructionScreenVisible(
+    bool image_hidden = false) {
+  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromoInstructions()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  id<GREYMatcher> image_matcher =
+      grey_accessibilityID(password_manager::kWidgetPromoInstructionsImageID);
+  [[EarlGrey selectElementWithMatcher:image_matcher]
+      assertWithMatcher:image_hidden ? grey_notVisible()
+                                     : grey_minimumVisiblePercent(0.4)];
+
+  id<GREYMatcher> title_matcher = grey_accessibilityLabel(
+      l10n_util::GetNSString(IDS_IOS_WIDGET_PROMO_INSTRUCTIONS_TITLE));
+  [[EarlGrey selectElementWithMatcher:title_matcher]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  id<GREYMatcher> subtitle_matcher = grey_text(
+      l10n_util::GetNSString(IDS_IOS_WIDGET_PROMO_INSTRUCTIONS_SUBTITLE));
+  [[EarlGrey selectElementWithMatcher:subtitle_matcher]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  id<GREYMatcher> step1_matcher = grey_accessibilityLabel(
+      l10n_util::GetNSString(IDS_IOS_WIDGET_PROMO_INSTRUCTIONS_STEP_1));
+  [[EarlGrey
+      selectElementWithMatcher:grey_allOf(step1_matcher,
+                                          grey_sufficientlyVisible(), nil)]
+         usingSearchAction:grey_scrollInDirection(kGREYDirectionDown,
+                                                  kScrollAmount)
+      onElementWithMatcher:
+          grey_accessibilityID(
+              password_manager::kWidgetPromoInstructionsScrollableViewID)];
+
+  id<GREYMatcher> step2_matcher = grey_accessibilityLabel(
+      l10n_util::GetNSString(IDS_IOS_WIDGET_PROMO_INSTRUCTIONS_STEP_2));
+  [[EarlGrey
+      selectElementWithMatcher:grey_allOf(step2_matcher,
+                                          grey_sufficientlyVisible(), nil)]
+         usingSearchAction:grey_scrollInDirection(kGREYDirectionDown,
+                                                  kScrollAmount)
+      onElementWithMatcher:
+          grey_accessibilityID(
+              password_manager::kWidgetPromoInstructionsScrollableViewID)];
+
+  id<GREYMatcher> step3_matcher = grey_accessibilityLabel(
+      l10n_util::GetNSString(IDS_IOS_WIDGET_PROMO_INSTRUCTIONS_STEP_3));
+  [[EarlGrey
+      selectElementWithMatcher:grey_allOf(step3_matcher,
+                                          grey_sufficientlyVisible(), nil)]
+         usingSearchAction:grey_scrollInDirection(kGREYDirectionDown,
+                                                  kScrollAmount)
+      onElementWithMatcher:
+          grey_accessibilityID(
+              password_manager::kWidgetPromoInstructionsScrollableViewID)];
+
+  id<GREYMatcher> step4_matcher = grey_accessibilityLabel(
+      l10n_util::GetNSString(IDS_IOS_WIDGET_PROMO_INSTRUCTIONS_STEP_4));
+  [[EarlGrey
+      selectElementWithMatcher:grey_allOf(step4_matcher,
+                                          grey_sufficientlyVisible(), nil)]
+         usingSearchAction:grey_scrollInDirection(kGREYDirectionDown,
+                                                  kScrollAmount)
+      onElementWithMatcher:
+          grey_accessibilityID(
+              password_manager::kWidgetPromoInstructionsScrollableViewID)];
+
+  [[EarlGrey selectElementWithMatcher:
+                 PasswordManagerWidgetPromoInstructionsCloseButton()]
+      assertWithMatcher:grey_sufficientlyVisible()];
 }
 
 }  // namespace
@@ -655,9 +758,17 @@ void CheckPasswordManagerVisitMetricCount(int count) {
 
   if ([self isRunningTest:@selector(testClosingPasswordManagerWidgetPromo)] ||
       [self isRunningTest:@selector
-            (testOpeningPasswordManagerWidgetPromoInstruction)] ||
+            (testOpeningPasswordManagerWidgetPromoInstructions)] ||
       [self
-          isRunningTest:@selector(testPasswordManagerWidgetPromoInEditMode)]) {
+          isRunningTest:@selector(testPasswordManagerWidgetPromoInEditMode)] ||
+      [self isRunningTest:@selector
+            (testPasswordManagerWidgetPromoDeviceOrientation)] ||
+      [self isRunningTest:@selector
+            (testDismissPasswordManagerWidgetPromoInstructionsScreen)] ||
+      [self isRunningTest:@selector
+            (testPasswordManagerWidgetPromoInstructionsDeviceOrientation)]) {
+    config.features_enabled.push_back(
+        password_manager::features::kIOSPasswordAuthOnEntryV2);
     config.additional_args.push_back(
         base::StringPrintf("--enable-features=%s:chosen_feature/"
                            "IPH_iOSPromoPasswordManagerWidget",
@@ -1468,6 +1579,7 @@ void CheckPasswordManagerVisitMetricCount(int count) {
   // Toggle the "Save Passwords" control off and back on and check the
   // preferences.
   constexpr BOOL kExpectedState[] = {YES, NO};
+  int count = 0;
   for (BOOL expected_initial_state : kExpectedState) {
     [[EarlGrey selectElementWithMatcher:
                    chrome_test_util::TableViewSwitchCell(
@@ -1478,6 +1590,25 @@ void CheckPasswordManagerVisitMetricCount(int count) {
     GREYAssertEqual(expected_final_state,
                     [PasswordSettingsAppInterface isCredentialsServiceEnabled],
                     @"State of the UI toggle differs from real preferences.");
+    count++;
+    // Verify histogram total count.
+    GREYAssertNil(
+        [MetricsAppInterface
+            expectTotalCount:count
+                forHistogram:
+                    @"PasswordManager.Settings.ToggleOfferToSavePasswords"],
+        @"Unexpected password settings toggle offer to save passwords switch "
+        @"histogram count");
+
+    // Verify histogram value and specific bucket count.
+    GREYAssertNil(
+        [MetricsAppInterface
+             expectCount:1
+               forBucket:expected_final_state
+            forHistogram:
+                @"PasswordManager.Settings.ToggleOfferToSavePasswords"],
+        @"Unexpected histogram error for password settings toggle offer to "
+        @"save passwords switch");
   }
 
   // "Done" to close settings submenu.
@@ -3504,8 +3635,7 @@ void CheckPasswordManagerVisitMetricCount(int count) {
   OpenPasswordManager();
 
   // The Password Manager widget promo should be visible.
-  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromo()]
-      assertWithMatcher:grey_sufficientlyVisible()];
+  CheckPasswordManagerWidgetPromoVisible();
 
   // Tap the promo's close button.
   [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromoCloseButton()]
@@ -3518,15 +3648,14 @@ void CheckPasswordManagerVisitMetricCount(int count) {
 
 // Tests that tapping the more info button of the Password Manager widget
 // promo displays the instructions on how to install the widget.
-- (void)testOpeningPasswordManagerWidgetPromoInstruction {
+- (void)testOpeningPasswordManagerWidgetPromoInstructions {
   // Add a saved password to not get the Password Manager's empty state.
   SavePasswordForm();
 
   OpenPasswordManager();
 
   // The Password Manager widget promo should be visible.
-  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromo()]
-      assertWithMatcher:grey_sufficientlyVisible()];
+  CheckPasswordManagerWidgetPromoVisible();
 
   // Tap the promo's more info button.
   [[EarlGrey
@@ -3534,8 +3663,7 @@ void CheckPasswordManagerVisitMetricCount(int count) {
       performAction:grey_tap()];
 
   // The Password Manager widget promo's instructions should be visible.
-  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromoInstructions()]
-      assertWithMatcher:grey_sufficientlyVisible()];
+  CheckPasswordManagerWidgetPromoInstructionScreenVisible();
 }
 
 // Tests that the more info and close buttons of the Password Manager widget
@@ -3560,6 +3688,117 @@ void CheckPasswordManagerVisitMetricCount(int count) {
   [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromoMoreInfoButton(
                                           /*enabled=*/false)]
       assertWithMatcher:grey_not(grey_enabled())];
+}
+
+// Tests that the Password Manager widget promo is as expected when
+// transitioning between portrait and landscape modes. Also tests that the close
+// button still works after the layout change.
+- (void)testPasswordManagerWidgetPromoDeviceOrientation {
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_SKIPPED(@"Landscape orientation doesn't change the look of "
+                           @"the instruction view on iPads.");
+  }
+
+  // Add a saved password to not get the Password Manager's empty state.
+  SavePasswordForm();
+
+  OpenPasswordManager();
+
+  // The Password Manager widget promo should be visible.
+  CheckPasswordManagerWidgetPromoVisible();
+
+  // The Password Manager widget promo's elements should be visible in landscape
+  // mode.
+  [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationLandscapeRight
+                                error:nil];
+  CheckPasswordManagerWidgetPromoVisible();
+
+  // The promo's close button should still be tappable in landscape mode.
+  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromoCloseButton()]
+      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromo()]
+      assertWithMatcher:grey_notVisible()];
+}
+
+// Tests that the Password Manager widget promo's instruction screen can be
+// dismissed by swipping it down and by tapping its close button.
+- (void)testDismissPasswordManagerWidgetPromoInstructionsScreen {
+  // Add a saved password to not get the Password Manager's empty state.
+  SavePasswordForm();
+
+  OpenPasswordManager();
+
+  // Tap the promo's more info button.
+  [[EarlGrey
+      selectElementWithMatcher:PasswordManagerWidgetPromoMoreInfoButton()]
+      performAction:grey_tap()];
+
+  // The Password Manager widget promo's instructions should be visible.
+  CheckPasswordManagerWidgetPromoInstructionScreenVisible();
+
+  // Swipe down to dismiss the instructions screen.
+  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromoInstructions()]
+      performAction:grey_swipeFastInDirection(kGREYDirectionDown)];
+
+  // The Password Manager widget promo should be visible.
+  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromo()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  // Tap the promo's more info button.
+  [[EarlGrey
+      selectElementWithMatcher:PasswordManagerWidgetPromoMoreInfoButton()]
+      performAction:grey_tap()];
+
+  // The Password Manager widget promo's instructions should be visible.
+  CheckPasswordManagerWidgetPromoInstructionScreenVisible();
+
+  // Tap the instruction screen's close button.
+  [[EarlGrey selectElementWithMatcher:
+                 PasswordManagerWidgetPromoInstructionsCloseButton()]
+      performAction:grey_tap()];
+
+  // The Password Manager widget promo should be visible.
+  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromo()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+}
+
+// Tests that the Password Manager widget promo's instruction screen is as
+// expected when transitioning between portrait and landscape modes.
+- (void)testPasswordManagerWidgetPromoInstructionsDeviceOrientation {
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_SKIPPED(@"Landscape orientation doesn't change the look of "
+                           @"the instruction view on iPads.");
+  }
+
+  // Add a saved password to not get the Password Manager's empty state.
+  SavePasswordForm();
+
+  OpenPasswordManager();
+
+  // The Password Manager widget promo should be visible.
+  [[EarlGrey selectElementWithMatcher:PasswordManagerWidgetPromo()]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  // Tap the promo's more info button.
+  [[EarlGrey
+      selectElementWithMatcher:PasswordManagerWidgetPromoMoreInfoButton()]
+      performAction:grey_tap()];
+
+  // The Password Manager widget promo's instructions should be visible with its
+  // image.
+  CheckPasswordManagerWidgetPromoInstructionScreenVisible();
+
+  // The Password Manager widget promo's instructions should be visible with no
+  // image in landscape mode.
+  [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationLandscapeRight
+                                error:nil];
+  CheckPasswordManagerWidgetPromoInstructionScreenVisible(
+      /*image_hidden=*/true);
+
+  // When going back to portrait mode, the Password Manager widget promo's
+  // instructions should be visible with its image.
+  [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationPortrait error:nil];
+  CheckPasswordManagerWidgetPromoInstructionScreenVisible();
 }
 
 @end

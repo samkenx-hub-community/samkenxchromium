@@ -475,6 +475,12 @@ void HTMLFormElement::ScheduleFormSubmission(
 
   FormSubmission* form_submission =
       FormSubmission::Create(this, attributes_, event, submit_button);
+  if (!form_submission) {
+    // Form submission is not allowed for some NavigationPolicies, e.g. Link
+    // Preview. If an user triggered such user event for form submission, just
+    // ignores it.
+    return;
+  }
   Frame* target_frame = form_submission->TargetFrame();
 
   // 'formdata' event handlers might disconnect the form.
@@ -494,7 +500,6 @@ void HTMLFormElement::ScheduleFormSubmission(
   DCHECK(form_submission->Method() == FormSubmission::kPostMethod ||
          form_submission->Method() == FormSubmission::kGetMethod);
   DCHECK(form_submission->Data());
-  DCHECK(form_submission->Form());
   if (form_submission->Action().IsEmpty())
     return;
   if (GetExecutionContext()->IsSandboxed(

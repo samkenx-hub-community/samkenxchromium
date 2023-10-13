@@ -4,7 +4,9 @@
 
 package org.chromium.chrome.modules.readaloud;
 
-import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+import android.view.ViewStub;
+
+import org.chromium.chrome.modules.readaloud.contentjs.Highlighter;
 
 /** Interface for creating ReadAloud playback. */
 public interface ReadAloudPlaybackHooks {
@@ -39,11 +41,17 @@ public interface ReadAloudPlaybackHooks {
     default void createPlayback(PlaybackArgs playbackArgs, CreatePlaybackCallback callback) {}
 
     /**
-     * Create the expanded player UI component.
-     * @param bottomSheetController BottomSheetController for showing the expanded player sheet.
-     * @return a new ExpandedPlayer.
+     * Create the player UI.
+     * @param miniPlayerViewStub View stub that can create the mini player UI.
+     * @param delegate Delegate providing the UI with outside dependencies.
+     * @return a Player.
      */
-    default ExpandedPlayer createExpandedPlayer(BottomSheetController bottomSheetController) {
-        return new ExpandedPlayer() {};
+    default Player createPlayer(ViewStub miniPlayerViewStub, Player.Delegate delegate) {
+        return new Player() {};
+    }
+
+    /** Creates the Highlighter. */
+    default Highlighter createHighlighter() {
+        return new Highlighter() {};
     }
 }

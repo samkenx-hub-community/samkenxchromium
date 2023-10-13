@@ -220,7 +220,7 @@ class DISPLAY_MANAGER_EXPORT DisplayManager
       float refresh_rate,
       bool is_interlaced,
       VariableRefreshRateState variable_refresh_rate_state,
-      const absl::optional<uint16_t>& vsync_rate_min);
+      const absl::optional<float>& vsync_rate_min);
 
   // Register stored rotation properties for the internal display.
   void RegisterDisplayRotationProperties(bool rotation_lock,
@@ -253,12 +253,6 @@ class DISPLAY_MANAGER_EXPORT DisplayManager
   // notification to prevent reentrance to UpdateDisplaysWith().
   void SetSelectedModeForDisplayId(int64_t display_id,
                                    const ManagedDisplayMode& display_mode);
-
-  // Returns true and fills the |mode| for a given |mode_info| in |display_id|
-  // if found, otherwise false.
-  bool GetMatchingModeForDisplayId(int64_t display_id,
-                                   const DisplayMode* mode_info,
-                                   ManagedDisplayMode* mode);
 
   // Tells if the virtual resolution feature is enabled.
   bool IsDisplayUIScalingEnabled() const;

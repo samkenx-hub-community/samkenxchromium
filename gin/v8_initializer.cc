@@ -13,8 +13,8 @@
 #include <utility>
 #include <vector>
 
-#include "base/allocator/partition_allocator/page_allocator.h"
-#include "base/allocator/partition_allocator/partition_address_space.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/page_allocator.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_address_space.h"
 #include "base/bits.h"
 #include "base/check.h"
 #include "base/check_op.h"
@@ -295,7 +295,6 @@ void SetFlags(IsolateHolder::ScriptMode mode,
     SetV8FlagsFormatted("--memory-reducer-gc-count=%i",
                         features::kV8MemoryReducerGCCount.Get());
   }
-  SetV8FlagsIfOverridden(features::kV8MinorMC, "--minor-ms", "--no-minor-ms");
   SetV8FlagsIfOverridden(features::kV8MinorMS, "--minor-ms", "--no-minor-ms");
   SetV8FlagsIfOverridden(features::kV8Sparkplug, "--sparkplug",
                          "--no-sparkplug");
@@ -412,7 +411,9 @@ void SetFlags(IsolateHolder::ScriptMode mode,
   SetV8FlagsIfOverridden(features::kWebAssemblyInlining,
                          "--experimental-wasm-inlining",
                          "--no-experimental-wasm-inlining");
-
+  SetV8FlagsIfOverridden(features::kWebAssemblyGenericWrapper,
+                         "--wasm-to-js-generic-wrapper",
+                         "--no-wasm-to-js-generic-wrapper");
   if (js_command_line_flags.empty())
     return;
 

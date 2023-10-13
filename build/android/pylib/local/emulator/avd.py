@@ -20,6 +20,7 @@ from devil.android import apk_helper
 from devil.android import device_utils
 from devil.android import settings
 from devil.android.sdk import adb_wrapper
+from devil.android.sdk import version_codes
 from devil.android.tools import system_app
 from devil.utils import cmd_helper
 from devil.utils import timeout_retry
@@ -958,6 +959,7 @@ class _AvdInstance:
             wipe_data=False,
             debug_tags=None,
             disk_size=None,
+            enable_network=False,
             require_fast_start=False):
     """Starts the emulator running an instance of the given AVD.
 
@@ -1099,6 +1101,9 @@ class _AvdInstance:
       logging.info('Device fully booted, verifying system settings.')
       _EnsureSystemSettings(self.device)
 
+    if enable_network:
+      _EnableNetwork(self.device)
+
   def Stop(self, force=False):
     """Stops the emulator process.
 
@@ -1179,3 +1184,40 @@ def _EnsureSystemSettings(device):
     logging.info('long_press_timeout set to %r', _LONG_PRESS_TIMEOUT)
   else:
     logging.warning('long_press_timeout is not set correctly')
+
+  # TODO(crbug.com/1488458): Move the date sync function to device_utils.py
+  if device.IsUserBuild():
+    logging.warning('Cannot sync the device date on "user" build')
+    return
+
+  logging.info('Sync the device date.')
+  timezone = device.RunShellCommand(['date', '+"%Z"'],
+                                    single_line=True,
+                                    check_return=True)
+  if timezone != 'UTC':
+    device.RunShellCommand(['setprop', 'persist.sys.timezone', '"Etc/UTC"'],
+                           check_return=True,
+                           as_root=True)
+  set_date_format = '%Y%m%d.%H%M%S'
+  set_date_command = ['date', '-s']
+  if device.build_version_sdk >= version_codes.MARSHMALLOW:
+    set_date_format = '%m%d%H%M%Y.%S'
+    set_date_command = ['date']
+  strgmtime = time.strftime(set_date_format, time.gmtime())
+  set_date_command.append(strgmtime)
+  device.RunShellCommand(set_date_command, check_return=True, as_root=True)
+  device.RunShellCommand(
+      ['am', 'broadcast', '-a', 'android.intent.action.TIME_SET'],
+      check_return=True,
+      as_root=True)
+
+
+def _EnableNetwork(device):
+  logging.info('Enable the network on the emulator.')
+  device.RunShellCommand(
+      ['settings', 'put', 'global', 'airplane_mode_on', '0'], as_root=True)
+  device.RunShellCommand(
+      ['am', 'broadcast', '-a', 'android.intent.action.AIRPLANE_MODE'],
+      as_root=True)
+  device.RunShellCommand(['svc', 'wifi', 'enable'], as_root=True)
+  device.RunShellCommand(['svc', 'data', 'enable'], as_root=True)

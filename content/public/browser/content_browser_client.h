@@ -38,6 +38,7 @@
 #include "content/public/browser/interest_group_manager.h"
 #include "content/public/browser/login_delegate.h"
 #include "content/public/browser/mojo_binder_policy_map.h"
+#include "content/public/browser/page.h"
 #include "content/public/browser/privacy_sandbox_invoking_api.h"
 #include "content/public/browser/storage_partition_config.h"
 #include "content/public/common/alternative_error_page_override_info.mojom-forward.h"
@@ -224,7 +225,7 @@ class FontAccessDelegate;
 class HidDelegate;
 class IdentityRequestDialogController;
 class LoginDelegate;
-class MDocProvider;
+class DigitalCredentialProvider;
 class MediaObserver;
 class NavigationHandle;
 class NavigationThrottle;
@@ -764,6 +765,13 @@ class CONTENT_EXPORT ContentBrowserClient {
       const absl::optional<url::Origin>& top_frame_origin,
       const GURL& script_url,
       BrowserContext* context);
+
+  // Sends the resizable boolean set via `window.setResizable(bool)` API to
+  // `BrowserView`. Passing std::nullopt will reset the resizable state to the
+  // default.
+  virtual void SetCanResizeFromWebAPI(content::Page* page,
+                                      absl::optional<bool> can_resize);
+  virtual bool GetCanResize(content::Page* page);
 
   // Returns true if the service worker associated with the given `scope` may be
   // deleted. This can return false if the service worker is tied to another
@@ -1346,6 +1354,14 @@ class CONTENT_EXPORT ContentBrowserClient {
       BrowserContext* browser_context,
       const ServiceWorkerVersionBaseInfo& service_worker_version_info,
       mojo::BinderMapWithContext<const ServiceWorkerVersionBaseInfo&>* map) {}
+
+  // Allows the embedder to register browser channel-associated interfaces that
+  // are exposed through the ServiceWorker. `service_worker_version_info`
+  // contains the information to uniquely identify the service worker instance.
+  // `associated_registry` contains interfaces provided by the browser.
+  virtual void RegisterAssociatedInterfaceBindersForServiceWorker(
+      const ServiceWorkerVersionBaseInfo& service_worker_version_info,
+      blink::AssociatedInterfaceRegistry& associated_registry) {}
 
   // Allows the embedder to register per-WebUI interface brokers that are used
   // for handling Mojo.bindInterface in WebUI JavaScript.
@@ -2188,7 +2204,8 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual bool ShouldSandboxNetworkService();
 
   // Returns true if system DNS resolution should be run outside of the network
-  // service.
+  // service. This is useful if the network service is sandboxed but system DNS
+  // resolution cannot run sandboxed.
   virtual bool ShouldRunOutOfProcessSystemDnsResolution();
 
   // Browser-side API to log blink UseCounters for events that don't occur in
@@ -2479,8 +2496,9 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual std::unique_ptr<IdentityRequestDialogController>
   CreateIdentityRequestDialogController(WebContents* web_contents);
 
-  // Creates an mdoc provider to fetch mdocs from native apps.
-  virtual std::unique_ptr<MDocProvider> CreateMDocProvider();
+  // Creates a digital credential provider to fetch from native apps.
+  virtual std::unique_ptr<DigitalCredentialProvider>
+  CreateDigitalCredentialProvider();
 
   // Returns true if JS dialogs from an iframe with different origin from the
   // main frame should be disallowed.

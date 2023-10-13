@@ -66,6 +66,7 @@ import org.chromium.chrome.browser.history.HistoryContentManager;
 import org.chromium.chrome.browser.history.StubbedHistoryProvider;
 import org.chromium.chrome.browser.notifications.channels.SiteChannelsManager;
 import org.chromium.chrome.browser.offlinepages.OfflinePageUtils;
+import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
@@ -234,6 +235,14 @@ public class PageInfoViewTest {
             UserPrefs.get(Profile.getLastUsedRegularProfile())
                     .setInteger(COOKIE_CONTROLS_MODE, value);
         });
+    }
+
+    private void enableTrackingProtection() {
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    UserPrefs.get(Profile.getLastUsedRegularProfile())
+                            .setBoolean(Pref.TRACKING_PROTECTION3PCD_ENABLED, true);
+                });
     }
 
     private String runJavascriptAsync(String type) throws TimeoutException {
@@ -459,7 +468,19 @@ public class PageInfoViewTest {
     public void testShowWithPermissionsAndCookieBlockingUserBypass() throws IOException {
         addSomePermissions(mTestServerRule.getServer().getURL("/"));
         loadUrlAndOpenPageInfo(mTestServerRule.getServer().getURL(sSimpleHtml));
-        mRenderTestRule.render(getPageInfoView(), "PageInfo_Permissions");
+        mRenderTestRule.render(getPageInfoView(), "PageInfo_Permissions_UserBypass");
+    }
+
+    /** Tests PageInfo on a website with 3PC and permissions with Tracking Protection enabled. */
+    @Test
+    @MediumTest
+    @Feature({"RenderTest"})
+    @EnableFeatures(PageInfoFeatures.USER_BYPASS_UI_NAME)
+    public void testShowWithPermissionsAndCookieBlockingTrackingProtection() throws IOException {
+        enableTrackingProtection();
+        addSomePermissions(mTestServerRule.getServer().getURL("/"));
+        loadUrlAndOpenPageInfo(mTestServerRule.getServer().getURL(sSimpleHtml));
+        mRenderTestRule.render(getPageInfoView(), "PageInfo_Permissions_TrackingProtection");
     }
 
     /**
@@ -882,7 +903,7 @@ public class PageInfoViewTest {
                 mTestServerRule.getServer().getURLWithHostName("www.example.com", "/"));
 
         final CallbackHelper onDidStartNavigationHelper = new CallbackHelper();
-        final WebContentsObserver observer = TestThreadUtils.runOnUiThreadBlocking(() -> {
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
             return new WebContentsObserver(sActivityTestRule.getWebContents()) {
                 @Override
                 public void didStartNavigationInPrimaryMainFrame(
@@ -920,22 +941,6 @@ public class PageInfoViewTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
-    @DisableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
-    public void testShowAdPersonalizationInfoSubPage() throws IOException {
-        loadUrlAndOpenPageInfo(
-                mTestServerRule.getServer().getURLWithHostName("example.com", sSimpleHtml));
-        onView(withId(PageInfoAdPersonalizationController.ROW_ID)).perform(click());
-        onViewWaiting(allOf(withText(R.string.page_info_ad_manage_interests), isDisplayed()));
-        mRenderTestRule.render(getPageInfoView(), "PageInfo_AdPersonalizationSubPage");
-    }
-
-    /**
-     * Tests ad personalization subpage.
-     */
-    @Test
-    @MediumTest
-    @Feature({"RenderTest"})
-    @EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
     public void testShowAdPersonalizationInfoSubPageV4() throws IOException {
         loadUrlAndOpenPageInfo(
                 mTestServerRule.getServer().getURLWithHostName("example.com", sSimpleHtml));
@@ -950,27 +955,6 @@ public class PageInfoViewTest {
      */
     @Test
     @MediumTest
-    @DisableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
-    public void testOpenAdPersonalizationSettings() throws IOException {
-        loadUrlAndOpenPageInfo(
-                mTestServerRule.getServer().getURLWithHostName("example.com", sSimpleHtml));
-        onView(withId(PageInfoAdPersonalizationController.ROW_ID)).perform(click());
-        onViewWaiting(allOf(withText(R.string.page_info_ad_manage_interests), isDisplayed()))
-                .perform(click());
-        // Check that settings are displayed.
-        onView(withText(R.string.privacy_sandbox_topic_interests_subtitle))
-                .check(matches(isDisplayed()));
-        // Leave settings view.
-        onView(withContentDescription("Navigate up")).perform(click());
-        onView(withText(R.string.privacy_sandbox_topic_interests_subtitle)).check(doesNotExist());
-    }
-
-    /**
-     * Tests opening ad personalization settings.
-     */
-    @Test
-    @MediumTest
-    @EnableFeatures(ChromeFeatureList.PRIVACY_SANDBOX_SETTINGS_4)
     public void testOpenAdPersonalizationSettingsV4() throws IOException {
         loadUrlAndOpenPageInfo(
                 mTestServerRule.getServer().getURLWithHostName("example.com", sSimpleHtml));

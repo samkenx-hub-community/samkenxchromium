@@ -14,7 +14,10 @@ namespace password_manager::features {
 // All features in alphabetical order. The features should be documented
 // alongside the definition of their values in the .cc file.
 
+BASE_DECLARE_FEATURE(kAutoApproveSharedPasswordUpdatesFromSameSender);
+
 BASE_DECLARE_FEATURE(kBiometricTouchToFill);
+BASE_DECLARE_FEATURE(kClearUndecryptablePasswordsOnSync);
 BASE_DECLARE_FEATURE(kDisablePasswordsDropdownForCvcFields);
 
 BASE_DECLARE_FEATURE(kEnablePasswordsAccountStorage);
@@ -30,16 +33,14 @@ BASE_DECLARE_FEATURE(kFillOnAccountSelect);
 BASE_DECLARE_FEATURE(kNewConfirmationBubbleForGeneratedPasswords);
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
-#if BUILDFLAG(IS_IOS)
-BASE_DECLARE_FEATURE(kOneReadLoginDatabaseMigration);
-#endif
-
 BASE_DECLARE_FEATURE(kSharedPasswordNotificationUI);
 
 BASE_DECLARE_FEATURE(kPasswordManagerEnableReceiverService);
 BASE_DECLARE_FEATURE(kPasswordManagerEnableSenderService);
 
 BASE_DECLARE_FEATURE(kPasswordManagerLogToTerminal);
+
+BASE_DECLARE_FEATURE(kSkipUndecryptablePasswords);
 
 BASE_DECLARE_FEATURE(kUseExtensionListForPSLMatching);
 

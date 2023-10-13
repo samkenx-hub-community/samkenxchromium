@@ -63,6 +63,10 @@ void AwFieldTrials::OnVariationsSetupComplete() {
 void AwFieldTrials::RegisterFeatureOverrides(base::FeatureList* feature_list) {
   AwFeatureOverrides aw_feature_overrides;
 
+  // Disable third-party storage partitioning on WebView.
+  aw_feature_overrides.DisableFeature(
+      net::features::kThirdPartyStoragePartitioning);
+
   // Disable network-change migration on WebView due to crbug.com/1430082.
   aw_feature_overrides.DisableFeature(
       net::features::kMigrateSessionsOnNetworkChangeV2);
@@ -70,6 +74,10 @@ void AwFieldTrials::RegisterFeatureOverrides(base::FeatureList* feature_list) {
   // Disable the passthrough on WebView.
   aw_feature_overrides.DisableFeature(
       ::features::kDefaultPassthroughCommandDecoder);
+
+  // Disable Reducing User Agent minor version on WebView.
+  aw_feature_overrides.DisableFeature(
+      blink::features::kReduceUserAgentMinorVersion);
 
   aw_feature_overrides.RegisterOverrides(feature_list);
 }

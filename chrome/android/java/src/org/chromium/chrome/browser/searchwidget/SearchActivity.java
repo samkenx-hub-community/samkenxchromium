@@ -22,7 +22,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.app.ActivityOptionsCompat;
 
-import org.chromium.base.BuildInfo;
 import org.chromium.base.Callback;
 import org.chromium.base.IntentUtils;
 import org.chromium.base.Log;
@@ -33,10 +32,10 @@ import org.chromium.base.supplier.UnownedUserDataSupplier;
 import org.chromium.blink.mojom.DisplayMode;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.IntentHandler;
-import org.chromium.chrome.browser.WebContentsFactory;
 import org.chromium.chrome.browser.app.tabmodel.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.back_press.BackPressManager;
 import org.chromium.chrome.browser.browserservices.intents.WebappConstants;
+import org.chromium.chrome.browser.content.WebContentsFactory;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulatorFactory;
 import org.chromium.chrome.browser.crash.ChromePureJavaExceptionReporter;
 import org.chromium.chrome.browser.customtabs.CustomTabsConnection;
@@ -232,11 +231,8 @@ public class SearchActivity extends AsyncInitializationActivity
             return true;
         };
 
-        BackPressManager backPressManager = null;
-        if (BackPressManager.isEnabled() || BuildInfo.isAtLeastT()) {
-            backPressManager = new BackPressManager();
-            getOnBackPressedDispatcher().addCallback(this, backPressManager.getCallback());
-        }
+        BackPressManager backPressManager = new BackPressManager();
+        getOnBackPressedDispatcher().addCallback(this, backPressManager.getCallback());
         // clang-format off
         mLocationBarCoordinator = new LocationBarCoordinator(mSearchBox, mAnchorView,
             mProfileSupplier, PrivacyPreferencesManagerImpl.getInstance(),

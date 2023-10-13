@@ -225,19 +225,16 @@ void SegmentationPlatformServiceImpl::OnDatabaseInitialized(bool success) {
   observers.push_back(proxy_.get());
   execution_service_.Initialize(
       storage_service_.get(), &signal_handler_, clock_, task_runner_,
-      config_holder->all_segment_ids(), model_provider_factory_.get(),
+      config_holder->legacy_output_segment_ids(), model_provider_factory_.get(),
       std::move(observers), platform_options_,
-      std::move(input_delegate_holder_), &config_holder->configs(),
-      profile_prefs_, storage_service_->cached_result_provider());
+      std::move(input_delegate_holder_), profile_prefs_,
+      storage_service_->cached_result_provider());
 
   proxy_->SetExecutionService(&execution_service_);
 
   for (auto& selector : segment_selectors_) {
     selector.second->OnPlatformInitialized(&execution_service_);
   }
-
-  result_refresh_manager_->RefreshModelResults(CreateSegmentResultProviders(),
-                                               &execution_service_);
 
   request_dispatcher_->OnPlatformInitialized(success, &execution_service_,
                                              CreateSegmentResultProviders());
@@ -250,6 +247,9 @@ void SegmentationPlatformServiceImpl::OnDatabaseInitialized(bool success) {
         FROM_HERE, std::move(callback));
   }
 
+  result_refresh_manager_->Initialize(CreateSegmentResultProviders(),
+                                      &execution_service_);
+
   // Run any daily maintenance tasks.
   RunDailyTasks(/*is_startup=*/true);
 
@@ -260,7 +260,8 @@ void SegmentationPlatformServiceImpl::OnDatabaseInitialized(bool success) {
 }
 
 void SegmentationPlatformServiceImpl::OnSegmentationModelUpdated(
-    proto::SegmentInfo segment_info) {
+    proto::SegmentInfo segment_info,
+    absl::optional<int64_t> old_model_version) {
   CHECK(IsPlatformInitialized());
   if (!segment_info.has_model_metadata()) {
     signal_handler_.OnSignalListUpdated();
@@ -271,10 +272,16 @@ void SegmentationPlatformServiceImpl::OnSegmentationModelUpdated(
   DCHECK(metadata_utils::ValidateSegmentInfoMetadataAndFeatures(segment_info) ==
          metadata_utils::ValidationResult::kValidationSuccess);
 
-  signal_handler_.OnSignalListUpdated();
+  // This method is called when model is available for execution at startup. The
+  // segment info would not have changed for most cases.
+  const bool version_updated =
+      !old_model_version || *old_model_version != segment_info.model_version();
+  if (version_updated) {
+    signal_handler_.OnSignalListUpdated();
+  }
 
   if (!metadata_utils::SegmentUsesLegacyOutput(segment_info.segment_id())) {
-    result_refresh_manager_->OnModelUpdated(&segment_info, &execution_service_);
+    result_refresh_manager_->OnModelUpdated(&segment_info);
     request_dispatcher_->OnModelUpdated(segment_info.segment_id());
   } else {
     execution_service_.OnNewModelInfoReadyLegacy(segment_info);
@@ -288,6 +295,7 @@ void SegmentationPlatformServiceImpl::OnSegmentationModelUpdated(
 }
 
 void SegmentationPlatformServiceImpl::OnModelRefreshNeeded() {
+  // TODO(b/303707413) : Migrate this to use RRM instead.
   execution_service_.RefreshModelResults();
 }
 
@@ -297,6 +305,7 @@ void SegmentationPlatformServiceImpl::OnServiceStatusChanged() {
 }
 
 void SegmentationPlatformServiceImpl::RunDailyTasks(bool is_startup) {
+  result_refresh_manager_->RefreshModelResults(is_startup);
   execution_service_.RunDailyTasks(is_startup);
   storage_service_->ExecuteDatabaseMaintenanceTasks(is_startup);
 

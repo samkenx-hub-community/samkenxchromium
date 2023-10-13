@@ -9,7 +9,7 @@
 #include "chrome/browser/privacy_sandbox/tracking_protection_onboarding_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tpcd/experiment/eligibility_service.h"
-#include "chrome/browser/tpcd/experiment/experiment_manager.h"
+#include "chrome/browser/tpcd/experiment/experiment_manager_impl.h"
 #include "content/public/common/content_features.h"
 
 namespace tpcd::experiment {
@@ -30,7 +30,8 @@ EligibilityServiceFactory::EligibilityServiceFactory()
     : ProfileKeyedServiceFactory(
           "EligibilityServiceFactory",
           ProfileSelections::Builder()
-              .WithRegular(ProfileSelection::kOriginalOnly)
+              .WithRegular(ProfileSelection::kOwnInstance)
+              .WithGuest(ProfileSelection::kOwnInstance)
               .Build()) {
   DependsOn(TrackingProtectionOnboardingFactory::GetInstance());
 }
@@ -42,12 +43,12 @@ bool EligibilityServiceFactory::ServiceIsCreatedWithBrowserContext() const {
 std::unique_ptr<KeyedService>
 EligibilityServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
-  if (!base::FeatureList::IsEnabled(
-          features::kCookieDeprecationFacilitatedTesting)) {
-    return nullptr;
+  Profile* profile = Profile::FromBrowserContext(context);
+  if (auto* experiment_manager =
+          ExperimentManagerImpl::GetForProfile(profile)) {
+    return std::make_unique<EligibilityService>(profile, experiment_manager);
   }
-  return std::make_unique<EligibilityService>(
-      Profile::FromBrowserContext(context), ExperimentManager::GetInstance());
+  return nullptr;
 }
 
 }  // namespace tpcd::experiment

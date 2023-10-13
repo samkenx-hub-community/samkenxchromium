@@ -19,11 +19,21 @@ bool StructTraits<
   return true;
 }
 
+bool StructTraits<blink::mojom::ServiceWorkerRouterConditionObjectDataView,
+                  blink::ServiceWorkerRouterConditionObject>::
+    Read(blink::mojom::ServiceWorkerRouterConditionObjectDataView data,
+         blink::ServiceWorkerRouterConditionObject* out) {
+  if (!data.ReadConditions(&out->conditions)) {
+    return false;
+  }
+  return true;
+}
+
 bool StructTraits<blink::mojom::ServiceWorkerRouterOrConditionDataView,
                   blink::ServiceWorkerRouterOrCondition>::
     Read(blink::mojom::ServiceWorkerRouterOrConditionDataView data,
          blink::ServiceWorkerRouterOrCondition* out) {
-  if (!data.ReadConditions(&out->conditions)) {
+  if (!data.ReadObjects(&out->objects)) {
     return false;
   }
   return true;
@@ -110,13 +120,13 @@ UnionTraits<blink::mojom::ServiceWorkerRouterSourceDataView,
             blink::ServiceWorkerRouterSource>::
     GetTag(const blink::ServiceWorkerRouterSource& data) {
   switch (data.type) {
-    case blink::ServiceWorkerRouterSource::SourceType::kNetwork:
+    case blink::ServiceWorkerRouterSource::Type::kNetwork:
       return blink::mojom::ServiceWorkerRouterSource::Tag::kNetworkSource;
-    case blink::ServiceWorkerRouterSource::SourceType::kRace:
+    case blink::ServiceWorkerRouterSource::Type::kRace:
       return blink::mojom::ServiceWorkerRouterSource::Tag::kRaceSource;
-    case blink::ServiceWorkerRouterSource::SourceType::kFetchEvent:
+    case blink::ServiceWorkerRouterSource::Type::kFetchEvent:
       return blink::mojom::ServiceWorkerRouterSource::Tag::kFetchEventSource;
-    case blink::ServiceWorkerRouterSource::SourceType::kCache:
+    case blink::ServiceWorkerRouterSource::Type::kCache:
       return blink::mojom::ServiceWorkerRouterSource::Tag::kCacheSource;
   }
 }
@@ -127,19 +137,19 @@ bool UnionTraits<blink::mojom::ServiceWorkerRouterSourceDataView,
          blink::ServiceWorkerRouterSource* out) {
   switch (data.tag()) {
     case blink::mojom::ServiceWorkerRouterSource::Tag::kNetworkSource:
-      out->type = blink::ServiceWorkerRouterSource::SourceType::kNetwork;
+      out->type = blink::ServiceWorkerRouterSource::Type::kNetwork;
       out->network_source.emplace();
       return true;
     case blink::mojom::ServiceWorkerRouterSource::Tag::kRaceSource:
-      out->type = blink::ServiceWorkerRouterSource::SourceType::kRace;
+      out->type = blink::ServiceWorkerRouterSource::Type::kRace;
       out->race_source.emplace();
       return true;
     case blink::mojom::ServiceWorkerRouterSource::Tag::kFetchEventSource:
-      out->type = blink::ServiceWorkerRouterSource::SourceType::kFetchEvent;
+      out->type = blink::ServiceWorkerRouterSource::Type::kFetchEvent;
       out->fetch_event_source.emplace();
       return true;
     case blink::mojom::ServiceWorkerRouterSource::Tag::kCacheSource:
-      out->type = blink::ServiceWorkerRouterSource::SourceType::kCache;
+      out->type = blink::ServiceWorkerRouterSource::Type::kCache;
       if (!data.ReadCacheSource(&out->cache_source)) {
         return false;
       }

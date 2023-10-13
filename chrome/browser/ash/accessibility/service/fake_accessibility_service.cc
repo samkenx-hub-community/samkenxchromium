@@ -200,11 +200,32 @@ void FakeAccessibilityService::RequestTtsVoices(
   }
 }
 
+void FakeAccessibilityService::RequestDarkenScreen(bool darken) {
+  for (auto& ux_client : ux_remotes_) {
+    ux_client->DarkenScreen(darken);
+  }
+}
+
+void FakeAccessibilityService::RequestOpenSettingsSubpage(
+    const std::string& subpage) {
+  for (auto& ux_client : ux_remotes_) {
+    ux_client->OpenSettingsSubpage(subpage);
+  }
+}
+
 void FakeAccessibilityService::RequestSetFocusRings(
     std::vector<ax::mojom::FocusRingInfoPtr> focus_rings,
     ax::mojom::AssistiveTechnologyType at_type) {
   for (auto& ux_client : ux_remotes_) {
     ux_client->SetFocusRings(mojo::Clone(focus_rings), at_type);
+  }
+}
+
+void FakeAccessibilityService::RequestSetHighlights(
+    const std::vector<gfx::Rect>& rects,
+    SkColor color) {
+  for (auto& ux_client : ux_remotes_) {
+    ux_client->SetHighlights(rects, color);
   }
 }
 

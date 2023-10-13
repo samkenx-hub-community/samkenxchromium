@@ -44,14 +44,6 @@ namespace {
 // default batch size for copy operations.
 const int kMaxBytesPerCopyOperation = 1024 * 1024 * 4;
 
-// When enabled, OneCopyRasterBufferProvider::RasterBufferImpl::Playback() runs
-// at normal thread priority.
-// TODO(crbug.com/1072756): Cleanup the feature when the Stable experiment is
-// complete, on November 25, 2020.
-BASE_FEATURE(kOneCopyRasterBufferPlaybackNormalThreadPriority,
-             "OneCopyRasterBufferPlaybackNormalThreadPriority",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kAlwaysUseMappableSIForOneCopyRaster,
              "AlwaysUseMappableSIForOneCopyRaster",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -145,8 +137,7 @@ bool OneCopyRasterBufferProvider::RasterBufferImpl::
   // the GpuChannelHost lock, which is acquired at normal thread priority by
   // other code. Acquiring it at background thread priority can cause a priority
   // inversion. https://crbug.com/1072756
-  return !base::FeatureList::IsEnabled(
-      kOneCopyRasterBufferPlaybackNormalThreadPriority);
+  return false;
 }
 
 OneCopyRasterBufferProvider::OneCopyRasterBufferProvider(
@@ -341,7 +332,6 @@ bool OneCopyRasterBufferProvider::PlaybackToStagingBuffer(
     const RasterSource::PlaybackSettings& playback_settings,
     uint64_t previous_content_id,
     uint64_t new_content_id) {
-  is_shared_memory_ = false;
   std::unique_ptr<gpu::SharedImageInterface::ScopedMapping> mapping;
   gfx::GpuMemoryBuffer* buffer = nullptr;
   void* memory = nullptr;
@@ -372,6 +362,11 @@ bool OneCopyRasterBufferProvider::PlaybackToStagingBuffer(
           gpu::kNullSurfaceHandle, gfx::BufferUsage::GPU_READ_CPU_READ_WRITE);
     }
 
+    if (staging_buffer->mailbox.IsZero()) {
+      LOG(ERROR) << "Creation of MappableSharedImage failed.";
+      return false;
+    }
+
     mapping = sii->MapSharedImage(staging_buffer->mailbox);
     if (!mapping) {
       LOG(ERROR) << "MapSharedImage Failed.";
@@ -379,7 +374,7 @@ bool OneCopyRasterBufferProvider::PlaybackToStagingBuffer(
     }
     memory = mapping->Memory(0);
     stride = mapping->Stride(0);
-    is_shared_memory_ = mapping->IsSharedMemory();
+    staging_buffer->is_shared_memory = mapping->IsSharedMemory();
   } else {
     // Allocate GpuMemoryBuffer if necessary.
     if (!staging_buffer->gpu_memory_buffer) {
@@ -416,7 +411,7 @@ bool OneCopyRasterBufferProvider::PlaybackToStagingBuffer(
 
     memory = buffer->memory(0);
     stride = buffer->stride(0);
-    is_shared_memory_ =
+    staging_buffer->is_shared_memory =
         buffer->GetType() == gfx::GpuMemoryBufferType::SHARED_MEMORY_BUFFER;
   }
 
@@ -506,7 +501,7 @@ gpu::SyncToken OneCopyRasterBufferProvider::CopyOnWorkerThread(
 #endif
 
   // COMMANDS_ISSUED is sufficient for shared memory resources.
-  if (is_shared_memory_) {
+  if (staging_buffer->is_shared_memory) {
     query_target = GL_COMMANDS_ISSUED_CHROMIUM;
   }
 

@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "base/containers/cxx20_erase.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
 #include "base/ranges/algorithm.h"
@@ -1480,7 +1481,8 @@ void CompositorFrameReporter::ReportScrollJankMetrics() const {
   const auto end_timestamp = viz_breakdown_.presentation_feedback.timestamp;
   if (global_trackers_.predictor_jank_tracker) {
     global_trackers_.predictor_jank_tracker->ReportLatestScrollDelta(
-        total_predicted_delta, end_timestamp, args_.interval);
+        total_predicted_delta, end_timestamp, args_.interval,
+        earliest_event->AsScrollUpdate()->trace_id());
   }
   if (global_trackers_.scroll_jank_dropped_frame_tracker) {
     global_trackers_.scroll_jank_dropped_frame_tracker
@@ -1822,13 +1824,10 @@ void CompositorFrameReporter::DiscardOldPartialUpdateReporters() {
     return;
   }
   // Remove all destroyed reporters from `partial_update_dependents_`.
-  partial_update_dependents_.erase(
-      std::remove_if(
-          partial_update_dependents_.begin(), partial_update_dependents_.end(),
-          [](const base::WeakPtr<CompositorFrameReporter>& reporter) {
-            return !reporter;
-          }),
-      partial_update_dependents_.end());
+  base::EraseIf(partial_update_dependents_,
+                [](const base::WeakPtr<CompositorFrameReporter>& reporter) {
+    return !reporter;
+  });
 }
 
 base::WeakPtr<CompositorFrameReporter> CompositorFrameReporter::GetWeakPtr() {

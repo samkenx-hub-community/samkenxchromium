@@ -26,14 +26,42 @@ std::atomic<bool>
     V8CrowdsourcedCompileHintsProducer::data_generated_for_this_process_ =
         false;
 
+namespace {
+bool ShouldThisProcessGenerateData() {
+  bool compile_hints_forced =
+      base::FeatureList::IsEnabled(features::kForceProduceCompileHints);
+  if (compile_hints_forced) {
+    return true;
+  }
+
+  // Data collection is only enabled on Windows. TODO(chromium:1406506): enable
+  // on more platforms.
+#if BUILDFLAG(IS_WIN)
+  bool compile_hints_enabled =
+      base::FeatureList::IsEnabled(features::kProduceCompileHints2);
+  if (!compile_hints_enabled) {
+    return false;
+  }
+
+  // Decide whether we collect the data based on client-side randomization.
+  // This is further subject to UKM restrictions: whether the user has enabled
+  // the data collection + downsampling. See crbug.com/1483975 .
+  double data_production_level =
+      features::kProduceCompileHintsDataProductionLevel.Get();
+  return base::RandDouble() < data_production_level;
+#else
+  return false;
+#endif
+}
+}  // namespace
+
 V8CrowdsourcedCompileHintsProducer::V8CrowdsourcedCompileHintsProducer(
     Page* page)
     : page_(page) {
-  // Call FeatureList::IsEnabled only once.
-  static bool compile_hints_enabled =
-      base::FeatureList::IsEnabled(features::kProduceCompileHints);
-  if (!compile_hints_enabled) {
-    state_ = State::kFinishedOrDisabled;
+  // Decide whether to produce the data once per renderer process.
+  static bool should_generate_data = ShouldThisProcessGenerateData();
+  if (should_generate_data && !data_generated_for_this_process_) {
+    state_ = State::kCollectingData;
   }
 }
 

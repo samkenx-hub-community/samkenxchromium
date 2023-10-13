@@ -532,7 +532,7 @@ IN_PROC_BROWSER_TEST_F(FileManagerPrivateApiTest, MediaMetadata) {
 
   // Get source media/test/data directory path.
   base::FilePath root_dir;
-  CHECK(base::PathService::Get(base::DIR_SOURCE_ROOT, &root_dir));
+  CHECK(base::PathService::Get(base::DIR_SRC_TEST_DATA_ROOT, &root_dir));
   const base::FilePath media_test_data_dir =
       root_dir.AppendASCII("media").AppendASCII("test").AppendASCII("data");
 
@@ -771,10 +771,13 @@ class FileManagerPrivateApiDlpTest : public FileManagerPrivateApiTest {
   }
 
   void TearDownOnMainThread() override {
+    // The files controller must be destroyed before the profile since it's
+    // holding a pointer to it.
+    files_controller_.reset();
     mock_rules_manager_ = nullptr;
     fpnm_ = nullptr;
     FileManagerPrivateApiTest::TearDownOnMainThread();
-  };
+  }
 
   std::unique_ptr<KeyedService> SetDlpRulesManager(
       content::BrowserContext* context) {
@@ -783,8 +786,8 @@ class FileManagerPrivateApiDlpTest : public FileManagerPrivateApiTest {
     ON_CALL(*mock_rules_manager_, IsFilesPolicyEnabled)
         .WillByDefault(testing::Return(true));
 
-    files_controller_ =
-        std::make_unique<policy::DlpFilesControllerAsh>(*mock_rules_manager_);
+    files_controller_ = std::make_unique<policy::DlpFilesControllerAsh>(
+        *mock_rules_manager_, Profile::FromBrowserContext(context));
     ON_CALL(*mock_rules_manager_, GetDlpFilesController)
         .WillByDefault(testing::Return(files_controller_.get()));
 

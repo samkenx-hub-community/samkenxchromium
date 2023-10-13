@@ -81,6 +81,7 @@ source_set("ipc_common_sources") {
     "gpu_client_ids.h",
     "gpu_disk_cache_type.cc",
     "gpu_disk_cache_type.h",
+    "gpu_memory_buffer_handle_info.h",
     "gpu_memory_buffer_impl.cc",
     "gpu_memory_buffer_impl.h",
     "gpu_memory_buffer_impl_shared_memory.cc",
@@ -370,6 +371,16 @@ mojom("interfaces") {
         {
           mojom = "gpu.mojom.Capabilities"
           cpp = "::gpu::Capabilities"
+        },
+      ]
+      traits_headers = [ "gpu_command_buffer_traits.h" ]
+      traits_public_deps = [ ":command_buffer_traits_sources" ]
+    },
+    {
+      types = [
+        {
+          mojom = "gpu.mojom.GLCapabilities"
+          cpp = "::gpu::GLCapabilities"
         },
       ]
       traits_headers = [ "gpu_command_buffer_traits.h" ]

@@ -61,7 +61,8 @@ std::string GetFacetRepresentation(const PasswordForm& form) {
 }
 
 std::string GetFacetRepresentation(const PasskeyCredential& passkey) {
-  std::string as_url = RPIDToURL(passkey.rp_id()).possibly_invalid_spec();
+  std::string as_url = base::StrCat(
+      {url::kHttpsScheme, url::kStandardSchemeSeparator, passkey.rp_id()});
   return FacetURI::FromPotentiallyInvalidSpec(as_url)
       .potentially_invalid_spec();
 }
@@ -73,7 +74,7 @@ FacetBrandingInfo CreateBrandingInfoFromFacetURI(
   FacetURI facet_uri =
       FacetURI::FromPotentiallyInvalidSpec(credential.GetFirstSignonRealm());
   if (facet_uri.IsValidAndroidFacetURI()) {
-    branding_info.name = SplitByDotAndReverse(facet_uri.android_package_name());
+    branding_info.name = facet_uri.GetAndroidPackageDisplayName();
     branding_info.icon_url = GURL(kDefaultAndroidIcon);
     return branding_info;
   }
@@ -96,6 +97,29 @@ FacetBrandingInfo CreateBrandingInfoFromFacetURI(
   branding_info.icon_url =
       GURL(kDefaultFallbackIconUrl).ReplaceComponents(replacements);
   return branding_info;
+}
+
+std::string CreateUsernamePasswordSortKey(const CredentialUIEntry& credential) {
+  std::string key;
+  // The origin isn't taken into account for normal credentials since we want to
+  // group them together.
+  const char kSortKeyPartsSeparator = ' ';
+  if (!credential.blocked_by_user) {
+    key += base::UTF16ToUTF8(credential.username) + kSortKeyPartsSeparator +
+           base::UTF16ToUTF8(credential.password);
+
+    key += kSortKeyPartsSeparator;
+    if (!credential.federation_origin.opaque()) {
+      key += credential.federation_origin.host();
+    } else {
+      key += kSortKeyPartsSeparator;
+    }
+  } else {
+    // Key for blocked by user credential since it does not store username and
+    // password. These credentials are not grouped together.
+    key = GetShownOrigin(credential);
+  }
+  return key;
 }
 
 }  // namespace
@@ -320,7 +344,8 @@ void PasswordsGrouper::GroupPasswordsImpl(
     map_signon_realm_to_group_id_[SignonRealm(form.signon_realm)] = group_id;
 
     // Store form for username/password key.
-    UsernamePasswordKey key(CreateUsernamePasswordSortKey(form));
+    UsernamePasswordKey key(
+        CreateUsernamePasswordSortKey(CredentialUIEntry(form)));
     map_group_id_to_credentials_[group_id].forms[key].push_back(
         std::move(form));
   }

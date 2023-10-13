@@ -42,7 +42,6 @@ class ActiveScriptWrappableCreationKey final {
   friend class EventSource;
   friend class FetchEvent;
   friend class FileReader;
-  friend class FileSystemDirectoryIterator;
   friend class FileWriter;
   friend class FontFace;
   template <typename NativeFrameType>
@@ -107,7 +106,6 @@ class ActiveScriptWrappableCreationKey final {
   friend class SVGImageElement;
   friend class TCPSocket;
   friend class UDPSocket;
-  friend class ViewTransition;
   friend class WakeLockSentinel;
   friend class WebSocketStream;
   friend class WebTransport;

@@ -190,7 +190,7 @@ arc::mojom::RawIconPngDataPtr FakeAppInstance::GenerateIconResponse(
     }
     case IconResponseType::ICON_RESPONSE_SEND_GOOD: {
       base::FilePath base_path;
-      CHECK(base::PathService::Get(base::DIR_SOURCE_ROOT, &base_path));
+      CHECK(base::PathService::Get(base::DIR_SRC_TEST_DATA_ROOT, &base_path));
       base::FilePath icon_file_path =
           base_path.AppendASCII("ash")
               .AppendASCII("components")
@@ -252,7 +252,7 @@ arc::mojom::RawIconPngDataPtr FakeAppInstance::GetFakeIcon(
 
   base::FilePath base_path;
   std::string png_data_as_string;
-  CHECK(base::PathService::Get(base::DIR_SOURCE_ROOT, &base_path));
+  CHECK(base::PathService::Get(base::DIR_SRC_TEST_DATA_ROOT, &base_path));
   base::FilePath icon_file_path = base_path.AppendASCII("ash")
                                       .AppendASCII("components")
                                       .AppendASCII("arc")
@@ -477,6 +477,18 @@ void FakeAppInstance::GetAppCategory(const std::string& package_name,
 
   if (itr != pkg_name_to_app_category_.end()) category = itr->second;
   std::move(callback).Run(category);
+}
+
+void FakeAppInstance::IsGameControlsApplicable(
+    const std::string& package_name,
+    IsGameControlsApplicableCallback callback) {
+  bool applicable = false;
+  if (std::find(game_control_applicable_pkgs_.begin(),
+                game_control_applicable_pkgs_.end(),
+                package_name) != game_control_applicable_pkgs_.end()) {
+    applicable = true;
+  }
+  std::move(callback).Run(applicable);
 }
 
 void FakeAppInstance::LaunchIntentWithWindowInfo(

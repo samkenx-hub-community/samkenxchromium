@@ -471,6 +471,10 @@ void SavedPasswordsPresenter::OnPasskeysChanged() {
       weak_ptr_factory_.GetWeakPtr(), PasswordStoreChangeList()));
 }
 
+void SavedPasswordsPresenter::OnPasskeyModelShuttingDown() {
+  passkey_store_observation_.Reset();
+}
+
 void SavedPasswordsPresenter::OnGetPasswordStoreResults(
     std::vector<std::unique_ptr<PasswordForm>> results) {
   // This class overrides OnGetPasswordStoreResultsFrom() (the version of this
@@ -523,7 +527,7 @@ void SavedPasswordsPresenter::AddForms(const std::vector<PasswordForm>& forms,
     // TODO(crbug.com/1359392): Consider replacing |sort_key_to_password_forms_|
     // when grouping is launched.
     sort_key_to_password_forms_.insert(
-        std::make_pair(CreateSortKey(form, IgnoreStore(true)), form));
+        std::make_pair(CreateSortKey(CredentialUIEntry(form)), form));
   }
 
 #if BUILDFLAG(IS_ANDROID)

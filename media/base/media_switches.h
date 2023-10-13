@@ -167,6 +167,7 @@ MEDIA_EXPORT extern const base::FeatureParam<base::TimeDelta>
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kAutoPictureInPictureForVideoPlayback);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kAutoplayIgnoreWebAudio);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kAutoplayDisableSettings);
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kAVDColorSpaceChanges);
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kCameraMicEffects);
@@ -177,6 +178,8 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kCameraMicEffects);
 // directly.
 // TODO(https://crbug.com/1453388): Guard Cast Sender flags with !IS_ANDROID.
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kCastStreamingAv1);
+MEDIA_EXPORT BASE_DECLARE_FEATURE(
+    kCastStreamingExponentialVideoBitrateAlgorithm);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kCastStreamingPerformanceOverlay);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kCastStreamingVp9);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kCdmHostVerification);
@@ -213,6 +216,7 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kCrOSSystemVoiceIsolationOption);
 #endif
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kD3D11VideoDecoderUseSharedHandle);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kDedicatedMediaServiceThread);
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kDocumentPictureInPictureCapture);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kEnableTabMuting);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kExposeSwDecodersToWebRTC);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kExternalClearKeyForTesting);
@@ -279,7 +283,6 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaPowerExperiment);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMemoryPressureBasedSourceBufferGC);
 // TODO(https://crbug.com/1453388): Guard Cast Sender flags with !IS_ANDROID.
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kOpenscreenCastStreamingSession);
-MEDIA_EXPORT BASE_DECLARE_FEATURE(kOpenscreenVideoBitrateFactorInFrameDrops);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseWritePixelsYUV);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseMultiPlaneFormatForHardwareVideo);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseMultiPlaneFormatForSoftwareVideo);
@@ -298,7 +301,6 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kPlatformHEVCEncoderSupport);
 #endif  // BUILDFLAG(ENABLE_PLATFORM_HEVC)
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kPlaybackSpeedButton);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kPreloadMediaEngagementData);
-MEDIA_EXPORT BASE_DECLARE_FEATURE(kPreloadMetadataLazyLoad);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kPreloadMetadataSuspend);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kRecordMediaEngagementScores);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kRecordWebAudioEngagement);
@@ -407,7 +409,6 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaFoundationD3D11VideoCaptureZeroCopy);
 
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaFoundationClearPlayback);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kAllowMediaFoundationFrameServerMode);
-MEDIA_EXPORT BASE_DECLARE_FEATURE(kWasapiRawAudioCapture);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kD3D11Vp9kSVCHWDecoding);
 
 // Strategy affecting how Media Foundation Renderer determines its rendering
@@ -475,6 +476,16 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kVideoDecodeBatching);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseWindowBoundsForPip);
 
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseSharedImagesForPepperVideo);
+
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kFFmpegAllowLists);
+
+#if BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS)
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kTheoraVideoCodec);
+
+#if BUILDFLAG(IS_CHROMEOS)
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kCrOSLegacyMediaFormats);
+#endif
+#endif
 
 // Based on a |command_line| and the current platform, returns the effective
 // autoplay policy. In other words, it will take into account the default policy

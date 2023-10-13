@@ -25,7 +25,10 @@ compile_entitlements("entitlements") {
 
 ios_appex_bundle("appex") {
   output_name = "open_extension"
-  deps = [ "//ios/chrome/open_extension:open" ]
+  deps = [
+    "//ios/chrome/open_extension:open",
+    "//ios/chrome/open_extension/resources",
+  ]
 
   bundle_deps_filter = [ "//third_party/icu:icudata" ]
   assert_no_deps = ios_extension_assert_no_deps
@@ -38,5 +41,5 @@ ios_appex_bundle("appex") {
 
   entitlements_target = ":entitlements"
   info_plist_target = ":tweak_info_plist"
-  bundle_identifier = "$chromium_bundle_id.openExtension"
+  bundle_identifier = "$chromium_bundle_id.OpenExtension"
 }

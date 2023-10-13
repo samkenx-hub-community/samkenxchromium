@@ -15,6 +15,7 @@ import org.chromium.url.GURL;
  */
 public class MockTab extends TabImpl {
     private GURL mGurlOverride;
+    private WebContents mWebContentsOverride;
     // TODO(crbug.com/1223963) set mIsInitialized to true when initialize is called
     private boolean mIsInitialized;
     private boolean mIsDestroyed;
@@ -28,8 +29,8 @@ public class MockTab extends TabImpl {
     /**
      * Create a new Tab for testing and initializes Tab UserData objects.
      */
-    public static Tab createAndInitialize(int id, boolean incognito) {
-        TabImpl tab = new MockTab(id, incognito);
+    public static MockTab createAndInitialize(int id, boolean incognito) {
+        MockTab tab = new MockTab(id, incognito);
         tab.initialize(null, null, null, null, null, false, null, false);
         return tab;
     }
@@ -37,9 +38,9 @@ public class MockTab extends TabImpl {
     /**
      * Create a new Tab for testing and initializes Tab UserData objects.
      */
-    public static Tab createAndInitialize(
+    public static MockTab createAndInitialize(
             int id, boolean incognito, @TabLaunchType int tabLaunchType) {
-        TabImpl tab = new MockTab(id, incognito, tabLaunchType);
+        MockTab tab = new MockTab(id, incognito, tabLaunchType);
         tab.initialize(null, null, null, null, null, false, null, false);
         return tab;
     }
@@ -81,6 +82,18 @@ public class MockTab extends TabImpl {
 
     public void setGurlOverrideForTesting(GURL url) {
         mGurlOverride = url;
+    }
+
+    public void setWebContentsOverrideForTesting(WebContents webContents) {
+        mWebContentsOverride = webContents;
+    }
+
+    @Override
+    public WebContents getWebContents() {
+        if (mWebContentsOverride != null) {
+            return mWebContentsOverride;
+        }
+        return super.getWebContents();
     }
 
     @Override

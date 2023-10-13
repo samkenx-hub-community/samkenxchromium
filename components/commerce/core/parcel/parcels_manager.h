@@ -9,12 +9,17 @@
 #include <queue>
 #include <utility>
 
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "components/commerce/core/commerce_types.h"
 #include "components/commerce/core/proto/parcel.pb.h"
 #include "components/commerce/core/proto/parcel_tracking_db_content.pb.h"
 #include "components/session_proto_db/session_proto_storage.h"
+
+namespace base {
+class Clock;
+}
 
 namespace network {
 class SharedURLLoaderFactory;
@@ -25,7 +30,6 @@ class IdentityManager;
 }  // namespace signin
 
 namespace commerce {
-class AccountChecker;
 class ParcelsServerProxy;
 class ParcelsStorage;
 
@@ -36,11 +40,11 @@ class ParcelsManager {
       signin::IdentityManager* identity_manager,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
       SessionProtoStorage<parcel_tracking_db::ParcelTrackingContent>*
-          parcel_tracking_proto_db,
-      AccountChecker* account_checker);
+          parcel_tracking_proto_db);
   // Ctor used for testing purposes.
   ParcelsManager(std::unique_ptr<ParcelsServerProxy> parcels_server_proxy,
-                 std::unique_ptr<ParcelsStorage> parcels_storage);
+                 std::unique_ptr<ParcelsStorage> parcels_storage,
+                 base::Clock* clock);
   ~ParcelsManager();
   ParcelsManager(const ParcelsManager&) = delete;
   ParcelsManager& operator=(const ParcelsManager&) = delete;
@@ -56,8 +60,15 @@ class ParcelsManager {
   void GetAllParcelStatuses(GetParcelStatusCallback callback);
 
   // Called to stop tracking a given parcel.
+  // DEPRECATED.
   void StopTrackingParcel(const std::string& tracking_id,
                           StopParcelTrackingCallback callback);
+
+  // Called to stop tracking multiple parcels.
+  void StopTrackingParcels(
+      const std::vector<std::pair<ParcelIdentifier::Carrier, std::string>>&
+          parcel_identifiers,
+      StopParcelTrackingCallback callback);
 
   // Called to stop tracking all parcels.
   void StopTrackingAllParcels(StopParcelTrackingCallback callback);
@@ -89,6 +100,11 @@ class ParcelsManager {
   void GetAllParcelStatusesInternal(GetParcelStatusCallback callback);
   void StopTrackingParcelInternal(const std::string& tracking_id,
                                   StopParcelTrackingCallback callback);
+  void StopTrackingParcelsInternal(
+      const std::vector<std::pair<ParcelIdentifier::Carrier, std::string>>&
+          parcel_identifiers,
+      StopParcelTrackingCallback callback);
+
   void StopTrackingAllParcelsInternal(StopParcelTrackingCallback callback);
 
   // Called when parcel status is retrieved from the network. If
@@ -107,6 +123,12 @@ class ParcelsManager {
                                 bool success);
 
   // Called when stop all parcel tracking is completed.
+  void OnStopTrackingParcelsDone(
+      const std::vector<ParcelIdentifier>& parcel_identifiers,
+      StopParcelTrackingCallback callback,
+      bool success);
+
+  // Called when stop all parcel tracking is completed.
   void OnStopTrackingAllParcelsDone(StopParcelTrackingCallback callback,
                                     bool success);
 
@@ -120,6 +142,8 @@ class ParcelsManager {
   bool is_processing_pending_operations_ = false;
 
   std::queue<base::OnceClosure> pending_operations_;
+
+  raw_ptr<base::Clock> clock_;
 
   std::unique_ptr<ParcelsServerProxy> parcels_server_proxy_;
 

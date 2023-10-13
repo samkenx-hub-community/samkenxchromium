@@ -62,9 +62,6 @@ class AutofillBubbleHandlerImpl : public AutofillBubbleHandler,
       content::WebContents* web_contents,
       SaveUpdateAddressProfileBubbleController* controller,
       bool is_user_gesture) override;
-  AutofillBubbleBase* ShowEditAddressProfileDialog(
-      content::WebContents* web_contents,
-      EditAddressProfileDialogController* controller) override;
   AutofillBubbleBase* ShowVirtualCardManualFallbackBubble(
       content::WebContents* web_contents,
       VirtualCardManualFallbackBubbleController* controller,
@@ -78,8 +75,6 @@ class AutofillBubbleHandlerImpl : public AutofillBubbleHandler,
       MandatoryReauthBubbleController* controller,
       bool is_user_gesture,
       MandatoryReauthBubbleType bubble_type) override;
-
-  void OnPasswordSaved() override;
 
   // AvatarToolbarButton::Observer:
   void OnAvatarHighlightAnimationFinished() override;

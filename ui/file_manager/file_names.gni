@@ -1,6 +1,5 @@
 # Static files are used as-is from the repository.
 image_loader_static_js_files = [
-  "image_loader/background.js",
   "image_loader/cache.js",
   "image_loader/image_loader.js",
   "image_loader/image_loader_client.js",
@@ -12,10 +11,11 @@ image_loader_static_js_files = [
   "image_loader/scheduler.js",
 ]
 
+image_loader_ts = [ "image_loader/background.ts" ]
+
 static_js_files = [
   # Background:
   "file_manager/background/js/file_manager_base.js",
-  "file_manager/background/js/file_operation_handler.js",
   "file_manager/background/js/file_operation_manager.js",
   "file_manager/background/js/file_operation_util.js",
 
@@ -28,13 +28,10 @@ static_js_files = [
   "file_manager/background/js/runtime_loaded_test_util.js",
   "file_manager/background/js/test_util.js",
   "file_manager/background/js/test_util_base.js",
-  "file_manager/background/js/volume_info_list_impl.js",
-  "file_manager/background/js/volume_manager_factory.js",
   "file_manager/background/js/volume_manager_impl.js",
   "file_manager/background/js/volume_manager_util.js",
 
   # Files Common:
-  "file_manager/common/js/api.js",
   "file_manager/common/js/app_util.js",
   "file_manager/common/js/array_data_model.js",
   "file_manager/common/js/async_util.js",
@@ -112,7 +109,6 @@ static_js_files = [
   "file_manager/foreground/js/list_thumbnail_loader.js",
   "file_manager/foreground/js/main.js",
   "file_manager/foreground/js/main_window_component.js",
-  "file_manager/foreground/js/metadata_box_controller.js",
   "file_manager/foreground/js/metadata_update_controller.js",
   "file_manager/foreground/js/metrics_start.js",
   "file_manager/foreground/js/mock_actions_model.js",
@@ -126,10 +122,8 @@ static_js_files = [
   "file_manager/foreground/js/navigation_uma.js",
   "file_manager/foreground/js/path_component.js",
   "file_manager/foreground/js/providers_model.js",
-  "file_manager/foreground/js/quick_view_controller.js",
-  "file_manager/foreground/js/quick_view_model.js",
-  "file_manager/foreground/js/quick_view_uma.js",
   "file_manager/foreground/js/scan_controller.js",
+  "file_manager/foreground/js/search_controller.js",
   "file_manager/foreground/js/selection_menu_controller.js",
   "file_manager/foreground/js/sort_menu_controller.js",
   "file_manager/foreground/js/spinner_controller.js",
@@ -192,7 +186,6 @@ static_js_files = [
   "file_manager/foreground/js/ui/install_linux_package_dialog.js",
   "file_manager/foreground/js/ui/list.js",
   "file_manager/foreground/js/ui/list_container.js",
-  "file_manager/foreground/js/ui/list_item.js",
   "file_manager/foreground/js/ui/list_selection_controller.js",
   "file_manager/foreground/js/ui/list_selection_model.js",
   "file_manager/foreground/js/ui/list_single_selection_model.js",
@@ -218,6 +211,8 @@ static_js_files = [
 
 ts_files = [
   # Common.
+  "file_manager/common/js/api.ts",
+  "file_manager/common/js/cr_ui.ts",
   "file_manager/common/js/dom_utils.ts",
   "file_manager/common/js/entry_utils.ts",
   "file_manager/common/js/file_tasks.ts",
@@ -278,6 +273,7 @@ ts_files = [
   "file_manager/widgets/xf_tree.ts",
   "file_manager/widgets/xf_tree_item.ts",
   "file_manager/widgets/xf_password_dialog.ts",
+  "file_manager/foreground/js/ui/list_item.ts",
   "file_manager/foreground/js/ui/banners/drive_bulk_pinning_banner.ts",
   "file_manager/foreground/js/ui/banners/drive_low_individual_space_banner.ts",
   "file_manager/foreground/js/ui/banners/drive_low_shared_drive_space_banner.ts",
@@ -304,15 +300,22 @@ ts_files = [
   "file_manager/background/js/crostini.ts",
   "file_manager/background/js/drive_sync_handler.ts",
   "file_manager/background/js/entry_location_impl.ts",
+  "file_manager/background/js/file_operation_handler.ts",
   "file_manager/background/js/launcher.ts",
   "file_manager/background/js/metrics_start.ts",
   "file_manager/background/js/volume_info_impl.ts",
+  "file_manager/background/js/volume_info_list_impl.ts",
+  "file_manager/background/js/volume_manager_factory.ts",
 
   # Foreground.
   "file_manager/foreground/js/file_transfer_controller.ts",
   "file_manager/foreground/js/banner_controller.ts",
   "file_manager/foreground/js/file_tasks.ts",
   "file_manager/foreground/js/last_modified_controller.ts",
+  "file_manager/foreground/js/metadata_box_controller.ts",
+  "file_manager/foreground/js/quick_view_controller.ts",
+  "file_manager/foreground/js/quick_view_model.ts",
+  "file_manager/foreground/js/quick_view_uma.ts",
   "file_manager/foreground/js/task_controller.ts",
   "file_manager/foreground/js/uma_enums.gen.ts",
 
@@ -327,6 +330,10 @@ ts_files = [
 # Closure is failing to recognize the generated JS from the TS.
 # JS targets should rely on externs to type check the Polymer elements from TS.
 ts_polymer = [
+  "file_manager/foreground/elements/files_quick_view.ts",
+  "file_manager/foreground/elements/files_metadata_box.ts",
+  "file_manager/foreground/elements/files_safe_media.ts",
+  "file_manager/foreground/elements/files_metadata_entry.ts",
   "file_manager/foreground/elements/files_toast.ts",
   "file_manager/foreground/elements/files_tooltip.ts",
 ]
@@ -436,6 +443,10 @@ foreach(_t, ts_templates) {
 
 # Generated in foregorund/elements folder.
 ts_generated_templates += [
+  "file_manager/foreground/elements/files_metadata_box.html.ts",
+  "file_manager/foreground/elements/files_metadata_entry.html.ts",
+  "file_manager/foreground/elements/files_quick_view.html.ts",
+  "file_manager/foreground/elements/files_safe_media.html.ts",
   "file_manager/foreground/elements/files_toast.html.ts",
   "file_manager/foreground/elements/files_tooltip.html.ts",
 ]
@@ -447,6 +458,7 @@ generate_definitions_js_files = [
   "file_manager/externs/volume_info.js",
   "file_manager/externs/volume_info_list.js",
   "file_manager/externs/search_item.js",
+  "file_manager/externs/quick_view.js",
 ]
 
 # d.ts. files that are manually created and checked-in in the repo.
@@ -456,7 +468,6 @@ checked_in_dts_files = [
   "file_manager/definitions/navigator_connection.d.ts",
   "file_manager/foreground/js/ui/command.d.ts",
   "file_manager/foreground/js/ui/list.d.ts",
-  "file_manager/foreground/js/ui/list_item.d.ts",
   "file_manager/foreground/js/ui/grid.d.ts",
   "file_manager/foreground/js/ui/menu_item.d.ts",
   "file_manager/foreground/js/ui/multi_menu_button.d.ts",
@@ -469,10 +480,6 @@ generated_js_files = [
 
   # Elements:
   "file_manager/foreground/elements/files_format_dialog.js",
-  "file_manager/foreground/elements/files_metadata_box.js",
-  "file_manager/foreground/elements/files_metadata_entry.js",
-  "file_manager/foreground/elements/files_quick_view.js",
-  "file_manager/foreground/elements/files_safe_media.js",
   "file_manager/foreground/elements/files_spinner.js",
   "file_manager/foreground/elements/icons.js",
   "file_manager/foreground/elements/xf_button.js",

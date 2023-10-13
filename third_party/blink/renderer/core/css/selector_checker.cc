@@ -55,6 +55,7 @@
 #include "third_party/blink/renderer/core/frame/settings.h"
 #include "third_party/blink/renderer/core/fullscreen/fullscreen.h"
 #include "third_party/blink/renderer/core/html/custom/element_internals.h"
+#include "third_party/blink/renderer/core/html/forms/html_button_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_field_set_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_form_control_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_input_element.h"
@@ -63,6 +64,7 @@
 #include "third_party/blink/renderer/core/html/html_dialog_element.h"
 #include "third_party/blink/renderer/core/html/html_document.h"
 #include "third_party/blink/renderer/core/html/html_frame_element_base.h"
+#include "third_party/blink/renderer/core/html/html_permission_element.h"
 #include "third_party/blink/renderer/core/html/html_slot_element.h"
 #include "third_party/blink/renderer/core/html/media/html_video_element.h"
 #include "third_party/blink/renderer/core/html/parser/html_parser_idioms.h"
@@ -1765,19 +1767,16 @@ bool SelectorChecker::CheckPseudoClass(const SelectorCheckingContext& context,
         break;
       }
 
-      if (auto* html_element = DynamicTo<HTMLElement>(element)) {
-        // Recomputing the slot assignment can update cached directionality.
-        // This should already have been done unless this an API call like
-        // Element.matches().
-        Document& document = element.GetDocument();
-        if (document.IsSlotAssignmentDirty()) {
-          CHECK_EQ(mode_, kQueryingRules);
-          document.GetSlotAssignmentEngine().RecalcSlotAssignments();
-        }
-
-        return html_element->CachedDirectionality() == direction;
+      // Recomputing the slot assignment can update cached directionality.
+      // This should already have been done unless this an API call like
+      // Element.matches().
+      Document& document = element.GetDocument();
+      if (document.IsSlotAssignmentDirty()) {
+        CHECK_EQ(mode_, kQueryingRules);
+        document.GetSlotAssignmentEngine().RecalcSlotAssignments();
       }
-      break;
+
+      return element.CachedDirectionality() == direction;
     }
     case CSSSelector::kPseudoDialogInTopLayer:
       if (auto* dialog = DynamicTo<HTMLDialogElement>(element)) {
@@ -1841,6 +1840,11 @@ bool SelectorChecker::CheckPseudoClass(const SelectorCheckingContext& context,
       DCHECK(RuntimeEnabledFeatures::CSSPseudoPlayingPausedEnabled());
       auto* media_element = DynamicTo<HTMLMediaElement>(element);
       return media_element && media_element->paused();
+    }
+    case CSSSelector::kPseudoPermissionGranted: {
+      DCHECK(RuntimeEnabledFeatures::PermissionElementEnabled());
+      auto* permission_element = DynamicTo<HTMLPermissionElement>(element);
+      return permission_element && permission_element->granted();
     }
     case CSSSelector::kPseudoPictureInPicture:
       return PictureInPictureController::IsElementInPictureInPicture(&element);
@@ -2016,30 +2020,27 @@ static bool MatchesUAShadowElement(Element& element, const AtomicString& id) {
 
 bool SelectorChecker::CheckPseudoAutofill(CSSSelector::PseudoType pseudo_type,
                                           Element& element) const {
-  HTMLFormControlElement* html_form_element = nullptr;
-  HTMLSelectListElement* owner_html_select_list_element =
-      HTMLSelectListElement::OwnerSelectList(&element);
-  if (owner_html_select_list_element &&
-      owner_html_select_list_element->AssignedPartType(&element) ==
-          HTMLSelectListElement::PartType::kButton) {
-    html_form_element = owner_html_select_list_element;
-  } else {
-    html_form_element = DynamicTo<HTMLFormControlElement>(&element);
+  HTMLFormControlElement* form_control_element =
+      DynamicTo<HTMLFormControlElement>(&element);
+  if (auto* button = DynamicTo<HTMLButtonElement>(&element)) {
+    if (auto* selectlist = button->OwnerSelectList()) {
+      form_control_element = selectlist;
+    }
   }
 
-  if (!html_form_element) {
+  if (!form_control_element) {
     return false;
   }
   switch (pseudo_type) {
     case CSSSelector::kPseudoAutofill:
     case CSSSelector::kPseudoWebKitAutofill:
-      return html_form_element->IsAutofilled() ||
-             html_form_element->IsPreviewed();
+      return form_control_element->IsAutofilled() ||
+             form_control_element->IsPreviewed();
     case CSSSelector::kPseudoAutofillPreviewed:
-      return html_form_element->GetAutofillState() ==
+      return form_control_element->GetAutofillState() ==
              WebAutofillState::kPreviewed;
     case CSSSelector::kPseudoAutofillSelected:
-      return html_form_element->HighlightAutofilled();
+      return form_control_element->HighlightAutofilled();
     default:
       NOTREACHED();
   }

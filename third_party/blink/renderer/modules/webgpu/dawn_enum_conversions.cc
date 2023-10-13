@@ -10,7 +10,6 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_blend_operation.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_buffer_binding_type.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_compare_function.h"
-#include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_compute_pass_timestamp_location.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_cull_mode.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_error_filter.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_feature_name.h"
@@ -22,7 +21,6 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_pipeline_statistic_name.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_primitive_topology.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_query_type.h"
-#include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_render_pass_timestamp_location.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_sampler_binding_type.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_stencil_operation.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_storage_texture_access.h"
@@ -844,6 +842,8 @@ WGPUVertexFormat AsDawnEnum(const V8GPUVertexFormat& webgpu_enum) {
       return WGPUVertexFormat_Sint32x3;
     case V8GPUVertexFormat::Enum::kSint32X4:
       return WGPUVertexFormat_Sint32x4;
+    case V8GPUVertexFormat::Enum::kUnorm1010102:
+      return WGPUVertexFormat_Unorm10_10_10_2;
   }
 }
 
@@ -918,26 +918,6 @@ WGPUErrorFilter AsDawnEnum(const V8GPUErrorFilter& webgpu_enum) {
   }
 }
 
-WGPUComputePassTimestampLocation AsDawnEnum(
-    const V8GPUComputePassTimestampLocation& webgpu_enum) {
-  switch (webgpu_enum.AsEnum()) {
-    case V8GPUComputePassTimestampLocation::Enum::kBeginning:
-      return WGPUComputePassTimestampLocation_Beginning;
-    case V8GPUComputePassTimestampLocation::Enum::kEnd:
-      return WGPUComputePassTimestampLocation_End;
-  }
-}
-
-WGPURenderPassTimestampLocation AsDawnEnum(
-    const V8GPURenderPassTimestampLocation& webgpu_enum) {
-  switch (webgpu_enum.AsEnum()) {
-    case V8GPURenderPassTimestampLocation::Enum::kBeginning:
-      return WGPURenderPassTimestampLocation_Beginning;
-    case V8GPURenderPassTimestampLocation::Enum::kEnd:
-      return WGPURenderPassTimestampLocation_End;
-  }
-}
-
 const char* FromDawnEnum(WGPUBufferMapState dawn_enum) {
   switch (dawn_enum) {
     case WGPUBufferMapState_Unmapped:
@@ -947,6 +927,50 @@ const char* FromDawnEnum(WGPUBufferMapState dawn_enum) {
     case WGPUBufferMapState_Mapped:
       return "mapped";
     case WGPUBufferMapState_Force32:
+      NOTREACHED();
+  }
+  return "";
+}
+
+const char* FromDawnEnum(WGPUBackendType dawn_enum) {
+  switch (dawn_enum) {
+    case WGPUBackendType_Undefined:
+      return "";
+    case WGPUBackendType_Null:
+      return "null";
+    case WGPUBackendType_WebGPU:
+      return "WebGPU";
+    case WGPUBackendType_D3D11:
+      return "D3D11";
+    case WGPUBackendType_D3D12:
+      return "D3D12";
+    case WGPUBackendType_Metal:
+      return "metal";
+    case WGPUBackendType_Vulkan:
+      return "vulkan";
+    case WGPUBackendType_OpenGL:
+      return "openGL";
+    case WGPUBackendType_OpenGLES:
+      return "openGLES";
+    case WGPUBackendType_Force32:
+    default:
+      NOTREACHED();
+  }
+  return "";
+}
+
+const char* FromDawnEnum(WGPUAdapterType dawn_enum) {
+  switch (dawn_enum) {
+    case WGPUAdapterType_DiscreteGPU:
+      return "discrete GPU";
+    case WGPUAdapterType_IntegratedGPU:
+      return "integrated GPU";
+    case WGPUAdapterType_CPU:
+      return "CPU";
+    case WGPUAdapterType_Unknown:
+      return "unknown";
+    case WGPUAdapterType_Force32:
+    default:
       NOTREACHED();
   }
   return "";

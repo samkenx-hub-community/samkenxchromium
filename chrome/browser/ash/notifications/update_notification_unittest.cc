@@ -46,7 +46,7 @@ class UpdateNotificationTest : public testing::Test,
   bool IsUpdateNotificationEnabled() const { return GetParam(); }
 
   void SetUp() override {
-    user_data_dir_.CreateUniqueTempDir();
+    ASSERT_TRUE(user_data_dir_.CreateUniqueTempDir());
     auto profile_manager_unique =
         std::make_unique<FakeProfileManager>(user_data_dir_.GetPath());
     fake_profile_manager_ = profile_manager_unique.get();
@@ -126,7 +126,10 @@ TEST_P(UpdateNotificationTest, ShowNotification) {
 
   // Show the update notification if the flag is enabled.
   ASSERT_TRUE(notification);
-  EXPECT_EQ(u"Your Chromebook is updated.", notification->message());
+  EXPECT_EQ(
+      u"New features include Magic Eraser on Google Photos to remove "
+      u"distractions, improved video call tools, and more",
+      notification->message());
 }
 
 }  // namespace ash

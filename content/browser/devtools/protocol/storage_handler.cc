@@ -1039,6 +1039,9 @@ void StorageHandler::OnInterestGroupAccessed(
     case AccessType::kAdditionalBidWin:
       type_enum = Storage::InterestGroupAccessTypeEnum::AdditionalBidWin;
       break;
+    case AccessType::kClear:
+      type_enum = Storage::InterestGroupAccessTypeEnum::Clear;
+      break;
   };
   frontend_->InterestGroupAccessed(access_time.ToDoubleT(), type_enum,
                                    owner_origin.Serialize(), name);
@@ -1066,7 +1069,7 @@ void SendGetInterestGroup(
   if (group.ads) {
     for (const auto& ad : *group.ads) {
       auto protocol_ad = protocol::Storage::InterestGroupAd::Create()
-                             .SetRenderUrl(ad.render_url.spec())
+                             .SetRenderURL(ad.render_url.spec())
                              .Build();
       if (ad.metadata) {
         protocol_ad->SetMetadata(*ad.metadata);
@@ -1079,7 +1082,7 @@ void SendGetInterestGroup(
   if (group.ad_components) {
     for (const auto& ad : *group.ad_components) {
       auto protocol_ad = protocol::Storage::InterestGroupAd::Create()
-                             .SetRenderUrl(ad.render_url.spec())
+                             .SetRenderURL(ad.render_url.spec())
                              .Build();
       if (ad.metadata) {
         protocol_ad->SetMetadata(*ad.metadata);
@@ -1098,17 +1101,17 @@ void SendGetInterestGroup(
           .SetAdComponents(std::move(ad_components))
           .Build();
   if (group.bidding_url) {
-    protocol_group->SetBiddingUrl(group.bidding_url->spec());
+    protocol_group->SetBiddingLogicURL(group.bidding_url->spec());
   }
   if (group.bidding_wasm_helper_url) {
-    protocol_group->SetBiddingWasmHelperUrl(
+    protocol_group->SetBiddingWasmHelperURL(
         group.bidding_wasm_helper_url->spec());
   }
   if (group.update_url) {
-    protocol_group->SetUpdateUrl(group.update_url->spec());
+    protocol_group->SetUpdateURL(group.update_url->spec());
   }
   if (group.trusted_bidding_signals_url) {
-    protocol_group->SetTrustedBiddingSignalsUrl(
+    protocol_group->SetTrustedBiddingSignalsURL(
         group.trusted_bidding_signals_url->spec());
   }
   if (group.user_bidding_signals) {
@@ -1674,9 +1677,6 @@ ToSourceRegistrationResult(StoreSourceResult result) {
   switch (result) {
     case StoreSourceResult::kSuccess:
       return Storage::AttributionReportingSourceRegistrationResultEnum::Success;
-    // This is temporarily being shown as an internal error, will be surfaced
-    // as the source-registration-parsing level after refactoring.
-    case StoreSourceResult::kEventReportWindowsInvalidStartTime:
     case StoreSourceResult::kInternalError:
       return Storage::AttributionReportingSourceRegistrationResultEnum::
           InternalError;
@@ -1744,22 +1744,16 @@ ToAggregationKeysEntries(const attribution_reporting::AggregationKeys& keys) {
   return out;
 }
 
-void SetEventReportWindowOrWindows(
-    const attribution_reporting::EventReportWindows& windows,
-    std::unique_ptr<Storage::AttributionReportingSourceRegistration>& out) {
-  if (windows.OnlySingularWindow()) {
-    out->SetEventReportWindow(windows.window_time().InSeconds());
-  } else {
-    auto end_times = std::make_unique<Array<int>>();
-    for (base::TimeDelta end_time : windows.end_times()) {
-      end_times->emplace_back(end_time.InSeconds());
-    }
-    out->SetEventReportWindows(
-        Storage::AttributionReportingEventReportWindows::Create()
-            .SetStart(windows.start_time().InSeconds())
-            .SetEnds(std::move(end_times))
-            .Build());
+std::unique_ptr<Storage::AttributionReportingEventReportWindows>
+ToEventReportWindows(const attribution_reporting::EventReportWindows& windows) {
+  auto end_times = std::make_unique<Array<int>>();
+  for (base::TimeDelta end_time : windows.end_times()) {
+    end_times->emplace_back(end_time.InSeconds());
   }
+  return Storage::AttributionReportingEventReportWindows::Create()
+      .SetStart(windows.start_time().InSeconds())
+      .SetEnds(std::move(end_times))
+      .Build();
 }
 
 }  // namespace
@@ -1792,21 +1786,12 @@ void StorageHandler::OnSourceHandled(
           .SetFilterData(ToFilterDataEntries(registration.filter_data))
           .SetAggregationKeys(
               ToAggregationKeysEntries(registration.aggregation_keys))
+          .SetExpiry(registration.expiry.InSeconds())
+          .SetEventReportWindows(
+              ToEventReportWindows(registration.event_report_windows))
+          .SetAggregatableReportWindow(
+              registration.aggregatable_report_window.InSeconds())
           .Build();
-
-  if (absl::optional<base::TimeDelta> delta = registration.expiry) {
-    out_source->SetExpiry(delta->InSeconds());
-  }
-
-  if (registration.event_report_windows.has_value()) {
-    SetEventReportWindowOrWindows(*registration.event_report_windows,
-                                  out_source);
-  }
-
-  if (absl::optional<base::TimeDelta> delta =
-          registration.aggregatable_report_window) {
-    out_source->SetAggregatableReportWindow(delta->InSeconds());
-  }
 
   if (registration.debug_key.has_value()) {
     out_source->SetDebugKey(base::NumberToString(*registration.debug_key));

@@ -68,6 +68,7 @@ class CORE_EXPORT StylePropertySerializer {
       const StylePropertyShorthand&) const;
   String GetShorthandValueForGrid(const StylePropertyShorthand&) const;
   String GetShorthandValueForGridArea(const StylePropertyShorthand&) const;
+  String GetShorthandValueForGridLine(const StylePropertyShorthand&) const;
   String GetShorthandValueForGridTemplate(const StylePropertyShorthand&) const;
   String ContainerValue() const;
   String TimelineValue(const StylePropertyShorthand&) const;
@@ -83,6 +84,7 @@ class CORE_EXPORT StylePropertySerializer {
                                           StringBuilder& result) const;
   String OffsetValue() const;
   String TextDecorationValue() const;
+  String TextSpacingValue() const;
   String BackgroundRepeatPropertyValue() const;
   String ContainIntrinsicSizeValue() const;
   String WhiteSpaceValue() const;

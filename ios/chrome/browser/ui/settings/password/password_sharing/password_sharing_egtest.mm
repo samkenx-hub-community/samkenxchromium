@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#import "base/test/ios/wait_util.h"
 #import "components/password_manager/core/browser/features/password_features.h"
 #import "components/password_manager/core/common/password_manager_features.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
@@ -24,6 +25,7 @@
 
 namespace {
 
+using base::test::ios::kWaitForActionTimeout;
 using chrome_test_util::ButtonWithAccessibilityLabel;
 using password_manager_test_utils::kScrollAmount;
 using password_manager_test_utils::OpenPasswordManager;
@@ -245,6 +247,40 @@ void SignInAndEnableSync() {
       assertWithMatcher:grey_notNil()];
 }
 
+- (void)testTappingGotItInFamilyPromoInviteMembersView {
+  // Override family status with
+  // `FetchFamilyMembersRequestStatus::kNoOtherFamilyMembers`.
+  AppLaunchConfiguration config = [self appConfigurationForTestCase];
+  config.additional_args.push_back(std::string("-") +
+                                   test_switches::kFamilyStatus + "=5");
+  [[AppLaunchManager sharedManager] ensureAppLaunchedWithConfiguration:config];
+
+  SignInAndEnableSync();
+  [self saveExamplePasswordAndOpenDetails];
+
+  [[EarlGrey
+      selectElementWithMatcher:grey_accessibilityID(kPasswordShareButtonId)]
+      performAction:grey_tap()];
+
+  // Check that the family promo view was displayed.
+  [[EarlGrey
+      selectElementWithMatcher:
+          grey_accessibilityLabel(l10n_util::GetNSString(
+              IDS_IOS_PASSWORD_SHARING_FAMILY_PROMO_INVITE_MEMBERS_TITLE))]
+      assertWithMatcher:grey_sufficientlyVisible()];
+
+  // Click the "Got It" button.
+  [[EarlGrey selectElementWithMatcher:
+                 ButtonWithAccessibilityLabel(l10n_util::GetNSString(
+                     IDS_IOS_PASSWORD_SHARING_FAMILY_PROMO_BUTTON))]
+      performAction:grey_tap()];
+
+  // Check that the current view is the password details view.
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
+                                          kPasswordDetailsTableViewId)]
+      assertWithMatcher:grey_notNil()];
+}
+
 - (void)testFetchingRecipientsError {
   // Override family status with `FetchFamilyMembersRequestStatus::kUnknown`.
   AppLaunchConfiguration config = [self appConfigurationForTestCase];
@@ -284,22 +320,45 @@ void SignInAndEnableSync() {
       selectElementWithMatcher:grey_accessibilityID(kPasswordShareButtonId)]
       performAction:grey_tap()];
 
-  // Make sure share button is disabled before selecting recipient.
+  // Make sure that the share button is disabled before the recipient selection
+  // and enabled after.
   [[EarlGrey
       selectElementWithMatcher:grey_accessibilityID(kFamilyPickerShareButtonId)]
       assertWithMatcher:grey_not(grey_enabled())];
-
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"user1@gmail.com")]
       performAction:grey_tap()];
   [[EarlGrey
       selectElementWithMatcher:grey_accessibilityID(kFamilyPickerShareButtonId)]
       assertWithMatcher:grey_enabled()];
 
+  // Initiate sharing and wait for the animation to finish.
   [[EarlGrey
       selectElementWithMatcher:grey_accessibilityID(kFamilyPickerShareButtonId)]
       performAction:grey_tap()];
+  // TODO(crbug.com/1463882): Override animation time for tests.
+  GREYCondition* waitForAnimationEnding = [GREYCondition
+      conditionWithName:@"Wait for sharing animation to end"
+                  block:^{
+                    NSError* error = nil;
+                    [[EarlGrey
+                        selectElementWithMatcher:
+                            grey_allOf(
+                                grey_accessibilityLabel(l10n_util::GetNSString(
+                                    IDS_IOS_PASSWORD_SHARING_SUCCESS_TITLE)),
+                                grey_kindOfClassName(@"UILabel"), nil)]
+                        assertWithMatcher:grey_sufficientlyVisible()
+                                    error:&error];
+                    return error == nil;
+                  }];
+  GREYAssertTrue([waitForAnimationEnding
+                     waitWithTimeout:kWaitForActionTimeout.InSecondsF()],
+                 @"Animation did not finish.");
 
-  // Check that the current view is the password details view.
+  // Dismiss the success status view and check that the password details view is
+  // currently displayed.
+  [[EarlGrey
+      selectElementWithMatcher:grey_accessibilityID(kSharingStatusDoneButtonId)]
+      performAction:grey_tap()];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
                                           kPasswordDetailsTableViewId)]
       assertWithMatcher:grey_notNil()];
@@ -320,8 +379,7 @@ void SignInAndEnableSync() {
 
   // Select first row and click "Next".
   [[EarlGrey
-      selectElementWithMatcher:grey_allOf(grey_accessibilityID(
-                                              @"username1, example.com"),
+      selectElementWithMatcher:grey_allOf(grey_accessibilityID(@"username1"),
                                           grey_sufficientlyVisible(), nil)]
       performAction:grey_tap()];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
@@ -448,6 +506,11 @@ void SignInAndEnableSync() {
 }
 
 - (void)testTappingLearnMoreInFirstRunExperienceView {
+  // TODO(crbug.com/1488977): Test fails on iPad simulator.
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_DISABLED(@"Failing on iPad Simulator");
+  }
+
   [ChromeEarlGrey setBoolValue:NO
                    forUserPref:prefs::kPasswordSharingFlowHasBeenEntered];
 

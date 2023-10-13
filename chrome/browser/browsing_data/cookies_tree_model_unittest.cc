@@ -19,6 +19,7 @@
 #include "chrome/browser/content_settings/cookie_settings_factory.h"
 #include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/content_settings/mock_settings_observer.h"
+#include "chrome/browser/privacy_sandbox/tracking_protection_settings_factory.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/browsing_data/content/cookie_helper.h"
 #include "components/browsing_data/content/mock_browsing_data_quota_helper.h"
@@ -35,8 +36,6 @@
 #include "components/prefs/pref_service.h"
 #include "components/supervised_user/core/common/features.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/notification_details.h"
-#include "content/public/browser/notification_types.h"
 #include "content/public/browser/storage_usage_info.h"
 #include "content/public/test/browser_task_environment.h"
 #include "extensions/buildflags/buildflags.h"
@@ -104,8 +103,9 @@ class CookiesTreeModelTest : public testing::Test {
     auto cookie_settings =
         base::MakeRefCounted<content_settings::CookieSettings>(
             HostContentSettingsMapFactory::GetForProfile(profile_.get()),
-            profile_->GetPrefs(), profile_->IsIncognitoProfile(),
-            kExtensionScheme);
+            profile_->GetPrefs(),
+            TrackingProtectionSettingsFactory::GetForProfile(profile_.get()),
+            profile_->IsIncognitoProfile(), kExtensionScheme);
 #if BUILDFLAG(ENABLE_EXTENSIONS)
     special_storage_policy_ =
         base::MakeRefCounted<ExtensionSpecialStoragePolicy>(

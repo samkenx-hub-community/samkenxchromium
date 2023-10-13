@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 import '//read-anything-side-panel.top-chrome/shared/sp_empty_state.js';
+import '//read-anything-side-panel.top-chrome/shared/sp_shared_style.css.js';
 import '//resources/cr_elements/cr_hidden_style.css.js';
 import '../strings.m.js';
 import './read_anything_toolbar.js';
 
 import {ColorChangeUpdater} from '//resources/cr_components/color_change_listener/colors_css_updater.js';
 import {WebUiListenerMixin} from '//resources/cr_elements/web_ui_listener_mixin.js';
-import {assert} from '//resources/js/assert_ts.js';
+import {assert} from '//resources/js/assert.js';
 import {rgbToSkColor, skColorToRgba} from '//resources/js/color_utils.js';
 import {loadTimeData} from '//resources/js/load_time_data.js';
 import {SkColor} from '//resources/mojo/skia/public/mojom/skcolor.mojom-webui.js';
@@ -24,6 +25,18 @@ interface LinkColor {
   default: string;
   visited: string;
 }
+
+interface UtteranceSettings {
+  lang: string;
+  volume: number;
+  pitch: number;
+  rate: number;
+}
+
+interface VoicesByLanguage {
+  [lang: string]: SpeechSynthesisVoice[];
+}
+
 // TODO(crbug.com/1465029): Remove colors defined here once the Views toolbar is
 // removed.
 const style = getComputedStyle(document.body);
@@ -165,6 +178,7 @@ export class ReadAnythingElement extends ReadAnythingElementBase {
   private utterancesToSpeak_: SpeechSynthesisUtterance[] = [];
   private currentUtteranceIndex_: number = 0;
   private previousHighlight_: HTMLElement|null;
+  private currentColorSuffix_: string;
 
   // If the WebUI toolbar should be shown. This happens when the WebUI feature
   // flag is enabled.
@@ -176,6 +190,7 @@ export class ReadAnythingElement extends ReadAnythingElementBase {
   // State for speech synthesis needs to be tracked separately because there
   // are bugs with window.speechSynthesis.paused and
   // window.speechSynthesis.speaking on some platforms.
+  private voice: SpeechSynthesisVoice|undefined;
   paused = true;
   speechStarted = false;
   maxSpeechLength = 175;
@@ -319,8 +334,10 @@ export class ReadAnythingElement extends ReadAnythingElementBase {
         loadTimeData.getString('readAnythingLoadingMessage');
     this.emptyStateSubheading_ = '';
     this.hasContent_ = false;
-    this.synth.cancel();
-    this.onSpeechStopped();
+    if (this.isReadAloudEnabled_) {
+      this.synth.cancel();
+      this.onSpeechStopped();
+    }
   }
 
   // TODO(crbug.com/1474951): Handle focus changes for speech, including
@@ -400,6 +417,92 @@ export class ReadAnythingElement extends ReadAnythingElementBase {
 
   onSpeechRateChange(rate: number) {
     this.rate = rate;
+  }
+
+  getSpeechSynthesisVoice(): SpeechSynthesisVoice|undefined {
+    if (!this.voice) {
+      this.voice = this.defaultVoice();
+    }
+    return this.voice;
+  }
+
+  defaultVoice(): SpeechSynthesisVoice|undefined {
+    // TODO(crbug.com/1474951): Additional logic to find default voice if there
+    // isn't a voice marked as default
+
+    // TODO(crbug.com/1474951): Filter by localService. Doing this now prevents
+    // voices from loading on Linux, which slows down development.
+    const languageCode = chrome.readingMode.speechSynthesisLanguageCode;
+    // TODO(crbug.com/1474951): Ensure various locales are handled such as
+    // "en-US" vs. "en-UK." This should be fixed by using page language instead
+    // of browser language.
+    const voices = this.synth.getVoices().filter(
+        voice => voice.lang.startsWith(languageCode));
+    if (!voices || (voices.length === 0)) {
+      // If no voices in the given language are found, use the default voice.
+      return this.synth.getVoices().find(
+          ({default: isDefaultVoice}) => isDefaultVoice);
+    }
+
+    // The default voice doesn't always match with the actual default voice
+    // of the device, therefore use the language code to find a voice first.
+    const voice = voices.find(({default: isDefaultVoice}) => isDefaultVoice);
+    if (!voice) {
+      return voices[0];
+    }
+
+    return voice;
+  }
+
+  getVoices(): VoicesByLanguage {
+    // TODO(crbug.com/1474951): Filter by localService. Doing this now prevents
+    // voices from loading on Linux, which slows down development.
+    return this.synth.getVoices()
+        .reduce(
+            (voicesByLang: VoicesByLanguage, voice: SpeechSynthesisVoice) => {
+              (voicesByLang[voice.lang] = voicesByLang[voice.lang] || [])
+                  .push(voice);
+              return voicesByLang;
+            },
+            {});
+  }
+
+  setSpeechSynthesisVoice(voice: SpeechSynthesisVoice) {
+    this.voice = voice;
+  }
+
+  previewSpeechSynthesisVoice(voice: SpeechSynthesisVoice) {
+    const defaultUtteranceSettings = this.defaultUtteranceSettings();
+
+    // TODO(crbug.com/1474951): Translate the utterance into the language of
+    // the voice being previewed, and remove the hard-coded string.
+    // TODO(crbug.com/1474951): Call this.synth.cancel() to interrupt reading
+    // and reset the play icon.
+    const utterance = new SpeechSynthesisUtterance('Hi. This is a preview');
+    utterance.voice = voice;
+    utterance.lang = defaultUtteranceSettings.lang;
+    utterance.volume = defaultUtteranceSettings.volume;
+    utterance.pitch = defaultUtteranceSettings.pitch;
+    utterance.rate = defaultUtteranceSettings.rate;
+
+    // TODO(crbug.com/1474951): Add tests for pause button
+    utterance.onstart = event => {
+      const toolbar = this.shadowRoot?.getElementById('toolbar');
+      assert(toolbar);
+      if (toolbar instanceof ReadAnythingToolbar) {
+        toolbar.showVoicePreviewPlaying(event.utterance.voice);
+      }
+    };
+
+    utterance.onend = () => {
+      const toolbar = this.shadowRoot?.getElementById('toolbar');
+      assert(toolbar);
+      if (toolbar instanceof ReadAnythingToolbar) {
+        toolbar.showVoicePreviewDone();
+      }
+    };
+
+    this.synth.speak(utterance);
   }
 
   stopSpeech() {
@@ -559,29 +662,39 @@ export class ReadAnythingElement extends ReadAnythingElementBase {
   playCurrentMessage() {
     const message = this.utterancesToSpeak_[this.currentUtteranceIndex_];
 
-    // TODO(crbug.com/1474951): Use correct locale when speaking.
-    const languageCode = chrome.readingMode.speechSynthesisLanguageCode;
-    message.lang = languageCode;
+    const voice = this.getSpeechSynthesisVoice();
+    if (!voice) {
+      // TODO(crbug.com/1474951): Handle when no voices are available.
+      return;
+    }
 
-    // TODO(crbug.com/1474951): Allow voice selection.
-    // This just selects the default voice of the brower's language. If no
-    // voice is available, nothing happens.
-    const voices =
-        this.synth.getVoices().filter(voice => voice.lang === languageCode);
-    message.voice = voices[0];
+    message.voice = voice;
 
-    // TODO(crbug.com/1474951): Ensure the correct default values are used.
-    message.volume = 1;
-    message.pitch = 1;
-
-    // TODO(crbug.com/1474951): Ensure rate change happens immediately, rather
-    // than on the next set of text.
-    // TODO(crbug.com/1474951): Ensure the rate is valid for the current speech
-    // engine.
-    message.rate = this.rate;
+    const utteranceSettings = this.defaultUtteranceSettings();
+    message.lang = utteranceSettings.lang;
+    message.volume = utteranceSettings.volume;
+    message.pitch = utteranceSettings.pitch;
+    message.rate = utteranceSettings.rate;
 
     this.speechStarted = true;
     this.synth.speak(message);
+  }
+
+  private defaultUtteranceSettings(): UtteranceSettings {
+    // TODO(crbug.com/1474951): Use correct locale when speaking.
+    const lang = chrome.readingMode.speechSynthesisLanguageCode;
+
+    return {
+      lang,
+      // TODO(crbug.com/1474951): Ensure rate change happens immediately, rather
+      // than on the next set of text.
+      // TODO(crbug.com/1474951): Ensure the rate is valid for the current
+      // speech engine.
+      rate: this.rate,
+      // TODO(crbug.com/1474951): Ensure the correct default values are used.
+      volume: 1,
+      pitch: 1,
+    };
   }
 
   // The following results in
@@ -774,10 +887,10 @@ export class ReadAnythingElement extends ReadAnythingElementBase {
   }
 
   updateHighlight(show: boolean) {
-    // TODO(crbug.com/1474951): This is a placeholder color. Use the UX color
-    // once finalized.
+    const highlightBackground =
+        this.getCurrentHighlightColorVar(this.currentColorSuffix_);
     this.updateStyles({
-      '--current-highlight-bg-color': show ? 'var(--google-yellow-400)' :
+      '--current-highlight-bg-color': show ? highlightBackground :
                                              'transparent',
     });
   }
@@ -785,12 +898,17 @@ export class ReadAnythingElement extends ReadAnythingElementBase {
   // TODO(crbug.com/1465029): This method should be renamed to updateTheme()
   // and replace the one below once we've removed the Views toolbar.
   updateThemeFromWebUi(colorSuffix: string) {
+    this.currentColorSuffix_ = colorSuffix;
     const emptyStateBodyColor = colorSuffix ?
         this.getEmptyStateBodyColorFromWebUi_(colorSuffix) :
         'var(--color-side-panel-card-secondary-foreground)';
     this.updateStyles({
       '--background-color': this.getBackgroundColorVar(colorSuffix),
       '--foreground-color': this.getForegroundColorVar(colorSuffix),
+      '--current-highlight-bg-color':
+          this.getCurrentHighlightColorVar(colorSuffix),
+      '--previous-highlight-color':
+          this.getPreviousHighlightColorVar(colorSuffix),
       '--sp-empty-state-heading-color':
           `var(--color-read-anything-foreground${colorSuffix})`,
       '--sp-empty-state-body-color': emptyStateBodyColor,
@@ -800,6 +918,14 @@ export class ReadAnythingElement extends ReadAnythingElementBase {
       '--visited-link-color':
           `var(--color-read-anything-link-visited${colorSuffix})`,
     });
+  }
+
+  getCurrentHighlightColorVar(colorSuffix: string) {
+    return `var(--color-current-read-aloud-highlight${colorSuffix})`;
+  }
+
+  getPreviousHighlightColorVar(colorSuffix: string) {
+    return `var(--color-previous-read-aloud-highlight${colorSuffix})`;
   }
 
   getBackgroundColorVar(colorSuffix: string) {
@@ -843,6 +969,19 @@ export class ReadAnythingElement extends ReadAnythingElementBase {
     const toolbar = shadowRoot.getElementById('toolbar');
     if (toolbar instanceof ReadAnythingToolbar) {
       toolbar.updateFonts();
+    }
+  }
+
+  private onKeyDown_(e: KeyboardEvent) {
+    if (e.key === 'k') {
+      e.stopPropagation();
+      const shadowRoot = this.shadowRoot;
+      assert(shadowRoot);
+      const toolbar = shadowRoot.getElementById('toolbar');
+      assert(toolbar);
+      if (toolbar instanceof ReadAnythingToolbar) {
+        toolbar.onPlayPauseClick();
+      }
     }
   }
 }

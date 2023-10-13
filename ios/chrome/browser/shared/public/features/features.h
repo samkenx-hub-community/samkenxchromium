@@ -158,9 +158,6 @@ BASE_DECLARE_FEATURE(kTabGridNewTransitions);
 // Whether the new tab grid tabs transitions should be enabled.
 bool IsNewTabGridTransitionsEnabled();
 
-// Feature to enable multiline gradient support in fade truncating label.
-BASE_DECLARE_FEATURE(kMultilineFadeTruncatingLabel);
-
 // Feature flag to control the maximum amount of non-modal DB promo impressions
 // server-side. Enabled by default to always have a default impression limit
 // value.
@@ -215,7 +212,7 @@ bool IsBottomOmniboxSteadyStateEnabled();
 BASE_DECLARE_FEATURE(kOnlyAccessClipboardAsync);
 
 // Feature flag that enables default browser video in settings experiment.
-BASE_DECLARE_FEATURE(kDBVideoInSettings);
+BASE_DECLARE_FEATURE(kDefaultBrowserVideoInSettings);
 
 // Feature flag that enables default browser promo to be displayed without
 // matching all the criteria and in depth metrics collection for the displayed
@@ -245,5 +242,11 @@ BASE_DECLARE_FEATURE(kIOSSaveToPhotos);
 // Kill switch to control the `settingsWillBeDismissed` bug fix (see
 // crbug.com/1482284).
 BASE_DECLARE_FEATURE(kSettingsWillBeDismissedBugFixKillSwitch);
+
+// Enables the new UIEditMenuInteraction system to be used in place of
+// UIMenuController which was deprecated in iOS 16.
+// TODO(crbug.com/1489734) Remove Flag once the minimum iOS deployment version
+// has been increased to iOS 16.
+BASE_DECLARE_FEATURE(kEnableUIEditMenuInteraction);
 
 #endif  // IOS_CHROME_BROWSER_SHARED_PUBLIC_FEATURES_FEATURES_H_

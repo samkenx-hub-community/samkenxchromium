@@ -6,17 +6,8 @@
 
 #include <utility>
 
-#include "chrome/browser/metrics/chrome_metrics_service_accessor.h"
-#include "chrome/common/chrome_switches.h"
-
 namespace {
 
-constexpr char kEarlySingletonForceEnabledGroup[] = "Enabled_Forced3";
-constexpr char kEarlySingletonEnabledGroup[] = "Enabled3";
-constexpr char kEarlySingletonDisabledMergeGroup[] = "Disabled_Merge3";
-constexpr char kEarlySingletonDefaultGroup[] = "Default3";
-
-const char* g_early_singleton_feature_group_ = nullptr;
 ChromeProcessSingleton* g_chrome_process_singleton_ = nullptr;
 
 }  // namespace
@@ -26,9 +17,8 @@ ChromeProcessSingleton::ChromeProcessSingleton(
     : startup_lock_(
           base::BindRepeating(&ChromeProcessSingleton::NotificationCallback,
                               base::Unretained(this))),
-      modal_dialog_lock_(startup_lock_.AsNotificationCallback()),
       process_singleton_(user_data_dir,
-                         modal_dialog_lock_.AsNotificationCallback()) {}
+                         startup_lock_.AsNotificationCallback()) {}
 
 ChromeProcessSingleton::~ChromeProcessSingleton() = default;
 
@@ -51,12 +41,6 @@ void ChromeProcessSingleton::Cleanup() {
   if (is_singleton_instance_) {
     process_singleton_.Cleanup();
   }
-}
-
-void ChromeProcessSingleton::SetModalDialogNotificationHandler(
-    base::RepeatingClosure notification_handler) {
-  modal_dialog_lock_.SetModalDialogNotificationHandler(
-      std::move(notification_handler));
 }
 
 void ChromeProcessSingleton::Unlock(
@@ -91,42 +75,6 @@ ChromeProcessSingleton* ChromeProcessSingleton::GetInstance() {
 bool ChromeProcessSingleton::IsSingletonInstance() {
   return g_chrome_process_singleton_ &&
          g_chrome_process_singleton_->is_singleton_instance_;
-}
-
-// static
-void ChromeProcessSingleton::SetupEarlySingletonFeature(
-    const base::CommandLine& command_line) {
-  DCHECK(!g_early_singleton_feature_group_);
-  if (command_line.HasSwitch(switches::kEnableEarlyProcessSingleton)) {
-    g_early_singleton_feature_group_ = kEarlySingletonForceEnabledGroup;
-    return;
-  }
-
-  g_early_singleton_feature_group_ = kEarlySingletonDefaultGroup;
-}
-
-// static
-void ChromeProcessSingleton::RegisterEarlySingletonFeature() {
-  DCHECK(g_early_singleton_feature_group_);
-  // The synthetic trial needs to use kCurrentLog to ensure that UMA report will
-  // be generated from the metrics log that is open at the time of registration.
-  ChromeMetricsServiceAccessor::RegisterSyntheticFieldTrial(
-      "EarlyProcessSingleton", g_early_singleton_feature_group_,
-      variations::SyntheticTrialAnnotationMode::kCurrentLog);
-}
-
-// static
-bool ChromeProcessSingleton::IsEarlySingletonFeatureEnabled() {
-  return g_early_singleton_feature_group_ == kEarlySingletonEnabledGroup ||
-         g_early_singleton_feature_group_ == kEarlySingletonForceEnabledGroup;
-}
-
-// static
-bool ChromeProcessSingleton::ShouldMergeMetrics() {
-  // This should not be called when the early singleton feature is enabled.
-  DCHECK(g_early_singleton_feature_group_ && !IsEarlySingletonFeatureEnabled());
-
-  return g_early_singleton_feature_group_ == kEarlySingletonDisabledMergeGroup;
 }
 
 bool ChromeProcessSingleton::NotificationCallback(

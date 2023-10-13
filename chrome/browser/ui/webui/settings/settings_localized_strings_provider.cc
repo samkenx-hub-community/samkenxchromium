@@ -77,6 +77,7 @@
 #include "components/password_manager/core/common/password_manager_features.h"
 #include "components/performance_manager/public/features.h"
 #include "components/permissions/features.h"
+#include "components/plus_addresses/features.h"
 #include "components/prefs/pref_service.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
 #include "components/safe_browsing/core/browser/hashprefix_realtime/hash_realtime_utils.h"
@@ -514,6 +515,7 @@ void AddClearBrowsingDataStrings(content::WebUIDataSource* html_source,
     {"clearPeriod7Days", IDS_SETTINGS_CLEAR_PERIOD_7_DAYS},
     {"clearPeriod4Weeks", IDS_SETTINGS_CLEAR_PERIOD_FOUR_WEEKS},
     {"clearPeriodEverything", IDS_SETTINGS_CLEAR_PERIOD_EVERYTHING},
+    {"clearPeriod15Minutes", IDS_SETTINGS_CLEAR_PERIOD_15_MINUTES},
     {"historyDeletionDialogTitle",
      IDS_CLEAR_BROWSING_DATA_HISTORY_NOTICE_TITLE},
     {"historyDeletionDialogOK", IDS_CLEAR_BROWSING_DATA_HISTORY_NOTICE_OK},
@@ -1066,7 +1068,8 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
     {"migratableCardsInfoSingle", IDS_SETTINGS_SINGLE_MIGRATABLE_CARD_INFO},
     {"migratableCardsInfoMultiple",
      IDS_SETTINGS_MULTIPLE_MIGRATABLE_CARDS_INFO},
-    {"remoteCreditCardLinkLabel", IDS_SETTINGS_REMOTE_CREDIT_CARD_LINK_LABEL},
+    {"remotePaymentMethodsLinkLabel",
+     IDS_SETTINGS_REMOTE_PAYMENT_METHODS_LINK_LABEL},
     {"canMakePaymentToggleLabel", IDS_SETTINGS_CAN_MAKE_PAYMENT_TOGGLE_LABEL},
     {"autofillDetail", IDS_SETTINGS_AUTOFILL_DETAIL},
     {"passwords", IDS_SETTINGS_PASSWORD_MANAGER},
@@ -1128,6 +1131,7 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
      IDS_SETTINGS_PASSWORDS_BIOMETRIC_AUTHENTICATION_FOR_FILLING_TOGGLE_LABEL_WIN},
     {"managePasskeysSubTitle", IDS_AUTOFILL_MANAGE_PASSKEYS_SUB_TITLE_WIN},
 #endif
+    {"plusAddressSettings", IDS_PLUS_ADDRESS_SETTINGS_LABEL},
   };
 
   GURL google_password_manager_url = GetGooglePasswordManagerURL(
@@ -1139,7 +1143,7 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
                          l10n_util::GetStringFUTF16(
                              IDS_SETTINGS_PAYMENTS_MANAGE_CREDIT_CARDS,
                              base::UTF8ToUTF16(chrome::kPaymentMethodsURL)));
-  html_source->AddString("manageCreditCardsUrl",
+  html_source->AddString("managePaymentMethodsUrl",
                          autofill::payments::GetManageInstrumentsUrl().spec());
   html_source->AddString("addressesAndPaymentMethodsLearnMoreURL",
                          chrome::kAddressesAndPaymentMethodsLearnMoreURL);
@@ -1219,6 +1223,9 @@ void AddAutofillStrings(content::WebUIDataSource* html_source,
       "syncEnableContactInfoDataTypeInTransportMode",
       base::FeatureList::IsEnabled(
           syncer::kSyncEnableContactInfoDataTypeInTransportMode));
+
+  html_source->AddString("plusAddressManagementUrl",
+                         plus_addresses::kPlusAddressManagementUrl.Get());
 }
 
 void AddSignOutDialogStrings(content::WebUIDataSource* html_source,
@@ -2600,10 +2607,14 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
      IDS_SETTINGS_TRACKING_PROTECTION_THIRD_PARTY_COOKIES_TOGGLE_LABEL},
     {"trackingProtectionThirdPartyCookiesToggleSubLabel",
      IDS_SETTINGS_TRACKING_PROTECTION_THIRD_PARTY_COOKIES_TOGGLE_SUB_LABEL},
+    {"trackingProtectionThirdPartyCookiesLearnMoreAriaLabel",
+     IDS_SETTINGS_TRACKING_PROTECTION_THIRD_PARTY_COOKIES_LEARN_MORE_ARIA_LABEL},
     {"trackingProtectionDoNotTrackToggleSubLabel",
      IDS_SETTINGS_TRACKING_PROTECTION_DO_NOT_TRACK_TOGGLE_SUB_LABEL},
-    {"trackingProtectionAdvancedExpandA11yLabel",
-     IDS_SETTINGS_TRACKING_PROTECTION_ADVANCED_EXPAND_A11Y_LABEL},
+    {"trackingProtectionSitesAllowedCookiesTitle",
+     IDS_SETTINGS_TRACKING_PROTECTION_SITES_ALLOWED_COOKIES_TITLE},
+    {"trackingProtectionSitesAllowedCookiesDescription",
+     IDS_SETTINGS_TRACKING_PROTECTION_SITES_ALLOWED_COOKIES_DESCRIPTION},
     {"siteSettingsCategoryFederatedIdentityApi",
      IDS_SITE_SETTINGS_TYPE_FEDERATED_IDENTITY_API},
     {"siteSettingsCategoryHandlers", IDS_SITE_SETTINGS_TYPE_HANDLERS},
@@ -2628,6 +2639,8 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
      IDS_SETTINGS_SITE_SETTINGS_ALL_SITES_SORT_METHOD_STORAGE},
     {"siteSettingsAllSitesSortMethodName",
      IDS_SETTINGS_SITE_SETTINGS_ALL_SITES_SORT_METHOD_NAME},
+    {"siteSettingsFileSystemSiteListHeader",
+     IDS_SETTINGS_SITE_SETTINGS_FILE_SYSTEM_SITE_LIST_HEADER},
     {"siteSettingsFileSystemSiteListEditHeader",
      IDS_SETTINGS_SITE_SETTINGS_FILE_SYSTEM_SITE_LIST_EDIT_HEADER},
     {"siteSettingsFileSystemSiteListRemoveGrantLabel",
@@ -2918,8 +2931,6 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
      IDS_SETTINGS_SITE_SETTINGS_CUSTOMIZED_BEHAVIORS},
     {"siteSettingsCustomizedBehaviorsDescription",
      IDS_SETTINGS_SITE_SETTINGS_CUSTOMIZED_BEHAVIORS_DESCRIPTION},
-    {"siteSettings3pcdBehaviorsDescription",
-     IDS_SETTINGS_SITE_SETTINGS_3PCD_BEHAVIORS_DESCRIPTION},
     {"siteSettingsCustomizedBehaviorsDescriptionShort",
      IDS_SETTINGS_SITE_SETTINGS_CUSTOMIZED_BEHAVIORS_DESCRIPTION_SHORT},
     {"siteSettingsAdsDescription", IDS_SETTINGS_SITE_SETTINGS_ADS_DESCRIPTION},
@@ -3271,9 +3282,18 @@ void AddSiteSettingsStrings(content::WebUIDataSource* html_source,
       "trackingProtectionBulletTwoDescription",
       l10n_util::GetStringFUTF16(
           IDS_SETTINGS_TRACKING_PROTECTION_BULLET_TWO_DESCRIPTION,
-          base::ASCIIToUTF16(chrome::kTrackingProtectionHelpCenterURL)));
+          base::ASCIIToUTF16(chrome::kUserBypassHelpCenterURL),
+          l10n_util::GetStringUTF16(
+              IDS_SETTINGS_TRACKING_PROTECTION_BULLET_TWO_LEARN_MORE_ARIA_LABEL)));
+  html_source->AddString(
+      "trackingProtectionRollbackNotice",
+      l10n_util::GetStringFUTF16(
+          IDS_SETTINGS_TRACKING_PROTECTION_ROLLBACK_NOTICE,
+          base::ASCIIToUTF16(chrome::kTrackingProtectionHelpCenterURL),
+          l10n_util::GetStringUTF16(
+              IDS_SETTINGS_TRACKING_PROTECTION_ROLLBACK_NOTICE_LEARN_MORE_ARIA_LABEL)));
   html_source->AddString("trackingProtectionThirdPartyCookiesLearnMoreUrl",
-                         chrome::kUserBypassHelpCenterURL);
+                         chrome::kManage3pcHelpCenterURL);
 
   // These ones cannot be constexpr because we need to check base::FeatureList.
   static webui::LocalizedString kSensorsLocalizedStrings[] = {
@@ -3375,8 +3395,6 @@ void AddSiteDataPageStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_SITE_DATA_PAGE_BLOCK_RADIO_SUB_LABEL},
       {"siteDataPageCustomizedBehaviorHeading",
        IDS_SETTINGS_SITE_DATA_PAGE_CUSTOMIZED_BEHAVIOR_HEADING},
-      {"siteDataPageCustomized3pcdHeading",
-       IDS_SETTINGS_SITE_SETTINGS_3PCD_BEHAVIORS},
       {"siteDataPageCustomizedBehaviorDescription",
        IDS_SETTINGS_SITE_DATA_PAGE_CUSTOMIZED_BEHAVIOR_DESCRIPTION},
       {"siteDataPageAllowExceptionsSubHeading",

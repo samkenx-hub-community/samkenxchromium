@@ -40,6 +40,7 @@ class MockTrayBackgroundView : public ash::TrayBackgroundView {
   std::u16string GetAccessibleNameForTray() override { return u""; }
   void HandleLocaleChange() override {}
   void HideBubbleWithView(const TrayBubbleView* bubble_view) override {}
+  void HideBubble(const TrayBubbleView* bubble_view) override {}
   void ClickedOutsideBubble() override {}
   void UpdateTrayItemColor(bool is_active) override {}
 };
@@ -207,7 +208,6 @@ TEST_F(MediaTrayTest, ShowEmptyStateWhenNoActiveNotification) {
 
   // Tap and show bubble.
   GestureTapOn(media_tray());
-
   EXPECT_NE(GetBubbleWrapper(), nullptr);
   EXPECT_TRUE(media_tray()->is_active());
 

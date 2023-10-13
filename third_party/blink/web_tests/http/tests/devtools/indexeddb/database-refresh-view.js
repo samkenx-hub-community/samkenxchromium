@@ -7,10 +7,10 @@ import {ApplicationTestRunner} from 'application_test_runner';
 import {ConsoleTestRunner} from 'console_test_runner';
 
 import * as Common from 'devtools/core/common/common.js';
+import * as Application from 'devtools/panels/application/application.js';
 
 (async function() {
   TestRunner.addResult(`Tests refreshing the database information and data views.\n`);
-  await TestRunner.loadLegacyModule('console');
   await TestRunner.navigatePromise('http://127.0.0.1:8000/devtools/indexeddb/resources/without-indexed-db.html');
   await ApplicationTestRunner.setupIndexedDBHelpers();
 
@@ -18,7 +18,6 @@ import * as Common from 'devtools/core/common/common.js';
   // previous tests.
   await ApplicationTestRunner.resetState();
 
-  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('resources');
 
   var databaseName = 'testDatabase';
@@ -32,7 +31,7 @@ import * as Common from 'devtools/core/common/common.js';
   var databaseId;
 
   function waitRefreshDatabase() {
-    var view = UI.panels.resources.sidebar.indexedDBListTreeElement.idbDatabaseTreeElements[0].view;
+    var view = Application.ResourcesPanel.ResourcesPanel.instance().sidebar.indexedDBListTreeElement.idbDatabaseTreeElements[0].view;
 
     view.getComponent().refreshDatabaseButtonClicked();
     return indexedDBModel.once(Resources.IndexedDBModel.Events.DatabaseLoaded);
@@ -61,7 +60,7 @@ import * as Common from 'devtools/core/common/common.js';
       Common.EventTarget.removeEventListeners([event]);
       callback();
     });
-    UI.panels.resources.sidebar.indexedDBListTreeElement.refreshIndexedDB();
+    Application.ResourcesPanel.ResourcesPanel.instance().sidebar.indexedDBListTreeElement.refreshIndexedDB();
   }
 
   // Initial tree
@@ -70,7 +69,7 @@ import * as Common from 'devtools/core/common/common.js';
   // Create database
   ApplicationTestRunner.createDatabaseAsync(databaseName);
   await new Promise(waitDatabaseAdded);
-  var idbDatabaseTreeElement = UI.panels.resources.sidebar.indexedDBListTreeElement.idbDatabaseTreeElements[0];
+  var idbDatabaseTreeElement = Application.ResourcesPanel.ResourcesPanel.instance().sidebar.indexedDBListTreeElement.idbDatabaseTreeElements[0];
   databaseId = idbDatabaseTreeElement.databaseId;
   TestRunner.addResult('Created database.');
   ApplicationTestRunner.dumpIndexedDBTree();

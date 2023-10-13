@@ -259,19 +259,23 @@ bool GenerateTouchPoints(
 
 std::string ValidatePointerEventProperties(double force,
                                            double tangential_pressure,
-                                           int tilt_x,
-                                           int tilt_y,
+                                           double tilt_x,
+                                           double tilt_y,
                                            int twist) {
-  if (force < 0 || force > 1)
-    return "'force' should be in the range of  [0,1]";
-  if (tangential_pressure < -1 || tangential_pressure > 1)
-    return "'tangential_pressure' should be in the range of  [-1,1]";
-  if (tilt_x < -90 || tilt_x > 90)
-    return "'tilt_x' should be in the range of  [-90,90]";
-  if (tilt_y < -90 || tilt_y > 90)
-    return "'tilt_y' should be in the range of  [-90,90]";
+  if (force < 0.0f || force > 1.0f) {
+    return "'force' should be in the range of [0,1]";
+  }
+  if (tangential_pressure < -1.0f || tangential_pressure > 1.0f) {
+    return "'tangential_pressure' should be in the range of [-1,1]";
+  }
+  if (tilt_x < -90.0f || tilt_x > 90.0f) {
+    return "'tilt_x' should be in the range of [-90,90]";
+  }
+  if (tilt_y < -90.0f || tilt_y > 90.0f) {
+    return "'tilt_y' should be in the range of [-90,90]";
+  }
   if (twist < 0 || twist > 359)
-    return "'twist' should be in the range of  [0,359]";
+    return "'twist' should be in the range of [0,359]";
   return "";
 }
 
@@ -355,9 +359,9 @@ DropData ProtocolDragDataToDropData(std::unique_ptr<Input::DragData> data) {
     items.push_back(blink::mojom::DragItem::NewString(std::move(mojo_item)));
   }
 
-  blink::mojom::DragDataPtr mojo_data =
-      blink::mojom::DragData::New(std::move(items), absl::nullopt,
-                                  network::mojom::ReferrerPolicy::kDefault);
+  blink::mojom::DragDataPtr mojo_data = blink::mojom::DragData::New(
+      std::move(items), absl::nullopt,
+      /*force_default_action=*/false, network::mojom::ReferrerPolicy::kDefault);
   DropData drop_data = DragDataToDropData(*mojo_data);
 
   protocol::Array<protocol::String> default_value;
@@ -381,8 +385,8 @@ CreateWebMouseEvent(const std::string& event_type,
                     Maybe<int> click_count,
                     Maybe<double> force,
                     Maybe<double> tangential_pressure,
-                    Maybe<int> tilt_x,
-                    Maybe<int> tilt_y,
+                    Maybe<double> tilt_x,
+                    Maybe<double> tilt_y,
                     Maybe<int> twist,
                     Maybe<double> delta_x,
                     Maybe<double> delta_y,
@@ -499,16 +503,16 @@ CreateWebTouchEvents(
       with_id++;
     }
     std::string message = ValidatePointerEventProperties(
-        point->GetForce(1.0), point->GetTangentialPressure(0),
-        point->GetTiltX(0), point->GetTiltY(0), point->GetTwist(0));
+        point->GetForce(1.0f), point->GetTangentialPressure(0.0f),
+        point->GetTiltX(0.0f), point->GetTiltY(0.0f), point->GetTwist(0));
     if (!message.empty()) {
       return base::unexpected(Response::InvalidParams(message));
     }
     points[id].id = id;
-    points[id].radius_x = point->GetRadiusX(1.0);
-    points[id].radius_y = point->GetRadiusY(1.0);
-    points[id].rotation_angle = point->GetRotationAngle(0.0);
-    points[id].force = point->GetForce(1.0);
+    points[id].radius_x = point->GetRadiusX(1.0f);
+    points[id].radius_y = point->GetRadiusY(1.0f);
+    points[id].rotation_angle = point->GetRotationAngle(0.0f);
+    points[id].force = point->GetForce(1.0f);
     points[id].pointer_type = blink::WebPointerProperties::PointerType::kTouch;
     points[id].SetPositionInWidget(
         CssPixelsToPointF(point->GetX(), point->GetY(), scale_factor));
@@ -806,7 +810,6 @@ struct InputHandler::DragController::DragState {
   blink::DragOperationsMask mask;
   base::WeakPtr<RenderWidgetHostImpl> host;
   gfx::PointF pos;
-  ui::mojom::DragOperation operation;
   // Acts as a counting semaphore for concurrent updates.
   size_t updating;
   base::OnceClosure updated_callback;
@@ -920,8 +923,8 @@ void InputHandler::DragController::StartDragging(
   }
 
   drag_state_ = std::make_unique<DragState>(
-      DragState{drop_data, drag_operations_mask, nullptr, gfx::PointF(),
-                ui::mojom::DragOperation::kNone, 0, base::DoNothing()});
+      DragState{drop_data, drag_operations_mask, nullptr, gfx::PointF(), 0,
+                base::DoNothing()});
   UpdateDragging(*initial_state_->host,
                  // Note we don't move it here. See
                  // InputHandler::DragController::HandleMouseEvent.
@@ -964,14 +967,16 @@ void InputHandler::DragController::UpdateDragging(
 void InputHandler::DragController::DragUpdated(
     std::unique_ptr<blink::WebMouseEvent> event,
     std::unique_ptr<FailSafe<DispatchMouseEventCallback>> callback,
-    ui::mojom::DragOperation operation) {
+    ui::mojom::DragOperation operation,
+    bool document_is_handling_drag) {
   if (!drag_state_) {
     // Dragging ended, perhaps due to a previous mouse up or a drag
     // cancellation.
     handler_.HandleMouseEvent(std::move(event), callback->release());
     return;
   }
-  drag_state_->operation = operation;
+  drag_state_->data.operation = operation;
+  drag_state_->data.document_is_handling_drag = document_is_handling_drag;
 
   --drag_state_->updating;
   if (callback) {
@@ -1038,7 +1043,7 @@ void InputHandler::DragController::EndDraggingWithRenderWidgetHostAtPoint(
   host->DragTargetDrop(drag_state_->data, point, point, event->GetModifiers(),
                        base::DoNothing());
   host->DragSourceEndedAt(
-      point, point, drag_state_->operation,
+      point, point, drag_state_->data.operation,
       base::BindOnce(&FailSafe<DispatchMouseEventCallback>::sendSuccess,
                      std::move(callback)));
 }
@@ -1282,8 +1287,8 @@ void InputHandler::DispatchMouseEvent(
     Maybe<int> click_count,
     Maybe<double> force,
     Maybe<double> tangential_pressure,
-    Maybe<int> tilt_x,
-    Maybe<int> tilt_y,
+    Maybe<double> tilt_x,
+    Maybe<double> tilt_y,
     Maybe<int> twist,
     Maybe<double> delta_x,
     Maybe<double> delta_y,
@@ -1408,18 +1413,16 @@ void InputHandler::OnWidgetForDispatchDragEvent(
         *drop_data, point, point, mask, event_modifiers,
         base::BindOnce(
             [](std::unique_ptr<DispatchDragEventCallback> callback,
-               ::ui::mojom::DragOperation operation) {
-              callback->sendSuccess();
-            },
+               ::ui::mojom::DragOperation operation,
+               bool document_is_handling_drag) { callback->sendSuccess(); },
             std::move(callback)));
   } else if (event_type == Input::DispatchDragEvent::TypeEnum::DragOver) {
     widget_host->DragTargetDragOver(
         point, point, mask, event_modifiers,
         base::BindOnce(
             [](std::unique_ptr<DispatchDragEventCallback> callback,
-               ::ui::mojom::DragOperation operation) {
-              callback->sendSuccess();
-            },
+               ::ui::mojom::DragOperation operation,
+               bool document_is_handling_drag) { callback->sendSuccess(); },
             std::move(callback)));
   } else if (event_type == Input::DispatchDragEvent::TypeEnum::Drop) {
     widget_host->DragTargetDragOver(
@@ -1428,11 +1431,14 @@ void InputHandler::OnWidgetForDispatchDragEvent(
             [](std::unique_ptr<DropData> drop_data, int event_modifiers,
                std::unique_ptr<DispatchDragEventCallback> callback,
                base::WeakPtr<RenderWidgetHostViewBase> target,
-               gfx::PointF point, ui::mojom::DragOperation current_op) {
+               gfx::PointF point, ui::mojom::DragOperation current_op,
+               bool document_is_handling_drag) {
               if (!target) {
                 callback->sendFailure(Response::InternalError());
                 return;
               }
+              drop_data->operation = current_op;
+              drop_data->document_is_handling_drag = document_is_handling_drag;
               RenderWidgetHostImpl* widget_host =
                   RenderWidgetHostImpl::From(target->GetRenderWidgetHost());
               widget_host->DragTargetDrop(*drop_data, point, point,
@@ -1755,8 +1761,8 @@ void InputHandler::DispatchSyntheticPointerActionTouch(
     SyntheticPointerActionParams action_params =
         PrepareSyntheticPointerActionParams(
             action_type, id, point->GetX(), point->GetY(), event_modifiers,
-            point->GetRadiusX(1.0), point->GetRadiusY(1.0),
-            point->GetRotationAngle(0.0), point->GetForce(1.0));
+            point->GetRadiusX(1.0f), point->GetRadiusY(1.0f),
+            point->GetRotationAngle(0.0f), point->GetForce(1.0f));
     param_list.push_back(action_params);
     original = gfx::PointF(point->GetX(), point->GetY());
     current_pointer_ids.insert(id);

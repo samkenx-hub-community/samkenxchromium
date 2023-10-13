@@ -39,6 +39,10 @@ void LCPCriticalPathPredictor::set_lcp_influencer_scripts(
   lcp_influencer_scripts_ = std::move(scripts);
 }
 
+void LCPCriticalPathPredictor::set_fetched_fonts(Vector<KURL> fonts) {
+  fetched_fonts_ = std::move(fonts);
+}
+
 void LCPCriticalPathPredictor::OnLargestContentfulPaintUpdated(
     Element* lcp_element) {
   if (lcp_element && IsA<HTMLImageElement>(lcp_element)) {
@@ -107,6 +111,16 @@ void LCPCriticalPathPredictor::OnLargestContentfulPaintUpdated(
       }
     }
   }
+}
+
+void LCPCriticalPathPredictor::OnFontFetched(const KURL& url) {
+  if (!base::FeatureList::IsEnabled(blink::features::kLCPPFontURLPredictor)) {
+    return;
+  }
+  if (!url.ProtocolIsInHTTPFamily()) {
+    return;
+  }
+  GetHost().NotifyFetchedFont(url);
 }
 
 mojom::blink::LCPCriticalPathPredictorHost&

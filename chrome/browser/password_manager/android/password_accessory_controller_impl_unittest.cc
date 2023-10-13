@@ -44,11 +44,11 @@
 #include "components/password_manager/core/common/password_manager_features.h"
 #include "components/security_state/core/security_state.h"
 #include "components/strings/grit/components_strings.h"
+#include "components/webauthn/android/cred_man_support.h"
 #include "components/webauthn/android/webauthn_cred_man_delegate.h"
 #include "components/webauthn/android/webauthn_cred_man_delegate_factory.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/test/web_contents_tester.h"
-#include "device/fido/features.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
@@ -81,6 +81,8 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::StrictMock;
+using webauthn::CredManSupport;
+using webauthn::WebAuthnCredManDelegate;
 using FillingSource = ManualFillingController::FillingSource;
 using IsFillingSourceAvailable = AccessoryController::IsFillingSourceAvailable;
 using IsExactMatch = autofill::UserInfo::IsExactMatch;
@@ -981,9 +983,8 @@ TEST_F(PasswordAccessoryControllerTest, FillsPasswordIfAuthSuccessful) {
 
   ON_CALL(*mock_authenticator, CanAuthenticateWithBiometrics)
       .WillByDefault(Return(true));
-  EXPECT_CALL(*mock_authenticator, Authenticate(_,
-                                                /*use_last_valid_auth=*/true))
-      .WillOnce(RunOnceCallback<0>(/*auth_succeeded=*/true));
+  EXPECT_CALL(*mock_authenticator, AuthenticateWithMessage)
+      .WillOnce(RunOnceCallback<1>(/*auth_succeeded=*/true));
 
   EXPECT_CALL(*password_client(), GetDeviceAuthenticator)
       .WillOnce(Return(testing::ByMove(std::move(mock_authenticator))))
@@ -1020,9 +1021,8 @@ TEST_F(PasswordAccessoryControllerTest, DoesntFillPasswordIfAuthFails) {
 
   ON_CALL(*mock_authenticator, CanAuthenticateWithBiometrics)
       .WillByDefault(Return(true));
-  EXPECT_CALL(*mock_authenticator, Authenticate(_,
-                                                /*use_last_valid_auth=*/true))
-      .WillOnce(RunOnceCallback<0>(/*auth_succeeded=*/false));
+  EXPECT_CALL(*mock_authenticator, AuthenticateWithMessage)
+      .WillOnce(RunOnceCallback<1>(/*auth_succeeded=*/false));
 
   EXPECT_CALL(*password_client(), GetDeviceAuthenticator)
       .WillOnce(Return(testing::ByMove(std::move(mock_authenticator))))
@@ -1061,9 +1061,7 @@ TEST_F(PasswordAccessoryControllerTest, CancelsOngoingAuthIfDestroyed) {
 
   ON_CALL(*mock_authenticator_ptr, CanAuthenticateWithBiometrics)
       .WillByDefault(Return(true));
-  EXPECT_CALL(*mock_authenticator_ptr,
-              Authenticate(_,
-                           /*use_last_valid_auth=*/true));
+  EXPECT_CALL(*mock_authenticator_ptr, AuthenticateWithMessage);
 
   EXPECT_CALL(*password_client(), GetDeviceAuthenticator)
       .WillOnce(Return(testing::ByMove(std::move(mock_authenticator))))
@@ -1079,8 +1077,8 @@ TEST_F(PasswordAccessoryControllerTest, CancelsOngoingAuthIfDestroyed) {
 }
 
 TEST_F(PasswordAccessoryControllerTest, ShowCredManReentry) {
-  webauthn::WebAuthnCredManDelegate::override_android_version_for_testing(true);
-  base::test::ScopedFeatureList enable_feature(device::kWebAuthnAndroidCredMan);
+  WebAuthnCredManDelegate::override_cred_man_support_for_testing(
+      CredManSupport::FULL_UNLESS_INAPPLICABLE);
   CreateSheetController();
   cred_man_delegate()->OnCredManConditionalRequestPending(
       /*has_results=*/true, base::RepeatingCallback<void(bool)>());
@@ -1095,8 +1093,8 @@ TEST_F(PasswordAccessoryControllerTest, ShowCredManReentry) {
 }
 
 TEST_F(PasswordAccessoryControllerTest, HideCredManReentryWithoutResult) {
-  webauthn::WebAuthnCredManDelegate::override_android_version_for_testing(true);
-  base::test::ScopedFeatureList enable_feature(device::kWebAuthnAndroidCredMan);
+  WebAuthnCredManDelegate::override_cred_man_support_for_testing(
+      CredManSupport::FULL_UNLESS_INAPPLICABLE);
   CreateSheetController();
   cred_man_delegate()->OnCredManConditionalRequestPending(
       /*has_results=*/false, base::RepeatingCallback<void(bool)>());
@@ -1111,8 +1109,8 @@ TEST_F(PasswordAccessoryControllerTest, HideCredManReentryWithoutResult) {
 }
 
 TEST_F(PasswordAccessoryControllerTest, HideCredManReentryOnNonSignInField) {
-  webauthn::WebAuthnCredManDelegate::override_android_version_for_testing(true);
-  base::test::ScopedFeatureList enable_feature(device::kWebAuthnAndroidCredMan);
+  WebAuthnCredManDelegate::override_cred_man_support_for_testing(
+      CredManSupport::FULL_UNLESS_INAPPLICABLE);
   CreateSheetController();
   cred_man_delegate()->OnCredManConditionalRequestPending(
       /*has_results=*/true, base::RepeatingCallback<void(bool)>());
@@ -1127,9 +1125,8 @@ TEST_F(PasswordAccessoryControllerTest, HideCredManReentryOnNonSignInField) {
 }
 
 TEST_F(PasswordAccessoryControllerTest, SuppressCredManReentryWithoutFeature) {
-  webauthn::WebAuthnCredManDelegate::override_android_version_for_testing(true);
-  base::test::ScopedFeatureList features;
-  features.InitAndDisableFeature(device::kWebAuthnAndroidCredMan);
+  WebAuthnCredManDelegate::override_cred_man_support_for_testing(
+      CredManSupport::DISABLED);
   CreateSheetController();
 
   EXPECT_CALL(mock_manual_filling_controller_,
@@ -1141,8 +1138,8 @@ TEST_F(PasswordAccessoryControllerTest, SuppressCredManReentryWithoutFeature) {
 }
 
 TEST_F(PasswordAccessoryControllerTest, OnCredManConditionalUiRequested) {
-  webauthn::WebAuthnCredManDelegate::override_android_version_for_testing(true);
-  base::test::ScopedFeatureList enable_feature(device::kWebAuthnAndroidCredMan);
+  WebAuthnCredManDelegate::override_cred_man_support_for_testing(
+      CredManSupport::FULL_UNLESS_INAPPLICABLE);
   CreateSheetController();
   base::MockCallback<base::RepeatingCallback<void(bool)>> cred_man_callback;
   cred_man_delegate()->OnCredManConditionalRequestPending(
@@ -1248,9 +1245,8 @@ TEST_F(PasswordAccessoryControllerTest,
        ShowMigrationSheetOnFillingCredentialIfEnabled) {
   if (base::android::BuildInfo::GetInstance()->is_automotive()) {
     auto mock_authenticator = std::make_unique<MockDeviceAuthenticator>();
-    ON_CALL(*mock_authenticator, Authenticate(_,
-                                              /*use_last_valid_auth=*/true))
-        .WillByDefault(RunOnceCallback<0>(/*auth_succeeded=*/true));
+    ON_CALL(*mock_authenticator, AuthenticateWithMessage)
+        .WillByDefault(RunOnceCallback<1>(/*auth_succeeded=*/true));
     EXPECT_CALL(*password_client(), GetDeviceAuthenticator)
         .WillOnce(Return(testing::ByMove(std::move(mock_authenticator))))
         .RetiresOnSaturation();
@@ -1286,9 +1282,8 @@ TEST_F(PasswordAccessoryControllerTest,
 TEST_F(PasswordAccessoryControllerTest, DontShowMigrationSheetlIfDisabled) {
   if (base::android::BuildInfo::GetInstance()->is_automotive()) {
     auto mock_authenticator = std::make_unique<MockDeviceAuthenticator>();
-    ON_CALL(*mock_authenticator, Authenticate(_,
-                                              /*use_last_valid_auth=*/true))
-        .WillByDefault(RunOnceCallback<0>(/*auth_succeeded=*/true));
+    ON_CALL(*mock_authenticator, AuthenticateWithMessage)
+        .WillByDefault(RunOnceCallback<1>(/*auth_succeeded=*/true));
     EXPECT_CALL(*password_client(), GetDeviceAuthenticator)
         .WillOnce(Return(testing::ByMove(std::move(mock_authenticator))))
         .RetiresOnSaturation();

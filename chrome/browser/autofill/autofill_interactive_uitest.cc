@@ -2085,7 +2085,7 @@ IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest, ComparePhoneNumbers) {
   profile.SetRawInfo(ADDRESS_HOME_ZIP, u"95110");
   profile.SetRawInfo(ADDRESS_HOME_COUNTRY, u"US");
   profile.SetRawInfo(PHONE_HOME_WHOLE_NUMBER, u"1-408-555-4567");
-  SetTestProfile(browser()->profile(), profile);
+  AddTestProfile(browser()->profile(), profile);
 
   GURL url = embedded_test_server()->GetURL("/autofill/form_phones.html");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
@@ -2138,7 +2138,7 @@ IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest, NoAutofillForCompanyName) {
   profile.SetRawInfo(ADDRESS_HOME_ZIP, u"95110");
   profile.SetRawInfo(COMPANY_NAME, ASCIIToUTF16(company_name));
   profile.SetRawInfo(PHONE_HOME_WHOLE_NUMBER, u"408-871-4567");
-  SetTestProfile(browser()->profile(), profile);
+  AddTestProfile(browser()->profile(), profile);
 
   GURL url =
       embedded_test_server()->GetURL("/autofill/read_only_field_test.html");
@@ -2209,7 +2209,7 @@ IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest, NoAutofillForReadOnlyFields) {
   profile.SetRawInfo(ADDRESS_HOME_ZIP, u"95110");
   profile.SetRawInfo(COMPANY_NAME, u"Company X");
   profile.SetRawInfo(PHONE_HOME_WHOLE_NUMBER, u"408-871-4567");
-  SetTestProfile(browser()->profile(), profile);
+  AddTestProfile(browser()->profile(), profile);
 
   GURL url =
       embedded_test_server()->GetURL("/autofill/read_only_field_test.html");
@@ -2273,7 +2273,7 @@ IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest,
   profile.SetRawInfo(NAME_LAST, u"Smith");
   profile.SetRawInfo(EMAIL_ADDRESS, ASCIIToUTF16(email));
   profile.SetRawInfo(PHONE_HOME_WHOLE_NUMBER, u"4088714567");
-  SetTestProfile(browser()->profile(), profile);
+  AddTestProfile(browser()->profile(), profile);
 
   GURL url = embedded_test_server()->GetURL(
       "/autofill/autofill_confirmemail_form.html");
@@ -2304,7 +2304,6 @@ IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest,
   streets.push_back("Ct");
 
   constexpr int kNumProfiles = 1500;
-  std::vector<AutofillProfile> profiles;
   for (int i = 0; i < kNumProfiles; i++) {
     AutofillProfile profile;
     std::u16string name(base::NumberToString16(i));
@@ -2322,9 +2321,8 @@ IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest,
     profile.SetRawInfo(ADDRESS_HOME_STATE, u"CA");
     profile.SetRawInfo(ADDRESS_HOME_ZIP, zip);
     profile.SetRawInfo(ADDRESS_HOME_COUNTRY, u"US");
-    profiles.push_back(profile);
+    AddTestProfile(browser()->profile(), profile);
   }
-  SetTestProfiles(browser()->profile(), &profiles);
 
   GURL url = embedded_test_server()->GetURL(
       "/autofill/latency_after_submit_test.html");
@@ -3268,7 +3266,7 @@ void DoDynamicChangingFormFill_SelectUpdated(
 
   // Check that the test page correctly parsed the 'is_selectlist' GET parameter
   // by checking type of the inserted field.
-  auto has_n_controls_of_type = [](const std::string& control_type,
+  auto has_n_controls_of_type = [](FormControlType control_type,
                                    size_t expected_number,
                                    const FormStructure& form) {
     size_t num_found = 0u;
@@ -3282,8 +3280,10 @@ void DoDynamicChangingFormFill_SelectUpdated(
   ASSERT_TRUE(WaitForMatchingForm(
       test->GetBrowserAutofillManager(),
       should_test_selectlist
-          ? base::BindRepeating(has_n_controls_of_type, "selectlist", 1)
-          : base::BindRepeating(has_n_controls_of_type, "select-one", 2)));
+          ? base::BindRepeating(has_n_controls_of_type,
+                                FormControlType::kSelectList, 1)
+          : base::BindRepeating(has_n_controls_of_type,
+                                FormControlType::kSelectOne, 2)));
 
   ValueWaiter refill = test->ListenForRefill("state");
   // Trigger first fill.

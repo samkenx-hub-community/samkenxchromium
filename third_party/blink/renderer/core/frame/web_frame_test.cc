@@ -6798,7 +6798,7 @@ class CompositedSelectionBoundsTest
     Vector<const cc::Layer*> layers;
     if (node->IsDocumentNode()) {
       layers = CcLayersByName(root_layer,
-                              "Scrolling background of LayoutNGView #document");
+                              "Scrolling background of LayoutView #document");
     } else {
       DCHECK(node->IsElementNode());
       layers = CcLayersByDOMElementId(root_layer,
@@ -7306,6 +7306,9 @@ class TestAccessInitialDocumentLocalFrameHost
                      SetWindowRectCallback callback) override {
     std::move(callback).Run();
   }
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+  void SetResizable(bool resizable) override {}
+#endif
   void DidFirstVisuallyNonEmptyPaint() override {}
   void DidAccessInitialMainDocument() override {
     ++did_access_initial_main_document_;
@@ -8136,7 +8139,7 @@ TEST_F(WebFrameTest, SameDocumentHistoryNavigationCommitType) {
       item->Url(), WebFrameLoadType::kBackForward, item.Get(),
       ClientRedirectPolicy::kNotClientRedirect,
       false /* has_transient_user_activation */, /*initiator_origin=*/nullptr,
-      /*is_synchronously_committed=*/false,
+      /*is_synchronously_committed=*/false, /*source_element=*/nullptr,
       mojom::blink::TriggeringEventInfo::kNotFromEvent,
       /*is_browser_initiated=*/true,
       /*soft_navigation_heuristics_task_id=*/absl::nullopt);
@@ -8878,7 +8881,7 @@ TEST_F(WebFrameTest, WebXrImmersiveOverlay) {
 
   const cc::Layer* root_layer = layer_tree_host->root_layer();
   EXPECT_EQ(1u, CcLayersByName(root_layer,
-                               "Scrolling background of LayoutNGView #document")
+                               "Scrolling background of LayoutView #document")
                     .size());
   EXPECT_EQ(1u, CcLayersByDOMElementId(root_layer, "other").size());
   // The overlay is not composited when it's not in full screen.
@@ -8892,7 +8895,7 @@ TEST_F(WebFrameTest, WebXrImmersiveOverlay) {
 
   root_layer = layer_tree_host->root_layer();
   EXPECT_EQ(0u, CcLayersByName(root_layer,
-                               "Scrolling background of LayoutNGView #document")
+                               "Scrolling background of LayoutView #document")
                     .size());
   EXPECT_EQ(0u, CcLayersByDOMElementId(root_layer, "other").size());
   EXPECT_EQ(1u, CcLayersByDOMElementId(root_layer, "overlay").size());
@@ -8906,7 +8909,7 @@ TEST_F(WebFrameTest, WebXrImmersiveOverlay) {
 
   root_layer = layer_tree_host->root_layer();
   EXPECT_EQ(1u, CcLayersByName(root_layer,
-                               "Scrolling background of LayoutNGView #document")
+                               "Scrolling background of LayoutView #document")
                     .size());
   EXPECT_EQ(1u, CcLayersByDOMElementId(root_layer, "other").size());
   // The overlay is not composited when it's not in full screen.
@@ -11214,12 +11217,13 @@ TEST_F(WebFrameTest, ImageDocumentLoadResponseEnd) {
   ImageResourceContent* image_content = img_document->CachedImage();
 
   EXPECT_TRUE(image_content);
-  EXPECT_NE(base::TimeTicks(), image_content->LoadEnd());
+  EXPECT_NE(base::TimeTicks(), image_content->LoadResponseEnd());
 
   DocumentLoader* loader = document->Loader();
 
   EXPECT_TRUE(loader);
-  EXPECT_EQ(loader->GetTiming().ResponseEnd(), image_content->LoadEnd());
+  EXPECT_EQ(loader->GetTiming().ResponseEnd(),
+            image_content->LoadResponseEnd());
 }
 
 TEST_F(WebFrameTest, CopyImageDocument) {

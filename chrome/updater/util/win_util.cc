@@ -11,6 +11,7 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <windows.h>
+#include <winhttp.h>
 #include <wrl/client.h>
 
 #include <algorithm>
@@ -295,7 +296,7 @@ std::wstring GetAppCohortKey(const std::string& app_id) {
 }
 
 std::wstring GetAppCohortKey(const std::wstring& app_id) {
-  return base::StrCat({COHORT_KEY, app_id});
+  return base::StrCat({GetAppClientStateKey(app_id), L"\\", kRegKeyCohort});
 }
 
 std::wstring GetAppCommandKey(const std::wstring& app_id,
@@ -1069,6 +1070,34 @@ absl::optional<std::wstring> GetRegKeyContents(const std::wstring& reg_key) {
     return {};
   }
   return base::ASCIIToWide(output);
+}
+
+std::wstring GetTextForSystemError(int error) {
+  if (static_cast<HRESULT>(error & 0xFFFF0000) ==
+      MAKE_HRESULT(SEVERITY_ERROR, FACILITY_WIN32, 0)) {
+    error = HRESULT_CODE(error);
+  }
+
+  HMODULE source = nullptr;
+  DWORD format_options =
+      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+      FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_MAX_WIDTH_MASK;
+
+  if (error >= WINHTTP_ERROR_BASE && error <= WINHTTP_ERROR_LAST) {
+    source = ::GetModuleHandle(_T("winhttp.dll"));
+    if (source) {
+      format_options |= FORMAT_MESSAGE_FROM_HMODULE;
+    }
+  }
+  wchar_t* system_allocated_buffer = nullptr;
+  const DWORD chars_written = ::FormatMessage(
+      format_options, source, error, 0,
+      reinterpret_cast<wchar_t*>(&system_allocated_buffer), 0, nullptr);
+  base::win::ScopedLocalAllocTyped<wchar_t> free_buffer(
+      system_allocated_buffer);
+  return chars_written > 0
+             ? system_allocated_buffer
+             : base::ASCIIToWide(base::StringPrintf("%#x", error));
 }
 
 }  // namespace updater

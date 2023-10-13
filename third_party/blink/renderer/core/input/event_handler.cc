@@ -1416,10 +1416,6 @@ void EventHandler::ClearDragState() {
   should_only_fire_drag_over_event_ = false;
 }
 
-void EventHandler::AnimateSnapFling(base::TimeTicks monotonic_time) {
-  scroll_manager_->AnimateSnapFling(monotonic_time);
-}
-
 void EventHandler::RecomputeMouseHoverStateIfNeeded() {
   mouse_event_manager_->RecomputeMouseHoverStateIfNeeded();
 }
@@ -1444,12 +1440,12 @@ Element* EventHandler::CurrentTouchDownElement() {
   return pointer_event_manager_->CurrentTouchDownElement();
 }
 
-void EventHandler::SetDownloadModifierTaskHandle(TaskHandle task_handle) {
-  download_modifier_task_handle_ = std::move(task_handle);
+void EventHandler::SetDelayedNavigationTaskHandle(TaskHandle task_handle) {
+  delayed_navigation_task_handle_ = std::move(task_handle);
 }
 
-TaskHandle& EventHandler::GetDownloadModifierTaskHandle() {
-  return download_modifier_task_handle_;
+TaskHandle& EventHandler::GetDelayedNavigationTaskHandle() {
+  return delayed_navigation_task_handle_;
 }
 
 bool EventHandler::IsPointerIdActiveOnFrame(PointerId pointer_id,

@@ -1409,6 +1409,8 @@ scoped_refptr<TileTask> TileManager::CreateRasterTask(
   playback_settings.msaa_sample_count = msaa_sample_count;
   playback_settings.visible =
       tile->required_for_activation() || tile->required_for_draw();
+  playback_settings.hdr_headroom =
+      target_color_params.hdr_max_luminance_relative;
 
   // Create and queue all image decode tasks that this tile depends on. Note
   // that we need to store the images for decode tasks in
@@ -1561,7 +1563,8 @@ void TileManager::OnRasterTaskCompleted(
 
   // Once raster is done, allow the resource to be exported to the display
   // compositor, by giving it a ResourceId.
-  bool exported = resource_pool_->PrepareForExport(resource);
+  bool exported = resource_pool_->PrepareForExport(
+      resource, viz::TransferableResource::ResourceSource::kTileRasterTask);
 
   // In SMOOTHNESS_TAKES_PRIORITY mode, we wait for GPU work to complete for a
   // tile before setting it as ready to draw.

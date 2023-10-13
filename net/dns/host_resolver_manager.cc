@@ -30,6 +30,7 @@
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
 #include "base/functional/identity.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
@@ -2953,6 +2954,8 @@ HostResolverManager::HostResolverManager(
       system_dns_config_notifier_(system_dns_config_notifier),
       target_network_(target_network),
       check_ipv6_on_wifi_(options.check_ipv6_on_wifi),
+      ipv6_reachability_override_(base::FeatureList::IsEnabled(
+          features::kEnableIPv6ReachabilityOverride)),
       tick_clock_(base::DefaultTickClock::GetInstance()),
       https_svcb_options_(
           options.https_svcb_options
@@ -3842,7 +3845,8 @@ void HostResolverManager::GetEffectiveParametersForRequest(
   // resolution based on a probe. Prior logic ensures that this is an automatic
   // query, so the code requesting the resolution should be amenable to
   // receiving an IPv6 resolution.
-  if (!use_local_ipv6 && !is_ip && !last_ipv6_probe_result_) {
+  if (!use_local_ipv6 && !is_ip && !last_ipv6_probe_result_ &&
+      !ipv6_reachability_override_) {
     *out_effective_flags |= HOST_RESOLVER_DEFAULT_FAMILY_SET_DUE_TO_NO_IPV6;
     effective_types.Remove(DnsQueryType::AAAA);
   }

@@ -9,10 +9,13 @@
 #include "ash/wm/overview/overview_types.h"
 #include "ash/wm/window_state_observer.h"
 #include "base/scoped_observation.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/aura/window_observer.h"
 #include "ui/compositor/presentation_time_recorder.h"
 
 namespace ash {
+
+class AutoSnapController;
 
 // Encapsulates the split view state with a single snapped window and
 // overview, also known as intermediate split view or the snap group creation
@@ -36,7 +39,13 @@ class SplitViewOverviewSession : public aura::WindowObserver,
   SplitViewOverviewSession& operator=(const SplitViewOverviewSession&) = delete;
   ~SplitViewOverviewSession() override;
 
+  // Initializes the session by starting overview. This must be called after the
+  // constructor, as consumers may check if `this` exists.
+  void Init(absl::optional<OverviewStartAction> action,
+            absl::optional<OverviewEnterExitType> type);
+
   const aura::Window* window() const { return window_; }
+  chromeos::WindowStateType GetWindowStateType() const;
 
   // aura::WindowObserver:
   void OnResizeLoopStarted(aura::Window* window) override;
@@ -55,6 +64,9 @@ class SplitViewOverviewSession : public aura::WindowObserver,
   // Records the presentation time of resize operation in clamshell split view
   // mode.
   std::unique_ptr<ui::PresentationTimeRecorder> presentation_time_recorder_;
+
+  // Observes windows and performs auto snapping if needed in clamshell mode.
+  std::unique_ptr<AutoSnapController> auto_snap_controller_;
 
   // The single snapped window in intermediate split view, with overview on
   // the opposite side.

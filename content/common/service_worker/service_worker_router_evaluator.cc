@@ -4,6 +4,7 @@
 
 #include "content/common/service_worker/service_worker_router_evaluator.h"
 
+#include <memory>
 #include <tuple>
 
 #include "base/json/json_writer.h"
@@ -17,9 +18,15 @@
 #include "third_party/liburlpattern/pattern.h"
 #include "third_party/liburlpattern/utils.h"
 #include "third_party/re2/src/re2/re2.h"
-#include "third_party/re2/src/re2/set.h"
 
 namespace {
+
+class BaseCondition;
+class OrCondition;
+class ConditionObject;
+
+base::Value ConditionToValue(
+    const blink::ServiceWorkerRouterCondition& condition);
 
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
@@ -32,8 +39,8 @@ enum class ServiceWorkerRouterEvaluatorErrorEnums {
   kEmptySource = 5,
   kInvalidSource = 6,
   kInvalidCondition = 7,
-
-  kMaxValue = kInvalidCondition,
+  kExceedMaxConditionDepth = 8,
+  kMaxValue = kExceedMaxConditionDepth,
 };
 
 void RecordSetupError(ServiceWorkerRouterEvaluatorErrorEnums e) {
@@ -166,6 +173,64 @@ std::string RunningStatusToString(
   }
 }
 
+base::Value OrConditionToValue(
+    const blink::ServiceWorkerRouterOrCondition& or_condition) {
+  base::Value::List ret;
+  ret.reserve(or_condition.objects.size());
+  for (const auto& ob : or_condition.objects) {
+    base::Value::List out_ob;
+    out_ob.reserve(ob.conditions.size());
+    for (auto&& c : ob.conditions) {
+      out_ob.Append(ConditionToValue(c));
+    }
+    ret.Append(std::move(out_ob));
+  }
+  return base::Value(std::move(ret));
+}
+
+base::Value ConditionToValue(
+    const blink::ServiceWorkerRouterCondition& condition) {
+  switch (condition.type) {
+    case blink::ServiceWorkerRouterCondition::Type::kUrlPattern: {
+      base::Value::Dict out_c;
+      const blink::SafeUrlPattern& url_pattern = *condition.url_pattern;
+      base::Value::Dict url_pattern_value;
+#define TO_VALUE(type, type_name)                           \
+  do {                                                      \
+    auto value = ConvertToPatternString(url_pattern, type); \
+    url_pattern_value.Set(type_name, value);                \
+  } while (0)
+      TO_VALUE(URLPatternFieldType::kProtocol, "protocol");
+      TO_VALUE(URLPatternFieldType::kUsername, "username");
+      TO_VALUE(URLPatternFieldType::kPassword, "password");
+      TO_VALUE(URLPatternFieldType::kHostname, "hostname");
+      TO_VALUE(URLPatternFieldType::kPort, "port");
+      TO_VALUE(URLPatternFieldType::kPathname, "pathname");
+      TO_VALUE(URLPatternFieldType::kSearch, "search");
+      TO_VALUE(URLPatternFieldType::kHash, "hash");
+#undef TO_VALUE
+      out_c.Set("urlPattern", std::move(url_pattern_value));
+      return base::Value(std::move(out_c));
+    }
+    case blink::ServiceWorkerRouterCondition::Type::kRequest: {
+      base::Value::Dict out_c;
+      out_c.Set("request", RequestToValue(*condition.request));
+      return base::Value(std::move(out_c));
+    }
+    case blink::ServiceWorkerRouterCondition::Type::kRunningStatus: {
+      base::Value::Dict out_c;
+      out_c.Set("running_status",
+                RunningStatusToString(*condition.running_status));
+      return base::Value(std::move(out_c));
+    }
+    case blink::ServiceWorkerRouterCondition::Type::kOr: {
+      base::Value::Dict out_c;
+      out_c.Set("or", OrConditionToValue(*condition.or_condition));
+      return base::Value(std::move(out_c));
+    }
+  }
+}
+
 bool IsValidCondition(const blink::ServiceWorkerRouterCondition& condition) {
   switch (condition.type) {
     case blink::ServiceWorkerRouterCondition::Type::kUrlPattern:
@@ -178,8 +243,7 @@ bool IsValidCondition(const blink::ServiceWorkerRouterCondition& condition) {
     case blink::ServiceWorkerRouterCondition::Type::kRunningStatus:
       return condition.running_status.has_value();
     case blink::ServiceWorkerRouterCondition::Type::kOr:
-      NOTIMPLEMENTED();
-      NOTREACHED_NORETURN();
+      return condition.or_condition.has_value();
   }
 }
 
@@ -194,28 +258,28 @@ bool IsValidSources(
   // Currently, only network source is supported.
   for (const auto& s : sources) {
     switch (s.type) {
-      case blink::ServiceWorkerRouterSource::SourceType::kNetwork:
+      case blink::ServiceWorkerRouterSource::Type::kNetwork:
         if (!s.network_source) {
           RecordSetupError(
               ServiceWorkerRouterEvaluatorErrorEnums::kInvalidSource);
           return false;
         }
         break;
-      case blink::ServiceWorkerRouterSource::SourceType::kRace:
+      case blink::ServiceWorkerRouterSource::Type::kRace:
         if (!s.race_source) {
           RecordSetupError(
               ServiceWorkerRouterEvaluatorErrorEnums::kInvalidSource);
           return false;
         }
         break;
-      case blink::ServiceWorkerRouterSource::SourceType::kFetchEvent:
+      case blink::ServiceWorkerRouterSource::Type::kFetchEvent:
         if (!s.fetch_event_source) {
           RecordSetupError(
               ServiceWorkerRouterEvaluatorErrorEnums::kInvalidSource);
           return false;
         }
         break;
-      case blink::ServiceWorkerRouterSource::SourceType::kCache:
+      case blink::ServiceWorkerRouterSource::Type::kCache:
         if (!s.cache_source) {
           RecordSetupError(
               ServiceWorkerRouterEvaluatorErrorEnums::kInvalidSource);
@@ -227,8 +291,28 @@ bool IsValidSources(
   return true;
 }
 
-bool IsMatchedRequest(const blink::ServiceWorkerRouterRequestCondition& pattern,
-                      const network::ResourceRequest& request) {
+[[nodiscard]] bool ExceedsMaxConditionDepth(
+    const std::vector<blink::ServiceWorkerRouterCondition>& conditions,
+    int depth = 0) {
+  if (depth >= blink::kServiceWorkerRouterConditionMaxRecursionDepth) {
+    return true;
+  }
+  for (const auto& c : conditions) {
+    if (c.type != blink::ServiceWorkerRouterCondition::Type::kOr) {
+      continue;
+    }
+    for (const auto& ob : c.or_condition->objects) {
+      if (ExceedsMaxConditionDepth(ob.conditions, depth + 1)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool MatchRequestCondition(
+    const blink::ServiceWorkerRouterRequestCondition& pattern,
+    const network::ResourceRequest& request) {
   if (pattern.method && *pattern.method != request.method) {
     return false;
   }
@@ -241,7 +325,7 @@ bool IsMatchedRequest(const blink::ServiceWorkerRouterRequestCondition& pattern,
   return true;
 }
 
-bool IsMatchedRunningCondition(
+bool MatchRunningCondition(
     const blink::ServiceWorkerRouterRunningStatusCondition& condition,
     const blink::EmbeddedWorkerStatus& running_status) {
   // returns true if both condition matches.
@@ -253,72 +337,51 @@ bool IsMatchedRunningCondition(
   return is_condition_running == is_status_running;
 }
 
-}  // namespace
-
-namespace content {
-
-class ServiceWorkerRouterEvaluator::RouterRule {
- public:
-  RouterRule()
-      : protocol_patterns_(RE2::Set(RE2::Options(), RE2::Anchor::UNANCHORED)),
-        username_patterns_(RE2::Set(RE2::Options(), RE2::Anchor::UNANCHORED)),
-        password_patterns_(RE2::Set(RE2::Options(), RE2::Anchor::UNANCHORED)),
-        hostname_patterns_(RE2::Set(RE2::Options(), RE2::Anchor::UNANCHORED)),
-        port_patterns_(RE2::Set(RE2::Options(), RE2::Anchor::UNANCHORED)),
-        pathname_patterns_(RE2::Set(RE2::Options(), RE2::Anchor::UNANCHORED)),
-        search_patterns_(RE2::Set(RE2::Options(), RE2::Anchor::UNANCHORED)),
-        hash_patterns_(RE2::Set(RE2::Options(), RE2::Anchor::UNANCHORED)) {}
-  ~RouterRule() = default;
-  bool SetRule(const blink::ServiceWorkerRouterRule& rule);
-  bool IsConditionMatched(
-      const network::ResourceRequest& request,
-      absl::optional<blink::EmbeddedWorkerStatus> running_status) const;
-  const std::vector<blink::ServiceWorkerRouterSource>& sources() const {
-    return sources_;
+absl::optional<size_t> FindOrCondition(
+    const std::vector<blink::ServiceWorkerRouterCondition>& conditions) {
+  for (size_t i = 0; i < conditions.size(); ++i) {
+    if (conditions[i].type == blink::ServiceWorkerRouterCondition::Type::kOr) {
+      return i;
+    }
   }
+  return absl::nullopt;
+}
+
+class BaseCondition {
+ public:
+  BaseCondition() = default;
+  // Not copyable
+  BaseCondition(const BaseCondition&) = delete;
+  // Movable
+  BaseCondition(BaseCondition&&) = default;
+  BaseCondition& operator=(BaseCondition&&) = default;
+  // Returns true on success. Otherwise, false.
+  bool Set(const std::vector<blink::ServiceWorkerRouterCondition>& conditions);
+  bool Match(const network::ResourceRequest& request,
+             absl::optional<blink::EmbeddedWorkerStatus> running_status) const;
   bool need_running_status() const { return need_running_status_; }
 
  private:
-  // Returns true on success. Otherwise, false.
-  bool SetConditions(
-      const std::vector<blink::ServiceWorkerRouterCondition>& conditions);
-  // Returns true on success. Otherwise, false.
-  bool SetSources(
-      const std::vector<blink::ServiceWorkerRouterSource>& sources) {
-    if (!IsValidSources(sources)) {
-      return false;
-    }
-    sources_ = sources;
-    return true;
-  }
-  bool IsUrlPatternConditionMatched(
-      const network::ResourceRequest& request) const;
-  bool IsNonUrlPatternConditionMatched(
+  bool MatchUrlPatternConditions(const network::ResourceRequest& request) const;
+  bool MatchNonUrlPatternConditions(
       const network::ResourceRequest& request,
       absl::optional<blink::EmbeddedWorkerStatus> running_status) const;
-  // To process SafeUrlPattern faster, all patterns are combined into the
-  // `RE::Set` and compiled when `ServiceWorkerRouterEvaluator` is initialized.
-  RE2::Set protocol_patterns_;
-  RE2::Set username_patterns_;
-  RE2::Set password_patterns_;
-  RE2::Set hostname_patterns_;
-  RE2::Set port_patterns_;
-  RE2::Set pathname_patterns_;
-  RE2::Set search_patterns_;
-  RE2::Set hash_patterns_;
-  size_t url_pattern_length_ = 0;
+
+  std::unique_ptr<RE2> protocol_pattern_;
+  std::unique_ptr<RE2> username_pattern_;
+  std::unique_ptr<RE2> password_pattern_;
+  std::unique_ptr<RE2> hostname_pattern_;
+  std::unique_ptr<RE2> port_pattern_;
+  std::unique_ptr<RE2> pathname_pattern_;
+  std::unique_ptr<RE2> search_pattern_;
+  std::unique_ptr<RE2> hash_pattern_;
+  bool has_url_pattern_ = false;
   // Non-SafeUrlPattern conditions are processed one by one.
   std::vector<blink::ServiceWorkerRouterCondition> non_url_pattern_conditions_;
-  std::vector<blink::ServiceWorkerRouterSource> sources_;
   bool need_running_status_ = false;
 };
 
-bool ServiceWorkerRouterEvaluator::RouterRule::SetRule(
-    const blink::ServiceWorkerRouterRule& rule) {
-  return SetConditions(rule.conditions) && SetSources(rule.sources);
-}
-
-bool ServiceWorkerRouterEvaluator::RouterRule::SetConditions(
+bool BaseCondition::Set(
     const std::vector<blink::ServiceWorkerRouterCondition>& conditions) {
   if (conditions.empty()) {
     // At least one condition must be set.
@@ -345,7 +408,8 @@ bool ServiceWorkerRouterEvaluator::RouterRule::SetConditions(
 #define SET_PATTERN(type_name, type)                                         \
   do {                                                                       \
     auto regex = ConvertToRegex(url_pattern, type);                          \
-    if (type_name##_patterns_.Add(regex, nullptr) == -1) {                   \
+    type_name##_pattern_ = std::make_unique<RE2>(regex, RE2::Options());     \
+    if (!type_name##_pattern_->ok()) {                                       \
       RecordSetupError(ServiceWorkerRouterEvaluatorErrorEnums::kParseError); \
       return false;                                                          \
     }                                                                        \
@@ -359,52 +423,35 @@ bool ServiceWorkerRouterEvaluator::RouterRule::SetConditions(
     SET_PATTERN(search, URLPatternFieldType::kSearch);
     SET_PATTERN(hash, URLPatternFieldType::kHash);
 #undef SET_PATTERN
-    // Counts the conditions to ensure all conditions are matched.
-    ++url_pattern_length_;
+    has_url_pattern_ = true;
     // TODO(crbug.com/1371756): consider fast path on empty parts and "*".
     // Currently, regular expressions are executed even for empty parts cases,
     // which try to match inputs with "^$".  It is also executed for "*".
     // If performance to evaluate regular expressions matter, fast path can
     // be needed.
   }
-  if (url_pattern_length_ > 0 &&
-      (!protocol_patterns_.Compile() || !username_patterns_.Compile() ||
-       !password_patterns_.Compile() || !hostname_patterns_.Compile() ||
-       !port_patterns_.Compile() || !pathname_patterns_.Compile() ||
-       !search_patterns_.Compile() || !hash_patterns_.Compile())) {
-    // Failed to compile the regex.
-    RecordSetupError(ServiceWorkerRouterEvaluatorErrorEnums::kCompileError);
-    return false;
-  }
   return true;
 }
 
-bool ServiceWorkerRouterEvaluator::RouterRule::IsConditionMatched(
+bool BaseCondition::Match(
     const network::ResourceRequest& request,
     absl::optional<blink::EmbeddedWorkerStatus> running_status) const {
-  return IsUrlPatternConditionMatched(request) &&
-         IsNonUrlPatternConditionMatched(request, running_status);
+  return MatchUrlPatternConditions(request) &&
+         MatchNonUrlPatternConditions(request, running_status);
 }
 
-bool ServiceWorkerRouterEvaluator::RouterRule::IsUrlPatternConditionMatched(
+bool BaseCondition::MatchUrlPatternConditions(
     const network::ResourceRequest& request) const {
-  if (url_pattern_length_ == 0) {  // nothing need to be matched.
+  if (!has_url_pattern_) {  // nothing need to be matched.
     return true;
   }
-#define PATTERN_MATCH(type_name, field)                                    \
-  do {                                                                     \
-    std::vector<int> vec;                                                  \
-    if (!type_name##_patterns_.Match(request.url.field(), &vec)) {         \
-      VLOG(3) << "not matched. url=" << request.url << " field=" << #field \
-              << " value=" << request.url.field();                         \
-      return false;                                                        \
-    }                                                                      \
-    if (vec.size() != url_pattern_length_) {                               \
-      VLOG(3) << "pattern length is different. url=" << request.url        \
-              << " field=" << #field << " value=" << request.url.field();  \
-      return false;                                                        \
-    }                                                                      \
-  } while (0)
+#define PATTERN_MATCH(type_name, field)                                  \
+  CHECK(type_name##_pattern_);                                           \
+  if (!RE2::FullMatch(request.url.field(), *type_name##_pattern_)) {     \
+    VLOG(3) << "not matched. url=" << request.url << " field=" << #field \
+            << " value=" << request.url.field();                         \
+    return false;                                                        \
+  }
   PATTERN_MATCH(protocol, scheme);
   PATTERN_MATCH(username, username);
   PATTERN_MATCH(password, password);
@@ -417,7 +464,7 @@ bool ServiceWorkerRouterEvaluator::RouterRule::IsUrlPatternConditionMatched(
   return true;
 }
 
-bool ServiceWorkerRouterEvaluator::RouterRule::IsNonUrlPatternConditionMatched(
+bool BaseCondition::MatchNonUrlPatternConditions(
     const network::ResourceRequest& request,
     absl::optional<blink::EmbeddedWorkerStatus> running_status) const {
   for (const auto& c : non_url_pattern_conditions_) {
@@ -426,23 +473,152 @@ bool ServiceWorkerRouterEvaluator::RouterRule::IsNonUrlPatternConditionMatched(
         NOTREACHED_NORETURN()
             << "UrlPattern should be separated in the compile time.";
       case blink::ServiceWorkerRouterCondition::Type::kRequest:
-        if (!IsMatchedRequest(*c.request, request)) {
+        if (!MatchRequestCondition(*c.request, request)) {
           return false;
         }
         break;
       case blink::ServiceWorkerRouterCondition::Type::kRunningStatus:
         if (running_status &&
-            !IsMatchedRunningCondition(*c.running_status, *running_status)) {
+            !MatchRunningCondition(*c.running_status, *running_status)) {
           return false;
         }
         break;
       case blink::ServiceWorkerRouterCondition::Type::kOr:
-        NOTIMPLEMENTED();
-        break;
+        NOTREACHED_NORETURN() << "OrCondition should be separated in advance";
     }
   }
   return true;
 }
+
+class OrCondition {
+ public:
+  OrCondition() = default;
+  // Not copyable
+  OrCondition(const OrCondition&) = delete;
+  // Movable
+  OrCondition(OrCondition&&) = default;
+  OrCondition& operator=(OrCondition&&) = default;
+  // Returns true on success. Otherwise, false.
+  bool Set(
+      const std::vector<blink::ServiceWorkerRouterConditionObject>& objects);
+  bool Match(const network::ResourceRequest& request,
+             absl::optional<blink::EmbeddedWorkerStatus> running_status) const;
+  bool need_running_status() const { return need_running_status_; }
+
+ private:
+  bool MatchUrlPatternConditions(const network::ResourceRequest& request) const;
+  bool MatchNonUrlPatternConditions(
+      const network::ResourceRequest& request,
+      absl::optional<blink::EmbeddedWorkerStatus> running_status) const;
+
+  std::vector<ConditionObject> conditions_;
+  bool need_running_status_ = false;
+};
+
+class ConditionObject {
+ public:
+  // Returns true on success. Otherwise, false.
+  bool Set(const std::vector<blink::ServiceWorkerRouterCondition>& conditions) {
+    if (auto&& or_idx = FindOrCondition(conditions); or_idx) {
+      if (conditions.size() >= 2) {
+        // `or` condition must be exclusive.
+        RecordSetupError(
+            ServiceWorkerRouterEvaluatorErrorEnums::kInvalidCondition);
+        return false;
+      }
+      OrCondition v;
+      bool success = v.Set(conditions[*or_idx].or_condition->objects);
+      value_ = std::move(v);
+      return success;
+    } else {
+      BaseCondition v;
+      bool success = v.Set(conditions);
+      value_ = std::move(v);
+      return success;
+    }
+  }
+  bool Match(const network::ResourceRequest& request,
+             absl::optional<blink::EmbeddedWorkerStatus> running_status) const {
+    return absl::visit(
+        [&request, running_status](const auto& condition) {
+          return condition.Match(request, running_status);
+        },
+        value_);
+  }
+  bool need_running_status() const {
+    return absl::visit(
+        [](const auto& condition) { return condition.need_running_status(); },
+        value_);
+  }
+
+ private:
+  absl::variant<BaseCondition, OrCondition> value_;
+};
+
+bool OrCondition::Set(
+    const std::vector<blink::ServiceWorkerRouterConditionObject>& objects) {
+  conditions_.reserve(objects.size());
+  for (const auto& ob : objects) {
+    conditions_.emplace_back();
+    auto& c = conditions_.back();
+    if (!c.Set(ob.conditions)) {
+      conditions_.clear();
+      return false;
+    }
+    need_running_status_ = need_running_status_ || c.need_running_status();
+  }
+  return true;
+}
+
+bool OrCondition::Match(
+    const network::ResourceRequest& request,
+    absl::optional<blink::EmbeddedWorkerStatus> running_status) const {
+  for (const auto& c : conditions_) {
+    if (c.Match(request, running_status)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
+namespace content {
+
+class ServiceWorkerRouterEvaluator::RouterRule {
+ public:
+  bool SetRule(const blink::ServiceWorkerRouterRule& rule) {
+    if (ExceedsMaxConditionDepth(rule.conditions)) {
+      // Too many recursion in the condition.
+      RecordSetupError(
+          ServiceWorkerRouterEvaluatorErrorEnums::kExceedMaxConditionDepth);
+      return false;
+    }
+    return condition_.Set(rule.conditions) && SetSources(rule.sources);
+  }
+  bool Match(const network::ResourceRequest& request,
+             absl::optional<blink::EmbeddedWorkerStatus> running_status) const {
+    return condition_.Match(request, running_status);
+  }
+  const std::vector<blink::ServiceWorkerRouterSource>& sources() const {
+    return sources_;
+  }
+  bool need_running_status() const { return condition_.need_running_status(); }
+
+ private:
+  // Returns true on success. Otherwise, false.
+  bool SetSources(
+      const std::vector<blink::ServiceWorkerRouterSource>& sources) {
+    if (!IsValidSources(sources)) {
+      return false;
+    }
+    sources_ = sources;
+    return true;
+  }
+
+  ConditionObject condition_;
+  std::vector<blink::ServiceWorkerRouterSource> sources_;
+};
 
 ServiceWorkerRouterEvaluator::ServiceWorkerRouterEvaluator(
     blink::ServiceWorkerRouterRules rules)
@@ -470,7 +646,7 @@ ServiceWorkerRouterEvaluator::EvaluateInternal(
     absl::optional<blink::EmbeddedWorkerStatus> running_status) const {
   CHECK(is_valid_);
   for (const auto& rule : compiled_rules_) {
-    if (rule->IsConditionMatched(request, running_status)) {
+    if (rule->Match(request, running_status)) {
       VLOG(3) << "matched request url=" << request.url;
       RecordMatchedSourceType(rule->sources());
       return rule->sources();
@@ -501,61 +677,21 @@ base::Value ServiceWorkerRouterEvaluator::ToValue() const {
     base::Value::List condition;
     base::Value::List source;
     for (const auto& c : r.conditions) {
-      switch (c.type) {
-        case blink::ServiceWorkerRouterCondition::Type::kUrlPattern: {
-          base::Value::Dict out_c;
-          base::Value out_value;
-          const blink::SafeUrlPattern& url_pattern = *c.url_pattern;
-          base::Value::Dict url_pattern_value;
-#define TO_VALUE(type, type_name)                           \
-  do {                                                      \
-    auto value = ConvertToPatternString(url_pattern, type); \
-    url_pattern_value.Set(type_name, value);                \
-  } while (0)
-          TO_VALUE(URLPatternFieldType::kProtocol, "protocol");
-          TO_VALUE(URLPatternFieldType::kUsername, "username");
-          TO_VALUE(URLPatternFieldType::kPassword, "password");
-          TO_VALUE(URLPatternFieldType::kHostname, "hostname");
-          TO_VALUE(URLPatternFieldType::kPort, "port");
-          TO_VALUE(URLPatternFieldType::kPathname, "pathname");
-          TO_VALUE(URLPatternFieldType::kSearch, "search");
-          TO_VALUE(URLPatternFieldType::kHash, "hash");
-#undef TO_VALUE
-          out_c.Set("urlPattern", std::move(url_pattern_value));
-          condition.Append(std::move(out_c));
-          break;
-        }
-        case blink::ServiceWorkerRouterCondition::Type::kRequest: {
-          base::Value::Dict out_c;
-          out_c.Set("request", RequestToValue(*c.request));
-          condition.Append(std::move(out_c));
-          break;
-        }
-        case blink::ServiceWorkerRouterCondition::Type::kRunningStatus: {
-          base::Value::Dict out_c;
-          out_c.Set("running_status", RunningStatusToString(*c.running_status));
-          condition.Append(std::move(out_c));
-          break;
-        }
-        case blink::ServiceWorkerRouterCondition::Type::kOr: {
-          NOTIMPLEMENTED();
-          break;
-        }
-      }
+      condition.Append(ConditionToValue(c));
     }
     for (const auto& s : r.sources) {
       switch (s.type) {
-        case blink::ServiceWorkerRouterSource::SourceType::kNetwork:
+        case blink::ServiceWorkerRouterSource::Type::kNetwork:
           source.Append("network");
           break;
-        case blink::ServiceWorkerRouterSource::SourceType::kRace:
+        case blink::ServiceWorkerRouterSource::Type::kRace:
           // TODO(crbug.com/1371756): we may need to update the name per target.
           source.Append("race-network-and-fetch-handler");
           break;
-        case blink::ServiceWorkerRouterSource::SourceType::kFetchEvent:
+        case blink::ServiceWorkerRouterSource::Type::kFetchEvent:
           source.Append("fetch-event");
           break;
-        case blink::ServiceWorkerRouterSource::SourceType::kCache:
+        case blink::ServiceWorkerRouterSource::Type::kCache:
           if (s.cache_source->cache_name) {
             base::Value::Dict out_s;
             out_s.Set("cache_name", *s.cache_source->cache_name);

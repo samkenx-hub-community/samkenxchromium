@@ -20,6 +20,7 @@
 #include "net/http/http_no_vary_search_data.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/blink/public/common/tokens/tokens.h"
 #include "url/gurl.h"
 
 namespace network {
@@ -89,6 +90,7 @@ class CONTENT_EXPORT PrefetchContainer {
  public:
   PrefetchContainer(
       const GlobalRenderFrameHostId& referring_render_frame_host_id,
+      const blink::DocumentToken& referring_document_token,
       const GURL& url,
       const PrefetchType& prefetch_type,
       const blink::mojom::Referrer& referrer,
@@ -101,9 +103,9 @@ class CONTENT_EXPORT PrefetchContainer {
   PrefetchContainer& operator=(const PrefetchContainer&) = delete;
 
   // Defines the key to uniquely identify a prefetch.
-  using Key = std::pair<GlobalRenderFrameHostId, GURL>;
+  using Key = std::pair<blink::DocumentToken, GURL>;
   Key GetPrefetchContainerKey() const {
-    return std::make_pair(referring_render_frame_host_id_, prefetch_url_);
+    return std::make_pair(referring_document_token_, prefetch_url_);
   }
 
   // The ID of the RenderFrameHost that triggered the prefetch.
@@ -258,10 +260,6 @@ class CONTENT_EXPORT PrefetchContainer {
       std::unique_ptr<base::OneShotTimer> block_until_head_timer);
   void ResetBlockUntilHeadTimer();
 
-  // Note: `GetServableState()` does NOT cover all servable condition checks.
-  // `HasPrefetchBeenConsideredToServe()` and
-  // `Reader::HaveDefaultContextCookiesChanged()` also should be checked.
-  // TODO(crbug.com/1449360): Make this requirement more explicit/checked.
   enum class ServableState {
     // Not servable nor should block until head received.
     kNotServable,
@@ -273,6 +271,10 @@ class CONTENT_EXPORT PrefetchContainer {
     // received on a navigation to a matching URL.
     kShouldBlockUntilHeadReceived,
   };
+
+  // Note: Even if this returns `kServable`, `CreateRequestHandler()` can still
+  // fail (returning null handler) due to final checks. See also the comment for
+  // `PrefetchResponseReader::CreateRequestHandler()`.
   ServableState GetServableState(base::TimeDelta cacheable_duration) const;
 
   // Called once it is determined whether or not the prefetch is servable, i.e.
@@ -424,8 +426,7 @@ class CONTENT_EXPORT PrefetchContainer {
     // Returns the `SinglePrefetch` to be served next.
     const SinglePrefetch& GetCurrentSinglePrefetchToServe() const;
 
-    // Set up a PrefetchRequestHandler from the Reader. After this point, the
-    // PrefetchResponseReader starts keeping alive itself.
+    // See the comment for `PrefetchResponseReader::CreateRequestHandler()`.
     PrefetchRequestHandler CreateRequestHandler();
 
    private:
@@ -464,10 +465,9 @@ class CONTENT_EXPORT PrefetchContainer {
   // has redirect(s).
   const SinglePrefetch& GetPreviousSinglePrefetchToPrefetch() const;
 
-  PrefetchRequestHandler CreateRequestHandlerInternal(Reader& reader);
-
-  // The ID of the RenderFrameHost that triggered the prefetch.
-  GlobalRenderFrameHostId referring_render_frame_host_id_;
+  // The ID of the RenderFrameHost/Document that triggered the prefetch.
+  const GlobalRenderFrameHostId referring_render_frame_host_id_;
+  const blink::DocumentToken referring_document_token_;
 
   // The URL that was requested to be prefetch.
   const GURL prefetch_url_;
@@ -595,6 +595,14 @@ class CONTENT_EXPORT PrefetchContainer {
 CONTENT_EXPORT std::ostream& operator<<(
     std::ostream& ostream,
     const PrefetchContainer& prefetch_container);
+
+CONTENT_EXPORT std::ostream& operator<<(
+    std::ostream& ostream,
+    const PrefetchContainer::Key& prefetch_key);
+
+CONTENT_EXPORT std::ostream& operator<<(
+    std::ostream& ostream,
+    PrefetchContainer::ServableState servable_state);
 
 }  // namespace content
 

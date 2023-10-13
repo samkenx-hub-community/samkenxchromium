@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <codecvt>
-
 #include "base/test/bind.h"
 #include "base/test/gmock_callback_support.h"
 #include "base/test/mock_callback.h"
@@ -88,8 +86,8 @@ class DlpFilesAppBrowserTestBase {
     ON_CALL(*mock_rules_manager_, IsFilesPolicyEnabled)
         .WillByDefault(testing::Return(true));
 
-    files_controller_ =
-        std::make_unique<policy::DlpFilesControllerAsh>(*mock_rules_manager_);
+    files_controller_ = std::make_unique<policy::DlpFilesControllerAsh>(
+        *mock_rules_manager_, Profile::FromBrowserContext(context));
     ON_CALL(*mock_rules_manager_, GetDlpFilesController)
         .WillByDefault(testing::Return(files_controller_.get()));
 
@@ -274,14 +272,23 @@ class DlpFilesAppBrowserTestBase {
       auto cb = base::BindLambdaForTesting(
           [task_id, warning_files, action, profile](
               const dlp::CheckFilesTransferRequest,
-              chromeos::DlpClient::CheckFilesTransferCallback) {
+              chromeos::DlpClient::CheckFilesTransferCallback daemon_callback) {
+            auto warning_callback = base::BindOnce(
+                [](chromeos::DlpClient::CheckFilesTransferCallback daemon_cb,
+                   absl::optional<std::u16string> justification,
+                   bool should_proceed) {
+                  if (should_proceed) {
+                    std::move(daemon_cb).Run({});
+                  }
+                },
+                std::move(daemon_callback));
             policy::FilesPolicyNotificationManager* fpnm =
                 policy::FilesPolicyNotificationManagerFactory::
                     GetForBrowserContext(profile);
             ASSERT_TRUE(fpnm);
             ASSERT_TRUE(fpnm->HasIOTask(task_id.value()));
             // Call FPNM to show the warning, which pauses the task.
-            fpnm->ShowDlpWarning(base::DoNothing(), task_id,
+            fpnm->ShowDlpWarning(std::move(warning_callback), task_id,
                                  std::move(warning_files),
                                  policy::DlpFileDestination(), action);
           });
@@ -302,6 +309,8 @@ class DlpFilesAppBrowserTestBase {
   // this class.
   raw_ptr<policy::MockDlpRulesManager, DanglingUntriaged | ExperimentalAsh>
       mock_rules_manager_ = nullptr;
+
+  std::unique_ptr<policy::DlpFilesControllerAsh> files_controller_;
 
   std::unique_ptr<file_access::MockScopedFileAccessDelegate>
       scoped_file_access_delegate_;
@@ -344,7 +353,6 @@ class DlpFilesAppBrowserTestBase {
     std::move(callback).Run(response);
   }
 
-  std::unique_ptr<policy::DlpFilesControllerAsh> files_controller_;
 };
 
 constexpr char kFileTransferConnectorSettingsForDlp[] = R"(
@@ -797,6 +805,18 @@ class DlpFilesAppBrowserTest
                             base::Unretained(this)));
   }
 
+  void TearDownOnMainThread() override {
+    // Make sure the rules manager does not return a freed files controller.
+    ON_CALL(*mock_rules_manager_, GetDlpFilesController)
+        .WillByDefault(testing::Return(nullptr));
+
+    // The files controller must be destroyed before the profile since it's
+    // holding a pointer to it.
+    files_controller_.reset();
+
+    FileManagerBrowserTestBase::TearDownOnMainThread();
+  }
+
   bool HandleDlpCommands(const std::string& name,
                          const base::Value::Dict& value,
                          std::string* output) override {
@@ -905,13 +925,12 @@ class FileTransferConnectorFilesAppBrowserTest
 
     // Verify the displayed blocked files shown in the dialog.
     std::vector<std::string> displayed_files;
-    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
     for (const auto* row_view : view->children()) {
       const views::Label* label =
           static_cast<const views::Label*>(row_view->GetViewByID(
               policy::PolicyDialogBase::kConfidentialRowTitleViewId));
       if (label) {
-        displayed_files.push_back(converter.to_bytes(label->GetText()));
+        displayed_files.push_back(base::UTF16ToUTF8(label->GetText()));
       }
     }
     EXPECT_THAT(displayed_files,
@@ -946,13 +965,12 @@ class FileTransferConnectorFilesAppBrowserTest
 
     // Verify the displayed blocked files shown in the dialog.
     std::vector<std::string> displayed_files;
-    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
     for (const auto* row_view : view->children()) {
       const views::Label* label =
           static_cast<const views::Label*>(row_view->GetViewByID(
               policy::PolicyDialogBase::kConfidentialRowTitleViewId));
       if (label) {
-        displayed_files.push_back(converter.to_bytes(label->GetText()));
+        displayed_files.push_back(base::UTF16ToUTF8(label->GetText()));
       }
     }
     EXPECT_THAT(displayed_files,
@@ -969,6 +987,79 @@ class FileTransferConnectorFilesAppBrowserTest
 };
 
 IN_PROC_BROWSER_TEST_P(FileTransferConnectorFilesAppBrowserTest, Test) {
+  StartTest();
+}
+
+// A version of FilesAppBrowserTest that supports DLP and Enterprise Connectors
+// files restrictions.
+class DlpAndEnterpriseConnectorsFilesAppBrowserTest
+    : public FileManagerBrowserTestBase,
+      public ::testing::WithParamInterface<file_manager::test::TestCase>,
+      public DlpFilesAppBrowserTestBase,
+      public FileTransferConnectorFilesAppBrowserTestBase {
+ public:
+  DlpAndEnterpriseConnectorsFilesAppBrowserTest(
+      const DlpAndEnterpriseConnectorsFilesAppBrowserTest&) = delete;
+  DlpAndEnterpriseConnectorsFilesAppBrowserTest& operator=(
+      const DlpAndEnterpriseConnectorsFilesAppBrowserTest&) = delete;
+
+ protected:
+  DlpAndEnterpriseConnectorsFilesAppBrowserTest() = default;
+  ~DlpAndEnterpriseConnectorsFilesAppBrowserTest() override = default;
+
+  void SetUpOnMainThread() override {
+    FileManagerBrowserTestBase::SetUpOnMainThread();
+    policy::DlpRulesManagerFactory::GetInstance()->SetTestingFactory(
+        profile(),
+        base::BindRepeating(&DlpFilesAppBrowserTestBase::SetDlpRulesManager,
+                            base::Unretained(this)));
+    FileTransferConnectorFilesAppBrowserTestBase::SetUpOnMainThread(profile());
+  }
+
+  void TearDownOnMainThread() override {
+    // The files controller must be destroyed before the profile since it's
+    // holding a pointer to it.
+    files_controller_.reset();
+    FileManagerBrowserTestBase::TearDownOnMainThread();
+  }
+
+  bool HandleDlpCommands(const std::string& name,
+                         const base::Value::Dict& value,
+                         std::string* output) override {
+    return DlpFilesAppBrowserTestBase::HandleDlpCommands(profile(), name, value,
+                                                         output);
+  }
+
+  bool HandleEnterpriseConnectorCommands(const std::string& name,
+                                         const base::Value::Dict& value,
+                                         std::string* output) override {
+    return FileTransferConnectorFilesAppBrowserTestBase::
+        HandleEnterpriseConnectorCommands(profile(), GetOptions(), name, value,
+                                          output);
+  }
+
+  const char* GetTestCaseName() const override { return GetParam().name; }
+
+  std::string GetFullTestCaseName() const override {
+    return GetParam().GetFullName();
+  }
+
+  const char* GetTestExtensionManifestName() const override {
+    return "file_manager_test_manifest.json";
+  }
+
+  FileManagerBrowserTestBase::Options GetOptions() const override {
+    return GetParam().options;
+  }
+};
+
+IN_PROC_BROWSER_TEST_P(DlpAndEnterpriseConnectorsFilesAppBrowserTest, Test) {
+  ASSERT_TRUE(policy::DlpRulesManagerFactory::GetForPrimaryProfile());
+  ON_CALL(*mock_rules_manager_, IsRestricted)
+      .WillByDefault(::testing::Return(policy::DlpRulesManager::Level::kAllow));
+  ON_CALL(*mock_rules_manager_, GetReportingManager)
+      .WillByDefault(::testing::Return(nullptr));
+
   StartTest();
 }
 
@@ -1069,6 +1160,13 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
             "transferConnectorFromUsbToDownloadsFlatWarnCancelNewUX"),
         FILE_TRANSFER_TEST_CASE_NEW_UX(
             "transferConnectorFromUsbToDownloadsDeepWarnCancelNewUX")));
+
+WRAPPED_INSTANTIATE_TEST_SUITE_P(
+    DlpEntrepriseConnectors, /* dlp_enterprise_connectors.js */
+    DlpAndEnterpriseConnectorsFilesAppBrowserTest,
+    ::testing::Values(
+        FILE_TRANSFER_TEST_CASE_NEW_UX("twoWarningsProceeded"),
+        FILE_TRANSFER_TEST_CASE_NEW_UX("differentBlockPolicies")));
 
 #undef FILE_TRANSFER_TEST_CASE
 #undef FILE_TRANSFER_TEST_CASE_NEW_UX

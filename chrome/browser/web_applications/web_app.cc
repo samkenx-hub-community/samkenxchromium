@@ -20,7 +20,9 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/to_string.h"
+#include "base/types/optional_util.h"
 #include "base/values.h"
+#include "chrome/browser/web_applications/generated_icon_fix_util.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom-shared.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.pb.h"
 #include "chrome/browser/web_applications/web_app_chromeos_data.h"
@@ -690,6 +692,14 @@ void WebApp::SetIsUserSelectedAppForSupportedLinks(
       is_user_selected_app_for_capturing_links;
 }
 
+void WebApp::SetSupportedLinksOfferIgnoreCount(int ignore_count) {
+  supported_links_offer_ignore_count_ = ignore_count;
+}
+
+void WebApp::SetSupportedLinksOfferDismissCount(int dismiss_count) {
+  supported_links_offer_dismiss_count_ = dismiss_count;
+}
+
 void WebApp::AddPlaceholderInfoToManagementExternalConfigMap(
     WebAppManagement::Type type,
     bool is_placeholder) {
@@ -741,6 +751,13 @@ void WebApp::SetAlwaysShowToolbarInFullscreen(bool show) {
 
 void WebApp::SetLatestInstallTime(const base::Time& latest_install_time) {
   latest_install_time_ = latest_install_time;
+}
+
+void WebApp::SetGeneratedIconFix(
+    absl::optional<GeneratedIconFix> generated_icon_fix) {
+  CHECK(!generated_icon_fix.has_value() ||
+        generated_icon_fix_util::IsValid(*generated_icon_fix));
+  generated_icon_fix_ = generated_icon_fix;
 }
 
 WebApp::ClientData::ClientData() = default;
@@ -891,6 +908,12 @@ void WebApp::IsolationData::SetPendingUpdateInfo(
   pending_update_info_ = pending_update_info;
 }
 
+const absl::optional<GeneratedIconFix>& WebApp::generated_icon_fix() const {
+  CHECK(!generated_icon_fix_.has_value() ||
+        generated_icon_fix_util::IsValid(generated_icon_fix_.value()));
+  return generated_icon_fix_;
+}
+
 bool WebApp::IsolationData::PendingUpdateInfo::operator==(
     const WebApp::IsolationData::PendingUpdateInfo& other) const = default;
 bool WebApp::IsolationData::PendingUpdateInfo::operator!=(
@@ -967,7 +990,10 @@ bool WebApp::operator==(const WebApp& other) const {
         app.current_os_integration_states_,
         app.isolation_data_,
         app.is_user_selected_app_for_capturing_links_,
-        app.latest_install_time_
+        app.latest_install_time_,
+        app.generated_icon_fix_,
+        app.supported_links_offer_ignore_count_,
+        app.supported_links_offer_dismiss_count_
         // clang-format on
     );
   };
@@ -1182,6 +1208,14 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
            is_user_selected_app_for_capturing_links_);
 
   root.Set("latest_install_time", base::ToString(latest_install_time_));
+
+  root.Set("generated_icon_fix", generated_icon_fix_util::ToDebugValue(
+                                     base::OptionalToPtr(generated_icon_fix_)));
+
+  root.Set("supported_links_offer_ignore_count",
+           supported_links_offer_ignore_count_);
+  root.Set("supported_links_offer_dismiss_count",
+           supported_links_offer_dismiss_count_);
 
   return base::Value(std::move(root));
 }

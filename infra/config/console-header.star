@@ -155,7 +155,7 @@ HEADER = headers.header(
                 ),
                 headers.link(
                     text = "checks",
-                    url = "/p/{}/checks/builders".format(settings.project),
+                    url = "/p/{}/g/checks".format(settings.project),
                     alt = "Checks console",
                 ),
                 headers.link(
@@ -391,7 +391,7 @@ HEADER = headers.header(
                 console_ids = [
                     "chromium/chromium.android",
                     "chrome/chrome.perf",
-                    "chromium/chromium.fuchsia.fyi",
+                    "chromium/sheriff.fuchsia",
                     "chromium/chromium.gpu.fyi",
                     "chromium/chromium.angle",
                     "chromium/chromium.swangle",

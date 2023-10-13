@@ -10,13 +10,10 @@ import {ApplicationTestRunner} from 'application_test_runner';
 
 import * as SDK from 'devtools/core/sdk/sdk.js';
 import * as Common from 'devtools/core/common/common.js';
-import * as UIModule from 'devtools/ui/legacy/legacy.js';
+import * as UI from 'devtools/ui/legacy/legacy.js';
 
 (async function() {
   TestRunner.addResult(`Tests framework event listeners output in Sources panel when service worker is present.\n`);
-  await TestRunner.loadLegacyModule('sources');
-  await TestRunner.loadLegacyModule('console');
-  await TestRunner.loadLegacyModule('console');
   await TestRunner.showPanel('elements');
 
   await TestRunner.evaluateInPage(`
@@ -40,7 +37,7 @@ import * as UIModule from 'devtools/ui/legacy/legacy.js';
       BrowserDebugger.ObjectEventListenersSidebarPane.instance();
 
   function isServiceWorker() {
-    var target = UIModule.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext).target();
+    var target = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext).target();
     return target.type() === SDK.Target.Type.ServiceWorker;
   }
 
@@ -53,7 +50,7 @@ import * as UIModule from 'devtools/ui/legacy/legacy.js';
     SourcesTestRunner.selectThread(executionContext.target());
     TestRunner.addResult('Context is service worker: ' + isServiceWorker());
     TestRunner.addResult('Dumping listeners');
-    await UI.viewManager.showView('sources.globalListeners').then(() => {
+    await UI.ViewManager.ViewManager.instance().showView('sources.globalListeners').then(() => {
       objectEventListenersPane.update();
       ElementsTestRunner.expandAndDumpEventListeners(objectEventListenersPane.eventListenersView, step3);
     });

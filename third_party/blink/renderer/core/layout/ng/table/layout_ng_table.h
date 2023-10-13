@@ -8,7 +8,7 @@
 #include "base/dcheck_is_on.h"
 #include "base/notreached.h"
 #include "third_party/blink/renderer/core/core_export.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_block.h"
+#include "third_party/blink/renderer/core/layout/layout_block.h"
 #include "third_party/blink/renderer/core/layout/ng/table/ng_table_layout_algorithm_types.h"
 
 namespace blink {
@@ -96,7 +96,7 @@ enum SkipEmptySectionsValue { kDoNotSkipEmptySections, kSkipEmptySections };
 // The validation state is a IsTableColumnsConstraintsDirty flag
 // on LayoutObject. They are invalidated inside
 // LayoutObject::SetNeeds*Layout.
-class CORE_EXPORT LayoutNGTable : public LayoutNGBlock {
+class CORE_EXPORT LayoutNGTable : public LayoutBlock {
  public:
   explicit LayoutNGTable(Element*);
   ~LayoutNGTable() override;
@@ -107,14 +107,12 @@ class CORE_EXPORT LayoutNGTable : public LayoutNGBlock {
 
   bool IsFirstCell(const LayoutNGTableCell&) const;
   LayoutNGTableSection* FirstSection() const;
-  LayoutNGTableSection* LastSection() const;
   LayoutNGTableSection* FirstNonEmptySection() const;
   LayoutNGTableSection* LastNonEmptySection() const;
   LayoutNGTableSection* NextSection(const LayoutNGTableSection*,
                                     SkipEmptySectionsValue) const;
   LayoutNGTableSection* PreviousSection(const LayoutNGTableSection*,
                                         SkipEmptySectionsValue) const;
-  LayoutNGTableSection* FirstBody() const;
 
   wtf_size_t ColumnCount() const;
 
@@ -178,10 +176,6 @@ class CORE_EXPORT LayoutNGTable : public LayoutNGBlock {
   PhysicalRect OverflowClipRect(const PhysicalOffset&,
                                 OverlayScrollbarClipBehavior) const override;
 
-#if DCHECK_IS_ON()
-  void AddVisualEffectOverflow() final;
-#endif
-
   bool VisualRectRespectsVisibility() const override {
     NOT_DESTROYED();
     return false;
@@ -199,22 +193,20 @@ class CORE_EXPORT LayoutNGTable : public LayoutNGBlock {
 
   // LayoutBlock methods end.
 
-  bool ShouldCollapseBorders() const {
+  bool HasCollapsedBorders() const {
     NOT_DESTROYED();
     return StyleRef().BorderCollapse() == EBorderCollapse::kCollapse;
   }
 
-  // TODO(1229581): Do we need both this and ShouldCollapseBorders()?
-  bool HasCollapsedBorders() const;
-
   unsigned AbsoluteColumnToEffectiveColumn(
       unsigned absolute_column_index) const;
+
+  unsigned EffectiveColumnCount() const;
 
  protected:
   bool IsOfType(LayoutObjectType type) const override {
     NOT_DESTROYED();
-    return type == kLayoutObjectTable ||
-           LayoutNGMixin<LayoutBlock>::IsOfType(type);
+    return type == kLayoutObjectTable || LayoutBlock::IsOfType(type);
   }
 
   // Table paints background specially.

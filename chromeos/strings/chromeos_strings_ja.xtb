@@ -24,6 +24,7 @@
 <translation id="1154390310959620237">カスタマイズできるショートカットは 5 件までです。いずれかのショートカットを削除すると、新しいショートカットを追加できるようになります。</translation>
 <translation id="1164939766849482256">「夜明けから夜更けまで」のスクリーン セーバー</translation>
 <translation id="1167755866710282443">メニューを開いてキーをカスタマイズします。メニューをドラッグして移動します。</translation>
+<translation id="1174073918202301297">ショートカットを追加しました</translation>
 <translation id="1175697296044146566">この <ph name="DEVICE_TYPE" /> は <ph name="MANAGER" /> によって管理されています。</translation>
 <translation id="1175951029573070619">普通（<ph name="SIGNAL_STRENGTH" />）</translation>
 <translation id="1181037720776840403">削除</translation>
@@ -91,6 +92,7 @@
 <translation id="1643449475550628585">壁紙画像を毎日変更する</translation>
 <translation id="1644574205037202324">履歴</translation>
 <translation id="1651925268237749928">共有アルバムを選択しました。他のユーザーも写真を追加、変更できます。現在このアルバムに含まれていない写真が壁紙に使用される可能性があります。</translation>
+<translation id="1661865805917886535">アカウント情報とシステム情報の一部が Google に送信されます。この情報は、技術的な問題への対処やサービス改善のために、Google のプライバシー ポリシー（<ph name="PRIVACYPOLICYURL" />）と利用規約（<ph name="TERMSOFSERVICEURL" />）に沿って使用されます。コンテンツの変更をリクエストするには、法的事項に関するヘルプ（<ph name="LEGALHELPPAGEURL" />）に移動してください。</translation>
 <translation id="1662989795263954667">停止 - インク切れ</translation>
 <translation id="1664796644829245314">「<ph name="PREVIEW_OBJECT" />」をプレビュー</translation>
 <translation id="1668469839109562275">組み込みの VPN</translation>
@@ -131,7 +133,6 @@
 <translation id="1871569928317311284">ダークモードをオフにする</translation>
 <translation id="1874612839560830905">MTU</translation>
 <translation id="188114911237521550">ダークモードをオフにする</translation>
-<translation id="1881188606372070653">法的理由によりコンテンツの変更をリクエストするには、<ph name="BEGIN_LINK1" />法的な問題に関するヘルプページ<ph name="END_LINK1" />をご覧ください。アカウント情報とシステム情報の一部が Google に送信されます。ご提供いただいた情報は、Google で技術的な問題の解決やサービスの改善を図るため、<ph name="BEGIN_LINK2" />プライバシー ポリシー<ph name="END_LINK2" />と<ph name="BEGIN_LINK3" />利用規約<ph name="END_LINK3" />に沿って使用されます。</translation>
 <translation id="1885577615937958993">メディアを早送りする</translation>
 <translation id="1887850431809612466">ハードウェア リビジョン</translation>
 <translation id="1897672602657312171">検索キーを使わないショートカットは、一部のアプリのショートカットと競合する可能性があります。そのまま使用する場合は、このショートカットをもう一度押します。または、検索キーを使用した新しいショートカットを押します。</translation>
@@ -193,6 +194,7 @@
 <translation id="2326139988748364651"><ph name="RESOLUTION_VALUE" /> dpi</translation>
 <translation id="2338501278241028356">近くのデバイスを検出するには Bluetooth をオンにしてください</translation>
 <translation id="2346474577291266260">非常に強い（<ph name="SIGNAL_STRENGTH" />）</translation>
+<translation id="2358070305000735383">「<ph name="DESCRIPTION" />」の編集ダイアログが開いています。</translation>
 <translation id="2359808026110333948">続行</translation>
 <translation id="2364498172489649528">成功</translation>
 <translation id="2367335866686097760">キーマッピングのキー</translation>
@@ -212,6 +214,7 @@
 <translation id="2505327257735685095">現在の壁紙画像を更新する</translation>
 <translation id="2512979179176933762">ウィンドウを表示する</translation>
 <translation id="2513396635448525189">ログイン画像</translation>
+<translation id="2515109918609218604">ショートカットを利用できません。ファンクション キーと検索キーを使わない新しいショートカットを押してください。</translation>
 <translation id="2517472476991765520">スキャン</translation>
 <translation id="2521835766824839541">前のトラック</translation>
 <translation id="2526590354069164005">デスクトップ</translation>
@@ -265,6 +268,7 @@
 <translation id="3122464029669770682">CPU</translation>
 <translation id="3124039320086536031">デバイスは接続されています。</translation>
 <translation id="3127341325625468058">{PAGE_NUMBER,plural, =0{ページを削除しますか？}=1{ページ {PAGE_NUMBER} を削除しますか？}other{ページ {PAGE_NUMBER} を削除しますか？}}</translation>
+<translation id="3146655726035122603"><ph name="PRODUCT_NAME" /> 限定</translation>
 <translation id="315116470104423982">モバイル データ</translation>
 <translation id="3156846309055100599"><ph name="PAGE_NUMBER" /> ページ目をスキャンしています...</translation>
 <translation id="315738237743207937">キャプティブ ポータルが検出されました</translation>
@@ -280,7 +284,6 @@
 <translation id="3226405216343213872">スキャナを検索しています</translation>
 <translation id="3226657629376379887">レイアウトの操作メニュー</translation>
 <translation id="3246869037381808805">昨日より前の印刷ジョブは削除されます</translation>
-<translation id="3248223063252096240"><ph name="PRODUCT_NAME" />　限定</translation>
 <translation id="3268178239013324452">失敗 - 扉が開いています</translation>
 <translation id="3275729367986477355">アバターの画像</translation>
 <translation id="3283504360622356314">{0,plural, =1{ファイルを編集}other{ファイルを編集}}</translation>
@@ -480,6 +483,7 @@
 <translation id="4793756956024303490">圧縮アルゴリズム</translation>
 <translation id="4794140124556169553">CPU のテストを行うと、システムのパフォーマンスに響することがあります</translation>
 <translation id="4798078634453489142">新しい APN を追加するには、APN を削除してください</translation>
+<translation id="479989351350248267">検索</translation>
 <translation id="4800589996161293643">Chromebook コミュニティ</translation>
 <translation id="4803391892369051319">IPv4</translation>
 <translation id="4808449224298348341">キャンセルされた印刷ジョブ <ph name="DOCUMENT_TITLE" /></translation>
@@ -688,6 +692,7 @@
 <translation id="6318437367327684789">ずっと</translation>
 <translation id="6319207335391420837"><ph name="DEVICE_NAME" /> のファームウェアをアップデート</translation>
 <translation id="6321407676395378991">スクリーン セーバーをオンにする</translation>
+<translation id="6324916366299863871">ショートカットの編集</translation>
 <translation id="6325525973963619867">失敗しました</translation>
 <translation id="6331191339300272798">ダークモードを自動的に設定する</translation>
 <translation id="6340526405444716530">カスタマイズ</translation>
@@ -787,6 +792,7 @@
 <translation id="7103252855940681301">デバイス <ph name="INDEX" />/<ph name="COUNT" />、名前: <ph name="NAME" />。</translation>
 <translation id="7107255225945990211"><ph name="PRODUCT_NAME" /> 限定のアートワークを選択します</translation>
 <translation id="7108668606237948702">Enter</translation>
+<translation id="7119389851461848805">電源</translation>
 <translation id="7130438335435247835">アクセス ポイント名（APN）</translation>
 <translation id="7134436342991564651">{0,plural, =1{ネームサーバー}other{ネームサーバー}}</translation>
 <translation id="7135814714616751706">ショートカットの検索</translation>
@@ -827,6 +833,7 @@
 <translation id="7375053625150546623">EAP</translation>
 <translation id="7388959671917308825">デバイス内蔵タッチパッド</translation>
 <translation id="7397270852490618635">ライトモードをオフにする</translation>
+<translation id="7401543881546089382">ショートカットを削除</translation>
 <translation id="741244894080940828">単位変換</translation>
 <translation id="7415801143053185905">HTTP レイテンシが非常に高くなっています</translation>
 <translation id="7425178841057519191">{NUM_ROOL_APPS,plural,offset:2 =1{ログインするたびに <ph name="APP_NAME_1" /> を自動的に開始するよう管理者が設定しています。}=2{ログインするたびに <ph name="APP_NAME_1" /> と <ph name="APP_NAME_2" /> を自動的に開始するよう管理者が設定しています。}=3{ログインするたびに <ph name="APP_NAME_1" />、<ph name="APP_NAME_2" />、<ph name="APP_NAME_3" /> を自動的に開始するよう管理者が設定しています。}other{ログインするたびに <ph name="APP_NAME_1" />、<ph name="APP_NAME_2" />、その他 # 個のアプリを自動的に開始するよう管理者が設定しています。}}</translation>
@@ -865,6 +872,7 @@
 <translation id="7705524343798198388">VPN</translation>
 <translation id="7716280709122323042">WPA3</translation>
 <translation id="7718231387947923843">キーボード ライト</translation>
+<translation id="7730077286107534951">アカウント情報とシステム情報の一部が Google に送信されます。この情報は、Google の<ph name="BEGIN_LINK2" />プライバシー ポリシー<ph name="END_LINK2" />と<ph name="BEGIN_LINK3" />利用規約<ph name="END_LINK3" />に基づき、技術的な問題への対処やサービス改善のために使用されます。コンテンツの変更をリクエストするには、<ph name="BEGIN_LINK1" />法的事項に関するヘルプ<ph name="END_LINK1" />をご覧ください。</translation>
 <translation id="773153675489693198">サイクル回数</translation>
 <translation id="7747039790905080783">事前共有キー</translation>
 <translation id="7752963721013053477">夜明けから夜更けまで - 限定</translation>
@@ -901,6 +909,7 @@
 <translation id="7978412674231730200">秘密鍵</translation>
 <translation id="7994702968232966508">EAP 方式</translation>
 <translation id="8004582292198964060">ブラウザ</translation>
+<translation id="8017679124341497925">ショートカットを編集しました</translation>
 <translation id="802154636333426148">ダウンロード エラー</translation>
 <translation id="8031884997696620457">HSPAPlus</translation>
 <translation id="80398733265834479">自動カラー モードを有効にする</translation>
@@ -941,6 +950,7 @@
 <translation id="8336739000755212683">デバイスのアカウント画像を変更</translation>
 <translation id="8347126826554447157"><ph name="SHORCTCUT1" /> または <ph name="SHORCTCUT2" /></translation>
 <translation id="8347227221149377169">印刷ジョブ</translation>
+<translation id="8349826889576450703">ランチャー</translation>
 <translation id="8351855506390808906">キーマッピングのタッチポイント</translation>
 <translation id="8352772353338965963">マルチログインにアカウントを追加します。ログインしているすべてのアカウントにパスワードなしでアクセスできるようになるため、この機能は信頼できるアカウントでのみ使用してください。</translation>
 <translation id="8364946094152050673">ネームサーバーが空です</translation>
@@ -1014,6 +1024,7 @@
 <translation id="8868741746785112895">GUID</translation>
 <translation id="8876270629542503161">デバイスの種類はタブレットです。</translation>
 <translation id="8881098542468797602">テストが成功しました</translation>
+<translation id="8892443466059986410">ショートカットの編集をキャンセル</translation>
 <translation id="8898840733695078011">電波強度</translation>
 <translation id="8909114361904403025">上矢印</translation>
 <translation id="8910721771319628100">デフォルトのネットワークの応答時間がしきい値を超えています</translation>
@@ -1036,6 +1047,7 @@
 <translation id="8998156756248178381">{NUM_ROOL_APPS,plural, =1{<ph name="APP_NAME_1" /> が自動的に開始されました}other{# 個のアプリが自動的に開始されました}}</translation>
 <translation id="8998289560386111590">お使いのデバイスではご利用いただけません</translation>
 <translation id="9003704114456258138">周波数</translation>
+<translation id="901834265349196618">メール</translation>
 <translation id="9024331582947483881">全画面表示</translation>
 <translation id="9025198690966128418">個人用デバイスとして使用</translation>
 <translation id="902638246363752736">キーボードの設定</translation>
@@ -1076,6 +1088,7 @@
 <translation id="945522503751344254">フィードバックを送信</translation>
 <translation id="952992212772159698">無効</translation>
 <translation id="960719561871045870">事業者コード</translation>
+<translation id="966787709310836684">メニュー</translation>
 <translation id="979450713603643090">ライトピンク</translation>
 <translation id="982713511914535780">放電テストを実行</translation>
 <translation id="987264212798334818">全般</translation>

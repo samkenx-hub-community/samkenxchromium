@@ -11,14 +11,19 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/uuid.h"
+#include "build/build_config.h"
+#include "chrome/browser/sync/test/integration/encryption_helper.h"
 #include "chrome/browser/sync/test/integration/fake_server_match_status_checker.h"
 #include "chrome/browser/sync/test/integration/passwords_helper.h"
 #include "chrome/browser/sync/test/integration/single_client_status_change_checker.h"
 #include "chrome/browser/sync/test/integration/sync_service_impl_harness.h"
 #include "chrome/browser/sync/test/integration/sync_test.h"
 #include "components/password_manager/core/browser/features/password_features.h"
+#include "components/password_manager/core/browser/features/password_manager_features_util.h"
 #include "components/password_manager/core/browser/password_form.h"
+#include "components/password_manager/core/browser/password_manager_metrics_util.h"
 #include "components/sync/base/features.h"
+#include "components/sync/base/model_type.h"
 #include "components/sync/engine/cycle/entity_change_metric_recording.h"
 #include "components/sync/engine/nigori/cross_user_sharing_public_key.h"
 #include "components/sync/engine/nigori/cross_user_sharing_public_private_key_pair.h"
@@ -32,6 +37,9 @@
 
 using password_manager::PasswordForm;
 using password_manager::PasswordStoreInterface;
+using password_manager::metrics_util::
+    ProcessIncomingPasswordSharingInvitationResult;
+using passwords_helper::GetAccountPasswordStoreInterface;
 using passwords_helper::GetAllLogins;
 using passwords_helper::GetProfilePasswordStoreInterface;
 using sync_pb::EntitySpecifics;
@@ -197,6 +205,25 @@ class ServerPasswordInvitationChecker
   const size_t expected_count_;
 };
 
+// Waits for the Incoming Password Sharing Invitation data type to become
+// inactive.
+class IncomingPasswordSharingInvitationInactiveChecker
+    : public SingleClientStatusChangeChecker {
+ public:
+  explicit IncomingPasswordSharingInvitationInactiveChecker(
+      syncer::SyncServiceImpl* service)
+      : SingleClientStatusChangeChecker(service) {}
+
+  // StatusChangeChecker implementation.
+  bool IsExitConditionSatisfied(std::ostream* os) override {
+    *os << "Waiting for Incoming Password Sharing Invitations to become "
+           "inactive.";
+
+    return !service()->GetActiveDataTypes().Has(
+        syncer::INCOMING_PASSWORD_SHARING_INVITATION);
+  }
+};
+
 class SingleClientIncomingPasswordSharingInvitationTest : public SyncTest {
  public:
   SingleClientIncomingPasswordSharingInvitationTest()
@@ -242,6 +269,19 @@ class SingleClientIncomingPasswordSharingInvitationTest : public SyncTest {
 
     passwords_helper::InjectKeystoreEncryptedServerPassword(password_data,
                                                             GetFakeServer());
+  }
+
+  bool SetupSyncTransportWithoutPasswordAccountStorage() {
+    if (!SetupClients()) {
+      return false;
+    }
+    if (!GetClient(0)->SignInPrimaryAccount()) {
+      return false;
+    }
+    if (!GetClient(0)->AwaitSyncTransportActive()) {
+      return false;
+    }
+    return true;
   }
 
  private:
@@ -362,11 +402,78 @@ IN_PROC_BROWSER_TEST_F(
   // before the remote password has been stored. The following histogram is
   // reported if the remote password exists locally during the initial sync
   // merge.
-  // TODO(crbug.com/1478704): add a new histogram to record when an invitation
-  // is ignored because of existing local password.
-  histogram_tester.ExpectTotalCount(
-      "PasswordManager.MergeSyncData.UpdateLoginSyncError",
-      /*expected_count=*/0);
+  histogram_tester.ExpectUniqueSample(
+      "PasswordManager.ProcessIncomingPasswordSharingInvitationResult",
+      ProcessIncomingPasswordSharingInvitationResult::
+          kCredentialsExistWithDifferentPassword,
+      /*expected_bucket_count=*/1);
 }
+
+// The unconsented primary account isn't supported on ChromeOS.
+// TODO(crbug.com/1348950): enable on Android once transport mode for Passwords
+// is supported.
+#if !BUILDFLAG(IS_CHROMEOS_ASH) && !BUILDFLAG(IS_ANDROID)
+IN_PROC_BROWSER_TEST_F(SingleClientIncomingPasswordSharingInvitationTest,
+                       ShouldStoreIncomingPasswordIntoAccountDB) {
+  // First, setup sync (in transport mode) to initialize Nigori node with a
+  // public key to be able to inject invitations.
+  ASSERT_TRUE(SetupSyncTransportWithoutPasswordAccountStorage());
+  ASSERT_FALSE(GetSyncService(0)->IsSyncFeatureEnabled());
+  ASSERT_TRUE(CrossUserSharingKeysChecker().Wait());
+
+  // Let the user opt in to the account-scoped password storage, and wait for it
+  // to become active.
+  password_manager::features_util::OptInToAccountStorage(
+      GetProfile(0)->GetPrefs(), GetSyncService(0));
+  PasswordSyncActiveChecker(GetSyncService(0)).Wait();
+  ASSERT_THAT(GetAllLogins(GetAccountPasswordStoreInterface(0)), IsEmpty());
+
+  InjectInvitationToServer();
+  EXPECT_TRUE(PasswordStoredChecker(GetSyncService(0),
+                                    GetAccountPasswordStoreInterface(0),
+                                    /*expected_count=*/1)
+                  .Wait());
+  EXPECT_TRUE(ServerPasswordInvitationChecker(/*expected_count=*/0).Wait());
+
+  EXPECT_THAT(GetAllLogins(GetProfilePasswordStoreInterface(0)), IsEmpty());
+  EXPECT_THAT(GetAllLogins(GetAccountPasswordStoreInterface(0)),
+              Contains(Pointee(
+                  AllOf(Field(&PasswordForm::password_value,
+                              base::UTF8ToUTF16(std::string(kPasswordValue))),
+                        Field(&PasswordForm::type,
+                              PasswordForm::Type::kReceivedViaSharing)))));
+}
+
+// This test verifies that Incoming Password Sharing Invitation data type is
+// stopped when the Password data type stops.
+IN_PROC_BROWSER_TEST_F(SingleClientIncomingPasswordSharingInvitationTest,
+                       ShouldStopReceivingPasswordsWhenPasswordsInactive) {
+  ASSERT_TRUE(SetupSyncTransportWithoutPasswordAccountStorage());
+  ASSERT_FALSE(GetSyncService(0)->IsSyncFeatureEnabled());
+
+  // Passwords and hence password sharing invitations should be disabled by
+  // default in transport mode.
+  ASSERT_FALSE(GetSyncService(0)->GetActiveDataTypes().Has(syncer::PASSWORDS));
+  ASSERT_FALSE(GetSyncService(0)->GetActiveDataTypes().Has(
+      syncer::INCOMING_PASSWORD_SHARING_INVITATION));
+
+  // Let the user opt in to the account-scoped password storage, and wait for it
+  // to become active.
+  password_manager::features_util::OptInToAccountStorage(
+      GetProfile(0)->GetPrefs(), GetSyncService(0));
+  PasswordSyncActiveChecker(GetSyncService(0)).Wait();
+
+  // Double check that both Passwords and Sharing Invitations are enabled.
+  ASSERT_TRUE(GetSyncService(0)->GetActiveDataTypes().Has(syncer::PASSWORDS));
+  ASSERT_TRUE(GetSyncService(0)->GetActiveDataTypes().Has(
+      syncer::INCOMING_PASSWORD_SHARING_INVITATION));
+
+  password_manager::features_util::OptOutOfAccountStorageAndClearSettings(
+      GetProfile(0)->GetPrefs(), GetSyncService(0));
+  EXPECT_TRUE(
+      IncomingPasswordSharingInvitationInactiveChecker(GetSyncService(0))
+          .Wait());
+}
+#endif  // !BUILDFLAG(IS_CHROMEOS_ASH) && !BUILDFLAG(IS_ANDROID)
 
 }  // namespace

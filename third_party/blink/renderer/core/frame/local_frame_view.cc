@@ -326,7 +326,6 @@ void LocalFrameView::Trace(Visitor* visitor) const {
   visitor->Trace(scroll_anchoring_scrollable_areas_);
   visitor->Trace(animating_scrollable_areas_);
   visitor->Trace(user_scrollable_areas_);
-  visitor->Trace(fixed_position_objects_);
   visitor->Trace(background_attachment_fixed_objects_);
   visitor->Trace(auto_size_info_);
   visitor->Trace(plugins_);
@@ -488,7 +487,6 @@ void LocalFrameView::Dispose() {
   // tracking groups when they update style or are destroyed, but sometimes they
   // are missed. It would be good to understand how/why that happens, but in the
   // mean time, it's not safe to keep pointers around to defunct LayoutObjects.
-  fixed_position_objects_.Clear();
   background_attachment_fixed_objects_.clear();
 
   // Destroy |m_autoSizeInfo| as early as possible, to avoid dereferencing
@@ -564,9 +562,6 @@ void LocalFrameView::SetLifecycleUpdatesThrottledForTesting(bool throttled) {
 }
 
 void LocalFrameView::FrameRectsChanged(const gfx::Rect& old_rect) {
-  const bool width_changed = Size().width() != old_rect.width();
-  const bool height_changed = Size().height() != old_rect.height();
-
   PropagateFrameRects();
 
   if (FrameRect() != old_rect) {
@@ -574,8 +569,8 @@ void LocalFrameView::FrameRectsChanged(const gfx::Rect& old_rect) {
       layout_view->SetShouldCheckForPaintInvalidation();
   }
 
-  if (width_changed || height_changed) {
-    ViewportSizeChanged(width_changed, height_changed);
+  if (Size() != old_rect.size()) {
+    ViewportSizeChanged();
     if (frame_->IsMainFrame())
       frame_->GetPage()->GetVisualViewport().MainFrameDidChangeSize();
     GetFrame().Loader().RestoreScrollPositionAndViewState();
@@ -826,10 +821,8 @@ void LocalFrameView::PerformLayout() {
           layout_object_counter_, contents_height_before_layout,
           GetLayoutView()->DocumentRect().Height(), Height());
 
-  gfx::Size new_size(Size());
-  if (old_size != new_size) {
-    MarkFixedPositionObjectsForLayout(old_size.width() != new_size.width(),
-                                      old_size.height() != new_size.height());
+  if (old_size != Size()) {
+    InvalidateLayoutForViewportConstrainedObjects();
   }
 
   if (frame_->IsMainFrame()) {
@@ -978,13 +971,15 @@ gfx::SizeF LocalFrameView::ViewportSizeForMediaQueries() const {
   if (!frame_->GetDocument()) {
     return gfx::SizeF(layout_size_);
   }
-  if (frame_->GetDocument()->Printing()) {
+  if (frame_->ShouldUsePrintingLayout()) {
     if (const LayoutView* layout_view = GetLayoutView()) {
       return layout_view->DefaultPageAreaSize();
     }
   }
   gfx::SizeF viewport_size(layout_size_);
-  viewport_size.Scale(1 / GetFrame().PageZoomFactor());
+  if (!frame_->GetDocument()->Printing()) {
+    viewport_size.Scale(1 / GetFrame().PageZoomFactor());
+  }
   return viewport_size;
 }
 
@@ -1189,9 +1184,11 @@ static bool BackgroundAttachmentFixedNeedsRepaintOnScroll(
   DCHECK(!To<LayoutBoxModelObject>(object).BackgroundTransfersToView());
   // The background doesn't need repaint if it's the viewport background and it
   // paints onto the border box space only.
-  if (IsA<LayoutView>(object) &&
-      object.GetBackgroundPaintLocation() == kBackgroundPaintInBorderBoxSpace) {
-    return false;
+  if (const auto* view = DynamicTo<LayoutView>(object)) {
+    if (view->GetBackgroundPaintLocation() ==
+        kBackgroundPaintInBorderBoxSpace) {
+      return false;
+    }
   }
   return !object.CanCompositeBackgroundAttachmentFixed();
 }
@@ -1206,20 +1203,7 @@ bool LocalFrameView::RequiresMainThreadScrollingForBackgroundAttachmentFixed()
   return false;
 }
 
-void LocalFrameView::AddFixedPositionObject(LayoutObject& object) {
-  if (!fixed_position_objects_)
-    fixed_position_objects_ = MakeGarbageCollected<ObjectSet>();
-  fixed_position_objects_->insert(&object);
-}
-
-void LocalFrameView::RemoveFixedPositionObject(LayoutObject& object) {
-  if (fixed_position_objects_)
-    fixed_position_objects_->erase(&object);
-}
-
-void LocalFrameView::ViewportSizeChanged(bool width_changed,
-                                         bool height_changed) {
-  DCHECK(width_changed || height_changed);
+void LocalFrameView::ViewportSizeChanged() {
   DCHECK(frame_->GetPage());
   if (frame_->GetDocument() &&
       frame_->GetDocument()->Lifecycle().LifecyclePostponed())
@@ -1252,22 +1236,23 @@ void LocalFrameView::ViewportSizeChanged(bool width_changed,
       frame_->GetPage()->GetBrowserControls().TotalHeight())
     layout_view->SetShouldCheckForPaintInvalidation();
 
-  if (GetFrame().GetDocument() && !IsInPerformLayout())
-    MarkFixedPositionObjectsForLayout(width_changed, height_changed);
+  if (GetFrame().GetDocument() && !IsInPerformLayout()) {
+    InvalidateLayoutForViewportConstrainedObjects();
+  }
 
   if (GetPaintTimingDetector().Visualizer())
     GetPaintTimingDetector().Visualizer()->OnViewportChanged();
 }
 
-void LocalFrameView::MarkFixedPositionObjectsForLayout(bool width_changed,
-                                                       bool height_changed) {
-  if (RuntimeEnabledFeatures::LayoutNewFixedPositionInvalidationEnabled()) {
-    auto* layout_view = GetLayoutView();
-    if (!layout_view || layout_view->NeedsLayout()) {
-      return;
-    }
-
+void LocalFrameView::InvalidateLayoutForViewportConstrainedObjects() {
+  auto* layout_view = GetLayoutView();
+  if (layout_view && !layout_view->NeedsLayout()) {
     for (const auto& fragment : layout_view->PhysicalFragments()) {
+      if (RuntimeEnabledFeatures::LayoutNewStickyLogicEnabled() &&
+          fragment.StickyDescendants()) {
+        layout_view->SetNeedsSimplifiedLayout();
+        return;
+      }
       if (!fragment.HasOutOfFlowFragmentChild()) {
         continue;
       }
@@ -1276,33 +1261,6 @@ void LocalFrameView::MarkFixedPositionObjectsForLayout(bool width_changed,
           layout_view->SetNeedsSimplifiedLayout();
           return;
         }
-      }
-    }
-
-    return;
-  }
-
-  if (!HasFixedPositionObjects() || !(width_changed || height_changed))
-    return;
-
-  for (const auto& layout_object : *fixed_position_objects_) {
-    const ComputedStyle& style = layout_object->StyleRef();
-    if (width_changed) {
-      if (style.UsedWidth().IsFixed() &&
-          (style.UsedLeft().IsAuto() || style.UsedRight().IsAuto())) {
-        layout_object->ContainingBlock()->SetNeedsSimplifiedLayout();
-      } else {
-        layout_object->SetNeedsLayoutAndFullPaintInvalidation(
-            layout_invalidation_reason::kSizeChanged);
-      }
-    }
-    if (height_changed) {
-      if (style.UsedHeight().IsFixed() &&
-          (style.UsedTop().IsAuto() || style.UsedBottom().IsAuto())) {
-        layout_object->ContainingBlock()->SetNeedsSimplifiedLayout();
-      } else {
-        layout_object->SetNeedsLayoutAndFullPaintInvalidation(
-            layout_invalidation_reason::kSizeChanged);
       }
     }
   }
@@ -1849,8 +1807,8 @@ void LocalFrameView::InitializeRootScroller() {
   viewport_scrollable_area_ = root_frame_viewport;
 
   DCHECK(frame_->GetDocument());
-  page->GlobalRootScrollerController().InitializeViewportScrollCallback(
-      *root_frame_viewport, *frame_->GetDocument());
+  page->GlobalRootScrollerController().Initialize(*root_frame_viewport,
+                                                  *frame_->GetDocument());
 }
 
 Color LocalFrameView::DocumentBackgroundColor() {
@@ -2594,8 +2552,8 @@ bool LocalFrameView::RunCompositingInputsLifecyclePhase(
         }
       }
 
-      frame_view.GetLayoutView()->Layer()->UpdateDescendantDependentFlags();
       frame_view.GetLayoutView()->CommitPendingSelection();
+      frame_view.GetLayoutView()->Layer()->UpdateDescendantDependentFlags();
     });
 #if DCHECK_IS_ON()
     SetIsUpdatingDescendantDependentFlags(false);
@@ -2706,8 +2664,7 @@ void LocalFrameView::RunPaintLifecyclePhase(PaintBenchmarkMode benchmark_mode) {
   ForAllNonThrottledLocalFrameViews(
       [this, needed_update,
        &total_animations_count](LocalFrameView& frame_view) {
-        if (RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled() &&
-            needed_update && paint_artifact_compositor_ &&
+        if (needed_update && paint_artifact_compositor_ &&
             frame_view.UserScrollableAreas()) {
           for (auto& scrollable_area : *frame_view.UserScrollableAreas()) {
             const auto* properties = scrollable_area->GetLayoutBox()
@@ -3037,28 +2994,17 @@ void LocalFrameView::PushPaintArtifactToCompositor(bool repainted) {
   }
 
   Vector<const TransformPaintPropertyNode*> scroll_translation_nodes;
-  if (base::FeatureList::IsEnabled(::features::kScrollUnification)) {
-    ForAllNonThrottledLocalFrameViews(
-        [&scroll_translation_nodes](LocalFrameView& frame_view) {
-          frame_view.GetUserScrollTranslationNodes(scroll_translation_nodes);
-        });
-  }
-
-  Vector<const TransformPaintPropertyNode*> anchor_position_scrollers;
-  if (!base::FeatureList::IsEnabled(::features::kScrollUnification)) {
-    ForAllNonThrottledLocalFrameViews(
-        [&anchor_position_scrollers](LocalFrameView& frame_view) {
-          frame_view.GetAnchorPositionScrollerIds(anchor_position_scrollers);
-        });
-  }
+  ForAllNonThrottledLocalFrameViews(
+      [&scroll_translation_nodes](LocalFrameView& frame_view) {
+        frame_view.GetUserScrollTranslationNodes(scroll_translation_nodes);
+      });
 
   WTF::Vector<std::unique_ptr<ViewTransitionRequest>> view_transition_requests;
   AppendViewTransitionRequests(view_transition_requests);
 
   paint_artifact_compositor_->Update(
       paint_controller_->GetPaintArtifactShared(), viewport_properties,
-      scroll_translation_nodes, anchor_position_scrollers,
-      std::move(view_transition_requests));
+      scroll_translation_nodes, std::move(view_transition_requests));
 
   CreatePaintTimelineEvents();
 }
@@ -3284,6 +3230,19 @@ void LocalFrameView::ForceLayoutForPagination(float maximum_shrink_factor) {
     return;
   }
 
+  auto LayoutForPrinting = [&layout_view]() {
+    Document& document = layout_view->GetDocument();
+    document.MarkViewportUnitsDirty();
+    layout_view->SetNeedsLayoutAndIntrinsicWidthsRecalcAndFullPaintInvalidation(
+        layout_invalidation_reason::kPrintingChanged);
+    document.UpdateStyleAndLayout(DocumentUpdateReason::kPrinting);
+  };
+
+  // Need to update computed style before we can set the initial containing
+  // block size. A zoom factor may have been set, and it shouldn't be applied
+  // when printing, e.g. when resolving @page margins.
+  frame_->GetDocument()->UpdateStyleAndLayoutTree();
+
   // Set up the initial containing block size for pagination. This is defined as
   // the page area size of the *first* page. [1] The size of the first page may
   // not be fully known yet, e.g. if the first page is named [2] and given a
@@ -3300,9 +3259,7 @@ void LocalFrameView::ForceLayoutForPagination(float maximum_shrink_factor) {
   layout_view->SetInitialContainingBlockSizeForPagination(
       initial_containing_block_size);
 
-  layout_view->SetNeedsLayoutAndIntrinsicWidthsRecalcAndFullPaintInvalidation(
-      layout_invalidation_reason::kPrintingChanged);
-  frame_->GetDocument()->UpdateStyleAndLayout(DocumentUpdateReason::kPrinting);
+  LayoutForPrinting();
 
   const auto& first_page = To<NGPhysicalBoxFragment>(
       *layout_view->GetPhysicalFragment(0)->Children()[0]);
@@ -3318,16 +3275,7 @@ void LocalFrameView::ForceLayoutForPagination(float maximum_shrink_factor) {
       // again.
       layout_view->SetInitialContainingBlockSizeForPagination(new_size);
 
-      // Make sure that everything that should respond to an initial containing
-      // block change actually responds (elements using viewport units, for
-      // instance).
-      frame_->GetDocument()->LayoutViewportWasResized();
-
-      layout_view
-          ->SetNeedsLayoutAndIntrinsicWidthsRecalcAndFullPaintInvalidation(
-              layout_invalidation_reason::kPrintingChanged);
-      frame_->GetDocument()->UpdateStyleAndLayout(
-          DocumentUpdateReason::kPrinting);
+      LayoutForPrinting();
     }
   }
 
@@ -3344,9 +3292,9 @@ void LocalFrameView::ForceLayoutForPagination(float maximum_shrink_factor) {
     float page_scale_factor;
     if (layout_view->StyleRef().IsHorizontalWritingMode()) {
       page_scale_factor =
-          page.LayoutOverflow().Width().ToFloat() / page.Size().width.ToFloat();
+          page.LayoutOverflow().Right().ToFloat() / page.Size().width.ToFloat();
     } else {
-      page_scale_factor = page.LayoutOverflow().Height().ToFloat() /
+      page_scale_factor = page.LayoutOverflow().Bottom().ToFloat() /
                           page.Size().height.ToFloat();
     }
     overall_scale_factor = std::max(overall_scale_factor, page_scale_factor);
@@ -3365,11 +3313,7 @@ void LocalFrameView::ForceLayoutForPagination(float maximum_shrink_factor) {
     PhysicalSize new_size =
         layout_view->PageAreaSize(/* page_index */ 0u, first_page_name);
     layout_view->SetInitialContainingBlockSizeForPagination(new_size);
-    frame_->GetDocument()->LayoutViewportWasResized();
-    layout_view->SetNeedsLayoutAndIntrinsicWidthsRecalcAndFullPaintInvalidation(
-        layout_invalidation_reason::kPrintingChanged);
-    frame_->GetDocument()->UpdateStyleAndLayout(
-        DocumentUpdateReason::kPrinting);
+    LayoutForPrinting();
   }
 
   if (TextAutosizer* text_autosizer = frame_->GetDocument()->GetTextAutosizer())
@@ -3602,7 +3546,6 @@ void LocalFrameView::ServiceScrollAnimations(base::TimeTicks start_time) {
             start_time.since_origin().InSecondsF());
       }
     }
-    GetFrame().AnimateSnapFling(start_time);
     // After scroll updates, snapshot scroll state once at top of animation
     // frame.
     GetFrame().UpdateScrollSnapshots();
@@ -4890,46 +4833,6 @@ void LocalFrameView::GetUserScrollTranslationNodes(
         area->GetLayoutBox()->FirstFragment().PaintProperties();
     if (paint_properties && paint_properties->Scroll()) {
       scroll_translation_nodes.push_back(paint_properties->ScrollTranslation());
-    }
-  }
-}
-
-void LocalFrameView::GetAnchorPositionScrollerIds(
-    Vector<const TransformPaintPropertyNode*>& anchor_position_scrollers) {
-  const auto* scrollable_areas = UserScrollableAreas();
-  if (!scrollable_areas) {
-    return;
-  }
-
-  // Ideally, we should collect the ids into a hash set, but defining a
-  // WTF::HashSet<cc::ElementId> requires introducing a magic deleted value to
-  // cc::ElementId. To prevent complicating the class for just one client in
-  // Blink that will soon be removed (when ScrollUnification is fully enabled,
-  // see crbug.com/1378021) and is not performance-sensitive, we choose to just
-  // use vector and binary search.
-  Vector<cc::ElementId> scroll_container_ids;
-  GetFrame().CollectAnchorPositionScrollerIds(&scroll_container_ids);
-  std::sort(scroll_container_ids.begin(), scroll_container_ids.end());
-  scroll_container_ids.erase(
-      std::unique(scroll_container_ids.begin(), scroll_container_ids.end()),
-      scroll_container_ids.end());
-
-  if (scroll_container_ids.empty()) {
-    return;
-  }
-
-  for (const auto& area : *scrollable_areas) {
-    const auto* paint_properties =
-        area->GetLayoutBox()->FirstFragment().PaintProperties();
-    if (paint_properties && paint_properties->Scroll()) {
-      cc::ElementId element_id = area->GetScrollElementId();
-      if (cc::ElementId* iter =
-              std::lower_bound(scroll_container_ids.begin(),
-                               scroll_container_ids.end(), element_id);
-          iter != scroll_container_ids.end() && *iter == element_id) {
-        anchor_position_scrollers.push_back(
-            paint_properties->ScrollTranslation());
-      }
     }
   }
 }

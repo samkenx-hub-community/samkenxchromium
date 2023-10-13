@@ -20,6 +20,7 @@
 #include "base/time/time.h"
 #include "base/trace_event/common/trace_event_common.h"
 #include "base/trace_event/trace_event.h"
+#include "content/browser/loader/navigation_url_loader.h"
 #include "content/browser/service_worker/service_worker_container_host.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_context_wrapper.h"
@@ -275,7 +276,7 @@ void ServiceWorkerMainResourceLoader::StartRequest(
       // TODO(crbug.com/1371756): support other sources in the full form.
       // https://github.com/yoshisatoyanagisawa/service-worker-static-routing-api/blob/main/final-form.md
       switch (sources[0].type) {
-        case blink::ServiceWorkerRouterSource::SourceType::kNetwork:
+        case blink::ServiceWorkerRouterSource::Type::kNetwork:
           // Network fallback is requested.
           // URLLoader in |fallback_callback_|, in other words |url_loader_|
           // which is referred in
@@ -310,13 +311,13 @@ void ServiceWorkerMainResourceLoader::StartRequest(
                   },
                   std::move(fallback_callback_), active_worker));
           return;
-        case blink::ServiceWorkerRouterSource::SourceType::kRace:
+        case blink::ServiceWorkerRouterSource::Type::kRace:
           race_network_request_mode = RaceNetworkRequestMode::kForced;
           break;
-        case blink::ServiceWorkerRouterSource::SourceType::kFetchEvent:
+        case blink::ServiceWorkerRouterSource::Type::kFetchEvent:
           race_network_request_mode = RaceNetworkRequestMode::kSkipped;
           break;
-        case blink::ServiceWorkerRouterSource::SourceType::kCache:
+        case blink::ServiceWorkerRouterSource::Type::kCache:
           cache_matcher_ = std::make_unique<ServiceWorkerCacheStorageMatcher>(
               sources[0].cache_source->cache_name,
               blink::mojom::FetchAPIRequest::From(resource_request_),
@@ -506,9 +507,7 @@ bool ServiceWorkerMainResourceLoader::StartRaceNetworkRequest(
       resource_request_.url);
   CHECK(!race_network_request_url_loader_client_);
   race_network_request_url_loader_client_.emplace(
-      resource_request_, AsWeakPtr(), std::move(forwarding_client),
-      network::features::GetDataPipeDefaultAllocationSize(
-          network::features::DataPipeAllocationSize::kLargerSizeIfPossible));
+      resource_request_, AsWeakPtr(), std::move(forwarding_client));
 
   // If the initial state is not kWaitForBody, that means creating data pipes
   // failed. Do not start RaceNetworkRequest this case.
@@ -538,8 +537,12 @@ bool ServiceWorkerMainResourceLoader::StartRaceNetworkRequest(
       forwarded_race_network_request_url_loader_factory_
           ->InitURLLoaderNewPipeAndPassReceiver(),
       GlobalRequestID::MakeBrowserInitiated().request_id,
-      network::mojom::kURLLoadOptionNone, resource_request_,
-      std::move(client_to_pass),
+      // Since RaceNetworkRequest may not involve the fetch handler for the
+      // navigation, requests SSLInfo here to be attached with the response.
+      // This is required to show the HTTPS padlock by the browser.
+      NavigationURLLoader::GetURLLoaderOptions(
+          resource_request_.is_outermost_main_frame),
+      resource_request_, std::move(client_to_pass),
       net::MutableNetworkTrafficAnnotationTag(
           ServiceWorkerRaceNetworkRequestURLLoaderClient::
               NetworkTrafficAnnotationTag()));
@@ -737,6 +740,13 @@ void ServiceWorkerMainResourceLoader::DidDispatchFetchEvent(
       return;
     case FetchResponseFrom::kSubresourceLoaderIsHandlingRedirect:
       NOTREACHED_NORETURN();
+  }
+
+  // Cancel the in-flight request processing for the fallback.
+  if (commit_responsibility() == FetchResponseFrom::kServiceWorker &&
+      race_network_request_url_loader_client_) {
+    race_network_request_url_loader_client_->CancelWriteData(
+        commit_responsibility());
   }
   RecordFetchResponseFrom();
 

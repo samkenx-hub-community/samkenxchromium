@@ -26,8 +26,8 @@ struct SameSizeAsNGLayoutResult
   Member<void*> physical_fragment;
   Member<void*> rare_data_;
   union {
-    NGBfcOffset bfc_offset;
-    NGBoxStrut oof_insets_for_get_computed_style;
+    BfcOffset bfc_offset;
+    BoxStrut oof_insets_for_get_computed_style;
   };
   LayoutUnit intrinsic_block_size;
   unsigned bitfields[1];
@@ -46,14 +46,10 @@ const NGLayoutResult* NGLayoutResult::Clone(const NGLayoutResult& other) {
 
 // static
 const NGLayoutResult* NGLayoutResult::CloneWithPostLayoutFragments(
-    const NGLayoutResult& other,
-    const absl::optional<PhysicalRect> updated_layout_overflow) {
-  DCHECK(!RuntimeEnabledFeatures::LayoutOverflowNoCloneEnabled() ||
-         !updated_layout_overflow);
+    const NGLayoutResult& other) {
   return MakeGarbageCollected<NGLayoutResult>(
       other, NGPhysicalBoxFragment::CloneWithPostLayoutFragments(
-                 To<NGPhysicalBoxFragment>(other.PhysicalFragment()),
-                 updated_layout_overflow));
+                 To<NGPhysicalBoxFragment>(other.PhysicalFragment())));
 }
 
 NGLayoutResult::NGLayoutResult(NGBoxFragmentBuilderPassKey passkey,
@@ -166,7 +162,7 @@ NGLayoutResult::NGLayoutResult(const NGLayoutResult& other,
     DCHECK(physical_fragment_->IsOutOfFlowPositioned());
     DCHECK_EQ(bfc_line_offset, LayoutUnit());
     DCHECK(bfc_block_offset && bfc_block_offset.value() == LayoutUnit());
-    oof_insets_for_get_computed_style_ = NGBoxStrut();
+    oof_insets_for_get_computed_style_ = BoxStrut();
   }
 
   NGExclusionSpace new_exclusion_space = MergeExclusionSpaces(
@@ -288,8 +284,8 @@ NGExclusionSpace NGLayoutResult::MergeExclusionSpaces(
     const NGExclusionSpace& new_input_exclusion_space,
     LayoutUnit bfc_line_offset,
     LayoutUnit block_offset_delta) {
-  NGBfcDelta offset_delta = {bfc_line_offset - other.BfcLineOffset(),
-                             block_offset_delta};
+  BfcDelta offset_delta = {bfc_line_offset - other.BfcLineOffset(),
+                           block_offset_delta};
 
   return NGExclusionSpace::MergeExclusionSpaces(
       /* old_output */ other.ExclusionSpace(),

@@ -120,7 +120,7 @@ class CanvasCaptureHandler::CanvasCaptureHandlerDelegate {
   void SendNewFrameOnIOThread(scoped_refptr<media::VideoFrame> video_frame,
                               base::TimeTicks current_time) {
     DCHECK_CALLED_ON_VALID_THREAD(io_thread_checker_);
-    new_frame_callback_.Run(std::move(video_frame), {}, current_time);
+    new_frame_callback_.Run(std::move(video_frame), current_time);
   }
 
   base::WeakPtr<CanvasCaptureHandlerDelegate> GetWeakPtrForIOThread() {
@@ -294,7 +294,7 @@ void CanvasCaptureHandler::AddVideoCapturerSourceToVideoTrack(
       track_id, MediaStreamSource::kTypeVideo, track_id, false,
       std::move(stream_video_source));
   stream_source->SetCapabilities(ComputeCapabilitiesForVideoSource(
-      track_id, preferred_formats, mojom::blink::FacingMode::NONE,
+      track_id, preferred_formats, mojom::blink::FacingMode::kNone,
       false /* is_device_capture */));
 
   *component = MakeGarbageCollected<MediaStreamComponentImpl>(

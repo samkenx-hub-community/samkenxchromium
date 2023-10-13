@@ -11,9 +11,9 @@
 #ifndef __XML_HASH_H__
 #define __XML_HASH_H__
 
+#include <libxml/xmlversion.h>
 #include <libxml/dict.h>
 #include <libxml/xmlstring.h>
-#include <libxml/xmlversion.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -94,108 +94,138 @@ typedef void (*xmlHashScannerFull)(void *payload, void *data,
 /*
  * Constructor and destructor.
  */
-XMLPUBFUN xmlHashTablePtr xmlHashCreate(int size);
-XMLPUBFUN xmlHashTablePtr xmlHashCreateDict(int size, xmlDictPtr dict);
-XMLPUBFUN void xmlHashFree(xmlHashTablePtr hash, xmlHashDeallocator dealloc);
-XMLPUBFUN void xmlHashDefaultDeallocator(void* entry, const xmlChar* name);
+XMLPUBFUN xmlHashTablePtr
+		xmlHashCreate		(int size);
+XMLPUBFUN xmlHashTablePtr
+		xmlHashCreateDict	(int size,
+					 xmlDictPtr dict);
+XMLPUBFUN void
+		xmlHashFree		(xmlHashTablePtr hash,
+					 xmlHashDeallocator dealloc);
+XMLPUBFUN void
+		xmlHashDefaultDeallocator(void *entry,
+					 const xmlChar *name);
 
 /*
  * Add a new entry to the hash table.
  */
-XMLPUBFUN int xmlHashAddEntry(xmlHashTablePtr hash,
-                              const xmlChar* name,
-                              void* userdata);
-XMLPUBFUN int xmlHashUpdateEntry(xmlHashTablePtr hash,
-                                 const xmlChar* name,
-                                 void* userdata,
-                                 xmlHashDeallocator dealloc);
-XMLPUBFUN int xmlHashAddEntry2(xmlHashTablePtr hash,
-                               const xmlChar* name,
-                               const xmlChar* name2,
-                               void* userdata);
-XMLPUBFUN int xmlHashUpdateEntry2(xmlHashTablePtr hash,
-                                  const xmlChar* name,
-                                  const xmlChar* name2,
-                                  void* userdata,
-                                  xmlHashDeallocator dealloc);
-XMLPUBFUN int xmlHashAddEntry3(xmlHashTablePtr hash,
-                               const xmlChar* name,
-                               const xmlChar* name2,
-                               const xmlChar* name3,
-                               void* userdata);
-XMLPUBFUN int xmlHashUpdateEntry3(xmlHashTablePtr hash,
-                                  const xmlChar* name,
-                                  const xmlChar* name2,
-                                  const xmlChar* name3,
-                                  void* userdata,
-                                  xmlHashDeallocator dealloc);
+XMLPUBFUN int
+		xmlHashAddEntry		(xmlHashTablePtr hash,
+		                         const xmlChar *name,
+		                         void *userdata);
+XMLPUBFUN int
+		xmlHashUpdateEntry	(xmlHashTablePtr hash,
+		                         const xmlChar *name,
+		                         void *userdata,
+					 xmlHashDeallocator dealloc);
+XMLPUBFUN int
+		xmlHashAddEntry2	(xmlHashTablePtr hash,
+		                         const xmlChar *name,
+		                         const xmlChar *name2,
+		                         void *userdata);
+XMLPUBFUN int
+		xmlHashUpdateEntry2	(xmlHashTablePtr hash,
+		                         const xmlChar *name,
+		                         const xmlChar *name2,
+		                         void *userdata,
+					 xmlHashDeallocator dealloc);
+XMLPUBFUN int
+		xmlHashAddEntry3	(xmlHashTablePtr hash,
+		                         const xmlChar *name,
+		                         const xmlChar *name2,
+		                         const xmlChar *name3,
+		                         void *userdata);
+XMLPUBFUN int
+		xmlHashUpdateEntry3	(xmlHashTablePtr hash,
+		                         const xmlChar *name,
+		                         const xmlChar *name2,
+		                         const xmlChar *name3,
+		                         void *userdata,
+					 xmlHashDeallocator dealloc);
 
 /*
  * Remove an entry from the hash table.
  */
-XMLPUBFUN int xmlHashRemoveEntry(xmlHashTablePtr hash,
-                                 const xmlChar* name,
-                                 xmlHashDeallocator dealloc);
-XMLPUBFUN int xmlHashRemoveEntry2(xmlHashTablePtr hash,
-                                  const xmlChar* name,
-                                  const xmlChar* name2,
-                                  xmlHashDeallocator dealloc);
-XMLPUBFUN int xmlHashRemoveEntry3(xmlHashTablePtr hash,
-                                  const xmlChar* name,
-                                  const xmlChar* name2,
-                                  const xmlChar* name3,
-                                  xmlHashDeallocator dealloc);
+XMLPUBFUN int
+		xmlHashRemoveEntry	(xmlHashTablePtr hash,
+					 const xmlChar *name,
+					 xmlHashDeallocator dealloc);
+XMLPUBFUN int
+		xmlHashRemoveEntry2	(xmlHashTablePtr hash,
+					 const xmlChar *name,
+					 const xmlChar *name2,
+					 xmlHashDeallocator dealloc);
+XMLPUBFUN int 
+		xmlHashRemoveEntry3	(xmlHashTablePtr hash,
+					 const xmlChar *name,
+					 const xmlChar *name2,
+					 const xmlChar *name3,
+					 xmlHashDeallocator dealloc);
 
 /*
  * Retrieve the payload.
  */
-XMLPUBFUN void* xmlHashLookup(xmlHashTablePtr hash, const xmlChar* name);
-XMLPUBFUN void* xmlHashLookup2(xmlHashTablePtr hash,
-                               const xmlChar* name,
-                               const xmlChar* name2);
-XMLPUBFUN void* xmlHashLookup3(xmlHashTablePtr hash,
-                               const xmlChar* name,
-                               const xmlChar* name2,
-                               const xmlChar* name3);
-XMLPUBFUN void* xmlHashQLookup(xmlHashTablePtr hash,
-                               const xmlChar* prefix,
-                               const xmlChar* name);
-XMLPUBFUN void* xmlHashQLookup2(xmlHashTablePtr hash,
-                                const xmlChar* prefix,
-                                const xmlChar* name,
-                                const xmlChar* prefix2,
-                                const xmlChar* name2);
-XMLPUBFUN void* xmlHashQLookup3(xmlHashTablePtr hash,
-                                const xmlChar* prefix,
-                                const xmlChar* name,
-                                const xmlChar* prefix2,
-                                const xmlChar* name2,
-                                const xmlChar* prefix3,
-                                const xmlChar* name3);
+XMLPUBFUN void *
+		xmlHashLookup		(xmlHashTablePtr hash,
+					 const xmlChar *name);
+XMLPUBFUN void *
+		xmlHashLookup2		(xmlHashTablePtr hash,
+					 const xmlChar *name,
+					 const xmlChar *name2);
+XMLPUBFUN void *
+		xmlHashLookup3		(xmlHashTablePtr hash,
+					 const xmlChar *name,
+					 const xmlChar *name2,
+					 const xmlChar *name3);
+XMLPUBFUN void *
+		xmlHashQLookup		(xmlHashTablePtr hash,
+					 const xmlChar *prefix,
+					 const xmlChar *name);
+XMLPUBFUN void *
+		xmlHashQLookup2		(xmlHashTablePtr hash,
+					 const xmlChar *prefix,
+					 const xmlChar *name,
+					 const xmlChar *prefix2,
+					 const xmlChar *name2);
+XMLPUBFUN void *
+		xmlHashQLookup3		(xmlHashTablePtr hash,
+					 const xmlChar *prefix,
+					 const xmlChar *name,
+					 const xmlChar *prefix2,
+					 const xmlChar *name2,
+					 const xmlChar *prefix3,
+					 const xmlChar *name3);
 
 /*
  * Helpers.
  */
-XMLPUBFUN xmlHashTablePtr xmlHashCopy(xmlHashTablePtr hash, xmlHashCopier copy);
-XMLPUBFUN int xmlHashSize(xmlHashTablePtr hash);
-XMLPUBFUN void xmlHashScan(xmlHashTablePtr hash,
-                           xmlHashScanner scan,
-                           void* data);
-XMLPUBFUN void xmlHashScan3(xmlHashTablePtr hash,
-                            const xmlChar* name,
-                            const xmlChar* name2,
-                            const xmlChar* name3,
-                            xmlHashScanner scan,
-                            void* data);
-XMLPUBFUN void xmlHashScanFull(xmlHashTablePtr hash,
-                               xmlHashScannerFull scan,
-                               void* data);
-XMLPUBFUN void xmlHashScanFull3(xmlHashTablePtr hash,
-                                const xmlChar* name,
-                                const xmlChar* name2,
-                                const xmlChar* name3,
-                                xmlHashScannerFull scan,
-                                void* data);
+XMLPUBFUN xmlHashTablePtr
+		xmlHashCopy		(xmlHashTablePtr hash,
+					 xmlHashCopier copy);
+XMLPUBFUN int
+		xmlHashSize		(xmlHashTablePtr hash);
+XMLPUBFUN void
+		xmlHashScan		(xmlHashTablePtr hash,
+					 xmlHashScanner scan,
+					 void *data);
+XMLPUBFUN void
+		xmlHashScan3		(xmlHashTablePtr hash,
+					 const xmlChar *name,
+					 const xmlChar *name2,
+					 const xmlChar *name3,
+					 xmlHashScanner scan,
+					 void *data);
+XMLPUBFUN void
+		xmlHashScanFull		(xmlHashTablePtr hash,
+					 xmlHashScannerFull scan,
+					 void *data);
+XMLPUBFUN void
+		xmlHashScanFull3	(xmlHashTablePtr hash,
+					 const xmlChar *name,
+					 const xmlChar *name2,
+					 const xmlChar *name3,
+					 xmlHashScannerFull scan,
+					 void *data);
 #ifdef __cplusplus
 }
 #endif

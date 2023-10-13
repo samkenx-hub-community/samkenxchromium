@@ -39,6 +39,12 @@ default_args = {
   # Don't include webrtc's builtin task queue implementation.
   rtc_link_task_queue_impl = false
 
+  # When building with Chromium, `webrtc::Location` is replaced by
+  # `base::Location`. Since WebRTC doesn't use `public_deps` (webrtc:8603), it
+  # would fail to propagate the dependency internally. Instead WebRTC let its
+  # embedders to define it globally for all of its targets.
+  rtc_common_public_deps = [ "//base" ]
+
   # Don't include the iLBC audio codec.
   # TODO(bugs.webrtc.org/8396): Once WebRTC gets rid of its internal
   # deps on codecs, we can remove this.
@@ -58,6 +64,9 @@ default_args = {
   # Overwrite default args declared in the Fuchsia sdk
   fuchsia_sdk_readelf_exec =
       "//third_party/llvm-build/Release+Asserts/bin/llvm-readelf"
+
+  # Overwrite default args declared in the pdfium library
+  pdf_use_partition_alloc_new_location = true
 
   devtools_visibility = [ "*" ]
 }
@@ -140,6 +149,10 @@ exec_script_whitelist =
       # with other repos. The entries in this list should be only for files
       # in the Chromium repo outside of //build.
       "//build_overrides/build.gni",
+
+      # This is to check existence of a reclient config file and show user
+      # friendly error message.
+      "//build/toolchain/rbe.gni",
 
       "//chrome/android/webapk/shell_apk/prepare_upload_dir/BUILD.gn",
       "//chrome/version.gni",

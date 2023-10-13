@@ -8,10 +8,11 @@ import {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_butto
 import {maybeShowTooltip} from '../common/js/dom_utils.js';
 import {isEntryInsideComputers, isEntryInsideDrive, isEntryInsideMyDrive, isGrandRootEntryInDrives, isMyFilesEntry, isTrashEntry, isVolumeEntry} from '../common/js/entry_utils.js';
 import {EntryList, FakeEntryImpl, VolumeEntry} from '../common/js/files_app_entry_types.js';
+import {vmTypeToIconName} from '../common/js/icon_util.js';
 import {recordEnum, recordUserAction} from '../common/js/metrics.js';
 import {str, strf, util} from '../common/js/util.js';
 import {VolumeManagerCommon} from '../common/js/volume_manager_types.js';
-import {FileData, FileKey, NavigationKey, NavigationRoot, NavigationType, PropStatus, State} from '../externs/ts/state.js';
+import {AndroidApp, FileData, FileKey, NavigationKey, NavigationRoot, NavigationType, PropStatus, State} from '../externs/ts/state.js';
 import {VolumeManager} from '../externs/volume_manager.js';
 import {constants} from '../foreground/js/constants.js';
 import {DirectoryModel} from '../foreground/js/directory_model.js';
@@ -64,7 +65,7 @@ interface NavigationItemData {
  * android app.
  */
 interface NavigationRootItemData extends NavigationItemData {
-  androidAppData: chrome.fileManagerPrivate.AndroidApp|null;
+  androidAppData: AndroidApp|null;
 }
 
 export class DirectoryTreeContainer {
@@ -246,8 +247,7 @@ export class DirectoryTreeContainer {
   }
 
   private renderItem_(
-      navigationKey: NavigationKey,
-      newData: FileData|chrome.fileManagerPrivate.AndroidApp|null,
+      navigationKey: NavigationKey, newData: FileData|AndroidApp|null,
       navigationRoot?: NavigationRoot) {
     if (!newData) {
       // The corresponding data is deleted from the store, do nothing here.
@@ -270,10 +270,14 @@ export class DirectoryTreeContainer {
         // Nothing changes, this render might be triggered by its parent.
         return;
       }
-      const androidAppData = newData as chrome.fileManagerPrivate.AndroidApp;
+      const androidAppData = newData as AndroidApp;
 
       element.label = androidAppData.name;
-      element.iconSet = androidAppData.iconSet || null;
+      if (typeof androidAppData.icon === 'object') {
+        element.iconSet = androidAppData.icon;
+      } else {
+        element.icon = androidAppData.icon;
+      }
       element.separator = navigationRoot.separator;
       // Setup external link for android app item.
       this.setupAndroidAppLink_(element);
@@ -289,6 +293,9 @@ export class DirectoryTreeContainer {
       return;
     }
     const fileData = newData as FileData;
+    if (window.IN_TEST) {
+      this.addAttributesForTesting_(element, fileData, navigationRoot);
+    }
 
     // TODO(b/228139439): The current menu/command implementation requires a
     // valid `.entry` existed on the tree item. We should remove this `.entry`
@@ -409,6 +416,30 @@ export class DirectoryTreeContainer {
       if (isExternalMedia) {
         element.icon = constants.ICON_TYPES.USB;
       }
+    }
+  }
+
+  /** Add attributes for testing purpose. */
+  private addAttributesForTesting_(
+      element: XfTreeItem, fileData: FileData,
+      navigationRoot?: NavigationRoot) {
+    // Add full-path for all non-root items.
+    if (!navigationRoot) {
+      element.setAttribute('full-path-for-testing', fileData.entry.fullPath);
+    }
+    if (!isVolumeEntry(fileData.entry)) {
+      return;
+    }
+    // Add volume-type for the root volume items.
+    const volumeData = getVolume(this.store_.getState(), fileData);
+    if (!volumeData) {
+      return;
+    }
+    if (volumeData.volumeType == VolumeManagerCommon.VolumeType.GUEST_OS) {
+      element.setAttribute(
+          'volume-type-for-testing', vmTypeToIconName(volumeData.vmType));
+    } else {
+      element.setAttribute('volume-type-for-testing', volumeData.volumeType);
     }
   }
 
@@ -790,7 +821,7 @@ export class DirectoryTreeContainer {
   /** Activate the directory behind the item. */
   private activateDirectory_(
       element: XfTreeItem, isRoot: boolean, fileData: FileData|null,
-      androidAppData: chrome.fileManagerPrivate.AndroidApp|null) {
+      androidAppData: AndroidApp|null) {
     if (androidAppData) {
       chrome.fileManagerPrivate.selectAndroidPickerApp(androidAppData, () => {
         if (chrome.runtime.lastError) {

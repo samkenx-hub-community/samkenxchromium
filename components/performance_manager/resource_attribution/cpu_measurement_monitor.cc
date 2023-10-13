@@ -28,9 +28,9 @@
 #include "components/performance_manager/public/graph/process_node.h"
 #include "components/performance_manager/public/graph/worker_node.h"
 #include "components/performance_manager/public/resource_attribution/attribution_helpers.h"
-#include "components/performance_manager/public/resource_attribution/frame_context_registry.h"
+#include "components/performance_manager/public/resource_attribution/frame_context.h"
 #include "components/performance_manager/public/resource_attribution/graph_change.h"
-#include "components/performance_manager/public/resource_attribution/worker_context_registry.h"
+#include "components/performance_manager/public/resource_attribution/worker_context.h"
 #include "content/public/browser/browser_child_process_host.h"
 #include "content/public/common/process_type.h"
 #include "third_party/abseil-cpp/absl/types/variant.h"
@@ -103,28 +103,21 @@ void ValidateCPUTimeResult(const CPUTimeResult& result) {
       result.metadata.measurement_time - result.start_time;
   CHECK(interval.is_positive());
 
-  // Cumulative CPU must not be more than was actually available. Over very
-  // short intervals (on the order of 0.01 ms) rounding up after dividing CPU
-  // between frames can lead to `cumulative_cpu` being more than `interval`, so
-  // allow 0.1 ms of slack.
-  static constexpr base::TimeDelta kEpsilon = base::Milliseconds(0.1);
-  static const int kNumProcessors = base::SysInfo::NumberOfProcessors();
   CHECK(!result.cumulative_cpu.is_negative());
-  CHECK_LE(result.cumulative_cpu, interval * kNumProcessors + kEpsilon);
 }
 
 // Adds the measurement in `delta` to `result`. The start time of `delta` must
-// immediately follow the end time of `result`. Used for adding successive
-// measurements of process, frame and worker contexts.
+// follow the end time of `result`. Used for adding successive measurements of
+// process, frame and worker contexts. There may be gaps between deltas, such as
+// if a process died and was restarted.
 void ApplySequentialDelta(CPUTimeResult& result, const CPUTimeResult& delta) {
   CHECK(!IsEmptyCPUTimeResult(delta));
   ValidateCPUTimeResult(delta);
   if (IsEmptyCPUTimeResult(result)) {
     result = delta;
   } else {
-    // Successive measurement periods should be back to back.
     ValidateCPUTimeResult(result);
-    CHECK_EQ(result.metadata.measurement_time, delta.start_time);
+    CHECK_LE(result.metadata.measurement_time, delta.start_time);
     result.metadata.measurement_time = delta.metadata.measurement_time;
     result.cumulative_cpu += delta.cumulative_cpu;
   }
@@ -314,7 +307,10 @@ void CPUMeasurementMonitor::OnProcessLifetimeChange(
     return;
   }
   // Only handle process start notifications (which is when the pid is
-  // assigned), not exit notifications.
+  // assigned), not exit notifications. Note the pid can be reassigned if a
+  // process dies and a new one is started for the same ProcessNode - in that
+  // case MonitorCPUUsage will reset the measurements and start monitoring the
+  // new process from scratch.
   if (!process_node->GetProcess().IsValid()) {
     return;
   }
@@ -322,11 +318,7 @@ void CPUMeasurementMonitor::OnProcessLifetimeChange(
   if (process_node->GetProcessType() != content::PROCESS_TYPE_RENDERER) {
     return;
   }
-  if (!base::Contains(cpu_measurement_map_, process_node)) {
-    // Process isn't being measured yet so it must have been created while
-    // measurements were already started.
-    MonitorCPUUsage(process_node);
-  }
+  MonitorCPUUsage(process_node);
 }
 
 void CPUMeasurementMonitor::OnBeforeProcessNodeRemoved(
@@ -407,10 +399,16 @@ void CPUMeasurementMonitor::MonitorCPUUsage(const ProcessNode* process_node) {
   // TODO(crbug.com/1471683): Measure other process types, just don't distribute
   // the measurements to frames and workers.
   CHECK_EQ(process_node->GetProcessType(), content::PROCESS_TYPE_RENDERER);
-  const auto& [it, was_inserted] = cpu_measurement_map_.emplace(
+
+  // If a process crashes and is restarted, a new process can be assigned to the
+  // same ProcessNode (and the same ProcessContext). When that happens
+  // OnProcessLifetimeChange will call MonitorCPUUsage again for the same node,
+  // creating a new CPUMeasurement that starts measuring the new process from 0.
+  // ApplyMeasurementDeltas will add the new measurements and the old
+  // measurements in the same ProcessContext.
+  cpu_measurement_map_.insert_or_assign(
       process_node,
       CPUMeasurement(cpu_measurement_delegate_factory_.Run(process_node)));
-  CHECK(was_inserted);
 }
 
 void CPUMeasurementMonitor::UpdateAllCPUMeasurements() {
@@ -484,11 +482,6 @@ void CPUMeasurementMonitor::ApplyMeasurementDeltas(
     const std::map<ResourceContext, CPUTimeResult>& measurement_deltas,
     GraphChange graph_change) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  CHECK(graph_);
-  const auto* frame_registry = FrameContextRegistry::GetFromGraph(graph_);
-  CHECK(frame_registry);
-  const auto* worker_registry = WorkerContextRegistry::GetFromGraph(graph_);
-  CHECK(worker_registry);
   for (const auto& [context, delta] : measurement_deltas) {
     CHECK(!ContextIs<PageContext>(context));
 
@@ -499,14 +492,14 @@ void CPUMeasurementMonitor::ApplyMeasurementDeltas(
     // Aggregate new frame and worker measurements to pages.
     if (ContextIs<FrameContext>(context)) {
       const FrameNode* frame_node =
-          frame_registry->GetFrameNodeForContext(context);
+          AsContext<FrameContext>(context).GetFrameNode();
       CHECK(frame_node);
       ApplyOverlappingDelta(
           measurement_results_[frame_node->GetPageNode()->GetResourceContext()],
           delta);
     } else if (ContextIs<WorkerContext>(context)) {
       const WorkerNode* worker_node =
-          worker_registry->GetWorkerNodeForContext(context);
+          AsContext<WorkerContext>(context).GetWorkerNode();
       CHECK(worker_node);
       for (const PageNode* page_node :
            GetClientPages(worker_node, graph_change)) {
@@ -657,6 +650,12 @@ void CPUMeasurementMonitor::CPUMeasurement::MeasureAndDistributeCPUUsage(
     // negative.
     return;
   }
+  // When measured in quick succession, GetCumulativeCPUUsage() can go
+  // backwards.
+  if (current_cpu_usage < most_recent_measurement_) {
+    current_cpu_usage = most_recent_measurement_;
+  }
+
   const base::TimeDelta cumulative_cpu_delta =
       current_cpu_usage - most_recent_measurement_;
   most_recent_measurement_ = current_cpu_usage;
@@ -672,6 +671,7 @@ void CPUMeasurementMonitor::CPUMeasurement::MeasureAndDistributeCPUUsage(
     // FrameNode or WorkerNode's containing process is measured when the node is
     // added, so `start_time` will be correctly set to the first time the node
     // is measured.
+    CHECK(!cpu_delta.is_negative());
     const auto [_, inserted] = measurement_deltas.emplace(
         context, CPUTimeResult{
                      .metadata = {.measurement_time = measurement_interval_end},

@@ -67,7 +67,7 @@ struct AutofillFieldUtilCase {
 
 // An <input> with a label placed on top of it (usually used as a placeholder
 // replacement).
-const char* kPoorMansPlaceholder = R"(
+const char* kPoorMansPlaceholderFullOverlap = R"(
   <style>
     .fixed_position_and_size {
       position: fixed;
@@ -77,8 +77,97 @@ const char* kPoorMansPlaceholder = R"(
       height: 20px;
     }
   </style>
-  <input id='target' class=fixed_position_and_size>
+  <input id=target class=fixed_position_and_size>
   <span class=fixed_position_and_size>label</span>
+)";
+
+// The <input> element partially overlaps the label (placeholder) but the label
+// is not fully contained in the <input> element. This is a common case for
+// placeholders that moph into a minified version when the user focuses an
+// <input> element.
+const char* kPoorMansPlaceholderPartialOverlap = R"(
+  <style>
+    .fixed_position_and_size {
+      position: fixed;
+      top: 30px;
+      left: 0;
+      width: 100px;
+      height: 20px;
+    }
+    .overlapping_position_and_size {
+      position: fixed;
+      top: 25px;
+      left: 0;
+      width: 100px;
+      height: 20px;
+    }
+  </style>
+  <input id=target class=fixed_position_and_size>
+  <span class=overlapping_position_and_size>label</span>
+)";
+
+// The <input> element touches the next element vertically but does not overlap.
+// The label should not be considered a placeholder.
+const char* kPoorMansPlaceholderNoOverlap = R"(
+  <input id='target'>
+  <div>not a label</div>
+)";
+
+// The <input> element touches the next element horizontally but does not
+// overlap. The label should not be considered a placeholder.
+const char* kPoorMansPlaceholderNoOverlap2 = R"(
+  <input id=target>
+  <span>not a label</span>
+)";
+
+// The span exceeds the vertical limits of the input element, which is a
+// pattern often observed in error messages. Therefore we don't consider the
+// span a label.
+const char* kPoorMansPlaceholderPossiblyErrorMessage = R"(
+  <style>
+    .fixed_position_and_size {
+      position: fixed;
+      top: 0px;
+      left: 0;
+      width: 100px;
+      height: 20px;
+    }
+    .label_position_and_size {
+      position: fixed;
+      top: 15px;
+      left: 0;
+      width: 100px;
+      height: 25px;
+    }
+  </style>
+  <input id=target class=fixed_position_and_size>
+  <span class=overlapping_position_and_size>not a label</span>
+)";
+
+// The span is not horizontally contained in the input element. We don't
+// consider this a label because have seen several cases where the actual
+// label was on the left of the input field in a <table> structure and the
+// text on the right, which just touched the element contained non-label
+// data (e.g. instructions like "don't enter symbols").
+const char* kPoorMansPlaceholderNoHorizontalContainment = R"(
+  <style>
+    .fixed_position_and_size {
+      position: fixed;
+      top: 0px;
+      left: 0;
+      width: 100px;
+      height: 20px;
+    }
+    .label_position_and_size {
+      position: fixed;
+      top: 15px;
+      left: 90px;
+      width: 100px;
+      height: 20px;
+    }
+  </style>
+  <input id=target class=fixed_position_and_size>
+  <span class=overlapping_position_and_size>not a label</span>
 )";
 
 void VerifyButtonTitleCache(const WebFormElement& form_target,
@@ -97,14 +186,40 @@ bool HaveSameFormControlId(const WebFormControlElement& element,
 class FormAutofillUtilsTest : public content::RenderViewTest {
  public:
   FormAutofillUtilsTest() {
-    scoped_feature_list_.InitAndEnableFeature(
-        features::kAutofillEnableSelectList);
+    scoped_feature_list_.InitWithFeatures(
+        /*enabled_features=*/{blink::features::
+                                  kAutofillUseDomNodeIdForRendererId,
+                              features::kAutofillContentEditables,
+                              features::kAutofillEnableSelectList},
+        /*disabled_features=*/{});
   }
   ~FormAutofillUtilsTest() override = default;
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
 };
+
+// Tests that WebFormElementToFormData() sets the
+// Form[Field]Data::{name,id_attribute,name_attribute} correctly.
+TEST_F(FormAutofillUtilsTest, WebFormElementToFormDataIdAndNames) {
+  LoadHTML(R"(
+    <form id=form-id name=form-name>
+      <input type=text id=input-id name=input-name>
+    </form>
+  )");
+  FormData form_data;
+  ASSERT_TRUE(WebFormElementToFormData(
+      GetFormElementById(GetMainFrame()->GetDocument(), "form-id"),
+      WebFormControlElement(), /*field_data_manager=*/nullptr, EXTRACT_OPTIONS,
+      &form_data, /*field=*/nullptr));
+  EXPECT_EQ(form_data.name, u"form-name");
+  EXPECT_EQ(form_data.id_attribute, u"form-id");
+  EXPECT_EQ(form_data.name_attribute, u"form-name");
+  ASSERT_EQ(form_data.fields.size(), 1u);
+  EXPECT_EQ(form_data.fields[0].name, u"input-name");
+  EXPECT_EQ(form_data.fields[0].id_attribute, u"input-id");
+  EXPECT_EQ(form_data.fields[0].name_attribute, u"input-name");
+}
 
 // Tests that large option values/contents are truncated while building the
 // FormData.
@@ -268,7 +383,16 @@ TEST_F(FormAutofillUtilsTest, InferLabelForElementTest) {
        u""},
       {"Infer from next sibling",
        "<input id='target' type='checkbox'>hello <b>world</b>", u"hello world"},
-      {"Poor man's placeholder", kPoorMansPlaceholder, u"label"},
+      {"Poor man's placeholder", kPoorMansPlaceholderFullOverlap, u"label"},
+      {"Poor man's placeholder partial overlap",
+       kPoorMansPlaceholderPartialOverlap, u"label"},
+      {"Poor man's placeholder no overlap", kPoorMansPlaceholderNoOverlap, u""},
+      {"Poor man's placeholder no overlap 2", kPoorMansPlaceholderNoOverlap2,
+       u""},
+      {"Poor man's placeholder: possibly an error message",
+       kPoorMansPlaceholderPossiblyErrorMessage, u""},
+      {"Poor man's placeholder: no horizontal containment",
+       kPoorMansPlaceholderNoHorizontalContainment, u""},
   };
   for (auto test_case : test_cases) {
     SCOPED_TRACE(test_case.description);
@@ -317,7 +441,8 @@ TEST_F(FormAutofillUtilsTest, InferLabelSourceTest) {
        FormFieldData::LabelSource::kTdTag},
       {"<dl><dt>label</dt><dd><input id='target'></dd></dl>",
        FormFieldData::LabelSource::kDdTag},
-      {kPoorMansPlaceholder, FormFieldData::LabelSource::kOverlayingLabel}};
+      {kPoorMansPlaceholderFullOverlap,
+       FormFieldData::LabelSource::kOverlayingLabel}};
 
   for (auto test_case : test_cases) {
     SCOPED_TRACE(testing::Message() << test_case.label_source);
@@ -545,12 +670,12 @@ TEST_F(FormAutofillUtilsTest, FindFormByUniqueId) {
   WebVector<WebFormElement> forms = doc.Forms();
 
   for (const auto& form : forms)
-    EXPECT_EQ(form, FindFormByUniqueRendererId(doc, GetFormRendererId(form)));
+    EXPECT_EQ(form, FindFormByRendererId(doc, GetFormRendererId(form)));
 
   // Expect null form element for non-existing form id.
   FormRendererId non_existing_form_id(GetFormRendererId(forms[0]).value() +
                                       1000);
-  EXPECT_TRUE(FindFormByUniqueRendererId(doc, non_existing_form_id).IsNull());
+  EXPECT_TRUE(FindFormByRendererId(doc, non_existing_form_id).IsNull());
 }
 
 // Used in ParameterizedFindFormControlByRendererIdTest.
@@ -560,13 +685,13 @@ struct FindFormControlTestParam {
   bool expectation;
 };
 
-// Tests FindFormControlElementByUniqueRendererId().
+// Tests FindFormControlByRendererId().
 class ParameterizedFindFormControlByRendererIdTest
     : public FormAutofillUtilsTest,
       public testing::WithParamInterface<FindFormControlTestParam> {};
 
 TEST_P(ParameterizedFindFormControlByRendererIdTest,
-       FindFormControlElementByUniqueRendererId) {
+       FindFormControlByRendererId) {
   LoadHTML(R"(
     <body>
       <input id="nonexistentField">
@@ -599,8 +724,8 @@ TEST_P(ParameterizedFindFormControlByRendererIdTest,
 
   EXPECT_EQ(
       GetParam().expectation,
-      queried_field == FindFormControlElementByUniqueRendererId(
-                           doc, queried_field_id, form_to_be_searched_id));
+      queried_field == FindFormControlByRendererId(doc, queried_field_id,
+                                                   form_to_be_searched_id));
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -629,7 +754,7 @@ TEST_F(FormAutofillUtilsTest, FindFormControlElementsByUniqueId) {
                                                non_existing_field_id,
                                                GetFieldRendererId(input1)};
 
-  auto elements = FindFormControlElementsByUniqueRendererId(doc, renderer_ids);
+  auto elements = FindFormControlsByRendererId(doc, renderer_ids);
 
   ASSERT_EQ(3u, elements.size());
   EXPECT_EQ(input3, elements[0]);
@@ -1885,6 +2010,82 @@ TEST_F(FormAutofillUtilsTest, NextWebNode_Backward) {
   }
 
   EXPECT_THAT(found_elements, Pointwise(SameNode(), expected_elements));
+}
+
+// Tests that GetMaxLength() of non-text form controls is 0, and text form
+// controls default to the maximum 32 bit integer (and *not* 64 bit integer, so
+// that we can still do arithmetic with the maximum length).
+TEST_F(FormAutofillUtilsTest, GetMaxLength) {
+  struct TestCase {
+    const char* html;
+    uint64_t expected_max_length;
+  };
+  static constexpr TestCase test_cases[] = {
+      {"<input id=field>", FormFieldData::kDefaultMaxLength},
+      {"<input id=field type=text>", FormFieldData::kDefaultMaxLength},
+      {"<input id=field type=text maxlength=-1>",
+       FormFieldData::kDefaultMaxLength},
+      {"<input id=field type=password>", FormFieldData::kDefaultMaxLength},
+      {"<input id=field type=text maxlength=123>", 123},
+      {"<textarea id=field>", FormFieldData::kDefaultMaxLength},
+      {"<textarea id=field maxlength=123>", 123},
+      {"<input id=field type=submit>", 0},
+      {"<select id=field></select>", 0},
+  };
+  for (auto test_case : test_cases) {
+    SCOPED_TRACE(test_case.html);
+    LoadHTML(test_case.html);
+    WebLocalFrame* web_frame = GetMainFrame();
+    ASSERT_NE(nullptr, web_frame);
+    WebFormControlElement field =
+        GetElementById(web_frame->GetDocument(), "field")
+            .DynamicTo<WebFormControlElement>();
+    EXPECT_FALSE(field.IsNull());
+    EXPECT_EQ(test_case.expected_max_length, GetMaxLength(field));
+  }
+}
+
+TEST_F(FormAutofillUtilsTest, FindFormForContentEditableSuccess) {
+  LoadHTML(
+      R"(<body>
+         <div id=my-id
+              name=my-name
+              class=my-class
+              autocomplete=given-name
+              contenteditable>
+         </div>
+         </body>)");
+  WebElement content_editable =
+      GetMainFrame()->GetDocument().GetElementById("my-id");
+  ASSERT_FALSE(content_editable.IsNull());
+  std::optional<FormData> form = FindFormForContentEditable(content_editable);
+  ASSERT_EQ(form->fields.size(), 1u);
+  const FormFieldData& field = form->fields[0];
+  EXPECT_TRUE(form->unique_renderer_id);
+  EXPECT_EQ(*form->unique_renderer_id, *field.unique_renderer_id);
+  EXPECT_EQ(form->unique_renderer_id, field.host_form_id);
+  EXPECT_EQ(field.parsed_autocomplete->field_type, HtmlFieldType::kGivenName);
+  EXPECT_EQ(field.name, u"my-id");
+  EXPECT_EQ(field.id_attribute, u"my-id");
+  EXPECT_EQ(field.name_attribute, u"my-name");
+  EXPECT_EQ(field.css_classes, u"my-class");
+  // TODO(crbug.com/1490372): Extract the value.
+  EXPECT_EQ(field.value, u"");
+}
+
+TEST_F(FormAutofillUtilsTest, FindFormForContentEditableFailures) {
+  LoadHTML(
+      R"(<body>
+         <div id=ce1></div>
+         <div contenteditable><div id=ce2 contenteditable></div></div>
+         <form id=ce3 contenteditable></form>
+         <textarea id=ce4 contenteditable><div contenteditable></textarea>
+         </body>)");
+  WebDocument doc = GetMainFrame()->GetDocument();
+  ASSERT_FALSE(FindFormForContentEditable(doc.GetElementById("ce1")));
+  ASSERT_FALSE(FindFormForContentEditable(doc.GetElementById("ce2")));
+  ASSERT_FALSE(FindFormForContentEditable(doc.GetElementById("ce3")));
+  ASSERT_FALSE(FindFormForContentEditable(doc.GetElementById("ce4")));
 }
 
 }  // namespace

@@ -218,13 +218,13 @@ void SetRuntimeFeaturesFromChromiumFeatures() {
     {wf::EnableDevicePosture, raw_ref(features::kDevicePosture)},
     {wf::EnableDigitalGoods, raw_ref(features::kDigitalGoodsApi),
      kSetOnlyIfOverridden},
-    {wf::EnableDirectSockets, raw_ref(features::kIsolatedWebApps)},
     {wf::EnableDocumentPolicy, raw_ref(features::kDocumentPolicy)},
     {wf::EnableDocumentPolicyNegotiation,
      raw_ref(features::kDocumentPolicyNegotiation)},
     {wf::EnableFedCm, raw_ref(features::kFedCm), kSetOnlyIfOverridden},
-    {wf::EnableFedCmAccountAutoSelectedFlag,
-     raw_ref(features::kFedCmAccountAutoSelectedFlag), kSetOnlyIfOverridden},
+    {wf::EnableFedCmIdentityCredentialAutoSelectedFlag,
+     raw_ref(features::kFedCmIdentityCredentialAutoSelectedFlag),
+     kSetOnlyIfOverridden},
     {wf::EnableFedCmAuthz, raw_ref(features::kFedCmAuthz), kDefault},
     {wf::EnableFedCmError, raw_ref(features::kFedCmError), kDefault},
     {wf::EnableFedCmHostedDomain, raw_ref(features::kFedCmHostedDomain),
@@ -233,6 +233,8 @@ void SetRuntimeFeaturesFromChromiumFeatures() {
      kDefault},
     {wf::EnableFedCmIdpSigninStatus,
      raw_ref(features::kFedCmIdpSigninStatusEnabled), kSetOnlyIfOverridden},
+    {wf::EnableFedCmIdpSignout, raw_ref(features::kFedCmLogoutRps),
+     kSetOnlyIfOverridden},
     {wf::EnableGamepadMultitouch, raw_ref(features::kEnableGamepadMultitouch)},
     {wf::EnableSharedStorageAPI,
      raw_ref(features::kPrivacySandboxAdsAPIsOverride), kSetOnlyIfOverridden},
@@ -595,15 +597,6 @@ void SetCustomizedRuntimeFeaturesFromCombinedArgs(
         WebRuntimeFeatures::EnablePrivateStateTokens(true);
         WebRuntimeFeatures::EnablePrivateStateTokensAlwaysAllowIssuance(false);
         break;
-    }
-  }
-
-  // Enables the Blink feature only when the base feature variation is enabled.
-  if (base::FeatureList::IsEnabled(features::kFedCm)) {
-    if (base::GetFieldTrialParamByFeatureAsBool(
-            features::kFedCm, features::kFedCmIdpSignoutFieldTrialParamName,
-            false)) {
-      WebRuntimeFeatures::EnableFedCmIdpSignout(true);
     }
   }
 

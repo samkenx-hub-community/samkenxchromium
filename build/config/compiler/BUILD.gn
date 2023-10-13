@@ -132,6 +132,11 @@ declare_args() {
       (is_chromeos || is_android || is_win || is_linux || is_mac ||
        (is_ios && use_lld)) && is_official_build
 
+  # Whether to enable thin lto incremental builds.
+  # See: https://clang.llvm.org/docs/ThinLTO.html#incremental
+  # The cache can lead to non-determinism: https://crbug.com/1486045
+  thin_lto_enable_cache = true
+
   # Initialize all local variables with a pattern. This flag will fill
   # uninitialized floating-point types (and 32-bit pointers) with 0xFF and the
   # rest with 0xAA. This makes behavior of uninitialized memory bugs consistent,
@@ -605,6 +610,24 @@ config("compiler") {
       }
     }
 
+    # TODO(crbug.com/1488374): This causes binary size growth and potentially
+    # other problems.
+    # TODO(crbug.com/1491036): This isn't supported by Cronet's mainline llvm version.
+    if (default_toolchain != "//build/toolchain/cros:target" &&
+        !llvm_android_mainline) {
+      cflags += [
+        "-mllvm",
+        "-split-threshold-for-reg-with-hint=0",
+      ]
+      if (use_thin_lto && is_a_target_toolchain) {
+        if (is_win) {
+          ldflags += [ "-mllvm:-split-threshold-for-reg-with-hint=0" ]
+        } else {
+          ldflags += [ "-Wl,-mllvm,-split-threshold-for-reg-with-hint=0" ]
+        }
+      }
+    }
+
     # TODO(crbug.com/1235145): Investigate why/if this should be needed.
     if (is_win) {
       cflags += [ "/clang:-ffp-contract=off" ]
@@ -709,9 +732,26 @@ config("compiler") {
       "-fsplit-lto-unit",
     ]
 
-    # Limit the size of the ThinLTO cache to the lesser of 10% of
-    # available disk space, 40GB and 100000 files.
-    cache_policy = "cache_size=10%:cache_size_bytes=40g:cache_size_files=100000"
+    if (thin_lto_enable_cache) {
+      # Limit the size of the ThinLTO cache to the lesser of 10% of
+      # available disk space, 40GB and 100000 files.
+      cache_policy =
+          "cache_size=10%:cache_size_bytes=40g:cache_size_files=100000"
+      cache_dir = rebase_path("$root_out_dir/thinlto-cache", root_build_dir)
+      if (is_win) {
+        ldflags += [
+          "/lldltocache:$cache_dir",
+          "/lldltocachepolicy:$cache_policy",
+        ]
+      } else {
+        if (is_apple) {
+          ldflags += [ "-Wl,-cache_path_lto,$cache_dir" ]
+        } else {
+          ldflags += [ "-Wl,--thinlto-cache-dir=$cache_dir" ]
+        }
+        ldflags += [ "-Wl,--thinlto-cache-policy=$cache_policy" ]
+      }
+    }
 
     # An import limit of 30 has better performance (per speedometer) and lower
     # binary size than the default setting of 100.
@@ -723,9 +763,6 @@ config("compiler") {
       ldflags += [
         "/opt:lldltojobs=all",
         "-mllvm:-import-instr-limit=$import_instr_limit",
-        "/lldltocache:" +
-            rebase_path("$root_out_dir/thinlto-cache", root_build_dir),
-        "/lldltocachepolicy:$cache_policy",
         "-mllvm:-disable-auto-upgrade-debug-info",
       ]
     } else {
@@ -740,19 +777,6 @@ config("compiler") {
       # TODO(thakis): Check if '=0' (that is, number of cores, instead
       # of "all" which means number of hardware threads) is faster.
       ldflags += [ "-Wl,--thinlto-jobs=all" ]
-      if (is_apple) {
-        ldflags += [
-          "-Wl,-cache_path_lto," +
-              rebase_path("$root_out_dir/thinlto-cache", root_build_dir),
-          "-Wcrl,object_path_lto",
-        ]
-      } else {
-        ldflags +=
-            [ "-Wl,--thinlto-cache-dir=" +
-              rebase_path("$root_out_dir/thinlto-cache", root_build_dir) ]
-      }
-
-      ldflags += [ "-Wl,--thinlto-cache-policy=$cache_policy" ]
 
       if (is_chromeos) {
         # ARM was originally set lower than x86 to keep the size
@@ -768,6 +792,9 @@ config("compiler") {
 
       ldflags += [ "-Wl,-mllvm,-import-instr-limit=$import_instr_limit" ]
 
+      if (is_apple) {
+        ldflags += [ "-Wcrl,object_path_lto" ]
+      }
       if (!is_chromeos) {
         # TODO(https://crbug.com/972449): turn on for ChromeOS when that
         # toolchain has this flag.
@@ -1814,14 +1841,6 @@ config("default_warnings") {
         "-Wno-ignored-pragma-optimize",
       ]
 
-      if (llvm_force_head_revision && !is_nacl && enable_precompiled_headers &&
-          !is_win) {
-        cflags += [
-          # TODO(crbug.com/1486799) Find a long-term solution.
-          "-Wno-deprecated-include-gch",
-        ]
-      }
-
       if (!is_nacl) {
         cflags += [
           # TODO(crbug.com/1343975) Evaluate and possibly enable.
@@ -1833,6 +1852,18 @@ config("default_warnings") {
           # TODO(crbug.com/1412713) Evaluate and possibly enable.
           "-Wno-deprecated-this-capture",
         ]
+
+        if (llvm_force_head_revision) {
+          # TODO(https://crbug.com/1490607): Fix and re-enable.
+          cflags += [ "-Wno-thread-safety-reference" ]
+        }
+
+        if (enable_precompiled_headers && !is_win) {
+          cflags += [
+            # TODO(crbug.com/1486799) Find a long-term solution.
+            "-Wno-deprecated-include-gch",
+          ]
+        }
       }
     }
 
@@ -2228,6 +2259,11 @@ if (is_win) {
     common_optimize_on_ldflags += [ "/OPT:REF" ]  # Remove unreferenced data.
     # TODO(thakis): Add LTO/PGO clang flags eventually, https://crbug.com/598772
   }
+
+  if (is_clang) {
+    # See below.
+    common_optimize_on_cflags += [ "/clang:-fno-math-errno" ]
+  }
 } else {
   common_optimize_on_cflags = []
   common_optimize_on_ldflags = []
@@ -2276,6 +2312,14 @@ if (is_win) {
       "-Wl,--gc-sections",
     ]
   }
+
+  # We cannot rely on errno being set after math functions,
+  # especially since glibc does not set it. Thus, use -fno-math-errno
+  # so that the compiler knows it can inline math functions.
+  # Note that this is different from -ffast-math (even though -ffast-math
+  # implies -fno-math-errno), which also allows a number of unsafe
+  # optimizations.
+  common_optimize_on_cflags += [ "-fno-math-errno" ]
 }
 
 config("default_stack_frames") {

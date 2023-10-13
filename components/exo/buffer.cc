@@ -272,8 +272,9 @@ Buffer::Texture::Texture(
                                       gpu_memory_buffer_->CloneHandle());
   } else {
     mailbox_ = sii->CreateSharedImage(
-        gpu_memory_buffer_, gpu_memory_buffer_manager, color_space,
-        kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, usage, "ExoTexture");
+        gpu_memory_buffer_, gpu_memory_buffer_manager,
+        gfx::BufferPlane::DEFAULT, color_space, kTopLeft_GrSurfaceOrigin,
+        kPremul_SkAlphaType, usage, "ExoTexture");
   }
   DCHECK(!mailbox_.IsZero());
   gpu::raster::RasterInterface* ri = context_provider_->RasterInterface();
@@ -553,6 +554,8 @@ bool Buffer::ProduceTransferableResource(
   resource->id = resource_manager->AllocateResourceId();
   resource->format = viz::SinglePlaneFormat::kRGBA_8888;
   resource->size = gpu_memory_buffer_->GetSize();
+  resource->resource_source =
+      viz::TransferableResource::ResourceSource::kExoBuffer;
 
   // Create a new image texture for |gpu_memory_buffer_| with |texture_target_|
   // if one doesn't already exist. The contents of this buffer are copied to

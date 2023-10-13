@@ -14,7 +14,6 @@
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/min_max_sizes.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_node.h"
-#include "third_party/blink/renderer/core/layout/ng/layout_ng_view.h"
 #include "third_party/blink/renderer/core/layout/ng/list/layout_ng_list_item.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_block_node.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_layout_result.h"
@@ -110,13 +109,14 @@ bool NGLayoutInputNode::IsTextControlPlaceholder() const {
 bool NGLayoutInputNode::IsPaginatedRoot() const {
   if (!IsBlock())
     return false;
-  const auto* view = DynamicTo<LayoutNGView>(box_.Get());
+  const auto* view = DynamicTo<LayoutView>(box_.Get());
   return view && view->IsFragmentationContextRoot();
 }
 
 NGBlockNode NGLayoutInputNode::ListMarkerBlockNodeIfListItem() const {
-  if (auto* list_item = DynamicTo<LayoutNGListItem>(box_.Get()))
+  if (auto* list_item = DynamicTo<LayoutListItem>(box_.Get())) {
     return NGBlockNode(DynamicTo<LayoutBox>(list_item->Marker()));
+  }
   return NGBlockNode(nullptr);
 }
 

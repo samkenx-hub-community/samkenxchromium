@@ -11,6 +11,7 @@
 #include "base/ranges/algorithm.h"
 #include "base/strings/escape.h"
 #include "base/strings/string_piece.h"
+#include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "components/url_formatter/elide_url.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
@@ -102,8 +103,7 @@ bool CanonicalizeHashComponent(const base::StringPiece& input_hash,
       CanonicalizeBase64Padding(&base64_encoded_hash) &&
       ContainsOnlyAlphanumericAnd(base64_encoded_hash,
                                   kBase64NonAlphanumericChars)) {
-    canonical_output->Append(base64_encoded_hash.data(),
-                             base64_encoded_hash.size());
+    canonical_output->Append(base64_encoded_hash);
     canonical_output->push_back('@');
     return true;
   }
@@ -126,7 +126,7 @@ bool CanonicalizePackageNameComponent(
   if (!package_name.empty() &&
       ContainsOnlyAlphanumericAnd(package_name,
                                   kPackageNameNonAlphanumericChars)) {
-    canonical_output->Append(package_name.data(), package_name.size());
+    canonical_output->Append(package_name);
     return true;
   }
   return false;
@@ -340,6 +340,14 @@ std::string FacetURI::android_package_name() const {
   if (!IsValidAndroidFacetURI())
     return "";
   return std::string(ComponentString(canonical_spec_, parsed_.host));
+}
+
+std::string FacetURI::GetAndroidPackageDisplayName() const {
+  CHECK(IsValidAndroidFacetURI());
+  std::vector<std::string> parts = base::SplitString(
+      android_package_name(), ".", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
+  std::reverse(parts.begin(), parts.end());
+  return base::JoinString(parts, ".");
 }
 
 FacetURI::FacetURI(const std::string& canonical_spec, bool is_valid)

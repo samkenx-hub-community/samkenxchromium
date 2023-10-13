@@ -24,9 +24,8 @@ class FakeChromeDeviceAuthenticatorCommon
   using ChromeDeviceAuthenticatorCommon::NeedsToAuthenticate;
   using ChromeDeviceAuthenticatorCommon::RecordAuthenticationTimeIfSuccessful;
 
-  explicit FakeChromeDeviceAuthenticatorCommon(
-      DeviceAuthenticatorProxy* proxy,
-      base::TimeDelta auth_validity_period);
+  FakeChromeDeviceAuthenticatorCommon(DeviceAuthenticatorProxy* proxy,
+                                      base::TimeDelta auth_validity_period);
   ~FakeChromeDeviceAuthenticatorCommon() override;
 
   bool CanAuthenticateWithBiometrics() override;
@@ -34,9 +33,6 @@ class FakeChromeDeviceAuthenticatorCommon
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
   bool CanAuthenticateWithBiometricOrScreenLock() override;
 #endif
-
-  void Authenticate(AuthenticateCallback callback,
-                    bool use_last_valid) override;
 
   void AuthenticateWithMessage(const std::u16string& message,
                                AuthenticateCallback callback) override;
@@ -47,7 +43,7 @@ class FakeChromeDeviceAuthenticatorCommon
 FakeChromeDeviceAuthenticatorCommon::FakeChromeDeviceAuthenticatorCommon(
     DeviceAuthenticatorProxy* proxy,
     base::TimeDelta auth_validity_period)
-    : ChromeDeviceAuthenticatorCommon(proxy, auth_validity_period) {}
+    : ChromeDeviceAuthenticatorCommon(proxy, auth_validity_period, "") {}
 
 FakeChromeDeviceAuthenticatorCommon::~FakeChromeDeviceAuthenticatorCommon() =
     default;
@@ -64,12 +60,6 @@ bool FakeChromeDeviceAuthenticatorCommon::
   return false;
 }
 #endif
-
-void FakeChromeDeviceAuthenticatorCommon::Authenticate(
-    AuthenticateCallback callback,
-    bool use_last_valid) {
-  NOTIMPLEMENTED();
-}
 
 void FakeChromeDeviceAuthenticatorCommon::Cancel() {
   NOTIMPLEMENTED();
@@ -103,6 +93,8 @@ class ChromeDeviceAuthenticatorCommonTest : public testing::Test {
         std::make_unique<FakeChromeDeviceAuthenticatorCommon>(
             other_proxy_.get(), kAuthValidityPeriod);
   }
+
+  DeviceAuthenticatorProxy* proxy() { return proxy_.get(); }
 
   FakeChromeDeviceAuthenticatorCommon* authenticator_pointer() {
     return authenticator_pointer_.get();
@@ -139,4 +131,16 @@ TEST_F(ChromeDeviceAuthenticatorCommonTest, NeedAuthentication) {
 
   task_environment().FastForwardBy(kAuthValidityPeriod);
   EXPECT_TRUE(authenticator_pointer()->NeedsToAuthenticate());
+}
+
+// Checks that user cannot perform an operation without reauthenticating when
+// `kAuthValidityPeriod` is 0.
+TEST_F(ChromeDeviceAuthenticatorCommonTest, NeedAuthenticationImmediately) {
+  auto authenticator_pointer_0_seconds =
+      std::make_unique<FakeChromeDeviceAuthenticatorCommon>(proxy(),
+                                                            base::Seconds(0));
+
+  authenticator_pointer_0_seconds->RecordAuthenticationTimeIfSuccessful(
+      /*success=*/true);
+  EXPECT_TRUE(authenticator_pointer_0_seconds->NeedsToAuthenticate());
 }

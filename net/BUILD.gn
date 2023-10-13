@@ -1092,6 +1092,7 @@ component("net") {
     ":cronet_buildflags",
     ":net_deps",
     "//build:chromeos_buildflags",
+    "//components/miracle_parameter/common",
     "//net/data/ssl/chrome_root_store:gen_root_store_inc",
     "//net/http:transport_security_state_generated_files",
   ]
@@ -1441,8 +1442,6 @@ component("net") {
       "cert/internal/system_trust_store_nss.h",
       "cert/internal/trust_store_nss.cc",
       "cert/internal/trust_store_nss.h",
-      "cert/known_roots_nss.cc",
-      "cert/known_roots_nss.h",
       "cert/nss_cert_database.cc",
       "cert/nss_cert_database.h",
       "cert/test_root_certs_builtin.cc",
@@ -1676,7 +1675,6 @@ source_set("net_deps") {
     ":cronet_buildflags",
     ":isolation_info_proto",
     ":net_export_header",
-    ":net_resources",
     ":preload_decoder",
     "//base",
     "//base/third_party/dynamic_annotations",
@@ -1685,6 +1683,10 @@ source_set("net_deps") {
     "//third_party/zlib",
     "//url:buildflags",
   ]
+
+  if (!disable_file_support) {
+    public_deps += [ ":net_resources" ]
+  }
 
   public_configs = net_configs
 
@@ -2956,6 +2958,7 @@ test("net_unittests") {
     "//net/tools/huffman_trie:huffman_trie_generator_sources",
     "//testing/gmock",
     "//testing/gtest",
+    "//third_party/anonymous_tokens:anonymous_tokens_tests",
     "//third_party/protobuf:protobuf_lite",
     "//third_party/zlib",
     "//url",
@@ -3285,6 +3288,7 @@ if (!is_ios) {
       "disk_cache/disk_cache_perftest.cc",
       "extras/sqlite/sqlite_persistent_cookie_store_perftest.cc",
       "socket/udp_socket_perftest.cc",
+      "spdy/spdy_http_utils_perftest.cc",
       "url_request/url_request_quic_perftest.cc",
     ]
 
@@ -3299,6 +3303,7 @@ if (!is_ios) {
       "//base/test:test_support_perf",
       "//testing/gtest",
       "//testing/perf",
+      "//third_party/google_benchmark:google_benchmark",
       "//url",
     ]
     data_deps = [
@@ -3744,6 +3749,17 @@ fuzzer_test("net_crl_set_fuzzer") {
     "//net",
   ]
   seed_corpus = "data/fuzzer_data/net_crl_set_fuzzer/"
+}
+
+fuzzer_test("net_spdy_headers_to_http_response_headers_fuzzer") {
+  sources = [ "spdy/spdy_headers_to_http_response_headers_fuzzer.cc" ]
+  deps = [
+    ":net_fuzzer_test_support",
+    "//base",
+    "//net",
+  ]
+  dict = "data/fuzzer_dictionaries/net_http_stream_parser_fuzzer.dict"
+  libfuzzer_options = [ "max_len = 512" ]
 }
 
 fuzzer_test("net_unescape_url_component_fuzzer") {

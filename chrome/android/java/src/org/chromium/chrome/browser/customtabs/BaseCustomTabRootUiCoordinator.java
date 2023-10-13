@@ -4,6 +4,7 @@
 
 package org.chromium.chrome.browser.customtabs;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.graphics.Rect;
 import android.text.TextUtils;
@@ -39,6 +40,8 @@ import org.chromium.chrome.browser.crash.ChromePureJavaExceptionReporter;
 import org.chromium.chrome.browser.customtabs.content.CustomTabActivityNavigationController;
 import org.chromium.chrome.browser.customtabs.content.CustomTabActivityTabController;
 import org.chromium.chrome.browser.customtabs.features.branding.BrandingController;
+import org.chromium.chrome.browser.customtabs.features.minimizedcustomtab.CustomTabMinimizationManager;
+import org.chromium.chrome.browser.customtabs.features.minimizedcustomtab.MinimizedFeatureUtils;
 import org.chromium.chrome.browser.customtabs.features.partialcustomtab.CustomTabHeightStrategy;
 import org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabBottomSheetStrategy;
 import org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabDisplayManager;
@@ -106,6 +109,10 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
     private @Nullable PageInsightsCoordinator mPageInsightsCoordinator;
     private @Nullable ContextualSearchObserver mContextualSearchObserver;
     private int mPageInsightsToken;
+
+    // The minimum API level is checked before initializing the manager.
+    @SuppressLint("NewApi")
+    private CustomTabMinimizationManager mMinimizationManager;
 
     /**
      * Stores the timestamp when the first tab page load completed. If PIH instantiation is delayed
@@ -235,6 +242,9 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
             mBrandingController.onToolbarInitialized(toolbar.getBrandingDelegate());
         }
         toolbar.setCloseButtonPosition(mIntentDataProvider.get().getCloseButtonPosition());
+        if (mMinimizationManager != null) {
+            toolbar.setMinimizeDelegate(mMinimizationManager);
+        }
         if (mIntentDataProvider.get().isPartialCustomTab()) {
             Callback<Runnable> softInputCallback;
             if (ChromeFeatureList.sCctResizableSideSheet.isEnabled()) {
@@ -277,15 +287,17 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
             });
         }
 
-        if (!ReengagementNotificationController.isEnabled()) return;
-        new OneShotCallback<>(mProfileSupplier, mCallbackController.makeCancelable(profile -> {
-            assert profile != null : "Unexpectedly null profile from TabModel.";
-            if (profile == null) return;
-            Tracker tracker = TrackerFactory.getTrackerForProfile(profile);
-            ReengagementNotificationController controller = new ReengagementNotificationController(
-                    mActivity, tracker, ReengagementActivity.class);
-            controller.tryToReengageTheUser();
-        }));
+        if (ReengagementNotificationController.isEnabled()) {
+            new OneShotCallback<>(mProfileSupplier, mCallbackController.makeCancelable(profile -> {
+                assert profile != null : "Unexpectedly null profile from TabModel.";
+                if (profile == null) return;
+                Tracker tracker = TrackerFactory.getTrackerForProfile(profile);
+                ReengagementNotificationController controller =
+                        new ReengagementNotificationController(
+                                mActivity, tracker, ReengagementActivity.class);
+                controller.tryToReengageTheUser();
+            }));
+        }
     }
 
     private void maybeCreatePageInsightsComponent() {
@@ -300,10 +312,19 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
                 mActivity.getWindow(), mWindowAndroid.getKeyboardDelegate(),
                 () -> mActivity.findViewById(R.id.page_insights_hub_container));
 
-        mPageInsightsCoordinator = new PageInsightsCoordinator(mActivity, mActivityTabProvider,
-                mShareDelegateSupplier, controller, getBottomSheetController(),
-                mExpandedBottomSheetHelper, mBrowserControlsManager, mBrowserControlsManager,
-                this::isPageInsightsHubEnabled, mPageInsightsFirstLoadTimeMs);
+        mPageInsightsCoordinator =
+                new PageInsightsCoordinator(
+                        mActivity,
+                        mActivityTabProvider,
+                        mShareDelegateSupplier,
+                        mProfileSupplier,
+                        controller,
+                        getBottomSheetController(),
+                        mExpandedBottomSheetHelper,
+                        mBrowserControlsManager,
+                        mBrowserControlsManager,
+                        this::isPageInsightsHubEnabled,
+                        mPageInsightsFirstLoadTimeMs);
 
         mContextualSearchObserver = new ContextualSearchObserver() {
             @Override
@@ -404,6 +425,14 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
                 intentDataProvider.getSideSheetPosition(),
                 intentDataProvider.getSideSheetSlideInBehavior(),
                 intentDataProvider.getActivitySideSheetRoundedCornersPosition());
+
+        if (MinimizedFeatureUtils.isMinimizedCustomTabAvailable(mActivity)) {
+            // The method above already checks for the minimum API level.
+            //
+            // noinspection NewApi
+            mMinimizationManager =
+                    new CustomTabMinimizationManager(mActivity, mActivityTabProvider);
+        }
     }
 
     @Override

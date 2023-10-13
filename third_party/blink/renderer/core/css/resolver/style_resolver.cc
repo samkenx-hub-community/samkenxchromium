@@ -258,6 +258,11 @@ String ComputeBaseComputedStyleDiff(const ComputedStyle* base_computed_style,
     exclusions.insert(DebugField::background_);
   }
   if (!CSSPropertyEquality::PropertiesEqual(
+          PropertyHandle(CSSProperty::Get(CSSPropertyID::kMaskImage)),
+          *base_computed_style, computed_style)) {
+    exclusions.insert(DebugField::mask_);
+  }
+  if (!CSSPropertyEquality::PropertiesEqual(
           PropertyHandle(CSSProperty::Get(CSSPropertyID::kWebkitMaskImage)),
           *base_computed_style, computed_style)) {
     exclusions.insert(DebugField::mask_);
@@ -1065,7 +1070,7 @@ const ComputedStyle* StyleResolver::ResolveStyle(
 
   // Compute the base style, or reuse an existing cached base style if
   // applicable (ie., only animation has changed). This is the bulk of the
-  // style computation itself, also also where the caching for the base
+  // style computation itself, also where the caching for the base
   // computed style optimization happens.
   ApplyBaseStyle(element, style_recalc_context, style_request, state, cascade);
 
@@ -1139,12 +1144,6 @@ const ComputedStyle* StyleResolver::ResolveStyle(
   return state.TakeStyle();
 }
 
-static bool AllowsInheritance(const StyleRequest& style_request,
-                              const ComputedStyle* parent_style) {
-  // The spec disallows inheritance for ::backdrop.
-  return parent_style && style_request.pseudo_id != kPseudoIdBackdrop;
-}
-
 void StyleResolver::InitStyle(Element& element,
                               const StyleRequest& style_request,
                               const ComputedStyle& source_for_noninherited,
@@ -1207,14 +1206,15 @@ void StyleResolver::InitStyle(Element& element,
   state.StyleBuilder().SetStyleType(style_request.pseudo_id);
   state.StyleBuilder().SetPseudoArgument(style_request.pseudo_argument);
 
-  // For highlight inheritance, propagate link visitedness and forced-colors
-  // status.
+  // For highlight inheritance, propagate link visitedness, forced-colors
+  // status, the font and the line height from the originating element. The
+  // font and line height are necessary to correctly resolve font relative
+  // units.
   if (state.UsesHighlightPseudoInheritance()) {
     state.StyleBuilder().SetInForcedColorsMode(
         style_request.originating_element_style->InForcedColorsMode());
     state.StyleBuilder().SetForcedColorAdjust(
         style_request.originating_element_style->ForcedColorAdjust());
-    // TODO(schenney): Remove these when a better solution is found
     state.StyleBuilder().SetFont(
         style_request.originating_element_style->GetFont());
     state.StyleBuilder().SetLineHeight(
@@ -1444,12 +1444,13 @@ void StyleResolver::ApplyBaseStyleNoCache(
         style_request.pseudo_id);
   }
 
-  if (!AllowsInheritance(style_request, state.ParentStyle())) {
-    // We either have no parent, or we are ::backdrop (which does not
-    // allow inheriting from its parent), so use the initial style
-    // as the parent. Note that we need to do this before MPC lookup,
-    // so that the parent comparison (to determine if we have a hit
-    // on inherited properties) is correctly determined.
+  if (!state.ParentStyle() ||
+      (style_request.pseudo_id == kPseudoIdBackdrop &&
+       !RuntimeEnabledFeatures::BackdropInheritOriginatingEnabled())) {
+    // We have no parent so use the initial style as the parent. Note that we
+    // need to do this before MPC lookup, so that the parent comparison (to
+    // determine if we have a hit on inherited properties) is correctly
+    // determined.
     state.SetParentStyle(InitialStyleForElement());
     state.SetLayoutParentStyle(state.ParentStyle());
 
@@ -1912,8 +1913,10 @@ void StyleResolver::CollectPseudoRulesForElement(
     PseudoId pseudo_id,
     const AtomicString& view_transition_name,
     unsigned rules_to_include) {
-  collector.SetPseudoElementStyleRequest(
-      StyleRequest(pseudo_id, nullptr, view_transition_name));
+  collector.SetPseudoElementStyleRequest(StyleRequest(
+      pseudo_id,
+      /* parent_style */ nullptr,
+      /* originating_element_style */ nullptr, view_transition_name));
 
   if (rules_to_include & kUACSSRules) {
     MatchUARules(element, collector);
@@ -2108,10 +2111,19 @@ bool StyleResolver::CacheSuccess::InheritedVariablesChanged(
          builder.InheritedVariables();
 }
 
+bool StyleResolver::CacheSuccess::LineHeightChanged(
+    const ComputedStyleBuilder& builder) const {
+  if (!cached_matched_properties) {
+    return false;
+  }
+  return cached_matched_properties->computed_style->LineHeight() !=
+         builder.LineHeight();
+}
+
 bool StyleResolver::CacheSuccess::IsUsableAfterApplyInheritedOnly(
     const ComputedStyleBuilder& builder) const {
   return !EffectiveZoomChanged(builder) && !FontChanged(builder) &&
-         !InheritedVariablesChanged(builder);
+         !InheritedVariablesChanged(builder) && !LineHeightChanged(builder);
 }
 
 StyleResolver::CacheSuccess StyleResolver::ApplyMatchedCache(
@@ -2817,6 +2829,19 @@ void StyleResolver::PropagateStyleToViewport() {
     PROPAGATE_VALUE(overflow_anchor, OverflowAnchor, SetOverflowAnchor);
   }
 
+  // Color
+  {
+    Color color = StyleColor(CSSValueID::kCanvastext).GetColor();
+    if (document_element_style) {
+      color =
+          document_element_style->VisitedDependentColor(GetCSSPropertyColor());
+    }
+    if (viewport_style.VisitedDependentColor(GetCSSPropertyColor()) != color) {
+      changed = true;
+      new_viewport_style_builder.SetColor(StyleColor(color));
+    }
+  }
+
   // Misc
   {
     PROPAGATE_FROM(document_element_style, EffectiveTouchAction,
@@ -2829,6 +2854,10 @@ void StyleResolver::PropagateStyleToViewport() {
                    SetColorSchemeForced, false);
     PROPAGATE_FROM(document_element_style, ScrollbarGutter, SetScrollbarGutter,
                    kScrollbarGutterAuto);
+    PROPAGATE_FROM(document_element_style, ScrollbarWidth, SetScrollbarWidth,
+                   EScrollbarWidth::kAuto);
+    PROPAGATE_FROM(document_element_style, ScrollbarColor, SetScrollbarColor,
+                   absl::nullopt);
     PROPAGATE_FROM(document_element_style, ForcedColorAdjust,
                    SetForcedColorAdjust, EForcedColorAdjust::kAuto);
   }

@@ -15,7 +15,6 @@
 #include "base/types/optional_util.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_histogram_helper.h"
-#include "chrome/browser/chromeos/policy/dlp/dlp_policy_event.pb.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_reporting_manager.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager.h"
 #include "chrome/browser/chromeos/policy/dlp/test/dlp_reporting_manager_test_helper.h"
@@ -24,6 +23,7 @@
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile_manager.h"
 #include "components/account_id/account_id.h"
+#include "components/enterprise/data_controls/dlp_policy_event.pb.h"
 #include "components/reporting/client/mock_report_queue.h"
 #include "content/public/test/browser_task_environment.h"
 #include "content/public/test/test_renderer_host.h"
@@ -315,8 +315,9 @@ TEST_F(DataTransferDlpControllerTest, PasteIfAllowed_CancelDst) {
 
 class MockFilesController : public policy::DlpFilesControllerAsh {
  public:
-  explicit MockFilesController(const policy::DlpRulesManager& rules_manager)
-      : DlpFilesControllerAsh(rules_manager) {}
+  explicit MockFilesController(const policy::DlpRulesManager& rules_manager,
+                               Profile* profile)
+      : DlpFilesControllerAsh(rules_manager, profile) {}
   ~MockFilesController() override = default;
 
   MOCK_METHOD(void,
@@ -335,7 +336,10 @@ TEST_F(DataTransferDlpControllerTest, DropFile_Blocked) {
                          extension_misc::kFilesManagerAppId}))));
   ui::DataTransferEndpoint data_dst((GURL(kExample1Url)));
 
-  MockFilesController files_controller(rules_manager_);
+  std::unique_ptr<TestingProfile> testing_profile =
+      TestingProfile::Builder().Build();
+
+  MockFilesController files_controller(rules_manager_, testing_profile.get());
   std::vector<ui::FileInfo> file_names;
   ASSERT_TRUE(drag_data.GetFilenames(&file_names));
 
@@ -362,7 +366,10 @@ TEST_F(DataTransferDlpControllerTest, DropFile_Allowed) {
                          extension_misc::kFilesManagerAppId}))));
   ui::DataTransferEndpoint data_dst((GURL(kExample1Url)));
 
-  MockFilesController files_controller(rules_manager_);
+  std::unique_ptr<TestingProfile> testing_profile =
+      TestingProfile::Builder().Build();
+
+  MockFilesController files_controller(rules_manager_, testing_profile.get());
   std::vector<ui::FileInfo> file_names;
   ASSERT_TRUE(drag_data.GetFilenames(&file_names));
 

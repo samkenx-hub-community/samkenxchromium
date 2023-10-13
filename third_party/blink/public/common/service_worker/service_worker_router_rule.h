@@ -22,6 +22,9 @@ namespace blink {
 
 struct ServiceWorkerRouterCondition;
 
+// TODO(crbug.com/1490445): set this value by discussing in spec proposal.
+static constexpr int kServiceWorkerRouterConditionMaxRecursionDepth = 10;
+
 struct ServiceWorkerRouterRequestCondition {
   // https://fetch.spec.whatwg.org/#concept-request-method
   // Technically, it can be an arbitrary string, but Chromium would set
@@ -52,8 +55,13 @@ struct ServiceWorkerRouterRunningStatusCondition {
   }
 };
 
-struct ServiceWorkerRouterOrCondition {
+struct ServiceWorkerRouterConditionObject {
   std::vector<ServiceWorkerRouterCondition> conditions;
+
+  bool operator==(const ServiceWorkerRouterConditionObject& other) const;
+};
+struct ServiceWorkerRouterOrCondition {
+  std::vector<ServiceWorkerRouterConditionObject> objects;
 
   bool operator==(const ServiceWorkerRouterOrCondition& other) const;
 };
@@ -132,7 +140,7 @@ struct BLINK_COMMON_EXPORT ServiceWorkerRouterSource {
   // Type of sources.
   // These values are persisted to logs. Entries should not be renumbered and
   // numeric values should never be reused.
-  enum class SourceType {
+  enum class Type {
     // Network is used as a source.
     kNetwork = 0,
     // Race network and fetch handler.
@@ -144,7 +152,7 @@ struct BLINK_COMMON_EXPORT ServiceWorkerRouterSource {
 
     kMaxValue = kCache,
   };
-  SourceType type;
+  Type type;
 
   absl::optional<ServiceWorkerRouterNetworkSource> network_source;
   absl::optional<ServiceWorkerRouterRaceSource> race_source;

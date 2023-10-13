@@ -330,8 +330,7 @@ views::Widget* FedCmAccountSelectionView::CreateBubbleWithAccessibleTitle(
     const absl::optional<std::u16string>& idp_title,
     blink::mojom::RpContext rp_context,
     bool show_auto_reauthn_checkbox) {
-  Browser* browser =
-      chrome::FindBrowserWithWebContents(delegate_->GetWebContents());
+  Browser* browser = chrome::FindBrowserWithTab(delegate_->GetWebContents());
 
   // Reject the API if the browser is not found or its tab strip model does not
   // exist, as we require those to show UI. It is unclear why there are callers
@@ -416,8 +415,7 @@ void FedCmAccountSelectionView::OnLinkClicked(LinkType link_type,
   if (input_protector_->IsPossiblyUnintendedInteraction(event)) {
     return;
   }
-  Browser* browser =
-      chrome::FindBrowserWithWebContents(delegate_->GetWebContents());
+  Browser* browser = chrome::FindBrowserWithTab(delegate_->GetWebContents());
   TabStripModel* tab_strip_model = browser->tab_strip_model();
 
   DCHECK(tab_strip_model);
@@ -457,28 +455,11 @@ void FedCmAccountSelectionView::OnCloseButtonClicked(const ui::Event& event) {
       views::Widget::ClosedReason::kCloseButtonClicked);
 }
 
-// TODO(crbug.com/1478837): Record metrics for error UI
-void FedCmAccountSelectionView::OnMoreDetailsButtonClicked(
-    const GURL& url,
-    const ui::Event& event) {
+void FedCmAccountSelectionView::OnSigninToIdP(const ui::Event& event) {
   if (input_protector_->IsPossiblyUnintendedInteraction(event)) {
     return;
   }
 
-  ShowModalDialog(url);
-}
-
-// TODO(crbug.com/1478837): Record metrics for error UI
-void FedCmAccountSelectionView::OnGotItButtonClicked(const ui::Event& event) {
-  if (input_protector_->IsPossiblyUnintendedInteraction(event)) {
-    return;
-  }
-
-  bubble_widget_->CloseWithReason(
-      views::Widget::ClosedReason::kAcceptButtonClicked);
-}
-
-void FedCmAccountSelectionView::OnSigninToIdP() {
   delegate_->OnSigninToIdP();
   is_mismatch_continue_clicked_ = true;
   popup_window_state_ =
@@ -487,15 +468,33 @@ void FedCmAccountSelectionView::OnSigninToIdP() {
                             MismatchDialogResult::kContinued);
 }
 
+void FedCmAccountSelectionView::OnGotIt(const ui::Event& event) {
+  if (input_protector_->IsPossiblyUnintendedInteraction(event)) {
+    return;
+  }
+
+  delegate_->OnDismiss(DismissReason::kGotItButton);
+}
+
+void FedCmAccountSelectionView::OnMoreDetails(const ui::Event& event) {
+  if (input_protector_->IsPossiblyUnintendedInteraction(event)) {
+    return;
+  }
+
+  delegate_->OnMoreDetails();
+  delegate_->OnDismiss(DismissReason::kMoreDetailsButton);
+}
+
 content::WebContents* FedCmAccountSelectionView::ShowModalDialog(
     const GURL& url) {
   if (!popup_window_) {
     popup_window_ = std::make_unique<FedCmModalDialogView>(
         delegate_->GetWebContents(), this);
   }
-
   input_protector_->VisibilityChanged(false);
-  bubble_widget_->Hide();
+  if (bubble_widget_) {
+    bubble_widget_->Hide();
+  }
   return popup_window_->ShowPopupWindow(url);
 }
 

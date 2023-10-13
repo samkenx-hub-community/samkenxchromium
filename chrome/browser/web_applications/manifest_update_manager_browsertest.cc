@@ -39,13 +39,13 @@
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
-#include "chrome/browser/ui/browser_dialogs.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/web_applications/test/isolated_web_app_test_utils.h"
 #include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
 #include "chrome/browser/ui/web_applications/web_app_browser_controller.h"
 #include "chrome/browser/ui/web_applications/web_app_controller_browsertest.h"
+#include "chrome/browser/ui/web_applications/web_app_dialogs.h"
 #include "chrome/browser/web_applications/external_install_options.h"
 #include "chrome/browser/web_applications/externally_managed_app_manager.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_url_info.h"
@@ -82,6 +82,7 @@
 #include "components/services/app_service/public/cpp/icon_info.h"
 #include "components/services/app_service/public/cpp/protocol_handler_info.h"
 #include "components/services/app_service/public/cpp/share_target.h"
+#include "components/webapps/browser/features.h"
 #include "components/webapps/browser/install_result_code.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "components/webapps/browser/uninstall_result_code.h"
@@ -4459,16 +4460,16 @@ class ManifestUpdateManagerAppIdentityBrowserTest
       Browser* browser,
       bool open_as_window = false,
       const char* override_title = nullptr) {
-    chrome::SetAutoAcceptWebAppDialogForTesting(
+    SetAutoAcceptWebAppDialogForTesting(
         /*auto_accept=*/true,
         /*auto_open_in_window=*/open_as_window);
-    chrome::SetOverrideTitleForTesting(override_title);
+    SetOverrideTitleForTesting(override_title);
     WebAppTestInstallWithOsHooksObserver observer(browser->profile());
     observer.BeginListening();
     CHECK(chrome::ExecuteCommand(browser, IDC_CREATE_SHORTCUT));
     webapps::AppId app_id = observer.Wait();
-    chrome::SetAutoAcceptWebAppDialogForTesting(false, false);
-    chrome::SetOverrideTitleForTesting(nullptr);
+    SetAutoAcceptWebAppDialogForTesting(false, false);
+    SetOverrideTitleForTesting(nullptr);
     return app_id;
   }
 
@@ -4699,7 +4700,7 @@ IN_PROC_BROWSER_TEST_F(ManifestUpdateManagerAppIdentityBrowserTest,
 
   base::RunLoop run_loop;
 
-  chrome::ShowWebAppIdentityUpdateDialog(
+  ShowWebAppIdentityUpdateDialog(
       app_id,
       /* title_change= */ true,
       /* icon_change= */ false, u"old_title", u"new_title",
@@ -5736,5 +5737,37 @@ INSTANTIATE_TEST_SUITE_P(
                         AppIdTestParam::kWithFlagPolicyAppIdentity |
                             AppIdTestParam::kWithFlagAppIdDialogForIcon)),
     ManifestUpdateManagerBrowserTest_AppIdentityParameterized::ParamToString);
+
+class ManifestUpdateManagerBrowserTest_CreateShortcutIgnoresManifest
+    : public ManifestUpdateManagerBrowserTest {
+  base::test::ScopedFeatureList scoped_feature_list_{
+      webapps::features::kCreateShortcutIgnoresManifest};
+};
+
+IN_PROC_BROWSER_TEST_F(
+    ManifestUpdateManagerBrowserTest_CreateShortcutIgnoresManifest,
+    CheckUpdateSkipped) {
+  // Install an app with no manifest, trigger an update by navigation.
+  GURL no_manifest_url = GetAppURLWithoutManifest();
+  const webapps::AppId app_id = InstallWebAppWithoutManifest();
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  UpdateCheckResultAwaiter result_awaiter(no_manifest_url);
+
+  // Inject new manifest into the page and load the page to trigger update.
+  EXPECT_TRUE(content::ExecJs(
+      web_contents,
+      "addManifestLinkTag('/banners/manifest_for_no_manifest_page.json')"));
+
+  DidFinishLoadObserver load_observer(web_contents, no_manifest_url);
+  EXPECT_TRUE(ui_test_utils::NavigateToURL(browser(), no_manifest_url));
+  EXPECT_TRUE(load_observer.AwaitCorrectPageLoaded());
+
+  EXPECT_EQ(ManifestUpdateResult::kShortcutIgnoresManifest,
+            std::move(result_awaiter).AwaitNextResult());
+
+  histogram_tester_.ExpectBucketCount(
+      kUpdateHistogramName, ManifestUpdateResult::kShortcutIgnoresManifest, 1);
+}
 
 }  // namespace web_app

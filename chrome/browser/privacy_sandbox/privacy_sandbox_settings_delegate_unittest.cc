@@ -4,17 +4,22 @@
 
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_settings_delegate.h"
 
+#include <stddef.h>
+
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "build/buildflag.h"
 #include "chrome/browser/content_settings/cookie_settings_factory.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/identity_test_environment_profile_adaptor.h"
 #include "chrome/browser/supervised_user/supervised_user_test_util.h"
+#include "chrome/browser/tpcd/experiment/mock_experiment_manager.h"
 #include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
@@ -26,6 +31,7 @@
 #include "components/privacy_sandbox/privacy_sandbox_prefs.h"
 #include "components/signin/public/identity_manager/account_capabilities_test_mutator.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
+#include "content/public/common/content_features.h"
 #include "content/public/test/browser_task_environment.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -48,8 +54,10 @@ class PrivacySandboxSettingsDelegateTest : public testing::Test {
         CreateProfileForIdentityTestEnvironment();
     adapter_ =
         std::make_unique<IdentityTestEnvironmentProfileAdaptor>(profile_.get());
-    delegate_ =
-        std::make_unique<PrivacySandboxSettingsDelegate>(profile_.get());
+    experiment_manager_ =
+        std::make_unique<tpcd::experiment::MockExperimentManager>();
+    delegate_ = std::make_unique<PrivacySandboxSettingsDelegate>(
+        profile_.get(), experiment_manager_.get());
   }
 
  protected:
@@ -85,12 +93,16 @@ class PrivacySandboxSettingsDelegateTest : public testing::Test {
   sync_preferences::TestingPrefServiceSyncable* prefs() {
     return profile()->GetTestingPrefService();
   }
+  tpcd::experiment::MockExperimentManager* experiment_manager() {
+    return experiment_manager_.get();
+  }
 
  private:
   content::BrowserTaskEnvironment browser_task_environment_;
   base::test::ScopedFeatureList feature_list_;
   std::unique_ptr<IdentityTestEnvironmentProfileAdaptor> adapter_;
   std::unique_ptr<TestingProfile> profile_;
+  std::unique_ptr<tpcd::experiment::MockExperimentManager> experiment_manager_;
   std::unique_ptr<PrivacySandboxSettingsDelegate> delegate_;
 };
 
@@ -271,6 +283,7 @@ class MockWebappRegistry : public WebappRegistry {
 #endif
 
 struct CookieDeprecationExperimentEligibilityTestCase {
+  bool force_eligible = false;
   absl::optional<bool> is_subject_to_enterprise_policies;
   content_settings::CookieControlsMode cookie_controls_mode_pref =
       content_settings::CookieControlsMode::kOff;
@@ -285,6 +298,7 @@ struct CookieDeprecationExperimentEligibilityTestCase {
   absl::optional<bool> expected_eligible_before;
   bool expected_eligible;
   bool expected_currently_eligible;
+  absl::optional<size_t> expected_reported_histogram;
 };
 
 const CookieDeprecationExperimentEligibilityTestCase
@@ -292,16 +306,24 @@ const CookieDeprecationExperimentEligibilityTestCase
         {
             .expected_eligible = false,
             .expected_currently_eligible = false,
+            .expected_reported_histogram = 2  // kHasNotSeenNotice
         },
+        {.force_eligible = true,
+         .expected_eligible = true,
+         .expected_currently_eligible = true,
+         // No histogram should be reported if the eligibility is forced.
+         .expected_reported_histogram = absl::nullopt},
         {
             .privacy_sandbox_eea_notice_acknowledged_pref = true,
             .expected_eligible = true,
             .expected_currently_eligible = true,
+            .expected_reported_histogram = 0  // kEligible
         },
         {
             .privacy_sandbox_row_notice_acknowledged_pref = true,
             .expected_eligible = true,
             .expected_currently_eligible = true,
+            .expected_reported_histogram = 0  // kEligible
         },
         {
             .cookie_controls_mode_pref =
@@ -309,36 +331,42 @@ const CookieDeprecationExperimentEligibilityTestCase
             .privacy_sandbox_eea_notice_acknowledged_pref = true,
             .expected_eligible = false,
             .expected_currently_eligible = false,
+            .expected_reported_histogram = 1  // k3pCookiesBlocked
         },
         {
             .cookie_content_setting = ContentSetting::CONTENT_SETTING_BLOCK,
             .privacy_sandbox_eea_notice_acknowledged_pref = true,
             .expected_eligible = false,
             .expected_currently_eligible = false,
+            .expected_reported_histogram = 1  // k3pCookiesBlocked
         },
         {
             .privacy_sandbox_eea_notice_acknowledged_pref = true,
             .install_date = absl::nullopt,
             .expected_eligible = false,
             .expected_currently_eligible = false,
+            .expected_reported_histogram = 3  // kNewUser
         },
         {
             .privacy_sandbox_eea_notice_acknowledged_pref = true,
             .install_date = kCurrentTime - base::Days(29),
             .expected_eligible = false,
             .expected_currently_eligible = false,
+            .expected_reported_histogram = 3  // kNewUser
         },
         {
             .is_subject_to_enterprise_policies = true,
             .privacy_sandbox_eea_notice_acknowledged_pref = true,
             .expected_eligible = false,
             .expected_currently_eligible = false,
+            .expected_reported_histogram = 4  // kEnterpriseUser
         },
         {
             .is_subject_to_enterprise_policies = false,
             .privacy_sandbox_eea_notice_acknowledged_pref = true,
             .expected_eligible = true,
             .expected_currently_eligible = true,
+            .expected_reported_histogram = 0  // kEligible
         },
 #if BUILDFLAG(IS_ANDROID)
         {
@@ -347,6 +375,7 @@ const CookieDeprecationExperimentEligibilityTestCase
                 std::vector<std::string>({"https://a.test"}),
             .expected_eligible = false,
             .expected_currently_eligible = false,
+            .expected_reported_histogram = 5  // kPwaOrTwaInstalled
         },
 #endif
         {
@@ -354,6 +383,7 @@ const CookieDeprecationExperimentEligibilityTestCase
             .expected_eligible_before = false,
             .expected_eligible = false,
             .expected_currently_eligible = true,
+            .expected_reported_histogram = 0  // kEligible
         },
 };
 
@@ -393,10 +423,54 @@ class CookieDeprecationExperimentEligibilityTest
 #endif
 };
 
+// The parameter indicates whether to use per-profile filtering.
+class CookieDeprecationExperimentEligibilityOTRProfileTest
+    : public PrivacySandboxSettingsDelegateTest,
+      public testing::WithParamInterface<bool> {};
+
 }  // namespace
+
+TEST_F(PrivacySandboxSettingsDelegateTest, IsEligible) {
+  feature_list()->InitAndEnableFeature(
+      features::kCookieDeprecationFacilitatedTesting);
+
+  const struct {
+    const char* description;
+    absl::optional<bool> is_eligible;
+    bool expected_eligible;
+  } kTestCases[] = {
+      {
+          .description = "unknown",
+          .expected_eligible = false,
+      },
+      {
+          .description = "eligible",
+          .is_eligible = true,
+          .expected_eligible = true,
+      },
+      {
+          .description = "ineligible",
+          .is_eligible = false,
+          .expected_eligible = false,
+      },
+  };
+
+  for (const auto& test_case : kTestCases) {
+    SCOPED_TRACE(test_case.description);
+    EXPECT_CALL(*experiment_manager(), IsClientEligible)
+        .WillOnce(::testing::Return(test_case.is_eligible));
+    EXPECT_EQ(delegate()->IsCookieDeprecationExperimentEligible(),
+              test_case.expected_eligible);
+  }
+}
 
 TEST_P(CookieDeprecationExperimentEligibilityTest, IsEligible) {
   const CookieDeprecationExperimentEligibilityTestCase& test_case = GetParam();
+
+  feature_list()->InitAndEnableFeatureWithParameters(
+      features::kCookieDeprecationFacilitatedTesting,
+      {{"use_profile_filtering", "true"},
+       {"force_eligible", test_case.force_eligible ? "true" : "false"}});
 
   if (test_case.expected_eligible_before) {
     EXPECT_EQ(delegate()->IsCookieDeprecationExperimentEligible(),
@@ -430,8 +504,19 @@ TEST_P(CookieDeprecationExperimentEligibilityTest, IsEligible) {
       .WillByDefault(testing::Return(test_case.origins_with_installed_app));
 #endif
 
+  base::HistogramTester histograms;
   EXPECT_EQ(delegate()->IsCookieDeprecationExperimentCurrentlyEligible(),
             test_case.expected_currently_eligible);
+  if (test_case.expected_reported_histogram.has_value()) {
+    histograms.ExpectUniqueSample(
+        "PrivacySandbox.CookieDeprecationFacilitatedTesting.ProfileEligibility",
+        *test_case.expected_reported_histogram, /*expected_bucket_count=*/1);
+  } else {
+    histograms.ExpectTotalCount(
+        "PrivacySandbox.CookieDeprecationFacilitatedTesting.ProfileEligibility",
+        0);
+  }
+
   EXPECT_EQ(delegate()->IsCookieDeprecationExperimentEligible(),
             test_case.expected_eligible);
 }
@@ -440,3 +525,48 @@ INSTANTIATE_TEST_SUITE_P(
     CookieDeprecationExperimentEligibility,
     CookieDeprecationExperimentEligibilityTest,
     ::testing::ValuesIn(kCookieDeprecationExperimentEligibilityTestCases));
+
+TEST_P(CookieDeprecationExperimentEligibilityOTRProfileTest, IsEligible) {
+  Profile* off_the_record_profile = profile()->GetOffTheRecordProfile(
+      Profile::OTRProfileID::CreateUniqueForTesting(),
+      /*create_if_needed=*/true);
+  PrivacySandboxSettingsDelegate delegate_under_test(off_the_record_profile,
+                                                     experiment_manager());
+
+  const bool use_profile_filtering = GetParam();
+
+  const char* use_profile_filtering_param =
+      use_profile_filtering ? "true" : "false";
+
+  {
+    feature_list()->InitAndEnableFeatureWithParameters(
+        features::kCookieDeprecationFacilitatedTesting,
+        {{"force_eligible", "true"},
+         {"use_profile_filtering", use_profile_filtering_param},
+         {"enable_otr_profiles", "true"}});
+
+    if (!use_profile_filtering) {
+      EXPECT_CALL(*experiment_manager(), IsClientEligible)
+          .WillOnce(::testing::Return(true));
+    } else {
+      EXPECT_CALL(*experiment_manager(), IsClientEligible).Times(0);
+    }
+
+    EXPECT_TRUE(delegate_under_test.IsCookieDeprecationExperimentEligible());
+    feature_list()->Reset();
+  }
+
+  {
+    feature_list()->InitAndEnableFeatureWithParameters(
+        features::kCookieDeprecationFacilitatedTesting,
+        {{"force_eligible", "true"},
+         {"use_profile_filtering", use_profile_filtering_param},
+         {"enable_otr_profiles", "false"}});
+    EXPECT_FALSE(delegate_under_test.IsCookieDeprecationExperimentEligible());
+    feature_list()->Reset();
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         CookieDeprecationExperimentEligibilityOTRProfileTest,
+                         testing::Bool());

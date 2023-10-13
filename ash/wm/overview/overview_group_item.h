@@ -50,23 +50,21 @@ class OverviewGroupItem : public OverviewItemBase,
   gfx::RectF GetTargetBoundsInScreen() const override;
   gfx::RectF GetWindowTargetBoundsWithInsets() const override;
   gfx::RectF GetTransformedBounds() const override;
-  float GetItemScale(const gfx::Size& size) override;
+  float GetItemScale(int height) override;
   void ScaleUpSelectedItem(OverviewAnimationType animation_type) override;
   void EnsureVisible() override;
   OverviewFocusableView* GetFocusableView() const override;
   views::View* GetBackDropView() const override;
   void UpdateRoundedCornersAndShadow() override;
-  void SetShadowBounds(absl::optional<gfx::RectF> bounds_in_screen) override;
   void SetOpacity(float opacity) override;
   float GetOpacity() const override;
   void PrepareForOverview() override;
   void OnStartingAnimationComplete() override;
   void HideForSavedDeskLibrary(bool animate) override;
   void RevertHideForSavedDeskLibrary(bool animate) override;
-  void CloseWindow() override;
+  void CloseWindows() override;
   void Restack() override;
-  void HandleMouseEvent(const ui::MouseEvent& event) override;
-  void HandleGestureEvent(ui::GestureEvent* event) override;
+  void StartDrag() override;
   void OnOverviewItemDragStarted(OverviewItemBase* item) override;
   void OnOverviewItemDragEnded(bool snap) override;
   void OnOverviewItemContinuousScroll(const gfx::Transform& target_transform,
@@ -91,6 +89,7 @@ class OverviewGroupItem : public OverviewItemBase,
                                       bool reposition) override;
 
  protected:
+  // OverviewItemBase:
   void CreateItemWidget() override;
 
  private:

@@ -1102,6 +1102,10 @@ TabDragController::StartSystemDragAndDropSessionIfNecessary(
       drag_image,
       gfx::Vector2d(drag_image.height() / 2, drag_image.width() / 2));
 
+  // Pull into a local to avoid use-after-free if RunShellDrag deletes |this|.
+  base::OnceClosure drag_loop_done_callback =
+      std::move(drag_loop_done_callback_);
+
   base::WeakPtr<TabDragController> ref(weak_factory_.GetWeakPtr());
   GetAttachedBrowserWidget()->RunShellDrag(
       attached_context_,
@@ -1114,6 +1118,10 @@ TabDragController::StartSystemDragAndDropSessionIfNecessary(
   // need to end the drag session ourselves.
   if (ref && attached_context_hidden_)
     EndDrag(END_DRAG_COMPLETE);
+
+  if (drag_loop_done_callback) {
+    std::move(drag_loop_done_callback).Run();
+  }
 
   return ref ? Liveness::ALIVE : Liveness::DELETED;
 }
@@ -2439,7 +2447,7 @@ Browser* TabDragController::CreateBrowserForDrag(
 }
 
 gfx::Point TabDragController::GetCursorScreenPoint() {
-#if BUILDFLAG(IS_CHROMEOS_ASH)
+#if BUILDFLAG(IS_CHROMEOS)
   views::Widget* widget = GetAttachedBrowserWidget();
   DCHECK(widget);
   aura::Window* widget_window = widget->GetNativeWindow();

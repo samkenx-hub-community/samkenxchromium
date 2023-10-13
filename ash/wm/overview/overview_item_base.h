@@ -11,7 +11,6 @@
 #include "ash/ash_export.h"
 #include "ash/style/system_shadow.h"
 #include "ash/wm/overview/overview_types.h"
-#include "base/allocator/partition_allocator/pointers/raw_ptr.h"
 #include "base/memory/raw_ptr.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/events/event.h"
@@ -48,7 +47,7 @@ class SystemShadow;
 // Defines the interface for the overview item which will be implemented by
 // `OverviewItem` and `OverviewGroupItem`. The `OverviewGrid` creates and owns
 // the instance of this interface.
-class OverviewItemBase {
+class ASH_EXPORT OverviewItemBase {
  public:
   OverviewItemBase(OverviewSession* overview_session,
                    OverviewGrid* overview_grid,
@@ -65,11 +64,21 @@ class OverviewItemBase {
       OverviewGrid* overview_grid);
 
   // Checks if this item is currently being dragged.
-  ASH_EXPORT bool IsDragItem() const;
+  bool IsDragItem() const;
 
-  // Handles focus related events forwarded from the contents view.
+  // Refreshes visuals of the `shadow_` by setting the visibility and updating
+  // the bounds.
+  void RefreshShadowVisuals(bool shadow_visible);
+
+  // Handles events forwarded from the contents view.
   void OnFocusedViewActivated();
   void OnFocusedViewClosed();
+  void HandleMouseEvent(const ui::MouseEvent& event);
+  void HandleGestureEvent(ui::GestureEvent* event);
+
+  // If in tablet mode, maybe forward events to `OverviewGridEventHandler` as we
+  // might want to process scroll events on the item.
+  void HandleGestureEventForTabletModeLayout(ui::GestureEvent* event);
 
   void set_should_animate_when_entering(bool should_animate) {
     should_animate_when_entering_ = should_animate;
@@ -174,10 +183,9 @@ class OverviewItemBase {
   // Returns the transformed bound of this.
   virtual gfx::RectF GetTransformedBounds() const = 0;
 
-  // Calculates and returns an optimal scale ratio. With MD this is only
-  // taking into account `size.height()` as the width can vary. Without MD this
-  // returns the scale that allows the item to fully fit within `size`.
-  virtual float GetItemScale(const gfx::Size& size) = 0;
+  // Calculates and returns an optimal scale ratio. Only the given `height` is
+  // taken into account as the width can vary.
+  virtual float GetItemScale(int height) = 0;
 
   // Increases the bounds of the dragged item.
   virtual void ScaleUpSelectedItem(OverviewAnimationType animation_type) = 0;
@@ -193,10 +201,6 @@ class OverviewItemBase {
 
   // Updates the rounded corners and shadow on this.
   virtual void UpdateRoundedCornersAndShadow() = 0;
-
-  // Sets the bounds of the item shadow. If `bounds_in_screen` is nullopt, the
-  // shadow will be hidden.
-  virtual void SetShadowBounds(absl::optional<gfx::RectF> bounds_in_screen) = 0;
 
   // Changes the opacity of all the window(s) the item owns.
   virtual void SetOpacity(float opacity) = 0;
@@ -221,18 +225,17 @@ class OverviewItemBase {
   // them immediately.
   virtual void RevertHideForSavedDeskLibrary(bool animate) = 0;
 
-  // Closes `transform_window_`.
-  // TODO(michelefan): This is temporarily added to reduce the scope of the
-  // task, which will be replaced by `CloseWindows()` in a follow-up cl.
-  virtual void CloseWindow() = 0;
+  // Closes window(s) hosted by `this`.
+  virtual void CloseWindows() = 0;
 
   // Inserts the item back to its original stacking order so that the order of
   // overview items is the same as when entering overview.
   virtual void Restack() = 0;
 
-  // Handles events forwarded from the contents view.
-  virtual void HandleMouseEvent(const ui::MouseEvent& event) = 0;
-  virtual void HandleGestureEvent(ui::GestureEvent* event) = 0;
+  // Called before dragging. Scales up the windows(s) hosted by `this` a little
+  // bit to indicate its selection and stacks the window(s) at the top of the Z
+  // order in order to keep them visible while being dragged around.
+  virtual void StartDrag() = 0;
 
   virtual void OnOverviewItemDragStarted(OverviewItemBase* item) = 0;
   virtual void OnOverviewItemDragEnded(bool snap) = 0;
@@ -294,6 +297,14 @@ class OverviewItemBase {
 
   void set_target_bounds_for_testing(const gfx::RectF& target_bounds) {
     target_bounds_ = target_bounds;
+  }
+
+  gfx::Rect get_shadow_content_bounds_for_testing() const {
+    return shadow_.get()->GetContentBounds();
+  }
+
+  RoundedLabelWidget* get_cannot_snap_widget_for_testing() {
+    return cannot_snap_widget_.get();
   }
 
  protected:
@@ -386,6 +397,20 @@ class OverviewItemBase {
 
  private:
   friend class OverviewTestBase;
+
+  // TODO(sammiequon): Current events go from OverviewItemView to
+  // OverviewItem to OverviewSession to OverviewWindowDragController. We may be
+  // able to shorten this pipeline.
+  void HandlePressEvent(const gfx::PointF& location_in_screen,
+                        bool from_touch_gesture);
+  void HandleReleaseEvent(const gfx::PointF& location_in_screen);
+  void HandleDragEvent(const gfx::PointF& location_in_screen);
+  void HandleLongPressEvent(const gfx::PointF& location_in_screen);
+  void HandleFlingStartEvent(const gfx::PointF& location_in_screen,
+                             float velocity_x,
+                             float velocity_y);
+  void HandleTapEvent();
+  void HandleGestureEndEvent();
 };
 
 }  // namespace ash

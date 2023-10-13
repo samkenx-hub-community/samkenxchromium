@@ -37,6 +37,8 @@ namespace tpcd::experiment {
 
 // The param indicates whether the user is in in a cohort with 3PCD enabled.
 // (True indicates that third-party cookies are blocked.)
+// These tests are running with "force_eligible" enabled to be deterministic
+// and avoid being flaky.
 class EligibilityServiceBrowserTest : public InProcessBrowserTest,
                                       public testing::WithParamInterface<bool> {
  public:
@@ -44,6 +46,7 @@ class EligibilityServiceBrowserTest : public InProcessBrowserTest,
     feature_list_.InitAndEnableFeatureWithParameters(
         features::kCookieDeprecationFacilitatedTesting,
         {{"label", "label_test"},
+         {"force_eligible", "true"},
          {"disable_3p_cookies", GetDisable3PCookies()}});
   }
 
@@ -73,11 +76,11 @@ class EligibilityServiceBrowserTest : public InProcessBrowserTest,
         ->FlushNetworkInterfaceForTesting();
   }
 
-  void FireOnClientEligibilityChanged(bool is_eligible) {
+  void MarkProfileEligibility(bool is_eligible) {
     auto* eligibility_service =
         tpcd::experiment::EligibilityServiceFactory::GetForProfile(
             browser()->profile());
-    eligibility_service->OnClientEligibilityChanged(is_eligible);
+    eligibility_service->MarkProfileEligibility(is_eligible);
   }
 
   net::EmbeddedTestServer https_server_{
@@ -119,7 +122,7 @@ IN_PROC_BROWSER_TEST_P(EligibilityServiceBrowserTest,
 
   ASSERT_FALSE(privacy_sandbox_settings->IsCookieDeprecationLabelAllowed());
 
-  FireOnClientEligibilityChanged(/*is_eligible=*/true);
+  MarkProfileEligibility(/*is_eligible=*/false);
 
   // Ensures the cookie deprecation label is updated in the network context.
   FlushNetworkInterface();
@@ -154,7 +157,7 @@ IN_PROC_BROWSER_TEST_P(EligibilityServiceBrowserTest,
 
   ASSERT_TRUE(privacy_sandbox_settings->IsCookieDeprecationLabelAllowed());
 
-  FireOnClientEligibilityChanged(/*is_eligible=*/false);
+  MarkProfileEligibility(/*is_eligible=*/true);
 
   // Ensures the cookie deprecation label is updated in the network context.
   FlushNetworkInterface();
@@ -174,21 +177,29 @@ IN_PROC_BROWSER_TEST_P(EligibilityServiceBrowserTest,
   privacy_sandbox::TrackingProtectionOnboarding* onboarding_service =
       TrackingProtectionOnboardingFactory::GetForProfile(browser()->profile());
 
-  FireOnClientEligibilityChanged(/*is_eligible=*/true);
+  const bool disable_3p_cookies = GetParam();
 
-  // Onboarding should be marked eligible for the cohort where 3PCD is enabled,
-  // but not when 3PCD is disabled.
   EXPECT_EQ(onboarding_service->GetOnboardingStatus(),
-            GetParam() ? privacy_sandbox::TrackingProtectionOnboarding::
-                             OnboardingStatus::kEligible
-                       : privacy_sandbox::TrackingProtectionOnboarding::
-                             OnboardingStatus::kIneligible);
+            disable_3p_cookies ? privacy_sandbox::TrackingProtectionOnboarding::
+                                     OnboardingStatus::kEligible
+                               : privacy_sandbox::TrackingProtectionOnboarding::
+                                     OnboardingStatus::kIneligible);
 
-  FireOnClientEligibilityChanged(/*is_eligible=*/false);
+  MarkProfileEligibility(/*is_eligible=*/false);
 
   EXPECT_EQ(onboarding_service->GetOnboardingStatus(),
             privacy_sandbox::TrackingProtectionOnboarding::OnboardingStatus::
                 kIneligible);
+
+  MarkProfileEligibility(/*is_eligible=*/true);
+
+  // Onboarding should be marked eligible for the cohort where 3PCD is enabled,
+  // but not when 3PCD is disabled.
+  EXPECT_EQ(onboarding_service->GetOnboardingStatus(),
+            disable_3p_cookies ? privacy_sandbox::TrackingProtectionOnboarding::
+                                     OnboardingStatus::kEligible
+                               : privacy_sandbox::TrackingProtectionOnboarding::
+                                     OnboardingStatus::kIneligible);
 }
 
 INSTANTIATE_TEST_SUITE_P(All, EligibilityServiceBrowserTest, testing::Bool());

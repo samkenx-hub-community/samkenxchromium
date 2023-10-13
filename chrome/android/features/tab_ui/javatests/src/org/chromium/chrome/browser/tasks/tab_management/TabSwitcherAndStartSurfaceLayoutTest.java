@@ -270,10 +270,14 @@ public class TabSwitcherAndStartSurfaceLayoutTest {
     @Feature({"RenderTest"})
     @UseMethodParameter(RefactorTestParams.class)
     // clang-format off
-    @EnableFeatures({ChromeFeatureList.THUMBNAIL_CACHE_REFACTOR, ChromeFeatureList.TAB_TO_GTS_ANIMATION + "<Study"})
+    @EnableFeatures({
+        ChromeFeatureList.THUMBNAIL_CACHE_REFACTOR,
+        ChromeFeatureList.TAB_TO_GTS_ANIMATION + "<Study"
+    })
     @DisableAnimationsTestRule.EnsureAnimationsOn
     @CommandLineFlags.Add({BASE_PARAMS})
-    public void testRenderGrid_3WebTabs_ThumbnailCacheRefactor(boolean isStartSurfaceRefactorEnabled) throws IOException {
+    public void testRenderGrid_3WebTabs_ThumbnailCacheRefactor(
+            boolean isStartSurfaceRefactorEnabled) throws IOException {
         // clang-format on
         ChromeTabbedActivity cta = mActivityTestRule.getActivity();
         prepareTabs(3, 0, mTestServer.getURL(TEST_URL));
@@ -1283,6 +1287,7 @@ public class TabSwitcherAndStartSurfaceLayoutTest {
     @MediumTest
     @UseMethodParameter(RefactorTestParams.class)
     @EnableFeatures({ChromeFeatureList.TAB_TO_GTS_ANIMATION + "<Study"})
+    @DisableFeatures({ChromeFeatureList.THUMBNAIL_CACHE_REFACTOR})
     @CommandLineFlags.Add({BASE_PARAMS})
     public void testThumbnailFetchingResult_changingAspectRatio(
             boolean isStartSurfaceRefactorEnabled) throws Exception {
@@ -1339,7 +1344,10 @@ public class TabSwitcherAndStartSurfaceLayoutTest {
     @MediumTest
     @UseMethodParameter(RefactorTestParams.class)
     // clang-format off
-    @EnableFeatures({ChromeFeatureList.THUMBNAIL_CACHE_REFACTOR, ChromeFeatureList.TAB_TO_GTS_ANIMATION + "<Study"})
+    @EnableFeatures({
+        ChromeFeatureList.THUMBNAIL_CACHE_REFACTOR,
+        ChromeFeatureList.TAB_TO_GTS_ANIMATION + "<Study"
+    })
     @CommandLineFlags.Add({BASE_PARAMS})
     public void testExpandTab_ThumbnailCacheRefactor(boolean isStartSurfaceRefactorEnabled)
             throws InterruptedException {
@@ -1495,8 +1503,8 @@ public class TabSwitcherAndStartSurfaceLayoutTest {
                     hasAtLeastOneValidViewHolder = true;
                     ViewLookupCachingFrameLayout tabView =
                             (ViewLookupCachingFrameLayout) viewHolder.itemView;
-                    TabGridThumbnailView thumbnail =
-                            (TabGridThumbnailView) tabView.fastFindViewById(R.id.tab_thumbnail);
+                    TabThumbnailView thumbnail =
+                            (TabThumbnailView) tabView.fastFindViewById(R.id.tab_thumbnail);
 
                     double thumbnailViewRatio = thumbnail.getWidth() * 1.0 / thumbnail.getHeight();
                     int pixelDelta =

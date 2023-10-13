@@ -88,7 +88,6 @@
 #include "base/time/time.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "chromeos/ui/base/window_state_type.h"
-#include "chromeos/ui/wm/features.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/test/test_window_delegate.h"
 #include "ui/aura/window.h"
@@ -2003,9 +2002,9 @@ TEST_P(OverviewSessionTest, ExitOverviewWhenAllGridsEmpty) {
   auto* item2 = GetOverviewItemForWindow(window2);
   ASSERT_TRUE(item1 && item2);
 
-  // Close |item2|. Verify that we are still in overview mode because |window1|
+  // Close `item2`. Verify that we are still in overview mode because `window1`
   // is still open. All the grids should not have a no windows widget.
-  item2->CloseWindow();
+  item2->CloseWindows();
   base::RunLoop().RunUntilIdle();
   ASSERT_TRUE(GetOverviewSession());
   ASSERT_EQ(3u, grids.size());
@@ -2015,9 +2014,9 @@ TEST_P(OverviewSessionTest, ExitOverviewWhenAllGridsEmpty) {
   for (auto& grid : grids)
     EXPECT_FALSE(grid->no_windows_widget());
 
-  // Close |item1|. Verify that since no windows are open, we exit overview
+  // Close `item1`. Verify that since no windows are open, we exit overview
   // mode.
-  item1->CloseWindow();
+  item1->CloseWindows();
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(GetOverviewSession());
 }
@@ -3365,7 +3364,7 @@ TEST_P(OverviewSessionTest, ClosingTransientTree) {
 
   auto* item = GetOverviewItemForWindow(window);
   ASSERT_TRUE(item);
-  item->CloseWindow();
+  item->CloseWindows();
 
   // `NativeWidgetAura::Close()` fires a post task.
   base::RunLoop().RunUntilIdle();
@@ -3540,7 +3539,7 @@ TEST_P(OverviewSessionTest, FrameThrottlingArc) {
 
 // Tests that if we combine a desk in overview, the overview applied clipping is
 // removed properly (other portions of the window will not be visible on exiting
-// overview). Regression test for b/282010852.
+// overview). Regression test for http://b/282010852.
 TEST_P(OverviewSessionTest, WindowClippingAfterCombiningDesks) {
   // Need at least two desks to combine them.
   auto* controller = DesksController::Get();
@@ -3568,6 +3567,37 @@ TEST_P(OverviewSessionTest, WindowClippingAfterCombiningDesks) {
   ToggleOverview();
   WaitForOverviewExitAnimation();
   EXPECT_TRUE(normal_window->layer()->clip_rect().IsEmpty());
+}
+
+// Tests that if we tab while the desks bar is sliding out, there is no crash.
+// Regression test for http://b/302708219.
+TEST_P(OverviewSessionTest, TabbingDuringExitAnimation) {
+  ui::ScopedAnimationDurationScaleMode scale_mode(
+      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+
+  ToggleOverview();
+  WaitForOverviewEnterAnimation();
+
+  auto* overview_grid = GetOverviewGridForRoot(Shell::GetPrimaryRootWindow());
+  const views::Widget* desks_widget = overview_grid->desks_widget();
+
+  // First activate the desks bar by clicking it (but do not click on the desk
+  // preview because that will exit overview). See bug details for why we need
+  // to activate the desks bar first.
+  ui::test::EventGenerator* generator = GetEventGenerator();
+  generator->set_current_screen_location(
+      desks_widget->GetWindowBoundsInScreen().origin());
+  generator->ClickLeftButton();
+  ASSERT_TRUE(wm::IsActiveWindow(desks_widget->GetNativeWindow()));
+
+  // Exit overview. This will slide out the desks widget.
+  ToggleOverview();
+
+  // Try tab focus traversal while the animation is in progress. There should be
+  // no crash.
+  SendKey(ui::VKEY_TAB);
+  SendKey(ui::VKEY_TAB);
+  SendKey(ui::VKEY_TAB);
 }
 
 // If you update the parameterisation of OverviewSessionTest also update the
@@ -5241,8 +5271,7 @@ INSTANTIATE_TEST_SUITE_P(/*no prefix*/,
 
 class FloatOverviewSessionTest : public OverviewTestBase {
  public:
-  FloatOverviewSessionTest()
-      : scoped_feature_list_(chromeos::wm::features::kWindowLayoutMenu) {}
+  FloatOverviewSessionTest() = default;
   FloatOverviewSessionTest(const FloatOverviewSessionTest&) = delete;
   FloatOverviewSessionTest& operator=(const FloatOverviewSessionTest&) = delete;
   ~FloatOverviewSessionTest() override = default;
@@ -5278,9 +5307,6 @@ class FloatOverviewSessionTest : public OverviewTestBase {
 
     return true;
   }
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 // Tests that the float container is stacked properly when entering and exiting

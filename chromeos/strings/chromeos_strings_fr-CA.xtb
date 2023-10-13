@@ -24,6 +24,7 @@
 <translation id="1154390310959620237">Vous ne pouvez personnaliser que cinq raccourcis. Supprimez un raccourci pour en ajouter un nouveau.</translation>
 <translation id="1164939766849482256">Écran de veille de l'aube à l'obscurité</translation>
 <translation id="1167755866710282443">Ouvrez le menu pour personnaliser les clés. Faites glisser le menu pour le déplacer.</translation>
+<translation id="1174073918202301297">Raccourci ajouté</translation>
 <translation id="1175697296044146566">Ce <ph name="DEVICE_TYPE" /> est géré par <ph name="MANAGER" />.</translation>
 <translation id="1175951029573070619">Moyen (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">Supprimer</translation>
@@ -91,6 +92,7 @@
 <translation id="1643449475550628585">Modifier le fond d'écran tous les jours</translation>
 <translation id="1644574205037202324">Historique</translation>
 <translation id="1651925268237749928">Vous avez sélectionné un album partagé. D'autres personnes peuvent ajouter ou modifier des photos. Votre fond d'écran peut utiliser des photos qui ne figurent pas dans cet album à l'heure actuelle.</translation>
+<translation id="1661865805917886535">Certains renseignements sur le compte et le système peuvent être envoyés à Google. Nous utilisons ces renseignements pour résoudre des problèmes techniques et améliorer nos services, sous réserve de notre politique de confidentialité (<ph name="PRIVACYPOLICYURL" />) et de nos conditions d'utilisation (<ph name="TERMSOFSERVICEURL" />). Pour demander des modifications de contenu, accédez à l'aide juridique (<ph name="LEGALHELPPAGEURL" />).</translation>
 <translation id="1662989795263954667">Tâchez arrêtée : à court d'encre</translation>
 <translation id="1664796644829245314">Aperçu de <ph name="PREVIEW_OBJECT" /></translation>
 <translation id="1668469839109562275">RPV intégré</translation>
@@ -131,7 +133,6 @@
 <translation id="1871569928317311284">Désactiver le thème sombre</translation>
 <translation id="1874612839560830905">MTU</translation>
 <translation id="188114911237521550">Désactiver le mode sombre</translation>
-<translation id="1881188606372070653">Accédez à la <ph name="BEGIN_LINK1" />page d'aide pour les questions d'ordre juridique<ph name="END_LINK1" /> afin de demander des modifications de contenu pour des raisons juridiques. Certains renseignements relatifs à votre compte et à votre système peuvent être envoyés à Google. Nous utiliserons les renseignements que vous nous fournissez pour vous aider à résoudre les problèmes techniques et pour améliorer nos services, sous réserve de notre <ph name="BEGIN_LINK2" />politique de confidentialité<ph name="END_LINK2" /> et de nos <ph name="BEGIN_LINK3" />conditions d'utilisation<ph name="END_LINK3" />.</translation>
 <translation id="1885577615937958993">avance rapide du contenu multimédia</translation>
 <translation id="1887850431809612466">Révision du matériel</translation>
 <translation id="1897672602657312171">Un raccourci sans touche de recherche peut entrer en conflit avec le raccourci de certaines applications. Appuyez à nouveau sur ce raccourci pour continuer à l'utiliser ou appuyez sur un nouveau raccourci à l'aide de la touche de recherche.</translation>
@@ -265,6 +266,7 @@
 <translation id="3122464029669770682">Processeur</translation>
 <translation id="3124039320086536031">L'appareil est connecté.</translation>
 <translation id="3127341325625468058">{PAGE_NUMBER,plural, =0{Retirer la page?}=1{Retirer la page {PAGE_NUMBER}?}one{Retirer la page {PAGE_NUMBER}?}other{Retirer la page {PAGE_NUMBER}?}}</translation>
+<translation id="3146655726035122603">Exclusif à <ph name="PRODUCT_NAME" /></translation>
 <translation id="315116470104423982">Données mobiles</translation>
 <translation id="3156846309055100599">Numérisation de la page <ph name="PAGE_NUMBER" /> en cours…</translation>
 <translation id="315738237743207937">Un portail captif a été détecté</translation>
@@ -280,7 +282,6 @@
 <translation id="3226405216343213872">Recherche de numériseurs en cours…</translation>
 <translation id="3226657629376379887">Menu des actions de mise en page</translation>
 <translation id="3246869037381808805">Les tâches d'impression de plus d'un jour seront retirées</translation>
-<translation id="3248223063252096240">éléments exclusifs <ph name="PRODUCT_NAME" /></translation>
 <translation id="3268178239013324452">Échec : porte de l'imprimante ouverte</translation>
 <translation id="3275729367986477355">Image d'avatar</translation>
 <translation id="3283504360622356314">{0,plural, =1{Modifier le fichier}one{Modifier le fichier}other{Modifier les fichiers}}</translation>
@@ -480,6 +481,7 @@
 <translation id="4793756956024303490">Algorithme de compression</translation>
 <translation id="4794140124556169553">Effectuer un test de processeur peut avoir un impact sur les performances de votre système</translation>
 <translation id="4798078634453489142">Retirer un nom de point d'accès pour en ajouter un nouveau</translation>
+<translation id="479989351350248267">chercher</translation>
 <translation id="4800589996161293643">Communauté Chromebook</translation>
 <translation id="4803391892369051319">IPv4</translation>
 <translation id="4808449224298348341">Tâche d'impression annulée : <ph name="DOCUMENT_TITLE" /></translation>
@@ -688,6 +690,7 @@
 <translation id="6318437367327684789">indéfiniment</translation>
 <translation id="6319207335391420837">Mettre à jour le micrologiciel de <ph name="DEVICE_NAME" /></translation>
 <translation id="6321407676395378991">Activer l'écran de veille</translation>
+<translation id="6324916366299863871">Modifier un raccourci</translation>
 <translation id="6325525973963619867">Échec</translation>
 <translation id="6331191339300272798">Thème sombre automatique</translation>
 <translation id="6340526405444716530">Personnalisation</translation>
@@ -787,6 +790,7 @@
 <translation id="7103252855940681301">Appareil <ph name="INDEX" /> de <ph name="COUNT" /> nommé <ph name="NAME" />.</translation>
 <translation id="7107255225945990211">Choisir parmi les illustrations exclusives à <ph name="PRODUCT_NAME" /></translation>
 <translation id="7108668606237948702">Entrée</translation>
+<translation id="7119389851461848805">marche</translation>
 <translation id="7130438335435247835">Nom du point d'accès (NPA)</translation>
 <translation id="7134436342991564651">{0,plural, =1{Serveur de noms}one{Serveur de noms}other{Serveurs de noms}}</translation>
 <translation id="7135814714616751706">Recherchez des raccourcis</translation>
@@ -827,6 +831,7 @@
 <translation id="7375053625150546623">EAP</translation>
 <translation id="7388959671917308825">Pavé tactile intégré</translation>
 <translation id="7397270852490618635">Désactiver le thème clair</translation>
+<translation id="7401543881546089382">Supprimer le raccourci</translation>
 <translation id="741244894080940828">conversion</translation>
 <translation id="7415801143053185905">Latence HTTP très élevée</translation>
 <translation id="7425178841057519191">{NUM_ROOL_APPS,plural,offset:2 =1{Votre administrateur a configuré <ph name="APP_NAME_1" /> pour qu'elle démarre automatiquement à chaque connexion.}=2{Votre administrateur a configuré <ph name="APP_NAME_1" /> et <ph name="APP_NAME_2" /> pour qu'elles démarrent automatiquement à chaque connexion.}=3{Votre administrateur a configuré <ph name="APP_NAME_1" />, <ph name="APP_NAME_2" /> et <ph name="APP_NAME_3" /> pour qu'elles démarrent automatiquement à chaque connexion.}one{Votre administrateur a configuré <ph name="APP_NAME_1" />, <ph name="APP_NAME_2" /> et # autre application pour qu'elles démarrent automatiquement à chaque connexion.}other{Votre administrateur a configuré <ph name="APP_NAME_1" />, <ph name="APP_NAME_2" /> et # autres applications pour qu'elles démarrent automatiquement à chaque connexion.}}</translation>
@@ -865,6 +870,7 @@
 <translation id="7705524343798198388">RPV</translation>
 <translation id="7716280709122323042">WPA3</translation>
 <translation id="7718231387947923843">éclairage du clavier</translation>
+<translation id="7730077286107534951">Certains renseignements relatifs à votre compte et à votre système peuvent être envoyés à Google. Nous utilisons ces renseignements pour nous aider à résoudre des problèmes techniques et à améliorer nos services, sous réserve de notre <ph name="BEGIN_LINK2" />politique de confidentialité<ph name="END_LINK2" /> et de nos <ph name="BEGIN_LINK3" />conditions d'utilisation<ph name="END_LINK3" />. Pour demander des modifications de contenu, accédez à l'<ph name="BEGIN_LINK1" />aide juridique<ph name="END_LINK1" />.</translation>
 <translation id="773153675489693198">Compte de cycles</translation>
 <translation id="7747039790905080783">Clé prépartagée</translation>
 <translation id="7752963721013053477">De l'aube à l'obscurité – exclusif</translation>
@@ -901,6 +907,7 @@
 <translation id="7978412674231730200">Clé privée</translation>
 <translation id="7994702968232966508">Méthode EAP</translation>
 <translation id="8004582292198964060">Navigateur</translation>
+<translation id="8017679124341497925">Raccourci modifié</translation>
 <translation id="802154636333426148">Échec du téléchargement</translation>
 <translation id="8031884997696620457">HSPAPlus</translation>
 <translation id="80398733265834479">Activer le mode Couleur automatique</translation>
@@ -941,6 +948,7 @@
 <translation id="8336739000755212683">Changer l'image du compte sur l'appareil</translation>
 <translation id="8347126826554447157"><ph name="SHORCTCUT1" /> ou <ph name="SHORCTCUT2" /></translation>
 <translation id="8347227221149377169">Tâches d'impression</translation>
+<translation id="8349826889576450703">lanceur d'applications</translation>
 <translation id="8351855506390808906">Point de contact d'affectation des touches</translation>
 <translation id="8352772353338965963">Ajouter un compte à la connexion multicompte. Tous les comptes connectés sont accessibles sans mot de passe. Nous vous recommandons donc de n'utiliser cette fonctionnalité qu'avec des comptes fiables.</translation>
 <translation id="8364946094152050673">Le champ des serveurs de nom est vide</translation>
@@ -1036,6 +1044,7 @@
 <translation id="8998156756248178381">{NUM_ROOL_APPS,plural, =1{<ph name="APP_NAME_1" /> a démarré automatiquement}one{# application a démarré automatiquement}other{# applications ont démarré automatiquement}}</translation>
 <translation id="8998289560386111590">Non accessible sur votre appareil</translation>
 <translation id="9003704114456258138">Fréquence</translation>
+<translation id="901834265349196618">courriel</translation>
 <translation id="9024331582947483881">plein écran</translation>
 <translation id="9025198690966128418">Utiliser comme un appareil personnel</translation>
 <translation id="902638246363752736">Paramètres du clavier</translation>
@@ -1076,6 +1085,7 @@
 <translation id="945522503751344254">Envoyer un commentaire à Google</translation>
 <translation id="952992212772159698">Désactivé</translation>
 <translation id="960719561871045870">Code de l'opérateur</translation>
+<translation id="966787709310836684">menu</translation>
 <translation id="979450713603643090">Rose clair</translation>
 <translation id="982713511914535780">Exécuter le test de décharge</translation>
 <translation id="987264212798334818">Généralités</translation>

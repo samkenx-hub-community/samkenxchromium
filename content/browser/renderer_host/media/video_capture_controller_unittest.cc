@@ -84,9 +84,7 @@ class MockVideoCaptureControllerEventHandler
                void(const VideoCaptureControllerID&, int buffer_id));
   MOCK_METHOD2(DoBufferDestroyed,
                void(const VideoCaptureControllerID&, int buffer_id));
-  MOCK_METHOD2(DoBufferReady,
-               void(ControllerIDAndSize buffer,
-                    std::vector<ControllerIDAndSize> scaled_buffers));
+  MOCK_METHOD1(DoBufferReady, void(ControllerIDAndSize buffer));
   MOCK_METHOD1(OnCaptureConfigurationChanged,
                void(const VideoCaptureControllerID&));
   MOCK_METHOD1(OnFrameWithEmptyRegionCapture,
@@ -98,7 +96,7 @@ class MockVideoCaptureControllerEventHandler
   MOCK_METHOD1(OnStartedUsingGpuDecode, void(const VideoCaptureControllerID&));
   MOCK_METHOD2(OnNewCropVersion,
                void(const VideoCaptureControllerID&, uint32_t));
-  MOCK_METHOD2(OnFrameDroppedEarly,
+  MOCK_METHOD2(OnFrameDropped,
                void(const VideoCaptureControllerID&,
                     media::VideoCaptureFrameDropReason));
 
@@ -116,28 +114,16 @@ class MockVideoCaptureControllerEventHandler
     DoBufferDestroyed(id, buffer_id);
   }
   void OnBufferReady(const VideoCaptureControllerID& id,
-                     const ReadyBuffer& buffer,
-                     const std::vector<ReadyBuffer>& scaled_buffers) override {
+                     const ReadyBuffer& buffer) override {
     EXPECT_EQ(expected_pixel_format_, buffer.frame_info->pixel_format);
     EXPECT_EQ(expected_color_space_, buffer.frame_info->color_space);
     EXPECT_TRUE(buffer.frame_info->metadata.reference_time.has_value());
-    std::vector<ControllerIDAndSize> scaled_frames;
-    for (const auto& scaled_buffer : scaled_buffers) {
-      scaled_frames.emplace_back(id, scaled_buffer.frame_info->coded_size);
-    }
-    DoBufferReady(ControllerIDAndSize(id, buffer.frame_info->coded_size),
-                  std::move(scaled_frames));
+    DoBufferReady(ControllerIDAndSize(id, buffer.frame_info->coded_size));
     if (enable_auto_return_buffer_on_buffer_ready_) {
       base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
           FROM_HERE, base::BindOnce(&VideoCaptureController::ReturnBuffer,
                                     base::Unretained(controller_), id, this,
                                     buffer.buffer_id, feedback_));
-      for (const auto& scaled_buffer : scaled_buffers) {
-        base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-            FROM_HERE, base::BindOnce(&VideoCaptureController::ReturnBuffer,
-                                      base::Unretained(controller_), id, this,
-                                      scaled_buffer.buffer_id, feedback_));
-      }
     }
   }
   void OnEnded(const VideoCaptureControllerID& id) override {
@@ -215,7 +201,8 @@ class VideoCaptureControllerTest
         media::VideoCaptureBufferType::kSharedMemory,
         std::make_unique<media::VideoFrameReceiverOnTaskRunner>(
             controller_->GetWeakPtrForIOThread(), GetIOThreadTaskRunner({})),
-        buffer_pool_);
+        buffer_pool_,
+        mojo::PendingRemote<video_capture::mojom::VideoEffectsManager>{});
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
   }
 
@@ -415,26 +402,20 @@ TEST_P(VideoCaptureControllerTest, NormalCaptureMultipleClients) {
   {
     InSequence s;
     EXPECT_CALL(*client_a_, DoBufferCreated(client_a_route_1, _));
-    EXPECT_CALL(*client_a_,
-                DoBufferReady(ControllerIDAndSize(client_a_route_1,
-                                                  device_format.frame_size),
-                              std::vector<ControllerIDAndSize>()));
+    EXPECT_CALL(*client_a_, DoBufferReady(ControllerIDAndSize(
+                                client_a_route_1, device_format.frame_size)));
   }
   {
     InSequence s;
     EXPECT_CALL(*client_b_, DoBufferCreated(client_b_route_1, _));
-    EXPECT_CALL(*client_b_,
-                DoBufferReady(ControllerIDAndSize(client_b_route_1,
-                                                  device_format.frame_size),
-                              std::vector<ControllerIDAndSize>()));
+    EXPECT_CALL(*client_b_, DoBufferReady(ControllerIDAndSize(
+                                client_b_route_1, device_format.frame_size)));
   }
   {
     InSequence s;
     EXPECT_CALL(*client_a_, DoBufferCreated(client_a_route_2, _));
-    EXPECT_CALL(*client_a_,
-                DoBufferReady(ControllerIDAndSize(client_a_route_2,
-                                                  device_format.frame_size),
-                              std::vector<ControllerIDAndSize>()));
+    EXPECT_CALL(*client_a_, DoBufferReady(ControllerIDAndSize(
+                                client_a_route_2, device_format.frame_size)));
   }
   client_a_->feedback_.resource_utilization = 0.5;
   client_b_->feedback_.resource_utilization = -1.0;
@@ -484,18 +465,12 @@ TEST_P(VideoCaptureControllerTest, NormalCaptureMultipleClients) {
                                            arbitrary_timestamp_);
 
   // The frame should be delivered to the clients in any order.
-  EXPECT_CALL(*client_a_,
-              DoBufferReady(ControllerIDAndSize(client_a_route_1,
-                                                device_format.frame_size),
-                            std::vector<ControllerIDAndSize>()));
-  EXPECT_CALL(*client_b_,
-              DoBufferReady(ControllerIDAndSize(client_b_route_1,
-                                                device_format.frame_size),
-                            std::vector<ControllerIDAndSize>()));
-  EXPECT_CALL(*client_a_,
-              DoBufferReady(ControllerIDAndSize(client_a_route_2,
-                                                device_format.frame_size),
-                            std::vector<ControllerIDAndSize>()));
+  EXPECT_CALL(*client_a_, DoBufferReady(ControllerIDAndSize(
+                              client_a_route_1, device_format.frame_size)));
+  EXPECT_CALL(*client_b_, DoBufferReady(ControllerIDAndSize(
+                              client_b_route_1, device_format.frame_size)));
+  EXPECT_CALL(*client_a_, DoBufferReady(ControllerIDAndSize(
+                              client_a_route_2, device_format.frame_size)));
   base::RunLoop().RunUntilIdle();
   Mock::VerifyAndClearExpectations(client_a_.get());
   Mock::VerifyAndClearExpectations(client_b_.get());
@@ -534,31 +509,23 @@ TEST_P(VideoCaptureControllerTest, NormalCaptureMultipleClients) {
   // the old clients only |kPoolSize - 1|.
   EXPECT_CALL(*client_b_, DoBufferCreated(client_b_route_2, _))
       .Times(kPoolSize);
-  EXPECT_CALL(*client_b_,
-              DoBufferReady(ControllerIDAndSize(client_b_route_2,
-                                                device_format.frame_size),
-                            std::vector<ControllerIDAndSize>()))
+  EXPECT_CALL(*client_b_, DoBufferReady(ControllerIDAndSize(
+                              client_b_route_2, device_format.frame_size)))
       .Times(kPoolSize);
   EXPECT_CALL(*client_a_, DoBufferCreated(client_a_route_1, _))
       .Times(kPoolSize - 1);
-  EXPECT_CALL(*client_a_,
-              DoBufferReady(ControllerIDAndSize(client_a_route_1,
-                                                device_format.frame_size),
-                            std::vector<ControllerIDAndSize>()))
+  EXPECT_CALL(*client_a_, DoBufferReady(ControllerIDAndSize(
+                              client_a_route_1, device_format.frame_size)))
       .Times(kPoolSize);
   EXPECT_CALL(*client_a_, DoBufferCreated(client_a_route_2, _))
       .Times(kPoolSize - 1);
-  EXPECT_CALL(*client_a_,
-              DoBufferReady(ControllerIDAndSize(client_a_route_2,
-                                                device_format.frame_size),
-                            std::vector<ControllerIDAndSize>()))
+  EXPECT_CALL(*client_a_, DoBufferReady(ControllerIDAndSize(
+                              client_a_route_2, device_format.frame_size)))
       .Times(kPoolSize);
   EXPECT_CALL(*client_b_, DoBufferCreated(client_b_route_1, _))
       .Times(kPoolSize - 1);
-  EXPECT_CALL(*client_b_,
-              DoBufferReady(ControllerIDAndSize(client_b_route_1,
-                                                device_format.frame_size),
-                            std::vector<ControllerIDAndSize>()))
+  EXPECT_CALL(*client_b_, DoBufferReady(ControllerIDAndSize(
+                              client_b_route_1, device_format.frame_size)))
       .Times(kPoolSize);
   base::RunLoop().RunUntilIdle();
   Mock::VerifyAndClearExpectations(client_a_.get());
@@ -602,100 +569,13 @@ TEST_P(VideoCaptureControllerTest, NormalCaptureMultipleClients) {
                                            arbitrary_timestamp_);
   // B2 is the only client left, and is the only one that should
   // get the buffer.
-  EXPECT_CALL(*client_b_,
-              DoBufferReady(ControllerIDAndSize(client_b_route_2,
-                                                device_format.frame_size),
-                            std::vector<ControllerIDAndSize>()))
+  EXPECT_CALL(*client_b_, DoBufferReady(ControllerIDAndSize(
+                              client_b_route_2, device_format.frame_size)))
       .Times(2);
   base::RunLoop().RunUntilIdle();
   Mock::VerifyAndClearExpectations(client_a_.get());
   Mock::VerifyAndClearExpectations(client_b_.get());
 }
-
-// External buffer handling by the VideoCaptureBufferPool and
-// VideoCaptureBufferTracker is only supported on macOS and as a result,
-// VideoCaptureDeviceClient's OnIncomingCapturedExternalBuffer() path only works
-// on macOS. This limits testing of scaled video frames to macOS due to
-// it using OnIncomingCapturedExternalBuffer(). When external buffer handling or
-// other means of achieving scaled video frames is supported on more platforms
-// VideoCaptureControllerTest.CaptureWithScaledFrames should run on those
-// platforms as well.
-// TODO(https://crbug.com/1174481): Update test to work on other platforms.
-#if BUILDFLAG(IS_MAC)
-
-TEST_P(VideoCaptureControllerTest, CaptureWithScaledFrames) {
-  const gfx::Size kFrameSize(444, 200);
-  const gfx::Size kScaledFrameSize(320, 240);
-
-  media::VideoCaptureParams session_params;
-  const media::VideoPixelFormat format = GetParam();
-  client_a_->expected_pixel_format_ = format;
-  client_b_->expected_pixel_format_ = format;
-  client_a_->expected_color_space_ = gfx::ColorSpace();
-  client_b_->expected_color_space_ = gfx::ColorSpace();
-  session_params.requested_format =
-      media::VideoCaptureFormat(kFrameSize, 30, format);
-  media::VideoCaptureFormat capture_format(kFrameSize, 25, format);
-  media::VideoCaptureFormat scaled_capture_format(kScaledFrameSize, 25, format);
-
-  const VideoCaptureControllerID client_a_route =
-      base::UnguessableToken::Create();
-  const VideoCaptureControllerID client_b_route =
-      base::UnguessableToken::Create();
-
-  const media::VideoCaptureSessionId session_id_1 =
-      base::UnguessableToken::Create();
-  const media::VideoCaptureSessionId session_id_2 =
-      base::UnguessableToken::Create();
-
-  controller_->AddClient(client_a_route, client_a_.get(), session_id_1,
-                         session_params);
-  controller_->AddClient(client_b_route, client_b_.get(), session_id_2,
-                         session_params);
-  ASSERT_EQ(2u, controller_->GetClientCount());
-
-  {
-    InSequence s;
-    EXPECT_CALL(*client_a_, DoBufferCreated(client_a_route, _)).Times(2);
-    std::vector<ControllerIDAndSize> scaled_frames = {
-        ControllerIDAndSize(client_a_route, kScaledFrameSize)};
-    EXPECT_CALL(*client_a_,
-                DoBufferReady(ControllerIDAndSize(client_a_route, kFrameSize),
-                              std::move(scaled_frames)));
-  }
-  {
-    InSequence s;
-    EXPECT_CALL(*client_b_, DoBufferCreated(client_b_route, _)).Times(2);
-    std::vector<ControllerIDAndSize> scaled_frames = {
-        ControllerIDAndSize(client_b_route, kScaledFrameSize)};
-    EXPECT_CALL(*client_b_,
-                DoBufferReady(ControllerIDAndSize(client_b_route, kFrameSize),
-                              std::move(scaled_frames)));
-  }
-  gfx::GpuMemoryBufferHandle frame_handle;
-  frame_handle.type = gfx::GpuMemoryBufferType::IO_SURFACE_BUFFER;
-  frame_handle.id = gfx::GpuMemoryBufferHandle::kInvalidId;
-  frame_handle.io_surface =
-      gfx::CreateIOSurface(kFrameSize, gfx::BufferFormat::BGRA_8888);
-  media::CapturedExternalVideoBuffer external_buffer(
-      std::move(frame_handle), capture_format, gfx::ColorSpace());
-
-  gfx::GpuMemoryBufferHandle scaled_frame_handle;
-  scaled_frame_handle.type = gfx::GpuMemoryBufferType::IO_SURFACE_BUFFER;
-  scaled_frame_handle.id = gfx::GpuMemoryBufferHandle::kInvalidId;
-  scaled_frame_handle.io_surface =
-      gfx::CreateIOSurface(kScaledFrameSize, gfx::BufferFormat::BGRA_8888);
-  std::vector<media::CapturedExternalVideoBuffer> scaled_external_buffers;
-  scaled_external_buffers.emplace_back(
-      std::move(scaled_frame_handle), scaled_capture_format, gfx::ColorSpace());
-
-  device_client_->OnIncomingCapturedExternalBuffer(
-      std::move(external_buffer), std::move(scaled_external_buffers),
-      arbitrary_reference_time_, arbitrary_timestamp_,
-      gfx::Rect(capture_format.frame_size));
-}
-
-#endif
 
 INSTANTIATE_TEST_SUITE_P(All,
                          VideoCaptureControllerTest,
@@ -847,10 +727,8 @@ TEST_F(VideoCaptureControllerTest, FrameFeedbackIsReportedForSequenceOfFrames) {
 
     client_a_->feedback_ = stub_consumer_feedback;
 
-    EXPECT_CALL(*client_a_,
-                DoBufferReady(
-                    ControllerIDAndSize(route_id, arbitrary_format.frame_size),
-                    std::vector<ControllerIDAndSize>()))
+    EXPECT_CALL(*client_a_, DoBufferReady(ControllerIDAndSize(
+                                route_id, arbitrary_format.frame_size)))
         .Times(1);
     EXPECT_CALL(*mock_launched_device_,
                 OnUtilizationReport(stub_consumer_feedback))
@@ -908,7 +786,7 @@ TEST_F(VideoCaptureControllerTest,
     EXPECT_CALL(*client_a_, DoBufferCreated(_, _))
         .Times(1)
         .WillOnce(SaveArg<1>(&buffer_id_reported_to_client));
-    EXPECT_CALL(*client_a_, DoBufferReady(_, _)).Times(1);
+    EXPECT_CALL(*client_a_, DoBufferReady(_)).Times(1);
   }
   EXPECT_CALL(*client_a_, DoBufferDestroyed(_, _)).Times(0);
   SendStubFrameToDeviceClient(arbitrary_format_, arbitrary_color_space_);
@@ -939,7 +817,7 @@ TEST_F(VideoCaptureControllerTest,
     EXPECT_CALL(*client_a_, DoBufferCreated(_, _))
         .Times(1)
         .WillOnce(SaveArg<1>(&buffer_id_reported_to_client));
-    EXPECT_CALL(*client_a_, DoBufferReady(_, _)).Times(1);
+    EXPECT_CALL(*client_a_, DoBufferReady(_)).Times(1);
   }
   SendStubFrameToDeviceClient(arbitrary_format_, arbitrary_color_space_);
   base::RunLoop().RunUntilIdle();
@@ -979,7 +857,7 @@ TEST_F(VideoCaptureControllerTest,
     EXPECT_CALL(*client_a_, DoBufferCreated(_, _))
         .Times(1)
         .WillOnce(SaveArg<1>(&first_buffer_id));
-    EXPECT_CALL(*client_a_, DoBufferReady(_, _)).Times(1);
+    EXPECT_CALL(*client_a_, DoBufferReady(_)).Times(1);
   }
   SendStubFrameToDeviceClient(arbitrary_format_, arbitrary_color_space_);
   base::RunLoop().RunUntilIdle();
@@ -1001,7 +879,7 @@ TEST_F(VideoCaptureControllerTest,
     EXPECT_CALL(*client_a_, DoBufferCreated(_, _))
         .Times(1)
         .WillOnce(SaveArg<1>(&second_buffer_id));
-    EXPECT_CALL(*client_a_, DoBufferReady(_, _)).Times(1);
+    EXPECT_CALL(*client_a_, DoBufferReady(_)).Times(1);
   }
   SendStubFrameToDeviceClient(arbitrary_format_, arbitrary_color_space_);
   base::RunLoop().RunUntilIdle();
@@ -1069,21 +947,14 @@ TEST_F(VideoCaptureControllerTest, OnStartedForMultipleClients) {
   }
 }
 
-TEST_F(VideoCaptureControllerTest, EarlyDroppedFramesAreSignalled) {
+TEST_F(VideoCaptureControllerTest, OnFrameDroppedIsForwarded) {
   media::VideoCaptureParams requested_params;
   requested_params.requested_format = arbitrary_format_;
   controller_->AddClient(arbitrary_route_id_, client_a_.get(),
                          arbitrary_session_id_, requested_params);
 
-  // When OnFrameDropped() is called, the signal is forwarded.
-  EXPECT_CALL(*client_a_, OnFrameDroppedEarly(_, _)).Times(1);
+  EXPECT_CALL(*client_a_, OnFrameDropped(_, _)).Times(1);
   controller_->OnFrameDropped(
-      media::VideoCaptureFrameDropReason::kBufferPoolMaxBufferCountExceeded);
-  Mock::VerifyAndClearExpectations(client_a_.get());
-
-  // When OnFrameDroppedByRenderer() is called, the signal is NOT forwarded.
-  EXPECT_CALL(*client_a_, OnFrameDroppedEarly(_, _)).Times(0);
-  controller_->OnFrameDroppedByRenderer(
       media::VideoCaptureFrameDropReason::kBufferPoolMaxBufferCountExceeded);
   Mock::VerifyAndClearExpectations(client_a_.get());
 }
@@ -1112,7 +983,7 @@ TEST_F(VideoCaptureControllerTest, DeviceClientWithColorSpace) {
     EXPECT_CALL(*client_a_, DoBufferCreated(_, _))
         .Times(1)
         .WillOnce(SaveArg<1>(&buffer_id_reported_to_client));
-    EXPECT_CALL(*client_a_, DoBufferReady(_, _)).Times(1);
+    EXPECT_CALL(*client_a_, DoBufferReady(_)).Times(1);
   }
   EXPECT_CALL(*client_a_, DoBufferDestroyed(_, _)).Times(0);
   SendStubFrameToDeviceClient(requested_params.requested_format,

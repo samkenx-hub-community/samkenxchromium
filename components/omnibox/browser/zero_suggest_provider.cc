@@ -52,6 +52,8 @@ using OIT = metrics::OmniboxInputType;
 namespace {
 
 using ResultType = ZeroSuggestProvider::ResultType;
+constexpr bool is_ios = !!BUILDFLAG(IS_IOS);
+constexpr bool is_android = !!BUILDFLAG(IS_ANDROID);
 
 // Represents whether ZeroSuggestProvider is allowed to display zero-prefix
 // suggestions, and if not, why not.
@@ -179,12 +181,16 @@ bool AllowRemoteNoURL(const AutocompleteProviderClient* client) {
 AutocompleteInput GetZeroSuggestInput(
     const AutocompleteInput& input,
     const AutocompleteProviderClient* client) {
+  // Given that this is supposed to be a zero-prefix input, clear the input text
+  // and copy over `current_page_classification` which will be used to determine
+  // if the ZPS response is eligible for caching.
   AutocompleteInput sanitized_input(u"", input.current_page_classification(),
                                     client->GetSchemeClassifier());
+  // Copy over `current_url` which will be used to key into the ZPS cache.
   sanitized_input.set_current_url(input.current_url());
-  sanitized_input.set_current_title(input.current_title());
+  // Set `prevent_inline_autocomplete` since we don't care about populating the
+  // `inline_autocompletion` field on the resulting matches.
   sanitized_input.set_prevent_inline_autocomplete(true);
-  sanitized_input.set_allow_exact_keyword_match(false);
   return sanitized_input;
 }
 
@@ -233,21 +239,25 @@ bool StoreRemoteResponse(const std::string& response_json,
     return false;
   }
 
+  const AutocompleteInput zero_suggest_input =
+      GetZeroSuggestInput(input, client);
+
   if (!SearchSuggestionParser::ParseSuggestResults(
-          *response_data, input, client->GetSchemeClassifier(),
-          kDefaultZeroSuggestRelevance,
+          *response_data, zero_suggest_input.text(),
+          client->GetSchemeClassifier(),
+          /*default_result_relevance=*/kDefaultZeroSuggestRelevance,
           /*is_keyword_result=*/false, results)) {
     return false;
   }
 
-  const auto page_class = input.current_page_classification();
+  const auto page_class = zero_suggest_input.current_page_classification();
   if (!ShouldCacheResultTypeInContext(result_type, page_class)) {
     return true;
   }
 
   // Force use of empty page URL when given an input with "No URL" result type.
   const std::string page_url = result_type != ResultType::kRemoteNoURL
-                                   ? input.current_url().spec()
+                                   ? zero_suggest_input.current_url().spec()
                                    : std::string();
   client->GetZeroSuggestCacheService()->StoreZeroSuggestResponse(page_url,
                                                                  response_json);
@@ -255,7 +265,7 @@ bool StoreRemoteResponse(const std::string& response_json,
   return true;
 }
 
-// Called in Start() with an input ensured to be appropriate for zero-suggest.
+// Called in Start().
 //
 // Returns true if the response stored in the user prefs is applicable to
 // |result_type| and can be successfully parsed for |input|. If so, populates
@@ -267,14 +277,17 @@ bool ReadStoredResponse(const AutocompleteProviderClient* client,
   DCHECK(results);
   DCHECK_NE(ResultType::kNone, result_type);
 
-  const auto page_class = input.current_page_classification();
+  const AutocompleteInput zero_suggest_input =
+      GetZeroSuggestInput(input, client);
+
+  const auto page_class = zero_suggest_input.current_page_classification();
   if (!ShouldCacheResultTypeInContext(result_type, page_class)) {
     return false;
   }
 
   // Force use of empty page URL when given an input with "No URL" result type.
   const std::string page_url = result_type != ResultType::kRemoteNoURL
-                                   ? input.current_url().spec()
+                                   ? zero_suggest_input.current_url().spec()
                                    : std::string();
   std::string response_json = client->GetZeroSuggestCacheService()
                                   ->ReadZeroSuggestResponse(page_url)
@@ -290,8 +303,9 @@ bool ReadStoredResponse(const AutocompleteProviderClient* client,
   }
 
   if (!SearchSuggestionParser::ParseSuggestResults(
-          *response_data, input, client->GetSchemeClassifier(),
-          kDefaultZeroSuggestRelevance,
+          *response_data, zero_suggest_input.text(),
+          client->GetSchemeClassifier(),
+          /*default_result_relevance=*/kDefaultZeroSuggestRelevance,
           /*is_keyword_result=*/false, results)) {
     return false;
   }
@@ -334,8 +348,7 @@ ZeroSuggestProvider::ResultType ZeroSuggestProvider::ResultTypeToRun(
   if (omnibox::IsOtherWebPage(page_class)) {
     if (focus_type_input_type ==
             std::make_pair(OFT::INTERACTION_FOCUS, OIT::URL) &&
-        base::FeatureList::IsEnabled(
-            omnibox::kFocusTriggersContextualWebZeroSuggest)) {
+        (is_ios || is_android)) {
       return ResultType::kRemoteSendURL;
     }
     if (focus_type_input_type ==
@@ -350,7 +363,7 @@ ZeroSuggestProvider::ResultType ZeroSuggestProvider::ResultTypeToRun(
   if (omnibox::IsSearchResultsPage(page_class)) {
     if (focus_type_input_type ==
             std::make_pair(OFT::INTERACTION_FOCUS, OIT::URL) &&
-        base::FeatureList::IsEnabled(omnibox::kFocusTriggersSRPZeroSuggest)) {
+        (is_ios || is_android)) {
       return ResultType::kRemoteSendURL;
     }
     if (focus_type_input_type ==
@@ -445,8 +458,7 @@ void ZeroSuggestProvider::StartPrefetch(const AutocompleteInput& input) {
               template_url, search_terms_args,
               template_url_service->search_terms_data(),
               base::BindOnce(&ZeroSuggestProvider::OnPrefetchURLLoadComplete,
-                             weak_ptr_factory_.GetWeakPtr(),
-                             GetZeroSuggestInput(input, client()),
+                             weak_ptr_factory_.GetWeakPtr(), input,
                              result_type));
 
   LogEvent(Event::kRequestSent, result_type, /*is_prefetch=*/true);
@@ -468,8 +480,7 @@ void ZeroSuggestProvider::Start(const AutocompleteInput& input,
 
   // Convert the stored response to |matches_|, if applicable.
   SearchSuggestionParser::Results results;
-  if (ReadStoredResponse(client(), GetZeroSuggestInput(input, client()),
-                         result_type_running_, &results)) {
+  if (ReadStoredResponse(client(), input, result_type_running_, &results)) {
     ConvertSuggestResultsToAutocompleteMatches(results, input);
     LogEvent(Event::kCachedResponseConvertedToMatches, result_type_running_,
              /*is_prefetch=*/false);
@@ -503,8 +514,7 @@ void ZeroSuggestProvider::Start(const AutocompleteInput& input,
                     template_url, search_terms_args,
                     template_url_service->search_terms_data(),
                     base::BindOnce(&ZeroSuggestProvider::OnURLLoadComplete,
-                                   weak_ptr_factory_.GetWeakPtr(),
-                                   GetZeroSuggestInput(input, client()),
+                                   weak_ptr_factory_.GetWeakPtr(), input,
                                    result_type_running_));
 
   LogEvent(Event::kRequestSent, result_type_running_, /*is_prefetch=*/false);
@@ -683,9 +693,11 @@ void ZeroSuggestProvider::ConvertSuggestResultsToAutocompleteMatches(
 
   // Add all the SuggestResults to the map. We display all ZeroSuggest search
   // suggestions as unbolded.
+  const AutocompleteInput zero_suggest_input =
+      GetZeroSuggestInput(input, client());
   MatchMap map;
   for (size_t i = 0; i < results.suggest_results.size(); ++i) {
-    AddMatchToMap(results.suggest_results[i], std::string(), input,
+    AddMatchToMap(results.suggest_results[i], std::string(), zero_suggest_input,
                   client()->GetTemplateURLService()->GetDefaultSearchProvider(),
                   client()->GetTemplateURLService()->search_terms_data(), i,
                   false, false, &map);

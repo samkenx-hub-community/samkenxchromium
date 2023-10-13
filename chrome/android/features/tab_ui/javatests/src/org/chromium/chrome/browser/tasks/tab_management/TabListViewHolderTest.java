@@ -438,7 +438,7 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
     public void testThumbnail() {
         mGridModel.set(TabProperties.GRID_CARD_SIZE, new Size(100, 500));
         mGridModel.set(TabProperties.THUMBNAIL_FETCHER, mMockThumbnailProvider);
-        TabGridThumbnailView thumbnail = mTabGridView.findViewById(R.id.tab_thumbnail);
+        TabThumbnailView thumbnail = mTabGridView.findViewById(R.id.tab_thumbnail);
         assertNull("Thumbnail should be set to no drawable.", thumbnail.getDrawable());
         assertNotNull("Thumbnail should have a background drawable.", thumbnail.getBackground());
         assertTrue("Thumbnail should be set to a place holder.", thumbnail.isPlaceholder());
@@ -460,7 +460,7 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
     @UiThreadTest
     public void testThumbnailGridCardSize() {
         mGridModel.set(TabProperties.THUMBNAIL_FETCHER, mMockThumbnailProvider);
-        TabGridThumbnailView thumbnail = mTabGridView.findViewById(R.id.tab_thumbnail);
+        TabThumbnailView thumbnail = mTabGridView.findViewById(R.id.tab_thumbnail);
         assertNull("Thumbnail should be set to no drawable.", thumbnail.getDrawable());
         assertNotNull("Thumbnail should have a background drawable.", thumbnail.getBackground());
         assertTrue("Thumbnail should be set to a place holder.", thumbnail.isPlaceholder());
@@ -918,7 +918,7 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
             mockCurrencyFormatter();
             mockUrlUtilities();
             mockOptimizationGuideResponse(OptimizationGuideDecision.TRUE, ANY_PRICE_TRACKING_DATA);
-            MockTab tab = (MockTab) MockTab.createAndInitialize(1, false);
+            MockTab tab = MockTab.createAndInitialize(1, false);
             tab.setGurlOverrideForTesting(TEST_GURL);
             tab.setIsInitialized(true);
             tab.setTimestampMillis(System.currentTimeMillis());

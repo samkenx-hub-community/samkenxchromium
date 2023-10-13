@@ -9,6 +9,7 @@
 <translation id="3399357656427473483">輕觸即可填入的憑證清單。</translation>
 <translation id="3653689374478248324">你即將登入 <ph name="SITE_NAME" /></translation>
 <translation id="3950820424414687140">登入</translation>
+<translation id="4553044860350038560">更多密碼金鑰</translation>
 <translation id="4598345735110653698">管理密碼金鑰</translation>
 <translation id="4722735765955348426"><ph name="USERNAME" />的密碼</translation>
 <translation id="4907224763885298217">使用螢幕鎖定功能</translation>
@@ -17,6 +18,7 @@
 <translation id="5591247451101092906">要使用已儲存的密碼或密碼金鑰嗎？</translation>
 <translation id="5624120631404540903">管理密碼</translation>
 <translation id="6560306912274274630"><ph name="USERNAME" /> 的密碼金鑰，使用螢幕鎖定</translation>
+<translation id="7286867818472074330">選取密碼金鑰</translation>
 <translation id="7669320311687290322"><ph name="ITEM_LABEL" />，第 <ph name="ITEM_POSITION" /> 個，共 <ph name="ITEMS_TOTAL" /> 個。</translation>
 <translation id="8891372124884726271">憑證清單已關閉。</translation>
 </translationbundle>

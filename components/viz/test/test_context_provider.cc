@@ -204,9 +204,8 @@ gpu::Mailbox TestSharedImageInterface::CreateSharedImage(
 
   auto gmb_handle = CreateGMBHandle(format, size, buffer_usage);
 
-  mailbox_to_gmb_handle_info_map_[mailbox] =
-      gpu::SharedImageInterfaceProxy::GpuMemoryBufferHandleInfo(
-          std::move(gmb_handle), format, size, buffer_usage);
+  mailbox_to_gmb_handle_info_map_[mailbox] = gpu::GpuMemoryBufferHandleInfo(
+      std::move(gmb_handle), format, size, buffer_usage);
 
   return mailbox;
 }
@@ -340,9 +339,9 @@ TestSharedImageInterface::MapSharedImage(const gpu::Mailbox& mailbox) {
   CHECK(it != mailbox_to_gmb_handle_info_map_.end());
 
   auto handle_info = it->second;
-  return SharedImageInterface::ScopedMapping::Create(
-      handle_info.handle.Clone(), handle_info.format, handle_info.size,
-      handle_info.buffer_usage);
+  // NOTE: We pass `handle_info` by copy here to ensure that the handle is
+  // cloned and hence can be reused by subsequent calls to MapSharedImage().
+  return SharedImageInterface::ScopedMapping::Create(handle_info);
 }
 
 bool TestSharedImageInterface::CheckSharedImageExists(
@@ -479,8 +478,6 @@ TestContextProvider::TestContextProvider(
     : support_(std::move(support)),
       context_gl_(std::move(gl)),
       raster_interface_gles_(std::move(raster)),
-      shared_image_interface_(
-          sii ? std::move(sii) : std::make_unique<TestSharedImageInterface>()),
       support_locking_(support_locking) {
   DCHECK(main_thread_checker_.CalledOnValidThread());
   DCHECK(context_gl_);
@@ -497,6 +494,18 @@ TestContextProvider::TestContextProvider(
   // unittests, and isn't needed here.
   cache_controller_ =
       std::make_unique<ContextCacheController>(support_.get(), nullptr);
+
+  if (sii) {
+    shared_image_interface_ = std::move(sii);
+  } else {
+    shared_image_interface_ = std::make_unique<TestSharedImageInterface>();
+
+    // By default, luminance textures are supported in GLES2.
+    gpu::SharedImageCapabilities shared_image_caps;
+    shared_image_caps.supports_luminance_shared_images = true;
+
+    shared_image_interface_->SetCapabilities(shared_image_caps);
+  }
 }
 
 TestContextProvider::~TestContextProvider() {

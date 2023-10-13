@@ -10,6 +10,7 @@
 #include "base/base64url.h"
 #include "base/containers/span.h"
 #include "base/json/json_reader.h"
+#include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/task_environment.h"
@@ -159,7 +160,7 @@ class BoundSessionRefreshCookieFetcherImplTest : public ::testing::Test {
     std::vector<network::mojom::CookieAccessDetailsPtr> cookie_access_details;
     cookie_access_details.emplace_back(network::mojom::CookieAccessDetails::New(
         access_type, kGairaUrl, net::SiteForCookies(),
-        CreateReportedCookies(cookies_), absl::nullopt));
+        CreateReportedCookies(cookies_), absl::nullopt, 1));
     fetcher_->OnCookiesAccessed(std::move(cookie_access_details));
   }
 

@@ -47,7 +47,6 @@
 #include "ui/display/tablet_state.h"
 #include "ui/display/types/display_constants.h"
 #include "ui/display/types/display_snapshot.h"
-#include "ui/display/types/display_types_util.h"
 #include "ui/display/types/native_display_delegate.h"
 #include "ui/display/util/display_util.h"
 #include "ui/events/devices/touchscreen_device.h"
@@ -640,7 +639,7 @@ void DisplayManager::RegisterDisplayProperty(
     float refresh_rate,
     bool is_interlaced,
     VariableRefreshRateState variable_refresh_rate_state,
-    const absl::optional<uint16_t>& vsync_rate_min) {
+    const absl::optional<float>& vsync_rate_min) {
   if (display_info_.find(display_id) == display_info_.end())
     display_info_[display_id] =
         ManagedDisplayInfo(display_id, std::string(), false);
@@ -733,24 +732,6 @@ void DisplayManager::SetSelectedModeForDisplayId(
   }
 
   display_modes_[display_id] = *iter;
-}
-
-bool DisplayManager::GetMatchingModeForDisplayId(int64_t display_id,
-                                                 const DisplayMode* mode_info,
-                                                 ManagedDisplayMode* mode) {
-  const ManagedDisplayInfo& info = GetDisplayInfo(display_id);
-  const ManagedDisplayInfo::ManagedDisplayModeList& display_modes =
-      info.display_modes();
-  for (const auto& display_mode : display_modes) {
-    if (display_mode.size() == mode_info->size() &&
-        display_mode.is_interlaced() == mode_info->is_interlaced() &&
-        IsWithinEpsilon(display_mode.refresh_rate(),
-                        mode_info->refresh_rate())) {
-      *mode = display_mode;
-      return true;
-    }
-  }
-  return false;
 }
 
 gfx::Insets DisplayManager::GetOverscanInsets(int64_t display_id) const {

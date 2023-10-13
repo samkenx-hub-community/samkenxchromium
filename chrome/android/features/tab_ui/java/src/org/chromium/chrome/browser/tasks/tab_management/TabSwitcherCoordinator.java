@@ -6,6 +6,7 @@ package org.chromium.chrome.browser.tasks.tab_management;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.os.SystemClock;
@@ -18,6 +19,7 @@ import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 
 import org.chromium.base.Callback;
+import org.chromium.base.ContextUtils;
 import org.chromium.base.Promise;
 import org.chromium.base.ResettersForTesting;
 import org.chromium.base.ThreadUtils;
@@ -36,7 +38,7 @@ import org.chromium.chrome.browser.layouts.LayoutStateProvider;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.lifecycle.DestroyObserver;
 import org.chromium.chrome.browser.multiwindow.MultiWindowModeStateDispatcher;
-import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
+import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 import org.chromium.chrome.browser.price_tracking.PriceDropNotificationManager;
 import org.chromium.chrome.browser.price_tracking.PriceDropNotificationManagerFactory;
 import org.chromium.chrome.browser.price_tracking.PriceTrackingFeatures;
@@ -125,7 +127,7 @@ public class TabSwitcherCoordinator
     private TabCreatorManager mTabCreatorManager;
     private boolean mIsInitialized;
     private PriceMessageService mPriceMessageService;
-    private SharedPreferencesManager.Observer mPriceAnnotationsPrefObserver;
+    private SharedPreferences.OnSharedPreferenceChangeListener mPriceAnnotationsPrefListener;
     private final ViewGroup mCoordinatorView;
     private final ViewGroup mRootView;
     private TabContentManager mTabContentManager;
@@ -144,6 +146,9 @@ public class TabSwitcherCoordinator
     private SnackbarManager mTabSelectionEditorSnackbarManager;
 
     /** {@see TabManagementDelegate#createCarouselTabSwitcher} */
+    // Suppress to observe SharedPreferences, which is discouraged; use another messaging channel
+    // instead.
+    @SuppressWarnings("UseSharedPreferencesManagerFromChromeCheck")
     public TabSwitcherCoordinator(@NonNull Activity activity,
             @NonNull ActivityLifecycleDispatcher lifecycleDispatcher,
             @NonNull TabModelSelector tabModelSelector,
@@ -315,7 +320,7 @@ public class TabSwitcherCoordinator
                 }
 
                 if (PriceTrackingFeatures.isPriceTrackingEnabled()) {
-                    mPriceAnnotationsPrefObserver = key -> {
+                    mPriceAnnotationsPrefListener = (sharedPrefs, key) -> {
                         if (PriceTrackingUtilities.TRACK_PRICES_ON_TABS.equals(key)
                                 && !mTabModelSelector.isIncognitoSelected()
                                 && mTabModelSelector.isTabStateInitialized()) {
@@ -324,8 +329,8 @@ public class TabSwitcherCoordinator
                                     false, isShowingTabsInMRUOrder(mMode));
                         }
                     };
-                    SharedPreferencesManager.getInstance().addObserver(
-                            mPriceAnnotationsPrefObserver);
+                    ContextUtils.getAppSharedPreferences().registerOnSharedPreferenceChangeListener(
+                            mPriceAnnotationsPrefListener);
                 }
             }
 
@@ -437,7 +442,7 @@ public class TabSwitcherCoordinator
                     mIncognitoReauthPromoMessageService = new IncognitoReauthPromoMessageService(
                             MessageService.MessageType.INCOGNITO_REAUTH_PROMO_MESSAGE,
                             Profile.getLastUsedRegularProfile(), mActivity,
-                            SharedPreferencesManager.getInstance(), mIncognitoReauthManager,
+                            ChromeSharedPreferences.getInstance(), mIncognitoReauthManager,
                             mSnackbarManager,
                             ()
                                     -> TabUiFeatureUtilities.isTabToGtsAnimationEnabled(mActivity),
@@ -859,6 +864,10 @@ public class TabSwitcherCoordinator
     }
 
     // ResetHandler implementation.
+    //
+    // Suppress to observe SharedPreferences, which is discouraged; use another messaging channel
+    // instead.
+    @SuppressWarnings("UseSharedPreferencesManagerFromChromeCheck")
     @Override
     public void onDestroy() {
         if (mTabSwitcherMenuActionHandler != null) {
@@ -883,8 +892,9 @@ public class TabSwitcherCoordinator
         if (mTabAttributeCache != null) {
             mTabAttributeCache.destroy();
         }
-        if (mPriceAnnotationsPrefObserver != null) {
-            SharedPreferencesManager.getInstance().removeObserver(mPriceAnnotationsPrefObserver);
+        if (mPriceAnnotationsPrefListener != null) {
+            ContextUtils.getAppSharedPreferences().unregisterOnSharedPreferenceChangeListener(
+                    mPriceAnnotationsPrefListener);
         }
     }
 

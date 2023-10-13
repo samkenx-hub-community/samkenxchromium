@@ -48,7 +48,8 @@ std::vector<std::string> GetList(const autofill::AutofillProfile& profile,
   std::vector<std::string> list;
 
   std::vector<std::u16string> values;
-  if (autofill::AutofillType(type).group() == autofill::FieldTypeGroup::kName) {
+  if (autofill::GroupTypeOfServerFieldType(type) ==
+      autofill::FieldTypeGroup::kName) {
     values.push_back(
         profile.GetInfo(autofill::AutofillType(type),
                         g_browser_process->GetApplicationLocale()));
@@ -196,6 +197,10 @@ autofill_private::CreditCardEntry CreditCardToCreditCardEntry(
       credit_card.record_type() == autofill::CreditCard::RecordType::kLocalCard
           ? credit_card.guid()
           : credit_card.server_id();
+  if (credit_card.record_type() ==
+      autofill::CreditCard::RecordType::kMaskedServerCard) {
+    card.instrument_id = base::NumberToString(credit_card.instrument_id());
+  }
   card.name = base::UTF16ToUTF8(
       credit_card.GetRawInfo(autofill::CREDIT_CARD_NAME_FULL));
   card.card_number =
@@ -263,6 +268,8 @@ autofill_private::IbanEntry IbanToIbanEntry(
   iban_entry.metadata.emplace();
   iban_entry.metadata->summary_label =
       base::UTF16ToUTF8(iban.GetIdentifierStringForAutofillDisplay());
+  iban_entry.metadata->is_local =
+      iban.record_type() == autofill::Iban::RecordType::kLocalIban;
 
   return iban_entry;
 }
@@ -276,8 +283,12 @@ AddressEntryList GenerateAddressList(
   const std::vector<autofill::AutofillProfile*>& profiles =
       personal_data.GetProfilesForSettings();
   std::vector<std::u16string> labels;
+  // TODO(crbug.com/1487119): Replace by `profiles` when
+  // `GetProfilesForSettings` starts returning a list of const AutofillProfile*.
   autofill::AutofillProfile::CreateDifferentiatingLabels(
-      profiles, g_browser_process->GetApplicationLocale(), &labels);
+      std::vector<const autofill::AutofillProfile*>(profiles.begin(),
+                                                    profiles.end()),
+      g_browser_process->GetApplicationLocale(), &labels);
   DCHECK_EQ(labels.size(), profiles.size());
 
   AddressEntryList list;

@@ -1918,11 +1918,8 @@ TEST_P(AnimationAnimationTestCompositing,
     </div>
   )HTML");
 
-  auto* scroller =
-      To<LayoutBoxModelObject>(GetLayoutObjectByElementId("scroller"));
-  if (!RuntimeEnabledFeatures::CompositeScrollAfterPaintEnabled()) {
-    ASSERT_TRUE(scroller->UsesCompositedScrolling());
-  }
+  auto* scroller = GetLayoutBoxByElementId("scroller");
+  ASSERT_TRUE(scroller->UsesCompositedScrolling());
 
   // Create ScrollTimeline
   ScrollTimelineOptions* options = ScrollTimelineOptions::Create();
@@ -2281,8 +2278,7 @@ TEST_P(AnimationAnimationTestCompositing,
   )HTML");
 
   // Create ScrollTimeline
-  auto* scroller =
-      To<LayoutBoxModelObject>(GetLayoutObjectByElementId("scroller"));
+  auto* scroller = GetLayoutBoxByElementId("scroller");
   PaintLayerScrollableArea* scrollable_area = scroller->GetScrollableArea();
   ASSERT_FALSE(scroller->UsesCompositedScrolling());
   scrollable_area->SetScrollOffset(ScrollOffset(0, 20),

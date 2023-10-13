@@ -288,12 +288,12 @@ bool PermissionRequestManager::ReprioritizeCurrentRequestIfNeeded() {
 
   auto current_request_fate = CurrentRequestFate::kKeepCurrent;
 
-  if (base::FeatureList::IsEnabled(features::kPermissionQuietChip)) {
+  if (PermissionUtil::DoesPlatformSupportChip()) {
     if (ShouldCurrentRequestUseQuietUI() &&
         !ShouldShowQuietRequestAgainIfPreempted(
             current_request_first_display_time_)) {
       current_request_fate = CurrentRequestFate::kFinalize;
-    } else if (base::FeatureList::IsEnabled(features::kPermissionChip)) {
+    } else {
       // Preempt current request if it is a quiet UI request.
       if (ShouldCurrentRequestUseQuietUI()) {
         current_request_fate = CurrentRequestFate::kPreempt;
@@ -314,17 +314,11 @@ bool PermissionRequestManager::ReprioritizeCurrentRequestIfNeeded() {
           current_request_fate = CurrentRequestFate::kPreempt;
         }
       }
-    } else if (ShouldCurrentRequestUseQuietUI()) {
-      current_request_fate = CurrentRequestFate::kPreempt;
     }
-  } else {
-    if (base::FeatureList::IsEnabled(features::kPermissionChip)) {
-      current_request_fate = CurrentRequestFate::kPreempt;
-    } else if (ShouldCurrentRequestUseQuietUI()) {
-      // If we're displaying a quiet permission request, ignore it in favor of a
-      // new permission request.
-      current_request_fate = CurrentRequestFate::kFinalize;
-    }
+  } else if (ShouldCurrentRequestUseQuietUI()) {
+    // If we're displaying a quiet permission request, ignore it in favor of a
+    // new permission request.
+    current_request_fate = CurrentRequestFate::kFinalize;
   }
 
   switch (current_request_fate) {
@@ -1051,6 +1045,9 @@ void PermissionRequestManager::FinalizeCurrentRequests(
               ShouldCurrentRequestUseQuietUI())) {
         embargo_status = PermissionEmbargoStatus::REPEATED_IGNORES;
       }
+    } else if (permission_action == PermissionAction::GRANTED_ONCE) {
+      autoblocker->RemoveEmbargoAndResetCounts(
+          request->requesting_origin(), request->GetContentSettingsType());
     }
     PermissionUmaUtil::RecordEmbargoStatus(embargo_status);
   }

@@ -405,15 +405,11 @@ class ComputedStyle final : public ComputedStyleBase {
       const StyleContentAlignmentData& normal_value_behavior) const;
   ContentDistributionType ResolvedAlignContentDistribution(
       const StyleContentAlignmentData& normal_value_behavior) const;
-  StyleSelfAlignmentData ResolvedAlignItems(
-      ItemPosition normal_value_behaviour) const;
   StyleSelfAlignmentData ResolvedAlignSelf(
       ItemPosition normal_value_behaviour,
       const ComputedStyle* parent_style = nullptr) const;
   StyleContentAlignmentData ResolvedAlignContent(
       const StyleContentAlignmentData& normal_behaviour) const;
-  StyleSelfAlignmentData ResolvedJustifyItems(
-      ItemPosition normal_value_behaviour) const;
   StyleSelfAlignmentData ResolvedJustifySelf(
       ItemPosition normal_value_behaviour,
       const ComputedStyle* parent_style = nullptr) const;
@@ -649,6 +645,13 @@ class ComputedStyle final : public ComputedStyleBase {
                : NGOutlineType::kDontIncludeBlockVisualOverflow;
   }
 
+  // position-fallback
+
+  // https://drafts.csswg.org/css-anchor-position-1/#position-fallback-list
+  bool MayHavePositionFallbackList() const {
+    return HasOutOfFlowPosition() && PositionFallback();
+  }
+
   // Scroll properties.
 
   PhysicalToLogicalGetter<const Length&, ComputedStyle>
@@ -804,6 +807,7 @@ class ComputedStyle final : public ComputedStyleBase {
            CustomStyleCallbackDependsOnFont();
   }
   bool CachedPseudoElementStylesDependOnFontMetrics() const;
+  bool HighlightPseudoElementStylesDependOnFontMetrics() const;
 
   // font-size
   int FontSize() const { return GetFontDescription().ComputedPixelSize(); }
@@ -2493,9 +2497,9 @@ class ComputedStyle final : public ComputedStyleBase {
             OverflowClipMargin()->GetMargin() != LayoutUnit());
   }
 
-  // Form-sizing utility function
+  // Field-sizing utility function
   bool ApplyControlFixedSize() const {
-    return FormSizing() == EFormSizing::kAuto;
+    return FieldSizing() == EFieldSizing::kFixed;
   }
 
  private:
@@ -2795,8 +2799,6 @@ inline bool ComputedStyle::HasAnyPseudoElementStyles() const {
 }
 
 inline bool ComputedStyle::HasAnyHighlightPseudoElementStyles() const {
-  return !!PseudoElementStylesInternal();
-
   static_assert(kPseudoIdSelection >= kFirstPublicPseudoId &&
                     kPseudoIdSelection <= kLastTrackedPublicPseudoId,
                 "kPseudoIdSelection must be public");
@@ -3126,6 +3128,7 @@ class ComputedStyleBuilder final : public ComputedStyleBuilderBase {
     return LineHeightInternal() ==
            ComputedStyleInitialValues::InitialLineHeight();
   }
+  const Length& LineHeight() const { return LineHeightInternal(); }
 
   // Sizing properties
   const Length& UsedWidth() const {

@@ -1005,6 +1005,8 @@ class MetaBuildWrapper:
       locations_file_abs_path = os.path.join(
           os.path.dirname(self.args.config_file),
           os.path.normpath(gn_args_locations_file))
+      if not self.Exists(locations_file_abs_path):
+        continue
       gn_args_locations = json.loads(self.ReadFile(locations_file_abs_path))
       gn_args_file = gn_args_locations.get(self.args.builder_group,
                                            {}).get(self.args.builder, None)
@@ -1013,6 +1015,23 @@ class MetaBuildWrapper:
             self.ReadFile(
                 os.path.join(os.path.dirname(locations_file_abs_path),
                              os.path.normpath(gn_args_file))))
+
+        if 'phases' in gn_args_dict:
+          # The builder has phased GN config.
+          if self.args.phase is None:
+            raise MBErr('Must specify a build --phase for %s on %s' %
+                        (self.args.builder, self.args.builder_group))
+          phase = str(self.args.phase)
+          phase_configs = gn_args_dict['phases']
+          if phase not in phase_configs:
+            raise MBErr('Phase %s doesn\'t exist for %s on %s' %
+                        (phase, self.args.builder, self.args.builder_group))
+          gn_args_dict = phase_configs[phase]
+        else:
+          # Non-phased GN config.
+          if self.args.phase is not None:
+            raise MBErr('Must not specify a build --phase for %s on %s' %
+                        (self.args.builder, self.args.builder_group))
         return {
             'args_file':
             gn_args_dict.get('args_file', ''),
@@ -2005,24 +2024,6 @@ class MetaBuildWrapper:
                        text=True,
                        input=input)
     return p.returncode, p.stdout, p.stderr
-
-  def _CipdPlatform(self):
-    """Returns current CIPD platform, e.g. linux-amd64.
-
-    Unless the platform is arm64, assumes amd64.
-    """
-    arch = 'amd64'
-    if platform.machine() == 'arm64':
-      arch = arm64
-    if self.platform == 'win32':
-      return 'windows-' + arch
-    if self.platform == 'darwin':
-      return 'mac-' + arch
-    return 'linux-' + arch
-
-  def ExpandUser(self, path):
-    # This function largely exists so it can be overridden for testing.
-    return os.path.expanduser(path)
 
   def Exists(self, path):
     # This function largely exists so it can be overridden for testing.

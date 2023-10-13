@@ -213,7 +213,7 @@ scoped_refptr<CertVerifyProc> CreateCertVerifyProc(
     case CERT_VERIFY_PROC_IOS:
       return base::MakeRefCounted<CertVerifyProcIOS>(std::move(crl_set));
 #endif
-#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+#if BUILDFLAG(IS_FUCHSIA)
     case CERT_VERIFY_PROC_BUILTIN:
       return CreateCertVerifyProcBuiltin(std::move(cert_net_fetcher),
                                          std::move(crl_set),
@@ -242,7 +242,7 @@ constexpr CertVerifyProcType kAllCertVerifiers[] = {
     CERT_VERIFY_PROC_ANDROID,
 #elif BUILDFLAG(IS_IOS)
     CERT_VERIFY_PROC_IOS,
-#elif BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+#elif BUILDFLAG(IS_FUCHSIA)
     CERT_VERIFY_PROC_BUILTIN,
 #endif
 #if BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
@@ -477,11 +477,11 @@ TEST_P(CertVerifyProcInternalTest, DistrustedIntermediate) {
               IsError(ERR_CERT_AUTHORITY_INVALID));
 
   // Trusting root should cause chain to verify successfully.
-  ScopedTestRoot trust_root(root->GetX509Certificate().get(),
+  ScopedTestRoot trust_root(root->GetX509Certificate(),
                             CertificateTrust::ForTrustAnchor());
   EXPECT_THAT(Verify(chain.get(), kHostname), IsOk());
 
-  ScopedTestRoot distrust_intermediate(intermediate->GetX509Certificate().get(),
+  ScopedTestRoot distrust_intermediate(intermediate->GetX509Certificate(),
                                        CertificateTrust::ForDistrusted());
   if (VerifyProcTypeIsBuiltin()) {
     // Distrusting intermediate should cause chain to not verify again.
@@ -512,7 +512,7 @@ TEST_P(CertVerifyProcInternalTest, EVVerificationMultipleOID) {
   leaf->SetCertificatePolicies({kOtherTestCertPolicy, kEVTestCertPolicy});
 
   scoped_refptr<X509Certificate> cert = leaf->GetX509Certificate();
-  ScopedTestRoot test_root(root->GetX509Certificate().get());
+  ScopedTestRoot test_root(root->GetX509Certificate());
 
   // Build a CRLSet that covers the target certificate.
   //
@@ -553,7 +553,7 @@ TEST_P(CertVerifyProcInternalTest, TrustedTargetCertWithEVPolicy) {
       EVRootCAMetadata::GetInstance(), SHA256HashValue(), kEVTestCertPolicy);
 
   scoped_refptr<X509Certificate> cert = leaf->GetX509Certificate();
-  ScopedTestRoot scoped_test_root(cert.get());
+  ScopedTestRoot scoped_test_root(cert);
 
   CertVerifyResult verify_result;
   int flags = 0;
@@ -584,7 +584,7 @@ TEST_P(CertVerifyProcInternalTest,
       X509Certificate::CalculateFingerprint256(leaf->GetCertBuffer()),
       kEVTestCertPolicy);
   scoped_refptr<X509Certificate> cert = leaf->GetX509Certificate();
-  ScopedTestRoot scoped_test_root(cert.get());
+  ScopedTestRoot scoped_test_root(cert);
 
   CertVerifyResult verify_result;
   int flags = 0;
@@ -685,7 +685,7 @@ TEST_P(CertVerifyProcInternalTest, CertWithNullInCommonNameAndNoSAN) {
   leaf->SetSubjectCommonName(common_name);
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -711,7 +711,7 @@ TEST_P(CertVerifyProcInternalTest, CertWithNullInCommonNameAndValidSAN) {
   leaf->SetSubjectCommonName(common_name);
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -734,7 +734,7 @@ TEST_P(CertVerifyProcInternalTest, CertWithNullInSAN) {
   leaf->SetSubjectAltName(hostname);
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -792,7 +792,7 @@ TEST_P(CertVerifyProcInternalTest, InvalidTarget) {
 // wasn't necessary.
 TEST_P(CertVerifyProcInternalTest, UnnecessaryInvalidIntermediate) {
   ScopedTestRoot test_root(
-      ImportCertFromFile(GetTestCertsDirectory(), "root_ca_cert.pem").get());
+      ImportCertFromFile(GetTestCertsDirectory(), "root_ca_cert.pem"));
 
   base::FilePath certs_dir =
       GetTestNetDataDirectory().AppendASCII("parse_certificate_unittest");
@@ -853,8 +853,7 @@ TEST_P(CertVerifyProcInternalTest, RejectExpiredCert) {
   base::FilePath certs_dir = GetTestCertsDirectory();
 
   // Load root_ca_cert.pem into the test root store.
-  ScopedTestRoot test_root(
-      ImportCertFromFile(certs_dir, "root_ca_cert.pem").get());
+  ScopedTestRoot test_root(ImportCertFromFile(certs_dir, "root_ca_cert.pem"));
 
   scoped_refptr<X509Certificate> cert = CreateCertificateChainFromFile(
       certs_dir, "expired_cert.pem", X509Certificate::FORMAT_AUTO);
@@ -893,7 +892,7 @@ TEST_P(CertVerifyProcInternalTest, RejectWeakKeys) {
       ASSERT_TRUE(intermediate->UseKeyFromFile(
           certs_dir.AppendASCII(signer_type + "-2.key")));
 
-      ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+      ScopedTestRoot scoped_root(root->GetX509Certificate());
 
       CertVerifyResult verify_result;
       int error =
@@ -943,7 +942,7 @@ TEST_P(CertVerifyProcInternalTest, ExtraneousRootCert) {
   scoped_refptr<X509Certificate> extra_cert =
       root_builder->GetX509Certificate();
 
-  ScopedTestRoot scoped_root(root_cert.get());
+  ScopedTestRoot scoped_root(root_cert);
 
   std::vector<bssl::UniquePtr<CRYPTO_BUFFER>> intermediates;
   intermediates.push_back(bssl::UpRef(extra_cert->cert_buffer()));
@@ -1010,7 +1009,7 @@ TEST_P(CertVerifyProcInternalTest, NameConstraintsOk) {
                             "*.test2.ExAmPlE.CoM", "*.example2.notarealtld"},
                            {});
 
-  ScopedTestRoot test_root(root->GetX509Certificate().get());
+  ScopedTestRoot test_root(root->GetX509Certificate());
 
   scoped_refptr<X509Certificate> leaf_cert = leaf->GetX509Certificate();
 
@@ -1037,7 +1036,7 @@ TEST_P(CertVerifyProcInternalTest, NameConstraintsFailure) {
   // example.com is allowed by kDomainsTest, but example.org is not.
   leaf->SetSubjectAltNames({"test.ExAmPlE.CoM", "test.ExAmPlE.OrG"}, {});
 
-  ScopedTestRoot test_root(root->GetX509Certificate().get());
+  ScopedTestRoot test_root(root->GetX509Certificate());
 
   scoped_refptr<X509Certificate> leaf_cert = leaf->GetX509Certificate();
 
@@ -1374,19 +1373,19 @@ TEST(CertVerifyProcTest, TestHasTooLongValidity) {
     bool is_valid_too_long;
   } tests[] = {
       {"start_after_expiry.pem", true},
-      {"pre_br_validity_ok.pem", false},
+      {"pre_br_validity_ok.pem", true},
       {"pre_br_validity_bad_121.pem", true},
       {"pre_br_validity_bad_2020.pem", true},
-      {"10_year_validity.pem", false},
+      {"10_year_validity.pem", true},
       {"11_year_validity.pem", true},
-      {"39_months_after_2015_04.pem", false},
+      {"39_months_after_2015_04.pem", true},
       {"40_months_after_2015_04.pem", true},
-      {"60_months_after_2012_07.pem", false},
+      {"60_months_after_2012_07.pem", true},
       {"61_months_after_2012_07.pem", true},
-      {"825_days_after_2018_03_01.pem", false},
+      {"825_days_after_2018_03_01.pem", true},
       {"826_days_after_2018_03_01.pem", true},
       {"825_days_1_second_after_2018_03_01.pem", true},
-      {"39_months_based_on_last_day.pem", false},
+      {"39_months_based_on_last_day.pem", true},
       {"398_days_after_2020_09_01.pem", false},
       {"399_days_after_2020_09_01.pem", true},
       {"398_days_1_second_after_2020_09_01.pem", true},
@@ -1508,7 +1507,7 @@ TEST_P(CertVerifyProcInternalTest, PublicKeyHashes) {
   intermediates.push_back(bssl::UpRef(certs[1]->cert_buffer()));
   intermediates.push_back(bssl::UpRef(certs[2]->cert_buffer()));
 
-  ScopedTestRoot scoped_root(certs[2].get());
+  ScopedTestRoot scoped_root(certs[2]);
   scoped_refptr<X509Certificate> cert_chain = X509Certificate::CreateFromBuffer(
       bssl::UpRef(certs[0]->cert_buffer()), std::move(intermediates));
   ASSERT_TRUE(cert_chain);
@@ -1555,7 +1554,7 @@ TEST_P(CertVerifyProcInternalTest, Sha1IntermediateUsesServerGatedCrypto) {
   intermediate->SetExtendedKeyUsages({der::Input(kNetscapeServerGatedCrypto)});
   intermediate->SetSignatureAlgorithm(SignatureAlgorithm::kRsaPkcs1Sha1);
 
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
 
   int flags = 0;
   CertVerifyResult verify_result;
@@ -1591,7 +1590,7 @@ TEST_P(CertVerifyProcInternalTest, VerifyReturnChainBasic) {
   intermediates.push_back(bssl::UpRef(certs[1]->cert_buffer()));
   intermediates.push_back(bssl::UpRef(certs[2]->cert_buffer()));
 
-  ScopedTestRoot scoped_root(certs[2].get());
+  ScopedTestRoot scoped_root(certs[2]);
 
   scoped_refptr<X509Certificate> google_full_chain =
       X509Certificate::CreateFromBuffer(bssl::UpRef(certs[0]->cert_buffer()),
@@ -1672,17 +1671,30 @@ TEST(CertVerifyProcTest, SymantecCertsRejected) {
        0x68, 0xac, 0x53, 0x8e, 0x40, 0xab, 0xab, 0x5b, 0x19, 0xa6, 0x48,
        0x56, 0x61, 0x04, 0x2a, 0x10, 0x61, 0xc4, 0x61, 0x27, 0x76}};
 
+  auto [leaf, root] = CertBuilder::CreateSimpleChain2();
+
+  static constexpr base::Time may_1_2016 = base::Time::FromTimeT(1462060800);
+  leaf->SetValidity(may_1_2016, may_1_2016 + base::Days(1));
+  scoped_refptr<X509Certificate> leaf_pre_june_2016 =
+      leaf->GetX509Certificate();
+
+  static constexpr base::Time june_1_2016 = base::Time::FromTimeT(1464739200);
+  leaf->SetValidity(june_1_2016, june_1_2016 + base::Days(1));
+  scoped_refptr<X509Certificate> leaf_post_june_2016 =
+      leaf->GetX509Certificate();
+
+  static constexpr base::Time dec_20_2017 = base::Time::FromTimeT(1513728000);
+  leaf->SetValidity(dec_20_2017, dec_20_2017 + base::Days(1));
+  scoped_refptr<X509Certificate> leaf_dec_2017 = leaf->GetX509Certificate();
+
   // Test that certificates from the legacy Symantec infrastructure are
   // rejected:
-  // - dec_2017.pem : A certificate issued after 2017-12-01, which is rejected
-  //                  as of M65
-  // - pre_june_2016.pem : A certificate issued prior to 2016-06-01, which is
-  //                       rejected as of M66.
-  for (const char* rejected_cert : {"dec_2017.pem", "pre_june_2016.pem"}) {
-    scoped_refptr<X509Certificate> cert = CreateCertificateChainFromFile(
-        GetTestCertsDirectory(), rejected_cert, X509Certificate::FORMAT_AUTO);
-    ASSERT_TRUE(cert);
-
+  // leaf_dec_2017: A certificate issued after 2017-12-01, which is rejected
+  //                as of M65
+  // leaf_pre_june_2016: A certificate issued prior to 2016-06-01, which is
+  //                     rejected as of M66.
+  for (X509Certificate* cert :
+       {leaf_dec_2017.get(), leaf_pre_june_2016.get()}) {
     scoped_refptr<CertVerifyProc> verify_proc;
     int error = 0;
 
@@ -1695,7 +1707,7 @@ TEST(CertVerifyProcTest, SymantecCertsRejected) {
 
     CertVerifyResult test_result_1;
     error = verify_proc->Verify(
-        cert.get(), "127.0.0.1", /*ocsp_response=*/std::string(),
+        cert, "www.example.com", /*ocsp_response=*/std::string(),
         /*sct_list=*/std::string(), 0, CertificateList(), &test_result_1,
         NetLogWithSource());
     EXPECT_THAT(error, IsError(ERR_CERT_SYMANTEC_LEGACY));
@@ -1712,7 +1724,7 @@ TEST(CertVerifyProcTest, SymantecCertsRejected) {
 
     CertVerifyResult test_result_2;
     error = verify_proc->Verify(
-        cert.get(), "127.0.0.1", /*ocsp_response=*/std::string(),
+        cert, "www.example.com", /*ocsp_response=*/std::string(),
         /*sct_list=*/std::string(), 0, CertificateList(), &test_result_2,
         NetLogWithSource());
     EXPECT_THAT(error, IsOk());
@@ -1721,7 +1733,7 @@ TEST(CertVerifyProcTest, SymantecCertsRejected) {
     // ... Or the caller disabled enforcement of Symantec policies.
     CertVerifyResult test_result_3;
     error = verify_proc->Verify(
-        cert.get(), "127.0.0.1", /*ocsp_response=*/std::string(),
+        cert, "www.example.com", /*ocsp_response=*/std::string(),
         /*sct_list=*/std::string(),
         CertVerifyProc::VERIFY_DISABLE_SYMANTEC_ENFORCEMENT, CertificateList(),
         &test_result_3, NetLogWithSource());
@@ -1731,10 +1743,7 @@ TEST(CertVerifyProcTest, SymantecCertsRejected) {
 
   // Test that certificates from the legacy Symantec infrastructure issued
   // after 2016-06-01 appropriately rejected.
-  scoped_refptr<X509Certificate> cert = CreateCertificateChainFromFile(
-      GetTestCertsDirectory(), "post_june_2016.pem",
-      X509Certificate::FORMAT_AUTO);
-  ASSERT_TRUE(cert);
+  scoped_refptr<X509Certificate> cert = leaf_post_june_2016;
 
   scoped_refptr<CertVerifyProc> verify_proc;
   int error = 0;
@@ -1748,7 +1757,7 @@ TEST(CertVerifyProcTest, SymantecCertsRejected) {
   verify_proc = base::MakeRefCounted<MockCertVerifyProc>(symantec_result);
 
   CertVerifyResult test_result_1;
-  error = verify_proc->Verify(cert.get(), "127.0.0.1",
+  error = verify_proc->Verify(cert.get(), "www.example.com",
                               /*ocsp_response=*/std::string(),
                               /*sct_list=*/std::string(), 0, CertificateList(),
                               &test_result_1, NetLogWithSource());
@@ -1764,7 +1773,7 @@ TEST(CertVerifyProcTest, SymantecCertsRejected) {
   verify_proc = base::MakeRefCounted<MockCertVerifyProc>(allowlisted_result);
 
   CertVerifyResult test_result_2;
-  error = verify_proc->Verify(cert.get(), "127.0.0.1",
+  error = verify_proc->Verify(cert.get(), "www.example.com",
                               /*ocsp_response=*/std::string(),
                               /*sct_list=*/std::string(), 0, CertificateList(),
                               &test_result_2, NetLogWithSource());
@@ -1774,7 +1783,7 @@ TEST(CertVerifyProcTest, SymantecCertsRejected) {
   // ... Or the caller disabled enforcement of Symantec policies.
   CertVerifyResult test_result_3;
   error = verify_proc->Verify(
-      cert.get(), "127.0.0.1", /*ocsp_response=*/std::string(),
+      cert.get(), "www.example.com", /*ocsp_response=*/std::string(),
       /*sct_list=*/std::string(),
       CertVerifyProc::VERIFY_DISABLE_SYMANTEC_ENFORCEMENT, CertificateList(),
       &test_result_3, NetLogWithSource());
@@ -1798,7 +1807,7 @@ TEST_P(CertVerifyProcInternalTest, VerifyReturnChainProperlyOrdered) {
   intermediates.push_back(bssl::UpRef(certs[2]->cert_buffer()));
   intermediates.push_back(bssl::UpRef(certs[1]->cert_buffer()));
 
-  ScopedTestRoot scoped_root(certs[2].get());
+  ScopedTestRoot scoped_root(certs[2]);
 
   scoped_refptr<X509Certificate> google_full_chain =
       X509Certificate::CreateFromBuffer(bssl::UpRef(certs[0]->cert_buffer()),
@@ -1833,7 +1842,7 @@ TEST_P(CertVerifyProcInternalTest, VerifyReturnChainFiltersUnrelatedCerts) {
   CertificateList certs = CreateCertificateListFromFile(
       certs_dir, "x509_verify_results.chain.pem", X509Certificate::FORMAT_AUTO);
   ASSERT_EQ(3U, certs.size());
-  ScopedTestRoot scoped_root(certs[2].get());
+  ScopedTestRoot scoped_root(certs[2]);
 
   scoped_refptr<X509Certificate> unrelated_certificate =
       ImportCertFromFile(certs_dir, "duplicate_cn_1.pem");
@@ -1928,7 +1937,7 @@ TEST_P(CertVerifyProcInternalTest, AdditionalTrustAnchors) {
 TEST_P(CertVerifyProcInternalTest, IsIssuedByKnownRootIgnoresTestRoots) {
   // Load root_ca_cert.pem into the test root store.
   ScopedTestRoot test_root(
-      ImportCertFromFile(GetTestCertsDirectory(), "root_ca_cert.pem").get());
+      ImportCertFromFile(GetTestCertsDirectory(), "root_ca_cert.pem"));
 
   scoped_refptr<X509Certificate> cert(
       ImportCertFromFile(GetTestCertsDirectory(), "ok_cert.pem"));
@@ -1956,7 +1965,7 @@ TEST_P(CertVerifyProcInternalTest, CRLSet) {
       CreateCertificateListFromFile(GetTestCertsDirectory(), "root_ca_cert.pem",
                                     X509Certificate::FORMAT_AUTO);
   ASSERT_EQ(1U, ca_cert_list.size());
-  ScopedTestRoot test_root(ca_cert_list[0].get());
+  ScopedTestRoot test_root(ca_cert_list[0]);
 
   CertificateList cert_list = CreateCertificateListFromFile(
       GetTestCertsDirectory(), "ok_cert.pem", X509Certificate::FORMAT_AUTO);
@@ -2008,7 +2017,7 @@ TEST_P(CertVerifyProcInternalTest, CRLSetLeafSerial) {
       CreateCertificateListFromFile(GetTestCertsDirectory(), "root_ca_cert.pem",
                                     X509Certificate::FORMAT_AUTO);
   ASSERT_EQ(1U, ca_cert_list.size());
-  ScopedTestRoot test_root(ca_cert_list[0].get());
+  ScopedTestRoot test_root(ca_cert_list[0]);
 
   scoped_refptr<X509Certificate> leaf = CreateCertificateChainFromFile(
       GetTestCertsDirectory(), "ok_cert_by_intermediate.pem",
@@ -2046,7 +2055,7 @@ TEST_P(CertVerifyProcInternalTest, CRLSetRootReturnsChain) {
       CreateCertificateListFromFile(GetTestCertsDirectory(), "root_ca_cert.pem",
                                     X509Certificate::FORMAT_AUTO);
   ASSERT_EQ(1U, ca_cert_list.size());
-  ScopedTestRoot test_root(ca_cert_list[0].get());
+  ScopedTestRoot test_root(ca_cert_list[0]);
 
   scoped_refptr<X509Certificate> leaf = CreateCertificateChainFromFile(
       GetTestCertsDirectory(), "ok_cert_by_intermediate.pem",
@@ -2094,7 +2103,7 @@ TEST_P(CertVerifyProcInternalTest, CRLSetRevokedBySubject) {
       ImportCertFromFile(GetTestCertsDirectory(), "ok_cert.pem"));
   ASSERT_TRUE(leaf);
 
-  ScopedTestRoot scoped_root(root.get());
+  ScopedTestRoot scoped_root(root);
 
   int flags = 0;
   CertVerifyResult verify_result;
@@ -2150,7 +2159,7 @@ TEST_P(CertVerifyProcInternalTest, BlockedInterceptionByRoot) {
   scoped_refptr<X509Certificate> root =
       ImportCertFromFile(GetTestCertsDirectory(), "root_ca_cert.pem");
   ASSERT_TRUE(root);
-  ScopedTestRoot test_root(root.get());
+  ScopedTestRoot test_root(root);
 
   scoped_refptr<X509Certificate> cert = CreateCertificateChainFromFile(
       GetTestCertsDirectory(), "ok_cert_by_intermediate.pem",
@@ -2195,7 +2204,7 @@ TEST_P(CertVerifyProcInternalTest, BlockedInterceptionByIntermediate) {
   scoped_refptr<X509Certificate> root =
       ImportCertFromFile(GetTestCertsDirectory(), "root_ca_cert.pem");
   ASSERT_TRUE(root);
-  ScopedTestRoot test_root(root.get());
+  ScopedTestRoot test_root(root);
 
   scoped_refptr<X509Certificate> cert = CreateCertificateChainFromFile(
       GetTestCertsDirectory(), "ok_cert_by_intermediate.pem",
@@ -2251,7 +2260,7 @@ TEST_P(CertVerifyProcInternalTest, DetectsInterceptionByRoot) {
   scoped_refptr<X509Certificate> root =
       ImportCertFromFile(GetTestCertsDirectory(), "root_ca_cert.pem");
   ASSERT_TRUE(root);
-  ScopedTestRoot test_root(root.get());
+  ScopedTestRoot test_root(root);
 
   scoped_refptr<X509Certificate> cert = CreateCertificateChainFromFile(
       GetTestCertsDirectory(), "ok_cert_by_intermediate.pem",
@@ -2323,8 +2332,8 @@ TEST_P(CertVerifyProcInternalTest, CRLSetDuringPathBuilding) {
                            &path_3_certs));
 
   // Add D and E as trust anchors.
-  ScopedTestRoot test_root_D(path_1_certs[3].get());  // D-by-D
-  ScopedTestRoot test_root_E(path_2_certs[3].get());  // E-by-E
+  ScopedTestRoot test_root_D(path_1_certs[3]);  // D-by-D
+  ScopedTestRoot test_root_E(path_2_certs[3]);  // E-by-E
 
   // Create a chain that contains all the certificate paths possible.
   // CertVerifyProcInternalTest.VerifyReturnChainFiltersUnrelatedCerts already
@@ -2410,7 +2419,7 @@ TEST_P(CertVerifyProcInternalTest, ValidityDayPlus5MinutesBeforeNotBefore) {
   leaf->SetValidity(not_before, not_after);
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -2430,7 +2439,7 @@ TEST_P(CertVerifyProcInternalTest, ValidityDayBeforeNotBefore) {
   leaf->SetValidity(not_before, not_after);
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -2450,7 +2459,7 @@ TEST_P(CertVerifyProcInternalTest, ValidityJustBeforeNotBefore) {
   leaf->SetValidity(not_before, not_after);
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -2470,7 +2479,7 @@ TEST_P(CertVerifyProcInternalTest, ValidityJustAfterNotBefore) {
   leaf->SetValidity(not_before, not_after);
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -2490,7 +2499,7 @@ TEST_P(CertVerifyProcInternalTest, ValidityJustBeforeNotAfter) {
   leaf->SetValidity(not_before, not_after);
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -2510,7 +2519,7 @@ TEST_P(CertVerifyProcInternalTest, ValidityJustAfterNotAfter) {
   leaf->SetValidity(not_before, not_after);
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -2539,7 +2548,7 @@ TEST_P(CertVerifyProcInternalTest, FailedIntermediateSignatureValidation) {
   root->GenerateECKey();
 
   // Trust the new root certificate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
 
   int flags = 0;
   CertVerifyResult verify_result;
@@ -2578,7 +2587,7 @@ TEST_P(CertVerifyProcInternalTest, FailedTargetSignatureValidation) {
   ASSERT_TRUE(cert.get());
 
   // Trust the root certificate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
 
   int flags = 0;
   CertVerifyResult verify_result;
@@ -2645,7 +2654,7 @@ TEST_P(CertVerifyProcNameNormalizationTest, StringType) {
   intermediate->SetSubjectTLV(CertBuilder::BuildNameWithCommonNameOfType(
       issuer_cn, CBS_ASN1_UTF8STRING));
 
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
 
   int flags = 0;
   CertVerifyResult verify_result;
@@ -2678,7 +2687,7 @@ TEST_P(CertVerifyProcNameNormalizationTest, CaseFolding) {
   intermediate->SetSubjectTLV(CertBuilder::BuildNameWithCommonNameOfType(
       "z" + issuer_hex, CBS_ASN1_PRINTABLESTRING));
 
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
 
   int flags = 0;
   CertVerifyResult verify_result;
@@ -2701,7 +2710,7 @@ TEST_P(CertVerifyProcNameNormalizationTest, ByteEqual) {
   intermediate->SetSubjectTLV(CertBuilder::BuildNameWithCommonNameOfType(
       issuer_hex, CBS_ASN1_PRINTABLESTRING));
 
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
 
   int flags = 0;
   CertVerifyResult verify_result;
@@ -2973,7 +2982,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
                                   "Not Found");
 
   // Trust the root certificate.
-  ScopedTestRoot scoped_root(root.get());
+  ScopedTestRoot scoped_root(root);
 
   // The chain being verified is solely the leaf certificate (missing the
   // intermediate and root).
@@ -3018,7 +3027,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       std::string(x509_util::CryptoBufferAsStringPiece(intermediate.get())));
 
   // Trust the root certificate.
-  ScopedTestRoot scoped_root(root.get());
+  ScopedTestRoot scoped_root(root);
 
   // The chain being verified is solely the leaf certificate (missing the
   // intermediate and root).
@@ -3080,7 +3089,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       ca_issuers_path, HTTP_OK, "application/x-x509-ca-cert", intermediate_pem);
 
   // Trust the root certificate.
-  ScopedTestRoot scoped_root(root.get());
+  ScopedTestRoot scoped_root(root);
 
   // The chain being verified is solely the leaf certificate (missing the
   // intermediate and root).
@@ -3134,7 +3143,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       ca_issuers_path, HTTP_OK, "application/x-x509-ca-cert", intermediate_pem);
 
   // Trust the root certificate.
-  ScopedTestRoot scoped_root(root.get());
+  ScopedTestRoot scoped_root(root);
 
   // The chain being verified is solely the leaf certificate (missing the
   // intermediate and root).
@@ -3189,7 +3198,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
 
   // Trust the root certificate.
   auto root_cert = root->GetX509Certificate();
-  ScopedTestRoot scoped_root(root_cert.get());
+  ScopedTestRoot scoped_root(root_cert);
 
   // Setup the test server to reply with the SHA256 intermediate.
   RegisterSimpleTestServerHandler(
@@ -3252,7 +3261,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest, RevocationHardFailNoCrls) {
   auto [leaf, intermediate, root] = CertBuilder::CreateSimpleChain3();
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3279,7 +3288,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
   auto [leaf, intermediate, root] = CertBuilder::CreateSimpleChain3();
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3317,7 +3326,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
   leaf->SetCrlDistributionPointUrl(CreateAndServeCrl(intermediate.get(), {}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3357,7 +3366,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       CreateAndServeCrl(intermediate.get(), {intermediate->GetSerialNumber()}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3392,7 +3401,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       CreateAndServeCrl(intermediate.get(), {leaf->GetSerialNumber()}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3426,7 +3435,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
   leaf->SetCrlDistributionPointUrl(CreateAndServeCrl(intermediate.get(), {}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3463,7 +3472,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       MakeRandomPath(".crl"), HTTP_NOT_FOUND, "text/plain", "Not Found"));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3500,7 +3509,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
   leaf->SetCrlDistributionPointUrl(CreateAndServeCrl(intermediate.get(), {}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3528,7 +3537,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest, RevocationSoftFailNoCrls) {
   auto [leaf, intermediate, root] = CertBuilder::CreateSimpleChain3();
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3566,7 +3575,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
   leaf->SetCrlDistributionPointUrl(CreateAndServeCrl(intermediate.get(), {}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3604,7 +3613,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       CreateAndServeCrl(intermediate.get(), {intermediate->GetSerialNumber()}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3637,7 +3646,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       CreateAndServeCrl(intermediate.get(), {leaf->GetSerialNumber()}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3671,7 +3680,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       CreateAndServeCrl(intermediate.get(), {leaf->GetSerialNumber()}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3707,7 +3716,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
   leaf->SetCrlDistributionPointUrl(CreateAndServeCrl(intermediate.get(), {}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3743,7 +3752,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
                         SignatureAlgorithm::kEcdsaSha1));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3785,7 +3794,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       EVP_md5()));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3824,7 +3833,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
       MakeRandomPath(".crl"), HTTP_NOT_FOUND, "text/plain", "Not Found"));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -3861,7 +3870,7 @@ TEST_P(CertVerifyProcInternalWithNetFetchingTest,
   leaf->SetCrlDistributionPointUrl(CreateAndServeCrl(intermediate.get(), {}));
 
   // Trust the root and build a chain to verify that includes the intermediate.
-  ScopedTestRoot scoped_root(root->GetX509Certificate().get());
+  ScopedTestRoot scoped_root(root->GetX509Certificate());
   scoped_refptr<X509Certificate> chain = leaf->GetX509CertificateChain();
   ASSERT_TRUE(chain.get());
 
@@ -4014,7 +4023,7 @@ class CertVerifyProcConstraintsTest : public CertVerifyProcInternalTest {
   }
 
   int VerifyWithTrust(CertificateTrust trust) {
-    ScopedTestRoot test_root(chain_.back()->GetX509Certificate().get(), trust);
+    ScopedTestRoot test_root(chain_.back()->GetX509Certificate(), trust);
     CertVerifyResult verify_result;
     int flags = 0;
     return CertVerifyProcInternalTest::Verify(
@@ -4973,7 +4982,7 @@ class CertVerifyProcConstraintsTrustedLeafTest
   }
 
   int VerifyWithTrust(CertificateTrust trust) {
-    ScopedTestRoot test_root(chain_[0]->GetX509Certificate().get(), trust);
+    ScopedTestRoot test_root(chain_[0]->GetX509Certificate(), trust);
     CertVerifyResult verify_result;
     int flags = 0;
     return CertVerifyProcInternalTest::Verify(
@@ -5022,43 +5031,43 @@ TEST_P(CertVerifyProcConstraintsTrustedLeafTest, RootAlsoTrusted) {
   // (Repeating the ScopedTestRoot before each call is due to the limitation
   // with destroying any ScopedTestRoot removing all test roots.)
   {
-    ScopedTestRoot test_root(chain_[1]->GetX509Certificate().get());
+    ScopedTestRoot test_root(chain_[1]->GetX509Certificate());
     EXPECT_THAT(Verify(), IsOk());
   }
 
   if (VerifyProcTypeIsBuiltin()) {
     {
-      ScopedTestRoot test_root1(chain_[1]->GetX509Certificate().get());
+      ScopedTestRoot test_root1(chain_[1]->GetX509Certificate());
       // An explicit trust entry for the leaf with a value of Unspecified
       // should be no different than the leaf not being in the trust store at
       // all.
       EXPECT_THAT(VerifyWithTrust(CertificateTrust::ForUnspecified()), IsOk());
     }
     {
-      ScopedTestRoot test_root1(chain_[1]->GetX509Certificate().get());
+      ScopedTestRoot test_root1(chain_[1]->GetX509Certificate());
       // If the leaf is explicitly distrusted, verification should fail even if
       // the root is trusted.
       EXPECT_THAT(VerifyWithTrust(CertificateTrust::ForDistrusted()),
                   IsError(ERR_CERT_AUTHORITY_INVALID));
     }
     {
-      ScopedTestRoot test_root(chain_[1]->GetX509Certificate().get());
+      ScopedTestRoot test_root(chain_[1]->GetX509Certificate());
       EXPECT_THAT(VerifyAsTrustedLeaf(), IsOk());
     }
     {
-      ScopedTestRoot test_root(chain_[1]->GetX509Certificate().get());
+      ScopedTestRoot test_root(chain_[1]->GetX509Certificate());
       EXPECT_THAT(VerifyWithTrust(CertificateTrust::ForTrustAnchorOrLeaf()),
                   IsOk());
     }
     {
-      ScopedTestRoot test_root(chain_[1]->GetX509Certificate().get());
+      ScopedTestRoot test_root(chain_[1]->GetX509Certificate());
       EXPECT_THAT(
           VerifyWithTrust(
               CertificateTrust::ForTrustedLeaf().WithRequireLeafSelfSigned()),
           IsOk());
     }
     {
-      ScopedTestRoot test_root(chain_[1]->GetX509Certificate().get());
+      ScopedTestRoot test_root(chain_[1]->GetX509Certificate());
       EXPECT_THAT(VerifyWithTrust(CertificateTrust::ForTrustAnchorOrLeaf()
                                       .WithRequireLeafSelfSigned()),
                   IsOk());
@@ -5278,7 +5287,7 @@ class CertVerifyProcConstraintsTrustedSelfSignedTest
   }
 
   int VerifyWithTrust(CertificateTrust trust) {
-    ScopedTestRoot test_root(cert_->GetX509Certificate().get(), trust);
+    ScopedTestRoot test_root(cert_->GetX509Certificate(), trust);
     CertVerifyResult verify_result;
     int flags = 0;
     return CertVerifyProcInternalTest::Verify(
@@ -5993,9 +6002,10 @@ TEST(CertVerifyProcTest, LogsOnlyMostSpecificTrustAnchorUMA) {
 // is_issued_by_known_root was derived from the OS.
 TEST(CertVerifyProcTest, HasTrustAnchorVerifyOutOfDateUMA) {
   base::HistogramTester histograms;
-  scoped_refptr<X509Certificate> cert(ImportCertFromFile(
-      GetTestCertsDirectory(), "39_months_based_on_last_day.pem"));
-  ASSERT_TRUE(cert);
+  // Since we are setting is_issued_by_known_root=true, the certificate to be
+  // verified needs to have a validity period that satisfies
+  // HasTooLongValidity.
+  auto [leaf, root] = CertBuilder::CreateSimpleChain2();
 
   CertVerifyResult result;
 
@@ -6017,10 +6027,11 @@ TEST(CertVerifyProcTest, HasTrustAnchorVerifyOutOfDateUMA) {
 
   int flags = 0;
   CertVerifyResult verify_result;
-  int error = verify_proc->Verify(
-      cert.get(), "127.0.0.1", /*ocsp_response=*/std::string(),
-      /*sct_list=*/std::string(), flags, CertificateList(), &verify_result,
-      NetLogWithSource());
+  int error =
+      verify_proc->Verify(leaf->GetX509Certificate().get(), "www.example.com",
+                          /*ocsp_response=*/std::string(),
+                          /*sct_list=*/std::string(), flags, CertificateList(),
+                          &verify_result, NetLogWithSource());
   EXPECT_EQ(OK, error);
   const base::HistogramBase::Sample kUnknownRootHistogramID = 0;
   histograms.ExpectUniqueSample(kTrustAnchorVerifyHistogram,

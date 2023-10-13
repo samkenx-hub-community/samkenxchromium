@@ -6,6 +6,7 @@
 #define COMPONENTS_AUTOFILL_CORE_BROWSER_AUTOFILL_CLIENT_H_
 
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -43,6 +44,10 @@
 
 class PrefService;
 
+namespace plus_addresses {
+class PlusAddressService;
+}
+
 namespace signin {
 class IdentityManager;
 }
@@ -65,15 +70,12 @@ class InternalAuthenticator;
 }
 #endif
 
-namespace plus_addresses {
-class PlusAddressService;
-}
-
 namespace autofill {
 
 class AddressNormalizer;
 class AutocompleteHistoryManager;
 class AutofillAblationStudy;
+class AutofillComposeDelegate;
 class AutofillDriver;
 class AutofillDownloadManager;
 struct AutofillErrorDialogContext;
@@ -91,6 +93,7 @@ class CreditCard;
 class CreditCardCvcAuthenticator;
 enum class CreditCardFetchResult;
 class CreditCardOtpAuthenticator;
+class CreditCardRiskBasedAuthenticator;
 class FormDataImporter;
 class Iban;
 class IbanManager;
@@ -249,16 +252,6 @@ class AutofillClient : public RiskDataLoader {
 
   // Used for options of upload prompt.
   struct SaveCreditCardOptions {
-    SaveCreditCardOptions& with_from_dynamic_change_form(bool b) {
-      from_dynamic_change_form = b;
-      return *this;
-    }
-
-    SaveCreditCardOptions& with_has_non_focusable_field(bool b) {
-      has_non_focusable_field = b;
-      return *this;
-    }
-
     SaveCreditCardOptions& with_should_request_name_from_user(bool b) {
       should_request_name_from_user = b;
       return *this;
@@ -291,8 +284,6 @@ class AutofillClient : public RiskDataLoader {
       return *this;
     }
 
-    bool from_dynamic_change_form = false;
-    bool has_non_focusable_field = false;
     bool should_request_name_from_user = false;
     bool should_request_expiration_date_from_user = false;
     bool show_prompt = false;
@@ -331,34 +322,52 @@ class AutofillClient : public RiskDataLoader {
         AutofillSuggestionTriggerSource::kUnspecified};
   };
 
+  // Describes the position of the Autofill popup on the screen.
+  struct PopupScreenLocation {
+    // The bounds of the popup in the screen coordinate system.
+    gfx::Rect bounds;
+    // Describes the position of the arrow on the popup's border and corresponds
+    // to a subset of the available options in `views::BubbleBorder::Arrow`.
+    enum class ArrowPosition {
+      kTopRight,
+      kTopLeft,
+      kBottomRight,
+      kBottomLeft,
+      kLeftTop,
+      kRightTop,
+      kMax = kRightTop
+    };
+    ArrowPosition arrow_position;
+  };
+
   // Callback to run after local credit card save or local CVC save is offered.
   // Sends whether the prompt was accepted, declined, or ignored in
   // |user_decision|.
-  typedef base::OnceCallback<void(SaveCardOfferUserDecision user_decision)>
-      LocalSaveCardPromptCallback;
+  using LocalSaveCardPromptCallback =
+      base::OnceCallback<void(SaveCardOfferUserDecision user_decision)>;
 
-  // Callback to run after upload credit card save is offered. Sends whether the
-  // prompt was accepted, declined, or ignored in |user_decision|, and
-  // additional |user_provided_card_details| if applicable.
-  typedef base::OnceCallback<void(
+  // Callback to run after upload credit card save or upload CVC save for
+  // existing server card is offered. Sends whether the prompt was accepted,
+  // declined, or ignored in |user_decision|, and additional
+  // |user_provided_card_details| if applicable.
+  using UploadSaveCardPromptCallback = base::OnceCallback<void(
       SaveCardOfferUserDecision user_decision,
-      const UserProvidedCardDetails& user_provided_card_details)>
-      UploadSaveCardPromptCallback;
+      const UserProvidedCardDetails& user_provided_card_details)>;
 
-  typedef base::OnceCallback<void(const CreditCard&)> CreditCardScanCallback;
+  using CreditCardScanCallback = base::OnceCallback<void(const CreditCard&)>;
 
   // Callback to run if user presses the Save button in the migration dialog.
   // Will pass a vector of GUIDs of cards that the user selected to upload to
   // LocalCardMigrationManager.
-  typedef base::OnceCallback<void(const std::vector<std::string>&)>
-      LocalCardMigrationCallback;
+  using LocalCardMigrationCallback =
+      base::OnceCallback<void(const std::vector<std::string>&)>;
 
   // Callback to run if the user presses the trash can button in the
   // action-required dialog. Will pass to LocalCardMigrationManager a
   // string of GUID of the card that the user selected to delete from local
   // storage.
-  typedef base::RepeatingCallback<void(const std::string&)>
-      MigrationDeleteCardCallback;
+  using MigrationDeleteCardCallback =
+      base::RepeatingCallback<void(const std::string&)>;
 
   // Callback to run after local IBAN save is offered. The callback runs with
   // `user_decision` indicating whether the prompt was accepted, declined,
@@ -370,14 +379,19 @@ class AutofillClient : public RiskDataLoader {
 
   // Callback to run if the OK button or the cancel button in a
   // Webauthn dialog is clicked.
-  typedef base::RepeatingCallback<void(WebauthnDialogCallbackType)>
-      WebauthnDialogCallback;
+  using WebauthnDialogCallback =
+      base::RepeatingCallback<void(WebauthnDialogCallbackType)>;
 
   // TODO(crbug.com/1486412): investigate if AutofillProfile should be passed
   // by const reference.
   using AddressProfileSavePromptCallback =
       base::OnceCallback<void(SaveAddressProfileOfferUserDecision,
                               AutofillProfile profile)>;
+
+  // The callback accepts the boolean parameter indicating whether the user has
+  // accepted the delete dialog. The callback is intended to be called only upon
+  // user closing the dialog directly and not when user closes the browser tab.
+  using AddressProfileDeleteDialogCallback = base::OnceCallback<void(bool)>;
 
   ~AutofillClient() override = default;
 
@@ -406,6 +420,8 @@ class AutofillClient : public RiskDataLoader {
   const PersonalDataManager* GetPersonalDataManager() const;
 
   // Gets the AutofillOptimizationGuide instance associated with the client.
+  // This function can return nullptr if we are on an unsupported platform, or
+  // if the AutofillOptimizationGuide's dependencies are not present.
   virtual AutofillOptimizationGuide* GetAutofillOptimizationGuide() const;
 
   // Gets the AutofillModelHandler instance for autofill machine learning
@@ -423,6 +439,9 @@ class AutofillClient : public RiskDataLoader {
   // KeyedService that manages that data.
   virtual plus_addresses::PlusAddressService* GetPlusAddressService();
 
+  // Returns the `AutofillComposeDelegate` instance for the tab of this client.
+  virtual AutofillComposeDelegate* GetComposeDelegate();
+
   // Orchestrates UI for enterprise plus address creation; no-op except on
   // supported platforms.
   virtual void OfferPlusAddressCreation(
@@ -436,6 +455,7 @@ class AutofillClient : public RiskDataLoader {
   // Can be null on unsupported platforms.
   virtual CreditCardCvcAuthenticator* GetCvcAuthenticator();
   virtual CreditCardOtpAuthenticator* GetOtpAuthenticator();
+  virtual CreditCardRiskBasedAuthenticator* GetRiskBasedAuthenticator();
 
   // Creates and returns a SingleFieldFormFillRouter using the
   // AutocompleteHistoryManager, IbanManager and MerchantPromoCodeManager
@@ -580,10 +600,6 @@ class AutofillClient : public RiskDataLoader {
   // Hides the virtual card enroll bubble and icon if it is visible.
   virtual void HideVirtualCardEnrollBubbleAndIconIfVisible();
 
-  // Returns the list of allowed merchants and BIN ranges for virtual cards.
-  virtual std::vector<std::string> GetAllowedMerchantsForVirtualCards() = 0;
-  virtual std::vector<std::string> GetAllowedBinRangesForVirtualCards() = 0;
-
   // Runs |show_migration_dialog_closure| if the user accepts the card migration
   // offer. This causes the card migration dialog to be shown.
   virtual void ShowLocalCardMigrationDialog(
@@ -677,15 +693,18 @@ class AutofillClient : public RiskDataLoader {
       LocalSaveCardPromptCallback callback) = 0;
 
   // Runs |callback| once the user makes a decision with respect to the
-  // offer-to-save prompt. Displays the contents of |legal_message_lines|
-  // to the user. Displays a cardholder name textfield in the bubble if
-  // |options.should_request_name_from_user| is true. Displays
-  // a pair of expiration date dropdowns in the bubble if
+  // offer-to-save prompt. This includes both the save server card prompt and
+  // the save CVC for a server card prompt. Displays the contents of
+  // |legal_message_lines| to the user. Displays a cardholder name textfield in
+  // the bubble if |options.should_request_name_from_user| is true. Displays a
+  // pair of expiration date dropdowns in the bubble if
   // |should_request_expiration_date_from_user| is true. On desktop, shows the
   // offer-to-save bubble if |options.show_prompt| is true;
   // otherwise only shows the omnibox icon. On mobile, shows the offer-to-save
   // infobar if |options.show_prompt| is true; otherwise does
   // not offer to save at all.
+  // TODO (crbug.com/1462821): Make |legal_message_lines| optional, as CVC
+  // upload has no legal message.
   virtual void ConfirmSaveCreditCardToCloud(
       const CreditCard& card,
       const LegalMessageLines& legal_message_lines,
@@ -712,7 +731,9 @@ class AutofillClient : public RiskDataLoader {
 
   // Show a delete address profile dialog asking if users want to proceed with
   // deletion.
-  virtual void ShowDeleteAddressProfileDialog() = 0;
+  virtual void ShowDeleteAddressProfileDialog(
+      const AutofillProfile& profile,
+      AddressProfileDeleteDialogCallback delete_dialog_callback) = 0;
 
   // Shows the offer-to-save (or update) address profile bubble. If
   // `original_profile` is nullptr, this renders a save prompt. Otherwise, it
@@ -781,6 +802,10 @@ class AutofillClient : public RiskDataLoader {
   // Note that the password manager doesn't distinguish between trigger sources.
   virtual PopupOpenArgs GetReopenPopupArgs(
       AutofillSuggestionTriggerSource trigger_source) const = 0;
+
+  // Returns the information of the popup on the screen, if there is one that is
+  // showing. Note that this implemented only on Desktop.
+  virtual std::optional<PopupScreenLocation> GetPopupScreenLocation() const;
 
   // Returns (not elided) suggestions currently held by the UI.
   virtual std::vector<Suggestion> GetPopupSuggestions() const = 0;

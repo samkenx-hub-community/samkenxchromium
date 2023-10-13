@@ -28,6 +28,8 @@
 #include "components/feature_engagement/public/feature_constants.h"
 #include "components/prefs/pref_service.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/models/dialog_model.h"
 #include "ui/base/models/dialog_model_menu_model_adapter.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
@@ -110,6 +112,11 @@ SidePanelToolbarContainer::PinnedSidePanelToolbarButton::CreateMenuModel() {
       dialog_model.Build());
 }
 
+BEGIN_METADATA(SidePanelToolbarContainer,
+               PinnedSidePanelToolbarButton,
+               ToolbarButton)
+END_METADATA
+
 ///////////////////////////////////////////////////////////////////////////////
 // SidePanelToolbarContainer:
 
@@ -138,11 +145,8 @@ SidePanelToolbarContainer::SidePanelToolbarContainer(BrowserView* browser_view)
       ->SetFlexAllocationOrder(views::FlexAllocationOrder::kReverse)
       .SetDefault(views::kFlexBehaviorKey,
                   hide_icon_flex_specification.WithOrder(3));
-  side_panel_button_->SetProperty(
-      views::kFlexBehaviorKey,
-      base::FeatureList::IsEnabled(features::kResponsiveToolbar)
-          ? hide_icon_flex_specification.WithOrder(1)
-          : views::FlexSpecification());
+  side_panel_button_->SetProperty(views::kFlexBehaviorKey,
+                                  views::FlexSpecification());
   AddMainItem(side_panel_button_);
   // Before creating the pinned buttons, verify that the pref value is correct
   // and update it if not. If the user has been moved into a different default
@@ -254,7 +258,8 @@ void SidePanelToolbarContainer::RemovePinnedEntryButtonFor(
   const auto iter = base::ranges::find(
       pinned_entry_buttons_, id, [](auto* button) { return button->id(); });
   DCHECK(iter != pinned_entry_buttons_.end());
-  RemoveChildView(*iter);
+  // This returns a unique_ptr which is immediately destroyed.
+  RemoveChildViewT(*iter);
   pinned_entry_buttons_.erase(iter);
   pinned_button_visibility_change_subscription_ =
       base::CallbackListSubscription();
@@ -331,3 +336,6 @@ SidePanelCoordinator* SidePanelToolbarContainer::GetSidePanelCoordinator() {
   return SidePanelUtil::GetSidePanelCoordinatorForBrowser(
       browser_view_->browser());
 }
+
+BEGIN_METADATA(SidePanelToolbarContainer, ToolbarIconContainerView)
+END_METADATA

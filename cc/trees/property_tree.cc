@@ -48,7 +48,9 @@ AnchorPositionScrollersData::AnchorPositionScrollersData(
 bool AnchorPositionScrollersData::operator==(
     const AnchorPositionScrollersData& other) const {
   return accumulated_scroll_origin == other.accumulated_scroll_origin &&
-         scroll_container_ids == other.scroll_container_ids;
+         scroll_container_ids == other.scroll_container_ids &&
+         needs_scroll_adjustment_in_x == other.needs_scroll_adjustment_in_x &&
+         needs_scroll_adjustment_in_y == other.needs_scroll_adjustment_in_y;
 }
 
 bool AnchorPositionScrollersData::operator!=(
@@ -514,7 +516,15 @@ gfx::Vector2dF TransformTree::AnchorPositionScrollOffset(TransformNode* node) {
     accumulated_scroll_offset +=
         transform_node->scroll_offset.OffsetFromOrigin();
   }
-  return data->accumulated_scroll_origin - accumulated_scroll_offset;
+  gfx::Vector2dF result =
+      data->accumulated_scroll_origin - accumulated_scroll_offset;
+  if (!data->needs_scroll_adjustment_in_x) {
+    result.set_x(0);
+  }
+  if (!data->needs_scroll_adjustment_in_y) {
+    result.set_y(0);
+  }
+  return result;
 }
 
 void TransformTree::UndoOverscroll(
@@ -1601,7 +1611,6 @@ gfx::PointF ScrollTree::GetScrollOffsetForScrollTimeline(
     const ScrollNode& scroll_node) const {
   gfx::PointF offset = current_scroll_offset(scroll_node.element_id);
   if (!property_trees()->is_main_thread() &&
-      base::FeatureList::IsEnabled(features::kScrollUnification) &&
       !CanRealizeScrollsOnCompositor(scroll_node)) {
     // Ignore impl-thread scroll delta if the scroll can't be realized on
     // compositor because the main thread is the source of truth in the case.

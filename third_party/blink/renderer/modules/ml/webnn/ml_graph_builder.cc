@@ -282,29 +282,6 @@ bool ValidateAxis(uint32_t axis,
   return true;
 }
 
-bool ValidateAxes(const Vector<uint32_t>& axes,
-                  uint32_t input_rank,
-                  ExceptionState& exception_state) {
-  if (base::ranges::any_of(axes, [input_rank](uint32_t axis) {
-        return base::MakeStrictNum(axis) >= input_rank;
-      })) {
-    exception_state.ThrowDOMException(
-        DOMExceptionCode::kDataError,
-        String::Format("The values in axes must be within the range from 0 "
-                       "to (%u).",
-                       input_rank - 1));
-    return false;
-  }
-
-  if (axes.size() != std::set<uint32_t>(axes.begin(), axes.end()).size()) {
-    exception_state.ThrowDOMException(
-        DOMExceptionCode::kDataError,
-        "Two or more values are same in the axes sequence.");
-    return false;
-  }
-  return true;
-}
-
 absl::optional<Vector<uint32_t>> BroadcastShapes(
     const Vector<uint32_t>& dims_lhs,
     const Vector<uint32_t>& dims_rhs,
@@ -391,7 +368,11 @@ MLOperand* BuildReduce(MLGraphBuilder* builder,
     default_axes[i] = i;
   }
   const auto axes = options->getAxesOr(std::move(default_axes));
-  if (!ValidateAxes(axes, input_rank, exception_state)) {
+  auto validation_result = webnn::ValidateAxes(axes, input_rank);
+  if (!validation_result.has_value()) {
+    exception_state.ThrowDOMException(
+        DOMExceptionCode::kDataError,
+        String::FromUTF8(validation_result.error()));
     return nullptr;
   }
 
@@ -1086,6 +1067,7 @@ BUILD_ELEMENTWISE_BINARY_OP(mul, kMul)
 BUILD_ELEMENTWISE_BINARY_OP(div, kDiv)
 BUILD_ELEMENTWISE_BINARY_OP(min, kMin)
 BUILD_ELEMENTWISE_BINARY_OP(max, kMax)
+BUILD_ELEMENTWISE_BINARY_OP(pow, kPow)
 
 #define BUILD_ELEMENTWISE_UNARY_OP(op, op_kind)                           \
   MLOperand* MLGraphBuilder::op(const MLOperand* input,                   \
@@ -1697,40 +1679,24 @@ HeapVector<Member<const MLOperand>> MLGraphBuilder::split(
     const uint32_t splits,
     const MLSplitOptions* options,
     ExceptionState& exception_state) {
-  const auto& input_shape = input->Dimensions();
-  const auto input_rank = input_shape.size();
-  const auto axis = options->axis();
-  // According to WebNN spec:
-  // https://www.w3.org/TR/webnn/#dom-mlsplitoptions-axis, the axis must be in
-  // the range [0, N-1] where N is the rank of input tensor.
-  if (!ValidateAxis(axis, input_rank, exception_state)) {
-    return {};
-  }
-
-  if (splits == 0) {
-    exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
-                                      "The splits must be greater than 0.");
-    return {};
-  }
-  if (input_shape[axis] % splits != 0) {
-    // According to WebNN spec:
-    // https://www.w3.org/TR/webnn/#dom-mlgraphbuilder-split-input-splits-options-splits,
-    // the splits specifies the number of output tensors along the axis. The
-    // number must evenly divide the dimension size of input along options.axis.
+  auto validated_outputs = webnn::ValidateSplitAndInferOutput(
+      ConvertToComponentOperand(input), {
+                                            .splits = splits,
+                                            .axis = options->axis(),
+                                        });
+  if (!validated_outputs.has_value()) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kDataError,
-        "The splits must evenly divide the dimension size of input along "
-        "options.axis.");
+        WTF::String::FromUTF8(validated_outputs.error()));
     return {};
   }
 
-  auto output_shape = input_shape;
-  output_shape[axis] = input_shape[axis] / splits;
   auto* split = MakeGarbageCollected<MLSplitOperator>(this, splits, options);
   HeapVector<Member<const MLOperand>> outputs;
-  for (uint32_t i = 0; i < splits; ++i) {
-    auto output = MLOperand::ValidateAndCreateOutput(this, input->Type(),
-                                                     output_shape, split);
+  for (const auto& validated_output : validated_outputs.value()) {
+    auto output = MLOperand::ValidateAndCreateOutput(
+        this, ComponentOperandTypeToBlink(validated_output.data_type),
+        Vector<uint32_t>(validated_output.dimensions), split);
     if (!output.has_value()) {
       exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
                                         output.error());
@@ -1750,44 +1716,24 @@ HeapVector<Member<const MLOperand>> MLGraphBuilder::split(
     const Vector<uint32_t>& splits,
     const MLSplitOptions* options,
     ExceptionState& exception_state) {
-  const auto& input_shape = input->Dimensions();
-  const auto input_rank = input_shape.size();
-  const auto axis = options->axis();
-  // According to WebNN spec:
-  // https://www.w3.org/TR/webnn/#dom-mlsplitoptions-axis, the axis must be in
-  // the range [0, N-1] where N is the rank of input tensor.
-  if (!ValidateAxis(axis, input_rank, exception_state)) {
-    return {};
-  }
-  auto checked_splits_sum = base::MakeCheckedNum<uint32_t>(0);
-  for (auto split_size : splits) {
-    checked_splits_sum += split_size;
-  }
-  if (!checked_splits_sum.IsValid()) {
-    exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
-                                      "The values of splits are too large.");
-    return {};
-  }
-  if (checked_splits_sum.ValueOrDie() != input_shape[axis]) {
-    // According to WebNN spec:
-    // https://www.w3.org/TR/webnn/#dom-mlgraphbuilder-split-input-splits-options-splits,
-    // the splits parameter specifies the sizes of each output tensor along the
-    // options.axis. The sum of sizes must equal to the dimension size of input
-    // along options.axis.
+  auto validated_outputs = webnn::ValidateSplitAndInferOutput(
+      ConvertToComponentOperand(input), {
+                                            .splits = splits,
+                                            .axis = options->axis(),
+                                        });
+  if (!validated_outputs.has_value()) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kDataError,
-        "The sum of split sizes must equal to the dimension size of input "
-        "along options.axis.");
+        WTF::String::FromUTF8(validated_outputs.error()));
     return {};
   }
 
   auto* split = MakeGarbageCollected<MLSplitOperator>(this, splits, options);
   HeapVector<Member<const MLOperand>> outputs;
-  for (auto split_size : splits) {
-    auto output_shape = input_shape;
-    output_shape[axis] = split_size;
-    auto output = MLOperand::ValidateAndCreateOutput(this, input->Type(),
-                                                     output_shape, split);
+  for (const auto& validated_output : validated_outputs.value()) {
+    auto output = MLOperand::ValidateAndCreateOutput(
+        this, ComponentOperandTypeToBlink(validated_output.data_type),
+        Vector<uint32_t>(validated_output.dimensions), split);
     if (!output.has_value()) {
       exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
                                         output.error());
@@ -1841,35 +1787,25 @@ MLOperand* MLGraphBuilder::transpose(const MLOperand* input,
   // When permutation is not specified, it’s set to [N-1, ..., 0], where N is
   // the rank of the input tensor.
   auto input_rank = input->Dimensions().size();
-  Vector<uint32_t> default_permutation(input_rank);
-  for (wtf_size_t i = 0; i < input_rank - 1; i++) {
-    default_permutation[i] = input_rank - 1 - i;
-  }
   const Vector<uint32_t> permutation =
-      options->getPermutationOr(std::move(default_permutation));
-  if (permutation.size() != input_rank) {
+      options->getPermutationOr(CreateDefaultPermutation(input_rank));
+  auto validated_output = webnn::ValidateTransposeAndInferOutput(
+      ConvertToComponentOperand(input), permutation);
+  if (!validated_output.has_value()) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kDataError,
-        "The number of values in permutation must be the same as the rank "
-        "of the input tensor.");
+        String::FromUTF8(validated_output.error()));
     return nullptr;
   }
 
-  if (!ValidateAxes(permutation, input_rank, exception_state)) {
-    return nullptr;
-  }
-
-  Vector<uint32_t> output_shape(input_rank);
-  for (wtf_size_t i = 0; i < input_rank; ++i) {
-    output_shape[i] = input->Dimensions()[permutation[i]];
-  }
   auto* transpose = MakeGarbageCollected<MLOperator>(
       this, MLOperator::OperatorKind::kTranspose, options);
   // According to WebNN spec
   // https://www.w3.org/TR/webnn/#api-mlgraphbuilder-transpose, the output
   // tensor of transpose has the same type as its input.
   auto output = MLOperand::ValidateAndCreateOutput(
-      this, input->Type(), std::move(output_shape), transpose);
+      this, ComponentOperandTypeToBlink(validated_output->data_type),
+      Vector<uint32_t>(validated_output->dimensions), transpose);
   if (!output.has_value()) {
     exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
                                       output.error());

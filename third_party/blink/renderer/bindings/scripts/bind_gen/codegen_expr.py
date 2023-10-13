@@ -219,14 +219,23 @@ def expr_from_exposure(exposure,
 
     def ref_selected(features):
         feature_tokens = map(
-            lambda feature: "OriginTrialFeature::k{}".format(feature),
-            features)
+            lambda feature: "mojom::blink::OriginTrialFeature::k{}".format(
+                feature), features)
         return _Expr("${{feature_selector}}.IsAnyOf({})".format(
             ", ".join(feature_tokens)))
 
-    # [CrossOriginIsolated]
+    # [CrossOriginIsolated], [CrossOriginIsolatedOrRuntimeEnabled]
     if exposure.only_in_coi_contexts:
         cross_origin_isolated_term = _Expr("${is_cross_origin_isolated}")
+    elif exposure.only_in_coi_contexts_or_runtime_enabled_features:
+        cross_origin_isolated_term = expr_or([
+            _Expr("${is_cross_origin_isolated}"),
+            expr_or(
+                list(
+                    map(
+                        ref_enabled, exposure.
+                        only_in_coi_contexts_or_runtime_enabled_features)))
+        ])
     else:
         cross_origin_isolated_term = _Expr(True)
 

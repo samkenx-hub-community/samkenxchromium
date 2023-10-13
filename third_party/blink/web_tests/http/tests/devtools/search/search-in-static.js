@@ -8,11 +8,10 @@ import {SourcesTestRunner} from 'sources_test_runner';
 
 import * as Common from 'devtools/core/common/common.js';
 import * as BindingsModule from 'devtools/models/bindings/bindings.js';
+import * as TextUtils from 'devtools/models/text_utils/text_utils.js';
 
 (async function() {
   TestRunner.addResult(`Tests static content provider search.\n`);
-  await TestRunner.loadLegacyModule('console');
-  await TestRunner.loadLegacyModule('sources');
   await TestRunner.showPanel('sources');
 
   await TestRunner.addIframe('resources/search.html');
@@ -27,7 +26,7 @@ import * as BindingsModule from 'devtools/models/bindings/bindings.js';
   }
 
   async function step3() {
-    staticContentProvider = TextUtils.StaticContentProvider.fromString('', Common.ResourceType.resourceTypes.Script, resource.content);
+    staticContentProvider = TextUtils.StaticContentProvider.StaticContentProvider.fromString('', Common.ResourceType.resourceTypes.Script, resource.content);
     TestRunner.addResult(resource.url);
 
     var text = 'searchTestUniqueString';

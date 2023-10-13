@@ -12,8 +12,8 @@
 #include "base/values.h"
 #include "chrome/browser/web_applications/commands/web_app_command.h"
 #include "chrome/browser/web_applications/locks/shared_web_contents_with_app_lock.h"
+#include "chrome/browser/web_applications/proto/web_app.pb.h"
 #include "chrome/browser/web_applications/web_app_icon_manager.h"
-#include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "components/webapps/common/web_app_id.h"
 
@@ -21,13 +21,16 @@ namespace web_app {
 
 class WebAppIconDownloader;
 
+// Used by metrics.
 enum class GeneratedIconFixResult {
-  kAppUninstalled,
-  kShutdown,
-  kDownloadFailure,
-  kStillGenerated,
-  kWriteFailure,
-  kSuccess,
+  kAppUninstalled = 0,
+  kShutdown = 1,
+  kDownloadFailure = 2,
+  kStillGenerated = 3,
+  kWriteFailure = 4,
+  kSuccess = 5,
+
+  kMaxValue = kSuccess,
 };
 
 class GeneratedIconFixCommand
@@ -35,6 +38,7 @@ class GeneratedIconFixCommand
  public:
   explicit GeneratedIconFixCommand(
       webapps::AppId app_id,
+      GeneratedIconFixSource source,
       base::OnceCallback<void(GeneratedIconFixResult)> callback);
   ~GeneratedIconFixCommand() override;
 
@@ -53,6 +57,7 @@ class GeneratedIconFixCommand
   void Stop(GeneratedIconFixResult result, base::Location location);
 
   webapps::AppId app_id_;
+  GeneratedIconFixSource source_;
   base::OnceCallback<void(GeneratedIconFixResult)> callback_;
   SharedWebContentsWithAppLockDescription lock_description_;
   std::unique_ptr<SharedWebContentsWithAppLock> lock_;

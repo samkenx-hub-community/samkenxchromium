@@ -72,7 +72,8 @@ class ImportNotifier:
              issue,
              patchset,
              dry_run=True,
-             service_account_key_json=None):
+             service_account_key_json=None,
+             sheriff_email=None):
         """Files bug reports for new failures.
 
         Args:
@@ -94,6 +95,8 @@ class ImportNotifier:
         """
         gerrit_url = SHORT_GERRIT_PREFIX + issue
         gerrit_url_with_ps = gerrit_url + '/' + patchset + '/'
+
+        self.sheriff_email = sheriff_email
 
         changed_test_baselines = self.find_changed_baselines_of_tests(
             rebaselined_tests)
@@ -336,7 +339,11 @@ class ImportNotifier:
                              'was not added to the CC list.')
 
             # component could be None.
-            components = [metadata.component] if metadata.component else None
+            components = [metadata.monorail_component
+                          ] if metadata.monorail_component else None
+            buganizer_public_components = [
+                metadata.buganizer_public_component
+            ] if metadata.buganizer_public_component else None
 
             prologue = ('WPT import {} introduced new failures in {}:\n\n'
                         'List of new failures:\n'.format(
@@ -376,6 +383,10 @@ class ImportNotifier:
                                                    labels=['Test-WebTest'])
             _log.info(bug)
             _log.info("WPT-NOTIFY enabled in %s; adding the bug to the pending list." % full_directory)
+
+            # TODO(crbug.com/1487196): refactor this so we use a common issue which is converted later to
+            # buganizer or monorail specific issue.
+            bug.buganizer_public_components = buganizer_public_components
             bugs.append(bug)
         return bugs
 
@@ -454,13 +465,33 @@ class ImportNotifier:
             _log.warning(e)
 
         for index, bug in enumerate(bugs, start=1):
+            buganizer_component_id = BUGANIZER_WPT_COMPONENT
             if buganizer_api and USE_BUGANIZER:
-                buganizer_res = buganizer_api.NewIssue(
-                    title=bug.summary,
-                    description=bug.description,
-                    cc=bug.cc,
-                    status="New",
-                    componentId=BUGANIZER_WPT_COMPONENT)
+                if 'summary' not in bug.body:
+                    _log.warning('failed to file bug')
+                    _log.warning('summary missing from bug:')
+                    _log.warning(bug)
+                    continue
+                if 'description' not in bug.body:
+                    _log.warning('failed to file bug')
+                    _log.warning('description missing from bug:')
+                    _log.warning(bug)
+                    continue
+                title = bug.body['summary']
+                description = bug.body['description']
+                cc = bug.body.get('cc', []) + [self.sheriff_email]
+                if bug.buganizer_public_components:
+                    buganizer_component_id = bug.buganizer_public_components[0]
+                try:
+                    buganizer_res = buganizer_api.NewIssue(
+                        title=title,
+                        description=description,
+                        cc=cc,
+                        status="New",
+                        componentId=buganizer_component_id)
+                except Exception as e:
+                    _log.warning('buganizer api call to new issue failed')
+                    _log.warning(e)
             else:
                 # using monorail
                 response = api.insert_issue(bug)

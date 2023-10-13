@@ -124,10 +124,10 @@ void AllPasswordsBottomSheetController::OnCredentialSelected(
     if (password_manager_util::CanUseBiometricAuth(authenticator.get(),
                                                    client_)) {
       authenticator_ = std::move(authenticator);
-      authenticator_->Authenticate(
+      authenticator_->AuthenticateWithMessage(
+          u"",
           base::BindOnce(&AllPasswordsBottomSheetController::OnReauthCompleted,
-                         base::Unretained(this), password),
-          /*use_last_valid_auth=*/true);
+                         base::Unretained(this), password));
       return;
     }
 

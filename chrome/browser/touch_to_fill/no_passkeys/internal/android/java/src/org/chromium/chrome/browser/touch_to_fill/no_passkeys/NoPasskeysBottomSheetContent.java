@@ -5,12 +5,18 @@
 package org.chromium.chrome.browser.touch_to_fill.no_passkeys;
 
 import android.content.Context;
+import android.graphics.Typeface;
+import android.text.Spannable;
+import android.text.SpannableString;
+import android.text.style.StyleSpan;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
+import org.chromium.chrome.browser.password_manager.PasswordManagerResourceProviderFactory;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetContent;
 import org.chromium.ui.base.LocalizationUtils;
 
@@ -19,6 +25,7 @@ class NoPasskeysBottomSheetContent implements BottomSheetContent {
     private final Delegate mDelegate;
     private final Context mContext;
     private final String mOrigin;
+    private View mContentView;
 
     /** User actions delegated by this bottom sheet. */
     interface Delegate {
@@ -51,23 +58,39 @@ class NoPasskeysBottomSheetContent implements BottomSheetContent {
     private View createContentView() {
         View contentView =
                 LayoutInflater.from(mContext).inflate(R.layout.no_passkeys_bottom_sheet, null);
-        contentView.setLayoutDirection(LocalizationUtils.isLayoutRtl() ? View.LAYOUT_DIRECTION_RTL
-                                                                       : View.LAYOUT_DIRECTION_LTR);
-        contentView.findViewById(R.id.no_passkeys_ok_button)
+        contentView.setLayoutDirection(
+                LocalizationUtils.isLayoutRtl()
+                        ? View.LAYOUT_DIRECTION_RTL
+                        : View.LAYOUT_DIRECTION_LTR);
+        ImageView headerImage = contentView.findViewById(R.id.no_passkeys_sheet_header_image);
+        headerImage.setImageResource(
+                PasswordManagerResourceProviderFactory.create().getPasswordManagerIcon());
+        contentView
+                .findViewById(R.id.no_passkeys_ok_button)
                 .setOnClickListener(v -> mDelegate.onClickOk());
-        contentView.findViewById(R.id.no_passkeys_use_another_device_button)
+        contentView
+                .findViewById(R.id.no_passkeys_use_another_device_button)
                 .setOnClickListener(v -> mDelegate.onClickUseAnotherDevice());
 
-        // TODO(crbug/1481495): Make the origin a bold typeface.
+        String subtitleString = mContext.getString(R.string.no_passkeys_sheet_subtitle, mOrigin);
+
+        SpannableString spannable = new SpannableString(subtitleString);
+        int startIndex = subtitleString.indexOf(mOrigin);
+        spannable.setSpan(new StyleSpan(Typeface.BOLD), startIndex, startIndex + mOrigin.length(),
+                Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+
         TextView subtitle = contentView.findViewById(R.id.no_passkeys_sheet_subtitle);
-        subtitle.setText(mContext.getString(R.string.no_passkeys_sheet_subtitle, mOrigin));
+        subtitle.setText(spannable);
         return contentView;
     }
 
     // BottomSheetContent implementation:
     @Override
     public View getContentView() {
-        return createContentView();
+        if (mContentView == null) {
+            mContentView = createContentView();
+        }
+        return mContentView;
     }
 
     @Override

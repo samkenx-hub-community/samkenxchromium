@@ -8,10 +8,12 @@ load("@builtin//encoding.star", "json")
 load("@builtin//lib/gn.star", "gn")
 load("@builtin//struct.star", "module")
 load("./clang_code_coverage_wrapper.star", "clang_code_coverage_wrapper")
+load("./config.star", "config")
 load("./platform.star", "platform")
 load("./rewrapper_cfg.star", "rewrapper_cfg")
 
-__filegroups = {}
+def __filegroups(ctx):
+    return {}
 
 def __parse_rewrapper_cmdline(ctx, cmd):
     if not "rewrapper" in cmd.args[0]:
@@ -41,7 +43,7 @@ def __parse_rewrapper_cmdline(ctx, cmd):
     return cmd.args[wrapped_command_pos:], cfg_file, True
 
 # TODO(b/278225415): change gn so this wrapper (and by extension this handler) becomes unnecessary.
-def __rewrite_clang_code_coverage_wrapper(ctx, cmd):
+def __parse_clang_code_coverage_wrapper_cmdline(ctx, cmd):
     # Example command:
     #   python3
     #     ../../build/toolchain/clang_code_coverage_wrapper.py
@@ -78,33 +80,40 @@ def __rewrite_clang_code_coverage_wrapper(ctx, cmd):
         fail("couldn't find rewrapper cfg file in %s" % str(cmd.args))
     coverage_wrapper_command = cmd.args[:rewrapper_pos] + cmd.args[wrapped_command_pos:]
     clang_command = clang_code_coverage_wrapper.run(ctx, list(coverage_wrapper_command))
-
-    ctx.actions.fix(
-        args = clang_command,
-        reproxy_config = json.encode(rewrapper_cfg.parse(ctx, cfg_file)),
-    )
+    return clang_command, cfg_file
 
 def __rewrite_rewrapper(ctx, cmd):
     # If clang-coverage, needs different handling.
     if len(cmd.args) > 2 and "clang_code_coverage_wrapper.py" in cmd.args[1]:
-        __rewrite_clang_code_coverage_wrapper(ctx, cmd)
-        return
-
-    # Below is handling for generic rewrapper.
-    args, cfg_file, wrapped = __parse_rewrapper_cmdline(ctx, cmd)
-    if not wrapped:
-        return
+        args, cfg_file = __parse_clang_code_coverage_wrapper_cmdline(ctx, cmd)
+    else:
+        # handling for generic rewrapper.
+        args, cfg_file, wrapped = __parse_rewrapper_cmdline(ctx, cmd)
+        if not wrapped:
+            print("command doesn't have rewrapper. %s" % str(cmd.args))
+            return
     if not cfg_file:
         fail("couldn't find rewrapper cfg file in %s" % str(cmd.args))
+    reproxy_config = rewrapper_cfg.parse(ctx, cfg_file)
+    if cmd.outputs[0] == ctx.fs.canonpath("./obj/third_party/abseil-cpp/absl/functional/any_invocable_test/any_invocable_test.o"):
+        # need longer timeout for any_invocable_test.o crbug.com/1484474
+        reproxy_config.update({
+            "exec_timeout": "4m",
+        })
     ctx.actions.fix(
         args = args,
-        reproxy_config = json.encode(rewrapper_cfg.parse(ctx, cfg_file)),
+        reproxy_config = json.encode(reproxy_config),
     )
 
 def __strip_rewrapper(ctx, cmd):
-    args, _, wrapped = __parse_rewrapper_cmdline(ctx, cmd)
-    if not wrapped:
-        return
+    # If clang-coverage, needs different handling.
+    if len(cmd.args) > 2 and "clang_code_coverage_wrapper.py" in cmd.args[1]:
+        args, _ = __parse_clang_code_coverage_wrapper_cmdline(ctx, cmd)
+    else:
+        args, _, wrapped = __parse_rewrapper_cmdline(ctx, cmd)
+        if not wrapped:
+            print("command doesn't have rewrapper. %s" % str(cmd.args))
+            return
     ctx.actions.fix(args = args)
 
 def __rewrite_action_remote_py(ctx, cmd):
@@ -156,7 +165,7 @@ __handlers = {
 
 def __use_remoteexec(ctx):
     if "args.gn" in ctx.metadata:
-        gn_args = gn.parse_args(ctx.metadata["args.gn"])
+        gn_args = gn.args(ctx)
         if gn_args.get("use_remoteexec") == "true":
             return True
     return False
@@ -187,6 +196,14 @@ def __step_config(ctx, step_config):
         },
     ]
 
+    # Disable racing on builders since bots don't have many CPU cores.
+    # TODO: b/297807325 - Siso wants to handle local execution.
+    # However, Reclient's alerts require racing and local fallback to be
+    # done on Reproxy side.
+    exec_strategy = "racing"
+    if config.get(ctx, "builder"):
+        exec_strategy = "remote_local_fallback"
+
     for rule in step_config["rules"]:
         # Replace nacl-clang/clang++ rules without command_prefix, because they will incorrectly match rewrapper.
         # Replace the original step rule with one that only rewrites rewrapper and convert its rewrapper config to reproxy config.
@@ -206,6 +223,15 @@ def __step_config(ctx, step_config):
         if rule["name"].startswith("clang/") or rule["name"].startswith("clang-cl/"):
             if not rule.get("action"):
                 fail("clang rule %s found without action" % rule["name"])
+
+            # TODO(b/294160948): reclient doesn't work well with cros wrapper symlink tricks.
+            cros_rule = {
+                "name": rule["name"] + "/cros",
+                "action": rule["action"],
+                "command_prefix": "../../build/cros_cache/",
+                "use_remote_exec_wrapper": True,
+            }
+            new_rules.append(cros_rule)
             new_rule = {
                 "name": rule["name"],
                 "action": rule["action"],
@@ -237,12 +263,10 @@ def __step_config(ctx, step_config):
             "platform": p,
             "labels": {
                 "type": "tool",
+                "siso_rule": rule["name"],
             },
             "canonicalize_working_dir": rule.get("canonicalize_dir", False),
-            # TODO: b/297807325 - Siso wants to handle local execution. However,
-            # Reclient's CompileErrorRatioAlert requires local fallback to be
-            # done on Reproxy side.
-            "exec_strategy": "remote_local_fallback",
+            "exec_strategy": exec_strategy,
             "exec_timeout": rule.get("timeout", "10m"),
             "reclient_timeout": rule.get("timeout", "10m"),
             "download_outputs": True,

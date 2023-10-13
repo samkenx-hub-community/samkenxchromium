@@ -82,6 +82,8 @@ constexpr webui::LocalizedString kLocalizedStringsWithoutPlaceholders[] = {
     {"scanQrCodeInputError",
      IDS_CELLULAR_SETUP_ESIM_PAGE_SCAN_QR_CODE_INPUT_ERROR},
     {"profileListPageMessage", IDS_CELLULAR_SETUP_PROFILE_LIST_PAGE_MESSAGE},
+    {"profileListPageMessageWithLink",
+     IDS_CELLULAR_SETUP_PROFILE_LIST_PAGE_MESSAGE_WITH_LINK},
     {"confirmationCodeMessage",
      IDS_CELLULAR_SETUP_ESIM_PAGE_CONFIRMATION_CODE_MESSAGE},
     {"confirmationCodeInput",
@@ -99,7 +101,14 @@ constexpr webui::LocalizedString kLocalizedStringsWithoutPlaceholders[] = {
     {"profileDiscoveryConsentScan",
      IDS_CELLULAR_SETUP_ESIM_PAGE_PROFILE_DISCOVERY_CONSENT_SCAN},
     {"profileDiscoveryConsentCancel",
-     IDS_CELLULAR_SETUP_ESIM_PAGE_PROFILE_DISCOVERY_CONSENT_CANCEL}};
+     IDS_CELLULAR_SETUP_ESIM_PAGE_PROFILE_DISCOVERY_CONSENT_CANCEL},
+    {"profileDiscoveryPageTitle",
+     IDS_CELLULAR_SETUP_PROFILE_DISCOVERY_PAGE_TITLE},
+    {"confimationCodePageTitle",
+     IDS_CELLULAR_SETUP_CONFIRMATION_CODE_PAGE_TITLE},
+    {"profileLoadingPageTitle", IDS_CELLULAR_SETUP_ESIM_PROFILE_LOADING_TITLE},
+    {"profileLoadingPageMessage",
+     IDS_CELLULAR_SETUP_ESIM_PROFILE_LOADING_MESSAGE}};
 
 struct NamedBoolean {
   const char* name;

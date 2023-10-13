@@ -24,6 +24,7 @@
 <translation id="1154390310959620237">உங்களால் 5 ஷார்ட்கட்களை மட்டுமே பிரத்தியேகமாக்க முடியும். புதியதைச் சேர்க்க ஏற்கெனவே இருக்கும் ஷார்ட்கட்டை நீக்கவும்.</translation>
 <translation id="1164939766849482256">டான் டூ டார்க் ஸ்கிரீன் சேவர்</translation>
 <translation id="1167755866710282443">விசைகளைப் பிரத்தியேகமாக்க மெனுவைத் திறக்கவும். நகர்த்த மெனுவை இழுக்கவும்.</translation>
+<translation id="1174073918202301297">”Shortcut added to”</translation>
 <translation id="1175697296044146566">இந்த <ph name="DEVICE_TYPE" /> சாதனத்தை <ph name="MANAGER" /> நிர்வகிக்கிறது.</translation>
 <translation id="1175951029573070619">சுமாராக உள்ளது (<ph name="SIGNAL_STRENGTH" />)</translation>
 <translation id="1181037720776840403">அகற்று</translation>
@@ -91,6 +92,7 @@
 <translation id="1643449475550628585">வால்பேப்பர் படத்தைத் தினமும் மாற்றும்</translation>
 <translation id="1644574205037202324">இதுவரை பார்த்தவை</translation>
 <translation id="1651925268237749928">பகிர்ந்த ஆல்பத்தைத் தேர்ந்தெடுத்துள்ளீர்கள். படங்களைப் பிறர் சேர்க்கலாம் மாற்றலாம். இந்த ஆல்பத்தில் தற்போது இல்லாத படங்களை உங்கள் வால்பேப்பர் பயன்படுத்தக்கூடும்.</translation>
+<translation id="1661865805917886535">சில கணக்கு மற்றும் சிஸ்டம் தகவல்கள் Googleளுக்கு அனுப்பப்படக்கூடும். தொழில்நுட்பக் கோளாறுகளைச் சரிசெய்யவும் எங்கள் சேவைகளை மேம்படுத்தவும் எங்கள் தனியுரிமைக் கொள்கை (<ph name="PRIVACYPOLICYURL" />), சேவை விதிமுறைகள் (<ph name="TERMSOFSERVICEURL" />) ஆகியவற்றுக்கு உட்பட்டு இந்தத் தகவல்களைப் பயன்படுத்துவோம். உள்ளடக்கத்தில் மாற்றங்களைச் செய்ய, சட்ட உதவிப் பக்கத்திற்கு (<ph name="LEGALHELPPAGEURL" />) செல்லவும்.</translation>
 <translation id="1662989795263954667">பிரிண்டரில் மை தீர்ந்துவிட்டதால் அச்சிட முடியவில்லை</translation>
 <translation id="1664796644829245314"><ph name="PREVIEW_OBJECT" /> இன் மாதிரிக்காட்சியைக் காட்டும்</translation>
 <translation id="1668469839109562275">உள்ளமைந்த VPN</translation>
@@ -117,6 +119,7 @@
 <translation id="1768959921651994223">அங்கீகரிப்பு வகை</translation>
 <translation id="1776228893584526149">வால்பேப்பர் நிறம்</translation>
 <translation id="1782199038061388045">மொழிபெயர்ப்பு</translation>
+<translation id="1788485524395674731">உங்கள் நிர்வாகி இந்த ஆப்ஸை நிர்வகிக்கிறார்</translation>
 <translation id="1792647875738159689">ஸ்கேன் செய்வதை ரத்துசெய்கிறது</translation>
 <translation id="1801418420130173017">டார்க் தீமினை முடக்குதல்</translation>
 <translation id="1807246157184219062">வெளிச்சம்</translation>
@@ -131,7 +134,6 @@
 <translation id="1871569928317311284">டார்க் தீமினை முடக்குதல்</translation>
 <translation id="1874612839560830905">MTU</translation>
 <translation id="188114911237521550">டார்க் பயன்முறையை முடக்குதல்</translation>
-<translation id="1881188606372070653">சட்டப்பூர்வக் காரணங்களுக்காக உள்ளடக்க மாற்றங்களைக் கோர, <ph name="BEGIN_LINK1" />சட்டப்பூர்வ உதவிப் பக்கத்திற்குச்<ph name="END_LINK1" /> செல்லவும். சில கணக்கு மற்றும் சிஸ்டம் தகவல்கள் Googleளுக்கு அனுப்பப்படக்கூடும். தொழில்நுட்பச் சிக்கல்களைச் சரிசெய்யவும் எங்கள் சேவைகளை மேம்படுத்தவும் நீங்கள் அளிக்கும் தகவல்களை எங்கள் <ph name="BEGIN_LINK2" />தனியுரிமைக் கொள்கை<ph name="END_LINK2" />, <ph name="BEGIN_LINK3" />சேவை விதிமுறைகள்<ph name="END_LINK3" /> ஆகியவற்றுக்கு உட்பட்டுப் பயன்படுத்துவோம்.</translation>
 <translation id="1885577615937958993">மீடியாவை முன்னோக்கி நகர்த்துவதற்கான ஐகான்</translation>
 <translation id="1887850431809612466">வன்பொருள் பதிப்பு</translation>
 <translation id="1897672602657312171">தேடல் விசை இல்லாத ஷார்ட்கட், சில ஆப்ஸின் ஷார்ட்கட் உடன் முரண்படக்கூடும். இந்த ஷார்ட்கட்டைத் தொடர்ந்து பயன்படுத்த, அதை மீண்டும் அழுத்தவும் அல்லது தேடல் விசையைப் பயன்படுத்தி புதிய ஷார்ட்கட்டை அழுத்தவும்.</translation>
@@ -212,6 +214,7 @@
 <translation id="2505327257735685095">தற்போதைய வால்பேப்பர் படத்தை ரெஃப்ரெஷ் செய்யும்</translation>
 <translation id="2512979179176933762">சாளரங்களைக் காட்டுவதற்கான ஐகான்</translation>
 <translation id="2513396635448525189">உள்நுழைவுப் படம்</translation>
+<translation id="2515109918609218604">ஷார்ட்கட் இல்லை. ஃபங்க்ஷன் மற்றும் தேடல் பட்டன்களைப் பயன்படுத்தாமல் புதிய ஷார்ட்கட்டை அழுத்தவும்.</translation>
 <translation id="2517472476991765520">ஸ்கேன்</translation>
 <translation id="2521835766824839541">முந்தைய டிராக் ஐகான்</translation>
 <translation id="2526590354069164005">டெஸ்க்டாப்</translation>
@@ -265,6 +268,7 @@
 <translation id="3122464029669770682">CPU</translation>
 <translation id="3124039320086536031">சாதனம் இணைக்கப்பட்டுள்ளது.</translation>
 <translation id="3127341325625468058">{PAGE_NUMBER,plural, =0{பக்கத்தை அகற்றவா?}=1{{PAGE_NUMBER}வது பக்கத்தை அகற்றவா?}other{{PAGE_NUMBER}வது பக்கத்தை அகற்றவா?}}</translation>
+<translation id="3146655726035122603"><ph name="PRODUCT_NAME" /> சாதனத்திற்குப் பிரத்தியேகமானவை</translation>
 <translation id="315116470104423982">மொபைல் டேட்டா</translation>
 <translation id="3156846309055100599"><ph name="PAGE_NUMBER" />வது பக்கம் ஸ்கேன் செய்யப்படுகிறது...</translation>
 <translation id="315738237743207937">கேப்டிவ் போர்டல் கண்டறியப்பட்டது</translation>
@@ -280,7 +284,6 @@
 <translation id="3226405216343213872">ஸ்கேனர்களைத் தேடுகிறது</translation>
 <translation id="3226657629376379887">தளவமைப்புகளுக்கான செயல்பாட்டு மெனு</translation>
 <translation id="3246869037381808805">1 நாளுக்கும் முன்னதாக உள்ள பிரிண்ட்டிங் பணிகள் அகற்றப்படும்</translation>
-<translation id="3248223063252096240"><ph name="PRODUCT_NAME" /> இன் பிரத்தியேக வீடியோக்கள்</translation>
 <translation id="3268178239013324452">பிரிண்டரின் மூடி திறந்துள்ளதால் அச்சிட முடியவில்லை</translation>
 <translation id="3275729367986477355">தோற்றப் படம்</translation>
 <translation id="3283504360622356314">{0,plural, =1{ஃபைலைத் திருத்துக}other{ஃபைல்களைத் திருத்துக}}</translation>
@@ -480,6 +483,7 @@
 <translation id="4793756956024303490">சுருக்குதல் அல்காரிதம்</translation>
 <translation id="4794140124556169553">CPU பரிசோதனையை இயக்குவதால் உங்கள் சிஸ்டத்தின் செயல்திறன் பாதிக்கப்படக்கூடும்</translation>
 <translation id="4798078634453489142">புதிய APNனைச் சேர்க்க ஒரு APNனை அகற்றவும்</translation>
+<translation id="479989351350248267">தேடல்</translation>
 <translation id="4800589996161293643">Chromebook சமூகம்</translation>
 <translation id="4803391892369051319">IPv4</translation>
 <translation id="4808449224298348341"><ph name="DOCUMENT_TITLE" /> அச்சுப் பணி ரத்துசெய்யப்பட்டது</translation>
@@ -623,6 +627,7 @@
 <translation id="584953448295717128">APN தானாகவே கண்டறியப்பட்டது.</translation>
 <translation id="5849570051105887917">உள்நாட்டு மொபைல் சேவை வழங்குநர் குறியீடு</translation>
 <translation id="5859603669299126575">ஆர்ட் கேலரி ஆல்பம்</translation>
+<translation id="5859969039821714932">ஷார்ட்கட் இல்லை. <ph name="KEY" /> பட்டனை அழுத்தாமல் புதிய ஷார்ட்கட்டை அழுத்தவும்.</translation>
 <translation id="5860033963881614850">ஆஃப்</translation>
 <translation id="5860491529813859533">இயக்கு</translation>
 <translation id="5876385649737594562">விருப்பங்களைத் தேர்ந்தெடுக்க ஆன் செய்யவும்</translation>
@@ -688,6 +693,7 @@
 <translation id="6318437367327684789">எப்போதும்</translation>
 <translation id="6319207335391420837"><ph name="DEVICE_NAME" /> இல் நிலைபொருளைப் புதுப்பியுங்கள்</translation>
 <translation id="6321407676395378991">ஸ்கிரீன் சேவரை இயக்குதல்</translation>
+<translation id="6324916366299863871">ஷார்ட்கட்டைத் திருத்து</translation>
 <translation id="6325525973963619867">தோல்வி</translation>
 <translation id="6331191339300272798">தானியங்கு டார்க் தீம்</translation>
 <translation id="6340526405444716530">பிரத்தியேகமாக்குதல்</translation>
@@ -787,6 +793,7 @@
 <translation id="7103252855940681301"><ph name="COUNT" /> சாதனங்களில் <ph name="INDEX" />வது சாதனத்தின் பெயர் <ph name="NAME" />.</translation>
 <translation id="7107255225945990211"><ph name="PRODUCT_NAME" /> பிரத்தியேக ஆர்ட்வொர்க்கைத் தேர்வுசெய்யும்</translation>
 <translation id="7108668606237948702">உள்ளிடு</translation>
+<translation id="7119389851461848805">பவர்</translation>
 <translation id="7130438335435247835">ஆக்சஸ் பாயிண்ட் நேம் (APN)</translation>
 <translation id="7134436342991564651">{0,plural, =1{நேம் சர்வர்}other{நேம் சர்வர்கள்}}</translation>
 <translation id="7135814714616751706">ஷார்ட்கட்களைத் தேடுக</translation>
@@ -827,6 +834,7 @@
 <translation id="7375053625150546623">EAP</translation>
 <translation id="7388959671917308825">உள்ளமைந்த டச்பேட்</translation>
 <translation id="7397270852490618635">லைட் தீமினை முடக்குதல்</translation>
+<translation id="7401543881546089382">ஷார்ட்கட்டை அகற்றவும்</translation>
 <translation id="741244894080940828">கன்வெர்ஷன்</translation>
 <translation id="7415801143053185905">HTTP கோரிக்கைகள் மிகவும் அதிக நேரம் எடுத்துக்கொள்கின்றன</translation>
 <translation id="7425178841057519191">{NUM_ROOL_APPS,plural,offset:2 =1{ஒவ்வொருமுறை நீங்கள் உள்நுழையும்போதும் <ph name="APP_NAME_1" /> ஆப்ஸ் தானாகத் தொடங்கும் வகையில் நிர்வாகி அமைத்துள்ளார்.}=2{ஒவ்வொருமுறை நீங்கள் உள்நுழையும்போதும் <ph name="APP_NAME_1" />,<ph name="APP_NAME_2" /> ஆகியவை தானாகத் தொடங்கும் வகையில் நிர்வாகி அமைத்துள்ளார்.}=3{ஒவ்வொருமுறை நீங்கள் உள்நுழையும்போதும் <ph name="APP_NAME_1" />, <ph name="APP_NAME_2" />, <ph name="APP_NAME_3" /> ஆகியவை தானாகத் தொடங்கும் வகையில் நிர்வாகி அமைத்துள்ளார்.}other{ஒவ்வொருமுறை நீங்கள் உள்நுழையும்போதும் <ph name="APP_NAME_1" />, <ph name="APP_NAME_2" /> மற்றும் # பிற ஆப்ஸ் தானாகத் தொடங்கும் வகையில் நிர்வாகி அமைத்துள்ளார்.}}</translation>
@@ -865,6 +873,7 @@
 <translation id="7705524343798198388">VPN</translation>
 <translation id="7716280709122323042">WPA3</translation>
 <translation id="7718231387947923843">கீபோர்டு ஒளி</translation>
+<translation id="7730077286107534951">கணக்கு மற்றும் சிஸ்டம் தகவல்கள் சில Googleளுக்கு அனுப்பப்படலாம். தொழில்நுட்பக் கோளாறுகளைச் சரிசெய்வதற்காகவும் எங்கள் சேவைகளை மேம்படுத்துவதற்காகவும் எங்கள் <ph name="BEGIN_LINK2" />தனியுரிமைக் கொள்கைக்கும்<ph name="END_LINK2" /> <ph name="BEGIN_LINK3" />சேவை விதிமுறைகளுக்கும்<ph name="END_LINK3" /> உட்பட்டு இவற்றைப் பயன்படுத்துவோம். சட்டப்பூர்வக் காரணங்களுக்காக உள்ளடக்க மாற்றங்களைக் கேட்க, <ph name="BEGIN_LINK1" />சட்டப்பூர்வ உதவிப் பக்கத்திற்குச்<ph name="END_LINK1" /> செல்லவும்.</translation>
 <translation id="773153675489693198">சுழற்சியின் எண்ணிக்கை</translation>
 <translation id="7747039790905080783">முன்பே பகிரப்பட்ட குறியீடு</translation>
 <translation id="7752963721013053477">டான் டூ டார்க் - பிரத்தியேகமானது</translation>
@@ -901,6 +910,7 @@
 <translation id="7978412674231730200">தனிப்பட்ட விசை</translation>
 <translation id="7994702968232966508">EAP முறை</translation>
 <translation id="8004582292198964060">உலாவி</translation>
+<translation id="8017679124341497925">ஷார்ட்கட் திருத்தப்பட்டது</translation>
 <translation id="802154636333426148">பதிவிறக்க முடியவில்லை</translation>
 <translation id="8031884997696620457">HSPAPlus</translation>
 <translation id="80398733265834479">தன்னியக்க வண்ணப் பயன்முறையை இயக்கும்</translation>
@@ -941,6 +951,7 @@
 <translation id="8336739000755212683">சாதனக் கணக்கின் படத்தை மாற்றவும்</translation>
 <translation id="8347126826554447157"><ph name="SHORCTCUT1" /> அல்லது <ph name="SHORCTCUT2" /></translation>
 <translation id="8347227221149377169">அச்சுப் பணிகள்</translation>
+<translation id="8349826889576450703">தொடக்கி</translation>
 <translation id="8351855506390808906">டச் பாயிண்ட் பட்டன் ஒதுக்கீடு</translation>
 <translation id="8352772353338965963">பல உள்நுழைவுக்குக் கணக்கைச் சேர்க்கவும். உள்நுழைந்த அனைத்து கணக்குகளையும் கடவுச்சொல் இல்லாமலே அணுகலாம் என்பதால் இந்த அம்சத்தை நம்பகமான கணக்குகளுடன் மட்டுமே பயன்படுத்த வேண்டும்.</translation>
 <translation id="8364946094152050673">பெயர் சேவையகங்கள் காலியாக உள்ளன</translation>
@@ -1036,6 +1047,7 @@
 <translation id="8998156756248178381">{NUM_ROOL_APPS,plural, =1{<ph name="APP_NAME_1" /> ஆப்ஸ் தானாகத் தொடங்கப்பட்டது}other{# ஆப்ஸ் தானாகத் தொடங்கப்பட்டன}}</translation>
 <translation id="8998289560386111590">உங்கள் சாதனத்தில் இல்லை</translation>
 <translation id="9003704114456258138">அதிர்வெண்</translation>
+<translation id="901834265349196618">மின்னஞ்சல்</translation>
 <translation id="9024331582947483881">முழுத்திரை</translation>
 <translation id="9025198690966128418">தனிப்பட்ட சாதனமாகப் பயன்படுத்து</translation>
 <translation id="902638246363752736">கீபோர்டு அமைப்புகள்</translation>
@@ -1076,6 +1088,7 @@
 <translation id="945522503751344254">கருத்தை அனுப்பு</translation>
 <translation id="952992212772159698">செயலாக்கப்படவில்லை</translation>
 <translation id="960719561871045870">ஆபரேட்டர் குறியீடு</translation>
+<translation id="966787709310836684">மெனு</translation>
 <translation id="979450713603643090">வெளிர் இளஞ்சிவப்பு</translation>
 <translation id="982713511914535780">டிஸ்சார்ஜ் சோதனையை இயக்கு</translation>
 <translation id="987264212798334818">பொது</translation>
